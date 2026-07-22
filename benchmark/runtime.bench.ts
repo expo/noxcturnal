@@ -42,6 +42,29 @@ bench('static JavaScript visitor transform', () => {
   transform(source, 'benchmark.js', visitorPipeline);
 });
 
+const rejectedIdentifierPipeline = defineNativePipeline({
+  apiVersion: 2,
+  phases: [
+    {
+      name: 'visit',
+      plugins: [
+        defineNativePlugin({
+          name: 'rejected-identifiers',
+          apiVersion: 2,
+          prepare: () => ({
+            controlFlow: [],
+            where: { Identifier: { name: { equals: '__never__' } } },
+          }),
+          visitor: { Identifier() {} },
+        }),
+      ],
+    },
+  ],
+});
+bench('native Identifier predicate with 0% selectivity', () => {
+  transform(source, 'benchmark.js', rejectedIdentifierPipeline);
+});
+
 const rejectedDeclarationPipeline = defineNativePipeline({
   apiVersion: 2,
   phases: [

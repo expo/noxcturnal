@@ -11,7 +11,7 @@ import {
   decodeEventBatch,
   decodePackedEnvelope,
   decodeRoutedEnvelope,
-  forEachRoutedEvent,
+  dispatchRoutedEvents,
   packEdits,
   packFieldRequests,
   packRouteManifest,
@@ -1873,7 +1873,7 @@ function createDispatcher(
     context: PluginContext,
     override?: Visitor<any>,
     overrideState?: any,
-    routedCallbacks: Handler<any>[] = [],
+    routedCallbacks: readonly Handler<any>[] = [],
   ) => {
     const delivered = override ? undefined : entry.delivered;
     const deliveryKey = delivered ? event.id * 2 + Number(event.side === 'exit') : 0;
@@ -1885,6 +1885,11 @@ function createDispatcher(
       : (entry.pathRuntime ??= createPathRuntime(plugin, entry, context));
     const path = makePath(runtime, event);
     currentSequence = event.sequence;
+    if (routedCallbacks.length === 1) {
+      routedCallbacks[0](path, override ? overrideState : entry.state);
+      delivered?.add(deliveryKey);
+      return;
+    }
     for (const callback of routedCallbacks) {
       callback(path, override ? overrideState : entry.state);
       delivered?.add(deliveryKey);
@@ -1904,31 +1909,13 @@ function createDispatcher(
       stopped: false,
       skipped: undefined,
     };
-    forEachRoutedEvent(routedBatch, (routeIds, event) => {
-      if (event.side === 'enter') {
-        for (let index = 0; index < routeIds.length; index++)
-          dispatchOne(
-            event,
-            synthetic,
-            entry,
-            context,
-            visitor,
-            state,
-            compiled.callbacks[routeIds[index]] as Handler<any>[],
-          );
-      } else {
-        for (let index = routeIds.length - 1; index >= 0; index--)
-          dispatchOne(
-            event,
-            synthetic,
-            entry,
-            context,
-            visitor,
-            state,
-            compiled.callbacks[routeIds[index]] as Handler<any>[],
-          );
-      }
-    });
+    dispatchRoutedEvents(
+      routedBatch,
+      compiled.callbacks.map(
+        callbacks => (event: NativeEvent) =>
+          dispatchOne(event, synthetic, entry, context, visitor, state, callbacks),
+      ),
+    );
   };
   const followupRouteCache = new Map<
     string,
@@ -1960,11 +1947,11 @@ function createDispatcher(
     }
     if (followup.routes.length === 0) return;
     const routed = session.nextRoutedPacked(followup.manifest, root);
-    forEachRoutedEvent(routed, (routeIds, event) => {
-      if (!filter(event)) return;
-      if (event.side === 'enter') {
-        for (let index = 0; index < routeIds.length; index++) {
-          const route = followup!.routes[routeIds[index]];
+    const accepted = new WeakSet<NativeEvent>();
+    dispatchRoutedEvents(
+      routed,
+      followup.routes.map(route => (event: NativeEvent) => {
+        if (accepted.has(event))
           dispatchOne(
             event,
             plugin,
@@ -1974,22 +1961,11 @@ function createDispatcher(
             undefined,
             route.callbacks as Handler<any>[],
           );
-        }
-      } else {
-        for (let index = routeIds.length - 1; index >= 0; index--) {
-          const route = followup!.routes[routeIds[index]];
-          dispatchOne(
-            event,
-            plugin,
-            entry,
-            context,
-            undefined,
-            undefined,
-            route.callbacks as Handler<any>[],
-          );
-        }
-      }
-    });
+      }),
+      event => {
+        if (filter(event)) accepted.add(event);
+      },
+    );
   };
   const routedThunks = compiledRoutes.map(route => {
     const entry = contexts.get(route.plugin)!;
@@ -2004,31 +1980,23 @@ function createDispatcher(
           undefined,
           route.callbacks as Handler<any>[],
         );
+    const callback = route.callbacks.length === 1 ? route.callbacks[0] : undefined;
     return (event: NativeEvent) => {
       const runtime = (entry.pathRuntime ??= createPathRuntime(route.plugin, entry, entry.context));
       const path = makePath(runtime, event);
       currentSequence = event.sequence;
-      for (const callback of route.callbacks) {
-        callback(path, entry.state);
-      }
+      if (callback) callback(path, entry.state);
+      else for (const routeCallback of route.callbacks) routeCallback(path, entry.state);
     };
   });
   return {
     contexts,
     run() {
-      forEachRoutedEvent(batch, (routeIds, event) => {
-        if (cacheEvents) session.cacheEvent(event);
-        if (event.side === 'enter') {
-          for (let index = 0; index < routeIds.length; index++) {
-            const routeId = routeIds[index];
-            routedThunks![routeId](event);
-          }
-        } else {
-          for (let index = routeIds.length - 1; index >= 0; index--) {
-            routedThunks![routeIds[index]](event);
-          }
-        }
-      });
+      dispatchRoutedEvents(
+        batch,
+        routedThunks!,
+        cacheEvents ? event => session.cacheEvent(event) : undefined,
+      );
     },
   };
 }

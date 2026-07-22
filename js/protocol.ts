@@ -9,7 +9,6 @@ export interface PackedEventBatch {
   includeParent?: boolean;
   includeScope?: boolean;
   includeExit?: boolean;
-  cachedEvents?: readonly NativeEvent[];
 }
 
 const EDIT_KINDS: Record<EditCommand['kind'], number> = {
@@ -173,9 +172,15 @@ export function decodeRoutedEnvelope(buffer: Buffer): RoutedEventBatch {
   };
 }
 
-export function forEachRoutedEvent(
+/** Decode a routed tape directly into its precompiled handlers.
+ *
+ * This hot path does not allocate a route subarray or invoke an intermediate
+ * JavaScript callback for every node record.
+ */
+export function dispatchRoutedEvents(
   batch: RoutedEventBatch,
-  callback: (routeIds: ArrayLike<number>, event: NativeEvent) => void,
+  handlers: readonly ((event: NativeEvent) => void)[],
+  onEvent?: (event: NativeEvent) => void,
 ): void {
   const words = new Uint32Array(
     batch.data.buffer,
@@ -189,11 +194,18 @@ export function forEachRoutedEvent(
     if ((sequenceWord & DYNAMIC_TAG) !== 0) {
       const id = words[offset++];
       const routeCount = words[offset++];
-      const routes = words.subarray(offset, offset + routeCount);
+      const routeStart = offset;
       offset += routeCount;
       const enter = enterEvents[id];
       if (!enter) throw new Error(`routed exit event ${id} has no enter record`);
-      callback(routes, { ...enter, sequence: sequenceWord & TAG_INDEX, side: 'exit' });
+      const event: NativeEvent = {
+        ...enter,
+        sequence: sequenceWord & TAG_INDEX,
+        side: 'exit',
+      };
+      onEvent?.(event);
+      for (let index = routeStart + routeCount - 1; index >= routeStart; index--)
+        handlers[words[index]](event);
       continue;
     }
     const sequence = sequenceWord;
@@ -207,23 +219,6 @@ export function forEachRoutedEvent(
     const scopeId = batch.includeScope ? words[offset++] : 0;
     const scopeParentId = batch.includeScope ? words[offset++] : MISSING_VALUE;
     const fieldCount = words[offset++];
-    const fields =
-      fieldCount === 0 ? EMPTY_FIELDS : new Array<NativeEvent['fields'][number]>(fieldCount);
-    for (let field = 0; field < fieldCount; field++) {
-      const key = FIELD_KEYS[words[offset++]];
-      if (!key) throw new Error('invalid routed field key');
-      const value = decodeValue(words[offset++], batch.strings);
-      fields[field] = {
-        key,
-        value:
-          typeof value === 'string' && (key !== 'value' || type !== 'StringLiteral')
-            ? parseScalar(value)
-            : value,
-      };
-    }
-    const routeCount = words[offset++];
-    const routes = words.subarray(offset, offset + routeCount);
-    offset += routeCount;
     const event: NativeEvent = {
       sequence,
       side: 'enter',
@@ -235,10 +230,25 @@ export function forEachRoutedEvent(
       parentType: parentTypeId === MISSING_VALUE ? undefined : NODE_TYPES[parentTypeId],
       scopeId,
       scopeParentId: scopeParentId === MISSING_VALUE ? undefined : scopeParentId,
-      fields,
+      fields: EMPTY_FIELDS,
     };
+    const node = event as NativeEvent & Record<string, unknown>;
+    for (let field = 0; field < fieldCount; field++) {
+      const key = FIELD_KEYS[words[offset++]];
+      if (!key) throw new Error('invalid routed field key');
+      const value = decodeValue(words[offset++], batch.strings);
+      node[key] =
+        typeof value === 'string' && (key !== 'value' || type !== 'StringLiteral')
+          ? parseScalar(value)
+          : value;
+    }
+    const routeCount = words[offset++];
+    const routeStart = offset;
+    offset += routeCount;
     enterEvents[id] = event;
-    callback(routes, event);
+    onEvent?.(event);
+    for (let index = routeStart; index < routeStart + routeCount; index++)
+      handlers[words[index]](event);
   }
   if (offset !== words.length) throw new Error('trailing routed tape words');
 }
@@ -247,75 +257,6 @@ function requiredId(map: ReadonlyMap<string, number>, value: string, kind: strin
   const id = map.get(value);
   if (id == null) throw new Error(`unknown routed ${kind}: ${value}`);
   return id;
-}
-
-export function forEachDispatchEvent(
-  batch: PackedEventBatch,
-  callback: (event: NativeEvent) => void,
-): void {
-  if (batch.cachedEvents) {
-    for (const event of batch.cachedEvents) callback(event);
-    return;
-  }
-  const words = new Uint32Array(
-    batch.data.buffer,
-    batch.data.byteOffset,
-    batch.data.byteLength / 4,
-  );
-  const enterEvents: (NativeEvent | undefined)[] | null = batch.includeExit === false ? null : [];
-  const decodedEvents = new Array<NativeEvent>(batch.emittedCount);
-  let offset = 0;
-  for (let index = 0; index < batch.emittedCount; index++) {
-    const sequenceWord = words[offset++];
-    if ((sequenceWord & DYNAMIC_TAG) !== 0) {
-      const id = words[offset++];
-      const enter = enterEvents?.[id];
-      if (!enter) throw new Error(`packed exit event ${id} has no preceding enter event`);
-      const event: NativeEvent = { ...enter, sequence: sequenceWord & TAG_INDEX, side: 'exit' };
-      decodedEvents[index] = event;
-      callback(event);
-      continue;
-    }
-    const sequence = sequenceWord;
-    const id = words[offset++];
-    const type = decodeTag(words[offset++], NODE_TYPES, batch.strings);
-    const start = words[offset++];
-    const end = words[offset++];
-    const rawParentId = batch.includeParent === false ? MISSING_VALUE : words[offset++];
-    const rawParentType = batch.includeParent === false ? MISSING_VALUE : words[offset++];
-    const scopeId = batch.includeScope === false ? 0 : words[offset++];
-    const rawScopeParentId = batch.includeScope === false ? MISSING_VALUE : words[offset++];
-    const fieldCount = words[offset++];
-    const event: NativeEvent = {
-      sequence,
-      side: 'enter',
-      id,
-      type,
-      start,
-      end,
-      parentId: rawParentId === MISSING_VALUE ? undefined : rawParentId,
-      parentType:
-        rawParentType === MISSING_VALUE
-          ? undefined
-          : decodeTag(rawParentType, NODE_TYPES, batch.strings),
-      scopeId,
-      scopeParentId: rawScopeParentId === MISSING_VALUE ? undefined : rawScopeParentId,
-      fields: EMPTY_FIELDS,
-    };
-    const node = event as NativeEvent & Record<string, unknown>;
-    for (let field = 0; field < fieldCount; field++) {
-      const key = decodeTag(words[offset++], FIELD_KEYS, batch.strings);
-      const value = decodeValue(words[offset++], batch.strings);
-      node[key] =
-        typeof value === 'string' && (key !== 'value' || type !== 'StringLiteral')
-          ? parseScalar(value)
-          : value;
-    }
-    if (enterEvents) enterEvents[id] = event;
-    decodedEvents[index] = event;
-    callback(event);
-  }
-  batch.cachedEvents = decodedEvents;
 }
 
 export function decodePackedEnvelope(buffer: Buffer): PackedEventBatch {
