@@ -34,6 +34,7 @@ pub struct NativeIndexedSession {
     source: String,
     filename: String,
     events: Vec<NativeEvent>,
+    enter_event_indexes: Vec<usize>,
     node_count: u32,
     timings: Timings,
     materialized_subscriptions: Vec<String>,
@@ -78,10 +79,13 @@ impl NativeIndexedSession {
                 None,
             )?
         };
+        let events = batch.events;
+        let enter_event_indexes = index_enter_events(&events, batch.node_count);
         Ok(Self {
             source,
             filename,
-            events: batch.events,
+            events,
+            enter_event_indexes,
             node_count: batch.node_count,
             timings: batch.timings,
             materialized_subscriptions: subscriptions,
@@ -236,11 +240,12 @@ impl NativeIndexedSession {
     pub fn inspect(&mut self, node_ids: Vec<u32>) -> Result<Vec<NativeEvent>> {
         self.ensure_open()?;
         self.ensure_materialized(&["*".into()], &[])?;
-        Ok(self
-            .events
-            .iter()
-            .filter(|event| event.side == "enter" && node_ids.contains(&event.id))
-            .cloned()
+        Ok(node_ids
+            .into_iter()
+            .filter_map(|id| {
+                let index = *self.enter_event_indexes.get(id as usize)?;
+                self.events.get(index).cloned()
+            })
             .collect())
     }
 
@@ -324,6 +329,7 @@ impl NativeIndexedSession {
     pub fn close(&mut self) {
         self.closed = true;
         self.events.clear();
+        self.enter_event_indexes.clear();
         self.scope_parents.clear();
     }
 
@@ -413,10 +419,23 @@ impl NativeIndexedSession {
                 .filter(|event| existing.insert((event.id, event.side.clone()))),
         );
         self.events.sort_by_key(|event| event.sequence);
+        self.enter_event_indexes = index_enter_events(&self.events, self.node_count);
         self.materialized_subscriptions.extend(missing);
         self.materialized_exit_subscriptions.extend(missing_exits);
         Ok(())
     }
+}
+
+fn index_enter_events(events: &[NativeEvent], node_count: u32) -> Vec<usize> {
+    let mut indexes = vec![usize::MAX; node_count as usize];
+    for (index, event) in events.iter().enumerate() {
+        if event.side == "enter"
+            && let Some(slot) = indexes.get_mut(event.id as usize)
+        {
+            *slot = index;
+        }
+    }
+    indexes
 }
 
 fn pack_event_refs<'a>(

@@ -30,10 +30,14 @@ fn vlq(mut value: i64, output: &mut String) {
 }
 
 fn decode_char(value: u8) -> Option<i64> {
-    b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
-        .iter()
-        .position(|character| *character == value)
-        .map(|index| index as i64)
+    match value {
+        b'A'..=b'Z' => Some(i64::from(value - b'A')),
+        b'a'..=b'z' => Some(i64::from(value - b'a') + 26),
+        b'0'..=b'9' => Some(i64::from(value - b'0') + 52),
+        b'+' => Some(62),
+        b'/' => Some(63),
+        _ => None,
+    }
 }
 
 fn decode_vlq(bytes: &[u8], cursor: &mut usize) -> Option<i64> {
@@ -358,10 +362,14 @@ pub fn compose(outer: &str, inner: &str, outer_name_count: u32) -> String {
             line.into_iter()
                 .filter_map(|segment| {
                     let inner_line = inner_lines.get(segment.original_line as usize)?;
-                    let traced = inner_line
-                        .iter()
-                        .rev()
-                        .find(|inner| inner.generated_column <= segment.original_column)?;
+                    // Segments are emitted in generated-column order. Looking up the closest
+                    // preceding inner segment used to scan backwards from the end for every
+                    // outer segment, making composition quadratic for dense, single-line maps
+                    // (a common shape for prebundled dependencies). `partition_point` keeps the
+                    // same greatest-lower-bound behavior in logarithmic time.
+                    let traced_index = inner_line
+                        .partition_point(|inner| inner.generated_column <= segment.original_column);
+                    let traced = inner_line.get(traced_index.checked_sub(1)?)?;
                     Some(Segment {
                         generated_column: segment.generated_column,
                         source: traced.source,
@@ -392,5 +400,24 @@ mod tests {
     #[test]
     fn composes_two_maps() {
         assert_eq!(compose("AAAA;AACA", "AAAA;AACA", 0), "AAAA;AACA");
+    }
+
+    #[test]
+    fn composes_dense_single_line_maps() {
+        let segments = (0..10_000)
+            .map(|column| Segment {
+                generated_column: column * 2,
+                source: 0,
+                original_line: 0,
+                original_column: column * 2,
+                name: None,
+            })
+            .collect();
+        let mappings = MapBuilder {
+            lines: vec![segments],
+        }
+        .encode();
+
+        assert_eq!(compose(&mappings, &mappings, 0), mappings);
     }
 }
