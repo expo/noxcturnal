@@ -1,6 +1,16 @@
-import { native, type NativeIndexedSessionBinding } from './native.js';
-import { FIELD_KEYS, NODE_TYPE_IDS, NODE_TYPES } from './generated-event-schema.js';
 import { createHash } from 'node:crypto';
+
+import { native, type NativeIndexedSessionBinding } from './native.js';
+import { NODE_TYPE_IDS, NODE_TYPES } from './generated-event-schema.js';
+import {
+  decodeEventBatch,
+  decodePackedEnvelope,
+  forEachDispatchEvent,
+  packEdits,
+  packFieldRequests,
+  parseScalar,
+  type PackedEventBatch,
+} from './protocol.js';
 import type {
   Diagnostic, EditCommand, EventBatch, InspectRequest, NativeBailoutResult, NativeEvent,
   NativeTransformResult, NodeSummary, NodeView, PluginPlan, QueryRequest, QueryResult,
@@ -214,10 +224,6 @@ export function pipelineCacheKey(pipeline: NativePipeline, filename: string, opt
   };
   return createHash('sha256').update(stableJson(descriptor)).digest('hex');
 }
-
-type PackedEventBatch = { data: Buffer; strings: string[]; nodeCount: number; emittedCount: number; timings: EventBatch['timings']; includeParent?: boolean; includeScope?: boolean };
-const EDIT_KINDS: Record<EditKind, number> = { Replace: 0, Remove: 1, AppendLeft: 2, PrependLeft: 3, AppendRight: 4, PrependRight: 5, AddSourceMapLocation: 6 };
-const EDIT_MAPPINGS: Record<NonNullable<EditCommand['mapping']>, number> = { Sourceless: 0, AnchorStart: 1, AnchorBoundaries: 2, Identity: 3 };
 
 export class NativeTransformSession {
   #closed = false;
@@ -968,126 +974,112 @@ function eventRouteKey(event: NativeEvent): string {
 }
 function matchingHandlers(visitor: Visitor<any>, event: NativeEvent): VisitorHandler<any>[] {
   let cache = matchingHandlerCache.get(visitor);
-  if (!cache) { cache = { routes: new Map(), fieldAware: visitorNeedsFieldRouting(visitor) }; matchingHandlerCache.set(visitor, cache); }
+  if (!cache) {
+    cache = { routes: new Map(), fieldAware: visitorNeedsFieldRouting(visitor) };
+    matchingHandlerCache.set(visitor, cache);
+  }
   const route = cache.fieldAware ? eventRouteKey(event) : event.type;
   const cached = cache.routes.get(route);
   if (cached) return cached;
-  const handlers = Object.entries(visitor).filter(([key, value]) => value && key.split('|').some(part => visitorKeyMatches(part, event))).map(([, value]) => value!) as VisitorHandler<any>[];
+  const handlers: VisitorHandler<any>[] = [];
+  for (const [key, handler] of Object.entries(visitor)) {
+    if (handler == null) continue;
+    for (const part of key.split('|')) {
+      if (visitorKeyMatches(part, event)) {
+        handlers.push(handler as VisitorHandler<any>);
+        break;
+      }
+    }
+  }
   cache.routes.set(route, handlers);
   return handlers;
 }
 function visitorNeedsFieldRouting(visitor: Visitor<any>): boolean {
-  return Object.keys(visitor).flatMap(key => key.split('|')).some(key => key === 'ReferencedIdentifier' || isCollapsedFunctionKey(key) || isCollapsedClassKey(key));
-}
-function forEachDispatchEvent(batch: PackedEventBatch, callback: (event: NativeEvent) => void): void {
-  const words = new Uint32Array(batch.data.buffer, batch.data.byteOffset, batch.data.byteLength / 4);
-  let offset = 0;
-  for (let index = 0; index < batch.emittedCount; index++) {
-    const sequence = words[offset++];
-    const side = words[offset++] === 0 ? 'enter' : 'exit';
-    const id = words[offset++];
-    const type = decodeTag(words[offset++], NODE_TYPES, batch.strings);
-    const start = words[offset++];
-    const end = words[offset++];
-    const rawParentId = batch.includeParent === false ? 0xffffffff : words[offset++];
-    const rawParentType = batch.includeParent === false ? 0xffffffff : words[offset++];
-    const scopeId = batch.includeScope === false ? 0 : words[offset++];
-    const rawScopeParentId = batch.includeScope === false ? 0xffffffff : words[offset++];
-    const fieldCount = words[offset++];
-    const event: NativeEvent = { sequence, side, id, type, start, end, parentId: rawParentId === 0xffffffff ? undefined : rawParentId, parentType: rawParentType === 0xffffffff ? undefined : decodeTag(rawParentType, NODE_TYPES, batch.strings), scopeId, scopeParentId: rawScopeParentId === 0xffffffff ? undefined : rawScopeParentId, fields: [] };
-    const node = event as NativeEvent & Record<string, unknown>;
-    for (let field = 0; field < fieldCount; field++) {
-      const key = decodeTag(words[offset++], FIELD_KEYS, batch.strings);
-      const value = decodeValue(words[offset++], batch.strings);
-      node[key] = typeof value === 'string' && !(key === 'value' && type === 'StringLiteral') ? parseScalar(value) : value;
+  for (const route of Object.keys(visitor)) {
+    for (const key of route.split('|')) {
+      if (key === 'ReferencedIdentifier' || isCollapsedFunctionKey(key) || isCollapsedClassKey(key)) return true;
     }
-    callback(event);
   }
+  return false;
 }
-function decodePackedEnvelope(buffer: Buffer): PackedEventBatch {
-  const shapeNodeCount = buffer.readUInt32LE(0);
-  const nodeCount = shapeNodeCount & 0x3fffffff;
-  const emittedCount = buffer.readUInt32LE(4);
-  const stringCount = buffer.readUInt32LE(8);
-  const wordsOffset = buffer.readUInt32LE(12);
-  const timings = { parseMs: buffer.readDoubleLE(16), semanticMs: buffer.readDoubleLE(24), traversalMs: buffer.readDoubleLE(32), renderAndMapMs: buffer.readDoubleLE(40) };
-  const strings = new Array<string>(stringCount);
-  let offset = 48;
-  for (let index = 0; index < stringCount; index++) {
-    const length = buffer.readUInt32LE(offset); offset += 4;
-    strings[index] = buffer.toString('utf8', offset, offset + length);
-    offset = (offset + length + 3) & ~3;
+function alias(key: string, type: string): boolean {
+  if (key === '*') return true;
+  if (key === 'Function') {
+    return type === 'Function'
+      || type === 'ArrowFunctionExpression'
+      || type.endsWith('FunctionDeclaration')
+      || type.endsWith('FunctionExpression');
   }
-  return { data: buffer.subarray(wordsOffset), strings, nodeCount, emittedCount, timings, includeParent: (shapeNodeCount & 0x80000000) !== 0, includeScope: (shapeNodeCount & 0x40000000) !== 0 };
+  if (key === 'Statement') return type.endsWith('Statement') || isDeclarationType(type);
+  if (key === 'Declaration') return isDeclarationType(type);
+  if (key === 'Expression') return type.endsWith('Expression') || isLiteralExpressionType(type);
+  if (key === 'MemberExpression') return isMemberExpressionType(type);
+  if (key === 'MetaProperty') return type === 'ImportMeta' || type === 'NewTarget';
+  if (key === 'ReferencedIdentifier') return type === 'Identifier';
+  if (isCollapsedFunctionKey(key)) return type === 'Function';
+  if (isCollapsedClassKey(key)) return type === 'Class';
+  return false;
 }
-function decodeEventBatch(batch: { data: Buffer; strings: string[]; nodeCount: number; emittedCount: number; timings: EventBatch['timings'] }): EventBatch {
-  const events: NativeEvent[] = new Array(batch.emittedCount);
-  let offset = 0;
-  for (let index = 0; index < events.length; index++) {
-    const sequence = batch.data.readUInt32LE(offset); offset += 4;
-    const side = batch.data.readUInt32LE(offset) === 0 ? 'enter' : 'exit'; offset += 4;
-    const id = batch.data.readUInt32LE(offset); offset += 4;
-    const type = decodeTag(batch.data.readUInt32LE(offset), NODE_TYPES, batch.strings); offset += 4;
-    const start = batch.data.readUInt32LE(offset); offset += 4;
-    const end = batch.data.readUInt32LE(offset); offset += 4;
-    const rawParentId = batch.data.readUInt32LE(offset); offset += 4;
-    const rawParentType = batch.data.readUInt32LE(offset); offset += 4;
-    const scopeId = batch.data.readUInt32LE(offset); offset += 4;
-    const rawScopeParentId = batch.data.readUInt32LE(offset); offset += 4;
-    const fieldCount = batch.data.readUInt32LE(offset); offset += 4;
-    const fields = new Array<{ key: string; value: string | number | boolean }>(fieldCount);
-    for (let field = 0; field < fieldCount; field++) {
-      fields[field] = { key: decodeTag(batch.data.readUInt32LE(offset), FIELD_KEYS, batch.strings), value: decodeValue(batch.data.readUInt32LE(offset + 4), batch.strings) };
-      offset += 8;
-    }
-    events[index] = { sequence, side, id, type, start, end, parentId: rawParentId === 0xffffffff ? undefined : rawParentId, parentType: rawParentType === 0xffffffff ? undefined : decodeTag(rawParentType, NODE_TYPES, batch.strings), scopeId, scopeParentId: rawScopeParentId === 0xffffffff ? undefined : rawScopeParentId, fields };
-  }
-  return { events, nodeCount: batch.nodeCount, emittedCount: batch.emittedCount, timings: batch.timings };
-}
-function packEdits(edits: readonly EditCommand[]): Buffer {
-  const strings: string[] = []; const words: number[] = [];
-  const stringId = (value: string): number => { const id = strings.length; strings.push(value); return id; };
-  for (let index = 0; index < edits.length; index++) { const edit = edits[index]; const names = edit.names ?? []; words.push(EDIT_KINDS[edit.kind], edit.start, edit.end, edit.content == null ? 0xffffffff : stringId(edit.content), EDIT_MAPPINGS[edit.mapping ?? 'Sourceless'], edit.order ?? index, names.length); for (const name of names) words.push(stringId(name)); }
-  const encoded = strings.map(value => Buffer.from(value));
-  const stringsSize = encoded.reduce((size, value) => size + 4 + value.length + ((4 - value.length % 4) % 4), 0);
-  const wordsOffset = 8 + stringsSize;
-  const data = Buffer.allocUnsafe(wordsOffset + words.length * 4);
-  data.writeUInt32LE(strings.length, 0); data.writeUInt32LE(wordsOffset, 4);
-  let offset = 8;
-  for (const value of encoded) { data.writeUInt32LE(value.length, offset); offset += 4; value.copy(data, offset); offset = (offset + value.length + 3) & ~3; }
-  for (let index = 0; index < words.length; index++) data.writeUInt32LE(words[index] >>> 0, wordsOffset + index * 4);
-  return data;
-}
-function packFieldRequests(fields?: Readonly<Record<string, readonly string[]>>): Buffer | undefined {
-  if (!fields) return undefined;
-  const words: number[] = [];
-  for (const [nodeType, requested] of Object.entries(fields)) {
-    const typeId = NODE_TYPE_IDS.get(nodeType);
-    if (typeId == null) continue;
-    const fieldIds = requested.map(field => FIELD_KEYS.indexOf(field as typeof FIELD_KEYS[number])).filter(id => id > 0);
-    words.push(typeId, fieldIds.length, ...fieldIds);
-  }
-  const data = Buffer.allocUnsafe(words.length * 4);
-  for (let index = 0; index < words.length; index++) data.writeUInt32LE(words[index], index * 4);
-  return data;
-}
-function decodeTag(tag: number, known: readonly string[], strings: string[]): string { return tag & 0x80000000 ? strings[tag & 0x7fffffff] : known[tag]; }
-function decodeValue(word: number, strings: string[]): string | number | boolean { if (word & 0x80000000) return (word & 1) === 1; if (word & 0x40000000) return word & 0x3fffffff; return strings[word]; }
-function alias(key: string, type: string): boolean { return (key === 'Function' && (type === 'Function' || type === 'ArrowFunctionExpression' || type.endsWith('FunctionDeclaration') || type.endsWith('FunctionExpression'))) || (key === 'Statement' && (type.endsWith('Statement') || isDeclarationType(type))) || (key === 'Declaration' && isDeclarationType(type)) || (key === 'Expression' && (type.endsWith('Expression') || isLiteralExpressionType(type))) || (key === 'MemberExpression' && isMemberExpressionType(type)) || (key === 'MetaProperty' && (type === 'ImportMeta' || type === 'NewTarget')) || (key === 'ReferencedIdentifier' && type === 'Identifier') || (isCollapsedFunctionKey(key) && type === 'Function') || (isCollapsedClassKey(key) && type === 'Class') || key === '*'; }
 function visitorKeyMatches(key: string, event: NativeEvent): boolean {
   if (key === 'ReferencedIdentifier') return event.type === 'Identifier' && eventField(event, 'global') != null;
   if (key === 'MetaProperty') return event.type === 'ImportMeta' || event.type === 'NewTarget';
   if (isCollapsedFunctionKey(key) || isCollapsedClassKey(key)) return event.type === (isCollapsedClassKey(key) ? 'Class' : 'Function') && eventField(event, 'nodeKind') === key;
   return key === event.type || alias(key, event.type);
 }
-function isLiteralExpressionType(type: string): boolean { return type === 'Identifier' || type === 'StringLiteral' || type === 'NumericLiteral' || type === 'BooleanLiteral' || type === 'BigIntLiteral' || type === 'RegExpLiteral' || type === 'NullLiteral' || type === 'TemplateLiteral'; }
-function isMemberExpressionType(type: string): boolean { return type === 'StaticMemberExpression' || type === 'ComputedMemberExpression' || type === 'PrivateFieldExpression'; }
-function isCollapsedFunctionKey(key: string): boolean { return key === 'FunctionDeclaration' || key === 'FunctionExpression' || key === 'TSDeclareFunction'; }
-function isCollapsedClassKey(key: string): boolean { return key === 'ClassDeclaration' || key === 'ClassExpression'; }
-function isDeclarationType(type: string): boolean { return type.endsWith('Declaration') || type === 'Function' || type === 'Class' || type === 'TSEnumDeclaration' || type === 'TSInterfaceDeclaration' || type === 'TSTypeAliasDeclaration' || type === 'TSModuleDeclaration' || type === 'TSImportEqualsDeclaration'; }
-function eventField(event: NativeEvent, key: string): unknown { const direct = (event as NativeEvent & Record<string, unknown>)[key]; return direct ?? event.fields.find(field => field.key === key)?.value; }
-function toNodeView(event: NativeEvent): NodeView { if (event.fields.length === 0) return event as unknown as NodeView; const node: Record<string, unknown> = { id: event.id, type: event.type, start: event.start, end: event.end, parentId: event.parentId, parentType: event.parentType, scopeId: event.scopeId, scopeParentId: event.scopeParentId }; for (const field of event.fields) node[field.key] = typeof field.value === 'string' && !(field.key === 'value' && event.type === 'StringLiteral') ? parseScalar(field.value) : field.value; return node as NodeView; }
-function parseScalar(value: string): string | number | boolean { if (value === 'true') return true; if (value === 'false') return false; const number = Number(value); return value !== '' && Number.isFinite(number) ? number : value; }
+function isLiteralExpressionType(type: string): boolean {
+  return type === 'Identifier'
+    || type === 'StringLiteral'
+    || type === 'NumericLiteral'
+    || type === 'BooleanLiteral'
+    || type === 'BigIntLiteral'
+    || type === 'RegExpLiteral'
+    || type === 'NullLiteral'
+    || type === 'TemplateLiteral';
+}
+function isMemberExpressionType(type: string): boolean {
+  return type === 'StaticMemberExpression'
+    || type === 'ComputedMemberExpression'
+    || type === 'PrivateFieldExpression';
+}
+function isCollapsedFunctionKey(key: string): boolean {
+  return key === 'FunctionDeclaration' || key === 'FunctionExpression' || key === 'TSDeclareFunction';
+}
+function isCollapsedClassKey(key: string): boolean {
+  return key === 'ClassDeclaration' || key === 'ClassExpression';
+}
+function isDeclarationType(type: string): boolean {
+  return type.endsWith('Declaration')
+    || type === 'Function'
+    || type === 'Class'
+    || type === 'TSEnumDeclaration'
+    || type === 'TSInterfaceDeclaration'
+    || type === 'TSTypeAliasDeclaration'
+    || type === 'TSModuleDeclaration'
+    || type === 'TSImportEqualsDeclaration';
+}
+function eventField(event: NativeEvent, key: string): unknown {
+  const direct = (event as NativeEvent & Record<string, unknown>)[key];
+  return direct ?? event.fields.find(field => field.key === key)?.value;
+}
+function toNodeView(event: NativeEvent): NodeView {
+  if (event.fields.length === 0) return event as unknown as NodeView;
+  const node: Record<string, unknown> = {
+    id: event.id,
+    type: event.type,
+    start: event.start,
+    end: event.end,
+    parentId: event.parentId,
+    parentType: event.parentType,
+    scopeId: event.scopeId,
+    scopeParentId: event.scopeParentId,
+  };
+  for (const field of event.fields) {
+    node[field.key] = typeof field.value === 'string' && (field.key !== 'value' || event.type !== 'StringLiteral')
+      ? parseScalar(field.value)
+      : field.value;
+  }
+  return node as NodeView;
+}
 function summary(node: NodeView): NodeSummary { return { id: node.id, type: node.type, start: node.start, end: node.end, parentId: node.parentId, parentType: node.parentType }; }
 function array(value: string | readonly string[]): string[] { return typeof value === 'string' ? [value] : [...value]; }
 function expandSubscriptions(values: readonly string[]): string[] { return [...new Set(values.flatMap(value => value.split('|')))]; }
@@ -1113,13 +1105,19 @@ function encodeSubscriptions(subscriptions: readonly string[]): { ids: number[];
 }
 function visitorSubscriptions(visitor?: Visitor<any>): NativeVisitorRoute[] {
   if (!visitor) return [];
-  const cached = visitorSubscriptionsCache.get(visitor); if (cached) return cached;
-  const subscriptions = expandSubscriptions(Object.keys(visitor)) as NativeVisitorRoute[]; visitorSubscriptionsCache.set(visitor, subscriptions); return subscriptions;
+  const cached = visitorSubscriptionsCache.get(visitor);
+  if (cached) return cached;
+  const subscriptions = expandSubscriptions(Object.keys(visitor)) as NativeVisitorRoute[];
+  visitorSubscriptionsCache.set(visitor, subscriptions);
+  return subscriptions;
 }
 function visitorHasExit(visitor?: Visitor<any>): boolean {
   if (!visitor) return false;
-  const cached = visitorExitCache.get(visitor); if (cached != null) return cached;
-  const hasExit = Object.values(visitor).some(handler => typeof handler === 'object' && handler?.exit != null); visitorExitCache.set(visitor, hasExit); return hasExit;
+  const cached = visitorExitCache.get(visitor);
+  if (cached != null) return cached;
+  const hasExit = Object.values(visitor).some(handler => typeof handler === 'object' && handler?.exit != null);
+  visitorExitCache.set(visitor, hasExit);
+  return hasExit;
 }
 function visitorRoutingFields(visitor?: Visitor<any>): Record<string, string[]> {
   const keys = new Set(visitor ? Object.keys(visitor).flatMap(key => key.split('|')) : []);
@@ -1129,7 +1127,20 @@ function visitorRoutingFields(visitor?: Visitor<any>): Record<string, string[]> 
   if (keys.has('ReferencedIdentifier')) fields.Identifier = ['name', 'global', 'read', 'write', 'bindingScopeId'];
   return fields;
 }
-function querySubscriptions(request: QueryRequest): string[] { const types: string[] = []; if (request.globals?.length || request.bindings?.length) types.push('Identifier'); if (request.imports) types.push('ImportDeclaration', 'ImportSpecifier', 'ImportDefaultSpecifier', 'ImportNamespaceSpecifier'); if (request.exports) types.push('ExportNamedDeclaration', 'ExportDefaultDeclaration', 'ExportAllDeclaration', 'ExportSpecifier'); if (request.constants?.length) types.push('Expression'); if (request.calls?.length) types.push('CallExpression'); if (request.captures?.length) types.push('Function', 'Identifier'); return types; }
+function querySubscriptions(request: QueryRequest): string[] {
+  const types: string[] = [];
+  if (request.globals?.length || request.bindings?.length) types.push('Identifier');
+  if (request.imports) {
+    types.push('ImportDeclaration', 'ImportSpecifier', 'ImportDefaultSpecifier', 'ImportNamespaceSpecifier');
+  }
+  if (request.exports) {
+    types.push('ExportNamedDeclaration', 'ExportDefaultDeclaration', 'ExportAllDeclaration', 'ExportSpecifier');
+  }
+  if (request.constants?.length) types.push('Expression');
+  if (request.calls?.length) types.push('CallExpression');
+  if (request.captures?.length) types.push('Function', 'Identifier');
+  return types;
+}
 function mappingPolicy(value?: CodeFragment['mapping']): EditCommand['mapping'] { return ({ 'sourceless': 'Sourceless', 'anchor-start': 'AnchorStart', 'anchor-boundaries': 'AnchorBoundaries', identity: 'Identity' } as const)[value ?? 'sourceless']; }
 function makeScope(runtime: PathRuntime, id: number, parentId: number | null): NativeScope {
   const cached = runtime.scopeCache.get(id);

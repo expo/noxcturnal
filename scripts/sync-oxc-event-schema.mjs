@@ -12,12 +12,18 @@ const source = fs.readFileSync(path.join(path.dirname(oxc.manifest_path), 'src/g
 const body = /pub enum AstType \{([\s\S]*?)\n\}/.exec(source)?.[1];
 if (!body) throw new Error('Could not read Oxc AstType variants');
 const variants = [...body.matchAll(/^\s*([A-Za-z][A-Za-z0-9_]*)\s*=\s*\d+,/gm)].map(match => match[1]);
-const publicName = variant => ['IdentifierName', 'IdentifierReference', 'BindingIdentifier'].includes(variant) ? 'Identifier' : variant;
+const publicName = variant => (
+  variant === 'IdentifierName'
+  || variant === 'IdentifierReference'
+  || variant === 'BindingIdentifier'
+    ? 'Identifier'
+    : variant
+);
 const nodeTypes = [...new Set(variants.map(publicName))];
 const schemaFile = path.join(root, 'protocol/event-schema.json');
 const previous = JSON.parse(fs.readFileSync(schemaFile, 'utf8'));
 const next = `${JSON.stringify({ nodeTypes, astKinds: Object.fromEntries(variants.map(variant => [variant, publicName(variant)])), fieldKeys: previous.fieldKeys }, null, 2)}\n`;
-if (process.argv.includes('--check')) {
+if (process.argv[2] === '--check') {
   if (fs.readFileSync(schemaFile, 'utf8') !== next) throw new Error('protocol/event-schema.json is stale against oxc_ast; run pnpm codegen');
 } else {
   fs.writeFileSync(schemaFile, next);

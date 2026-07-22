@@ -11,65 +11,14 @@ use oxc_span::{GetSpan, SourceType};
 use oxc_syntax::operator::{BinaryOperator, LogicalOperator, UnaryOperator};
 use rustc_hash::{FxHashMap, FxHashSet};
 
+pub use crate::event_types::{
+    EventBatch, FieldRequest, NativeCommitResult, NativeEvent, NativeVlqMap, NodeField,
+    PackedEventBatch, ParseClassification, Timings,
+};
 use crate::generated_event_schema::{
     ast_kind_protocol_id, field_key_id, field_key_name, node_type_id, node_type_name,
 };
 use crate::{editor, sourcemap};
-
-#[napi(object)]
-#[derive(Clone)]
-pub struct NodeField {
-    pub key: String,
-    pub value: String,
-}
-
-#[napi(object)]
-#[derive(Clone)]
-pub struct NativeEvent {
-    pub sequence: u32,
-    pub side: String,
-    pub id: u32,
-    pub r#type: String,
-    pub start: u32,
-    pub end: u32,
-    pub parent_id: Option<u32>,
-    pub parent_type: Option<String>,
-    pub scope_id: u32,
-    pub scope_parent_id: Option<u32>,
-    pub fields: Vec<NodeField>,
-}
-
-#[napi(object)]
-pub struct FieldRequest {
-    pub node_type: String,
-    pub fields: Vec<String>,
-}
-
-#[napi(object)]
-#[derive(Clone)]
-pub struct Timings {
-    pub parse_ms: f64,
-    pub semantic_ms: f64,
-    pub traversal_ms: f64,
-    pub render_and_map_ms: f64,
-}
-
-#[napi(object)]
-pub struct EventBatch {
-    pub events: Vec<NativeEvent>,
-    pub node_count: u32,
-    pub emitted_count: u32,
-    pub timings: Timings,
-}
-
-#[napi(object)]
-pub struct PackedEventBatch {
-    pub data: Buffer,
-    pub strings: Vec<String>,
-    pub node_count: u32,
-    pub emitted_count: u32,
-    pub timings: Timings,
-}
 
 struct PackedEventParts {
     data: Vec<u8>,
@@ -77,27 +26,6 @@ struct PackedEventParts {
     node_count: u32,
     emitted_count: u32,
     timings: Timings,
-}
-
-#[napi(object)]
-pub struct ParseClassification {
-    pub syntax: String,
-    pub supported: bool,
-    pub codegen_candidate: bool,
-    pub reason: String,
-}
-
-#[napi(object)]
-pub struct NativeVlqMap {
-    pub mappings: String,
-    pub names: Vec<String>,
-}
-
-#[napi(object)]
-pub struct NativeCommitResult {
-    pub code: String,
-    pub map: NativeVlqMap,
-    pub timings: Timings,
 }
 
 #[napi]
@@ -1512,7 +1440,10 @@ fn materialize_with_scope_parents(
     ))
 }
 
-#[allow(clippy::too_many_arguments)] // Primitive FFI inputs deliberately avoid object conversion.
+#[expect(
+    clippy::too_many_arguments,
+    reason = "primitive FFI inputs avoid object conversion"
+)]
 pub fn materialize_packed(
     source: &str,
     filename: &str,
@@ -1546,7 +1477,10 @@ pub fn materialize_packed(
     })
 }
 
-#[allow(clippy::too_many_arguments)]
+#[expect(
+    clippy::too_many_arguments,
+    reason = "primitive FFI inputs avoid object conversion"
+)]
 fn materialize_packed_internal(
     source: &str,
     filename: &str,
@@ -1633,7 +1567,10 @@ fn materialize_packed_internal(
     })
 }
 
-#[allow(clippy::too_many_arguments)] // Primitive FFI inputs deliberately avoid object conversion.
+#[expect(
+    clippy::too_many_arguments,
+    reason = "primitive FFI inputs avoid object conversion"
+)]
 pub fn materialize_packed_buffer(
     source: &str,
     filename: &str,

@@ -1,5 +1,6 @@
 mod editor;
 mod engine;
+mod event_types;
 mod generated_event_schema;
 mod sourcemap;
 
@@ -41,8 +42,12 @@ pub fn materialize_events(
     )
 }
 
+#[expect(
+    clippy::allow_attributes,
+    reason = "napi expands the function before Clippy can fulfill an expect attribute"
+)]
+#[allow(clippy::too_many_arguments)]
 #[napi]
-#[allow(clippy::too_many_arguments)] // Primitive N-API arguments are faster than object conversion.
 pub fn materialize_packed_events(
     source: String,
     filename: String,
@@ -65,8 +70,12 @@ pub fn materialize_packed_events(
     )
 }
 
+#[expect(
+    clippy::allow_attributes,
+    reason = "napi expands the function before Clippy can fulfill an expect attribute"
+)]
+#[allow(clippy::too_many_arguments)]
 #[napi]
-#[allow(clippy::too_many_arguments)] // Primitive N-API arguments are faster than object conversion.
 pub fn materialize_packed_buffer(
     source: String,
     filename: String,

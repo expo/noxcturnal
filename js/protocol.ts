@@ -1,0 +1,240 @@
+import { FIELD_KEYS, NODE_TYPE_IDS, NODE_TYPES } from './generated-event-schema.js';
+import type { EditCommand, EventBatch, NativeEvent } from './types.js';
+
+export interface PackedEventBatch {
+  data: Buffer;
+  strings: string[];
+  nodeCount: number;
+  emittedCount: number;
+  timings: EventBatch['timings'];
+  includeParent?: boolean;
+  includeScope?: boolean;
+}
+
+const EDIT_KINDS: Record<EditCommand['kind'], number> = {
+  Replace: 0,
+  Remove: 1,
+  AppendLeft: 2,
+  PrependLeft: 3,
+  AppendRight: 4,
+  PrependRight: 5,
+  AddSourceMapLocation: 6,
+};
+
+const EDIT_MAPPINGS: Record<NonNullable<EditCommand['mapping']>, number> = {
+  Sourceless: 0,
+  AnchorStart: 1,
+  AnchorBoundaries: 2,
+  Identity: 3,
+};
+
+const DYNAMIC_TAG = 0x80000000;
+const TAG_INDEX = 0x7fffffff;
+const NUMBER_VALUE = 0x40000000;
+const NUMBER_PAYLOAD = 0x3fffffff;
+const MISSING_VALUE = 0xffffffff;
+const PACKED_HEADER_BYTES = 48;
+
+export function forEachDispatchEvent(batch: PackedEventBatch, callback: (event: NativeEvent) => void): void {
+  const words = new Uint32Array(batch.data.buffer, batch.data.byteOffset, batch.data.byteLength / 4);
+  let offset = 0;
+  for (let index = 0; index < batch.emittedCount; index++) {
+    const sequence = words[offset++];
+    const side = words[offset++] === 0 ? 'enter' : 'exit';
+    const id = words[offset++];
+    const type = decodeTag(words[offset++], NODE_TYPES, batch.strings);
+    const start = words[offset++];
+    const end = words[offset++];
+    const rawParentId = batch.includeParent === false ? MISSING_VALUE : words[offset++];
+    const rawParentType = batch.includeParent === false ? MISSING_VALUE : words[offset++];
+    const scopeId = batch.includeScope === false ? 0 : words[offset++];
+    const rawScopeParentId = batch.includeScope === false ? MISSING_VALUE : words[offset++];
+    const fieldCount = words[offset++];
+    const event: NativeEvent = {
+      sequence,
+      side,
+      id,
+      type,
+      start,
+      end,
+      parentId: rawParentId === MISSING_VALUE ? undefined : rawParentId,
+      parentType: rawParentType === MISSING_VALUE ? undefined : decodeTag(rawParentType, NODE_TYPES, batch.strings),
+      scopeId,
+      scopeParentId: rawScopeParentId === MISSING_VALUE ? undefined : rawScopeParentId,
+      fields: [],
+    };
+    const node = event as NativeEvent & Record<string, unknown>;
+    for (let field = 0; field < fieldCount; field++) {
+      const key = decodeTag(words[offset++], FIELD_KEYS, batch.strings);
+      const value = decodeValue(words[offset++], batch.strings);
+      node[key] = typeof value === 'string' && (key !== 'value' || type !== 'StringLiteral')
+        ? parseScalar(value)
+        : value;
+    }
+    callback(event);
+  }
+}
+
+export function decodePackedEnvelope(buffer: Buffer): PackedEventBatch {
+  const shapeNodeCount = buffer.readUInt32LE(0);
+  const nodeCount = shapeNodeCount & NUMBER_PAYLOAD;
+  const emittedCount = buffer.readUInt32LE(4);
+  const stringCount = buffer.readUInt32LE(8);
+  const wordsOffset = buffer.readUInt32LE(12);
+  const timings = {
+    parseMs: buffer.readDoubleLE(16),
+    semanticMs: buffer.readDoubleLE(24),
+    traversalMs: buffer.readDoubleLE(32),
+    renderAndMapMs: buffer.readDoubleLE(40),
+  };
+  const strings = new Array<string>(stringCount);
+  let offset = PACKED_HEADER_BYTES;
+  for (let index = 0; index < stringCount; index++) {
+    const length = buffer.readUInt32LE(offset);
+    offset += 4;
+    strings[index] = buffer.toString('utf8', offset, offset + length);
+    offset = alignToWord(offset + length);
+  }
+  return {
+    data: buffer.subarray(wordsOffset),
+    strings,
+    nodeCount,
+    emittedCount,
+    timings,
+    includeParent: (shapeNodeCount & DYNAMIC_TAG) !== 0,
+    includeScope: (shapeNodeCount & NUMBER_VALUE) !== 0,
+  };
+}
+
+export function decodeEventBatch(batch: PackedEventBatch): EventBatch {
+  const events = new Array<NativeEvent>(batch.emittedCount);
+  let offset = 0;
+  for (let index = 0; index < events.length; index++) {
+    const sequence = batch.data.readUInt32LE(offset); offset += 4;
+    const side = batch.data.readUInt32LE(offset) === 0 ? 'enter' : 'exit'; offset += 4;
+    const id = batch.data.readUInt32LE(offset); offset += 4;
+    const type = decodeTag(batch.data.readUInt32LE(offset), NODE_TYPES, batch.strings); offset += 4;
+    const start = batch.data.readUInt32LE(offset); offset += 4;
+    const end = batch.data.readUInt32LE(offset); offset += 4;
+    const rawParentId = batch.data.readUInt32LE(offset); offset += 4;
+    const rawParentType = batch.data.readUInt32LE(offset); offset += 4;
+    const scopeId = batch.data.readUInt32LE(offset); offset += 4;
+    const rawScopeParentId = batch.data.readUInt32LE(offset); offset += 4;
+    const fieldCount = batch.data.readUInt32LE(offset); offset += 4;
+    const fields = new Array<{ key: string; value: string | number | boolean }>(fieldCount);
+    for (let field = 0; field < fieldCount; field++) {
+      fields[field] = {
+        key: decodeTag(batch.data.readUInt32LE(offset), FIELD_KEYS, batch.strings),
+        value: decodeValue(batch.data.readUInt32LE(offset + 4), batch.strings),
+      };
+      offset += 8;
+    }
+    events[index] = {
+      sequence,
+      side,
+      id,
+      type,
+      start,
+      end,
+      parentId: rawParentId === MISSING_VALUE ? undefined : rawParentId,
+      parentType: rawParentType === MISSING_VALUE ? undefined : decodeTag(rawParentType, NODE_TYPES, batch.strings),
+      scopeId,
+      scopeParentId: rawScopeParentId === MISSING_VALUE ? undefined : rawScopeParentId,
+      fields,
+    };
+  }
+  return {
+    events,
+    nodeCount: batch.nodeCount,
+    emittedCount: batch.emittedCount,
+    timings: batch.timings,
+  };
+}
+
+export function packEdits(edits: readonly EditCommand[]): Buffer {
+  const strings: string[] = [];
+  const words: number[] = [];
+  const stringId = (value: string): number => {
+    const id = strings.length;
+    strings.push(value);
+    return id;
+  };
+  for (let index = 0; index < edits.length; index++) {
+    const edit = edits[index];
+    const names = edit.names ?? [];
+    words.push(
+      EDIT_KINDS[edit.kind],
+      edit.start,
+      edit.end,
+      edit.content == null ? MISSING_VALUE : stringId(edit.content),
+      EDIT_MAPPINGS[edit.mapping ?? 'Sourceless'],
+      edit.order ?? index,
+      names.length,
+    );
+    for (const name of names) words.push(stringId(name));
+  }
+
+  const encodedStrings = strings.map(value => Buffer.from(value));
+  const stringsSize = encodedStrings.reduce(
+    (size, value) => size + 4 + value.length + paddingFor(value.length),
+    0,
+  );
+  const wordsOffset = 8 + stringsSize;
+  const data = Buffer.allocUnsafe(wordsOffset + words.length * 4);
+  data.writeUInt32LE(strings.length, 0);
+  data.writeUInt32LE(wordsOffset, 4);
+  let offset = 8;
+  for (const value of encodedStrings) {
+    data.writeUInt32LE(value.length, offset);
+    offset += 4;
+    value.copy(data, offset);
+    offset = alignToWord(offset + value.length);
+  }
+  for (let index = 0; index < words.length; index++) {
+    data.writeUInt32LE(words[index] >>> 0, wordsOffset + index * 4);
+  }
+  return data;
+}
+
+export function packFieldRequests(fields?: Readonly<Record<string, readonly string[]>>): Buffer | undefined {
+  if (!fields) return undefined;
+  const words: number[] = [];
+  for (const [nodeType, requested] of Object.entries(fields)) {
+    const typeId = NODE_TYPE_IDS.get(nodeType);
+    if (typeId == null) continue;
+    const fieldIds = requested
+      .map(field => FIELD_KEYS.indexOf(field as typeof FIELD_KEYS[number]))
+      .filter(id => id > 0);
+    words.push(typeId, fieldIds.length, ...fieldIds);
+  }
+  const data = Buffer.allocUnsafe(words.length * 4);
+  for (let index = 0; index < words.length; index++) {
+    data.writeUInt32LE(words[index], index * 4);
+  }
+  return data;
+}
+
+export function parseScalar(value: string): string | number | boolean {
+  if (value === 'true') return true;
+  if (value === 'false') return false;
+  const number = Number(value);
+  return value !== '' && Number.isFinite(number) ? number : value;
+}
+
+function decodeTag(tag: number, known: readonly string[], strings: string[]): string {
+  return tag & DYNAMIC_TAG ? strings[tag & TAG_INDEX] : known[tag];
+}
+
+function decodeValue(word: number, strings: string[]): string | number | boolean {
+  if (word & DYNAMIC_TAG) return (word & 1) === 1;
+  if (word & NUMBER_VALUE) return word & NUMBER_PAYLOAD;
+  return strings[word];
+}
+
+function alignToWord(offset: number): number {
+  return (offset + 3) & ~3;
+}
+
+function paddingFor(length: number): number {
+  return (4 - length % 4) % 4;
+}
