@@ -6,7 +6,7 @@
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "files": ["dist", "*.node", "README.md"],
+  "files": ["dist", "*.node", "README.md", "FITMENT.md"],
   "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" } },
   "scripts": {
     "codegen": "nix shell nixpkgs#cargo -c node scripts/sync-oxc-event-schema.mjs && node scripts/generate-event-schema.mjs",

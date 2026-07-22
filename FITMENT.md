@@ -1,0 +1,47 @@
+# Expo and Metro transform fitment
+
+This matrix audits the source transforms currently present in `babel-preset-expo/src/plugins` and `@expo/metro-config/src/transform-plugins`. “Supported” means the transform can be reimplemented as a Noxcturnal plugin without transferring a recursive ESTree. It does not mean the Babel plugin itself can be loaded unchanged.
+
+| Transform | Required Noxcturnal primitives | Status |
+| --- | --- | --- |
+| `babel-plugin-transform-export-namespace-from` | export/specifier child roles, UID generation, multiple replacement | Supported |
+| `client-module-proxy-plugin` | directives, import/export queries, targeted traversal, metadata, validated module statements | Supported |
+| `define-plugin` | `ReferencedIdentifier`, static member-chain matching, unary argument roles, scope binding checks, replacement | Supported |
+| `detect-dynamic-exports` | call/assignment roles, semantic globals, metadata | Supported |
+| `environment-restricted-imports` | import/export/call facts and ranged diagnostics | Supported |
+| `expo-inline-manifest-plugin` | global static-member chains, literals, replacement | Supported |
+| `expo-router-plugin` | global static-member chains, escaped literals, replacement | Supported |
+| `fix-hermes-v1-async-arrow-non-simple-params` | function parameter/body roles, UIDs, validated generated statements | Supported |
+| `fix-hermes-v1-class-in-finally` | class declaration/expression routing, `TryStatement` block/handler/finalizer roles, ancestry | Supported |
+| `fix-hermes-v1-super-in-object-accessor` | ancestry, member/object roles, object-property kind/key/computed facts | Supported |
+| `import-meta-transform-plugin` | `MetaProperty` routing and expression replacement | Supported |
+| `inline-env-vars` | `process.env` member-chain matching, global facts, escaped literals | Supported |
+| `lazy-decorators-plugin` | complete Babel decorators lowering | Intentional Babel fallback; arbitrary compiler compatibility is out of scope |
+| `minify-platform-select-plugin` | call arguments, member roles, object property lists and scalar property facts | Supported |
+| `restricted-react-api-plugin` | import specifiers, destructuring children, member chains, bindings, diagnostics | Supported |
+| `server-actions-plugin` | directives, function/export roles, captures, binding declaration/owner paths, stable scope identity/complete parent tree, UIDs, directive-safe scope/program insertion, metadata | Supported; representative extraction fixture passes, downstream snapshot differentials remain |
+| `server-data-loaders-plugin` | export declarations/specifiers, bindings, metadata, removal | Supported |
+| `server-metadata-plugin` | export declarations/specifiers, metadata, removal | Supported |
+| `use-dom-directive-plugin` | directives, import/export traversal, body insertion, metadata | Supported |
+| `warn-on-deep-rn-imports` | imports and ranged diagnostics | Supported |
+| `widgets-plugin` | object property key/value roles, scalar property facts, literal replacement | Supported |
+| `importExportLiveBindings` | import/export structure, bindings and references (including JSX), semantic rename, UIDs, program generation | Supported; representative module-lowering fixture passes, downstream snapshot differentials remain |
+| `importExportStatic` | import/export structure, bindings and references (including JSX), semantic rename, UIDs, program generation | Supported; representative module-lowering fixture passes, downstream snapshot differentials remain |
+
+The lazy decorators wrapper intentionally delegates to the complete Babel decorators transform. It is arbitrary Babel-plugin compatibility and remains on the Babel syntax-lowering route. The same applies to React Compiler, Reanimated/Worklets, Flow stripping, React Native Codegen, and other external compilers configured by the preset rather than implemented as Expo source visitors.
+
+## API mapping
+
+- Babel visitor aliases used by these transforms map to concrete Oxc subscriptions before traversal. Field-sensitive routes include `ReferencedIdentifier`, `FunctionDeclaration`, `FunctionExpression`, `ClassDeclaration`, `ClassExpression`, and `MetaProperty`.
+- `PluginPlan.children` declares structural roles before parsing. The runtime retains one native index and prefetches all requested parent types’ direct children in one packed-buffer call. Undeclared structural reads throw rather than introducing hidden per-property FFI.
+- `path.get()` provides the familiar Babel-shaped union. `getChild()` and `getChildList()` are the constrained typed alternatives. Returned paths are shallow summaries with source ranges and scalar facts.
+- Complex construction uses escaped primitives, code templates, and natively validated expression or statement fragments. Generated syntax becomes observable only after a phase boundary.
+- Binding renames use Oxc semantic identities, not textual name matching, and preserve shorthand object/destructuring keys.
+- Scope ancestry comes from Oxc's complete semantic scope table through an on-demand packed integer buffer, so empty intermediate scopes are preserved without adding object transfer to ordinary event batches.
+- Ancestry and scope payloads are similarly opt-in through `PluginPlan.ancestry` and `semantics: ['scope']`; unused parent and scope words are omitted from the stateless packed hot path.
+
+## Remaining evidence gates
+
+`test/fitment.test.ts` implements representative transforms rather than merely probing individual helpers: Metro-style import/export lowering covers semantic import references, JSX, shorthand properties, unbound calls, generated module/export statements, and an explicit reparse phase; server-action extraction covers directives, lexical captures, complete scope parents, parameters, generated top-level registration, replacement, metadata, and reparsing the output.
+
+Complete migration readiness still requires running the existing Expo snapshot suites against downstream production implementations of the two module transforms and server actions. Recorded bundle corpus, Flow fallback frequency, 11-worker behavior, and cross-platform binary checks also remain external evidence gates. These are validation gaps rather than reasons to add Metro-specific policy to this library.

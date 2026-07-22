@@ -76,6 +76,8 @@ pub fn materialize_packed_buffer(
     root_end: Option<u32>,
     field_requests: Option<napi::bindgen_prelude::Buffer>,
     include_exit: Option<bool>,
+    include_parent: Option<bool>,
+    include_scope: Option<bool>,
 ) -> napi::Result<napi::bindgen_prelude::Buffer> {
     engine::materialize_packed_buffer(
         &source,
@@ -86,6 +88,8 @@ pub fn materialize_packed_buffer(
         root_end,
         field_requests.as_deref(),
         include_exit,
+        include_parent,
+        include_scope,
     )
 }
 
@@ -152,4 +156,9 @@ pub fn compose_mappings(outer: String, inner: String, outer_name_count: u32) -> 
 #[napi]
 pub fn validate_expression(code: String, parser_mode: Option<String>) -> napi::Result<()> {
     engine::validate_expression(&code, parser_mode.as_deref())
+}
+
+#[napi]
+pub fn validate_statements(code: String, parser_mode: Option<String>) -> napi::Result<()> {
+    engine::validate_statements(&code, parser_mode.as_deref())
 }

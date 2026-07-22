@@ -18,3 +18,12 @@ const visitorPipeline = defineNativePipeline({ apiVersion: 1, phases: [{ name: '
 bench('static JavaScript visitor transform', () => {
   transform(source, 'benchmark.js', visitorPipeline);
 });
+
+const structuralPipeline = defineNativePipeline({ apiVersion: 1, phases: [{ name: 'visit', plugins: [defineNativePlugin({
+  name: 'program-children', apiVersion: 1,
+  prepare() { return { children: { Program: ['body'] } }; },
+  visitor: { Program(path) { path.getChildList('body'); } },
+})] }] });
+bench('declared structural child transform', () => {
+  transform(source, 'benchmark.js', structuralPipeline);
+});

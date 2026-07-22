@@ -23,18 +23,21 @@ The public entry point exports:
 The transform contract supports:
 
 - ordered immutable phases with a native render/reparse boundary between phases;
+- immutable reusable plugin definitions with `withOptions`, plus frozen pipeline/phase/plugin-array snapshots;
 - declarative subscriptions, fields, semantic/query requirements, metadata ownership, phase filters, and ancestry declarations;
 - an optional analyze/apply lifecycle that resolves all transform decisions before any apply hook executes;
 - `prepare`, isolated state creation, `pre`, enter/exit visitors, `post`, and guaranteed `cleanup` handling;
 - concrete and union visitor keys plus `Function`, `Statement`, `Expression`, and `MemberExpression` aliases;
 - per-plugin `skip`/`stop`, pipeline `stopAll`, targeted `path.traverse`, subtree/scope widening, remaining-file subscriptions, and explicit program revisits;
 - lazy compact `parentPath`, `findParent`, function-parent, and program-parent access;
-- scope binding/global checks, binding views, and collision-safe UID generation;
-- batched globals, imports, exports, constants, calls, binding read/write references, and lexical capture queries plus shallow node inspection;
+- declared structural child roles with one packed prefetch, Babel-shaped `get`, typed `getChild`/`getChildList`, and no hidden property-level FFI;
+- nearest-scope binding/global checks, interned scope identity backed by Oxc's complete packed scope-parent table, parent/program-owner paths, lazy binding declaration/owning-scope paths, directive-safe `scope.push`, semantic binding rename (including shorthand-property preservation), and collision-safe UID generation;
+- batched globals, imports, exports, conservative constant-expression evaluation, calls, binding read/write references, and lexical capture queries plus shallow node inspection; constant IDs and scope parents use dedicated packed integer-buffer calls rather than object transfer;
+- field-aware Babel routes for referenced identifiers, meta properties, and Oxc-collapsed function/class declaration and expression variants;
 - typed metadata ownership, structured diagnostics, deterministic errors, transactional bailout, and pristine caller fallback;
 - caller-provided parser adapters for syntax outside the built-in parser contract.
 
-The editor supports replacement/removal, append/prepend, all four insertion affinities, move/reset/indent/trim, static and functional replacement lowering, source-map marks, overlap rejection, and UTF-16 public offsets. `context.editor.supports()` is the compatibility boundary; unsupported future MagicString operations must be capability-gated rather than silently approximated.
+The editor supports replacement/removal, multiple-fragment replacement, append/prepend, body-container insertion, comments, all four insertion affinities, move/reset/indent/trim, static and functional replacement lowering, source-map marks, overlap rejection, and UTF-16 public offsets. `context.editor.supports()` is the compatibility boundary; unsupported future MagicString operations must be capability-gated rather than silently approximated.
 
 Source maps are generated as encoded VLQ in Rust. `line`, `boundary`, and `character` modes, mapping policies, names, Unicode offsets, explicit marks, encoded input maps, and multi-phase composition are implemented. Decoded segment arrays do not cross N-API.
 
@@ -92,24 +95,24 @@ git diff --check
 
 Latest verified results on macOS arm64:
 
-- 34 Vitest integration tests passed;
+- 55 Vitest integration/fitment tests passed;
 - 7 Rust unit tests passed;
 - TypeScript, `cargo fmt`, clippy with denied warnings, frozen offline install, package dry-run, and `git diff --check` passed;
-- the Metro transform spike's 500-file synthetic corpus (847.9 KiB, source maps enabled) completed in 20.0 ms median versus Babel's 210.2 ms across 40 samples: **10.52x faster than Babel** and **3.80x faster than Oxc-walker + MagicString**;
+- the latest Metro transform spike run over its 500-file synthetic corpus (847.9 KiB, source maps enabled) completed in 20.0 ms median versus Babel's 214.9 ms across 12 warm samples: **10.73x faster than Babel** and **3.80x faster than Oxc-walker + MagicString**;
 - all four implementations observed 8,500 dependencies; the benchmark checks parseability and stable checksums for every implementation;
-- native stages on the final sample were approximately parse 2.2 ms, semantic 1.9 ms, traversal 2.2 ms, and render/map 1.8 ms.
-- the standalone Vitest benchmarks averaged 4.58 ms for subscribed identifier materialization, 10.98 ms for broad materialization, and 1.93 ms for the static JavaScript visitor fixture.
+- native stages on the final sample were approximately parse 2.4 ms, semantic 2.1 ms, traversal 1.9 ms, and render/map 2.0 ms; measured N-API transfer was 2.2 ms after subtracting native stage time.
+- the latest standalone Vitest run averaged 4.13 ms for subscribed identifier materialization, 11.94 ms for broad materialization, 1.73 ms for the static JavaScript visitor fixture, and 5.78 ms for a declared structural child transform.
 
 `.github/workflows/ci.yml` now verifies the full project on macOS arm64 and builds artifacts for all eight declared NAPI targets. The matrix still needs its first hosted run before cross-platform distribution is considered validated.
 
 Benchmark numbers are machine-local and should be treated as regression indicators, not universal acceptance figures.
 
-The packed event word stream and the non-ASCII byte-to-UTF-16 index use the parse's `oxc_allocator` arena. Packed field requests and edit commands are decoded directly from N-API buffers without an intermediate word vector, and ASCII edit normalization does not allocate an offset index. Keep final code/maps, edit records containing strings, public event objects, and interned owned strings outside the arena: they either cross the N-API boundary or contain `Drop` types, which Oxc arena containers deliberately do not support.
+The packed event word stream and the non-ASCII byte-to-UTF-16 index use the parse's `oxc_allocator` arena. Packed field requests and edit commands are decoded directly from N-API buffers without an intermediate word vector, ASCII edit normalization does not allocate an offset index, and hot owned hash indexes use the same `rustc_hash` implementation used throughout Oxc. Keep final code/maps, edit records containing strings, public event objects, and interned owned strings outside the arena: they either cross the N-API boundary or contain `Drop` types, which Oxc arena containers deliberately do not support.
 
 
 ## Tests worth preserving
 
-`test/runtime.test.ts` covers parser routing, narrow native materialization, phase reparsing, lifecycle and ordering, aliases, traversal and widening, semantic queries, inspection, editor behavior, transactional conflict handling, bailout/fallback, parent paths, ancestry helpers, metadata ownership, parser adapters, map composition/tracing, Unicode and CRLF mappings, worker threads, budgets, and randomized non-overlapping edit batches.
+`test/runtime.test.ts` covers parser routing, narrow native materialization, phase reparsing, lifecycle and ordering, aliases, field-aware Babel visitor routes, member-chain matching, declared structural child roles, traversal and widening, semantic and conservative constant-expression queries, binding paths and complete scope identity/parents/insertion, inspection, editor behavior, transactional conflict handling, bailout/fallback, parent paths, ancestry helpers, metadata ownership, parser adapters, map composition/tracing, Unicode and CRLF mappings, worker threads, budgets, and randomized non-overlapping edit batches. `test/fitment.test.ts` implements representative Metro module lowering and server-action extraction end to end, including output parsing.
 
 `benchmark/runtime.bench.ts` compares narrow native event materialization, deliberately broad materialization, and the static JavaScript visitor facade. Any hot-path change should run all three.
 

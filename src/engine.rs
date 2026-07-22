@@ -8,6 +8,8 @@ use oxc_ast_visit::{Visit, walk};
 use oxc_parser::Parser;
 use oxc_semantic::{AstNodes, Scoping, SemanticBuilder};
 use oxc_span::{GetSpan, SourceType};
+use oxc_syntax::operator::{BinaryOperator, LogicalOperator, UnaryOperator};
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::generated_event_schema::{
     ast_kind_protocol_id, field_key_id, field_key_name, node_type_id, node_type_name,
@@ -106,6 +108,7 @@ pub struct NativeIndexedSession {
     node_count: u32,
     timings: Timings,
     materialized_subscriptions: Vec<String>,
+    scope_parents: Vec<u32>,
     closed: bool,
 }
 
@@ -118,20 +121,23 @@ impl NativeIndexedSession {
         subscriptions: Option<Vec<String>>,
     ) -> Result<Self> {
         let subscriptions = subscriptions.unwrap_or_default();
-        let batch = if subscriptions.is_empty() {
-            EventBatch {
-                events: Vec::new(),
-                node_count: 0,
-                emitted_count: 0,
-                timings: Timings {
-                    parse_ms: 0.0,
-                    semantic_ms: 0.0,
-                    traversal_ms: 0.0,
-                    render_and_map_ms: 0.0,
+        let (batch, scope_parents) = if subscriptions.is_empty() {
+            (
+                EventBatch {
+                    events: Vec::new(),
+                    node_count: 0,
+                    emitted_count: 0,
+                    timings: Timings {
+                        parse_ms: 0.0,
+                        semantic_ms: 0.0,
+                        traversal_ms: 0.0,
+                        render_and_map_ms: 0.0,
+                    },
                 },
-            }
+                Vec::new(),
+            )
         } else {
-            materialize(&source, &filename, &subscriptions, None, None, true)?
+            materialize_with_scope_parents(&source, &filename, &subscriptions, None, None, true)?
         };
         Ok(Self {
             source,
@@ -140,6 +146,7 @@ impl NativeIndexedSession {
             node_count: batch.node_count,
             timings: batch.timings,
             materialized_subscriptions: subscriptions,
+            scope_parents,
             closed: false,
         })
     }
@@ -200,7 +207,7 @@ impl NativeIndexedSession {
         self.ensure_materialized(&subscriptions)?;
         let root = root_start.zip(root_end);
         let mut strings = Vec::<String>::new();
-        let mut string_ids = std::collections::HashMap::<String, u32>::new();
+        let mut string_ids = FxHashMap::<String, u32>::default();
         let mut words = Vec::<u32>::new();
         let mut emitted_count = 0;
         let mut intern = |value: &str| {
@@ -288,10 +295,69 @@ impl NativeIndexedSession {
     }
 
     #[napi]
+    pub fn children_packed_buffer(
+        &mut self,
+        parent_ids: Vec<u32>,
+        parent_types: Vec<String>,
+        parent_type_ids: Vec<u32>,
+    ) -> Result<Buffer> {
+        self.ensure_open()?;
+        self.ensure_materialized(&["*".into()])?;
+        let mut parent_ids = parent_ids.into_iter().collect::<FxHashSet<_>>();
+        let parent_type_ids = parent_type_ids.into_iter().collect::<FxHashSet<_>>();
+        parent_ids.extend(
+            self.events
+                .iter()
+                .filter(|event| event.side == "enter")
+                .filter(|event| {
+                    node_type_id(&event.r#type).is_some_and(|id| parent_type_ids.contains(&id))
+                        || parent_types
+                            .iter()
+                            .any(|parent_type| alias_matches(parent_type, &event.r#type))
+                })
+                .map(|event| event.id),
+        );
+        Ok(pack_event_refs(
+            self.events.iter().filter(|event| {
+                event.side == "enter"
+                    && event
+                        .parent_id
+                        .is_some_and(|parent_id| parent_ids.contains(&parent_id))
+            }),
+            self.node_count,
+            &self.timings,
+        ))
+    }
+
+    #[napi]
+    pub fn constants_packed_buffer(&mut self, node_ids: Vec<u32>) -> Result<Buffer> {
+        self.ensure_open()?;
+        self.ensure_materialized(&["Expression".into()])?;
+        let node_ids = node_ids.into_iter().collect::<FxHashSet<_>>();
+        Ok(pack_event_refs(
+            self.events
+                .iter()
+                .filter(|event| event.side == "enter" && node_ids.contains(&event.id)),
+            self.node_count,
+            &self.timings,
+        ))
+    }
+
+    #[napi]
     pub fn query_globals(&mut self, names: Vec<String>) -> Result<Vec<GlobalFact>> {
         self.ensure_open()?;
         self.ensure_materialized(&["Identifier".into()])?;
         Ok(globals_from_events(&self.events, &names))
+    }
+
+    #[napi]
+    pub fn scope_parents_buffer(&self) -> Result<Buffer> {
+        self.ensure_open()?;
+        let mut data = Vec::with_capacity(self.scope_parents.len() * 4);
+        for parent in &self.scope_parents {
+            data.extend_from_slice(&parent.to_le_bytes());
+        }
+        Ok(data.into())
     }
 
     #[napi]
@@ -308,6 +374,7 @@ impl NativeIndexedSession {
     pub fn close(&mut self) {
         self.closed = true;
         self.events.clear();
+        self.scope_parents.clear();
     }
 
     #[napi]
@@ -352,12 +419,20 @@ impl NativeIndexedSession {
         if missing.is_empty() {
             return Ok(());
         }
-        let batch = materialize(&self.source, &self.filename, &missing, None, None, true)?;
+        let (batch, scope_parents) = materialize_with_scope_parents(
+            &self.source,
+            &self.filename,
+            &missing,
+            None,
+            None,
+            true,
+        )?;
         self.node_count = batch.node_count;
         self.timings.parse_ms += batch.timings.parse_ms;
         self.timings.semantic_ms += batch.timings.semantic_ms;
         self.timings.traversal_ms += batch.timings.traversal_ms;
-        let mut existing = std::collections::HashSet::new();
+        self.scope_parents = scope_parents;
+        let mut existing = FxHashSet::default();
         for event in &self.events {
             existing.insert((event.id, event.side.clone()));
         }
@@ -371,6 +446,86 @@ impl NativeIndexedSession {
         self.materialized_subscriptions.extend(missing);
         Ok(())
     }
+}
+
+fn pack_event_refs<'a>(
+    events: impl Iterator<Item = &'a NativeEvent>,
+    node_count: u32,
+    timings: &Timings,
+) -> Buffer {
+    let mut strings = Vec::<String>::new();
+    let mut string_ids = FxHashMap::<String, u32>::default();
+    let mut words = Vec::<u32>::new();
+    let mut emitted_count = 0_u32;
+    let mut intern = |value: &str| {
+        if let Some(id) = string_ids.get(value) {
+            *id
+        } else {
+            let id = strings.len() as u32;
+            strings.push(value.to_owned());
+            string_ids.insert(value.to_owned(), id);
+            id
+        }
+    };
+    for event in events {
+        let type_tag =
+            node_type_id(&event.r#type).unwrap_or_else(|| 0x8000_0000 | intern(&event.r#type));
+        let parent_type_tag = event.parent_type.as_ref().map_or(u32::MAX, |value| {
+            node_type_id(value).unwrap_or_else(|| 0x8000_0000 | intern(value))
+        });
+        words.extend([
+            event.sequence,
+            0,
+            event.id,
+            type_tag,
+            event.start,
+            event.end,
+            event.parent_id.unwrap_or(u32::MAX),
+            parent_type_tag,
+            event.scope_id,
+            event.scope_parent_id.unwrap_or(u32::MAX),
+            event.fields.len() as u32,
+        ]);
+        for field in &event.fields {
+            words
+                .push(field_key_id(&field.key).unwrap_or_else(|| 0x8000_0000 | intern(&field.key)));
+            words.push(
+                packed_scalar(&field.key, &field.value).unwrap_or_else(|| intern(&field.value)),
+            );
+        }
+        emitted_count += 1;
+    }
+    let strings_size: usize = strings
+        .iter()
+        .map(|value| 4 + value.len() + (4 - value.len() % 4) % 4)
+        .sum();
+    let words_offset = 48 + strings_size;
+    let mut output = Vec::with_capacity(words_offset + words.len() * 4);
+    for word in [
+        node_count | 0xc000_0000,
+        emitted_count,
+        strings.len() as u32,
+        words_offset as u32,
+    ] {
+        output.extend_from_slice(&word.to_le_bytes());
+    }
+    for value in [
+        timings.parse_ms,
+        timings.semantic_ms,
+        timings.traversal_ms,
+        timings.render_and_map_ms,
+    ] {
+        output.extend_from_slice(&value.to_le_bytes());
+    }
+    for value in strings {
+        output.extend_from_slice(&(value.len() as u32).to_le_bytes());
+        output.extend_from_slice(value.as_bytes());
+        output.resize(output.len().next_multiple_of(4), 0);
+    }
+    for word in words {
+        output.extend_from_slice(&word.to_le_bytes());
+    }
+    output.into()
 }
 
 fn expression_subscription(subscription: &str) -> bool {
@@ -495,14 +650,36 @@ fn alias_matches(subscription: &str, node_type: &str) -> bool {
                     | "FunctionDeclaration"
                     | "FunctionExpression"
             ))
-        || (subscription == "Statement" && node_type.ends_with("Statement"))
-        || (subscription == "Declaration" && node_type.ends_with("Declaration"))
+        || (subscription == "Statement"
+            && (node_type.ends_with("Statement") || declaration_subscription(node_type)))
+        || (subscription == "Declaration" && declaration_subscription(node_type))
         || (subscription == "MemberExpression"
             && matches!(
                 node_type,
                 "StaticMemberExpression" | "ComputedMemberExpression" | "PrivateFieldExpression"
             ))
         || (subscription == "Expression" && expression_subscription(node_type))
+        || (subscription == "ReferencedIdentifier" && node_type == "Identifier")
+        || (subscription == "MetaProperty" && matches!(node_type, "ImportMeta" | "NewTarget"))
+        || (matches!(
+            subscription,
+            "FunctionDeclaration" | "FunctionExpression" | "TSDeclareFunction"
+        ) && node_type == "Function")
+        || (matches!(subscription, "ClassDeclaration" | "ClassExpression") && node_type == "Class")
+}
+
+fn declaration_subscription(node_type: &str) -> bool {
+    node_type.ends_with("Declaration")
+        || matches!(
+            node_type,
+            "Function"
+                | "Class"
+                | "TSEnumDeclaration"
+                | "TSInterfaceDeclaration"
+                | "TSTypeAliasDeclaration"
+                | "TSModuleDeclaration"
+                | "TSImportEqualsDeclaration"
+        )
 }
 
 fn packed_scalar(key: &str, value: &str) -> Option<u32> {
@@ -520,6 +697,10 @@ fn packed_scalar(key: &str, value: &str) -> Option<u32> {
             | "generator"
             | "expression"
             | "hasInitializer"
+            | "method"
+            | "shorthand"
+            | "prefix"
+            | "delegate"
     ) {
         return Some(0x8000_0000 | u32::from(value == "true"));
     }
@@ -531,6 +712,7 @@ fn packed_scalar(key: &str, value: &str) -> Option<u32> {
             | "bodyEnd"
             | "specifierCount"
             | "declarationCount"
+            | "parameterCount"
     ) {
         return value
             .parse::<u32>()
@@ -541,7 +723,7 @@ fn packed_scalar(key: &str, value: &str) -> Option<u32> {
     None
 }
 
-fn intern_packed(strings: &mut std::collections::HashMap<String, u32>, value: &str) -> u32 {
+fn intern_packed(strings: &mut FxHashMap<String, u32>, value: &str) -> u32 {
     if let Some(id) = strings.get(value) {
         return *id;
     }
@@ -550,8 +732,28 @@ fn intern_packed(strings: &mut std::collections::HashMap<String, u32>, value: &s
     id
 }
 
+fn static_member_path(expression: &Expression<'_>) -> Option<String> {
+    match expression {
+        Expression::Identifier(identifier) => Some(identifier.name.to_string()),
+        Expression::StaticMemberExpression(member) => Some(format!(
+            "{}.{}",
+            static_member_path(&member.object)?,
+            member.property.name
+        )),
+        Expression::ComputedMemberExpression(member) => match &member.expression {
+            Expression::StringLiteral(property) => Some(format!(
+                "{}.{}",
+                static_member_path(&member.object)?,
+                property.value
+            )),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
 struct DirectPackedFields {
-    words: [u32; 8],
+    words: [u32; 32],
     len: usize,
 }
 
@@ -559,11 +761,11 @@ fn packed_fields_direct(
     kind: AstKind<'_>,
     scoping: &Scoping,
     requested: Option<&[String]>,
-    strings: &mut std::collections::HashMap<String, u32>,
+    strings: &mut FxHashMap<String, u32>,
 ) -> Option<DirectPackedFields> {
     let wants = |key: &str| requested.is_none_or(|fields| fields.iter().any(|field| field == key));
     let mut result = DirectPackedFields {
-        words: [0; 8],
+        words: [0; 32],
         len: 0,
     };
     let mut push = |key: &str, value: u32| {
@@ -600,6 +802,13 @@ fn packed_fields_direct(
             if wants("property") {
                 let value = intern_packed(strings, &member.property.name);
                 push("property", value);
+            }
+            if wants("memberPath")
+                && let Some(path) = static_member_path(&member.object)
+            {
+                let path = format!("{path}.{}", member.property.name);
+                let value = intern_packed(strings, &path);
+                push("memberPath", value);
             }
             let mut object = &member.object;
             while let Expression::StaticMemberExpression(parent) = object {
@@ -668,6 +877,32 @@ fn fields(kind: AstKind<'_>, scoping: &Scoping, requested: Option<&[String]>) ->
         AstKind::StringLiteral(literal) => push!("value", literal.value.to_string()),
         AstKind::NumericLiteral(literal) => push!("value", literal.value.to_string()),
         AstKind::BooleanLiteral(literal) => push!("value", literal.value.to_string()),
+        AstKind::ObjectProperty(property) => {
+            push!("kind", format!("{:?}", property.kind).to_ascii_lowercase());
+            push!("computed", property.computed.to_string());
+            push!("method", property.method.to_string());
+            push!("shorthand", property.shorthand.to_string());
+            if let Some(key) = property.key.static_name() {
+                push!("key", key.to_string());
+            }
+        }
+        AstKind::UpdateExpression(expression) => {
+            push!("operator", expression.operator.as_str().into());
+            push!("prefix", expression.prefix.to_string());
+        }
+        AstKind::UnaryExpression(expression) => {
+            push!("operator", expression.operator.as_str().into());
+            push!("prefix", "true".into());
+        }
+        AstKind::BinaryExpression(expression) => {
+            push!("operator", expression.operator.as_str().into());
+        }
+        AstKind::LogicalExpression(expression) => {
+            push!("operator", expression.operator.as_str().into());
+        }
+        AstKind::AssignmentExpression(expression) => {
+            push!("operator", expression.operator.as_str().into());
+        }
         AstKind::CallExpression(call) => {
             push!("optional", call.optional.to_string());
             push!("argumentCount", call.arguments.len().to_string());
@@ -695,6 +930,9 @@ fn fields(kind: AstKind<'_>, scoping: &Scoping, requested: Option<&[String]>) ->
         AstKind::StaticMemberExpression(member) => {
             push!("computed", "false".into());
             push!("property", member.property.name.to_string());
+            if let Some(path) = static_member_path(&member.object) {
+                push!("memberPath", format!("{path}.{}", member.property.name));
+            }
             let mut object = &member.object;
             while let Expression::StaticMemberExpression(parent) = object {
                 object = &parent.object;
@@ -712,11 +950,16 @@ fn fields(kind: AstKind<'_>, scoping: &Scoping, requested: Option<&[String]>) ->
             push!("computed", "true".into());
             if let Expression::StringLiteral(property) = &member.expression {
                 push!("property", property.value.to_string());
+                if let Some(path) = static_member_path(&member.object) {
+                    push!("memberPath", format!("{path}.{}", property.value));
+                }
             }
         }
         AstKind::Function(function) => {
+            push!("nodeKind", format!("{:?}", function.r#type));
             push!("async", function.r#async.to_string());
             push!("generator", function.generator.to_string());
+            push!("parameterCount", function.params.items.len().to_string());
             if let Some(identifier) = &function.id {
                 push!("name", identifier.name.to_string());
             }
@@ -728,6 +971,7 @@ fn fields(kind: AstKind<'_>, scoping: &Scoping, requested: Option<&[String]>) ->
         AstKind::ArrowFunctionExpression(function) => {
             push!("async", function.r#async.to_string());
             push!("expression", function.expression.to_string());
+            push!("parameterCount", function.params.items.len().to_string());
             let inset = u32::from(!function.expression);
             push!(
                 "bodyStartByte",
@@ -737,6 +981,12 @@ fn fields(kind: AstKind<'_>, scoping: &Scoping, requested: Option<&[String]>) ->
                 "bodyEndByte",
                 function.body.span.end.saturating_sub(inset).to_string(),
             );
+        }
+        AstKind::Class(class) => {
+            push!("nodeKind", format!("{:?}", class.r#type));
+            if let Some(identifier) = &class.id {
+                push!("name", identifier.name.to_string());
+            }
         }
         AstKind::ImportDeclaration(declaration) => {
             push!("source", declaration.source.value.to_string());
@@ -779,6 +1029,16 @@ fn fields(kind: AstKind<'_>, scoping: &Scoping, requested: Option<&[String]>) ->
             );
             push!("specifierCount", declaration.specifiers.len().to_string());
         }
+        AstKind::ExportAllDeclaration(declaration) => {
+            push!("source", declaration.source.value.to_string());
+            if let Some(exported) = &declaration.exported {
+                push!("exported", exported.name().to_string());
+            }
+            push!(
+                "exportKind",
+                format!("{:?}", declaration.export_kind).to_ascii_lowercase(),
+            );
+        }
         AstKind::ExportSpecifier(specifier) => {
             push!("local", specifier.local.name().to_string());
             push!("exported", specifier.exported.name().to_string());
@@ -801,6 +1061,9 @@ fn fields(kind: AstKind<'_>, scoping: &Scoping, requested: Option<&[String]>) ->
         AstKind::Directive(directive) => {
             push!("value", directive.directive.to_string());
         }
+        AstKind::YieldExpression(expression) => {
+            push!("delegate", expression.delegate.to_string());
+        }
         AstKind::ImportMeta(_) => {
             push!("meta", "import".into());
             push!("property", "meta".into());
@@ -811,7 +1074,254 @@ fn fields(kind: AstKind<'_>, scoping: &Scoping, requested: Option<&[String]>) ->
         }
         _ => {}
     }
+    if let Some(value) = constant_for_kind(kind) {
+        push!("constantKind", value.kind().into());
+        push!("constantValue", value.encode());
+    }
     result
+}
+
+#[derive(Clone, Debug)]
+enum EvaluatedConstant {
+    Null,
+    Boolean(bool),
+    Number(f64),
+    String(String),
+}
+
+impl EvaluatedConstant {
+    fn kind(&self) -> &'static str {
+        match self {
+            Self::Null => "null",
+            Self::Boolean(_) => "boolean",
+            Self::Number(_) => "number",
+            Self::String(_) => "string",
+        }
+    }
+
+    fn encode(&self) -> String {
+        match self {
+            Self::Null => String::new(),
+            Self::Boolean(value) => value.to_string(),
+            Self::Number(value) => js_number_string(*value),
+            Self::String(value) => value.clone(),
+        }
+    }
+
+    fn truthy(&self) -> bool {
+        match self {
+            Self::Null => false,
+            Self::Boolean(value) => *value,
+            Self::Number(value) => *value != 0.0 && !value.is_nan(),
+            Self::String(value) => !value.is_empty(),
+        }
+    }
+
+    fn number(&self) -> Option<f64> {
+        match self {
+            Self::Null => Some(0.0),
+            Self::Boolean(value) => Some(f64::from(*value)),
+            Self::Number(value) => Some(*value),
+            Self::String(value) if value.trim().is_empty() => Some(0.0),
+            Self::String(value) => value.trim().parse().ok(),
+        }
+    }
+}
+
+fn constant_for_kind(kind: AstKind<'_>) -> Option<EvaluatedConstant> {
+    match kind {
+        AstKind::NullLiteral(_) => Some(EvaluatedConstant::Null),
+        AstKind::BooleanLiteral(value) => Some(EvaluatedConstant::Boolean(value.value)),
+        AstKind::NumericLiteral(value) => Some(EvaluatedConstant::Number(value.value)),
+        AstKind::StringLiteral(value) => Some(EvaluatedConstant::String(value.value.to_string())),
+        AstKind::UnaryExpression(value) => evaluate_expression(&value.argument)
+            .and_then(|argument| evaluate_unary(value.operator, argument)),
+        AstKind::BinaryExpression(value) => evaluate_binary(
+            value.operator,
+            evaluate_expression(&value.left)?,
+            evaluate_expression(&value.right)?,
+        ),
+        AstKind::LogicalExpression(value) => {
+            evaluate_logical(value.operator, &value.left, &value.right)
+        }
+        AstKind::ConditionalExpression(value) => {
+            if evaluate_expression(&value.test)?.truthy() {
+                evaluate_expression(&value.consequent)
+            } else {
+                evaluate_expression(&value.alternate)
+            }
+        }
+        AstKind::ParenthesizedExpression(value) => evaluate_expression(&value.expression),
+        AstKind::SequenceExpression(value) => evaluate_sequence(&value.expressions),
+        _ => None,
+    }
+}
+
+fn evaluate_expression(expression: &Expression<'_>) -> Option<EvaluatedConstant> {
+    match expression {
+        Expression::NullLiteral(_) => Some(EvaluatedConstant::Null),
+        Expression::BooleanLiteral(value) => Some(EvaluatedConstant::Boolean(value.value)),
+        Expression::NumericLiteral(value) => Some(EvaluatedConstant::Number(value.value)),
+        Expression::StringLiteral(value) => {
+            Some(EvaluatedConstant::String(value.value.to_string()))
+        }
+        Expression::UnaryExpression(value) => evaluate_expression(&value.argument)
+            .and_then(|argument| evaluate_unary(value.operator, argument)),
+        Expression::BinaryExpression(value) => evaluate_binary(
+            value.operator,
+            evaluate_expression(&value.left)?,
+            evaluate_expression(&value.right)?,
+        ),
+        Expression::LogicalExpression(value) => {
+            evaluate_logical(value.operator, &value.left, &value.right)
+        }
+        Expression::ConditionalExpression(value) => {
+            if evaluate_expression(&value.test)?.truthy() {
+                evaluate_expression(&value.consequent)
+            } else {
+                evaluate_expression(&value.alternate)
+            }
+        }
+        Expression::ParenthesizedExpression(value) => evaluate_expression(&value.expression),
+        Expression::SequenceExpression(value) => evaluate_sequence(&value.expressions),
+        Expression::TSAsExpression(value) => evaluate_expression(&value.expression),
+        Expression::TSSatisfiesExpression(value) => evaluate_expression(&value.expression),
+        Expression::TSTypeAssertion(value) => evaluate_expression(&value.expression),
+        Expression::TSNonNullExpression(value) => evaluate_expression(&value.expression),
+        _ => None,
+    }
+}
+
+fn evaluate_sequence(expressions: &[Expression<'_>]) -> Option<EvaluatedConstant> {
+    let mut result = None;
+    for expression in expressions {
+        result = Some(evaluate_expression(expression)?);
+    }
+    result
+}
+
+fn evaluate_unary(operator: UnaryOperator, value: EvaluatedConstant) -> Option<EvaluatedConstant> {
+    match operator {
+        UnaryOperator::LogicalNot => Some(EvaluatedConstant::Boolean(!value.truthy())),
+        UnaryOperator::UnaryPlus => Some(EvaluatedConstant::Number(value.number()?)),
+        UnaryOperator::UnaryNegation => Some(EvaluatedConstant::Number(-value.number()?)),
+        UnaryOperator::BitwiseNot => Some(EvaluatedConstant::Number(
+            (!(value.number()? as i32)) as f64,
+        )),
+        _ => None,
+    }
+}
+
+fn evaluate_logical(
+    operator: LogicalOperator,
+    left: &Expression<'_>,
+    right: &Expression<'_>,
+) -> Option<EvaluatedConstant> {
+    let left = evaluate_expression(left)?;
+    match operator {
+        LogicalOperator::Or if left.truthy() => Some(left),
+        LogicalOperator::And if !left.truthy() => Some(left),
+        LogicalOperator::Coalesce if !matches!(left, EvaluatedConstant::Null) => Some(left),
+        _ => evaluate_expression(right),
+    }
+}
+
+fn evaluate_binary(
+    operator: BinaryOperator,
+    left: EvaluatedConstant,
+    right: EvaluatedConstant,
+) -> Option<EvaluatedConstant> {
+    use BinaryOperator as Op;
+    if operator == Op::Addition
+        && (matches!(left, EvaluatedConstant::String(_))
+            || matches!(right, EvaluatedConstant::String(_)))
+    {
+        return Some(EvaluatedConstant::String(format!(
+            "{}{}",
+            constant_string(&left)?,
+            constant_string(&right)?
+        )));
+    }
+    if matches!(
+        operator,
+        Op::StrictEquality | Op::StrictInequality | Op::Equality | Op::Inequality
+    ) {
+        let equal = constants_equal(&left, &right)?;
+        return Some(EvaluatedConstant::Boolean(
+            if matches!(operator, Op::StrictInequality | Op::Inequality) {
+                !equal
+            } else {
+                equal
+            },
+        ));
+    }
+    let left = left.number()?;
+    let right = right.number()?;
+    let value = match operator {
+        Op::Addition => EvaluatedConstant::Number(left + right),
+        Op::Subtraction => EvaluatedConstant::Number(left - right),
+        Op::Multiplication => EvaluatedConstant::Number(left * right),
+        Op::Division => EvaluatedConstant::Number(left / right),
+        Op::Remainder => EvaluatedConstant::Number(left % right),
+        Op::Exponential => EvaluatedConstant::Number(left.powf(right)),
+        Op::LessThan => EvaluatedConstant::Boolean(left < right),
+        Op::LessEqualThan => EvaluatedConstant::Boolean(left <= right),
+        Op::GreaterThan => EvaluatedConstant::Boolean(left > right),
+        Op::GreaterEqualThan => EvaluatedConstant::Boolean(left >= right),
+        Op::ShiftLeft => EvaluatedConstant::Number(((left as i32) << ((right as u32) & 31)) as f64),
+        Op::ShiftRight => {
+            EvaluatedConstant::Number(((left as i32) >> ((right as u32) & 31)) as f64)
+        }
+        Op::ShiftRightZeroFill => {
+            EvaluatedConstant::Number(((left as u32) >> ((right as u32) & 31)) as f64)
+        }
+        Op::BitwiseOR => EvaluatedConstant::Number(((left as i32) | (right as i32)) as f64),
+        Op::BitwiseXOR => EvaluatedConstant::Number(((left as i32) ^ (right as i32)) as f64),
+        Op::BitwiseAnd => EvaluatedConstant::Number(((left as i32) & (right as i32)) as f64),
+        _ => return None,
+    };
+    Some(value)
+}
+
+fn constants_equal(left: &EvaluatedConstant, right: &EvaluatedConstant) -> Option<bool> {
+    match (left, right) {
+        (EvaluatedConstant::Null, EvaluatedConstant::Null) => Some(true),
+        (EvaluatedConstant::Boolean(left), EvaluatedConstant::Boolean(right)) => {
+            Some(left == right)
+        }
+        (EvaluatedConstant::Number(left), EvaluatedConstant::Number(right)) => Some(left == right),
+        (EvaluatedConstant::String(left), EvaluatedConstant::String(right)) => Some(left == right),
+        _ => None,
+    }
+}
+
+fn constant_string(value: &EvaluatedConstant) -> Option<String> {
+    match value {
+        EvaluatedConstant::Null => Some("null".into()),
+        EvaluatedConstant::Boolean(value) => Some(value.to_string()),
+        EvaluatedConstant::Number(value)
+            if *value == 0.0
+                || (value.is_finite() && value.abs() >= 1e-6 && value.abs() < 1e21) =>
+        {
+            Some(js_number_string(*value))
+        }
+        EvaluatedConstant::Number(_) => None,
+        EvaluatedConstant::String(value) => Some(value.clone()),
+    }
+}
+
+fn js_number_string(value: f64) -> String {
+    if value.is_nan() {
+        "NaN".into()
+    } else if value == f64::INFINITY {
+        "Infinity".into()
+    } else if value == f64::NEG_INFINITY {
+        "-Infinity".into()
+    } else if value == 0.0 {
+        "0".into()
+    } else {
+        value.to_string()
+    }
 }
 
 struct EventCollector<'a> {
@@ -915,6 +1425,25 @@ pub fn materialize(
     root_end: Option<u32>,
     include_exit: bool,
 ) -> Result<EventBatch> {
+    materialize_with_scope_parents(
+        source,
+        filename,
+        subscriptions,
+        root_start,
+        root_end,
+        include_exit,
+    )
+    .map(|(batch, _)| batch)
+}
+
+fn materialize_with_scope_parents(
+    source: &str,
+    filename: &str,
+    subscriptions: &[String],
+    root_start: Option<u32>,
+    root_end: Option<u32>,
+    include_exit: bool,
+) -> Result<(EventBatch, Vec<u32>)> {
     let parse_started = Instant::now();
     let allocator = Allocator::default();
     let parsed = Parser::new(&allocator, source, source_type(filename, source)?).parse();
@@ -955,17 +1484,32 @@ pub fn materialize(
     collector.visit_program(&parsed.program);
     let traversal_ms = elapsed(traversal_started);
     let emitted_count = collector.events.len() as u32;
-    Ok(EventBatch {
-        events: collector.events,
-        node_count: semantic_return.semantic.nodes().len() as u32,
-        emitted_count,
-        timings: Timings {
-            parse_ms,
-            semantic_ms,
-            traversal_ms,
-            render_and_map_ms: 0.0,
+    let scope_parents = semantic_return
+        .semantic
+        .scoping()
+        .scope_descendants_from_root()
+        .map(|scope_id| {
+            semantic_return
+                .semantic
+                .scoping()
+                .scope_parent_id(scope_id)
+                .map_or(u32::MAX, |parent_id| parent_id.index() as u32)
+        })
+        .collect();
+    Ok((
+        EventBatch {
+            events: collector.events,
+            node_count: semantic_return.semantic.nodes().len() as u32,
+            emitted_count,
+            timings: Timings {
+                parse_ms,
+                semantic_ms,
+                traversal_ms,
+                render_and_map_ms: 0.0,
+            },
         },
-    })
+        scope_parents,
+    ))
 }
 
 #[allow(clippy::too_many_arguments)] // Primitive FFI inputs deliberately avoid object conversion.
@@ -1055,7 +1599,7 @@ fn materialize_packed_internal(
         sequence: 0,
         emitted_count: 0,
         words: ArenaVec::new_in(&&allocator),
-        string_ids: std::collections::HashMap::new(),
+        string_ids: FxHashMap::default(),
     };
     collector.visit_program(&parsed.program);
     let traversal_ms = elapsed(traversal_started);
@@ -1093,7 +1637,11 @@ pub fn materialize_packed_buffer(
     root_end: Option<u32>,
     packed_field_requests: Option<&[u8]>,
     include_exit: Option<bool>,
+    include_parent: Option<bool>,
+    include_scope: Option<bool>,
 ) -> Result<Buffer> {
+    let include_parent = include_parent.unwrap_or(true);
+    let include_scope = include_scope.unwrap_or(true);
     let parts = materialize_packed_internal(
         source,
         filename,
@@ -1103,8 +1651,8 @@ pub fn materialize_packed_buffer(
         root_end,
         packed_field_requests,
         include_exit,
-        true,
-        true,
+        include_parent,
+        include_scope,
     )?;
     let strings_size: usize = parts
         .strings
@@ -1113,7 +1661,9 @@ pub fn materialize_packed_buffer(
         .sum();
     let words_offset = 48 + strings_size;
     let mut output = Vec::with_capacity(words_offset + parts.data.len());
-    let shape_node_count = parts.node_count | 0xc000_0000;
+    let shape_node_count = parts.node_count
+        | if include_parent { 0x8000_0000 } else { 0 }
+        | if include_scope { 0x4000_0000 } else { 0 };
     for word in [
         shape_node_count,
         parts.emitted_count,
@@ -1198,7 +1748,7 @@ struct PackedEventCollector<'a> {
     sequence: u32,
     emitted_count: u32,
     words: ArenaVec<'a, u32>,
-    string_ids: std::collections::HashMap<String, u32>,
+    string_ids: FxHashMap<String, u32>,
 }
 
 impl PackedEventCollector<'_> {
@@ -1530,17 +2080,26 @@ pub fn inspect_nodes(source: &str, filename: &str, node_ids: &[u32]) -> Result<V
 }
 
 pub fn validate_expression(code: &str, parser_mode: Option<&str>) -> Result<()> {
+    let source = format!("({code})");
+    validate_fragment(&source, parser_mode, "expression")
+}
+
+pub fn validate_statements(code: &str, parser_mode: Option<&str>) -> Result<()> {
+    validate_fragment(code, parser_mode, "statement")
+}
+
+fn validate_fragment(code: &str, parser_mode: Option<&str>, kind: &str) -> Result<()> {
     let extension = match parser_mode.unwrap_or("js") {
         "jsx" => "jsx",
         "ts" => "ts",
         "tsx" => "tsx",
+        "dts" => "d.ts",
         _ => "js",
     };
-    let source = format!("({code})");
     let allocator = Allocator::default();
     let parsed = Parser::new(
         &allocator,
-        &source,
+        code,
         SourceType::from_path(format!("fragment.{extension}")).unwrap(),
     )
     .parse();
@@ -1549,7 +2108,7 @@ pub fn validate_expression(code: &str, parser_mode: Option<&str>) -> Result<()> 
     } else {
         Err(Error::new(
             Status::InvalidArg,
-            format!("invalid expression fragment: {:?}", parsed.diagnostics),
+            format!("invalid {kind} fragment: {:?}", parsed.diagnostics),
         ))
     }
 }

@@ -20,10 +20,25 @@ export interface PrepareContext {
 export interface NativeScope {
   readonly id: number;
   readonly parentId: number | null;
+  readonly parent: NativeScope | null;
+  readonly path: NativeNodePath | null;
   hasBinding(name: string): boolean;
   hasGlobal(name: string): boolean;
-  getBinding(name: string): { name: string; global: boolean } | null;
+  getBinding(name: string): NativeBinding | null;
+  getProgramParent(): NativeScope;
+  push(content: CodeFragment | string): void;
   generateUid(name?: string): string;
+  rename(name: string, replacement?: string): string;
+}
+
+export interface NativeBinding {
+  readonly name: string;
+  readonly global: boolean;
+  readonly scopeId?: number;
+  readonly declaration: NodeSummary | null;
+  readonly references: readonly (NodeView | NodeSummary)[];
+  readonly path: NativeNodePath | null;
+  readonly scope: NativeScope | null;
 }
 
 export interface PluginContext {
@@ -72,8 +87,10 @@ export interface CodeFragment { code: string; mapping: 'sourceless' | 'anchor-st
 export interface CodeFactory {
   identifier(name: string): CodeFragment;
   stringLiteral(value: string): CodeFragment;
+  literal(value: string | number | boolean | bigint | null): CodeFragment;
   template(parts: TemplateStringsArray, ...values: readonly (CodeFragment | string)[]): CodeFragment;
   parseExpression(code: string, parserMode?: TransformOptions['parser']): CodeFragment;
+  parseStatements(code: string, parserMode?: TransformOptions['parser']): CodeFragment;
 }
 export interface MetadataWriter { set(key: string, value: unknown): void; get(key: string): unknown }
 export type TransformDecision<Analysis = unknown> =
@@ -90,15 +107,26 @@ export interface NativeNodePath<T extends NodeView = NodeView> {
   getSource(): string;
   getLocation(): SourceLocation;
   is<TType extends string>(type: TType): this is NativeNodePath<NodeOfType<TType>>;
+  get(key: string): NativeNodePath | readonly NativeNodePath[] | null;
+  getChild(key: string): NativeNodePath | null;
+  getChildList(key: string): readonly NativeNodePath[];
+  getChildren(): readonly NativeNodePath[];
+  matchesPattern(pattern: string, allowPartial?: boolean): boolean;
   findParent(predicate: (path: NativeNodePath) => boolean): NativeNodePath | null;
+  find(predicate: (path: NativeNodePath) => boolean): NativeNodePath | null;
   getFunctionParent(): NativeNodePath | null;
   getProgramParent(): NativeNodePath | null;
   replaceWith(code: CodeFragment | string): void;
+  replaceWithMultiple(code: readonly (CodeFragment | string)[]): void;
   update(code: CodeFragment | string): void;
   overwrite(code: CodeFragment | string): void;
   remove(): void;
   insertBefore(code: string): void;
   insertAfter(code: string): void;
+  unshiftContainer(key: 'body', code: CodeFragment | string | readonly (CodeFragment | string)[]): void;
+  pushContainer(key: 'body', code: CodeFragment | string | readonly (CodeFragment | string)[]): void;
+  addComment(position: 'leading' | 'trailing' | 'inner', content: string, line?: boolean): void;
+  buildCodeFrameError(message: string): NativeTransformError;
   prependToBody(code: string): void;
   appendToBody(code: string): void;
   skip(): void;
@@ -126,15 +154,33 @@ export interface NativePlugin<State = unknown, Options = unknown> {
   post?(context: PluginContext, state: State): void;
   cleanup?(reason: 'complete' | 'bailout' | 'error', state: State): void;
 }
+export type NativePluginDefinition<State = unknown, Options = unknown> = Omit<NativePlugin<State, Options>, 'apiVersion'> & { apiVersion?: 1 };
+export interface DefinedNativePlugin<State = unknown, Options = unknown> extends NativePlugin<State, Options> {
+  withOptions(options: Options): DefinedNativePlugin<State, Options>;
+}
 export interface PipelinePhase { name: string; plugins: readonly NativePlugin<any, any>[]; reparseAfterEdits?: boolean }
 export interface NativePipeline { apiVersion: 1; phases: readonly PipelinePhase[] }
+export type NativePipelineDefinition = Omit<NativePipeline, 'apiVersion'> & { apiVersion?: 1 };
+export interface NativePluginPipelineDefinition { apiVersion?: 1; plugins: readonly NativePlugin<any, any>[]; phaseName?: string }
 
 class Bailout extends Error {}
 export class NativeTransformError extends Error {
   constructor(message: string, readonly diagnostics: Diagnostic[]) { super(message); this.name = 'NativeTransformError'; }
 }
-export function defineNativePlugin<State, Options = unknown>(plugin: NativePlugin<State, Options>): NativePlugin<State, Options> { return plugin; }
-export function defineNativePipeline(pipeline: NativePipeline): NativePipeline { return pipeline; }
+export function defineNativePlugin<State, Options = unknown>(plugin: NativePluginDefinition<State, Options>): DefinedNativePlugin<State, Options> {
+  const definition = { ...plugin, apiVersion: 1 as const, visitor: plugin.visitor == null ? undefined : Object.freeze({ ...plugin.visitor }) } as DefinedNativePlugin<State, Options>;
+  Object.defineProperty(definition, 'withOptions', { enumerable: false, value: (options: Options) => defineNativePlugin({ ...plugin, options }) });
+  return Object.freeze(definition);
+}
+export function defineNativePipeline(pipeline: NativePipelineDefinition | NativePluginPipelineDefinition | readonly NativePlugin<any, any>[]): NativePipeline {
+  const normalized: NativePipelineDefinition = isPluginList(pipeline)
+    ? { phases: [{ name: 'transform', plugins: pipeline }] }
+    : 'plugins' in pipeline
+      ? { phases: [{ name: pipeline.phaseName ?? 'transform', plugins: pipeline.plugins }] }
+      : pipeline;
+  return Object.freeze({ apiVersion: 1, phases: Object.freeze(normalized.phases.map(phase => Object.freeze({ ...phase, plugins: Object.freeze([...phase.plugins]) }))) });
+}
+function isPluginList(value: NativePipelineDefinition | NativePluginPipelineDefinition | readonly NativePlugin<any, any>[]): value is readonly NativePlugin<any, any>[] { return Array.isArray(value); }
 const parserAdapters = new Map<string, ParserAdapter>();
 export function registerParserAdapter(adapter: ParserAdapter): () => void {
   if (parserAdapters.has(adapter.name)) throw new Error(`Parser adapter already registered: ${adapter.name}`);
@@ -170,15 +216,22 @@ export class NativeTransformSession {
   #eventCache: (NativeEvent | undefined)[] = [];
   #queryCache = new Map<string, QueryResult>();
   #identifiersCache: NativeEvent[] | null = null;
+  #scopeParentsCache: Map<number, number | null> | null = null;
+  #childrenCache = new Map<number, NativeEvent[]>();
+  #prefetchedChildTypes = new Set<string>();
   readonly openMs: number;
   #native: NativeIndexedSessionBinding | null = null;
   #useStatelessInitialBatch: boolean;
   #nativeFilename: string;
-  constructor(readonly source: string, readonly filename: string, readonly options: TransformOptions = {}, initialSubscriptions: readonly string[] = []) {
+  #includeParent: boolean;
+  #includeScope: boolean;
+  constructor(readonly source: string, readonly filename: string, readonly options: TransformOptions = {}, initialSubscriptions: readonly string[] = [], retainInitialIndex = false, includeParent = true, includeScope = true) {
     const started = performance.now();
     this.#nativeFilename = parserFilename(filename, options.parser);
-    this.#useStatelessInitialBatch = initialSubscriptions.length > 0;
-    if (!this.#useStatelessInitialBatch) this.#native = new native.NativeIndexedSession(source, this.#nativeFilename, []);
+    this.#includeParent = includeParent;
+    this.#includeScope = includeScope;
+    this.#useStatelessInitialBatch = initialSubscriptions.length > 0 && !retainInitialIndex;
+    if (!this.#useStatelessInitialBatch) this.#native = new native.NativeIndexedSession(source, this.#nativeFilename, [...initialSubscriptions]);
     this.openMs = performance.now() - started;
     if (this.#native && options.maxNativeMemoryBytes != null && this.#native.memoryUsage() > options.maxNativeMemoryBytes) {
       this.#native.close();
@@ -198,10 +251,12 @@ export class NativeTransformSession {
     const started = performance.now();
     const fieldRequests = fields && Object.entries(fields).map(([nodeType, requested]) => ({ nodeType, fields: [...requested] }));
     const packed = this.#useStatelessInitialBatch
-      ? (() => { const ids: number[] = []; const fallback: string[] = []; for (const subscription of subscriptions) { const id = NODE_TYPE_IDS.get(subscription); if (id) ids.push(id); else fallback.push(subscription); } return decodePackedEnvelope(native.materializePackedBuffer(this.source, this.#nativeFilename, fallback, ids, root?.start, root?.end, packFieldRequests(fields), includeExit)); })()
+      ? (() => { const ids: number[] = []; const fallback: string[] = []; for (const subscription of subscriptions) { const id = NODE_TYPE_IDS.get(subscription); if (id) ids.push(id); else fallback.push(subscription); } return decodePackedEnvelope(native.materializePackedBuffer(this.source, this.#nativeFilename, fallback, ids, root?.start, root?.end, packFieldRequests(fields), includeExit, this.#includeParent, this.#includeScope)); })()
       : this.#binding().nextPacked([...subscriptions], root?.start, root?.end, fieldRequests, includeExit);
     this.#useStatelessInitialBatch = false;
-    packed.timings.napiTransferMs = (packed.timings.napiTransferMs ?? 0) + performance.now() - started;
+    const elapsed = performance.now() - started;
+    const nativeWork = packed.timings.parseMs + packed.timings.semanticMs + packed.timings.traversalMs + packed.timings.renderAndMapMs;
+    packed.timings.napiTransferMs = (packed.timings.napiTransferMs ?? 0) + Math.max(0, elapsed - nativeWork);
     return packed;
   }
   cacheEvent(event: NativeEvent): void { if (event.side === 'enter') this.#eventCache[event.id] = event; }
@@ -210,16 +265,20 @@ export class NativeTransformSession {
     const cacheKey = stableJson(request);
     const cached = this.#queryCache.get(cacheKey);
     if (cached) return cached;
-    const types = querySubscriptions(request);
+    const types = querySubscriptions({ ...request, constants: undefined });
     const nodes = types.length ? this.next(types, undefined, undefined, false).events.map(toNodeView) : [];
     const globals: QueryResult['globals'] = {};
     for (const fact of this.#binding().queryGlobals((request.globals ?? []).map(query => query.name))) {
       globals[fact.name] = { references: fact.references.map(reference => ({ id: reference.id, type: 'Identifier', start: reference.start, end: reference.end })) };
     }
     const constants: QueryResult['constants'] = {};
+    const constantNodes = request.constants?.length ? this.constantNodes(request.constants) : [];
     for (const id of request.constants ?? []) {
-      const node = nodes.find(candidate => candidate.id === id);
-      constants[id] = node?.value == null ? null : parseScalar(String(node.value));
+      const node = constantNodes.find(candidate => candidate.id === id);
+      constants[id] = node?.constantKind === 'string' ? String(node.constantValue)
+        : node?.constantKind === 'number' ? Number(node.constantValue)
+          : node?.constantKind === 'boolean' ? node.constantValue === true || node.constantValue === 'true'
+            : null;
     }
     const result = {
       globals,
@@ -229,9 +288,8 @@ export class NativeTransformSession {
       calls: Object.fromEntries((request.calls ?? []).map(call => [call.callee, nodes.filter(node => node.type === 'CallExpression' && node.calleeName === call.callee && (!call.globalOnly || node.calleeGlobal === true) && (!call.staticArguments || typeof node.staticArgument === 'string'))])),
       captures: Object.fromEntries((request.captures ?? []).map(capture => {
         const fn = nodes.find(node => node.id === capture.functionId);
-        const scopeParents = new Map(nodes.map(node => [node.scopeId, node.scopeParentId == null ? null : Number(node.scopeParentId)]));
-        const scopeContains = (ancestor: number, child: number) => { let scope: number | null | undefined = child; while (scope != null) { if (scope === ancestor) return true; scope = scopeParents.get(scope); } return false; };
-        const references = fn ? nodes.filter(node => node.type === 'Identifier' && node.start >= fn.start && node.end <= fn.end && node.binding !== true && node.global !== true && typeof node.bindingScopeId === 'number' && scopeContains(fn.scopeId, node.scopeId) && node.bindingScopeId !== fn.scopeId && !scopeContains(fn.scopeId, node.bindingScopeId)).map(summary) : [];
+        const scopeContains = (ancestor: number, child: number) => { let scope: number | null = child; while (scope != null) { if (scope === ancestor) return true; scope = this.scopeParentId(scope); } return false; };
+        const references = fn ? nodes.filter(node => node.type === 'Identifier' && node.start >= fn.start && node.end <= fn.end && node.binding !== true && node.global !== true && typeof node.bindingScopeId === 'number' && scopeContains(fn.scopeId, node.scopeId) && node.bindingScopeId !== fn.scopeId && !scopeContains(fn.scopeId, node.bindingScopeId)) : [];
         return [capture.functionId, references];
       })),
       bindings: (request.bindings ?? []).flatMap(binding => {
@@ -254,8 +312,58 @@ export class NativeTransformSession {
       return Object.freeze(Object.fromEntries(['id', 'type', 'start', 'end', 'scopeId', ...request.fields].filter(key => key in node).map(key => [key, node[key]]))) as NodeView;
     });
   }
+  children(parentId: number): NativeEvent[] {
+    this.#assertOpen();
+    const cached = this.#childrenCache.get(parentId);
+    if (cached) return cached;
+    const parent = this.event(parentId);
+    if (parent && [...this.#prefetchedChildTypes].some(type => type === parent.type || alias(type, parent.type))) {
+      const empty: NativeEvent[] = [];
+      this.#childrenCache.set(parentId, empty);
+      return empty;
+    }
+    this.prefetchChildren([parentId]);
+    return this.#childrenCache.get(parentId)!;
+  }
+  constantNodes(nodeIds: readonly number[]): NodeView[] {
+    this.#assertOpen();
+    const batch = decodeEventBatch(decodePackedEnvelope(this.#binding().constantsPackedBuffer([...nodeIds])));
+    for (const event of batch.events) this.cacheEvent(event);
+    return batch.events.map(toNodeView);
+  }
+  prefetchChildren(parentIds: readonly number[] = [], parentTypes: readonly string[] = []): number {
+    this.#assertOpen();
+    const missing = parentIds.filter(parentId => !this.#childrenCache.has(parentId));
+    const missingTypes = parentTypes.filter(type => !this.#prefetchedChildTypes.has(type));
+    if (missing.length === 0 && missingTypes.length === 0) return 0;
+    if (++this.#batches > (this.options.maxFollowUpBatches ?? 64)) throw new Error('follow-up-batch-budget-exceeded');
+    const started = performance.now();
+    const typeIds: number[] = [];
+    const fallbackTypes: string[] = [];
+    for (const type of missingTypes) { const id = NODE_TYPE_IDS.get(type); if (id == null) fallbackTypes.push(type); else typeIds.push(id); }
+    const batch = decodeEventBatch(decodePackedEnvelope(this.#binding().childrenPackedBuffer(missing, fallbackTypes, typeIds)));
+    for (const parentId of missing) this.#childrenCache.set(parentId, []);
+    for (const event of batch.events) {
+      this.#eventCache[event.id] = event;
+      let children = this.#childrenCache.get(event.parentId!);
+      if (!children) { children = []; this.#childrenCache.set(event.parentId!, children); }
+      children.push(event);
+    }
+    for (const type of missingTypes) this.#prefetchedChildTypes.add(type);
+    if (this.options.maxNativeMemoryBytes != null && this.#binding().memoryUsage() > this.options.maxNativeMemoryBytes) throw new Error('native-memory-budget-exceeded');
+    return performance.now() - started;
+  }
   event(nodeId: number): NativeEvent | undefined { this.#assertOpen(); const cached = this.#eventCache[nodeId]; if (cached) return cached; const event = this.#binding().inspect([nodeId])[0]; if (event) this.#eventCache[nodeId] = event; return event; }
   identifierEvents(): NativeEvent[] { this.#assertOpen(); return this.#identifiersCache ??= this.next(['Identifier'], undefined, undefined, false).events; }
+  scopeParentId(scopeId: number): number | null {
+    this.#assertOpen();
+    if (!this.#scopeParentsCache) {
+      const data = this.#binding().scopeParentsBuffer();
+      const words = new Uint32Array(data.buffer, data.byteOffset, data.byteLength >>> 2);
+      this.#scopeParentsCache = new Map(Array.from(words, (parent, id) => [id, parent === 0xffffffff ? null : parent]));
+    }
+    return this.#scopeParentsCache.get(scopeId) ?? null;
+  }
   generateUid(name = 'temp'): string {
     if (!this.#uidsInitialized) {
       for (const event of this.#binding().next(['Identifier']).events) {
@@ -330,18 +438,34 @@ export function transform(source: string, filename: string, pipeline: NativePipe
       for (const plugin of activePlugins) {
         plans.get(plugin)!.subscriptions!.forEach(type => { subscriptions.add(type); materializationSubscriptions.add(type); });
         for (const query of plans.get(plugin)!.queries ?? []) querySubscriptions(query).forEach(type => materializationSubscriptions.add(type));
+        if (plans.get(plugin)!.semantics?.some(capability => capability === 'scope')) {
+          materializationSubscriptions.add('Identifier');
+          materializationSubscriptions.add('Program');
+          materializationSubscriptions.add('Function');
+          materializationSubscriptions.add('ArrowFunctionExpression');
+          materializationSubscriptions.add('Directive');
+        }
+        if (Object.keys(plans.get(plugin)!.children ?? {}).length > 0) materializationSubscriptions.add('*');
       }
       if (subscriptions.has('*')) {
         if (!options.allowBroadVisitors) throw new Bailout('broad-catch-all-visitor');
         diagnostics.push({ code: 'broad-visitor', message: 'Catch-all visitor disables the optimized subscription path.', phase: phase.name });
       }
       const fieldRequests: Record<string, string[]> = {};
-      for (const plugin of activePlugins) for (const [type, fields] of Object.entries(plans.get(plugin)?.fields ?? {})) fieldRequests[type] = [...new Set([...(fieldRequests[type] ?? []), ...fields])];
-      const session = new NativeTransformSession(phaseSource, filename, options, [...materializationSubscriptions]);
+      for (const plugin of activePlugins) {
+        for (const [type, fields] of Object.entries(plans.get(plugin)?.fields ?? {})) fieldRequests[type] = [...new Set([...(fieldRequests[type] ?? []), ...fields])];
+        for (const [type, fields] of Object.entries(visitorRoutingFields(plugin.visitor))) fieldRequests[type] = [...new Set([...(fieldRequests[type] ?? []), ...fields])];
+      }
+      const retainsAdditionalIndex = [...materializationSubscriptions].some(type => !subscriptions.has(type));
+      const includeParent = activePlugins.some(plugin => plans.get(plugin)?.ancestry != null);
+      const includeScope = activePlugins.some(plugin => plans.get(plugin)?.semantics?.some(capability => capability === 'scope'));
+      const session = new NativeTransformSession(phaseSource, filename, options, [...materializationSubscriptions], retainsAdditionalIndex, includeParent, includeScope);
       totals.sessionOpenMs += session.openMs;
       openSession = session;
       const batch = session.nextPacked([...subscriptions], undefined, fieldRequests, activePlugins.some(plugin => visitorHasExit(plugin.visitor)));
       addTimings(totals, batch.timings);
+      const childParentTypes = activePlugins.flatMap(plugin => Object.keys(plans.get(plugin)?.children ?? {}));
+      if (childParentTypes.length > 0) totals.napiTransferMs += session.prefetchChildren([], childParentTypes);
       const activePhase = { ...phase, plugins: activePlugins };
       const dispatch = createDispatcher(session, activePhase, plans, batch, edits, metadata, diagnostics);
       for (const plugin of activePlugins) {
@@ -455,6 +579,11 @@ function createDispatcher(session: NativeTransformSession, phase: PipelinePhase,
       },
       widen(target, types, scopeOnly) { replay(session.next(expandSubscriptions(types), scopeOnly ? undefined : { start: target.start, end: target.end }, undefined, visitorHasExit(plugin.visitor)).events.filter(candidate => candidate.sequence > target.sequence && (!scopeOnly || candidate.scopeId === target.scopeId)), plugin, entry, context); },
       parent(_target, parentId) { const parent = session.event(parentId); return parent ? makePath(runtime, parent) : null; },
+      children(target) { return session.children(target.id).map(child => makePath(runtime, child)); },
+      allowsChild(type, role) { const declared = plans.get(plugin)?.children; return declared == null ? plugin.name === 'nested' : Object.entries(declared).some(([parent, roles]) => (parent === type || alias(parent, type)) && (roles.includes(role) || roles.includes('*'))); },
+      allowsAncestry() { return plugin.name === 'nested' || plans.get(plugin)?.ancestry != null; },
+      allowsScope() { return plugin.name === 'nested' || plans.get(plugin)?.semantics?.some(capability => capability === 'scope') === true; },
+      scopeCache: new Map(),
     };
     return runtime;
   };
@@ -463,7 +592,7 @@ function createDispatcher(session: NativeTransformSession, phase: PipelinePhase,
     if (!override && entry.delivered.has(deliveryKey)) return;
     if (entry.stopped || stopAll || entry.skipped.some(range => event.start > range.start && event.end <= range.end)) return;
     const visitor = override ?? plugin.visitor ?? {};
-    const handlers = matchingHandlers(visitor, event.type);
+    const handlers = matchingHandlers(visitor, event);
     for (const handler of event.side === 'exit' ? [...handlers].reverse() : handlers) {
       const callback = typeof handler === 'function' ? (event.side === 'enter' ? handler : undefined) : handler[event.side];
       if (!callback) continue;
@@ -483,33 +612,48 @@ function createDispatcher(session: NativeTransformSession, phase: PipelinePhase,
 }
 
 type PathState = { stopped: boolean; skipped: { start: number; end: number }[] };
-type PathRuntime = { session: NativeTransformSession; context: PluginContext; edits: EditCommand[]; owner: string; nextOrder: () => number; state: PathState; nested: (target: NativeEvent, visitor: Visitor<any>, value: any) => void; widen: (target: NativeEvent, types: string[], scopeOnly: boolean) => void; parent: (target: NativeEvent, id: number) => NativeNodePath | null };
+type PathRuntime = { session: NativeTransformSession; context: PluginContext; edits: EditCommand[]; owner: string; nextOrder: () => number; state: PathState; nested: (target: NativeEvent, visitor: Visitor<any>, value: any) => void; widen: (target: NativeEvent, types: string[], scopeOnly: boolean) => void; parent: (target: NativeEvent, id: number) => NativeNodePath | null; children: (target: NativeEvent) => NativeNodePath[]; allowsChild: (type: string, role: string) => boolean; allowsAncestry: () => boolean; allowsScope: () => boolean; scopeCache: Map<number, NativeScope> };
 function makePath(runtime: PathRuntime, event: NativeEvent): NativeNodePath { return new NodePathImpl(runtime, event); }
 
 class NodePathImpl implements NativeNodePath {
   readonly node: NodeView;
-  readonly parent: NodeSummary | null;
+  readonly #parent: NodeSummary | null;
   #scope?: NativeScope;
   constructor(readonly runtime: PathRuntime, readonly event: NativeEvent) {
     this.node = toNodeView(event);
-    this.parent = event.parentId == null ? null : { id: event.parentId, type: event.parentType! };
+    this.#parent = event.parentId == null ? null : { id: event.parentId, type: event.parentType! };
   }
   get context(): PluginContext { return this.runtime.context; }
-  get parentPath(): NativeNodePath | null { return this.event.parentId == null ? null : this.runtime.parent(this.event, this.event.parentId); }
-  get scope(): NativeScope { return this.#scope ??= makeScope(this.runtime.session, this.event.scopeId, this.event.scopeParentId ?? null); }
+  get parent(): NodeSummary | null { this.#assertAncestry(); return this.#parent; }
+  get parentPath(): NativeNodePath | null { this.#assertAncestry(); return this.event.parentId == null ? null : this.runtime.parent(this.event, this.event.parentId); }
+  get scope(): NativeScope { if (!this.runtime.allowsScope()) throw new Error(`${this.runtime.owner}: undeclared scope semantics`); return this.#scope ??= makeScope(this.runtime, this.event.scopeId, this.event.scopeParentId ?? null); }
   getSource(): string { return this.runtime.session.source.slice(this.event.start, this.event.end); }
   getLocation(): SourceLocation { return location(this.runtime.session.source, this.event.start, this.event.end); }
   is<TType extends string>(type: TType): this is NativeNodePath<NodeOfType<TType>> { return type === this.event.type; }
+  childrenUnchecked(): readonly NativeNodePath[] { return this.runtime.children(this.event); }
+  getChildren(): readonly NativeNodePath[] { this.#assertChildRole('*'); return this.childrenUnchecked(); }
+  get(key: string): NativeNodePath | readonly NativeNodePath[] | null { this.#assertChildRole(key); return selectChildRole(this, key, this.childrenUnchecked()); }
+  getChild(key: string): NativeNodePath | null { const value = this.get(key); if (Array.isArray(value)) throw new Error(`${this.node.type}.${key} is a child list`); return value as NativeNodePath | null; }
+  getChildList(key: string): readonly NativeNodePath[] { const value = this.get(key); if (!Array.isArray(value)) throw new Error(`${this.node.type}.${key} is not a child list`); return value; }
+  matchesPattern(pattern: string, allowPartial = false): boolean { const memberPath = this.node.memberPath; return typeof memberPath === 'string' && (memberPath === pattern || (allowPartial && memberPath.startsWith(`${pattern}.`))); }
+  #assertChildRole(role: string): void { if (!this.runtime.allowsChild(this.node.type, role)) throw new Error(`${this.runtime.owner}: undeclared child role ${this.node.type}.${role}`); }
+  #assertAncestry(): void { if (!this.runtime.allowsAncestry()) throw new Error(`${this.runtime.owner}: undeclared ancestry access`); }
   findParent(predicate: (path: NativeNodePath) => boolean): NativeNodePath | null { let parent = this.parentPath; while (parent) { if (predicate(parent)) return parent; parent = parent.parentPath; } return null; }
+  find(predicate: (path: NativeNodePath) => boolean): NativeNodePath | null { let current: NativeNodePath | null = this; while (current) { if (predicate(current)) return current; current = current.parentPath; } return null; }
   getFunctionParent(): NativeNodePath | null { return this.findParent(parent => alias('Function', parent.node.type)); }
   getProgramParent(): NativeNodePath | null { return this.findParent(parent => parent.node.type === 'Program'); }
   #edit(kind: EditKind, content?: string | CodeFragment): void { this.runtime.edits.push({ kind, start: this.event.start, end: this.event.end, content: typeof content === 'string' ? content : content?.code, mapping: typeof content === 'string' ? 'Sourceless' : mappingPolicy(content?.mapping), names: typeof content === 'string' ? undefined : content?.names ? [...content.names] : undefined, owner: this.runtime.owner, order: this.runtime.nextOrder() }); }
   replaceWith(code: string | CodeFragment): void { this.#edit('Replace', code); }
+  replaceWithMultiple(code: readonly (string | CodeFragment)[]): void { this.#edit('Replace', joinFragments(code)); }
   update(code: string | CodeFragment): void { this.#edit('Replace', code); }
   overwrite(code: string | CodeFragment): void { this.#edit('Replace', code); }
   remove(): void { this.#edit('Remove'); }
   insertBefore(content: string): void { this.runtime.edits.push({ kind: 'PrependRight', start: this.event.start, end: this.event.start, content, owner: this.runtime.owner, order: this.runtime.nextOrder() }); }
   insertAfter(content: string): void { this.runtime.edits.push({ kind: 'AppendLeft', start: this.event.end, end: this.event.end, content, owner: this.runtime.owner, order: this.runtime.nextOrder() }); }
+  unshiftContainer(key: 'body', code: string | CodeFragment | readonly (string | CodeFragment)[]): void { if (key !== 'body') throw new Error(`Unsupported container: ${key}`); this.prependToBody(fragmentText(code)); }
+  pushContainer(key: 'body', code: string | CodeFragment | readonly (string | CodeFragment)[]): void { if (key !== 'body') throw new Error(`Unsupported container: ${key}`); this.appendToBody(fragmentText(code)); }
+  addComment(position: 'leading' | 'trailing' | 'inner', content: string, line = false): void { const comment = line ? `//${content}\n` : `/*${content}*/`; if (position === 'leading') this.insertBefore(comment); else if (position === 'trailing') this.insertAfter(comment); else this.prependToBody(comment); }
+  buildCodeFrameError(message: string): NativeTransformError { return new NativeTransformError(message, [{ code: 'plugin-error', message, start: this.event.start, end: this.event.end }]); }
   prependToBody(content: string): void { const offset = Number(this.node.bodyStart ?? this.event.start); this.runtime.edits.push({ kind: 'AppendRight', start: offset, end: offset, content, owner: this.runtime.owner, order: this.runtime.nextOrder() }); }
   appendToBody(content: string): void { const offset = Number(this.node.bodyEnd ?? this.event.end); this.runtime.edits.push({ kind: 'PrependLeft', start: offset, end: offset, content, owner: this.runtime.owner, order: this.runtime.nextOrder() }); }
   skip(): void { this.runtime.state.skipped.push({ start: this.event.start, end: this.event.end }); }
@@ -521,17 +665,21 @@ class NodePathImpl implements NativeNodePath {
 }
 
 type EditKind = EditCommand['kind'];
-const matchingHandlerCache = new WeakMap<object, Map<string, VisitorHandler<any>[]>>();
+const matchingHandlerCache = new WeakMap<object, { routes: Map<string, VisitorHandler<any>[]>; fieldAware: boolean }>();
 const visitorSubscriptionsCache = new WeakMap<object, string[]>();
 const visitorExitCache = new WeakMap<object, boolean>();
-function matchingHandlers(visitor: Visitor<any>, type: string): VisitorHandler<any>[] {
+function matchingHandlers(visitor: Visitor<any>, event: NativeEvent): VisitorHandler<any>[] {
   let cache = matchingHandlerCache.get(visitor);
-  if (!cache) { cache = new Map(); matchingHandlerCache.set(visitor, cache); }
-  const cached = cache.get(type);
+  if (!cache) { cache = { routes: new Map(), fieldAware: visitorNeedsFieldRouting(visitor) }; matchingHandlerCache.set(visitor, cache); }
+  const route = cache.fieldAware ? `${event.type}:${eventField(event, 'nodeKind') ?? ''}:${event.type === 'Identifier' && eventField(event, 'global') != null ? 'reference' : ''}` : event.type;
+  const cached = cache.routes.get(route);
   if (cached) return cached;
-  const handlers = Object.entries(visitor).filter(([key, value]) => value && key.split('|').some(part => part === type || alias(part, type))).map(([, value]) => value!);
-  cache.set(type, handlers);
+  const handlers = Object.entries(visitor).filter(([key, value]) => value && key.split('|').some(part => visitorKeyMatches(part, event))).map(([, value]) => value!);
+  cache.routes.set(route, handlers);
   return handlers;
+}
+function visitorNeedsFieldRouting(visitor: Visitor<any>): boolean {
+  return Object.keys(visitor).flatMap(key => key.split('|')).some(key => key === 'ReferencedIdentifier' || isCollapsedFunctionKey(key) || isCollapsedClassKey(key));
 }
 function forEachDispatchEvent(batch: PackedEventBatch, callback: (event: NativeEvent) => void): void {
   const words = new Uint32Array(batch.data.buffer, batch.data.byteOffset, batch.data.byteLength / 4);
@@ -627,10 +775,22 @@ function packFieldRequests(fields?: Readonly<Record<string, readonly string[]>>)
 }
 function decodeTag(tag: number, known: readonly string[], strings: string[]): string { return tag & 0x80000000 ? strings[tag & 0x7fffffff] : known[tag]; }
 function decodeValue(word: number, strings: string[]): string | number | boolean { if (word & 0x80000000) return (word & 1) === 1; if (word & 0x40000000) return word & 0x3fffffff; return strings[word]; }
-function alias(key: string, type: string): boolean { return (key === 'Function' && (type === 'Function' || type === 'ArrowFunctionExpression' || type.endsWith('FunctionDeclaration') || type.endsWith('FunctionExpression'))) || (key === 'Statement' && type.endsWith('Statement')) || (key === 'Expression' && (type.endsWith('Expression') || ['Identifier', 'StringLiteral', 'NumericLiteral', 'BooleanLiteral', 'BigIntLiteral', 'RegExpLiteral', 'NullLiteral', 'TemplateLiteral'].includes(type))) || (key === 'MemberExpression' && ['StaticMemberExpression', 'ComputedMemberExpression', 'PrivateFieldExpression'].includes(type)) || key === '*'; }
-function toNodeView(event: NativeEvent): NodeView { if (event.fields.length === 0) return event as unknown as NodeView; const node: Record<string, unknown> = { id: event.id, type: event.type, start: event.start, end: event.end, scopeId: event.scopeId, scopeParentId: event.scopeParentId }; for (const field of event.fields) node[field.key] = typeof field.value === 'string' && !(field.key === 'value' && event.type === 'StringLiteral') ? parseScalar(field.value) : field.value; return node as NodeView; }
+function alias(key: string, type: string): boolean { return (key === 'Function' && (type === 'Function' || type === 'ArrowFunctionExpression' || type.endsWith('FunctionDeclaration') || type.endsWith('FunctionExpression'))) || (key === 'Statement' && (type.endsWith('Statement') || isDeclarationType(type))) || (key === 'Declaration' && isDeclarationType(type)) || (key === 'Expression' && (type.endsWith('Expression') || isLiteralExpressionType(type))) || (key === 'MemberExpression' && isMemberExpressionType(type)) || (key === 'MetaProperty' && (type === 'ImportMeta' || type === 'NewTarget')) || (key === 'ReferencedIdentifier' && type === 'Identifier') || (isCollapsedFunctionKey(key) && type === 'Function') || (isCollapsedClassKey(key) && type === 'Class') || key === '*'; }
+function visitorKeyMatches(key: string, event: NativeEvent): boolean {
+  if (key === 'ReferencedIdentifier') return event.type === 'Identifier' && eventField(event, 'global') != null;
+  if (key === 'MetaProperty') return event.type === 'ImportMeta' || event.type === 'NewTarget';
+  if (isCollapsedFunctionKey(key) || isCollapsedClassKey(key)) return event.type === (isCollapsedClassKey(key) ? 'Class' : 'Function') && eventField(event, 'nodeKind') === key;
+  return key === event.type || alias(key, event.type);
+}
+function isLiteralExpressionType(type: string): boolean { return type === 'Identifier' || type === 'StringLiteral' || type === 'NumericLiteral' || type === 'BooleanLiteral' || type === 'BigIntLiteral' || type === 'RegExpLiteral' || type === 'NullLiteral' || type === 'TemplateLiteral'; }
+function isMemberExpressionType(type: string): boolean { return type === 'StaticMemberExpression' || type === 'ComputedMemberExpression' || type === 'PrivateFieldExpression'; }
+function isCollapsedFunctionKey(key: string): boolean { return key === 'FunctionDeclaration' || key === 'FunctionExpression' || key === 'TSDeclareFunction'; }
+function isCollapsedClassKey(key: string): boolean { return key === 'ClassDeclaration' || key === 'ClassExpression'; }
+function isDeclarationType(type: string): boolean { return type.endsWith('Declaration') || type === 'Function' || type === 'Class' || type === 'TSEnumDeclaration' || type === 'TSInterfaceDeclaration' || type === 'TSTypeAliasDeclaration' || type === 'TSModuleDeclaration' || type === 'TSImportEqualsDeclaration'; }
+function eventField(event: NativeEvent, key: string): unknown { const direct = (event as NativeEvent & Record<string, unknown>)[key]; return direct ?? event.fields.find(field => field.key === key)?.value; }
+function toNodeView(event: NativeEvent): NodeView { if (event.fields.length === 0) return event as unknown as NodeView; const node: Record<string, unknown> = { id: event.id, type: event.type, start: event.start, end: event.end, parentId: event.parentId, parentType: event.parentType, scopeId: event.scopeId, scopeParentId: event.scopeParentId }; for (const field of event.fields) node[field.key] = typeof field.value === 'string' && !(field.key === 'value' && event.type === 'StringLiteral') ? parseScalar(field.value) : field.value; return node as NodeView; }
 function parseScalar(value: string): string | number | boolean { if (value === 'true') return true; if (value === 'false') return false; const number = Number(value); return value !== '' && Number.isFinite(number) ? number : value; }
-function summary(node: NodeView): NodeSummary { return { id: node.id, type: node.type }; }
+function summary(node: NodeView): NodeSummary { return { id: node.id, type: node.type, start: node.start, end: node.end, parentId: node.parentId, parentType: node.parentType }; }
 function array(value: string | readonly string[]): string[] { return typeof value === 'string' ? [value] : [...value]; }
 function expandSubscriptions(values: readonly string[]): string[] { return [...new Set(values.flatMap(value => value.split('|')))]; }
 function visitorSubscriptions(visitor?: Visitor<any>): string[] {
@@ -643,19 +803,148 @@ function visitorHasExit(visitor?: Visitor<any>): boolean {
   const cached = visitorExitCache.get(visitor); if (cached != null) return cached;
   const hasExit = Object.values(visitor).some(handler => typeof handler === 'object' && handler?.exit != null); visitorExitCache.set(visitor, hasExit); return hasExit;
 }
-function querySubscriptions(request: QueryRequest): string[] { const types: string[] = []; if (request.globals?.length || request.bindings?.length) types.push('Identifier'); if (request.imports) types.push('ImportDeclaration', 'ImportSpecifier', 'ImportDefaultSpecifier', 'ImportNamespaceSpecifier'); if (request.exports) types.push('ExportNamedDeclaration', 'ExportDefaultDeclaration', 'ExportAllDeclaration', 'ExportSpecifier'); if (request.constants?.length) types.push('StringLiteral', 'NumericLiteral', 'BooleanLiteral'); if (request.calls?.length) types.push('CallExpression'); if (request.captures?.length) types.push('Function', 'Identifier'); return types; }
+function visitorRoutingFields(visitor?: Visitor<any>): Record<string, string[]> {
+  const keys = new Set(visitor ? Object.keys(visitor).flatMap(key => key.split('|')) : []);
+  const fields: Record<string, string[]> = {};
+  if (keys.has('FunctionDeclaration') || keys.has('FunctionExpression') || keys.has('TSDeclareFunction')) fields.Function = ['nodeKind', 'name', 'async', 'generator', 'parameterCount', 'bodyStart', 'bodyEnd'];
+  if (keys.has('ClassDeclaration') || keys.has('ClassExpression')) fields.Class = ['nodeKind', 'name'];
+  if (keys.has('ReferencedIdentifier')) fields.Identifier = ['name', 'global', 'read', 'write', 'bindingScopeId'];
+  return fields;
+}
+function querySubscriptions(request: QueryRequest): string[] { const types: string[] = []; if (request.globals?.length || request.bindings?.length) types.push('Identifier'); if (request.imports) types.push('ImportDeclaration', 'ImportSpecifier', 'ImportDefaultSpecifier', 'ImportNamespaceSpecifier'); if (request.exports) types.push('ExportNamedDeclaration', 'ExportDefaultDeclaration', 'ExportAllDeclaration', 'ExportSpecifier'); if (request.constants?.length) types.push('Expression'); if (request.calls?.length) types.push('CallExpression'); if (request.captures?.length) types.push('Function', 'Identifier'); return types; }
 function mappingPolicy(value?: CodeFragment['mapping']): EditCommand['mapping'] { return ({ 'sourceless': 'Sourceless', 'anchor-start': 'AnchorStart', 'anchor-boundaries': 'AnchorBoundaries', identity: 'Identity' } as const)[value ?? 'sourceless']; }
-function makeScope(session: NativeTransformSession, id: number, parentId: number | null): NativeScope {
+function makeScope(runtime: PathRuntime, id: number, parentId: number | null): NativeScope {
+  const cached = runtime.scopeCache.get(id);
+  if (cached) return cached;
+  const session = runtime.session;
   const identifierEvents = () => session.identifierEvents();
-  const scopeChain = () => { const events = identifierEvents(); const parents = new Map(events.map(event => [event.scopeId, event.scopeParentId ?? null])); const ids = []; let scope: number | null = id; while (scope != null) { ids.push(scope); scope = parents.get(scope) ?? null; } return { events, ids }; };
-  return {
+  const scopeChain = () => { const events = identifierEvents(); const ids = []; let scope: number | null = id; while (scope != null) { ids.push(scope); scope = session.scopeParentId(scope); } return { events, ids }; };
+  const resolve = (name: string): QueryResult['bindings'][number] | undefined => {
+    const { ids } = scopeChain();
+    const bindings = session.query({ bindings: [{ name }] }).bindings;
+    return ids.map(scopeId => bindings.find(binding => binding.scopeId === scopeId)).find((binding): binding is QueryResult['bindings'][number] => binding != null);
+  };
+  let parentScope: NativeScope | undefined;
+  let ownerPath: NativeNodePath | null | undefined;
+  const scope: NativeScope = {
     id, parentId,
-    hasBinding: name => { const { events, ids } = scopeChain(); return events.some(event => ids.includes(event.scopeId) && toNodeView(event).name === name && toNodeView(event).binding === true); },
+    get parent() { return parentId == null ? null : parentScope ??= makeScope(runtime, parentId, session.scopeParentId(parentId)); },
+    get path() { return ownerPath === undefined ? ownerPath = scopeOwnerPath(runtime, id) : ownerPath; },
+    hasBinding: name => resolve(name) != null,
     hasGlobal: name => session.query({ globals: [{ name }] }).globals[name].references.length > 0,
-    getBinding(name) { if (this.hasBinding(name)) return { name, global: false }; if (this.hasGlobal(name)) return { name, global: true }; return null; },
+    getBinding(name) { const binding = resolve(name); if (binding) return makeBinding(runtime, binding); if (this.hasGlobal(name)) return { name, global: true, declaration: null, references: session.query({ globals: [{ name, references: true }] }).globals[name].references, path: null, scope: null }; return null; },
+    getProgramParent() { let current: NativeScope = this; while (current.parent) current = current.parent; return current; },
+    push(content) {
+      const owner = this.path;
+      if (!owner) throw new Error(`Cannot find owner path for scope ${id}`);
+      const directives = session.next(['Directive'], { start: owner.node.start, end: owner.node.end }, undefined, false).events.filter(event => event.scopeId === id);
+      const offset = directives.reduce((end, directive) => Math.max(end, directive.end), Number(owner.node.bodyStart ?? owner.node.start));
+      runtime.context.editor.appendLeft(offset, `${directives.length === 0 ? '' : '\n'}${fragmentText(content)}\n`);
+    },
     generateUid: name => session.generateUid(name),
+    rename(name, replacement = session.generateUid(name)) {
+      const binding = resolve(name);
+      if (!binding) throw new Error(`Cannot rename unbound identifier ${name}`);
+      if (!/^[$A-Z_a-z][$\w]*$/.test(replacement)) throw new Error(`Invalid identifier: ${replacement}`);
+      const nodes = [binding.declaration, ...binding.references].filter((node): node is NodeSummary | NodeView => node != null);
+      const shorthandParentIds = [...new Set(nodes.flatMap(node => {
+        const view = node as NodeView;
+        return view.parentId != null && isShorthandPropertyType(view.parentType) ? [view.parentId] : [];
+      }))];
+      const parentStarts = new Map(session.inspect(shorthandParentIds.map(nodeId => ({ nodeId, fields: [] }))).map(parent => [parent.id, parent.start]));
+      for (const node of nodes) {
+        const view = node as NodeView;
+        const preservesShorthandKey = view.parentId != null && parentStarts.get(view.parentId) === view.start;
+        runtime.edits.push({ kind: 'Replace', start: node.start!, end: node.end!, content: preservesShorthandKey ? `${name}: ${replacement}` : replacement, mapping: 'AnchorBoundaries', names: [name], owner: runtime.owner, order: runtime.nextOrder() });
+      }
+      return replacement;
+    },
+  };
+  runtime.scopeCache.set(id, scope);
+  return scope;
+}
+
+function scopeOwnerPath(runtime: PathRuntime, scopeId: number): NativeNodePath | null {
+  const events = runtime.session.next(['Program', 'Function', 'ArrowFunctionExpression'], undefined, undefined, false).events;
+  const owner = events.find(event => event.scopeId === scopeId && (event.type === 'Program' || event.type === 'Function' || event.type === 'ArrowFunctionExpression'));
+  return owner ? makePath(runtime, owner) : null;
+}
+
+function makeBinding(runtime: PathRuntime, binding: QueryResult['bindings'][number]): NativeBinding {
+  let path: NativeNodePath | null | undefined;
+  let scope: NativeScope | null | undefined;
+  return {
+    ...binding,
+    global: false,
+    get path() { return path === undefined ? path = bindingOwnerPath(runtime, binding.declaration) : path; },
+    get scope() { if (scope !== undefined) return scope; const event = binding.declaration == null ? undefined : runtime.session.event(binding.declaration.id); return scope = makeScope(runtime, binding.scopeId, event?.scopeParentId ?? null); },
   };
 }
+
+function bindingOwnerPath(runtime: PathRuntime, declaration: NodeSummary | null): NativeNodePath | null {
+  let parentId = declaration?.parentId;
+  let fallback: NativeNodePath | null = declaration == null ? null : pathForId(runtime, declaration.id);
+  while (parentId != null) {
+    const event = runtime.session.event(parentId);
+    if (!event) break;
+    const path = makePath(runtime, event);
+    fallback = path;
+    if (isBindingOwnerType(event.type)) return path;
+    parentId = event.parentId;
+  }
+  return fallback;
+}
+function pathForId(runtime: PathRuntime, nodeId: number): NativeNodePath | null { const event = runtime.session.event(nodeId); return event ? makePath(runtime, event) : null; }
+function isBindingOwnerType(type: string): boolean { return type === 'VariableDeclarator' || type === 'Function' || type === 'Class' || type === 'ImportSpecifier' || type === 'ImportDefaultSpecifier' || type === 'ImportNamespaceSpecifier' || type === 'FormalParameter' || type === 'FormalParameterRest' || type === 'CatchParameter'; }
+
+function joinFragments(values: readonly (string | CodeFragment)[]): CodeFragment {
+  return { code: values.map(value => typeof value === 'string' ? value : value.code).join('\n'), mapping: values.some(value => typeof value !== 'string' && value.mapping === 'identity') ? 'identity' : 'anchor-boundaries', names: values.flatMap(value => typeof value === 'string' ? [] : [...(value.names ?? [])]) };
+}
+function fragmentText(value: string | CodeFragment | readonly (string | CodeFragment)[]): string { return isFragmentList(value) ? joinFragments(value).code : typeof value === 'string' ? value : value.code; }
+function isFragmentList(value: string | CodeFragment | readonly (string | CodeFragment)[]): value is readonly (string | CodeFragment)[] { return Array.isArray(value); }
+
+const LIST_CHILD_ROLES = new Set(['arguments', 'body', 'declarations', 'decorators', 'directives', 'elements', 'params', 'properties', 'specifiers']);
+function selectChildRole(path: NodePathImpl, key: string, children: readonly NativeNodePath[]): NativeNodePath | readonly NativeNodePath[] | null {
+  const type = path.node.type;
+  const at = (index: number) => children[index] ?? null;
+  const last = () => children.at(-1) ?? null;
+  if (key === 'body') {
+    if (type === 'Program' || type === 'BlockStatement' || type === 'FunctionBody' || type === 'ClassBody' || type === 'TSModuleBlock') return children;
+    return last();
+  }
+  if (key === 'arguments' && (type === 'CallExpression' || type === 'NewExpression')) return children.slice(1);
+  if (key === 'callee' && (type === 'CallExpression' || type === 'NewExpression')) return at(0);
+  if (key === 'declarations' && type === 'VariableDeclaration') return children.filter(child => child.node.type === 'VariableDeclarator');
+  if (key === 'specifiers' && (type === 'ImportDeclaration' || type === 'ExportNamedDeclaration')) return children.filter(child => child.node.type.endsWith('Specifier'));
+  if (key === 'directives' && (type === 'Program' || type === 'FunctionBody')) return children.filter(child => child.node.type === 'Directive');
+  if (key === 'decorators' && (type === 'Class' || type === 'MethodDefinition' || type === 'PropertyDefinition' || type === 'FormalParameter')) return children.filter(child => child.node.type === 'Decorator');
+  if (key === 'properties' && (type === 'ObjectExpression' || type === 'ObjectPattern' || type === 'ObjectAssignmentTarget')) return children;
+  if (key === 'elements' && (type === 'ArrayExpression' || type === 'ArrayPattern' || type === 'ArrayAssignmentTarget')) return children;
+  if (key === 'params' && alias('Function', type)) {
+    const parameters = children.find(child => child.node.type === 'FormalParameters');
+    return parameters instanceof NodePathImpl ? parameters.childrenUnchecked() : [];
+  }
+  if (key === 'id' && (type === 'VariableDeclarator' || type === 'Function' || type === 'Class' || type === 'TSEnumDeclaration' || type === 'TSInterfaceDeclaration' || type === 'TSTypeAliasDeclaration')) return at(0);
+  if (key === 'init' && type === 'VariableDeclarator') return children.length > 1 ? last() : null;
+  if (key === 'expression' && type === 'ExpressionStatement') return at(0);
+  if ((key === 'key' || key === 'value') && (type === 'ObjectProperty' || type === 'BindingProperty' || type === 'AssignmentTargetPropertyProperty')) return key === 'key' ? at(0) : last();
+  if ((key === 'object' || key === 'property') && isMemberExpressionType(type)) return key === 'object' ? at(0) : last();
+  if ((key === 'left' || key === 'right') && (type === 'BinaryExpression' || type === 'LogicalExpression' || type === 'AssignmentExpression' || type === 'PrivateInExpression')) return key === 'left' ? at(0) : last();
+  if (key === 'argument' && (type === 'UnaryExpression' || type === 'UpdateExpression' || type === 'AwaitExpression' || type === 'YieldExpression' || type === 'ReturnStatement' || type === 'ThrowStatement' || type === 'SpreadElement')) return at(0);
+  if (key === 'test' && (type === 'IfStatement' || type === 'ConditionalExpression' || type === 'WhileStatement' || type === 'DoWhileStatement' || type === 'ForStatement' || type === 'SwitchStatement')) return at(0);
+  if (key === 'consequent' && (type === 'IfStatement' || type === 'ConditionalExpression')) return at(1);
+  if (key === 'alternate' && (type === 'IfStatement' || type === 'ConditionalExpression')) return at(2);
+  if (key === 'block' && type === 'TryStatement') return children.find(child => child.node.type === 'BlockStatement') ?? null;
+  if (key === 'handler' && type === 'TryStatement') return children.find(child => child.node.type === 'CatchClause') ?? null;
+  if (key === 'finalizer' && type === 'TryStatement') { const blocks = children.filter(child => child.node.type === 'BlockStatement'); return blocks.length > 1 ? blocks[1] : null; }
+  if (key === 'superClass' && type === 'Class') { const candidates = children.filter(child => child.node.type !== 'Decorator' && child.node.type !== 'ClassBody' && !child.node.type.startsWith('TS')); return typeof path.node.name === 'string' ? candidates[1] ?? null : candidates[0] ?? null; }
+  if ((key === 'key' || key === 'value') && (type === 'MethodDefinition' || type === 'PropertyDefinition' || type === 'AccessorProperty')) return key === 'key' ? children.find(child => child.node.type !== 'Decorator') ?? null : last();
+  if (key === 'source' && (type.startsWith('Import') || type.startsWith('Export'))) return children.find(child => child.node.type === 'StringLiteral') ?? null;
+  if (key === 'declaration' && (type === 'ExportNamedDeclaration' || type === 'ExportDefaultDeclaration')) return children.find(child => !child.node.type.endsWith('Specifier') && child.node.type !== 'StringLiteral') ?? null;
+  if (LIST_CHILD_ROLES.has(key)) return [];
+  throw new Error(`${type} does not expose child role ${JSON.stringify(key)}`);
+}
+function isShorthandPropertyType(type: string | undefined): boolean { return type === 'ObjectProperty' || type === 'BindingProperty' || type === 'AssignmentTargetPropertyIdentifier'; }
 function location(source: string, start: number, end: number): SourceLocation { const at = (offset: number) => { const before = source.slice(0, offset); const lines = before.split('\n'); return { line: lines.length, column: lines.at(-1)!.length }; }; return { start: at(start), end: at(end) }; }
 function locationOffset(source: string, position: SourceLocation['start']): number { const lines = source.split('\n'); let offset = 0; for (let line = 1; line < position.line; line++) offset += (lines[line - 1]?.length ?? 0) + 1; return offset + position.column; }
 const SOURCE_HINTS = ['process.env', 'require', 'import', 'export', 'codegenNativeComponent'] as const;
@@ -680,7 +969,15 @@ function classifyForTransform(filename: string, source: string): ParseClassifica
   return { syntax, supported, get codegenCandidate() { return source.includes('codegenNativeComponent') || source.includes('codegenNativeCommands'); }, reason: supported ? 'oxc-supported' : syntax === 'flow' ? 'flow-requires-parser-adapter' : 'unknown-extension' };
 }
 function addTimings(target: NativeTransformResult['timings'], value: NativeTransformResult['timings']): void { target.parseMs += value.parseMs; target.semanticMs += value.semanticMs; target.traversalMs += value.traversalMs; target.renderAndMapMs += value.renderAndMapMs; target.napiTransferMs = (target.napiTransferMs ?? 0) + (value.napiTransferMs ?? 0); }
-const codeFactory: CodeFactory = { identifier(name) { if (!/^[$A-Z_a-z][$\w]*$/.test(name)) throw new Error(`Invalid identifier: ${name}`); return { code: name, mapping: 'sourceless' }; }, stringLiteral: value => ({ code: JSON.stringify(value), mapping: 'sourceless' }), template(parts, ...values) { return { code: parts.reduce((code, part, index) => code + part + (index < values.length ? typeof values[index] === 'string' ? values[index] : values[index].code : ''), ''), mapping: 'sourceless' }; }, parseExpression(code, parserMode) { native.validateExpression(code, parserMode === 'auto' ? undefined : parserMode); return { code, mapping: 'anchor-boundaries' }; } };
+const EDITOR_CAPABILITIES = new Set(['append', 'prepend', 'update', 'overwrite', 'remove', 'move', 'reset', 'indent', 'trim', 'addSourceMapLocation', 'replace', 'replaceAll']);
+const codeFactory: CodeFactory = {
+  identifier(name) { if (!/^[$A-Z_a-z][$\w]*$/.test(name)) throw new Error(`Invalid identifier: ${name}`); return { code: name, mapping: 'sourceless' }; },
+  stringLiteral: value => ({ code: JSON.stringify(value), mapping: 'sourceless' }),
+  literal(value) { return { code: typeof value === 'bigint' ? `${value}n` : value === null ? 'null' : typeof value === 'string' ? JSON.stringify(value) : String(value), mapping: 'sourceless' }; },
+  template(parts, ...values) { return { code: parts.reduce((code, part, index) => code + part + (index < values.length ? typeof values[index] === 'string' ? values[index] : values[index].code : ''), ''), mapping: 'sourceless' }; },
+  parseExpression(code, parserMode) { native.validateExpression(code, parserMode === 'auto' ? undefined : parserMode); return { code, mapping: 'anchor-boundaries' }; },
+  parseStatements(code, parserMode) { native.validateStatements(code, parserMode === 'auto' ? undefined : parserMode); return { code, mapping: 'anchor-boundaries' }; },
+};
 function stableJson(value: unknown): string { if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`; if (value && typeof value === 'object') return `{${Object.entries(value).sort(([a], [b]) => a.localeCompare(b)).map(([key, item]) => `${JSON.stringify(key)}:${stableJson(item)}`).join(',')}}`; return JSON.stringify(value); }
 
 function makeEditor(session: NativeTransformSession, edits: EditCommand[], owner: string, nextOrder: () => number): NativeEditor {
@@ -689,7 +986,7 @@ function makeEditor(session: NativeTransformSession, edits: EditCommand[], owner
   const leading = () => source.length - source.trimStart().length;
   const trailing = () => source.length - source.trimEnd().length;
   return {
-    supports: capability => ['append', 'prepend', 'update', 'overwrite', 'remove', 'move', 'reset', 'indent', 'trim', 'addSourceMapLocation', 'replace', 'replaceAll'].includes(capability),
+    supports: capability => EDITOR_CAPABILITIES.has(capability),
     append: content => push('AppendLeft', source.length, source.length, content),
     prepend: content => push('PrependRight', 0, 0, content),
     appendLeft: (offset, content) => push('AppendLeft', offset, offset, content),

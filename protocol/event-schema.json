@@ -387,6 +387,8 @@
     "bindingScopeId",
     "binding",
     "value",
+    "constantKind",
+    "constantValue",
     "optional",
     "argumentCount",
     "calleeName",
@@ -411,6 +413,15 @@
     "kind",
     "declarationCount",
     "hasInitializer",
-    "meta"
+    "meta",
+    "key",
+    "method",
+    "shorthand",
+    "operator",
+    "prefix",
+    "parameterCount",
+    "delegate",
+    "nodeKind",
+    "memberPath"
   ]
 }

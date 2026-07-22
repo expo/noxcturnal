@@ -31,6 +31,25 @@ test('materializes arbitrary subscriptions without a complete ESTree', () => {
   assert.throws(() => session.next(['Program']), /session-closed/);
 });
 
+test('materializes complete compact call payloads on the stateless packed path', () => {
+  const session = new NativeTransformSession("require('value')", 'fixture.js', {}, ['CallExpression']);
+  const [call] = session.next(['CallExpression']).events;
+  assert.deepEqual(Object.fromEntries(call.fields.map(field => [field.key, field.value])), {
+    optional: false, argumentCount: 1, calleeName: 'require', calleeGlobal: true, staticArgument: 'value',
+  });
+  session.close();
+});
+
+test('exposes common scalar discriminants without child-tree transfer', () => {
+  const session = NativeTransformSession.open('const value = { platform: 1 }; value.total += -2;', 'fixture.js');
+  const events = session.next(['ObjectProperty', 'AssignmentExpression', 'UnaryExpression'], undefined, undefined, false).events;
+  const property = events.find(event => event.type === 'ObjectProperty')!;
+  assert.deepEqual(Object.fromEntries(property.fields.map(field => [field.key, field.value])), { kind: 'init', computed: false, method: false, shorthand: false, key: 'platform' });
+  assert.equal(events.find(event => event.type === 'AssignmentExpression')!.fields.find(field => field.key === 'operator')?.value, '+=');
+  assert.equal(events.find(event => event.type === 'UnaryExpression')!.fields.find(field => field.key === 'operator')?.value, '-');
+  session.close();
+});
+
 test('retains materially less native event memory for narrow plans', () => {
   const source = Array.from({ length: 200 }, (_, index) => `export const value${index} = source${index} + ${index};`).join('\n');
   const narrow = NativeTransformSession.open(source, 'fixture.js');
@@ -84,6 +103,35 @@ test('supports aliases, enter/exit order, state, skip, and stop', () => {
   assert.deepEqual(order, ['pre', 'enter:1', 'exit', 'post', 'cleanup:complete']);
 });
 
+test('routes Babel-compatible semantic and collapsed Oxc visitor keys', () => {
+  const seen = { references: [] as string[], meta: [] as string[], functionDeclarations: [] as string[], functionExpressions: 0, classDeclarations: [] as string[], classExpressions: 0 };
+  const plugin = defineNativePlugin({ name: 'babel-routes', apiVersion: 1, visitor: {
+    ReferencedIdentifier(path) { seen.references.push(String(path.node.name)); },
+    MetaProperty(path) { seen.meta.push(path.node.type); },
+    FunctionDeclaration(path) { seen.functionDeclarations.push(String(path.node.name)); },
+    FunctionExpression() { seen.functionExpressions++; },
+    ClassDeclaration(path) { seen.classDeclarations.push(String(path.node.name)); },
+    ClassExpression() { seen.classExpressions++; },
+  } });
+  transform('const local = globalValue; use(local); function declared() {} const expression = function () {}; class Declared {} const ClassExpressionValue = class {}; import.meta; function target() { return new.target }', 'fixture.js', defineNativePipeline({ apiVersion: 1, phases: [{ name: 'routes', plugins: [plugin] }] }));
+  assert.deepEqual(seen.references, ['globalValue', 'use', 'local']);
+  assert.deepEqual(seen.meta, ['ImportMeta', 'NewTarget']);
+  assert.deepEqual(seen.functionDeclarations, ['declared', 'target']);
+  assert.equal(seen.functionExpressions, 1);
+  assert.deepEqual(seen.classDeclarations, ['Declared']);
+  assert.equal(seen.classExpressions, 1);
+});
+
+test('matches static member chains without traversing child objects', () => {
+  const matches: string[] = [];
+  const plugin = defineNativePlugin({ name: 'member-patterns', apiVersion: 1, visitor: { MemberExpression(path) {
+    if (path.matchesPattern('process.env.NODE_ENV')) matches.push(path.getSource());
+    if (path.matchesPattern('process.env', true)) matches.push(`partial:${path.getSource()}`);
+  } } });
+  transform("process.env.NODE_ENV; process['env'].EXPO_PUBLIC_VALUE; process[key].dynamic", 'fixture.js', defineNativePipeline({ apiVersion: 1, phases: [{ name: 'match', plugins: [plugin] }] }));
+  assert.deepEqual(matches, ['process.env.NODE_ENV', 'partial:process.env.NODE_ENV', 'partial:process.env', "partial:process['env'].EXPO_PUBLIC_VALUE", "partial:process['env']"]);
+});
+
 test('orders multiple plugins forward on enter and in reverse on exit', () => {
   const order: string[] = [];
   const plugin = (name: string) => defineNativePlugin({
@@ -110,6 +158,25 @@ test('supports targeted nested traversal and semantic global queries', () => {
   assert.ok(!names.some(([name]) => name === 'outside'));
 });
 
+test('resolves bindings through identifier-free intermediate scopes', () => {
+  const observations: unknown[] = [];
+  const plugin = defineNativePlugin({
+    name: 'complete-scope-tree', apiVersion: 1,
+    prepare() { return { semantics: ['scope'] }; },
+    visitor: {
+      ArrowFunctionExpression(path) {
+        const binding = path.scope.getBinding('outer');
+        const program = path.scope.getProgramParent();
+        let depth = 0;
+        for (let scope = path.scope.parent; scope; scope = scope.parent) depth++;
+        observations.push([binding?.name, binding?.scope === program, depth]);
+      },
+    },
+  });
+  transform('const outer = 1; { { (() => outer); } }', 'fixture.js', defineNativePipeline({ apiVersion: 1, phases: [{ name: 'scope', plugins: [plugin] }] }));
+  assert.deepEqual(observations, [['outer', true, 3]]);
+});
+
 test('executes coarse global queries and targeted inspection', () => {
   const session = NativeTransformSession.open('globalValue + (() => { const globalValue = 1; return globalValue })()', 'fixture.js');
   const query = session.query({ globals: [{ name: 'globalValue', references: true }] });
@@ -118,6 +185,20 @@ test('executes coarse global queries and targeted inspection', () => {
   const [inspected] = session.inspect([{ nodeId: reference.id, fields: ['name', 'global'] }]);
   assert.equal(inspected.name, 'globalValue');
   assert.equal(inspected.global, true);
+});
+
+test('conservatively evaluates side-effect-free constant expressions', () => {
+  const source = `const a = 1 + 2 * 3; const b = !0 && "yes"; const c = true ? "123" : "x"; const d = sideEffect();`;
+  const session = NativeTransformSession.open(source, 'fixture.js');
+  const expressions = session.next(['BinaryExpression', 'LogicalExpression', 'ConditionalExpression', 'CallExpression'], undefined, undefined, false).events;
+  const bySource = new Map(expressions.map(event => [source.slice(event.start, event.end), event.id]));
+  const ids = ['1 + 2 * 3', '!0 && "yes"', 'true ? "123" : "x"', 'sideEffect()'].map(expression => bySource.get(expression)!);
+  const constants = session.query({ constants: ids }).constants;
+  assert.equal(constants[ids[0]], 7);
+  assert.equal(constants[ids[1]], 'yes');
+  assert.equal(constants[ids[2]], '123');
+  assert.equal(constants[ids[3]], null);
+  session.close();
 });
 
 test('provides module specifier and declaration facts for source transforms', () => {
@@ -188,6 +269,33 @@ test('builds deterministic cache keys and falls back with pristine source', () =
   assert.equal(result.metadata.fallback, true);
 });
 
+test('creates immutable pipelines and reusable option-bound plugin definitions', () => {
+  const definition = defineNativePlugin<undefined, { value: string }>({ name: 'configured', apiVersion: 1, prepare(_context, options) { assert.equal(options.value, 'configured'); } });
+  const configured = definition.withOptions({ value: 'configured' });
+  const pipeline = defineNativePipeline({ apiVersion: 1, phases: [{ name: 'visit', plugins: [configured] }] });
+  assert.ok(Object.isFrozen(definition));
+  assert.ok(Object.isFrozen(pipeline));
+  assert.ok(Object.isFrozen(pipeline.phases));
+  assert.ok(Object.isFrozen(pipeline.phases[0].plugins));
+  assert.notEqual(pipelineCacheKey(definitionPipeline(definition), 'fixture.js'), pipelineCacheKey(definitionPipeline(configured), 'fixture.js'));
+  transform('value', 'fixture.js', pipeline);
+});
+
+test('supplies API versions and supports the single-pass pipeline shorthand', () => {
+  const plugin = defineNativePlugin({ name: 'concise', visitor: { NumericLiteral(path) { path.replaceWith('2'); } } });
+  const pipeline = defineNativePipeline([plugin]);
+  assert.equal(plugin.apiVersion, 1);
+  assert.equal(pipeline.apiVersion, 1);
+  assert.equal(pipeline.phases[0].name, 'transform');
+  const result = transform('const value = 1;', 'fixture.js', pipeline);
+  assert.equal(result.status, 'complete');
+  assert.equal(result.code, 'const value = 2;');
+});
+
+function definitionPipeline(plugin: ReturnType<typeof defineNativePlugin>): ReturnType<typeof defineNativePipeline> {
+  return defineNativePipeline({ apiVersion: 1, phases: [{ name: 'visit', plugins: [plugin] }] });
+}
+
 test('rejects conflicting edits transactionally', () => {
   const plugin = name => defineNativePlugin({ name, apiVersion: 1, visitor: { Identifier: path => path.replaceWith(name) } });
   assert.throws(() => transform('const value = 1', 'fixture.js', defineNativePipeline({ apiVersion: 1, phases: [{ name: 'source', plugins: [plugin('a'), plugin('b')] }] })), /overlapping edits/);
@@ -217,20 +325,39 @@ test('expands the Expression alias consistently for literal expressions', () => 
   assert.ok(seen.includes('RegExpLiteral'));
 });
 
+test('treats declarations as Babel statements despite collapsed Oxc node kinds', () => {
+  const declarations: string[] = [];
+  const statements: string[] = [];
+  const plugin = defineNativePlugin({ name: 'declaration-alias', apiVersion: 1, visitor: {
+    Declaration(path) { declarations.push(path.node.type); },
+    Statement(path) { statements.push(path.node.type); },
+  } });
+  transform("import value from 'pkg'; const item = value; function fn() {} class Example {} export { item };", 'fixture.js', defineNativePipeline({ apiVersion: 1, phases: [{ name: 'visit', plugins: [plugin] }] }));
+  assert.deepEqual(declarations, ['ImportDeclaration', 'VariableDeclaration', 'Function', 'Class', 'ExportNamedDeclaration']);
+  assert.deepEqual(statements, declarations);
+});
+
 test('provides parent paths backed by native indexed records', () => {
   let parentType: string | undefined;
-  const plugin = defineNativePlugin({ name: 'parent', apiVersion: 1, visitor: { NumericLiteral(path) { parentType = path.parentPath?.node.type; } } });
+  const plugin = defineNativePlugin({ name: 'parent', apiVersion: 1, prepare() { return { ancestry: 'parent' }; }, visitor: { NumericLiteral(path) { parentType = path.parentPath?.node.type; } } });
   transform('const value = 1', 'fixture.js', defineNativePipeline({ apiVersion: 1, phases: [{ name: 'visit', plugins: [plugin] }] }));
   assert.equal(parentType, 'VariableDeclarator');
 });
 
 test('provides lazy ancestor helpers without recursive node materialization', () => {
   let ancestors: unknown;
-  const plugin = defineNativePlugin({ name: 'ancestors', apiVersion: 1, visitor: { NumericLiteral(path) {
+  const plugin = defineNativePlugin({ name: 'ancestors', apiVersion: 1, prepare() { return { ancestry: 'findParent' }; }, visitor: { NumericLiteral(path) {
     ancestors = [path.findParent(parent => parent.node.type === 'ReturnStatement')?.node.type, path.getFunctionParent()?.node.type, path.getProgramParent()?.node.type];
   } } });
   transform('function fixture() { return 1 }', 'fixture.js', defineNativePipeline({ apiVersion: 1, phases: [{ name: 'visit', plugins: [plugin] }] }));
   assert.deepEqual(ancestors, ['ReturnStatement', 'Function', 'Program']);
+});
+
+test('requires ancestry and scope payloads to be declared', () => {
+  const ancestry = defineNativePlugin({ name: 'undeclared-ancestry', apiVersion: 1, visitor: { Identifier(path) { void path.parentPath; } } });
+  const scope = defineNativePlugin({ name: 'undeclared-scope', apiVersion: 1, visitor: { Identifier(path) { void path.scope; } } });
+  assert.throws(() => transform('value', 'fixture.js', defineNativePipeline({ apiVersion: 1, phases: [{ name: 'visit', plugins: [ancestry] }] })), /undeclared ancestry access/);
+  assert.throws(() => transform('value', 'fixture.js', defineNativePipeline({ apiVersion: 1, phases: [{ name: 'visit', plugins: [scope] }] })), /undeclared scope semantics/);
 });
 
 test('honors plan phase filters and validates expression fragments natively', () => {
@@ -242,6 +369,18 @@ test('honors plan phase filters and validates expression fragments natively', ()
   });
   transform('value', 'fixture.js', defineNativePipeline({ apiVersion: 1, phases: [{ name: 'first', plugins: [plugin] }, { name: 'second', plugins: [plugin] }] }));
   assert.deepEqual(visited, ['second']);
+});
+
+test('builds escaped primitive literals and validates statement fragments', () => {
+  const plugin = defineNativePlugin({ name: 'code-factory', apiVersion: 1, visitor: { Program(path) {
+    assert.equal(path.context.code.literal('quoted\nvalue').code, '"quoted\\nvalue"');
+    assert.equal(path.context.code.literal(12n).code, '12n');
+    path.appendToBody(path.context.code.parseStatements('\nexport const generated = null;').code);
+    assert.throws(() => path.context.code.parseStatements('export const ='), /invalid statement fragment/);
+  } } });
+  const result = transform('const original = true;', 'fixture.js', defineNativePipeline({ apiVersion: 1, phases: [{ name: 'generate', plugins: [plugin] }] }));
+  assert.equal(result.status, 'complete');
+  assert.equal(result.code, 'const original = true;\nexport const generated = null;');
 });
 
 test('composes source maps across phases', () => {
@@ -328,6 +467,123 @@ test('exposes binding reads, writes, and lexical captures', () => {
   assert.ok(facts.bindings[0].references.some(reference => reference.read === true));
   assert.ok(facts.captures[fn.id].some(reference => reference.id === facts.bindings[0].references[0].id));
   session.close();
+});
+
+test('resolves the nearest binding and renames only its semantic references', () => {
+  const plugin = defineNativePlugin({
+    name: 'rename-binding', apiVersion: 1,
+    prepare() { return { semantics: ['scope'] }; },
+    visitor: { Program(path) {
+      const binding = path.scope.getBinding('value');
+      assert.equal(binding?.global, false);
+      assert.equal(binding?.references.length, 3);
+      assert.equal(binding?.path?.node.type, 'VariableDeclarator');
+      assert.equal(binding?.scope?.id, path.scope.id);
+      assert.equal(binding?.scope?.getProgramParent().id, path.scope.id);
+      assert.equal(path.scope.rename('value', 'renamed'), 'renamed');
+    } },
+  });
+  const source = 'let value = 1; use(value); const object = { value }; ({ value } = object); function nested(value) { return value }';
+  const result = transform(source, 'fixture.js', defineNativePipeline({ apiVersion: 1, phases: [{ name: 'rename', plugins: [plugin] }] }));
+  assert.equal(result.status, 'complete');
+  assert.equal(result.code, 'let renamed = 1; use(renamed); const object = { value: renamed }; ({ value: renamed } = object); function nested(value) { return value }');
+});
+
+test('exposes lazy Babel-shaped binding paths and scope parent chains', () => {
+  let observed: unknown;
+  const plugin = defineNativePlugin({ name: 'binding-path', apiVersion: 1, prepare() { return { semantics: ['scope'] }; }, visitor: { Function(path) {
+    if (path.node.name !== 'nested') return;
+    const binding = path.scope.getBinding('parameter');
+    observed = [binding?.path?.node.type, binding?.scope?.id, binding?.scope === path.scope, binding?.scope?.parent?.id, binding?.scope?.getProgramParent().id];
+  } } });
+  transform('function nested(parameter) { return parameter }', 'fixture.js', defineNativePipeline({ apiVersion: 1, phases: [{ name: 'scope', plugins: [plugin] }] }));
+  assert.deepEqual(observed, ['FormalParameter', 1, true, 0, 0]);
+});
+
+test('pushes generated declarations into a scope after its directive prologue', () => {
+  const plugin = defineNativePlugin({ name: 'scope-push', apiVersion: 1, prepare() { return { semantics: ['scope'] }; }, visitor: { Function(path) {
+    if (path.node.name === 'action') path.scope.push(path.context.code.parseStatements('var injected = 1;'));
+  } } });
+  const result = transform('function action() { "use action"; return injected }', 'fixture.js', defineNativePipeline({ apiVersion: 1, phases: [{ name: 'push', plugins: [plugin] }] }));
+  assert.equal(result.status, 'complete');
+  assert.equal(result.code, 'function action() { "use action";\nvar injected = 1;\n return injected }');
+});
+
+test('provides Babel-shaped multi-replacement, container, comment, and code-frame helpers', () => {
+  const plugin = defineNativePlugin({ name: 'path-conveniences', apiVersion: 1, visitor: {
+    Program(path) { path.unshiftContainer('body', '/* first */\n'); path.pushContainer('body', '\n/* last */'); },
+    NumericLiteral(path) { path.replaceWithMultiple(['2', '3']); assert.match(path.buildCodeFrameError('fixture').message, /fixture/); },
+  } });
+  const result = transform('const value = 1;', 'fixture.js', defineNativePipeline({ apiVersion: 1, phases: [{ name: 'edit', plugins: [plugin] }] }));
+  assert.equal(result.status, 'complete');
+  assert.equal(result.code, '/* first */\nconst value = 2\n3;\n/* last */');
+});
+
+test('provides lazy compact structural child roles without recursive ESTree transfer', () => {
+  const observed: Record<string, string[]> = {};
+  const sources = (value: ReturnType<any>) => (Array.isArray(value) ? value : value ? [value] : []).map(path => path.getSource());
+  const plugin = defineNativePlugin({ name: 'child-roles', apiVersion: 1,
+    prepare() { return { children: { Program: ['body'], ImportDeclaration: ['specifiers', 'source'], VariableDeclarator: ['id', 'init'], CallExpression: ['callee', 'arguments'], ObjectProperty: ['key', 'value'], Function: ['params'], FormalParameters: ['*'], ExportDefaultDeclaration: ['declaration'] } }; },
+    visitor: {
+    Program(path) { observed.body = sources(path.get('body')); },
+    ImportDeclaration(path) { observed.specifiers = sources(path.get('specifiers')); observed.source = sources(path.get('source')); },
+    VariableDeclarator(path) { if (path.getSource().includes('result')) { observed.id = sources(path.get('id')); observed.init = sources(path.get('init')); } },
+    CallExpression(path) { observed.callee = sources(path.get('callee')); observed.arguments = sources(path.get('arguments')); },
+    ObjectProperty(path) { observed.key = sources(path.get('key')); observed.value = sources(path.get('value')); },
+    Function(path) { observed.params = sources(path.get('params')); },
+    ExportDefaultDeclaration(path) { observed.declaration = sources(path.get('declaration')); },
+  } });
+  transform("import item, { x as y } from 'pkg'; function f(a, { b }) {} const result = fn({ platform: 1 }, y); export default result;", 'fixture.js', defineNativePipeline({ apiVersion: 1, phases: [{ name: 'inspect', plugins: [plugin] }] }), { maxFollowUpBatches: 2 });
+  assert.deepEqual(observed.callee, ['fn']);
+  assert.deepEqual(observed.arguments, ['{ platform: 1 }', 'y']);
+  assert.deepEqual(observed.key, ['platform']);
+  assert.deepEqual(observed.value, ['1']);
+  assert.deepEqual(observed.id, ['result']);
+  assert.deepEqual(observed.init, ['fn({ platform: 1 }, y)']);
+  assert.deepEqual(observed.source, ["'pkg'"]);
+  assert.deepEqual(observed.specifiers, ['item', 'x as y']);
+  assert.deepEqual(observed.params, ['a', '{ b }']);
+  assert.deepEqual(observed.declaration, ['result']);
+  assert.equal(observed.body.length, 4);
+});
+
+test('requires structural child roles to be declared before parsing', () => {
+  const plugin = defineNativePlugin({ name: 'undeclared-child', apiVersion: 1, visitor: { CallExpression(path) { path.get('arguments'); } } });
+  assert.throws(() => transform('run(1)', 'fixture.js', defineNativePipeline({ apiVersion: 1, phases: [{ name: 'visit', plugins: [plugin] }] })), /undeclared child role CallExpression\.arguments/);
+});
+
+test('distinguishes control-flow and class child roles needed by structural fixes', () => {
+  const observed: Record<string, string | null> = {};
+  const one = (value: unknown) => value && !Array.isArray(value) ? value as { getSource(): string } : null;
+  const plugin = defineNativePlugin({ name: 'structural-roles', apiVersion: 1,
+    prepare() { return { children: { TryStatement: ['block', 'handler', 'finalizer'], Class: ['superClass', 'body'] } }; },
+    visitor: {
+      TryStatement(path) { observed.block = one(path.get('block'))?.getSource() ?? null; observed.handler = one(path.get('handler'))?.getSource() ?? null; observed.finalizer = one(path.get('finalizer'))?.getSource() ?? null; },
+      Class(path) { observed.superClass = one(path.get('superClass'))?.getSource() ?? null; observed.classBody = one(path.get('body'))?.getSource() ?? null; },
+    },
+  });
+  transform('try { work() } catch (error) { recover(error) } finally { cleanup() } class Child extends Parent { method() {} }', 'fixture.js', defineNativePipeline({ apiVersion: 1, phases: [{ name: 'inspect', plugins: [plugin] }] }));
+  assert.deepEqual(observed, { block: '{ work() }', handler: 'catch (error) { recover(error) }', finalizer: '{ cleanup() }', superClass: 'Parent', classBody: '{ method() {} }' });
+});
+
+test('implements a Platform.select-style transform through declared compact roles', () => {
+  const plugin = defineNativePlugin({ name: 'platform-select', apiVersion: 1,
+    prepare() { return { children: { CallExpression: ['callee', 'arguments'], ObjectExpression: ['properties'], ObjectProperty: ['value'] } }; },
+    visitor: { CallExpression(path) {
+      const callee = path.getChild('callee');
+      if (!callee?.matchesPattern('Platform.select')) return;
+      const argument = path.getChildList('arguments')[0];
+      if (!argument?.is('ObjectExpression')) return;
+      const properties = argument.getChildList('properties');
+      if (properties.some(property => property.node.type !== 'ObjectProperty' || property.node.computed === true)) return;
+      const selected = properties.find(property => property.node.key === 'ios') ?? properties.find(property => property.node.key === 'native') ?? properties.find(property => property.node.key === 'default');
+      const value = selected?.getChild('value');
+      if (value) path.replaceWith(value.getSource());
+    } },
+  });
+  const result = transform("const selected = Platform.select({ web: 'web', native: makeNative(), ios: 'ios' });", 'fixture.js', defineNativePipeline({ apiVersion: 1, phases: [{ name: 'platform', plugins: [plugin] }] }), { maxFollowUpBatches: 2 });
+  assert.equal(result.status, 'complete');
+  assert.equal(result.code, "const selected = 'ios';");
 });
 
 test('validates metadata ownership', () => {

@@ -12,6 +12,9 @@ interface NativeBinding {
     nextPacked(subscriptions: string[], rootStart?: number, rootEnd?: number, fieldRequests?: { nodeType: string; fields: string[] }[], includeExit?: boolean): { data: Buffer; strings: string[]; nodeCount: number; emittedCount: number; timings: Timings };
     queryGlobals(names: string[]): { name: string; references: { id: number; start: number; end: number }[] }[];
     inspect(nodeIds: number[]): import('./types.js').NativeEvent[];
+    childrenPackedBuffer(parentIds: number[], parentTypes: string[], parentTypeIds: number[]): Buffer;
+    constantsPackedBuffer(nodeIds: number[]): Buffer;
+    scopeParentsBuffer(): Buffer;
     commit(edits: EditCommand[], sourceMapMode?: string): { code: string; map: NativeVlqMap; timings: Timings };
     close(): void;
     memoryUsage(): number;
@@ -22,13 +25,14 @@ interface NativeBinding {
   commitPackedBuffer(source: string, filename: string, data: Buffer, sourceMapMode?: string): { code: string; map: NativeVlqMap; timings: Timings };
   materializeEvents(source: string, filename: string, subscriptions: string[], rootStart?: number, rootEnd?: number): EventBatch;
   materializePackedEvents(source: string, filename: string, subscriptions: string[], subscriptionIds: number[], rootStart?: number, rootEnd?: number, fieldRequests?: Buffer, includeExit?: boolean): { data: Buffer; strings: string[]; nodeCount: number; emittedCount: number; timings: Timings };
-  materializePackedBuffer(source: string, filename: string, subscriptions: string[], subscriptionIds: number[], rootStart?: number, rootEnd?: number, fieldRequests?: Buffer, includeExit?: boolean): Buffer;
+  materializePackedBuffer(source: string, filename: string, subscriptions: string[], subscriptionIds: number[], rootStart?: number, rootEnd?: number, fieldRequests?: Buffer, includeExit?: boolean, includeParent?: boolean, includeScope?: boolean): Buffer;
   queryGlobals(source: string, filename: string, names: string[]): { name: string; references: { id: number; start: number; end: number }[] }[];
   inspectNodes(source: string, filename: string, nodeIds: number[]): import('./types.js').NativeEvent[];
   nativeVersion(): string;
   oxcVersion(): string;
   composeMappings(outer: string, inner: string, outerNameCount: number): string;
   validateExpression(code: string, parserMode?: string): void;
+  validateStatements(code: string, parserMode?: string): void;
 }
 
 const require = createRequire(import.meta.url);
@@ -56,6 +60,7 @@ function loadBinding(): NativeBinding {
       inspectNodes: unavailable as never,
       composeMappings: unavailable as never,
       validateExpression: unavailable as never,
+      validateStatements: unavailable as never,
     };
   }
 }

@@ -43,6 +43,8 @@ export interface NodeView {
   readonly end: number;
   readonly scopeId: ScopeId;
   readonly scopeParentId?: ScopeId;
+  readonly parentId?: NodeId;
+  readonly parentType?: string;
   readonly [field: string]: unknown;
 }
 
@@ -68,7 +70,7 @@ export interface NativeNodeMap {
 export type KnownNodeType = keyof NativeNodeMap;
 export type NodeOfType<T extends string> = T extends KnownNodeType ? NativeNodeMap[T] : NodeView;
 
-export interface NodeSummary { id: NodeId; type: string; start?: number; end?: number }
+export interface NodeSummary { id: NodeId; type: string; start?: number; end?: number; parentId?: NodeId; parentType?: string }
 export interface SourceLocation { start: Position; end: Position }
 export interface Position { line: number; column: number }
 export interface Timings {
@@ -117,7 +119,7 @@ export interface QueryResult {
   exports: NodeView[];
   constants: Record<number, string | number | boolean | null>;
   calls: Record<string, NodeView[]>;
-  captures: Record<number, NodeSummary[]>;
+  captures: Record<number, NodeView[]>;
   bindings: { name: string; scopeId: ScopeId; declaration: NodeSummary | null; references: NodeView[] }[];
 }
 export interface InspectRequest { nodeId: NodeId; fields: string[] }
@@ -130,6 +132,7 @@ export interface PluginPlan {
   metadataWrites?: readonly string[];
   phases?: readonly string[];
   ancestry?: 'parent' | 'findParent' | 'functionParent' | 'programParent' | number;
+  children?: Readonly<Record<string, readonly string[]>>;
 }
 
 export interface TransformOptions {
