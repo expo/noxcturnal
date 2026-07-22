@@ -278,6 +278,7 @@ export class NativeTransformSession {
     const packed = this.#useStatelessInitialBatch
       ? (() => { const { ids, fallback } = encodeSubscriptions(subscriptions); return decodePackedEnvelope(native.materializePackedBuffer(this.source, this.#nativeFilename, fallback, ids, root?.start, root?.end, packFieldRequests(fields), includeExit, this.#includeParent, this.#includeScope, [...this.#identifierNames], [...this.#staticMemberPatterns])); })()
       : this.#binding().nextPacked([...subscriptions], root?.start, root?.end, fieldRequests, includeExit);
+    packed.includeExit = includeExit;
     this.#useStatelessInitialBatch = false;
     const elapsed = performance.now() - started;
     const nativeWork = packed.timings.parseMs + packed.timings.semanticMs + packed.timings.traversalMs + packed.timings.renderAndMapMs;
@@ -770,6 +771,8 @@ function createDispatcher(
   const activeTraversals = new Set<string>();
   const contexts = new Map<NativePlugin<any, any>, DispatcherEntry>();
   const phaseRoutes = new Map<string, PhaseRoute[]>();
+  const routesByIdentifierName = phase.plugins.some(plugin => plans.get(plugin)?.identifierNames != null);
+  const routesByStaticMemberPath = phase.plugins.some(plugin => plans.get(plugin)?.staticMemberPatterns != null);
   const metadataOwners = new Map<string, string>();
   for (const plugin of phase.plugins) for (const key of plans.get(plugin)?.metadataWrites ?? []) {
     const owner = metadataOwners.get(key);
@@ -860,9 +863,9 @@ function createDispatcher(
     for (const event of events) dispatchOne(event, synthetic, entry, context, visitor, state);
   };
   const routesFor = (event: NativeEvent): PhaseRoute[] => {
-    const key = event.type === 'Identifier'
+    const key = routesByIdentifierName && event.type === 'Identifier'
       ? `${eventRouteKey(event)}:${eventField(event, 'name') ?? ''}`
-      : event.type === 'StaticMemberExpression'
+      : routesByStaticMemberPath && event.type === 'StaticMemberExpression'
         ? `${event.type}:${eventField(event, 'memberPath') ?? ''}`
         : eventRouteKey(event);
     let routes = phaseRoutes.get(key);

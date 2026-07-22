@@ -9,6 +9,7 @@ export interface PackedEventBatch {
   timings: EventBatch['timings'];
   includeParent?: boolean;
   includeScope?: boolean;
+  includeExit?: boolean;
 }
 
 const EDIT_KINDS: Record<EditCommand['kind'], number> = {
@@ -32,15 +33,26 @@ const DYNAMIC_TAG = 0x80000000;
 const TAG_INDEX = 0x7fffffff;
 const NUMBER_VALUE = 0x40000000;
 const NUMBER_PAYLOAD = 0x3fffffff;
+const EXIT_TAG = 0x20000000;
+const NODE_COUNT_PAYLOAD = 0x1fffffff;
 const MISSING_VALUE = 0xffffffff;
 const PACKED_HEADER_BYTES = 48;
+const EMPTY_FIELDS = Object.freeze([]) as unknown as NativeEvent['fields'];
 
 export function forEachDispatchEvent(batch: PackedEventBatch, callback: (event: NativeEvent) => void): void {
   const words = new Uint32Array(batch.data.buffer, batch.data.byteOffset, batch.data.byteLength / 4);
+  const enterEvents: (NativeEvent | undefined)[] | null = batch.includeExit === false ? null : [];
   let offset = 0;
   for (let index = 0; index < batch.emittedCount; index++) {
-    const sequence = words[offset++];
-    const side = words[offset++] === 0 ? 'enter' : 'exit';
+    const sequenceWord = words[offset++];
+    if ((sequenceWord & DYNAMIC_TAG) !== 0) {
+      const id = words[offset++];
+      const enter = enterEvents?.[id];
+      if (!enter) throw new Error(`packed exit event ${id} has no preceding enter event`);
+      callback({ ...enter, sequence: sequenceWord & TAG_INDEX, side: 'exit' });
+      continue;
+    }
+    const sequence = sequenceWord;
     const id = words[offset++];
     const type = decodeTag(words[offset++], NODE_TYPES, batch.strings);
     const start = words[offset++];
@@ -52,7 +64,7 @@ export function forEachDispatchEvent(batch: PackedEventBatch, callback: (event: 
     const fieldCount = words[offset++];
     const event: NativeEvent = {
       sequence,
-      side,
+      side: 'enter',
       id,
       type,
       start,
@@ -61,7 +73,7 @@ export function forEachDispatchEvent(batch: PackedEventBatch, callback: (event: 
       parentType: rawParentType === MISSING_VALUE ? undefined : decodeTag(rawParentType, NODE_TYPES, batch.strings),
       scopeId,
       scopeParentId: rawScopeParentId === MISSING_VALUE ? undefined : rawScopeParentId,
-      fields: [],
+      fields: EMPTY_FIELDS,
     };
     const node = event as NativeEvent & Record<string, unknown>;
     for (let field = 0; field < fieldCount; field++) {
@@ -71,13 +83,14 @@ export function forEachDispatchEvent(batch: PackedEventBatch, callback: (event: 
         ? parseScalar(value)
         : value;
     }
+    if (enterEvents) enterEvents[id] = event;
     callback(event);
   }
 }
 
 export function decodePackedEnvelope(buffer: Buffer): PackedEventBatch {
   const shapeNodeCount = buffer.readUInt32LE(0);
-  const nodeCount = shapeNodeCount & NUMBER_PAYLOAD;
+  const nodeCount = shapeNodeCount & NODE_COUNT_PAYLOAD;
   const emittedCount = buffer.readUInt32LE(4);
   const stringCount = buffer.readUInt32LE(8);
   const wordsOffset = buffer.readUInt32LE(12);
@@ -103,15 +116,24 @@ export function decodePackedEnvelope(buffer: Buffer): PackedEventBatch {
     timings,
     includeParent: (shapeNodeCount & DYNAMIC_TAG) !== 0,
     includeScope: (shapeNodeCount & NUMBER_VALUE) !== 0,
+    includeExit: (shapeNodeCount & EXIT_TAG) !== 0,
   };
 }
 
 export function decodeEventBatch(batch: PackedEventBatch): EventBatch {
   const events = new Array<NativeEvent>(batch.emittedCount);
+  const enterEvents: (NativeEvent | undefined)[] | null = batch.includeExit === false ? null : [];
   let offset = 0;
   for (let index = 0; index < events.length; index++) {
-    const sequence = batch.data.readUInt32LE(offset); offset += 4;
-    const side = batch.data.readUInt32LE(offset) === 0 ? 'enter' : 'exit'; offset += 4;
+    const sequenceWord = batch.data.readUInt32LE(offset); offset += 4;
+    if ((sequenceWord & DYNAMIC_TAG) !== 0) {
+      const id = batch.data.readUInt32LE(offset); offset += 4;
+      const enter = enterEvents?.[id];
+      if (!enter) throw new Error(`packed exit event ${id} has no preceding enter event`);
+      events[index] = { ...enter, sequence: sequenceWord & TAG_INDEX, side: 'exit' };
+      continue;
+    }
+    const sequence = sequenceWord;
     const id = batch.data.readUInt32LE(offset); offset += 4;
     const type = decodeTag(batch.data.readUInt32LE(offset), NODE_TYPES, batch.strings); offset += 4;
     const start = batch.data.readUInt32LE(offset); offset += 4;
@@ -129,9 +151,9 @@ export function decodeEventBatch(batch: PackedEventBatch): EventBatch {
       };
       offset += 8;
     }
-    events[index] = {
+    const event: NativeEvent = {
       sequence,
-      side,
+      side: 'enter',
       id,
       type,
       start,
@@ -142,6 +164,8 @@ export function decodeEventBatch(batch: PackedEventBatch): EventBatch {
       scopeParentId: rawScopeParentId === MISSING_VALUE ? undefined : rawScopeParentId,
       fields,
     };
+    if (enterEvents) enterEvents[id] = event;
+    events[index] = event;
   }
   return {
     events,

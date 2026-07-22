@@ -19,6 +19,15 @@ bench('static JavaScript visitor transform', () => {
   transform(source, 'benchmark.js', visitorPipeline);
 });
 
+const exitVisitorPipeline = defineNativePipeline([defineNativePlugin({
+  name: 'identifier-enter-exit',
+  apiVersion: 1,
+  visitor: { Identifier: { enter() {}, exit() {} } },
+})]);
+bench('enter/exit JavaScript visitor transform', () => {
+  transform(source, 'benchmark.js', exitVisitorPipeline);
+});
+
 const pluginFanoutPipeline = defineNativePipeline({
   apiVersion: 1,
   phases: [{

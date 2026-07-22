@@ -33,10 +33,12 @@ test('materializes arbitrary subscriptions without a complete ESTree', () => {
 
 test('materializes complete compact call payloads on the stateless packed path', () => {
   const session = new NativeTransformSession("require('value')", 'fixture.js', {}, ['CallExpression']);
-  const [call] = session.next(['CallExpression']).events;
+  const [call, callExit] = session.next(['CallExpression']).events;
   assert.deepEqual(Object.fromEntries(call.fields.map(field => [field.key, field.value])), {
     optional: false, argumentCount: 1, calleeName: 'require', calleeGlobal: true, staticArgument: 'value',
   });
+  assert.equal(callExit.side, 'exit');
+  assert.deepEqual(callExit.fields, call.fields);
   session.close();
 });
 
@@ -48,6 +50,44 @@ test('exposes common scalar discriminants without child-tree transfer', () => {
   assert.equal(events.find(event => event.type === 'AssignmentExpression')!.fields.find(field => field.key === 'operator')?.value, '+=');
   assert.equal(events.find(event => event.type === 'UnaryExpression')!.fields.find(field => field.key === 'operator')?.value, '-');
   session.close();
+});
+
+test('keeps direct packed fields equivalent to retained event fields', () => {
+  const source = `"use strict";
+    import base, { named as local } from 'pkg';
+    export const value = local + 2;
+    const emoji = '😀';
+    let target = base.member;
+    target += -1;
+    target++;
+    const object = { target };
+    new Factory('value');
+    import.meta;
+    function *generate() { yield *target; }
+    const arrow = () => object;
+    class Example {}
+    export { target };
+  `;
+  const subscriptions = [
+    'Identifier', 'StringLiteral', 'NumericLiteral', 'BinaryExpression',
+    'AssignmentExpression', 'UnaryExpression', 'UpdateExpression', 'NewExpression',
+    'StaticMemberExpression', 'ImportDeclaration', 'ExportNamedDeclaration',
+    'VariableDeclaration', 'VariableDeclarator', 'Directive', 'YieldExpression',
+    'MetaProperty', 'ObjectProperty', 'Function', 'ArrowFunctionExpression', 'Class',
+    'ImportSpecifier', 'ImportDefaultSpecifier', 'ExportSpecifier',
+  ];
+  const retained = NativeTransformSession.open(source, 'fixture.js');
+  const direct = new NativeTransformSession(source, 'fixture.js', {}, subscriptions);
+  const normalize = (session: NativeTransformSession) => session
+    .next(subscriptions, undefined, undefined, false)
+    .events
+    .map(({ sequence: _sequence, ...event }) => ({
+      ...event,
+      fields: Object.fromEntries(event.fields.map(field => [field.key, field.value])),
+    }));
+  assert.deepEqual(normalize(direct), normalize(retained));
+  direct.close();
+  retained.close();
 });
 
 test('retains materially less native event memory for narrow plans', () => {

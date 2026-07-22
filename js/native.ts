@@ -9,7 +9,7 @@ interface NativeBinding {
   available: boolean;
   NativeIndexedSession: new (source: string, filename: string, subscriptions?: string[]) => {
     next(subscriptions: string[], rootStart?: number, rootEnd?: number, fieldRequests?: { nodeType: string; fields: string[] }[]): EventBatch;
-    nextPacked(subscriptions: string[], rootStart?: number, rootEnd?: number, fieldRequests?: { nodeType: string; fields: string[] }[], includeExit?: boolean): { data: Buffer; strings: string[]; nodeCount: number; emittedCount: number; timings: Timings };
+    nextPacked(subscriptions: string[], rootStart?: number, rootEnd?: number, fieldRequests?: { nodeType: string; fields: string[] }[], includeExit?: boolean): { data: Buffer; strings: string[]; nodeCount: number; emittedCount: number; timings: Timings; includeExit?: boolean };
     queryGlobals(names: string[]): { name: string; references: { id: number; start: number; end: number }[] }[];
     inspect(nodeIds: number[]): import('./types.js').NativeEvent[];
     childrenPackedBuffer(parentIds: number[], parentTypes: string[], parentTypeIds: number[]): Buffer;

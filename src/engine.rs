@@ -103,6 +103,7 @@ impl NativeIndexedSession {
             })
             .cloned()
             .collect();
+        hydrate_exit_events(&mut events);
         if let Some(requests) = field_requests {
             for event in &mut events {
                 if let Some(request) = requests
@@ -157,6 +158,11 @@ impl NativeIndexedSession {
                 && root.is_none_or(|(start, end)| event.start >= start && event.end <= end)
                 && (include_exit.unwrap_or(true) || event.side == "enter")
         }) {
+            if event.side == "exit" {
+                words.extend([event.sequence | 0x8000_0000, event.id]);
+                emitted_count += 1;
+                continue;
+            }
             let requested_fields = field_requests.as_ref().and_then(|requests| {
                 requests
                     .iter()
@@ -177,7 +183,6 @@ impl NativeIndexedSession {
             });
             words.extend([
                 event.sequence,
-                u32::from(event.side == "exit"),
                 event.id,
                 type_tag,
                 event.start,
@@ -404,7 +409,6 @@ fn pack_event_refs<'a>(
         });
         words.extend([
             event.sequence,
-            0,
             event.id,
             type_tag,
             event.start,
@@ -689,6 +693,7 @@ struct DirectPackedFields {
 fn packed_fields_direct(
     kind: AstKind<'_>,
     scoping: &Scoping,
+    utf16: Option<&[u32]>,
     requested: Option<&[String]>,
     precomputed_member_path: Option<&str>,
     strings: &mut FxHashMap<String, u32>,
@@ -706,6 +711,107 @@ fn packed_fields_direct(
         }
     };
     match kind {
+        AstKind::IdentifierReference(identifier) => {
+            if wants("name") {
+                let value = intern_packed(strings, &identifier.name);
+                push("name", value);
+            }
+            let reference = identifier
+                .reference_id
+                .get()
+                .map(|id| scoping.get_reference(id));
+            push(
+                "global",
+                0x8000_0000
+                    | u32::from(reference.is_some_and(|reference| reference.symbol_id().is_none())),
+            );
+            if let Some(reference) = reference {
+                push("read", 0x8000_0000 | u32::from(reference.is_read()));
+                push("write", 0x8000_0000 | u32::from(reference.is_write()));
+                if let Some(symbol_id) = reference.symbol_id() {
+                    push(
+                        "bindingScopeId",
+                        0x4000_0000 | scoping.symbol_scope_id(symbol_id).index() as u32,
+                    );
+                }
+            }
+        }
+        AstKind::BindingIdentifier(identifier) => {
+            if wants("name") {
+                let value = intern_packed(strings, &identifier.name);
+                push("name", value);
+            }
+            push("binding", 0x8000_0001);
+        }
+        AstKind::IdentifierName(identifier) => {
+            if wants("name") {
+                let value = intern_packed(strings, &identifier.name);
+                push("name", value);
+            }
+        }
+        AstKind::StringLiteral(literal) => {
+            if wants("value") {
+                let value = intern_packed(strings, &literal.value);
+                push("value", value);
+            }
+        }
+        AstKind::NumericLiteral(literal) => {
+            if wants("value") {
+                let value = intern_packed(strings, &literal.value.to_string());
+                push("value", value);
+            }
+        }
+        AstKind::BooleanLiteral(literal) => {
+            push("value", 0x8000_0000 | u32::from(literal.value));
+        }
+        AstKind::ObjectProperty(property) => {
+            if wants("kind") {
+                let kind = format!("{:?}", property.kind).to_ascii_lowercase();
+                let kind = intern_packed(strings, &kind);
+                push("kind", kind);
+            }
+            push("computed", 0x8000_0000 | u32::from(property.computed));
+            push("method", 0x8000_0000 | u32::from(property.method));
+            push("shorthand", 0x8000_0000 | u32::from(property.shorthand));
+            if wants("key")
+                && let Some(key) = property.key.static_name()
+            {
+                let key = intern_packed(strings, &key);
+                push("key", key);
+            }
+        }
+        AstKind::BinaryExpression(expression) => {
+            if wants("operator") {
+                let operator = intern_packed(strings, expression.operator.as_str());
+                push("operator", operator);
+            }
+        }
+        AstKind::LogicalExpression(expression) => {
+            if wants("operator") {
+                let operator = intern_packed(strings, expression.operator.as_str());
+                push("operator", operator);
+            }
+        }
+        AstKind::AssignmentExpression(expression) => {
+            if wants("operator") {
+                let operator = intern_packed(strings, expression.operator.as_str());
+                push("operator", operator);
+            }
+        }
+        AstKind::UpdateExpression(expression) => {
+            if wants("operator") {
+                let operator = intern_packed(strings, expression.operator.as_str());
+                push("operator", operator);
+            }
+            push("prefix", 0x8000_0000 | u32::from(expression.prefix));
+        }
+        AstKind::UnaryExpression(expression) => {
+            if wants("operator") {
+                let operator = intern_packed(strings, expression.operator.as_str());
+                push("operator", operator);
+            }
+            push("prefix", 0x8000_0001);
+        }
         AstKind::CallExpression(call) => {
             push("optional", 0x8000_0000 | u32::from(call.optional));
             push("argumentCount", 0x4000_0000 | call.arguments.len() as u32);
@@ -719,6 +825,21 @@ fn packed_fields_direct(
                     .get()
                     .is_some_and(|id| !scoping.has_binding(id));
                 push("calleeGlobal", 0x8000_0000 | u32::from(global));
+            }
+            if let Some(oxc_ast::ast::Argument::StringLiteral(literal)) = call.arguments.first()
+                && wants("staticArgument")
+            {
+                let value = intern_packed(strings, &literal.value);
+                push("staticArgument", value);
+            }
+        }
+        AstKind::NewExpression(call) => {
+            push("argumentCount", 0x4000_0000 | call.arguments.len() as u32);
+            if let Expression::Identifier(identifier) = &call.callee
+                && wants("calleeName")
+            {
+                let value = intern_packed(strings, &identifier.name);
+                push("calleeName", value);
             }
             if let Some(oxc_ast::ast::Argument::StringLiteral(literal)) = call.arguments.first()
                 && wants("staticArgument")
@@ -759,7 +880,239 @@ fn packed_fields_direct(
                 push("rootGlobal", 0x8000_0000 | u32::from(global));
             }
         }
+        AstKind::ComputedMemberExpression(member) => {
+            push("computed", 0x8000_0001);
+            if let Expression::StringLiteral(property) = &member.expression {
+                if wants("property") {
+                    let value = intern_packed(strings, &property.value);
+                    push("property", value);
+                }
+                if wants("memberPath")
+                    && let Some(path) = static_member_path(&member.object)
+                {
+                    let path = format!("{path}.{}", property.value);
+                    let value = intern_packed(strings, &path);
+                    push("memberPath", value);
+                }
+            }
+        }
+        AstKind::Function(function) => {
+            if wants("nodeKind") {
+                let node_kind = format!("{:?}", function.r#type);
+                let node_kind = intern_packed(strings, &node_kind);
+                push("nodeKind", node_kind);
+            }
+            push("async", 0x8000_0000 | u32::from(function.r#async));
+            push("generator", 0x8000_0000 | u32::from(function.generator));
+            push(
+                "parameterCount",
+                0x4000_0000 | function.params.items.len() as u32,
+            );
+            if wants("name")
+                && let Some(identifier) = &function.id
+            {
+                let name = intern_packed(strings, &identifier.name);
+                push("name", name);
+            }
+            if let Some(body) = &function.body {
+                let body_start = body.span.start + 1;
+                let body_end = body.span.end.saturating_sub(1);
+                push(
+                    "bodyStart",
+                    0x4000_0000 | utf16.map_or(body_start, |index| index[body_start as usize]),
+                );
+                push(
+                    "bodyEnd",
+                    0x4000_0000 | utf16.map_or(body_end, |index| index[body_end as usize]),
+                );
+            }
+        }
+        AstKind::ArrowFunctionExpression(function) => {
+            push("async", 0x8000_0000 | u32::from(function.r#async));
+            push("expression", 0x8000_0000 | u32::from(function.expression));
+            push(
+                "parameterCount",
+                0x4000_0000 | function.params.items.len() as u32,
+            );
+            let inset = u32::from(!function.expression);
+            let body_start = function.body.span.start + inset;
+            let body_end = function.body.span.end.saturating_sub(inset);
+            push(
+                "bodyStart",
+                0x4000_0000 | utf16.map_or(body_start, |index| index[body_start as usize]),
+            );
+            push(
+                "bodyEnd",
+                0x4000_0000 | utf16.map_or(body_end, |index| index[body_end as usize]),
+            );
+        }
+        AstKind::Class(class) => {
+            if wants("nodeKind") {
+                let node_kind = format!("{:?}", class.r#type);
+                let node_kind = intern_packed(strings, &node_kind);
+                push("nodeKind", node_kind);
+            }
+            if wants("name")
+                && let Some(identifier) = &class.id
+            {
+                let name = intern_packed(strings, &identifier.name);
+                push("name", name);
+            }
+        }
+        AstKind::ImportDeclaration(declaration) => {
+            if wants("source") {
+                let source = intern_packed(strings, &declaration.source.value);
+                push("source", source);
+            }
+            if wants("importKind") {
+                let import_kind = format!("{:?}", declaration.import_kind).to_ascii_lowercase();
+                let import_kind = intern_packed(strings, &import_kind);
+                push("importKind", import_kind);
+            }
+            push(
+                "specifierCount",
+                0x4000_0000
+                    | declaration
+                        .specifiers
+                        .as_ref()
+                        .map_or(0, |specifiers| specifiers.len()) as u32,
+            );
+        }
+        AstKind::ImportSpecifier(specifier) => {
+            if wants("imported") {
+                let imported = intern_packed(strings, &specifier.imported.name());
+                push("imported", imported);
+            }
+            if wants("local") {
+                let local = intern_packed(strings, &specifier.local.name);
+                push("local", local);
+            }
+            if wants("importKind") {
+                let import_kind = format!("{:?}", specifier.import_kind).to_ascii_lowercase();
+                let import_kind = intern_packed(strings, &import_kind);
+                push("importKind", import_kind);
+            }
+        }
+        AstKind::ImportDefaultSpecifier(specifier) => {
+            let imported = intern_packed(strings, "default");
+            push("imported", imported);
+            if wants("local") {
+                let local = intern_packed(strings, &specifier.local.name);
+                push("local", local);
+            }
+        }
+        AstKind::ImportNamespaceSpecifier(specifier) => {
+            let imported = intern_packed(strings, "*");
+            push("imported", imported);
+            if wants("local") {
+                let local = intern_packed(strings, &specifier.local.name);
+                push("local", local);
+            }
+        }
+        AstKind::ExportNamedDeclaration(declaration) => {
+            if wants("source")
+                && let Some(source) = &declaration.source
+            {
+                let source = intern_packed(strings, &source.value);
+                push("source", source);
+            }
+            if wants("exportKind") {
+                let export_kind = format!("{:?}", declaration.export_kind).to_ascii_lowercase();
+                let export_kind = intern_packed(strings, &export_kind);
+                push("exportKind", export_kind);
+            }
+            push(
+                "specifierCount",
+                0x4000_0000 | declaration.specifiers.len() as u32,
+            );
+        }
+        AstKind::ExportAllDeclaration(declaration) => {
+            if wants("source") {
+                let source = intern_packed(strings, &declaration.source.value);
+                push("source", source);
+            }
+            if wants("exported")
+                && let Some(exported) = &declaration.exported
+            {
+                let exported = intern_packed(strings, &exported.name());
+                push("exported", exported);
+            }
+            if wants("exportKind") {
+                let export_kind = format!("{:?}", declaration.export_kind).to_ascii_lowercase();
+                let export_kind = intern_packed(strings, &export_kind);
+                push("exportKind", export_kind);
+            }
+        }
+        AstKind::ExportSpecifier(specifier) => {
+            if wants("local") {
+                let local = intern_packed(strings, &specifier.local.name());
+                push("local", local);
+            }
+            if wants("exported") {
+                let exported = intern_packed(strings, &specifier.exported.name());
+                push("exported", exported);
+            }
+            if wants("exportKind") {
+                let export_kind = format!("{:?}", specifier.export_kind).to_ascii_lowercase();
+                let export_kind = intern_packed(strings, &export_kind);
+                push("exportKind", export_kind);
+            }
+        }
+        AstKind::VariableDeclaration(declaration) => {
+            if wants("kind") {
+                let kind = declaration.kind.to_string();
+                let kind = intern_packed(strings, &kind);
+                push("kind", kind);
+            }
+            push(
+                "declarationCount",
+                0x4000_0000 | declaration.declarations.len() as u32,
+            );
+        }
+        AstKind::VariableDeclarator(declarator) => {
+            if wants("kind") {
+                let kind = declarator.kind.to_string();
+                let kind = intern_packed(strings, &kind);
+                push("kind", kind);
+            }
+            push(
+                "hasInitializer",
+                0x8000_0000 | u32::from(declarator.init.is_some()),
+            );
+        }
+        AstKind::Directive(directive) => {
+            if wants("value") {
+                let value = intern_packed(strings, &directive.directive);
+                push("value", value);
+            }
+        }
+        AstKind::YieldExpression(expression) => {
+            push("delegate", 0x8000_0000 | u32::from(expression.delegate));
+        }
+        AstKind::ImportMeta(_) => {
+            let meta = intern_packed(strings, "import");
+            push("meta", meta);
+            let property = intern_packed(strings, "meta");
+            push("property", property);
+        }
+        AstKind::NewTarget(_) => {
+            let meta = intern_packed(strings, "new");
+            push("meta", meta);
+            let property = intern_packed(strings, "target");
+            push("property", property);
+        }
         _ => return None,
+    }
+    if let Some(value) = constant_for_kind(kind) {
+        if wants("constantKind") {
+            let kind = intern_packed(strings, value.kind());
+            push("constantKind", kind);
+        }
+        if wants("constantValue") {
+            let encoded = value.encode();
+            let value = intern_packed(strings, &encoded);
+            push("constantValue", value);
+        }
     }
     Some(result)
 }
@@ -1258,7 +1611,7 @@ fn js_number_string(value: f64) -> String {
 }
 
 struct EventCollector<'a> {
-    subscriptions: &'a [String],
+    subscriptions: [bool; NODE_TYPE_COUNT + 1],
     nodes: &'a AstNodes<'a>,
     scoping: &'a Scoping,
     utf16: Option<&'a [u32]>,
@@ -1285,15 +1638,30 @@ impl<'a> EventCollector<'a> {
         {
             return;
         }
-        let node_type = kind_name(kind);
-        if !self
-            .subscriptions
-            .iter()
-            .any(|subscription| alias_matches(subscription, &node_type))
-        {
+        let protocol_id = ast_kind_protocol_id(kind);
+        if !self.subscriptions[protocol_id as usize] {
             return;
         }
+        let node_type = node_type_name(protocol_id)
+            .expect("generated protocol covers every Oxc AstKind")
+            .to_owned();
         let id = kind.node_id();
+        if side == "exit" {
+            self.events.push(NativeEvent {
+                sequence,
+                side: side.into(),
+                id: id.index() as u32,
+                r#type: node_type,
+                start,
+                end,
+                parent_id: None,
+                parent_type: None,
+                scope_id: 0,
+                scope_parent_id: None,
+                fields: Vec::new(),
+            });
+            return;
+        }
         let node = self.nodes.get_node(id);
         let scope_id = match kind {
             AstKind::Function(function) => function.scope_id.get().unwrap_or(node.scope_id()),
@@ -1366,7 +1734,28 @@ pub fn materialize(
         root_end,
         include_exit,
     )
-    .map(|(batch, _)| batch)
+    .map(|(mut batch, _)| {
+        hydrate_exit_events(&mut batch.events);
+        batch
+    })
+}
+
+fn hydrate_exit_events(events: &mut [NativeEvent]) {
+    let mut enters = FxHashMap::default();
+    for index in 0..events.len() {
+        if events[index].side == "enter" {
+            enters.insert(events[index].id, index);
+            continue;
+        }
+        let Some(&enter_index) = enters.get(&events[index].id) else {
+            continue;
+        };
+        let sequence = events[index].sequence;
+        let mut exit = events[enter_index].clone();
+        exit.sequence = sequence;
+        exit.side = "exit".into();
+        events[index] = exit;
+    }
 }
 
 fn materialize_with_scope_parents(
@@ -1405,7 +1794,7 @@ fn materialize_with_scope_parents(
     let traversal_started = Instant::now();
     let utf16 = (!source.is_ascii()).then(|| utf16_index(source, &allocator));
     let mut collector = EventCollector {
-        subscriptions,
+        subscriptions: subscription_set_from_names(subscriptions),
         nodes: semantic_return.semantic.nodes(),
         scoping: semantic_return.semantic.scoping(),
         utf16: utf16.as_deref().map(|offsets| &**offsets),
@@ -1622,7 +2011,12 @@ pub fn materialize_packed_buffer(
     let mut output = Vec::with_capacity(words_offset + parts.data.len());
     let shape_node_count = parts.node_count
         | if include_parent { 0x8000_0000 } else { 0 }
-        | if include_scope { 0x4000_0000 } else { 0 };
+        | if include_scope { 0x4000_0000 } else { 0 }
+        | if include_exit.unwrap_or(true) {
+            0x2000_0000
+        } else {
+            0
+        };
     for word in [
         shape_node_count,
         parts.emitted_count,
@@ -1699,6 +2093,17 @@ fn subscription_set(ids: &[u32]) -> [bool; NODE_TYPE_COUNT + 1] {
         if let Some(subscribed) = subscriptions.get_mut(id as usize) {
             *subscribed = true;
         }
+    }
+    subscriptions
+}
+
+fn subscription_set_from_names(names: &[String]) -> [bool; NODE_TYPE_COUNT + 1] {
+    let mut subscriptions = [false; NODE_TYPE_COUNT + 1];
+    for (id, subscribed) in subscriptions.iter_mut().enumerate().skip(1) {
+        let node_type = node_type_name(id as u32).expect("generated node type id");
+        *subscribed = names
+            .iter()
+            .any(|subscription| alias_matches(subscription, node_type));
     }
     subscriptions
 }
@@ -1823,6 +2228,12 @@ impl PackedEventCollector<'_> {
             filtered_static_member_path = path;
         }
         let id = kind.node_id();
+        if side == 1 {
+            self.words
+                .extend([sequence | 0x8000_0000, id.index() as u32]);
+            self.emitted_count += 1;
+            return;
+        }
         let scope_id = self.include_scope.then(|| {
             let nodes = self
                 .nodes
@@ -1843,6 +2254,29 @@ impl PackedEventCollector<'_> {
                 .parent_id(id)
                 .index() as u32
         });
+        let parent_type_id = if self.include_parent && !is_root {
+            ast_kind_protocol_id(
+                self.nodes
+                    .expect("parent collection requires the node store")
+                    .parent_kind(id),
+            )
+        } else {
+            u32::MAX
+        };
+        let event_scope_id = scope_id.map_or(0, |id| id.index() as u32);
+        let scope_parent_id = scope_id
+            .and_then(|id| self.scoping.scope_parent_id(id))
+            .map_or(u32::MAX, |id| id.index() as u32);
+        let emit_header = |words: &mut PackedWords, field_count: u32| {
+            words.extend([sequence, id.index() as u32, protocol_id, start, end]);
+            if self.include_parent {
+                words.extend([parent_id.unwrap_or(u32::MAX), parent_type_id]);
+            }
+            if self.include_scope {
+                words.extend([event_scope_id, scope_parent_id]);
+            }
+            words.push(field_count);
+        };
         let requested = self.field_requests.and_then(|requests| {
             requests
                 .iter()
@@ -1852,33 +2286,12 @@ impl PackedEventCollector<'_> {
         if let Some(node_fields) = packed_fields_direct(
             kind,
             self.scoping,
+            self.utf16,
             requested_fields,
             filtered_static_member_path.as_deref(),
             &mut self.string_ids,
         ) {
-            let parent_type_id = if self.include_parent && !is_root {
-                ast_kind_protocol_id(
-                    self.nodes
-                        .expect("parent collection requires the node store")
-                        .parent_kind(id),
-                )
-            } else {
-                u32::MAX
-            };
-            let event_scope_id = scope_id.map_or(0, |id| id.index() as u32);
-            let scope_parent_id = scope_id
-                .and_then(|id| self.scoping.scope_parent_id(id))
-                .map_or(u32::MAX, |id| id.index() as u32);
-            self.words
-                .extend([sequence, side, id.index() as u32, protocol_id, start, end]);
-            if self.include_parent {
-                self.words
-                    .extend([parent_id.unwrap_or(u32::MAX), parent_type_id]);
-            }
-            if self.include_scope {
-                self.words.extend([event_scope_id, scope_parent_id]);
-            }
-            self.words.push((node_fields.len / 2) as u32);
+            emit_header(&mut self.words, (node_fields.len / 2) as u32);
             self.words
                 .extend_from_slice(&node_fields.words[..node_fields.len]);
             self.emitted_count += 1;
@@ -1896,29 +2309,7 @@ impl PackedEventCollector<'_> {
                     .to_string();
             }
         }
-        let parent_type_id = if self.include_parent && !is_root {
-            ast_kind_protocol_id(
-                self.nodes
-                    .expect("parent collection requires the node store")
-                    .parent_kind(id),
-            )
-        } else {
-            u32::MAX
-        };
-        let event_scope_id = scope_id.map_or(0, |id| id.index() as u32);
-        let scope_parent_id = scope_id
-            .and_then(|id| self.scoping.scope_parent_id(id))
-            .map_or(u32::MAX, |id| id.index() as u32);
-        self.words
-            .extend([sequence, side, id.index() as u32, protocol_id, start, end]);
-        if self.include_parent {
-            self.words
-                .extend([parent_id.unwrap_or(u32::MAX), parent_type_id]);
-        }
-        if self.include_scope {
-            self.words.extend([event_scope_id, scope_parent_id]);
-        }
-        self.words.push(node_fields.len() as u32);
+        emit_header(&mut self.words, node_fields.len() as u32);
         for field in node_fields {
             let key =
                 field_key_id(&field.key).unwrap_or_else(|| 0x8000_0000 | self.intern(&field.key));
