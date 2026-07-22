@@ -452,6 +452,156 @@ export class NativeTransformSession {
   }
 }
 
+type PreparedPluginPlan = PluginPlan & {
+  subscriptions: readonly NativeVisitorRoute[];
+};
+
+interface PreparedPhase {
+  activePlugins: NativePlugin<any, any>[];
+  plans: Map<NativePlugin<any, any>, PreparedPluginPlan>;
+  subscriptions: Set<string>;
+  materializationSubscriptions: Set<string>;
+  fieldRequests: Record<string, string[]>;
+  identifierNames: string[];
+  staticMemberPatterns: string[];
+  includeParent: boolean;
+  includeScope: boolean;
+}
+
+function phaseIsEnabled(plan: PreparedPluginPlan, phaseName: string): boolean {
+  if (plan.enabled === false) return false;
+  if (plan.phases == null || plan.phases.length === 0) return true;
+  for (const enabledPhase of plan.phases) {
+    if (enabledPhase === phaseName) return true;
+  }
+  return false;
+}
+
+function routeContains(subscription: string, first: string, second: string): boolean {
+  for (const route of subscription.split('|')) {
+    if (route === first || route === second) return true;
+  }
+  return false;
+}
+
+function mergeFieldRequests(target: Record<string, string[]>, source: Readonly<Record<string, readonly string[]>>): void {
+  for (const [type, fields] of Object.entries(source)) {
+    const merged = new Set(target[type]);
+    for (const field of fields) merged.add(field);
+    target[type] = [...merged];
+  }
+}
+
+function collectSharedFilter(
+  plugins: readonly NativePlugin<any, any>[],
+  plans: ReadonlyMap<NativePlugin<any, any>, PreparedPluginPlan>,
+  subscribes: (subscription: string) => boolean,
+  select: (plan: PreparedPluginPlan) => readonly string[] | undefined,
+): string[] {
+  const values = new Set<string>();
+  let subscriberCount = 0;
+  for (const plugin of plugins) {
+    const plan = plans.get(plugin)!;
+    let subscribed = false;
+    for (const subscription of plan.subscriptions) {
+      if (subscribes(subscription)) {
+        subscribed = true;
+        break;
+      }
+    }
+    if (!subscribed) continue;
+    subscriberCount++;
+    const selected = select(plan);
+    if (selected == null) return [];
+    for (const value of selected) values.add(value);
+  }
+  return subscriberCount === 0 ? [] : [...values];
+}
+
+function preparePhase(
+  phase: PipelinePhase,
+  phaseSource: string,
+  filename: string,
+  options: TransformOptions,
+  parser: ParseClassification,
+): PreparedPhase {
+  const hints = sourceHints(phaseSource);
+  const plans = new Map<NativePlugin<any, any>, PreparedPluginPlan>();
+  for (const plugin of phase.plugins) {
+    if (plugin.apiVersion !== 1) throw new Error(`${plugin.name}: unsupported API version`);
+    const prepareSubscriptions = new Set<NativeVisitorRoute>();
+    const plan = plugin.prepare?.({
+      filename,
+      options,
+      parser,
+      sourceHints: hints,
+      subscribe: (...types) => {
+        for (const type of types) prepareSubscriptions.add(type);
+      },
+    }, plugin.options as any) ?? {};
+    plans.set(plugin, {
+      ...plan,
+      subscriptions: [
+        ...(plan.subscriptions ?? []),
+        ...prepareSubscriptions,
+        ...visitorSubscriptions(plugin.visitor),
+      ],
+    });
+  }
+
+  const activePlugins = phase.plugins.filter(plugin => phaseIsEnabled(plans.get(plugin)!, phase.name));
+  const subscriptions = new Set<string>();
+  const materializationSubscriptions = new Set<string>();
+  const fieldRequests: Record<string, string[]> = {};
+  let includeParent = false;
+  let includeScope = false;
+
+  for (const plugin of activePlugins) {
+    const plan = plans.get(plugin)!;
+    for (const type of plan.subscriptions) {
+      subscriptions.add(type);
+      materializationSubscriptions.add(type);
+    }
+    for (const query of plan.queries ?? []) {
+      for (const type of querySubscriptions(query)) materializationSubscriptions.add(type);
+    }
+    if (plan.semantics?.[0] === 'scope') {
+      includeScope = true;
+      materializationSubscriptions.add('Identifier');
+      materializationSubscriptions.add('Program');
+      materializationSubscriptions.add('Function');
+      materializationSubscriptions.add('ArrowFunctionExpression');
+      materializationSubscriptions.add('Directive');
+    }
+    if (plan.children && Object.keys(plan.children).length > 0) materializationSubscriptions.add('*');
+    includeParent ||= plan.ancestry != null;
+    mergeFieldRequests(fieldRequests, plan.fields ?? {});
+    mergeFieldRequests(fieldRequests, visitorRoutingFields(plugin.visitor));
+  }
+
+  return {
+    activePlugins,
+    plans,
+    subscriptions,
+    materializationSubscriptions,
+    fieldRequests,
+    includeParent,
+    includeScope,
+    identifierNames: collectSharedFilter(
+      activePlugins,
+      plans,
+      subscription => routeContains(subscription, 'Identifier', 'ReferencedIdentifier'),
+      plan => plan.identifierNames,
+    ),
+    staticMemberPatterns: collectSharedFilter(
+      activePlugins,
+      plans,
+      subscription => routeContains(subscription, 'StaticMemberExpression', 'MemberExpression'),
+      plan => plan.staticMemberPatterns,
+    ),
+  };
+}
+
 export function transform(source: string, filename: string, pipeline: NativePipeline, options: TransformOptions = {}): TransformResult {
   if (pipeline.apiVersion !== 1) throw new Error(`Unsupported pipeline API version: ${pipeline.apiVersion}`);
   const parser = classifyForTransform(parserFilename(filename, options.parser), source);
@@ -483,49 +633,23 @@ export function transform(source: string, filename: string, pipeline: NativePipe
   try {
     for (const phase of pipeline.phases) {
       const edits: EditCommand[] = [];
-      const subscriptions = new Set<string>();
-      const materializationSubscriptions = new Set<string>();
-      const plans = new Map<NativePlugin<any, any>, PluginPlan>();
-      for (const plugin of phase.plugins) {
-        if (plugin.apiVersion !== 1) throw new Error(`${plugin.name}: unsupported API version`);
-        const prepareSubscriptions = new Set<NativeVisitorRoute>();
-        const plan = plugin.prepare?.({ filename, options, parser, sourceHints: sourceHints(phaseSource), subscribe: (...types) => types.forEach(type => prepareSubscriptions.add(type)) }, plugin.options as any) ?? {};
-        const merged: PluginPlan = { ...plan, subscriptions: [...(plan.subscriptions ?? []), ...prepareSubscriptions, ...visitorSubscriptions(plugin.visitor)] };
-        plans.set(plugin, merged);
-      }
-      const activePlugins = phase.plugins.filter(plugin => plans.get(plugin)?.enabled !== false && (!plans.get(plugin)?.phases?.length || plans.get(plugin)!.phases!.includes(phase.name)));
-      for (const plugin of activePlugins) {
-        plans.get(plugin)!.subscriptions!.forEach(type => { subscriptions.add(type); materializationSubscriptions.add(type); });
-        for (const query of plans.get(plugin)!.queries ?? []) querySubscriptions(query).forEach(type => materializationSubscriptions.add(type));
-        if (plans.get(plugin)!.semantics?.some(capability => capability === 'scope')) {
-          materializationSubscriptions.add('Identifier');
-          materializationSubscriptions.add('Program');
-          materializationSubscriptions.add('Function');
-          materializationSubscriptions.add('ArrowFunctionExpression');
-          materializationSubscriptions.add('Directive');
-        }
-        if (Object.keys(plans.get(plugin)!.children ?? {}).length > 0) materializationSubscriptions.add('*');
-      }
+      const prepared = preparePhase(phase, phaseSource, filename, options, parser);
+      const {
+        activePlugins,
+        plans,
+        subscriptions,
+        materializationSubscriptions,
+        fieldRequests,
+        identifierNames,
+        staticMemberPatterns,
+        includeParent,
+        includeScope,
+      } = prepared;
       if (subscriptions.has('*')) {
         if (!options.allowBroadVisitors) throw new Bailout('broad-catch-all-visitor');
         diagnostics.push({ code: 'broad-visitor', message: 'Catch-all visitor disables the optimized subscription path.', phase: phase.name });
       }
-      const fieldRequests: Record<string, string[]> = {};
-      for (const plugin of activePlugins) {
-        for (const [type, fields] of Object.entries(plans.get(plugin)?.fields ?? {})) fieldRequests[type] = [...new Set([...(fieldRequests[type] ?? []), ...fields])];
-        for (const [type, fields] of Object.entries(visitorRoutingFields(plugin.visitor))) fieldRequests[type] = [...new Set([...(fieldRequests[type] ?? []), ...fields])];
-      }
       const retainsAdditionalIndex = [...materializationSubscriptions].some(type => !subscriptions.has(type));
-      const includeParent = activePlugins.some(plugin => plans.get(plugin)?.ancestry != null);
-      const includeScope = activePlugins.some(plugin => plans.get(plugin)?.semantics?.some(capability => capability === 'scope'));
-      const identifierSubscribers = activePlugins.filter(plugin => plans.get(plugin)!.subscriptions!.some(type => type.split('|').some(part => part === 'Identifier' || part === 'ReferencedIdentifier')));
-      const identifierNames = identifierSubscribers.length > 0 && identifierSubscribers.every(plugin => plans.get(plugin)?.identifierNames != null)
-        ? [...new Set(identifierSubscribers.flatMap(plugin => [...plans.get(plugin)!.identifierNames!]))]
-        : [];
-      const staticMemberSubscribers = activePlugins.filter(plugin => plans.get(plugin)!.subscriptions!.some(type => type.split('|').some(part => part === 'StaticMemberExpression' || part === 'MemberExpression')));
-      const staticMemberPatterns = staticMemberSubscribers.length > 0 && staticMemberSubscribers.every(plugin => plans.get(plugin)?.staticMemberPatterns != null)
-        ? [...new Set(staticMemberSubscribers.flatMap(plugin => [...plans.get(plugin)!.staticMemberPatterns!]))]
-        : [];
       const session = new NativeTransformSession(phaseSource, filename, options, [...materializationSubscriptions], retainsAdditionalIndex, includeParent, includeScope, identifierNames, staticMemberPatterns);
       totals.sessionOpenMs += session.openMs;
       openSession = session;
@@ -601,13 +725,40 @@ export function transformOrFallback(
   return result.status === 'bailout' ? fallback(result.source, filename, result.reason) : result;
 }
 
-function createDispatcher(session: NativeTransformSession, phase: PipelinePhase, plans: Map<NativePlugin<any, any>, PluginPlan>, batch: PackedEventBatch, edits: EditCommand[], metadata: Record<string, unknown>, diagnostics: Diagnostic[]) {
-  let order = 0; let stopAll = false; let currentSequence = -1;
+interface DispatcherEntry extends PathState {
+  context: PluginContext;
+  state: any;
+  delivered: Set<number>;
+  pathRuntime?: PathRuntime;
+}
+
+interface PhaseRoute {
+  plugin: NativePlugin<any, any>;
+  entry: DispatcherEntry;
+  handlers: VisitorHandler<any>[];
+}
+
+interface Dispatcher {
+  contexts: Map<NativePlugin<any, any>, DispatcherEntry>;
+  run(): void;
+}
+
+function createDispatcher(
+  session: NativeTransformSession,
+  phase: PipelinePhase,
+  plans: ReadonlyMap<NativePlugin<any, any>, PluginPlan>,
+  batch: PackedEventBatch,
+  edits: EditCommand[],
+  metadata: Record<string, unknown>,
+  diagnostics: Diagnostic[],
+): Dispatcher {
+  let order = 0;
+  let stopAll = false;
+  let currentSequence = -1;
   let visitorId = 0;
   const visitorIds = new WeakMap<object, number>();
   const activeTraversals = new Set<string>();
-  const contexts = new Map<NativePlugin<any, any>, { context: PluginContext; state: any; stopped: boolean; skipped: { start: number; end: number }[]; delivered: Set<number> }>();
-  type PhaseRoute = { plugin: NativePlugin<any, any>; entry: NonNullable<ReturnType<typeof contexts.get>>; handlers: VisitorHandler<any>[] };
+  const contexts = new Map<NativePlugin<any, any>, DispatcherEntry>();
   const phaseRoutes = new Map<string, PhaseRoute[]>();
   const metadataOwners = new Map<string, string>();
   for (const plugin of phase.plugins) for (const key of plans.get(plugin)?.metadataWrites ?? []) {
@@ -617,7 +768,13 @@ function createDispatcher(session: NativeTransformSession, phase: PipelinePhase,
   }
   for (const plugin of phase.plugins) {
     const allowedMetadata = new Set(plans.get(plugin)?.metadataWrites ?? []);
-    const entry = { state: undefined, stopped: false, skipped: [] as { start: number; end: number }[], delivered: new Set<number>(), context: undefined as unknown as PluginContext };
+    const entry: DispatcherEntry = {
+      state: undefined,
+      stopped: false,
+      skipped: [],
+      delivered: new Set(),
+      context: undefined as unknown as PluginContext,
+    };
     const context: PluginContext = {
       filename: session.filename, phase: phase.name, source: session.source,
       metadata: { set(key, value) { if (!allowedMetadata.has(key)) throw new Error(`${plugin.name}: undeclared metadata key ${key}`); metadata[key] = value; }, get: key => metadata[key] },
@@ -630,12 +787,13 @@ function createDispatcher(session: NativeTransformSession, phase: PipelinePhase,
       code: codeFactory,
       editor: makeEditor(session, edits, plugin.name, () => order++),
     };
-    entry.context = context; contexts.set(plugin, entry);
+    entry.context = context;
+    contexts.set(plugin, entry);
   }
-  const replay = (events: NativeEvent[], plugin: NativePlugin<any, any>, entry: ReturnType<typeof contexts.get> & {}, context: PluginContext) => {
+  const replay = (events: NativeEvent[], plugin: NativePlugin<any, any>, entry: DispatcherEntry, context: PluginContext) => {
     for (const event of events) dispatchOne(event, plugin, entry, context);
   };
-  const createPathRuntime = (plugin: NativePlugin<any, any>, entry: NonNullable<ReturnType<typeof contexts.get>>, context: PluginContext): PathRuntime => {
+  const createPathRuntime = (plugin: NativePlugin<any, any>, entry: DispatcherEntry, context: PluginContext): PathRuntime => {
     let runtime: PathRuntime;
     runtime = {
       session, context, edits, owner: plugin.name, nextOrder: () => order++, state: entry,
@@ -649,23 +807,32 @@ function createDispatcher(session: NativeTransformSession, phase: PipelinePhase,
       widen(target, types, scopeOnly) { replay(session.next(expandSubscriptions(types), scopeOnly ? undefined : { start: target.start, end: target.end }, undefined, visitorHasExit(plugin.visitor)).events.filter(candidate => candidate.sequence > target.sequence && (!scopeOnly || candidate.scopeId === target.scopeId)), plugin, entry, context); },
       parent(_target, parentId) { const parent = session.event(parentId); return parent ? makePath(runtime, parent) : null; },
       children(target) { return session.children(target.id).map(child => makePath(runtime, child)); },
-      allowsChild(type, role) { const declared = plans.get(plugin)?.children; return declared == null ? plugin.name === 'nested' : Object.entries(declared).some(([parent, roles]) => (parent === type || alias(parent, type)) && (roles.includes(role) || roles.includes('*'))); },
+      allowsChild(type, role) {
+        const declared = plans.get(plugin)?.children;
+        if (declared == null) return plugin.name === 'nested';
+        for (const [parent, roles] of Object.entries(declared)) {
+          if ((parent === type || alias(parent, type)) && childRoleIsDeclared(roles, role)) return true;
+        }
+        return false;
+      },
       allowsAncestry() { return plugin.name === 'nested' || plans.get(plugin)?.ancestry != null; },
-      allowsScope() { return plugin.name === 'nested' || plans.get(plugin)?.semantics?.some(capability => capability === 'scope') === true; },
+      allowsScope() { return plugin.name === 'nested' || plans.get(plugin)?.semantics?.[0] === 'scope'; },
       scopeCache: new Map(),
     };
     return runtime;
   };
-  const dispatchOne = (event: NativeEvent, plugin: NativePlugin<any, any>, entry: NonNullable<ReturnType<typeof contexts.get>>, context: PluginContext, override?: Visitor<any>, overrideState?: any, routedHandlers?: VisitorHandler<any>[]) => {
+  const dispatchOne = (event: NativeEvent, plugin: NativePlugin<any, any>, entry: DispatcherEntry, context: PluginContext, override?: Visitor<any>, overrideState?: any, routedHandlers?: VisitorHandler<any>[]) => {
     const deliveryKey = event.id * 2 + Number(event.side === 'exit');
     if (!override && entry.delivered.has(deliveryKey)) return;
-    if (entry.stopped || stopAll || entry.skipped.some(range => event.start > range.start && event.end <= range.end)) return;
+    if (entry.stopped || stopAll || eventIsSkipped(event, entry.skipped)) return;
     const visitor = override ?? plugin.visitor ?? {};
     const handlers = routedHandlers ?? matchingHandlers(visitor, event);
     for (const handler of event.side === 'exit' ? [...handlers].reverse() : handlers) {
       const callback = typeof handler === 'function' ? (event.side === 'enter' ? handler : undefined) : handler[event.side];
       if (!callback) continue;
-      const runtime = override ? createPathRuntime(plugin, entry, context) : ((entry as typeof entry & { pathRuntime?: PathRuntime }).pathRuntime ??= createPathRuntime(plugin, entry, context));
+      const runtime = override
+        ? createPathRuntime(plugin, entry, context)
+        : (entry.pathRuntime ??= createPathRuntime(plugin, entry, context));
       const path = makePath(runtime, event);
       currentSequence = event.sequence;
       callback(path, override ? overrideState : entry.state);
@@ -688,8 +855,8 @@ function createDispatcher(session: NativeTransformSession, phase: PipelinePhase,
     routes = [];
     for (const plugin of phase.plugins) {
       const plan = plans.get(plugin);
-      if (event.type === 'Identifier' && plan?.identifierNames && !plan.identifierNames.some(name => name === eventField(event, 'name'))) continue;
-      if (event.type === 'StaticMemberExpression' && plan?.staticMemberPatterns && !plan.staticMemberPatterns.some(pattern => pattern === eventField(event, 'memberPath'))) continue;
+      if (event.type === 'Identifier' && plan?.identifierNames && !hasExactValue(plan.identifierNames, eventField(event, 'name'))) continue;
+      if (event.type === 'StaticMemberExpression' && plan?.staticMemberPatterns && !hasExactValue(plan.staticMemberPatterns, eventField(event, 'memberPath'))) continue;
       const handlers = matchingHandlers(plugin.visitor ?? {}, event);
       if (handlers.length > 0) routes.push({ plugin, entry: contexts.get(plugin)!, handlers });
     }
@@ -714,6 +881,27 @@ function createDispatcher(session: NativeTransformSession, phase: PipelinePhase,
       }
     }
   }); } };
+}
+
+function childRoleIsDeclared(roles: readonly string[], requestedRole: string): boolean {
+  for (const role of roles) {
+    if (role === requestedRole || role === '*') return true;
+  }
+  return false;
+}
+
+function eventIsSkipped(event: NativeEvent, ranges: readonly { start: number; end: number }[]): boolean {
+  for (const range of ranges) {
+    if (event.start > range.start && event.end <= range.end) return true;
+  }
+  return false;
+}
+
+function hasExactValue(values: readonly string[], candidate: unknown): boolean {
+  for (const value of values) {
+    if (value === candidate) return true;
+  }
+  return false;
 }
 
 type PathState = { stopped: boolean; skipped: { start: number; end: number }[] };
