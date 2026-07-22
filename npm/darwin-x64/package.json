@@ -1,0 +1,19 @@
+{
+  "name": "noxcturnal-darwin-x64",
+  "version": "0.1.0",
+  "cpu": [
+    "x64"
+  ],
+  "main": "noxcturnal.darwin-x64.node",
+  "files": [
+    "noxcturnal.darwin-x64.node"
+  ],
+  "description": "Native-backed JavaScript transform runtime with visitor ergonomics",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "os": [
+    "darwin"
+  ]
+}

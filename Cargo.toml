@@ -1,0 +1,28 @@
+[package]
+name = "noxcturnal"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+description = "Native-backed JavaScript transform runtime with visitor ergonomics"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+napi = { version = "3.4.0", default-features = false, features = ["napi8", "dyn-symbols"] }
+napi-derive = "3.3.0"
+oxc_allocator = "=0.141.0"
+oxc_ast = "=0.141.0"
+oxc_ast_visit = "=0.141.0"
+oxc_parser = "=0.141.0"
+oxc_semantic = "=0.141.0"
+oxc_span = "=0.141.0"
+oxc_syntax = "=0.141.0"
+
+[build-dependencies]
+napi-build = "2.2.3"
+
+[profile.release]
+lto = true
+strip = "symbols"
+codegen-units = 1

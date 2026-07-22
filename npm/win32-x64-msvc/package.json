@@ -1,0 +1,19 @@
+{
+  "name": "noxcturnal-win32-x64-msvc",
+  "version": "0.1.0",
+  "cpu": [
+    "x64"
+  ],
+  "main": "noxcturnal.win32-x64-msvc.node",
+  "files": [
+    "noxcturnal.win32-x64-msvc.node"
+  ],
+  "description": "Native-backed JavaScript transform runtime with visitor ergonomics",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "os": [
+    "win32"
+  ]
+}

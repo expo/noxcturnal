@@ -1,0 +1,22 @@
+{
+  "name": "noxcturnal-linux-x64-musl",
+  "version": "0.1.0",
+  "cpu": [
+    "x64"
+  ],
+  "main": "noxcturnal.linux-x64-musl.node",
+  "files": [
+    "noxcturnal.linux-x64-musl.node"
+  ],
+  "description": "Native-backed JavaScript transform runtime with visitor ergonomics",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "os": [
+    "linux"
+  ],
+  "libc": [
+    "musl"
+  ]
+}

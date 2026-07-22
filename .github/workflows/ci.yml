@@ -1,0 +1,85 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.12.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: cachix/install-nix-action@v31
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: pnpm verify
+      - run: pnpm benchmark
+      - run: nix shell nixpkgs#cargo nixpkgs#rustc nixpkgs#rustfmt nixpkgs#clippy nixpkgs#pkg-config -c cargo fmt --check
+      - run: nix shell nixpkgs#cargo nixpkgs#rustc nixpkgs#rustfmt nixpkgs#clippy nixpkgs#pkg-config -c cargo clippy --all-targets -- -D warnings
+      - run: pnpm pack --pack-destination "$(mktemp -d)"
+      - run: git diff --check
+
+  native:
+    name: Native ${{ matrix.target }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: aarch64-apple-darwin
+            runner: macos-14
+            package: darwin-arm64
+          - target: x86_64-apple-darwin
+            runner: macos-13
+            package: darwin-x64
+          - target: x86_64-unknown-linux-gnu
+            runner: ubuntu-24.04
+            package: linux-x64-gnu
+          - target: aarch64-unknown-linux-gnu
+            runner: ubuntu-24.04-arm
+            package: linux-arm64-gnu
+          - target: x86_64-unknown-linux-musl
+            runner: ubuntu-24.04
+            package: linux-x64-musl
+          - target: aarch64-unknown-linux-musl
+            runner: ubuntu-24.04-arm
+            package: linux-arm64-musl
+          - target: x86_64-pc-windows-msvc
+            runner: windows-2022
+            package: win32-x64-msvc
+          - target: aarch64-pc-windows-msvc
+            runner: windows-11-arm
+            package: win32-arm64-msvc
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.12.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec napi build --platform --release --target ${{ matrix.target }}
+      - name: Stage platform binary
+        shell: bash
+        run: cp noxcturnal.*.node npm/${{ matrix.package }}/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: noxcturnal-${{ matrix.package }}
+          path: npm/${{ matrix.package }}/*.node
+          if-no-files-found: error

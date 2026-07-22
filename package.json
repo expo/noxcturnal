@@ -1,0 +1,54 @@
+{
+  "name": "noxcturnal",
+  "version": "0.1.0",
+  "description": "Native-backed JavaScript transform runtime with visitor ergonomics",
+  "license": "MIT",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": ["dist", "*.node", "README.md"],
+  "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" } },
+  "scripts": {
+    "codegen": "nix shell nixpkgs#cargo -c node scripts/sync-oxc-event-schema.mjs && node scripts/generate-event-schema.mjs",
+    "codegen:check": "nix shell nixpkgs#cargo -c node scripts/sync-oxc-event-schema.mjs --check && node scripts/generate-event-schema.mjs --check",
+    "build:native": "nix shell nixpkgs#cargo nixpkgs#rustc nixpkgs#pkg-config -c napi build --platform --release",
+    "build:js": "tsc -p tsconfig.json",
+    "build": "pnpm build:native && pnpm build:js",
+    "test": "vitest run",
+    "benchmark": "vitest bench --run",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "verify": "pnpm codegen:check && pnpm typecheck && pnpm test && nix shell nixpkgs#cargo nixpkgs#rustc nixpkgs#pkg-config -c cargo test"
+  },
+  "devDependencies": {
+    "@napi-rs/cli": "^3.4.5",
+    "@jridgewell/trace-mapping": "^0.3.31",
+    "@types/node": "^22.15.0",
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.4"
+  },
+  "optionalDependencies": {
+    "noxcturnal-darwin-arm64": "workspace:*",
+    "noxcturnal-darwin-x64": "workspace:*",
+    "noxcturnal-linux-arm64-gnu": "workspace:*",
+    "noxcturnal-linux-arm64-musl": "workspace:*",
+    "noxcturnal-linux-x64-gnu": "workspace:*",
+    "noxcturnal-linux-x64-musl": "workspace:*",
+    "noxcturnal-win32-arm64-msvc": "workspace:*",
+    "noxcturnal-win32-x64-msvc": "workspace:*"
+  },
+  "engines": { "node": ">=18" },
+  "napi": {
+    "binaryName": "noxcturnal",
+    "targets": [
+      "aarch64-apple-darwin",
+      "x86_64-apple-darwin",
+      "x86_64-unknown-linux-gnu",
+      "aarch64-unknown-linux-gnu",
+      "x86_64-unknown-linux-musl",
+      "aarch64-unknown-linux-musl",
+      "x86_64-pc-windows-msvc",
+      "aarch64-pc-windows-msvc"
+    ]
+  },
+  "packageManager": "pnpm@10.12.1"
+}
