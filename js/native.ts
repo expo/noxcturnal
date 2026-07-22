@@ -40,6 +40,8 @@ interface NativeBinding {
       names: string[],
     ): { name: string; references: { id: number; start: number; end: number }[] }[];
     inspect(nodeIds: number[]): import('./types.js').NativeEvent[];
+    nodeSummary(nodeId: number): import('./types.js').NativeEvent | null;
+    nodeSummariesBuffer(): Buffer;
     childrenPackedBuffer(
       parentIds: number[],
       parentTypes: string[],

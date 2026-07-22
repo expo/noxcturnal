@@ -380,6 +380,7 @@ export class NativeTransformSession {
   #batches = 0;
   #uids = new Set<string>();
   #eventCache: (NativeEvent | undefined)[] = [];
+  #nodeSummaryWords: Uint32Array | null = null;
   #nodeViewCache: (NodeView | undefined)[] = [];
   #queryCache = new Map<string, QueryResult>();
   #identifiersCache: NativeEvent[] | null = null;
@@ -716,7 +717,32 @@ export class NativeTransformSession {
     this.#assertOpen();
     const cached = this.#eventCache[nodeId];
     if (cached) return cached;
-    const event = this.#binding().inspect([nodeId])[0];
+    if (this.#nodeSummaryWords == null) {
+      const data = this.#binding().nodeSummariesBuffer();
+      this.#nodeSummaryWords = new Uint32Array(data.buffer, data.byteOffset, data.byteLength >>> 2);
+    }
+    const offset = nodeId * 7;
+    const words = this.#nodeSummaryWords;
+    const type = NODE_TYPES[words[offset]!] || 'Unknown';
+    const parentId = words[offset + 3]!;
+    const parentTypeId = words[offset + 4]!;
+    const scopeParentId = words[offset + 6]!;
+    const event: NativeEvent | undefined =
+      type === 'Unknown'
+        ? undefined
+        : {
+            sequence: nodeId,
+            side: 'enter',
+            id: nodeId,
+            type,
+            start: words[offset + 1]!,
+            end: words[offset + 2]!,
+            parentId: parentId === 0xffffffff ? undefined : parentId,
+            parentType: parentTypeId === 0xffffffff ? undefined : NODE_TYPES[parentTypeId],
+            scopeId: words[offset + 5]!,
+            scopeParentId: scopeParentId === 0xffffffff ? undefined : scopeParentId,
+            fields: [],
+          };
     if (event) this.#eventCache[nodeId] = event;
     return event;
   }
@@ -1077,11 +1103,22 @@ export function transform(
     jsDispatchMs: 0,
     mapCompositionMs: 0,
     totalMs: 0,
+    phases: [] as NonNullable<NativeTransformResult['timings']['phases']>,
   };
   const allStates: { plugin: NativePlugin<any, any>; state: any }[] = [];
+  const deferredMapLayers: { source: string; edits: EditCommand[] }[] = [];
   let openSession: NativeTransformSession | null = null;
+  let reusableSession: NativeTransformSession | null = null;
+  let activePhase:
+    | { name: string; started: number; before: ReturnType<typeof timingSnapshot> }
+    | undefined;
   try {
     for (const phase of pipeline.phases) {
+      activePhase = {
+        name: phase.name,
+        started: performance.now(),
+        before: timingSnapshot(totals),
+      };
       const edits: EditCommand[] = [];
       const prepared = preparePhase(phase, phaseSource, filename, options, parser);
       const {
@@ -1107,19 +1144,22 @@ export function transform(
       const retainsAdditionalIndex = [...materializationSubscriptions].some(
         type => !subscriptions.has(type),
       );
-      const session = new NativeTransformSession(
-        phaseSource,
-        filename,
-        options,
-        [...materializationSubscriptions],
-        retainsAdditionalIndex,
-        includeParent,
-        includeScope,
-        identifierNames,
-        staticMemberPatterns,
-        [...exitSubscriptions],
-      );
-      totals.sessionOpenMs += session.openMs;
+      const session: NativeTransformSession =
+        reusableSession ??
+        new NativeTransformSession(
+          phaseSource,
+          filename,
+          options,
+          [...materializationSubscriptions],
+          retainsAdditionalIndex || includeParent || includeScope,
+          includeParent,
+          includeScope,
+          identifierNames,
+          staticMemberPatterns,
+          [...exitSubscriptions],
+        );
+      if (reusableSession == null) totals.sessionOpenMs += session.openMs;
+      reusableSession = null;
       openSession = session;
       const batch = session.nextPacked(
         [...subscriptions],
@@ -1186,13 +1226,32 @@ export function transform(
       for (const plugin of activePlugins)
         plugin.post?.(dispatch.contexts.get(plugin)!.context, dispatch.contexts.get(plugin)!.state);
       if (edits.length === 0) {
-        session.close();
-        openSession = null;
+        reusableSession = session;
+        totals.phases.push(finishPhaseTiming(activePhase, totals, 'complete'));
+        activePhase = undefined;
         continue;
       }
-      const committed = session.commit(edits, options.sourceMapMode);
+      const layerSource = phaseSource;
+      const committed = session.commit(edits, 'none');
       addTimings(totals, committed.timings);
       phaseSource = committed.code;
+      deferredMapLayers.push({ source: layerSource, edits: [...edits] });
+      session.close();
+      openSession = null;
+      totals.phases.push(finishPhaseTiming(activePhase, totals, 'complete'));
+      activePhase = undefined;
+      // Opening the next phase creates the explicit render/reparse boundary.
+    }
+    reusableSession?.close();
+    openSession = null;
+    for (const layer of deferredMapLayers) {
+      const committed = native.commitPackedBuffer(
+        layer.source,
+        parserFilename(filename, options.parser),
+        packEdits(layer.edits),
+        options.sourceMapMode,
+      );
+      addTimings(totals, committed.timings);
       if (finalMap == null) {
         finalMap = committed.map;
       } else {
@@ -1207,9 +1266,6 @@ export function transform(
         };
         totals.mapCompositionMs += performance.now() - compositionStarted;
       }
-      session.close();
-      openSession = null;
-      // Opening the next phase creates the explicit render/reparse boundary.
     }
     for (const { plugin, state } of allStates) plugin.cleanup?.('complete', state);
     totals.totalMs = performance.now() - transformStarted;
@@ -1222,17 +1278,26 @@ export function transform(
       timings: totals,
     };
   } catch (error) {
+    if (activePhase) {
+      totals.phases.push(
+        finishPhaseTiming(activePhase, totals, error instanceof Bailout ? 'bailout' : 'error'),
+      );
+    }
     openSession?.close();
     const bailout = error instanceof Bailout;
     for (const { plugin, state } of allStates)
       plugin.cleanup?.(bailout ? 'bailout' : 'error', state);
-    if (bailout)
-      return {
+    if (bailout) {
+      totals.totalMs = performance.now() - transformStarted;
+      const result = {
         status: 'bailout',
         reason: error.message,
         source: originalSource,
         diagnostics,
       } satisfies NativeBailoutResult;
+      Object.defineProperty(result, 'timings', { value: totals, enumerable: false });
+      return result;
+    }
     if (error instanceof NativeTransformError) throw error;
     const message = error instanceof Error ? error.message : String(error);
     throw new NativeTransformError(message, [
@@ -1474,12 +1539,13 @@ function createDispatcher(
     if (delivered?.has(deliveryKey)) return;
     if (entry.stopped || stopAll || eventIsSkipped(event, entry.skipped)) return;
     const callbacks = routedCallbacks ?? matchingCallbacks(override ?? plugin.visitor ?? {}, event);
+    if (callbacks.length === 0) return;
+    const runtime = override
+      ? createPathRuntime(plugin, entry, context)
+      : (entry.pathRuntime ??= createPathRuntime(plugin, entry, context));
+    const path = makePath(runtime, event);
+    currentSequence = event.sequence;
     for (const callback of callbacks) {
-      const runtime = override
-        ? createPathRuntime(plugin, entry, context)
-        : (entry.pathRuntime ??= createPathRuntime(plugin, entry, context));
-      const path = makePath(runtime, event);
-      currentSequence = event.sequence;
       callback(path, override ? overrideState : entry.state);
       delivered?.add(deliveryKey);
     }
@@ -1500,16 +1566,17 @@ function createDispatcher(
     for (const event of events) dispatchOne(event, synthetic, entry, context, visitor, state);
   };
   const routesFor = (event: NativeEvent): PhaseRoute[] => {
+    const templateKey = eventRouteKey(event);
     const key =
       routesByIdentifierName && event.type === 'Identifier'
-        ? `${eventRouteKey(event)}:${eventField(event, 'name') ?? ''}`
+        ? `${templateKey}:${eventField(event, 'name') ?? ''}`
         : routesByStaticMemberPath && event.type === 'StaticMemberExpression'
           ? `${event.type}:${eventField(event, 'memberPath') ?? ''}`
-          : eventRouteKey(event);
+          : templateKey;
     let routes = phaseRoutes.get(key);
     if (routes) return routes;
     routes = [];
-    let templates = phaseRouteTemplates.get(key);
+    let templates = phaseRouteTemplates.get(templateKey);
     if (!templates) {
       templates = [];
       for (const plugin of phase.plugins) {
@@ -1522,7 +1589,7 @@ function createDispatcher(
           });
         }
       }
-      phaseRouteTemplates.set(key, templates);
+      phaseRouteTemplates.set(templateKey, templates);
     }
     for (const template of templates) {
       const plugin = template.plugin;
@@ -2582,6 +2649,38 @@ function addTimings(
   target.traversalMs += value.traversalMs;
   target.renderAndMapMs += value.renderAndMapMs;
   target.napiTransferMs = (target.napiTransferMs ?? 0) + (value.napiTransferMs ?? 0);
+}
+function timingSnapshot(timings: NativeTransformResult['timings']) {
+  return {
+    parseMs: timings.parseMs,
+    semanticMs: timings.semanticMs,
+    traversalMs: timings.traversalMs,
+    renderAndMapMs: timings.renderAndMapMs,
+    sessionOpenMs: timings.sessionOpenMs ?? 0,
+    napiTransferMs: timings.napiTransferMs ?? 0,
+    jsDispatchMs: timings.jsDispatchMs ?? 0,
+    mapCompositionMs: timings.mapCompositionMs ?? 0,
+    totalMs: timings.totalMs ?? 0,
+  };
+}
+function finishPhaseTiming(
+  phase: { name: string; started: number; before: ReturnType<typeof timingSnapshot> },
+  totals: NativeTransformResult['timings'],
+  status: 'complete' | 'bailout' | 'error',
+): NonNullable<NativeTransformResult['timings']['phases']>[number] {
+  const after = timingSnapshot(totals);
+  return {
+    name: phase.name,
+    status,
+    parseMs: after.parseMs - phase.before.parseMs,
+    semanticMs: after.semanticMs - phase.before.semanticMs,
+    traversalMs: after.traversalMs - phase.before.traversalMs,
+    renderAndMapMs: after.renderAndMapMs - phase.before.renderAndMapMs,
+    napiTransferMs: after.napiTransferMs - phase.before.napiTransferMs,
+    jsDispatchMs: after.jsDispatchMs - phase.before.jsDispatchMs,
+    mapCompositionMs: after.mapCompositionMs - phase.before.mapCompositionMs,
+    totalMs: performance.now() - phase.started,
+  };
 }
 const EDITOR_CAPABILITIES = new Set([
   'append',

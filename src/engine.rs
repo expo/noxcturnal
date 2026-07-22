@@ -29,12 +29,24 @@ struct PackedEventParts {
     timings: Timings,
 }
 
+#[derive(Clone, Copy, Default)]
+struct NodeSummary {
+    type_id: u32,
+    start: u32,
+    end: u32,
+    parent_id: Option<u32>,
+    parent_type_id: Option<u32>,
+    scope_id: u32,
+    scope_parent_id: Option<u32>,
+}
+
 #[napi]
 pub struct NativeIndexedSession {
     source: String,
     filename: String,
     events: Vec<NativeEvent>,
     enter_event_indexes: Vec<usize>,
+    node_summaries: Vec<NodeSummary>,
     node_count: u32,
     timings: Timings,
     materialized_subscriptions: Vec<String>,
@@ -54,7 +66,7 @@ impl NativeIndexedSession {
     ) -> Result<Self> {
         let subscriptions = subscriptions.unwrap_or_default();
         let exit_subscriptions = exit_subscriptions.unwrap_or_default();
-        let (batch, scope_parents) = if subscriptions.is_empty() {
+        let (batch, scope_parents, node_summaries) = if subscriptions.is_empty() {
             (
                 EventBatch {
                     events: Vec::new(),
@@ -67,6 +79,7 @@ impl NativeIndexedSession {
                         render_and_map_ms: 0.0,
                     },
                 },
+                Vec::new(),
                 Vec::new(),
             )
         } else {
@@ -86,6 +99,7 @@ impl NativeIndexedSession {
             filename,
             events,
             enter_event_indexes,
+            node_summaries,
             node_count: batch.node_count,
             timings: batch.timings,
             materialized_subscriptions: subscriptions,
@@ -250,6 +264,36 @@ impl NativeIndexedSession {
     }
 
     #[napi]
+    pub fn node_summary(&self, node_id: u32) -> Result<Option<NativeEvent>> {
+        self.ensure_open()?;
+        Ok(self
+            .node_summaries
+            .get(node_id as usize)
+            .copied()
+            .map(|summary| summary.event(node_id)))
+    }
+
+    #[napi]
+    pub fn node_summaries_buffer(&self) -> Result<Buffer> {
+        self.ensure_open()?;
+        let mut output = Vec::with_capacity(self.node_summaries.len() * 7 * 4);
+        for summary in &self.node_summaries {
+            for word in [
+                summary.type_id,
+                summary.start,
+                summary.end,
+                summary.parent_id.unwrap_or(u32::MAX),
+                summary.parent_type_id.unwrap_or(u32::MAX),
+                summary.scope_id,
+                summary.scope_parent_id.unwrap_or(u32::MAX),
+            ] {
+                output.extend_from_slice(&word.to_le_bytes());
+            }
+        }
+        Ok(output.into())
+    }
+
+    #[napi]
     pub fn children_packed_buffer(
         &mut self,
         parent_ids: Vec<u32>,
@@ -330,6 +374,7 @@ impl NativeIndexedSession {
         self.closed = true;
         self.events.clear();
         self.enter_event_indexes.clear();
+        self.node_summaries.clear();
         self.scope_parents.clear();
     }
 
@@ -349,7 +394,12 @@ impl NativeIndexedSession {
                         .sum::<usize>()
             })
             .sum();
-        (self.source.len() + self.filename.len() + event_bytes).min(u32::MAX as usize) as u32
+        (self.source.len()
+            + self.filename.len()
+            + event_bytes
+            + self.node_summaries.len() * std::mem::size_of::<NodeSummary>()
+            + self.enter_event_indexes.len() * std::mem::size_of::<usize>())
+        .min(u32::MAX as usize) as u32
     }
 
     fn ensure_open(&self) -> Result<()> {
@@ -395,7 +445,7 @@ impl NativeIndexedSession {
                 materialized.push(subscription.clone());
             }
         }
-        let (batch, scope_parents) = materialize_with_scope_parents(
+        let (batch, scope_parents, node_summaries) = materialize_with_scope_parents(
             &self.source,
             &self.filename,
             &materialized,
@@ -408,6 +458,9 @@ impl NativeIndexedSession {
         self.timings.semantic_ms += batch.timings.semantic_ms;
         self.timings.traversal_ms += batch.timings.traversal_ms;
         self.scope_parents = scope_parents;
+        if self.node_summaries.is_empty() {
+            self.node_summaries = node_summaries;
+        }
         let mut existing = FxHashSet::default();
         for event in &self.events {
             existing.insert((event.id, event.side.clone()));
@@ -423,6 +476,27 @@ impl NativeIndexedSession {
         self.materialized_subscriptions.extend(missing);
         self.materialized_exit_subscriptions.extend(missing_exits);
         Ok(())
+    }
+}
+
+impl NodeSummary {
+    fn event(self, id: u32) -> NativeEvent {
+        NativeEvent {
+            sequence: id,
+            side: "enter".into(),
+            id,
+            r#type: node_type_name(self.type_id).unwrap_or("Unknown").into(),
+            start: self.start,
+            end: self.end,
+            parent_id: self.parent_id,
+            parent_type: self
+                .parent_type_id
+                .and_then(node_type_name)
+                .map(str::to_owned),
+            scope_id: self.scope_id,
+            scope_parent_id: self.scope_parent_id,
+            fields: Vec::new(),
+        }
     }
 }
 
@@ -1431,6 +1505,7 @@ struct EventCollector<'a> {
     utf16: Option<&'a [u32]>,
     root: Option<(u32, u32)>,
     events: Vec<NativeEvent>,
+    node_summaries: Vec<NodeSummary>,
     sequence: u32,
 }
 
@@ -1450,6 +1525,36 @@ impl VisitSide {
 }
 
 impl<'a> EventCollector<'a> {
+    fn record_summary(&mut self, kind: AstKind<'a>) {
+        let id = kind.node_id();
+        let node = self.nodes.get_node(id);
+        let span = kind.span();
+        let scope_id = match kind {
+            AstKind::Function(function) => function.scope_id.get().unwrap_or(node.scope_id()),
+            AstKind::ArrowFunctionExpression(function) => {
+                function.scope_id.get().unwrap_or(node.scope_id())
+            }
+            _ => node.scope_id(),
+        };
+        let is_root = id.index() == 0;
+        self.node_summaries[id.index()] = NodeSummary {
+            type_id: ast_kind_protocol_id(kind),
+            start: self
+                .utf16
+                .map_or(span.start, |index| index[span.start as usize]),
+            end: self
+                .utf16
+                .map_or(span.end, |index| index[span.end as usize]),
+            parent_id: (!is_root).then(|| self.nodes.parent_id(id).index() as u32),
+            parent_type_id: (!is_root).then(|| ast_kind_protocol_id(self.nodes.parent_kind(id))),
+            scope_id: scope_id.index() as u32,
+            scope_parent_id: self
+                .scoping
+                .scope_parent_id(scope_id)
+                .map(|id| id.index() as u32),
+        };
+    }
+
     fn emit(&mut self, kind: AstKind<'a>, side: VisitSide) {
         let sequence = self.sequence;
         self.sequence += 1;
@@ -1534,6 +1639,7 @@ impl<'a> EventCollector<'a> {
 
 impl<'a> Visit<'a> for EventCollector<'a> {
     fn enter_node(&mut self, kind: AstKind<'a>) {
+        self.record_summary(kind);
         self.emit(kind, VisitSide::Enter);
     }
     fn leave_node(&mut self, kind: AstKind<'a>) {
@@ -1563,7 +1669,7 @@ pub fn materialize(
         root_start,
         root_end,
     )
-    .map(|(mut batch, _)| {
+    .map(|(mut batch, _, _)| {
         hydrate_exit_events(&mut batch.events);
         batch
     })
@@ -1594,7 +1700,7 @@ fn materialize_with_scope_parents(
     exit_subscriptions: &[String],
     root_start: Option<u32>,
     root_end: Option<u32>,
-) -> Result<(EventBatch, Vec<u32>)> {
+) -> Result<(EventBatch, Vec<u32>, Vec<NodeSummary>)> {
     let parse_started = Instant::now();
     let allocator = Allocator::default();
     let parsed = Parser::new(&allocator, source, source_type(filename, source)?).parse();
@@ -1630,6 +1736,7 @@ fn materialize_with_scope_parents(
         utf16: utf16.as_deref().map(|offsets| &**offsets),
         root: root_start.zip(root_end),
         events: Vec::new(),
+        node_summaries: vec![NodeSummary::default(); semantic_return.semantic.nodes().len()],
         sequence: 0,
     };
     collector.visit_program(&parsed.program);
@@ -1660,6 +1767,7 @@ fn materialize_with_scope_parents(
             },
         },
         scope_parents,
+        collector.node_summaries,
     ))
 }
 
@@ -2188,7 +2296,15 @@ pub fn commit(
 ) -> Result<NativeCommitResult> {
     let started = Instant::now();
     let edits = editor::normalize(source, commands)?;
-    let (code, mappings, names) = sourcemap::render(source, &edits, mode.unwrap_or("boundary"));
+    let (code, mappings, names) = if mode == Some("none") {
+        (
+            sourcemap::render_code(source, &edits),
+            String::new(),
+            Vec::new(),
+        )
+    } else {
+        sourcemap::render(source, &edits, mode.unwrap_or("boundary"))
+    };
     Ok(NativeCommitResult {
         code,
         map: NativeVlqMap { mappings, names },

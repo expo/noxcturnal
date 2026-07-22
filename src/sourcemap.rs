@@ -306,6 +306,23 @@ pub fn render(source: &str, edits: &[ByteEdit], mode: &str) -> (String, String, 
     (code, map.mappings, names)
 }
 
+pub fn render_code(source: &str, edits: &[ByteEdit]) -> String {
+    let added: usize = edits.iter().map(|edit| edit.content.len()).sum();
+    let removed: usize = edits.iter().map(|edit| edit.end - edit.start).sum();
+    let mut code =
+        String::with_capacity(source.len().saturating_add(added).saturating_sub(removed));
+    let mut cursor = 0;
+    for edit in edits {
+        code.push_str(&source[cursor..edit.start]);
+        if !edit.mark_only {
+            code.push_str(&edit.content);
+        }
+        cursor = edit.end;
+    }
+    code.push_str(&source[cursor..]);
+    code
+}
+
 fn decode(mappings: &str) -> Vec<Vec<Segment>> {
     let mut lines = Vec::new();
     let (mut source, mut original_line, mut original_column, mut name) = (0, 0, 0, 0);

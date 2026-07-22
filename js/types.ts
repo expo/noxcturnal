@@ -1,13 +1,33 @@
 import type { NativeFieldKey, NativeNodeType } from './generated-event-schema.js';
 
 export type { NativeFieldKey, NativeNodeType } from './generated-event-schema.js';
-export type NativeVisitorAlias = 'Function' | 'Statement' | 'Declaration' | 'Expression' | 'MemberExpression' | 'MetaProperty' | 'ReferencedIdentifier' | 'FunctionDeclaration' | 'FunctionExpression' | 'TSDeclareFunction' | 'ClassDeclaration' | 'ClassExpression' | '*';
+export type NativeVisitorAlias =
+  | 'Function'
+  | 'Statement'
+  | 'Declaration'
+  | 'Expression'
+  | 'MemberExpression'
+  | 'MetaProperty'
+  | 'ReferencedIdentifier'
+  | 'FunctionDeclaration'
+  | 'FunctionExpression'
+  | 'TSDeclareFunction'
+  | 'ClassDeclaration'
+  | 'ClassExpression'
+  | '*';
 export type NativeVisitorRoute = NativeNodeType | NativeVisitorAlias;
 export type NodeId = number;
 export type ScopeId = number;
 export type SourceMapMode = 'line' | 'boundary' | 'character';
 export type MappingPolicy = 'Sourceless' | 'AnchorStart' | 'AnchorBoundaries' | 'Identity';
-export type EditKind = 'Replace' | 'Remove' | 'AppendLeft' | 'PrependLeft' | 'AppendRight' | 'PrependRight' | 'AddSourceMapLocation';
+export type EditKind =
+  | 'Replace'
+  | 'Remove'
+  | 'AppendLeft'
+  | 'PrependLeft'
+  | 'AppendRight'
+  | 'PrependRight'
+  | 'AddSourceMapLocation';
 
 export interface EditCommand {
   kind: EditKind;
@@ -54,14 +74,51 @@ export interface NodeView {
   readonly [field: string]: unknown;
 }
 
-export interface IdentifierView extends NodeView { readonly type: 'Identifier'; readonly name: string; readonly global?: boolean; readonly binding?: boolean; readonly bindingScopeId?: ScopeId; readonly read?: boolean; readonly write?: boolean }
-export interface StringLiteralView extends NodeView { readonly type: 'StringLiteral'; readonly value: string }
-export interface NumericLiteralView extends NodeView { readonly type: 'NumericLiteral'; readonly value: number }
-export interface BooleanLiteralView extends NodeView { readonly type: 'BooleanLiteral'; readonly value: boolean }
-export interface CallExpressionView extends NodeView { readonly type: 'CallExpression'; readonly optional: boolean; readonly argumentCount: number; readonly calleeName?: string; readonly calleeGlobal?: boolean; readonly staticArgument?: string }
-export interface FunctionView extends NodeView { readonly type: 'Function' | 'ArrowFunctionExpression'; readonly name?: string; readonly async: boolean; readonly generator?: boolean; readonly bodyStart: number; readonly bodyEnd: number }
-export interface ImportDeclarationView extends NodeView { readonly type: 'ImportDeclaration'; readonly source: string }
-export interface ExportNamedDeclarationView extends NodeView { readonly type: 'ExportNamedDeclaration'; readonly source?: string }
+export interface IdentifierView extends NodeView {
+  readonly type: 'Identifier';
+  readonly name: string;
+  readonly global?: boolean;
+  readonly binding?: boolean;
+  readonly bindingScopeId?: ScopeId;
+  readonly read?: boolean;
+  readonly write?: boolean;
+}
+export interface StringLiteralView extends NodeView {
+  readonly type: 'StringLiteral';
+  readonly value: string;
+}
+export interface NumericLiteralView extends NodeView {
+  readonly type: 'NumericLiteral';
+  readonly value: number;
+}
+export interface BooleanLiteralView extends NodeView {
+  readonly type: 'BooleanLiteral';
+  readonly value: boolean;
+}
+export interface CallExpressionView extends NodeView {
+  readonly type: 'CallExpression';
+  readonly optional: boolean;
+  readonly argumentCount: number;
+  readonly calleeName?: string;
+  readonly calleeGlobal?: boolean;
+  readonly staticArgument?: string;
+}
+export interface FunctionView extends NodeView {
+  readonly type: 'Function' | 'ArrowFunctionExpression';
+  readonly name?: string;
+  readonly async: boolean;
+  readonly generator?: boolean;
+  readonly bodyStart: number;
+  readonly bodyEnd: number;
+}
+export interface ImportDeclarationView extends NodeView {
+  readonly type: 'ImportDeclaration';
+  readonly source: string;
+}
+export interface ExportNamedDeclarationView extends NodeView {
+  readonly type: 'ExportNamedDeclaration';
+  readonly source?: string;
+}
 export interface NativeNodeMap {
   Identifier: IdentifierView;
   StringLiteral: StringLiteralView;
@@ -74,11 +131,26 @@ export interface NativeNodeMap {
   ExportNamedDeclaration: ExportNamedDeclarationView;
 }
 export type KnownNodeType = keyof NativeNodeMap;
-export type NodeOfType<T extends string> = T extends KnownNodeType ? NativeNodeMap[T] : NodeView & { readonly type: T };
+export type NodeOfType<T extends string> = T extends KnownNodeType
+  ? NativeNodeMap[T]
+  : NodeView & { readonly type: T };
 
-export interface NodeSummary { id: NodeId; type: string; start?: number; end?: number; parentId?: NodeId; parentType?: string }
-export interface SourceLocation { start: Position; end: Position }
-export interface Position { line: number; column: number }
+export interface NodeSummary {
+  id: NodeId;
+  type: string;
+  start?: number;
+  end?: number;
+  parentId?: NodeId;
+  parentType?: string;
+}
+export interface SourceLocation {
+  start: Position;
+  end: Position;
+}
+export interface Position {
+  line: number;
+  column: number;
+}
 export interface Timings {
   parseMs: number;
   semanticMs: number;
@@ -89,10 +161,38 @@ export interface Timings {
   jsDispatchMs?: number;
   mapCompositionMs?: number;
   totalMs?: number;
+  phases?: PhaseTimings[];
 }
-export interface NativeVlqMap { mappings: string; names: string[] }
-export interface Diagnostic { code: string; message: string; plugin?: string; phase?: string; start?: number; end?: number }
-export interface ParseClassification { syntax: 'js' | 'jsx' | 'ts' | 'tsx' | 'dts' | 'flow' | 'unknown'; supported: boolean; codegenCandidate: boolean; reason: string }
+export interface PhaseTimings {
+  name: string;
+  status: 'complete' | 'bailout' | 'error';
+  parseMs: number;
+  semanticMs: number;
+  traversalMs: number;
+  renderAndMapMs: number;
+  napiTransferMs: number;
+  jsDispatchMs: number;
+  mapCompositionMs: number;
+  totalMs: number;
+}
+export interface NativeVlqMap {
+  mappings: string;
+  names: string[];
+}
+export interface Diagnostic {
+  code: string;
+  message: string;
+  plugin?: string;
+  phase?: string;
+  start?: number;
+  end?: number;
+}
+export interface ParseClassification {
+  syntax: 'js' | 'jsx' | 'ts' | 'tsx' | 'dts' | 'flow' | 'unknown';
+  supported: boolean;
+  codegenCandidate: boolean;
+  reason: string;
+}
 
 export interface NativeTransformResult {
   status: 'complete';
@@ -107,6 +207,7 @@ export interface NativeBailoutResult {
   reason: string;
   source: string;
   diagnostics: Diagnostic[];
+  timings?: Timings;
 }
 export type TransformResult = NativeTransformResult | NativeBailoutResult;
 
@@ -126,9 +227,17 @@ export interface QueryResult {
   constants: Record<number, string | number | boolean | null>;
   calls: Record<string, NodeView[]>;
   captures: Record<number, NodeView[]>;
-  bindings: { name: string; scopeId: ScopeId; declaration: NodeSummary | null; references: NodeView[] }[];
+  bindings: {
+    name: string;
+    scopeId: ScopeId;
+    declaration: NodeSummary | null;
+    references: NodeView[];
+  }[];
 }
-export interface InspectRequest { nodeId: NodeId; fields: readonly NativeFieldKey[] }
+export interface InspectRequest {
+  nodeId: NodeId;
+  fields: readonly NativeFieldKey[];
+}
 
 export interface PluginPlan {
   /** Disable this plugin, including its lifecycle and subscriptions, for the current file. */
@@ -160,5 +269,10 @@ export interface TransformOptions {
 export interface ParserAdapter {
   name: string;
   supports(route: ParseClassification): boolean;
-  transform(source: string, filename: string, pipeline: unknown, options: TransformOptions): TransformResult;
+  transform(
+    source: string,
+    filename: string,
+    pipeline: unknown,
+    options: TransformOptions,
+  ): TransformResult;
 }
