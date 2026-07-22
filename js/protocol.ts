@@ -1,4 +1,4 @@
-import { FIELD_KEYS, NODE_TYPE_IDS, NODE_TYPES } from './generated-event-schema.js';
+import { FIELD_KEY_IDS, FIELD_KEYS, NODE_TYPE_IDS, NODE_TYPES } from './generated-event-schema.js';
 import type { EditCommand, EventBatch, NativeEvent } from './types.js';
 
 export interface PackedEventBatch {
@@ -225,10 +225,13 @@ export function packFieldRequests(fields?: Readonly<Record<string, readonly stri
   for (const [nodeType, requested] of Object.entries(fields)) {
     const typeId = NODE_TYPE_IDS.get(nodeType);
     if (typeId == null) continue;
-    const fieldIds = requested
-      .map(field => FIELD_KEYS.indexOf(field as typeof FIELD_KEYS[number]))
-      .filter(id => id > 0);
-    words.push(typeId, fieldIds.length, ...fieldIds);
+    const countIndex = words.length + 1;
+    words.push(typeId, 0);
+    for (const field of requested) {
+      const fieldId = FIELD_KEY_IDS.get(field);
+      if (fieldId != null && fieldId !== 0) words.push(fieldId);
+    }
+    words[countIndex] = words.length - countIndex - 1;
   }
   const data = Buffer.allocUnsafe(words.length * 4);
   for (let index = 0; index < words.length; index++) {

@@ -5,3 +5,4 @@ export type NativeNodeType = Exclude<(typeof NODE_TYPES)[number], ''>;
 export const NODE_TYPE_IDS = new Map<string, number>(NODE_TYPES.map((value, index) => [value, index]));
 export const FIELD_KEYS = ["","name","global","read","write","bindingScopeId","binding","value","constantKind","constantValue","optional","argumentCount","calleeName","calleeGlobal","staticArgument","computed","property","rootName","rootGlobal","async","generator","bodyStart","bodyEnd","expression","source","importKind","specifierCount","imported","local","exportKind","exported","kind","declarationCount","hasInitializer","meta","key","method","shorthand","operator","prefix","parameterCount","delegate","nodeKind","memberPath"] as const;
 export type NativeFieldKey = Exclude<(typeof FIELD_KEYS)[number], ''>;
+export const FIELD_KEY_IDS = new Map<string, number>(FIELD_KEYS.map((value, index) => [value, index]));

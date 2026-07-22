@@ -1,3 +1,4 @@
+mod constant_eval;
 mod editor;
 mod engine;
 mod event_types;
