@@ -1,22 +1,26 @@
 {
   "name": "noxcturnal-linux-arm64-musl",
   "version": "0.1.0",
-  "cpu": [
-    "arm64"
-  ],
-  "main": "noxcturnal.linux-arm64-musl.node",
+  "description": "Native-backed JavaScript transform runtime with visitor ergonomics",
+  "license": "MIT",
   "files": [
     "noxcturnal.linux-arm64-musl.node"
   ],
-  "description": "Native-backed JavaScript transform runtime with visitor ergonomics",
-  "license": "MIT",
-  "engines": {
-    "node": ">=18"
-  },
   "os": [
     "linux"
   ],
+  "cpu": [
+    "arm64"
+  ],
   "libc": [
     "musl"
-  ]
+  ],
+  "main": "noxcturnal.linux-arm64-musl.node",
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "engines": {
+    "node": ">=18"
+  }
 }

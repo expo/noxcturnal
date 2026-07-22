@@ -81,15 +81,19 @@ The `Function` alias must match real function nodes only. Do not change it back 
 Use Nix for Rust tooling. From `/Users/phil/git/expo/noxcturnal`:
 
 ```sh
+nix develop
 pnpm install --frozen-lockfile
 pnpm build
 pnpm verify
 pnpm benchmark
-nix shell nixpkgs#cargo nixpkgs#rustc nixpkgs#rustfmt nixpkgs#clippy nixpkgs#pkg-config -c cargo fmt --check
-nix shell nixpkgs#cargo nixpkgs#rustc nixpkgs#rustfmt nixpkgs#clippy nixpkgs#pkg-config -c cargo clippy --all-targets -- -D warnings
+pnpm rust:format
+pnpm rust:lint
 pnpm pack --pack-destination "$(mktemp -d)"
 git diff --check
 ```
+
+Package scripts assume Cargo and Rust are already on `PATH`; they no longer open nested Nix shells.
+`pnpm install` prepares a local pre-commit hook that runs lint-staged with Oxfmt.
 
 `pnpm verify` runs TypeScript checking, the Vitest integration suite, and Rust unit tests. Integration tests and benchmarks intentionally use Vitest, per project requirement.
 
@@ -122,7 +126,6 @@ Benchmark numbers are machine-local and should be treated as regression indicato
 
 The packed event word stream and the non-ASCII byte-to-UTF-16 index use the parse's `oxc_allocator` arena. Packed field requests and edit commands are decoded directly from N-API buffers without an intermediate word vector, ASCII edit normalization does not allocate an offset index, and hot owned hash indexes use the same `rustc_hash` implementation used throughout Oxc. Keep final code/maps, edit records containing strings, public event objects, and interned owned strings outside the arena: they either cross the N-API boundary or contain `Drop` types, which Oxc arena containers deliberately do not support.
 
-
 ## Tests worth preserving
 
 `test/runtime.test.ts` covers parser routing, narrow native materialization, phase reparsing, lifecycle and ordering, aliases, field-aware Babel visitor routes, member-chain matching, declared structural child roles, traversal and widening, semantic and conservative constant-expression queries, binding paths and complete scope identity/parents/insertion, inspection, editor behavior, transactional conflict handling, bailout/fallback, parent paths, ancestry helpers, metadata ownership, parser adapters, map composition/tracing, Unicode and CRLF mappings, worker threads, budgets, and randomized non-overlapping edit batches. `test/fitment.test.ts` implements representative Metro module lowering and server-action extraction end to end, including output parsing.
@@ -138,6 +141,13 @@ The root package is a pnpm workspace with eight NAPI platform packages under `np
 - Windows arm64/x64 MSVC.
 
 The root package declares them with `workspace:*` optional dependencies. `pnpm pack` rewrites these to `0.1.0` in the published manifest. The loader first tries the local `.node` file and then the matching optional platform package. Failure to load produces the stable `native-load-failed` parser route so callers can fall back without breaking startup.
+
+Changesets treats the root and all eight platform packages as a fixed release group. The release
+workflow creates a version PR while changesets are pending; after that PR is merged, it builds all
+eight native targets before publishing anything. The build jobs transfer their ephemeral binaries to
+the release job, which stages the platform packages and uses the standard Changesets action to
+publish the fixed package group. The final npm identity and trusted-publisher configuration must
+still be confirmed before enabling the first production release.
 
 Only the local macOS arm64 binary has been built. The other directories are publish scaffolds and require their respective CI builds before release.
 

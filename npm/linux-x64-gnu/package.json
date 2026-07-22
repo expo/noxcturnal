@@ -1,22 +1,26 @@
 {
   "name": "noxcturnal-linux-x64-gnu",
   "version": "0.1.0",
-  "cpu": [
-    "x64"
-  ],
-  "main": "noxcturnal.linux-x64-gnu.node",
+  "description": "Native-backed JavaScript transform runtime with visitor ergonomics",
+  "license": "MIT",
   "files": [
     "noxcturnal.linux-x64-gnu.node"
   ],
-  "description": "Native-backed JavaScript transform runtime with visitor ergonomics",
-  "license": "MIT",
-  "engines": {
-    "node": ">=18"
-  },
   "os": [
     "linux"
   ],
+  "cpu": [
+    "x64"
+  ],
   "libc": [
     "glibc"
-  ]
+  ],
+  "main": "noxcturnal.linux-x64-gnu.node",
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "engines": {
+    "node": ">=18"
+  }
 }

@@ -3,26 +3,54 @@
   "version": "0.1.0",
   "description": "Native-backed JavaScript transform runtime with visitor ergonomics",
   "license": "MIT",
+  "files": [
+    "dist",
+    "*.node",
+    "README.md",
+    "FITMENT.md"
+  ],
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "files": ["dist", "*.node", "README.md", "FITMENT.md"],
-  "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" } },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
   "scripts": {
-    "codegen": "nix shell nixpkgs#cargo -c node scripts/sync-oxc-event-schema.mjs && node scripts/generate-event-schema.mjs",
-    "codegen:check": "nix shell nixpkgs#cargo -c node scripts/sync-oxc-event-schema.mjs --check && node scripts/generate-event-schema.mjs --check",
-    "build:native": "nix shell nixpkgs#cargo nixpkgs#rustc nixpkgs#pkg-config -c napi build --platform --release",
+    "codegen": "node scripts/sync-oxc-event-schema.mjs && node scripts/generate-event-schema.mjs",
+    "codegen:check": "node scripts/sync-oxc-event-schema.mjs --check && node scripts/generate-event-schema.mjs --check",
+    "build:native": "napi build --platform --release",
     "build:js": "tsc -p tsconfig.json",
     "build": "pnpm build:native && pnpm build:js",
     "test": "vitest run",
     "benchmark": "vitest bench --run",
     "typecheck": "tsc -p tsconfig.json --noEmit && vitest --run --typecheck.only --typecheck.tsconfig tsconfig.type-tests.json",
-    "verify": "pnpm codegen:check && pnpm typecheck && pnpm test && nix shell nixpkgs#cargo nixpkgs#rustc nixpkgs#pkg-config -c cargo test"
+    "format": "oxfmt .",
+    "rust:format": "cargo fmt --check",
+    "rust:lint": "cargo clippy --all-targets -- -D warnings",
+    "verify": "pnpm codegen:check && pnpm typecheck && pnpm test && cargo test",
+    "prepare": "node scripts/prepare.mjs",
+    "prepublishOnly": "pnpm build:js",
+    "changeset": "changeset",
+    "changeset:status": "changeset status",
+    "changeset:version": "changeset version && pnpm install --lockfile-only",
+    "changeset:publish": "changeset publish"
   },
   "devDependencies": {
-    "@napi-rs/cli": "^3.4.5",
+    "@changesets/cli": "^2.31.1",
+    "@changesets/get-github-info": "^0.6.0",
     "@jridgewell/trace-mapping": "^0.3.31",
+    "@napi-rs/cli": "^3.4.5",
     "@types/node": "^22.15.0",
+    "dotenv": "^17.2.3",
+    "lint-staged": "^17.1.1",
+    "oxfmt": "^0.60.0",
     "typescript": "^5.8.3",
     "vitest": "^3.2.4"
   },
@@ -36,7 +64,9 @@
     "noxcturnal-win32-arm64-msvc": "workspace:*",
     "noxcturnal-win32-x64-msvc": "workspace:*"
   },
-  "engines": { "node": ">=18" },
+  "lint-staged": {
+    "*": "oxfmt --no-error-on-unmatched-pattern"
+  },
   "napi": {
     "binaryName": "noxcturnal",
     "targets": [
@@ -49,6 +79,9 @@
       "x86_64-pc-windows-msvc",
       "aarch64-pc-windows-msvc"
     ]
+  },
+  "engines": {
+    "node": ">=18"
   },
   "packageManager": "pnpm@10.12.1"
 }

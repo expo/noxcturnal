@@ -1,0 +1,29 @@
+{
+  "$schema": "https://unpkg.com/@changesets/config@0.3.0/schema.json",
+  "changelog": "../scripts/changelog.cjs",
+  "commit": false,
+  "fixed": [
+    [
+      "noxcturnal",
+      "noxcturnal-darwin-arm64",
+      "noxcturnal-darwin-x64",
+      "noxcturnal-linux-arm64-gnu",
+      "noxcturnal-linux-arm64-musl",
+      "noxcturnal-linux-x64-gnu",
+      "noxcturnal-linux-x64-musl",
+      "noxcturnal-win32-arm64-msvc",
+      "noxcturnal-win32-x64-msvc"
+    ]
+  ],
+  "access": "public",
+  "baseBranch": "main",
+  "updateInternalDependencies": "patch",
+  "snapshot": {
+    "prereleaseTemplate": "{tag}-{commit}",
+    "useCalculatedVersion": true
+  },
+  "___experimentalUnsafeOptions_WILL_CHANGE_IN_PATCH": {
+    "onlyUpdatePeerDependentsWhenOutOfRange": true,
+    "updateInternalDependents": "out-of-range"
+  }
+}

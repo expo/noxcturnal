@@ -1,19 +1,23 @@
 {
   "name": "noxcturnal-darwin-arm64",
   "version": "0.1.0",
+  "description": "Native-backed JavaScript transform runtime with visitor ergonomics",
+  "license": "MIT",
+  "files": [
+    "noxcturnal.darwin-arm64.node"
+  ],
+  "os": [
+    "darwin"
+  ],
   "cpu": [
     "arm64"
   ],
   "main": "noxcturnal.darwin-arm64.node",
-  "files": [
-    "noxcturnal.darwin-arm64.node"
-  ],
-  "description": "Native-backed JavaScript transform runtime with visitor ergonomics",
-  "license": "MIT",
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
   "engines": {
     "node": ">=18"
-  },
-  "os": [
-    "darwin"
-  ]
+  }
 }
