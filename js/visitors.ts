@@ -231,6 +231,7 @@ export class NativeTransformSession {
   #uids = new Set<string>();
   #uidsInitialized = false;
   #eventCache: (NativeEvent | undefined)[] = [];
+  #nodeViewCache: (NodeView | undefined)[] = [];
   #queryCache = new Map<string, QueryResult>();
   #identifiersCache: NativeEvent[] | null = null;
   #identifierViewsCache: NodeView[] | null = null;
@@ -284,6 +285,9 @@ export class NativeTransformSession {
     return packed;
   }
   cacheEvent(event: NativeEvent): void { if (event.side === 'enter') this.#eventCache[event.id] = event; }
+  nodeView(event: NativeEvent): NodeView {
+    return this.#nodeViewCache[event.id] ??= toNodeView(event);
+  }
   query(request: QueryRequest): QueryResult {
     this.#assertOpen();
     const cacheKey = stableJson(request);
@@ -734,7 +738,7 @@ export function transformOrFallback(
 interface DispatcherEntry extends PathState {
   context: PluginContext;
   state: any;
-  delivered: Set<number>;
+  delivered?: Set<number>;
   pathRuntime?: PathRuntime;
 }
 
@@ -778,7 +782,6 @@ function createDispatcher(
       state: undefined,
       stopped: false,
       skipped: [],
-      delivered: new Set(),
       context: undefined as unknown as PluginContext,
     };
     const context: PluginContext = {
@@ -788,7 +791,10 @@ function createDispatcher(
       diagnostic: diagnostic => diagnostics.push({ ...diagnostic, plugin: plugin.name, phase: phase.name }),
       unsupported: reason => { throw new Bailout(`${plugin.name}:${reason}`); },
       stopAll: () => { stopAll = true; },
-      subscribeRemaining: (...types) => replay(session.next(expandSubscriptions(types), undefined, undefined, visitorHasExit(plugin.visitor)).events.filter(event => event.sequence > currentSequence), plugin, entry, context),
+      subscribeRemaining: (...types) => {
+        entry.delivered ??= new Set();
+        replay(session.next(expandSubscriptions(types), undefined, undefined, visitorHasExit(plugin.visitor)).events.filter(event => event.sequence > currentSequence), plugin, entry, context);
+      },
       revisitProgram: (visitor, state) => replayCustom(session.next(visitorSubscriptions(visitor), undefined, undefined, visitorHasExit(visitor)).events, visitor, state, context),
       code: codeFactory,
       editor: makeEditor(session, edits, plugin.name, () => order++),
@@ -810,7 +816,10 @@ function createDispatcher(
         try { replayCustom(session.next(visitorSubscriptions(nested), { start: target.start, end: target.end }, undefined, visitorHasExit(nested)).events, nested, state, context); }
         finally { activeTraversals.delete(key); }
       },
-      widen(target, types, scopeOnly) { replay(session.next(expandSubscriptions(types), scopeOnly ? undefined : { start: target.start, end: target.end }, undefined, visitorHasExit(plugin.visitor)).events.filter(candidate => candidate.sequence > target.sequence && (!scopeOnly || candidate.scopeId === target.scopeId)), plugin, entry, context); },
+      widen(target, types, scopeOnly) {
+        entry.delivered ??= new Set();
+        replay(session.next(expandSubscriptions(types), scopeOnly ? undefined : { start: target.start, end: target.end }, undefined, visitorHasExit(plugin.visitor)).events.filter(candidate => candidate.sequence > target.sequence && (!scopeOnly || candidate.scopeId === target.scopeId)), plugin, entry, context);
+      },
       parent(_target, parentId) { const parent = session.event(parentId); return parent ? makePath(runtime, parent) : null; },
       children(target) { return session.children(target.id).map(child => makePath(runtime, child)); },
       allowsChild(type, role) {
@@ -829,7 +838,7 @@ function createDispatcher(
   };
   const dispatchOne = (event: NativeEvent, plugin: NativePlugin<any, any>, entry: DispatcherEntry, context: PluginContext, override?: Visitor<any>, overrideState?: any, routedHandlers?: VisitorHandler<any>[]) => {
     const deliveryKey = event.id * 2 + Number(event.side === 'exit');
-    if (!override && entry.delivered.has(deliveryKey)) return;
+    if (!override && entry.delivered?.has(deliveryKey)) return;
     if (entry.stopped || stopAll || eventIsSkipped(event, entry.skipped)) return;
     const visitor = override ?? plugin.visitor ?? {};
     const handlers = routedHandlers ?? matchingHandlers(visitor, event);
@@ -842,12 +851,12 @@ function createDispatcher(
       const path = makePath(runtime, event);
       currentSequence = event.sequence;
       callback(path, override ? overrideState : entry.state);
-      if (!override) entry.delivered.add(deliveryKey);
+      if (!override) entry.delivered?.add(deliveryKey);
     }
   };
   const replayCustom = (events: NativeEvent[], visitor: Visitor<any>, state: any, context: PluginContext) => {
     const synthetic = { name: 'nested', apiVersion: 1 as const, visitor };
-    const entry = { context, state, stopped: false, skipped: [] as { start: number; end: number }[], delivered: new Set<number>() };
+    const entry = { context, state, stopped: false, skipped: [] as { start: number; end: number }[] };
     for (const event of events) dispatchOne(event, synthetic, entry, context, visitor, state);
   };
   const routesFor = (event: NativeEvent): PhaseRoute[] => {
@@ -919,7 +928,7 @@ class NodePathImpl implements NativeNodePath {
   readonly #parent: NodeSummary | null;
   #scope?: NativeScope;
   constructor(readonly runtime: PathRuntime, readonly event: NativeEvent) {
-    this.node = toNodeView(event);
+    this.node = runtime.session.nodeView(event);
     this.#parent = event.parentId == null ? null : { id: event.parentId, type: event.parentType! };
   }
   get context(): PluginContext { return this.runtime.context; }

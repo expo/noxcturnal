@@ -16,7 +16,8 @@ pub use crate::event_types::{
     PackedEventBatch, ParseClassification, Timings,
 };
 use crate::generated_event_schema::{
-    ast_kind_protocol_id, field_key_id, field_key_name, node_type_id, node_type_name,
+    NODE_TYPE_COUNT, ast_kind_protocol_id, field_key_id, field_key_name, node_type_id,
+    node_type_name,
 };
 use crate::{editor, sourcemap};
 
@@ -689,6 +690,7 @@ fn packed_fields_direct(
     kind: AstKind<'_>,
     scoping: &Scoping,
     requested: Option<&[String]>,
+    precomputed_member_path: Option<&str>,
     strings: &mut FxHashMap<String, u32>,
 ) -> Option<DirectPackedFields> {
     let wants = |key: &str| requested.is_none_or(|fields| fields.iter().any(|field| field == key));
@@ -731,12 +733,15 @@ fn packed_fields_direct(
                 let value = intern_packed(strings, &member.property.name);
                 push("property", value);
             }
-            if wants("memberPath")
-                && let Some(path) = static_member_path(&member.object)
-            {
-                let path = format!("{path}.{}", member.property.name);
-                let value = intern_packed(strings, &path);
-                push("memberPath", value);
+            if wants("memberPath") {
+                if let Some(path) = precomputed_member_path {
+                    let value = intern_packed(strings, path);
+                    push("memberPath", value);
+                } else if let Some(path) = static_member_path(&member.object) {
+                    let path = format!("{path}.{}", member.property.name);
+                    let value = intern_packed(strings, &path);
+                    push("memberPath", value);
+                }
             }
             let mut object = &member.object;
             while let Expression::StaticMemberExpression(parent) = object {
@@ -1506,8 +1511,9 @@ fn materialize_packed_internal(
         ));
     }
     let semantic_started = Instant::now();
+    let build_nodes = include_parent || include_scope;
     let semantic_return = SemanticBuilder::new()
-        .with_build_nodes(true)
+        .with_build_nodes(build_nodes)
         .with_check_syntax_error(true)
         .build(&parsed.program);
     let semantic_ms = elapsed(semantic_started);
@@ -1520,14 +1526,23 @@ fn materialize_packed_internal(
             ),
         ));
     }
+    let node_count = semantic_return.semantic.stats().nodes;
     let field_requests = decode_field_requests(packed_field_requests)?;
     let traversal_started = Instant::now();
     let utf16 = (!source.is_ascii()).then(|| utf16_index(source, &allocator));
+    let output_capacity =
+        source
+            .len()
+            .saturating_mul(if subscriptions.iter().any(|value| value == "*") {
+                6
+            } else {
+                2
+            });
     let mut collector = PackedEventCollector {
         subscriptions: &subscriptions,
-        subscription_ids: &subscription_ids,
+        subscription_ids: subscription_set(&subscription_ids),
         field_requests: field_requests.as_deref(),
-        nodes: semantic_return.semantic.nodes(),
+        nodes: build_nodes.then(|| semantic_return.semantic.nodes()),
         scoping: semantic_return.semantic.scoping(),
         utf16: utf16.as_deref().map(|offsets| &**offsets),
         root: root_start.zip(root_end),
@@ -1538,15 +1553,12 @@ fn materialize_packed_internal(
         static_member_patterns,
         sequence: 0,
         emitted_count: 0,
-        words: ArenaVec::new_in(&&allocator),
+        words: PackedWords::with_capacity(output_capacity),
         string_ids: FxHashMap::default(),
     };
     collector.visit_program(&parsed.program);
     let traversal_ms = elapsed(traversal_started);
-    let mut data = Vec::with_capacity(collector.words.len() * 4);
-    for &word in &collector.words {
-        data.extend_from_slice(&word.to_le_bytes());
-    }
+    let data = collector.words.into_bytes();
     let mut strings = (0..collector.string_ids.len())
         .map(|_| String::new())
         .collect::<Vec<_>>();
@@ -1556,7 +1568,7 @@ fn materialize_packed_internal(
     Ok(PackedEventParts {
         data,
         strings,
-        node_count: semantic_return.semantic.nodes().len() as u32,
+        node_count,
         emitted_count: collector.emitted_count,
         timings: Timings {
             parse_ms,
@@ -1681,11 +1693,21 @@ fn decode_field_requests(data: Option<&[u8]>) -> Result<Option<Vec<FieldRequest>
     Ok(Some(requests))
 }
 
+fn subscription_set(ids: &[u32]) -> [bool; NODE_TYPE_COUNT + 1] {
+    let mut subscriptions = [false; NODE_TYPE_COUNT + 1];
+    for &id in ids {
+        if let Some(subscribed) = subscriptions.get_mut(id as usize) {
+            *subscribed = true;
+        }
+    }
+    subscriptions
+}
+
 struct PackedEventCollector<'a> {
     subscriptions: &'a [String],
-    subscription_ids: &'a [u32],
+    subscription_ids: [bool; NODE_TYPE_COUNT + 1],
     field_requests: Option<&'a [FieldRequest]>,
-    nodes: &'a AstNodes<'a>,
+    nodes: Option<&'a AstNodes<'a>>,
     scoping: &'a Scoping,
     utf16: Option<&'a [u32]>,
     root: Option<(u32, u32)>,
@@ -1696,8 +1718,36 @@ struct PackedEventCollector<'a> {
     static_member_patterns: &'a [String],
     sequence: u32,
     emitted_count: u32,
-    words: ArenaVec<'a, u32>,
+    words: PackedWords,
     string_ids: FxHashMap<String, u32>,
+}
+
+struct PackedWords(Vec<u8>);
+
+impl PackedWords {
+    fn with_capacity(capacity: usize) -> Self {
+        Self(Vec::with_capacity(capacity))
+    }
+
+    fn push(&mut self, word: u32) {
+        self.0.extend_from_slice(&word.to_le_bytes());
+    }
+
+    fn extend<const N: usize>(&mut self, words: [u32; N]) {
+        for word in words {
+            self.push(word);
+        }
+    }
+
+    fn extend_from_slice(&mut self, words: &[u32]) {
+        for &word in words {
+            self.push(word);
+        }
+    }
+
+    fn into_bytes(self) -> Vec<u8> {
+        self.0
+    }
 }
 
 impl PackedEventCollector<'_> {
@@ -1726,7 +1776,7 @@ impl PackedEventCollector<'_> {
             return;
         }
         let protocol_id = ast_kind_protocol_id(kind);
-        let fast_match = self.subscription_ids.contains(&protocol_id);
+        let fast_match = self.subscription_ids[protocol_id as usize];
         if !fast_match && self.subscriptions.is_empty() {
             return;
         }
@@ -1756,23 +1806,28 @@ impl PackedEventCollector<'_> {
                 return;
             }
         }
+        let mut filtered_static_member_path = None;
         if !self.static_member_patterns.is_empty()
             && let AstKind::StaticMemberExpression(member) = kind
         {
             let path = static_member_path(&member.object)
                 .map(|object| format!("{object}.{}", member.property.name));
-            if path.is_none_or(|path| {
+            if path.as_ref().is_none_or(|path| {
                 !self
                     .static_member_patterns
                     .iter()
-                    .any(|pattern| pattern == &path)
+                    .any(|pattern| pattern == path)
             }) {
                 return;
             }
+            filtered_static_member_path = path;
         }
         let id = kind.node_id();
         let scope_id = self.include_scope.then(|| {
-            let node = self.nodes.get_node(id);
+            let nodes = self
+                .nodes
+                .expect("scope collection requires the node store");
+            let node = nodes.get_node(id);
             match kind {
                 AstKind::Function(function) => function.scope_id.get().unwrap_or(node.scope_id()),
                 AstKind::ArrowFunctionExpression(function) => {
@@ -1782,19 +1837,31 @@ impl PackedEventCollector<'_> {
             }
         });
         let is_root = id.index() == 0;
-        let parent_id =
-            (self.include_parent && !is_root).then(|| self.nodes.parent_id(id).index() as u32);
+        let parent_id = (self.include_parent && !is_root).then(|| {
+            self.nodes
+                .expect("parent collection requires the node store")
+                .parent_id(id)
+                .index() as u32
+        });
         let requested = self.field_requests.and_then(|requests| {
             requests
                 .iter()
                 .find(|request| request.node_type == node_type)
         });
         let requested_fields = requested.map(|request| request.fields.as_slice());
-        if let Some(node_fields) =
-            packed_fields_direct(kind, self.scoping, requested_fields, &mut self.string_ids)
-        {
+        if let Some(node_fields) = packed_fields_direct(
+            kind,
+            self.scoping,
+            requested_fields,
+            filtered_static_member_path.as_deref(),
+            &mut self.string_ids,
+        ) {
             let parent_type_id = if self.include_parent && !is_root {
-                ast_kind_protocol_id(self.nodes.parent_kind(id))
+                ast_kind_protocol_id(
+                    self.nodes
+                        .expect("parent collection requires the node store")
+                        .parent_kind(id),
+                )
             } else {
                 u32::MAX
             };
@@ -1830,7 +1897,11 @@ impl PackedEventCollector<'_> {
             }
         }
         let parent_type_id = if self.include_parent && !is_root {
-            ast_kind_protocol_id(self.nodes.parent_kind(id))
+            ast_kind_protocol_id(
+                self.nodes
+                    .expect("parent collection requires the node store")
+                    .parent_kind(id),
+            )
         } else {
             u32::MAX
         };
