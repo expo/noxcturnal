@@ -37,6 +37,7 @@ pub struct NativeIndexedSession {
     node_count: u32,
     timings: Timings,
     materialized_subscriptions: Vec<String>,
+    materialized_exit_subscriptions: Vec<String>,
     scope_parents: Vec<u32>,
     closed: bool,
 }
@@ -48,8 +49,10 @@ impl NativeIndexedSession {
         source: String,
         filename: String,
         subscriptions: Option<Vec<String>>,
+        exit_subscriptions: Option<Vec<String>>,
     ) -> Result<Self> {
         let subscriptions = subscriptions.unwrap_or_default();
+        let exit_subscriptions = exit_subscriptions.unwrap_or_default();
         let (batch, scope_parents) = if subscriptions.is_empty() {
             (
                 EventBatch {
@@ -66,7 +69,14 @@ impl NativeIndexedSession {
                 Vec::new(),
             )
         } else {
-            materialize_with_scope_parents(&source, &filename, &subscriptions, None, None, true)?
+            materialize_with_scope_parents(
+                &source,
+                &filename,
+                &subscriptions,
+                &exit_subscriptions,
+                None,
+                None,
+            )?
         };
         Ok(Self {
             source,
@@ -75,6 +85,7 @@ impl NativeIndexedSession {
             node_count: batch.node_count,
             timings: batch.timings,
             materialized_subscriptions: subscriptions,
+            materialized_exit_subscriptions: exit_subscriptions,
             scope_parents,
             closed: false,
         })
@@ -89,7 +100,7 @@ impl NativeIndexedSession {
         field_requests: Option<Vec<FieldRequest>>,
     ) -> Result<EventBatch> {
         self.ensure_open()?;
-        self.ensure_materialized(&subscriptions)?;
+        self.ensure_materialized(&subscriptions, &subscriptions)?;
         let root = root_start.zip(root_end);
         let mut events: Vec<_> = self
             .events
@@ -131,10 +142,11 @@ impl NativeIndexedSession {
         root_start: Option<u32>,
         root_end: Option<u32>,
         field_requests: Option<Vec<FieldRequest>>,
-        include_exit: Option<bool>,
+        exit_subscriptions: Option<Vec<String>>,
     ) -> Result<PackedEventBatch> {
         self.ensure_open()?;
-        self.ensure_materialized(&subscriptions)?;
+        let exit_subscriptions = exit_subscriptions.unwrap_or_default();
+        self.ensure_materialized(&subscriptions, &exit_subscriptions)?;
         let root = root_start.zip(root_end);
         let mut strings = Vec::<String>::new();
         let mut string_ids = FxHashMap::<String, u32>::default();
@@ -151,12 +163,16 @@ impl NativeIndexedSession {
             }
         };
         for event in self.events.iter().filter(|event| {
-            subscriptions
+            let selected = if event.side == "exit" {
+                &exit_subscriptions
+            } else {
+                &subscriptions
+            };
+            selected
                 .iter()
                 .flat_map(|subscription| subscription.split('|'))
                 .any(|subscription| alias_matches(subscription, &event.r#type))
                 && root.is_none_or(|(start, end)| event.start >= start && event.end <= end)
-                && (include_exit.unwrap_or(true) || event.side == "enter")
         }) {
             if event.side == "exit" {
                 words.extend([event.sequence | 0x8000_0000, event.id]);
@@ -219,7 +235,7 @@ impl NativeIndexedSession {
     #[napi]
     pub fn inspect(&mut self, node_ids: Vec<u32>) -> Result<Vec<NativeEvent>> {
         self.ensure_open()?;
-        self.ensure_materialized(&["*".into()])?;
+        self.ensure_materialized(&["*".into()], &[])?;
         Ok(self
             .events
             .iter()
@@ -236,7 +252,7 @@ impl NativeIndexedSession {
         parent_type_ids: Vec<u32>,
     ) -> Result<Buffer> {
         self.ensure_open()?;
-        self.ensure_materialized(&["*".into()])?;
+        self.ensure_materialized(&["*".into()], &[])?;
         let mut parent_ids = parent_ids.into_iter().collect::<FxHashSet<_>>();
         let parent_type_ids = parent_type_ids.into_iter().collect::<FxHashSet<_>>();
         parent_ids.extend(
@@ -266,7 +282,7 @@ impl NativeIndexedSession {
     #[napi]
     pub fn constants_packed_buffer(&mut self, node_ids: Vec<u32>) -> Result<Buffer> {
         self.ensure_open()?;
-        self.ensure_materialized(&["Expression".into()])?;
+        self.ensure_materialized(&["Expression".into()], &[])?;
         let node_ids = node_ids.into_iter().collect::<FxHashSet<_>>();
         Ok(pack_event_refs(
             self.events
@@ -280,7 +296,7 @@ impl NativeIndexedSession {
     #[napi]
     pub fn query_globals(&mut self, names: Vec<String>) -> Result<Vec<GlobalFact>> {
         self.ensure_open()?;
-        self.ensure_materialized(&["Identifier".into()])?;
+        self.ensure_materialized(&["Identifier".into()], &[])?;
         Ok(globals_from_events(&self.events, &names))
     }
 
@@ -338,7 +354,11 @@ impl NativeIndexedSession {
         }
     }
 
-    fn ensure_materialized(&mut self, subscriptions: &[String]) -> Result<()> {
+    fn ensure_materialized(
+        &mut self,
+        subscriptions: &[String],
+        exit_subscriptions: &[String],
+    ) -> Result<()> {
         let missing: Vec<String> = subscriptions
             .iter()
             .filter(|subscription| {
@@ -350,16 +370,32 @@ impl NativeIndexedSession {
             })
             .cloned()
             .collect();
-        if missing.is_empty() {
+        let missing_exits: Vec<String> = exit_subscriptions
+            .iter()
+            .filter(|subscription| {
+                !self
+                    .materialized_exit_subscriptions
+                    .iter()
+                    .any(|existing| existing == "*" || existing == *subscription)
+            })
+            .cloned()
+            .collect();
+        if missing.is_empty() && missing_exits.is_empty() {
             return Ok(());
+        }
+        let mut materialized = missing.clone();
+        for subscription in &missing_exits {
+            if !materialized.iter().any(|existing| existing == subscription) {
+                materialized.push(subscription.clone());
+            }
         }
         let (batch, scope_parents) = materialize_with_scope_parents(
             &self.source,
             &self.filename,
-            &missing,
+            &materialized,
+            &missing_exits,
             None,
             None,
-            true,
         )?;
         self.node_count = batch.node_count;
         self.timings.parse_ms += batch.timings.parse_ms;
@@ -378,6 +414,7 @@ impl NativeIndexedSession {
         );
         self.events.sort_by_key(|event| event.sequence);
         self.materialized_subscriptions.extend(missing);
+        self.materialized_exit_subscriptions.extend(missing_exits);
         Ok(())
     }
 }
@@ -1612,13 +1649,13 @@ fn js_number_string(value: f64) -> String {
 
 struct EventCollector<'a> {
     subscriptions: [bool; NODE_TYPE_COUNT + 1],
+    exit_subscriptions: [bool; NODE_TYPE_COUNT + 1],
     nodes: &'a AstNodes<'a>,
     scoping: &'a Scoping,
     utf16: Option<&'a [u32]>,
     root: Option<(u32, u32)>,
     events: Vec<NativeEvent>,
     sequence: u32,
-    include_exit: bool,
 }
 
 impl<'a> EventCollector<'a> {
@@ -1709,7 +1746,7 @@ impl<'a> Visit<'a> for EventCollector<'a> {
         self.emit(kind, "enter");
     }
     fn leave_node(&mut self, kind: AstKind<'a>) {
-        if self.include_exit {
+        if self.exit_subscriptions[ast_kind_protocol_id(kind) as usize] {
             self.emit(kind, "exit");
         }
     }
@@ -1726,13 +1763,14 @@ pub fn materialize(
     root_end: Option<u32>,
     include_exit: bool,
 ) -> Result<EventBatch> {
+    let exit_subscriptions = if include_exit { subscriptions } else { &[] };
     materialize_with_scope_parents(
         source,
         filename,
         subscriptions,
+        exit_subscriptions,
         root_start,
         root_end,
-        include_exit,
     )
     .map(|(mut batch, _)| {
         hydrate_exit_events(&mut batch.events);
@@ -1762,9 +1800,9 @@ fn materialize_with_scope_parents(
     source: &str,
     filename: &str,
     subscriptions: &[String],
+    exit_subscriptions: &[String],
     root_start: Option<u32>,
     root_end: Option<u32>,
-    include_exit: bool,
 ) -> Result<(EventBatch, Vec<u32>)> {
     let parse_started = Instant::now();
     let allocator = Allocator::default();
@@ -1795,13 +1833,13 @@ fn materialize_with_scope_parents(
     let utf16 = (!source.is_ascii()).then(|| utf16_index(source, &allocator));
     let mut collector = EventCollector {
         subscriptions: subscription_set_from_names(subscriptions),
+        exit_subscriptions: subscription_set_from_names(exit_subscriptions),
         nodes: semantic_return.semantic.nodes(),
         scoping: semantic_return.semantic.scoping(),
         utf16: utf16.as_deref().map(|offsets| &**offsets),
         root: root_start.zip(root_end),
         events: Vec::new(),
         sequence: 0,
-        include_exit,
     };
     collector.visit_program(&parsed.program);
     let traversal_ms = elapsed(traversal_started);
@@ -1843,20 +1881,22 @@ pub fn materialize_packed(
     filename: &str,
     subscriptions: Vec<String>,
     subscription_ids: Vec<u32>,
+    exit_subscriptions: Vec<String>,
+    exit_subscription_ids: Vec<u32>,
     root_start: Option<u32>,
     root_end: Option<u32>,
     packed_field_requests: Option<&[u8]>,
-    include_exit: Option<bool>,
 ) -> Result<PackedEventBatch> {
     let parts = materialize_packed_internal(
         source,
         filename,
         subscriptions,
         subscription_ids,
+        exit_subscriptions,
+        exit_subscription_ids,
         root_start,
         root_end,
         packed_field_requests,
-        include_exit,
         true,
         true,
         &[],
@@ -1880,10 +1920,11 @@ fn materialize_packed_internal(
     filename: &str,
     subscriptions: Vec<String>,
     subscription_ids: Vec<u32>,
+    exit_subscriptions: Vec<String>,
+    exit_subscription_ids: Vec<u32>,
     root_start: Option<u32>,
     root_end: Option<u32>,
     packed_field_requests: Option<&[u8]>,
-    include_exit: Option<bool>,
     include_parent: bool,
     include_scope: bool,
     identifier_names: &[String],
@@ -1930,12 +1971,15 @@ fn materialize_packed_internal(
     let mut collector = PackedEventCollector {
         subscriptions: &subscriptions,
         subscription_ids: subscription_set(&subscription_ids),
+        exit_subscription_ids: subscription_set_with_names(
+            &exit_subscription_ids,
+            &exit_subscriptions,
+        ),
         field_requests: field_requests.as_deref(),
         nodes: build_nodes.then(|| semantic_return.semantic.nodes()),
         scoping: semantic_return.semantic.scoping(),
         utf16: utf16.as_deref().map(|offsets| &**offsets),
         root: root_start.zip(root_end),
-        include_exit: include_exit.unwrap_or(true),
         include_parent,
         include_scope,
         identifier_names,
@@ -1977,10 +2021,11 @@ pub fn materialize_packed_buffer(
     filename: &str,
     subscriptions: Vec<String>,
     subscription_ids: Vec<u32>,
+    exit_subscriptions: Vec<String>,
+    exit_subscription_ids: Vec<u32>,
     root_start: Option<u32>,
     root_end: Option<u32>,
     packed_field_requests: Option<&[u8]>,
-    include_exit: Option<bool>,
     include_parent: Option<bool>,
     include_scope: Option<bool>,
     identifier_names: Vec<String>,
@@ -1988,15 +2033,17 @@ pub fn materialize_packed_buffer(
 ) -> Result<Buffer> {
     let include_parent = include_parent.unwrap_or(true);
     let include_scope = include_scope.unwrap_or(true);
+    let include_exit = !exit_subscription_ids.is_empty() || !exit_subscriptions.is_empty();
     let parts = materialize_packed_internal(
         source,
         filename,
         subscriptions,
         subscription_ids,
+        exit_subscriptions,
+        exit_subscription_ids,
         root_start,
         root_end,
         packed_field_requests,
-        include_exit,
         include_parent,
         include_scope,
         &identifier_names,
@@ -2012,11 +2059,7 @@ pub fn materialize_packed_buffer(
     let shape_node_count = parts.node_count
         | if include_parent { 0x8000_0000 } else { 0 }
         | if include_scope { 0x4000_0000 } else { 0 }
-        | if include_exit.unwrap_or(true) {
-            0x2000_0000
-        } else {
-            0
-        };
+        | if include_exit { 0x2000_0000 } else { 0 };
     for word in [
         shape_node_count,
         parts.emitted_count,
@@ -2108,15 +2151,26 @@ fn subscription_set_from_names(names: &[String]) -> [bool; NODE_TYPE_COUNT + 1] 
     subscriptions
 }
 
+fn subscription_set_with_names(ids: &[u32], names: &[String]) -> [bool; NODE_TYPE_COUNT + 1] {
+    let mut subscriptions = subscription_set(ids);
+    if !names.is_empty() {
+        let named = subscription_set_from_names(names);
+        for (subscribed, named) in subscriptions.iter_mut().zip(named) {
+            *subscribed |= named;
+        }
+    }
+    subscriptions
+}
+
 struct PackedEventCollector<'a> {
     subscriptions: &'a [String],
     subscription_ids: [bool; NODE_TYPE_COUNT + 1],
+    exit_subscription_ids: [bool; NODE_TYPE_COUNT + 1],
     field_requests: Option<&'a [FieldRequest]>,
     nodes: Option<&'a AstNodes<'a>>,
     scoping: &'a Scoping,
     utf16: Option<&'a [u32]>,
     root: Option<(u32, u32)>,
-    include_exit: bool,
     include_parent: bool,
     include_scope: bool,
     identifier_names: &'a [String],
@@ -2326,7 +2380,7 @@ impl<'a> Visit<'a> for PackedEventCollector<'a> {
         self.emit(kind, 0);
     }
     fn leave_node(&mut self, kind: AstKind<'a>) {
-        if self.include_exit {
+        if self.exit_subscription_ids[ast_kind_protocol_id(kind) as usize] {
             self.emit(kind, 1);
         }
     }

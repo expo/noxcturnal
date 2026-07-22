@@ -42,6 +42,46 @@ test('materializes complete compact call payloads on the stateless packed path',
   session.close();
 });
 
+test('materializes exits only for explicitly subscribed routes', () => {
+  const source = 'function example(value) { return value + 1 }';
+  for (const retained of [false, true]) {
+    const createSession = () => new NativeTransformSession(
+      source,
+      'fixture.js',
+      {},
+      retained ? [] : ['Program', 'Function', 'Identifier'],
+      retained,
+    );
+    const enterSession = createSession();
+    const enterCount = enterSession.nextPacked(
+      ['Program', 'Function', 'Identifier'],
+      undefined,
+      undefined,
+      false,
+    ).emittedCount;
+    enterSession.close();
+    const exitSession = createSession();
+    const emittedCount = exitSession.nextPacked(
+      ['Program', 'Function', 'Identifier'],
+      undefined,
+      undefined,
+      true,
+      ['Program'],
+    ).emittedCount;
+    assert.equal(emittedCount, enterCount + 1);
+    exitSession.close();
+  }
+});
+
+test('skips native rendering when a phase produces no edits', () => {
+  const plugin = defineNativePlugin({ name: 'analysis-only', apiVersion: 1, visitor: { Identifier() {} } });
+  const source = 'const answer = value;';
+  const result = transform(source, 'fixture.js', defineNativePipeline([plugin]));
+  assert.equal(result.status, 'complete');
+  assert.equal(result.code, source);
+  assert.equal(result.timings.renderAndMapMs, 0);
+});
+
 test('exposes common scalar discriminants without child-tree transfer', () => {
   const session = NativeTransformSession.open('const value = { platform: 1 }; value.total += -2;', 'fixture.js');
   const events = session.next(['ObjectProperty', 'AssignmentExpression', 'UnaryExpression'], undefined, undefined, false).events;

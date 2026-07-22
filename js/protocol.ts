@@ -176,36 +176,20 @@ export function decodeEventBatch(batch: PackedEventBatch): EventBatch {
 }
 
 export function packEdits(edits: readonly EditCommand[]): Buffer {
-  const strings: string[] = [];
-  const words: number[] = [];
-  const stringId = (value: string): number => {
-    const id = strings.length;
-    strings.push(value);
-    return id;
-  };
-  for (let index = 0; index < edits.length; index++) {
-    const edit = edits[index];
-    const names = edit.names ?? [];
-    words.push(
-      EDIT_KINDS[edit.kind],
-      edit.start,
-      edit.end,
-      edit.content == null ? MISSING_VALUE : stringId(edit.content),
-      EDIT_MAPPINGS[edit.mapping ?? 'Sourceless'],
-      edit.order ?? index,
-      names.length,
-    );
-    for (const name of names) words.push(stringId(name));
+  const encodedStrings: Buffer[] = [];
+  let wordCount = 0;
+  for (const edit of edits) {
+    if (edit.content != null) encodedStrings.push(Buffer.from(edit.content));
+    for (const name of edit.names ?? []) encodedStrings.push(Buffer.from(name));
+    wordCount += 7 + (edit.names?.length ?? 0);
   }
-
-  const encodedStrings = strings.map(value => Buffer.from(value));
   const stringsSize = encodedStrings.reduce(
     (size, value) => size + 4 + value.length + paddingFor(value.length),
     0,
   );
   const wordsOffset = 8 + stringsSize;
-  const data = Buffer.allocUnsafe(wordsOffset + words.length * 4);
-  data.writeUInt32LE(strings.length, 0);
+  const data = Buffer.allocUnsafe(wordsOffset + wordCount * 4);
+  data.writeUInt32LE(encodedStrings.length, 0);
   data.writeUInt32LE(wordsOffset, 4);
   let offset = 8;
   for (const value of encodedStrings) {
@@ -214,8 +198,23 @@ export function packEdits(edits: readonly EditCommand[]): Buffer {
     value.copy(data, offset);
     offset = alignToWord(offset + value.length);
   }
-  for (let index = 0; index < words.length; index++) {
-    data.writeUInt32LE(words[index] >>> 0, wordsOffset + index * 4);
+  let wordOffset = wordsOffset;
+  let stringId = 0;
+  const write = (word: number) => {
+    data.writeUInt32LE(word >>> 0, wordOffset);
+    wordOffset += 4;
+  };
+  for (let index = 0; index < edits.length; index++) {
+    const edit = edits[index];
+    const names = edit.names ?? [];
+    write(EDIT_KINDS[edit.kind]);
+    write(edit.start);
+    write(edit.end);
+    write(edit.content == null ? MISSING_VALUE : stringId++);
+    write(EDIT_MAPPINGS[edit.mapping ?? 'Sourceless']);
+    write(edit.order ?? index);
+    write(names.length);
+    for (let nameIndex = 0; nameIndex < names.length; nameIndex++) write(stringId++);
   }
   return data;
 }

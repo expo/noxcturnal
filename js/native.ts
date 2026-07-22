@@ -7,9 +7,9 @@ import type { EditCommand, EventBatch, NativeVlqMap, ParseClassification, Timing
 
 interface NativeBinding {
   available: boolean;
-  NativeIndexedSession: new (source: string, filename: string, subscriptions?: string[]) => {
+  NativeIndexedSession: new (source: string, filename: string, subscriptions?: string[], exitSubscriptions?: string[]) => {
     next(subscriptions: string[], rootStart?: number, rootEnd?: number, fieldRequests?: { nodeType: string; fields: string[] }[]): EventBatch;
-    nextPacked(subscriptions: string[], rootStart?: number, rootEnd?: number, fieldRequests?: { nodeType: string; fields: string[] }[], includeExit?: boolean): { data: Buffer; strings: string[]; nodeCount: number; emittedCount: number; timings: Timings; includeExit?: boolean };
+    nextPacked(subscriptions: string[], rootStart?: number, rootEnd?: number, fieldRequests?: { nodeType: string; fields: string[] }[], exitSubscriptions?: string[]): { data: Buffer; strings: string[]; nodeCount: number; emittedCount: number; timings: Timings; includeExit?: boolean };
     queryGlobals(names: string[]): { name: string; references: { id: number; start: number; end: number }[] }[];
     inspect(nodeIds: number[]): import('./types.js').NativeEvent[];
     childrenPackedBuffer(parentIds: number[], parentTypes: string[], parentTypeIds: number[]): Buffer;
@@ -24,8 +24,8 @@ interface NativeBinding {
   commitPackedEdits(source: string, filename: string, data: Buffer, strings: string[], sourceMapMode?: string): { code: string; map: NativeVlqMap; timings: Timings };
   commitPackedBuffer(source: string, filename: string, data: Buffer, sourceMapMode?: string): { code: string; map: NativeVlqMap; timings: Timings };
   materializeEvents(source: string, filename: string, subscriptions: string[], rootStart?: number, rootEnd?: number): EventBatch;
-  materializePackedEvents(source: string, filename: string, subscriptions: string[], subscriptionIds: number[], rootStart?: number, rootEnd?: number, fieldRequests?: Buffer, includeExit?: boolean): { data: Buffer; strings: string[]; nodeCount: number; emittedCount: number; timings: Timings };
-  materializePackedBuffer(source: string, filename: string, subscriptions: string[], subscriptionIds: number[], rootStart?: number, rootEnd?: number, fieldRequests?: Buffer, includeExit?: boolean, includeParent?: boolean, includeScope?: boolean, identifierNames?: string[], staticMemberPatterns?: string[]): Buffer;
+  materializePackedEvents(source: string, filename: string, subscriptions: string[], subscriptionIds: number[], exitSubscriptions: string[], exitSubscriptionIds: number[], rootStart?: number, rootEnd?: number, fieldRequests?: Buffer): { data: Buffer; strings: string[]; nodeCount: number; emittedCount: number; timings: Timings };
+  materializePackedBuffer(source: string, filename: string, subscriptions: string[], subscriptionIds: number[], exitSubscriptions: string[], exitSubscriptionIds: number[], rootStart?: number, rootEnd?: number, fieldRequests?: Buffer, includeParent?: boolean, includeScope?: boolean, identifierNames?: string[], staticMemberPatterns?: string[]): Buffer;
   queryGlobals(source: string, filename: string, names: string[]): { name: string; references: { id: number; start: number; end: number }[] }[];
   inspectNodes(source: string, filename: string, nodeIds: number[]): import('./types.js').NativeEvent[];
   nativeVersion(): string;
