@@ -7,6 +7,9 @@ import type {
   SourceLocation, TransformOptions, TransformResult, ParseClassification,
   NodeOfType,
   ParserAdapter,
+  NativeFieldKey,
+  NativeNodeType,
+  NativeVisitorRoute,
 } from './types.js';
 
 export interface PrepareContext {
@@ -14,7 +17,7 @@ export interface PrepareContext {
   readonly options: TransformOptions;
   readonly parser: ReturnType<typeof native.classify>;
   readonly sourceHints: ReadonlySet<string>;
-  subscribe(...types: string[]): void;
+  subscribe(...types: NativeVisitorRoute[]): void;
 }
 
 export interface NativeScope {
@@ -58,7 +61,7 @@ export interface PluginContext {
 }
 
 export interface NativeEditor {
-  supports(capability: string): boolean;
+  supports(capability: EditorCapability): boolean;
   append(content: string): void;
   prepend(content: string): void;
   appendLeft(offset: number, content: string): void;
@@ -82,6 +85,7 @@ export interface NativeEditor {
   toString(): string;
   isEmpty(): boolean;
 }
+export type EditorCapability = 'append' | 'prepend' | 'update' | 'overwrite' | 'remove' | 'move' | 'reset' | 'indent' | 'trim' | 'addSourceMapLocation' | 'replace' | 'replaceAll';
 
 export interface CodeFragment { code: string; mapping: 'sourceless' | 'anchor-start' | 'anchor-boundaries' | 'identity'; names?: readonly string[] }
 export interface CodeFactory {
@@ -106,7 +110,7 @@ export interface NativeNodePath<T extends NodeView = NodeView> {
   readonly context: PluginContext;
   getSource(): string;
   getLocation(): SourceLocation;
-  is<TType extends string>(type: TType): this is NativeNodePath<NodeOfType<TType>>;
+  is<TType extends NativeNodeType>(type: TType): this is NativeNodePath<NodeOfType<TType>>;
   get(key: string): NativeNodePath | readonly NativeNodePath[] | null;
   getChild(key: string): NativeNodePath | null;
   getChildList(key: string): readonly NativeNodePath[];
@@ -132,15 +136,22 @@ export interface NativeNodePath<T extends NodeView = NodeView> {
   skip(): void;
   stop(): void;
   traverse<State>(visitor: Visitor<State>, state?: State): void;
-  subscribeWithin(types: string | readonly string[]): void;
-  subscribeForScope(types: string | readonly string[]): void;
+  subscribeWithin(types: NativeVisitorRoute | readonly NativeVisitorRoute[]): void;
+  subscribeForScope(types: NativeVisitorRoute | readonly NativeVisitorRoute[]): void;
   unsupported(reason: string): never;
 }
 
-type Handler<State> = (path: NativeNodePath, state: State) => void;
-export type VisitorHandler<State> = Handler<State> | { enter?: Handler<State>; exit?: Handler<State> };
-export type Visitor<State> = Record<string, VisitorHandler<State> | undefined>;
-export interface NativePlugin<State = unknown, Options = unknown> {
+type NodeForRoute<Route extends NativeVisitorRoute> =
+  Route extends 'ReferencedIdentifier' ? NodeOfType<'Identifier'> :
+  Route extends 'FunctionDeclaration' | 'FunctionExpression' | 'TSDeclareFunction' ? NodeOfType<'Function'> :
+  Route extends 'ClassDeclaration' | 'ClassExpression' ? NodeOfType<'Class'> :
+  Route extends NativeNodeType ? NodeOfType<Route> : NodeView;
+type Handler<State, Node extends NodeView = NodeView> = (path: NativeNodePath<Node>, state: State) => void;
+export type VisitorHandler<State, Node extends NodeView = NodeView> = Handler<State, Node> | { enter?: Handler<State, Node>; exit?: Handler<State, Node> };
+export type Visitor<State> = { [Route in NativeVisitorRoute]?: VisitorHandler<State, NodeForRoute<Route>> } & {
+  [compositeRoute: `${NativeVisitorRoute}|${string}`]: VisitorHandler<State> | undefined;
+};
+export interface NativePlugin<State = unknown, Options = unknown, Analysis = unknown> {
   name: string;
   version?: string;
   apiVersion: 1;
@@ -148,15 +159,15 @@ export interface NativePlugin<State = unknown, Options = unknown> {
   prepare?(context: PrepareContext, options: Options): PluginPlan | void;
   createState?(): State;
   pre?(context: PluginContext, state: State): void;
-  analyze?(context: PluginContext, state: State): TransformDecision | void;
-  apply?(context: PluginContext, analysis: unknown, state: State): void;
+  analyze?(context: PluginContext, state: State): TransformDecision<Analysis> | void;
+  apply?(context: PluginContext, analysis: Analysis, state: State): void;
   visitor?: Visitor<State>;
   post?(context: PluginContext, state: State): void;
   cleanup?(reason: 'complete' | 'bailout' | 'error', state: State): void;
 }
-export type NativePluginDefinition<State = unknown, Options = unknown> = Omit<NativePlugin<State, Options>, 'apiVersion'> & { apiVersion?: 1 };
-export interface DefinedNativePlugin<State = unknown, Options = unknown> extends NativePlugin<State, Options> {
-  withOptions(options: Options): DefinedNativePlugin<State, Options>;
+export type NativePluginDefinition<State = unknown, Options = unknown, Analysis = unknown> = Omit<NativePlugin<State, Options, Analysis>, 'apiVersion'> & { apiVersion?: 1 };
+export interface DefinedNativePlugin<State = unknown, Options = unknown, Analysis = unknown> extends NativePlugin<State, Options, Analysis> {
+  withOptions(options: Options): DefinedNativePlugin<State, Options, Analysis>;
 }
 export interface PipelinePhase { name: string; plugins: readonly NativePlugin<any, any>[]; reparseAfterEdits?: boolean }
 export interface NativePipeline { apiVersion: 1; phases: readonly PipelinePhase[] }
@@ -167,8 +178,8 @@ class Bailout extends Error {}
 export class NativeTransformError extends Error {
   constructor(message: string, readonly diagnostics: Diagnostic[]) { super(message); this.name = 'NativeTransformError'; }
 }
-export function defineNativePlugin<State, Options = unknown>(plugin: NativePluginDefinition<State, Options>): DefinedNativePlugin<State, Options> {
-  const definition = { ...plugin, apiVersion: 1 as const, visitor: plugin.visitor == null ? undefined : Object.freeze({ ...plugin.visitor }) } as DefinedNativePlugin<State, Options>;
+export function defineNativePlugin<State = undefined, Options = undefined, Analysis = unknown>(plugin: NativePluginDefinition<State, Options, Analysis>): DefinedNativePlugin<State, Options, Analysis> {
+  const definition = { ...plugin, apiVersion: 1 as const, visitor: plugin.visitor == null ? undefined : Object.freeze({ ...plugin.visitor }) } as DefinedNativePlugin<State, Options, Analysis>;
   Object.defineProperty(definition, 'withOptions', { enumerable: false, value: (options: Options) => defineNativePlugin({ ...plugin, options }) });
   return Object.freeze(definition);
 }
@@ -429,9 +440,9 @@ export function transform(source: string, filename: string, pipeline: NativePipe
       const plans = new Map<NativePlugin<any, any>, PluginPlan>();
       for (const plugin of phase.plugins) {
         if (plugin.apiVersion !== 1) throw new Error(`${plugin.name}: unsupported API version`);
-        const prepareSubscriptions = new Set<string>();
+        const prepareSubscriptions = new Set<NativeVisitorRoute>();
         const plan = plugin.prepare?.({ filename, options, parser, sourceHints: sourceHints(phaseSource), subscribe: (...types) => types.forEach(type => prepareSubscriptions.add(type)) }, plugin.options as any) ?? {};
-        const merged = { ...plan, subscriptions: [...(plan.subscriptions ?? []), ...prepareSubscriptions, ...visitorSubscriptions(plugin.visitor)] };
+        const merged: PluginPlan = { ...plan, subscriptions: [...(plan.subscriptions ?? []), ...prepareSubscriptions, ...visitorSubscriptions(plugin.visitor)] };
         plans.set(plugin, merged);
       }
       const activePlugins = phase.plugins.filter(plugin => !plans.get(plugin)?.phases?.length || plans.get(plugin)!.phases!.includes(phase.name));
@@ -666,7 +677,7 @@ class NodePathImpl implements NativeNodePath {
 
 type EditKind = EditCommand['kind'];
 const matchingHandlerCache = new WeakMap<object, { routes: Map<string, VisitorHandler<any>[]>; fieldAware: boolean }>();
-const visitorSubscriptionsCache = new WeakMap<object, string[]>();
+const visitorSubscriptionsCache = new WeakMap<object, NativeVisitorRoute[]>();
 const visitorExitCache = new WeakMap<object, boolean>();
 function matchingHandlers(visitor: Visitor<any>, event: NativeEvent): VisitorHandler<any>[] {
   let cache = matchingHandlerCache.get(visitor);
@@ -674,7 +685,7 @@ function matchingHandlers(visitor: Visitor<any>, event: NativeEvent): VisitorHan
   const route = cache.fieldAware ? `${event.type}:${eventField(event, 'nodeKind') ?? ''}:${event.type === 'Identifier' && eventField(event, 'global') != null ? 'reference' : ''}` : event.type;
   const cached = cache.routes.get(route);
   if (cached) return cached;
-  const handlers = Object.entries(visitor).filter(([key, value]) => value && key.split('|').some(part => visitorKeyMatches(part, event))).map(([, value]) => value!);
+  const handlers = Object.entries(visitor).filter(([key, value]) => value && key.split('|').some(part => visitorKeyMatches(part, event))).map(([, value]) => value!) as VisitorHandler<any>[];
   cache.routes.set(route, handlers);
   return handlers;
 }
@@ -793,10 +804,10 @@ function parseScalar(value: string): string | number | boolean { if (value === '
 function summary(node: NodeView): NodeSummary { return { id: node.id, type: node.type, start: node.start, end: node.end, parentId: node.parentId, parentType: node.parentType }; }
 function array(value: string | readonly string[]): string[] { return typeof value === 'string' ? [value] : [...value]; }
 function expandSubscriptions(values: readonly string[]): string[] { return [...new Set(values.flatMap(value => value.split('|')))]; }
-function visitorSubscriptions(visitor?: Visitor<any>): string[] {
+function visitorSubscriptions(visitor?: Visitor<any>): NativeVisitorRoute[] {
   if (!visitor) return [];
   const cached = visitorSubscriptionsCache.get(visitor); if (cached) return cached;
-  const subscriptions = expandSubscriptions(Object.keys(visitor)); visitorSubscriptionsCache.set(visitor, subscriptions); return subscriptions;
+  const subscriptions = expandSubscriptions(Object.keys(visitor)) as NativeVisitorRoute[]; visitorSubscriptionsCache.set(visitor, subscriptions); return subscriptions;
 }
 function visitorHasExit(visitor?: Visitor<any>): boolean {
   if (!visitor) return false;

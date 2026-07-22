@@ -1,6 +1,6 @@
 export type * from './types.js';
 export type {
-  CodeFactory, CodeFragment, DefinedNativePlugin, MetadataWriter, NativeBinding, NativeEditor,
+  CodeFactory, CodeFragment, DefinedNativePlugin, EditorCapability, MetadataWriter, NativeBinding, NativeEditor,
   NativeNodePath, NativePipeline, NativePipelineDefinition, NativePlugin, NativePluginDefinition,
   NativePluginPipelineDefinition, NativeScope, PipelinePhase, PluginContext, PrepareContext,
   TransformDecision, Visitor, VisitorHandler,

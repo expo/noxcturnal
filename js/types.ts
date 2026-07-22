@@ -1,3 +1,8 @@
+import type { NativeFieldKey, NativeNodeType } from './generated-event-schema.js';
+
+export type { NativeFieldKey, NativeNodeType } from './generated-event-schema.js';
+export type NativeVisitorAlias = 'Function' | 'Statement' | 'Declaration' | 'Expression' | 'MemberExpression' | 'MetaProperty' | 'ReferencedIdentifier' | 'FunctionDeclaration' | 'FunctionExpression' | 'TSDeclareFunction' | 'ClassDeclaration' | 'ClassExpression' | '*';
+export type NativeVisitorRoute = NativeNodeType | NativeVisitorAlias;
 export type NodeId = number;
 export type ScopeId = number;
 export type SourceMapMode = 'line' | 'boundary' | 'character';
@@ -45,6 +50,7 @@ export interface NodeView {
   readonly scopeParentId?: ScopeId;
   readonly parentId?: NodeId;
   readonly parentType?: string;
+  /** Scalar fields requested dynamically through a plugin plan are present as `unknown`. */
   readonly [field: string]: unknown;
 }
 
@@ -68,7 +74,7 @@ export interface NativeNodeMap {
   ExportNamedDeclaration: ExportNamedDeclarationView;
 }
 export type KnownNodeType = keyof NativeNodeMap;
-export type NodeOfType<T extends string> = T extends KnownNodeType ? NativeNodeMap[T] : NodeView;
+export type NodeOfType<T extends string> = T extends KnownNodeType ? NativeNodeMap[T] : NodeView & { readonly type: T };
 
 export interface NodeSummary { id: NodeId; type: string; start?: number; end?: number; parentId?: NodeId; parentType?: string }
 export interface SourceLocation { start: Position; end: Position }
@@ -122,17 +128,17 @@ export interface QueryResult {
   captures: Record<number, NodeView[]>;
   bindings: { name: string; scopeId: ScopeId; declaration: NodeSummary | null; references: NodeView[] }[];
 }
-export interface InspectRequest { nodeId: NodeId; fields: string[] }
+export interface InspectRequest { nodeId: NodeId; fields: readonly NativeFieldKey[] }
 
 export interface PluginPlan {
-  subscriptions?: readonly string[];
-  fields?: Readonly<Record<string, readonly string[]>>;
-  semantics?: readonly string[];
+  subscriptions?: readonly NativeVisitorRoute[];
+  fields?: Readonly<Partial<Record<NativeNodeType, readonly NativeFieldKey[]>>>;
+  semantics?: readonly 'scope'[];
   queries?: readonly QueryRequest[];
   metadataWrites?: readonly string[];
   phases?: readonly string[];
   ancestry?: 'parent' | 'findParent' | 'functionParent' | 'programParent' | number;
-  children?: Readonly<Record<string, readonly string[]>>;
+  children?: Readonly<Partial<Record<NativeVisitorRoute, readonly string[]>>>;
 }
 
 export interface TransformOptions {

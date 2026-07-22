@@ -45,6 +45,8 @@ Within a phase every plugin observes the same immutable source. Mutations become
 
 `defineNativePlugin` returns an immutable reusable definition and supplies the current API version. Bind per-pipeline options with `plugin.withOptions(options)`. `defineNativePipeline([plugin])` is the single-pass shorthand; pass `{ phases: [...] }` when edits must become visible between passes. Pipelines snapshot and freeze their phase and plugin arrays so cache identity cannot drift after construction.
 
+The TypeScript API derives its node and scalar-field names from the generated Oxc protocol schema. Visitor keys contextually narrow `path.node` (including `ReferencedIdentifier` and collapsed function/class routes), invalid route/field/capability literals are rejected, and the generic analysis value returned by `analyze` flows into `apply`. Composite routes such as `'Identifier|StringLiteral'` intentionally receive the common `NodeView`; use `path.is(...)` when a branch needs a specific view.
+
 ## Implemented surface
 
 - Declarative plugin plans, static subscriptions, aliases, lifecycle hooks, state, metadata ownership, diagnostics, and cleanup.
