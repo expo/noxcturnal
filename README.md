@@ -45,11 +45,13 @@ Within a phase every plugin observes the same immutable source. Mutations become
 
 `defineNativePlugin` returns an immutable reusable definition and supplies the current API version. Bind per-pipeline options with `plugin.withOptions(options)`. `defineNativePipeline([plugin])` is the single-pass shorthand; pass `{ phases: [...] }` when edits must become visible between passes. Pipelines snapshot and freeze their phase and plugin arrays so cache identity cannot drift after construction.
 
+`prepare` may return `{ enabled: false }` to remove a plugin and its lifecycle from the current file, which is useful with `sourceHints` for directive-driven transforms. Hot define-style visitors may declare `identifierNames` or exact `staticMemberPatterns`. These filters are enabled only when every plugin subscribing to that event family opts in; otherwise the phase safely falls back to unfiltered delivery.
+
 The TypeScript API derives its node and scalar-field names from the generated Oxc protocol schema. Visitor keys contextually narrow `path.node` (including `ReferencedIdentifier` and collapsed function/class routes), invalid route/field/capability literals are rejected, and the generic analysis value returned by `analyze` flows into `apply`. Composite routes such as `'Identifier|StringLiteral'` intentionally receive the common `NodeView`; use `path.is(...)` when a branch needs a specific view.
 
 ## Implemented surface
 
-- Declarative plugin plans, static subscriptions, aliases, lifecycle hooks, state, metadata ownership, diagnostics, and cleanup.
+- Declarative plugin plans, static subscriptions, safe all-subscriber event filters, per-file enablement, aliases, lifecycle hooks, state, metadata ownership, diagnostics, and cleanup.
 - Optional analyze/apply lifecycle: every plugin decision is collected before any apply hook runs, so unsupported files bail out from pristine input without speculative mutation.
 - Arbitrary compact Oxc node events with stable per-parse node IDs, parent summaries, scope IDs, typed scalar fields, semantic global-reference facts, and UTF-16 ranges. The integer node/field protocol is generated and checked against the pinned Oxc `AstKind` definition.
 - Lazy compact ancestor paths with `findParent`, function/program-parent helpers, declared field filtering, and explicit batched `inspect` for additional shallow facts.

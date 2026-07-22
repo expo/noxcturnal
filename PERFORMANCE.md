@@ -41,6 +41,15 @@ The Metro spike completed in 20.3 ms median versus 213.6 ms for Babel and 77.2 m
 Oxc-walker plus MagicString: 10.55x and 3.81x respectively. All implementations observed
 8,500 dependencies and passed the output parse/checksum checks.
 
+The sibling spike also has `npm run bench:plugins`, based on the plugin patterns in the current
+`babel-preset-expo` and `@expo/metro-config` checkout. Its 500-file, 1.45 MiB corpus combines nine
+independent define/env, import-policy, static platform selection, dependency, import-meta,
+dynamic-export, directive/action-analysis, and Program-insertion plugins with ordinary application
+logic. It compares both equivalent merged Babel visitors and the actual built Expo Babel preset.
+On the same machine, a final six-sample run measured 358.5 ms for the equivalent Babel visitors,
+1330.7 ms for Expo Babel, and 50.3 ms for Noxcturnal: 7.13x and 26.48x respectively. The command
+fails when the lead over the actual Expo Babel pipeline falls below 10x.
+
 ## Findings and changes
 
 Phase dispatch previously tested every event against every plugin. A phase-level route cache
@@ -53,6 +62,13 @@ name. A realistic `path.scope.hasBinding(path.node.name)` loop exhausted the def
 limit; with a raised limit it took roughly 52 ms warm. Sessions now build binding and global
 indexes once from semantic Identifier facts. The workload completes under the default budget
 in about 6.09 ms.
+
+Expo-like profiling also showed that a define plugin should not receive every referenced
+Identifier just to match a few global names, and member-pattern plugins should not receive every
+member chain. `identifierNames` and `staticMemberPatterns` now filter these families during native
+materialization when every subscriber opts in. Generated protocol aliases are expanded to integer
+node IDs before the native traversal, avoiding repeated string alias matching. `enabled: false`
+allows directive-gated plugins to contribute no events or lifecycle work for irrelevant files.
 
 The remaining broad and structural costs have different causes. Catch-all visitors necessarily
 transfer and replay every selected node. Structural child access uses the retained-session path,

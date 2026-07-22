@@ -1534,6 +1534,8 @@ pub fn materialize_packed(
         include_exit,
         true,
         true,
+        &[],
+        &[],
     )?;
     Ok(PackedEventBatch {
         data: parts.data.into(),
@@ -1556,6 +1558,8 @@ fn materialize_packed_internal(
     include_exit: Option<bool>,
     include_parent: bool,
     include_scope: bool,
+    identifier_names: &[String],
+    static_member_patterns: &[String],
 ) -> Result<PackedEventParts> {
     let parse_started = Instant::now();
     let allocator = Allocator::default();
@@ -1596,6 +1600,8 @@ fn materialize_packed_internal(
         include_exit: include_exit.unwrap_or(true),
         include_parent,
         include_scope,
+        identifier_names,
+        static_member_patterns,
         sequence: 0,
         emitted_count: 0,
         words: ArenaVec::new_in(&&allocator),
@@ -1639,6 +1645,8 @@ pub fn materialize_packed_buffer(
     include_exit: Option<bool>,
     include_parent: Option<bool>,
     include_scope: Option<bool>,
+    identifier_names: Vec<String>,
+    static_member_patterns: Vec<String>,
 ) -> Result<Buffer> {
     let include_parent = include_parent.unwrap_or(true);
     let include_scope = include_scope.unwrap_or(true);
@@ -1653,6 +1661,8 @@ pub fn materialize_packed_buffer(
         include_exit,
         include_parent,
         include_scope,
+        &identifier_names,
+        &static_member_patterns,
     )?;
     let strings_size: usize = parts
         .strings
@@ -1745,6 +1755,8 @@ struct PackedEventCollector<'a> {
     include_exit: bool,
     include_parent: bool,
     include_scope: bool,
+    identifier_names: &'a [String],
+    static_member_patterns: &'a [String],
     sequence: u32,
     emitted_count: u32,
     words: ArenaVec<'a, u32>,
@@ -1790,6 +1802,36 @@ impl PackedEventCollector<'_> {
                 .any(|subscription| alias_matches(subscription, node_type))
         {
             return;
+        }
+        if !self.identifier_names.is_empty() {
+            let identifier_name = match kind {
+                AstKind::IdentifierReference(identifier) => Some(identifier.name.as_str()),
+                AstKind::BindingIdentifier(identifier) => Some(identifier.name.as_str()),
+                AstKind::IdentifierName(identifier) => Some(identifier.name.as_str()),
+                _ => None,
+            };
+            if identifier_name.is_some_and(|identifier_name| {
+                !self
+                    .identifier_names
+                    .iter()
+                    .any(|name| name == identifier_name)
+            }) {
+                return;
+            }
+        }
+        if !self.static_member_patterns.is_empty()
+            && let AstKind::StaticMemberExpression(member) = kind
+        {
+            let path = static_member_path(&member.object)
+                .map(|object| format!("{object}.{}", member.property.name));
+            if path.is_none_or(|path| {
+                !self
+                    .static_member_patterns
+                    .iter()
+                    .any(|pattern| pattern == &path)
+            }) {
+                return;
+            }
         }
         let id = kind.node_id();
         let scope_id = self.include_scope.then(|| {

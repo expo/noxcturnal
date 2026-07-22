@@ -78,6 +78,8 @@ pub fn materialize_packed_buffer(
     include_exit: Option<bool>,
     include_parent: Option<bool>,
     include_scope: Option<bool>,
+    identifier_names: Option<Vec<String>>,
+    static_member_patterns: Option<Vec<String>>,
 ) -> napi::Result<napi::bindgen_prelude::Buffer> {
     engine::materialize_packed_buffer(
         &source,
@@ -90,6 +92,8 @@ pub fn materialize_packed_buffer(
         include_exit,
         include_parent,
         include_scope,
+        identifier_names.unwrap_or_default(),
+        static_member_patterns.unwrap_or_default(),
     )
 }
 

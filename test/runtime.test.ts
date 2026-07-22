@@ -488,6 +488,49 @@ test('indexes repeated scope lookups without consuming follow-up batches', () =>
   assert.equal(globals, 100);
 });
 
+test('filters hot event families only when every subscriber opts in', () => {
+  const firstSeen = new Set();
+  const secondSeen = new Set();
+  const first = defineNativePlugin({
+    name: 'first-filter', apiVersion: 1,
+    prepare() { return { identifierNames: ['first'], staticMemberPatterns: ['process.env.FIRST'] }; },
+    visitor: {
+      ReferencedIdentifier(path) { firstSeen.add(String(path.node.name)); },
+      StaticMemberExpression(path) { firstSeen.add(String(path.node.memberPath)); },
+    },
+  });
+  const second = defineNativePlugin({
+    name: 'second-filter', apiVersion: 1,
+    prepare() { return { identifierNames: ['second'], staticMemberPatterns: ['process.env.SECOND'] }; },
+    visitor: {
+      ReferencedIdentifier(path) { secondSeen.add(String(path.node.name)); },
+      StaticMemberExpression(path) { secondSeen.add(String(path.node.memberPath)); },
+    },
+  });
+  transform('first; second; third; process.env.FIRST; process.env.SECOND; process.env.THIRD;', 'fixture.js', defineNativePipeline([first, second]));
+  assert.deepEqual([...firstSeen].sort(), ['first', 'process.env.FIRST']);
+  assert.deepEqual([...secondSeen].sort(), ['process.env.SECOND', 'second']);
+
+  const unfiltered = new Set();
+  const broad = defineNativePlugin({ name: 'unfiltered', apiVersion: 1, visitor: { ReferencedIdentifier(path) { unfiltered.add(String(path.node.name)); } } });
+  transform('first; second; third;', 'fixture.js', defineNativePipeline([first, broad]));
+  assert.ok(unfiltered.has('third'));
+});
+
+test('can disable a plugin and its lifecycle for the current file', () => {
+  let lifecycleCalls = 0;
+  const plugin = defineNativePlugin({
+    name: 'disabled', apiVersion: 1,
+    prepare() { return { enabled: false }; },
+    createState() { lifecycleCalls++; },
+    pre() { lifecycleCalls++; },
+    visitor: { Identifier() { lifecycleCalls++; } },
+    post() { lifecycleCalls++; },
+  });
+  transform('const value = source;', 'fixture.js', defineNativePipeline([plugin]));
+  assert.equal(lifecycleCalls, 0);
+});
+
 test('resolves the nearest binding and renames only its semantic references', () => {
   const plugin = defineNativePlugin({
     name: 'rename-binding', apiVersion: 1,

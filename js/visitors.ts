@@ -239,11 +239,15 @@ export class NativeTransformSession {
   #nativeFilename: string;
   #includeParent: boolean;
   #includeScope: boolean;
-  constructor(readonly source: string, readonly filename: string, readonly options: TransformOptions = {}, initialSubscriptions: readonly string[] = [], retainInitialIndex = false, includeParent = true, includeScope = true) {
+  #identifierNames: readonly string[];
+  #staticMemberPatterns: readonly string[];
+  constructor(readonly source: string, readonly filename: string, readonly options: TransformOptions = {}, initialSubscriptions: readonly string[] = [], retainInitialIndex = false, includeParent = true, includeScope = true, identifierNames: readonly string[] = [], staticMemberPatterns: readonly string[] = []) {
     const started = performance.now();
     this.#nativeFilename = parserFilename(filename, options.parser);
     this.#includeParent = includeParent;
     this.#includeScope = includeScope;
+    this.#identifierNames = identifierNames;
+    this.#staticMemberPatterns = staticMemberPatterns;
     this.#useStatelessInitialBatch = initialSubscriptions.length > 0 && !retainInitialIndex;
     if (!this.#useStatelessInitialBatch) this.#native = new native.NativeIndexedSession(source, this.#nativeFilename, [...initialSubscriptions]);
     this.openMs = performance.now() - started;
@@ -265,7 +269,7 @@ export class NativeTransformSession {
     const started = performance.now();
     const fieldRequests = fields && Object.entries(fields).map(([nodeType, requested]) => ({ nodeType, fields: [...requested] }));
     const packed = this.#useStatelessInitialBatch
-      ? (() => { const ids: number[] = []; const fallback: string[] = []; for (const subscription of subscriptions) { const id = NODE_TYPE_IDS.get(subscription); if (id) ids.push(id); else fallback.push(subscription); } return decodePackedEnvelope(native.materializePackedBuffer(this.source, this.#nativeFilename, fallback, ids, root?.start, root?.end, packFieldRequests(fields), includeExit, this.#includeParent, this.#includeScope)); })()
+      ? (() => { const { ids, fallback } = encodeSubscriptions(subscriptions); return decodePackedEnvelope(native.materializePackedBuffer(this.source, this.#nativeFilename, fallback, ids, root?.start, root?.end, packFieldRequests(fields), includeExit, this.#includeParent, this.#includeScope, [...this.#identifierNames], [...this.#staticMemberPatterns])); })()
       : this.#binding().nextPacked([...subscriptions], root?.start, root?.end, fieldRequests, includeExit);
     this.#useStatelessInitialBatch = false;
     const elapsed = performance.now() - started;
@@ -279,15 +283,22 @@ export class NativeTransformSession {
     const cacheKey = stableJson(request);
     const cached = this.#queryCache.get(cacheKey);
     if (cached) return cached;
-    const types = querySubscriptions({ ...request, constants: undefined });
+    const directGlobals = request.globals?.length && request.bindings == null && request.captures == null;
+    const types = querySubscriptions({ ...request, constants: undefined }).filter(type => !(directGlobals && type === 'Identifier'));
     const needsIdentifiers = types.some(type => type === 'Identifier');
     const remainingTypes = needsIdentifiers ? types.filter(type => type !== 'Identifier') : types;
     const nodes = remainingTypes.length ? this.next(remainingTypes, undefined, undefined, false).events.map(toNodeView) : [];
     if (needsIdentifiers) nodes.push(...this.identifierViews());
     const globals: QueryResult['globals'] = {};
     if (request.globals?.length) {
-      const index = this.identifierIndexes().globals;
-      for (const query of request.globals) globals[query.name] = { references: index.get(query.name) ?? [] };
+      if (directGlobals) {
+        for (const fact of this.#binding().queryGlobals(request.globals.map(query => query.name))) {
+          globals[fact.name] = { references: fact.references.map(reference => ({ id: reference.id, type: 'Identifier', start: reference.start, end: reference.end })) };
+        }
+      } else {
+        const index = this.identifierIndexes().globals;
+        for (const query of request.globals) globals[query.name] = { references: index.get(query.name) ?? [] };
+      }
     }
     const constants: QueryResult['constants'] = {};
     const constantNodes = request.constants?.length ? this.constantNodes(request.constants) : [];
@@ -482,7 +493,7 @@ export function transform(source: string, filename: string, pipeline: NativePipe
         const merged: PluginPlan = { ...plan, subscriptions: [...(plan.subscriptions ?? []), ...prepareSubscriptions, ...visitorSubscriptions(plugin.visitor)] };
         plans.set(plugin, merged);
       }
-      const activePlugins = phase.plugins.filter(plugin => !plans.get(plugin)?.phases?.length || plans.get(plugin)!.phases!.includes(phase.name));
+      const activePlugins = phase.plugins.filter(plugin => plans.get(plugin)?.enabled !== false && (!plans.get(plugin)?.phases?.length || plans.get(plugin)!.phases!.includes(phase.name)));
       for (const plugin of activePlugins) {
         plans.get(plugin)!.subscriptions!.forEach(type => { subscriptions.add(type); materializationSubscriptions.add(type); });
         for (const query of plans.get(plugin)!.queries ?? []) querySubscriptions(query).forEach(type => materializationSubscriptions.add(type));
@@ -507,7 +518,15 @@ export function transform(source: string, filename: string, pipeline: NativePipe
       const retainsAdditionalIndex = [...materializationSubscriptions].some(type => !subscriptions.has(type));
       const includeParent = activePlugins.some(plugin => plans.get(plugin)?.ancestry != null);
       const includeScope = activePlugins.some(plugin => plans.get(plugin)?.semantics?.some(capability => capability === 'scope'));
-      const session = new NativeTransformSession(phaseSource, filename, options, [...materializationSubscriptions], retainsAdditionalIndex, includeParent, includeScope);
+      const identifierSubscribers = activePlugins.filter(plugin => plans.get(plugin)!.subscriptions!.some(type => type.split('|').some(part => part === 'Identifier' || part === 'ReferencedIdentifier')));
+      const identifierNames = identifierSubscribers.length > 0 && identifierSubscribers.every(plugin => plans.get(plugin)?.identifierNames != null)
+        ? [...new Set(identifierSubscribers.flatMap(plugin => [...plans.get(plugin)!.identifierNames!]))]
+        : [];
+      const staticMemberSubscribers = activePlugins.filter(plugin => plans.get(plugin)!.subscriptions!.some(type => type.split('|').some(part => part === 'StaticMemberExpression' || part === 'MemberExpression')));
+      const staticMemberPatterns = staticMemberSubscribers.length > 0 && staticMemberSubscribers.every(plugin => plans.get(plugin)?.staticMemberPatterns != null)
+        ? [...new Set(staticMemberSubscribers.flatMap(plugin => [...plans.get(plugin)!.staticMemberPatterns!]))]
+        : [];
+      const session = new NativeTransformSession(phaseSource, filename, options, [...materializationSubscriptions], retainsAdditionalIndex, includeParent, includeScope, identifierNames, staticMemberPatterns);
       totals.sessionOpenMs += session.openMs;
       openSession = session;
       const batch = session.nextPacked([...subscriptions], undefined, fieldRequests, activePlugins.some(plugin => visitorHasExit(plugin.visitor)));
@@ -659,11 +678,18 @@ function createDispatcher(session: NativeTransformSession, phase: PipelinePhase,
     for (const event of events) dispatchOne(event, synthetic, entry, context, visitor, state);
   };
   const routesFor = (event: NativeEvent): PhaseRoute[] => {
-    const key = eventRouteKey(event);
+    const key = event.type === 'Identifier'
+      ? `${eventRouteKey(event)}:${eventField(event, 'name') ?? ''}`
+      : event.type === 'StaticMemberExpression'
+        ? `${event.type}:${eventField(event, 'memberPath') ?? ''}`
+        : eventRouteKey(event);
     let routes = phaseRoutes.get(key);
     if (routes) return routes;
     routes = [];
     for (const plugin of phase.plugins) {
+      const plan = plans.get(plugin);
+      if (event.type === 'Identifier' && plan?.identifierNames && !plan.identifierNames.some(name => name === eventField(event, 'name'))) continue;
+      if (event.type === 'StaticMemberExpression' && plan?.staticMemberPatterns && !plan.staticMemberPatterns.some(pattern => pattern === eventField(event, 'memberPath'))) continue;
       const handlers = matchingHandlers(plugin.visitor ?? {}, event);
       if (handlers.length > 0) routes.push({ plugin, entry: contexts.get(plugin)!, handlers });
     }
@@ -877,6 +903,26 @@ function parseScalar(value: string): string | number | boolean { if (value === '
 function summary(node: NodeView): NodeSummary { return { id: node.id, type: node.type, start: node.start, end: node.end, parentId: node.parentId, parentType: node.parentType }; }
 function array(value: string | readonly string[]): string[] { return typeof value === 'string' ? [value] : [...value]; }
 function expandSubscriptions(values: readonly string[]): string[] { return [...new Set(values.flatMap(value => value.split('|')))]; }
+const encodedSubscriptionsCache = new Map<string, { ids: number[]; fallback: string[] }>();
+function encodeSubscriptions(subscriptions: readonly string[]): { ids: number[]; fallback: string[] } {
+  const key = subscriptions.join('|');
+  const cached = encodedSubscriptionsCache.get(key);
+  if (cached) return cached;
+  const ids = new Set<number>();
+  const fallback: string[] = [];
+  for (const subscription of subscriptions) {
+    const id = NODE_TYPE_IDS.get(subscription);
+    if (id != null) { ids.add(id); continue; }
+    let expanded = false;
+    for (let typeId = 1; typeId < NODE_TYPES.length; typeId++) {
+      if (alias(subscription, NODE_TYPES[typeId])) { ids.add(typeId); expanded = true; }
+    }
+    if (!expanded) fallback.push(subscription);
+  }
+  const encoded = { ids: [...ids], fallback };
+  encodedSubscriptionsCache.set(key, encoded);
+  return encoded;
+}
 function visitorSubscriptions(visitor?: Visitor<any>): NativeVisitorRoute[] {
   if (!visitor) return [];
   const cached = visitorSubscriptionsCache.get(visitor); if (cached) return cached;

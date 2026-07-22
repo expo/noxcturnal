@@ -95,7 +95,7 @@ git diff --check
 
 Latest verified results on macOS arm64:
 
-- 56 Vitest integration/fitment tests passed;
+- 58 Vitest integration/fitment tests passed;
 - 7 Rust unit tests passed;
 - TypeScript, `cargo fmt`, clippy with denied warnings, frozen offline install, package dry-run, and `git diff --check` passed;
 - the latest Metro transform spike run over its 500-file synthetic corpus (847.9 KiB, source maps enabled) completed in 20.0 ms median versus Babel's 214.9 ms across 12 warm samples: **10.73x faster than Babel** and **3.80x faster than Oxc-walker + MagicString**;
@@ -107,6 +107,14 @@ Latest verified results on macOS arm64:
 dispatch reduced a seven-plugin disjoint workload by about 47%, and per-session binding/global
 indexes changed repeated distinct scope lookups from exhausting the follow-up budget (roughly
 52 ms with a raised budget) to about 6.09 ms.
+
+The Expo-like benchmark in `../metro-transform-spike` now runs nine independent plugin patterns
+derived from `babel-preset-expo` and `@expo/metro-config`, plus the actual built Expo Babel preset.
+Its latest 500-file run measured 50.3 ms for Noxcturnal, 358.5 ms for equivalent merged Babel
+visitors (7.13x), and 1330.7 ms for Expo Babel (26.48x). It gates the requested real-pipeline lead
+at 10x. Native materialization supports safe all-subscriber `identifierNames` and
+`staticMemberPatterns` filters, generated aliases expand to integer IDs before traversal, and
+plugins can return `enabled: false` from `prepare` for source-hint-based per-file gating.
 
 `.github/workflows/ci.yml` now verifies the full project on macOS arm64 and builds artifacts for all eight declared NAPI targets. The matrix still needs its first hosted run before cross-platform distribution is considered validated.
 

@@ -131,7 +131,13 @@ export interface QueryResult {
 export interface InspectRequest { nodeId: NodeId; fields: readonly NativeFieldKey[] }
 
 export interface PluginPlan {
+  /** Disable this plugin, including its lifecycle and subscriptions, for the current file. */
+  enabled?: boolean;
   subscriptions?: readonly NativeVisitorRoute[];
+  /** Restrict Identifier/ReferencedIdentifier delivery to these semantic names. The filter is used only when every Identifier subscriber in the phase declares one. */
+  identifierNames?: readonly string[];
+  /** Restrict StaticMemberExpression/MemberExpression delivery to exact non-computed member paths when every matching subscriber opts in. */
+  staticMemberPatterns?: readonly string[];
   fields?: Readonly<Partial<Record<NativeNodeType, readonly NativeFieldKey[]>>>;
   semantics?: readonly 'scope'[];
   queries?: readonly QueryRequest[];
