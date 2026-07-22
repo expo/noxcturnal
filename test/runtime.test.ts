@@ -469,6 +469,25 @@ test('exposes binding reads, writes, and lexical captures', () => {
   session.close();
 });
 
+test('indexes repeated scope lookups without consuming follow-up batches', () => {
+  const source = Array.from({ length: 100 }, (_, index) => `const value${index} = global${index};`).join('\n');
+  let bindings = 0;
+  let globals = 0;
+  const plugin = defineNativePlugin({
+    name: 'many-scope-lookups', apiVersion: 1,
+    prepare() { return { semantics: ['scope'] }; },
+    visitor: { Identifier(path) {
+      const name = String(path.node.name);
+      if (path.scope.hasBinding(name)) bindings++;
+      if (path.scope.hasGlobal(name)) globals++;
+    } },
+  });
+  const result = transform(source, 'fixture.js', defineNativePipeline([plugin]));
+  assert.equal(result.status, 'complete');
+  assert.equal(bindings, 100);
+  assert.equal(globals, 100);
+});
+
 test('resolves the nearest binding and renames only its semantic references', () => {
   const plugin = defineNativePlugin({
     name: 'rename-binding', apiVersion: 1,

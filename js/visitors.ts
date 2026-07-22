@@ -227,6 +227,9 @@ export class NativeTransformSession {
   #eventCache: (NativeEvent | undefined)[] = [];
   #queryCache = new Map<string, QueryResult>();
   #identifiersCache: NativeEvent[] | null = null;
+  #identifierViewsCache: NodeView[] | null = null;
+  #bindingIndexCache: Map<string, QueryResult['bindings'][number]> | null = null;
+  #globalIndexCache: Map<string, NodeSummary[]> | null = null;
   #scopeParentsCache: Map<number, number | null> | null = null;
   #childrenCache = new Map<number, NativeEvent[]>();
   #prefetchedChildTypes = new Set<string>();
@@ -277,10 +280,14 @@ export class NativeTransformSession {
     const cached = this.#queryCache.get(cacheKey);
     if (cached) return cached;
     const types = querySubscriptions({ ...request, constants: undefined });
-    const nodes = types.length ? this.next(types, undefined, undefined, false).events.map(toNodeView) : [];
+    const needsIdentifiers = types.some(type => type === 'Identifier');
+    const remainingTypes = needsIdentifiers ? types.filter(type => type !== 'Identifier') : types;
+    const nodes = remainingTypes.length ? this.next(remainingTypes, undefined, undefined, false).events.map(toNodeView) : [];
+    if (needsIdentifiers) nodes.push(...this.identifierViews());
     const globals: QueryResult['globals'] = {};
-    for (const fact of this.#binding().queryGlobals((request.globals ?? []).map(query => query.name))) {
-      globals[fact.name] = { references: fact.references.map(reference => ({ id: reference.id, type: 'Identifier', start: reference.start, end: reference.end })) };
+    if (request.globals?.length) {
+      const index = this.identifierIndexes().globals;
+      for (const query of request.globals) globals[query.name] = { references: index.get(query.name) ?? [] };
     }
     const constants: QueryResult['constants'] = {};
     const constantNodes = request.constants?.length ? this.constantNodes(request.constants) : [];
@@ -304,14 +311,12 @@ export class NativeTransformSession {
         return [capture.functionId, references];
       })),
       bindings: (request.bindings ?? []).flatMap(binding => {
-        const identifiers = nodes.filter(node => node.type === 'Identifier');
-        const declarations = identifiers.filter(node => node.binding === true && (binding.name == null || node.name === binding.name) && (binding.scopeId == null || node.scopeId === binding.scopeId));
-        return declarations.map(declaration => ({
-          name: String(declaration.name),
-          scopeId: declaration.scopeId,
-          declaration: summary(declaration),
-          references: identifiers.filter(node => node.binding !== true && node.bindingScopeId === declaration.scopeId && node.name === declaration.name && (!binding.reads || node.read === true) && (!binding.writes || node.write === true)),
-        }));
+        const index = this.identifierIndexes().bindings;
+        const candidates = binding.name != null && binding.scopeId != null
+          ? [index.get(`${binding.scopeId}:${binding.name}`)].filter((candidate): candidate is QueryResult['bindings'][number] => candidate != null)
+          : [...index.values()].filter(candidate => (binding.name == null || candidate.name === binding.name) && (binding.scopeId == null || candidate.scopeId === binding.scopeId));
+        if (!binding.reads && !binding.writes) return candidates;
+        return candidates.map(candidate => ({ ...candidate, references: candidate.references.filter(reference => (!binding.reads || reference.read === true) && (!binding.writes || reference.write === true)) }));
       }),
     };
     this.#queryCache.set(cacheKey, result);
@@ -366,6 +371,38 @@ export class NativeTransformSession {
   }
   event(nodeId: number): NativeEvent | undefined { this.#assertOpen(); const cached = this.#eventCache[nodeId]; if (cached) return cached; const event = this.#binding().inspect([nodeId])[0]; if (event) this.#eventCache[nodeId] = event; return event; }
   identifierEvents(): NativeEvent[] { this.#assertOpen(); return this.#identifiersCache ??= this.next(['Identifier'], undefined, undefined, false).events; }
+  identifierViews(): NodeView[] { return this.#identifierViewsCache ??= this.identifierEvents().map(toNodeView); }
+  identifierIndexes(): { bindings: Map<string, QueryResult['bindings'][number]>; globals: Map<string, NodeSummary[]> } {
+    if (this.#bindingIndexCache && this.#globalIndexCache) return { bindings: this.#bindingIndexCache, globals: this.#globalIndexCache };
+    const bindings = new Map<string, QueryResult['bindings'][number]>();
+    const globals = new Map<string, NodeSummary[]>();
+    for (const node of this.identifierViews()) {
+      const name = String(node.name);
+      if (node.binding === true) {
+        bindings.set(`${node.scopeId}:${name}`, { name, scopeId: node.scopeId, declaration: summary(node), references: [] });
+      } else if (node.global === true) {
+        let references = globals.get(name);
+        if (!references) { references = []; globals.set(name, references); }
+        references.push(summary(node));
+      }
+    }
+    for (const node of this.identifierViews()) {
+      if (node.binding === true || node.global === true || typeof node.bindingScopeId !== 'number') continue;
+      bindings.get(`${node.bindingScopeId}:${String(node.name)}`)?.references.push(node);
+    }
+    this.#bindingIndexCache = bindings;
+    this.#globalIndexCache = globals;
+    return { bindings, globals };
+  }
+  bindingForScopes(name: string, scopeIds: readonly number[]): QueryResult['bindings'][number] | undefined {
+    const bindings = this.identifierIndexes().bindings;
+    for (const scopeId of scopeIds) {
+      const binding = bindings.get(`${scopeId}:${name}`);
+      if (binding) return binding;
+    }
+    return undefined;
+  }
+  globalReferences(name: string): NodeSummary[] { return this.identifierIndexes().globals.get(name) ?? []; }
   scopeParentId(scopeId: number): number | null {
     this.#assertOpen();
     if (!this.#scopeParentsCache) {
@@ -551,6 +588,8 @@ function createDispatcher(session: NativeTransformSession, phase: PipelinePhase,
   const visitorIds = new WeakMap<object, number>();
   const activeTraversals = new Set<string>();
   const contexts = new Map<NativePlugin<any, any>, { context: PluginContext; state: any; stopped: boolean; skipped: { start: number; end: number }[]; delivered: Set<number> }>();
+  type PhaseRoute = { plugin: NativePlugin<any, any>; entry: NonNullable<ReturnType<typeof contexts.get>>; handlers: VisitorHandler<any>[] };
+  const phaseRoutes = new Map<string, PhaseRoute[]>();
   const metadataOwners = new Map<string, string>();
   for (const plugin of phase.plugins) for (const key of plans.get(plugin)?.metadataWrites ?? []) {
     const owner = metadataOwners.get(key);
@@ -598,12 +637,12 @@ function createDispatcher(session: NativeTransformSession, phase: PipelinePhase,
     };
     return runtime;
   };
-  const dispatchOne = (event: NativeEvent, plugin: NativePlugin<any, any>, entry: NonNullable<ReturnType<typeof contexts.get>>, context: PluginContext, override?: Visitor<any>, overrideState?: any) => {
+  const dispatchOne = (event: NativeEvent, plugin: NativePlugin<any, any>, entry: NonNullable<ReturnType<typeof contexts.get>>, context: PluginContext, override?: Visitor<any>, overrideState?: any, routedHandlers?: VisitorHandler<any>[]) => {
     const deliveryKey = event.id * 2 + Number(event.side === 'exit');
     if (!override && entry.delivered.has(deliveryKey)) return;
     if (entry.stopped || stopAll || entry.skipped.some(range => event.start > range.start && event.end <= range.end)) return;
     const visitor = override ?? plugin.visitor ?? {};
-    const handlers = matchingHandlers(visitor, event);
+    const handlers = routedHandlers ?? matchingHandlers(visitor, event);
     for (const handler of event.side === 'exit' ? [...handlers].reverse() : handlers) {
       const callback = typeof handler === 'function' ? (event.side === 'enter' ? handler : undefined) : handler[event.side];
       if (!callback) continue;
@@ -619,7 +658,36 @@ function createDispatcher(session: NativeTransformSession, phase: PipelinePhase,
     const entry = { context, state, stopped: false, skipped: [] as { start: number; end: number }[], delivered: new Set<number>() };
     for (const event of events) dispatchOne(event, synthetic, entry, context, visitor, state);
   };
-  return { contexts, run() { forEachDispatchEvent(batch, event => { session.cacheEvent(event); const ordered = event.side === 'exit' ? [...phase.plugins].reverse() : phase.plugins; for (const plugin of ordered) dispatchOne(event, plugin, contexts.get(plugin)!, contexts.get(plugin)!.context); }); } };
+  const routesFor = (event: NativeEvent): PhaseRoute[] => {
+    const key = eventRouteKey(event);
+    let routes = phaseRoutes.get(key);
+    if (routes) return routes;
+    routes = [];
+    for (const plugin of phase.plugins) {
+      const handlers = matchingHandlers(plugin.visitor ?? {}, event);
+      if (handlers.length > 0) routes.push({ plugin, entry: contexts.get(plugin)!, handlers });
+    }
+    phaseRoutes.set(key, routes);
+    return routes;
+  };
+  const onlyPlugin = phase.plugins.length === 1 ? phase.plugins[0] : undefined;
+  const onlyEntry = onlyPlugin == null ? undefined : contexts.get(onlyPlugin)!;
+  return { contexts, run() { forEachDispatchEvent(batch, event => {
+    session.cacheEvent(event);
+    if (onlyPlugin && onlyEntry) {
+      dispatchOne(event, onlyPlugin, onlyEntry, onlyEntry.context);
+      return;
+    }
+    const routes = routesFor(event);
+    if (event.side === 'enter') {
+      for (const route of routes) dispatchOne(event, route.plugin, route.entry, route.entry.context, undefined, undefined, route.handlers);
+    } else {
+      for (let index = routes.length - 1; index >= 0; index--) {
+        const route = routes[index];
+        dispatchOne(event, route.plugin, route.entry, route.entry.context, undefined, undefined, route.handlers);
+      }
+    }
+  }); } };
 }
 
 type PathState = { stopped: boolean; skipped: { start: number; end: number }[] };
@@ -679,10 +747,15 @@ type EditKind = EditCommand['kind'];
 const matchingHandlerCache = new WeakMap<object, { routes: Map<string, VisitorHandler<any>[]>; fieldAware: boolean }>();
 const visitorSubscriptionsCache = new WeakMap<object, NativeVisitorRoute[]>();
 const visitorExitCache = new WeakMap<object, boolean>();
+function eventRouteKey(event: NativeEvent): string {
+  if (event.type === 'Identifier') return `${event.type}:${eventField(event, 'global') == null ? '' : 'reference'}`;
+  if (event.type === 'Function' || event.type === 'Class') return `${event.type}:${eventField(event, 'nodeKind') ?? ''}`;
+  return event.type;
+}
 function matchingHandlers(visitor: Visitor<any>, event: NativeEvent): VisitorHandler<any>[] {
   let cache = matchingHandlerCache.get(visitor);
   if (!cache) { cache = { routes: new Map(), fieldAware: visitorNeedsFieldRouting(visitor) }; matchingHandlerCache.set(visitor, cache); }
-  const route = cache.fieldAware ? `${event.type}:${eventField(event, 'nodeKind') ?? ''}:${event.type === 'Identifier' && eventField(event, 'global') != null ? 'reference' : ''}` : event.type;
+  const route = cache.fieldAware ? eventRouteKey(event) : event.type;
   const cached = cache.routes.get(route);
   if (cached) return cached;
   const handlers = Object.entries(visitor).filter(([key, value]) => value && key.split('|').some(part => visitorKeyMatches(part, event))).map(([, value]) => value!) as VisitorHandler<any>[];
@@ -828,12 +901,9 @@ function makeScope(runtime: PathRuntime, id: number, parentId: number | null): N
   const cached = runtime.scopeCache.get(id);
   if (cached) return cached;
   const session = runtime.session;
-  const identifierEvents = () => session.identifierEvents();
-  const scopeChain = () => { const events = identifierEvents(); const ids = []; let scope: number | null = id; while (scope != null) { ids.push(scope); scope = session.scopeParentId(scope); } return { events, ids }; };
+  const scopeChain = () => { const ids = []; let scope: number | null = id; while (scope != null) { ids.push(scope); scope = session.scopeParentId(scope); } return ids; };
   const resolve = (name: string): QueryResult['bindings'][number] | undefined => {
-    const { ids } = scopeChain();
-    const bindings = session.query({ bindings: [{ name }] }).bindings;
-    return ids.map(scopeId => bindings.find(binding => binding.scopeId === scopeId)).find((binding): binding is QueryResult['bindings'][number] => binding != null);
+    return session.bindingForScopes(name, scopeChain());
   };
   let parentScope: NativeScope | undefined;
   let ownerPath: NativeNodePath | null | undefined;
@@ -842,8 +912,8 @@ function makeScope(runtime: PathRuntime, id: number, parentId: number | null): N
     get parent() { return parentId == null ? null : parentScope ??= makeScope(runtime, parentId, session.scopeParentId(parentId)); },
     get path() { return ownerPath === undefined ? ownerPath = scopeOwnerPath(runtime, id) : ownerPath; },
     hasBinding: name => resolve(name) != null,
-    hasGlobal: name => session.query({ globals: [{ name }] }).globals[name].references.length > 0,
-    getBinding(name) { const binding = resolve(name); if (binding) return makeBinding(runtime, binding); if (this.hasGlobal(name)) return { name, global: true, declaration: null, references: session.query({ globals: [{ name, references: true }] }).globals[name].references, path: null, scope: null }; return null; },
+    hasGlobal: name => session.globalReferences(name).length > 0,
+    getBinding(name) { const binding = resolve(name); if (binding) return makeBinding(runtime, binding); const references = session.globalReferences(name); if (references.length > 0) return { name, global: true, declaration: null, references, path: null, scope: null }; return null; },
     getProgramParent() { let current: NativeScope = this; while (current.parent) current = current.parent; return current; },
     push(content) {
       const owner = this.path;

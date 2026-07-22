@@ -95,13 +95,18 @@ git diff --check
 
 Latest verified results on macOS arm64:
 
-- 55 Vitest integration/fitment tests passed;
+- 56 Vitest integration/fitment tests passed;
 - 7 Rust unit tests passed;
 - TypeScript, `cargo fmt`, clippy with denied warnings, frozen offline install, package dry-run, and `git diff --check` passed;
 - the latest Metro transform spike run over its 500-file synthetic corpus (847.9 KiB, source maps enabled) completed in 20.0 ms median versus Babel's 214.9 ms across 12 warm samples: **10.73x faster than Babel** and **3.80x faster than Oxc-walker + MagicString**;
 - all four implementations observed 8,500 dependencies; the benchmark checks parseability and stable checksums for every implementation;
 - native stages on the final sample were approximately parse 2.4 ms, semantic 2.1 ms, traversal 1.9 ms, and render/map 2.0 ms; measured N-API transfer was 2.2 ms after subtracting native stage time.
 - the latest standalone Vitest run averaged 4.13 ms for subscribed identifier materialization, 11.94 ms for broad materialization, 1.73 ms for the static JavaScript visitor fixture, and 5.78 ms for a declared structural child transform.
+
+`PERFORMANCE.md` records the expanded worst-case suite and targeted findings. Phase-level route
+dispatch reduced a seven-plugin disjoint workload by about 47%, and per-session binding/global
+indexes changed repeated distinct scope lookups from exhausting the follow-up budget (roughly
+52 ms with a raised budget) to about 6.09 ms.
 
 `.github/workflows/ci.yml` now verifies the full project on macOS arm64 and builds artifacts for all eight declared NAPI targets. The matrix still needs its first hosted run before cross-platform distribution is considered validated.
 
