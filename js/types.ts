@@ -16,6 +16,12 @@ export type NativeVisitorAlias =
   | 'ClassExpression'
   | '*';
 export type NativeVisitorRoute = NativeNodeType | NativeVisitorAlias;
+export type ScalarValue = string | number | boolean | null;
+export type ScalarPredicate =
+  | { equals: ScalarValue }
+  | { oneOf: readonly ScalarValue[] }
+  | { present: boolean };
+export type ControlFlowCapability = 'skip' | 'stop' | 'nested-traverse' | 'dynamic-subscriptions';
 export type NodeId = number;
 export type ScopeId = number;
 export type SourceMapMode = 'line' | 'boundary' | 'character';
@@ -58,7 +64,6 @@ export interface EventBatch {
   events: NativeEvent[];
   nodeCount: number;
   emittedCount: number;
-  timings: Timings;
 }
 
 export interface NodeView {
@@ -151,30 +156,6 @@ export interface Position {
   line: number;
   column: number;
 }
-export interface Timings {
-  parseMs: number;
-  semanticMs: number;
-  traversalMs: number;
-  renderAndMapMs: number;
-  sessionOpenMs?: number;
-  napiTransferMs?: number;
-  jsDispatchMs?: number;
-  mapCompositionMs?: number;
-  totalMs?: number;
-  phases?: PhaseTimings[];
-}
-export interface PhaseTimings {
-  name: string;
-  status: 'complete' | 'bailout' | 'error';
-  parseMs: number;
-  semanticMs: number;
-  traversalMs: number;
-  renderAndMapMs: number;
-  napiTransferMs: number;
-  jsDispatchMs: number;
-  mapCompositionMs: number;
-  totalMs: number;
-}
 export interface NativeVlqMap {
   mappings: string;
   names: string[];
@@ -200,14 +181,12 @@ export interface NativeTransformResult {
   map: NativeVlqMap;
   metadata: Record<string, unknown>;
   diagnostics: Diagnostic[];
-  timings: Timings;
 }
 export interface NativeBailoutResult {
   status: 'bailout';
   reason: string;
   source: string;
   diagnostics: Diagnostic[];
-  timings?: Timings;
 }
 export type TransformResult = NativeTransformResult | NativeBailoutResult;
 
@@ -248,6 +227,12 @@ export interface PluginPlan {
   /** Restrict StaticMemberExpression/MemberExpression delivery to exact non-computed member paths when every matching subscriber opts in. */
   staticMemberPatterns?: readonly string[];
   fields?: Readonly<Partial<Record<NativeNodeType, readonly NativeFieldKey[]>>>;
+  /** Exact, type-sensitive scalar filters evaluated before a route callback is delivered. */
+  where?: Readonly<
+    Partial<Record<NativeVisitorRoute, Readonly<Partial<Record<NativeFieldKey, ScalarPredicate>>>>>
+  >;
+  /** Dynamic path operations used by this plugin. Omitted capabilities are rejected at runtime. */
+  controlFlow?: readonly ControlFlowCapability[];
   semantics?: readonly 'scope'[];
   queries?: readonly QueryRequest[];
   metadataWrites?: readonly string[];

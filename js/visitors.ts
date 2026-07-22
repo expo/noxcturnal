@@ -1,15 +1,24 @@
 import { createHash } from 'node:crypto';
 
 import { native, type NativeIndexedSessionBinding } from './native.js';
-import { NODE_TYPE_IDS, NODE_TYPES } from './generated-event-schema.js';
+import {
+  FIELD_KEY_IDS,
+  NODE_TYPE_IDS,
+  NODE_TYPES,
+  PREDICATE_FIELDS,
+} from './generated-event-schema.js';
 import {
   decodeEventBatch,
   decodePackedEnvelope,
-  forEachDispatchEvent,
+  decodeRoutedEnvelope,
+  forEachRoutedEvent,
   packEdits,
   packFieldRequests,
+  packRouteManifest,
   parseScalar,
+  type NativeRouteManifestEntry,
   type PackedEventBatch,
+  type RoutedEventBatch,
 } from './protocol.js';
 import type {
   Diagnostic,
@@ -33,6 +42,8 @@ import type {
   NativeFieldKey,
   NativeNodeType,
   NativeVisitorRoute,
+  ControlFlowCapability,
+  ScalarPredicate,
 } from './types.js';
 
 export interface PrepareContext {
@@ -230,7 +241,7 @@ export type Visitor<State> = {
 export interface NativePlugin<State = unknown, Options = unknown, Analysis = unknown> {
   name: string;
   version?: string;
-  apiVersion: 1;
+  apiVersion: 2;
   options?: Options;
   prepare?(context: PrepareContext, options: Options): PluginPlan | void;
   createState?(): State;
@@ -244,7 +255,7 @@ export interface NativePlugin<State = unknown, Options = unknown, Analysis = unk
 export type NativePluginDefinition<State = unknown, Options = unknown, Analysis = unknown> = Omit<
   NativePlugin<State, Options, Analysis>,
   'apiVersion'
-> & { apiVersion?: 1 };
+> & { apiVersion?: 2 };
 export interface DefinedNativePlugin<
   State = unknown,
   Options = unknown,
@@ -267,12 +278,12 @@ export interface PipelinePhase {
 
 /** An immutable, reusable transform configuration. */
 export interface NativePipeline {
-  apiVersion: 1;
+  apiVersion: 2;
   phases: readonly PipelinePhase[];
 }
-export type NativePipelineDefinition = Omit<NativePipeline, 'apiVersion'> & { apiVersion?: 1 };
+export type NativePipelineDefinition = Omit<NativePipeline, 'apiVersion'> & { apiVersion?: 2 };
 export interface NativePluginPipelineDefinition {
-  apiVersion?: 1;
+  apiVersion?: 2;
   plugins: readonly NativePlugin<any, any>[];
   phaseName?: string;
 }
@@ -294,7 +305,7 @@ export function defineNativePlugin<State = undefined, Options = undefined, Analy
 ): DefinedNativePlugin<State, Options, Analysis> {
   const definition = {
     ...plugin,
-    apiVersion: 1 as const,
+    apiVersion: 2 as const,
     visitor: plugin.visitor == null ? undefined : Object.freeze({ ...plugin.visitor }),
   } as DefinedNativePlugin<State, Options, Analysis>;
   Object.defineProperty(definition, 'withOptions', {
@@ -323,7 +334,7 @@ export function defineNativePipeline(
       ? { phases: [{ name: pipeline.phaseName ?? 'transform', plugins: pipeline.plugins }] }
       : pipeline;
   return Object.freeze({
-    apiVersion: 1,
+    apiVersion: 2,
     phases: Object.freeze(
       normalized.phases.map(phase =>
         Object.freeze({ ...phase, plugins: Object.freeze([...phase.plugins]) }),
@@ -340,6 +351,12 @@ function isPluginList(
   return Array.isArray(value);
 }
 const parserAdapters = new Map<string, ParserAdapter>();
+let routedProtocolAvailable: boolean | undefined;
+
+function supportsRoutedProtocol(): boolean {
+  return (routedProtocolAvailable ??=
+    native.materializeRoutedBuffer != null && native.routedProtocolVersion?.() === 1);
+}
 export function registerParserAdapter(adapter: ParserAdapter): () => void {
   if (parserAdapters.has(adapter.name))
     throw new Error(`Parser adapter already registered: ${adapter.name}`);
@@ -390,7 +407,7 @@ export class NativeTransformSession {
   #scopeParentsCache: Map<number, number | null> | null = null;
   #childrenCache = new Map<number, NativeEvent[]>();
   #prefetchedChildTypes = new Set<string>();
-  readonly openMs: number;
+  #packedBatchCache = new Map<string, PackedEventBatch>();
   #native: NativeIndexedSessionBinding | null = null;
   #useStatelessInitialBatch: boolean;
   #nativeFilename: string;
@@ -411,7 +428,6 @@ export class NativeTransformSession {
     staticMemberPatterns: readonly string[] = [],
     initialExitSubscriptions: readonly string[] = [],
   ) {
-    const started = performance.now();
     this.#nativeFilename = parserFilename(filename, options.parser);
     this.#includeParent = includeParent;
     this.#includeScope = includeScope;
@@ -425,7 +441,6 @@ export class NativeTransformSession {
         [...initialSubscriptions],
         [...initialExitSubscriptions],
       );
-    this.openMs = performance.now() - started;
     if (
       this.#native &&
       options.maxNativeMemoryBytes != null &&
@@ -464,13 +479,17 @@ export class NativeTransformSession {
     requestedExitSubscriptions?: readonly string[],
   ): PackedEventBatch {
     this.#assertOpen();
+    const exitSubscriptions = requestedExitSubscriptions ?? (includeExit ? subscriptions : []);
+    const cacheKey = stableJson({ subscriptions, root, fields, exitSubscriptions });
+    const cached = this.#packedBatchCache.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
     if (++this.#batches > (this.options.maxFollowUpBatches ?? 64))
       throw new Error('follow-up-batch-budget-exceeded');
-    const started = performance.now();
     const fieldRequests =
       fields &&
       Object.entries(fields).map(([nodeType, requested]) => ({ nodeType, fields: [...requested] }));
-    const exitSubscriptions = requestedExitSubscriptions ?? (includeExit ? subscriptions : []);
     const packed = this.#useStatelessInitialBatch
       ? (() => {
           const encoded = encodeSubscriptions(subscriptions);
@@ -498,15 +517,19 @@ export class NativeTransformSession {
         ]);
     packed.includeExit = exitSubscriptions.length > 0;
     this.#useStatelessInitialBatch = false;
-    const elapsed = performance.now() - started;
-    const nativeWork =
-      packed.timings.parseMs +
-      packed.timings.semanticMs +
-      packed.timings.traversalMs +
-      packed.timings.renderAndMapMs;
-    packed.timings.napiTransferMs =
-      (packed.timings.napiTransferMs ?? 0) + Math.max(0, elapsed - nativeWork);
+    this.#packedBatchCache.set(cacheKey, packed);
     return packed;
+  }
+  nextRoutedPacked(
+    manifest: Buffer,
+    root?: { start: number; end: number },
+    followUp = true,
+  ): RoutedEventBatch {
+    this.#assertOpen();
+    if (followUp && ++this.#batches > (this.options.maxFollowUpBatches ?? 64))
+      throw new Error('follow-up-batch-budget-exceeded');
+    const buffer = this.#binding().nextRoutedPacked(manifest, root?.start, root?.end);
+    return decodeRoutedEnvelope(buffer);
   }
   cacheEvent(event: NativeEvent): void {
     if (
@@ -677,14 +700,13 @@ export class NativeTransformSession {
     for (const event of batch.events) this.cacheEvent(event);
     return batch.events.map(toNodeView);
   }
-  prefetchChildren(parentIds: readonly number[] = [], parentTypes: readonly string[] = []): number {
+  prefetchChildren(parentIds: readonly number[] = [], parentTypes: readonly string[] = []): void {
     this.#assertOpen();
     const missing = parentIds.filter(parentId => !this.#childrenCache.has(parentId));
     const missingTypes = parentTypes.filter(type => !this.#prefetchedChildTypes.has(type));
-    if (missing.length === 0 && missingTypes.length === 0) return 0;
+    if (missing.length === 0 && missingTypes.length === 0) return;
     if (++this.#batches > (this.options.maxFollowUpBatches ?? 64))
       throw new Error('follow-up-batch-budget-exceeded');
-    const started = performance.now();
     const typeIds: number[] = [];
     const fallbackTypes: string[] = [];
     for (const type of missingTypes) {
@@ -711,7 +733,6 @@ export class NativeTransformSession {
       this.#binding().memoryUsage() > this.options.maxNativeMemoryBytes
     )
       throw new Error('native-memory-budget-exceeded');
-    return performance.now() - started;
   }
   event(nodeId: number): NativeEvent | undefined {
     this.#assertOpen();
@@ -861,6 +882,7 @@ export class NativeTransformSession {
   }
   close(): void {
     if (!this.#closed) this.#native?.close();
+    this.#packedBatchCache.clear();
     this.#closed = true;
   }
   #assertOpen(): void {
@@ -897,7 +919,20 @@ interface PreparedPhase {
   staticMemberPatterns: string[];
   includeParent: boolean;
   includeScope: boolean;
+  compiledRoutes?: readonly CompiledRouteTemplate[];
+  manifest?: Buffer;
 }
+
+interface CompiledRouteTemplate extends NativeRouteManifestEntry {
+  plugin: NativePlugin<any, any>;
+  callbacks: readonly Handler<any>[];
+  fast: boolean;
+}
+const preparedPhaseCaches = new WeakMap<PipelinePhase, Map<string, Omit<PreparedPhase, 'plans'>>>();
+const compiledPhaseCaches = new WeakMap<
+  PipelinePhase,
+  Map<string, { routes: CompiledRouteTemplate[]; manifest: Buffer }>
+>();
 
 function phaseIsEnabled(plan: PreparedPluginPlan, phaseName: string): boolean {
   if (plan.enabled === false) return false;
@@ -970,7 +1005,7 @@ function preparePhase(
   const hints = sourceHints(phaseSource);
   const plans = new Map<NativePlugin<any, any>, PreparedPluginPlan>();
   for (const plugin of phase.plugins) {
-    if (plugin.apiVersion !== 1) throw new Error(`${plugin.name}: unsupported API version`);
+    if (plugin.apiVersion !== 2) throw new Error(`${plugin.name}: unsupported API version`);
     const prepareSubscriptions = new Set<NativeVisitorRoute>();
     const plan =
       plugin.prepare?.(
@@ -985,6 +1020,7 @@ function preparePhase(
         },
         plugin.options as any,
       ) ?? {};
+    validatePredicates(plugin.name, plan);
     plans.set(plugin, {
       ...plan,
       subscriptions: [
@@ -994,6 +1030,12 @@ function preparePhase(
       ],
     });
   }
+
+  const preparedKey = phase.plugins
+    .map(plugin => `${plugin.name}:${pluginPlanCacheKey(plans.get(plugin)!)}`)
+    .join('\u001e');
+  const cachedPrepared = preparedPhaseCaches.get(phase)?.get(preparedKey);
+  if (cachedPrepared) return { ...cachedPrepared, plans };
 
   const activePlugins = phase.plugins.filter(plugin =>
     phaseIsEnabled(plans.get(plugin)!, phase.name),
@@ -1027,10 +1069,18 @@ function preparePhase(
       materializationSubscriptions.add('*');
     includeParent ||= plan.ancestry != null;
     mergeFieldRequests(fieldRequests, plan.fields ?? {});
+    for (const [route, predicates] of Object.entries(plan.where ?? {})) {
+      for (const concrete of concreteRouteTypes(route)) {
+        mergeFieldRequests(fieldRequests, {
+          [concrete]: Object.keys(predicates ?? {}),
+        });
+      }
+    }
     mergeFieldRequests(fieldRequests, visitorRoutingFields(plugin.visitor));
   }
 
-  return {
+  const routed = compilePhaseRoutes(phase, activePlugins, plans, includeParent, includeScope);
+  const prepared: PreparedPhase = {
     activePlugins,
     plans,
     subscriptions,
@@ -1039,6 +1089,8 @@ function preparePhase(
     fieldRequests,
     includeParent,
     includeScope,
+    compiledRoutes: routed?.routes,
+    manifest: routed?.manifest,
     identifierNames: collectSharedFilter(
       activePlugins,
       plans,
@@ -1052,6 +1104,320 @@ function preparePhase(
       plan => plan.staticMemberPatterns,
     ),
   };
+  let preparedCache = preparedPhaseCaches.get(phase);
+  if (!preparedCache) {
+    preparedCache = new Map();
+    preparedPhaseCaches.set(phase, preparedCache);
+  }
+  const { plans: _, ...cacheable } = prepared;
+  if (preparedCache.size < 64) preparedCache.set(preparedKey, cacheable);
+  return prepared;
+}
+
+function pluginPlanCacheKey(plan: PreparedPluginPlan): string {
+  const fields = Object.entries(plan.fields ?? {})
+    .map(([type, values]) => `${type}:${values?.join(',') ?? ''}`)
+    .join(';');
+  const where = Object.entries(plan.where ?? {})
+    .map(
+      ([route, predicates]) =>
+        `${route}:${Object.entries(predicates ?? {})
+          .map(([field, predicate]) => `${field}=${stableJson(predicate)}`)
+          .join(',')}`,
+    )
+    .join(';');
+  return [
+    plan.enabled === false ? '0' : '1',
+    plan.subscriptions.join(','),
+    plan.identifierNames?.join(',') ?? '',
+    plan.staticMemberPatterns?.join(',') ?? '',
+    fields,
+    where,
+    plan.controlFlow?.join(',') ?? '*',
+    plan.semantics?.join(',') ?? '',
+    plan.metadataWrites?.join(',') ?? '',
+    plan.phases?.join(',') ?? '',
+    String(plan.ancestry ?? ''),
+    stableJson(plan.children ?? null),
+    stableJson(plan.queries ?? null),
+  ].join('\u001f');
+}
+
+function compilePhaseRoutes(
+  phase: PipelinePhase,
+  plugins: readonly NativePlugin<any, any>[],
+  plans: ReadonlyMap<NativePlugin<any, any>, PreparedPluginPlan>,
+  includeParent: boolean,
+  includeScope: boolean,
+): { routes: CompiledRouteTemplate[]; manifest: Buffer } | undefined {
+  const cacheKey = stableJson({
+    includeParent,
+    includeScope,
+    plugins: plugins.map(plugin => {
+      const plan = plans.get(plugin)!;
+      return {
+        name: plugin.name,
+        fields: plan.fields ?? null,
+        where: plan.where ?? null,
+        identifierNames: plan.identifierNames ?? null,
+        staticMemberPatterns: plan.staticMemberPatterns ?? null,
+        controlFlow: plan.controlFlow,
+      };
+    }),
+  });
+  let cache = compiledPhaseCaches.get(phase);
+  if (!cache) {
+    cache = new Map();
+    compiledPhaseCaches.set(phase, cache);
+  }
+  const cached = cache.get(cacheKey);
+  if (cached) return cached;
+  const phaseIsStatic = plugins.every(
+    plugin => (plans.get(plugin)?.controlFlow?.length ?? 0) === 0,
+  );
+  const routes: CompiledRouteTemplate[] = [];
+  for (let pluginId = 0; pluginId < plugins.length; pluginId++) {
+    const plugin = plugins[pluginId];
+    const plan = plans.get(plugin)!;
+    const variants = visitorRouteVariants(plugin.visitor);
+    for (const variant of variants) {
+      const predicates: Record<string, ScalarPredicate> = { ...variant.predicates };
+      const matchOnlyFields = new Set<string>();
+      for (const [declaredRoute, fields] of Object.entries(plan.where ?? {})) {
+        if (
+          declaredRoute
+            .split('|')
+            .some(route =>
+              route === 'ReferencedIdentifier' ||
+              isCollapsedFunctionKey(route) ||
+              isCollapsedClassKey(route)
+                ? variant.visitorKeys.includes(route)
+                : route === variant.nodeType || alias(route, variant.nodeType),
+            )
+        )
+          for (const [field, predicate] of Object.entries(fields ?? {})) {
+            matchOnlyFields.add(field);
+            predicates[field] = predicates[field]
+              ? intersectPredicates(predicates[field], predicate)
+              : predicate;
+          }
+      }
+      if (variant.nodeType === 'Identifier' && plan.identifierNames)
+        predicates.name = predicates.name
+          ? intersectPredicates(predicates.name, { oneOf: plan.identifierNames })
+          : { oneOf: plan.identifierNames };
+      if (variant.nodeType === 'StaticMemberExpression' && plan.staticMemberPatterns)
+        predicates.memberPath = predicates.memberPath
+          ? intersectPredicates(predicates.memberPath, { oneOf: plan.staticMemberPatterns })
+          : { oneOf: plan.staticMemberPatterns };
+      const explicitlyRequested = plan.fields?.[variant.nodeType as NativeNodeType];
+      const payloadFields = (explicitlyRequested ?? []).slice();
+      for (const field of visitorRoutingFields(plugin.visitor)[variant.nodeType] ?? [])
+        if (!payloadFields.includes(field as NativeFieldKey))
+          payloadFields.push(field as NativeFieldKey);
+      routes.push({
+        id: routes.length,
+        pluginId,
+        nodeType: variant.nodeType,
+        side: variant.side,
+        order: pluginId,
+        predicates,
+        payloadFields,
+        plugin,
+        callbacks: variant.callbacks,
+        fast: phaseIsStatic && plugin.analyze == null,
+      });
+    }
+  }
+  const manifest = packRouteManifest(routes, includeParent, includeScope);
+  const compiled = { routes, manifest };
+  if (cache.size < 64) cache.set(cacheKey, compiled);
+  return compiled;
+}
+
+function intersectPredicates(left: ScalarPredicate, right: ScalarPredicate): ScalarPredicate {
+  if ('present' in left) {
+    if ('present' in right) return left.present === right.present ? left : { oneOf: [] };
+    return left.present ? right : { oneOf: [] };
+  }
+  if ('present' in right) return right.present ? left : { oneOf: [] };
+  const leftValues = 'equals' in left ? [left.equals] : left.oneOf;
+  const rightValues = 'equals' in right ? [right.equals] : right.oneOf;
+  const values = leftValues.filter(value => rightValues.some(candidate => candidate === value));
+  return values.length === 1 ? { equals: values[0] } : { oneOf: values };
+}
+
+function visitorRouteVariants(visitor?: Visitor<any>): {
+  nodeType: string;
+  side: 'enter' | 'exit';
+  predicates: Record<string, ScalarPredicate>;
+  callbacks: Handler<any>[];
+  visitorKeys: string[];
+}[] {
+  if (!visitor) return [];
+  const grouped = new Map<
+    string,
+    {
+      nodeType: string;
+      side: 'enter' | 'exit';
+      predicates: Record<string, ScalarPredicate>;
+      callbacks: Handler<any>[];
+      visitorKeys: string[];
+      registrations: Set<number>;
+    }
+  >();
+  const add = (
+    nodeType: string,
+    side: 'enter' | 'exit',
+    predicates: Record<string, ScalarPredicate>,
+    callback: Handler<any>,
+    visitorKey: string,
+    registration: number,
+  ) => {
+    const key = `${nodeType}:${side}:${stableJson(predicates)}`;
+    const route = grouped.get(key) ?? {
+      nodeType,
+      side,
+      predicates,
+      callbacks: [],
+      visitorKeys: [],
+      registrations: new Set(),
+    };
+    if (!route.registrations.has(registration)) {
+      if (side === 'exit') route.callbacks.unshift(callback);
+      else route.callbacks.push(callback);
+      route.registrations.add(registration);
+    }
+    if (!route.visitorKeys.includes(visitorKey)) route.visitorKeys.push(visitorKey);
+    grouped.set(key, route);
+  };
+  let registration = 0;
+  for (const [key, handler] of Object.entries(visitor)) {
+    if (!handler) continue;
+    for (const visitorKey of key.split('|')) {
+      const nodeTypes = concreteRouteTypes(visitorKey);
+      const predicates: Record<string, ScalarPredicate> = {};
+      if (visitorKey === 'ReferencedIdentifier') predicates.global = { present: true };
+      else if (isCollapsedFunctionKey(visitorKey) || isCollapsedClassKey(visitorKey))
+        predicates.nodeKind = { equals: visitorKey };
+      for (const nodeType of nodeTypes) {
+        if (typeof handler === 'function')
+          add(nodeType, 'enter', predicates, handler as Handler<any>, visitorKey, registration);
+        else {
+          if (handler.enter)
+            add(
+              nodeType,
+              'enter',
+              predicates,
+              handler.enter as Handler<any>,
+              visitorKey,
+              registration,
+            );
+          if (handler.exit)
+            add(
+              nodeType,
+              'exit',
+              predicates,
+              handler.exit as Handler<any>,
+              visitorKey,
+              registration,
+            );
+        }
+      }
+    }
+    registration++;
+  }
+  return [...grouped.values()].map(({ registrations: _, ...route }) => route);
+}
+
+const nestedRouteCaches = new WeakMap<
+  object,
+  { manifest: Buffer; callbacks: readonly (readonly Handler<any>[])[] }
+>();
+
+function compileNestedVisitor(visitor: Visitor<any>): {
+  manifest: Buffer;
+  callbacks: readonly (readonly Handler<any>[])[];
+} {
+  const cached = nestedRouteCaches.get(visitor);
+  if (cached) return cached;
+  const variants = visitorRouteVariants(visitor);
+  const routes: NativeRouteManifestEntry[] = variants.map((variant, id) => ({
+    id,
+    pluginId: 0,
+    nodeType: variant.nodeType,
+    side: variant.side,
+    order: 0,
+    predicates: variant.predicates,
+    payloadFields: PREDICATE_FIELDS[variant.nodeType] ?? [],
+  }));
+  const compiled = {
+    manifest: packRouteManifest(routes, true, true),
+    callbacks: variants.map(variant => variant.callbacks),
+  };
+  nestedRouteCaches.set(visitor, compiled);
+  return compiled;
+}
+
+function concreteRouteTypes(route: string): string[] {
+  const concrete: string[] = [];
+  for (const part of route.split('|')) {
+    for (let index = 1; index < NODE_TYPES.length; index++)
+      if (part === NODE_TYPES[index] || alias(part, NODE_TYPES[index])) {
+        concrete.push(NODE_TYPES[index]);
+      }
+  }
+  return [...new Set(concrete)];
+}
+
+function validatePredicates(plugin: string, plan: PluginPlan): void {
+  const controlCapabilities = new Set<ControlFlowCapability>([
+    'skip',
+    'stop',
+    'nested-traverse',
+    'dynamic-subscriptions',
+  ]);
+  const declaredControls = new Set<string>();
+  for (const capability of plan.controlFlow ?? []) {
+    if (!controlCapabilities.has(capability) || !declaredControls.add(capability))
+      throw new Error(`${plugin}: invalid control-flow capability ${capability}`);
+  }
+  for (const [route, predicates] of Object.entries(plan.where ?? {})) {
+    const concreteTypes = concreteRouteTypes(route);
+    if (concreteTypes.length === 0) throw new Error(`${plugin}: unknown predicate route ${route}`);
+    for (const [field, predicate] of Object.entries(predicates ?? {})) {
+      if (!FIELD_KEY_IDS.has(field))
+        throw new Error(`${plugin}: unsupported predicate field ${field}`);
+      const invalidType = concreteTypes.find(type => !PREDICATE_FIELDS[type]?.includes(field));
+      if (invalidType)
+        throw new Error(`${plugin}: predicate field ${field} is not valid for ${invalidType}`);
+      if (predicate == null || typeof predicate !== 'object')
+        throw new Error(`${plugin}: invalid predicate for ${route}.${field}`);
+      const operations =
+        Number('equals' in predicate) +
+        Number('oneOf' in predicate) +
+        Number('present' in predicate);
+      if (
+        operations !== 1 ||
+        ('oneOf' in predicate && !Array.isArray(predicate.oneOf)) ||
+        ('present' in predicate && typeof predicate.present !== 'boolean')
+      )
+        throw new Error(`${plugin}: invalid predicate for ${route}.${field}`);
+      const values =
+        'equals' in predicate ? [predicate.equals] : 'oneOf' in predicate ? predicate.oneOf : [];
+      if (values.length > 1024 || values.some(value => !isScalarPredicateValue(value)))
+        throw new Error(`${plugin}: invalid scalar value for ${route}.${field}`);
+    }
+  }
+}
+
+function isScalarPredicateValue(value: unknown): value is string | number | boolean | null {
+  return (
+    value === null ||
+    typeof value === 'string' ||
+    typeof value === 'boolean' ||
+    (typeof value === 'number' && Number.isFinite(value))
+  );
 }
 
 /** Execute a native pipeline synchronously. */
@@ -1061,7 +1427,7 @@ export function transform(
   pipeline: NativePipeline,
   options: TransformOptions = {},
 ): TransformResult {
-  if (pipeline.apiVersion !== 1)
+  if (pipeline.apiVersion !== 2)
     throw new Error(`Unsupported pipeline API version: ${pipeline.apiVersion}`);
   const parser = classifyForTransform(parserFilename(filename, options.parser), source);
   if (!parser.supported) {
@@ -1092,33 +1458,17 @@ export function transform(
   let finalMap: NativeTransformResult['map'] | null = options.inputSourceMap ?? null;
   const metadata: Record<string, unknown> = {};
   const diagnostics: Diagnostic[] = [];
-  const transformStarted = performance.now();
-  const totals = {
-    parseMs: 0,
-    semanticMs: 0,
-    traversalMs: 0,
-    renderAndMapMs: 0,
-    sessionOpenMs: 0,
-    napiTransferMs: 0,
-    jsDispatchMs: 0,
-    mapCompositionMs: 0,
-    totalMs: 0,
-    phases: [] as NonNullable<NativeTransformResult['timings']['phases']>,
-  };
   const allStates: { plugin: NativePlugin<any, any>; state: any }[] = [];
-  const deferredMapLayers: { source: string; edits: EditCommand[] }[] = [];
+  const deferredMapLayers: {
+    source: string;
+    edits: EditCommand[];
+    map?: NativeTransformResult['map'];
+  }[] = [];
   let openSession: NativeTransformSession | null = null;
   let reusableSession: NativeTransformSession | null = null;
-  let activePhase:
-    | { name: string; started: number; before: ReturnType<typeof timingSnapshot> }
-    | undefined;
+  let reusableRoutedBatch: { manifest: Buffer; batch: RoutedEventBatch } | null = null;
   try {
     for (const phase of pipeline.phases) {
-      activePhase = {
-        name: phase.name,
-        started: performance.now(),
-        before: timingSnapshot(totals),
-      };
       const edits: EditCommand[] = [];
       const prepared = preparePhase(phase, phaseSource, filename, options, parser);
       const {
@@ -1132,6 +1482,8 @@ export function transform(
         staticMemberPatterns,
         includeParent,
         includeScope,
+        compiledRoutes,
+        manifest,
       } = prepared;
       if (subscriptions.has('*')) {
         if (!options.allowBroadVisitors) throw new Bailout('broad-catch-all-visitor');
@@ -1144,36 +1496,67 @@ export function transform(
       const retainsAdditionalIndex = [...materializationSubscriptions].some(
         type => !subscriptions.has(type),
       );
+      const requiresIndex = retainsAdditionalIndex || includeParent || includeScope;
+      if (manifest == null || compiledRoutes == null || !supportsRoutedProtocol())
+        throw new Error('compiled visitor dispatch is unavailable');
       const session: NativeTransformSession =
         reusableSession ??
         new NativeTransformSession(
           phaseSource,
           filename,
           options,
-          [...materializationSubscriptions],
-          retainsAdditionalIndex || includeParent || includeScope,
+          !requiresIndex ? [] : [...materializationSubscriptions],
+          requiresIndex,
           includeParent,
           includeScope,
           identifierNames,
           staticMemberPatterns,
           [...exitSubscriptions],
         );
-      if (reusableSession == null) totals.sessionOpenMs += session.openMs;
       reusableSession = null;
       openSession = session;
-      const batch = session.nextPacked(
-        [...subscriptions],
-        undefined,
-        fieldRequests,
-        exitSubscriptions.size > 0,
-        [...exitSubscriptions],
-      );
-      addTimings(totals, batch.timings);
+      let batch: RoutedEventBatch;
+      {
+        const cachedRouted = reusableRoutedBatch as {
+          manifest: Buffer;
+          batch: RoutedEventBatch;
+        } | null;
+        if (
+          options.maxNativeMemoryBytes != null &&
+          manifest.byteLength > options.maxNativeMemoryBytes
+        )
+          throw new Error('native-memory-budget-exceeded');
+        if (cachedRouted?.manifest.equals(manifest)) {
+          batch = cachedRouted.batch;
+        } else {
+          if (requiresIndex) {
+            batch = session.nextRoutedPacked(manifest, undefined, false);
+            if (
+              options.maxNativeMemoryBytes != null &&
+              session.nativeMemoryBytes + manifest.byteLength + batch.data.byteLength >
+                options.maxNativeMemoryBytes
+            )
+              throw new Error('native-memory-budget-exceeded');
+          } else {
+            const routedBuffer = native.materializeRoutedBuffer!(
+              phaseSource,
+              parserFilename(filename, options.parser),
+              manifest,
+            );
+            if (
+              options.maxNativeMemoryBytes != null &&
+              manifest.byteLength + routedBuffer.byteLength > options.maxNativeMemoryBytes
+            )
+              throw new Error('native-memory-budget-exceeded');
+            batch = decodeRoutedEnvelope(routedBuffer);
+          }
+        }
+        reusableRoutedBatch = null;
+      }
       const childParentTypes = activePlugins.flatMap(plugin =>
         Object.keys(plans.get(plugin)?.children ?? {}),
       );
-      if (childParentTypes.length > 0)
-        totals.napiTransferMs += session.prefetchChildren([], childParentTypes);
+      if (childParentTypes.length > 0) session.prefetchChildren([], childParentTypes);
       const dispatch = createDispatcher(
         session,
         phase,
@@ -1184,6 +1567,7 @@ export function transform(
         metadata,
         diagnostics,
         retainsAdditionalIndex || includeParent || includeScope,
+        compiledRoutes,
       );
       for (const plugin of activePlugins) {
         const state = plugin.createState?.();
@@ -1220,42 +1604,42 @@ export function transform(
           plugin.apply?.(entry.context, decision.analysis, entry.state);
         }
       }
-      const dispatchStarted = performance.now();
       dispatch.run();
-      totals.jsDispatchMs += performance.now() - dispatchStarted;
       for (const plugin of activePlugins)
         plugin.post?.(dispatch.contexts.get(plugin)!.context, dispatch.contexts.get(plugin)!.state);
       if (edits.length === 0) {
         reusableSession = session;
-        totals.phases.push(finishPhaseTiming(activePhase, totals, 'complete'));
-        activePhase = undefined;
+        reusableRoutedBatch = { manifest, batch };
         continue;
       }
       const layerSource = phaseSource;
-      const committed = session.commit(edits, 'none');
-      addTimings(totals, committed.timings);
+      const isFinalPhase = phase === pipeline.phases[pipeline.phases.length - 1];
+      const committed = session.commit(edits, isFinalPhase ? options.sourceMapMode : 'none');
       phaseSource = committed.code;
-      deferredMapLayers.push({ source: layerSource, edits: [...edits] });
+      deferredMapLayers.push({
+        source: layerSource,
+        edits: [...edits],
+        map: isFinalPhase ? committed.map : undefined,
+      });
       session.close();
+      reusableRoutedBatch = null;
       openSession = null;
-      totals.phases.push(finishPhaseTiming(activePhase, totals, 'complete'));
-      activePhase = undefined;
       // Opening the next phase creates the explicit render/reparse boundary.
     }
     reusableSession?.close();
     openSession = null;
     for (const layer of deferredMapLayers) {
-      const committed = native.commitPackedBuffer(
-        layer.source,
-        parserFilename(filename, options.parser),
-        packEdits(layer.edits),
-        options.sourceMapMode,
-      );
-      addTimings(totals, committed.timings);
+      const committed = layer.map
+        ? { map: layer.map }
+        : native.commitPackedBuffer(
+            layer.source,
+            parserFilename(filename, options.parser),
+            packEdits(layer.edits),
+            options.sourceMapMode,
+          );
       if (finalMap == null) {
         finalMap = committed.map;
       } else {
-        const compositionStarted = performance.now();
         finalMap = {
           mappings: native.composeMappings(
             committed.map.mappings,
@@ -1264,39 +1648,28 @@ export function transform(
           ),
           names: [...committed.map.names, ...finalMap.names],
         };
-        totals.mapCompositionMs += performance.now() - compositionStarted;
       }
     }
     for (const { plugin, state } of allStates) plugin.cleanup?.('complete', state);
-    totals.totalMs = performance.now() - transformStarted;
     return {
       status: 'complete',
       code: phaseSource,
       map: finalMap ?? { mappings: '', names: [] },
       metadata,
       diagnostics,
-      timings: totals,
     };
   } catch (error) {
-    if (activePhase) {
-      totals.phases.push(
-        finishPhaseTiming(activePhase, totals, error instanceof Bailout ? 'bailout' : 'error'),
-      );
-    }
     openSession?.close();
     const bailout = error instanceof Bailout;
     for (const { plugin, state } of allStates)
       plugin.cleanup?.(bailout ? 'bailout' : 'error', state);
     if (bailout) {
-      totals.totalMs = performance.now() - transformStarted;
-      const result = {
+      return {
         status: 'bailout',
         reason: error.message,
         source: originalSource,
         diagnostics,
       } satisfies NativeBailoutResult;
-      Object.defineProperty(result, 'timings', { value: totals, enumerable: false });
-      return result;
     }
     if (error instanceof NativeTransformError) throw error;
     const message = error instanceof Error ? error.message : String(error);
@@ -1326,15 +1699,6 @@ interface DispatcherEntry extends PathState {
   pathRuntime?: PathRuntime;
 }
 
-interface PhaseRoute {
-  plugin: NativePlugin<any, any>;
-  entry: DispatcherEntry;
-  enterCallbacks: Handler<any>[];
-  exitCallbacks: Handler<any>[];
-}
-type PhaseRouteTemplate = Omit<PhaseRoute, 'entry'>;
-const phaseRouteTemplateCaches = new WeakMap<object, Map<string, PhaseRouteTemplate[]>>();
-
 interface Dispatcher {
   contexts: Map<NativePlugin<any, any>, DispatcherEntry>;
   run(): void;
@@ -1345,31 +1709,20 @@ function createDispatcher(
   phase: PipelinePhase,
   activePlugins: readonly NativePlugin<any, any>[],
   plans: ReadonlyMap<NativePlugin<any, any>, PluginPlan>,
-  batch: PackedEventBatch,
+  batch: RoutedEventBatch,
   edits: EditCommand[],
   metadata: Record<string, unknown>,
   diagnostics: Diagnostic[],
   cacheEvents: boolean,
+  compiledRoutes: readonly CompiledRouteTemplate[],
 ): Dispatcher {
   let order = 0;
   let stopAll = false;
   let currentSequence = -1;
   let visitorId = 0;
-  const visitorIds = new WeakMap<object, number>();
-  const activeTraversals = new Set<string>();
+  let visitorIds: WeakMap<object, number> | undefined;
+  let activeTraversals: Set<string> | undefined;
   const contexts = new Map<NativePlugin<any, any>, DispatcherEntry>();
-  const phaseRoutes = new Map<string, PhaseRoute[]>();
-  let phaseRouteTemplates = phaseRouteTemplateCaches.get(phase);
-  if (!phaseRouteTemplates) {
-    phaseRouteTemplates = new Map();
-    phaseRouteTemplateCaches.set(phase, phaseRouteTemplates);
-  }
-  const routesByIdentifierName = activePlugins.some(
-    plugin => plans.get(plugin)?.identifierNames != null,
-  );
-  const routesByStaticMemberPath = activePlugins.some(
-    plugin => plans.get(plugin)?.staticMemberPatterns != null,
-  );
   const metadataOwners = new Map<string, string>();
   for (const plugin of activePlugins)
     for (const key of plans.get(plugin)?.metadataWrites ?? []) {
@@ -1383,7 +1736,7 @@ function createDispatcher(
     const entry: DispatcherEntry = {
       state: undefined,
       stopped: false,
-      skipped: [],
+      skipped: undefined,
       context: undefined as unknown as PluginContext,
     };
     const context: PluginContext = {
@@ -1406,41 +1759,36 @@ function createDispatcher(
         throw new Bailout(`${plugin.name}:${reason}`);
       },
       stopAll: () => {
+        assertDeclaredControl(plugin, plans.get(plugin), 'stop');
         stopAll = true;
       },
       subscribeRemaining: (...types) => {
+        assertDeclaredControl(plugin, plans.get(plugin), 'dynamic-subscriptions');
         entry.delivered ??= new Set();
-        replay(
-          session
-            .next(expandSubscriptions(types), undefined, undefined, visitorHasExit(plugin.visitor))
-            .events.filter(event => event.sequence > currentSequence),
+        replayRoutedFollowup(
           plugin,
           entry,
           context,
+          expandSubscriptions(types),
+          undefined,
+          event => event.sequence > currentSequence,
         );
       },
-      revisitProgram: (visitor, state) =>
-        replayCustom(
-          session.next(visitorSubscriptions(visitor), undefined, undefined, visitorHasExit(visitor))
-            .events,
+      revisitProgram: (visitor, state) => (
+        assertDeclaredControl(plugin, plans.get(plugin), 'dynamic-subscriptions'),
+        replayCustomRouted(
+          session.nextRoutedPacked(compileNestedVisitor(visitor).manifest),
           visitor,
           state,
           context,
-        ),
+        )
+      ),
       code: codeFactory,
       editor: makeEditor(session, edits, plugin.name, () => order++),
     };
     entry.context = context;
     contexts.set(plugin, entry);
   }
-  const replay = (
-    events: NativeEvent[],
-    plugin: NativePlugin<any, any>,
-    entry: DispatcherEntry,
-    context: PluginContext,
-  ) => {
-    for (const event of events) dispatchOne(event, plugin, entry, context);
-  };
   const createPathRuntime = (
     plugin: NativePlugin<any, any>,
     entry: DispatcherEntry,
@@ -1455,6 +1803,8 @@ function createDispatcher(
       nextOrder: () => order++,
       state: entry,
       nested(target, nested, state) {
+        visitorIds ??= new WeakMap();
+        activeTraversals ??= new Set();
         let id = visitorIds.get(nested);
         if (id == null) {
           id = visitorId++;
@@ -1464,13 +1814,12 @@ function createDispatcher(
         if (activeTraversals.has(key)) throw new Error(`recursive traversal of node ${target.id}`);
         activeTraversals.add(key);
         try {
-          replayCustom(
-            session.next(
-              visitorSubscriptions(nested),
-              { start: target.start, end: target.end },
-              undefined,
-              visitorHasExit(nested),
-            ).events,
+          const compiled = compileNestedVisitor(nested);
+          replayCustomRouted(
+            session.nextRoutedPacked(compiled.manifest, {
+              start: target.start,
+              end: target.end,
+            }),
             nested,
             state,
             context,
@@ -1481,23 +1830,12 @@ function createDispatcher(
       },
       widen(target, types, scopeOnly) {
         entry.delivered ??= new Set();
-        replay(
-          session
-            .next(
-              expandSubscriptions(types),
-              scopeOnly ? undefined : { start: target.start, end: target.end },
-              undefined,
-              visitorHasExit(plugin.visitor),
-            )
-            .events.filter(
-              candidate =>
-                candidate.sequence > target.sequence &&
-                (!scopeOnly || candidate.scopeId === target.scopeId),
-            ),
-          plugin,
-          entry,
-          context,
-        );
+        const expanded = expandSubscriptions(types);
+        const root = scopeOnly ? undefined : { start: target.start, end: target.end };
+        const filter = (candidate: NativeEvent) =>
+          candidate.sequence > target.sequence &&
+          (!scopeOnly || candidate.scopeId === target.scopeId);
+        replayRoutedFollowup(plugin, entry, context, expanded, root, filter);
       },
       parent(_target, parentId) {
         const parent = session.event(parentId);
@@ -1522,6 +1860,9 @@ function createDispatcher(
         return plugin.name === 'nested' || plans.get(plugin)?.semantics?.[0] === 'scope';
       },
       scopeCache: new Map(),
+      assertControl(capability) {
+        assertDeclaredControl(plugin, plans.get(plugin), capability);
+      },
     };
     return runtime;
   };
@@ -1532,132 +1873,173 @@ function createDispatcher(
     context: PluginContext,
     override?: Visitor<any>,
     overrideState?: any,
-    routedCallbacks?: Handler<any>[],
+    routedCallbacks: Handler<any>[] = [],
   ) => {
     const delivered = override ? undefined : entry.delivered;
     const deliveryKey = delivered ? event.id * 2 + Number(event.side === 'exit') : 0;
     if (delivered?.has(deliveryKey)) return;
     if (entry.stopped || stopAll || eventIsSkipped(event, entry.skipped)) return;
-    const callbacks = routedCallbacks ?? matchingCallbacks(override ?? plugin.visitor ?? {}, event);
-    if (callbacks.length === 0) return;
+    if (routedCallbacks.length === 0) return;
     const runtime = override
       ? createPathRuntime(plugin, entry, context)
       : (entry.pathRuntime ??= createPathRuntime(plugin, entry, context));
     const path = makePath(runtime, event);
     currentSequence = event.sequence;
-    for (const callback of callbacks) {
+    for (const callback of routedCallbacks) {
       callback(path, override ? overrideState : entry.state);
       delivered?.add(deliveryKey);
     }
   };
-  const replayCustom = (
-    events: NativeEvent[],
+  const replayCustomRouted = (
+    routedBatch: RoutedEventBatch,
     visitor: Visitor<any>,
     state: any,
     context: PluginContext,
   ) => {
-    const synthetic = { name: 'nested', apiVersion: 1 as const, visitor };
+    const compiled = compileNestedVisitor(visitor);
+    const synthetic = { name: 'nested', apiVersion: 2 as const, visitor };
     const entry = {
       context,
       state,
       stopped: false,
-      skipped: [] as { start: number; end: number }[],
+      skipped: undefined,
     };
-    for (const event of events) dispatchOne(event, synthetic, entry, context, visitor, state);
+    forEachRoutedEvent(routedBatch, (routeIds, event) => {
+      if (event.side === 'enter') {
+        for (let index = 0; index < routeIds.length; index++)
+          dispatchOne(
+            event,
+            synthetic,
+            entry,
+            context,
+            visitor,
+            state,
+            compiled.callbacks[routeIds[index]] as Handler<any>[],
+          );
+      } else {
+        for (let index = routeIds.length - 1; index >= 0; index--)
+          dispatchOne(
+            event,
+            synthetic,
+            entry,
+            context,
+            visitor,
+            state,
+            compiled.callbacks[routeIds[index]] as Handler<any>[],
+          );
+      }
+    });
   };
-  const routesFor = (event: NativeEvent): PhaseRoute[] => {
-    const templateKey = eventRouteKey(event);
-    const key =
-      routesByIdentifierName && event.type === 'Identifier'
-        ? `${templateKey}:${eventField(event, 'name') ?? ''}`
-        : routesByStaticMemberPath && event.type === 'StaticMemberExpression'
-          ? `${event.type}:${eventField(event, 'memberPath') ?? ''}`
-          : templateKey;
-    let routes = phaseRoutes.get(key);
-    if (routes) return routes;
-    routes = [];
-    let templates = phaseRouteTemplates.get(templateKey);
-    if (!templates) {
-      templates = [];
-      for (const plugin of phase.plugins) {
-        const callbacks = matchingCallbackPair(plugin.visitor ?? {}, event);
-        if (callbacks.enter.length > 0 || callbacks.exit.length > 0) {
-          templates.push({
+  const followupRouteCache = new Map<
+    string,
+    { manifest: Buffer; routes: readonly CompiledRouteTemplate[] }
+  >();
+  const replayRoutedFollowup = (
+    plugin: NativePlugin<any, any>,
+    entry: DispatcherEntry,
+    context: PluginContext,
+    types: readonly string[],
+    root: { start: number; end: number } | undefined,
+    filter: (event: NativeEvent) => boolean,
+  ): void => {
+    const pluginIndex = activePlugins.indexOf(plugin);
+    const key = `${pluginIndex}:${types.join('|')}`;
+    let followup = followupRouteCache.get(key);
+    if (!followup) {
+      const selected = compiledRoutes.filter(
+        route =>
+          route.plugin === plugin &&
+          types.some(type => type === route.nodeType || alias(type, route.nodeType)),
+      );
+      const routes = selected.map((route, id) => ({ ...route, id }));
+      followup = {
+        routes,
+        manifest: packRouteManifest(routes, true, true),
+      };
+      followupRouteCache.set(key, followup);
+    }
+    if (followup.routes.length === 0) return;
+    const routed = session.nextRoutedPacked(followup.manifest, root);
+    forEachRoutedEvent(routed, (routeIds, event) => {
+      if (!filter(event)) return;
+      if (event.side === 'enter') {
+        for (let index = 0; index < routeIds.length; index++) {
+          const route = followup!.routes[routeIds[index]];
+          dispatchOne(
+            event,
             plugin,
-            enterCallbacks: callbacks.enter,
-            exitCallbacks: callbacks.exit,
-          });
+            entry,
+            context,
+            undefined,
+            undefined,
+            route.callbacks as Handler<any>[],
+          );
+        }
+      } else {
+        for (let index = routeIds.length - 1; index >= 0; index--) {
+          const route = followup!.routes[routeIds[index]];
+          dispatchOne(
+            event,
+            plugin,
+            entry,
+            context,
+            undefined,
+            undefined,
+            route.callbacks as Handler<any>[],
+          );
         }
       }
-      phaseRouteTemplates.set(templateKey, templates);
-    }
-    for (const template of templates) {
-      const plugin = template.plugin;
-      const entry = contexts.get(plugin);
-      if (!entry) continue;
-      const plan = plans.get(plugin);
-      if (
-        event.type === 'Identifier' &&
-        plan?.identifierNames &&
-        !hasExactValue(plan.identifierNames, eventField(event, 'name'))
-      )
-        continue;
-      if (
-        event.type === 'StaticMemberExpression' &&
-        plan?.staticMemberPatterns &&
-        !hasExactValue(plan.staticMemberPatterns, eventField(event, 'memberPath'))
-      )
-        continue;
-      routes.push({
-        plugin,
-        entry,
-        enterCallbacks: template.enterCallbacks,
-        exitCallbacks: template.exitCallbacks,
-      });
-    }
-    phaseRoutes.set(key, routes);
-    return routes;
+    });
   };
-  const onlyPlugin = activePlugins.length === 1 ? activePlugins[0] : undefined;
-  const onlyEntry = onlyPlugin == null ? undefined : contexts.get(onlyPlugin)!;
+  const routedThunks = compiledRoutes.map(route => {
+    const entry = contexts.get(route.plugin)!;
+    if (!route.fast)
+      return (event: NativeEvent) =>
+        dispatchOne(
+          event,
+          route.plugin,
+          entry,
+          entry.context,
+          undefined,
+          undefined,
+          route.callbacks as Handler<any>[],
+        );
+    return (event: NativeEvent) => {
+      const runtime = (entry.pathRuntime ??= createPathRuntime(route.plugin, entry, entry.context));
+      const path = makePath(runtime, event);
+      currentSequence = event.sequence;
+      for (const callback of route.callbacks) {
+        callback(path, entry.state);
+      }
+    };
+  });
   return {
     contexts,
     run() {
-      forEachDispatchEvent(batch, event => {
+      forEachRoutedEvent(batch, (routeIds, event) => {
         if (cacheEvents) session.cacheEvent(event);
-        if (onlyPlugin && onlyEntry) {
-          dispatchOne(event, onlyPlugin, onlyEntry, onlyEntry.context);
-          return;
-        }
-        const routes = routesFor(event);
         if (event.side === 'enter') {
-          for (const route of routes)
-            dispatchOne(
-              event,
-              route.plugin,
-              route.entry,
-              route.entry.context,
-              undefined,
-              undefined,
-              route.enterCallbacks,
-            );
+          for (let index = 0; index < routeIds.length; index++) {
+            const routeId = routeIds[index];
+            routedThunks![routeId](event);
+          }
         } else {
-          for (let index = routes.length - 1; index >= 0; index--) {
-            const route = routes[index];
-            dispatchOne(
-              event,
-              route.plugin,
-              route.entry,
-              route.entry.context,
-              undefined,
-              undefined,
-              route.exitCallbacks,
-            );
+          for (let index = routeIds.length - 1; index >= 0; index--) {
+            routedThunks![routeIds[index]](event);
           }
         }
       });
     },
   };
+}
+
+function assertDeclaredControl(
+  plugin: Pick<NativePlugin<any, any>, 'name'>,
+  plan: PluginPlan | undefined,
+  capability: ControlFlowCapability,
+): void {
+  if (plan?.controlFlow?.includes(capability)) return;
+  throw new Error(`${plugin.name}: undeclared control-flow capability ${capability}`);
 }
 
 function childRoleIsDeclared(roles: readonly string[], requestedRole: string): boolean {
@@ -1669,22 +2051,16 @@ function childRoleIsDeclared(roles: readonly string[], requestedRole: string): b
 
 function eventIsSkipped(
   event: NativeEvent,
-  ranges: readonly { start: number; end: number }[],
+  ranges: readonly { start: number; end: number }[] | undefined,
 ): boolean {
+  if (!ranges) return false;
   for (const range of ranges) {
     if (event.start > range.start && event.end <= range.end) return true;
   }
   return false;
 }
 
-function hasExactValue(values: readonly string[], candidate: unknown): boolean {
-  for (const value of values) {
-    if (value === candidate) return true;
-  }
-  return false;
-}
-
-type PathState = { stopped: boolean; skipped: { start: number; end: number }[] };
+type PathState = { stopped: boolean; skipped?: { start: number; end: number }[] };
 type PathRuntime = {
   session: NativeTransformSession;
   context: PluginContext;
@@ -1700,20 +2076,25 @@ type PathRuntime = {
   allowsAncestry: () => boolean;
   allowsScope: () => boolean;
   scopeCache: Map<number, NativeScope>;
+  assertControl: (capability: ControlFlowCapability) => void;
 };
 function makePath(runtime: PathRuntime, event: NativeEvent): NativeNodePath {
   return new NodePathImpl(runtime, event);
 }
 
 class NodePathImpl implements NativeNodePath {
-  readonly node: NodeView;
+  #node?: NodeView;
   #parent?: NodeSummary | null;
   #scope?: NativeScope;
   constructor(
     readonly runtime: PathRuntime,
     readonly event: NativeEvent,
-  ) {
-    this.node = runtime.session.nodeView(event);
+  ) {}
+  get node(): NodeView {
+    if (!this.#node) {
+      this.#node = this.runtime.session.nodeView(this.event);
+    }
+    return this.#node;
   }
   get context(): PluginContext {
     return this.runtime.context;
@@ -1903,18 +2284,23 @@ class NodePathImpl implements NativeNodePath {
     });
   }
   skip(): void {
-    this.runtime.state.skipped.push({ start: this.event.start, end: this.event.end });
+    this.runtime.assertControl('skip');
+    (this.runtime.state.skipped ??= []).push({ start: this.event.start, end: this.event.end });
   }
   stop(): void {
+    this.runtime.assertControl('stop');
     this.runtime.state.stopped = true;
   }
   traverse<State>(visitor: Visitor<State>, state?: State): void {
+    this.runtime.assertControl('nested-traverse');
     this.runtime.nested(this.event, visitor, state);
   }
   subscribeWithin(types: string | readonly string[]): void {
+    this.runtime.assertControl('dynamic-subscriptions');
     this.runtime.widen(this.event, array(types), false);
   }
   subscribeForScope(types: string | readonly string[]): void {
+    this.runtime.assertControl('dynamic-subscriptions');
     this.runtime.widen(this.event, array(types), true);
   }
   unsupported(reason: string): never {
@@ -1923,62 +2309,9 @@ class NodePathImpl implements NativeNodePath {
 }
 
 type EditKind = EditCommand['kind'];
-type CallbackPair = { enter: Handler<any>[]; exit: Handler<any>[] };
-const matchingHandlerCache = new WeakMap<
-  object,
-  { routes: Map<string, CallbackPair>; fieldAware: boolean }
->();
 const visitorSubscriptionsCache = new WeakMap<object, NativeVisitorRoute[]>();
 const visitorExitSubscriptionsCache = new WeakMap<object, NativeVisitorRoute[]>();
 const visitorRoutingFieldsCache = new WeakMap<object, Record<string, string[]>>();
-function eventRouteKey(event: NativeEvent): string {
-  if (event.type === 'Identifier')
-    return `${event.type}:${eventField(event, 'global') == null ? '' : 'reference'}`;
-  if (event.type === 'Function' || event.type === 'Class')
-    return `${event.type}:${eventField(event, 'nodeKind') ?? ''}`;
-  return event.type;
-}
-function matchingCallbackPair(visitor: Visitor<any>, event: NativeEvent): CallbackPair {
-  let cache = matchingHandlerCache.get(visitor);
-  if (!cache) {
-    cache = { routes: new Map(), fieldAware: visitorNeedsFieldRouting(visitor) };
-    matchingHandlerCache.set(visitor, cache);
-  }
-  const route = cache.fieldAware ? eventRouteKey(event) : event.type;
-  const cached = cache.routes.get(route);
-  if (cached) return cached;
-  const enter: Handler<any>[] = [];
-  const exit: Handler<any>[] = [];
-  for (const [key, handler] of Object.entries(visitor)) {
-    if (handler == null) continue;
-    for (const part of key.split('|')) {
-      if (visitorKeyMatches(part, event)) {
-        if (typeof handler === 'function') enter.push(handler as Handler<any>);
-        else {
-          if (handler.enter) enter.push(handler.enter as Handler<any>);
-          if (handler.exit) exit.unshift(handler.exit as Handler<any>);
-        }
-        break;
-      }
-    }
-  }
-  const callbacks = { enter, exit };
-  cache.routes.set(route, callbacks);
-  return callbacks;
-}
-function matchingCallbacks(visitor: Visitor<any>, event: NativeEvent): Handler<any>[] {
-  const callbacks = matchingCallbackPair(visitor, event);
-  return event.side === 'enter' ? callbacks.enter : callbacks.exit;
-}
-function visitorNeedsFieldRouting(visitor: Visitor<any>): boolean {
-  for (const route of Object.keys(visitor)) {
-    for (const key of route.split('|')) {
-      if (key === 'ReferencedIdentifier' || isCollapsedFunctionKey(key) || isCollapsedClassKey(key))
-        return true;
-    }
-  }
-  return false;
-}
 function alias(key: string, type: string): boolean {
   if (key === '*') return true;
   if (key === 'Function') {
@@ -1998,17 +2331,6 @@ function alias(key: string, type: string): boolean {
   if (isCollapsedFunctionKey(key)) return type === 'Function';
   if (isCollapsedClassKey(key)) return type === 'Class';
   return false;
-}
-function visitorKeyMatches(key: string, event: NativeEvent): boolean {
-  if (key === 'ReferencedIdentifier')
-    return event.type === 'Identifier' && eventField(event, 'global') != null;
-  if (key === 'MetaProperty') return event.type === 'ImportMeta' || event.type === 'NewTarget';
-  if (isCollapsedFunctionKey(key) || isCollapsedClassKey(key))
-    return (
-      event.type === (isCollapsedClassKey(key) ? 'Class' : 'Function') &&
-      eventField(event, 'nodeKind') === key
-    );
-  return key === event.type || alias(key, event.type);
 }
 function isLiteralExpressionType(type: string): boolean {
   return (
@@ -2116,9 +2438,6 @@ function visitorSubscriptions(visitor?: Visitor<any>): NativeVisitorRoute[] {
   const subscriptions = expandSubscriptions(Object.keys(visitor)) as NativeVisitorRoute[];
   visitorSubscriptionsCache.set(visitor, subscriptions);
   return subscriptions;
-}
-function visitorHasExit(visitor?: Visitor<any>): boolean {
-  return visitorExitSubscriptions(visitor).length > 0;
 }
 function visitorExitSubscriptions(visitor?: Visitor<any>): NativeVisitorRoute[] {
   if (!visitor) return [];
@@ -2638,48 +2957,6 @@ function classifyForTransform(filename: string, source: string): ParseClassifica
       : syntax === 'flow'
         ? 'flow-requires-parser-adapter'
         : 'unknown-extension',
-  };
-}
-function addTimings(
-  target: NativeTransformResult['timings'],
-  value: NativeTransformResult['timings'],
-): void {
-  target.parseMs += value.parseMs;
-  target.semanticMs += value.semanticMs;
-  target.traversalMs += value.traversalMs;
-  target.renderAndMapMs += value.renderAndMapMs;
-  target.napiTransferMs = (target.napiTransferMs ?? 0) + (value.napiTransferMs ?? 0);
-}
-function timingSnapshot(timings: NativeTransformResult['timings']) {
-  return {
-    parseMs: timings.parseMs,
-    semanticMs: timings.semanticMs,
-    traversalMs: timings.traversalMs,
-    renderAndMapMs: timings.renderAndMapMs,
-    sessionOpenMs: timings.sessionOpenMs ?? 0,
-    napiTransferMs: timings.napiTransferMs ?? 0,
-    jsDispatchMs: timings.jsDispatchMs ?? 0,
-    mapCompositionMs: timings.mapCompositionMs ?? 0,
-    totalMs: timings.totalMs ?? 0,
-  };
-}
-function finishPhaseTiming(
-  phase: { name: string; started: number; before: ReturnType<typeof timingSnapshot> },
-  totals: NativeTransformResult['timings'],
-  status: 'complete' | 'bailout' | 'error',
-): NonNullable<NativeTransformResult['timings']['phases']>[number] {
-  const after = timingSnapshot(totals);
-  return {
-    name: phase.name,
-    status,
-    parseMs: after.parseMs - phase.before.parseMs,
-    semanticMs: after.semanticMs - phase.before.semanticMs,
-    traversalMs: after.traversalMs - phase.before.traversalMs,
-    renderAndMapMs: after.renderAndMapMs - phase.before.renderAndMapMs,
-    napiTransferMs: after.napiTransferMs - phase.before.napiTransferMs,
-    jsDispatchMs: after.jsDispatchMs - phase.before.jsDispatchMs,
-    mapCompositionMs: after.mapCompositionMs - phase.before.mapCompositionMs,
-    totalMs: performance.now() - phase.started,
   };
 }
 const EDITOR_CAPABILITIES = new Set([

@@ -31,20 +31,10 @@ pub struct FieldRequest {
 }
 
 #[napi(object)]
-#[derive(Clone)]
-pub struct Timings {
-    pub parse_ms: f64,
-    pub semantic_ms: f64,
-    pub traversal_ms: f64,
-    pub render_and_map_ms: f64,
-}
-
-#[napi(object)]
 pub struct EventBatch {
     pub events: Vec<NativeEvent>,
     pub node_count: u32,
     pub emitted_count: u32,
-    pub timings: Timings,
 }
 
 #[napi(object)]
@@ -53,7 +43,6 @@ pub struct PackedEventBatch {
     pub strings: Vec<String>,
     pub node_count: u32,
     pub emitted_count: u32,
-    pub timings: Timings,
 }
 
 #[napi(object)]
@@ -74,5 +63,4 @@ pub struct NativeVlqMap {
 pub struct NativeCommitResult {
     pub code: String,
     pub map: NativeVlqMap,
-    pub timings: Timings,
 }

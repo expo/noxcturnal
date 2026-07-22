@@ -1,4 +1,4 @@
-use std::time::Instant;
+use std::borrow::Cow;
 
 use napi::{Error, Result, Status, bindgen_prelude::Buffer};
 use napi_derive::napi;
@@ -13,11 +13,11 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use crate::constant_eval::constant_for_kind;
 pub use crate::event_types::{
     EventBatch, FieldRequest, NativeCommitResult, NativeEvent, NativeVlqMap, NodeField,
-    PackedEventBatch, ParseClassification, Timings,
+    PackedEventBatch, ParseClassification,
 };
 use crate::generated_event_schema::{
-    NODE_TYPE_COUNT, ast_kind_protocol_id, field_key_id, field_key_name, node_type_id,
-    node_type_name,
+    FIELD_KEY_COUNT, NODE_TYPE_COUNT, ast_kind_protocol_id, field_key_id, field_key_name,
+    node_type_id, node_type_name, predicate_field_supported,
 };
 use crate::{editor, sourcemap};
 
@@ -26,7 +26,57 @@ struct PackedEventParts {
     strings: Vec<String>,
     node_count: u32,
     emitted_count: u32,
-    timings: Timings,
+}
+
+const ROUTE_MANIFEST_MAGIC: u32 = 0x4e_52_4d_31; // NRM1
+const ROUTED_TAPE_MAGIC: u32 = 0x4e_52_54_31; // NRT1
+const ROUTED_PROTOCOL_VERSION: u32 = 2;
+const MAX_COMPILED_ROUTES: usize = 4096;
+const MAX_ROUTE_PREDICATES: usize = 64;
+const MAX_PREDICATE_VALUES: usize = 1024;
+const MAX_ROUTE_PAYLOAD_FIELDS: usize = 64;
+const MAX_ROUTE_MANIFEST_BYTES: usize = 4 * 1024 * 1024;
+
+#[derive(Clone)]
+struct CompiledPredicate {
+    field_id: u32,
+    operation: u32,
+    values: Vec<CompiledScalar>,
+}
+
+#[derive(Clone)]
+enum CompiledScalar {
+    String(String),
+    Number(f64),
+    Boolean(bool),
+    Null,
+}
+
+enum PredicateScalar<'a> {
+    String(Cow<'a, str>),
+    Number(f64),
+    Boolean(bool),
+}
+
+#[derive(Clone)]
+struct CompiledRoute {
+    id: u32,
+    node_type_id: u32,
+    side: VisitSide,
+    predicates: Vec<CompiledPredicate>,
+    payload_field_ids: Vec<u32>,
+}
+
+struct CompiledManifest {
+    routes_by_type: Vec<Vec<CompiledRoute>>,
+    include_parent: bool,
+    include_scope: bool,
+}
+
+#[derive(Default)]
+struct RoutedCounts {
+    node_records: u32,
+    route_deliveries: u32,
 }
 
 #[derive(Clone, Copy, Default)]
@@ -48,7 +98,6 @@ pub struct NativeIndexedSession {
     enter_event_indexes: Vec<usize>,
     node_summaries: Vec<NodeSummary>,
     node_count: u32,
-    timings: Timings,
     materialized_subscriptions: Vec<String>,
     materialized_exit_subscriptions: Vec<String>,
     scope_parents: Vec<u32>,
@@ -72,12 +121,6 @@ impl NativeIndexedSession {
                     events: Vec::new(),
                     node_count: 0,
                     emitted_count: 0,
-                    timings: Timings {
-                        parse_ms: 0.0,
-                        semantic_ms: 0.0,
-                        traversal_ms: 0.0,
-                        render_and_map_ms: 0.0,
-                    },
                 },
                 Vec::new(),
                 Vec::new(),
@@ -101,7 +144,6 @@ impl NativeIndexedSession {
             enter_event_indexes,
             node_summaries,
             node_count: batch.node_count,
-            timings: batch.timings,
             materialized_subscriptions: subscriptions,
             materialized_exit_subscriptions: exit_subscriptions,
             scope_parents,
@@ -149,7 +191,6 @@ impl NativeIndexedSession {
             emitted_count: events.len() as u32,
             events,
             node_count: self.node_count,
-            timings: self.timings.clone(),
         })
     }
 
@@ -246,8 +287,41 @@ impl NativeIndexedSession {
             strings,
             node_count: self.node_count,
             emitted_count,
-            timings: self.timings.clone(),
         })
+    }
+
+    #[napi]
+    pub fn next_routed_packed(
+        &mut self,
+        manifest: Buffer,
+        root_start: Option<u32>,
+        root_end: Option<u32>,
+    ) -> Result<Buffer> {
+        self.ensure_open()?;
+        let manifest = decode_route_manifest(&manifest)?;
+        let mut subscriptions = Vec::new();
+        let mut exit_subscriptions = Vec::new();
+        for routes in &manifest.routes_by_type {
+            for route in routes {
+                let name = node_type_name(route.node_type_id)
+                    .expect("validated route node type")
+                    .to_owned();
+                if !subscriptions.contains(&name) {
+                    subscriptions.push(name.clone());
+                }
+                if route.side == VisitSide::Exit && !exit_subscriptions.contains(&name) {
+                    exit_subscriptions.push(name);
+                }
+            }
+        }
+        self.ensure_materialized(&subscriptions, &exit_subscriptions)?;
+        routed_buffer_from_index(
+            &manifest,
+            &self.events,
+            &self.enter_event_indexes,
+            self.node_count,
+            root_start.zip(root_end),
+        )
     }
 
     #[napi]
@@ -324,7 +398,6 @@ impl NativeIndexedSession {
                         .is_some_and(|parent_id| parent_ids.contains(&parent_id))
             }),
             self.node_count,
-            &self.timings,
         ))
     }
 
@@ -338,7 +411,6 @@ impl NativeIndexedSession {
                 .iter()
                 .filter(|event| event.side == "enter" && node_ids.contains(&event.id)),
             self.node_count,
-            &self.timings,
         ))
     }
 
@@ -454,9 +526,6 @@ impl NativeIndexedSession {
             None,
         )?;
         self.node_count = batch.node_count;
-        self.timings.parse_ms += batch.timings.parse_ms;
-        self.timings.semantic_ms += batch.timings.semantic_ms;
-        self.timings.traversal_ms += batch.timings.traversal_ms;
         self.scope_parents = scope_parents;
         if self.node_summaries.is_empty() {
             self.node_summaries = node_summaries;
@@ -512,11 +581,7 @@ fn index_enter_events(events: &[NativeEvent], node_count: u32) -> Vec<usize> {
     indexes
 }
 
-fn pack_event_refs<'a>(
-    events: impl Iterator<Item = &'a NativeEvent>,
-    node_count: u32,
-    timings: &Timings,
-) -> Buffer {
+fn pack_event_refs<'a>(events: impl Iterator<Item = &'a NativeEvent>, node_count: u32) -> Buffer {
     let mut strings = Vec::<String>::new();
     let mut string_ids = FxHashMap::<String, u32>::default();
     let mut words = Vec::<u32>::new();
@@ -562,7 +627,7 @@ fn pack_event_refs<'a>(
         .iter()
         .map(|value| 4 + value.len() + (4 - value.len() % 4) % 4)
         .sum();
-    let words_offset = 48 + strings_size;
+    let words_offset = 16 + strings_size;
     let mut output = Vec::with_capacity(words_offset + words.len() * 4);
     for word in [
         node_count | 0xc000_0000,
@@ -571,14 +636,6 @@ fn pack_event_refs<'a>(
         words_offset as u32,
     ] {
         output.extend_from_slice(&word.to_le_bytes());
-    }
-    for value in [
-        timings.parse_ms,
-        timings.semantic_ms,
-        timings.traversal_ms,
-        timings.render_and_map_ms,
-    ] {
-        output.extend_from_slice(&value.to_le_bytes());
     }
     for value in strings {
         output.extend_from_slice(&(value.len() as u32).to_le_bytes());
@@ -617,10 +674,6 @@ pub struct GlobalReference {
 pub struct GlobalFact {
     pub name: String,
     pub references: Vec<GlobalReference>,
-}
-
-fn elapsed(start: Instant) -> f64 {
-    start.elapsed().as_secs_f64() * 1000.0
 }
 
 pub fn classify_source(filename: &str, source: &str) -> ParseClassification {
@@ -820,15 +873,16 @@ struct DirectPackedFields {
     len: usize,
 }
 
-fn packed_fields_direct(
+fn packed_fields_direct<T: AsRef<str>>(
     kind: AstKind<'_>,
     scoping: &Scoping,
     utf16: Option<&[u32]>,
-    requested: Option<&[String]>,
+    requested: Option<&[T]>,
     precomputed_member_path: Option<&str>,
     strings: &mut FxHashMap<String, u32>,
 ) -> Option<DirectPackedFields> {
-    let wants = |key: &str| requested.is_none_or(|fields| fields.iter().any(|field| field == key));
+    let wants =
+        |key: &str| requested.is_none_or(|fields| fields.iter().any(|field| field.as_ref() == key));
     let mut result = DirectPackedFields {
         words: [0; 32],
         len: 0,
@@ -1701,22 +1755,18 @@ fn materialize_with_scope_parents(
     root_start: Option<u32>,
     root_end: Option<u32>,
 ) -> Result<(EventBatch, Vec<u32>, Vec<NodeSummary>)> {
-    let parse_started = Instant::now();
     let allocator = Allocator::default();
     let parsed = Parser::new(&allocator, source, source_type(filename, source)?).parse();
-    let parse_ms = elapsed(parse_started);
     if !parsed.diagnostics.is_empty() {
         return Err(Error::new(
             Status::InvalidArg,
             format!("Oxc parse failed: {:?}", parsed.diagnostics),
         ));
     }
-    let semantic_started = Instant::now();
     let semantic_return = SemanticBuilder::new()
         .with_build_nodes(true)
         .with_check_syntax_error(true)
         .build(&parsed.program);
-    let semantic_ms = elapsed(semantic_started);
     if !semantic_return.diagnostics.is_empty() {
         return Err(Error::new(
             Status::InvalidArg,
@@ -1726,7 +1776,6 @@ fn materialize_with_scope_parents(
             ),
         ));
     }
-    let traversal_started = Instant::now();
     let utf16 = (!source.is_ascii()).then(|| utf16_index(source, &allocator));
     let mut collector = EventCollector {
         subscriptions: subscription_set_from_names(subscriptions),
@@ -1740,7 +1789,6 @@ fn materialize_with_scope_parents(
         sequence: 0,
     };
     collector.visit_program(&parsed.program);
-    let traversal_ms = elapsed(traversal_started);
     let emitted_count = collector.events.len() as u32;
     let scope_parents = semantic_return
         .semantic
@@ -1759,12 +1807,6 @@ fn materialize_with_scope_parents(
             events: collector.events,
             node_count: semantic_return.semantic.nodes().len() as u32,
             emitted_count,
-            timings: Timings {
-                parse_ms,
-                semantic_ms,
-                traversal_ms,
-                render_and_map_ms: 0.0,
-            },
         },
         scope_parents,
         collector.node_summaries,
@@ -1806,7 +1848,6 @@ pub fn materialize_packed(
         strings: parts.strings,
         node_count: parts.node_count,
         emitted_count: parts.emitted_count,
-        timings: parts.timings,
     })
 }
 
@@ -1829,23 +1870,19 @@ fn materialize_packed_internal(
     identifier_names: &[String],
     static_member_patterns: &[String],
 ) -> Result<PackedEventParts> {
-    let parse_started = Instant::now();
     let allocator = Allocator::default();
     let parsed = Parser::new(&allocator, source, source_type(filename, source)?).parse();
-    let parse_ms = elapsed(parse_started);
     if !parsed.diagnostics.is_empty() {
         return Err(Error::new(
             Status::InvalidArg,
             format!("Oxc parse failed: {:?}", parsed.diagnostics),
         ));
     }
-    let semantic_started = Instant::now();
     let build_nodes = include_parent || include_scope;
     let semantic_return = SemanticBuilder::new()
         .with_build_nodes(build_nodes)
         .with_check_syntax_error(true)
         .build(&parsed.program);
-    let semantic_ms = elapsed(semantic_started);
     if !semantic_return.diagnostics.is_empty() {
         return Err(Error::new(
             Status::InvalidArg,
@@ -1857,7 +1894,6 @@ fn materialize_packed_internal(
     }
     let node_count = semantic_return.semantic.stats().nodes;
     let field_requests = decode_field_requests(packed_field_requests)?;
-    let traversal_started = Instant::now();
     let utf16 = (!source.is_ascii()).then(|| utf16_index(source, &allocator));
     let output_capacity =
         source
@@ -1889,7 +1925,6 @@ fn materialize_packed_internal(
         string_ids: FxHashMap::default(),
     };
     collector.visit_program(&parsed.program);
-    let traversal_ms = elapsed(traversal_started);
     let data = collector.words.into_bytes();
     let mut strings = (0..collector.string_ids.len())
         .map(|_| String::new())
@@ -1902,12 +1937,6 @@ fn materialize_packed_internal(
         strings,
         node_count,
         emitted_count: collector.emitted_count,
-        timings: Timings {
-            parse_ms,
-            semantic_ms,
-            traversal_ms,
-            render_and_map_ms: 0.0,
-        },
     })
 }
 
@@ -1953,7 +1982,7 @@ pub fn materialize_packed_buffer(
         .iter()
         .map(|value| 4 + value.len() + (4 - value.len() % 4) % 4)
         .sum();
-    let words_offset = 48 + strings_size;
+    let words_offset = 16 + strings_size;
     let mut output = Vec::with_capacity(words_offset + parts.data.len());
     let shape_node_count = parts.node_count
         | if include_parent { 0x8000_0000 } else { 0 }
@@ -1967,14 +1996,6 @@ pub fn materialize_packed_buffer(
     ] {
         output.extend_from_slice(&word.to_le_bytes());
     }
-    for value in [
-        parts.timings.parse_ms,
-        parts.timings.semantic_ms,
-        parts.timings.traversal_ms,
-        parts.timings.render_and_map_ms,
-    ] {
-        output.extend_from_slice(&value.to_le_bytes());
-    }
     for value in parts.strings {
         output.extend_from_slice(&(value.len() as u32).to_le_bytes());
         output.extend_from_slice(value.as_bytes());
@@ -1982,6 +2003,486 @@ pub fn materialize_packed_buffer(
     }
     output.extend_from_slice(&parts.data);
     Ok(output.into())
+}
+
+pub fn materialize_routed_buffer(
+    source: &str,
+    filename: &str,
+    manifest_data: &[u8],
+    root_start: Option<u32>,
+    root_end: Option<u32>,
+) -> Result<Buffer> {
+    let manifest = decode_route_manifest(manifest_data)?;
+    let allocator = Allocator::default();
+    let parsed = Parser::new(&allocator, source, source_type(filename, source)?).parse();
+    if !parsed.diagnostics.is_empty() {
+        return Err(Error::new(
+            Status::InvalidArg,
+            format!("Oxc parse failed: {:?}", parsed.diagnostics),
+        ));
+    }
+    let build_nodes = manifest.include_parent || manifest.include_scope;
+    let semantic_return = SemanticBuilder::new()
+        .with_build_nodes(build_nodes)
+        .with_check_syntax_error(true)
+        .build(&parsed.program);
+    if !semantic_return.diagnostics.is_empty() {
+        return Err(Error::new(
+            Status::InvalidArg,
+            format!(
+                "Oxc semantic analysis failed: {:?}",
+                semantic_return.diagnostics
+            ),
+        ));
+    }
+    let utf16 = (!source.is_ascii()).then(|| utf16_index(source, &allocator));
+    let mut collector = RoutedEventCollector {
+        manifest: &manifest,
+        nodes: build_nodes.then(|| semantic_return.semantic.nodes()),
+        scoping: semantic_return.semantic.scoping(),
+        utf16: utf16.as_deref().map(|offsets| &**offsets),
+        root: root_start.zip(root_end),
+        sequence: 0,
+        words: PackedWords::with_capacity(source.len().saturating_mul(2)),
+        string_ids: FxHashMap::default(),
+        counts: RoutedCounts::default(),
+    };
+    collector.visit_program(&parsed.program);
+    let data = collector.words.into_bytes();
+    let mut strings = (0..collector.string_ids.len())
+        .map(|_| String::new())
+        .collect::<Vec<_>>();
+    for (value, id) in collector.string_ids {
+        strings[id as usize] = value;
+    }
+    encode_routed_envelope(
+        &manifest,
+        semantic_return.semantic.stats().nodes,
+        strings,
+        data,
+        collector.counts,
+    )
+}
+
+fn routed_buffer_from_index(
+    manifest: &CompiledManifest,
+    events: &[NativeEvent],
+    enter_indexes: &[usize],
+    node_count: u32,
+    root: Option<(u32, u32)>,
+) -> Result<Buffer> {
+    let mut words = PackedWords::with_capacity(events.len().saturating_mul(24));
+    let mut string_ids = FxHashMap::<String, u32>::default();
+    let mut counts = RoutedCounts::default();
+    for event in events {
+        if root.is_some_and(|(start, end)| event.start < start || event.end > end) {
+            continue;
+        }
+        let Some(protocol_id) = node_type_id(&event.r#type) else {
+            continue;
+        };
+        let candidates = &manifest.routes_by_type[protocol_id as usize];
+        if candidates.is_empty() {
+            continue;
+        }
+        let side = if event.side == "exit" {
+            VisitSide::Exit
+        } else {
+            VisitSide::Enter
+        };
+        let source_event = if side == VisitSide::Exit {
+            enter_indexes
+                .get(event.id as usize)
+                .and_then(|index| events.get(*index))
+                .ok_or_else(|| Error::new(Status::GenericFailure, "indexed exit has no enter"))?
+        } else {
+            event
+        };
+        let mut matched_routes = Vec::new();
+        let mut payload_field_ids = [false; FIELD_KEY_COUNT + 1];
+        let mut matched_exit_carrier = false;
+        for route in candidates
+            .iter()
+            .filter(|route| side == VisitSide::Enter || route.side == side)
+        {
+            if route
+                .predicates
+                .iter()
+                .all(|predicate| indexed_predicate_matches(predicate, source_event, protocol_id))
+            {
+                if route.side == side {
+                    matched_routes.push(route.id);
+                } else {
+                    matched_exit_carrier = true;
+                }
+                for &field_id in &route.payload_field_ids {
+                    payload_field_ids[field_id as usize] = true;
+                }
+            }
+        }
+        if matched_routes.is_empty() && !matched_exit_carrier {
+            continue;
+        }
+        if side == VisitSide::Exit {
+            words.extend([
+                event.sequence | 0x8000_0000,
+                event.id,
+                matched_routes.len() as u32,
+            ]);
+            words.extend_from_slice(&matched_routes);
+            counts.node_records += 1;
+            counts.route_deliveries += matched_routes.len() as u32;
+            continue;
+        }
+        words.extend([
+            event.sequence,
+            event.id,
+            protocol_id,
+            event.start,
+            event.end,
+        ]);
+        if manifest.include_parent {
+            words.extend([
+                event.parent_id.unwrap_or(u32::MAX),
+                event
+                    .parent_type
+                    .as_deref()
+                    .and_then(node_type_id)
+                    .unwrap_or(u32::MAX),
+            ]);
+        }
+        if manifest.include_scope {
+            words.extend([event.scope_id, event.scope_parent_id.unwrap_or(u32::MAX)]);
+        }
+        let payload_fields = source_event
+            .fields
+            .iter()
+            .filter(|field| {
+                field_key_id(&field.key).is_some_and(|id| payload_field_ids[id as usize])
+            })
+            .collect::<Vec<_>>();
+        words.push(payload_fields.len() as u32);
+        for field in payload_fields {
+            let field_id = field_key_id(&field.key).expect("filtered field id");
+            let value = packed_scalar(&field.key, &field.value).unwrap_or_else(|| {
+                let next = string_ids.len() as u32;
+                *string_ids.entry(field.value.clone()).or_insert(next)
+            });
+            words.extend([field_id, value]);
+        }
+        words.push(matched_routes.len() as u32);
+        words.extend_from_slice(&matched_routes);
+        counts.node_records += 1;
+        counts.route_deliveries += matched_routes.len() as u32;
+    }
+    let data = words.into_bytes();
+    let mut strings = (0..string_ids.len())
+        .map(|_| String::new())
+        .collect::<Vec<_>>();
+    for (value, id) in string_ids {
+        strings[id as usize] = value;
+    }
+    encode_routed_envelope(manifest, node_count, strings, data, counts)
+}
+
+fn indexed_predicate_matches(
+    predicate: &CompiledPredicate,
+    event: &NativeEvent,
+    node_type_id: u32,
+) -> bool {
+    let field_name = field_key_name(predicate.field_id).expect("validated predicate field");
+    let actual = event.fields.iter().find(|field| field.key == field_name);
+    if predicate.operation == 2 {
+        let expected = matches!(
+            predicate.values.first(),
+            Some(CompiledScalar::Boolean(true))
+        );
+        return actual.is_some() == expected;
+    }
+    let Some(actual) = actual else {
+        return false;
+    };
+    let scalar_type = predicate_scalar_type(field_name, node_type_id, &actual.value);
+    predicate.values.iter().any(|expected| match expected {
+        CompiledScalar::String(value) => scalar_type == 0 && actual.value == *value,
+        CompiledScalar::Number(value) => {
+            scalar_type == 1
+                && actual
+                    .value
+                    .parse::<f64>()
+                    .is_ok_and(|actual| actual == *value)
+        }
+        CompiledScalar::Boolean(value) => {
+            scalar_type == 2
+                && actual
+                    .value
+                    .parse::<bool>()
+                    .is_ok_and(|actual| actual == *value)
+        }
+        CompiledScalar::Null => false,
+    })
+}
+
+fn encode_routed_envelope(
+    manifest: &CompiledManifest,
+    node_count: u32,
+    strings: Vec<String>,
+    data: Vec<u8>,
+    counts: RoutedCounts,
+) -> Result<Buffer> {
+    let strings_size: usize = strings
+        .iter()
+        .map(|value| 4 + value.len() + (4 - value.len() % 4) % 4)
+        .sum();
+    let records_offset = 32 + strings_size;
+    let shape_flags = u32::from(manifest.include_parent) | (u32::from(manifest.include_scope) << 1);
+    let mut output = Vec::with_capacity(records_offset + data.len());
+    for word in [
+        ROUTED_TAPE_MAGIC,
+        ROUTED_PROTOCOL_VERSION,
+        shape_flags,
+        node_count,
+        counts.node_records,
+        counts.route_deliveries,
+        strings.len() as u32,
+        records_offset as u32,
+    ] {
+        output.extend_from_slice(&word.to_le_bytes());
+    }
+    for value in strings {
+        output.extend_from_slice(&(value.len() as u32).to_le_bytes());
+        output.extend_from_slice(value.as_bytes());
+        output.resize(output.len().next_multiple_of(4), 0);
+    }
+    output.extend_from_slice(&data);
+    Ok(output.into())
+}
+
+fn decode_route_manifest(data: &[u8]) -> Result<CompiledManifest> {
+    if data.len() < 32 || data.len() > MAX_ROUTE_MANIFEST_BYTES || !data.len().is_multiple_of(4) {
+        return Err(Error::new(
+            Status::InvalidArg,
+            "invalid routed manifest buffer",
+        ));
+    }
+    let word = |index: usize| {
+        u32::from_le_bytes(
+            data[index * 4..index * 4 + 4]
+                .try_into()
+                .expect("word bounds"),
+        )
+    };
+    if word(0) != ROUTE_MANIFEST_MAGIC {
+        return Err(Error::new(
+            Status::InvalidArg,
+            "invalid routed manifest magic",
+        ));
+    }
+    if word(1) != ROUTED_PROTOCOL_VERSION {
+        return Err(Error::new(
+            Status::InvalidArg,
+            "incompatible routed protocol version",
+        ));
+    }
+    let flags = word(2);
+    if flags & !3 != 0 {
+        return Err(Error::new(
+            Status::InvalidArg,
+            "unknown routed manifest flags",
+        ));
+    }
+    let route_count = word(3) as usize;
+    if route_count > MAX_COMPILED_ROUTES {
+        return Err(Error::new(
+            Status::InvalidArg,
+            "compiled route limit exceeded",
+        ));
+    }
+    let string_count = word(4) as usize;
+    let strings_offset = word(5) as usize;
+    let plugin_count = word(6) as usize;
+    if plugin_count > MAX_COMPILED_ROUTES {
+        return Err(Error::new(
+            Status::InvalidArg,
+            "compiled plugin limit exceeded",
+        ));
+    }
+    if strings_offset < 32 || strings_offset > data.len() || !strings_offset.is_multiple_of(4) {
+        return Err(Error::new(
+            Status::InvalidArg,
+            "invalid routed manifest string offset",
+        ));
+    }
+    let mut strings = Vec::with_capacity(string_count);
+    let mut byte_cursor = strings_offset;
+    for _ in 0..string_count {
+        if byte_cursor + 4 > data.len() {
+            return Err(Error::new(
+                Status::InvalidArg,
+                "truncated routed manifest strings",
+            ));
+        }
+        let length =
+            u32::from_le_bytes(data[byte_cursor..byte_cursor + 4].try_into().unwrap()) as usize;
+        byte_cursor += 4;
+        if byte_cursor + length > data.len() {
+            return Err(Error::new(
+                Status::InvalidArg,
+                "truncated routed manifest string",
+            ));
+        }
+        strings.push(
+            std::str::from_utf8(&data[byte_cursor..byte_cursor + length])
+                .map_err(|_| Error::new(Status::InvalidArg, "invalid routed manifest UTF-8"))?
+                .to_owned(),
+        );
+        byte_cursor = (byte_cursor + length).next_multiple_of(4);
+    }
+    let word_limit = strings_offset / 4;
+    let mut cursor = 8;
+    let mut seen_ids = FxHashSet::default();
+    let mut routes_by_type = vec![Vec::new(); NODE_TYPE_COUNT + 1];
+    for _ in 0..route_count {
+        if cursor + 8 > word_limit {
+            return Err(Error::new(Status::InvalidArg, "truncated compiled route"));
+        }
+        let id = word(cursor);
+        let node_type_id = word(cursor + 1);
+        let side = match word(cursor + 2) {
+            0 => VisitSide::Enter,
+            1 => VisitSide::Exit,
+            _ => {
+                return Err(Error::new(
+                    Status::InvalidArg,
+                    "invalid compiled route side",
+                ));
+            }
+        };
+        let plugin_id = word(cursor + 3) as usize;
+        let order = word(cursor + 4) as usize;
+        let route_flags = word(cursor + 5);
+        let predicate_count = word(cursor + 6) as usize;
+        let payload_count = word(cursor + 7) as usize;
+        cursor += 8;
+        if node_type_id == 0 || node_type_id as usize > NODE_TYPE_COUNT {
+            return Err(Error::new(
+                Status::InvalidArg,
+                "invalid compiled node type id",
+            ));
+        }
+        if plugin_id >= plugin_count || order >= route_count.max(1) {
+            return Err(Error::new(
+                Status::InvalidArg,
+                "invalid compiled plugin or order id",
+            ));
+        }
+        if id as usize >= route_count || !seen_ids.insert(id) {
+            return Err(Error::new(
+                Status::InvalidArg,
+                "duplicate compiled route id",
+            ));
+        }
+        if route_flags != 0
+            || predicate_count > MAX_ROUTE_PREDICATES
+            || payload_count > MAX_ROUTE_PAYLOAD_FIELDS
+        {
+            return Err(Error::new(
+                Status::InvalidArg,
+                "invalid compiled route limits",
+            ));
+        }
+        let mut predicates = Vec::with_capacity(predicate_count);
+        for _ in 0..predicate_count {
+            if cursor + 3 > word_limit {
+                return Err(Error::new(
+                    Status::InvalidArg,
+                    "truncated compiled predicate",
+                ));
+            }
+            let field_id = word(cursor);
+            let operation = word(cursor + 1);
+            let value_count = word(cursor + 2) as usize;
+            cursor += 3;
+            if field_key_name(field_id).is_none()
+                || !predicate_field_supported(node_type_id, field_id)
+                || operation > 2
+                || (operation == 0 && value_count != 1)
+                || (operation == 2 && value_count != 1)
+                || value_count > MAX_PREDICATE_VALUES
+                || cursor + value_count * 2 > word_limit
+            {
+                return Err(Error::new(Status::InvalidArg, "invalid compiled predicate"));
+            }
+            let mut values = Vec::with_capacity(value_count);
+            for _ in 0..value_count {
+                let tag = word(cursor);
+                let payload = word(cursor + 1);
+                cursor += 2;
+                values.push(match tag {
+                    0 => CompiledScalar::String(
+                        strings
+                            .get(payload as usize)
+                            .ok_or_else(|| {
+                                Error::new(Status::InvalidArg, "invalid predicate string id")
+                            })?
+                            .clone(),
+                    ),
+                    1 => CompiledScalar::Number(
+                        strings
+                            .get(payload as usize)
+                            .ok_or_else(|| {
+                                Error::new(Status::InvalidArg, "invalid predicate number id")
+                            })?
+                            .parse::<f64>()
+                            .map_err(|_| {
+                                Error::new(Status::InvalidArg, "invalid predicate number")
+                            })?,
+                    ),
+                    2 => CompiledScalar::Boolean(payload != 0),
+                    3 if payload == 0 => CompiledScalar::Null,
+                    _ => return Err(Error::new(Status::InvalidArg, "invalid predicate scalar")),
+                });
+            }
+            predicates.push(CompiledPredicate {
+                field_id,
+                operation,
+                values,
+            });
+        }
+        if cursor + payload_count > word_limit {
+            return Err(Error::new(
+                Status::InvalidArg,
+                "truncated route payload fields",
+            ));
+        }
+        let mut payload_field_ids = Vec::with_capacity(payload_count);
+        for _ in 0..payload_count {
+            let field_id = word(cursor);
+            cursor += 1;
+            if field_key_name(field_id).is_none() {
+                return Err(Error::new(Status::InvalidArg, "invalid payload field id"));
+            }
+            payload_field_ids.push(field_id);
+        }
+        routes_by_type[node_type_id as usize].push(CompiledRoute {
+            id,
+            node_type_id,
+            side,
+            predicates,
+            payload_field_ids,
+        });
+    }
+    if cursor != word_limit {
+        return Err(Error::new(
+            Status::InvalidArg,
+            "trailing routed manifest words",
+        ));
+    }
+    Ok(CompiledManifest {
+        routes_by_type,
+        include_parent: flags & 1 != 0,
+        include_scope: flags & 2 != 0,
+    })
 }
 
 fn decode_field_requests(data: Option<&[u8]>) -> Result<Option<Vec<FieldRequest>>> {
@@ -2288,13 +2789,418 @@ impl<'a> Visit<'a> for PackedEventCollector<'a> {
     }
 }
 
+struct RoutedEventCollector<'a> {
+    manifest: &'a CompiledManifest,
+    nodes: Option<&'a AstNodes<'a>>,
+    scoping: &'a Scoping,
+    utf16: Option<&'a [u32]>,
+    root: Option<(u32, u32)>,
+    sequence: u32,
+    words: PackedWords,
+    string_ids: FxHashMap<String, u32>,
+    counts: RoutedCounts,
+}
+
+impl RoutedEventCollector<'_> {
+    fn intern(&mut self, value: &str) -> u32 {
+        if let Some(id) = self.string_ids.get(value) {
+            return *id;
+        }
+        let id = self.string_ids.len() as u32;
+        self.string_ids.insert(value.to_owned(), id);
+        id
+    }
+
+    fn predicate_matches(
+        &mut self,
+        predicate: &CompiledPredicate,
+        node_fields: &[NodeField],
+        kind: AstKind<'_>,
+    ) -> bool {
+        let field_name = field_key_name(predicate.field_id).expect("validated predicate field");
+        if let Some(actual) = direct_predicate_scalar(kind, self.scoping, field_name) {
+            return compiled_predicate_matches(predicate, actual);
+        }
+        let node_type_id = ast_kind_protocol_id(kind);
+        let actual = node_fields.iter().find(|field| field.key == field_name);
+        if predicate.operation == 2 {
+            let expected = matches!(
+                predicate.values.first(),
+                Some(CompiledScalar::Boolean(true))
+            );
+            return actual.is_some() == expected;
+        }
+        let Some(actual) = actual else {
+            return false;
+        };
+        let scalar_type = predicate_scalar_type(field_name, node_type_id, &actual.value);
+        predicate.values.iter().any(|expected| match expected {
+            CompiledScalar::String(value) => scalar_type == 0 && actual.value == *value,
+            CompiledScalar::Number(value) => {
+                scalar_type == 1
+                    && actual
+                        .value
+                        .parse::<f64>()
+                        .is_ok_and(|actual| actual == *value)
+            }
+            CompiledScalar::Boolean(value) => {
+                scalar_type == 2
+                    && actual
+                        .value
+                        .parse::<bool>()
+                        .is_ok_and(|actual| actual == *value)
+            }
+            CompiledScalar::Null => false,
+        })
+    }
+
+    fn emit(&mut self, kind: AstKind<'_>, side: VisitSide) {
+        let sequence = self.sequence;
+        self.sequence += 1;
+        let protocol_id = ast_kind_protocol_id(kind);
+        let candidates = &self.manifest.routes_by_type[protocol_id as usize];
+        if candidates.is_empty() {
+            return;
+        }
+        let span = kind.span();
+        let start = self
+            .utf16
+            .map_or(span.start, |index| index[span.start as usize]);
+        let end = self
+            .utf16
+            .map_or(span.end, |index| index[span.end as usize]);
+        if self
+            .root
+            .is_some_and(|(root_start, root_end)| start < root_start || end > root_end)
+        {
+            return;
+        }
+        let predicate_field_names = candidates
+            .iter()
+            .filter(|route| side == VisitSide::Enter || route.side == side)
+            .flat_map(|route| route.predicates.iter())
+            .filter_map(|predicate| field_key_name(predicate.field_id))
+            .filter(|field| !has_direct_predicate_scalar(protocol_id, field))
+            .map(str::to_owned)
+            .collect::<Vec<_>>();
+        let mut predicate_fields = if predicate_field_names.is_empty() {
+            Vec::new()
+        } else {
+            fields(kind, self.scoping, Some(&predicate_field_names))
+        };
+        normalize_routed_fields(&mut predicate_fields, self.utf16);
+        let mut matched_route_ids = Vec::new();
+        let mut payload_field_ids = [false; FIELD_KEY_COUNT + 1];
+        let mut matched_exit_carrier = false;
+        for route in candidates
+            .iter()
+            .filter(|route| side == VisitSide::Enter || route.side == side)
+        {
+            debug_assert_eq!(route.node_type_id, protocol_id);
+            if route
+                .predicates
+                .iter()
+                .all(|predicate| self.predicate_matches(predicate, &predicate_fields, kind))
+            {
+                if route.side == side {
+                    matched_route_ids.push(route.id);
+                } else {
+                    matched_exit_carrier = true;
+                }
+                for &field_id in &route.payload_field_ids {
+                    payload_field_ids[field_id as usize] = true;
+                }
+            }
+        }
+        if matched_route_ids.is_empty() && !matched_exit_carrier {
+            return;
+        }
+        let id = kind.node_id();
+        if side == VisitSide::Exit {
+            self.words.extend([
+                sequence | 0x8000_0000,
+                id.index() as u32,
+                matched_route_ids.len() as u32,
+            ]);
+            self.words.extend_from_slice(&matched_route_ids);
+            self.counts.node_records += 1;
+            self.counts.route_deliveries += matched_route_ids.len() as u32;
+            return;
+        }
+        let payload_names = payload_field_ids
+            .iter()
+            .enumerate()
+            .filter(|(_, requested)| **requested)
+            .filter_map(|(id, _)| field_key_name(id as u32))
+            .collect::<Vec<_>>();
+        let direct_payload = packed_fields_direct(
+            kind,
+            self.scoping,
+            self.utf16,
+            Some(&payload_names),
+            None,
+            &mut self.string_ids,
+        );
+        let mut fallback_payload = if direct_payload.is_none() && !payload_names.is_empty() {
+            fields(
+                kind,
+                self.scoping,
+                Some(
+                    &payload_names
+                        .iter()
+                        .map(|field| (*field).to_owned())
+                        .collect::<Vec<_>>(),
+                ),
+            )
+        } else {
+            Vec::new()
+        };
+        normalize_routed_fields(&mut fallback_payload, self.utf16);
+        let is_root = id.index() == 0;
+        let parent_id = (self.manifest.include_parent && !is_root).then(|| {
+            self.nodes
+                .expect("parent routes require nodes")
+                .parent_id(id)
+                .index() as u32
+        });
+        let parent_type_id = if self.manifest.include_parent && !is_root {
+            ast_kind_protocol_id(
+                self.nodes
+                    .expect("parent routes require nodes")
+                    .parent_kind(id),
+            )
+        } else {
+            u32::MAX
+        };
+        let scope_id = self.manifest.include_scope.then(|| {
+            let nodes = self.nodes.expect("scope routes require nodes");
+            let node = nodes.get_node(id);
+            match kind {
+                AstKind::Function(function) => function.scope_id.get().unwrap_or(node.scope_id()),
+                AstKind::ArrowFunctionExpression(function) => {
+                    function.scope_id.get().unwrap_or(node.scope_id())
+                }
+                _ => node.scope_id(),
+            }
+        });
+        self.words
+            .extend([sequence, id.index() as u32, protocol_id, start, end]);
+        if self.manifest.include_parent {
+            self.words
+                .extend([parent_id.unwrap_or(u32::MAX), parent_type_id]);
+        }
+        if self.manifest.include_scope {
+            let scope_id = scope_id.expect("scope id");
+            self.words.extend([
+                scope_id.index() as u32,
+                self.scoping
+                    .scope_parent_id(scope_id)
+                    .map_or(u32::MAX, |id| id.index() as u32),
+            ]);
+        }
+        if let Some(payload) = direct_payload {
+            self.words.push((payload.len / 2) as u32);
+            self.words.extend_from_slice(&payload.words[..payload.len]);
+        } else {
+            self.words.push(fallback_payload.len() as u32);
+            for field in fallback_payload {
+                let key = field_key_id(&field.key).expect("requested generated field");
+                let value = packed_scalar(&field.key, &field.value)
+                    .unwrap_or_else(|| self.intern(&field.value));
+                self.words.extend([key, value]);
+            }
+        }
+        self.words.push(matched_route_ids.len() as u32);
+        self.words.extend_from_slice(&matched_route_ids);
+        self.counts.node_records += 1;
+        self.counts.route_deliveries += matched_route_ids.len() as u32;
+    }
+}
+
+fn normalize_routed_fields(fields: &mut [NodeField], utf16: Option<&[u32]>) {
+    for field in fields {
+        if let Some(name) = field.key.strip_suffix("Byte")
+            && let Ok(offset) = field.value.parse::<usize>()
+        {
+            field.key = name.to_owned();
+            field.value = utf16
+                .map_or(offset as u32, |index| index[offset])
+                .to_string();
+        }
+    }
+}
+
+fn has_direct_predicate_scalar(node_type_id: u32, field: &str) -> bool {
+    match node_type_name(node_type_id) {
+        Some("Identifier") => matches!(
+            field,
+            "name" | "global" | "read" | "write" | "bindingScopeId" | "binding"
+        ),
+        Some("VariableDeclaration") | Some("VariableDeclarator") => field == "kind",
+        Some("StaticMemberExpression") => field == "memberPath",
+        Some("Function") | Some("Class") => field == "nodeKind",
+        _ => false,
+    }
+}
+
+fn direct_predicate_scalar<'a>(
+    kind: AstKind<'a>,
+    scoping: &Scoping,
+    field: &str,
+) -> Option<PredicateScalar<'a>> {
+    match kind {
+        AstKind::IdentifierReference(identifier) => match field {
+            "name" => Some(PredicateScalar::String(Cow::Borrowed(
+                identifier.name.as_str(),
+            ))),
+            "global" => Some(PredicateScalar::Boolean(
+                identifier
+                    .reference_id
+                    .get()
+                    .is_some_and(|id| scoping.get_reference(id).symbol_id().is_none()),
+            )),
+            "read" => identifier
+                .reference_id
+                .get()
+                .map(|id| PredicateScalar::Boolean(scoping.get_reference(id).is_read())),
+            "write" => identifier
+                .reference_id
+                .get()
+                .map(|id| PredicateScalar::Boolean(scoping.get_reference(id).is_write())),
+            "bindingScopeId" => identifier.reference_id.get().and_then(|id| {
+                scoping.get_reference(id).symbol_id().map(|symbol_id| {
+                    PredicateScalar::Number(scoping.symbol_scope_id(symbol_id).index() as f64)
+                })
+            }),
+            _ => None,
+        },
+        AstKind::BindingIdentifier(identifier) => match field {
+            "name" => Some(PredicateScalar::String(Cow::Borrowed(
+                identifier.name.as_str(),
+            ))),
+            "binding" => Some(PredicateScalar::Boolean(true)),
+            _ => None,
+        },
+        AstKind::IdentifierName(identifier) if field == "name" => Some(PredicateScalar::String(
+            Cow::Borrowed(identifier.name.as_str()),
+        )),
+        AstKind::VariableDeclaration(declaration) if field == "kind" => Some(
+            PredicateScalar::String(Cow::Owned(declaration.kind.to_string())),
+        ),
+        AstKind::VariableDeclarator(declarator) if field == "kind" => Some(
+            PredicateScalar::String(Cow::Owned(declarator.kind.to_string())),
+        ),
+        AstKind::StaticMemberExpression(member) if field == "memberPath" => {
+            static_member_path(&member.object).map(|object| {
+                PredicateScalar::String(Cow::Owned(format!("{object}.{}", member.property.name)))
+            })
+        }
+        AstKind::Function(function) if field == "nodeKind" => Some(PredicateScalar::String(
+            Cow::Owned(format!("{:?}", function.r#type)),
+        )),
+        AstKind::Class(class) if field == "nodeKind" => Some(PredicateScalar::String(Cow::Owned(
+            format!("{:?}", class.r#type),
+        ))),
+        _ => None,
+    }
+}
+
+fn compiled_predicate_matches(predicate: &CompiledPredicate, actual: PredicateScalar<'_>) -> bool {
+    if predicate.operation == 2 {
+        return matches!(
+            predicate.values.first(),
+            Some(CompiledScalar::Boolean(true))
+        );
+    }
+    predicate
+        .values
+        .iter()
+        .any(|expected| match (expected, &actual) {
+            (CompiledScalar::String(expected), PredicateScalar::String(actual)) => {
+                expected == actual
+            }
+            (CompiledScalar::Number(expected), PredicateScalar::Number(actual)) => {
+                expected == actual
+            }
+            (CompiledScalar::Boolean(expected), PredicateScalar::Boolean(actual)) => {
+                expected == actual
+            }
+            _ => false,
+        })
+}
+
+fn predicate_scalar_type(field: &str, node_type_id: u32, value: &str) -> u8 {
+    if matches!(
+        field,
+        "bindingScopeId"
+            | "argumentCount"
+            | "bodyStart"
+            | "bodyEnd"
+            | "specifierCount"
+            | "declarationCount"
+            | "parameterCount"
+    ) || (field == "value" && node_type_name(node_type_id) == Some("NumericLiteral"))
+    {
+        1
+    } else if matches!(
+        field,
+        "global"
+            | "read"
+            | "write"
+            | "binding"
+            | "optional"
+            | "calleeGlobal"
+            | "computed"
+            | "rootGlobal"
+            | "async"
+            | "generator"
+            | "expression"
+            | "hasInitializer"
+            | "method"
+            | "shorthand"
+            | "prefix"
+            | "delegate"
+    ) || (field == "value" && node_type_name(node_type_id) == Some("BooleanLiteral"))
+    {
+        2
+    } else if field == "constantValue" {
+        if value == "true" || value == "false" {
+            2
+        } else if value.parse::<f64>().is_ok() {
+            1
+        } else {
+            0
+        }
+    } else {
+        0
+    }
+}
+
+impl<'a> Visit<'a> for RoutedEventCollector<'a> {
+    fn enter_node(&mut self, kind: AstKind<'a>) {
+        self.emit(kind, VisitSide::Enter);
+    }
+
+    fn leave_node(&mut self, kind: AstKind<'a>) {
+        if self.manifest.routes_by_type[ast_kind_protocol_id(kind) as usize]
+            .iter()
+            .any(|route| route.side == VisitSide::Exit)
+        {
+            self.emit(kind, VisitSide::Exit);
+        }
+    }
+
+    fn visit_program(&mut self, program: &oxc_ast::ast::Program<'a>) {
+        walk::walk_program(self, program);
+    }
+}
+
 pub fn commit(
     source: &str,
     _filename: &str,
     commands: Vec<editor::EditCommand>,
     mode: Option<&str>,
 ) -> Result<NativeCommitResult> {
-    let started = Instant::now();
     let edits = editor::normalize(source, commands)?;
     let (code, mappings, names) = if mode == Some("none") {
         (
@@ -2308,12 +3214,6 @@ pub fn commit(
     Ok(NativeCommitResult {
         code,
         map: NativeVlqMap { mappings, names },
-        timings: Timings {
-            parse_ms: 0.0,
-            semantic_ms: 0.0,
-            traversal_ms: 0.0,
-            render_and_map_ms: elapsed(started),
-        },
     })
 }
 

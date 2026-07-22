@@ -37,6 +37,8 @@ const typedVisitor = defineNativePlugin({
     return {
       subscriptions: ['CallExpression'],
       fields: { CallExpression: ['calleeName', 'argumentCount'] },
+      where: { CallExpression: { optional: { equals: false } } },
+      controlFlow: ['nested-traverse', 'dynamic-subscriptions'],
       semantics: ['scope'],
       children: { Identifier: ['name'] },
     };
@@ -48,6 +50,18 @@ const invalidPlan: PluginPlan = {
   fields: { UnknownNode: ['name'] },
 };
 void invalidPlan;
+
+const invalidPredicate: PluginPlan = {
+  where: {
+    VariableDeclaration: {
+      // @ts-expect-error Scalar predicates must use a supported declarative operation.
+      kind: { matches: /const/ },
+    },
+  },
+  // @ts-expect-error Unknown control-flow capabilities should be rejected.
+  controlFlow: ['pause'],
+};
+void invalidPredicate;
 
 const analyzed = defineNativePlugin<undefined, undefined, { count: number }>({
   name: 'analyzed',
@@ -82,7 +96,11 @@ configured.withOptions({ mode: 'production' });
 // @ts-expect-error Invalid plugin options should be rejected.
 configured.withOptions({ mode: 'preview' });
 
-const pipeline = defineNativePipeline([typedVisitor, analyzed, configured.withOptions({ mode: 'development' })]);
+const pipeline = defineNativePipeline([
+  typedVisitor,
+  analyzed,
+  configured.withOptions({ mode: 'development' }),
+]);
 pipeline.phases[0].plugins;
 
 declare const path: NativeNodePath;
@@ -92,4 +110,3 @@ if (path.is('Identifier')) {
 }
 // @ts-expect-error Unknown concrete node types should be rejected by path.is.
 path.is('Identifer');
-

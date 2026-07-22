@@ -8,7 +8,7 @@ mod sourcemap;
 use napi_derive::napi;
 
 pub use editor::{EditCommand, EditKind, MappingPolicy};
-pub use engine::{EventBatch, NativeEvent, NodeField, ParseClassification, Timings};
+pub use engine::{EventBatch, NativeEvent, NodeField, ParseClassification};
 
 #[napi]
 pub fn native_version() -> &'static str {
@@ -18,6 +18,11 @@ pub fn native_version() -> &'static str {
 #[napi]
 pub fn oxc_version() -> &'static str {
     "0.141.0"
+}
+
+#[napi]
+pub fn routed_protocol_version() -> u32 {
+    1
 }
 
 #[napi]
@@ -109,6 +114,17 @@ pub fn materialize_packed_buffer(
         identifier_names.unwrap_or_default(),
         static_member_patterns.unwrap_or_default(),
     )
+}
+
+#[napi]
+pub fn materialize_routed_buffer(
+    source: String,
+    filename: String,
+    manifest: napi::bindgen_prelude::Buffer,
+    root_start: Option<u32>,
+    root_end: Option<u32>,
+) -> napi::Result<napi::bindgen_prelude::Buffer> {
+    engine::materialize_routed_buffer(&source, &filename, &manifest, root_start, root_end)
 }
 
 #[napi]

@@ -1,15 +1,15 @@
 import { FIELD_KEY_IDS, FIELD_KEYS, NODE_TYPE_IDS, NODE_TYPES } from './generated-event-schema.js';
-import type { EditCommand, EventBatch, NativeEvent } from './types.js';
+import type { EditCommand, EventBatch, NativeEvent, ScalarPredicate } from './types.js';
 
 export interface PackedEventBatch {
   data: Buffer;
   strings: string[];
   nodeCount: number;
   emittedCount: number;
-  timings: EventBatch['timings'];
   includeParent?: boolean;
   includeScope?: boolean;
   includeExit?: boolean;
+  cachedEvents?: readonly NativeEvent[];
 }
 
 const EDIT_KINDS: Record<EditCommand['kind'], number> = {
@@ -36,12 +36,234 @@ const NUMBER_PAYLOAD = 0x3fffffff;
 const EXIT_TAG = 0x20000000;
 const NODE_COUNT_PAYLOAD = 0x1fffffff;
 const MISSING_VALUE = 0xffffffff;
-const PACKED_HEADER_BYTES = 48;
+const PACKED_HEADER_BYTES = 16;
+const ROUTE_MANIFEST_MAGIC = 0x4e524d31;
+const ROUTED_TAPE_MAGIC = 0x4e525431;
+export const ROUTED_PROTOCOL_VERSION = 2;
 const EMPTY_FIELDS = Object.freeze([]) as unknown as NativeEvent['fields'];
 
-export function forEachDispatchEvent(batch: PackedEventBatch, callback: (event: NativeEvent) => void): void {
-  const words = new Uint32Array(batch.data.buffer, batch.data.byteOffset, batch.data.byteLength / 4);
+export interface NativeRouteManifestEntry {
+  id: number;
+  pluginId: number;
+  nodeType: string;
+  side: 'enter' | 'exit';
+  order: number;
+  predicates: Readonly<Record<string, ScalarPredicate>>;
+  payloadFields: readonly string[];
+}
+
+export interface RoutedEventBatch {
+  data: Buffer;
+  strings: string[];
+  nodeCount: number;
+  nodeRecordCount: number;
+  routeDeliveryCount: number;
+  includeParent: boolean;
+  includeScope: boolean;
+}
+
+export function packRouteManifest(
+  routes: readonly NativeRouteManifestEntry[],
+  includeParent: boolean,
+  includeScope: boolean,
+): Buffer {
+  if (routes.length > 4096) throw new Error('compiled route limit exceeded');
+  const strings: string[] = [];
+  const stringIds = new Map<string, number>();
+  const intern = (value: string) => {
+    const existing = stringIds.get(value);
+    if (existing != null) return existing;
+    const id = strings.length;
+    strings.push(value);
+    stringIds.set(value, id);
+    return id;
+  };
+  const words: number[] = [
+    ROUTE_MANIFEST_MAGIC,
+    ROUTED_PROTOCOL_VERSION,
+    Number(includeParent) | (Number(includeScope) << 1),
+    routes.length,
+    0,
+    0,
+    0,
+    0,
+  ];
+  for (const route of routes) {
+    const predicates = Object.entries(route.predicates);
+    if (predicates.length > 64 || route.payloadFields.length > 64)
+      throw new Error(`compiled route ${route.id} exceeds field limits`);
+    words.push(
+      route.id,
+      requiredId(NODE_TYPE_IDS, route.nodeType, 'node type'),
+      route.side === 'exit' ? 1 : 0,
+      route.pluginId,
+      route.order,
+      0,
+      predicates.length,
+      route.payloadFields.length,
+    );
+    for (const [field, predicate] of predicates) {
+      const values =
+        'equals' in predicate
+          ? [predicate.equals]
+          : 'oneOf' in predicate
+            ? predicate.oneOf
+            : [predicate.present];
+      words.push(
+        requiredId(FIELD_KEY_IDS, field, 'field'),
+        'equals' in predicate ? 0 : 'oneOf' in predicate ? 1 : 2,
+        values.length,
+      );
+      for (const value of values) {
+        if (typeof value === 'string') words.push(0, intern(value));
+        else if (typeof value === 'number') words.push(1, intern(String(value)));
+        else if (typeof value === 'boolean') words.push(2, Number(value));
+        else words.push(3, 0);
+      }
+    }
+    for (const field of route.payloadFields) words.push(requiredId(FIELD_KEY_IDS, field, 'field'));
+  }
+  words[4] = strings.length;
+  words[5] = words.length * 4;
+  words[6] = routes.reduce((count, route) => Math.max(count, route.pluginId + 1), 0);
+  const stringsBytes = strings.reduce(
+    (total, value) => total + 4 + Buffer.byteLength(value) + paddingFor(Buffer.byteLength(value)),
+    0,
+  );
+  const output = Buffer.allocUnsafe(words.length * 4 + stringsBytes);
+  words.forEach((word, index) => output.writeUInt32LE(word >>> 0, index * 4));
+  let offset = words.length * 4;
+  for (const value of strings) {
+    const length = output.write(value, offset + 4, 'utf8');
+    output.writeUInt32LE(length, offset);
+    offset += 4 + length;
+    const padding = paddingFor(length);
+    output.fill(0, offset, offset + padding);
+    offset += padding;
+  }
+  return output;
+}
+
+export function decodeRoutedEnvelope(buffer: Buffer): RoutedEventBatch {
+  if (buffer.length < 32 || buffer.readUInt32LE(0) !== ROUTED_TAPE_MAGIC)
+    throw new Error('invalid routed tape');
+  if (buffer.readUInt32LE(4) !== ROUTED_PROTOCOL_VERSION)
+    throw new Error('incompatible routed protocol version');
+  const flags = buffer.readUInt32LE(8);
+  const stringCount = buffer.readUInt32LE(24);
+  const recordsOffset = buffer.readUInt32LE(28);
+  const strings: string[] = [];
+  let offset = 32;
+  for (let index = 0; index < stringCount; index++) {
+    const length = buffer.readUInt32LE(offset);
+    offset += 4;
+    strings.push(buffer.toString('utf8', offset, offset + length));
+    offset += length + paddingFor(length);
+  }
+  if (offset !== recordsOffset || recordsOffset > buffer.length)
+    throw new Error('invalid routed tape offsets');
+  return {
+    data: buffer.subarray(recordsOffset),
+    strings,
+    nodeCount: buffer.readUInt32LE(12),
+    nodeRecordCount: buffer.readUInt32LE(16),
+    routeDeliveryCount: buffer.readUInt32LE(20),
+    includeParent: (flags & 1) !== 0,
+    includeScope: (flags & 2) !== 0,
+  };
+}
+
+export function forEachRoutedEvent(
+  batch: RoutedEventBatch,
+  callback: (routeIds: ArrayLike<number>, event: NativeEvent) => void,
+): void {
+  const words = new Uint32Array(
+    batch.data.buffer,
+    batch.data.byteOffset,
+    batch.data.byteLength / 4,
+  );
+  const enterEvents: (NativeEvent | undefined)[] = [];
+  let offset = 0;
+  for (let record = 0; record < batch.nodeRecordCount; record++) {
+    const sequenceWord = words[offset++];
+    if ((sequenceWord & DYNAMIC_TAG) !== 0) {
+      const id = words[offset++];
+      const routeCount = words[offset++];
+      const routes = words.subarray(offset, offset + routeCount);
+      offset += routeCount;
+      const enter = enterEvents[id];
+      if (!enter) throw new Error(`routed exit event ${id} has no enter record`);
+      callback(routes, { ...enter, sequence: sequenceWord & TAG_INDEX, side: 'exit' });
+      continue;
+    }
+    const sequence = sequenceWord;
+    const id = words[offset++];
+    const type = NODE_TYPES[words[offset++]];
+    if (!type) throw new Error('invalid routed node type');
+    const start = words[offset++];
+    const end = words[offset++];
+    const parentId = batch.includeParent ? words[offset++] : MISSING_VALUE;
+    const parentTypeId = batch.includeParent ? words[offset++] : MISSING_VALUE;
+    const scopeId = batch.includeScope ? words[offset++] : 0;
+    const scopeParentId = batch.includeScope ? words[offset++] : MISSING_VALUE;
+    const fieldCount = words[offset++];
+    const fields =
+      fieldCount === 0 ? EMPTY_FIELDS : new Array<NativeEvent['fields'][number]>(fieldCount);
+    for (let field = 0; field < fieldCount; field++) {
+      const key = FIELD_KEYS[words[offset++]];
+      if (!key) throw new Error('invalid routed field key');
+      const value = decodeValue(words[offset++], batch.strings);
+      fields[field] = {
+        key,
+        value:
+          typeof value === 'string' && (key !== 'value' || type !== 'StringLiteral')
+            ? parseScalar(value)
+            : value,
+      };
+    }
+    const routeCount = words[offset++];
+    const routes = words.subarray(offset, offset + routeCount);
+    offset += routeCount;
+    const event: NativeEvent = {
+      sequence,
+      side: 'enter',
+      id,
+      type,
+      start,
+      end,
+      parentId: parentId === MISSING_VALUE ? undefined : parentId,
+      parentType: parentTypeId === MISSING_VALUE ? undefined : NODE_TYPES[parentTypeId],
+      scopeId,
+      scopeParentId: scopeParentId === MISSING_VALUE ? undefined : scopeParentId,
+      fields,
+    };
+    enterEvents[id] = event;
+    callback(routes, event);
+  }
+  if (offset !== words.length) throw new Error('trailing routed tape words');
+}
+
+function requiredId(map: ReadonlyMap<string, number>, value: string, kind: string): number {
+  const id = map.get(value);
+  if (id == null) throw new Error(`unknown routed ${kind}: ${value}`);
+  return id;
+}
+
+export function forEachDispatchEvent(
+  batch: PackedEventBatch,
+  callback: (event: NativeEvent) => void,
+): void {
+  if (batch.cachedEvents) {
+    for (const event of batch.cachedEvents) callback(event);
+    return;
+  }
+  const words = new Uint32Array(
+    batch.data.buffer,
+    batch.data.byteOffset,
+    batch.data.byteLength / 4,
+  );
   const enterEvents: (NativeEvent | undefined)[] | null = batch.includeExit === false ? null : [];
+  const decodedEvents = new Array<NativeEvent>(batch.emittedCount);
   let offset = 0;
   for (let index = 0; index < batch.emittedCount; index++) {
     const sequenceWord = words[offset++];
@@ -49,7 +271,9 @@ export function forEachDispatchEvent(batch: PackedEventBatch, callback: (event: 
       const id = words[offset++];
       const enter = enterEvents?.[id];
       if (!enter) throw new Error(`packed exit event ${id} has no preceding enter event`);
-      callback({ ...enter, sequence: sequenceWord & TAG_INDEX, side: 'exit' });
+      const event: NativeEvent = { ...enter, sequence: sequenceWord & TAG_INDEX, side: 'exit' };
+      decodedEvents[index] = event;
+      callback(event);
       continue;
     }
     const sequence = sequenceWord;
@@ -70,7 +294,10 @@ export function forEachDispatchEvent(batch: PackedEventBatch, callback: (event: 
       start,
       end,
       parentId: rawParentId === MISSING_VALUE ? undefined : rawParentId,
-      parentType: rawParentType === MISSING_VALUE ? undefined : decodeTag(rawParentType, NODE_TYPES, batch.strings),
+      parentType:
+        rawParentType === MISSING_VALUE
+          ? undefined
+          : decodeTag(rawParentType, NODE_TYPES, batch.strings),
       scopeId,
       scopeParentId: rawScopeParentId === MISSING_VALUE ? undefined : rawScopeParentId,
       fields: EMPTY_FIELDS,
@@ -79,13 +306,16 @@ export function forEachDispatchEvent(batch: PackedEventBatch, callback: (event: 
     for (let field = 0; field < fieldCount; field++) {
       const key = decodeTag(words[offset++], FIELD_KEYS, batch.strings);
       const value = decodeValue(words[offset++], batch.strings);
-      node[key] = typeof value === 'string' && (key !== 'value' || type !== 'StringLiteral')
-        ? parseScalar(value)
-        : value;
+      node[key] =
+        typeof value === 'string' && (key !== 'value' || type !== 'StringLiteral')
+          ? parseScalar(value)
+          : value;
     }
     if (enterEvents) enterEvents[id] = event;
+    decodedEvents[index] = event;
     callback(event);
   }
+  batch.cachedEvents = decodedEvents;
 }
 
 export function decodePackedEnvelope(buffer: Buffer): PackedEventBatch {
@@ -94,12 +324,6 @@ export function decodePackedEnvelope(buffer: Buffer): PackedEventBatch {
   const emittedCount = buffer.readUInt32LE(4);
   const stringCount = buffer.readUInt32LE(8);
   const wordsOffset = buffer.readUInt32LE(12);
-  const timings = {
-    parseMs: buffer.readDoubleLE(16),
-    semanticMs: buffer.readDoubleLE(24),
-    traversalMs: buffer.readDoubleLE(32),
-    renderAndMapMs: buffer.readDoubleLE(40),
-  };
   const strings = new Array<string>(stringCount);
   let offset = PACKED_HEADER_BYTES;
   for (let index = 0; index < stringCount; index++) {
@@ -113,7 +337,6 @@ export function decodePackedEnvelope(buffer: Buffer): PackedEventBatch {
     strings,
     nodeCount,
     emittedCount,
-    timings,
     includeParent: (shapeNodeCount & DYNAMIC_TAG) !== 0,
     includeScope: (shapeNodeCount & NUMBER_VALUE) !== 0,
     includeExit: (shapeNodeCount & EXIT_TAG) !== 0,
@@ -125,24 +348,35 @@ export function decodeEventBatch(batch: PackedEventBatch): EventBatch {
   const enterEvents: (NativeEvent | undefined)[] | null = batch.includeExit === false ? null : [];
   let offset = 0;
   for (let index = 0; index < events.length; index++) {
-    const sequenceWord = batch.data.readUInt32LE(offset); offset += 4;
+    const sequenceWord = batch.data.readUInt32LE(offset);
+    offset += 4;
     if ((sequenceWord & DYNAMIC_TAG) !== 0) {
-      const id = batch.data.readUInt32LE(offset); offset += 4;
+      const id = batch.data.readUInt32LE(offset);
+      offset += 4;
       const enter = enterEvents?.[id];
       if (!enter) throw new Error(`packed exit event ${id} has no preceding enter event`);
       events[index] = { ...enter, sequence: sequenceWord & TAG_INDEX, side: 'exit' };
       continue;
     }
     const sequence = sequenceWord;
-    const id = batch.data.readUInt32LE(offset); offset += 4;
-    const type = decodeTag(batch.data.readUInt32LE(offset), NODE_TYPES, batch.strings); offset += 4;
-    const start = batch.data.readUInt32LE(offset); offset += 4;
-    const end = batch.data.readUInt32LE(offset); offset += 4;
-    const rawParentId = batch.data.readUInt32LE(offset); offset += 4;
-    const rawParentType = batch.data.readUInt32LE(offset); offset += 4;
-    const scopeId = batch.data.readUInt32LE(offset); offset += 4;
-    const rawScopeParentId = batch.data.readUInt32LE(offset); offset += 4;
-    const fieldCount = batch.data.readUInt32LE(offset); offset += 4;
+    const id = batch.data.readUInt32LE(offset);
+    offset += 4;
+    const type = decodeTag(batch.data.readUInt32LE(offset), NODE_TYPES, batch.strings);
+    offset += 4;
+    const start = batch.data.readUInt32LE(offset);
+    offset += 4;
+    const end = batch.data.readUInt32LE(offset);
+    offset += 4;
+    const rawParentId = batch.data.readUInt32LE(offset);
+    offset += 4;
+    const rawParentType = batch.data.readUInt32LE(offset);
+    offset += 4;
+    const scopeId = batch.data.readUInt32LE(offset);
+    offset += 4;
+    const rawScopeParentId = batch.data.readUInt32LE(offset);
+    offset += 4;
+    const fieldCount = batch.data.readUInt32LE(offset);
+    offset += 4;
     const fields = new Array<{ key: string; value: string | number | boolean }>(fieldCount);
     for (let field = 0; field < fieldCount; field++) {
       fields[field] = {
@@ -159,7 +393,10 @@ export function decodeEventBatch(batch: PackedEventBatch): EventBatch {
       start,
       end,
       parentId: rawParentId === MISSING_VALUE ? undefined : rawParentId,
-      parentType: rawParentType === MISSING_VALUE ? undefined : decodeTag(rawParentType, NODE_TYPES, batch.strings),
+      parentType:
+        rawParentType === MISSING_VALUE
+          ? undefined
+          : decodeTag(rawParentType, NODE_TYPES, batch.strings),
       scopeId,
       scopeParentId: rawScopeParentId === MISSING_VALUE ? undefined : rawScopeParentId,
       fields,
@@ -171,32 +408,38 @@ export function decodeEventBatch(batch: PackedEventBatch): EventBatch {
     events,
     nodeCount: batch.nodeCount,
     emittedCount: batch.emittedCount,
-    timings: batch.timings,
   };
 }
 
 export function packEdits(edits: readonly EditCommand[]): Buffer {
-  const encodedStrings: Buffer[] = [];
+  const strings: string[] = [];
+  const stringLengths: number[] = [];
+  const addString = (value: string) => {
+    strings.push(value);
+    stringLengths.push(Buffer.byteLength(value));
+  };
   let wordCount = 0;
   for (const edit of edits) {
-    if (edit.content != null) encodedStrings.push(Buffer.from(edit.content));
-    for (const name of edit.names ?? []) encodedStrings.push(Buffer.from(name));
+    if (edit.content != null) addString(edit.content);
+    for (const name of edit.names ?? []) addString(name);
     wordCount += 7 + (edit.names?.length ?? 0);
   }
-  const stringsSize = encodedStrings.reduce(
-    (size, value) => size + 4 + value.length + paddingFor(value.length),
+  const stringsSize = stringLengths.reduce(
+    (size, length) => size + 4 + length + paddingFor(length),
     0,
   );
   const wordsOffset = 8 + stringsSize;
   const data = Buffer.allocUnsafe(wordsOffset + wordCount * 4);
-  data.writeUInt32LE(encodedStrings.length, 0);
+  data.writeUInt32LE(strings.length, 0);
   data.writeUInt32LE(wordsOffset, 4);
   let offset = 8;
-  for (const value of encodedStrings) {
-    data.writeUInt32LE(value.length, offset);
+  for (let index = 0; index < strings.length; index++) {
+    const value = strings[index];
+    const length = stringLengths[index];
+    data.writeUInt32LE(length, offset);
     offset += 4;
-    value.copy(data, offset);
-    offset = alignToWord(offset + value.length);
+    data.write(value, offset, length, 'utf8');
+    offset = alignToWord(offset + length);
   }
   let wordOffset = wordsOffset;
   let stringId = 0;
@@ -219,7 +462,9 @@ export function packEdits(edits: readonly EditCommand[]): Buffer {
   return data;
 }
 
-export function packFieldRequests(fields?: Readonly<Record<string, readonly string[]>>): Buffer | undefined {
+export function packFieldRequests(
+  fields?: Readonly<Record<string, readonly string[]>>,
+): Buffer | undefined {
   if (!fields) return undefined;
   const words: number[] = [];
   for (const [nodeType, requested] of Object.entries(fields)) {
@@ -262,5 +507,5 @@ function alignToWord(offset: number): number {
 }
 
 function paddingFor(length: number): number {
-  return (4 - length % 4) % 4;
+  return (4 - (length % 4)) % 4;
 }

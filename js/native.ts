@@ -1,12 +1,6 @@
 import { join } from 'node:path';
 
-import type {
-  EditCommand,
-  EventBatch,
-  NativeVlqMap,
-  ParseClassification,
-  Timings,
-} from './types.js';
+import type { EditCommand, EventBatch, NativeVlqMap, ParseClassification } from './types.js';
 
 interface NativeBinding {
   available: boolean;
@@ -33,9 +27,9 @@ interface NativeBinding {
       strings: string[];
       nodeCount: number;
       emittedCount: number;
-      timings: Timings;
       includeExit?: boolean;
     };
+    nextRoutedPacked(manifest: Buffer, rootStart?: number, rootEnd?: number): Buffer;
     queryGlobals(
       names: string[],
     ): { name: string; references: { id: number; start: number; end: number }[] }[];
@@ -49,10 +43,7 @@ interface NativeBinding {
     ): Buffer;
     constantsPackedBuffer(nodeIds: number[]): Buffer;
     scopeParentsBuffer(): Buffer;
-    commit(
-      edits: EditCommand[],
-      sourceMapMode?: string,
-    ): { code: string; map: NativeVlqMap; timings: Timings };
+    commit(edits: EditCommand[], sourceMapMode?: string): { code: string; map: NativeVlqMap };
     close(): void;
     memoryUsage(): number;
   };
@@ -62,20 +53,20 @@ interface NativeBinding {
     filename: string,
     edits: EditCommand[],
     sourceMapMode?: string,
-  ): { code: string; map: NativeVlqMap; timings: Timings };
+  ): { code: string; map: NativeVlqMap };
   commitPackedEdits(
     source: string,
     filename: string,
     data: Buffer,
     strings: string[],
     sourceMapMode?: string,
-  ): { code: string; map: NativeVlqMap; timings: Timings };
+  ): { code: string; map: NativeVlqMap };
   commitPackedBuffer(
     source: string,
     filename: string,
     data: Buffer,
     sourceMapMode?: string,
-  ): { code: string; map: NativeVlqMap; timings: Timings };
+  ): { code: string; map: NativeVlqMap };
   materializeEvents(
     source: string,
     filename: string,
@@ -93,7 +84,7 @@ interface NativeBinding {
     rootStart?: number,
     rootEnd?: number,
     fieldRequests?: Buffer,
-  ): { data: Buffer; strings: string[]; nodeCount: number; emittedCount: number; timings: Timings };
+  ): { data: Buffer; strings: string[]; nodeCount: number; emittedCount: number };
   materializePackedBuffer(
     source: string,
     filename: string,
@@ -109,6 +100,13 @@ interface NativeBinding {
     identifierNames?: string[],
     staticMemberPatterns?: string[],
   ): Buffer;
+  materializeRoutedBuffer?(
+    source: string,
+    filename: string,
+    manifest: Buffer,
+    rootStart?: number,
+    rootEnd?: number,
+  ): Buffer;
   queryGlobals(
     source: string,
     filename: string,
@@ -121,6 +119,7 @@ interface NativeBinding {
   ): import('./types.js').NativeEvent[];
   nativeVersion(): string;
   oxcVersion(): string;
+  routedProtocolVersion?(): number;
   composeMappings(outer: string, inner: string, outerNameCount: number): string;
   validateExpression(code: string, parserMode?: string): void;
   validateStatements(code: string, parserMode?: string): void;
@@ -166,6 +165,8 @@ function loadBinding(): NativeBinding {
         materializeEvents: unavailable as never,
         materializePackedEvents: unavailable as never,
         materializePackedBuffer: unavailable as never,
+        materializeRoutedBuffer: unavailable as never,
+        routedProtocolVersion: () => 0,
         queryGlobals: unavailable as never,
         inspectNodes: unavailable as never,
         composeMappings: unavailable as never,
