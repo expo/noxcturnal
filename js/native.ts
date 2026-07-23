@@ -39,28 +39,7 @@ interface NativeBinding {
         write: boolean;
       }[];
     }[];
-    resolveBinding(
-      name: string,
-      scopeId: number,
-    ): {
-      name: string;
-      scopeId: number;
-      declarationId?: number;
-      declarationStart?: number;
-      declarationEnd?: number;
-      declarationParentId?: number;
-      references: {
-        id: number;
-        start: number;
-        end: number;
-        scopeId: number;
-        parentId?: number;
-        parentType?: string;
-        read: boolean;
-        write: boolean;
-      }[];
-    } | null;
-    hasBindingInScope(name: string, scopeId: number): boolean;
+    resolveBindingScope(name: string, scopeId: number): number | null;
     scopeParentsBuffer(): Buffer;
     queryCaptures(functionId: number): {
       id: number;

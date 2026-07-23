@@ -1,7 +1,7 @@
 use napi::{Error, Status};
 use napi_derive::napi;
 use oxc_allocator::Allocator;
-use oxc_ast::AstKind;
+use oxc_ast::{AstKind, ast::MethodDefinitionKind};
 use oxc_ast_visit::{Visit, walk};
 use oxc_parser::Parser;
 use oxc_semantic::{AstNodes, SemanticBuilder};
@@ -10,6 +10,7 @@ use oxc_syntax::node::NodeId;
 use rustc_hash::FxHashMap;
 
 use crate::engine::source_type;
+use crate::sourcemap::vlq;
 
 #[derive(Clone)]
 #[napi(object)]
@@ -189,9 +190,10 @@ impl FunctionMapCollector<'_> {
                         _ => None,
                     });
                     let mut name = self.property_name(&method.key);
-                    let kind = format!("{:?}", method.kind);
-                    if kind != "Method" && kind != "Constructor" {
-                        name = format!("{}__{name}", kind.to_ascii_lowercase());
+                    match method.kind {
+                        MethodDefinitionKind::Get => name = format!("get__{name}"),
+                        MethodDefinitionKind::Set => name = format!("set__{name}"),
+                        MethodDefinitionKind::Method | MethodDefinitionKind::Constructor => {}
                     }
                     return class_name.map_or(name.clone(), |class_name| {
                         format!(
@@ -400,24 +402,4 @@ fn line_starts(source: &str) -> Vec<usize> {
 
 fn position_greater(left: Position, right: Position) -> bool {
     left.line > right.line || (left.line == right.line && left.column > right.column)
-}
-
-fn vlq(mut value: i64, output: &mut String) {
-    const CHARS: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    let negative = value < 0;
-    if negative {
-        value = -value;
-    }
-    let mut encoded = (value << 1) | i64::from(negative);
-    loop {
-        let mut digit = (encoded & 31) as usize;
-        encoded >>= 5;
-        if encoded != 0 {
-            digit |= 32;
-        }
-        output.push(CHARS[digit] as char);
-        if encoded == 0 {
-            break;
-        }
-    }
 }

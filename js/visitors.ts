@@ -500,21 +500,24 @@ export class NativeTransformSession {
     buildInitialRoute = true,
   ) {
     this.#nativeFilename = parserFilename(filename, options.parser);
-    this.#native = new native.NativeIndexedSession(
-      source,
-      this.#nativeFilename,
-      options.functionMap,
-      retentionManifest,
-      initialManifest,
-      buildInitialRoute,
-    );
-    if (
-      this.#native &&
-      options.maxNativeMemoryBytes != null &&
-      this.#native.memoryUsage() > options.maxNativeMemoryBytes
-    ) {
-      this.#native.close();
-      throw new Error('native-memory-budget-exceeded');
+    // Without a retention plan or function map the native session holds no state, so its
+    // construction (and the source copy it takes) is deferred until something needs it.
+    if (options.functionMap === true || retentionManifest != null || initialManifest != null) {
+      this.#native = new native.NativeIndexedSession(
+        source,
+        this.#nativeFilename,
+        options.functionMap,
+        retentionManifest,
+        initialManifest,
+        buildInitialRoute,
+      );
+      if (
+        options.maxNativeMemoryBytes != null &&
+        this.#native.memoryUsage() > options.maxNativeMemoryBytes
+      ) {
+        this.#native.close();
+        throw new Error('native-memory-budget-exceeded');
+      }
     }
   }
   get nativeMemoryBytes(): number {
@@ -553,9 +556,7 @@ export class NativeTransformSession {
     const cacheKey = stableJson(request);
     const cached = this.#queryCache.get(cacheKey);
     if (cached) return cached;
-    const types = querySubscriptions({ ...request, constants: undefined }).filter(
-      type => type !== 'Identifier',
-    );
+    const types = querySubscriptions(request);
     const nodes = types.length
       ? decodeEventBatch(
           decodePackedEnvelope(this.#binding().queryNodesPackedBuffer(types)),
@@ -632,33 +633,7 @@ export class NativeTransformSession {
       bindings: (request.bindings ?? []).flatMap(binding =>
         this.#binding()
           .queryBindings(binding.name, binding.scopeId, binding.reads, binding.writes)
-          .map(fact => ({
-            name: fact.name,
-            scopeId: fact.scopeId,
-            declaration:
-              fact.declarationId == null
-                ? null
-                : {
-                    id: fact.declarationId,
-                    type: 'Identifier',
-                    start: fact.declarationStart!,
-                    end: fact.declarationEnd!,
-                    parentId: fact.declarationParentId,
-                  },
-            references: fact.references.map(reference => ({
-              id: reference.id,
-              type: 'Identifier',
-              start: reference.start,
-              end: reference.end,
-              scopeId: reference.scopeId,
-              parentId: reference.parentId,
-              parentType: reference.parentType,
-              name: fact.name,
-              bindingScopeId: fact.scopeId,
-              read: reference.read,
-              write: reference.write,
-            })),
-          })),
+          .map(adaptBindingFact),
       ),
     };
     this.#queryCache.set(cacheKey, result);
@@ -820,39 +795,14 @@ export class NativeTransformSession {
     if (event) this.#eventCache[nodeId] = event;
     return event;
   }
-  hasBindingInScope(name: string, scopeId: number): boolean {
-    return this.#binding().hasBindingInScope(name, scopeId);
+  /** The scope owning the nearest binding visible from `scopeId`, or null. */
+  resolveBindingScope(name: string, scopeId: number): number | null {
+    return this.#binding().resolveBindingScope(name, scopeId);
   }
   resolveBinding(name: string, scopeId: number): QueryResult['bindings'][number] | undefined {
-    const fact = this.#binding().resolveBinding(name, scopeId);
-    if (!fact) return undefined;
-    return {
-      name: fact.name,
-      scopeId: fact.scopeId,
-      declaration:
-        fact.declarationId == null
-          ? null
-          : {
-              id: fact.declarationId,
-              type: 'Identifier',
-              start: fact.declarationStart!,
-              end: fact.declarationEnd!,
-              parentId: fact.declarationParentId,
-            },
-      references: fact.references.map(reference => ({
-        id: reference.id,
-        type: 'Identifier',
-        start: reference.start,
-        end: reference.end,
-        scopeId: reference.scopeId,
-        parentId: reference.parentId,
-        parentType: reference.parentType,
-        name: fact.name,
-        bindingScopeId: fact.scopeId,
-        read: reference.read,
-        write: reference.write,
-      })),
-    };
+    const scope = this.#binding().resolveBindingScope(name, scopeId);
+    const fact = scope == null ? undefined : this.#binding().queryBindings(name, scope)[0];
+    return fact && adaptBindingFact(fact);
   }
   globalReferences(name: string): NodeSummary[] {
     return (
@@ -925,17 +875,7 @@ export class NativeTransformSession {
   }
   #binding(): NativeIndexedSessionBinding {
     this.#assertOpen();
-    if (!this.#native) {
-      this.#native = new native.NativeIndexedSession(this.source, this.#nativeFilename);
-      if (
-        this.options.maxNativeMemoryBytes != null &&
-        this.#native.memoryUsage() > this.options.maxNativeMemoryBytes
-      ) {
-        this.#native.close();
-        throw new Error('native-memory-budget-exceeded');
-      }
-    }
-    return this.#native;
+    return (this.#native ??= new native.NativeIndexedSession(this.source, this.#nativeFilename));
   }
 }
 
@@ -951,8 +891,8 @@ interface PreparedPhase {
   includeParent: boolean;
   includeScope: boolean;
   retentionCapabilities: number;
-  compiledRoutes?: readonly CompiledRouteTemplate[];
-  manifest?: Buffer;
+  compiledRoutes: readonly CompiledRouteTemplate[];
+  manifest: Buffer;
 }
 
 interface CompiledRouteTemplate extends NativeRouteManifestEntry {
@@ -1122,8 +1062,8 @@ function preparePhase(
     includeParent,
     includeScope,
     retentionCapabilities,
-    compiledRoutes: routed?.routes,
-    manifest: routed?.manifest,
+    compiledRoutes: routed.routes,
+    manifest: routed.manifest,
   };
   let preparedCache = preparedPhaseCaches.get(phase);
   if (!preparedCache) {
@@ -1172,7 +1112,7 @@ function compilePhaseRoutes(
   includeParent: boolean,
   includeScope: boolean,
   retentionCapabilities: number,
-): { routes: CompiledRouteTemplate[]; manifest: Buffer } | undefined {
+): { routes: CompiledRouteTemplate[]; manifest: Buffer } {
   const cacheKey = stableJson({
     includeParent,
     includeScope,
@@ -1697,8 +1637,6 @@ export function transform(
         includeScope ||
         options.functionMap === true ||
         futureSubscriptions.size > 0;
-      if (manifest == null || compiledRoutes == null)
-        throw new Error('compiled visitor dispatch invariant violated');
       const retainedRoutes = [...compiledRoutes, ...futureRetentionRoutes].map((route, id) => ({
         ...route,
         id,
@@ -2760,10 +2698,6 @@ function isDeclarationType(type: string): boolean {
     type === 'TSImportEqualsDeclaration'
   );
 }
-function eventField(event: NativeEvent, key: string): unknown {
-  const direct = (event as NativeEvent & Record<string, unknown>)[key];
-  return direct ?? event.fields.find(field => field.key === key)?.value;
-}
 function toNodeView(event: NativeEvent): NodeView {
   if (event.fields.length === 0) return event as unknown as NodeView;
   const node = event as NativeEvent & Record<string, unknown>;
@@ -2774,16 +2708,6 @@ function toNodeView(event: NativeEvent): NodeView {
         : field.value;
   }
   return node as NodeView;
-}
-function summary(node: NodeView): NodeSummary {
-  return {
-    id: node.id,
-    type: node.type,
-    start: node.start,
-    end: node.end,
-    parentId: node.parentId,
-    parentType: node.parentType,
-  };
 }
 function array(value: string | readonly string[]): string[] {
   return typeof value === 'string' ? [value] : [...value];
@@ -2891,6 +2815,38 @@ function mappingPolicy(value?: CodeFragment['mapping']): EditCommand['mapping'] 
     } as const
   )[value ?? 'sourceless'];
 }
+function adaptBindingFact(
+  fact: ReturnType<NativeIndexedSessionBinding['queryBindings']>[number],
+): QueryResult['bindings'][number] {
+  return {
+    name: fact.name,
+    scopeId: fact.scopeId,
+    declaration:
+      fact.declarationId == null
+        ? null
+        : {
+            id: fact.declarationId,
+            type: 'Identifier',
+            start: fact.declarationStart!,
+            end: fact.declarationEnd!,
+            parentId: fact.declarationParentId,
+          },
+    references: fact.references.map(reference => ({
+      id: reference.id,
+      type: 'Identifier',
+      start: reference.start,
+      end: reference.end,
+      scopeId: reference.scopeId,
+      parentId: reference.parentId,
+      parentType: reference.parentType,
+      name: fact.name,
+      bindingScopeId: fact.scopeId,
+      read: reference.read,
+      write: reference.write,
+    })),
+  };
+}
+
 function makeScope(runtime: PathRuntime, id: number, parentId: number | null): NativeScope {
   const cached = runtime.scopeCache.get(id);
   if (cached) return cached;
@@ -2912,7 +2868,7 @@ function makeScope(runtime: PathRuntime, id: number, parentId: number | null): N
     get path() {
       return ownerPath === undefined ? (ownerPath = scopeOwnerPath(runtime, id)) : ownerPath;
     },
-    hasBinding: name => session.hasBindingInScope(name, id),
+    hasBinding: name => session.resolveBindingScope(name, id) != null,
     hasGlobal: name => session.globalReferences(name).length > 0,
     getBinding(name) {
       const binding = resolve(name);

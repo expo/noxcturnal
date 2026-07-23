@@ -31,7 +31,6 @@ pub struct EditCommand {
     pub end: u32,
     pub content: Option<String>,
     pub mapping: Option<MappingPolicy>,
-    pub owner: Option<String>,
     pub order: Option<u32>,
     pub names: Option<Vec<String>>,
 }
@@ -197,7 +196,6 @@ mod tests {
             end,
             content: Some(content.into()),
             mapping: None,
-            owner: None,
             order: Some(order),
             names: None,
         }

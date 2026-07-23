@@ -251,31 +251,20 @@ impl RetainedIndex {
             .collect()
     }
 
-    /// Resolve the nearest binding for `name` visible from `scope_id`, walking the
+    /// Locate the nearest scope binding `name` visible from `scope_id`, walking the
     /// scope-parent chain natively so callers issue one N-API request per lookup.
-    pub fn resolve_binding(
-        &self,
-        name: &str,
-        scope_id: u32,
-        scope_parents: &[u32],
-    ) -> Option<NativeBindingFact> {
-        let (scope, name_id) = self.resolve_binding_scope(name, scope_id, scope_parents)?;
-        let binding = &self.bindings[&(scope, name_id)];
-        Some(self.binding_fact(scope, name_id, binding, false, false))
-    }
-
-    /// Locate the nearest scope binding `name` without materializing references.
+    /// References are not materialized; callers fetch the full fact by scope when needed.
     pub fn resolve_binding_scope(
         &self,
         name: &str,
         scope_id: u32,
         scope_parents: &[u32],
-    ) -> Option<(u32, u32)> {
+    ) -> Option<u32> {
         let &name_id = self.name_ids.get(name)?;
         let mut scope = scope_id;
         loop {
             if self.bindings.contains_key(&(scope, name_id)) {
-                return Some((scope, name_id));
+                return Some(scope);
             }
             scope = scope_parents
                 .get(scope as usize)
@@ -651,10 +640,10 @@ impl RetainedIndex {
         &self.scalar_fields[start as usize..(start + length) as usize]
     }
 
-    pub fn summary_buffer(&self, node_id: u32, scope_parents: &[u32]) -> Buffer {
+    fn write_summary(&self, node_id: u32, scope_parents: &[u32], output: &mut Vec<u8>) {
         let index = node_id as usize;
         let Some(&type_id) = self.type_ids.get(index) else {
-            return Buffer::default();
+            return;
         };
         let parent_id = self.parent_ids[index];
         let parent_type_id = if parent_id == ABSENT_ID {
@@ -667,7 +656,6 @@ impl RetainedIndex {
             .get(scope_id as usize)
             .copied()
             .unwrap_or(ABSENT_ID);
-        let mut output = Vec::with_capacity(7 * 4);
         for word in [
             type_id,
             self.starts[index],
@@ -679,38 +667,18 @@ impl RetainedIndex {
         ] {
             output.extend_from_slice(&word.to_le_bytes());
         }
+    }
+
+    pub fn summary_buffer(&self, node_id: u32, scope_parents: &[u32]) -> Buffer {
+        let mut output = Vec::with_capacity(7 * 4);
+        self.write_summary(node_id, scope_parents, &mut output);
         output.into()
     }
 
     pub fn summary_buffers(&self, node_ids: &[u32], scope_parents: &[u32]) -> Buffer {
         let mut output = Vec::with_capacity(node_ids.len() * 7 * 4);
         for &node_id in node_ids {
-            let index = node_id as usize;
-            let Some(&type_id) = self.type_ids.get(index) else {
-                continue;
-            };
-            let parent_id = self.parent_ids[index];
-            let parent_type_id = if parent_id == ABSENT_ID {
-                ABSENT_ID
-            } else {
-                self.type_ids[parent_id as usize]
-            };
-            let scope_id = self.scope_ids[index];
-            let scope_parent_id = scope_parents
-                .get(scope_id as usize)
-                .copied()
-                .unwrap_or(ABSENT_ID);
-            for word in [
-                type_id,
-                self.starts[index],
-                self.ends[index],
-                parent_id,
-                parent_type_id,
-                scope_id,
-                scope_parent_id,
-            ] {
-                output.extend_from_slice(&word.to_le_bytes());
-            }
+            self.write_summary(node_id, scope_parents, &mut output);
         }
         output.into()
     }

@@ -43,7 +43,7 @@ struct Segment {
     name: Option<i64>,
 }
 
-fn vlq(mut value: i64, output: &mut String) {
+pub(crate) fn vlq(mut value: i64, output: &mut String) {
     const CHARS: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     let negative = value < 0;
     if negative {
@@ -488,7 +488,6 @@ mod tests {
                     end: 0,
                     content: Some("/* generated */\n".into()),
                     mapping: Some(MappingPolicy::Sourceless),
-                    owner: None,
                     order: Some(0),
                     names: None,
                 },
@@ -498,7 +497,6 @@ mod tests {
                     end: 11,
                     content: Some("renamed".into()),
                     mapping: Some(MappingPolicy::AnchorBoundaries),
-                    owner: None,
                     order: Some(1),
                     names: Some(vec!["value".into()]),
                 },
@@ -524,7 +522,6 @@ mod tests {
                     end: index * 2 + 1,
                     content: Some("y".into()),
                     mapping: Some(MappingPolicy::AnchorStart),
-                    owner: None,
                     order: Some(index),
                     names: Some(vec![format!("name{index}")]),
                 })

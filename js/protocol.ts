@@ -484,17 +484,10 @@ export function packEdits(edits: readonly EditCommand[]): Buffer {
   }
   let wordIndex = 0;
   let stringId = 0;
-  const wordView =
-    (data.byteOffset + wordsOffset) % 4 === 0
-      ? new Uint32Array(data.buffer, data.byteOffset + wordsOffset, wordCount)
-      : null;
-  const write = wordView
-    ? (word: number) => {
-        wordView[wordIndex++] = word;
-      }
-    : (word: number) => {
-        data.writeUInt32LE(word >>> 0, wordsOffset + 4 * wordIndex++);
-      };
+  const words = new Uint32Array(wordCount);
+  const write = (word: number) => {
+    words[wordIndex++] = word;
+  };
   for (let index = 0; index < edits.length; index++) {
     const edit = edits[index];
     const names = edit.names ?? [];
@@ -507,6 +500,7 @@ export function packEdits(edits: readonly EditCommand[]): Buffer {
     write(names.length);
     for (let nameIndex = 0; nameIndex < names.length; nameIndex++) write(stringId++);
   }
+  data.set(new Uint8Array(words.buffer, 0, words.byteLength), wordsOffset);
   return data;
 }
 
@@ -552,8 +546,9 @@ export function coerceFieldValue(
   nodeType: string,
   value: string,
 ): string | number | boolean {
-  if (key === 'value' ? nodeType === 'StringLiteral' : key !== 'constantValue') return value;
-  return parseScalar(value);
+  return (key === 'value' && nodeType !== 'StringLiteral') || key === 'constantValue'
+    ? parseScalar(value)
+    : value;
 }
 
 function decodeTag(tag: number, known: readonly string[], strings: string[]): string {

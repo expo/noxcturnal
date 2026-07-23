@@ -81,7 +81,6 @@ struct CompiledManifest {
     include_exit: bool,
     retention_capabilities: u32,
     structural_parent_types: FxHashSet<u32>,
-    retained_fields_by_type: Vec<Vec<u32>>,
     /// Union of route payload/predicate and retained-plan field names per node type,
     /// precomputed so the retained collector performs no per-node field-name work.
     merged_field_names_by_type: Vec<Vec<String>>,
@@ -97,10 +96,6 @@ const SEMANTIC_FIELD_KEYS: [&str; 6] = [
     "calleeGlobal",
     "rootGlobal",
 ];
-
-fn is_semantic_field(field_id: u32) -> bool {
-    field_key_name(field_id).is_some_and(|name| SEMANTIC_FIELD_KEYS.contains(&name))
-}
 
 #[derive(Default)]
 struct RoutedCounts {
@@ -182,32 +177,21 @@ impl NativeIndexedSession {
         root_end: Option<u32>,
     ) -> Result<Buffer> {
         self.ensure_open()?;
-        let is_initial_manifest = root_start.is_none()
-            && root_end.is_none()
-            && self
-                .initial_route_manifest
-                .as_deref()
-                .is_some_and(|initial| initial == manifest.as_ref());
+        // The precompiled initial tape is moved out on its first request; afterwards every
+        // request recomputes from the retained index, so no served flag is needed.
         if root_start.is_none() && root_end.is_none() && self.initial_routed_buffer.is_some() {
-            if !is_initial_manifest && !self.initial_routed_served {
+            if self.initial_route_manifest.as_deref() != Some(manifest.as_ref()) {
                 return Err(Error::new(
                     Status::GenericFailure,
                     "route manifest does not match the compiled retention plan",
                 ));
             }
-            if is_initial_manifest {
-                self.initial_routed_served = true;
-                return self
-                    .initial_routed_buffer
-                    .take()
-                    .map(Buffer::from)
-                    .ok_or_else(|| {
-                        Error::new(
-                            Status::GenericFailure,
-                            "initial routed buffer was not constructed",
-                        )
-                    });
-            }
+            self.initial_route_manifest = None;
+            return Ok(self
+                .initial_routed_buffer
+                .take()
+                .map(Buffer::from)
+                .expect("initial routed buffer is present"));
         }
         let manifest = decode_route_manifest(&manifest)?;
         routed_buffer_from_index(
@@ -384,27 +368,13 @@ impl NativeIndexedSession {
         Ok(output.into())
     }
 
-    /// Resolve the nearest binding visible from `scope_id` in one call.
+    /// Resolve the scope owning the nearest binding visible from `scope_id` in one call.
     #[napi]
-    pub fn resolve_binding(
-        &self,
-        name: String,
-        scope_id: u32,
-    ) -> Result<Option<NativeBindingFact>> {
+    pub fn resolve_binding_scope(&self, name: String, scope_id: u32) -> Result<Option<u32>> {
         self.ensure_open()?;
         Ok(self
             .retained_index
-            .resolve_binding(&name, scope_id, &self.scope_parents))
-    }
-
-    /// Binding visibility check that materializes no reference data.
-    #[napi]
-    pub fn has_binding_in_scope(&self, name: String, scope_id: u32) -> Result<bool> {
-        self.ensure_open()?;
-        Ok(self
-            .retained_index
-            .resolve_binding_scope(&name, scope_id, &self.scope_parents)
-            .is_some())
+            .resolve_binding_scope(&name, scope_id, &self.scope_parents))
     }
 
     #[napi]
@@ -1453,14 +1423,12 @@ impl<'a> EventCollector<'a> {
                     .contains(&ast_kind_protocol_id(self.nodes.parent_kind(id)))
         });
         let protocol_id = ast_kind_protocol_id(kind);
-        let has_route_or_plan_fields = self.retention_routes.is_some_and(|manifest| {
-            !manifest.routes_by_type[protocol_id as usize].is_empty()
-                || !manifest.retained_fields_by_type[protocol_id as usize].is_empty()
+        // A node without requested fields records nothing: an absent range and an empty
+        // range read back identically.
+        let requested_fields: &[String] = self.retention_routes.map_or(&[], |manifest| {
+            &manifest.merged_field_names_by_type[protocol_id as usize]
         });
-        if retain_all_fields || retain_structural_fields || has_route_or_plan_fields {
-            let requested_fields: &[String] = self.retention_routes.map_or(&[], |manifest| {
-                &manifest.merged_field_names_by_type[protocol_id as usize]
-            });
+        if retain_all_fields || retain_structural_fields || !requested_fields.is_empty() {
             let member_path = if let AstKind::StaticMemberExpression(member) = kind {
                 static_member_path(&member.object)
                     .map(|object| format!("{object}.{}", member.property.name))
@@ -1624,12 +1592,11 @@ pub fn materialize_routed_buffer(
             format!("Oxc parse failed: {:?}", parsed.diagnostics),
         ));
     }
-    let build_nodes = manifest.include_parent || manifest.include_scope;
     // Semantic analysis is skipped entirely when no compiled route consumes semantic data.
     // The collector then assigns preorder node IDs itself during its single traversal.
     let semantic_return = manifest.needs_semantics.then(|| {
         SemanticBuilder::new()
-            .with_build_nodes(build_nodes)
+            .with_build_nodes(true)
             .with_check_syntax_error(true)
             .build(&parsed.program)
     });
@@ -1649,14 +1616,12 @@ pub fn materialize_routed_buffer(
         manifest: &manifest,
         nodes: semantic_return
             .as_ref()
-            .filter(|_| build_nodes)
             .map(|semantic_return| semantic_return.semantic.nodes()),
         scoping: semantic_return
             .as_ref()
             .map(|semantic_return| semantic_return.semantic.scoping()),
         utf16: utf16.as_deref().map(|offsets| &**offsets),
         root: root_start.zip(root_end),
-        assign_node_ids: semantic_return.is_none(),
         node_count: 0,
         sequence: 0,
         words: PackedWords::with_capacity(source.len().saturating_mul(2)),
@@ -1664,11 +1629,7 @@ pub fn materialize_routed_buffer(
         counts: RoutedCounts::default(),
     };
     collector.visit_program(&parsed.program);
-    let node_count = semantic_return
-        .as_ref()
-        .map_or(collector.node_count, |semantic_return| {
-            semantic_return.semantic.stats().nodes
-        });
+    let node_count = collector.node_count;
     let data = collector.words.into_bytes();
     let mut strings = (0..collector.string_ids.len())
         .map(|_| String::new())
@@ -2218,21 +2179,6 @@ fn decode_route_manifest(data: &[u8]) -> Result<CompiledManifest> {
         .any(|route| route.side == VisitSide::Exit);
     let include_parent = flags & 1 != 0;
     let include_scope = flags & 2 != 0;
-    let needs_semantics = include_parent
-        || include_scope
-        || routes_by_type.iter().flatten().any(|route| {
-            route
-                .predicates
-                .iter()
-                .map(|predicate| predicate.field_id)
-                .chain(route.payload_field_ids.iter().copied())
-                .any(is_semantic_field)
-        })
-        || retained_fields_by_type
-            .iter()
-            .flatten()
-            .copied()
-            .any(is_semantic_field);
     let merged_field_names_by_type = routes_by_type
         .iter()
         .zip(&retained_fields_by_type)
@@ -2259,6 +2205,12 @@ fn decode_route_manifest(data: &[u8]) -> Result<CompiledManifest> {
             names
         })
         .collect::<Vec<_>>();
+    let needs_semantics = include_parent
+        || include_scope
+        || merged_field_names_by_type
+            .iter()
+            .flatten()
+            .any(|name| SEMANTIC_FIELD_KEYS.contains(&name.as_str()));
     Ok(CompiledManifest {
         routes_by_type,
         include_parent,
@@ -2266,7 +2218,6 @@ fn decode_route_manifest(data: &[u8]) -> Result<CompiledManifest> {
         include_exit,
         retention_capabilities: flags >> 2,
         structural_parent_types,
-        retained_fields_by_type,
         merged_field_names_by_type,
         needs_semantics,
     })
@@ -2306,7 +2257,6 @@ struct RoutedEventCollector<'a> {
     scoping: Option<&'a Scoping>,
     utf16: Option<&'a [u32]>,
     root: Option<(u32, u32)>,
-    assign_node_ids: bool,
     node_count: u32,
     sequence: u32,
     words: PackedWords,
@@ -2563,43 +2513,34 @@ fn direct_predicate_scalar<'a>(
     field: &str,
 ) -> Option<PredicateScalar<'a>> {
     match kind {
-        AstKind::IdentifierReference(identifier) => match field {
-            "name" => Some(PredicateScalar::String(Cow::Borrowed(
-                identifier.name.as_str(),
-            ))),
-            "global" => {
-                let scoping = scoping?;
-                Some(PredicateScalar::Boolean(
-                    identifier
-                        .reference_id
-                        .get()
-                        .is_some_and(|id| scoping.get_reference(id).symbol_id().is_none()),
-                ))
+        AstKind::IdentifierReference(identifier) => {
+            if field == "name" {
+                return Some(PredicateScalar::String(Cow::Borrowed(
+                    identifier.name.as_str(),
+                )));
             }
-            "read" => {
-                let scoping = scoping?;
-                identifier
-                    .reference_id
-                    .get()
-                    .map(|id| PredicateScalar::Boolean(scoping.get_reference(id).is_read()))
-            }
-            "write" => {
-                let scoping = scoping?;
-                identifier
-                    .reference_id
-                    .get()
-                    .map(|id| PredicateScalar::Boolean(scoping.get_reference(id).is_write()))
-            }
-            "bindingScopeId" => {
-                let scoping = scoping?;
-                identifier.reference_id.get().and_then(|id| {
+            // The remaining identifier predicates are semantic; manifests requesting them
+            // always run semantic analysis.
+            let scoping = scoping?;
+            let reference = identifier.reference_id.get();
+            match field {
+                "global" => {
+                    Some(PredicateScalar::Boolean(reference.is_some_and(|id| {
+                        scoping.get_reference(id).symbol_id().is_none()
+                    })))
+                }
+                "read" => reference
+                    .map(|id| PredicateScalar::Boolean(scoping.get_reference(id).is_read())),
+                "write" => reference
+                    .map(|id| PredicateScalar::Boolean(scoping.get_reference(id).is_write())),
+                "bindingScopeId" => reference.and_then(|id| {
                     scoping.get_reference(id).symbol_id().map(|symbol_id| {
                         PredicateScalar::Number(scoping.symbol_scope_id(symbol_id).index() as f64)
                     })
-                })
+                }),
+                _ => None,
             }
-            _ => None,
-        },
+        }
         AstKind::BindingIdentifier(identifier) => match field {
             "name" => Some(PredicateScalar::String(Cow::Borrowed(
                 identifier.name.as_str(),
@@ -2704,10 +2645,10 @@ fn predicate_scalar_type(field: &str, node_type_id: u32, value: &str) -> u8 {
 
 impl<'a> Visit<'a> for RoutedEventCollector<'a> {
     fn enter_node(&mut self, kind: AstKind<'a>) {
-        if self.assign_node_ids {
+        if self.scoping.is_none() {
             kind.set_node_id(NodeId::new(self.node_count as usize));
-            self.node_count += 1;
         }
+        self.node_count += 1;
         self.emit(kind, VisitSide::Enter);
     }
 
@@ -2818,7 +2759,6 @@ pub fn commit_packed(
                 )
             },
             mapping: Some(mapping),
-            owner: None,
             order: Some(word(cursor + 5)),
             names: Some(names),
         });
