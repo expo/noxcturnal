@@ -5,6 +5,7 @@ import {
   NativeTransformSession,
   transform,
 } from '../dist/index.js';
+import { generateLargeFileSource } from './large-file-corpus.js';
 
 const source = Array.from(
   { length: 2_000 },
@@ -431,15 +432,54 @@ function allocationVisitor(name: string) {
 }
 
 function generatedSource(minimumBytes: number): string {
-  const lines: string[] = [];
-  let bytes = 0;
-  for (let index = 0; bytes < minimumBytes; index++) {
-    const line = `export const generatedValue${index} = source${index} + ${index};\n`;
-    lines.push(line);
-    bytes += Buffer.byteLength(line);
-  }
-  return lines.join('');
+  return generateLargeFileSource(minimumBytes, 'shallow');
 }
+
+for (const shape of ['nested', 'functions', 'dependencies'] as const) {
+  const generated = generateLargeFileSource(650 * 1024, shape);
+  const pipeline = allocationVisitor('ranges');
+  bench(`650 KiB ${shape} range visitor`, () => {
+    transform(generated, 'generated.js', pipeline);
+  });
+}
+
+const functionMapSource = generateLargeFileSource(650 * 1024, 'functions');
+bench('650 KiB native function map', () => {
+  transform(functionMapSource, 'generated.js', visitorPipeline, { functionMap: true });
+});
+
+const sparseEditSource = generateLargeFileSource(650 * 1024, 'sparse-edits');
+const sparseEditPipeline = defineNativePipeline({
+  phases: [
+    {
+      name: 'sparse-edits',
+      plugins: [
+        defineNativePlugin({
+          name: 'sparse-edit-plugin',
+          prepare: () => ({ fields: { Identifier: ['name'] } }),
+          visitor: {
+            Identifier(path) {
+              if (String(path.node.name).startsWith('EDIT_'))
+                path.replaceWith(String(path.node.name).slice(5));
+            },
+          },
+        }),
+      ],
+    },
+  ],
+});
+bench('650 KiB sparse edits', () => {
+  transform(sparseEditSource, 'generated.js', sparseEditPipeline, {
+    sourceMapMode: 'boundary',
+  });
+});
+
+const denseEditSource = generateLargeFileSource(650 * 1024, 'dense-edits');
+bench('650 KiB dense edits', () => {
+  transform(denseEditSource, 'generated.js', denseEditPipeline, {
+    sourceMapMode: 'boundary',
+  });
+});
 
 for (const name of ['no-properties', 'ranges', 'scalar', 'parent', 'snapshot']) {
   const pipeline = allocationVisitor(name);
@@ -449,11 +489,25 @@ for (const name of ['no-properties', 'ranges', 'scalar', 'parent', 'snapshot']) 
 for (const [label, generated] of [
   ['256 KiB', generatedSource(256 * 1024)],
   ['650 KiB', generatedSource(650 * 1024)],
+  ['1 MiB', generatedSource(1024 * 1024)],
   ['2 MiB', generatedSource(2 * 1024 * 1024)],
+  ['5 MiB', generatedSource(5 * 1024 * 1024)],
 ] as const) {
   const pipeline = allocationVisitor('ranges');
   bench(`${label} range visitor`, () => {
     transform(generated, 'generated.js', pipeline);
+  });
+}
+
+for (const [label, generated] of [
+  ['empty', ''],
+  ['100 B', generatedSource(100)],
+  ['1 KiB', generatedSource(1024)],
+  ['10 KiB', generatedSource(10 * 1024)],
+  ['100 KiB', generatedSource(100 * 1024)],
+] as const) {
+  bench(`fixed-cost profile: ${label}`, () => {
+    transform(generated, 'generated.js', visitorPipeline, { debugPerformance: true });
   });
 }
 

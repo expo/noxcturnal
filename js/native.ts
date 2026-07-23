@@ -1,6 +1,12 @@
 import { join } from 'node:path';
 
-import type { EditCommand, EventBatch, NativeVlqMap, ParseClassification } from './types.js';
+import type {
+  EditCommand,
+  EventBatch,
+  FunctionMap,
+  NativeVlqMap,
+  ParseClassification,
+} from './types.js';
 
 interface NativeBinding {
   available: boolean;
@@ -9,6 +15,7 @@ interface NativeBinding {
     filename: string,
     subscriptions?: string[],
     exitSubscriptions?: string[],
+    functionMap?: boolean,
   ) => {
     next(
       subscriptions: string[],
@@ -47,6 +54,7 @@ interface NativeBinding {
     close(): void;
     memoryUsage(): number;
     parseCount(): number;
+    takeFunctionMap(): FunctionMap | null;
   };
   classify(filename: string, source: string): ParseClassification;
   commitEdits(
@@ -119,6 +127,7 @@ interface NativeBinding {
     nodeIds: number[],
   ): import('./types.js').NativeEvent[];
   composeMappings(outer: string, inner: string, outerNameCount: number): string;
+  generateFunctionMap(source: string, filename: string): FunctionMap;
   validateExpression(code: string, parserMode?: string): void;
   validateStatements(code: string, parserMode?: string): void;
 }
@@ -165,6 +174,7 @@ function loadBinding(): NativeBinding {
         queryGlobals: unavailable as never,
         inspectNodes: unavailable as never,
         composeMappings: unavailable as never,
+        generateFunctionMap: unavailable as never,
         validateExpression: unavailable as never,
         validateStatements: unavailable as never,
       };

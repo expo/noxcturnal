@@ -2,6 +2,7 @@ mod constant_eval;
 mod editor;
 mod engine;
 mod event_types;
+mod function_map;
 mod generated_event_schema;
 mod sourcemap;
 
@@ -9,6 +10,7 @@ use napi_derive::napi;
 
 pub use editor::{EditCommand, EditKind, MappingPolicy};
 pub use engine::{EventBatch, NativeEvent, NodeField, ParseClassification};
+pub use function_map::FunctionMap;
 
 #[napi]
 pub fn classify(filename: String, source: String) -> ParseClassification {
@@ -170,6 +172,11 @@ pub fn commit_packed_buffer(
 #[napi]
 pub fn compose_mappings(outer: String, inner: String, outer_name_count: u32) -> String {
     sourcemap::compose(&outer, &inner, outer_name_count)
+}
+
+#[napi]
+pub fn generate_function_map(source: String, filename: String) -> napi::Result<FunctionMap> {
+    function_map::generate(&source, &filename)
 }
 
 #[napi]

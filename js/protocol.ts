@@ -61,6 +61,7 @@ export interface RoutedEventBatch {
   routeDeliveryCount: number;
   includeParent: boolean;
   includeScope: boolean;
+  includeExit: boolean;
 }
 
 export function packRouteManifest(
@@ -176,6 +177,7 @@ export function decodeRoutedEnvelope(buffer: Buffer): RoutedEventBatch {
     routeDeliveryCount: buffer.readUInt32LE(16),
     includeParent: (flags & 1) !== 0,
     includeScope: (flags & 2) !== 0,
+    includeExit: (flags & 4) !== 0,
   };
 }
 
@@ -206,7 +208,7 @@ export function dispatchRoutedEvents(
     batch.data.byteOffset,
     batch.data.byteLength / 4,
   );
-  const enterEvents: (NativeEvent | undefined)[] = [];
+  const enterEvents: (NativeEvent | undefined)[] | null = batch.includeExit ? [] : null;
   let offset = 0;
   for (let record = 0; record < batch.nodeRecordCount; record++) {
     const sequenceWord = words[offset++];
@@ -215,7 +217,7 @@ export function dispatchRoutedEvents(
       const routeCount = words[offset++];
       const routeStart = offset;
       offset += routeCount;
-      const enter = enterEvents[id];
+      const enter = enterEvents?.[id];
       if (!enter) throw new Error(`routed exit event ${id} has no enter record`);
       const event: NativeEvent = {
         ...enter,
@@ -264,7 +266,7 @@ export function dispatchRoutedEvents(
     const routeCount = words[offset++];
     const routeStart = offset;
     offset += routeCount;
-    enterEvents[id] = event;
+    if (enterEvents) enterEvents[id] = event;
     onEvent?.(event);
     for (let index = routeStart; index < routeStart + routeCount; index++)
       handlers[words[index]](event);

@@ -176,6 +176,10 @@ export interface NativeVlqMap {
   mappings: string;
   names: string[];
 }
+export interface FunctionMap {
+  names: string[];
+  mappings: string;
+}
 export interface Diagnostic {
   code: string;
   message: string;
@@ -195,6 +199,7 @@ export interface NativeTransformResult {
   status: 'complete';
   code: string;
   map: NativeVlqMap;
+  functionMap: FunctionMap | null;
   metadata: Record<string, unknown>;
   diagnostics: Diagnostic[];
 }
@@ -267,6 +272,8 @@ export interface TransformOptions {
   allowBroadVisitors?: boolean;
   inputSourceMap?: NativeVlqMap & { sources?: string[]; sourcesContent?: (string | null)[] };
   parserAdapter?: string;
+  /** Generate a Metro-compatible function map for the final transformed code. */
+  functionMap?: boolean;
   /** Include phase decisions and counters in metadata. Intended for benchmarks/debugging only. */
   debugPerformance?: boolean;
 }

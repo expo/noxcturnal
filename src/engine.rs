@@ -15,6 +15,7 @@ pub use crate::event_types::{
     EventBatch, FieldRequest, NativeCommitResult, NativeEvent, NativeVlqMap, NodeField,
     PackedEventBatch, ParseClassification,
 };
+use crate::function_map::{FunctionMap, FunctionMapCollector};
 use crate::generated_event_schema::{
     FIELD_KEY_COUNT, NODE_TYPE_COUNT, ast_kind_protocol_id, field_key_id, field_key_name,
     node_type_id, node_type_name, predicate_field_supported,
@@ -26,6 +27,13 @@ struct PackedEventParts {
     strings: Vec<String>,
     node_count: u32,
     emitted_count: u32,
+}
+
+struct MaterializedSessionParts {
+    batch: EventBatch,
+    scope_parents: Vec<u32>,
+    node_summaries: Vec<NodeSummary>,
+    function_map: Option<FunctionMap>,
 }
 
 const ROUTE_MANIFEST_MAGIC: u32 = 0x4e_52_4d_46; // NRMF
@@ -70,6 +78,7 @@ struct CompiledManifest {
     routes_by_type: Vec<Vec<CompiledRoute>>,
     include_parent: bool,
     include_scope: bool,
+    include_exit: bool,
 }
 
 #[derive(Default)]
@@ -101,6 +110,7 @@ pub struct NativeIndexedSession {
     materialized_exit_subscriptions: Vec<String>,
     scope_parents: Vec<u32>,
     parse_count: u32,
+    function_map: Option<FunctionMap>,
     closed: bool,
 }
 
@@ -112,20 +122,23 @@ impl NativeIndexedSession {
         filename: String,
         subscriptions: Option<Vec<String>>,
         exit_subscriptions: Option<Vec<String>>,
+        function_map: Option<bool>,
     ) -> Result<Self> {
         let subscriptions = subscriptions.unwrap_or_default();
         let exit_subscriptions = exit_subscriptions.unwrap_or_default();
-        let parse_count = u32::from(!subscriptions.is_empty());
-        let (batch, scope_parents, node_summaries) = if subscriptions.is_empty() {
-            (
-                EventBatch {
+        let collect_function_map = function_map.unwrap_or(false);
+        let parse_count = u32::from(!subscriptions.is_empty() || collect_function_map);
+        let parts = if subscriptions.is_empty() && !collect_function_map {
+            MaterializedSessionParts {
+                batch: EventBatch {
                     events: Vec::new(),
                     node_count: 0,
                     emitted_count: 0,
                 },
-                Vec::new(),
-                Vec::new(),
-            )
+                scope_parents: Vec::new(),
+                node_summaries: Vec::new(),
+                function_map: None,
+            }
         } else {
             materialize_with_scope_parents(
                 &source,
@@ -134,8 +147,15 @@ impl NativeIndexedSession {
                 &exit_subscriptions,
                 None,
                 None,
+                collect_function_map,
             )?
         };
+        let MaterializedSessionParts {
+            batch,
+            scope_parents,
+            node_summaries,
+            function_map,
+        } = parts;
         let events = batch.events;
         let enter_event_indexes = index_enter_events(&events, batch.node_count);
         Ok(Self {
@@ -149,6 +169,7 @@ impl NativeIndexedSession {
             materialized_exit_subscriptions: exit_subscriptions,
             scope_parents,
             parse_count,
+            function_map,
             closed: false,
         })
     }
@@ -481,6 +502,11 @@ impl NativeIndexedSession {
         self.parse_count
     }
 
+    #[napi]
+    pub fn take_function_map(&mut self) -> Option<FunctionMap> {
+        self.function_map.take()
+    }
+
     fn ensure_open(&self) -> Result<()> {
         if self.closed {
             Err(Error::new(Status::GenericFailure, "session-closed"))
@@ -524,14 +550,21 @@ impl NativeIndexedSession {
                 materialized.push(subscription.clone());
             }
         }
-        let (batch, scope_parents, node_summaries) = materialize_with_scope_parents(
+        let parts = materialize_with_scope_parents(
             &self.source,
             &self.filename,
             &materialized,
             &missing_exits,
             None,
             None,
+            false,
         )?;
+        let MaterializedSessionParts {
+            batch,
+            scope_parents,
+            node_summaries,
+            ..
+        } = parts;
         self.parse_count += 1;
         self.node_count = batch.node_count;
         self.scope_parents = scope_parents;
@@ -719,7 +752,7 @@ pub fn classify_source(filename: &str, source: &str) -> ParseClassification {
     }
 }
 
-fn source_type(filename: &str, source: &str) -> Result<SourceType> {
+pub(crate) fn source_type(filename: &str, source: &str) -> Result<SourceType> {
     let classification = classify_source(filename, source);
     if !classification.supported {
         return Err(Error::new(Status::GenericFailure, classification.reason));
@@ -1569,6 +1602,7 @@ struct EventCollector<'a> {
     events: Vec<NativeEvent>,
     node_summaries: Vec<NodeSummary>,
     sequence: u32,
+    function_map: Option<FunctionMapCollector<'a>>,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -1701,12 +1735,18 @@ impl<'a> EventCollector<'a> {
 
 impl<'a> Visit<'a> for EventCollector<'a> {
     fn enter_node(&mut self, kind: AstKind<'a>) {
+        if let Some(function_map) = &mut self.function_map {
+            function_map.enter(kind);
+        }
         self.record_summary(kind);
         self.emit(kind, VisitSide::Enter);
     }
     fn leave_node(&mut self, kind: AstKind<'a>) {
         if self.exit_subscriptions[ast_kind_protocol_id(kind) as usize] {
             self.emit(kind, VisitSide::Exit);
+        }
+        if let Some(function_map) = &mut self.function_map {
+            function_map.leave(kind);
         }
     }
     fn visit_program(&mut self, program: &oxc_ast::ast::Program<'a>) {
@@ -1730,10 +1770,11 @@ pub fn materialize(
         exit_subscriptions,
         root_start,
         root_end,
+        false,
     )
-    .map(|(mut batch, _, _)| {
-        hydrate_exit_events(&mut batch.events);
-        batch
+    .map(|mut parts| {
+        hydrate_exit_events(&mut parts.batch.events);
+        parts.batch
     })
 }
 
@@ -1762,7 +1803,8 @@ fn materialize_with_scope_parents(
     exit_subscriptions: &[String],
     root_start: Option<u32>,
     root_end: Option<u32>,
-) -> Result<(EventBatch, Vec<u32>, Vec<NodeSummary>)> {
+    collect_function_map: bool,
+) -> Result<MaterializedSessionParts> {
     let allocator = Allocator::default();
     let parsed = Parser::new(&allocator, source, source_type(filename, source)?).parse();
     if !parsed.diagnostics.is_empty() {
@@ -1795,8 +1837,14 @@ fn materialize_with_scope_parents(
         events: Vec::new(),
         node_summaries: vec![NodeSummary::default(); semantic_return.semantic.nodes().len()],
         sequence: 0,
+        function_map: collect_function_map
+            .then(|| FunctionMapCollector::new(source, semantic_return.semantic.nodes(), filename)),
     };
     collector.visit_program(&parsed.program);
+    let function_map = collector
+        .function_map
+        .take()
+        .map(FunctionMapCollector::finish);
     let emitted_count = collector.events.len() as u32;
     let scope_parents = semantic_return
         .semantic
@@ -1810,15 +1858,16 @@ fn materialize_with_scope_parents(
                 .map_or(u32::MAX, |parent_id| parent_id.index() as u32)
         })
         .collect();
-    Ok((
-        EventBatch {
+    Ok(MaterializedSessionParts {
+        batch: EventBatch {
             events: collector.events,
             node_count: semantic_return.semantic.nodes().len() as u32,
             emitted_count,
         },
         scope_parents,
-        collector.node_summaries,
-    ))
+        node_summaries: collector.node_summaries,
+        function_map,
+    })
 }
 
 #[expect(
@@ -2243,7 +2292,9 @@ fn encode_routed_envelope(
         .map(|value| 4 + value.len() + (4 - value.len() % 4) % 4)
         .sum();
     let records_offset = 28 + strings_size;
-    let shape_flags = u32::from(manifest.include_parent) | (u32::from(manifest.include_scope) << 1);
+    let shape_flags = u32::from(manifest.include_parent)
+        | (u32::from(manifest.include_scope) << 1)
+        | (u32::from(manifest.include_exit) << 2);
     let mut output = Vec::with_capacity(records_offset + data.len());
     for word in [
         ROUTED_TAPE_MAGIC,
@@ -2479,10 +2530,15 @@ fn decode_route_manifest(data: &[u8]) -> Result<CompiledManifest> {
             "trailing routed manifest words",
         ));
     }
+    let include_exit = routes_by_type
+        .iter()
+        .flatten()
+        .any(|route| route.side == VisitSide::Exit);
     Ok(CompiledManifest {
         routes_by_type,
         include_parent: flags & 1 != 0,
         include_scope: flags & 2 != 0,
+        include_exit,
     })
 }
 

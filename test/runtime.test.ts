@@ -323,6 +323,98 @@ test('provides direct path fields and retained snapshots', () => {
   assert.ok(performance.utf8SlabBytes > 0);
 });
 
+test('generates Metro-compatible function maps natively', () => {
+  const pipeline = defineNativePipeline({
+    phases: [{ name: 'function-map', plugins: [] }],
+  });
+  const source = 'var x=1; function named(a){ return a } var inferred = function(){ return x };';
+  const result = transform(source, 'fixture.js', pipeline, {
+    functionMap: true,
+    debugPerformance: true,
+  });
+  assert.equal(result.status, 'complete');
+  if (result.status !== 'complete') return;
+  assert.deepEqual(result.functionMap, {
+    names: ['<global>', 'named', 'inferred'],
+    mappings: 'AAA,SC,6BD,gBE,sBF',
+  });
+  const performance = result.metadata.performance as {
+    nativeParses: number;
+    routeDeliveries: number;
+  };
+  assert.equal(performance.nativeParses, 1);
+  assert.equal(performance.routeDeliveries, 0);
+});
+
+test('matches Metro function naming and frame positions', () => {
+  const pipeline = defineNativePipeline({
+    phases: [{ name: 'function-map', plugins: [] }],
+  });
+  const fixtures = [
+    [
+      'class Foo { method(){} static make(){} get value(){return 1} }',
+      {
+        names: ['Foo', 'Foo#method', 'Foo.make', 'Foo#get__value'],
+        mappings: 'AAA,YC,UD,CE,eF,CG,qBH',
+      },
+    ],
+    [
+      'const obj={method(){}, arrow:()=>1};',
+      {
+        names: ['<global>', 'obj.method', 'obj.arrow'],
+        mappings: 'AAA,WC,UD,QE,KF',
+      },
+    ],
+    [
+      'useCallback(()=>1); foo(function(){}, ()=>2); export default function(){}',
+      {
+        names: ['<global>', '<anonymous>', 'foo$argument_0', 'foo$argument_1', 'default'],
+        mappings: 'AAA,YC,KD,OE,YF,EG,KH,kBI',
+      },
+    ],
+    [
+      'const obj={ ["x"](){}, [Symbol.iterator]: function(){} }; class C { ["y"](){} }',
+      {
+        names: ['<global>', 'obj.x', 'obj.@@iterator', 'C', 'C#y'],
+        mappings: 'AAA,YC,SD,qBE,YF,IG,UC,SD',
+      },
+    ],
+    [
+      'target.member = ()=>1; const frozen=Object.freeze(()=>2);',
+      {
+        names: ['<global>', 'target.member', 'frozen'],
+        mappings: 'AAA,gBC,KD,6BE,KF',
+      },
+    ],
+    [
+      'fixture.run=()=>1;',
+      {
+        names: ['<global>', 'run'],
+        mappings: 'AAA,YC,KD',
+      },
+    ],
+    [
+      'class C { field=()=>1; static make=()=>2 } const x = new Foo(()=>1);',
+      {
+        names: ['C', 'C#field', 'C.make', '<global>', 'Foo$argument_0'],
+        mappings: 'AAA,gBC,KD,cE,KF,EG,mBC,KD',
+      },
+    ],
+    [
+      '"use strict";\r\nfunction value(){\r\n return 1;\r\n}\r\n',
+      {
+        names: ['<global>', 'value'],
+        mappings: 'AAA;ACC;CDE',
+      },
+    ],
+  ] as const;
+  for (const [source, expected] of fixtures) {
+    const result = transform(source, 'fixture.js', pipeline, { functionMap: true });
+    assert.equal(result.status, 'complete');
+    if (result.status === 'complete') assert.deepEqual(result.functionMap, expected);
+  }
+});
+
 test('hydrates targeted snapshots once and retains exit ancestry and scope', () => {
   const snapshots: Readonly<Record<string, unknown>>[] = [];
   const plugin = defineNativePlugin({

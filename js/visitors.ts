@@ -42,6 +42,7 @@ import type {
   NativeFieldKey,
   NativeNodeType,
   NativeVisitorRoute,
+  FunctionMap,
   ControlFlowCapability,
   ScalarPredicate,
   EditEffect,
@@ -525,6 +526,7 @@ export class NativeTransformSession {
         this.#nativeFilename,
         [...initialSubscriptions],
         [...initialExitSubscriptions],
+        options.functionMap,
       );
     if (
       this.#native &&
@@ -540,6 +542,9 @@ export class NativeTransformSession {
   }
   get nativeParseCount(): number {
     return this.#nativeParseCount + (this.#native?.parseCount() ?? 0);
+  }
+  takeFunctionMap(): FunctionMap | null {
+    return this.#native?.takeFunctionMap() ?? null;
   }
   recordStatelessParse(): void {
     this.#nativeParseCount++;
@@ -1547,7 +1552,10 @@ export function transform(
     }
   }
   const originalSource = source;
+  const transformStarted = options.debugPerformance ? performance.now() : 0;
+  const phasePlanStarted = options.debugPerformance ? performance.now() : 0;
   const phasePlan = compilePhasePlan(pipeline);
+  const phasePlanMs = options.debugPerformance ? performance.now() - phasePlanStarted : 0;
   let phaseSource = source;
   let finalMap: NativeTransformResult['map'] | null = options.inputSourceMap ?? null;
   const metadata: Record<string, unknown> = {};
@@ -1571,6 +1579,18 @@ export function transform(
       nodeFacades: 0,
       snapshots: 0,
       scopeFacades: 0,
+      sourceBytes: Buffer.byteLength(source),
+      phasePlanMs,
+      phasePreparationMs: 0,
+      sessionOpenMs: 0,
+      nativeAndDecodeMs: 0,
+      dispatcherSetupMs: 0,
+      dispatchMs: 0,
+      pathConstructionMs: 0,
+      callbackMs: 0,
+      renderAndMapMs: 0,
+      functionMapMs: 0,
+      totalMs: 0,
     };
   const allStates: { plugin: NativePlugin<any, any>; state: any }[] = [];
   const deferredMapLayers: {
@@ -1582,6 +1602,7 @@ export function transform(
   let reusableSession: NativeTransformSession | null = null;
   let reusableRoutedBatch: { manifest: Buffer; batch: RoutedEventBatch } | null = null;
   let pendingEdits: EditCommand[] = [];
+  let nativeFunctionMap: FunctionMap | null = null;
   const recordedParseCounts = new WeakMap<NativeTransformSession, number>();
   try {
     for (let phaseIndex = 0; phaseIndex < pipeline.phases.length; phaseIndex++) {
@@ -1594,7 +1615,10 @@ export function transform(
         reusableRoutedBatch = null;
       }
       const edits: EditCommand[] = [];
+      const preparationStarted = options.debugPerformance ? performance.now() : 0;
       const prepared = preparePhase(phase, observationSource, filename, options, parser);
+      if (options.debugPerformance)
+        performanceCounters(metadata).phasePreparationMs += performance.now() - preparationStarted;
       const {
         activePlugins,
         plans,
@@ -1642,10 +1666,12 @@ export function transform(
       const retainsAdditionalIndex = [...materializationSubscriptions].some(
         type => !subscriptions.has(type),
       );
-      const requiresIndex = retainsAdditionalIndex || includeParent || includeScope;
+      const requiresIndex =
+        retainsAdditionalIndex || includeParent || includeScope || options.functionMap === true;
       if (manifest == null || compiledRoutes == null)
         throw new Error('compiled visitor dispatch invariant violated');
       const retainedSession = reusableSession;
+      const sessionStarted = options.debugPerformance ? performance.now() : 0;
       const session: NativeTransformSession =
         retainedSession ??
         new NativeTransformSession(
@@ -1660,11 +1686,14 @@ export function transform(
           staticMemberPatterns,
           [...exitSubscriptions],
         );
+      if (options.debugPerformance)
+        performanceCounters(metadata).sessionOpenMs += performance.now() - sessionStarted;
       if (phaseExecution) phaseExecution.reusedParse = retainedSession != null;
       reusableSession = null;
       openSession = session;
       let batch: RoutedEventBatch;
       {
+        const nativeStarted = options.debugPerformance ? performance.now() : 0;
         const cachedRouted = reusableRoutedBatch as {
           manifest: Buffer;
           batch: RoutedEventBatch;
@@ -1701,6 +1730,8 @@ export function transform(
           }
         }
         reusableRoutedBatch = null;
+        if (options.debugPerformance)
+          performanceCounters(metadata).nativeAndDecodeMs += performance.now() - nativeStarted;
       }
       if (options.debugPerformance) {
         const performance = metadata.performance as {
@@ -1716,10 +1747,13 @@ export function transform(
         performance.recordWords += batch.recordBytes / 4;
         performance.utf8SlabBytes += batch.stringSlabBytes;
       }
+      if (options.functionMap && nativeFunctionMap == null)
+        nativeFunctionMap = session.takeFunctionMap();
       const childParentTypes = activePlugins.flatMap(plugin =>
         Object.keys(plans.get(plugin)?.children ?? {}),
       );
       if (childParentTypes.length > 0) session.prefetchChildren([], childParentTypes);
+      const dispatcherStarted = options.debugPerformance ? performance.now() : 0;
       const dispatch = createDispatcher(
         session,
         phase,
@@ -1732,6 +1766,8 @@ export function transform(
         retainsAdditionalIndex || includeParent || includeScope,
         compiledRoutes,
       );
+      if (options.debugPerformance)
+        performanceCounters(metadata).dispatcherSetupMs += performance.now() - dispatcherStarted;
       for (const plugin of activePlugins) {
         const state = plugin.createState?.();
         allStates.push({ plugin, state });
@@ -1767,7 +1803,10 @@ export function transform(
           plugin.apply?.(entry.context, decision.analysis, entry.state);
         }
       }
+      const dispatchStarted = options.debugPerformance ? performance.now() : 0;
       dispatch.run();
+      if (options.debugPerformance)
+        performanceCounters(metadata).dispatchMs += performance.now() - dispatchStarted;
       for (const plugin of activePlugins)
         plugin.post?.(dispatch.contexts.get(plugin)!.context, dispatch.contexts.get(plugin)!.state);
       for (const plugin of activePlugins) {
@@ -1817,7 +1856,10 @@ export function transform(
       }
       const layerSource = phaseSource;
       const realizeMap = isFinalPhase || phasePlan[phaseIndex].requiresRealizedMap;
+      const renderStarted = options.debugPerformance ? performance.now() : 0;
       const committed = session.commit(effectiveEdits, realizeMap ? options.sourceMapMode : 'none');
+      if (options.debugPerformance)
+        performanceCounters(metadata).renderAndMapMs += performance.now() - renderStarted;
       phaseSource = committed.code;
       if (phaseExecution) phaseExecution.render = 'committed';
       pendingEdits = [];
@@ -1881,10 +1923,20 @@ export function transform(
       }
     }
     for (const { plugin, state } of allStates) plugin.cleanup?.('complete', state);
+    const functionMapStarted = options.debugPerformance ? performance.now() : 0;
+    const functionMap = options.functionMap
+      ? (nativeFunctionMap ??
+        native.generateFunctionMap(originalSource, parserFilename(filename, options.parser)))
+      : null;
+    if (options.debugPerformance)
+      performanceCounters(metadata).functionMapMs = performance.now() - functionMapStarted;
+    if (options.debugPerformance)
+      performanceCounters(metadata).totalMs = performance.now() - transformStarted;
     return {
       status: 'complete',
       code: phaseSource,
       map: finalMap ?? { mappings: '', names: [] },
+      functionMap,
       metadata,
       diagnostics,
     };
@@ -2120,12 +2172,12 @@ function createDispatcher(
     const path = makePath(runtime, event);
     currentSequence = event.sequence;
     if (routedCallbacks.length === 1) {
-      routedCallbacks[0](path, override ? overrideState : entry.state);
+      invokeCallback(runtime, routedCallbacks[0], path, override ? overrideState : entry.state);
       delivered?.add(deliveryKey);
       return;
     }
     for (const callback of routedCallbacks) {
-      callback(path, override ? overrideState : entry.state);
+      invokeCallback(runtime, callback, path, override ? overrideState : entry.state);
       delivered?.add(deliveryKey);
     }
   };
@@ -2219,8 +2271,10 @@ function createDispatcher(
       const runtime = (entry.pathRuntime ??= createPathRuntime(route.plugin, entry, entry.context));
       const path = makePath(runtime, event);
       currentSequence = event.sequence;
-      if (callback) callback(path, entry.state);
-      else for (const routeCallback of route.callbacks) routeCallback(path, entry.state);
+      if (callback) invokeCallback(runtime, callback, path, entry.state);
+      else
+        for (const routeCallback of route.callbacks)
+          invokeCallback(runtime, routeCallback, path, entry.state);
     };
   });
   return {
@@ -2233,6 +2287,22 @@ function createDispatcher(
       );
     },
   };
+}
+
+function invokeCallback(
+  runtime: PathRuntime,
+  callback: Handler<any>,
+  path: NativeNodePath,
+  state: any,
+): void {
+  const counters = runtime.performance;
+  if (!counters) {
+    callback(path, state);
+    return;
+  }
+  const started = performance.now();
+  callback(path, state);
+  counters.callbackMs += performance.now() - started;
 }
 
 function assertDeclaredControl(
@@ -2286,15 +2356,33 @@ type PerformanceAllocationCounters = {
   nodeFacades: number;
   snapshots: number;
   scopeFacades: number;
+  phasePreparationMs: number;
+  sessionOpenMs: number;
+  nativeAndDecodeMs: number;
+  dispatcherSetupMs: number;
+  dispatchMs: number;
+  pathConstructionMs: number;
+  callbackMs: number;
+  renderAndMapMs: number;
+  functionMapMs: number;
+  totalMs: number;
 };
+function performanceCounters(metadata: Record<string, unknown>): PerformanceAllocationCounters {
+  return metadata.performance as PerformanceAllocationCounters;
+}
 function optionsPerformance(
   metadata: Record<string, unknown>,
 ): PerformanceAllocationCounters | undefined {
   return metadata.performance as PerformanceAllocationCounters | undefined;
 }
 function allocatePath(runtime: PathRuntime, event: NativeEvent): NodePathImpl {
-  if (runtime.performance) runtime.performance.pathFacades++;
-  return new NodePathImpl(runtime, event);
+  const counters = runtime.performance;
+  if (!counters) return new NodePathImpl(runtime, event);
+  const started = performance.now();
+  counters.pathFacades++;
+  const path = new NodePathImpl(runtime, event);
+  counters.pathConstructionMs += performance.now() - started;
+  return path;
 }
 function makePath(runtime: PathRuntime, event: NativeEvent): NativeNodePath {
   return allocatePath(runtime, event);
