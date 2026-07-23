@@ -1,28 +1,11 @@
 import { bench } from 'vitest';
-import {
-  defineNativePipeline,
-  defineNativePlugin,
-  NativeTransformSession,
-  transform,
-} from '../dist/index.js';
+import { defineNativePipeline, defineNativePlugin, transform } from '../dist/index.js';
 import { generateLargeFileSource } from './large-file-corpus.js';
 
 const source = Array.from(
   { length: 2_000 },
   (_, index) => `export const value${index} = source${index} + ${index};`,
 ).join('\n');
-bench('subscribed Identifier event materialization', () => {
-  const session = NativeTransformSession.open(source, 'benchmark.js');
-  session.next(['Identifier']);
-  session.close();
-});
-
-bench('broad native event materialization', () => {
-  const session = NativeTransformSession.open(source, 'benchmark.js');
-  session.next(['*']);
-  session.close();
-});
-
 const visitorPipeline = defineNativePipeline({
   phases: [
     {

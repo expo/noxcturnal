@@ -11,29 +11,23 @@ use oxc_span::{GetSpan, SourceType};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::constant_eval::constant_for_kind;
-pub use crate::event_types::{
-    EventBatch, FieldRequest, NativeCommitResult, NativeEvent, NativeVlqMap, NodeField,
-    PackedEventBatch, ParseClassification,
-};
+pub use crate::event_types::{NativeCommitResult, NativeVlqMap, NodeField, ParseClassification};
 use crate::function_map::{FunctionMap, FunctionMapCollector};
 use crate::generated_event_schema::{
     FIELD_KEY_COUNT, NODE_TYPE_COUNT, ast_kind_protocol_id, field_key_id, field_key_name,
     node_type_id, node_type_name, predicate_field_supported,
 };
+use crate::retained_index::{
+    NativeBindingFact, NativeCallFact, NativeCaptureReference, NativeConstantFact, RetainedIndex,
+};
 use crate::{editor, sourcemap};
 
-struct PackedEventParts {
-    data: Vec<u8>,
-    strings: Vec<String>,
-    node_count: u32,
-    emitted_count: u32,
-}
-
 struct MaterializedSessionParts {
-    batch: EventBatch,
+    node_count: u32,
     scope_parents: Vec<u32>,
-    node_summaries: Vec<NodeSummary>,
+    retained_index: RetainedIndex,
     function_map: Option<FunctionMap>,
+    initial_routed_buffer: Option<Vec<u8>>,
 }
 
 const ROUTE_MANIFEST_MAGIC: u32 = 0x4e_52_4d_46; // NRMF
@@ -43,6 +37,12 @@ const MAX_ROUTE_PREDICATES: usize = 64;
 const MAX_PREDICATE_VALUES: usize = 1024;
 const MAX_ROUTE_PAYLOAD_FIELDS: usize = 64;
 const MAX_ROUTE_MANIFEST_BYTES: usize = 4 * 1024 * 1024;
+const RETAIN_IDENTIFIERS: u32 = 1 << 0;
+const RETAIN_CONSTANTS: u32 = 1 << 1;
+const RETAIN_CALLS: u32 = 1 << 2;
+const RETAIN_CHILDREN: u32 = 1 << 3;
+const RETAIN_INSPECTION: u32 = 1 << 4;
+const RETAIN_MODULE_FACTS: u32 = 1 << 5;
 
 #[derive(Clone)]
 struct CompiledPredicate {
@@ -79,6 +79,9 @@ struct CompiledManifest {
     include_parent: bool,
     include_scope: bool,
     include_exit: bool,
+    retention_capabilities: u32,
+    structural_parent_types: FxHashSet<u32>,
+    retained_fields_by_type: Vec<Vec<u32>>,
 }
 
 #[derive(Default)]
@@ -87,30 +90,18 @@ struct RoutedCounts {
     route_deliveries: u32,
 }
 
-#[derive(Clone, Copy, Default)]
-struct NodeSummary {
-    type_id: u32,
-    start: u32,
-    end: u32,
-    parent_id: Option<u32>,
-    parent_type_id: Option<u32>,
-    scope_id: u32,
-    scope_parent_id: Option<u32>,
-}
-
 #[napi]
 pub struct NativeIndexedSession {
     source: String,
     filename: String,
-    events: Vec<NativeEvent>,
-    enter_event_indexes: Vec<usize>,
-    node_summaries: Vec<NodeSummary>,
+    retained_index: RetainedIndex,
     node_count: u32,
-    materialized_subscriptions: Vec<String>,
-    materialized_exit_subscriptions: Vec<String>,
     scope_parents: Vec<u32>,
     parse_count: u32,
     function_map: Option<FunctionMap>,
+    initial_route_manifest: Option<Vec<u8>>,
+    initial_routed_buffer: Option<Vec<u8>>,
+    initial_routed_served: bool,
     closed: bool,
 }
 
@@ -120,196 +111,52 @@ impl NativeIndexedSession {
     pub fn new(
         source: String,
         filename: String,
-        subscriptions: Option<Vec<String>>,
-        exit_subscriptions: Option<Vec<String>>,
         function_map: Option<bool>,
+        retention_manifest: Option<Buffer>,
+        initial_route_manifest: Option<Buffer>,
+        build_initial_route: Option<bool>,
     ) -> Result<Self> {
-        let subscriptions = subscriptions.unwrap_or_default();
-        let exit_subscriptions = exit_subscriptions.unwrap_or_default();
         let collect_function_map = function_map.unwrap_or(false);
-        let parse_count = u32::from(!subscriptions.is_empty() || collect_function_map);
-        let parts = if subscriptions.is_empty() && !collect_function_map {
+        let has_retention = retention_manifest.is_some();
+        let has_initial_route = initial_route_manifest.is_some();
+        let parse_count = u32::from(collect_function_map || has_retention || has_initial_route);
+        let parts = if !collect_function_map && !has_retention && !has_initial_route {
             MaterializedSessionParts {
-                batch: EventBatch {
-                    events: Vec::new(),
-                    node_count: 0,
-                    emitted_count: 0,
-                },
+                node_count: 0,
                 scope_parents: Vec::new(),
-                node_summaries: Vec::new(),
+                retained_index: RetainedIndex::default(),
                 function_map: None,
+                initial_routed_buffer: None,
             }
         } else {
             materialize_with_scope_parents(
                 &source,
                 &filename,
-                &subscriptions,
-                &exit_subscriptions,
-                None,
-                None,
                 collect_function_map,
+                retention_manifest.as_deref(),
+                initial_route_manifest.as_deref(),
+                build_initial_route.unwrap_or(true),
             )?
         };
         let MaterializedSessionParts {
-            batch,
+            node_count,
             scope_parents,
-            node_summaries,
+            retained_index,
             function_map,
+            initial_routed_buffer,
         } = parts;
-        let events = batch.events;
-        let enter_event_indexes = index_enter_events(&events, batch.node_count);
         Ok(Self {
             source,
             filename,
-            events,
-            enter_event_indexes,
-            node_summaries,
-            node_count: batch.node_count,
-            materialized_subscriptions: subscriptions,
-            materialized_exit_subscriptions: exit_subscriptions,
+            retained_index,
+            node_count,
             scope_parents,
             parse_count,
             function_map,
+            initial_route_manifest: initial_route_manifest.map(|manifest| manifest.to_vec()),
+            initial_routed_buffer,
+            initial_routed_served: false,
             closed: false,
-        })
-    }
-
-    #[napi]
-    pub fn next(
-        &mut self,
-        subscriptions: Vec<String>,
-        root_start: Option<u32>,
-        root_end: Option<u32>,
-        field_requests: Option<Vec<FieldRequest>>,
-    ) -> Result<EventBatch> {
-        self.ensure_open()?;
-        self.ensure_materialized(&subscriptions, &subscriptions)?;
-        let root = root_start.zip(root_end);
-        let mut events: Vec<_> = self
-            .events
-            .iter()
-            .filter(|event| {
-                subscriptions
-                    .iter()
-                    .flat_map(|subscription| subscription.split('|'))
-                    .any(|subscription| alias_matches(subscription, &event.r#type))
-                    && root.is_none_or(|(start, end)| event.start >= start && event.end <= end)
-            })
-            .cloned()
-            .collect();
-        hydrate_exit_events(&mut events);
-        if let Some(requests) = field_requests {
-            for event in &mut events {
-                if let Some(request) = requests
-                    .iter()
-                    .find(|request| request.node_type == event.r#type)
-                {
-                    event
-                        .fields
-                        .retain(|field| request.fields.contains(&field.key));
-                }
-            }
-        }
-        Ok(EventBatch {
-            emitted_count: events.len() as u32,
-            events,
-            node_count: self.node_count,
-        })
-    }
-
-    #[napi]
-    pub fn next_packed(
-        &mut self,
-        subscriptions: Vec<String>,
-        root_start: Option<u32>,
-        root_end: Option<u32>,
-        field_requests: Option<Vec<FieldRequest>>,
-        exit_subscriptions: Option<Vec<String>>,
-    ) -> Result<PackedEventBatch> {
-        self.ensure_open()?;
-        let exit_subscriptions = exit_subscriptions.unwrap_or_default();
-        self.ensure_materialized(&subscriptions, &exit_subscriptions)?;
-        let root = root_start.zip(root_end);
-        let mut strings = Vec::<String>::new();
-        let mut string_ids = FxHashMap::<String, u32>::default();
-        let mut words = Vec::<u32>::new();
-        let mut emitted_count = 0;
-        let mut intern = |value: &str| {
-            if let Some(id) = string_ids.get(value) {
-                *id
-            } else {
-                let id = strings.len() as u32;
-                strings.push(value.to_owned());
-                string_ids.insert(value.to_owned(), id);
-                id
-            }
-        };
-        for event in self.events.iter().filter(|event| {
-            let selected = if event.side == "exit" {
-                &exit_subscriptions
-            } else {
-                &subscriptions
-            };
-            selected
-                .iter()
-                .flat_map(|subscription| subscription.split('|'))
-                .any(|subscription| alias_matches(subscription, &event.r#type))
-                && root.is_none_or(|(start, end)| event.start >= start && event.end <= end)
-        }) {
-            if event.side == "exit" {
-                words.extend([event.sequence | 0x8000_0000, event.id]);
-                emitted_count += 1;
-                continue;
-            }
-            let requested_fields = field_requests.as_ref().and_then(|requests| {
-                requests
-                    .iter()
-                    .find(|request| request.node_type == event.r#type)
-                    .map(|request| &request.fields)
-            });
-            let fields: Vec<_> = event
-                .fields
-                .iter()
-                .filter(|field| {
-                    requested_fields.is_none_or(|requested| requested.contains(&field.key))
-                })
-                .collect();
-            let type_tag =
-                node_type_id(&event.r#type).unwrap_or_else(|| 0x8000_0000 | intern(&event.r#type));
-            let parent_type_tag = event.parent_type.as_ref().map_or(u32::MAX, |value| {
-                node_type_id(value).unwrap_or_else(|| 0x8000_0000 | intern(value))
-            });
-            words.extend([
-                event.sequence,
-                event.id,
-                type_tag,
-                event.start,
-                event.end,
-                event.parent_id.unwrap_or(u32::MAX),
-                parent_type_tag,
-                event.scope_id,
-                event.scope_parent_id.unwrap_or(u32::MAX),
-                fields.len() as u32,
-            ]);
-            for field in fields {
-                words.push(
-                    field_key_id(&field.key).unwrap_or_else(|| 0x8000_0000 | intern(&field.key)),
-                );
-                words.push(
-                    packed_scalar(&field.key, &field.value).unwrap_or_else(|| intern(&field.value)),
-                );
-            }
-            emitted_count += 1;
-        }
-        let mut data = Vec::with_capacity(words.len() * 4);
-        for word in words {
-            data.extend_from_slice(&word.to_le_bytes());
-        }
-        Ok(PackedEventBatch {
-            data: data.into(),
-            strings,
-            node_count: self.node_count,
-            emitted_count,
         })
     }
 
@@ -321,73 +168,70 @@ impl NativeIndexedSession {
         root_end: Option<u32>,
     ) -> Result<Buffer> {
         self.ensure_open()?;
+        let is_initial_manifest = root_start.is_none()
+            && root_end.is_none()
+            && self
+                .initial_route_manifest
+                .as_deref()
+                .is_some_and(|initial| initial == manifest.as_ref());
         let manifest = decode_route_manifest(&manifest)?;
-        let mut subscriptions = Vec::new();
-        let mut exit_subscriptions = Vec::new();
-        for routes in &manifest.routes_by_type {
-            for route in routes {
-                let name = node_type_name(route.node_type_id)
-                    .expect("validated route node type")
-                    .to_owned();
-                if !subscriptions.contains(&name) {
-                    subscriptions.push(name.clone());
-                }
-                if route.side == VisitSide::Exit && !exit_subscriptions.contains(&name) {
-                    exit_subscriptions.push(name);
-                }
+        if root_start.is_none() && root_end.is_none() && self.initial_routed_buffer.is_some() {
+            if !is_initial_manifest && !self.initial_routed_served {
+                return Err(Error::new(
+                    Status::GenericFailure,
+                    "route manifest does not match the compiled retention plan",
+                ));
+            }
+            if is_initial_manifest {
+                self.initial_routed_served = true;
+                return self
+                    .initial_routed_buffer
+                    .clone()
+                    .map(Buffer::from)
+                    .ok_or_else(|| {
+                        Error::new(
+                            Status::GenericFailure,
+                            "initial routed buffer was not constructed",
+                        )
+                    });
             }
         }
-        self.ensure_materialized(&subscriptions, &exit_subscriptions)?;
         routed_buffer_from_index(
             &manifest,
-            &self.events,
-            &self.enter_event_indexes,
-            self.node_count,
+            &self.retained_index,
+            &self.scope_parents,
             root_start.zip(root_end),
         )
     }
 
     #[napi]
-    pub fn inspect(&mut self, node_ids: Vec<u32>) -> Result<Vec<NativeEvent>> {
+    pub fn inspect_packed_buffer(&mut self, node_ids: Vec<u32>) -> Result<Buffer> {
         self.ensure_open()?;
-        self.ensure_materialized(&["*".into()], &[])?;
-        Ok(node_ids
-            .into_iter()
-            .filter_map(|id| {
-                let index = *self.enter_event_indexes.get(id as usize)?;
-                self.events.get(index).cloned()
-            })
-            .collect())
+        if !node_ids.is_empty() && !self.retained_index.has_scalar_fields() {
+            return Err(Error::new(
+                Status::GenericFailure,
+                "undeclared-retention-capability: inspection",
+            ));
+        }
+        Ok(self
+            .retained_index
+            .packed_events_buffer(&node_ids, &self.scope_parents))
     }
 
     #[napi]
-    pub fn node_summary(&self, node_id: u32) -> Result<Option<NativeEvent>> {
+    pub fn node_summary_buffer(&self, node_id: u32) -> Result<Buffer> {
         self.ensure_open()?;
         Ok(self
-            .node_summaries
-            .get(node_id as usize)
-            .copied()
-            .map(|summary| summary.event(node_id)))
+            .retained_index
+            .summary_buffer(node_id, &self.scope_parents))
     }
 
     #[napi]
-    pub fn node_summaries_buffer(&self) -> Result<Buffer> {
+    pub fn node_summary_buffers(&self, node_ids: Vec<u32>) -> Result<Buffer> {
         self.ensure_open()?;
-        let mut output = Vec::with_capacity(self.node_summaries.len() * 7 * 4);
-        for summary in &self.node_summaries {
-            for word in [
-                summary.type_id,
-                summary.start,
-                summary.end,
-                summary.parent_id.unwrap_or(u32::MAX),
-                summary.parent_type_id.unwrap_or(u32::MAX),
-                summary.scope_id,
-                summary.scope_parent_id.unwrap_or(u32::MAX),
-            ] {
-                output.extend_from_slice(&word.to_le_bytes());
-            }
-        }
-        Ok(output.into())
+        Ok(self
+            .retained_index
+            .summary_buffers(&node_ids, &self.scope_parents))
     }
 
     #[napi]
@@ -398,60 +242,121 @@ impl NativeIndexedSession {
         parent_type_ids: Vec<u32>,
     ) -> Result<Buffer> {
         self.ensure_open()?;
-        self.ensure_materialized(&["*".into()], &[])?;
         let mut parent_ids = parent_ids.into_iter().collect::<FxHashSet<_>>();
-        let parent_type_ids = parent_type_ids.into_iter().collect::<FxHashSet<_>>();
-        parent_ids.extend(
-            self.events
-                .iter()
-                .filter(|event| event.side == "enter")
-                .filter(|event| {
-                    node_type_id(&event.r#type).is_some_and(|id| parent_type_ids.contains(&id))
-                        || parent_types
-                            .iter()
-                            .any(|parent_type| alias_matches(parent_type, &event.r#type))
-                })
-                .map(|event| event.id),
-        );
-        Ok(pack_event_refs(
-            self.events.iter().filter(|event| {
-                event.side == "enter"
-                    && event
-                        .parent_id
-                        .is_some_and(|parent_id| parent_ids.contains(&parent_id))
-            }),
-            self.node_count,
+        let mut parent_type_ids = parent_type_ids.into_iter().collect::<FxHashSet<_>>();
+        for type_id in 0..NODE_TYPE_COUNT as u32 {
+            if let Some(node_type) = node_type_name(type_id)
+                && parent_types
+                    .iter()
+                    .any(|parent_type| alias_matches(parent_type, node_type))
+            {
+                parent_type_ids.insert(type_id);
+            }
+        }
+        parent_ids.extend(self.retained_index.node_ids_of_types(&parent_type_ids));
+        let child_ids = parent_ids
+            .iter()
+            .flat_map(|parent_id| self.retained_index.children(*parent_id))
+            .collect::<FxHashSet<_>>();
+        let ordered_child_ids = (0..self.node_count)
+            .filter(|node_id| child_ids.contains(node_id))
+            .collect::<Vec<_>>();
+        Ok(self
+            .retained_index
+            .packed_events_buffer(&ordered_child_ids, &self.scope_parents))
+    }
+
+    #[napi]
+    pub fn query_constants(&self, node_ids: Vec<u32>) -> Result<Vec<NativeConstantFact>> {
+        self.ensure_open()?;
+        Ok(self.retained_index.constant_facts(&node_ids))
+    }
+
+    #[napi]
+    pub fn query_calls(
+        &self,
+        callee_name: String,
+        global_only: Option<bool>,
+        static_arguments: Option<bool>,
+    ) -> Result<Vec<NativeCallFact>> {
+        self.ensure_open()?;
+        Ok(self.retained_index.call_facts(
+            &callee_name,
+            global_only.unwrap_or(false),
+            static_arguments.unwrap_or(false),
         ))
     }
 
     #[napi]
-    pub fn constants_packed_buffer(&mut self, node_ids: Vec<u32>) -> Result<Buffer> {
+    pub fn query_nodes_packed_buffer(&self, node_types: Vec<String>) -> Result<Buffer> {
         self.ensure_open()?;
-        self.ensure_materialized(&["Expression".into()], &[])?;
-        let node_ids = node_ids.into_iter().collect::<FxHashSet<_>>();
-        Ok(pack_event_refs(
-            self.events
-                .iter()
-                .filter(|event| event.side == "enter" && node_ids.contains(&event.id)),
-            self.node_count,
-        ))
+        let type_ids = node_types
+            .iter()
+            .filter_map(|node_type| node_type_id(node_type))
+            .collect::<FxHashSet<_>>();
+        let node_ids = self
+            .retained_index
+            .node_ids_of_types(&type_ids)
+            .collect::<Vec<_>>();
+        Ok(self
+            .retained_index
+            .packed_events_buffer(&node_ids, &self.scope_parents))
     }
 
     #[napi]
     pub fn query_globals(&mut self, names: Vec<String>) -> Result<Vec<GlobalFact>> {
         self.ensure_open()?;
-        self.ensure_materialized(&["Identifier".into()], &[])?;
-        Ok(globals_from_events(&self.events, &names))
+        Ok(names
+            .into_iter()
+            .map(|name| GlobalFact {
+                references: self
+                    .retained_index
+                    .global_references(&name)
+                    .into_iter()
+                    .map(|reference| GlobalReference {
+                        id: reference.id,
+                        start: reference.start,
+                        end: reference.end,
+                    })
+                    .collect(),
+                name,
+            })
+            .collect())
     }
 
     #[napi]
-    pub fn scope_parents_buffer(&self) -> Result<Buffer> {
+    pub fn query_bindings(
+        &mut self,
+        name: Option<String>,
+        scope_id: Option<u32>,
+        reads: Option<bool>,
+        writes: Option<bool>,
+    ) -> Result<Vec<NativeBindingFact>> {
         self.ensure_open()?;
-        let mut data = Vec::with_capacity(self.scope_parents.len() * 4);
-        for parent in &self.scope_parents {
-            data.extend_from_slice(&parent.to_le_bytes());
-        }
-        Ok(data.into())
+        Ok(self.retained_index.binding_facts(
+            name.as_deref(),
+            scope_id,
+            reads.unwrap_or(false),
+            writes.unwrap_or(false),
+        ))
+    }
+
+    #[napi]
+    pub fn query_captures(&mut self, function_id: u32) -> Result<Vec<NativeCaptureReference>> {
+        self.ensure_open()?;
+        Ok(self
+            .retained_index
+            .captures(function_id, &self.scope_parents))
+    }
+
+    #[napi]
+    pub fn scope_parent_id(&self, scope_id: u32) -> Result<Option<u32>> {
+        self.ensure_open()?;
+        Ok(self
+            .scope_parents
+            .get(scope_id as usize)
+            .copied()
+            .filter(|parent| *parent != u32::MAX))
     }
 
     #[napi]
@@ -467,33 +372,23 @@ impl NativeIndexedSession {
     #[napi]
     pub fn close(&mut self) {
         self.closed = true;
-        self.events.clear();
-        self.enter_event_indexes.clear();
-        self.node_summaries.clear();
+        self.retained_index.clear();
         self.scope_parents.clear();
+        self.initial_route_manifest = None;
+        self.initial_routed_buffer = None;
+        self.initial_routed_served = true;
     }
 
     #[napi]
     pub fn memory_usage(&self) -> u32 {
-        let event_bytes: usize = self
-            .events
-            .iter()
-            .map(|event| {
-                std::mem::size_of::<NativeEvent>()
-                    + event.r#type.len()
-                    + event.parent_type.as_ref().map_or(0, String::len)
-                    + event
-                        .fields
-                        .iter()
-                        .map(|field| field.key.len() + field.value.len())
-                        .sum::<usize>()
-            })
-            .sum();
         (self.source.len()
             + self.filename.len()
-            + event_bytes
-            + self.node_summaries.len() * std::mem::size_of::<NodeSummary>()
-            + self.enter_event_indexes.len() * std::mem::size_of::<usize>())
+            + self.retained_index.memory_usage()
+            + self
+                .initial_route_manifest
+                .as_ref()
+                .map_or(0, Vec::capacity)
+            + self.initial_routed_buffer.as_ref().map_or(0, Vec::capacity))
         .min(u32::MAX as usize) as u32
     }
 
@@ -514,194 +409,6 @@ impl NativeIndexedSession {
             Ok(())
         }
     }
-
-    fn ensure_materialized(
-        &mut self,
-        subscriptions: &[String],
-        exit_subscriptions: &[String],
-    ) -> Result<()> {
-        let missing: Vec<String> = subscriptions
-            .iter()
-            .filter(|subscription| {
-                !self.materialized_subscriptions.iter().any(|existing| {
-                    existing == "*"
-                        || existing == *subscription
-                        || (existing == "Expression" && expression_subscription(subscription))
-                })
-            })
-            .cloned()
-            .collect();
-        let missing_exits: Vec<String> = exit_subscriptions
-            .iter()
-            .filter(|subscription| {
-                !self
-                    .materialized_exit_subscriptions
-                    .iter()
-                    .any(|existing| existing == "*" || existing == *subscription)
-            })
-            .cloned()
-            .collect();
-        if missing.is_empty() && missing_exits.is_empty() {
-            return Ok(());
-        }
-        let mut materialized = missing.clone();
-        for subscription in &missing_exits {
-            if !materialized.iter().any(|existing| existing == subscription) {
-                materialized.push(subscription.clone());
-            }
-        }
-        let parts = materialize_with_scope_parents(
-            &self.source,
-            &self.filename,
-            &materialized,
-            &missing_exits,
-            None,
-            None,
-            false,
-        )?;
-        let MaterializedSessionParts {
-            batch,
-            scope_parents,
-            node_summaries,
-            ..
-        } = parts;
-        self.parse_count += 1;
-        self.node_count = batch.node_count;
-        self.scope_parents = scope_parents;
-        if self.node_summaries.is_empty() {
-            self.node_summaries = node_summaries;
-        }
-        let mut existing = FxHashSet::default();
-        for event in &self.events {
-            existing.insert((event.id, event.side.clone()));
-        }
-        self.events.extend(
-            batch
-                .events
-                .into_iter()
-                .filter(|event| existing.insert((event.id, event.side.clone()))),
-        );
-        self.events.sort_by_key(|event| event.sequence);
-        self.enter_event_indexes = index_enter_events(&self.events, self.node_count);
-        self.materialized_subscriptions.extend(missing);
-        self.materialized_exit_subscriptions.extend(missing_exits);
-        Ok(())
-    }
-}
-
-impl NodeSummary {
-    fn event(self, id: u32) -> NativeEvent {
-        NativeEvent {
-            sequence: id,
-            side: "enter".into(),
-            id,
-            r#type: node_type_name(self.type_id).unwrap_or("Unknown").into(),
-            start: self.start,
-            end: self.end,
-            parent_id: self.parent_id,
-            parent_type: self
-                .parent_type_id
-                .and_then(node_type_name)
-                .map(str::to_owned),
-            scope_id: self.scope_id,
-            scope_parent_id: self.scope_parent_id,
-            fields: Vec::new(),
-        }
-    }
-}
-
-fn index_enter_events(events: &[NativeEvent], node_count: u32) -> Vec<usize> {
-    let mut indexes = vec![usize::MAX; node_count as usize];
-    for (index, event) in events.iter().enumerate() {
-        if event.side == "enter"
-            && let Some(slot) = indexes.get_mut(event.id as usize)
-        {
-            *slot = index;
-        }
-    }
-    indexes
-}
-
-fn pack_event_refs<'a>(events: impl Iterator<Item = &'a NativeEvent>, node_count: u32) -> Buffer {
-    let mut strings = Vec::<String>::new();
-    let mut string_ids = FxHashMap::<String, u32>::default();
-    let mut words = Vec::<u32>::new();
-    let mut emitted_count = 0_u32;
-    let mut intern = |value: &str| {
-        if let Some(id) = string_ids.get(value) {
-            *id
-        } else {
-            let id = strings.len() as u32;
-            strings.push(value.to_owned());
-            string_ids.insert(value.to_owned(), id);
-            id
-        }
-    };
-    for event in events {
-        let type_tag =
-            node_type_id(&event.r#type).unwrap_or_else(|| 0x8000_0000 | intern(&event.r#type));
-        let parent_type_tag = event.parent_type.as_ref().map_or(u32::MAX, |value| {
-            node_type_id(value).unwrap_or_else(|| 0x8000_0000 | intern(value))
-        });
-        words.extend([
-            event.sequence,
-            event.id,
-            type_tag,
-            event.start,
-            event.end,
-            event.parent_id.unwrap_or(u32::MAX),
-            parent_type_tag,
-            event.scope_id,
-            event.scope_parent_id.unwrap_or(u32::MAX),
-            event.fields.len() as u32,
-        ]);
-        for field in &event.fields {
-            words
-                .push(field_key_id(&field.key).unwrap_or_else(|| 0x8000_0000 | intern(&field.key)));
-            words.push(
-                packed_scalar(&field.key, &field.value).unwrap_or_else(|| intern(&field.value)),
-            );
-        }
-        emitted_count += 1;
-    }
-    let strings_size: usize = strings
-        .iter()
-        .map(|value| 4 + value.len() + (4 - value.len() % 4) % 4)
-        .sum();
-    let words_offset = 16 + strings_size;
-    let mut output = Vec::with_capacity(words_offset + words.len() * 4);
-    for word in [
-        node_count | 0xc000_0000,
-        emitted_count,
-        strings.len() as u32,
-        words_offset as u32,
-    ] {
-        output.extend_from_slice(&word.to_le_bytes());
-    }
-    for value in strings {
-        output.extend_from_slice(&(value.len() as u32).to_le_bytes());
-        output.extend_from_slice(value.as_bytes());
-        output.resize(output.len().next_multiple_of(4), 0);
-    }
-    for word in words {
-        output.extend_from_slice(&word.to_le_bytes());
-    }
-    output.into()
-}
-
-fn expression_subscription(subscription: &str) -> bool {
-    subscription.ends_with("Expression")
-        || matches!(
-            subscription,
-            "Identifier"
-                | "StringLiteral"
-                | "NumericLiteral"
-                | "BooleanLiteral"
-                | "BigIntLiteral"
-                | "RegExpLiteral"
-                | "NullLiteral"
-                | "TemplateLiteral"
-        )
 }
 
 #[napi(object)]
@@ -781,21 +488,6 @@ fn utf16_index<'a>(source: &str, allocator: &'a Allocator) -> ArenaVec<'a, u32> 
     offsets
 }
 
-fn kind_name(kind: AstKind<'_>) -> String {
-    match kind {
-        AstKind::Directive(_) => "Directive".into(),
-        AstKind::IdentifierReference(_) => "Identifier".into(),
-        AstKind::BindingIdentifier(_) => "Identifier".into(),
-        AstKind::IdentifierName(_) => "Identifier".into(),
-        _ => kind
-            .debug_name()
-            .split('(')
-            .next()
-            .unwrap_or("Unknown")
-            .into(),
-    }
-}
-
 fn alias_matches(subscription: &str, node_type: &str) -> bool {
     subscription == "*"
         || subscription == node_type
@@ -823,6 +515,21 @@ fn alias_matches(subscription: &str, node_type: &str) -> bool {
             "FunctionDeclaration" | "FunctionExpression" | "TSDeclareFunction"
         ) && node_type == "Function")
         || (matches!(subscription, "ClassDeclaration" | "ClassExpression") && node_type == "Class")
+}
+
+fn expression_subscription(node_type: &str) -> bool {
+    node_type.ends_with("Expression")
+        || matches!(
+            node_type,
+            "Identifier"
+                | "StringLiteral"
+                | "NumericLiteral"
+                | "BooleanLiteral"
+                | "BigIntLiteral"
+                | "RegExpLiteral"
+                | "NullLiteral"
+                | "TemplateLiteral"
+        )
 }
 
 fn declaration_subscription(node_type: &str) -> bool {
@@ -1593,16 +1300,14 @@ fn fields(kind: AstKind<'_>, scoping: &Scoping, requested: Option<&[String]>) ->
 }
 
 struct EventCollector<'a> {
-    subscriptions: [bool; NODE_TYPE_COUNT + 1],
-    exit_subscriptions: [bool; NODE_TYPE_COUNT + 1],
     nodes: &'a AstNodes<'a>,
     scoping: &'a Scoping,
     utf16: Option<&'a [u32]>,
-    root: Option<(u32, u32)>,
-    events: Vec<NativeEvent>,
-    node_summaries: Vec<NodeSummary>,
-    sequence: u32,
+    retained_index: RetainedIndex,
     function_map: Option<FunctionMapCollector<'a>>,
+    retention_routes: Option<&'a CompiledManifest>,
+    retention_capabilities: u32,
+    retained_string_ids: FxHashMap<String, u32>,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -1611,16 +1316,14 @@ enum VisitSide {
     Exit,
 }
 
-impl VisitSide {
-    const fn as_str(self) -> &'static str {
-        match self {
-            Self::Enter => "enter",
-            Self::Exit => "exit",
-        }
-    }
-}
-
 impl<'a> EventCollector<'a> {
+    fn retains_traversal_kind(&self, kind: AstKind<'a>) -> bool {
+        self.retention_capabilities & RETAIN_INSPECTION != 0
+            || self.retention_routes.is_some_and(|manifest| {
+                !manifest.routes_by_type[ast_kind_protocol_id(kind) as usize].is_empty()
+            })
+    }
+
     fn record_summary(&mut self, kind: AstKind<'a>) {
         let id = kind.node_id();
         let node = self.nodes.get_node(id);
@@ -1633,117 +1336,139 @@ impl<'a> EventCollector<'a> {
             _ => node.scope_id(),
         };
         let is_root = id.index() == 0;
-        self.node_summaries[id.index()] = NodeSummary {
-            type_id: ast_kind_protocol_id(kind),
-            start: self
-                .utf16
+        self.retained_index.record(
+            id.index() as u32,
+            ast_kind_protocol_id(kind),
+            self.utf16
                 .map_or(span.start, |index| index[span.start as usize]),
-            end: self
-                .utf16
+            self.utf16
                 .map_or(span.end, |index| index[span.end as usize]),
-            parent_id: (!is_root).then(|| self.nodes.parent_id(id).index() as u32),
-            parent_type_id: (!is_root).then(|| ast_kind_protocol_id(self.nodes.parent_kind(id))),
-            scope_id: scope_id.index() as u32,
-            scope_parent_id: self
-                .scoping
-                .scope_parent_id(scope_id)
-                .map(|id| id.index() as u32),
-        };
-    }
-
-    fn emit(&mut self, kind: AstKind<'a>, side: VisitSide) {
-        let sequence = self.sequence;
-        self.sequence += 1;
-        let span = kind.span();
-        let start = self
-            .utf16
-            .map_or(span.start, |index| index[span.start as usize]);
-        let end = self
-            .utf16
-            .map_or(span.end, |index| index[span.end as usize]);
-        if self
-            .root
-            .is_some_and(|(root_start, root_end)| start < root_start || end > root_end)
+            (!is_root).then(|| self.nodes.parent_id(id).index() as u32),
+            scope_id.index() as u32,
+        );
+        self.retained_index.record_semantics(
+            kind,
+            self.scoping,
+            id.index() as u32,
+            scope_id.index() as u32,
+            self.retention_capabilities & RETAIN_IDENTIFIERS != 0,
+        );
+        if self.retention_capabilities & RETAIN_CALLS != 0
+            && matches!(kind, AstKind::CallExpression(_))
         {
-            return;
-        }
-        let protocol_id = ast_kind_protocol_id(kind);
-        if !self.subscriptions[protocol_id as usize] {
-            return;
-        }
-        let node_type = node_type_name(protocol_id)
-            .expect("generated protocol covers every Oxc AstKind")
-            .to_owned();
-        let id = kind.node_id();
-        if side == VisitSide::Exit {
-            self.events.push(NativeEvent {
-                sequence,
-                side: side.as_str().into(),
-                id: id.index() as u32,
-                r#type: node_type,
-                start,
-                end,
-                parent_id: None,
-                parent_type: None,
-                scope_id: 0,
-                scope_parent_id: None,
-                fields: Vec::new(),
-            });
-            return;
-        }
-        let node = self.nodes.get_node(id);
-        let scope_id = match kind {
-            AstKind::Function(function) => function.scope_id.get().unwrap_or(node.scope_id()),
-            AstKind::ArrowFunctionExpression(function) => {
-                function.scope_id.get().unwrap_or(node.scope_id())
-            }
-            _ => node.scope_id(),
-        };
-        let is_root = id.index() == 0;
-        let parent_id = (!is_root).then(|| self.nodes.parent_id(id).index() as u32);
-        let parent_type = (!is_root).then(|| kind_name(self.nodes.parent_kind(id)));
-        let mut node_fields = fields(kind, self.scoping, None);
-        for field in &mut node_fields {
-            if let Some(name) = field.key.strip_suffix("Byte")
-                && let Ok(offset) = field.value.parse::<usize>()
-            {
-                field.key = name.into();
-                field.value = self
-                    .utf16
-                    .map_or(offset as u32, |index| index[offset])
-                    .to_string();
+            let call_fields = fields(
+                kind,
+                self.scoping,
+                Some(&[
+                    "calleeName".into(),
+                    "calleeGlobal".into(),
+                    "staticArgument".into(),
+                ]),
+            );
+            let field = |key: &str| {
+                call_fields
+                    .iter()
+                    .find(|field| field.key == key)
+                    .map(|field| field.value.as_str())
+            };
+            if let Some(callee_name) = field("calleeName") {
+                self.retained_index.record_call(
+                    id.index() as u32,
+                    callee_name,
+                    field("calleeGlobal") == Some("true"),
+                    field("staticArgument").map(str::to_owned),
+                );
             }
         }
-        self.events.push(NativeEvent {
-            sequence,
-            side: side.as_str().into(),
-            id: id.index() as u32,
-            r#type: node_type,
-            start,
-            end,
-            parent_id,
-            parent_type,
-            scope_id: scope_id.index() as u32,
-            scope_parent_id: self
-                .scoping
-                .scope_parent_id(scope_id)
-                .map(|id| id.index() as u32),
-            fields: node_fields,
+        let retain_all_fields = self.retention_capabilities & RETAIN_MODULE_FACTS != 0;
+        let retain_structural_fields = self.retention_routes.is_some_and(|manifest| {
+            id.index() != 0
+                && manifest
+                    .structural_parent_types
+                    .contains(&ast_kind_protocol_id(self.nodes.parent_kind(id)))
         });
+        let protocol_id = ast_kind_protocol_id(kind);
+        let requested_route_fields = self
+            .retention_routes
+            .map(|manifest| &manifest.routes_by_type[protocol_id as usize])
+            .filter(|routes| !routes.is_empty())
+            .map(|routes| {
+                let mut names = Vec::new();
+                for field_id in routes.iter().flat_map(|route| {
+                    route
+                        .payload_field_ids
+                        .iter()
+                        .copied()
+                        .chain(route.predicates.iter().map(|predicate| predicate.field_id))
+                }) {
+                    let name = field_key_name(field_id)
+                        .expect("validated retained route field")
+                        .to_owned();
+                    if !names.contains(&name) {
+                        names.push(name);
+                    }
+                }
+                names
+            });
+        let retained_plan_fields = self
+            .retention_routes
+            .map(|manifest| &manifest.retained_fields_by_type[protocol_id as usize])
+            .filter(|fields| !fields.is_empty());
+        if retain_all_fields
+            || retain_structural_fields
+            || requested_route_fields.is_some()
+            || retained_plan_fields.is_some()
+        {
+            let requested_fields = requested_route_fields
+                .unwrap_or_default()
+                .into_iter()
+                .chain(
+                    retained_plan_fields
+                        .into_iter()
+                        .flatten()
+                        .filter_map(|field_id| field_key_name(*field_id).map(str::to_owned)),
+                )
+                .collect::<FxHashSet<_>>()
+                .into_iter()
+                .collect::<Vec<_>>();
+            let member_path = if let AstKind::StaticMemberExpression(member) = kind {
+                static_member_path(&member.object)
+                    .map(|object| format!("{object}.{}", member.property.name))
+            } else {
+                None
+            };
+            let retained_fields = packed_fields_direct(
+                kind,
+                self.scoping,
+                self.utf16,
+                (!retain_all_fields && !retain_structural_fields)
+                    .then_some(requested_fields.as_slice()),
+                member_path.as_deref(),
+                &mut self.retained_string_ids,
+            );
+            if let Some(retained_fields) = retained_fields {
+                self.retained_index.record_packed_fields(
+                    id.index() as u32,
+                    &retained_fields.words[..retained_fields.len],
+                );
+            }
+        }
     }
 }
 
 impl<'a> Visit<'a> for EventCollector<'a> {
     fn enter_node(&mut self, kind: AstKind<'a>) {
+        self.retained_index
+            .record_enter(kind.node_id().index() as u32);
         if let Some(function_map) = &mut self.function_map {
             function_map.enter(kind);
         }
         self.record_summary(kind);
-        self.emit(kind, VisitSide::Enter);
     }
     fn leave_node(&mut self, kind: AstKind<'a>) {
-        if self.exit_subscriptions[ast_kind_protocol_id(kind) as usize] {
-            self.emit(kind, VisitSide::Exit);
+        if self.retains_traversal_kind(kind) {
+            self.retained_index
+                .record_exit(kind.node_id().index() as u32);
         }
         if let Some(function_map) = &mut self.function_map {
             function_map.leave(kind);
@@ -1754,56 +1479,13 @@ impl<'a> Visit<'a> for EventCollector<'a> {
     }
 }
 
-pub fn materialize(
-    source: &str,
-    filename: &str,
-    subscriptions: &[String],
-    root_start: Option<u32>,
-    root_end: Option<u32>,
-    include_exit: bool,
-) -> Result<EventBatch> {
-    let exit_subscriptions = if include_exit { subscriptions } else { &[] };
-    materialize_with_scope_parents(
-        source,
-        filename,
-        subscriptions,
-        exit_subscriptions,
-        root_start,
-        root_end,
-        false,
-    )
-    .map(|mut parts| {
-        hydrate_exit_events(&mut parts.batch.events);
-        parts.batch
-    })
-}
-
-fn hydrate_exit_events(events: &mut [NativeEvent]) {
-    let mut enters = FxHashMap::default();
-    for index in 0..events.len() {
-        if events[index].side == "enter" {
-            enters.insert(events[index].id, index);
-            continue;
-        }
-        let Some(&enter_index) = enters.get(&events[index].id) else {
-            continue;
-        };
-        let sequence = events[index].sequence;
-        let mut exit = events[enter_index].clone();
-        exit.sequence = sequence;
-        exit.side = "exit".into();
-        events[index] = exit;
-    }
-}
-
 fn materialize_with_scope_parents(
     source: &str,
     filename: &str,
-    subscriptions: &[String],
-    exit_subscriptions: &[String],
-    root_start: Option<u32>,
-    root_end: Option<u32>,
     collect_function_map: bool,
+    retention_manifest: Option<&[u8]>,
+    initial_route_manifest: Option<&[u8]>,
+    build_initial_route: bool,
 ) -> Result<MaterializedSessionParts> {
     let allocator = Allocator::default();
     let parsed = Parser::new(&allocator, source, source_type(filename, source)?).parse();
@@ -1827,25 +1509,18 @@ fn materialize_with_scope_parents(
         ));
     }
     let utf16 = (!source.is_ascii()).then(|| utf16_index(source, &allocator));
-    let mut collector = EventCollector {
-        subscriptions: subscription_set_from_names(subscriptions),
-        exit_subscriptions: subscription_set_from_names(exit_subscriptions),
-        nodes: semantic_return.semantic.nodes(),
-        scoping: semantic_return.semantic.scoping(),
-        utf16: utf16.as_deref().map(|offsets| &**offsets),
-        root: root_start.zip(root_end),
-        events: Vec::new(),
-        node_summaries: vec![NodeSummary::default(); semantic_return.semantic.nodes().len()],
-        sequence: 0,
-        function_map: collect_function_map
-            .then(|| FunctionMapCollector::new(source, semantic_return.semantic.nodes(), filename)),
-    };
-    collector.visit_program(&parsed.program);
-    let function_map = collector
-        .function_map
-        .take()
-        .map(FunctionMapCollector::finish);
-    let emitted_count = collector.events.len() as u32;
+    let compiled_manifest = initial_route_manifest
+        .map(decode_route_manifest)
+        .transpose()?;
+    let retention_manifest = retention_manifest.map(decode_route_manifest).transpose()?;
+    let retention_capabilities = retention_manifest
+        .as_ref()
+        .or(compiled_manifest.as_ref())
+        .map_or(u32::MAX, |manifest| manifest.retention_capabilities);
+    let structural_parent_types = retention_manifest
+        .as_ref()
+        .or(compiled_manifest.as_ref())
+        .map(|manifest| &manifest.structural_parent_types);
     let scope_parents = semantic_return
         .semantic
         .scoping()
@@ -1857,209 +1532,52 @@ fn materialize_with_scope_parents(
                 .scope_parent_id(scope_id)
                 .map_or(u32::MAX, |parent_id| parent_id.index() as u32)
         })
-        .collect();
-    Ok(MaterializedSessionParts {
-        batch: EventBatch {
-            events: collector.events,
-            node_count: semantic_return.semantic.nodes().len() as u32,
-            emitted_count,
-        },
-        scope_parents,
-        node_summaries: collector.node_summaries,
-        function_map,
-    })
-}
-
-#[expect(
-    clippy::too_many_arguments,
-    reason = "primitive FFI inputs avoid object conversion"
-)]
-pub fn materialize_packed(
-    source: &str,
-    filename: &str,
-    subscriptions: Vec<String>,
-    subscription_ids: Vec<u32>,
-    exit_subscriptions: Vec<String>,
-    exit_subscription_ids: Vec<u32>,
-    root_start: Option<u32>,
-    root_end: Option<u32>,
-    packed_field_requests: Option<&[u8]>,
-) -> Result<PackedEventBatch> {
-    let parts = materialize_packed_internal(
-        source,
-        filename,
-        subscriptions,
-        subscription_ids,
-        exit_subscriptions,
-        exit_subscription_ids,
-        root_start,
-        root_end,
-        packed_field_requests,
-        true,
-        true,
-        &[],
-        &[],
-    )?;
-    Ok(PackedEventBatch {
-        data: parts.data.into(),
-        strings: parts.strings,
-        node_count: parts.node_count,
-        emitted_count: parts.emitted_count,
-    })
-}
-
-#[expect(
-    clippy::too_many_arguments,
-    reason = "primitive FFI inputs avoid object conversion"
-)]
-fn materialize_packed_internal(
-    source: &str,
-    filename: &str,
-    subscriptions: Vec<String>,
-    subscription_ids: Vec<u32>,
-    exit_subscriptions: Vec<String>,
-    exit_subscription_ids: Vec<u32>,
-    root_start: Option<u32>,
-    root_end: Option<u32>,
-    packed_field_requests: Option<&[u8]>,
-    include_parent: bool,
-    include_scope: bool,
-    identifier_names: &[String],
-    static_member_patterns: &[String],
-) -> Result<PackedEventParts> {
-    let allocator = Allocator::default();
-    let parsed = Parser::new(&allocator, source, source_type(filename, source)?).parse();
-    if !parsed.diagnostics.is_empty() {
-        return Err(Error::new(
-            Status::InvalidArg,
-            format!("Oxc parse failed: {:?}", parsed.diagnostics),
-        ));
-    }
-    let build_nodes = include_parent || include_scope;
-    let semantic_return = SemanticBuilder::new()
-        .with_build_nodes(build_nodes)
-        .with_check_syntax_error(true)
-        .build(&parsed.program);
-    if !semantic_return.diagnostics.is_empty() {
-        return Err(Error::new(
-            Status::InvalidArg,
-            format!(
-                "Oxc semantic analysis failed: {:?}",
-                semantic_return.diagnostics
-            ),
-        ));
-    }
-    let node_count = semantic_return.semantic.stats().nodes;
-    let field_requests = decode_field_requests(packed_field_requests)?;
-    let utf16 = (!source.is_ascii()).then(|| utf16_index(source, &allocator));
-    let output_capacity =
-        source
-            .len()
-            .saturating_mul(if subscriptions.iter().any(|value| value == "*") {
-                6
-            } else {
-                2
-            });
-    let mut collector = PackedEventCollector {
-        subscriptions: &subscriptions,
-        subscription_ids: subscription_set(&subscription_ids),
-        exit_subscription_ids: subscription_set_with_names(
-            &exit_subscription_ids,
-            &exit_subscriptions,
-        ),
-        field_requests: field_requests.as_deref(),
-        nodes: build_nodes.then(|| semantic_return.semantic.nodes()),
+        .collect::<Vec<_>>();
+    let mut collector = EventCollector {
+        nodes: semantic_return.semantic.nodes(),
         scoping: semantic_return.semantic.scoping(),
         utf16: utf16.as_deref().map(|offsets| &**offsets),
-        root: root_start.zip(root_end),
-        include_parent,
-        include_scope,
-        identifier_names,
-        static_member_patterns,
-        sequence: 0,
-        emitted_count: 0,
-        words: PackedWords::with_capacity(output_capacity),
-        string_ids: FxHashMap::default(),
+        retained_index: RetainedIndex::with_node_count(
+            semantic_return.semantic.nodes().len(),
+            (retention_capabilities & RETAIN_CHILDREN != 0)
+                .then_some(())
+                .and(structural_parent_types),
+            retention_capabilities & RETAIN_CONSTANTS != 0,
+            retention_capabilities & (RETAIN_INSPECTION | RETAIN_MODULE_FACTS) != 0
+                || retention_manifest.is_some(),
+        ),
+        function_map: collect_function_map
+            .then(|| FunctionMapCollector::new(source, semantic_return.semantic.nodes(), filename)),
+        retention_routes: retention_manifest.as_ref(),
+        retention_capabilities,
+        retained_string_ids: FxHashMap::default(),
     };
     collector.visit_program(&parsed.program);
-    let data = collector.words.into_bytes();
-    let mut strings = (0..collector.string_ids.len())
-        .map(|_| String::new())
-        .collect::<Vec<_>>();
-    for (value, id) in collector.string_ids {
-        strings[id as usize] = value;
-    }
-    Ok(PackedEventParts {
-        data,
-        strings,
-        node_count,
-        emitted_count: collector.emitted_count,
+    collector
+        .retained_index
+        .set_scalar_strings(std::mem::take(&mut collector.retained_string_ids));
+    let function_map = collector
+        .function_map
+        .take()
+        .map(FunctionMapCollector::finish);
+    let initial_routed_buffer = if build_initial_route {
+        compiled_manifest
+            .as_ref()
+            .map(|manifest| {
+                routed_buffer_from_index(manifest, &collector.retained_index, &scope_parents, None)
+                    .map(|buffer| buffer.to_vec())
+            })
+            .transpose()?
+    } else {
+        None
+    };
+    Ok(MaterializedSessionParts {
+        node_count: semantic_return.semantic.nodes().len() as u32,
+        scope_parents,
+        retained_index: collector.retained_index,
+        function_map,
+        initial_routed_buffer,
     })
-}
-
-#[expect(
-    clippy::too_many_arguments,
-    reason = "primitive FFI inputs avoid object conversion"
-)]
-pub fn materialize_packed_buffer(
-    source: &str,
-    filename: &str,
-    subscriptions: Vec<String>,
-    subscription_ids: Vec<u32>,
-    exit_subscriptions: Vec<String>,
-    exit_subscription_ids: Vec<u32>,
-    root_start: Option<u32>,
-    root_end: Option<u32>,
-    packed_field_requests: Option<&[u8]>,
-    include_parent: Option<bool>,
-    include_scope: Option<bool>,
-    identifier_names: Vec<String>,
-    static_member_patterns: Vec<String>,
-) -> Result<Buffer> {
-    let include_parent = include_parent.unwrap_or(true);
-    let include_scope = include_scope.unwrap_or(true);
-    let include_exit = !exit_subscription_ids.is_empty() || !exit_subscriptions.is_empty();
-    let parts = materialize_packed_internal(
-        source,
-        filename,
-        subscriptions,
-        subscription_ids,
-        exit_subscriptions,
-        exit_subscription_ids,
-        root_start,
-        root_end,
-        packed_field_requests,
-        include_parent,
-        include_scope,
-        &identifier_names,
-        &static_member_patterns,
-    )?;
-    let strings_size: usize = parts
-        .strings
-        .iter()
-        .map(|value| 4 + value.len() + (4 - value.len() % 4) % 4)
-        .sum();
-    let words_offset = 16 + strings_size;
-    let mut output = Vec::with_capacity(words_offset + parts.data.len());
-    let shape_node_count = parts.node_count
-        | if include_parent { 0x8000_0000 } else { 0 }
-        | if include_scope { 0x4000_0000 } else { 0 }
-        | if include_exit { 0x2000_0000 } else { 0 };
-    for word in [
-        shape_node_count,
-        parts.emitted_count,
-        parts.strings.len() as u32,
-        words_offset as u32,
-    ] {
-        output.extend_from_slice(&word.to_le_bytes());
-    }
-    for value in parts.strings {
-        output.extend_from_slice(&(value.len() as u32).to_le_bytes());
-        output.extend_from_slice(value.as_bytes());
-        output.resize(output.len().next_multiple_of(4), 0);
-    }
-    output.extend_from_slice(&parts.data);
-    Ok(output.into())
 }
 
 pub fn materialize_routed_buffer(
@@ -2123,38 +1641,68 @@ pub fn materialize_routed_buffer(
 
 fn routed_buffer_from_index(
     manifest: &CompiledManifest,
-    events: &[NativeEvent],
-    enter_indexes: &[usize],
-    node_count: u32,
+    index: &RetainedIndex,
+    scope_parents: &[u32],
     root: Option<(u32, u32)>,
 ) -> Result<Buffer> {
-    let mut words = PackedWords::with_capacity(events.len().saturating_mul(24));
-    let mut string_ids = FxHashMap::<String, u32>::default();
-    let mut counts = RoutedCounts::default();
-    for event in events {
-        if root.is_some_and(|(start, end)| event.start < start || event.end > end) {
-            continue;
-        }
-        let Some(protocol_id) = node_type_id(&event.r#type) else {
-            continue;
-        };
-        let candidates = &manifest.routes_by_type[protocol_id as usize];
-        if candidates.is_empty() {
-            continue;
-        }
-        let side = if event.side == "exit" {
+    let mut writer =
+        RetainedRouteWriter::with_capacity(index.traversal_records().len().saturating_mul(8));
+    for &record in index.traversal_records() {
+        let side = if record & 0x8000_0000 != 0 {
             VisitSide::Exit
         } else {
             VisitSide::Enter
         };
-        let source_event = if side == VisitSide::Exit {
-            enter_indexes
-                .get(event.id as usize)
-                .and_then(|index| events.get(*index))
-                .ok_or_else(|| Error::new(Status::GenericFailure, "indexed exit has no enter"))?
-        } else {
-            event
+        let node_id = record & 0x7fff_ffff;
+        writer.record(manifest, index, node_id, side, scope_parents, root);
+    }
+    writer.finish(manifest, index.len() as u32)
+}
+
+struct RetainedRouteWriter {
+    words: PackedWords,
+    string_ids: FxHashMap<String, u32>,
+    counts: RoutedCounts,
+    sequence: u32,
+}
+
+impl RetainedRouteWriter {
+    fn with_capacity(capacity: usize) -> Self {
+        Self {
+            words: PackedWords::with_capacity(capacity),
+            string_ids: FxHashMap::default(),
+            counts: RoutedCounts::default(),
+            sequence: 0,
+        }
+    }
+
+    fn record(
+        &mut self,
+        manifest: &CompiledManifest,
+        index: &RetainedIndex,
+        node_id: u32,
+        side: VisitSide,
+        scope_parents: &[u32],
+        root: Option<(u32, u32)>,
+    ) {
+        let Some(protocol_id) = index.type_id(node_id) else {
+            return;
         };
+        let candidates = &manifest.routes_by_type[protocol_id as usize];
+        if side == VisitSide::Exit && !candidates.iter().any(|route| route.side == VisitSide::Exit)
+        {
+            return;
+        }
+        let event_sequence = self.sequence;
+        self.sequence += 1;
+        if candidates.is_empty() {
+            return;
+        }
+        let start = index.start(node_id);
+        let end = index.end(node_id);
+        if root.is_some_and(|(root_start, root_end)| start < root_start || end > root_end) {
+            return;
+        }
         let mut matched_routes = Vec::new();
         let mut payload_field_ids = [false; FIELD_KEY_COUNT + 1];
         let mut matched_exit_carrier = false;
@@ -2165,7 +1713,7 @@ fn routed_buffer_from_index(
             if route
                 .predicates
                 .iter()
-                .all(|predicate| indexed_predicate_matches(predicate, source_event, protocol_id))
+                .all(|predicate| retained_predicate_matches(predicate, index, node_id, protocol_id))
             {
                 if route.side == side {
                     matched_routes.push(route.id);
@@ -2178,77 +1726,90 @@ fn routed_buffer_from_index(
             }
         }
         if matched_routes.is_empty() && !matched_exit_carrier {
-            continue;
+            return;
         }
         if side == VisitSide::Exit {
-            words.extend([
-                event.sequence | 0x8000_0000,
-                event.id,
+            self.words.extend([
+                event_sequence | 0x8000_0000,
+                node_id,
                 matched_routes.len() as u32,
             ]);
-            words.extend_from_slice(&matched_routes);
-            counts.node_records += 1;
-            counts.route_deliveries += matched_routes.len() as u32;
-            continue;
+            self.words.extend_from_slice(&matched_routes);
+            self.counts.node_records += 1;
+            self.counts.route_deliveries += matched_routes.len() as u32;
+            return;
         }
-        words.extend([
-            event.sequence,
-            event.id,
-            protocol_id,
-            event.start,
-            event.end,
-        ]);
+        self.words
+            .extend([event_sequence, node_id, protocol_id, start, end]);
         if manifest.include_parent {
-            words.extend([
-                event.parent_id.unwrap_or(u32::MAX),
-                event
-                    .parent_type
-                    .as_deref()
-                    .and_then(node_type_id)
+            let parent_id = index.parent_id(node_id);
+            self.words.extend([
+                parent_id.unwrap_or(u32::MAX),
+                parent_id
+                    .and_then(|parent_id| index.type_id(parent_id))
                     .unwrap_or(u32::MAX),
             ]);
         }
         if manifest.include_scope {
-            words.extend([event.scope_id, event.scope_parent_id.unwrap_or(u32::MAX)]);
+            let scope_id = index.scope_id(node_id);
+            self.words.extend([
+                scope_id,
+                scope_parents
+                    .get(scope_id as usize)
+                    .copied()
+                    .unwrap_or(u32::MAX),
+            ]);
         }
-        let payload_fields = source_event
-            .fields
+        let payload_fields = payload_field_ids
             .iter()
-            .filter(|field| {
-                field_key_id(&field.key).is_some_and(|id| payload_field_ids[id as usize])
+            .enumerate()
+            .filter(|(_, requested)| **requested)
+            .filter_map(|(field_id, _)| {
+                index
+                    .scalar_field(node_id, field_id as u32)
+                    .map(|value| (field_id as u32, value))
             })
             .collect::<Vec<_>>();
-        words.push(payload_fields.len() as u32);
-        for field in payload_fields {
-            let field_id = field_key_id(&field.key).expect("filtered field id");
-            let value = packed_scalar(&field.key, &field.value).unwrap_or_else(|| {
-                let next = string_ids.len() as u32;
-                *string_ids.entry(field.value.clone()).or_insert(next)
-            });
-            words.extend([field_id, value]);
+        self.words.push(payload_fields.len() as u32);
+        for (field_id, retained) in payload_fields {
+            let value = match retained {
+                crate::retained_index::RetainedFieldValue::Packed(value) => value,
+                crate::retained_index::RetainedFieldValue::String(id) => {
+                    let value = index
+                        .scalar_string(id)
+                        .expect("retained scalar string id is valid");
+                    let next = self.string_ids.len() as u32;
+                    *self.string_ids.entry(value.to_owned()).or_insert(next)
+                }
+            };
+            self.words.extend([field_id, value]);
         }
-        words.push(matched_routes.len() as u32);
-        words.extend_from_slice(&matched_routes);
-        counts.node_records += 1;
-        counts.route_deliveries += matched_routes.len() as u32;
+        self.words.push(matched_routes.len() as u32);
+        self.words.extend_from_slice(&matched_routes);
+        self.counts.node_records += 1;
+        self.counts.route_deliveries += matched_routes.len() as u32;
     }
-    let data = words.into_bytes();
-    let mut strings = (0..string_ids.len())
-        .map(|_| String::new())
-        .collect::<Vec<_>>();
-    for (value, id) in string_ids {
-        strings[id as usize] = value;
+
+    fn finish(self, manifest: &CompiledManifest, node_count: u32) -> Result<Buffer> {
+        let data = self.words.into_bytes();
+        let mut strings = (0..self.string_ids.len())
+            .map(|_| String::new())
+            .collect::<Vec<_>>();
+        for (value, id) in self.string_ids {
+            strings[id as usize] = value;
+        }
+        encode_routed_envelope(manifest, node_count, strings, data, self.counts)
     }
-    encode_routed_envelope(manifest, node_count, strings, data, counts)
 }
 
-fn indexed_predicate_matches(
+fn retained_predicate_matches(
     predicate: &CompiledPredicate,
-    event: &NativeEvent,
+    index: &RetainedIndex,
+    node_id: u32,
     node_type_id: u32,
 ) -> bool {
     let field_name = field_key_name(predicate.field_id).expect("validated predicate field");
-    let actual = event.fields.iter().find(|field| field.key == field_name);
+    let actual = index.scalar_field(node_id, predicate.field_id);
     if predicate.operation == 2 {
         let expected = matches!(
             predicate.values.first(),
@@ -2259,25 +1820,46 @@ fn indexed_predicate_matches(
     let Some(actual) = actual else {
         return false;
     };
-    let scalar_type = predicate_scalar_type(field_name, node_type_id, &actual.value);
-    predicate.values.iter().any(|expected| match expected {
-        CompiledScalar::String(value) => scalar_type == 0 && actual.value == *value,
-        CompiledScalar::Number(value) => {
-            scalar_type == 1
-                && actual
-                    .value
-                    .parse::<f64>()
-                    .is_ok_and(|actual| actual == *value)
+    match actual {
+        crate::retained_index::RetainedFieldValue::Packed(value)
+            if value & 0x8000_0000 != 0 =>
+        {
+            predicate
+                .values
+                .iter()
+                .any(|expected| matches!(expected, CompiledScalar::Boolean(expected) if *expected == (value & 1 != 0)))
         }
-        CompiledScalar::Boolean(value) => {
-            scalar_type == 2
-                && actual
-                    .value
-                    .parse::<bool>()
-                    .is_ok_and(|actual| actual == *value)
+        crate::retained_index::RetainedFieldValue::Packed(value)
+            if value & 0x4000_0000 != 0 =>
+        {
+            let actual = (value & 0x3fff_ffff) as f64;
+            predicate
+                .values
+                .iter()
+                .any(|expected| matches!(expected, CompiledScalar::Number(expected) if *expected == actual))
         }
-        CompiledScalar::Null => false,
-    })
+        crate::retained_index::RetainedFieldValue::Packed(_) => false,
+        crate::retained_index::RetainedFieldValue::String(id) => {
+            let actual = index
+                .scalar_string(id)
+                .expect("retained scalar string id is valid");
+            let scalar_type = predicate_scalar_type(field_name, node_type_id, actual);
+            predicate.values.iter().any(|expected| match expected {
+                CompiledScalar::String(value) => scalar_type == 0 && actual == value,
+                CompiledScalar::Number(value) => {
+                    scalar_type == 1
+                        && actual
+                            .parse::<f64>()
+                            .is_ok_and(|actual| actual == *value)
+                }
+                CompiledScalar::Boolean(value) => {
+                    scalar_type == 2
+                        && actual.parse::<bool>().is_ok_and(|actual| actual == *value)
+                }
+                CompiledScalar::Null => false,
+            })
+        }
+    }
 }
 
 fn encode_routed_envelope(
@@ -2337,7 +1919,7 @@ fn decode_route_manifest(data: &[u8]) -> Result<CompiledManifest> {
         ));
     }
     let flags = word(1);
-    if flags & !3 != 0 {
+    if flags & !0x3ff != 0 {
         return Err(Error::new(
             Status::InvalidArg,
             "unknown routed manifest flags",
@@ -2353,6 +1935,7 @@ fn decode_route_manifest(data: &[u8]) -> Result<CompiledManifest> {
     let string_count = word(3) as usize;
     let strings_offset = word(4) as usize;
     let plugin_count = word(5) as usize;
+    let structural_parent_count = word(6) as usize;
     if plugin_count > MAX_COMPILED_ROUTES {
         return Err(Error::new(
             Status::InvalidArg,
@@ -2524,6 +2107,65 @@ fn decode_route_manifest(data: &[u8]) -> Result<CompiledManifest> {
             payload_field_ids,
         });
     }
+    if cursor + structural_parent_count > word_limit {
+        return Err(Error::new(
+            Status::InvalidArg,
+            "truncated structural parent types",
+        ));
+    }
+    let mut structural_parent_types = FxHashSet::default();
+    for _ in 0..structural_parent_count {
+        let type_id = word(cursor);
+        cursor += 1;
+        if type_id == 0
+            || type_id as usize > NODE_TYPE_COUNT
+            || !structural_parent_types.insert(type_id)
+        {
+            return Err(Error::new(
+                Status::InvalidArg,
+                "invalid structural parent type",
+            ));
+        }
+    }
+    if cursor >= word_limit {
+        return Err(Error::new(
+            Status::InvalidArg,
+            "missing retained field plan",
+        ));
+    }
+    let retained_type_count = word(cursor) as usize;
+    cursor += 1;
+    let mut retained_fields_by_type = vec![Vec::new(); NODE_TYPE_COUNT + 1];
+    for _ in 0..retained_type_count {
+        if cursor + 2 > word_limit {
+            return Err(Error::new(
+                Status::InvalidArg,
+                "truncated retained field plan",
+            ));
+        }
+        let type_id = word(cursor);
+        let field_count = word(cursor + 1) as usize;
+        cursor += 2;
+        if type_id == 0
+            || type_id as usize > NODE_TYPE_COUNT
+            || !retained_fields_by_type[type_id as usize].is_empty()
+            || cursor + field_count > word_limit
+        {
+            return Err(Error::new(
+                Status::InvalidArg,
+                "invalid retained field plan",
+            ));
+        }
+        let fields = &mut retained_fields_by_type[type_id as usize];
+        for _ in 0..field_count {
+            let field_id = word(cursor);
+            cursor += 1;
+            if field_key_name(field_id).is_none() || fields.contains(&field_id) {
+                return Err(Error::new(Status::InvalidArg, "invalid retained field id"));
+            }
+            fields.push(field_id);
+        }
+    }
     if cursor != word_limit {
         return Err(Error::new(
             Status::InvalidArg,
@@ -2539,103 +2181,10 @@ fn decode_route_manifest(data: &[u8]) -> Result<CompiledManifest> {
         include_parent: flags & 1 != 0,
         include_scope: flags & 2 != 0,
         include_exit,
+        retention_capabilities: flags >> 2,
+        structural_parent_types,
+        retained_fields_by_type,
     })
-}
-
-fn decode_field_requests(data: Option<&[u8]>) -> Result<Option<Vec<FieldRequest>>> {
-    let Some(data) = data else {
-        return Ok(None);
-    };
-    if data.len() % 4 != 0 {
-        return Err(Error::new(
-            Status::InvalidArg,
-            "invalid packed field request buffer",
-        ));
-    }
-    let word_count = data.len() / 4;
-    let word =
-        |index: usize| u32::from_le_bytes(data[index * 4..index * 4 + 4].try_into().unwrap());
-    let mut cursor = 0;
-    let mut requests = Vec::new();
-    while cursor < word_count {
-        if cursor + 2 > word_count {
-            return Err(Error::new(
-                Status::InvalidArg,
-                "truncated packed field request",
-            ));
-        }
-        let count = word(cursor + 1) as usize;
-        if cursor + 2 + count > word_count {
-            return Err(Error::new(
-                Status::InvalidArg,
-                "truncated packed field keys",
-            ));
-        }
-        let node_type = node_type_name(word(cursor))
-            .ok_or_else(|| Error::new(Status::InvalidArg, "invalid packed node type id"))?
-            .to_owned();
-        let fields = (cursor + 2..cursor + 2 + count)
-            .map(|index| {
-                field_key_name(word(index))
-                    .map(str::to_owned)
-                    .ok_or_else(|| Error::new(Status::InvalidArg, "invalid packed field key id"))
-            })
-            .collect::<Result<Vec<_>>>()?;
-        requests.push(FieldRequest { node_type, fields });
-        cursor += 2 + count;
-    }
-    Ok(Some(requests))
-}
-
-fn subscription_set(ids: &[u32]) -> [bool; NODE_TYPE_COUNT + 1] {
-    let mut subscriptions = [false; NODE_TYPE_COUNT + 1];
-    for &id in ids {
-        if let Some(subscribed) = subscriptions.get_mut(id as usize) {
-            *subscribed = true;
-        }
-    }
-    subscriptions
-}
-
-fn subscription_set_from_names(names: &[String]) -> [bool; NODE_TYPE_COUNT + 1] {
-    let mut subscriptions = [false; NODE_TYPE_COUNT + 1];
-    for (id, subscribed) in subscriptions.iter_mut().enumerate().skip(1) {
-        let node_type = node_type_name(id as u32).expect("generated node type id");
-        *subscribed = names
-            .iter()
-            .any(|subscription| alias_matches(subscription, node_type));
-    }
-    subscriptions
-}
-
-fn subscription_set_with_names(ids: &[u32], names: &[String]) -> [bool; NODE_TYPE_COUNT + 1] {
-    let mut subscriptions = subscription_set(ids);
-    if !names.is_empty() {
-        let named = subscription_set_from_names(names);
-        for (subscribed, named) in subscriptions.iter_mut().zip(named) {
-            *subscribed |= named;
-        }
-    }
-    subscriptions
-}
-
-struct PackedEventCollector<'a> {
-    subscriptions: &'a [String],
-    subscription_ids: [bool; NODE_TYPE_COUNT + 1],
-    exit_subscription_ids: [bool; NODE_TYPE_COUNT + 1],
-    field_requests: Option<&'a [FieldRequest]>,
-    nodes: Option<&'a AstNodes<'a>>,
-    scoping: &'a Scoping,
-    utf16: Option<&'a [u32]>,
-    root: Option<(u32, u32)>,
-    include_parent: bool,
-    include_scope: bool,
-    identifier_names: &'a [String],
-    static_member_patterns: &'a [String],
-    sequence: u32,
-    emitted_count: u32,
-    words: PackedWords,
-    string_ids: FxHashMap<String, u32>,
 }
 
 struct PackedWords(Vec<u8>);
@@ -2663,186 +2212,6 @@ impl PackedWords {
 
     fn into_bytes(self) -> Vec<u8> {
         self.0
-    }
-}
-
-impl PackedEventCollector<'_> {
-    fn intern(&mut self, value: &str) -> u32 {
-        if let Some(id) = self.string_ids.get(value) {
-            return *id;
-        }
-        let id = self.string_ids.len() as u32;
-        self.string_ids.insert(value.to_owned(), id);
-        id
-    }
-    fn emit(&mut self, kind: AstKind<'_>, side: VisitSide) {
-        let sequence = self.sequence;
-        self.sequence += 1;
-        let span = kind.span();
-        let start = self
-            .utf16
-            .map_or(span.start, |index| index[span.start as usize]);
-        let end = self
-            .utf16
-            .map_or(span.end, |index| index[span.end as usize]);
-        if self
-            .root
-            .is_some_and(|(root_start, root_end)| start < root_start || end > root_end)
-        {
-            return;
-        }
-        let protocol_id = ast_kind_protocol_id(kind);
-        let fast_match = self.subscription_ids[protocol_id as usize];
-        if !fast_match && self.subscriptions.is_empty() {
-            return;
-        }
-        let node_type =
-            node_type_name(protocol_id).expect("generated protocol covers every Oxc AstKind");
-        if !fast_match
-            && !self
-                .subscriptions
-                .iter()
-                .any(|subscription| alias_matches(subscription, node_type))
-        {
-            return;
-        }
-        if !self.identifier_names.is_empty() {
-            let identifier_name = match kind {
-                AstKind::IdentifierReference(identifier) => Some(identifier.name.as_str()),
-                AstKind::BindingIdentifier(identifier) => Some(identifier.name.as_str()),
-                AstKind::IdentifierName(identifier) => Some(identifier.name.as_str()),
-                _ => None,
-            };
-            if identifier_name.is_some_and(|identifier_name| {
-                !self
-                    .identifier_names
-                    .iter()
-                    .any(|name| name == identifier_name)
-            }) {
-                return;
-            }
-        }
-        let mut filtered_static_member_path = None;
-        if !self.static_member_patterns.is_empty()
-            && let AstKind::StaticMemberExpression(member) = kind
-        {
-            let path = static_member_path(&member.object)
-                .map(|object| format!("{object}.{}", member.property.name));
-            if path.as_ref().is_none_or(|path| {
-                !self
-                    .static_member_patterns
-                    .iter()
-                    .any(|pattern| pattern == path)
-            }) {
-                return;
-            }
-            filtered_static_member_path = path;
-        }
-        let id = kind.node_id();
-        if side == VisitSide::Exit {
-            self.words
-                .extend([sequence | 0x8000_0000, id.index() as u32]);
-            self.emitted_count += 1;
-            return;
-        }
-        let scope_id = self.include_scope.then(|| {
-            let nodes = self
-                .nodes
-                .expect("scope collection requires the node store");
-            let node = nodes.get_node(id);
-            match kind {
-                AstKind::Function(function) => function.scope_id.get().unwrap_or(node.scope_id()),
-                AstKind::ArrowFunctionExpression(function) => {
-                    function.scope_id.get().unwrap_or(node.scope_id())
-                }
-                _ => node.scope_id(),
-            }
-        });
-        let is_root = id.index() == 0;
-        let parent_id = (self.include_parent && !is_root).then(|| {
-            self.nodes
-                .expect("parent collection requires the node store")
-                .parent_id(id)
-                .index() as u32
-        });
-        let parent_type_id = if self.include_parent && !is_root {
-            ast_kind_protocol_id(
-                self.nodes
-                    .expect("parent collection requires the node store")
-                    .parent_kind(id),
-            )
-        } else {
-            u32::MAX
-        };
-        let event_scope_id = scope_id.map_or(0, |id| id.index() as u32);
-        let scope_parent_id = scope_id
-            .and_then(|id| self.scoping.scope_parent_id(id))
-            .map_or(u32::MAX, |id| id.index() as u32);
-        let emit_header = |words: &mut PackedWords, field_count: u32| {
-            words.extend([sequence, id.index() as u32, protocol_id, start, end]);
-            if self.include_parent {
-                words.extend([parent_id.unwrap_or(u32::MAX), parent_type_id]);
-            }
-            if self.include_scope {
-                words.extend([event_scope_id, scope_parent_id]);
-            }
-            words.push(field_count);
-        };
-        let requested = self.field_requests.and_then(|requests| {
-            requests
-                .iter()
-                .find(|request| request.node_type == node_type)
-        });
-        let requested_fields = requested.map(|request| request.fields.as_slice());
-        if let Some(node_fields) = packed_fields_direct(
-            kind,
-            self.scoping,
-            self.utf16,
-            requested_fields,
-            filtered_static_member_path.as_deref(),
-            &mut self.string_ids,
-        ) {
-            emit_header(&mut self.words, (node_fields.len / 2) as u32);
-            self.words
-                .extend_from_slice(&node_fields.words[..node_fields.len]);
-            self.emitted_count += 1;
-            return;
-        }
-        let mut node_fields = fields(kind, self.scoping, requested_fields);
-        for field in &mut node_fields {
-            if let Some(name) = field.key.strip_suffix("Byte")
-                && let Ok(offset) = field.value.parse::<usize>()
-            {
-                field.key = name.into();
-                field.value = self
-                    .utf16
-                    .map_or(offset as u32, |index| index[offset])
-                    .to_string();
-            }
-        }
-        emit_header(&mut self.words, node_fields.len() as u32);
-        for field in node_fields {
-            let key =
-                field_key_id(&field.key).unwrap_or_else(|| 0x8000_0000 | self.intern(&field.key));
-            let value = packed_scalar(&field.key, &field.value)
-                .unwrap_or_else(|| self.intern(&field.value));
-            self.words.extend([key, value]);
-        }
-        self.emitted_count += 1;
-    }
-}
-
-impl<'a> Visit<'a> for PackedEventCollector<'a> {
-    fn enter_node(&mut self, kind: AstKind<'a>) {
-        self.emit(kind, VisitSide::Enter);
-    }
-    fn leave_node(&mut self, kind: AstKind<'a>) {
-        if self.exit_subscription_ids[ast_kind_protocol_id(kind) as usize] {
-            self.emit(kind, VisitSide::Exit);
-        }
-    }
-    fn visit_program(&mut self, program: &oxc_ast::ast::Program<'a>) {
-        walk::walk_program(self, program);
     }
 }
 
@@ -3401,43 +2770,6 @@ pub fn commit_packed_buffer(
     commit_packed(source, filename, &data[words_offset..], strings, mode)
 }
 
-pub fn query_globals(source: &str, filename: &str, names: &[String]) -> Result<Vec<GlobalFact>> {
-    let batch = materialize(source, filename, &["Identifier".into()], None, None, false)?;
-    Ok(globals_from_events(&batch.events, names))
-}
-
-fn globals_from_events(events: &[NativeEvent], names: &[String]) -> Vec<GlobalFact> {
-    names
-        .iter()
-        .map(|name| GlobalFact {
-            name: name.clone(),
-            references: events
-                .iter()
-                .filter(|event| event.side == "enter")
-                .filter(|event| {
-                    let field = |key: &str| event.fields.iter().find(|field| field.key == key);
-                    field("name").is_some_and(|field| field.value == *name)
-                        && field("global").is_some_and(|field| field.value == "true")
-                })
-                .map(|event| GlobalReference {
-                    id: event.id,
-                    start: event.start,
-                    end: event.end,
-                })
-                .collect(),
-        })
-        .collect()
-}
-
-pub fn inspect_nodes(source: &str, filename: &str, node_ids: &[u32]) -> Result<Vec<NativeEvent>> {
-    let batch = materialize(source, filename, &["*".into()], None, None, false)?;
-    Ok(batch
-        .events
-        .into_iter()
-        .filter(|event| event.side == "enter" && node_ids.contains(&event.id))
-        .collect())
-}
-
 pub fn validate_expression(code: &str, parser_mode: Option<&str>) -> Result<()> {
     let source = format!("({code})");
     validate_fragment(&source, parser_mode, "expression")
@@ -3475,26 +2807,6 @@ fn validate_fragment(code: &str, parser_mode: Option<&str>, kind: &str) -> Resul
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn emits_only_subscribed_nodes_with_semantic_fields() {
-        let result = materialize(
-            "const x = 1; function f(require) { require('x') } foo('y')",
-            "fixture.js",
-            &["CallExpression".into()],
-            None,
-            None,
-            true,
-        )
-        .unwrap();
-        assert_eq!(result.events.len(), 4);
-        assert!(
-            result
-                .events
-                .iter()
-                .all(|event| event.r#type == "CallExpression")
-        );
-    }
 
     #[test]
     fn classifies_flow_as_unsupported() {

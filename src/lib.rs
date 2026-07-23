@@ -4,103 +4,18 @@ mod engine;
 mod event_types;
 mod function_map;
 mod generated_event_schema;
+mod retained_index;
 mod sourcemap;
 
 use napi_derive::napi;
 
 pub use editor::{EditCommand, EditKind, MappingPolicy};
-pub use engine::{EventBatch, NativeEvent, NodeField, ParseClassification};
+pub use engine::ParseClassification;
 pub use function_map::FunctionMap;
 
 #[napi]
 pub fn classify(filename: String, source: String) -> ParseClassification {
     engine::classify_source(&filename, &source)
-}
-
-#[napi]
-pub fn materialize_events(
-    source: String,
-    filename: String,
-    subscriptions: Vec<String>,
-    root_start: Option<u32>,
-    root_end: Option<u32>,
-) -> napi::Result<EventBatch> {
-    engine::materialize(
-        &source,
-        &filename,
-        &subscriptions,
-        root_start,
-        root_end,
-        true,
-    )
-}
-
-#[expect(
-    clippy::allow_attributes,
-    reason = "napi expands the function before Clippy can fulfill an expect attribute"
-)]
-#[allow(clippy::too_many_arguments)]
-#[napi]
-pub fn materialize_packed_events(
-    source: String,
-    filename: String,
-    subscriptions: Vec<String>,
-    subscription_ids: Vec<u32>,
-    exit_subscriptions: Vec<String>,
-    exit_subscription_ids: Vec<u32>,
-    root_start: Option<u32>,
-    root_end: Option<u32>,
-    field_requests: Option<napi::bindgen_prelude::Buffer>,
-) -> napi::Result<engine::PackedEventBatch> {
-    engine::materialize_packed(
-        &source,
-        &filename,
-        subscriptions,
-        subscription_ids,
-        exit_subscriptions,
-        exit_subscription_ids,
-        root_start,
-        root_end,
-        field_requests.as_deref(),
-    )
-}
-
-#[expect(
-    clippy::allow_attributes,
-    reason = "napi expands the function before Clippy can fulfill an expect attribute"
-)]
-#[allow(clippy::too_many_arguments)]
-#[napi]
-pub fn materialize_packed_buffer(
-    source: String,
-    filename: String,
-    subscriptions: Vec<String>,
-    subscription_ids: Vec<u32>,
-    exit_subscriptions: Vec<String>,
-    exit_subscription_ids: Vec<u32>,
-    root_start: Option<u32>,
-    root_end: Option<u32>,
-    field_requests: Option<napi::bindgen_prelude::Buffer>,
-    include_parent: Option<bool>,
-    include_scope: Option<bool>,
-    identifier_names: Option<Vec<String>>,
-    static_member_patterns: Option<Vec<String>>,
-) -> napi::Result<napi::bindgen_prelude::Buffer> {
-    engine::materialize_packed_buffer(
-        &source,
-        &filename,
-        subscriptions,
-        subscription_ids,
-        exit_subscriptions,
-        exit_subscription_ids,
-        root_start,
-        root_end,
-        field_requests.as_deref(),
-        include_parent,
-        include_scope,
-        identifier_names.unwrap_or_default(),
-        static_member_patterns.unwrap_or_default(),
-    )
 }
 
 #[napi]
@@ -112,51 +27,6 @@ pub fn materialize_routed_buffer(
     root_end: Option<u32>,
 ) -> napi::Result<napi::bindgen_prelude::Buffer> {
     engine::materialize_routed_buffer(&source, &filename, &manifest, root_start, root_end)
-}
-
-#[napi]
-pub fn query_globals(
-    source: String,
-    filename: String,
-    names: Vec<String>,
-) -> napi::Result<Vec<engine::GlobalFact>> {
-    engine::query_globals(&source, &filename, &names)
-}
-
-#[napi]
-pub fn inspect_nodes(
-    source: String,
-    filename: String,
-    node_ids: Vec<u32>,
-) -> napi::Result<Vec<NativeEvent>> {
-    engine::inspect_nodes(&source, &filename, &node_ids)
-}
-
-#[napi]
-pub fn commit_edits(
-    source: String,
-    filename: String,
-    edits: Vec<EditCommand>,
-    source_map_mode: Option<String>,
-) -> napi::Result<engine::NativeCommitResult> {
-    engine::commit(&source, &filename, edits, source_map_mode.as_deref())
-}
-
-#[napi]
-pub fn commit_packed_edits(
-    source: String,
-    filename: String,
-    data: napi::bindgen_prelude::Buffer,
-    strings: Vec<String>,
-    source_map_mode: Option<String>,
-) -> napi::Result<engine::NativeCommitResult> {
-    engine::commit_packed(
-        &source,
-        &filename,
-        &data,
-        strings,
-        source_map_mode.as_deref(),
-    )
 }
 
 #[napi]

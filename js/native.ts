@@ -1,55 +1,80 @@
+import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
-import type {
-  EditCommand,
-  EventBatch,
-  FunctionMap,
-  NativeVlqMap,
-  ParseClassification,
-} from './types.js';
+import type { EditCommand, FunctionMap, NativeVlqMap, ParseClassification } from './types.js';
 
 interface NativeBinding {
-  available: boolean;
   NativeIndexedSession: new (
     source: string,
     filename: string,
-    subscriptions?: string[],
-    exitSubscriptions?: string[],
     functionMap?: boolean,
+    retentionManifest?: Buffer,
+    initialRouteManifest?: Buffer,
+    buildInitialRoute?: boolean,
   ) => {
-    next(
-      subscriptions: string[],
-      rootStart?: number,
-      rootEnd?: number,
-      fieldRequests?: { nodeType: string; fields: string[] }[],
-    ): EventBatch;
-    nextPacked(
-      subscriptions: string[],
-      rootStart?: number,
-      rootEnd?: number,
-      fieldRequests?: { nodeType: string; fields: string[] }[],
-      exitSubscriptions?: string[],
-    ): {
-      data: Buffer;
-      strings: string[];
-      nodeCount: number;
-      emittedCount: number;
-      includeExit?: boolean;
-    };
     nextRoutedPacked(manifest: Buffer, rootStart?: number, rootEnd?: number): Buffer;
     queryGlobals(
       names: string[],
     ): { name: string; references: { id: number; start: number; end: number }[] }[];
-    inspect(nodeIds: number[]): import('./types.js').NativeEvent[];
-    nodeSummary(nodeId: number): import('./types.js').NativeEvent | null;
-    nodeSummariesBuffer(): Buffer;
+    queryBindings(
+      name?: string,
+      scopeId?: number,
+      reads?: boolean,
+      writes?: boolean,
+    ): {
+      name: string;
+      scopeId: number;
+      declarationId?: number;
+      declarationStart?: number;
+      declarationEnd?: number;
+      declarationParentId?: number;
+      references: {
+        id: number;
+        start: number;
+        end: number;
+        scopeId: number;
+        parentId?: number;
+        parentType?: string;
+        read: boolean;
+        write: boolean;
+      }[];
+    }[];
+    queryCaptures(functionId: number): {
+      id: number;
+      start: number;
+      end: number;
+      scopeId: number;
+      bindingScopeId: number;
+      parentId?: number;
+      parentType?: string;
+      name: string;
+      read: boolean;
+      write: boolean;
+    }[];
+    inspectPackedBuffer(nodeIds: number[]): Buffer;
+    nodeSummaryBuffer(nodeId: number): Buffer;
+    nodeSummaryBuffers(nodeIds: number[]): Buffer;
     childrenPackedBuffer(
       parentIds: number[],
       parentTypes: string[],
       parentTypeIds: number[],
     ): Buffer;
-    constantsPackedBuffer(nodeIds: number[]): Buffer;
-    scopeParentsBuffer(): Buffer;
+    queryConstants(nodeIds: number[]): { id: number; kind: string; value: string }[];
+    queryCalls(
+      calleeName: string,
+      globalOnly?: boolean,
+      staticArguments?: boolean,
+    ): {
+      id: number;
+      start: number;
+      end: number;
+      scopeId: number;
+      calleeName: string;
+      calleeGlobal: boolean;
+      staticArgument?: string;
+    }[];
+    queryNodesPackedBuffer(nodeTypes: string[]): Buffer;
+    scopeParentId(scopeId: number): number | null;
     commit(edits: EditCommand[], sourceMapMode?: string): { code: string; map: NativeVlqMap };
     close(): void;
     memoryUsage(): number;
@@ -57,58 +82,12 @@ interface NativeBinding {
     takeFunctionMap(): FunctionMap | null;
   };
   classify(filename: string, source: string): ParseClassification;
-  commitEdits(
-    source: string,
-    filename: string,
-    edits: EditCommand[],
-    sourceMapMode?: string,
-  ): { code: string; map: NativeVlqMap };
-  commitPackedEdits(
-    source: string,
-    filename: string,
-    data: Buffer,
-    strings: string[],
-    sourceMapMode?: string,
-  ): { code: string; map: NativeVlqMap };
   commitPackedBuffer(
     source: string,
     filename: string,
     data: Buffer,
     sourceMapMode?: string,
   ): { code: string; map: NativeVlqMap };
-  materializeEvents(
-    source: string,
-    filename: string,
-    subscriptions: string[],
-    rootStart?: number,
-    rootEnd?: number,
-  ): EventBatch;
-  materializePackedEvents(
-    source: string,
-    filename: string,
-    subscriptions: string[],
-    subscriptionIds: number[],
-    exitSubscriptions: string[],
-    exitSubscriptionIds: number[],
-    rootStart?: number,
-    rootEnd?: number,
-    fieldRequests?: Buffer,
-  ): { data: Buffer; strings: string[]; nodeCount: number; emittedCount: number };
-  materializePackedBuffer(
-    source: string,
-    filename: string,
-    subscriptions: string[],
-    subscriptionIds: number[],
-    exitSubscriptions: string[],
-    exitSubscriptionIds: number[],
-    rootStart?: number,
-    rootEnd?: number,
-    fieldRequests?: Buffer,
-    includeParent?: boolean,
-    includeScope?: boolean,
-    identifierNames?: string[],
-    staticMemberPatterns?: string[],
-  ): Buffer;
   materializeRoutedBuffer(
     source: string,
     filename: string,
@@ -116,16 +95,6 @@ interface NativeBinding {
     rootStart?: number,
     rootEnd?: number,
   ): Buffer;
-  queryGlobals(
-    source: string,
-    filename: string,
-    names: string[],
-  ): { name: string; references: { id: number; start: number; end: number }[] }[];
-  inspectNodes(
-    source: string,
-    filename: string,
-    nodeIds: number[],
-  ): import('./types.js').NativeEvent[];
   composeMappings(outer: string, inner: string, outerNameCount: number): string;
   generateFunctionMap(source: string, filename: string): FunctionMap;
   validateExpression(code: string, parserMode?: string): void;
@@ -136,50 +105,7 @@ function loadBinding(): NativeBinding {
   const root = join(__dirname, '..');
   const suffix = platformSuffix();
   const local = join(root, `noxcturnal.${suffix}.node`);
-  try {
-    return Object.assign(require(local), { available: true }) as NativeBinding;
-  } catch (localError) {
-    try {
-      return Object.assign(require(`noxcturnal-${suffix}`), { available: true }) as NativeBinding;
-    } catch (packageError) {
-      const error = new AggregateError(
-        [localError, packageError],
-        `Could not load ${local} or noxcturnal-${suffix}.`,
-      );
-      const unavailable = () => {
-        throw new Error(`Noxcturnal native binding is unavailable. ${error.message}`, {
-          cause: error,
-        });
-      };
-      return {
-        available: false,
-        NativeIndexedSession: class {
-          constructor() {
-            unavailable();
-          }
-        } as never,
-        classify: () => ({
-          syntax: 'unknown',
-          supported: false,
-          codegenCandidate: false,
-          reason: 'native-load-failed',
-        }),
-        commitEdits: unavailable as never,
-        commitPackedEdits: unavailable as never,
-        commitPackedBuffer: unavailable as never,
-        materializeEvents: unavailable as never,
-        materializePackedEvents: unavailable as never,
-        materializePackedBuffer: unavailable as never,
-        materializeRoutedBuffer: unavailable as never,
-        queryGlobals: unavailable as never,
-        inspectNodes: unavailable as never,
-        composeMappings: unavailable as never,
-        generateFunctionMap: unavailable as never,
-        validateExpression: unavailable as never,
-        validateStatements: unavailable as never,
-      };
-    }
-  }
+  return require(existsSync(local) ? local : `noxcturnal-${suffix}`) as NativeBinding;
 }
 function platformSuffix(): string {
   if (process.platform === 'darwin') return `darwin-${process.arch}`;

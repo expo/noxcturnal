@@ -26,7 +26,6 @@ export {
   defineNativePlugin,
   compilePhasePlan,
   NativeTransformError,
-  NativeTransformSession,
   pipelineCacheKey,
   registerParserAdapter,
   transform,

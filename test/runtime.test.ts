@@ -8,14 +8,27 @@ import {
   compilePhasePlan,
   defineNativePipeline,
   defineNativePlugin,
-  NativeTransformSession,
   pipelineCacheKey,
   registerParserAdapter,
   transform,
   transformClassificationCacheKey,
 } from '../dist/index.js';
+import { NativeTransformSession } from '../dist/visitors.js';
 import { native } from '../dist/native.js';
 import { decodeRoutedEnvelope, packEdits, packRouteManifest } from '../dist/protocol.js';
+
+const ALL_RETAINED_CAPABILITIES = (1 << 6) - 1;
+const openRetained = (
+  source: string,
+  filename: string,
+  options: ConstructorParameters<typeof NativeTransformSession>[2] = {},
+) =>
+  new NativeTransformSession(
+    source,
+    filename,
+    options,
+    packRouteManifest([], false, false, ALL_RETAINED_CAPABILITIES),
+  );
 
 test('loads the Noxcturnal binding and classifies parser routes', () => {
   assert.deepEqual(classify('fixture.tsx', 'const view = <View />').syntax, 'tsx');
@@ -422,6 +435,7 @@ test('hydrates targeted snapshots once and retains exit ancestry and scope', () 
     prepare: () => ({
       ancestry: 'parent',
       semantics: ['scope'],
+      fields: { Identifier: ['name'] },
     }),
     visitor: {
       Identifier: {
@@ -449,7 +463,7 @@ test('hydrates targeted snapshots once and retains exit ancestry and scope', () 
   );
   assert.ok(snapshots.every(snapshot => typeof snapshot.scopeId === 'number'));
   assert.ok(snapshots.every(Object.isFrozen));
-  assert.equal((result.metadata.performance as { nativeParses: number }).nativeParses, 2);
+  assert.equal((result.metadata.performance as { nativeParses: number }).nativeParses, 1);
   assert.throws(
     () =>
       transform(
@@ -475,69 +489,6 @@ test('hydrates targeted snapshots once and retains exit ancestry and scope', () 
       ),
     /unknown snapshot field/,
   );
-});
-
-test('materializes arbitrary subscriptions without a complete ESTree', () => {
-  const session = NativeTransformSession.open(`const answer = foo('value')`, 'fixture.js');
-  const identifiers = session.next(['Identifier']);
-  assert.ok(identifiers.nodeCount > identifiers.emittedCount / 2);
-  assert.ok(identifiers.events.every(event => event.type === 'Identifier'));
-  assert.ok(
-    identifiers.events.some(event =>
-      event.fields.some(field => field.key === 'name' && field.value === 'foo'),
-    ),
-  );
-  session.close();
-  assert.throws(() => session.next(['Program']), /session-closed/);
-});
-
-test('materializes complete compact call payloads on the stateless packed path', () => {
-  const session = new NativeTransformSession("require('value')", 'fixture.js', {}, [
-    'CallExpression',
-  ]);
-  const [call, callExit] = session.next(['CallExpression']).events;
-  assert.deepEqual(Object.fromEntries(call.fields.map(field => [field.key, field.value])), {
-    optional: false,
-    argumentCount: 1,
-    calleeName: 'require',
-    calleeGlobal: true,
-    staticArgument: 'value',
-  });
-  assert.equal(callExit.side, 'exit');
-  assert.deepEqual(callExit.fields, call.fields);
-  session.close();
-});
-
-test('materializes exits only for explicitly subscribed routes', () => {
-  const source = 'function example(value) { return value + 1 }';
-  for (const retained of [false, true]) {
-    const createSession = () =>
-      new NativeTransformSession(
-        source,
-        'fixture.js',
-        {},
-        retained ? [] : ['Program', 'Function', 'Identifier'],
-        retained,
-      );
-    const enterSession = createSession();
-    const enterCount = enterSession.nextPacked(
-      ['Program', 'Function', 'Identifier'],
-      undefined,
-      undefined,
-      false,
-    ).emittedCount;
-    enterSession.close();
-    const exitSession = createSession();
-    const emittedCount = exitSession.nextPacked(
-      ['Program', 'Function', 'Identifier'],
-      undefined,
-      undefined,
-      true,
-      ['Program'],
-    ).emittedCount;
-    assert.equal(emittedCount, enterCount + 1);
-    exitSession.close();
-  }
 });
 
 test('skips native rendering when a phase produces no edits', () => {
@@ -755,7 +706,7 @@ test('rejects malformed routed manifests at the native boundary', () => {
     false,
     false,
   );
-  manifest.writeUInt32LE(99, 4);
+  manifest.writeUInt32LE(1 << 15, 4);
   assert.throws(
     () => native.materializeRoutedBuffer('const value = 1;', 'fixture.js', manifest),
     /unknown routed manifest flags/,
@@ -779,6 +730,55 @@ test('rejects malformed routed manifests at the native boundary', () => {
     () => native.materializeRoutedBuffer('const value = 1;', 'fixture.js', duplicate),
     /duplicate compiled route id/,
   );
+});
+
+test('constructs the retained index and initial routed tape in one native parse', () => {
+  const source = 'const value = source + 1; use(value);';
+  const manifest = packRouteManifest(
+    [
+      {
+        id: 0,
+        pluginId: 0,
+        nodeType: 'Identifier',
+        side: 'enter',
+        order: 0,
+        predicates: {},
+        payloadFields: ['name', 'global'],
+      },
+    ],
+    true,
+    true,
+  );
+  const expected = native.materializeRoutedBuffer(source, 'fixture.js', manifest);
+  const session = new native.NativeIndexedSession(source, 'fixture.js', false, manifest, manifest);
+  const first = session.nextRoutedPacked(manifest);
+  const second = session.nextRoutedPacked(manifest);
+  assert.deepEqual(first, expected);
+  assert.deepEqual(second, expected);
+  assert.equal(session.parseCount(), 1);
+  session.close();
+});
+
+test('retains only semantic and query sidecars declared by the compiled manifest', () => {
+  const source = "const outer = 1; load('x'); function fn() { return outer + 2 }";
+  const open = (capabilities: number) =>
+    new native.NativeIndexedSession(
+      source,
+      'fixture.js',
+      false,
+      packRouteManifest([], false, false, capabilities),
+    );
+  const none = open(0);
+  assert.deepEqual(none.queryBindings('outer'), []);
+  assert.deepEqual(none.queryCalls('load', true, true), []);
+  assert.deepEqual(none.queryConstants([3]), []);
+  none.close();
+
+  const planned = open((1 << 0) | (1 << 1) | (1 << 2));
+  assert.equal(planned.queryBindings('outer').length, 1);
+  assert.equal(planned.queryCalls('load', true, true).length, 1);
+  assert.ok(planned.queryConstants([...Array(32).keys()]).length > 0);
+  planned.close();
 });
 
 test('validates predicate fields across every concrete alias route', () => {
@@ -885,7 +885,10 @@ test('uses cached routed tapes for declared nested traversal', () => {
   };
   const plugin = defineNativePlugin({
     name: 'routed-nested',
-    prepare: () => ({ controlFlow: ['nested-traverse'] }),
+    prepare: () => ({
+      controlFlow: ['nested-traverse'],
+      fields: { Identifier: ['name'] },
+    }),
     visitor: {
       Function(path) {
         path.traverse(nestedVisitor);
@@ -926,103 +929,52 @@ test('expands Function aliases to arrow functions in nested routed traversal', (
 });
 
 test('exposes common scalar discriminants without child-tree transfer', () => {
-  const session = NativeTransformSession.open(
-    'const value = { platform: 1 }; value.total += -2;',
-    'fixture.js',
-  );
-  const events = session.next(
-    ['ObjectProperty', 'AssignmentExpression', 'UnaryExpression'],
-    undefined,
-    undefined,
-    false,
-  ).events;
+  const session = openRetained('const value = { platform: 1 }; value.total += -2;', 'fixture.js');
+  const events = session.nodes(['ObjectProperty', 'AssignmentExpression', 'UnaryExpression']);
   const property = events.find(event => event.type === 'ObjectProperty')!;
-  assert.deepEqual(Object.fromEntries(property.fields.map(field => [field.key, field.value])), {
-    kind: 'init',
-    computed: false,
-    method: false,
-    shorthand: false,
-    key: 'platform',
-  });
-  assert.equal(
-    events
-      .find(event => event.type === 'AssignmentExpression')!
-      .fields.find(field => field.key === 'operator')?.value,
-    '+=',
+  assert.deepEqual(
+    {
+      kind: property.kind,
+      computed: String(property.computed),
+      method: String(property.method),
+      shorthand: String(property.shorthand),
+      key: property.key,
+    },
+    {
+      kind: 'init',
+      computed: 'false',
+      method: 'false',
+      shorthand: 'false',
+      key: 'platform',
+    },
   );
-  assert.equal(
-    events
-      .find(event => event.type === 'UnaryExpression')!
-      .fields.find(field => field.key === 'operator')?.value,
-    '-',
-  );
+  assert.equal(events.find(event => event.type === 'AssignmentExpression')!.operator, '+=');
+  assert.equal(events.find(event => event.type === 'UnaryExpression')!.operator, '-');
   session.close();
 });
 
-test('keeps direct packed fields equivalent to retained event fields', () => {
-  const source = `"use strict";
-    import base, { named as local } from 'pkg';
-    export const value = local + 2;
-    const emoji = '😀';
-    let target = base.member;
-    target += -1;
-    target++;
-    const object = { target };
-    new Factory('value');
-    import.meta;
-    function *generate() { yield *target; }
-    const arrow = () => object;
-    class Example {}
-    export { target };
-  `;
-  const subscriptions = [
-    'Identifier',
-    'StringLiteral',
-    'NumericLiteral',
-    'BinaryExpression',
-    'AssignmentExpression',
-    'UnaryExpression',
-    'UpdateExpression',
-    'NewExpression',
-    'StaticMemberExpression',
-    'ImportDeclaration',
-    'ExportNamedDeclaration',
-    'VariableDeclaration',
-    'VariableDeclarator',
-    'Directive',
-    'YieldExpression',
-    'MetaProperty',
-    'ObjectProperty',
-    'Function',
-    'ArrowFunctionExpression',
-    'Class',
-    'ImportSpecifier',
-    'ImportDefaultSpecifier',
-    'ExportSpecifier',
-  ];
-  const retained = NativeTransformSession.open(source, 'fixture.js');
-  const direct = new NativeTransformSession(source, 'fixture.js', {}, subscriptions);
-  const normalize = (session: NativeTransformSession) =>
-    session
-      .next(subscriptions, undefined, undefined, false)
-      .events.map(({ sequence: _sequence, ...event }) => ({
-        ...event,
-        fields: Object.fromEntries(event.fields.map(field => [field.key, field.value])),
-      }));
-  assert.deepEqual(normalize(direct), normalize(retained));
-  direct.close();
-  retained.close();
-});
-
-test('retains materially less native event memory for narrow plans', () => {
+test('retains materially less native memory for narrow plans', () => {
   const source = Array.from(
     { length: 200 },
     (_, index) => `export const value${index} = source${index} + ${index};`,
   ).join('\n');
-  const narrow = NativeTransformSession.open(source, 'fixture.js');
-  narrow.next(['Identifier']);
-  const broad = NativeTransformSession.open(source, 'fixture.js');
-  broad.next(['*']);
+  const narrowManifest = packRouteManifest(
+    [
+      {
+        id: 0,
+        pluginId: 0,
+        nodeType: 'Identifier',
+        side: 'enter',
+        order: 0,
+        predicates: {},
+        payloadFields: ['name'],
+      },
+    ],
+    false,
+    false,
+  );
+  const narrow = new NativeTransformSession(source, 'fixture.js', {}, narrowManifest);
+  const broad = openRetained(source, 'fixture.js');
   assert.ok(narrow.nativeMemoryBytes < broad.nativeMemoryBytes * 0.6);
   narrow.close();
   broad.close();
@@ -1209,7 +1161,10 @@ test('supports targeted nested traversal and semantic global queries', () => {
   const names = [];
   const plugin = defineNativePlugin({
     name: 'targeted',
-    prepare: () => ({ controlFlow: ['nested-traverse'] }),
+    prepare: () => ({
+      controlFlow: ['nested-traverse'],
+      fields: { Identifier: ['name', 'global'] },
+    }),
     visitor: {
       Function(path) {
         path.traverse({
@@ -1256,7 +1211,7 @@ test('resolves bindings through identifier-free intermediate scopes', () => {
 });
 
 test('executes coarse global queries and targeted inspection', () => {
-  const session = NativeTransformSession.open(
+  const session = openRetained(
     'globalValue + (() => { const globalValue = 1; return globalValue })()',
     'fixture.js',
   );
@@ -1270,13 +1225,13 @@ test('executes coarse global queries and targeted inspection', () => {
 
 test('conservatively evaluates side-effect-free constant expressions', () => {
   const source = `const a = 1 + 2 * 3; const b = !0 && "yes"; const c = true ? "123" : "x"; const d = sideEffect();`;
-  const session = NativeTransformSession.open(source, 'fixture.js');
-  const expressions = session.next(
-    ['BinaryExpression', 'LogicalExpression', 'ConditionalExpression', 'CallExpression'],
-    undefined,
-    undefined,
-    false,
-  ).events;
+  const session = openRetained(source, 'fixture.js');
+  const expressions = session.nodes([
+    'BinaryExpression',
+    'LogicalExpression',
+    'ConditionalExpression',
+    'CallExpression',
+  ]);
   const bySource = new Map(
     expressions.map(event => [source.slice(event.start, event.end), event.id]),
   );
@@ -1292,20 +1247,17 @@ test('conservatively evaluates side-effect-free constant expressions', () => {
 });
 
 test('provides module specifier and declaration facts for source transforms', () => {
-  const session = NativeTransformSession.open(
+  const session = openRetained(
     "import base, { value as local } from 'pkg'; export { local as renamed }; const answer = 1;",
     'fixture.js',
   );
-  const nodes = session
-    .next([
-      'ImportDeclaration',
-      'ImportSpecifier',
-      'ImportDefaultSpecifier',
-      'ExportSpecifier',
-      'VariableDeclaration',
-    ])
-    .events.filter(event => event.side === 'enter')
-    .map(event => Object.fromEntries(event.fields.map(field => [field.key, field.value])));
+  const nodes = session.nodes([
+    'ImportDeclaration',
+    'ImportSpecifier',
+    'ImportDefaultSpecifier',
+    'ExportSpecifier',
+    'VariableDeclaration',
+  ]);
   assert.ok(nodes.some(node => node.source === 'pkg' && node.specifierCount === 2));
   assert.ok(nodes.some(node => node.imported === 'value' && node.local === 'local'));
   assert.ok(nodes.some(node => node.imported === 'default' && node.local === 'base'));
@@ -1891,6 +1843,12 @@ test('provides call and capture query declarations', () => {
   let captures: unknown[] = [];
   const plugin = defineNativePlugin({
     name: 'queries',
+    prepare: () => ({
+      queries: [
+        { calls: [{ callee: 'load', globalOnly: true, staticArguments: true }] },
+        { captures: [{ functionId: 0 }] },
+      ],
+    }),
     visitor: {
       Function(path) {
         calls = path.context.query({
@@ -1912,11 +1870,11 @@ test('provides call and capture query declarations', () => {
 });
 
 test('exposes binding reads, writes, and lexical captures', () => {
-  const session = NativeTransformSession.open(
+  const session = openRetained(
     'let outer = 0; function update() { outer++; return outer }',
     'fixture.js',
   );
-  const [fn] = session.next(['Function']).events.filter(event => event.side === 'enter');
+  const [fn] = session.nodes(['Function']);
   const facts = session.query({ bindings: [{ name: 'outer' }], captures: [{ functionId: fn.id }] });
   assert.equal(facts.bindings.length, 1);
   assert.ok(facts.bindings[0].references.some(reference => reference.write === true));
@@ -2445,28 +2403,34 @@ test('traces CRLF, directive, wrapper, and explicit-location mappings', () => {
 
 test('enforces native memory and follow-up batch budgets', () => {
   assert.throws(
-    () => NativeTransformSession.open('const value = 1', 'fixture.js', { maxNativeMemoryBytes: 1 }),
+    () => openRetained('const value = 1', 'fixture.js', { maxNativeMemoryBytes: 1 }),
     /native-memory-budget-exceeded/,
   );
-  const session = NativeTransformSession.open('const value = 1', 'fixture.js', {
+  const session = openRetained('const value = 1', 'fixture.js', {
     maxFollowUpBatches: 1,
   });
-  session.next(['Program']);
-  assert.throws(() => session.next(['Identifier']), /follow-up-batch-budget-exceeded/);
+  session.nextRoutedPacked(packRouteManifest([], false, false));
+  assert.throws(
+    () => session.nextRoutedPacked(packRouteManifest([], false, false)),
+    /follow-up-batch-budget-exceeded/,
+  );
   session.close();
 });
 
 test('keeps native sessions worker-thread isolated', async () => {
-  const moduleUrl = new URL('../dist/index.js', import.meta.url).href;
+  const moduleUrl = new URL('../dist/native.js', import.meta.url).href;
+  const manifest = packRouteManifest([], false, false, ALL_RETAINED_CAPABILITIES).toString(
+    'base64',
+  );
   const value = await new Promise((resolve, reject) => {
     const worker = new Worker(
-      `import { parentPort } from 'node:worker_threads'; import(${JSON.stringify(moduleUrl)}).then(({ NativeTransformSession }) => { const session = NativeTransformSession.open('const value = 1', 'worker.js'); parentPort.postMessage(session.next(['Identifier']).emittedCount); session.close(); }, error => { throw error; });`,
+      `import { parentPort } from 'node:worker_threads'; import(${JSON.stringify(moduleUrl)}).then(({ native }) => { const session = new native.NativeIndexedSession('const value = 1', 'worker.js', false, Buffer.from(${JSON.stringify(manifest)}, 'base64')); parentPort.postMessage(session.parseCount()); session.close(); }, error => { throw error; });`,
       { eval: true },
     );
     worker.once('message', resolve);
     worker.once('error', reject);
   });
-  assert.equal(value, 2);
+  assert.equal(value, 1);
 });
 
 test('handles deterministic randomized non-overlapping edit batches', () => {
@@ -2474,7 +2438,7 @@ test('handles deterministic randomized non-overlapping edit batches', () => {
   const random = () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 2 ** 32;
   for (let iteration = 0; iteration < 100; iteration++) {
     const source = 'abcdefghijklmnopqrstuvwxyz';
-    const session = NativeTransformSession.open(source, 'fuzz.js');
+    const session = openRetained(source, 'fuzz.js');
     const edits = Array.from({ length: 5 }, (_, index) => ({
       kind: 'Replace' as const,
       start: index * 5,

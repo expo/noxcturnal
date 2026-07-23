@@ -1,4 +1,10 @@
-import { FIELD_KEY_IDS, FIELD_KEYS, NODE_TYPE_IDS, NODE_TYPES } from './generated-event-schema.js';
+import {
+  FIELD_KEY_IDS,
+  FIELD_KEYS,
+  NODE_TYPE_IDS,
+  NODE_TYPES,
+  PREDICATE_FIELDS,
+} from './generated-event-schema.js';
 import type { EditCommand, EventBatch, NativeEvent, ScalarPredicate } from './types.js';
 
 export interface PackedEventBatch {
@@ -68,8 +74,30 @@ export function packRouteManifest(
   routes: readonly NativeRouteManifestEntry[],
   includeParent: boolean,
   includeScope: boolean,
+  retentionCapabilities = 0,
+  structuralParentTypes: readonly string[] = [],
+  retainedFields: Readonly<Record<string, readonly string[]>> = {},
 ): Buffer {
   if (routes.length > 4096) throw new Error('compiled route limit exceeded');
+  const concreteStructuralParentTypes = [
+    ...new Set(
+      structuralParentTypes.flatMap(type =>
+        NODE_TYPE_IDS.has(type)
+          ? [type]
+          : NODE_TYPES.filter(concrete => concrete && aliasType(type, concrete)),
+      ),
+    ),
+  ];
+  const concreteRetainedFields: Record<string, string[]> = {};
+  for (const [type, fields] of Object.entries(retainedFields)) {
+    const concreteTypes = NODE_TYPE_IDS.has(type)
+      ? [type]
+      : NODE_TYPES.filter(concrete => concrete && aliasType(type, concrete));
+    for (const concrete of concreteTypes) {
+      const target = (concreteRetainedFields[concrete] ??= []);
+      for (const field of fields) if (!target.includes(field)) target.push(field);
+    }
+  }
   const strings: string[] = [];
   const stringIds = new Map<string, number>();
   const intern = (value: string) => {
@@ -82,12 +110,12 @@ export function packRouteManifest(
   };
   const words: number[] = [
     ROUTE_MANIFEST_MAGIC,
-    Number(includeParent) | (Number(includeScope) << 1),
+    Number(includeParent) | (Number(includeScope) << 1) | (retentionCapabilities << 2),
     routes.length,
     0,
     0,
     0,
-    0,
+    concreteStructuralParentTypes.length,
   ];
   for (const route of routes) {
     const predicates = Object.entries(route.predicates);
@@ -124,6 +152,14 @@ export function packRouteManifest(
     }
     for (const field of route.payloadFields) words.push(requiredId(FIELD_KEY_IDS, field, 'field'));
   }
+  for (const nodeType of concreteStructuralParentTypes)
+    words.push(requiredId(NODE_TYPE_IDS, nodeType, 'structural parent type'));
+  const retainedFieldEntries = Object.entries(concreteRetainedFields);
+  words.push(retainedFieldEntries.length);
+  for (const [nodeType, fields] of retainedFieldEntries) {
+    words.push(requiredId(NODE_TYPE_IDS, nodeType, 'retained field node type'), fields.length);
+    for (const field of fields) words.push(requiredId(FIELD_KEY_IDS, field, 'retained field'));
+  }
   words[3] = strings.length;
   words[4] = words.length * 4;
   words[5] = routes.reduce((count, route) => Math.max(count, route.pluginId + 1), 0);
@@ -143,6 +179,16 @@ export function packRouteManifest(
     offset += padding;
   }
   return output;
+}
+
+function aliasType(alias: string, concrete: string): boolean {
+  if (alias === concrete) return true;
+  if (alias === 'Identifier') return concrete === 'Identifier';
+  if (alias === 'Function')
+    return concrete === 'Function' || concrete === 'ArrowFunctionExpression';
+  if (alias === 'Class') return concrete === 'Class';
+  if (alias === 'Expression') return PREDICATE_FIELDS[concrete] != null;
+  return false;
 }
 
 export function decodeRoutedEnvelope(buffer: Buffer): RoutedEventBatch {
@@ -272,6 +318,36 @@ export function dispatchRoutedEvents(
       handlers[words[index]](event);
   }
   if (offset !== words.length) throw new Error('trailing routed tape words');
+}
+
+export function routedParentIds(batch: RoutedEventBatch): number[] {
+  if (!batch.includeParent) return [];
+  const words = new Uint32Array(
+    batch.data.buffer,
+    batch.data.byteOffset,
+    batch.data.byteLength / 4,
+  );
+  const parents = new Set<number>();
+  let offset = 0;
+  for (let record = 0; record < batch.nodeRecordCount; record++) {
+    const sequence = words[offset++];
+    if ((sequence & DYNAMIC_TAG) !== 0) {
+      offset++;
+      const routeCount = words[offset++];
+      offset += routeCount;
+      continue;
+    }
+    offset += 4;
+    const parentId = words[offset++];
+    offset++;
+    if (parentId !== MISSING_VALUE) parents.add(parentId);
+    if (batch.includeScope) offset += 2;
+    const fieldCount = words[offset++];
+    offset += fieldCount * 2;
+    const routeCount = words[offset++];
+    offset += routeCount;
+  }
+  return [...parents];
 }
 
 function requiredId(map: ReadonlyMap<string, number>, value: string, kind: string): number {

@@ -1,12 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'vitest';
 
-import {
-  defineNativePipeline,
-  defineNativePlugin,
-  NativeTransformSession,
-  transform,
-} from '../dist/index.js';
+import { defineNativePipeline, defineNativePlugin, transform } from '../dist/index.js';
 
 type ImportState = { modules: Map<string, string> };
 
@@ -88,6 +83,7 @@ const metroExports = defineNativePlugin<ExportState>({
     return {
       controlFlow: ['nested-traverse'],
       semantics: ['scope'],
+      fields: { Identifier: ['name', 'binding'] },
       children: {
         ExportNamedDeclaration: ['declaration', 'specifiers'],
         ExportDefaultDeclaration: ['declaration'],
@@ -250,7 +246,4 @@ test('expresses server-action extraction with captures, directives, scopes, and 
     id: './fixture',
     names: ['_inlineAction'],
   });
-  const parsed = NativeTransformSession.open(result.code, 'fixture.js');
-  assert.equal(parsed.next(['Program'], undefined, undefined, false).events.length, 1);
-  parsed.close();
 });

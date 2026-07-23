@@ -16,6 +16,7 @@ import {
   packFieldRequests,
   packRouteManifest,
   parseScalar,
+  routedParentIds,
   type NativeRouteManifestEntry,
   type PackedEventBatch,
   type RoutedEventBatch,
@@ -482,52 +483,30 @@ export class NativeTransformSession {
   #batches = 0;
   #uids = new Set<string>();
   #eventCache: (NativeEvent | undefined)[] = [];
-  #nodeSummaryWords: Uint32Array | null = null;
-  #nodeViewCache: (NodeView | undefined)[] = [];
   #queryCache = new Map<string, QueryResult>();
-  #identifiersCache: NativeEvent[] | null = null;
-  #identifierViewsCache: NodeView[] | null = null;
-  #bindingIndexCache: Map<string, QueryResult['bindings'][number]> | null = null;
-  #globalIndexCache: Map<string, NodeSummary[]> | null = null;
-  #scopeParentsCache: Map<number, number | null> | null = null;
-  #childrenCache = new Map<number, NativeEvent[]>();
+  #childrenCache = new Map<number, number[]>();
   #prefetchedChildTypes = new Set<string>();
-  #packedBatchCache = new Map<string, PackedEventBatch>();
   #native: NativeIndexedSessionBinding | null = null;
-  #useStatelessInitialBatch: boolean;
   #nativeFilename: string;
-  #includeParent: boolean;
-  #includeScope: boolean;
-  #identifierNames: readonly string[];
-  #staticMemberPatterns: readonly string[];
   #lineStarts: number[] | null = null;
   #nativeParseCount = 0;
   constructor(
     readonly source: string,
     readonly filename: string,
     readonly options: TransformOptions = {},
-    initialSubscriptions: readonly string[] = [],
-    retainInitialIndex = false,
-    includeParent = true,
-    includeScope = true,
-    identifierNames: readonly string[] = [],
-    staticMemberPatterns: readonly string[] = [],
-    initialExitSubscriptions: readonly string[] = [],
+    retentionManifest?: Buffer,
+    initialManifest?: Buffer,
+    buildInitialRoute = true,
   ) {
     this.#nativeFilename = parserFilename(filename, options.parser);
-    this.#includeParent = includeParent;
-    this.#includeScope = includeScope;
-    this.#identifierNames = identifierNames;
-    this.#staticMemberPatterns = staticMemberPatterns;
-    this.#useStatelessInitialBatch = initialSubscriptions.length > 0 && !retainInitialIndex;
-    if (!this.#useStatelessInitialBatch)
-      this.#native = new native.NativeIndexedSession(
-        source,
-        this.#nativeFilename,
-        [...initialSubscriptions],
-        [...initialExitSubscriptions],
-        options.functionMap,
-      );
+    this.#native = new native.NativeIndexedSession(
+      source,
+      this.#nativeFilename,
+      options.functionMap,
+      retentionManifest,
+      initialManifest,
+      buildInitialRoute,
+    );
     if (
       this.#native &&
       options.maxNativeMemoryBytes != null &&
@@ -549,74 +528,6 @@ export class NativeTransformSession {
   recordStatelessParse(): void {
     this.#nativeParseCount++;
   }
-  static open(
-    source: string,
-    filename: string,
-    options: TransformOptions = {},
-  ): NativeTransformSession {
-    return new NativeTransformSession(source, filename, options);
-  }
-  next(
-    subscriptions: readonly string[],
-    root?: { start: number; end: number },
-    fields?: Readonly<Record<string, readonly string[]>>,
-    includeExit = true,
-  ): EventBatch {
-    const batch = decodeEventBatch(this.nextPacked(subscriptions, root, fields, includeExit));
-    for (const event of batch.events)
-      if (event.side === 'enter') this.#eventCache[event.id] = event;
-    return batch;
-  }
-  nextPacked(
-    subscriptions: readonly string[],
-    root?: { start: number; end: number },
-    fields?: Readonly<Record<string, readonly string[]>>,
-    includeExit = true,
-    requestedExitSubscriptions?: readonly string[],
-  ): PackedEventBatch {
-    this.#assertOpen();
-    const exitSubscriptions = requestedExitSubscriptions ?? (includeExit ? subscriptions : []);
-    const cacheKey = stableJson({ subscriptions, root, fields, exitSubscriptions });
-    const cached = this.#packedBatchCache.get(cacheKey);
-    if (cached) {
-      return cached;
-    }
-    if (++this.#batches > (this.options.maxFollowUpBatches ?? 64))
-      throw new Error('follow-up-batch-budget-exceeded');
-    const fieldRequests =
-      fields &&
-      Object.entries(fields).map(([nodeType, requested]) => ({ nodeType, fields: [...requested] }));
-    const packed = this.#useStatelessInitialBatch
-      ? (() => {
-          this.#nativeParseCount++;
-          const encoded = encodeSubscriptions(subscriptions);
-          const encodedExits = encodeSubscriptions(exitSubscriptions);
-          return decodePackedEnvelope(
-            native.materializePackedBuffer(
-              this.source,
-              this.#nativeFilename,
-              encoded.fallback,
-              encoded.ids,
-              encodedExits.fallback,
-              encodedExits.ids,
-              root?.start,
-              root?.end,
-              packFieldRequests(fields),
-              this.#includeParent,
-              this.#includeScope,
-              [...this.#identifierNames],
-              [...this.#staticMemberPatterns],
-            ),
-          );
-        })()
-      : this.#binding().nextPacked([...subscriptions], root?.start, root?.end, fieldRequests, [
-          ...exitSubscriptions,
-        ]);
-    packed.includeExit = exitSubscriptions.length > 0;
-    this.#useStatelessInitialBatch = false;
-    this.#packedBatchCache.set(cacheKey, packed);
-    return packed;
-  }
   nextRoutedPacked(
     manifest: Buffer,
     root?: { start: number; end: number },
@@ -629,49 +540,37 @@ export class NativeTransformSession {
     return decodeRoutedEnvelope(buffer);
   }
   cacheEvent(event: NativeEvent): void {
-    if (
-      event.side === 'enter' &&
-      (this.#includeParent || this.#includeScope || this.#native != null)
-    ) {
+    if (event.side === 'enter') {
       this.#eventCache[event.id] = event;
     }
   }
   nodeView(event: NativeEvent): NodeView {
-    return (this.#nodeViewCache[event.id] ??= toNodeView(event));
+    return toNodeView(event);
   }
   query(request: QueryRequest): QueryResult {
     this.#assertOpen();
     const cacheKey = stableJson(request);
     const cached = this.#queryCache.get(cacheKey);
     if (cached) return cached;
-    const directGlobals =
-      request.globals?.length && request.bindings == null && request.captures == null;
     const types = querySubscriptions({ ...request, constants: undefined }).filter(
-      type => !(directGlobals && type === 'Identifier'),
+      type => type !== 'Identifier',
     );
-    const needsIdentifiers = types.some(type => type === 'Identifier');
-    const remainingTypes = needsIdentifiers ? types.filter(type => type !== 'Identifier') : types;
-    const nodes = remainingTypes.length
-      ? this.next(remainingTypes, undefined, undefined, false).events.map(toNodeView)
+    const nodes = types.length
+      ? decodeEventBatch(
+          decodePackedEnvelope(this.#binding().queryNodesPackedBuffer(types)),
+        ).events.map(toNodeView)
       : [];
-    if (needsIdentifiers) nodes.push(...this.identifierViews());
     const globals: QueryResult['globals'] = {};
     if (request.globals?.length) {
-      if (directGlobals) {
-        for (const fact of this.#binding().queryGlobals(request.globals.map(query => query.name))) {
-          globals[fact.name] = {
-            references: fact.references.map(reference => ({
-              id: reference.id,
-              type: 'Identifier',
-              start: reference.start,
-              end: reference.end,
-            })),
-          };
-        }
-      } else {
-        const index = this.identifierIndexes().globals;
-        for (const query of request.globals)
-          globals[query.name] = { references: index.get(query.name) ?? [] };
+      for (const fact of this.#binding().queryGlobals(request.globals.map(query => query.name))) {
+        globals[fact.name] = {
+          references: fact.references.map(reference => ({
+            id: reference.id,
+            type: 'Identifier',
+            start: reference.start,
+            end: reference.end,
+          })),
+        };
       }
     }
     const constants: QueryResult['constants'] = {};
@@ -695,107 +594,148 @@ export class NativeTransformSession {
       calls: Object.fromEntries(
         (request.calls ?? []).map(call => [
           call.callee,
-          nodes.filter(
-            node =>
-              node.type === 'CallExpression' &&
-              node.calleeName === call.callee &&
-              (!call.globalOnly || node.calleeGlobal === true) &&
-              (!call.staticArguments || typeof node.staticArgument === 'string'),
-          ),
+          this.#binding()
+            .queryCalls(call.callee, call.globalOnly, call.staticArguments)
+            .map(fact => ({
+              id: fact.id,
+              type: 'CallExpression',
+              start: fact.start,
+              end: fact.end,
+              scopeId: fact.scopeId,
+              calleeName: fact.calleeName,
+              calleeGlobal: fact.calleeGlobal,
+              staticArgument: fact.staticArgument,
+            })),
         ]),
       ),
       captures: Object.fromEntries(
-        (request.captures ?? []).map(capture => {
-          const fn = nodes.find(node => node.id === capture.functionId);
-          const scopeContains = (ancestor: number, child: number) => {
-            let scope: number | null = child;
-            while (scope != null) {
-              if (scope === ancestor) return true;
-              scope = this.scopeParentId(scope);
-            }
-            return false;
-          };
-          const references = fn
-            ? nodes.filter(
-                node =>
-                  node.type === 'Identifier' &&
-                  node.start >= fn.start &&
-                  node.end <= fn.end &&
-                  node.binding !== true &&
-                  node.global !== true &&
-                  typeof node.bindingScopeId === 'number' &&
-                  scopeContains(fn.scopeId, node.scopeId) &&
-                  node.bindingScopeId !== fn.scopeId &&
-                  !scopeContains(fn.scopeId, node.bindingScopeId),
-              )
-            : [];
-          return [capture.functionId, references];
-        }),
+        (request.captures ?? []).map(capture => [
+          capture.functionId,
+          this.#binding()
+            .queryCaptures(capture.functionId)
+            .map(reference => ({
+              id: reference.id,
+              type: 'Identifier',
+              start: reference.start,
+              end: reference.end,
+              scopeId: reference.scopeId,
+              parentId: reference.parentId,
+              parentType: reference.parentType,
+              name: reference.name,
+              bindingScopeId: reference.bindingScopeId,
+              read: reference.read,
+              write: reference.write,
+            })),
+        ]),
       ),
-      bindings: (request.bindings ?? []).flatMap(binding => {
-        const index = this.identifierIndexes().bindings;
-        const candidates =
-          binding.name != null && binding.scopeId != null
-            ? [index.get(`${binding.scopeId}:${binding.name}`)].filter(
-                (candidate): candidate is QueryResult['bindings'][number] => candidate != null,
-              )
-            : [...index.values()].filter(
-                candidate =>
-                  (binding.name == null || candidate.name === binding.name) &&
-                  (binding.scopeId == null || candidate.scopeId === binding.scopeId),
-              );
-        if (!binding.reads && !binding.writes) return candidates;
-        return candidates.map(candidate => ({
-          ...candidate,
-          references: candidate.references.filter(
-            reference =>
-              (!binding.reads || reference.read === true) &&
-              (!binding.writes || reference.write === true),
-          ),
-        }));
-      }),
+      bindings: (request.bindings ?? []).flatMap(binding =>
+        this.#binding()
+          .queryBindings(binding.name, binding.scopeId, binding.reads, binding.writes)
+          .map(fact => ({
+            name: fact.name,
+            scopeId: fact.scopeId,
+            declaration:
+              fact.declarationId == null
+                ? null
+                : {
+                    id: fact.declarationId,
+                    type: 'Identifier',
+                    start: fact.declarationStart!,
+                    end: fact.declarationEnd!,
+                    parentId: fact.declarationParentId,
+                  },
+            references: fact.references.map(reference => ({
+              id: reference.id,
+              type: 'Identifier',
+              start: reference.start,
+              end: reference.end,
+              scopeId: reference.scopeId,
+              parentId: reference.parentId,
+              parentType: reference.parentType,
+              name: fact.name,
+              bindingScopeId: fact.scopeId,
+              read: reference.read,
+              write: reference.write,
+            })),
+          })),
+      ),
     };
     this.#queryCache.set(cacheKey, result);
     return result;
   }
   inspect(requests: readonly InspectRequest[]): NodeView[] {
-    return this.#binding()
-      .inspect(requests.map(request => request.nodeId))
-      .map(toNodeView)
-      .map(node => {
-        const request = requests.find(item => item.nodeId === node.id)!;
-        return Object.freeze(
+    const resolved = new Map<number, NodeView>();
+    const missing: InspectRequest[] = [];
+    for (const request of requests) {
+      const cached = this.#eventCache[request.nodeId];
+      if (cached && request.fields.every(field => cached.fields.some(item => item.key === field))) {
+        resolved.set(request.nodeId, toNodeView(cached));
+      } else if (request.fields.length === 0) {
+        const event = this.event(request.nodeId);
+        if (event) resolved.set(request.nodeId, toNodeView(event));
+      } else {
+        missing.push(request);
+      }
+    }
+    if (missing.length > 0)
+      for (const node of decodeEventBatch(
+        decodePackedEnvelope(
+          this.#binding().inspectPackedBuffer(missing.map(request => request.nodeId)),
+        ),
+      ).events.map(toNodeView))
+        resolved.set(node.id, node);
+    return requests.flatMap(request => {
+      const node = resolved.get(request.nodeId);
+      if (!node) return [];
+      return [
+        Object.freeze(
           Object.fromEntries(
             ['id', 'type', 'start', 'end', 'scopeId', ...request.fields]
               .filter(key => key in node)
               .map(key => [key, node[key]]),
           ),
-        ) as NodeView;
-      });
+        ) as NodeView,
+      ];
+    });
   }
   children(parentId: number): NativeEvent[] {
     this.#assertOpen();
     const cached = this.#childrenCache.get(parentId);
-    if (cached) return cached;
+    if (cached) return cached.flatMap(nodeId => this.event(nodeId) ?? []);
     const parent = this.event(parentId);
     if (
       parent &&
       [...this.#prefetchedChildTypes].some(type => type === parent.type || alias(type, parent.type))
     ) {
-      const empty: NativeEvent[] = [];
+      const empty: number[] = [];
       this.#childrenCache.set(parentId, empty);
-      return empty;
+      return [];
     }
     this.prefetchChildren([parentId]);
-    return this.#childrenCache.get(parentId)!;
+    return this.#childrenCache.get(parentId)!.flatMap(nodeId => this.event(nodeId) ?? []);
   }
   constantNodes(nodeIds: readonly number[]): NodeView[] {
     this.#assertOpen();
-    const batch = decodeEventBatch(
-      decodePackedEnvelope(this.#binding().constantsPackedBuffer([...nodeIds])),
-    );
-    for (const event of batch.events) this.cacheEvent(event);
-    return batch.events.map(toNodeView);
+    return this.#binding()
+      .queryConstants([...nodeIds])
+      .flatMap(fact => {
+        const event = this.event(fact.id);
+        return event
+          ? [
+              {
+                ...toNodeView(event),
+                constantKind: fact.kind,
+                constantValue: fact.value,
+              },
+            ]
+          : [];
+      });
+  }
+  nodes(nodeTypes: readonly string[]): NodeView[] {
+    this.#assertOpen();
+    return decodeEventBatch(
+      decodePackedEnvelope(this.#binding().queryNodesPackedBuffer([...nodeTypes])),
+    ).events.map(toNodeView);
   }
   prefetchChildren(parentIds: readonly number[] = [], parentTypes: readonly string[] = []): void {
     this.#assertOpen();
@@ -822,7 +762,7 @@ export class NativeTransformSession {
         children = [];
         this.#childrenCache.set(event.parentId!, children);
       }
-      children.push(event);
+      children.push(event.id);
     }
     for (const type of missingTypes) this.#prefetchedChildTypes.add(type);
     if (
@@ -835,12 +775,27 @@ export class NativeTransformSession {
     this.#assertOpen();
     const cached = this.#eventCache[nodeId];
     if (cached) return cached;
-    if (this.#nodeSummaryWords == null) {
-      const data = this.#binding().nodeSummariesBuffer();
-      this.#nodeSummaryWords = new Uint32Array(data.buffer, data.byteOffset, data.byteLength >>> 2);
-    }
-    const offset = nodeId * 7;
-    const words = this.#nodeSummaryWords;
+    const data = this.#binding().nodeSummaryBuffer(nodeId);
+    if (data.byteLength !== 7 * 4) return undefined;
+    const words = new Uint32Array(data.buffer, data.byteOffset, 7);
+    return this.#cacheSummary(nodeId, words, 0);
+  }
+  prefetchEvents(nodeIds: readonly number[]): void {
+    this.#assertOpen();
+    const missing = [...new Set(nodeIds)].filter(nodeId => this.#eventCache[nodeId] === undefined);
+    if (missing.length === 0) return;
+    const data = this.#binding().nodeSummaryBuffers(missing);
+    if (data.byteLength !== missing.length * 7 * 4)
+      throw new Error('invalid native node summary buffer');
+    const words = new Uint32Array(
+      data.buffer,
+      data.byteOffset,
+      data.byteLength / Uint32Array.BYTES_PER_ELEMENT,
+    );
+    for (let index = 0; index < missing.length; index++)
+      this.#cacheSummary(missing[index]!, words, index * 7);
+  }
+  #cacheSummary(nodeId: number, words: Uint32Array, offset: number): NativeEvent | undefined {
     const type = NODE_TYPES[words[offset]!] || 'Unknown';
     const parentId = words[offset + 3]!;
     const parentTypeId = words[offset + 4]!;
@@ -864,77 +819,58 @@ export class NativeTransformSession {
     if (event) this.#eventCache[nodeId] = event;
     return event;
   }
-  identifierEvents(): NativeEvent[] {
-    this.#assertOpen();
-    return (this.#identifiersCache ??= this.next(
-      ['Identifier'],
-      undefined,
-      undefined,
-      false,
-    ).events);
-  }
-  identifierViews(): NodeView[] {
-    return (this.#identifierViewsCache ??= this.identifierEvents().map(toNodeView));
-  }
-  identifierIndexes(): {
-    bindings: Map<string, QueryResult['bindings'][number]>;
-    globals: Map<string, NodeSummary[]>;
-  } {
-    if (this.#bindingIndexCache && this.#globalIndexCache)
-      return { bindings: this.#bindingIndexCache, globals: this.#globalIndexCache };
-    const bindings = new Map<string, QueryResult['bindings'][number]>();
-    const globals = new Map<string, NodeSummary[]>();
-    for (const node of this.identifierViews()) {
-      const name = String(node.name);
-      if (node.binding === true) {
-        bindings.set(`${node.scopeId}:${name}`, {
-          name,
-          scopeId: node.scopeId,
-          declaration: summary(node),
-          references: [],
-        });
-      } else if (node.global === true) {
-        let references = globals.get(name);
-        if (!references) {
-          references = [];
-          globals.set(name, references);
-        }
-        references.push(summary(node));
-      }
-    }
-    for (const node of this.identifierViews()) {
-      if (node.binding === true || node.global === true || typeof node.bindingScopeId !== 'number')
-        continue;
-      bindings.get(`${node.bindingScopeId}:${String(node.name)}`)?.references.push(node);
-    }
-    this.#bindingIndexCache = bindings;
-    this.#globalIndexCache = globals;
-    return { bindings, globals };
-  }
   bindingForScopes(
     name: string,
     scopeIds: readonly number[],
   ): QueryResult['bindings'][number] | undefined {
-    const bindings = this.identifierIndexes().bindings;
     for (const scopeId of scopeIds) {
-      const binding = bindings.get(`${scopeId}:${name}`);
-      if (binding) return binding;
+      const fact = this.#binding().queryBindings(name, scopeId)[0];
+      if (fact)
+        return {
+          name: fact.name,
+          scopeId: fact.scopeId,
+          declaration:
+            fact.declarationId == null
+              ? null
+              : {
+                  id: fact.declarationId,
+                  type: 'Identifier',
+                  start: fact.declarationStart!,
+                  end: fact.declarationEnd!,
+                  parentId: fact.declarationParentId,
+                },
+          references: fact.references.map(reference => ({
+            id: reference.id,
+            type: 'Identifier',
+            start: reference.start,
+            end: reference.end,
+            scopeId: reference.scopeId,
+            parentId: reference.parentId,
+            parentType: reference.parentType,
+            name: fact.name,
+            bindingScopeId: fact.scopeId,
+            read: reference.read,
+            write: reference.write,
+          })),
+        };
     }
     return undefined;
   }
   globalReferences(name: string): NodeSummary[] {
-    return this.identifierIndexes().globals.get(name) ?? [];
+    return (
+      this.#binding()
+        .queryGlobals([name])[0]
+        ?.references.map(reference => ({
+          id: reference.id,
+          type: 'Identifier',
+          start: reference.start,
+          end: reference.end,
+        })) ?? []
+    );
   }
   scopeParentId(scopeId: number): number | null {
     this.#assertOpen();
-    if (!this.#scopeParentsCache) {
-      const data = this.#binding().scopeParentsBuffer();
-      const words = new Uint32Array(data.buffer, data.byteOffset, data.byteLength >>> 2);
-      this.#scopeParentsCache = new Map(
-        Array.from(words, (parent, id) => [id, parent === 0xffffffff ? null : parent]),
-      );
-    }
-    return this.#scopeParentsCache.get(scopeId) ?? null;
+    return this.#binding().scopeParentId(scopeId);
   }
   generateUid(name = 'temp'): string {
     const base = `_${name.replace(/[^A-Za-z0-9_$]/g, '') || 'temp'}`;
@@ -979,7 +915,6 @@ export class NativeTransformSession {
   }
   close(): void {
     if (!this.#closed) this.#native?.close();
-    this.#packedBatchCache.clear();
     this.#closed = true;
   }
   #assertOpen(): void {
@@ -988,7 +923,7 @@ export class NativeTransformSession {
   #binding(): NativeIndexedSessionBinding {
     this.#assertOpen();
     if (!this.#native) {
-      this.#native = new native.NativeIndexedSession(this.source, this.#nativeFilename, [], []);
+      this.#native = new native.NativeIndexedSession(this.source, this.#nativeFilename);
       if (
         this.options.maxNativeMemoryBytes != null &&
         this.#native.memoryUsage() > this.options.maxNativeMemoryBytes
@@ -1009,13 +944,10 @@ interface PreparedPhase {
   activePlugins: NativePlugin<any, any>[];
   plans: Map<NativePlugin<any, any>, PreparedPluginPlan>;
   subscriptions: Set<string>;
-  materializationSubscriptions: Set<string>;
-  exitSubscriptions: Set<string>;
   fieldRequests: Record<string, string[]>;
-  identifierNames: string[];
-  staticMemberPatterns: string[];
   includeParent: boolean;
   includeScope: boolean;
+  retentionCapabilities: number;
   compiledRoutes?: readonly CompiledRouteTemplate[];
   manifest?: Buffer;
 }
@@ -1030,6 +962,13 @@ const compiledPhaseCaches = new WeakMap<
   PipelinePhase,
   Map<string, { routes: CompiledRouteTemplate[]; manifest: Buffer }>
 >();
+
+const RETAIN_IDENTIFIERS = 1 << 0;
+const RETAIN_CONSTANTS = 1 << 1;
+const RETAIN_CALLS = 1 << 2;
+const RETAIN_CHILDREN = 1 << 3;
+const RETAIN_INSPECTION = 1 << 4;
+const RETAIN_MODULE_FACTS = 1 << 5;
 
 function phaseIsEnabled(plan: PreparedPluginPlan, phaseName: string): boolean {
   if (plan.enabled === false) return false;
@@ -1064,32 +1003,6 @@ function mergeFieldRequests(
       if (!present) merged.push(field);
     }
   }
-}
-
-function collectSharedFilter(
-  plugins: readonly NativePlugin<any, any>[],
-  plans: ReadonlyMap<NativePlugin<any, any>, PreparedPluginPlan>,
-  subscribes: (subscription: string) => boolean,
-  select: (plan: PreparedPluginPlan) => readonly string[] | undefined,
-): string[] {
-  const values = new Set<string>();
-  let subscriberCount = 0;
-  for (const plugin of plugins) {
-    const plan = plans.get(plugin)!;
-    let subscribed = false;
-    for (const subscription of plan.subscriptions) {
-      if (subscribes(subscription)) {
-        subscribed = true;
-        break;
-      }
-    }
-    if (!subscribed) continue;
-    subscriberCount++;
-    const selected = select(plan);
-    if (selected == null) return [];
-    for (const value of selected) values.add(value);
-  }
-  return subscriberCount === 0 ? [] : [...values];
 }
 
 function preparePhase(
@@ -1139,8 +1052,6 @@ function preparePhase(
     phaseIsEnabled(plans.get(plugin)!, phase.name),
   );
   const subscriptions = new Set<string>();
-  const materializationSubscriptions = new Set<string>();
-  const exitSubscriptions = new Set<string>();
   const fieldRequests: Record<string, string[]> = {};
   let includeParent = false;
   let includeScope = false;
@@ -1149,22 +1060,10 @@ function preparePhase(
     const plan = plans.get(plugin)!;
     for (const type of plan.subscriptions) {
       subscriptions.add(type);
-      materializationSubscriptions.add(type);
-    }
-    for (const type of visitorExitSubscriptions(plugin.visitor)) exitSubscriptions.add(type);
-    for (const query of plan.queries ?? []) {
-      for (const type of querySubscriptions(query)) materializationSubscriptions.add(type);
     }
     if (plan.semantics?.[0] === 'scope') {
       includeScope = true;
-      materializationSubscriptions.add('Identifier');
-      materializationSubscriptions.add('Program');
-      materializationSubscriptions.add('Function');
-      materializationSubscriptions.add('ArrowFunctionExpression');
-      materializationSubscriptions.add('Directive');
     }
-    if (plan.children && Object.keys(plan.children).length > 0)
-      materializationSubscriptions.add('*');
     includeParent ||= plan.ancestry != null;
     mergeFieldRequests(fieldRequests, plan.fields ?? {});
     for (const [route, predicates] of Object.entries(plan.where ?? {})) {
@@ -1177,30 +1076,51 @@ function preparePhase(
     mergeFieldRequests(fieldRequests, visitorRoutingFields(plugin.visitor));
   }
 
-  const routed = compilePhaseRoutes(phase, activePlugins, plans, includeParent, includeScope);
+  let retentionCapabilities = 0;
+  for (const plugin of activePlugins) {
+    const plan = plans.get(plugin)!;
+    if (
+      plan.semantics?.includes('scope') ||
+      plan.queries?.some(
+        query =>
+          (query.globals?.length ?? 0) > 0 ||
+          (query.bindings?.length ?? 0) > 0 ||
+          (query.captures?.length ?? 0) > 0,
+      )
+    )
+      retentionCapabilities |= RETAIN_IDENTIFIERS;
+    if (plan.queries?.some(query => (query.constants?.length ?? 0) > 0))
+      retentionCapabilities |= RETAIN_CONSTANTS;
+    if (plan.queries?.some(query => (query.calls?.length ?? 0) > 0))
+      retentionCapabilities |= RETAIN_CALLS;
+    if (plan.queries?.some(query => query.imports === true || query.exports === true))
+      retentionCapabilities |= RETAIN_MODULE_FACTS;
+    if (plan.children && Object.keys(plan.children).length > 0)
+      retentionCapabilities |= RETAIN_CHILDREN;
+    if (
+      plan.controlFlow?.includes('nested-traverse') ||
+      plan.controlFlow?.includes('dynamic-subscriptions')
+    )
+      retentionCapabilities |= RETAIN_INSPECTION;
+  }
+  const routed = compilePhaseRoutes(
+    phase,
+    activePlugins,
+    plans,
+    includeParent,
+    includeScope,
+    retentionCapabilities,
+  );
   const prepared: PreparedPhase = {
     activePlugins,
     plans,
     subscriptions,
-    materializationSubscriptions,
-    exitSubscriptions,
     fieldRequests,
     includeParent,
     includeScope,
+    retentionCapabilities,
     compiledRoutes: routed?.routes,
     manifest: routed?.manifest,
-    identifierNames: collectSharedFilter(
-      activePlugins,
-      plans,
-      subscription => routeContains(subscription, 'Identifier', 'ReferencedIdentifier'),
-      plan => plan.identifierNames,
-    ),
-    staticMemberPatterns: collectSharedFilter(
-      activePlugins,
-      plans,
-      subscription => routeContains(subscription, 'StaticMemberExpression', 'MemberExpression'),
-      plan => plan.staticMemberPatterns,
-    ),
   };
   let preparedCache = preparedPhaseCaches.get(phase);
   if (!preparedCache) {
@@ -1248,10 +1168,13 @@ function compilePhaseRoutes(
   plans: ReadonlyMap<NativePlugin<any, any>, PreparedPluginPlan>,
   includeParent: boolean,
   includeScope: boolean,
+  retentionCapabilities: number,
 ): { routes: CompiledRouteTemplate[]; manifest: Buffer } | undefined {
   const cacheKey = stableJson({
     includeParent,
     includeScope,
+    retentionCapabilities,
+    children: plugins.map(plugin => plans.get(plugin)?.children ?? null),
     plugins: plugins.map(plugin => {
       const plan = plans.get(plugin)!;
       return {
@@ -1328,7 +1251,19 @@ function compilePhaseRoutes(
       });
     }
   }
-  const manifest = packRouteManifest(routes, includeParent, includeScope);
+  const structuralParentTypes = [
+    ...new Set(plugins.flatMap(plugin => Object.keys(plans.get(plugin)?.children ?? {}))),
+  ];
+  const retainedFields: Record<string, string[]> = {};
+  for (const plugin of plugins) mergeFieldRequests(retainedFields, plans.get(plugin)?.fields ?? {});
+  const manifest = packRouteManifest(
+    routes,
+    includeParent,
+    includeScope,
+    retentionCapabilities,
+    structuralParentTypes,
+    retainedFields,
+  );
   const compiled = { routes, manifest };
   if (cache.size < 64) cache.set(cacheKey, compiled);
   return compiled;
@@ -1431,12 +1366,17 @@ function visitorRouteVariants(visitor?: Visitor<any>): {
 
 const nestedRouteCaches = new WeakMap<
   object,
-  { manifest: Buffer; callbacks: readonly (readonly Handler<any>[])[] }
+  {
+    manifest: Buffer;
+    callbacks: readonly (readonly Handler<any>[])[];
+    routes: readonly NativeRouteManifestEntry[];
+  }
 >();
 
 function compileNestedVisitor(visitor: Visitor<any>): {
   manifest: Buffer;
   callbacks: readonly (readonly Handler<any>[])[];
+  routes: readonly NativeRouteManifestEntry[];
 } {
   const cached = nestedRouteCaches.get(visitor);
   if (cached) return cached;
@@ -1448,14 +1388,46 @@ function compileNestedVisitor(visitor: Visitor<any>): {
     side: variant.side,
     order: 0,
     predicates: variant.predicates,
-    payloadFields: PREDICATE_FIELDS[variant.nodeType] ?? [],
+    payloadFields: [],
   }));
   const compiled = {
     manifest: packRouteManifest(routes, true, true),
     callbacks: variants.map(variant => variant.callbacks),
+    routes,
   };
   nestedRouteCaches.set(visitor, compiled);
   return compiled;
+}
+
+function assertNestedFieldsDeclared(
+  plugin: NativePlugin<any, any>,
+  plan: Pick<PluginPlan, 'fields'> | undefined,
+  routes: readonly NativeRouteManifestEntry[],
+): void {
+  for (const route of routes) {
+    const declared = plan?.fields?.[route.nodeType as NativeNodeType] ?? [];
+    for (const field of Object.keys(route.predicates))
+      if (!declared.includes(field as NativeFieldKey))
+        throw new Error(
+          `${plugin.name}: nested traversal requires declared field ${route.nodeType}.${field}`,
+        );
+  }
+}
+
+function nestedManifest(
+  plugin: NativePlugin<any, any>,
+  plan: Pick<PluginPlan, 'fields'> | undefined,
+  compiled: ReturnType<typeof compileNestedVisitor>,
+): Buffer {
+  assertNestedFieldsDeclared(plugin, plan, compiled.routes);
+  return packRouteManifest(
+    compiled.routes.map(route => ({
+      ...route,
+      payloadFields: plan?.fields?.[route.nodeType as NativeNodeType] ?? [],
+    })),
+    true,
+    true,
+  );
 }
 
 function concreteRouteTypes(route: string): string[] {
@@ -1601,6 +1573,7 @@ export function transform(
   let openSession: NativeTransformSession | null = null;
   let reusableSession: NativeTransformSession | null = null;
   let reusableRoutedBatch: { manifest: Buffer; batch: RoutedEventBatch } | null = null;
+  const preparedAhead = new Map<number, { source: string; prepared: PreparedPhase }>();
   let pendingEdits: EditCommand[] = [];
   let nativeFunctionMap: FunctionMap | null = null;
   const recordedParseCounts = new WeakMap<NativeTransformSession, number>();
@@ -1616,20 +1589,22 @@ export function transform(
       }
       const edits: EditCommand[] = [];
       const preparationStarted = options.debugPerformance ? performance.now() : 0;
-      const prepared = preparePhase(phase, observationSource, filename, options, parser);
+      const ahead = preparedAhead.get(phaseIndex);
+      preparedAhead.delete(phaseIndex);
+      const prepared =
+        ahead?.source === observationSource
+          ? ahead.prepared
+          : preparePhase(phase, observationSource, filename, options, parser);
       if (options.debugPerformance)
         performanceCounters(metadata).phasePreparationMs += performance.now() - preparationStarted;
       const {
         activePlugins,
         plans,
         subscriptions,
-        materializationSubscriptions,
-        exitSubscriptions,
         fieldRequests,
-        identifierNames,
-        staticMemberPatterns,
         includeParent,
         includeScope,
+        retentionCapabilities,
         compiledRoutes,
         manifest,
       } = prepared;
@@ -1663,13 +1638,76 @@ export function transform(
           phase: phase.name,
         });
       }
-      const retainsAdditionalIndex = [...materializationSubscriptions].some(
-        type => !subscriptions.has(type),
+      const futureSubscriptions = new Set<string>();
+      const futureRetentionRoutes: CompiledRouteTemplate[] = [];
+      const structuralParentTypes = new Set(
+        activePlugins.flatMap(plugin => Object.keys(plans.get(plugin)?.children ?? {})),
+      );
+      const retainedFields: Record<string, string[]> = {};
+      for (const plugin of activePlugins)
+        mergeFieldRequests(retainedFields, plans.get(plugin)?.fields ?? {});
+      let futureRetentionCapabilities = 0;
+      for (let futureIndex = phaseIndex + 1; futureIndex < pipeline.phases.length; futureIndex++) {
+        if (phasePlan[futureIndex].requiresPrintedInput) break;
+        const futureObservationSource =
+          phasePlan[futureIndex].observes === 'original' ? originalSource : observationSource;
+        if (futureObservationSource !== observationSource) continue;
+        const futurePhase = pipeline.phases[futureIndex];
+        const existingFuture = preparedAhead.get(futureIndex);
+        const futurePrepared =
+          existingFuture?.source === futureObservationSource
+            ? existingFuture.prepared
+            : preparePhase(futurePhase, futureObservationSource, filename, options, parser);
+        preparedAhead.set(futureIndex, {
+          source: futureObservationSource,
+          prepared: futurePrepared,
+        });
+        for (const subscription of futurePrepared.subscriptions)
+          futureSubscriptions.add(subscription);
+        futureRetentionRoutes.push(...(futurePrepared.compiledRoutes ?? []));
+        futureRetentionCapabilities |= futurePrepared.retentionCapabilities;
+        for (const plugin of futurePrepared.activePlugins)
+          for (const type of Object.keys(futurePrepared.plans.get(plugin)?.children ?? {}))
+            structuralParentTypes.add(type);
+        for (const plugin of futurePrepared.activePlugins)
+          mergeFieldRequests(retainedFields, futurePrepared.plans.get(plugin)?.fields ?? {});
+      }
+      const requiresNativeQueries = activePlugins.some(
+        plugin => (plans.get(plugin)?.queries?.length ?? 0) > 0,
+      );
+      const requiresStructuralIndex = activePlugins.some(
+        plugin => Object.keys(plans.get(plugin)?.children ?? {}).length > 0,
+      );
+      const requiresRetainedInspection = activePlugins.some(plugin =>
+        plans
+          .get(plugin)
+          ?.controlFlow?.some(
+            capability =>
+              capability === 'nested-traverse' || capability === 'dynamic-subscriptions',
+          ),
       );
       const requiresIndex =
-        retainsAdditionalIndex || includeParent || includeScope || options.functionMap === true;
+        requiresNativeQueries ||
+        requiresStructuralIndex ||
+        requiresRetainedInspection ||
+        includeParent ||
+        includeScope ||
+        options.functionMap === true ||
+        futureSubscriptions.size > 0;
       if (manifest == null || compiledRoutes == null)
         throw new Error('compiled visitor dispatch invariant violated');
+      const retainedRoutes = [...compiledRoutes, ...futureRetentionRoutes].map((route, id) => ({
+        ...route,
+        id,
+      }));
+      const retentionManifest = packRouteManifest(
+        retainedRoutes,
+        includeParent,
+        includeScope,
+        retentionCapabilities | futureRetentionCapabilities,
+        [...structuralParentTypes],
+        retainedFields,
+      );
       const retainedSession = reusableSession;
       const sessionStarted = options.debugPerformance ? performance.now() : 0;
       const session: NativeTransformSession =
@@ -1678,13 +1716,9 @@ export function transform(
           observationSource,
           filename,
           options,
-          !requiresIndex ? [] : [...materializationSubscriptions],
-          requiresIndex,
-          includeParent,
-          includeScope,
-          identifierNames,
-          staticMemberPatterns,
-          [...exitSubscriptions],
+          requiresIndex ? retentionManifest : undefined,
+          requiresIndex ? manifest : undefined,
+          true,
         );
       if (options.debugPerformance)
         performanceCounters(metadata).sessionOpenMs += performance.now() - sessionStarted;
@@ -1753,6 +1787,7 @@ export function transform(
         Object.keys(plans.get(plugin)?.children ?? {}),
       );
       if (childParentTypes.length > 0) session.prefetchChildren([], childParentTypes);
+      if (batch.includeParent) session.prefetchEvents(routedParentIds(batch));
       const dispatcherStarted = options.debugPerformance ? performance.now() : 0;
       const dispatch = createDispatcher(
         session,
@@ -1763,7 +1798,7 @@ export function transform(
         edits,
         metadata,
         diagnostics,
-        retainsAdditionalIndex || includeParent || includeScope,
+        requiresIndex || includeParent || includeScope,
         compiledRoutes,
       );
       if (options.debugPerformance)
@@ -2059,15 +2094,16 @@ function createDispatcher(
           event => event.sequence > currentSequence,
         );
       },
-      revisitProgram: (visitor, state) => (
-        assertDeclaredControl(plugin, plans.get(plugin), 'dynamic-subscriptions'),
+      revisitProgram: (visitor, state) => {
+        assertDeclaredControl(plugin, plans.get(plugin), 'dynamic-subscriptions');
+        const compiled = compileNestedVisitor(visitor);
         replayCustomRouted(
-          session.nextRoutedPacked(compileNestedVisitor(visitor).manifest),
+          session.nextRoutedPacked(nestedManifest(plugin, plans.get(plugin), compiled)),
           visitor,
           state,
           context,
-        )
-      ),
+        );
+      },
       code: codeFactory,
       editor: makeEditor(session, edits, plugin.name, () => order++),
     };
@@ -2101,7 +2137,7 @@ function createDispatcher(
         try {
           const compiled = compileNestedVisitor(nested);
           replayCustomRouted(
-            session.nextRoutedPacked(compiled.manifest, {
+            session.nextRoutedPacked(nestedManifest(plugin, plans.get(plugin), compiled), {
               start: target.start,
               end: target.end,
             }),
@@ -2661,7 +2697,6 @@ class NodePathImpl implements NativeNodePath {
 
 type EditKind = EditCommand['kind'];
 const visitorSubscriptionsCache = new WeakMap<object, NativeVisitorRoute[]>();
-const visitorExitSubscriptionsCache = new WeakMap<object, NativeVisitorRoute[]>();
 const visitorRoutingFieldsCache = new WeakMap<object, Record<string, string[]>>();
 function alias(key: string, type: string): boolean {
   if (key === '*') return true;
@@ -2790,18 +2825,6 @@ function visitorSubscriptions(visitor?: Visitor<any>): NativeVisitorRoute[] {
   visitorSubscriptionsCache.set(visitor, subscriptions);
   return subscriptions;
 }
-function visitorExitSubscriptions(visitor?: Visitor<any>): NativeVisitorRoute[] {
-  if (!visitor) return [];
-  const cached = visitorExitSubscriptionsCache.get(visitor);
-  if (cached) return cached;
-  const keys: string[] = [];
-  for (const [key, handler] of Object.entries(visitor)) {
-    if (typeof handler === 'object' && handler?.exit != null) keys.push(key);
-  }
-  const subscriptions = expandSubscriptions(keys) as NativeVisitorRoute[];
-  visitorExitSubscriptionsCache.set(visitor, subscriptions);
-  return subscriptions;
-}
 function visitorRoutingFields(visitor?: Visitor<any>): Record<string, string[]> {
   if (!visitor) return {};
   const cached = visitorRoutingFieldsCache.get(visitor);
@@ -2837,7 +2860,6 @@ function visitorRoutingFields(visitor?: Visitor<any>): Record<string, string[]> 
 }
 function querySubscriptions(request: QueryRequest): string[] {
   const types: string[] = [];
-  if (request.globals?.length || request.bindings?.length) types.push('Identifier');
   if (request.imports) {
     types.push(
       'ImportDeclaration',
@@ -2854,9 +2876,6 @@ function querySubscriptions(request: QueryRequest): string[] {
       'ExportSpecifier',
     );
   }
-  if (request.constants?.length) types.push('Expression');
-  if (request.calls?.length) types.push('CallExpression');
-  if (request.captures?.length) types.push('Function', 'Identifier');
   return types;
 }
 function mappingPolicy(value?: CodeFragment['mapping']): EditCommand['mapping'] {
@@ -2918,8 +2937,11 @@ function makeScope(runtime: PathRuntime, id: number, parentId: number | null): N
       const owner = this.path;
       if (!owner) throw new Error(`Cannot find owner path for scope ${id}`);
       const directives = session
-        .next(['Directive'], { start: owner.node.start, end: owner.node.end }, undefined, false)
-        .events.filter(event => event.scopeId === id);
+        .nodes(['Directive'])
+        .filter(
+          event =>
+            event.scopeId === id && event.start >= owner.node.start && event.end <= owner.node.end,
+        );
       const offset = directives.reduce(
         (end, directive) => Math.max(end, directive.end),
         Number(owner.node.bodyStart ?? owner.node.start),
@@ -2976,20 +2998,16 @@ function makeScope(runtime: PathRuntime, id: number, parentId: number | null): N
 }
 
 function scopeOwnerPath(runtime: PathRuntime, scopeId: number): NativeNodePath | null {
-  const events = runtime.session.next(
-    ['Program', 'Function', 'ArrowFunctionExpression'],
-    undefined,
-    undefined,
-    false,
-  ).events;
-  const owner = events.find(
-    event =>
-      event.scopeId === scopeId &&
-      (event.type === 'Program' ||
-        event.type === 'Function' ||
-        event.type === 'ArrowFunctionExpression'),
-  );
-  return owner ? makePath(runtime, owner) : null;
+  const owner = runtime.session
+    .nodes(['Program', 'Function', 'ArrowFunctionExpression'])
+    .find(
+      event =>
+        event.scopeId === scopeId &&
+        (event.type === 'Program' ||
+          event.type === 'Function' ||
+          event.type === 'ArrowFunctionExpression'),
+    );
+  return owner ? pathForId(runtime, owner.id) : null;
 }
 
 function makeBinding(
