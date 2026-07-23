@@ -21,11 +21,25 @@ export type ScalarPredicate =
   | { equals: ScalarValue }
   | { oneOf: readonly ScalarValue[] }
   | { present: boolean };
-export type ControlFlowCapability = 'skip' | 'stop' | 'nested-traverse' | 'dynamic-subscriptions';
+export type ControlFlowCapability =
+  | 'skip'
+  | 'stop'
+  | 'stop-all'
+  | 'nested-traverse'
+  | 'dynamic-subscriptions';
 export type NodeId = number;
 export type ScopeId = number;
 export type SourceMapMode = 'line' | 'boundary' | 'character';
 export type MappingPolicy = 'Sourceless' | 'AnchorStart' | 'AnchorBoundaries' | 'Identity';
+export type EditEffect =
+  | 'none'
+  | 'text-only'
+  | 'expression-shape'
+  | 'bindings'
+  | 'module-structure'
+  | 'whole-program';
+export type PhaseObservation = 'original' | 'current-ast' | 'rendered-source';
+export type CoordinateSpace = 'original' | 'current' | 'generated';
 export type EditKind =
   | 'Replace'
   | 'Remove'
@@ -44,6 +58,8 @@ export interface EditCommand {
   owner?: string;
   order?: number;
   names?: string[];
+  /** Coordinate system used by the edit. Existing callers default to `original`. */
+  coordinateSpace?: CoordinateSpace;
 }
 
 export interface NativeEvent {
@@ -239,6 +255,8 @@ export interface PluginPlan {
   phases?: readonly string[];
   ancestry?: 'parent' | 'findParent' | 'functionParent' | 'programParent' | number;
   children?: Readonly<Partial<Record<NativeVisitorRoute, readonly string[]>>>;
+  /** Conservative effect of editor/native actions performed by this plugin. */
+  editEffect?: EditEffect;
 }
 
 export interface TransformOptions {
@@ -249,6 +267,8 @@ export interface TransformOptions {
   allowBroadVisitors?: boolean;
   inputSourceMap?: NativeVlqMap & { sources?: string[]; sourcesContent?: (string | null)[] };
   parserAdapter?: string;
+  /** Include phase decisions and counters in metadata. Intended for benchmarks/debugging only. */
+  debugPerformance?: boolean;
 }
 
 export interface ParserAdapter {

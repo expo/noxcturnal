@@ -2,8 +2,8 @@ export type * from './types.js';
 export type {
   CodeFactory,
   CodeFragment,
+  CompiledPhasePlan,
   DefinedNativePlugin,
-  EditorCapability,
   MetadataWriter,
   NativeBinding,
   NativeEditor,
@@ -12,9 +12,9 @@ export type {
   NativePipelineDefinition,
   NativePlugin,
   NativePluginDefinition,
-  NativePluginPipelineDefinition,
   NativeScope,
   PipelinePhase,
+  SnapshotOptions,
   PluginContext,
   PrepareContext,
   TransformDecision,
@@ -24,15 +24,14 @@ export type {
 export {
   defineNativePipeline,
   defineNativePlugin,
+  compilePhasePlan,
   NativeTransformError,
   NativeTransformSession,
   pipelineCacheKey,
   registerParserAdapter,
   transform,
-  transformOrFallback,
+  transformClassificationCacheKey,
 } from './visitors.js';
 
 import { native } from './native.js';
-export const nativeVersion = native.nativeVersion;
-export const oxcVersion = native.oxcVersion;
 export const classify = native.classify;

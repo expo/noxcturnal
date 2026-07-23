@@ -1,4 +1,38 @@
 use crate::editor::{ByteEdit, MappingPolicy};
+use rustc_hash::FxHashMap;
+
+enum Piece<'a> {
+    Original {
+        text: &'a str,
+    },
+    Generated {
+        text: &'a str,
+        removed: &'a str,
+        mapping: MappingPolicy,
+        names: &'a [String],
+        mark_only: bool,
+    },
+}
+
+fn for_each_piece<'a>(source: &'a str, edits: &'a [ByteEdit], mut visit: impl FnMut(Piece<'a>)) {
+    let mut cursor = 0;
+    for edit in edits {
+        visit(Piece::Original {
+            text: &source[cursor..edit.start],
+        });
+        visit(Piece::Generated {
+            text: &edit.content,
+            removed: &source[edit.start..edit.end],
+            mapping: edit.mapping,
+            names: &edit.names,
+            mark_only: edit.mark_only,
+        });
+        cursor = edit.end;
+    }
+    visit(Piece::Original {
+        text: &source[cursor..],
+    });
+}
 
 #[derive(Debug, Clone, Copy)]
 struct Segment {
@@ -256,53 +290,55 @@ pub fn render(source: &str, edits: &[ByteEdit], mode: &str) -> (String, String, 
         }),
         ..StreamingMap::default()
     };
-    let mut cursor = 0;
     let character = mode == "character";
     let mut names = Vec::<String>::new();
-    for edit in edits {
-        let unchanged = &source[cursor..edit.start];
-        code.push_str(unchanged);
-        map.copied(unchanged, character);
-        let removed = &source[edit.start..edit.end];
-        if edit.mark_only {
-            map.mark();
-            cursor = edit.end;
-            continue;
+    let mut name_ids = FxHashMap::<String, i64>::default();
+    for_each_piece(source, edits, |piece| match piece {
+        Piece::Original { text } => {
+            code.push_str(text);
+            map.copied(text, character);
         }
-        if edit.mapping == MappingPolicy::Identity && removed == edit.content {
-            code.push_str(&edit.content);
-            map.copied(&edit.content, character);
-        } else {
-            if mode != "line"
-                && matches!(
-                    edit.mapping,
-                    MappingPolicy::AnchorStart
-                        | MappingPolicy::AnchorBoundaries
-                        | MappingPolicy::Identity
-                )
-            {
-                let name = edit.names.first().map(|name| {
-                    if let Some(index) = names.iter().position(|existing| existing == name) {
-                        index as i64
-                    } else {
-                        names.push(name.clone());
-                        (names.len() - 1) as i64
-                    }
-                });
-                map.mark_name(name);
-            }
-            map.removed(removed);
-            code.push_str(&edit.content);
-            map.generated(&edit.content);
-            if mode != "line" && edit.mapping == MappingPolicy::AnchorBoundaries {
+        Piece::Generated {
+            text,
+            removed,
+            mapping,
+            names: piece_names,
+            mark_only,
+        } => {
+            if mark_only {
                 map.mark();
+            } else if mapping == MappingPolicy::Identity && removed == text {
+                code.push_str(text);
+                map.copied(text, character);
+            } else {
+                if mode != "line"
+                    && matches!(
+                        mapping,
+                        MappingPolicy::AnchorStart
+                            | MappingPolicy::AnchorBoundaries
+                            | MappingPolicy::Identity
+                    )
+                {
+                    let name = piece_names.first().map(|name| {
+                        if let Some(index) = name_ids.get(name) {
+                            return *index;
+                        }
+                        let index = names.len() as i64;
+                        names.push(name.clone());
+                        name_ids.insert(name.clone(), index);
+                        index
+                    });
+                    map.mark_name(name);
+                }
+                map.removed(removed);
+                code.push_str(text);
+                map.generated(text);
+                if mode != "line" && mapping == MappingPolicy::AnchorBoundaries {
+                    map.mark();
+                }
             }
         }
-        cursor = edit.end;
-    }
-    let tail = &source[cursor..];
-    code.push_str(tail);
-    map.copied(tail, character);
+    });
     (code, map.mappings, names)
 }
 
@@ -311,15 +347,16 @@ pub fn render_code(source: &str, edits: &[ByteEdit]) -> String {
     let removed: usize = edits.iter().map(|edit| edit.end - edit.start).sum();
     let mut code =
         String::with_capacity(source.len().saturating_add(added).saturating_sub(removed));
-    let mut cursor = 0;
-    for edit in edits {
-        code.push_str(&source[cursor..edit.start]);
-        if !edit.mark_only {
-            code.push_str(&edit.content);
+    for_each_piece(source, edits, |piece| match piece {
+        Piece::Original { text } => code.push_str(text),
+        Piece::Generated {
+            text, mark_only, ..
+        } => {
+            if !mark_only {
+                code.push_str(text);
+            }
         }
-        cursor = edit.end;
-    }
-    code.push_str(&source[cursor..]);
+    });
     code
 }
 
@@ -408,6 +445,7 @@ pub fn compose(outer: &str, inner: &str, outer_name_count: u32) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::editor::{EditCommand, EditKind, normalize};
     #[test]
     fn encodes_identity_lines() {
         let (_, map, _) = render("a\nb", &[], "boundary");
@@ -436,5 +474,67 @@ mod tests {
         .encode();
 
         assert_eq!(compose(&mappings, &mappings, 0), mappings);
+    }
+
+    #[test]
+    fn code_and_mapped_piece_rendering_match() {
+        let source = "const value = 1;\n";
+        let edits = normalize(
+            source,
+            vec![
+                EditCommand {
+                    kind: EditKind::PrependRight,
+                    start: 0,
+                    end: 0,
+                    content: Some("/* generated */\n".into()),
+                    mapping: Some(MappingPolicy::Sourceless),
+                    owner: None,
+                    order: Some(0),
+                    names: None,
+                },
+                EditCommand {
+                    kind: EditKind::Replace,
+                    start: 6,
+                    end: 11,
+                    content: Some("renamed".into()),
+                    mapping: Some(MappingPolicy::AnchorBoundaries),
+                    owner: None,
+                    order: Some(1),
+                    names: Some(vec!["value".into()]),
+                },
+            ],
+        )
+        .unwrap();
+        let code = render_code(source, &edits);
+        let (mapped_code, mappings, names) = render(source, &edits, "boundary");
+        assert_eq!(code, mapped_code);
+        assert!(!mappings.is_empty());
+        assert_eq!(names, ["value"]);
+    }
+
+    #[test]
+    fn interns_dense_mapping_names_in_first_seen_order() {
+        let source = "x ".repeat(1_000);
+        let edits = normalize(
+            &source,
+            (0..1_000)
+                .map(|index| EditCommand {
+                    kind: EditKind::Replace,
+                    start: index * 2,
+                    end: index * 2 + 1,
+                    content: Some("y".into()),
+                    mapping: Some(MappingPolicy::AnchorStart),
+                    owner: None,
+                    order: Some(index),
+                    names: Some(vec![format!("name{index}")]),
+                })
+                .collect(),
+        )
+        .unwrap();
+        let (_, mappings, names) = render(&source, &edits, "boundary");
+        assert!(!mappings.is_empty());
+        assert_eq!(names.len(), 1_000);
+        assert_eq!(names.first().map(String::as_str), Some("name0"));
+        assert_eq!(names.last().map(String::as_str), Some("name999"));
     }
 }

@@ -36,9 +36,9 @@ const EXIT_TAG = 0x20000000;
 const NODE_COUNT_PAYLOAD = 0x1fffffff;
 const MISSING_VALUE = 0xffffffff;
 const PACKED_HEADER_BYTES = 16;
-const ROUTE_MANIFEST_MAGIC = 0x4e524d31;
-const ROUTED_TAPE_MAGIC = 0x4e525431;
-export const ROUTED_PROTOCOL_VERSION = 2;
+const ROUTE_MANIFEST_MAGIC = 0x4e524d46;
+const ROUTED_TAPE_MAGIC = 0x4e525446;
+const ROUTED_HEADER_BYTES = 28;
 const EMPTY_FIELDS = Object.freeze([]) as unknown as NativeEvent['fields'];
 
 export interface NativeRouteManifestEntry {
@@ -53,7 +53,9 @@ export interface NativeRouteManifestEntry {
 
 export interface RoutedEventBatch {
   data: Buffer;
-  strings: string[];
+  stringAt(id: number): string;
+  recordBytes: number;
+  stringSlabBytes: number;
   nodeCount: number;
   nodeRecordCount: number;
   routeDeliveryCount: number;
@@ -79,7 +81,6 @@ export function packRouteManifest(
   };
   const words: number[] = [
     ROUTE_MANIFEST_MAGIC,
-    ROUTED_PROTOCOL_VERSION,
     Number(includeParent) | (Number(includeScope) << 1),
     routes.length,
     0,
@@ -122,9 +123,9 @@ export function packRouteManifest(
     }
     for (const field of route.payloadFields) words.push(requiredId(FIELD_KEY_IDS, field, 'field'));
   }
-  words[4] = strings.length;
-  words[5] = words.length * 4;
-  words[6] = routes.reduce((count, route) => Math.max(count, route.pluginId + 1), 0);
+  words[3] = strings.length;
+  words[4] = words.length * 4;
+  words[5] = routes.reduce((count, route) => Math.max(count, route.pluginId + 1), 0);
   const stringsBytes = strings.reduce(
     (total, value) => total + 4 + Buffer.byteLength(value) + paddingFor(Buffer.byteLength(value)),
     0,
@@ -144,31 +145,49 @@ export function packRouteManifest(
 }
 
 export function decodeRoutedEnvelope(buffer: Buffer): RoutedEventBatch {
-  if (buffer.length < 32 || buffer.readUInt32LE(0) !== ROUTED_TAPE_MAGIC)
+  if (buffer.length < ROUTED_HEADER_BYTES || buffer.readUInt32LE(0) !== ROUTED_TAPE_MAGIC)
     throw new Error('invalid routed tape');
-  if (buffer.readUInt32LE(4) !== ROUTED_PROTOCOL_VERSION)
-    throw new Error('incompatible routed protocol version');
-  const flags = buffer.readUInt32LE(8);
-  const stringCount = buffer.readUInt32LE(24);
-  const recordsOffset = buffer.readUInt32LE(28);
-  const strings: string[] = [];
-  let offset = 32;
+  const flags = buffer.readUInt32LE(4);
+  const stringCount = buffer.readUInt32LE(20);
+  const recordsOffset = buffer.readUInt32LE(24);
+  if (stringCount > (recordsOffset - ROUTED_HEADER_BYTES) / 4)
+    throw new Error('invalid routed tape string count');
+  const stringOffsets = new Uint32Array(stringCount);
+  const stringLengths = new Uint32Array(stringCount);
+  let offset = ROUTED_HEADER_BYTES;
   for (let index = 0; index < stringCount; index++) {
+    if (offset + 4 > recordsOffset) throw new Error('invalid routed tape string table');
     const length = buffer.readUInt32LE(offset);
     offset += 4;
-    strings.push(buffer.toString('utf8', offset, offset + length));
+    if (length > recordsOffset - offset) throw new Error('invalid routed tape string length');
+    stringOffsets[index] = offset;
+    stringLengths[index] = length;
     offset += length + paddingFor(length);
   }
   if (offset !== recordsOffset || recordsOffset > buffer.length)
     throw new Error('invalid routed tape offsets');
   return {
     data: buffer.subarray(recordsOffset),
-    strings,
-    nodeCount: buffer.readUInt32LE(12),
-    nodeRecordCount: buffer.readUInt32LE(16),
-    routeDeliveryCount: buffer.readUInt32LE(20),
+    stringAt: lazyStringLookup(buffer, stringOffsets, stringLengths),
+    recordBytes: buffer.length - recordsOffset,
+    stringSlabBytes: recordsOffset - ROUTED_HEADER_BYTES,
+    nodeCount: buffer.readUInt32LE(8),
+    nodeRecordCount: buffer.readUInt32LE(12),
+    routeDeliveryCount: buffer.readUInt32LE(16),
     includeParent: (flags & 1) !== 0,
     includeScope: (flags & 2) !== 0,
+  };
+}
+
+function lazyStringLookup(
+  buffer: Buffer,
+  offsets: Uint32Array,
+  lengths: Uint32Array,
+): (id: number) => string {
+  const cache = new Array<string | undefined>(offsets.length);
+  return id => {
+    if (id >= offsets.length) throw new Error(`invalid routed string id ${id}`);
+    return (cache[id] ??= buffer.toString('utf8', offsets[id], offsets[id] + lengths[id]));
   };
 }
 
@@ -236,7 +255,7 @@ export function dispatchRoutedEvents(
     for (let field = 0; field < fieldCount; field++) {
       const key = FIELD_KEYS[words[offset++]];
       if (!key) throw new Error('invalid routed field key');
-      const value = decodeValue(words[offset++], batch.strings);
+      const value = decodeValue(words[offset++], batch.stringAt);
       node[key] =
         typeof value === 'string' && (key !== 'value' || type !== 'StringLiteral')
           ? parseScalar(value)
@@ -353,6 +372,12 @@ export function decodeEventBatch(batch: PackedEventBatch): EventBatch {
 }
 
 export function packEdits(edits: readonly EditCommand[]): Buffer {
+  for (const edit of edits) {
+    if (edit.coordinateSpace != null && edit.coordinateSpace !== 'original')
+      throw new Error(
+        `edit coordinate space ${edit.coordinateSpace} requires explicit translation before commit`,
+      );
+  }
   const strings: string[] = [];
   const stringLengths: number[] = [];
   const addString = (value: string) => {
@@ -437,10 +462,13 @@ function decodeTag(tag: number, known: readonly string[], strings: string[]): st
   return tag & DYNAMIC_TAG ? strings[tag & TAG_INDEX] : known[tag];
 }
 
-function decodeValue(word: number, strings: string[]): string | number | boolean {
+function decodeValue(
+  word: number,
+  strings: readonly string[] | ((id: number) => string),
+): string | number | boolean {
   if (word & DYNAMIC_TAG) return (word & 1) === 1;
   if (word & NUMBER_VALUE) return word & NUMBER_PAYLOAD;
-  return strings[word];
+  return typeof strings === 'function' ? strings(word) : strings[word];
 }
 
 function alignToWord(offset: number): number {

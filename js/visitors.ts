@@ -44,6 +44,8 @@ import type {
   NativeVisitorRoute,
   ControlFlowCapability,
   ScalarPredicate,
+  EditEffect,
+  PhaseObservation,
 } from './types.js';
 
 export interface PrepareContext {
@@ -95,7 +97,6 @@ export interface PluginContext {
 }
 
 export interface NativeEditor {
-  supports(capability: EditorCapability): boolean;
   append(content: string): void;
   prepend(content: string): void;
   appendLeft(offset: number, content: string): void;
@@ -125,20 +126,6 @@ export interface NativeEditor {
   toString(): string;
   isEmpty(): boolean;
 }
-export type EditorCapability =
-  | 'append'
-  | 'prepend'
-  | 'update'
-  | 'overwrite'
-  | 'remove'
-  | 'move'
-  | 'reset'
-  | 'indent'
-  | 'trim'
-  | 'addSourceMapLocation'
-  | 'replace'
-  | 'replaceAll';
-
 export interface CodeFragment {
   code: string;
   mapping: 'sourceless' | 'anchor-start' | 'anchor-boundaries' | 'identity';
@@ -165,12 +152,17 @@ export type TransformDecision<Analysis = unknown> =
   | { status: 'unsupported'; reason: string; location?: SourceLocation };
 
 export interface NativeNodePath<T extends NodeView = NodeView> {
+  readonly id: number;
+  readonly type: string;
+  readonly start: number;
+  readonly end: number;
   readonly node: T;
   readonly parent: NodeSummary | null;
   readonly parentPath: NativeNodePath | null;
   readonly scope: NativeScope;
   readonly context: PluginContext;
   getSource(): string;
+  snapshot(options?: SnapshotOptions): Readonly<T>;
   getLocation(): SourceLocation;
   is<TType extends NativeNodeType>(type: TType): this is NativeNodePath<NodeOfType<TType>>;
   get(key: string): NativeNodePath | readonly NativeNodePath[] | null;
@@ -209,6 +201,11 @@ export interface NativeNodePath<T extends NodeView = NodeView> {
   unsupported(reason: string): never;
 }
 
+export interface SnapshotOptions {
+  fields?: readonly string[];
+  ancestry?: 'none' | 'parent';
+}
+
 type NodeForRoute<Route extends NativeVisitorRoute> = Route extends 'ReferencedIdentifier'
   ? NodeOfType<'Identifier'>
   : Route extends 'FunctionDeclaration' | 'FunctionExpression' | 'TSDeclareFunction'
@@ -240,8 +237,6 @@ export type Visitor<State> = {
  */
 export interface NativePlugin<State = unknown, Options = unknown, Analysis = unknown> {
   name: string;
-  version?: string;
-  apiVersion: 2;
   options?: Options;
   prepare?(context: PrepareContext, options: Options): PluginPlan | void;
   createState?(): State;
@@ -251,11 +246,14 @@ export interface NativePlugin<State = unknown, Options = unknown, Analysis = unk
   visitor?: Visitor<State>;
   post?(context: PluginContext, state: State): void;
   cleanup?(reason: 'complete' | 'bailout' | 'error', state: State): void;
+  /** Static fallback used by phase planning when prepare() is source-dependent. */
+  editEffect?: EditEffect;
 }
-export type NativePluginDefinition<State = unknown, Options = unknown, Analysis = unknown> = Omit<
-  NativePlugin<State, Options, Analysis>,
-  'apiVersion'
-> & { apiVersion?: 2 };
+export type NativePluginDefinition<
+  State = unknown,
+  Options = unknown,
+  Analysis = unknown,
+> = NativePlugin<State, Options, Analysis>;
 export interface DefinedNativePlugin<
   State = unknown,
   Options = unknown,
@@ -273,20 +271,30 @@ export interface DefinedNativePlugin<
 export interface PipelinePhase {
   name: string;
   plugins: readonly NativePlugin<any, any>[];
-  reparseAfterEdits?: boolean;
+  observes?: PhaseObservation;
+  editEffect?: EditEffect;
+  requiresPrintedInput?: boolean;
+  requiresFreshSemantics?: boolean;
+  requiresRealizedMap?: boolean;
+}
+
+export interface CompiledPhasePlan {
+  name: string;
+  observes: PhaseObservation;
+  editEffect: EditEffect;
+  requiresPrintedInput: boolean;
+  requiresFreshSemantics: boolean;
+  requiresRealizedMap: boolean;
+  boundaryBefore: boolean;
+  canReuseAst: boolean;
+  canDeferRendering: boolean;
 }
 
 /** An immutable, reusable transform configuration. */
 export interface NativePipeline {
-  apiVersion: 2;
   phases: readonly PipelinePhase[];
 }
-export type NativePipelineDefinition = Omit<NativePipeline, 'apiVersion'> & { apiVersion?: 2 };
-export interface NativePluginPipelineDefinition {
-  apiVersion?: 2;
-  plugins: readonly NativePlugin<any, any>[];
-  phaseName?: string;
-}
+export type NativePipelineDefinition = NativePipeline;
 
 class Bailout extends Error {}
 export class NativeTransformError extends Error {
@@ -305,7 +313,6 @@ export function defineNativePlugin<State = undefined, Options = undefined, Analy
 ): DefinedNativePlugin<State, Options, Analysis> {
   const definition = {
     ...plugin,
-    apiVersion: 2 as const,
     visitor: plugin.visitor == null ? undefined : Object.freeze({ ...plugin.visitor }),
   } as DefinedNativePlugin<State, Options, Analysis>;
   Object.defineProperty(definition, 'withOptions', {
@@ -322,41 +329,90 @@ export function defineNativePlugin<State = undefined, Options = undefined, Analy
  * earlier phase. Plugins in one phase share parsing, semantic analysis, and a
  * transactional edit commit.
  */
-export function defineNativePipeline(
-  pipeline:
-    | NativePipelineDefinition
-    | NativePluginPipelineDefinition
-    | readonly NativePlugin<any, any>[],
-): NativePipeline {
-  const normalized: NativePipelineDefinition = isPluginList(pipeline)
-    ? { phases: [{ name: 'transform', plugins: pipeline }] }
-    : 'plugins' in pipeline
-      ? { phases: [{ name: pipeline.phaseName ?? 'transform', plugins: pipeline.plugins }] }
-      : pipeline;
+export function defineNativePipeline(pipeline: NativePipelineDefinition): NativePipeline {
   return Object.freeze({
-    apiVersion: 2,
     phases: Object.freeze(
-      normalized.phases.map(phase =>
+      pipeline.phases.map(phase =>
         Object.freeze({ ...phase, plugins: Object.freeze([...phase.plugins]) }),
       ),
     ),
   });
 }
-function isPluginList(
-  value:
-    | NativePipelineDefinition
-    | NativePluginPipelineDefinition
-    | readonly NativePlugin<any, any>[],
-): value is readonly NativePlugin<any, any>[] {
-  return Array.isArray(value);
+
+const EDIT_EFFECT_RANK: Readonly<Record<EditEffect, number>> = {
+  none: 0,
+  'text-only': 1,
+  'expression-shape': 2,
+  bindings: 3,
+  'module-structure': 4,
+  'whole-program': 5,
+};
+const EDIT_EFFECTS = new Set<EditEffect>(Object.keys(EDIT_EFFECT_RANK) as EditEffect[]);
+const PHASE_OBSERVATIONS = new Set<PhaseObservation>([
+  'original',
+  'current-ast',
+  'rendered-source',
+]);
+
+function maxEditEffect(effects: readonly EditEffect[]): EditEffect {
+  let selected: EditEffect = 'none';
+  for (const effect of effects)
+    if (EDIT_EFFECT_RANK[effect] > EDIT_EFFECT_RANK[selected]) selected = effect;
+  return selected;
+}
+
+/** Compile conservative phase boundaries without parsing a source file. */
+export function compilePhasePlan(pipeline: NativePipeline): readonly CompiledPhasePlan[] {
+  let previousEffect: EditEffect = 'none';
+  return Object.freeze(
+    pipeline.phases.map((phase, index) => {
+      if (phase.observes != null && !PHASE_OBSERVATIONS.has(phase.observes))
+        throw new Error(`${phase.name}: invalid phase observation ${String(phase.observes)}`);
+      if (phase.editEffect != null && !EDIT_EFFECTS.has(phase.editEffect))
+        throw new Error(`${phase.name}: invalid edit effect ${String(phase.editEffect)}`);
+      for (const plugin of phase.plugins)
+        if (plugin.editEffect != null && !EDIT_EFFECTS.has(plugin.editEffect))
+          throw new Error(`${plugin.name}: invalid edit effect ${String(plugin.editEffect)}`);
+      const observes =
+        phase.observes ?? (phase.requiresPrintedInput ? 'rendered-source' : 'current-ast');
+      const editEffect =
+        phase.editEffect ??
+        maxEditEffect(phase.plugins.map(plugin => plugin.editEffect ?? 'whole-program'));
+      const boundaryBefore =
+        index > 0 &&
+        (observes === 'rendered-source' ||
+          previousEffect === 'whole-program' ||
+          (EDIT_EFFECT_RANK[previousEffect] >= EDIT_EFFECT_RANK.bindings &&
+            phase.requiresFreshSemantics !== false));
+      const requiresPrintedInput =
+        phase.requiresPrintedInput === true || observes === 'rendered-source';
+      const requiresFreshSemantics =
+        phase.requiresFreshSemantics ??
+        (index > 0 && EDIT_EFFECT_RANK[previousEffect] >= EDIT_EFFECT_RANK.bindings);
+      const plan = Object.freeze({
+        name: phase.name,
+        observes,
+        editEffect,
+        requiresPrintedInput,
+        requiresFreshSemantics,
+        requiresRealizedMap: phase.requiresRealizedMap === true,
+        boundaryBefore,
+        canReuseAst:
+          !boundaryBefore &&
+          (previousEffect === 'none' ||
+            (previousEffect === 'text-only' && observes !== 'rendered-source')),
+        canDeferRendering:
+          editEffect === 'none' ||
+          (editEffect === 'text-only' &&
+            !phase.requiresRealizedMap &&
+            observes !== 'rendered-source'),
+      });
+      previousEffect = editEffect;
+      return plan;
+    }),
+  );
 }
 const parserAdapters = new Map<string, ParserAdapter>();
-let routedProtocolAvailable: boolean | undefined;
-
-function supportsRoutedProtocol(): boolean {
-  return (routedProtocolAvailable ??=
-    native.materializeRoutedBuffer != null && native.routedProtocolVersion?.() === 1);
-}
 export function registerParserAdapter(adapter: ParserAdapter): () => void {
   if (parserAdapters.has(adapter.name))
     throw new Error(`Parser adapter already registered: ${adapter.name}`);
@@ -372,23 +428,51 @@ export function pipelineCacheKey(
   options: TransformOptions = {},
 ): string {
   const descriptor = {
-    apiVersion: pipeline.apiVersion,
-    nativeVersion: native.nativeVersion(),
-    oxcVersion: native.oxcVersion(),
     filename,
     options,
+    phaseGraph: compilePhasePlan(pipeline),
     phases: pipeline.phases.map(phase => ({
       name: phase.name,
-      reparseAfterEdits: !!phase.reparseAfterEdits,
+      observes: phase.observes,
+      editEffect: phase.editEffect,
+      requiresPrintedInput: phase.requiresPrintedInput,
+      requiresFreshSemantics: phase.requiresFreshSemantics,
+      requiresRealizedMap: phase.requiresRealizedMap,
       plugins: phase.plugins.map(plugin => ({
         name: plugin.name,
-        version: plugin.version ?? '0',
-        apiVersion: plugin.apiVersion,
+        editEffect: plugin.editEffect,
         options: plugin.options ?? null,
       })),
     })),
   };
   return createHash('sha256').update(stableJson(descriptor)).digest('hex');
+}
+
+/**
+ * Cache key for schedulers that classify a source before selecting a worker
+ * lane. It deliberately records classification and phase planning separately
+ * from the source-content key normally supplied by Metro.
+ */
+export function transformClassificationCacheKey(
+  pipeline: NativePipeline,
+  filename: string,
+  source: string,
+  options: TransformOptions = {},
+): string {
+  const classification = classifyForTransform(parserFilename(filename, options.parser), source);
+  return createHash('sha256')
+    .update(
+      stableJson({
+        pipeline: pipelineCacheKey(pipeline, filename, options),
+        classification: {
+          syntax: classification.syntax,
+          supported: classification.supported,
+          codegenCandidate: classification.codegenCandidate,
+          reason: classification.reason,
+        },
+      }),
+    )
+    .digest('hex');
 }
 
 /** A retained native index used by advanced query and traversal operations. */
@@ -416,6 +500,7 @@ export class NativeTransformSession {
   #identifierNames: readonly string[];
   #staticMemberPatterns: readonly string[];
   #lineStarts: number[] | null = null;
+  #nativeParseCount = 0;
   constructor(
     readonly source: string,
     readonly filename: string,
@@ -452,6 +537,12 @@ export class NativeTransformSession {
   }
   get nativeMemoryBytes(): number {
     return this.#binding().memoryUsage();
+  }
+  get nativeParseCount(): number {
+    return this.#nativeParseCount + (this.#native?.parseCount() ?? 0);
+  }
+  recordStatelessParse(): void {
+    this.#nativeParseCount++;
   }
   static open(
     source: string,
@@ -492,6 +583,7 @@ export class NativeTransformSession {
       Object.entries(fields).map(([nodeType, requested]) => ({ nodeType, fields: [...requested] }));
     const packed = this.#useStatelessInitialBatch
       ? (() => {
+          this.#nativeParseCount++;
           const encoded = encodeSubscriptions(subscriptions);
           const encodedExits = encodeSubscriptions(exitSubscriptions);
           return decodePackedEnvelope(
@@ -1005,7 +1097,6 @@ function preparePhase(
   const hints = sourceHints(phaseSource);
   const plans = new Map<NativePlugin<any, any>, PreparedPluginPlan>();
   for (const plugin of phase.plugins) {
-    if (plugin.apiVersion !== 2) throw new Error(`${plugin.name}: unsupported API version`);
     const prepareSubscriptions = new Set<NativeVisitorRoute>();
     const plan =
       plugin.prepare?.(
@@ -1021,6 +1112,8 @@ function preparePhase(
         plugin.options as any,
       ) ?? {};
     validatePredicates(plugin.name, plan);
+    if (plan.editEffect != null && !EDIT_EFFECTS.has(plan.editEffect))
+      throw new Error(`${plugin.name}: invalid edit effect ${String(plan.editEffect)}`);
     plans.set(plugin, {
       ...plan,
       subscriptions: [
@@ -1140,6 +1233,7 @@ function pluginPlanCacheKey(plan: PreparedPluginPlan): string {
     String(plan.ancestry ?? ''),
     stableJson(plan.children ?? null),
     stableJson(plan.queries ?? null),
+    plan.editEffect ?? '',
   ].join('\u001f');
 }
 
@@ -1172,8 +1266,8 @@ function compilePhaseRoutes(
   }
   const cached = cache.get(cacheKey);
   if (cached) return cached;
-  const phaseIsStatic = plugins.every(
-    plugin => (plans.get(plugin)?.controlFlow?.length ?? 0) === 0,
+  const hasGlobalStop = plugins.some(plugin =>
+    plans.get(plugin)?.controlFlow?.includes('stop-all'),
   );
   const routes: CompiledRouteTemplate[] = [];
   for (let pluginId = 0; pluginId < plugins.length; pluginId++) {
@@ -1225,7 +1319,7 @@ function compilePhaseRoutes(
         payloadFields,
         plugin,
         callbacks: variant.callbacks,
-        fast: phaseIsStatic && plugin.analyze == null,
+        fast: !hasGlobalStop && (plan.controlFlow?.length ?? 0) === 0 && plugin.analyze == null,
       });
     }
   }
@@ -1374,6 +1468,7 @@ function validatePredicates(plugin: string, plan: PluginPlan): void {
   const controlCapabilities = new Set<ControlFlowCapability>([
     'skip',
     'stop',
+    'stop-all',
     'nested-traverse',
     'dynamic-subscriptions',
   ]);
@@ -1427,8 +1522,6 @@ export function transform(
   pipeline: NativePipeline,
   options: TransformOptions = {},
 ): TransformResult {
-  if (pipeline.apiVersion !== 2)
-    throw new Error(`Unsupported pipeline API version: ${pipeline.apiVersion}`);
   const parser = classifyForTransform(parserFilename(filename, options.parser), source);
   if (!parser.supported) {
     const adapter = options.parserAdapter
@@ -1454,10 +1547,31 @@ export function transform(
     }
   }
   const originalSource = source;
+  const phasePlan = compilePhasePlan(pipeline);
   let phaseSource = source;
   let finalMap: NativeTransformResult['map'] | null = options.inputSourceMap ?? null;
   const metadata: Record<string, unknown> = {};
   const diagnostics: Diagnostic[] = [];
+  if (options.debugPerformance)
+    metadata.performance = {
+      phases: phasePlan,
+      phaseExecutions: [],
+      reparses: 0,
+      nativeParses: 0,
+      routeDeliveries: 0,
+      nodeRecords: 0,
+      payloadBytes: 0,
+      recordWords: 0,
+      utf8SlabBytes: 0,
+      editCount: 0,
+      renderedBytes: 0,
+      mappingSegments: 0,
+      mapEncodes: 0,
+      pathFacades: 0,
+      nodeFacades: 0,
+      snapshots: 0,
+      scopeFacades: 0,
+    };
   const allStates: { plugin: NativePlugin<any, any>; state: any }[] = [];
   const deferredMapLayers: {
     source: string;
@@ -1467,10 +1581,20 @@ export function transform(
   let openSession: NativeTransformSession | null = null;
   let reusableSession: NativeTransformSession | null = null;
   let reusableRoutedBatch: { manifest: Buffer; batch: RoutedEventBatch } | null = null;
+  let pendingEdits: EditCommand[] = [];
+  const recordedParseCounts = new WeakMap<NativeTransformSession, number>();
   try {
-    for (const phase of pipeline.phases) {
+    for (let phaseIndex = 0; phaseIndex < pipeline.phases.length; phaseIndex++) {
+      const phase = pipeline.phases[phaseIndex];
+      const observationSource =
+        phasePlan[phaseIndex].observes === 'original' ? originalSource : phaseSource;
+      if (reusableSession && reusableSession.source !== observationSource) {
+        reusableSession.close();
+        reusableSession = null;
+        reusableRoutedBatch = null;
+      }
       const edits: EditCommand[] = [];
-      const prepared = preparePhase(phase, phaseSource, filename, options, parser);
+      const prepared = preparePhase(phase, observationSource, filename, options, parser);
       const {
         activePlugins,
         plans,
@@ -1485,6 +1609,28 @@ export function transform(
         compiledRoutes,
         manifest,
       } = prepared;
+      const runtimeEditEffect =
+        phase.editEffect ??
+        maxEditEffect(
+          activePlugins.map(
+            plugin => plans.get(plugin)?.editEffect ?? plugin.editEffect ?? 'whole-program',
+          ),
+        );
+      const phaseExecution = options.debugPerformance
+        ? {
+            name: phase.name,
+            observes: phasePlan[phaseIndex].observes,
+            editEffect: runtimeEditEffect,
+            source:
+              observationSource === originalSource ? ('original' as const) : ('rendered' as const),
+            reusedParse: false,
+            render: 'pending' as 'pending' | 'unchanged' | 'deferred' | 'committed',
+          }
+        : undefined;
+      if (phaseExecution) {
+        const performance = metadata.performance as { phaseExecutions: unknown[] };
+        performance.phaseExecutions.push(phaseExecution);
+      }
       if (subscriptions.has('*')) {
         if (!options.allowBroadVisitors) throw new Bailout('broad-catch-all-visitor');
         diagnostics.push({
@@ -1497,12 +1643,13 @@ export function transform(
         type => !subscriptions.has(type),
       );
       const requiresIndex = retainsAdditionalIndex || includeParent || includeScope;
-      if (manifest == null || compiledRoutes == null || !supportsRoutedProtocol())
-        throw new Error('compiled visitor dispatch is unavailable');
+      if (manifest == null || compiledRoutes == null)
+        throw new Error('compiled visitor dispatch invariant violated');
+      const retainedSession = reusableSession;
       const session: NativeTransformSession =
-        reusableSession ??
+        retainedSession ??
         new NativeTransformSession(
-          phaseSource,
+          observationSource,
           filename,
           options,
           !requiresIndex ? [] : [...materializationSubscriptions],
@@ -1513,6 +1660,7 @@ export function transform(
           staticMemberPatterns,
           [...exitSubscriptions],
         );
+      if (phaseExecution) phaseExecution.reusedParse = retainedSession != null;
       reusableSession = null;
       openSession = session;
       let batch: RoutedEventBatch;
@@ -1538,8 +1686,9 @@ export function transform(
             )
               throw new Error('native-memory-budget-exceeded');
           } else {
-            const routedBuffer = native.materializeRoutedBuffer!(
-              phaseSource,
+            session.recordStatelessParse();
+            const routedBuffer = native.materializeRoutedBuffer(
+              observationSource,
               parserFilename(filename, options.parser),
               manifest,
             );
@@ -1552,6 +1701,20 @@ export function transform(
           }
         }
         reusableRoutedBatch = null;
+      }
+      if (options.debugPerformance) {
+        const performance = metadata.performance as {
+          routeDeliveries: number;
+          nodeRecords: number;
+          payloadBytes: number;
+          recordWords: number;
+          utf8SlabBytes: number;
+        };
+        performance.routeDeliveries += batch.routeDeliveryCount;
+        performance.nodeRecords += batch.nodeRecordCount;
+        performance.payloadBytes += batch.data.byteLength;
+        performance.recordWords += batch.recordBytes / 4;
+        performance.utf8SlabBytes += batch.stringSlabBytes;
       }
       const childParentTypes = activePlugins.flatMap(plugin =>
         Object.keys(plans.get(plugin)?.children ?? {}),
@@ -1590,8 +1753,8 @@ export function transform(
               message: decision.reason,
               plugin: plugin.name,
               phase: phase.name,
-              start: locationOffset(phaseSource, decision.location.start),
-              end: locationOffset(phaseSource, decision.location.end),
+              start: locationOffset(observationSource, decision.location.start),
+              end: locationOffset(observationSource, decision.location.end),
             });
           throw new Bailout(`${plugin.name}:${decision.reason}`);
         }
@@ -1607,21 +1770,79 @@ export function transform(
       dispatch.run();
       for (const plugin of activePlugins)
         plugin.post?.(dispatch.contexts.get(plugin)!.context, dispatch.contexts.get(plugin)!.state);
-      if (edits.length === 0) {
+      for (const plugin of activePlugins) {
+        const pluginEffect = plans.get(plugin)?.editEffect ?? plugin.editEffect;
+        if (pluginEffect === 'none' && edits.some(edit => edit.owner === plugin.name))
+          throw new Error(`${plugin.name}: plugin declared edit effect none but emitted edits`);
+      }
+      if (runtimeEditEffect === 'none' && edits.length > 0)
+        throw new Error(`${phase.name}: phase declared edit effect none but emitted edits`);
+      if (options.debugPerformance) {
+        const previous = recordedParseCounts.get(session) ?? 0;
+        const performance = metadata.performance as { nativeParses: number };
+        performance.nativeParses += session.nativeParseCount - previous;
+        recordedParseCounts.set(session, session.nativeParseCount);
+      }
+      const isFinalPhase = phaseIndex === pipeline.phases.length - 1;
+      if (edits.length > 0 && observationSource !== phaseSource)
+        throw new Error(
+          `${phase.name}: edits against original source are ambiguous after a rendered boundary`,
+        );
+      const effectiveEdits = pendingEdits.length === 0 ? edits : [...pendingEdits, ...edits];
+      if (effectiveEdits.length === 0) {
+        if (phaseExecution) phaseExecution.render = 'unchanged';
+        if (observationSource === phaseSource) {
+          reusableSession = session;
+          reusableRoutedBatch = { manifest, batch };
+        } else {
+          session.close();
+          openSession = null;
+        }
+        continue;
+      }
+      const nextPlan = phasePlan[phaseIndex + 1];
+      const canDefer =
+        !isFinalPhase &&
+        runtimeEditEffect === 'text-only' &&
+        nextPlan != null &&
+        !nextPlan.requiresPrintedInput &&
+        pipeline.phases[phaseIndex + 1].requiresFreshSemantics !== true &&
+        !phasePlan[phaseIndex].requiresRealizedMap;
+      if (canDefer) {
+        if (phaseExecution) phaseExecution.render = 'deferred';
+        pendingEdits = effectiveEdits;
         reusableSession = session;
         reusableRoutedBatch = { manifest, batch };
         continue;
       }
       const layerSource = phaseSource;
-      const isFinalPhase = phase === pipeline.phases[pipeline.phases.length - 1];
-      const committed = session.commit(edits, isFinalPhase ? options.sourceMapMode : 'none');
+      const realizeMap = isFinalPhase || phasePlan[phaseIndex].requiresRealizedMap;
+      const committed = session.commit(effectiveEdits, realizeMap ? options.sourceMapMode : 'none');
       phaseSource = committed.code;
+      if (phaseExecution) phaseExecution.render = 'committed';
+      pendingEdits = [];
+      if (options.debugPerformance) {
+        const performance = metadata.performance as {
+          editCount: number;
+          renderedBytes: number;
+          mappingSegments: number;
+          mapEncodes: number;
+        };
+        performance.editCount += effectiveEdits.length;
+        performance.renderedBytes += Buffer.byteLength(committed.code);
+        performance.mappingSegments += countMappingSegments(committed.map.mappings);
+        if (realizeMap) performance.mapEncodes++;
+      }
       deferredMapLayers.push({
         source: layerSource,
-        edits: [...edits],
-        map: isFinalPhase ? committed.map : undefined,
+        edits: [...effectiveEdits],
+        map: realizeMap ? committed.map : undefined,
       });
       session.close();
+      if (options.debugPerformance && phaseIndex + 1 < pipeline.phases.length) {
+        const performance = metadata.performance as { reparses: number };
+        performance.reparses++;
+      }
       reusableRoutedBatch = null;
       openSession = null;
       // Opening the next phase creates the explicit render/reparse boundary.
@@ -1629,6 +1850,7 @@ export function transform(
     reusableSession?.close();
     openSession = null;
     for (const layer of deferredMapLayers) {
+      const encodedDeferredMap = layer.map == null;
       const committed = layer.map
         ? { map: layer.map }
         : native.commitPackedBuffer(
@@ -1637,6 +1859,14 @@ export function transform(
             packEdits(layer.edits),
             options.sourceMapMode,
           );
+      if (encodedDeferredMap && options.debugPerformance) {
+        const performance = metadata.performance as {
+          mapEncodes: number;
+          mappingSegments: number;
+        };
+        performance.mapEncodes++;
+        performance.mappingSegments += countMappingSegments(committed.map.mappings);
+      }
       if (finalMap == null) {
         finalMap = committed.map;
       } else {
@@ -1680,16 +1910,19 @@ export function transform(
   }
 }
 
-/** Execute a native pipeline, delegating unsupported syntax to the caller. */
-export function transformOrFallback(
-  source: string,
-  filename: string,
-  pipeline: NativePipeline,
-  fallback: (source: string, filename: string, reason: string) => NativeTransformResult,
-  options: TransformOptions = {},
-): NativeTransformResult {
-  const result = transform(source, filename, pipeline, options);
-  return result.status === 'bailout' ? fallback(result.source, filename, result.reason) : result;
+function countMappingSegments(mappings: string): number {
+  if (mappings.length === 0) return 0;
+  let count = 0;
+  let inSegment = false;
+  for (const character of mappings) {
+    if (character === ',' || character === ';') {
+      inSegment = false;
+    } else if (!inSegment) {
+      count++;
+      inSegment = true;
+    }
+  }
+  return count;
 }
 
 interface DispatcherEntry extends PathState {
@@ -1759,7 +1992,7 @@ function createDispatcher(
         throw new Bailout(`${plugin.name}:${reason}`);
       },
       stopAll: () => {
-        assertDeclaredControl(plugin, plans.get(plugin), 'stop');
+        assertDeclaredControl(plugin, plans.get(plugin), 'stop-all');
         stopAll = true;
       },
       subscribeRemaining: (...types) => {
@@ -1863,6 +2096,7 @@ function createDispatcher(
       assertControl(capability) {
         assertDeclaredControl(plugin, plans.get(plugin), capability);
       },
+      performance: optionsPerformance(metadata),
     };
     return runtime;
   };
@@ -1902,7 +2136,7 @@ function createDispatcher(
     context: PluginContext,
   ) => {
     const compiled = compileNestedVisitor(visitor);
-    const synthetic = { name: 'nested', apiVersion: 2 as const, visitor };
+    const synthetic = { name: 'nested', visitor };
     const entry = {
       context,
       state,
@@ -2045,9 +2279,25 @@ type PathRuntime = {
   allowsScope: () => boolean;
   scopeCache: Map<number, NativeScope>;
   assertControl: (capability: ControlFlowCapability) => void;
+  performance?: PerformanceAllocationCounters;
 };
-function makePath(runtime: PathRuntime, event: NativeEvent): NativeNodePath {
+type PerformanceAllocationCounters = {
+  pathFacades: number;
+  nodeFacades: number;
+  snapshots: number;
+  scopeFacades: number;
+};
+function optionsPerformance(
+  metadata: Record<string, unknown>,
+): PerformanceAllocationCounters | undefined {
+  return metadata.performance as PerformanceAllocationCounters | undefined;
+}
+function allocatePath(runtime: PathRuntime, event: NativeEvent): NodePathImpl {
+  if (runtime.performance) runtime.performance.pathFacades++;
   return new NodePathImpl(runtime, event);
+}
+function makePath(runtime: PathRuntime, event: NativeEvent): NativeNodePath {
+  return allocatePath(runtime, event);
 }
 
 class NodePathImpl implements NativeNodePath {
@@ -2058,8 +2308,21 @@ class NodePathImpl implements NativeNodePath {
     readonly runtime: PathRuntime,
     readonly event: NativeEvent,
   ) {}
+  get id(): number {
+    return this.event.id;
+  }
+  get type(): string {
+    return this.event.type;
+  }
+  get start(): number {
+    return this.event.start;
+  }
+  get end(): number {
+    return this.event.end;
+  }
   get node(): NodeView {
     if (!this.#node) {
+      if (this.runtime.performance) this.runtime.performance.nodeFacades++;
       this.#node = this.runtime.session.nodeView(this.event);
     }
     return this.#node;
@@ -2091,6 +2354,38 @@ class NodePathImpl implements NativeNodePath {
   }
   getSource(): string {
     return this.runtime.session.source.slice(this.event.start, this.event.end);
+  }
+  snapshot(options: SnapshotOptions = {}): Readonly<NodeView> {
+    if (this.runtime.performance) this.runtime.performance.snapshots++;
+    const fields = options.fields;
+    let source = this.node as NodeView & Record<string, unknown>;
+    if (fields) {
+      for (const field of fields)
+        if (!FIELD_KEY_IDS.has(field)) throw new Error(`unknown snapshot field ${field}`);
+      const missing = fields.filter(field => !(field in source));
+      if (missing.length > 0) {
+        const inspected = this.runtime.session.inspect([
+          { nodeId: this.event.id, fields: fields as NativeFieldKey[] },
+        ])[0];
+        if (inspected) Object.assign(source, inspected);
+      }
+    }
+    const snapshot: Record<string, unknown> = {
+      id: source.id,
+      type: source.type,
+      start: source.start,
+      end: source.end,
+      scopeId: source.scopeId,
+    };
+    if (source.scopeParentId != null) snapshot.scopeParentId = source.scopeParentId;
+    for (const field of fields ?? Object.keys(source)) {
+      if (!(field in snapshot) && field in source) snapshot[field] = source[field];
+    }
+    if (options.ancestry === 'parent' && this.event.parentId != null) {
+      snapshot.parentId = this.event.parentId;
+      snapshot.parentType = this.event.parentType;
+    }
+    return Object.freeze(snapshot) as Readonly<NodeView>;
   }
   getLocation(): SourceLocation {
     return this.runtime.session.sourceLocation(this.event.start, this.event.end);
@@ -2489,6 +2784,7 @@ function mappingPolicy(value?: CodeFragment['mapping']): EditCommand['mapping'] 
 function makeScope(runtime: PathRuntime, id: number, parentId: number | null): NativeScope {
   const cached = runtime.scopeCache.get(id);
   if (cached) return cached;
+  if (runtime.performance) runtime.performance.scopeFacades++;
   const session = runtime.session;
   const scopeChain = () => {
     const ids = [];
@@ -2927,20 +3223,6 @@ function classifyForTransform(filename: string, source: string): ParseClassifica
         : 'unknown-extension',
   };
 }
-const EDITOR_CAPABILITIES = new Set([
-  'append',
-  'prepend',
-  'update',
-  'overwrite',
-  'remove',
-  'move',
-  'reset',
-  'indent',
-  'trim',
-  'addSourceMapLocation',
-  'replace',
-  'replaceAll',
-]);
 const codeFactory: CodeFactory = {
   identifier(name) {
     if (!/^[$A-Z_a-z][$\w]*$/.test(name)) throw new Error(`Invalid identifier: ${name}`);
@@ -3007,7 +3289,6 @@ function makeEditor(
   const leading = () => source.length - source.trimStart().length;
   const trailing = () => source.length - source.trimEnd().length;
   return {
-    supports: capability => EDITOR_CAPABILITIES.has(capability),
     append: content => push('AppendLeft', source.length, source.length, content),
     prepend: content => push('PrependRight', 0, 0, content),
     appendLeft: (offset, content) => push('AppendLeft', offset, offset, content),

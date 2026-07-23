@@ -4,6 +4,7 @@ import {
   type NativeNodePath,
   type NodeOfType,
   type PluginPlan,
+  type EditEffect,
 } from '../js/index.js';
 
 const typedVisitor = defineNativePlugin({
@@ -38,7 +39,7 @@ const typedVisitor = defineNativePlugin({
       subscriptions: ['CallExpression'],
       fields: { CallExpression: ['calleeName', 'argumentCount'] },
       where: { CallExpression: { optional: { equals: false } } },
-      controlFlow: ['nested-traverse', 'dynamic-subscriptions'],
+      controlFlow: ['nested-traverse', 'dynamic-subscriptions', 'stop-all'],
       semantics: ['scope'],
       children: { Identifier: ['name'] },
     };
@@ -96,11 +97,14 @@ configured.withOptions({ mode: 'production' });
 // @ts-expect-error Invalid plugin options should be rejected.
 configured.withOptions({ mode: 'preview' });
 
-const pipeline = defineNativePipeline([
-  typedVisitor,
-  analyzed,
-  configured.withOptions({ mode: 'development' }),
-]);
+const pipeline = defineNativePipeline({
+  phases: [
+    {
+      name: 'transform',
+      plugins: [typedVisitor, analyzed, configured.withOptions({ mode: 'development' })],
+    },
+  ],
+});
 pipeline.phases[0].plugins;
 
 declare const path: NativeNodePath;
@@ -108,5 +112,12 @@ if (path.is('Identifier')) {
   const identifier: NodeOfType<'Identifier'> = path.node;
   identifier.name;
 }
+const effect: EditEffect = 'text-only';
+void effect;
+path.id.toFixed();
+path.start.toFixed();
+path.snapshot({ fields: ['name'], ancestry: 'parent' });
+// @ts-expect-error Snapshot ancestry must be bounded.
+path.snapshot({ ancestry: 'all' });
 // @ts-expect-error Unknown concrete node types should be rejected by path.is.
 path.is('Identifer');

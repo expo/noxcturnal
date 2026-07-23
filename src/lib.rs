@@ -11,21 +11,6 @@ pub use editor::{EditCommand, EditKind, MappingPolicy};
 pub use engine::{EventBatch, NativeEvent, NodeField, ParseClassification};
 
 #[napi]
-pub fn native_version() -> &'static str {
-    env!("CARGO_PKG_VERSION")
-}
-
-#[napi]
-pub fn oxc_version() -> &'static str {
-    "0.141.0"
-}
-
-#[napi]
-pub fn routed_protocol_version() -> u32 {
-    1
-}
-
-#[napi]
 pub fn classify(filename: String, source: String) -> ParseClassification {
     engine::classify_source(&filename, &source)
 }

@@ -46,6 +46,7 @@ interface NativeBinding {
     commit(edits: EditCommand[], sourceMapMode?: string): { code: string; map: NativeVlqMap };
     close(): void;
     memoryUsage(): number;
+    parseCount(): number;
   };
   classify(filename: string, source: string): ParseClassification;
   commitEdits(
@@ -100,7 +101,7 @@ interface NativeBinding {
     identifierNames?: string[],
     staticMemberPatterns?: string[],
   ): Buffer;
-  materializeRoutedBuffer?(
+  materializeRoutedBuffer(
     source: string,
     filename: string,
     manifest: Buffer,
@@ -117,9 +118,6 @@ interface NativeBinding {
     filename: string,
     nodeIds: number[],
   ): import('./types.js').NativeEvent[];
-  nativeVersion(): string;
-  oxcVersion(): string;
-  routedProtocolVersion?(): number;
   composeMappings(outer: string, inner: string, outerNameCount: number): string;
   validateExpression(code: string, parserMode?: string): void;
   validateStatements(code: string, parserMode?: string): void;
@@ -157,8 +155,6 @@ function loadBinding(): NativeBinding {
           codegenCandidate: false,
           reason: 'native-load-failed',
         }),
-        nativeVersion: () => 'unavailable',
-        oxcVersion: () => 'unavailable',
         commitEdits: unavailable as never,
         commitPackedEdits: unavailable as never,
         commitPackedBuffer: unavailable as never,
@@ -166,7 +162,6 @@ function loadBinding(): NativeBinding {
         materializePackedEvents: unavailable as never,
         materializePackedBuffer: unavailable as never,
         materializeRoutedBuffer: unavailable as never,
-        routedProtocolVersion: () => 0,
         queryGlobals: unavailable as never,
         inspectNodes: unavailable as never,
         composeMappings: unavailable as never,

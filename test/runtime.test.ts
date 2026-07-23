@@ -5,22 +5,384 @@ import { Worker } from 'node:worker_threads';
 
 import {
   classify,
+  compilePhasePlan,
   defineNativePipeline,
   defineNativePlugin,
   NativeTransformSession,
-  nativeVersion,
   pipelineCacheKey,
   registerParserAdapter,
   transform,
-  transformOrFallback,
+  transformClassificationCacheKey,
 } from '../dist/index.js';
 import { native } from '../dist/native.js';
-import { packRouteManifest } from '../dist/protocol.js';
+import { decodeRoutedEnvelope, packEdits, packRouteManifest } from '../dist/protocol.js';
 
 test('loads the Noxcturnal binding and classifies parser routes', () => {
-  assert.match(nativeVersion(), /^0\.1\.0/);
   assert.deepEqual(classify('fixture.tsx', 'const view = <View />').syntax, 'tsx');
   assert.equal(classify('fixture.js', '// @flow\nconst x: number = 1').supported, false);
+});
+
+test('rejects malformed routed string tables before decoding records', () => {
+  const invalidCount = Buffer.alloc(28);
+  invalidCount.writeUInt32LE(0x4e525446, 0);
+  invalidCount.writeUInt32LE(1, 20);
+  invalidCount.writeUInt32LE(28, 24);
+  assert.throws(() => decodeRoutedEnvelope(invalidCount), /string count/);
+
+  const invalidLength = Buffer.alloc(32);
+  invalidLength.writeUInt32LE(0x4e525446, 0);
+  invalidLength.writeUInt32LE(1, 20);
+  invalidLength.writeUInt32LE(32, 24);
+  invalidLength.writeUInt32LE(100, 28);
+  assert.throws(() => decodeRoutedEnvelope(invalidLength), /string length/);
+
+  const empty = Buffer.alloc(28);
+  empty.writeUInt32LE(0x4e525446, 0);
+  empty.writeUInt32LE(28, 24);
+  assert.throws(() => decodeRoutedEnvelope(empty).stringAt(0), /string id/);
+});
+
+test('keys scheduler classification and phase planning', () => {
+  const pipeline = defineNativePipeline({ phases: [{ name: 'transform', plugins: [] }] });
+  const js = transformClassificationCacheKey(pipeline, 'fixture.js', 'const value = 1');
+  const flow = transformClassificationCacheKey(
+    pipeline,
+    'fixture.js',
+    '// @flow\nconst value: number = 1',
+  );
+  assert.notEqual(js, flow);
+  assert.equal(js, transformClassificationCacheKey(pipeline, 'fixture.js', 'const other = 2'));
+});
+
+test('compiles conservative phase boundaries and edit effects', () => {
+  const text = defineNativePlugin({ name: 'text', editEffect: 'text-only' });
+  const unknown = defineNativePlugin({ name: 'unknown' });
+  const plans = compilePhasePlan(
+    defineNativePipeline({
+      phases: [
+        { name: 'text', plugins: [text], observes: 'current-ast' },
+        { name: 'original-observer', plugins: [text], observes: 'original' },
+        { name: 'compiler', plugins: [unknown], observes: 'rendered-source' },
+      ],
+    }),
+  );
+  assert.equal(plans[0].editEffect, 'text-only');
+  assert.equal(plans[1].canReuseAst, true);
+  assert.equal(plans[2].boundaryBefore, true);
+  assert.equal(plans[2].editEffect, 'whole-program');
+  assert.ok(Object.isFrozen(plans));
+  assert.throws(
+    () =>
+      compilePhasePlan(
+        defineNativePipeline({
+          phases: [
+            {
+              name: 'invalid',
+              plugins: [],
+              editEffect: 'sometimes' as never,
+            },
+          ],
+        }),
+      ),
+    /invalid edit effect/,
+  );
+});
+
+test('rejects edits that violate a none effect contract', () => {
+  const plugin = defineNativePlugin({
+    name: 'false-none-contract',
+    editEffect: 'none',
+    visitor: {
+      Identifier(path) {
+        path.replaceWith('changed');
+      },
+    },
+  });
+  assert.throws(
+    () =>
+      transform(
+        'const value = 1',
+        'fixture.js',
+        defineNativePipeline({ phases: [{ name: 'transform', plugins: [plugin] }] }),
+      ),
+    /declared edit effect none but emitted edits/,
+  );
+});
+
+test('defers text-only rendering across phases that observe the retained AST', () => {
+  let observed = '';
+  const edit = defineNativePlugin({
+    name: 'edit-text',
+    prepare: () => ({ editEffect: 'text-only' }),
+    visitor: {
+      Identifier(path) {
+        path.replaceWith('renamed');
+      },
+    },
+  });
+  const observe = defineNativePlugin({
+    name: 'observe-original-ast',
+    visitor: {
+      Identifier(path) {
+        observed = path.getSource();
+      },
+    },
+  });
+  const result = transform(
+    'const value = 1',
+    'fixture.js',
+    defineNativePipeline({
+      phases: [
+        { name: 'edit', plugins: [edit], observes: 'current-ast' },
+        { name: 'observe', plugins: [observe], observes: 'current-ast' },
+      ],
+    }),
+    { debugPerformance: true },
+  );
+  assert.equal(result.status, 'complete');
+  assert.equal(observed, 'value');
+  assert.equal(result.code, 'const renamed = 1');
+  const performance = result.metadata.performance as {
+    reparses: number;
+    nativeParses: number;
+    phaseExecutions: { editEffect: string; render: string; reusedParse: boolean }[];
+  };
+  assert.equal(performance.reparses, 0);
+  assert.equal(performance.nativeParses, 1);
+  assert.deepEqual(
+    performance.phaseExecutions.map(phase => [phase.editEffect, phase.render, phase.reusedParse]),
+    [
+      ['text-only', 'deferred', false],
+      ['whole-program', 'committed', true],
+    ],
+  );
+});
+
+test('runs original observers against pristine source after a rendered boundary', () => {
+  let observed = '';
+  const edit = defineNativePlugin({
+    name: 'rendered-edit',
+    editEffect: 'whole-program',
+    visitor: {
+      Identifier(path) {
+        path.replaceWith('renamed');
+      },
+    },
+  });
+  const observe = defineNativePlugin({
+    name: 'original-observer',
+    editEffect: 'none',
+    visitor: {
+      Identifier(path) {
+        observed = path.getSource();
+      },
+    },
+  });
+  const result = transform(
+    'const value = 1',
+    'fixture.js',
+    defineNativePipeline({
+      phases: [
+        { name: 'render', plugins: [edit], observes: 'current-ast' },
+        { name: 'original', plugins: [observe], observes: 'original' },
+      ],
+    }),
+    { debugPerformance: true },
+  );
+  assert.equal(result.status, 'complete');
+  assert.equal(observed, 'value');
+  assert.equal(result.code, 'const renamed = 1');
+  const performance = result.metadata.performance as {
+    nativeParses: number;
+    phaseExecutions: { source: string; render: string; reusedParse: boolean }[];
+  };
+  assert.equal(performance.nativeParses, 2);
+  assert.deepEqual(performance.phaseExecutions[1], {
+    name: 'original',
+    observes: 'original',
+    editEffect: 'none',
+    source: 'original',
+    reusedParse: false,
+    render: 'unchanged',
+  });
+});
+
+test('rejects ambiguous original-source edits after rendering', () => {
+  const edit = (name: string) =>
+    defineNativePlugin({
+      name,
+      editEffect: 'whole-program',
+      visitor: {
+        Identifier(path) {
+          path.replaceWith('renamed');
+        },
+      },
+    });
+  assert.throws(
+    () =>
+      transform(
+        'const value = 1',
+        'fixture.js',
+        defineNativePipeline({
+          phases: [
+            { name: 'render', plugins: [edit('first')] },
+            { name: 'original-edit', plugins: [edit('second')], observes: 'original' },
+          ],
+        }),
+      ),
+    /edits against original source are ambiguous/,
+  );
+});
+
+test('realizes an explicitly required map once and reuses it at final composition', () => {
+  const edit = defineNativePlugin({
+    name: 'mapped-edit',
+    editEffect: 'text-only',
+    visitor: {
+      Identifier(path) {
+        path.replaceWith({
+          code: 'renamed',
+          mapping: 'anchor-boundaries',
+          names: ['value'],
+        });
+      },
+    },
+  });
+  const result = transform(
+    'const value = 1',
+    'fixture.js',
+    defineNativePipeline({
+      phases: [
+        {
+          name: 'mapped',
+          plugins: [edit],
+          requiresRealizedMap: true,
+        },
+        {
+          name: 'observe-rendered',
+          plugins: [],
+          observes: 'rendered-source',
+        },
+      ],
+    }),
+    { debugPerformance: true, sourceMapMode: 'boundary' },
+  );
+  assert.equal(result.status, 'complete');
+  assert.equal(result.code, 'const renamed = 1');
+  assert.deepEqual(result.map.names, ['value']);
+  const performance = result.metadata.performance as {
+    mapEncodes: number;
+    mappingSegments: number;
+  };
+  assert.equal(performance.mapEncodes, 1);
+  assert.ok(performance.mappingSegments > 0);
+});
+
+test('provides direct path fields and retained snapshots', () => {
+  let retained: Readonly<Record<string, unknown>> | undefined;
+  const plugin = defineNativePlugin({
+    name: 'snapshot',
+    prepare: () => ({
+      fields: { Identifier: ['name'] },
+      ancestry: 'parent',
+    }),
+    visitor: {
+      Identifier(path) {
+        assert.equal(path.type, 'Identifier');
+        assert.equal(path.id, path.node.id);
+        assert.equal(path.start, path.node.start);
+        retained = path.snapshot({ fields: ['name'], ancestry: 'parent' });
+      },
+    },
+  });
+  const result = transform(
+    'const value = 1',
+    'fixture.js',
+    defineNativePipeline({ phases: [{ name: 'transform', plugins: [plugin] }] }),
+    {
+      debugPerformance: true,
+    },
+  );
+  assert.equal(result.status, 'complete');
+  assert.equal(retained?.name, 'value');
+  assert.ok(Object.isFrozen(retained));
+  assert.ok(result.metadata.performance);
+  const performance = result.metadata.performance as {
+    pathFacades: number;
+    nodeFacades: number;
+    snapshots: number;
+    scopeFacades: number;
+    recordWords: number;
+    utf8SlabBytes: number;
+  };
+  assert.equal(performance.pathFacades, 1);
+  assert.equal(performance.nodeFacades, 1);
+  assert.equal(performance.snapshots, 1);
+  assert.equal(performance.scopeFacades, 0);
+  assert.ok(performance.recordWords > 0);
+  assert.ok(performance.utf8SlabBytes > 0);
+});
+
+test('hydrates targeted snapshots once and retains exit ancestry and scope', () => {
+  const snapshots: Readonly<Record<string, unknown>>[] = [];
+  const plugin = defineNativePlugin({
+    name: 'targeted-snapshot',
+    prepare: () => ({
+      ancestry: 'parent',
+      semantics: ['scope'],
+    }),
+    visitor: {
+      Identifier: {
+        enter(path) {
+          snapshots.push(path.snapshot({ fields: ['name'], ancestry: 'parent' }));
+        },
+        exit(path) {
+          snapshots.push(path.snapshot({ fields: ['name'], ancestry: 'parent' }));
+        },
+      },
+    },
+  });
+  const result = transform(
+    'const value = other',
+    'fixture.js',
+    defineNativePipeline({ phases: [{ name: 'transform', plugins: [plugin] }] }),
+    {
+      debugPerformance: true,
+    },
+  );
+  assert.equal(result.status, 'complete');
+  assert.deepEqual(
+    snapshots.map(snapshot => snapshot.name),
+    ['value', 'value', 'other', 'other'],
+  );
+  assert.ok(snapshots.every(snapshot => typeof snapshot.scopeId === 'number'));
+  assert.ok(snapshots.every(Object.isFrozen));
+  assert.equal((result.metadata.performance as { nativeParses: number }).nativeParses, 2);
+  assert.throws(
+    () =>
+      transform(
+        'const value = 1',
+        'fixture.js',
+        defineNativePipeline({
+          phases: [
+            {
+              name: 'transform',
+              plugins: [
+                defineNativePlugin({
+                  name: 'invalid-snapshot',
+                  visitor: {
+                    Identifier(path) {
+                      path.snapshot({ fields: ['notAField'] });
+                    },
+                  },
+                }),
+              ],
+            },
+          ],
+        }),
+      ),
+    /unknown snapshot field/,
+  );
 });
 
 test('materializes arbitrary subscriptions without a complete ESTree', () => {
@@ -89,11 +451,14 @@ test('materializes exits only for explicitly subscribed routes', () => {
 test('skips native rendering when a phase produces no edits', () => {
   const plugin = defineNativePlugin({
     name: 'analysis-only',
-    apiVersion: 2,
     visitor: { Identifier() {} },
   });
   const source = 'const answer = value;';
-  const result = transform(source, 'fixture.js', defineNativePipeline([plugin]));
+  const result = transform(
+    source,
+    'fixture.js',
+    defineNativePipeline({ phases: [{ name: 'transform', plugins: [plugin] }] }),
+  );
   assert.equal(result.status, 'complete');
   assert.equal(result.code, source);
 });
@@ -102,14 +467,12 @@ test('reuses identical packed events across unchanged phases', () => {
   const plugin = (name: string) =>
     defineNativePlugin({
       name,
-      apiVersion: 2,
       visitor: { Identifier() {} },
     });
   const result = transform(
     'const answer = value;',
     'fixture.js',
     defineNativePipeline({
-      apiVersion: 2,
       phases: [
         { name: 'first', plugins: [plugin('first')] },
         { name: 'second', plugins: [plugin('second')] },
@@ -123,7 +486,6 @@ test('applies exact scalar route predicates without exposing a new visitor shape
   const seen: string[] = [];
   const plugin = defineNativePlugin({
     name: 'predicates',
-    apiVersion: 2,
     prepare() {
       return {
         where: { VariableDeclaration: { kind: { oneOf: ['let', 'const'] } } },
@@ -139,7 +501,7 @@ test('applies exact scalar route predicates without exposing a new visitor shape
   const result = transform(
     'var first = 1; let second = 2; const third = 3;',
     'fixture.js',
-    defineNativePipeline({ apiVersion: 2, phases: [{ name: 'main', plugins: [plugin] }] }),
+    defineNativePipeline({ phases: [{ name: 'main', plugins: [plugin] }] }),
   );
   assert.equal(result.status, 'complete');
   assert.deepEqual(seen, ['let s', 'const']);
@@ -149,7 +511,6 @@ test('supports absent predicates and rejects undeclared dynamic control flow', (
   let absent = 0;
   const predicatePlugin = defineNativePlugin({
     name: 'absent',
-    apiVersion: 2,
     prepare: () => ({ where: { ExportNamedDeclaration: { source: { present: false } } } }),
     visitor: {
       ExportNamedDeclaration() {
@@ -160,13 +521,12 @@ test('supports absent predicates and rejects undeclared dynamic control flow', (
   transform(
     "export const local = 1; export { value } from 'module';",
     'fixture.js',
-    defineNativePipeline({ apiVersion: 2, phases: [{ name: 'main', plugins: [predicatePlugin] }] }),
+    defineNativePipeline({ phases: [{ name: 'main', plugins: [predicatePlugin] }] }),
   );
   assert.equal(absent, 1);
 
   const staticPlugin = defineNativePlugin({
     name: 'static',
-    apiVersion: 2,
     prepare: () => ({ controlFlow: [] }),
     visitor: {
       Identifier(path) {
@@ -180,7 +540,6 @@ test('supports absent predicates and rejects undeclared dynamic control flow', (
         'const value = 1;',
         'fixture.js',
         defineNativePipeline({
-          apiVersion: 2,
           phases: [{ name: 'main', plugins: [staticPlugin] }],
         }),
       ),
@@ -193,7 +552,6 @@ test('routes static enter and exit callbacks by integer id in native order', () 
   const plugin = (name: string) =>
     defineNativePlugin({
       name,
-      apiVersion: 2,
       prepare: () => ({ controlFlow: [] }),
       visitor: {
         Function: {
@@ -210,7 +568,6 @@ test('routes static enter and exit callbacks by integer id in native order', () 
     'function example() {}',
     'fixture.js',
     defineNativePipeline({
-      apiVersion: 2,
       phases: [{ name: 'main', plugins: [plugin('first'), plugin('second')] }],
     }),
   );
@@ -227,7 +584,6 @@ test('keeps predicate-only fields native', () => {
   let calls = 0;
   const plugin = defineNativePlugin({
     name: 'selective',
-    apiVersion: 2,
     prepare: () => ({
       controlFlow: [],
       fields: { VariableDeclaration: [] },
@@ -243,7 +599,7 @@ test('keeps predicate-only fields native', () => {
   const result = transform(
     'var first = 1; let second = 2; const third = 3;',
     'fixture.js',
-    defineNativePipeline({ apiVersion: 2, phases: [{ name: 'main', plugins: [plugin] }] }),
+    defineNativePipeline({ phases: [{ name: 'main', plugins: [plugin] }] }),
   );
   assert.equal(result.status, 'complete');
   assert.equal(calls, 1);
@@ -259,7 +615,6 @@ test('keeps scalar predicates type-sensitive for false, zero, and empty strings'
   ) =>
     defineNativePlugin({
       name,
-      apiVersion: 2,
       prepare: () => ({
         controlFlow: [],
         fields: { [route]: [] },
@@ -270,18 +625,25 @@ test('keeps scalar predicates type-sensitive for false, zero, and empty strings'
   const result = transform(
     'false; true; 0; 1; ""; "x";',
     'fixture.js',
-    defineNativePipeline([
-      predicatePlugin('false', 'BooleanLiteral', { equals: false }, () => seen.boolean++),
-      predicatePlugin('zero', 'NumericLiteral', { equals: 0 }, () => seen.number++),
-      predicatePlugin('empty', 'StringLiteral', { equals: '' }, () => seen.string++),
-      predicatePlugin('typed', 'NumericLiteral', { equals: '0' }, () => seen.wrongType++),
-    ]),
+    defineNativePipeline({
+      phases: [
+        {
+          name: 'transform',
+          plugins: [
+            predicatePlugin('false', 'BooleanLiteral', { equals: false }, () => seen.boolean++),
+            predicatePlugin('zero', 'NumericLiteral', { equals: 0 }, () => seen.number++),
+            predicatePlugin('empty', 'StringLiteral', { equals: '' }, () => seen.string++),
+            predicatePlugin('typed', 'NumericLiteral', { equals: '0' }, () => seen.wrongType++),
+          ],
+        },
+      ],
+    }),
   );
   assert.equal(result.status, 'complete');
   assert.deepEqual(seen, { boolean: 1, number: 1, string: 1, wrongType: 0 });
 });
 
-test('rejects malformed and incompatible routed manifests at the native boundary', () => {
+test('rejects malformed routed manifests at the native boundary', () => {
   assert.throws(
     () => native.materializeRoutedBuffer('const value = 1;', 'fixture.js', Buffer.alloc(32)),
     /invalid routed manifest magic/,
@@ -304,7 +666,7 @@ test('rejects malformed and incompatible routed manifests at the native boundary
   manifest.writeUInt32LE(99, 4);
   assert.throws(
     () => native.materializeRoutedBuffer('const value = 1;', 'fixture.js', manifest),
-    /incompatible routed protocol version/,
+    /unknown routed manifest flags/,
   );
 
   const duplicate = packRouteManifest(
@@ -320,7 +682,7 @@ test('rejects malformed and incompatible routed manifests at the native boundary
     false,
     false,
   );
-  duplicate.writeUInt32LE(0, 16 * 4);
+  duplicate.writeUInt32LE(0, 15 * 4);
   assert.throws(
     () => native.materializeRoutedBuffer('const value = 1;', 'fixture.js', duplicate),
     /duplicate compiled route id/,
@@ -330,7 +692,6 @@ test('rejects malformed and incompatible routed manifests at the native boundary
 test('validates predicate fields across every concrete alias route', () => {
   const plugin = defineNativePlugin({
     name: 'invalid-alias-predicate',
-    apiVersion: 2,
     prepare: () => ({
       controlFlow: [],
       where: { Expression: { kind: { equals: 'const' } } },
@@ -343,7 +704,6 @@ test('validates predicate fields across every concrete alias route', () => {
         'value;',
         'fixture.js',
         defineNativePipeline({
-          apiVersion: 2,
           phases: [{ name: 'main', plugins: [plugin] }],
         }),
       ),
@@ -355,7 +715,6 @@ test('deduplicates overlapping parts of a compiled composite visitor key', () =>
   let calls = 0;
   const plugin = defineNativePlugin({
     name: 'compiled-composite',
-    apiVersion: 2,
     prepare: () => ({ controlFlow: [] }),
     visitor: {
       'Identifier|Expression'() {
@@ -367,7 +726,6 @@ test('deduplicates overlapping parts of a compiled composite visitor key', () =>
     'value;',
     'fixture.js',
     defineNativePipeline({
-      apiVersion: 2,
       phases: [{ name: 'main', plugins: [plugin] }],
     }),
   );
@@ -378,7 +736,6 @@ test('reverses overlapping compiled exit callbacks within one plugin', () => {
   const calls: string[] = [];
   const plugin = defineNativePlugin({
     name: 'compiled-exit-order',
-    apiVersion: 2,
     prepare: () => ({ controlFlow: [] }),
     visitor: {
       Identifier: {
@@ -397,7 +754,6 @@ test('reverses overlapping compiled exit callbacks within one plugin', () => {
     'value;',
     'fixture.js',
     defineNativePipeline({
-      apiVersion: 2,
       phases: [{ name: 'main', plugins: [plugin] }],
     }),
   );
@@ -408,7 +764,6 @@ test('keeps declared skip semantics on the compiled slow lane', () => {
   const calls: string[] = [];
   const plugin = defineNativePlugin({
     name: 'compiled-skip',
-    apiVersion: 2,
     prepare: () => ({ controlFlow: ['skip'] }),
     visitor: {
       Function(path) {
@@ -423,7 +778,7 @@ test('keeps declared skip semantics on the compiled slow lane', () => {
   const result = transform(
     'function example(parameter) { return parameter; }',
     'fixture.js',
-    defineNativePipeline({ apiVersion: 2, phases: [{ name: 'main', plugins: [plugin] }] }),
+    defineNativePipeline({ phases: [{ name: 'main', plugins: [plugin] }] }),
   );
   assert.equal(result.status, 'complete');
   assert.deepEqual(calls, ['function']);
@@ -438,7 +793,6 @@ test('uses cached routed tapes for declared nested traversal', () => {
   };
   const plugin = defineNativePlugin({
     name: 'routed-nested',
-    apiVersion: 2,
     prepare: () => ({ controlFlow: ['nested-traverse'] }),
     visitor: {
       Function(path) {
@@ -449,7 +803,7 @@ test('uses cached routed tapes for declared nested traversal', () => {
   const result = transform(
     'function example(parameter) { return parameter; }',
     'fixture.js',
-    defineNativePipeline([plugin]),
+    defineNativePipeline({ phases: [{ name: 'transform', plugins: [plugin] }] }),
   );
   assert.equal(result.status, 'complete');
   assert.deepEqual(names, ['example', 'parameter', 'parameter']);
@@ -459,7 +813,6 @@ test('expands Function aliases to arrow functions in nested routed traversal', (
   const functions: string[] = [];
   const plugin = defineNativePlugin({
     name: 'nested-function-alias',
-    apiVersion: 2,
     prepare: () => ({ ancestry: 'parent', controlFlow: ['nested-traverse'] }),
     visitor: {
       VariableDeclaration(path) {
@@ -474,7 +827,7 @@ test('expands Function aliases to arrow functions in nested routed traversal', (
   const result = transform(
     'for (const value of values) callbacks.push(() => value);',
     'fixture.js',
-    defineNativePipeline([plugin]),
+    defineNativePipeline({ phases: [{ name: 'transform', plugins: [plugin] }] }),
   );
   assert.equal(result.status, 'complete');
   assert.deepEqual(functions, ['ArrowFunctionExpression']);
@@ -587,7 +940,6 @@ test('runs ordered phases and reparses edited code', () => {
   const observations = [];
   const replace = defineNativePlugin({
     name: 'replace-number',
-    apiVersion: 2,
     prepare: () => ({ fields: { NumericLiteral: ['value'] } }),
     visitor: {
       NumericLiteral(path) {
@@ -597,7 +949,6 @@ test('runs ordered phases and reparses edited code', () => {
   });
   const observe = defineNativePlugin({
     name: 'observe-number',
-    apiVersion: 2,
     prepare() {
       return { fields: { NumericLiteral: ['value'] }, metadataWrites: ['observed'] };
     },
@@ -612,9 +963,8 @@ test('runs ordered phases and reparses edited code', () => {
     'export const value = 1;',
     'fixture.js',
     defineNativePipeline({
-      apiVersion: 2,
       phases: [
-        { name: 'rewrite', plugins: [replace], reparseAfterEdits: true },
+        { name: 'rewrite', plugins: [replace], requiresPrintedInput: true },
         { name: 'analyze', plugins: [observe] },
       ],
     }),
@@ -630,7 +980,6 @@ test('supports aliases, enter/exit order, state, skip, and stop', () => {
   const order = [];
   const plugin = defineNativePlugin({
     name: 'lifecycle',
-    apiVersion: 2,
     createState: () => ({ count: 0 }),
     pre(_context, state) {
       order.push('pre');
@@ -656,7 +1005,7 @@ test('supports aliases, enter/exit order, state, skip, and stop', () => {
   const result = transform(
     'function example() { return 1 }',
     'fixture.js',
-    defineNativePipeline({ apiVersion: 2, phases: [{ name: 'visit', plugins: [plugin] }] }),
+    defineNativePipeline({ phases: [{ name: 'visit', plugins: [plugin] }] }),
   );
   assert.equal(result.status, 'complete');
   assert.deepEqual(order, ['pre', 'enter:1', 'exit', 'post', 'cleanup:complete']);
@@ -673,7 +1022,6 @@ test('routes Babel-compatible semantic and collapsed Oxc visitor keys', () => {
   };
   const plugin = defineNativePlugin({
     name: 'babel-routes',
-    apiVersion: 2,
     visitor: {
       ReferencedIdentifier(path) {
         seen.references.push(String(path.node.name));
@@ -698,7 +1046,7 @@ test('routes Babel-compatible semantic and collapsed Oxc visitor keys', () => {
   transform(
     'const local = globalValue; use(local); function declared() {} const expression = function () {}; class Declared {} const ClassExpressionValue = class {}; import.meta; function target() { return new.target }',
     'fixture.js',
-    defineNativePipeline({ apiVersion: 2, phases: [{ name: 'routes', plugins: [plugin] }] }),
+    defineNativePipeline({ phases: [{ name: 'routes', plugins: [plugin] }] }),
   );
   assert.deepEqual(seen.references, ['globalValue', 'use', 'local']);
   assert.deepEqual(seen.meta, ['ImportMeta', 'NewTarget']);
@@ -712,7 +1060,6 @@ test('matches static member chains without traversing child objects', () => {
   const matches: string[] = [];
   const plugin = defineNativePlugin({
     name: 'member-patterns',
-    apiVersion: 2,
     prepare: () => ({
       fields: {
         StaticMemberExpression: ['memberPath'],
@@ -729,7 +1076,7 @@ test('matches static member chains without traversing child objects', () => {
   transform(
     "process.env.NODE_ENV; process['env'].EXPO_PUBLIC_VALUE; process[key].dynamic",
     'fixture.js',
-    defineNativePipeline({ apiVersion: 2, phases: [{ name: 'match', plugins: [plugin] }] }),
+    defineNativePipeline({ phases: [{ name: 'match', plugins: [plugin] }] }),
   );
   assert.deepEqual(matches, [
     'process.env.NODE_ENV',
@@ -745,7 +1092,6 @@ test('orders multiple plugins forward on enter and in reverse on exit', () => {
   const plugin = (name: string) =>
     defineNativePlugin({
       name,
-      apiVersion: 2 as const,
       visitor: {
         Function: {
           enter() {
@@ -761,7 +1107,6 @@ test('orders multiple plugins forward on enter and in reverse on exit', () => {
     'function fixture() {}',
     'fixture.js',
     defineNativePipeline({
-      apiVersion: 2,
       phases: [{ name: 'visit', plugins: [plugin('a'), plugin('b')] }],
     }),
   );
@@ -772,7 +1117,6 @@ test('supports targeted nested traversal and semantic global queries', () => {
   const names = [];
   const plugin = defineNativePlugin({
     name: 'targeted',
-    apiVersion: 2,
     prepare: () => ({ controlFlow: ['nested-traverse'] }),
     visitor: {
       Function(path) {
@@ -787,7 +1131,7 @@ test('supports targeted nested traversal and semantic global queries', () => {
   const result = transform(
     'const outside = 1; function f(local) { return local + external }',
     'fixture.js',
-    defineNativePipeline({ apiVersion: 2, phases: [{ name: 'visit', plugins: [plugin] }] }),
+    defineNativePipeline({ phases: [{ name: 'visit', plugins: [plugin] }] }),
   );
   assert.equal(result.status, 'complete');
   assert.ok(names.some(([name, global]) => name === 'external' && global === true));
@@ -798,7 +1142,6 @@ test('resolves bindings through identifier-free intermediate scopes', () => {
   const observations: unknown[] = [];
   const plugin = defineNativePlugin({
     name: 'complete-scope-tree',
-    apiVersion: 2,
     prepare() {
       return { semantics: ['scope'] };
     },
@@ -815,7 +1158,7 @@ test('resolves bindings through identifier-free intermediate scopes', () => {
   transform(
     'const outer = 1; { { (() => outer); } }',
     'fixture.js',
-    defineNativePipeline({ apiVersion: 2, phases: [{ name: 'scope', plugins: [plugin] }] }),
+    defineNativePipeline({ phases: [{ name: 'scope', plugins: [plugin] }] }),
   );
   assert.deepEqual(observations, [['outer', true, 3]]);
 });
@@ -882,9 +1225,7 @@ test('provides module specifier and declaration facts for source transforms', ()
 test('provides general editor operations and structured diagnostics', () => {
   const plugin = defineNativePlugin({
     name: 'editor',
-    apiVersion: 2,
     pre(context) {
-      assert.equal(context.editor.supports('move'), true);
       context.editor.trim();
       context.editor.prepend('/* before */');
       context.editor.append('/* after */');
@@ -894,7 +1235,7 @@ test('provides general editor operations and structured diagnostics', () => {
   const result = transform(
     '  value  ',
     'fixture.js',
-    defineNativePipeline({ apiVersion: 2, phases: [{ name: 'edit', plugins: [plugin] }] }),
+    defineNativePipeline({ phases: [{ name: 'edit', plugins: [plugin] }] }),
   );
   assert.equal(result.status, 'complete');
   assert.equal(result.code, '/* before */value/* after */');
@@ -907,7 +1248,6 @@ test('returns pristine source on explicit bailout and calls cleanup', () => {
   let cleanup;
   const plugin = defineNativePlugin({
     name: 'bail',
-    apiVersion: 2,
     visitor: {
       Identifier(path) {
         path.replaceWith('changed');
@@ -922,7 +1262,7 @@ test('returns pristine source on explicit bailout and calls cleanup', () => {
   const result = transform(
     source,
     'fixture.js',
-    defineNativePipeline({ apiVersion: 2, phases: [{ name: 'source', plugins: [plugin] }] }),
+    defineNativePipeline({ phases: [{ name: 'source', plugins: [plugin] }] }),
   );
   assert.deepEqual(result, { status: 'bailout', reason: 'bail:fixture', source, diagnostics: [] });
   assert.equal(cleanup, 'bailout');
@@ -932,7 +1272,6 @@ test('analyzes every plugin before applying edits and bails out pristine', () =>
   const lifecycle: string[] = [];
   const supported = defineNativePlugin({
     name: 'supported',
-    apiVersion: 2,
     analyze() {
       lifecycle.push('analyze:supported');
       return { status: 'supported', analysis: 'replacement' };
@@ -944,7 +1283,6 @@ test('analyzes every plugin before applying edits and bails out pristine', () =>
   });
   const unsupported = defineNativePlugin({
     name: 'unsupported-analysis',
-    apiVersion: 2,
     analyze() {
       lifecycle.push('analyze:unsupported');
       return { status: 'unsupported', reason: 'needs-compiler' };
@@ -955,7 +1293,6 @@ test('analyzes every plugin before applying edits and bails out pristine', () =>
     source,
     'fixture.js',
     defineNativePipeline({
-      apiVersion: 2,
       phases: [{ name: 'source', plugins: [supported, unsupported] }],
     }),
   );
@@ -964,40 +1301,29 @@ test('analyzes every plugin before applying edits and bails out pristine', () =>
   assert.deepEqual(lifecycle, ['analyze:supported', 'analyze:unsupported']);
 });
 
-test('builds deterministic cache keys and falls back with pristine source', () => {
+test('builds deterministic cache keys and returns pristine bailout source', () => {
   const plugin = defineNativePlugin({
     name: 'unsupported',
-    version: '1.0.0',
-    apiVersion: 2,
     visitor: { Program: path => path.unsupported('test') },
   });
   const pipeline = defineNativePipeline({
-    apiVersion: 2,
     phases: [{ name: 'source', plugins: [plugin] }],
   });
   assert.equal(pipelineCacheKey(pipeline, 'fixture.js'), pipelineCacheKey(pipeline, 'fixture.js'));
-  const result = transformOrFallback('const pristine = true', 'fixture.js', pipeline, source => ({
-    status: 'complete',
-    code: source,
-    map: { mappings: '', names: [] },
-    metadata: { fallback: true },
-    diagnostics: [],
-  }));
-  assert.equal(result.code, 'const pristine = true');
-  assert.equal(result.metadata.fallback, true);
+  const result = transform('const pristine = true', 'fixture.js', pipeline);
+  assert.equal(result.status, 'bailout');
+  assert.equal(result.source, 'const pristine = true');
 });
 
 test('creates immutable pipelines and reusable option-bound plugin definitions', () => {
   const definition = defineNativePlugin<undefined, { value: string }>({
     name: 'configured',
-    apiVersion: 2,
     prepare(_context, options) {
       assert.equal(options.value, 'configured');
     },
   });
   const configured = definition.withOptions({ value: 'configured' });
   const pipeline = defineNativePipeline({
-    apiVersion: 2,
     phases: [{ name: 'visit', plugins: [configured] }],
   });
   assert.ok(Object.isFrozen(definition));
@@ -1011,7 +1337,7 @@ test('creates immutable pipelines and reusable option-bound plugin definitions',
   transform('value', 'fixture.js', pipeline);
 });
 
-test('supplies API versions and supports the single-pass pipeline shorthand', () => {
+test('requires explicit pipeline phases', () => {
   const plugin = defineNativePlugin({
     name: 'concise',
     visitor: {
@@ -1020,9 +1346,7 @@ test('supplies API versions and supports the single-pass pipeline shorthand', ()
       },
     },
   });
-  const pipeline = defineNativePipeline([plugin]);
-  assert.equal(plugin.apiVersion, 2);
-  assert.equal(pipeline.apiVersion, 2);
+  const pipeline = defineNativePipeline({ phases: [{ name: 'transform', plugins: [plugin] }] });
   assert.equal(pipeline.phases[0].name, 'transform');
   const result = transform('const value = 1;', 'fixture.js', pipeline);
   assert.equal(result.status, 'complete');
@@ -1032,14 +1356,13 @@ test('supplies API versions and supports the single-pass pipeline shorthand', ()
 function definitionPipeline(
   plugin: ReturnType<typeof defineNativePlugin>,
 ): ReturnType<typeof defineNativePipeline> {
-  return defineNativePipeline({ apiVersion: 2, phases: [{ name: 'visit', plugins: [plugin] }] });
+  return defineNativePipeline({ phases: [{ name: 'visit', plugins: [plugin] }] });
 }
 
 test('rejects conflicting edits transactionally', () => {
   const plugin = name =>
     defineNativePlugin({
       name,
-      apiVersion: 2,
       visitor: { Identifier: path => path.replaceWith(name) },
     });
   assert.throws(
@@ -1048,7 +1371,6 @@ test('rejects conflicting edits transactionally', () => {
         'const value = 1',
         'fixture.js',
         defineNativePipeline({
-          apiVersion: 2,
           phases: [{ name: 'source', plugins: [plugin('a'), plugin('b')] }],
         }),
       ),
@@ -1060,13 +1382,12 @@ test('expands union visitor keys before native subscription planning', () => {
   const seen: string[] = [];
   const plugin = defineNativePlugin({
     name: 'union',
-    apiVersion: 2,
     visitor: { 'ImportDeclaration|ExportNamedDeclaration': path => seen.push(path.node.type) },
   });
   transform(
     "import value from 'source'; export { value }",
     'fixture.js',
-    defineNativePipeline({ apiVersion: 2, phases: [{ name: 'visit', plugins: [plugin] }] }),
+    defineNativePipeline({ phases: [{ name: 'visit', plugins: [plugin] }] }),
   );
   assert.deepEqual(seen, ['ImportDeclaration', 'ExportNamedDeclaration']);
 });
@@ -1075,13 +1396,12 @@ test('expands the Expression alias consistently for literal expressions', () => 
   const seen: string[] = [];
   const plugin = defineNativePlugin({
     name: 'expressions',
-    apiVersion: 2,
     visitor: { Expression: path => seen.push(path.node.type) },
   });
   transform(
     'true; 1; "value"; null; /value/;',
     'fixture.js',
-    defineNativePipeline({ apiVersion: 2, phases: [{ name: 'visit', plugins: [plugin] }] }),
+    defineNativePipeline({ phases: [{ name: 'visit', plugins: [plugin] }] }),
   );
   assert.ok(seen.includes('BooleanLiteral'));
   assert.ok(seen.includes('NumericLiteral'));
@@ -1095,7 +1415,6 @@ test('treats declarations as Babel statements despite collapsed Oxc node kinds',
   const statements: string[] = [];
   const plugin = defineNativePlugin({
     name: 'declaration-alias',
-    apiVersion: 2,
     visitor: {
       Declaration(path) {
         declarations.push(path.node.type);
@@ -1108,7 +1427,7 @@ test('treats declarations as Babel statements despite collapsed Oxc node kinds',
   transform(
     "import value from 'pkg'; const item = value; function fn() {} class Example {} export { item };",
     'fixture.js',
-    defineNativePipeline({ apiVersion: 2, phases: [{ name: 'visit', plugins: [plugin] }] }),
+    defineNativePipeline({ phases: [{ name: 'visit', plugins: [plugin] }] }),
   );
   assert.deepEqual(declarations, [
     'ImportDeclaration',
@@ -1124,7 +1443,6 @@ test('provides parent paths backed by native indexed records', () => {
   let parentType: string | undefined;
   const plugin = defineNativePlugin({
     name: 'parent',
-    apiVersion: 2,
     prepare() {
       return { ancestry: 'parent' };
     },
@@ -1137,7 +1455,7 @@ test('provides parent paths backed by native indexed records', () => {
   transform(
     'const value = 1',
     'fixture.js',
-    defineNativePipeline({ apiVersion: 2, phases: [{ name: 'visit', plugins: [plugin] }] }),
+    defineNativePipeline({ phases: [{ name: 'visit', plugins: [plugin] }] }),
   );
   assert.equal(parentType, 'VariableDeclarator');
 });
@@ -1146,7 +1464,6 @@ test('provides lazy ancestor helpers without recursive node materialization', ()
   let ancestors: unknown;
   const plugin = defineNativePlugin({
     name: 'ancestors',
-    apiVersion: 2,
     prepare() {
       return { ancestry: 'findParent' };
     },
@@ -1163,7 +1480,7 @@ test('provides lazy ancestor helpers without recursive node materialization', ()
   transform(
     'function fixture() { return 1 }',
     'fixture.js',
-    defineNativePipeline({ apiVersion: 2, phases: [{ name: 'visit', plugins: [plugin] }] }),
+    defineNativePipeline({ phases: [{ name: 'visit', plugins: [plugin] }] }),
   );
   assert.deepEqual(ancestors, ['ReturnStatement', 'Function', 'Program']);
 });
@@ -1171,7 +1488,6 @@ test('provides lazy ancestor helpers without recursive node materialization', ()
 test('requires ancestry and scope payloads to be declared', () => {
   const ancestry = defineNativePlugin({
     name: 'undeclared-ancestry',
-    apiVersion: 2,
     visitor: {
       Identifier(path) {
         void path.parentPath;
@@ -1180,7 +1496,6 @@ test('requires ancestry and scope payloads to be declared', () => {
   });
   const scope = defineNativePlugin({
     name: 'undeclared-scope',
-    apiVersion: 2,
     visitor: {
       Identifier(path) {
         void path.scope;
@@ -1192,7 +1507,7 @@ test('requires ancestry and scope payloads to be declared', () => {
       transform(
         'value',
         'fixture.js',
-        defineNativePipeline({ apiVersion: 2, phases: [{ name: 'visit', plugins: [ancestry] }] }),
+        defineNativePipeline({ phases: [{ name: 'visit', plugins: [ancestry] }] }),
       ),
     /undeclared ancestry access/,
   );
@@ -1201,7 +1516,7 @@ test('requires ancestry and scope payloads to be declared', () => {
       transform(
         'value',
         'fixture.js',
-        defineNativePipeline({ apiVersion: 2, phases: [{ name: 'visit', plugins: [scope] }] }),
+        defineNativePipeline({ phases: [{ name: 'visit', plugins: [scope] }] }),
       ),
     /undeclared scope semantics/,
   );
@@ -1211,7 +1526,6 @@ test('honors plan phase filters and validates expression fragments natively', ()
   const visited: string[] = [];
   const plugin = defineNativePlugin({
     name: 'phased',
-    apiVersion: 2,
     prepare() {
       return { phases: ['second'] };
     },
@@ -1229,7 +1543,6 @@ test('honors plan phase filters and validates expression fragments natively', ()
     'value',
     'fixture.js',
     defineNativePipeline({
-      apiVersion: 2,
       phases: [
         { name: 'first', plugins: [plugin] },
         { name: 'second', plugins: [plugin] },
@@ -1242,7 +1555,6 @@ test('honors plan phase filters and validates expression fragments natively', ()
 test('builds escaped primitive literals and validates statement fragments', () => {
   const plugin = defineNativePlugin({
     name: 'code-factory',
-    apiVersion: 2,
     visitor: {
       Program(path) {
         assert.equal(path.context.code.literal('quoted\nvalue').code, '"quoted\\nvalue"');
@@ -1260,7 +1572,7 @@ test('builds escaped primitive literals and validates statement fragments', () =
   const result = transform(
     'const original = true;',
     'fixture.js',
-    defineNativePipeline({ apiVersion: 2, phases: [{ name: 'generate', plugins: [plugin] }] }),
+    defineNativePipeline({ phases: [{ name: 'generate', plugins: [plugin] }] }),
   );
   assert.equal(result.status, 'complete');
   assert.equal(result.code, 'const original = true;\nexport const generated = null;');
@@ -1269,14 +1581,12 @@ test('builds escaped primitive literals and validates statement fragments', () =
 test('composes source maps across phases', () => {
   const first = defineNativePlugin({
     name: 'first',
-    apiVersion: 2,
     visitor: {
       NumericLiteral: path => path.replaceWith({ code: '20', mapping: 'anchor-boundaries' }),
     },
   });
   const second = defineNativePlugin({
     name: 'second',
-    apiVersion: 2,
     visitor: {
       NumericLiteral: path => path.replaceWith({ code: '300', mapping: 'anchor-boundaries' }),
     },
@@ -1285,7 +1595,6 @@ test('composes source maps across phases', () => {
     'const value = 1',
     'fixture.js',
     defineNativePipeline({
-      apiVersion: 2,
       phases: [
         { name: 'first', plugins: [first] },
         { name: 'second', plugins: [second] },
@@ -1300,7 +1609,6 @@ test('composes source maps across phases', () => {
 test('supports all four insertion affinities deterministically', () => {
   const plugin = defineNativePlugin({
     name: 'affinity',
-    apiVersion: 2,
     pre(context) {
       context.editor.appendLeft(0, 'AL');
       context.editor.prependLeft(0, 'PL');
@@ -1311,7 +1619,7 @@ test('supports all four insertion affinities deterministically', () => {
   const result = transform(
     'x',
     'fixture.js',
-    defineNativePipeline({ apiVersion: 2, phases: [{ name: 'edit', plugins: [plugin] }] }),
+    defineNativePipeline({ phases: [{ name: 'edit', plugins: [plugin] }] }),
   );
   assert.equal(result.status, 'complete');
   assert.equal(result.code, 'PLALPRARx');
@@ -1320,7 +1628,6 @@ test('supports all four insertion affinities deterministically', () => {
 test('lowers static and functional replacements against pristine source', () => {
   const plugin = defineNativePlugin({
     name: 'replace',
-    apiVersion: 2,
     pre(context) {
       context.editor.replace('one', 'ONE');
       context.editor.replaceAll(/two/g, match => match.toUpperCase());
@@ -1329,7 +1636,7 @@ test('lowers static and functional replacements against pristine source', () => 
   const result = transform(
     'one; two; two;',
     'fixture.js',
-    defineNativePipeline({ apiVersion: 2, phases: [{ name: 'edit', plugins: [plugin] }] }),
+    defineNativePipeline({ phases: [{ name: 'edit', plugins: [plugin] }] }),
   );
   assert.equal(result.status, 'complete');
   assert.equal(result.code, 'ONE; TWO; TWO;');
@@ -1339,7 +1646,7 @@ test('allows an explicit parser mode independent of filename extension', () => {
   const result = transform(
     'const value: number = 1',
     'fixture.js',
-    defineNativePipeline({ apiVersion: 2, phases: [] }),
+    defineNativePipeline({ phases: [] }),
     { parser: 'ts' },
   );
   assert.equal(result.status, 'complete');
@@ -1349,7 +1656,6 @@ test('widens over only the remaining traversal and suppresses duplicates', () =>
   const seen: string[] = [];
   const plugin = defineNativePlugin({
     name: 'widen',
-    apiVersion: 2,
     prepare: () => ({
       controlFlow: ['dynamic-subscriptions'],
       fields: { CallExpression: ['calleeName'], Identifier: ['name'] },
@@ -1366,7 +1672,7 @@ test('widens over only the remaining traversal and suppresses duplicates', () =>
   transform(
     'before; mark(); after;',
     'fixture.js',
-    defineNativePipeline({ apiVersion: 2, phases: [{ name: 'visit', plugins: [plugin] }] }),
+    defineNativePipeline({ phases: [{ name: 'visit', plugins: [plugin] }] }),
   );
   assert.deepEqual(seen, ['before', 'mark', 'after']);
 });
@@ -1376,7 +1682,6 @@ test('implements per-plugin skip and stop', () => {
   const stopped: string[] = [];
   const skipPlugin = defineNativePlugin({
     name: 'skip',
-    apiVersion: 2,
     prepare: () => ({ controlFlow: ['skip'], fields: { Identifier: ['name'] } }),
     visitor: {
       Function(path) {
@@ -1389,7 +1694,6 @@ test('implements per-plugin skip and stop', () => {
   });
   const stopPlugin = defineNativePlugin({
     name: 'stop',
-    apiVersion: 2,
     prepare: () => ({ controlFlow: ['stop'] }),
     visitor: {
       Identifier(path) {
@@ -1402,7 +1706,6 @@ test('implements per-plugin skip and stop', () => {
     'outside; function fn(inside) { return inside } trailing;',
     'fixture.js',
     defineNativePipeline({
-      apiVersion: 2,
       phases: [{ name: 'visit', plugins: [skipPlugin, stopPlugin] }],
     }),
   );
@@ -1411,12 +1714,91 @@ test('implements per-plugin skip and stop', () => {
   assert.equal(stopped.length, 1);
 });
 
+test('requires an explicit global stop capability', () => {
+  let peerCalls = 0;
+  const localStopOnly = defineNativePlugin({
+    name: 'local-stop-only',
+    prepare: () => ({ controlFlow: ['stop'] }),
+    visitor: {
+      Identifier(path) {
+        path.context.stopAll();
+      },
+    },
+  });
+  assert.throws(
+    () =>
+      transform(
+        'value;',
+        'fixture.js',
+        defineNativePipeline({ phases: [{ name: 'transform', plugins: [localStopOnly] }] }),
+      ),
+    /local-stop-only: undeclared control-flow capability stop-all/,
+  );
+
+  const globalStop = defineNativePlugin({
+    name: 'global-stop',
+    prepare: () => ({ controlFlow: ['stop-all'] }),
+    visitor: {
+      Identifier(path) {
+        path.context.stopAll();
+      },
+    },
+  });
+  const peer = defineNativePlugin({
+    name: 'global-stop-peer',
+    visitor: {
+      Identifier() {
+        peerCalls++;
+      },
+    },
+  });
+  transform(
+    'value;',
+    'fixture.js',
+    defineNativePipeline({ phases: [{ name: 'transform', plugins: [globalStop, peer] }] }),
+  );
+  assert.equal(peerCalls, 0);
+});
+
+test('keeps static routes independent from another plugin dynamic skip state', () => {
+  let dynamicIdentifiers = 0;
+  let staticIdentifiers = 0;
+  const dynamic = defineNativePlugin({
+    name: 'dynamic-skip',
+    prepare: () => ({ controlFlow: ['skip'] }),
+    visitor: {
+      Function(path) {
+        path.skip();
+      },
+      Identifier() {
+        dynamicIdentifiers++;
+      },
+    },
+  });
+  const fixed = defineNativePlugin({
+    name: 'fixed-route',
+    prepare: () => ({ controlFlow: [] }),
+    visitor: {
+      Identifier() {
+        staticIdentifiers++;
+      },
+    },
+  });
+  const result = transform(
+    'const outside = 1; function example(argument) { return argument }',
+    'fixture.js',
+    defineNativePipeline({ phases: [{ name: 'transform', plugins: [dynamic, fixed] }] }),
+  );
+  assert.equal(result.status, 'complete');
+  assert.equal(dynamicIdentifiers, 1);
+  assert.equal(staticIdentifiers, 4);
+});
+
 test('provides call and capture query declarations', () => {
   let calls = 0;
   let captures: unknown[] = [];
   const plugin = defineNativePlugin({
     name: 'queries',
-    apiVersion: 2,
     visitor: {
       Function(path) {
         calls = path.context.query({
@@ -1431,7 +1813,7 @@ test('provides call and capture query declarations', () => {
   transform(
     "const outer = 1; load('x'); function fn() { return outer }",
     'fixture.js',
-    defineNativePipeline({ apiVersion: 2, phases: [{ name: 'visit', plugins: [plugin] }] }),
+    defineNativePipeline({ phases: [{ name: 'visit', plugins: [plugin] }] }),
   );
   assert.equal(calls, 1);
   assert.equal(captures.length, 1);
@@ -1462,7 +1844,6 @@ test('indexes repeated scope lookups without consuming follow-up batches', () =>
   let globals = 0;
   const plugin = defineNativePlugin({
     name: 'many-scope-lookups',
-    apiVersion: 2,
     prepare() {
       return { semantics: ['scope'], fields: { Identifier: ['name'] } };
     },
@@ -1474,7 +1855,11 @@ test('indexes repeated scope lookups without consuming follow-up batches', () =>
       },
     },
   });
-  const result = transform(source, 'fixture.js', defineNativePipeline([plugin]));
+  const result = transform(
+    source,
+    'fixture.js',
+    defineNativePipeline({ phases: [{ name: 'transform', plugins: [plugin] }] }),
+  );
   assert.equal(result.status, 'complete');
   assert.equal(bindings, 100);
   assert.equal(globals, 100);
@@ -1485,7 +1870,6 @@ test('filters hot event families only when every subscriber opts in', () => {
   const secondSeen = new Set();
   const first = defineNativePlugin({
     name: 'first-filter',
-    apiVersion: 2,
     prepare() {
       return {
         identifierNames: ['first'],
@@ -1504,7 +1888,6 @@ test('filters hot event families only when every subscriber opts in', () => {
   });
   const second = defineNativePlugin({
     name: 'second-filter',
-    apiVersion: 2,
     prepare() {
       return {
         identifierNames: ['second'],
@@ -1524,7 +1907,7 @@ test('filters hot event families only when every subscriber opts in', () => {
   transform(
     'first; second; third; process.env.FIRST; process.env.SECOND; process.env.THIRD;',
     'fixture.js',
-    defineNativePipeline([first, second]),
+    defineNativePipeline({ phases: [{ name: 'transform', plugins: [first, second] }] }),
   );
   assert.deepEqual([...firstSeen].sort(), ['first', 'process.env.FIRST']);
   assert.deepEqual([...secondSeen].sort(), ['process.env.SECOND', 'second']);
@@ -1532,7 +1915,6 @@ test('filters hot event families only when every subscriber opts in', () => {
   const unfiltered = new Set();
   const broad = defineNativePlugin({
     name: 'unfiltered',
-    apiVersion: 2,
     prepare: () => ({ fields: { Identifier: ['name'] } }),
     visitor: {
       ReferencedIdentifier(path) {
@@ -1540,7 +1922,11 @@ test('filters hot event families only when every subscriber opts in', () => {
       },
     },
   });
-  transform('first; second; third;', 'fixture.js', defineNativePipeline([first, broad]));
+  transform(
+    'first; second; third;',
+    'fixture.js',
+    defineNativePipeline({ phases: [{ name: 'transform', plugins: [first, broad] }] }),
+  );
   assert.ok(unfiltered.has('third'));
 });
 
@@ -1548,7 +1934,6 @@ test('can disable a plugin and its lifecycle for the current file', () => {
   let lifecycleCalls = 0;
   const plugin = defineNativePlugin({
     name: 'disabled',
-    apiVersion: 2,
     prepare() {
       return { enabled: false };
     },
@@ -1567,14 +1952,17 @@ test('can disable a plugin and its lifecycle for the current file', () => {
       lifecycleCalls++;
     },
   });
-  transform('const value = source;', 'fixture.js', defineNativePipeline([plugin]));
+  transform(
+    'const value = source;',
+    'fixture.js',
+    defineNativePipeline({ phases: [{ name: 'transform', plugins: [plugin] }] }),
+  );
   assert.equal(lifecycleCalls, 0);
 });
 
 test('resolves the nearest binding and renames only its semantic references', () => {
   const plugin = defineNativePlugin({
     name: 'rename-binding',
-    apiVersion: 2,
     prepare() {
       return { semantics: ['scope'], fields: { Function: ['name'] } };
     },
@@ -1595,7 +1983,7 @@ test('resolves the nearest binding and renames only its semantic references', ()
   const result = transform(
     source,
     'fixture.js',
-    defineNativePipeline({ apiVersion: 2, phases: [{ name: 'rename', plugins: [plugin] }] }),
+    defineNativePipeline({ phases: [{ name: 'rename', plugins: [plugin] }] }),
   );
   assert.equal(result.status, 'complete');
   assert.equal(
@@ -1608,7 +1996,6 @@ test('exposes lazy Babel-shaped binding paths and scope parent chains', () => {
   let observed: unknown;
   const plugin = defineNativePlugin({
     name: 'binding-path',
-    apiVersion: 2,
     prepare() {
       return { semantics: ['scope'], fields: { Function: ['name', 'bodyStart'] } };
     },
@@ -1629,7 +2016,7 @@ test('exposes lazy Babel-shaped binding paths and scope parent chains', () => {
   transform(
     'function nested(parameter) { return parameter }',
     'fixture.js',
-    defineNativePipeline({ apiVersion: 2, phases: [{ name: 'scope', plugins: [plugin] }] }),
+    defineNativePipeline({ phases: [{ name: 'scope', plugins: [plugin] }] }),
   );
   assert.deepEqual(observed, ['FormalParameter', 1, true, 0, 0]);
 });
@@ -1637,7 +2024,6 @@ test('exposes lazy Babel-shaped binding paths and scope parent chains', () => {
 test('pushes generated declarations into a scope after its directive prologue', () => {
   const plugin = defineNativePlugin({
     name: 'scope-push',
-    apiVersion: 2,
     prepare() {
       return { semantics: ['scope'], fields: { Function: ['name', 'bodyStart'] } };
     },
@@ -1651,7 +2037,7 @@ test('pushes generated declarations into a scope after its directive prologue', 
   const result = transform(
     'function action() { "use action"; return injected }',
     'fixture.js',
-    defineNativePipeline({ apiVersion: 2, phases: [{ name: 'push', plugins: [plugin] }] }),
+    defineNativePipeline({ phases: [{ name: 'push', plugins: [plugin] }] }),
   );
   assert.equal(result.status, 'complete');
   assert.equal(
@@ -1663,7 +2049,6 @@ test('pushes generated declarations into a scope after its directive prologue', 
 test('provides Babel-shaped multi-replacement, container, comment, and code-frame helpers', () => {
   const plugin = defineNativePlugin({
     name: 'path-conveniences',
-    apiVersion: 2,
     visitor: {
       Program(path) {
         path.unshiftContainer('body', '/* first */\n');
@@ -1678,7 +2063,7 @@ test('provides Babel-shaped multi-replacement, container, comment, and code-fram
   const result = transform(
     'const value = 1;',
     'fixture.js',
-    defineNativePipeline({ apiVersion: 2, phases: [{ name: 'edit', plugins: [plugin] }] }),
+    defineNativePipeline({ phases: [{ name: 'edit', plugins: [plugin] }] }),
   );
   assert.equal(result.status, 'complete');
   assert.equal(result.code, '/* first */\nconst value = 2\n3;\n/* last */');
@@ -1690,7 +2075,6 @@ test('provides lazy compact structural child roles without recursive ESTree tran
     (Array.isArray(value) ? value : value ? [value] : []).map(path => path.getSource());
   const plugin = defineNativePlugin({
     name: 'child-roles',
-    apiVersion: 2,
     prepare() {
       return {
         children: {
@@ -1738,7 +2122,7 @@ test('provides lazy compact structural child roles without recursive ESTree tran
   transform(
     "import item, { x as y } from 'pkg'; function f(a, { b }) {} const result = fn({ platform: 1 }, y); export default result;",
     'fixture.js',
-    defineNativePipeline({ apiVersion: 2, phases: [{ name: 'inspect', plugins: [plugin] }] }),
+    defineNativePipeline({ phases: [{ name: 'inspect', plugins: [plugin] }] }),
     { maxFollowUpBatches: 2 },
   );
   assert.deepEqual(observed.callee, ['fn']);
@@ -1757,7 +2141,6 @@ test('provides lazy compact structural child roles without recursive ESTree tran
 test('requires structural child roles to be declared before parsing', () => {
   const plugin = defineNativePlugin({
     name: 'undeclared-child',
-    apiVersion: 2,
     visitor: {
       CallExpression(path) {
         path.get('arguments');
@@ -1769,7 +2152,7 @@ test('requires structural child roles to be declared before parsing', () => {
       transform(
         'run(1)',
         'fixture.js',
-        defineNativePipeline({ apiVersion: 2, phases: [{ name: 'visit', plugins: [plugin] }] }),
+        defineNativePipeline({ phases: [{ name: 'visit', plugins: [plugin] }] }),
       ),
     /undeclared child role CallExpression\.arguments/,
   );
@@ -1781,7 +2164,6 @@ test('distinguishes control-flow and class child roles needed by structural fixe
     value && !Array.isArray(value) ? (value as { getSource(): string }) : null;
   const plugin = defineNativePlugin({
     name: 'structural-roles',
-    apiVersion: 2,
     prepare() {
       return {
         fields: { Class: ['name'] },
@@ -1806,7 +2188,7 @@ test('distinguishes control-flow and class child roles needed by structural fixe
   transform(
     'try { work() } catch (error) { recover(error) } finally { cleanup() } class Child extends Parent { method() {} }',
     'fixture.js',
-    defineNativePipeline({ apiVersion: 2, phases: [{ name: 'inspect', plugins: [plugin] }] }),
+    defineNativePipeline({ phases: [{ name: 'inspect', plugins: [plugin] }] }),
   );
   assert.deepEqual(observed, {
     block: '{ work() }',
@@ -1820,7 +2202,6 @@ test('distinguishes control-flow and class child roles needed by structural fixe
 test('implements a Platform.select-style transform through declared compact roles', () => {
   const plugin = defineNativePlugin({
     name: 'platform-select',
-    apiVersion: 2,
     prepare() {
       return {
         children: {
@@ -1855,7 +2236,7 @@ test('implements a Platform.select-style transform through declared compact role
   const result = transform(
     "const selected = Platform.select({ web: 'web', native: makeNative(), ios: 'ios' });",
     'fixture.js',
-    defineNativePipeline({ apiVersion: 2, phases: [{ name: 'platform', plugins: [plugin] }] }),
+    defineNativePipeline({ phases: [{ name: 'platform', plugins: [plugin] }] }),
     { maxFollowUpBatches: 2 },
   );
   assert.equal(result.status, 'complete');
@@ -1865,7 +2246,6 @@ test('implements a Platform.select-style transform through declared compact role
 test('validates metadata ownership', () => {
   const plugin = defineNativePlugin({
     name: 'metadata',
-    apiVersion: 2,
     pre(context) {
       context.metadata.set('undeclared', true);
     },
@@ -1875,7 +2255,7 @@ test('validates metadata ownership', () => {
       transform(
         'value',
         'fixture.js',
-        defineNativePipeline({ apiVersion: 2, phases: [{ name: 'visit', plugins: [plugin] }] }),
+        defineNativePipeline({ phases: [{ name: 'visit', plugins: [plugin] }] }),
       ),
     /undeclared metadata key/,
   );
@@ -1897,7 +2277,7 @@ test('supports caller-provided parser adapters for unsupported syntax', () => {
     const result = transform(
       '// @flow\nconst value: number = 1',
       'fixture.js',
-      defineNativePipeline({ apiVersion: 2, phases: [] }),
+      defineNativePipeline({ phases: [] }),
     );
     assert.equal(result.status, 'complete');
     assert.equal(result.metadata.adapter, true);
@@ -1909,7 +2289,6 @@ test('supports caller-provided parser adapters for unsupported syntax', () => {
 test('produces traceable Unicode-aware VLQ mappings', () => {
   const plugin = defineNativePlugin({
     name: 'map',
-    apiVersion: 2,
     visitor: {
       NumericLiteral: path =>
         path.replaceWith({ code: '200', mapping: 'anchor-start', names: ['generatedValue'] }),
@@ -1918,7 +2297,7 @@ test('produces traceable Unicode-aware VLQ mappings', () => {
   const result = transform(
     "const emoji = '😀';\nconst value = 1;",
     'fixture.js',
-    defineNativePipeline({ apiVersion: 2, phases: [{ name: 'edit', plugins: [plugin] }] }),
+    defineNativePipeline({ phases: [{ name: 'edit', plugins: [plugin] }] }),
   );
   assert.equal(result.status, 'complete');
   const map = new TraceMap({
@@ -1938,7 +2317,6 @@ test('produces traceable Unicode-aware VLQ mappings', () => {
 test('traces CRLF, directive, wrapper, and explicit-location mappings', () => {
   const plugin = defineNativePlugin({
     name: 'map-boundaries',
-    apiVersion: 2,
     pre(context) {
       context.editor.prepend('/* wrapper */\n');
       context.editor.append('\n/* end */');
@@ -1949,7 +2327,7 @@ test('traces CRLF, directive, wrapper, and explicit-location mappings', () => {
   const result = transform(
     source,
     'fixture.js',
-    defineNativePipeline({ apiVersion: 2, phases: [{ name: 'edit', plugins: [plugin] }] }),
+    defineNativePipeline({ phases: [{ name: 'edit', plugins: [plugin] }] }),
     { sourceMapMode: 'character' },
   );
   assert.equal(result.status, 'complete');
@@ -2014,4 +2392,20 @@ test('handles deterministic randomized non-overlapping edit batches', () => {
     assert.equal(session.commit(edits).code.length, source.length);
     session.close();
   }
+});
+
+test('rejects untranslatable mixed edit coordinate spaces', () => {
+  assert.throws(
+    () =>
+      packEdits([
+        {
+          kind: 'Replace',
+          start: 0,
+          end: 1,
+          content: 'x',
+          coordinateSpace: 'generated',
+        },
+      ]),
+    /requires explicit translation/,
+  );
 });

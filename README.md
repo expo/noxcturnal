@@ -48,12 +48,16 @@ const replaceConstants = defineNativePlugin({
   },
 });
 
-const result = transform(source, filename, defineNativePipeline([replaceConstants]));
+const result = transform(
+  source,
+  filename,
+  defineNativePipeline({ phases: [{ name: 'transform', plugins: [replaceConstants] }] }),
+);
 ```
 
 Within a phase every plugin observes the same immutable source. Mutations become visible after the native commit and optional reparse boundary. A bailout discards attempted edits and returns the pristine input source.
 
-`defineNativePlugin` returns an immutable reusable API-v2 definition. Bind per-pipeline options with `plugin.withOptions(options)`. `defineNativePipeline([plugin])` is the single-pass shorthand; pass `{ phases: [...] }` when edits must become visible between passes. Pipelines snapshot and freeze their phase and plugin arrays so cache identity cannot drift after construction. API v2 has no generic visitor-dispatch fallback: every transform phase is compiled to numeric native routes.
+`defineNativePlugin` returns an immutable reusable definition. Bind per-pipeline options with `plugin.withOptions(options)`. Pipelines always declare explicit phases and snapshot and freeze their phase and plugin arrays so cache identity cannot drift after construction. Every transform phase is compiled to numeric native routes.
 
 `prepare` may return `{ enabled: false }` to remove a plugin and its lifecycle from the current file, which is useful with `sourceHints` for directive-driven transforms. Consumers declare every scalar property read by a callback in `fields`; undeclared payload fields are not transferred. They also declare `skip`, `stop`, nested traversal, and dynamic subscriptions in `controlFlow`; undeclared operations fail. Hot define-style visitors may declare `identifierNames`, exact `staticMemberPatterns`, or typed `where` predicates, all evaluated before native route delivery.
 
@@ -62,7 +66,7 @@ The TypeScript API derives its node and scalar-field names from the generated Ox
 ## Implemented surface
 
 - Declarative plugin plans, static subscriptions, safe all-subscriber event filters, per-file enablement, aliases, lifecycle hooks, state, metadata ownership, diagnostics, and cleanup.
-- Compiled binary route manifests and routed tapes with native scalar predicates, numeric JavaScript dispatch, explicit payload fields, and no API-v1 transform fallback or runtime timing instrumentation.
+- Compiled binary route manifests and routed tapes with native scalar predicates, numeric JavaScript dispatch, explicit payload fields, and no runtime timing instrumentation.
 - Optional analyze/apply lifecycle: every plugin decision is collected before any apply hook runs, so unsupported files bail out from pristine input without speculative mutation.
 - Arbitrary compact Oxc node events with stable per-parse node IDs, parent summaries, scope IDs, typed scalar fields, semantic global-reference facts, and UTF-16 ranges. The integer node/field protocol is generated and checked against the pinned Oxc `AstKind` definition.
 - Lazy compact ancestor paths with `findParent`, function/program-parent helpers, declared field filtering, and explicit batched `inspect` for additional shallow facts.
@@ -82,4 +86,4 @@ The safe session strategy materializes an owned native event/semantic index for 
 
 The current Expo/Metro source-transform capability audit is recorded in [FITMENT.md](./FITMENT.md). External Babel syntax transforms remain explicit fallback work rather than arbitrary-plugin compatibility.
 
-`context.editor.supports(name)` is the capability boundary for compatibility-oriented editor operations. Plugins should test it before depending on operations outside the documented surface. The hot transform result always returns encoded `mappings` and `names`; decoded maps are intentionally absent.
+The editor surface is a direct contract: every documented operation is supported. The hot transform result always returns encoded `mappings` and `names`; decoded maps are intentionally absent.

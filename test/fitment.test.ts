@@ -12,7 +12,6 @@ type ImportState = { modules: Map<string, string> };
 
 const metroImports = defineNativePlugin<ImportState>({
   name: 'metro-import-fitment',
-  apiVersion: 2,
   prepare() {
     return {
       semantics: ['scope'],
@@ -85,7 +84,6 @@ type ExportState = { statements: string[] };
 
 const metroExports = defineNativePlugin<ExportState>({
   name: 'metro-export-fitment',
-  apiVersion: 2,
   prepare() {
     return {
       controlFlow: ['nested-traverse'],
@@ -155,9 +153,8 @@ test('expresses Metro-style import/export lowering with semantic references and 
     source,
     'fixture.jsx',
     defineNativePipeline({
-      apiVersion: 2,
       phases: [
-        { name: 'imports', plugins: [metroImports], reparseAfterEdits: true },
+        { name: 'imports', plugins: [metroImports], requiresPrintedInput: true },
         { name: 'exports', plugins: [metroExports] },
       ],
     }),
@@ -183,7 +180,6 @@ type ActionState = { names: string[] };
 
 const serverActions = defineNativePlugin<ActionState>({
   name: 'server-actions-fitment',
-  apiVersion: 2,
   prepare() {
     return {
       subscriptions: ['Directive'],
@@ -238,7 +234,6 @@ test('expresses server-action extraction with captures, directives, scopes, and 
     source,
     'fixture.js',
     defineNativePipeline({
-      apiVersion: 2,
       phases: [{ name: 'actions', plugins: [serverActions] }],
     }),
   );

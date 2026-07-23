@@ -28,9 +28,8 @@ struct PackedEventParts {
     emitted_count: u32,
 }
 
-const ROUTE_MANIFEST_MAGIC: u32 = 0x4e_52_4d_31; // NRM1
-const ROUTED_TAPE_MAGIC: u32 = 0x4e_52_54_31; // NRT1
-const ROUTED_PROTOCOL_VERSION: u32 = 2;
+const ROUTE_MANIFEST_MAGIC: u32 = 0x4e_52_4d_46; // NRMF
+const ROUTED_TAPE_MAGIC: u32 = 0x4e_52_54_46; // NRTF
 const MAX_COMPILED_ROUTES: usize = 4096;
 const MAX_ROUTE_PREDICATES: usize = 64;
 const MAX_PREDICATE_VALUES: usize = 1024;
@@ -101,6 +100,7 @@ pub struct NativeIndexedSession {
     materialized_subscriptions: Vec<String>,
     materialized_exit_subscriptions: Vec<String>,
     scope_parents: Vec<u32>,
+    parse_count: u32,
     closed: bool,
 }
 
@@ -115,6 +115,7 @@ impl NativeIndexedSession {
     ) -> Result<Self> {
         let subscriptions = subscriptions.unwrap_or_default();
         let exit_subscriptions = exit_subscriptions.unwrap_or_default();
+        let parse_count = u32::from(!subscriptions.is_empty());
         let (batch, scope_parents, node_summaries) = if subscriptions.is_empty() {
             (
                 EventBatch {
@@ -147,6 +148,7 @@ impl NativeIndexedSession {
             materialized_subscriptions: subscriptions,
             materialized_exit_subscriptions: exit_subscriptions,
             scope_parents,
+            parse_count,
             closed: false,
         })
     }
@@ -474,6 +476,11 @@ impl NativeIndexedSession {
         .min(u32::MAX as usize) as u32
     }
 
+    #[napi]
+    pub fn parse_count(&self) -> u32 {
+        self.parse_count
+    }
+
     fn ensure_open(&self) -> Result<()> {
         if self.closed {
             Err(Error::new(Status::GenericFailure, "session-closed"))
@@ -525,6 +532,7 @@ impl NativeIndexedSession {
             None,
             None,
         )?;
+        self.parse_count += 1;
         self.node_count = batch.node_count;
         self.scope_parents = scope_parents;
         if self.node_summaries.is_empty() {
@@ -2234,12 +2242,11 @@ fn encode_routed_envelope(
         .iter()
         .map(|value| 4 + value.len() + (4 - value.len() % 4) % 4)
         .sum();
-    let records_offset = 32 + strings_size;
+    let records_offset = 28 + strings_size;
     let shape_flags = u32::from(manifest.include_parent) | (u32::from(manifest.include_scope) << 1);
     let mut output = Vec::with_capacity(records_offset + data.len());
     for word in [
         ROUTED_TAPE_MAGIC,
-        ROUTED_PROTOCOL_VERSION,
         shape_flags,
         node_count,
         counts.node_records,
@@ -2259,7 +2266,7 @@ fn encode_routed_envelope(
 }
 
 fn decode_route_manifest(data: &[u8]) -> Result<CompiledManifest> {
-    if data.len() < 32 || data.len() > MAX_ROUTE_MANIFEST_BYTES || !data.len().is_multiple_of(4) {
+    if data.len() < 28 || data.len() > MAX_ROUTE_MANIFEST_BYTES || !data.len().is_multiple_of(4) {
         return Err(Error::new(
             Status::InvalidArg,
             "invalid routed manifest buffer",
@@ -2278,36 +2285,30 @@ fn decode_route_manifest(data: &[u8]) -> Result<CompiledManifest> {
             "invalid routed manifest magic",
         ));
     }
-    if word(1) != ROUTED_PROTOCOL_VERSION {
-        return Err(Error::new(
-            Status::InvalidArg,
-            "incompatible routed protocol version",
-        ));
-    }
-    let flags = word(2);
+    let flags = word(1);
     if flags & !3 != 0 {
         return Err(Error::new(
             Status::InvalidArg,
             "unknown routed manifest flags",
         ));
     }
-    let route_count = word(3) as usize;
+    let route_count = word(2) as usize;
     if route_count > MAX_COMPILED_ROUTES {
         return Err(Error::new(
             Status::InvalidArg,
             "compiled route limit exceeded",
         ));
     }
-    let string_count = word(4) as usize;
-    let strings_offset = word(5) as usize;
-    let plugin_count = word(6) as usize;
+    let string_count = word(3) as usize;
+    let strings_offset = word(4) as usize;
+    let plugin_count = word(5) as usize;
     if plugin_count > MAX_COMPILED_ROUTES {
         return Err(Error::new(
             Status::InvalidArg,
             "compiled plugin limit exceeded",
         ));
     }
-    if strings_offset < 32 || strings_offset > data.len() || !strings_offset.is_multiple_of(4) {
+    if strings_offset < 28 || strings_offset > data.len() || !strings_offset.is_multiple_of(4) {
         return Err(Error::new(
             Status::InvalidArg,
             "invalid routed manifest string offset",
@@ -2339,7 +2340,7 @@ fn decode_route_manifest(data: &[u8]) -> Result<CompiledManifest> {
         byte_cursor = (byte_cursor + length).next_multiple_of(4);
     }
     let word_limit = strings_offset / 4;
-    let mut cursor = 8;
+    let mut cursor = 7;
     let mut seen_ids = FxHashSet::default();
     let mut routes_by_type = vec![Vec::new(); NODE_TYPE_COUNT + 1];
     for _ in 0..route_count {
