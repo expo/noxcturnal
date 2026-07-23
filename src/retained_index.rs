@@ -231,6 +231,14 @@ impl RetainedIndex {
         if name.is_some() && requested_name_id.is_none() {
             return Vec::new();
         }
+        if let (Some(scope_id), Some(name_id)) = (scope_id, requested_name_id) {
+            return self
+                .bindings
+                .get(&(scope_id, name_id))
+                .map(|binding| self.binding_fact(scope_id, name_id, binding, reads, writes))
+                .into_iter()
+                .collect();
+        }
         self.bindings
             .iter()
             .filter(|((candidate_scope_id, candidate_name_id), _)| {
@@ -238,34 +246,79 @@ impl RetainedIndex {
                     && requested_name_id.is_none_or(|name_id| name_id == *candidate_name_id)
             })
             .map(|(&(scope_id, name_id), binding)| {
-                let declaration = binding.declaration_id.map(|node_id| {
-                    (
-                        node_id,
-                        self.starts[node_id as usize],
-                        self.ends[node_id as usize],
-                    )
-                });
-                NativeBindingFact {
-                    name: self.names[name_id as usize].clone(),
-                    scope_id,
-                    declaration_id: declaration.map(|value| value.0),
-                    declaration_start: declaration.map(|value| value.1),
-                    declaration_end: declaration.map(|value| value.2),
-                    declaration_parent_id: declaration.and_then(|value| {
-                        let parent_id = self.parent_ids[value.0 as usize];
-                        (parent_id != ABSENT_ID).then_some(parent_id)
-                    }),
-                    references: binding
-                        .references
-                        .iter()
-                        .filter(|reference| {
-                            (!reads || reference.read) && (!writes || reference.write)
-                        })
-                        .map(|reference| self.native_reference(reference))
-                        .collect(),
-                }
+                self.binding_fact(scope_id, name_id, binding, reads, writes)
             })
             .collect()
+    }
+
+    /// Resolve the nearest binding for `name` visible from `scope_id`, walking the
+    /// scope-parent chain natively so callers issue one N-API request per lookup.
+    pub fn resolve_binding(
+        &self,
+        name: &str,
+        scope_id: u32,
+        scope_parents: &[u32],
+    ) -> Option<NativeBindingFact> {
+        let (scope, name_id) = self.resolve_binding_scope(name, scope_id, scope_parents)?;
+        let binding = &self.bindings[&(scope, name_id)];
+        Some(self.binding_fact(scope, name_id, binding, false, false))
+    }
+
+    /// Locate the nearest scope binding `name` without materializing references.
+    pub fn resolve_binding_scope(
+        &self,
+        name: &str,
+        scope_id: u32,
+        scope_parents: &[u32],
+    ) -> Option<(u32, u32)> {
+        let &name_id = self.name_ids.get(name)?;
+        let mut scope = scope_id;
+        loop {
+            if self.bindings.contains_key(&(scope, name_id)) {
+                return Some((scope, name_id));
+            }
+            scope = scope_parents
+                .get(scope as usize)
+                .copied()
+                .unwrap_or(ABSENT_ID);
+            if scope == ABSENT_ID {
+                return None;
+            }
+        }
+    }
+
+    fn binding_fact(
+        &self,
+        scope_id: u32,
+        name_id: u32,
+        binding: &BindingRecord,
+        reads: bool,
+        writes: bool,
+    ) -> NativeBindingFact {
+        let declaration = binding.declaration_id.map(|node_id| {
+            (
+                node_id,
+                self.starts[node_id as usize],
+                self.ends[node_id as usize],
+            )
+        });
+        NativeBindingFact {
+            name: self.names[name_id as usize].clone(),
+            scope_id,
+            declaration_id: declaration.map(|value| value.0),
+            declaration_start: declaration.map(|value| value.1),
+            declaration_end: declaration.map(|value| value.2),
+            declaration_parent_id: declaration.and_then(|value| {
+                let parent_id = self.parent_ids[value.0 as usize];
+                (parent_id != ABSENT_ID).then_some(parent_id)
+            }),
+            references: binding
+                .references
+                .iter()
+                .filter(|reference| (!reads || reference.read) && (!writes || reference.write))
+                .map(|reference| self.native_reference(reference))
+                .collect(),
+        }
     }
 
     pub fn global_references(&self, name: &str) -> Vec<NativeSemanticReference> {
@@ -632,8 +685,32 @@ impl RetainedIndex {
     pub fn summary_buffers(&self, node_ids: &[u32], scope_parents: &[u32]) -> Buffer {
         let mut output = Vec::with_capacity(node_ids.len() * 7 * 4);
         for &node_id in node_ids {
-            let summary = self.summary_buffer(node_id, scope_parents);
-            output.extend_from_slice(&summary);
+            let index = node_id as usize;
+            let Some(&type_id) = self.type_ids.get(index) else {
+                continue;
+            };
+            let parent_id = self.parent_ids[index];
+            let parent_type_id = if parent_id == ABSENT_ID {
+                ABSENT_ID
+            } else {
+                self.type_ids[parent_id as usize]
+            };
+            let scope_id = self.scope_ids[index];
+            let scope_parent_id = scope_parents
+                .get(scope_id as usize)
+                .copied()
+                .unwrap_or(ABSENT_ID);
+            for word in [
+                type_id,
+                self.starts[index],
+                self.ends[index],
+                parent_id,
+                parent_type_id,
+                scope_id,
+                scope_parent_id,
+            ] {
+                output.extend_from_slice(&word.to_le_bytes());
+            }
         }
         output.into()
     }

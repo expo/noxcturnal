@@ -30,7 +30,12 @@ const schemaFile = path.join(root, 'protocol/event-schema.json');
 const previous = JSON.parse(fs.readFileSync(schemaFile, 'utf8'));
 const next = `${JSON.stringify({ nodeTypes, astKinds: Object.fromEntries(variants.map(variant => [variant, publicName(variant)])), predicateFields: previous.predicateFields, fieldKeys: previous.fieldKeys }, null, 2)}\n`;
 if (process.argv[2] === '--check') {
-  if (fs.readFileSync(schemaFile, 'utf8') !== next)
+  // Compare parsed content rather than bytes: the checked-in file is rewritten by the
+  // repository formatter, which changes whitespace without changing the schema.
+  if (
+    JSON.stringify(JSON.parse(fs.readFileSync(schemaFile, 'utf8'))) !==
+    JSON.stringify(JSON.parse(next))
+  )
     throw new Error('protocol/event-schema.json is stale against oxc_ast; run pnpm codegen');
 } else {
   fs.writeFileSync(schemaFile, next);

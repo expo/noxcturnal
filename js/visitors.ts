@@ -12,10 +12,10 @@ import {
   decodePackedEnvelope,
   decodeRoutedEnvelope,
   dispatchRoutedEvents,
+  coerceFieldValue,
   packEdits,
   packFieldRequests,
   packRouteManifest,
-  parseScalar,
   routedParentIds,
   type NativeRouteManifestEntry,
   type PackedEventBatch,
@@ -489,6 +489,7 @@ export class NativeTransformSession {
   #native: NativeIndexedSessionBinding | null = null;
   #nativeFilename: string;
   #lineStarts: number[] | null = null;
+  #scopeParents: Uint32Array | null = null;
   #nativeParseCount = 0;
   constructor(
     readonly source: string,
@@ -819,42 +820,39 @@ export class NativeTransformSession {
     if (event) this.#eventCache[nodeId] = event;
     return event;
   }
-  bindingForScopes(
-    name: string,
-    scopeIds: readonly number[],
-  ): QueryResult['bindings'][number] | undefined {
-    for (const scopeId of scopeIds) {
-      const fact = this.#binding().queryBindings(name, scopeId)[0];
-      if (fact)
-        return {
-          name: fact.name,
-          scopeId: fact.scopeId,
-          declaration:
-            fact.declarationId == null
-              ? null
-              : {
-                  id: fact.declarationId,
-                  type: 'Identifier',
-                  start: fact.declarationStart!,
-                  end: fact.declarationEnd!,
-                  parentId: fact.declarationParentId,
-                },
-          references: fact.references.map(reference => ({
-            id: reference.id,
-            type: 'Identifier',
-            start: reference.start,
-            end: reference.end,
-            scopeId: reference.scopeId,
-            parentId: reference.parentId,
-            parentType: reference.parentType,
-            name: fact.name,
-            bindingScopeId: fact.scopeId,
-            read: reference.read,
-            write: reference.write,
-          })),
-        };
-    }
-    return undefined;
+  hasBindingInScope(name: string, scopeId: number): boolean {
+    return this.#binding().hasBindingInScope(name, scopeId);
+  }
+  resolveBinding(name: string, scopeId: number): QueryResult['bindings'][number] | undefined {
+    const fact = this.#binding().resolveBinding(name, scopeId);
+    if (!fact) return undefined;
+    return {
+      name: fact.name,
+      scopeId: fact.scopeId,
+      declaration:
+        fact.declarationId == null
+          ? null
+          : {
+              id: fact.declarationId,
+              type: 'Identifier',
+              start: fact.declarationStart!,
+              end: fact.declarationEnd!,
+              parentId: fact.declarationParentId,
+            },
+      references: fact.references.map(reference => ({
+        id: reference.id,
+        type: 'Identifier',
+        start: reference.start,
+        end: reference.end,
+        scopeId: reference.scopeId,
+        parentId: reference.parentId,
+        parentType: reference.parentType,
+        name: fact.name,
+        bindingScopeId: fact.scopeId,
+        read: reference.read,
+        write: reference.write,
+      })),
+    };
   }
   globalReferences(name: string): NodeSummary[] {
     return (
@@ -870,7 +868,12 @@ export class NativeTransformSession {
   }
   scopeParentId(scopeId: number): number | null {
     this.#assertOpen();
-    return this.#binding().scopeParentId(scopeId);
+    if (this.#scopeParents == null) {
+      const data = this.#binding().scopeParentsBuffer();
+      this.#scopeParents = new Uint32Array(data.buffer, data.byteOffset, data.byteLength / 4);
+    }
+    const parent = this.#scopeParents[scopeId];
+    return parent === undefined || parent === 0xffffffff ? null : parent;
   }
   generateUid(name = 'temp'): string {
     const base = `_${name.replace(/[^A-Za-z0-9_$]/g, '') || 'temp'}`;
@@ -2766,8 +2769,8 @@ function toNodeView(event: NativeEvent): NodeView {
   const node = event as NativeEvent & Record<string, unknown>;
   for (const field of event.fields) {
     node[field.key] =
-      typeof field.value === 'string' && (field.key !== 'value' || event.type !== 'StringLiteral')
-        ? parseScalar(field.value)
+      typeof field.value === 'string'
+        ? coerceFieldValue(field.key, event.type, field.value)
         : field.value;
   }
   return node as NodeView;
@@ -2893,17 +2896,8 @@ function makeScope(runtime: PathRuntime, id: number, parentId: number | null): N
   if (cached) return cached;
   if (runtime.performance) runtime.performance.scopeFacades++;
   const session = runtime.session;
-  const scopeChain = () => {
-    const ids = [];
-    let scope: number | null = id;
-    while (scope != null) {
-      ids.push(scope);
-      scope = session.scopeParentId(scope);
-    }
-    return ids;
-  };
   const resolve = (name: string): QueryResult['bindings'][number] | undefined => {
-    return session.bindingForScopes(name, scopeChain());
+    return session.resolveBinding(name, id);
   };
   let parentScope: NativeScope | undefined;
   let ownerPath: NativeNodePath | null | undefined;
@@ -2918,7 +2912,7 @@ function makeScope(runtime: PathRuntime, id: number, parentId: number | null): N
     get path() {
       return ownerPath === undefined ? (ownerPath = scopeOwnerPath(runtime, id)) : ownerPath;
     },
-    hasBinding: name => resolve(name) != null,
+    hasBinding: name => session.hasBindingInScope(name, id),
     hasGlobal: name => session.globalReferences(name).length > 0,
     getBinding(name) {
       const binding = resolve(name);

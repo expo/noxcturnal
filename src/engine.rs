@@ -8,6 +8,7 @@ use oxc_ast_visit::{Visit, walk};
 use oxc_parser::Parser;
 use oxc_semantic::{AstNodes, Scoping, SemanticBuilder};
 use oxc_span::{GetSpan, SourceType};
+use oxc_syntax::node::NodeId;
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::constant_eval::constant_for_kind;
@@ -23,7 +24,6 @@ use crate::retained_index::{
 use crate::{editor, sourcemap};
 
 struct MaterializedSessionParts {
-    node_count: u32,
     scope_parents: Vec<u32>,
     retained_index: RetainedIndex,
     function_map: Option<FunctionMap>,
@@ -82,6 +82,24 @@ struct CompiledManifest {
     retention_capabilities: u32,
     structural_parent_types: FxHashSet<u32>,
     retained_fields_by_type: Vec<Vec<u32>>,
+    /// Union of route payload/predicate and retained-plan field names per node type,
+    /// precomputed so the retained collector performs no per-node field-name work.
+    merged_field_names_by_type: Vec<Vec<String>>,
+    needs_semantics: bool,
+}
+
+/// Field keys whose values come from Oxc's semantic analysis rather than the AST.
+const SEMANTIC_FIELD_KEYS: [&str; 6] = [
+    "global",
+    "read",
+    "write",
+    "bindingScopeId",
+    "calleeGlobal",
+    "rootGlobal",
+];
+
+fn is_semantic_field(field_id: u32) -> bool {
+    field_key_name(field_id).is_some_and(|name| SEMANTIC_FIELD_KEYS.contains(&name))
 }
 
 #[derive(Default)]
@@ -95,7 +113,6 @@ pub struct NativeIndexedSession {
     source: String,
     filename: String,
     retained_index: RetainedIndex,
-    node_count: u32,
     scope_parents: Vec<u32>,
     parse_count: u32,
     function_map: Option<FunctionMap>,
@@ -122,7 +139,6 @@ impl NativeIndexedSession {
         let parse_count = u32::from(collect_function_map || has_retention || has_initial_route);
         let parts = if !collect_function_map && !has_retention && !has_initial_route {
             MaterializedSessionParts {
-                node_count: 0,
                 scope_parents: Vec::new(),
                 retained_index: RetainedIndex::default(),
                 function_map: None,
@@ -139,7 +155,6 @@ impl NativeIndexedSession {
             )?
         };
         let MaterializedSessionParts {
-            node_count,
             scope_parents,
             retained_index,
             function_map,
@@ -149,7 +164,6 @@ impl NativeIndexedSession {
             source,
             filename,
             retained_index,
-            node_count,
             scope_parents,
             parse_count,
             function_map,
@@ -174,7 +188,6 @@ impl NativeIndexedSession {
                 .initial_route_manifest
                 .as_deref()
                 .is_some_and(|initial| initial == manifest.as_ref());
-        let manifest = decode_route_manifest(&manifest)?;
         if root_start.is_none() && root_end.is_none() && self.initial_routed_buffer.is_some() {
             if !is_initial_manifest && !self.initial_routed_served {
                 return Err(Error::new(
@@ -186,7 +199,7 @@ impl NativeIndexedSession {
                 self.initial_routed_served = true;
                 return self
                     .initial_routed_buffer
-                    .clone()
+                    .take()
                     .map(Buffer::from)
                     .ok_or_else(|| {
                         Error::new(
@@ -196,6 +209,7 @@ impl NativeIndexedSession {
                     });
             }
         }
+        let manifest = decode_route_manifest(&manifest)?;
         routed_buffer_from_index(
             &manifest,
             &self.retained_index,
@@ -254,13 +268,12 @@ impl NativeIndexedSession {
             }
         }
         parent_ids.extend(self.retained_index.node_ids_of_types(&parent_type_ids));
-        let child_ids = parent_ids
+        let mut ordered_child_ids = parent_ids
             .iter()
             .flat_map(|parent_id| self.retained_index.children(*parent_id))
-            .collect::<FxHashSet<_>>();
-        let ordered_child_ids = (0..self.node_count)
-            .filter(|node_id| child_ids.contains(node_id))
             .collect::<Vec<_>>();
+        ordered_child_ids.sort_unstable();
+        ordered_child_ids.dedup();
         Ok(self
             .retained_index
             .packed_events_buffer(&ordered_child_ids, &self.scope_parents))
@@ -357,6 +370,41 @@ impl NativeIndexedSession {
             .get(scope_id as usize)
             .copied()
             .filter(|parent| *parent != u32::MAX))
+    }
+
+    /// The complete scope-parent table as little-endian u32 words, so JavaScript can
+    /// perform scope-chain walks without one N-API call per level.
+    #[napi]
+    pub fn scope_parents_buffer(&self) -> Result<Buffer> {
+        self.ensure_open()?;
+        let mut output = Vec::with_capacity(self.scope_parents.len() * 4);
+        for &parent in &self.scope_parents {
+            output.extend_from_slice(&parent.to_le_bytes());
+        }
+        Ok(output.into())
+    }
+
+    /// Resolve the nearest binding visible from `scope_id` in one call.
+    #[napi]
+    pub fn resolve_binding(
+        &self,
+        name: String,
+        scope_id: u32,
+    ) -> Result<Option<NativeBindingFact>> {
+        self.ensure_open()?;
+        Ok(self
+            .retained_index
+            .resolve_binding(&name, scope_id, &self.scope_parents))
+    }
+
+    /// Binding visibility check that materializes no reference data.
+    #[napi]
+    pub fn has_binding_in_scope(&self, name: String, scope_id: u32) -> Result<bool> {
+        self.ensure_open()?;
+        Ok(self
+            .retained_index
+            .resolve_binding_scope(&name, scope_id, &self.scope_parents)
+            .is_some())
     }
 
     #[napi]
@@ -623,7 +671,7 @@ struct DirectPackedFields {
 
 fn packed_fields_direct<T: AsRef<str>>(
     kind: AstKind<'_>,
-    scoping: &Scoping,
+    scoping: Option<&Scoping>,
     utf16: Option<&[u32]>,
     requested: Option<&[T]>,
     precomputed_member_path: Option<&str>,
@@ -635,6 +683,11 @@ fn packed_fields_direct<T: AsRef<str>>(
         words: [0; 32],
         len: 0,
     };
+    // An explicitly empty request can push nothing; skip the kind match and constant
+    // evaluation entirely for the common "routed without payload fields" case.
+    if requested.is_some_and(<[T]>::is_empty) {
+        return Some(result);
+    }
     let mut push = |key: &str, value: u32| {
         if wants(key) {
             result.words[result.len] = field_key_id(key).expect("field protocol id");
@@ -648,23 +701,27 @@ fn packed_fields_direct<T: AsRef<str>>(
                 let value = intern_packed(strings, &identifier.name);
                 push("name", value);
             }
-            let reference = identifier
-                .reference_id
-                .get()
-                .map(|id| scoping.get_reference(id));
-            push(
-                "global",
-                0x8000_0000
-                    | u32::from(reference.is_some_and(|reference| reference.symbol_id().is_none())),
-            );
-            if let Some(reference) = reference {
-                push("read", 0x8000_0000 | u32::from(reference.is_read()));
-                push("write", 0x8000_0000 | u32::from(reference.is_write()));
-                if let Some(symbol_id) = reference.symbol_id() {
-                    push(
-                        "bindingScopeId",
-                        0x4000_0000 | scoping.symbol_scope_id(symbol_id).index() as u32,
-                    );
+            if let Some(scoping) = scoping {
+                let reference = identifier
+                    .reference_id
+                    .get()
+                    .map(|id| scoping.get_reference(id));
+                push(
+                    "global",
+                    0x8000_0000
+                        | u32::from(
+                            reference.is_some_and(|reference| reference.symbol_id().is_none()),
+                        ),
+                );
+                if let Some(reference) = reference {
+                    push("read", 0x8000_0000 | u32::from(reference.is_read()));
+                    push("write", 0x8000_0000 | u32::from(reference.is_write()));
+                    if let Some(symbol_id) = reference.symbol_id() {
+                        push(
+                            "bindingScopeId",
+                            0x4000_0000 | scoping.symbol_scope_id(symbol_id).index() as u32,
+                        );
+                    }
                 }
             }
         }
@@ -752,11 +809,13 @@ fn packed_fields_direct<T: AsRef<str>>(
                     let value = intern_packed(strings, &identifier.name);
                     push("calleeName", value);
                 }
-                let global = identifier
-                    .reference_id
-                    .get()
-                    .is_some_and(|id| !scoping.has_binding(id));
-                push("calleeGlobal", 0x8000_0000 | u32::from(global));
+                if let Some(scoping) = scoping {
+                    let global = identifier
+                        .reference_id
+                        .get()
+                        .is_some_and(|id| !scoping.has_binding(id));
+                    push("calleeGlobal", 0x8000_0000 | u32::from(global));
+                }
             }
             if let Some(oxc_ast::ast::Argument::StringLiteral(literal)) = call.arguments.first()
                 && wants("staticArgument")
@@ -805,11 +864,13 @@ fn packed_fields_direct<T: AsRef<str>>(
                     let value = intern_packed(strings, &identifier.name);
                     push("rootName", value);
                 }
-                let global = identifier
-                    .reference_id
-                    .get()
-                    .is_some_and(|id| scoping.get_reference(id).symbol_id().is_none());
-                push("rootGlobal", 0x8000_0000 | u32::from(global));
+                if let Some(scoping) = scoping {
+                    let global = identifier
+                        .reference_id
+                        .get()
+                        .is_some_and(|id| scoping.get_reference(id).symbol_id().is_none());
+                    push("rootGlobal", 0x8000_0000 | u32::from(global));
+                }
             }
         }
         AstKind::ComputedMemberExpression(member) => {
@@ -1049,7 +1110,11 @@ fn packed_fields_direct<T: AsRef<str>>(
     Some(result)
 }
 
-fn fields(kind: AstKind<'_>, scoping: &Scoping, requested: Option<&[String]>) -> Vec<NodeField> {
+fn fields(
+    kind: AstKind<'_>,
+    scoping: Option<&Scoping>,
+    requested: Option<&[String]>,
+) -> Vec<NodeField> {
     let mut result = Vec::new();
     macro_rules! push {
         ($key:expr, $value:expr $(,)?) => {
@@ -1068,23 +1133,25 @@ fn fields(kind: AstKind<'_>, scoping: &Scoping, requested: Option<&[String]>) ->
     match kind {
         AstKind::IdentifierReference(identifier) => {
             push!("name", identifier.name.to_string());
-            let reference = identifier
-                .reference_id
-                .get()
-                .map(|id| scoping.get_reference(id));
-            let global = reference.is_some_and(|reference| reference.symbol_id().is_none());
-            push!("global", global.to_string());
-            if let Some(reference) = reference {
-                push!("read", reference.is_read().to_string());
-                push!("write", reference.is_write().to_string());
-            }
-            if let Some(reference_id) = identifier.reference_id.get()
-                && let Some(symbol_id) = scoping.get_reference(reference_id).symbol_id()
-            {
-                push!(
-                    "bindingScopeId",
-                    scoping.symbol_scope_id(symbol_id).index().to_string(),
-                );
+            if let Some(scoping) = scoping {
+                let reference = identifier
+                    .reference_id
+                    .get()
+                    .map(|id| scoping.get_reference(id));
+                let global = reference.is_some_and(|reference| reference.symbol_id().is_none());
+                push!("global", global.to_string());
+                if let Some(reference) = reference {
+                    push!("read", reference.is_read().to_string());
+                    push!("write", reference.is_write().to_string());
+                }
+                if let Some(reference_id) = identifier.reference_id.get()
+                    && let Some(symbol_id) = scoping.get_reference(reference_id).symbol_id()
+                {
+                    push!(
+                        "bindingScopeId",
+                        scoping.symbol_scope_id(symbol_id).index().to_string(),
+                    );
+                }
             }
         }
         AstKind::BindingIdentifier(identifier) => {
@@ -1126,11 +1193,13 @@ fn fields(kind: AstKind<'_>, scoping: &Scoping, requested: Option<&[String]>) ->
             push!("argumentCount", call.arguments.len().to_string());
             if let Expression::Identifier(identifier) = &call.callee {
                 push!("calleeName", identifier.name.to_string());
-                let global = identifier
-                    .reference_id
-                    .get()
-                    .is_some_and(|id| !scoping.has_binding(id));
-                push!("calleeGlobal", global.to_string());
+                if let Some(scoping) = scoping {
+                    let global = identifier
+                        .reference_id
+                        .get()
+                        .is_some_and(|id| !scoping.has_binding(id));
+                    push!("calleeGlobal", global.to_string());
+                }
             }
             if let Some(oxc_ast::ast::Argument::StringLiteral(literal)) = call.arguments.first() {
                 push!("staticArgument", literal.value.to_string());
@@ -1157,11 +1226,13 @@ fn fields(kind: AstKind<'_>, scoping: &Scoping, requested: Option<&[String]>) ->
             }
             if let Expression::Identifier(identifier) = object {
                 push!("rootName", identifier.name.to_string());
-                let global = identifier
-                    .reference_id
-                    .get()
-                    .is_some_and(|id| scoping.get_reference(id).symbol_id().is_none());
-                push!("rootGlobal", global.to_string());
+                if let Some(scoping) = scoping {
+                    let global = identifier
+                        .reference_id
+                        .get()
+                        .is_some_and(|id| scoping.get_reference(id).symbol_id().is_none());
+                    push!("rootGlobal", global.to_string());
+                }
             }
         }
         AstKind::ComputedMemberExpression(member) => {
@@ -1354,31 +1425,25 @@ impl<'a> EventCollector<'a> {
             self.retention_capabilities & RETAIN_IDENTIFIERS != 0,
         );
         if self.retention_capabilities & RETAIN_CALLS != 0
-            && matches!(kind, AstKind::CallExpression(_))
+            && let AstKind::CallExpression(call) = kind
+            && let Expression::Identifier(identifier) = &call.callee
         {
-            let call_fields = fields(
-                kind,
-                self.scoping,
-                Some(&[
-                    "calleeName".into(),
-                    "calleeGlobal".into(),
-                    "staticArgument".into(),
-                ]),
-            );
-            let field = |key: &str| {
-                call_fields
-                    .iter()
-                    .find(|field| field.key == key)
-                    .map(|field| field.value.as_str())
+            let callee_global = identifier
+                .reference_id
+                .get()
+                .is_some_and(|reference_id| !self.scoping.has_binding(reference_id));
+            let static_argument = match call.arguments.first() {
+                Some(oxc_ast::ast::Argument::StringLiteral(literal)) => {
+                    Some(literal.value.to_string())
+                }
+                _ => None,
             };
-            if let Some(callee_name) = field("calleeName") {
-                self.retained_index.record_call(
-                    id.index() as u32,
-                    callee_name,
-                    field("calleeGlobal") == Some("true"),
-                    field("staticArgument").map(str::to_owned),
-                );
-            }
+            self.retained_index.record_call(
+                id.index() as u32,
+                identifier.name.as_str(),
+                callee_global,
+                static_argument,
+            );
         }
         let retain_all_fields = self.retention_capabilities & RETAIN_MODULE_FACTS != 0;
         let retain_structural_fields = self.retention_routes.is_some_and(|manifest| {
@@ -1388,49 +1453,14 @@ impl<'a> EventCollector<'a> {
                     .contains(&ast_kind_protocol_id(self.nodes.parent_kind(id)))
         });
         let protocol_id = ast_kind_protocol_id(kind);
-        let requested_route_fields = self
-            .retention_routes
-            .map(|manifest| &manifest.routes_by_type[protocol_id as usize])
-            .filter(|routes| !routes.is_empty())
-            .map(|routes| {
-                let mut names = Vec::new();
-                for field_id in routes.iter().flat_map(|route| {
-                    route
-                        .payload_field_ids
-                        .iter()
-                        .copied()
-                        .chain(route.predicates.iter().map(|predicate| predicate.field_id))
-                }) {
-                    let name = field_key_name(field_id)
-                        .expect("validated retained route field")
-                        .to_owned();
-                    if !names.contains(&name) {
-                        names.push(name);
-                    }
-                }
-                names
+        let has_route_or_plan_fields = self.retention_routes.is_some_and(|manifest| {
+            !manifest.routes_by_type[protocol_id as usize].is_empty()
+                || !manifest.retained_fields_by_type[protocol_id as usize].is_empty()
+        });
+        if retain_all_fields || retain_structural_fields || has_route_or_plan_fields {
+            let requested_fields: &[String] = self.retention_routes.map_or(&[], |manifest| {
+                &manifest.merged_field_names_by_type[protocol_id as usize]
             });
-        let retained_plan_fields = self
-            .retention_routes
-            .map(|manifest| &manifest.retained_fields_by_type[protocol_id as usize])
-            .filter(|fields| !fields.is_empty());
-        if retain_all_fields
-            || retain_structural_fields
-            || requested_route_fields.is_some()
-            || retained_plan_fields.is_some()
-        {
-            let requested_fields = requested_route_fields
-                .unwrap_or_default()
-                .into_iter()
-                .chain(
-                    retained_plan_fields
-                        .into_iter()
-                        .flatten()
-                        .filter_map(|field_id| field_key_name(*field_id).map(str::to_owned)),
-                )
-                .collect::<FxHashSet<_>>()
-                .into_iter()
-                .collect::<Vec<_>>();
             let member_path = if let AstKind::StaticMemberExpression(member) = kind {
                 static_member_path(&member.object)
                     .map(|object| format!("{object}.{}", member.property.name))
@@ -1439,10 +1469,9 @@ impl<'a> EventCollector<'a> {
             };
             let retained_fields = packed_fields_direct(
                 kind,
-                self.scoping,
+                Some(self.scoping),
                 self.utf16,
-                (!retain_all_fields && !retain_structural_fields)
-                    .then_some(requested_fields.as_slice()),
+                (!retain_all_fields && !retain_structural_fields).then_some(requested_fields),
                 member_path.as_deref(),
                 &mut self.retained_string_ids,
             );
@@ -1572,7 +1601,6 @@ fn materialize_with_scope_parents(
         None
     };
     Ok(MaterializedSessionParts {
-        node_count: semantic_return.semantic.nodes().len() as u32,
         scope_parents,
         retained_index: collector.retained_index,
         function_map,
@@ -1597,11 +1625,17 @@ pub fn materialize_routed_buffer(
         ));
     }
     let build_nodes = manifest.include_parent || manifest.include_scope;
-    let semantic_return = SemanticBuilder::new()
-        .with_build_nodes(build_nodes)
-        .with_check_syntax_error(true)
-        .build(&parsed.program);
-    if !semantic_return.diagnostics.is_empty() {
+    // Semantic analysis is skipped entirely when no compiled route consumes semantic data.
+    // The collector then assigns preorder node IDs itself during its single traversal.
+    let semantic_return = manifest.needs_semantics.then(|| {
+        SemanticBuilder::new()
+            .with_build_nodes(build_nodes)
+            .with_check_syntax_error(true)
+            .build(&parsed.program)
+    });
+    if let Some(semantic_return) = &semantic_return
+        && !semantic_return.diagnostics.is_empty()
+    {
         return Err(Error::new(
             Status::InvalidArg,
             format!(
@@ -1613,16 +1647,28 @@ pub fn materialize_routed_buffer(
     let utf16 = (!source.is_ascii()).then(|| utf16_index(source, &allocator));
     let mut collector = RoutedEventCollector {
         manifest: &manifest,
-        nodes: build_nodes.then(|| semantic_return.semantic.nodes()),
-        scoping: semantic_return.semantic.scoping(),
+        nodes: semantic_return
+            .as_ref()
+            .filter(|_| build_nodes)
+            .map(|semantic_return| semantic_return.semantic.nodes()),
+        scoping: semantic_return
+            .as_ref()
+            .map(|semantic_return| semantic_return.semantic.scoping()),
         utf16: utf16.as_deref().map(|offsets| &**offsets),
         root: root_start.zip(root_end),
+        assign_node_ids: semantic_return.is_none(),
+        node_count: 0,
         sequence: 0,
         words: PackedWords::with_capacity(source.len().saturating_mul(2)),
         string_ids: FxHashMap::default(),
         counts: RoutedCounts::default(),
     };
     collector.visit_program(&parsed.program);
+    let node_count = semantic_return
+        .as_ref()
+        .map_or(collector.node_count, |semantic_return| {
+            semantic_return.semantic.stats().nodes
+        });
     let data = collector.words.into_bytes();
     let mut strings = (0..collector.string_ids.len())
         .map(|_| String::new())
@@ -1630,13 +1676,7 @@ pub fn materialize_routed_buffer(
     for (value, id) in collector.string_ids {
         strings[id as usize] = value;
     }
-    encode_routed_envelope(
-        &manifest,
-        semantic_return.semantic.stats().nodes,
-        strings,
-        data,
-        collector.counts,
-    )
+    encode_routed_envelope(&manifest, node_count, strings, data, collector.counts)
 }
 
 fn routed_buffer_from_index(
@@ -2176,14 +2216,59 @@ fn decode_route_manifest(data: &[u8]) -> Result<CompiledManifest> {
         .iter()
         .flatten()
         .any(|route| route.side == VisitSide::Exit);
+    let include_parent = flags & 1 != 0;
+    let include_scope = flags & 2 != 0;
+    let needs_semantics = include_parent
+        || include_scope
+        || routes_by_type.iter().flatten().any(|route| {
+            route
+                .predicates
+                .iter()
+                .map(|predicate| predicate.field_id)
+                .chain(route.payload_field_ids.iter().copied())
+                .any(is_semantic_field)
+        })
+        || retained_fields_by_type
+            .iter()
+            .flatten()
+            .copied()
+            .any(is_semantic_field);
+    let merged_field_names_by_type = routes_by_type
+        .iter()
+        .zip(&retained_fields_by_type)
+        .map(|(routes, retained_field_ids)| {
+            let mut names = Vec::new();
+            let field_ids = routes
+                .iter()
+                .flat_map(|route| {
+                    route
+                        .payload_field_ids
+                        .iter()
+                        .copied()
+                        .chain(route.predicates.iter().map(|predicate| predicate.field_id))
+                })
+                .chain(retained_field_ids.iter().copied());
+            for field_id in field_ids {
+                let name = field_key_name(field_id)
+                    .expect("validated manifest field")
+                    .to_owned();
+                if !names.contains(&name) {
+                    names.push(name);
+                }
+            }
+            names
+        })
+        .collect::<Vec<_>>();
     Ok(CompiledManifest {
         routes_by_type,
-        include_parent: flags & 1 != 0,
-        include_scope: flags & 2 != 0,
+        include_parent,
+        include_scope,
         include_exit,
         retention_capabilities: flags >> 2,
         structural_parent_types,
         retained_fields_by_type,
+        merged_field_names_by_type,
+        needs_semantics,
     })
 }
 
@@ -2218,9 +2303,11 @@ impl PackedWords {
 struct RoutedEventCollector<'a> {
     manifest: &'a CompiledManifest,
     nodes: Option<&'a AstNodes<'a>>,
-    scoping: &'a Scoping,
+    scoping: Option<&'a Scoping>,
     utf16: Option<&'a [u32]>,
     root: Option<(u32, u32)>,
+    assign_node_ids: bool,
+    node_count: u32,
     sequence: u32,
     words: PackedWords,
     string_ids: FxHashMap<String, u32>,
@@ -2420,6 +2507,7 @@ impl RoutedEventCollector<'_> {
             self.words.extend([
                 scope_id.index() as u32,
                 self.scoping
+                    .expect("scope routes require semantics")
                     .scope_parent_id(scope_id)
                     .map_or(u32::MAX, |id| id.index() as u32),
             ]);
@@ -2471,7 +2559,7 @@ fn has_direct_predicate_scalar(node_type_id: u32, field: &str) -> bool {
 
 fn direct_predicate_scalar<'a>(
     kind: AstKind<'a>,
-    scoping: &Scoping,
+    scoping: Option<&Scoping>,
     field: &str,
 ) -> Option<PredicateScalar<'a>> {
     match kind {
@@ -2479,25 +2567,37 @@ fn direct_predicate_scalar<'a>(
             "name" => Some(PredicateScalar::String(Cow::Borrowed(
                 identifier.name.as_str(),
             ))),
-            "global" => Some(PredicateScalar::Boolean(
+            "global" => {
+                let scoping = scoping?;
+                Some(PredicateScalar::Boolean(
+                    identifier
+                        .reference_id
+                        .get()
+                        .is_some_and(|id| scoping.get_reference(id).symbol_id().is_none()),
+                ))
+            }
+            "read" => {
+                let scoping = scoping?;
                 identifier
                     .reference_id
                     .get()
-                    .is_some_and(|id| scoping.get_reference(id).symbol_id().is_none()),
-            )),
-            "read" => identifier
-                .reference_id
-                .get()
-                .map(|id| PredicateScalar::Boolean(scoping.get_reference(id).is_read())),
-            "write" => identifier
-                .reference_id
-                .get()
-                .map(|id| PredicateScalar::Boolean(scoping.get_reference(id).is_write())),
-            "bindingScopeId" => identifier.reference_id.get().and_then(|id| {
-                scoping.get_reference(id).symbol_id().map(|symbol_id| {
-                    PredicateScalar::Number(scoping.symbol_scope_id(symbol_id).index() as f64)
+                    .map(|id| PredicateScalar::Boolean(scoping.get_reference(id).is_read()))
+            }
+            "write" => {
+                let scoping = scoping?;
+                identifier
+                    .reference_id
+                    .get()
+                    .map(|id| PredicateScalar::Boolean(scoping.get_reference(id).is_write()))
+            }
+            "bindingScopeId" => {
+                let scoping = scoping?;
+                identifier.reference_id.get().and_then(|id| {
+                    scoping.get_reference(id).symbol_id().map(|symbol_id| {
+                        PredicateScalar::Number(scoping.symbol_scope_id(symbol_id).index() as f64)
+                    })
                 })
-            }),
+            }
             _ => None,
         },
         AstKind::BindingIdentifier(identifier) => match field {
@@ -2604,6 +2704,10 @@ fn predicate_scalar_type(field: &str, node_type_id: u32, value: &str) -> u8 {
 
 impl<'a> Visit<'a> for RoutedEventCollector<'a> {
     fn enter_node(&mut self, kind: AstKind<'a>) {
+        if self.assign_node_ids {
+            kind.set_node_id(NodeId::new(self.node_count as usize));
+            self.node_count += 1;
+        }
         self.emit(kind, VisitSide::Enter);
     }
 

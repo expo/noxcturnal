@@ -304,10 +304,7 @@ export function dispatchRoutedEvents(
       const key = FIELD_KEYS[words[offset++]];
       if (!key) throw new Error('invalid routed field key');
       const value = decodeValue(words[offset++], batch.stringAt);
-      node[key] =
-        typeof value === 'string' && (key !== 'value' || type !== 'StringLiteral')
-          ? parseScalar(value)
-          : value;
+      node[key] = typeof value === 'string' ? coerceFieldValue(key, type, value) : value;
     }
     const routeCount = words[offset++];
     const routeStart = offset;
@@ -485,12 +482,19 @@ export function packEdits(edits: readonly EditCommand[]): Buffer {
     data.write(value, offset, length, 'utf8');
     offset = alignToWord(offset + length);
   }
-  let wordOffset = wordsOffset;
+  let wordIndex = 0;
   let stringId = 0;
-  const write = (word: number) => {
-    data.writeUInt32LE(word >>> 0, wordOffset);
-    wordOffset += 4;
-  };
+  const wordView =
+    (data.byteOffset + wordsOffset) % 4 === 0
+      ? new Uint32Array(data.buffer, data.byteOffset + wordsOffset, wordCount)
+      : null;
+  const write = wordView
+    ? (word: number) => {
+        wordView[wordIndex++] = word;
+      }
+    : (word: number) => {
+        data.writeUInt32LE(word >>> 0, wordsOffset + 4 * wordIndex++);
+      };
   for (let index = 0; index < edits.length; index++) {
     const edit = edits[index];
     const names = edit.names ?? [];
@@ -534,6 +538,22 @@ export function parseScalar(value: string): string | number | boolean {
   if (value === 'false') return false;
   const number = Number(value);
   return value !== '' && Number.isFinite(number) ? number : value;
+}
+
+/** Coerce a decoded string field only where a non-string value is meaningful.
+ *
+ * Booleans and counts arrive packed as typed words; the only string-carried
+ * scalars that can represent numbers or booleans are literal `value`s and
+ * evaluated `constantValue`s. Identifier names, operators, and other
+ * source-derived strings stay strings without a numeric parse attempt.
+ */
+export function coerceFieldValue(
+  key: string,
+  nodeType: string,
+  value: string,
+): string | number | boolean {
+  if (key === 'value' ? nodeType === 'StringLiteral' : key !== 'constantValue') return value;
+  return parseScalar(value);
 }
 
 function decodeTag(tag: number, known: readonly string[], strings: string[]): string {
