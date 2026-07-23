@@ -15,8 +15,8 @@ use crate::constant_eval::constant_for_kind;
 pub use crate::event_types::{NativeCommitResult, NativeVlqMap, NodeField, ParseClassification};
 use crate::function_map::{FunctionMap, FunctionMapCollector};
 use crate::generated_event_schema::{
-    FIELD_KEY_COUNT, NODE_TYPE_COUNT, ast_kind_protocol_id, field_key_id, field_key_name,
-    node_type_id, node_type_name, predicate_field_supported,
+    NODE_TYPE_COUNT, ast_kind_protocol_id, field_key_id, field_key_name, node_type_id,
+    node_type_name, predicate_field_supported,
 };
 use crate::retained_index::{
     NativeBindingFact, NativeCallFact, NativeCaptureReference, NativeConstantFact, RetainedIndex,
@@ -72,6 +72,9 @@ struct CompiledRoute {
     side: VisitSide,
     predicates: Vec<CompiledPredicate>,
     payload_field_ids: Vec<u32>,
+    /// Field names for `payload_field_ids`, resolved once at manifest decode so the
+    /// per-node collectors never rebuild name lists.
+    payload_names: Vec<String>,
 }
 
 struct CompiledManifest {
@@ -84,6 +87,9 @@ struct CompiledManifest {
     /// Union of route payload/predicate and retained-plan field names per node type,
     /// precomputed so the retained collector performs no per-node field-name work.
     merged_field_names_by_type: Vec<Vec<String>>,
+    /// Predicate field names without a direct scalar accessor per node type; these are
+    /// the only fields the stateless collector must materialize before matching.
+    fallback_predicate_names_by_type: Vec<Vec<String>>,
     needs_semantics: bool,
 }
 
@@ -1627,6 +1633,7 @@ pub fn materialize_routed_buffer(
         words: PackedWords::with_capacity(source.len().saturating_mul(2)),
         string_ids: FxHashMap::default(),
         counts: RoutedCounts::default(),
+        route_scratch: Vec::new(),
     };
     collector.visit_program(&parsed.program);
     let node_count = collector.node_count;
@@ -1665,6 +1672,7 @@ struct RetainedRouteWriter {
     string_ids: FxHashMap<String, u32>,
     counts: RoutedCounts,
     sequence: u32,
+    route_scratch: Vec<u32>,
 }
 
 impl RetainedRouteWriter {
@@ -1674,6 +1682,7 @@ impl RetainedRouteWriter {
             string_ids: FxHashMap::default(),
             counts: RoutedCounts::default(),
             sequence: 0,
+            route_scratch: Vec::new(),
         }
     }
 
@@ -1704,8 +1713,10 @@ impl RetainedRouteWriter {
         if root.is_some_and(|(root_start, root_end)| start < root_start || end > root_end) {
             return;
         }
-        let mut matched_routes = Vec::new();
-        let mut payload_field_ids = [false; FIELD_KEY_COUNT + 1];
+        let mut matched_routes = std::mem::take(&mut self.route_scratch);
+        matched_routes.clear();
+        let mut payload_route: Option<&CompiledRoute> = None;
+        let mut payload_union: Vec<u32> = Vec::new();
         let mut matched_exit_carrier = false;
         for route in candidates
             .iter()
@@ -1721,12 +1732,24 @@ impl RetainedRouteWriter {
                 } else {
                     matched_exit_carrier = true;
                 }
-                for &field_id in &route.payload_field_ids {
-                    payload_field_ids[field_id as usize] = true;
+                if !route.payload_field_ids.is_empty() {
+                    if payload_route.is_none() && payload_union.is_empty() {
+                        payload_route = Some(route);
+                    } else {
+                        if let Some(previous) = payload_route.take() {
+                            payload_union.extend_from_slice(&previous.payload_field_ids);
+                        }
+                        for &field_id in &route.payload_field_ids {
+                            if !payload_union.contains(&field_id) {
+                                payload_union.push(field_id);
+                            }
+                        }
+                    }
                 }
             }
         }
         if matched_routes.is_empty() && !matched_exit_carrier {
+            self.route_scratch = matched_routes;
             return;
         }
         if side == VisitSide::Exit {
@@ -1738,6 +1761,7 @@ impl RetainedRouteWriter {
             self.words.extend_from_slice(&matched_routes);
             self.counts.node_records += 1;
             self.counts.route_deliveries += matched_routes.len() as u32;
+            self.route_scratch = matched_routes;
             return;
         }
         self.words
@@ -1761,18 +1785,17 @@ impl RetainedRouteWriter {
                     .unwrap_or(u32::MAX),
             ]);
         }
-        let payload_fields = payload_field_ids
+        let payload_ids: &[u32] =
+            payload_route.map_or(&payload_union, |route| &route.payload_field_ids);
+        let present = payload_ids
             .iter()
-            .enumerate()
-            .filter(|(_, requested)| **requested)
-            .filter_map(|(field_id, _)| {
-                index
-                    .scalar_field(node_id, field_id as u32)
-                    .map(|value| (field_id as u32, value))
-            })
-            .collect::<Vec<_>>();
-        self.words.push(payload_fields.len() as u32);
-        for (field_id, retained) in payload_fields {
+            .filter(|&&field_id| index.scalar_field(node_id, field_id).is_some())
+            .count();
+        self.words.push(present as u32);
+        for &field_id in payload_ids {
+            let Some(retained) = index.scalar_field(node_id, field_id) else {
+                continue;
+            };
             let value = match retained {
                 crate::retained_index::RetainedFieldValue::Packed(value) => value,
                 crate::retained_index::RetainedFieldValue::String(id) => {
@@ -1789,6 +1812,7 @@ impl RetainedRouteWriter {
         self.words.extend_from_slice(&matched_routes);
         self.counts.node_records += 1;
         self.counts.route_deliveries += matched_routes.len() as u32;
+        self.route_scratch = matched_routes;
     }
 
     fn finish(self, manifest: &CompiledManifest, node_count: u32) -> Result<Buffer> {
@@ -2100,12 +2124,17 @@ fn decode_route_manifest(data: &[u8]) -> Result<CompiledManifest> {
             }
             payload_field_ids.push(field_id);
         }
+        let payload_names = payload_field_ids
+            .iter()
+            .filter_map(|&field_id| field_key_name(field_id).map(str::to_owned))
+            .collect();
         routes_by_type[node_type_id as usize].push(CompiledRoute {
             id,
             node_type_id,
             side,
             predicates,
             payload_field_ids,
+            payload_names,
         });
     }
     if cursor + structural_parent_count > word_limit {
@@ -2211,6 +2240,22 @@ fn decode_route_manifest(data: &[u8]) -> Result<CompiledManifest> {
             .iter()
             .flatten()
             .any(|name| SEMANTIC_FIELD_KEYS.contains(&name.as_str()));
+    let fallback_predicate_names_by_type = routes_by_type
+        .iter()
+        .enumerate()
+        .map(|(type_id, routes)| {
+            let mut names: Vec<String> = Vec::new();
+            for predicate in routes.iter().flat_map(|route| route.predicates.iter()) {
+                if let Some(name) = field_key_name(predicate.field_id)
+                    && !has_direct_predicate_scalar(type_id as u32, name)
+                    && !names.iter().any(|existing| existing == name)
+                {
+                    names.push(name.to_owned());
+                }
+            }
+            names
+        })
+        .collect::<Vec<_>>();
     Ok(CompiledManifest {
         routes_by_type,
         include_parent,
@@ -2219,6 +2264,7 @@ fn decode_route_manifest(data: &[u8]) -> Result<CompiledManifest> {
         retention_capabilities: flags >> 2,
         structural_parent_types,
         merged_field_names_by_type,
+        fallback_predicate_names_by_type,
         needs_semantics,
     })
 }
@@ -2262,6 +2308,7 @@ struct RoutedEventCollector<'a> {
     words: PackedWords,
     string_ids: FxHashMap<String, u32>,
     counts: RoutedCounts,
+    route_scratch: Vec<u32>,
 }
 
 impl RoutedEventCollector<'_> {
@@ -2338,22 +2385,19 @@ impl RoutedEventCollector<'_> {
         {
             return;
         }
-        let predicate_field_names = candidates
-            .iter()
-            .filter(|route| side == VisitSide::Enter || route.side == side)
-            .flat_map(|route| route.predicates.iter())
-            .filter_map(|predicate| field_key_name(predicate.field_id))
-            .filter(|field| !has_direct_predicate_scalar(protocol_id, field))
-            .map(str::to_owned)
-            .collect::<Vec<_>>();
-        let mut predicate_fields = if predicate_field_names.is_empty() {
+        let fallback_names = &self.manifest.fallback_predicate_names_by_type[protocol_id as usize];
+        let mut predicate_fields = if fallback_names.is_empty() {
             Vec::new()
         } else {
-            fields(kind, self.scoping, Some(&predicate_field_names))
+            fields(kind, self.scoping, Some(fallback_names))
         };
         normalize_routed_fields(&mut predicate_fields, self.utf16);
-        let mut matched_route_ids = Vec::new();
-        let mut payload_field_ids = [false; FIELD_KEY_COUNT + 1];
+        let mut matched_route_ids = std::mem::take(&mut self.route_scratch);
+        matched_route_ids.clear();
+        // Coalesced manifests make a single payload-carrying matched route the common
+        // case; a union list is built only when distinct payload contracts match at once.
+        let mut payload_route: Option<&CompiledRoute> = None;
+        let mut payload_union: Vec<String> = Vec::new();
         let mut matched_exit_carrier = false;
         for route in candidates
             .iter()
@@ -2370,12 +2414,24 @@ impl RoutedEventCollector<'_> {
                 } else {
                     matched_exit_carrier = true;
                 }
-                for &field_id in &route.payload_field_ids {
-                    payload_field_ids[field_id as usize] = true;
+                if !route.payload_names.is_empty() {
+                    if payload_route.is_none() && payload_union.is_empty() {
+                        payload_route = Some(route);
+                    } else {
+                        if let Some(previous) = payload_route.take() {
+                            payload_union.extend(previous.payload_names.iter().cloned());
+                        }
+                        for name in &route.payload_names {
+                            if !payload_union.contains(name) {
+                                payload_union.push(name.clone());
+                            }
+                        }
+                    }
                 }
             }
         }
         if matched_route_ids.is_empty() && !matched_exit_carrier {
+            self.route_scratch = matched_route_ids;
             return;
         }
         let id = kind.node_id();
@@ -2388,33 +2444,21 @@ impl RoutedEventCollector<'_> {
             self.words.extend_from_slice(&matched_route_ids);
             self.counts.node_records += 1;
             self.counts.route_deliveries += matched_route_ids.len() as u32;
+            self.route_scratch = matched_route_ids;
             return;
         }
-        let payload_names = payload_field_ids
-            .iter()
-            .enumerate()
-            .filter(|(_, requested)| **requested)
-            .filter_map(|(id, _)| field_key_name(id as u32))
-            .collect::<Vec<_>>();
+        let payload_names: &[String] =
+            payload_route.map_or(&payload_union, |route| &route.payload_names);
         let direct_payload = packed_fields_direct(
             kind,
             self.scoping,
             self.utf16,
-            Some(&payload_names),
+            Some(payload_names),
             None,
             &mut self.string_ids,
         );
         let mut fallback_payload = if direct_payload.is_none() && !payload_names.is_empty() {
-            fields(
-                kind,
-                self.scoping,
-                Some(
-                    &payload_names
-                        .iter()
-                        .map(|field| (*field).to_owned())
-                        .collect::<Vec<_>>(),
-                ),
-            )
+            fields(kind, self.scoping, Some(payload_names))
         } else {
             Vec::new()
         };
@@ -2478,6 +2522,7 @@ impl RoutedEventCollector<'_> {
         self.words.extend_from_slice(&matched_route_ids);
         self.counts.node_records += 1;
         self.counts.route_deliveries += matched_route_ids.len() as u32;
+        self.route_scratch = matched_route_ids;
     }
 }
 
