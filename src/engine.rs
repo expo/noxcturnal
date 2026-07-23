@@ -374,16 +374,6 @@ impl NativeIndexedSession {
     }
 
     #[napi]
-    pub fn commit(
-        &self,
-        edits: Vec<editor::EditCommand>,
-        mode: Option<String>,
-    ) -> Result<NativeCommitResult> {
-        self.ensure_open()?;
-        commit(&self.source, &self.filename, edits, mode.as_deref())
-    }
-
-    #[napi]
     pub fn close(&mut self) {
         self.closed = true;
         self.retained_index.clear();
@@ -2795,7 +2785,7 @@ pub fn commit(
     commands: Vec<editor::EditCommand>,
     mode: Option<&str>,
 ) -> Result<NativeCommitResult> {
-    let edits = editor::normalize(source, commands)?;
+    let edits = editor::resolve_copies(source, editor::normalize(source, commands)?)?;
     let (code, mappings, names) = if mode == Some("none") {
         (
             sourcemap::render_code(source, &edits),
@@ -2818,16 +2808,56 @@ pub fn commit_packed(
     strings: Vec<String>,
     mode: Option<&str>,
 ) -> Result<NativeCommitResult> {
-    if !data.len().is_multiple_of(4) {
+    if !data.len().is_multiple_of(4) || data.len() < 4 {
         return Err(Error::new(Status::InvalidArg, "invalid packed edit buffer"));
     }
     let word_count = data.len() / 4;
     let word =
         |index: usize| u32::from_le_bytes(data[index * 4..index * 4 + 4].try_into().unwrap());
-    let mut cursor = 0;
+    // Words region: [partsOffset, edit words..., parts table...]. The parts table holds
+    // deferred content entries: [partCount, then per part (tag, a, b)] where tag 0 is an
+    // interned text id and tag 1 is a source copy range in UTF-16 offsets.
+    let parts_offset = word(0) as usize;
+    if parts_offset < 1 || parts_offset > word_count {
+        return Err(Error::new(
+            Status::InvalidArg,
+            "invalid packed parts offset",
+        ));
+    }
+    let mut parts_entries: Vec<Vec<editor::RawContentPart>> = Vec::new();
+    let mut parts_cursor = parts_offset;
+    while parts_cursor < word_count {
+        let part_count = word(parts_cursor) as usize;
+        parts_cursor += 1;
+        if parts_cursor + part_count * 3 > word_count {
+            return Err(Error::new(Status::InvalidArg, "truncated packed parts"));
+        }
+        let mut entry = Vec::with_capacity(part_count);
+        for part in 0..part_count {
+            let base = parts_cursor + part * 3;
+            entry.push(match word(base) {
+                0 => editor::RawContentPart::Text(
+                    strings
+                        .get(word(base + 1) as usize)
+                        .cloned()
+                        .ok_or_else(|| {
+                            Error::new(Status::InvalidArg, "invalid packed string id")
+                        })?,
+                ),
+                1 => editor::RawContentPart::Copy {
+                    start: word(base + 1),
+                    end: word(base + 2),
+                },
+                _ => return Err(Error::new(Status::InvalidArg, "invalid packed part tag")),
+            });
+        }
+        parts_cursor += part_count * 3;
+        parts_entries.push(entry);
+    }
+    let mut cursor = 1;
     let mut edits = Vec::new();
-    while cursor < word_count {
-        if cursor + 7 > word_count {
+    while cursor < parts_offset {
+        if cursor + 7 > parts_offset {
             return Err(Error::new(Status::InvalidArg, "truncated packed edit"));
         }
         let kind = match word(cursor) {
@@ -2854,7 +2884,7 @@ pub fn commit_packed(
             }
         };
         let name_count = word(cursor + 6) as usize;
-        if cursor + 7 + name_count > word_count {
+        if cursor + 7 + name_count > parts_offset {
             return Err(Error::new(
                 Status::InvalidArg,
                 "truncated packed edit names",
@@ -2868,19 +2898,33 @@ pub fn commit_packed(
                     .ok_or_else(|| Error::new(Status::InvalidArg, "invalid packed string id"))
             })
             .collect::<Result<Vec<_>>>()?;
+        const PARTS_TAG: u32 = 0x8000_0000;
+        let (content, parts) =
+            if content_id == u32::MAX {
+                (None, Vec::new())
+            } else if content_id & PARTS_TAG != 0 {
+                let entry = (content_id & !PARTS_TAG) as usize;
+                (
+                    None,
+                    parts_entries
+                        .get(entry)
+                        .cloned()
+                        .ok_or_else(|| Error::new(Status::InvalidArg, "invalid packed parts id"))?,
+                )
+            } else {
+                (
+                    Some(strings.get(content_id as usize).cloned().ok_or_else(|| {
+                        Error::new(Status::InvalidArg, "invalid packed string id")
+                    })?),
+                    Vec::new(),
+                )
+            };
         edits.push(editor::EditCommand {
             kind,
             start: word(cursor + 1),
             end: word(cursor + 2),
-            content: if content_id == u32::MAX {
-                None
-            } else {
-                Some(
-                    strings.get(content_id as usize).cloned().ok_or_else(|| {
-                        Error::new(Status::InvalidArg, "invalid packed string id")
-                    })?,
-                )
-            },
+            content,
+            parts,
             mapping: Some(mapping),
             order: Some(word(cursor + 5)),
             names: Some(names),

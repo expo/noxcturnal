@@ -1,4 +1,3 @@
-import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
 import type { EditCommand, FunctionMap, NativeVlqMap, ParseClassification } from './types.js';
@@ -76,7 +75,6 @@ interface NativeBinding {
     }[];
     queryNodesPackedBuffer(nodeTypes: string[]): Buffer;
     scopeParentId(scopeId: number): number | null;
-    commit(edits: EditCommand[], sourceMapMode?: string): { code: string; map: NativeVlqMap };
     close(): void;
     memoryUsage(): number;
     parseCount(): number;
@@ -105,8 +103,14 @@ interface NativeBinding {
 function loadBinding(): NativeBinding {
   const root = join(__dirname, '..');
   const suffix = platformSuffix();
-  const local = join(root, `noxcturnal.${suffix}.node`);
-  return require(existsSync(local) ? local : `noxcturnal-${suffix}`) as NativeBinding;
+  // Probe by requiring rather than fs-checking: test environments routinely mock `fs`,
+  // and module resolution is the authority on loadability anyway.
+  try {
+    return require(join(root, `noxcturnal.${suffix}.node`)) as NativeBinding;
+  } catch (error) {
+    if ((error as { code?: string }).code !== 'MODULE_NOT_FOUND') throw error;
+    return require(`noxcturnal-${suffix}`) as NativeBinding;
+  }
 }
 function platformSuffix(): string {
   if (process.platform === 'darwin') return `darwin-${process.arch}`;

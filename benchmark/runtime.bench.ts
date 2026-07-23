@@ -464,6 +464,74 @@ bench('650 KiB dense edits', () => {
   });
 });
 
+// Copy-scale gates: thousands of deferred copies against thousands of edits pin the
+// commit-time copy resolution to its binary-search bound (distinct ranges) and its
+// shared sub-render cache (one range copied per node).
+const copyHeavySource = generateLargeFileSource(650 * 1024, 'functions');
+const copyHeavyPipeline = defineNativePipeline({
+  phases: [
+    {
+      name: 'copy-heavy',
+      plugins: [
+        defineNativePlugin({
+          name: 'duplicate-functions',
+          visitor: {
+            Function(path) {
+              path.insertAfter(path.getSource());
+            },
+          },
+        }),
+        defineNativePlugin({
+          name: 'rewrite-parameters',
+          prepare: () => ({ identifierNames: ['value'], fields: { Identifier: ['name'] } }),
+          visitor: {
+            Identifier(path) {
+              if (path.node.name === 'value') path.replaceWith('value_');
+            },
+          },
+        }),
+      ],
+    },
+  ],
+});
+bench('650 KiB per-node duplication with contained edits', () => {
+  transform(copyHeavySource, 'generated.js', copyHeavyPipeline, { sourceMapMode: 'boundary' });
+});
+
+const repeatedCopyPipeline = defineNativePipeline({
+  phases: [
+    {
+      name: 'repeated-copy',
+      plugins: [
+        defineNativePlugin({
+          name: 'mirror-first-function',
+          createState: () => ({
+            fragment: undefined as import('../dist/index.js').SourceFragment | undefined,
+          }),
+          visitor: {
+            Function(path, state) {
+              if (state.fragment) path.insertAfter(state.fragment);
+              else state.fragment = path.getSource();
+            },
+          },
+        }),
+        defineNativePlugin({
+          name: 'rewrite-parameters',
+          prepare: () => ({ identifierNames: ['value'], fields: { Identifier: ['name'] } }),
+          visitor: {
+            Identifier(path) {
+              if (path.node.name === 'value') path.replaceWith('value_');
+            },
+          },
+        }),
+      ],
+    },
+  ],
+});
+bench('650 KiB repeated single-range copies', () => {
+  transform(copyHeavySource, 'generated.js', repeatedCopyPipeline, { sourceMapMode: 'boundary' });
+});
+
 for (const name of ['no-properties', 'ranges', 'scalar', 'parent', 'snapshot']) {
   const pipeline = allocationVisitor(name);
   bench(`allocation profile: ${name}`, () => transform(source, 'benchmark.js', pipeline));

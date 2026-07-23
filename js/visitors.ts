@@ -66,7 +66,7 @@ export interface NativeScope {
   hasGlobal(name: string): boolean;
   getBinding(name: string): NativeBinding | null;
   getProgramParent(): NativeScope;
-  push(content: CodeFragment | string): void;
+  push(content: Code): void;
   generateUid(name?: string): string;
   rename(name: string, replacement?: string): string;
 }
@@ -93,6 +93,18 @@ export interface PluginContext {
   stopAll(): void;
   subscribeRemaining(...types: string[]): void;
   revisitProgram(visitor: Visitor<any>, state?: unknown): void;
+  /**
+   * Insert a helper at the end of the directive prologue, once per transform.
+   *
+   * The registry lives on the transform, so re-ensuring a key in a later phase is a
+   * no-op — including across plugins when they deliberately share a key. Ensuring the
+   * same key with different realized content is a loud error naming both owners.
+   * Helpers land one per line in first-ensure order. Keys are namespaced by
+   * convention (`pluginName/helper`) unless deliberately shared.
+   */
+  ensureHelper(key: string, code: Code): void;
+  /** A provenance-carrying fragment of the current phase's source. */
+  sourceSlice(start: number, end: number): SourceFragment;
   readonly code: CodeFactory;
   readonly editor: NativeEditor;
 }
@@ -132,14 +144,34 @@ export interface CodeFragment {
   mapping: 'sourceless' | 'anchor-start' | 'anchor-boundaries' | 'identity';
   names?: readonly string[];
 }
+/**
+ * A provenance-carrying slice of the current phase's source.
+ *
+ * Returned by `path.getSource()`. Replacements built from source fragments keep the
+ * referenced ranges original-source-backed, so edits from other plugins inside those
+ * ranges compose instead of conflicting, and source maps stay exact. Coercing a
+ * fragment to a string throws: copying source text without provenance is the explicit
+ * escape hatch `path.sourceText()` / `fragment.text()`.
+ */
+export interface SourceFragment {
+  readonly kind: 'source';
+  readonly start: number;
+  readonly end: number;
+  /** Copy the slice as plain text, deliberately discarding provenance. */
+  text(): string;
+}
+/** Template output mixing literal text, code fragments, and source fragments. */
+export interface CompositeFragment {
+  readonly kind: 'composite';
+  readonly parts: readonly (string | CodeFragment | SourceFragment)[];
+}
+/** Any value accepted where replacement content is expected. */
+export type Code = string | CodeFragment | SourceFragment | CompositeFragment;
 export interface CodeFactory {
   identifier(name: string): CodeFragment;
   stringLiteral(value: string): CodeFragment;
   literal(value: string | number | boolean | bigint | null): CodeFragment;
-  template(
-    parts: TemplateStringsArray,
-    ...values: readonly (CodeFragment | string)[]
-  ): CodeFragment;
+  template(parts: TemplateStringsArray, ...values: readonly (Code | NativeNodePath)[]): Code;
   parseExpression(code: string, parserMode?: TransformOptions['parser']): CodeFragment;
   parseStatements(code: string, parserMode?: TransformOptions['parser']): CodeFragment;
 }
@@ -162,7 +194,9 @@ export interface NativeNodePath<T extends NodeView = NodeView> {
   readonly parentPath: NativeNodePath | null;
   readonly scope: NativeScope;
   readonly context: PluginContext;
-  getSource(): string;
+  getSource(): SourceFragment;
+  /** The node's source as plain text, without provenance. */
+  sourceText(): string;
   snapshot(options?: SnapshotOptions): Readonly<T>;
   getLocation(): SourceLocation;
   is<TType extends NativeNodeType>(type: TType): this is NativeNodePath<NodeOfType<TType>>;
@@ -175,25 +209,19 @@ export interface NativeNodePath<T extends NodeView = NodeView> {
   find(predicate: (path: NativeNodePath) => boolean): NativeNodePath | null;
   getFunctionParent(): NativeNodePath | null;
   getProgramParent(): NativeNodePath | null;
-  replaceWith(code: CodeFragment | string): void;
-  replaceWithMultiple(code: readonly (CodeFragment | string)[]): void;
-  update(code: CodeFragment | string): void;
-  overwrite(code: CodeFragment | string): void;
+  replaceWith(code: Code): void;
+  replaceWithMultiple(code: readonly Code[]): void;
+  update(code: Code): void;
+  overwrite(code: Code): void;
   remove(): void;
-  insertBefore(code: string): void;
-  insertAfter(code: string): void;
-  unshiftContainer(
-    key: 'body',
-    code: CodeFragment | string | readonly (CodeFragment | string)[],
-  ): void;
-  pushContainer(
-    key: 'body',
-    code: CodeFragment | string | readonly (CodeFragment | string)[],
-  ): void;
+  insertBefore(code: Code): void;
+  insertAfter(code: Code): void;
+  unshiftContainer(key: 'body', code: Code | readonly Code[]): void;
+  pushContainer(key: 'body', code: Code | readonly Code[]): void;
   addComment(position: 'leading' | 'trailing' | 'inner', content: string, line?: boolean): void;
   buildCodeFrameError(message: string): NativeTransformError;
-  prependToBody(code: string): void;
-  appendToBody(code: string): void;
+  prependToBody(code: Code): void;
+  appendToBody(code: Code): void;
   skip(): void;
   stop(): void;
   traverse<State>(visitor: Visitor<State>, state?: State): void;
@@ -894,7 +922,34 @@ export class NativeTransformSession {
   }
   commit(edits: EditCommand[], mode?: string) {
     this.#assertOpen();
-    return native.commitPackedBuffer(this.source, this.#nativeFilename, packEdits(edits), mode);
+    try {
+      return {
+        ...native.commitPackedBuffer(this.source, this.#nativeFilename, packEdits(edits), mode),
+        edits,
+        deduped: 0,
+      };
+    } catch (error) {
+      // Convergent identical edits are collapsed only on the failure path, so the
+      // common case pays nothing for the check.
+      const { edits: deduped, dropped } = dedupeConvergentEdits(edits);
+      if (dropped > 0) {
+        try {
+          return {
+            ...native.commitPackedBuffer(
+              this.source,
+              this.#nativeFilename,
+              packEdits(deduped),
+              mode,
+            ),
+            edits: deduped,
+            deduped: dropped,
+          };
+        } catch (retryError) {
+          throw attributeEditConflict(retryError, deduped);
+        }
+      }
+      throw attributeEditConflict(error, edits);
+    }
   }
   close(): void {
     if (!this.#closed) this.#native?.close();
@@ -1545,6 +1600,8 @@ export function transform(
   let finalMap: NativeTransformResult['map'] | null = options.inputSourceMap ?? null;
   const metadata: Record<string, unknown> = {};
   const diagnostics: Diagnostic[] = [];
+  const helpers = new Map<string, HelperRegistration>();
+  const provenance = { degradations: 0 };
   if (options.debugPerformance)
     metadata.performance = {
       phases: phasePlan,
@@ -1557,6 +1614,7 @@ export function transform(
       recordWords: 0,
       utf8SlabBytes: 0,
       editCount: 0,
+      convergentEditsDeduped: 0,
       renderedBytes: 0,
       mappingSegments: 0,
       mapEncodes: 0,
@@ -1813,6 +1871,8 @@ export function transform(
         requiresIndex || includeParent || includeScope,
         compiledRoutes,
         dispatchRoutes,
+        helpers,
+        provenance,
       );
       if (options.debugPerformance)
         performanceCounters(metadata).dispatcherSetupMs += performance.now() - dispatcherStarted;
@@ -1914,18 +1974,20 @@ export function transform(
       if (options.debugPerformance) {
         const performance = metadata.performance as {
           editCount: number;
+          convergentEditsDeduped: number;
           renderedBytes: number;
           mappingSegments: number;
           mapEncodes: number;
         };
-        performance.editCount += effectiveEdits.length;
+        performance.editCount += committed.edits.length;
+        performance.convergentEditsDeduped += committed.deduped;
         performance.renderedBytes += Buffer.byteLength(committed.code);
         performance.mappingSegments += countMappingSegments(committed.map.mappings);
         if (realizeMap) performance.mapEncodes++;
       }
       deferredMapLayers.push({
         source: layerSource,
-        edits: [...effectiveEdits],
+        edits: [...committed.edits],
         map: realizeMap ? committed.map : undefined,
       });
       session.close();
@@ -1980,6 +2042,9 @@ export function transform(
       performanceCounters(metadata).functionMapMs = performance.now() - functionMapStarted;
     if (options.debugPerformance)
       performanceCounters(metadata).totalMs = performance.now() - transformStarted;
+    // Always-on observability: a count only, so production consumers can notice
+    // weakened maps or stale cross-phase text without debug tracing enabled.
+    if (provenance.degradations > 0) metadata.provenanceDegradations = provenance.degradations;
     return {
       status: 'complete',
       code: phaseSource,
@@ -2049,6 +2114,8 @@ function createDispatcher(
   cacheEvents: boolean,
   compiledRoutes: readonly CompiledRouteTemplate[],
   dispatchRoutes: readonly DispatchRoute[],
+  helpers: Map<string, HelperRegistration>,
+  provenance: { degradations: number },
 ): Dispatcher {
   let order = 0;
   let stopAll = false;
@@ -2056,6 +2123,7 @@ function createDispatcher(
   let visitorId = 0;
   let visitorIds: WeakMap<object, number> | undefined;
   let activeTraversals: Set<string> | undefined;
+  let prologueOffset = -1;
   const contexts = new Map<NativePlugin<any, any>, DispatcherEntry>();
   const metadataOwners = new Map<string, string>();
   for (const plugin of activePlugins)
@@ -2117,6 +2185,47 @@ function createDispatcher(
           state,
           context,
         );
+      },
+      ensureHelper: (key, code) => {
+        const realized = realizeContent(session, code, (message, fragment) => {
+          provenance.degradations++;
+          if (optionsPerformance(metadata))
+            diagnostics.push({
+              code: 'provenance-degraded',
+              message,
+              plugin: plugin.name,
+              phase: phase.name,
+              start: fragment.start,
+              end: fragment.end,
+            });
+        });
+        const existing = helpers.get(key);
+        if (existing) {
+          if (!identicalRealizedContent(existing.realized, realized))
+            throw new Error(
+              `helper ${key} realized different content for ${plugin.name} than for its first registrant ${existing.owner}`,
+            );
+          return;
+        }
+        helpers.set(key, { owner: plugin.name, realized });
+        if (prologueOffset < 0) prologueOffset = directivePrologueEnd(session.source);
+        const prefix =
+          prologueOffset > 0 && session.source[prologueOffset - 1] !== '\n' ? '\n' : '';
+        edits.push({
+          kind: 'AppendLeft',
+          start: prologueOffset,
+          end: prologueOffset,
+          ...(realized.contentParts
+            ? { contentParts: [...(prefix ? [prefix] : []), ...realized.contentParts, '\n'] }
+            : { content: `${prefix}${realized.content}\n` }),
+          owner: plugin.name,
+          order: order++,
+        });
+      },
+      sourceSlice: (start, end) => {
+        if (!(start >= 0 && end >= start && end <= session.source.length))
+          throw new Error(`invalid source slice ${start}..${end}`);
+        return makeSourceFragment(session, start, end);
       },
       code: codeFactory,
       editor: makeEditor(session, edits, plugin.name, () => order++),
@@ -2199,6 +2308,7 @@ function createDispatcher(
         assertDeclaredControl(plugin, plans.get(plugin), capability);
       },
       performance: optionsPerformance(metadata),
+      provenance,
     };
     return runtime;
   };
@@ -2422,6 +2532,7 @@ type PathRuntime = {
   scopeCache: Map<number, NativeScope>;
   assertControl: (capability: ControlFlowCapability) => void;
   performance?: PerformanceAllocationCounters;
+  provenance: { degradations: number };
 };
 type PerformanceAllocationCounters = {
   pathFacades: number;
@@ -2511,7 +2622,10 @@ class NodePathImpl implements NativeNodePath {
       this.event.scopeParentId ?? null,
     ));
   }
-  getSource(): string {
+  getSource(): SourceFragment {
+    return makeSourceFragment(this.runtime.session, this.event.start, this.event.end);
+  }
+  sourceText(): string {
     return this.runtime.session.source.slice(this.event.start, this.event.end);
   }
   snapshot(options: SnapshotOptions = {}): Readonly<NodeView> {
@@ -2623,54 +2737,146 @@ class NodePathImpl implements NativeNodePath {
       order: this.runtime.nextOrder(),
     });
   }
-  replaceWith(code: string | CodeFragment): void {
-    this.#edit('Replace', code);
+  /** Lower a provenance-carrying replacement into gap edits around kept source ranges.
+   *
+   * Source fragments that lie inside the replaced range, in order, survive in place:
+   * no edit covers them, so other plugins' edits within those ranges compose instead
+   * of conflicting, and their source mappings stay exact. Fragments that cannot be
+   * kept (other session, out of range or order) degrade to plain-text copies.
+   */
+  #replaceStructured(fragment: SourceFragment | CompositeFragment): void {
+    const parts = fragment.kind === 'source' ? [fragment] : fragment.parts;
+    const session = this.runtime.session;
+    const end = this.event.end;
+    let cursor = this.event.start;
+    let glue: (string | { start: number; end: number })[] = [];
+    let glueHasCopy = false;
+    let glueMapping: EditCommand['mapping'] = 'Sourceless';
+    let glueNames: string[] = [];
+    const degraded = this.#degraded;
+    const flush = (gapEnd: number) => {
+      if (glue.length > 0 || gapEnd > cursor) {
+        const shared = {
+          kind: 'Replace' as const,
+          start: cursor,
+          end: gapEnd,
+          mapping: glue.length === 0 ? ('Sourceless' as const) : glueMapping,
+          names: glueNames.length > 0 ? glueNames : undefined,
+          owner: this.runtime.owner,
+          order: this.runtime.nextOrder(),
+        };
+        if (glueHasCopy) this.runtime.edits.push({ ...shared, contentParts: glue });
+        else this.runtime.edits.push({ ...shared, content: glue.join('') });
+      }
+      cursor = gapEnd;
+      glue = [];
+      glueHasCopy = false;
+      glueMapping = 'Sourceless';
+      glueNames = [];
+    };
+    for (const part of parts) {
+      if (typeof part === 'string') {
+        if (part) glue.push(part);
+        continue;
+      }
+      if ('kind' in part) {
+        const sameSession = SOURCE_FRAGMENT_SESSIONS.get(part) === session;
+        if (sameSession && part.start >= cursor && part.end <= end && part.start <= part.end) {
+          flush(part.start);
+          cursor = part.end;
+        } else if (sameSession) {
+          degraded(
+            `source fragment ${part.start}..${part.end} cannot be kept in place ` +
+              '(out of order or outside the replaced range); deferred to a commit-time copy',
+            part,
+          );
+          glue.push({ start: part.start, end: part.end });
+          glueHasCopy = true;
+          if (glueMapping === 'Sourceless') glueMapping = 'AnchorBoundaries';
+        } else {
+          degraded(
+            `source fragment ${part.start}..${part.end} comes from another phase; copied as text`,
+            part,
+          );
+          if (part.text()) glue.push(part.text());
+          if (glueMapping === 'Sourceless') glueMapping = 'AnchorBoundaries';
+        }
+        continue;
+      }
+      if (part.code) glue.push(part.code);
+      const policy = mappingPolicy(part.mapping);
+      if (policy !== 'Sourceless') glueMapping = policy;
+      if (part.names) glueNames.push(...part.names);
+    }
+    flush(end);
   }
-  replaceWithMultiple(code: readonly (string | CodeFragment)[]): void {
-    this.#edit('Replace', joinFragments(code));
+
+  replaceWith(code: Code): void {
+    if (typeof code !== 'string' && isProvenanceCode(code)) this.#replaceStructured(code);
+    else this.#edit('Replace', code);
   }
-  update(code: string | CodeFragment): void {
-    this.#edit('Replace', code);
+  replaceWithMultiple(code: readonly Code[]): void {
+    if (code.some(value => typeof value !== 'string' && isProvenanceCode(value))) {
+      const parts: (string | CodeFragment | SourceFragment)[] = [];
+      code.forEach((value, index) => {
+        if (index > 0) parts.push('\n');
+        if (typeof value === 'string' || !isProvenanceCode(value)) parts.push(value);
+        else if (value.kind === 'source') parts.push(value);
+        else parts.push(...value.parts);
+      });
+      this.#replaceStructured({ kind: 'composite', parts });
+      return;
+    }
+    this.#edit('Replace', joinFragments(code as readonly (string | CodeFragment)[]));
   }
-  overwrite(code: string | CodeFragment): void {
-    this.#edit('Replace', code);
+  update(code: Code): void {
+    this.replaceWith(code);
+  }
+  overwrite(code: Code): void {
+    this.replaceWith(code);
   }
   remove(): void {
     this.#edit('Remove');
   }
-  insertBefore(content: string): void {
+  #insert(
+    kind: EditKind,
+    offset: number,
+    content: Code | readonly Code[],
+    prefix = '',
+    suffix = '',
+  ): void {
     this.runtime.edits.push({
-      kind: 'PrependRight',
-      start: this.event.start,
-      end: this.event.start,
-      content,
+      kind,
+      start: offset,
+      end: offset,
+      ...realizeContent(this.runtime.session, content, this.#degraded, prefix, suffix),
       owner: this.runtime.owner,
       order: this.runtime.nextOrder(),
     });
   }
-  insertAfter(content: string): void {
-    this.runtime.edits.push({
-      kind: 'AppendLeft',
-      start: this.event.end,
-      end: this.event.end,
-      content,
-      owner: this.runtime.owner,
-      order: this.runtime.nextOrder(),
-    });
+  #degraded = (message: string, target: SourceFragment): void => {
+    this.runtime.provenance.degradations++;
+    if (this.runtime.performance)
+      this.runtime.context.diagnostic({
+        code: 'provenance-degraded',
+        message,
+        start: target.start,
+        end: target.end,
+      });
+  };
+  insertBefore(content: Code): void {
+    this.#insert('PrependRight', this.event.start, content);
   }
-  unshiftContainer(
-    key: 'body',
-    code: string | CodeFragment | readonly (string | CodeFragment)[],
-  ): void {
-    if (key !== 'body') throw new Error(`Unsupported container: ${key}`);
-    this.prependToBody(fragmentText(code));
+  insertAfter(content: Code): void {
+    this.#insert('AppendLeft', this.event.end, content);
   }
-  pushContainer(
-    key: 'body',
-    code: string | CodeFragment | readonly (string | CodeFragment)[],
-  ): void {
+  unshiftContainer(key: 'body', code: Code | readonly Code[]): void {
     if (key !== 'body') throw new Error(`Unsupported container: ${key}`);
-    this.appendToBody(fragmentText(code));
+    this.#insert('AppendRight', Number(this.node.bodyStart ?? this.event.start), code);
+  }
+  pushContainer(key: 'body', code: Code | readonly Code[]): void {
+    if (key !== 'body') throw new Error(`Unsupported container: ${key}`);
+    this.#insert('PrependLeft', Number(this.node.bodyEnd ?? this.event.end), code);
   }
   addComment(position: 'leading' | 'trailing' | 'inner', content: string, line = false): void {
     const comment = line ? `//${content}\n` : `/*${content}*/`;
@@ -2683,27 +2889,11 @@ class NodePathImpl implements NativeNodePath {
       { code: 'plugin-error', message, start: this.event.start, end: this.event.end },
     ]);
   }
-  prependToBody(content: string): void {
-    const offset = Number(this.node.bodyStart ?? this.event.start);
-    this.runtime.edits.push({
-      kind: 'AppendRight',
-      start: offset,
-      end: offset,
-      content,
-      owner: this.runtime.owner,
-      order: this.runtime.nextOrder(),
-    });
+  prependToBody(content: Code): void {
+    this.#insert('AppendRight', Number(this.node.bodyStart ?? this.event.start), content);
   }
-  appendToBody(content: string): void {
-    const offset = Number(this.node.bodyEnd ?? this.event.end);
-    this.runtime.edits.push({
-      kind: 'PrependLeft',
-      start: offset,
-      end: offset,
-      content,
-      owner: this.runtime.owner,
-      order: this.runtime.nextOrder(),
-    });
+  appendToBody(content: Code): void {
+    this.#insert('PrependLeft', Number(this.node.bodyEnd ?? this.event.end), content);
   }
   skip(): void {
     this.runtime.assertControl('skip');
@@ -2909,6 +3099,224 @@ function mappingPolicy(value?: CodeFragment['mapping']): EditCommand['mapping'] 
     } as const
   )[value ?? 'sourceless'];
 }
+
+const SOURCE_FRAGMENT_SESSIONS = new WeakMap<SourceFragment, NativeTransformSession>();
+
+const DIRECTIVE_PROLOGUE =
+  /(?:\s|\/\/[^\n]*|\/\*[\s\S]*?\*\/)*(['"])(?:(?!\1)[^\\\r\n]|\\.)*\1[ \t]*(?:;|(?=\r?\n|$))/y;
+
+/** Offset just past the shebang and leading directive statements, detected textually. */
+function directivePrologueEnd(source: string): number {
+  let offset = 0;
+  if (source.startsWith('#!')) {
+    const newline = source.indexOf('\n');
+    offset = newline === -1 ? source.length : newline + 1;
+  }
+  DIRECTIVE_PROLOGUE.lastIndex = offset;
+  while (DIRECTIVE_PROLOGUE.exec(source) != null) {
+    offset = DIRECTIVE_PROLOGUE.lastIndex;
+  }
+  // Land after the final directive's line break so helpers get their own lines.
+  if (source.charCodeAt(offset) === 13 && source.charCodeAt(offset + 1) === 10) offset += 2;
+  else if (source.charCodeAt(offset) === 10) offset += 1;
+  return offset;
+}
+
+interface HelperRegistration {
+  owner: string;
+  realized: RealizedContent;
+}
+
+function identicalRealizedContent(a: RealizedContent, b: RealizedContent): boolean {
+  if (a.content != null || b.content != null) return a.content === b.content;
+  return identicalContentParts(a.contentParts, b.contentParts);
+}
+
+function makeSourceFragment(
+  session: NativeTransformSession,
+  start: number,
+  end: number,
+): SourceFragment {
+  const reject = (): never => {
+    throw new Error(
+      `source fragment ${start}..${end} carries provenance and cannot be used as text; ` +
+        'interpolate it with code.template`...` (or pass it to replaceWith) to keep provenance, ' +
+        'or call .text() to copy it as plain text',
+    );
+  };
+  const fragment: SourceFragment = Object.freeze({
+    kind: 'source' as const,
+    start,
+    end,
+    text: () => session.source.slice(start, end),
+    toString: reject,
+    [Symbol.toPrimitive]: reject,
+  });
+  SOURCE_FRAGMENT_SESSIONS.set(fragment, session);
+  return fragment;
+}
+
+type RealizedContent =
+  | { content: string; contentParts?: undefined }
+  | { content?: undefined; contentParts: (string | { start: number; end: number })[] };
+
+/** Flatten replacement content into commit-ready form.
+ *
+ * Same-session source fragments become deferred copy parts realized at commit with the
+ * phase's contained edits applied; fragments from other sessions degrade to eager text.
+ */
+function realizeContent(
+  session: NativeTransformSession,
+  value: Code | readonly Code[],
+  onDegrade?: (message: string, fragment: SourceFragment) => void,
+  prefix = '',
+  suffix = '',
+): RealizedContent {
+  const parts: (string | { start: number; end: number })[] = [];
+  let hasCopy = false;
+  const push = (part: Code): void => {
+    if (typeof part === 'string') {
+      if (part) parts.push(part);
+      return;
+    }
+    if ('kind' in part) {
+      if (part.kind === 'composite') {
+        for (const inner of part.parts) push(inner);
+        return;
+      }
+      if (SOURCE_FRAGMENT_SESSIONS.get(part) === session) {
+        parts.push({ start: part.start, end: part.end });
+        hasCopy = true;
+      } else {
+        onDegrade?.(
+          `source fragment ${part.start}..${part.end} comes from another phase; copied as text`,
+          part,
+        );
+        if (part.text()) parts.push(part.text());
+      }
+      return;
+    }
+    if (part.code) parts.push(part.code);
+  };
+  if (prefix) parts.push(prefix);
+  if (isFragmentList(value)) {
+    value.forEach((part, index) => {
+      if (index > 0) parts.push('\n');
+      push(part);
+    });
+  } else {
+    push(value);
+  }
+  if (suffix) parts.push(suffix);
+  if (!hasCopy) return { content: parts.join('') };
+  const merged: (string | { start: number; end: number })[] = [];
+  for (const part of parts) {
+    const last = merged[merged.length - 1];
+    if (typeof part === 'string' && typeof last === 'string')
+      merged[merged.length - 1] = last + part;
+    else merged.push(part);
+  }
+  return { contentParts: merged };
+}
+
+function attributeEditConflict(error: unknown, edits: readonly EditCommand[]): unknown {
+  if (!(error instanceof Error)) return error;
+  const match =
+    /overlapping edits at (\d+)\.\.(\d+) and (\d+)\.\.(\d+)/.exec(error.message) ??
+    /copied range in edit (\d+)\.\.(\d+) partially overlaps edit (\d+)\.\.(\d+)/.exec(
+      error.message,
+    ) ??
+    /circular source copy in edit (\d+)\.\.(\d+) through edit (\d+)\.\.(\d+)/.exec(error.message);
+  if (!match) return error;
+  const findEdit = (start: number, end: number, exclude?: EditCommand) =>
+    edits.find(
+      edit =>
+        edit !== exclude &&
+        Math.min(edit.start, edit.end) === start &&
+        Math.max(edit.start, edit.end) === end,
+    );
+  const sameRange = match[1] === match[3] && match[2] === match[4];
+  const firstEdit = findEdit(Number(match[1]), Number(match[2]));
+  const secondEdit = findEdit(
+    Number(match[3]),
+    Number(match[4]),
+    sameRange ? firstEdit : undefined,
+  );
+  const first = firstEdit?.owner ?? 'unknown';
+  error.message +=
+    sameRange && secondEdit == null
+      ? ` (owner: ${first})`
+      : ` (owners: ${first}, ${secondEdit?.owner ?? 'unknown'})`;
+  return error;
+}
+
+function identicalContentParts(
+  a: readonly (string | { start: number; end: number })[],
+  b: readonly (string | { start: number; end: number })[],
+): boolean {
+  return (
+    a.length === b.length &&
+    a.every((part, index) => {
+      const other = b[index];
+      if (typeof part === 'string' || typeof other === 'string') return part === other;
+      return part.start === other.start && part.end === other.end;
+    })
+  );
+}
+
+function identicalConvergentEdit(a: EditCommand, b: EditCommand): boolean {
+  if (a.kind !== b.kind || a.content !== b.content) return false;
+  if ((a.mapping ?? 'Sourceless') !== (b.mapping ?? 'Sourceless')) return false;
+  const aNames = a.names ?? [];
+  const bNames = b.names ?? [];
+  if (aNames.length !== bNames.length || aNames.some((name, index) => name !== bNames[index]))
+    return false;
+  if (a.contentParts == null || b.contentParts == null)
+    return a.contentParts == null && b.contentParts == null;
+  return identicalContentParts(a.contentParts, b.contentParts);
+}
+
+/** Collapse byte-identical range edits from different plugins to the first owner.
+ *
+ * Convergent identical edits would otherwise fail overlap validation although either
+ * alone yields the same output. Insertions are left untouched: stacking them is
+ * intentional, and idempotent-intent inserts are `ensureHelper`'s job.
+ */
+function dedupeConvergentEdits(edits: readonly EditCommand[]): {
+  edits: EditCommand[];
+  dropped: number;
+} {
+  const byRange = new Map<string, EditCommand>();
+  const kept: EditCommand[] = [];
+  let dropped = 0;
+  for (const edit of edits) {
+    if (edit.end === edit.start) {
+      kept.push(edit);
+      continue;
+    }
+    const key = `${Math.min(edit.start, edit.end)}:${Math.max(edit.start, edit.end)}`;
+    const first = byRange.get(key);
+    if (first && identicalConvergentEdit(first, edit)) {
+      dropped++;
+      continue;
+    }
+    if (!first) byRange.set(key, edit);
+    kept.push(edit);
+  }
+  return { edits: kept, dropped };
+}
+
+function isProvenanceCode(value: Code): value is SourceFragment | CompositeFragment {
+  return typeof value !== 'string' && 'kind' in value;
+}
+
+function containsProvenance(value: Code | NativeNodePath): boolean {
+  if (typeof value === 'string') return false;
+  if ('getSource' in value) return true;
+  if (!('kind' in value)) return false;
+  return value.kind === 'source' || value.parts.some(part => containsProvenance(part));
+}
+
 function adaptBindingFact(
   fact: ReturnType<NativeIndexedSessionBinding['queryBindings']>[number],
 ): QueryResult['bindings'][number] {
@@ -2990,10 +3398,20 @@ function makeScope(runtime: PathRuntime, id: number, parentId: number | null): N
         (end, directive) => Math.max(end, directive.end),
         Number(owner.node.bodyStart ?? owner.node.start),
       );
-      runtime.context.editor.appendLeft(
-        offset,
-        `${directives.length === 0 ? '' : '\n'}${fragmentText(content)}\n`,
-      );
+      runtime.edits.push({
+        kind: 'AppendLeft',
+        start: offset,
+        end: offset,
+        ...realizeContent(
+          runtime.session,
+          content,
+          undefined,
+          directives.length === 0 ? '' : '\n',
+          '\n',
+        ),
+        owner: runtime.owner,
+        order: runtime.nextOrder(),
+      });
     },
     generateUid: name => session.generateUid(name),
     rename(name, replacement = session.generateUid(name)) {
@@ -3119,16 +3537,7 @@ function joinFragments(values: readonly (string | CodeFragment)[]): CodeFragment
     names: values.flatMap(value => (typeof value === 'string' ? [] : [...(value.names ?? [])])),
   };
 }
-function fragmentText(value: string | CodeFragment | readonly (string | CodeFragment)[]): string {
-  return isFragmentList(value)
-    ? joinFragments(value).code
-    : typeof value === 'string'
-      ? value
-      : value.code;
-}
-function isFragmentList(
-  value: string | CodeFragment | readonly (string | CodeFragment)[],
-): value is readonly (string | CodeFragment)[] {
+function isFragmentList(value: Code | readonly Code[]): value is readonly Code[] {
   return Array.isArray(value);
 }
 
@@ -3393,6 +3802,20 @@ const codeFactory: CodeFactory = {
     };
   },
   template(parts, ...values) {
+    if (values.some(containsProvenance)) {
+      const composite: (string | CodeFragment | SourceFragment)[] = [];
+      parts.forEach((part, index) => {
+        if (part) composite.push(part);
+        if (index >= values.length) return;
+        const value = values[index]!;
+        const resolved: Code =
+          typeof value !== 'string' && 'getSource' in value ? value.getSource() : value;
+        if (typeof resolved === 'string' || !('kind' in resolved)) composite.push(resolved);
+        else if (resolved.kind === 'source') composite.push(resolved);
+        else composite.push(...resolved.parts);
+      });
+      return { kind: 'composite', parts: composite };
+    }
     return {
       code: parts.reduce(
         (code, part, index) =>
@@ -3400,8 +3823,8 @@ const codeFactory: CodeFactory = {
           part +
           (index < values.length
             ? typeof values[index] === 'string'
-              ? values[index]
-              : values[index].code
+              ? (values[index] as string)
+              : (values[index] as CodeFragment).code
             : ''),
         '',
       ),

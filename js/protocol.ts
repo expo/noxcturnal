@@ -41,6 +41,7 @@ const NUMBER_PAYLOAD = 0x3fffffff;
 const EXIT_TAG = 0x20000000;
 const NODE_COUNT_PAYLOAD = 0x1fffffff;
 const MISSING_VALUE = 0xffffffff;
+const PARTS_TAG = 0x80000000;
 const PACKED_HEADER_BYTES = 16;
 const ROUTE_MANIFEST_MAGIC = 0x4e524d46;
 const ROUTED_TAPE_MAGIC = 0x4e525446;
@@ -432,16 +433,36 @@ export function packEdits(edits: readonly EditCommand[]): Buffer {
   }
   const strings: string[] = [];
   const stringLengths: number[] = [];
-  const addString = (value: string) => {
+  const addString = (value: string): number => {
     strings.push(value);
     stringLengths.push(Buffer.byteLength(value));
+    return strings.length - 1;
   };
-  let wordCount = 0;
-  for (const edit of edits) {
-    if (edit.content != null) addString(edit.content);
-    for (const name of edit.names ?? []) addString(name);
-    wordCount += 7 + (edit.names?.length ?? 0);
+  // One interning pass with flat side tables; no per-edit allocation.
+  const contentWords = new Uint32Array(edits.length);
+  const nameIds: number[] = [];
+  const partsData: number[] = [];
+  let editWords = 0;
+  let partsEntryCount = 0;
+  for (let index = 0; index < edits.length; index++) {
+    const edit = edits[index];
+    if (edit.contentParts != null) {
+      contentWords[index] = PARTS_TAG | partsEntryCount++;
+      partsData.push(edit.contentParts.length);
+      for (const part of edit.contentParts) {
+        if (typeof part === 'string') partsData.push(0, addString(part), 0);
+        else partsData.push(1, part.start, part.end);
+      }
+    } else if (edit.content != null) {
+      contentWords[index] = addString(edit.content);
+    } else {
+      contentWords[index] = MISSING_VALUE;
+    }
+    const names = edit.names;
+    if (names) for (const name of names) nameIds.push(addString(name));
+    editWords += 7 + (names?.length ?? 0);
   }
+  const wordCount = 1 + editWords + partsData.length;
   // Strings pack as one lengths table plus a single concatenated slab: one utf8 encode
   // instead of one native write call per string.
   const slabBytes = stringLengths.reduce((size, length) => size + length, 0);
@@ -455,23 +476,25 @@ export function packEdits(edits: readonly EditCommand[]): Buffer {
   data.write(strings.join(''), slabOffset, slabBytes, 'utf8');
   data.fill(0, slabOffset + slabBytes, wordsOffset);
   let wordIndex = 0;
-  let stringId = 0;
+  let nameCursor = 0;
   const words = new Uint32Array(wordCount);
   const write = (word: number) => {
     words[wordIndex++] = word;
   };
+  write(1 + editWords);
   for (let index = 0; index < edits.length; index++) {
     const edit = edits[index];
-    const names = edit.names ?? [];
+    const nameCount = edit.names?.length ?? 0;
     write(EDIT_KINDS[edit.kind]);
     write(edit.start);
     write(edit.end);
-    write(edit.content == null ? MISSING_VALUE : stringId++);
+    write(contentWords[index]);
     write(EDIT_MAPPINGS[edit.mapping ?? 'Sourceless']);
     write(edit.order ?? index);
-    write(names.length);
-    for (let nameIndex = 0; nameIndex < names.length; nameIndex++) write(stringId++);
+    write(nameCount);
+    for (let name = 0; name < nameCount; name++) write(nameIds[nameCursor++]);
   }
+  for (const word of partsData) write(word);
   data.set(new Uint8Array(words.buffer, 0, words.byteLength), wordsOffset);
   return data;
 }

@@ -118,7 +118,7 @@ const metroExports = defineNativePlugin<ExportState>({
       const declaration = path.getChild('declaration');
       assert.ok(declaration);
       const local = path.scope.generateUid('default');
-      path.replaceWith(`var ${local} = ${declaration.getSource()};`);
+      path.replaceWith(path.context.code.template`var ${local} = ${declaration};`);
       state.statements.push(`exports.default = ${local};`);
     },
     Program: {
@@ -206,7 +206,7 @@ const serverActions = defineNativePlugin<ActionState>({
       ];
       const names = [...new Set(captures.map(capture => String(capture.name)))].sort();
       const actionId = path.scope.getProgramParent().generateUid('inlineAction');
-      const parameters = path.getChildList('params').map(parameter => parameter.getSource());
+      const parameters = path.getChildList('params').map(parameter => parameter.sourceText());
       const closureParameter = names.length > 0 ? ['$$closure'] : [];
       const bodyEnd = Number(path.node.bodyEnd);
       const bodySource = path.context.source.slice(directive.node.end, bodyEnd);

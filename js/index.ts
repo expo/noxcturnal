@@ -1,7 +1,10 @@
 export type * from './types.js';
 export type {
+  Code,
   CodeFactory,
   CodeFragment,
+  CompositeFragment,
+  SourceFragment,
   CompiledPhasePlan,
   DefinedNativePlugin,
   MetadataWriter,

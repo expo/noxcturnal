@@ -1,4 +1,4 @@
-use crate::editor::{ByteEdit, MappingPolicy};
+use crate::editor::{ByteEdit, ContentSpan, MappingPolicy};
 use rustc_hash::FxHashMap;
 
 enum Piece<'a> {
@@ -11,6 +11,7 @@ enum Piece<'a> {
         mapping: MappingPolicy,
         names: &'a [String],
         mark_only: bool,
+        content_map: &'a [ContentSpan],
     },
 }
 
@@ -26,6 +27,7 @@ fn for_each_piece<'a>(source: &'a str, edits: &'a [ByteEdit], mut visit: impl Fn
             mapping: edit.mapping,
             names: &edit.names,
             mark_only: edit.mark_only,
+            content_map: &edit.content_map,
         });
         cursor = edit.end;
     }
@@ -280,6 +282,28 @@ impl StreamingMap {
     }
 }
 
+fn intern(names: &mut Vec<String>, name_ids: &mut FxHashMap<String, i64>, name: &str) -> i64 {
+    if let Some(index) = name_ids.get(name) {
+        return *index;
+    }
+    let index = names.len() as i64;
+    names.push(name.to_string());
+    name_ids.insert(name.to_string(), index);
+    index
+}
+
+/// Line/column (UTF-16 columns) of a byte offset, for repositioning inside copies.
+fn position_at(source: &str, line_starts: &[usize], offset: usize) -> (i64, i64) {
+    let line = line_starts.partition_point(|start| *start <= offset) - 1;
+    let text = &source[line_starts[line]..offset];
+    let column = if text.is_ascii() {
+        text.len() as i64
+    } else {
+        text.chars().map(|ch| ch.len_utf16() as i64).sum()
+    };
+    (line as i64, column)
+}
+
 pub fn render(source: &str, edits: &[ByteEdit], mode: &str) -> (String, String, Vec<String>) {
     let mut code = String::with_capacity(source.len());
     let mut map = StreamingMap {
@@ -293,6 +317,22 @@ pub fn render(source: &str, edits: &[ByteEdit], mode: &str) -> (String, String, 
     let character = mode == "character";
     let mut names = Vec::<String>::new();
     let mut name_ids = FxHashMap::<String, i64>::default();
+    // Copy-carrying edits reposition the original cursor to arbitrary offsets, which
+    // needs a line index over the source. Built only when such an edit exists.
+    let line_starts: Vec<usize> =
+        if mode != "line" && edits.iter().any(|edit| !edit.content_map.is_empty()) {
+            let mut starts = vec![0];
+            starts.extend(
+                source
+                    .bytes()
+                    .enumerate()
+                    .filter(|(_, byte)| *byte == b'\n')
+                    .map(|(index, _)| index + 1),
+            );
+            starts
+        } else {
+            Vec::new()
+        };
     for_each_piece(source, edits, |piece| match piece {
         Piece::Original { text } => {
             code.push_str(text);
@@ -304,6 +344,7 @@ pub fn render(source: &str, edits: &[ByteEdit], mode: &str) -> (String, String, 
             mapping,
             names: piece_names,
             mark_only,
+            content_map,
         } => {
             if mark_only {
                 map.mark();
@@ -319,20 +360,62 @@ pub fn render(source: &str, edits: &[ByteEdit], mode: &str) -> (String, String, 
                             | MappingPolicy::Identity
                     )
                 {
-                    let name = piece_names.first().map(|name| {
-                        if let Some(index) = name_ids.get(name) {
-                            return *index;
-                        }
-                        let index = names.len() as i64;
-                        names.push(name.clone());
-                        name_ids.insert(name.clone(), index);
-                        index
-                    });
+                    let name = piece_names
+                        .first()
+                        .map(|name| intern(&mut names, &mut name_ids, name));
                     map.mark_name(name);
                 }
                 map.removed(removed);
                 code.push_str(text);
-                map.generated(text);
+                if content_map.is_empty() || mode == "line" {
+                    map.generated(text);
+                } else {
+                    // Replay the content's source structure: verbatim copies map back to
+                    // their origin tokens, contained edits keep their own anchors and
+                    // names, and glue between them stays unmapped.
+                    let saved = (map.original_line, map.original_column);
+                    let mut position = 0;
+                    for span in content_map {
+                        match span {
+                            ContentSpan::Copy {
+                                offset,
+                                origin,
+                                len,
+                            } => {
+                                if *offset > position {
+                                    map.generated(&text[position..*offset]);
+                                }
+                                let (line, column) = position_at(source, &line_starts, *origin);
+                                map.original_line = line;
+                                map.original_column = column;
+                                map.mark();
+                                map.copied(&text[*offset..*offset + *len], character);
+                                position = *offset + *len;
+                            }
+                            ContentSpan::Anchor {
+                                offset,
+                                origin,
+                                name,
+                            } => {
+                                if *offset > position {
+                                    map.generated(&text[position..*offset]);
+                                    position = *offset;
+                                }
+                                let (line, column) = position_at(source, &line_starts, *origin);
+                                map.original_line = line;
+                                map.original_column = column;
+                                map.mark_name(
+                                    name.as_ref()
+                                        .map(|name| intern(&mut names, &mut name_ids, name)),
+                                );
+                            }
+                        }
+                    }
+                    if position < text.len() {
+                        map.generated(&text[position..]);
+                    }
+                    (map.original_line, map.original_column) = saved;
+                }
                 if mode != "line" && mapping == MappingPolicy::AnchorBoundaries {
                     map.mark();
                 }
@@ -487,6 +570,7 @@ mod tests {
                     start: 0,
                     end: 0,
                     content: Some("/* generated */\n".into()),
+                    parts: Vec::new(),
                     mapping: Some(MappingPolicy::Sourceless),
                     order: Some(0),
                     names: None,
@@ -496,6 +580,7 @@ mod tests {
                     start: 6,
                     end: 11,
                     content: Some("renamed".into()),
+                    parts: Vec::new(),
                     mapping: Some(MappingPolicy::AnchorBoundaries),
                     order: Some(1),
                     names: Some(vec!["value".into()]),
@@ -521,6 +606,7 @@ mod tests {
                     start: index * 2,
                     end: index * 2 + 1,
                     content: Some("y".into()),
+                    parts: Vec::new(),
                     mapping: Some(MappingPolicy::AnchorStart),
                     order: Some(index),
                     names: Some(vec![format!("name{index}")]),

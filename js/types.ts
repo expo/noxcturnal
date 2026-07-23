@@ -54,6 +54,9 @@ export interface EditCommand {
   start: number;
   end: number;
   content?: string;
+  /** Deferred content: literal text and source-range copies realized at commit
+   * against the same phase's edits. Mutually exclusive with `content`. */
+  contentParts?: readonly (string | { start: number; end: number })[];
   mapping?: MappingPolicy;
   owner?: string;
   order?: number;

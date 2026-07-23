@@ -3,6 +3,7 @@ import { test } from 'vitest';
 import { originalPositionFor, TraceMap } from '@jridgewell/trace-mapping';
 import { Worker } from 'node:worker_threads';
 
+import type { SourceFragment } from '../dist/index.js';
 import {
   classify,
   compilePhasePlan,
@@ -143,7 +144,7 @@ test('defers text-only rendering across phases that observe the retained AST', (
     name: 'observe-original-ast',
     visitor: {
       Identifier(path) {
-        observed = path.getSource();
+        observed = path.sourceText();
       },
     },
   });
@@ -193,7 +194,7 @@ test('runs original observers against pristine source after a rendered boundary'
     editEffect: 'none',
     visitor: {
       Identifier(path) {
-        observed = path.getSource();
+        observed = path.sourceText();
       },
     },
   });
@@ -543,7 +544,7 @@ test('applies exact scalar route predicates without exposing a new visitor shape
     },
     visitor: {
       VariableDeclaration(path) {
-        seen.push(path.getSource().slice(0, 5));
+        seen.push(path.sourceText().slice(0, 5));
       },
     },
   });
@@ -1118,8 +1119,8 @@ test('matches static member chains without traversing child objects', () => {
     }),
     visitor: {
       MemberExpression(path) {
-        if (path.matchesPattern('process.env.NODE_ENV')) matches.push(path.getSource());
-        if (path.matchesPattern('process.env', true)) matches.push(`partial:${path.getSource()}`);
+        if (path.matchesPattern('process.env.NODE_ENV')) matches.push(path.sourceText());
+        if (path.matchesPattern('process.env', true)) matches.push(`partial:${path.sourceText()}`);
       },
     },
   });
@@ -2128,7 +2129,7 @@ test('provides Babel-shaped multi-replacement, container, comment, and code-fram
 test('provides lazy compact structural child roles without recursive ESTree transfer', () => {
   const observed: Record<string, string[]> = {};
   const sources = (value: ReturnType<any>) =>
-    (Array.isArray(value) ? value : value ? [value] : []).map(path => path.getSource());
+    (Array.isArray(value) ? value : value ? [value] : []).map(path => path.sourceText());
   const plugin = defineNativePlugin({
     name: 'child-roles',
     prepare() {
@@ -2154,7 +2155,7 @@ test('provides lazy compact structural child roles without recursive ESTree tran
         observed.source = sources(path.get('source'));
       },
       VariableDeclarator(path) {
-        if (path.getSource().includes('result')) {
+        if (path.sourceText().includes('result')) {
           observed.id = sources(path.get('id'));
           observed.init = sources(path.get('init'));
         }
@@ -2217,7 +2218,7 @@ test('requires structural child roles to be declared before parsing', () => {
 test('distinguishes control-flow and class child roles needed by structural fixes', () => {
   const observed: Record<string, string | null> = {};
   const one = (value: unknown) =>
-    value && !Array.isArray(value) ? (value as { getSource(): string }) : null;
+    value && !Array.isArray(value) ? (value as { sourceText(): string }) : null;
   const plugin = defineNativePlugin({
     name: 'structural-roles',
     prepare() {
@@ -2231,13 +2232,13 @@ test('distinguishes control-flow and class child roles needed by structural fixe
     },
     visitor: {
       TryStatement(path) {
-        observed.block = one(path.get('block'))?.getSource() ?? null;
-        observed.handler = one(path.get('handler'))?.getSource() ?? null;
-        observed.finalizer = one(path.get('finalizer'))?.getSource() ?? null;
+        observed.block = one(path.get('block'))?.sourceText() ?? null;
+        observed.handler = one(path.get('handler'))?.sourceText() ?? null;
+        observed.finalizer = one(path.get('finalizer'))?.sourceText() ?? null;
       },
       Class(path) {
-        observed.superClass = one(path.get('superClass'))?.getSource() ?? null;
-        observed.classBody = one(path.get('body'))?.getSource() ?? null;
+        observed.superClass = one(path.get('superClass'))?.sourceText() ?? null;
+        observed.classBody = one(path.get('body'))?.sourceText() ?? null;
       },
     },
   });
@@ -2470,4 +2471,608 @@ test('rejects untranslatable mixed edit coordinate spaces', () => {
       ]),
     /requires explicit translation/,
   );
+});
+
+test('composes an unwrap replacement with inner edits from another plugin', () => {
+  // The log-box failure shape: one plugin strips an export wrapper by replacing the
+  // declaration with its own source, another rewrites a call inside the body. The
+  // provenance-carrying replacement keeps the body range live, so both apply.
+  const source = `export function setup() {\n    const toast = require('./toast');\n}\n`;
+  const unwrapExports = defineNativePlugin({
+    name: 'unwrap-exports',
+    prepare: () => ({ children: { ExportNamedDeclaration: ['declaration'] } }),
+    visitor: {
+      ExportNamedDeclaration(path) {
+        const declaration = path.getChild('declaration');
+        assert.ok(declaration);
+        path.replaceWith(declaration.getSource());
+      },
+    },
+  });
+  const rewriteRequires = defineNativePlugin({
+    name: 'rewrite-requires',
+    prepare: () => ({ fields: { CallExpression: ['calleeName', 'staticArgument'] } }),
+    visitor: {
+      CallExpression(path) {
+        if (path.node.calleeName !== 'require') return;
+        path.replaceWith(`_REQ(${JSON.stringify(path.node.staticArgument)})`);
+      },
+    },
+  });
+  const result = transform(
+    source,
+    'fixture.js',
+    defineNativePipeline({
+      phases: [{ name: 'transform', plugins: [unwrapExports, rewriteRequires] }],
+    }),
+  );
+  assert.equal(result.status, 'complete');
+  assert.equal(result.code, `function setup() {\n    const toast = _REQ("./toast");\n}\n`);
+});
+
+test('composes template slots with glue text and inner edits', () => {
+  const source = `export default function main() { return require('./impl'); }\n`;
+  const lowerDefault = defineNativePlugin({
+    name: 'lower-default-export',
+    prepare: () => ({ children: { ExportDefaultDeclaration: ['declaration'] } }),
+    visitor: {
+      ExportDefaultDeclaration(path) {
+        const declaration = path.getChild('declaration');
+        assert.ok(declaration);
+        path.replaceWith(path.context.code.template`var _default = ${declaration};`);
+      },
+    },
+  });
+  const rewriteRequires = defineNativePlugin({
+    name: 'rewrite-requires',
+    prepare: () => ({ fields: { CallExpression: ['calleeName', 'staticArgument'] } }),
+    visitor: {
+      CallExpression(path) {
+        if (path.node.calleeName !== 'require') return;
+        path.replaceWith(`_REQ(${JSON.stringify(path.node.staticArgument)})`);
+      },
+    },
+  });
+  const result = transform(
+    source,
+    'fixture.js',
+    defineNativePipeline({
+      phases: [{ name: 'transform', plugins: [lowerDefault, rewriteRequires] }],
+    }),
+  );
+  assert.equal(result.status, 'complete');
+  assert.equal(result.code, `var _default = function main() { return _REQ("./impl"); };\n`);
+});
+
+test('rejects string coercion of source fragments with guidance', () => {
+  assert.throws(
+    () =>
+      transform(
+        'const value = 1;',
+        'fixture.js',
+        defineNativePipeline({
+          phases: [
+            {
+              name: 'transform',
+              plugins: [
+                defineNativePlugin({
+                  name: 'coerce-fragment',
+                  visitor: {
+                    VariableDeclaration(path) {
+                      path.replaceWith(`copied: ${path.getSource()}`);
+                    },
+                  },
+                }),
+              ],
+            },
+          ],
+        }),
+      ),
+    /carries provenance/,
+  );
+});
+
+test('degrades out-of-place source fragments to plain text copies', () => {
+  // A fragment interpolated outside its own range (duplication) cannot keep
+  // provenance for both copies; the replacement still renders correctly.
+  const source = 'const value = compute();\n';
+  const duplicate = defineNativePlugin({
+    name: 'duplicate-initializer',
+    prepare: () => ({ children: { VariableDeclarator: ['init'] } }),
+    visitor: {
+      VariableDeclarator(path) {
+        const init = path.getChild('init');
+        assert.ok(init);
+        const fragment = init.getSource();
+        path.replaceWith(path.context.code.template`checked = ${fragment} ?? ${fragment}`);
+      },
+    },
+  });
+  const result = transform(
+    source,
+    'fixture.js',
+    defineNativePipeline({ phases: [{ name: 'transform', plugins: [duplicate] }] }),
+  );
+  assert.equal(result.status, 'complete');
+  assert.equal(result.code, 'const checked = compute() ?? compute();\n');
+});
+
+test('attributes overlapping edit conflicts to their owning plugins', () => {
+  const source = 'const value = 1;\n';
+  const wide = defineNativePlugin({
+    name: 'wide-owner',
+    visitor: {
+      VariableDeclaration(path) {
+        path.replaceWith('var value = 2;');
+      },
+    },
+  });
+  const inner = defineNativePlugin({
+    name: 'inner-owner',
+    prepare: () => ({ fields: { Identifier: ['name'] } }),
+    visitor: {
+      Identifier(path) {
+        if (path.node.name === 'value') path.replaceWith('renamed');
+      },
+    },
+  });
+  assert.throws(
+    () =>
+      transform(
+        source,
+        'fixture.js',
+        defineNativePipeline({ phases: [{ name: 'transform', plugins: [wide, inner] }] }),
+      ),
+    /owners: wide-owner, inner-owner/,
+  );
+});
+
+test('inserted copies reflect same-phase edits at commit time', () => {
+  const source = `function helper() { return require('./impl'); }\n`;
+  const duplicateHelper = defineNativePlugin({
+    name: 'duplicate-helper',
+    visitor: {
+      Function(path) {
+        path.insertAfter(path.getSource());
+      },
+    },
+  });
+  const rewriteRequires = defineNativePlugin({
+    name: 'rewrite-requires',
+    prepare: () => ({ fields: { CallExpression: ['calleeName', 'staticArgument'] } }),
+    visitor: {
+      CallExpression(path) {
+        if (path.node.calleeName === 'require') path.replaceWith(`_REQ("./impl")`);
+      },
+    },
+  });
+  const result = transform(
+    source,
+    'fixture.js',
+    defineNativePipeline({
+      phases: [{ name: 'transform', plugins: [duplicateHelper, rewriteRequires] }],
+    }),
+  );
+  assert.equal(result.status, 'complete');
+  assert.equal(result.code.match(/_REQ\("\.\/impl"\)/g)?.length, 2);
+  assert.ok(!result.code.includes('require('));
+});
+
+test('duplicated template slots reflect same-phase edits', () => {
+  const source = 'const value = compute();\n';
+  const duplicate = defineNativePlugin({
+    name: 'duplicate-initializer',
+    prepare: () => ({ children: { VariableDeclarator: ['init'] } }),
+    visitor: {
+      VariableDeclarator(path) {
+        const init = path.getChild('init');
+        assert.ok(init);
+        const fragment = init.getSource();
+        path.replaceWith(path.context.code.template`checked = ${fragment} ?? ${fragment}`);
+      },
+    },
+  });
+  const upgradeCalls = defineNativePlugin({
+    name: 'upgrade-calls',
+    prepare: () => ({ fields: { CallExpression: ['calleeName'] } }),
+    visitor: {
+      CallExpression(path) {
+        if (path.node.calleeName === 'compute') path.replaceWith('compute2()');
+      },
+    },
+  });
+  const result = transform(
+    source,
+    'fixture.js',
+    defineNativePipeline({
+      phases: [{ name: 'transform', plugins: [duplicate, upgradeCalls] }],
+    }),
+  );
+  assert.equal(result.status, 'complete');
+  assert.equal(result.code, 'const checked = compute2() ?? compute2();\n');
+});
+
+test('rejects circular source copies', () => {
+  const source = 'function loop() { seed(); }\n';
+  const selfCopy = defineNativePlugin({
+    name: 'self-copy',
+    prepare: () => ({ fields: { Function: ['bodyStart', 'bodyEnd'] } }),
+    visitor: {
+      Function(path) {
+        path.prependToBody(path.getSource());
+      },
+    },
+  });
+  assert.throws(
+    () =>
+      transform(
+        source,
+        'fixture.js',
+        defineNativePipeline({ phases: [{ name: 'transform', plugins: [selfCopy] }] }),
+      ),
+    /circular source copy .*\(owner: self-copy\)/,
+  );
+});
+
+test('rejects copies whose range is partially overlapped by another edit', () => {
+  const source = 'const a = 1; const b = 2;\n';
+  const secondDeclaration = source.indexOf('const b');
+  const copySecond = defineNativePlugin({
+    name: 'copy-second',
+    visitor: {
+      VariableDeclaration(path) {
+        if (path.start === secondDeclaration) path.insertAfter(path.getSource());
+      },
+    },
+  });
+  const straddle = defineNativePlugin({
+    name: 'straddler',
+    visitor: {
+      Program(path) {
+        // Replace across the copied declaration's start boundary.
+        path.context.editor.update(secondDeclaration - 2, secondDeclaration + 5, 'X');
+      },
+    },
+  });
+  assert.throws(
+    () =>
+      transform(
+        source,
+        'fixture.js',
+        defineNativePipeline({ phases: [{ name: 'transform', plugins: [copySecond, straddle] }] }),
+      ),
+    /partially overlaps .*\(owners: copy-second, straddler\)/,
+  );
+});
+
+test('degrades cross-phase fragments to text with a debug diagnostic', () => {
+  const source = 'const first = 1;\nconst second = target();\n';
+  const capture = defineNativePlugin({
+    name: 'capture-fragment',
+    prepare: () => ({ metadataWrites: ['captured'], fields: { CallExpression: ['calleeName'] } }),
+    visitor: {
+      CallExpression(path, _state) {
+        if (path.node.calleeName === 'target') {
+          path.context.metadata.set('captured', path.getSource());
+          path.replaceWith('renamed()');
+        }
+      },
+    },
+  });
+  const reuse = defineNativePlugin({
+    name: 'reuse-fragment',
+    prepare: () => ({ identifierNames: ['first'], fields: { Identifier: ['name'] } }),
+    visitor: {
+      Identifier(path) {
+        const captured = path.context.metadata.get('captured') as SourceFragment | undefined;
+        if (captured) path.replaceWith(captured);
+      },
+    },
+  });
+  const result = transform(
+    source,
+    'fixture.js',
+    defineNativePipeline({
+      phases: [
+        { name: 'one', plugins: [capture] },
+        { name: 'two', requiresPrintedInput: true, plugins: [reuse] },
+      ],
+    }),
+    { debugPerformance: true },
+  );
+  assert.equal(result.status, 'complete');
+  // The stale copy carries phase-one text; the live phase-one range was edited.
+  assert.ok(result.code.includes('const target() = 1;'));
+  assert.ok(result.code.includes('renamed()'));
+  assert.ok(result.diagnostics.some(diagnostic => diagnostic.code === 'provenance-degraded'));
+});
+
+test('counts provenance degradations in metadata without debug tracing', () => {
+  const source = 'const first = 1;\nconst second = target();\n';
+  const capture = defineNativePlugin({
+    name: 'capture-fragment',
+    prepare: () => ({ metadataWrites: ['captured'], fields: { CallExpression: ['calleeName'] } }),
+    visitor: {
+      CallExpression(path) {
+        if (path.node.calleeName === 'target') {
+          path.context.metadata.set('captured', path.getSource());
+          path.replaceWith('renamed()');
+        }
+      },
+    },
+  });
+  const reuse = defineNativePlugin({
+    name: 'reuse-fragment',
+    prepare: () => ({ identifierNames: ['first'], fields: { Identifier: ['name'] } }),
+    visitor: {
+      Identifier(path) {
+        const captured = path.context.metadata.get('captured') as SourceFragment | undefined;
+        if (captured) path.replaceWith(captured);
+      },
+    },
+  });
+  const result = transform(
+    source,
+    'fixture.js',
+    defineNativePipeline({
+      phases: [
+        { name: 'one', plugins: [capture] },
+        { name: 'two', requiresPrintedInput: true, plugins: [reuse] },
+      ],
+    }),
+  );
+  assert.equal(result.status, 'complete');
+  assert.equal(result.metadata.provenanceDegradations, 1);
+  assert.ok(!result.diagnostics.some(diagnostic => diagnostic.code === 'provenance-degraded'));
+});
+
+test('ensureHelper inserts each key once at the end of the directive prologue', () => {
+  const source = "#!/usr/bin/env node\n'use strict';\nconst value = compute();\n";
+  const first = defineNativePlugin({
+    name: 'first-ensurer',
+    pre(context) {
+      context.ensureHelper('shared/flag', 'var __flag = true;');
+      context.ensureHelper('first/own', 'var __first = 1;');
+    },
+  });
+  const second = defineNativePlugin({
+    name: 'second-ensurer',
+    pre(context) {
+      context.ensureHelper('shared/flag', 'var __flag = true;');
+    },
+  });
+  const result = transform(
+    source,
+    'fixture.js',
+    defineNativePipeline({ phases: [{ name: 'one', plugins: [first, second] }] }),
+  );
+  assert.equal(result.status, 'complete');
+  assert.equal(
+    result.code,
+    "#!/usr/bin/env node\n'use strict';\nvar __flag = true;\nvar __first = 1;\nconst value = compute();\n",
+  );
+});
+
+test('ensureHelper re-ensures are no-ops in later phases', () => {
+  const source = 'const value = 1;\n';
+  const ensurer = (name: string) =>
+    defineNativePlugin({
+      name,
+      pre(context) {
+        context.ensureHelper('shared/flag', 'var __flag = true;');
+      },
+    });
+  const result = transform(
+    source,
+    'fixture.js',
+    defineNativePipeline({
+      phases: [
+        { name: 'one', plugins: [ensurer('one-ensurer')] },
+        { name: 'two', requiresPrintedInput: true, plugins: [ensurer('two-ensurer')] },
+      ],
+    }),
+  );
+  assert.equal(result.status, 'complete');
+  assert.equal(result.code, 'var __flag = true;\nconst value = 1;\n');
+});
+
+test('ensureHelper conflicts loudly when one key realizes different content', () => {
+  const source = 'const value = 1;\n';
+  const ensurer = (name: string, content: string) =>
+    defineNativePlugin({
+      name,
+      pre(context) {
+        context.ensureHelper('shared/flag', content);
+      },
+    });
+  assert.throws(
+    () =>
+      transform(
+        source,
+        'fixture.js',
+        defineNativePipeline({
+          phases: [
+            {
+              name: 'one',
+              plugins: [
+                ensurer('owner-a', 'var __flag = 1;'),
+                ensurer('owner-b', 'var __flag = 2;'),
+              ],
+            },
+          ],
+        }),
+      ),
+    /helper shared\/flag .*owner-b.*owner-a/,
+  );
+});
+
+test('collapses byte-identical convergent edits to the first owner', () => {
+  const source = 'const value = compute();\n';
+  const upgrade = (name: string) =>
+    defineNativePlugin({
+      name,
+      prepare: () => ({ fields: { CallExpression: ['calleeName'] } }),
+      visitor: {
+        CallExpression(path) {
+          if (path.node.calleeName === 'compute') path.replaceWith('compute2()');
+        },
+      },
+    });
+  const result = transform(
+    source,
+    'fixture.js',
+    defineNativePipeline({
+      phases: [
+        { name: 'transform', plugins: [upgrade('first-upgrade'), upgrade('second-upgrade')] },
+      ],
+    }),
+    { debugPerformance: true },
+  );
+  assert.equal(result.status, 'complete');
+  assert.equal(result.code, 'const value = compute2();\n');
+  const performance = result.metadata.performance as { convergentEditsDeduped: number };
+  assert.equal(performance.convergentEditsDeduped, 1);
+});
+
+test('still rejects convergent edits whose content differs', () => {
+  const source = 'const value = compute();\n';
+  const upgrade = (name: string, replacement: string) =>
+    defineNativePlugin({
+      name,
+      prepare: () => ({ fields: { CallExpression: ['calleeName'] } }),
+      visitor: {
+        CallExpression(path) {
+          if (path.node.calleeName === 'compute') path.replaceWith(replacement);
+        },
+      },
+    });
+  assert.throws(
+    () =>
+      transform(
+        source,
+        'fixture.js',
+        defineNativePipeline({
+          phases: [
+            {
+              name: 'transform',
+              plugins: [
+                upgrade('first-upgrade', 'compute2()'),
+                upgrade('second-upgrade', 'compute3()'),
+              ],
+            },
+          ],
+        }),
+      ),
+    /owners: first-upgrade, second-upgrade/,
+  );
+});
+
+test('sourceSlice returns a provenance-carrying fragment', () => {
+  const source = 'const value = compute();\n';
+  const guard = defineNativePlugin({
+    name: 'guard-calls',
+    prepare: () => ({ fields: { CallExpression: ['calleeName'] } }),
+    visitor: {
+      CallExpression(path) {
+        const slice = path.context.sourceSlice(path.start, path.end);
+        assert.throws(() => `${slice}`, /carries provenance/);
+        assert.throws(() => path.context.sourceSlice(path.start, source.length + 1));
+        path.replaceWith(path.context.code.template`guard(${slice})`);
+      },
+    },
+  });
+  const result = transform(
+    source,
+    'fixture.js',
+    defineNativePipeline({ phases: [{ name: 'transform', plugins: [guard] }] }),
+  );
+  assert.equal(result.status, 'complete');
+  assert.equal(result.code, 'const value = guard(compute());\n');
+});
+
+test('repeated copies of one range share a render and reflect inner edits', () => {
+  const source = 'function seed() { return compute(); }\nalpha();\nbeta();\n';
+  const mirror = defineNativePlugin({
+    name: 'mirror',
+    prepare: () => ({ fields: { CallExpression: ['calleeName'] } }),
+    createState: () => ({ fragment: undefined as SourceFragment | undefined }),
+    visitor: {
+      Function(path, state) {
+        state.fragment = path.getSource();
+      },
+      CallExpression(path, state) {
+        if (path.node.calleeName !== 'compute' && state.fragment) {
+          path.insertAfter(state.fragment);
+        }
+      },
+    },
+  });
+  const rewrite = defineNativePlugin({
+    name: 'rewrite',
+    prepare: () => ({ fields: { CallExpression: ['calleeName'] } }),
+    visitor: {
+      CallExpression(path) {
+        if (path.node.calleeName === 'compute') path.replaceWith('compute2()');
+      },
+    },
+  });
+  const result = transform(
+    source,
+    'fixture.js',
+    defineNativePipeline({ phases: [{ name: 'transform', plugins: [mirror, rewrite] }] }),
+  );
+  assert.equal(result.status, 'complete');
+  assert.equal(result.code.match(/compute2\(\)/g)?.length, 3);
+  assert.ok(!result.code.includes('compute()'));
+});
+
+test('maps copied content back to its original tokens', () => {
+  const source = 'function helper() { return VALUE; }\nlater();\n';
+  const duplicate = defineNativePlugin({
+    name: 'duplicate-helper',
+    visitor: {
+      Function(path) {
+        path.insertAfter(path.getSource());
+      },
+    },
+  });
+  const rename = defineNativePlugin({
+    name: 'rename-value',
+    prepare: () => ({ identifierNames: ['VALUE'], fields: { Identifier: ['name'] } }),
+    visitor: {
+      Identifier(path) {
+        if (path.node.name === 'VALUE')
+          path.replaceWith({ code: 'WRAPPED', mapping: 'anchor-start', names: ['VALUE'] });
+      },
+    },
+  });
+  const result = transform(
+    source,
+    'fixture.js',
+    defineNativePipeline({ phases: [{ name: 'transform', plugins: [duplicate, rename] }] }),
+    { sourceMapMode: 'boundary' },
+  );
+  assert.equal(result.status, 'complete');
+  const copyStart = result.code.indexOf('function helper', 1);
+  const innerIdentifier = result.code.indexOf('WRAPPED', copyStart);
+  assert.ok(copyStart > 0 && innerIdentifier > copyStart);
+  const map = new TraceMap({
+    version: 3,
+    sources: ['fixture.js'],
+    names: result.map.names,
+    mappings: result.map.mappings,
+  });
+  // The copy's interior maps to the same source tokens as the original.
+  assert.deepEqual(originalPositionFor(map, { line: 1, column: copyStart }), {
+    source: 'fixture.js',
+    line: 1,
+    column: 0,
+    name: null,
+  });
+  assert.deepEqual(originalPositionFor(map, { line: 1, column: innerIdentifier }), {
+    source: 'fixture.js',
+    line: 1,
+    column: source.indexOf('VALUE'),
+    name: 'VALUE',
+  });
 });
