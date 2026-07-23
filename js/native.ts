@@ -87,6 +87,14 @@ interface NativeBinding {
     data: Buffer,
     sourceMapMode?: string,
   ): { code: string; map: NativeVlqMap };
+  commitDecodedBuffer(
+    source: string,
+    filename: string,
+    data: Buffer,
+    sourceMapMode?: string,
+  ): { code: string; map: Buffer };
+  composeDecodedChain(layers: Buffer[]): NativeVlqMap;
+  composeMappings(outer: string, inner: string, outerNameCount: number): string;
   materializeRoutedBuffer(
     source: string,
     filename: string,
@@ -94,7 +102,6 @@ interface NativeBinding {
     rootStart?: number,
     rootEnd?: number,
   ): Buffer;
-  composeMappings(outer: string, inner: string, outerNameCount: number): string;
   generateFunctionMap(source: string, filename: string): FunctionMap;
   validateExpression(code: string, parserMode?: string): void;
   validateStatements(code: string, parserMode?: string): void;

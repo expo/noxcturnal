@@ -103,6 +103,17 @@ export interface PluginContext {
    * convention (`pluginName/helper`) unless deliberately shared.
    */
   ensureHelper(key: string, code: Code): void;
+  /**
+   * Replace a range under a keyed, idempotent intent, once per transform.
+   *
+   * The registry lives on the transform: re-ensuring a key with identical realized
+   * content — from any plugin, or from a later phase — is a no-op, so plugins that
+   * deliberately share a key claim the same tokens through one edit owned by the
+   * first registrant. The same key with divergent realized content (or a different
+   * range in the same phase) is a loud error naming both owners. Distinct keys on
+   * overlapping ranges stay ordinary overlap conflicts.
+   */
+  ensureReplace(key: string, start: number, end: number, code: Code): void;
   /** A provenance-carrying fragment of the current phase's source. */
   sourceSlice(start: number, end: number): SourceFragment;
   readonly code: CodeFactory;
@@ -216,6 +227,9 @@ export interface NativeNodePath<T extends NodeView = NodeView> {
   remove(): void;
   insertBefore(code: Code): void;
   insertAfter(code: Code): void;
+  /** Relocate this node's source range: contained edits from any plugin apply
+   * inside the moved content wherever it lands. */
+  moveTo(destination: number): void;
   unshiftContainer(key: 'body', code: Code | readonly Code[]): void;
   pushContainer(key: 'body', code: Code | readonly Code[]): void;
   addComment(position: 'leading' | 'trailing' | 'inner', content: string, line?: boolean): void;
@@ -330,6 +344,8 @@ export class NativeTransformError extends Error {
   constructor(
     message: string,
     readonly diagnostics: Diagnostic[],
+    /** Owning plugin names of a conflict, structured for fallback telemetry. */
+    readonly owners?: readonly string[],
   ) {
     super(message);
     this.name = 'NativeTransformError';
@@ -922,34 +938,16 @@ export class NativeTransformSession {
   }
   commit(edits: EditCommand[], mode?: string) {
     this.#assertOpen();
-    try {
-      return {
-        ...native.commitPackedBuffer(this.source, this.#nativeFilename, packEdits(edits), mode),
-        edits,
-        deduped: 0,
-      };
-    } catch (error) {
-      // Convergent identical edits are collapsed only on the failure path, so the
-      // common case pays nothing for the check.
-      const { edits: deduped, dropped } = dedupeConvergentEdits(edits);
-      if (dropped > 0) {
-        try {
-          return {
-            ...native.commitPackedBuffer(
-              this.source,
-              this.#nativeFilename,
-              packEdits(deduped),
-              mode,
-            ),
-            edits: deduped,
-            deduped: dropped,
-          };
-        } catch (retryError) {
-          throw attributeEditConflict(retryError, deduped);
-        }
-      }
-      throw attributeEditConflict(error, edits);
-    }
+    return commitWithDedupe(edits, data =>
+      native.commitPackedBuffer(this.source, this.#nativeFilename, data, mode),
+    );
+  }
+  /** Commit whose map stays a packed decoded layer for later chain composition. */
+  commitDecoded(edits: EditCommand[], mode?: string) {
+    this.#assertOpen();
+    return commitWithDedupe(edits, data =>
+      native.commitDecodedBuffer(this.source, this.#nativeFilename, data, mode),
+    );
   }
   close(): void {
     if (!this.#closed) this.#native?.close();
@@ -961,6 +959,27 @@ export class NativeTransformSession {
   #binding(): NativeIndexedSessionBinding {
     this.#assertOpen();
     return (this.#native ??= new native.NativeIndexedSession(this.source, this.#nativeFilename));
+  }
+}
+
+function commitWithDedupe<Committed extends object>(
+  edits: EditCommand[],
+  commit: (data: Buffer) => Committed,
+): Committed & { edits: EditCommand[]; deduped: number } {
+  try {
+    return { ...commit(packEdits(edits)), edits, deduped: 0 };
+  } catch (error) {
+    // Convergent identical edits are collapsed only on the failure path, so the
+    // common case pays nothing for the check.
+    const { edits: deduped, dropped } = dedupeConvergentEdits(edits);
+    if (dropped > 0) {
+      try {
+        return { ...commit(packEdits(deduped)), edits: deduped, deduped: dropped };
+      } catch (retryError) {
+        throw attributeEditConflict(retryError, deduped);
+      }
+    }
+    throw attributeEditConflict(error, edits);
   }
 }
 
@@ -1597,10 +1616,11 @@ export function transform(
   const phasePlan = compilePhasePlan(pipeline);
   const phasePlanMs = options.debugPerformance ? performance.now() - phasePlanStarted : 0;
   let phaseSource = source;
-  let finalMap: NativeTransformResult['map'] | null = options.inputSourceMap ?? null;
+  const inputMap = options.inputSourceMap ?? null;
+  let finalMap: NativeTransformResult['map'] | null = null;
   const metadata: Record<string, unknown> = {};
   const diagnostics: Diagnostic[] = [];
-  const helpers = new Map<string, HelperRegistration>();
+  const intents = new Map<string, IntentRegistration>();
   const provenance = { degradations: 0 };
   if (options.debugPerformance)
     metadata.performance = {
@@ -1636,11 +1656,9 @@ export function transform(
       totalMs: 0,
     };
   const allStates: { plugin: NativePlugin<any, any>; state: any }[] = [];
-  const deferredMapLayers: {
-    source: string;
-    edits: EditCommand[];
-    map?: NativeTransformResult['map'];
-  }[] = [];
+  // Committed phase mappings in packed decoded form, earliest phase first; the
+  // chain composes and encodes once after the last phase.
+  const mapLayers: Buffer[] = [];
   let openSession: NativeTransformSession | null = null;
   let reusableSession: NativeTransformSession | null = null;
   let reusableRoutedBatch: { manifest: Buffer; batch: RoutedEventBatch } | null = null;
@@ -1871,7 +1889,7 @@ export function transform(
         requiresIndex || includeParent || includeScope,
         compiledRoutes,
         dispatchRoutes,
-        helpers,
+        intents,
         provenance,
       );
       if (options.debugPerformance)
@@ -1962,34 +1980,46 @@ export function transform(
         reusableRoutedBatch = { manifest, batch };
         continue;
       }
-      const layerSource = phaseSource;
-      const realizeMap = isFinalPhase || phasePlan[phaseIndex].requiresRealizedMap;
+      // The sole final layer encodes VLQ directly; any earlier committed layer keeps
+      // its mapping in packed decoded form so the chain encodes once at the end.
+      const decodedLayer = !(isFinalPhase && mapLayers.length === 0);
       const renderStarted = options.debugPerformance ? performance.now() : 0;
-      const committed = session.commit(effectiveEdits, realizeMap ? options.sourceMapMode : 'none');
-      if (options.debugPerformance)
+      const recordCommit = (
+        committed: { edits: EditCommand[]; deduped: number; code: string },
+        segments: number,
+        encoded: boolean,
+      ) => {
         performanceCounters(metadata).renderAndMapMs += performance.now() - renderStarted;
-      phaseSource = committed.code;
-      if (phaseExecution) phaseExecution.render = 'committed';
-      pendingEdits = [];
-      if (options.debugPerformance) {
-        const performance = metadata.performance as {
+        const performanceMetadata = metadata.performance as {
           editCount: number;
           convergentEditsDeduped: number;
           renderedBytes: number;
           mappingSegments: number;
           mapEncodes: number;
         };
-        performance.editCount += committed.edits.length;
-        performance.convergentEditsDeduped += committed.deduped;
-        performance.renderedBytes += Buffer.byteLength(committed.code);
-        performance.mappingSegments += countMappingSegments(committed.map.mappings);
-        if (realizeMap) performance.mapEncodes++;
+        performanceMetadata.editCount += committed.edits.length;
+        performanceMetadata.convergentEditsDeduped += committed.deduped;
+        performanceMetadata.renderedBytes += Buffer.byteLength(committed.code);
+        performanceMetadata.mappingSegments += segments;
+        if (encoded) performanceMetadata.mapEncodes++;
+      };
+      if (decodedLayer) {
+        const committed = session.commitDecoded(effectiveEdits, options.sourceMapMode);
+        phaseSource = committed.code;
+        mapLayers.push(committed.map);
+        if (options.debugPerformance)
+          recordCommit(committed, decodedSegmentCount(committed.map), false);
+      } else {
+        const committed = session.commit(effectiveEdits, options.sourceMapMode);
+        phaseSource = committed.code;
+        // The sole final layer: the pipeline's own map is exactly this commit's map,
+        // pending only input-map composition at the boundary below.
+        finalMap = committed.map;
+        if (options.debugPerformance)
+          recordCommit(committed, countMappingSegments(committed.map.mappings), true);
       }
-      deferredMapLayers.push({
-        source: layerSource,
-        edits: [...committed.edits],
-        map: realizeMap ? committed.map : undefined,
-      });
+      if (phaseExecution) phaseExecution.render = 'committed';
+      pendingEdits = [];
       session.close();
       if (options.debugPerformance && phaseIndex + 1 < pipeline.phases.length) {
         const performance = metadata.performance as { reparses: number };
@@ -2001,36 +2031,27 @@ export function transform(
     }
     reusableSession?.close();
     openSession = null;
-    for (const layer of deferredMapLayers) {
-      const encodedDeferredMap = layer.map == null;
-      const committed = layer.map
-        ? { map: layer.map }
-        : native.commitPackedBuffer(
-            layer.source,
-            parserFilename(filename, options.parser),
-            packEdits(layer.edits),
-            options.sourceMapMode,
-          );
-      if (encodedDeferredMap && options.debugPerformance) {
-        const performance = metadata.performance as {
-          mapEncodes: number;
-          mappingSegments: number;
-        };
-        performance.mapEncodes++;
-        performance.mappingSegments += countMappingSegments(committed.map.mappings);
+    if (mapLayers.length > 0) {
+      const composeStarted = options.debugPerformance ? performance.now() : 0;
+      finalMap = native.composeDecodedChain(mapLayers);
+      if (options.debugPerformance) {
+        performanceCounters(metadata).renderAndMapMs += performance.now() - composeStarted;
+        (metadata.performance as { mapEncodes: number }).mapEncodes++;
       }
-      if (finalMap == null) {
-        finalMap = committed.map;
-      } else {
-        finalMap = {
-          mappings: native.composeMappings(
-            committed.map.mappings,
-            finalMap.mappings,
-            committed.map.names.length,
-          ),
-          names: [...committed.map.names, ...finalMap.names],
-        };
-      }
+    }
+    // Input source maps compose once at the boundary where they enter.
+    if (inputMap != null) {
+      finalMap =
+        finalMap == null
+          ? inputMap
+          : {
+              mappings: native.composeMappings(
+                finalMap.mappings,
+                inputMap.mappings,
+                finalMap.names.length,
+              ),
+              names: [...finalMap.names, ...inputMap.names],
+            };
     }
     for (const { plugin, state } of allStates) plugin.cleanup?.('complete', state);
     const functionMapStarted = options.debugPerformance ? performance.now() : 0;
@@ -2068,11 +2089,19 @@ export function transform(
     }
     if (error instanceof NativeTransformError) throw error;
     const message = error instanceof Error ? error.message : String(error);
-    throw new NativeTransformError(message, [
-      ...diagnostics,
-      { code: 'native-transform-error', message },
-    ]);
+    throw new NativeTransformError(
+      message,
+      [...diagnostics, { code: 'native-transform-error', message }],
+      (error as Error & { owners?: readonly string[] }).owners,
+    );
   }
+}
+
+/** Segment count of a packed decoded layer buffer (see the native layer layout). */
+function decodedSegmentCount(layer: Buffer): number {
+  if (layer.length < 12) return 0;
+  const segmentsOffset = layer.readUInt32LE(4);
+  return (layer.length / 4 - segmentsOffset) / 5;
 }
 
 function countMappingSegments(mappings: string): number {
@@ -2114,7 +2143,7 @@ function createDispatcher(
   cacheEvents: boolean,
   compiledRoutes: readonly CompiledRouteTemplate[],
   dispatchRoutes: readonly DispatchRoute[],
-  helpers: Map<string, HelperRegistration>,
+  intents: Map<string, IntentRegistration>,
   provenance: { degradations: number },
 ): Dispatcher {
   let order = 0;
@@ -2140,6 +2169,43 @@ function createDispatcher(
       stopped: false,
       skipped: undefined,
       context: undefined as unknown as PluginContext,
+    };
+    const realizeIntentContent = (code: Code): RealizedContent =>
+      realizeContent(session, code, (message, fragment) => {
+        provenance.degradations++;
+        if (optionsPerformance(metadata))
+          diagnostics.push({
+            code: 'provenance-degraded',
+            message,
+            plugin: plugin.name,
+            phase: phase.name,
+            start: fragment.start,
+            end: fragment.end,
+          });
+      });
+    /** Register `(kind, key)` for this plugin, or return the existing registration
+     * when the intent is already claimed with identical realized content. */
+    const ensureIntent = (
+      kind: string,
+      key: string,
+      describe: string,
+      realized: RealizedContent,
+      range?: { start: number; end: number },
+    ): IntentRegistration | null => {
+      const composite = `${kind}\u0000${key}`;
+      const existing = intents.get(composite);
+      if (existing) {
+        if (!identicalRealizedContent(existing.realized, realized))
+          throw Object.assign(
+            new Error(
+              `${describe} realized different content for ${plugin.name} than for its first registrant ${existing.owner}`,
+            ),
+            { owners: [plugin.name, existing.owner] },
+          );
+        return existing;
+      }
+      intents.set(composite, { owner: plugin.name, realized, phase: phase.name, ...range });
+      return null;
     };
     const context: PluginContext = {
       filename: session.filename,
@@ -2187,37 +2253,49 @@ function createDispatcher(
         );
       },
       ensureHelper: (key, code) => {
-        const realized = realizeContent(session, code, (message, fragment) => {
-          provenance.degradations++;
-          if (optionsPerformance(metadata))
-            diagnostics.push({
-              code: 'provenance-degraded',
-              message,
-              plugin: plugin.name,
-              phase: phase.name,
-              start: fragment.start,
-              end: fragment.end,
-            });
-        });
-        const existing = helpers.get(key);
-        if (existing) {
-          if (!identicalRealizedContent(existing.realized, realized))
-            throw new Error(
-              `helper ${key} realized different content for ${plugin.name} than for its first registrant ${existing.owner}`,
-            );
-          return;
-        }
-        helpers.set(key, { owner: plugin.name, realized });
+        const realized = realizeIntentContent(code);
+        if (ensureIntent('helper', key, `helper ${key}`, realized)) return;
         if (prologueOffset < 0) prologueOffset = directivePrologueEnd(session.source);
         const prefix =
           prologueOffset > 0 && session.source[prologueOffset - 1] !== '\n' ? '\n' : '';
         edits.push({
-          kind: 'AppendLeft',
+          kind: 'Prologue',
           start: prologueOffset,
           end: prologueOffset,
           ...(realized.contentParts
             ? { contentParts: [...(prefix ? [prefix] : []), ...realized.contentParts, '\n'] }
             : { content: `${prefix}${realized.content}\n` }),
+          owner: plugin.name,
+          order: order++,
+        });
+      },
+      ensureReplace: (key, start, end, code) => {
+        if (!(start >= 0 && end >= start && end <= session.source.length))
+          throw new Error(`invalid replacement intent range ${start}..${end}`);
+        const realized = realizeIntentContent(code);
+        const existing = ensureIntent('replace', key, `replacement intent ${key}`, realized, {
+          start,
+          end,
+        });
+        if (existing) {
+          // Ranges are phase coordinates: within the registering phase the intent
+          // binds one exact range; later phases re-ensure content only.
+          if (existing.phase === phase.name && (existing.start !== start || existing.end !== end))
+            throw Object.assign(
+              new Error(
+                `replacement intent ${key} targets ${start}..${end} for ${plugin.name} but ${existing.start}..${existing.end} for its first registrant ${existing.owner}`,
+              ),
+              { owners: [plugin.name, existing.owner] },
+            );
+          return;
+        }
+        edits.push({
+          kind: 'Replace',
+          start,
+          end,
+          ...(realized.contentParts
+            ? { contentParts: realized.contentParts }
+            : { content: realized.content }),
           owner: plugin.name,
           order: order++,
         });
@@ -2870,6 +2948,18 @@ class NodePathImpl implements NativeNodePath {
   insertAfter(content: Code): void {
     this.#insert('AppendLeft', this.event.end, content);
   }
+  moveTo(destination: number): void {
+    if (destination > this.event.start && destination < this.event.end)
+      throw new Error('move destination cannot be inside the moved node');
+    this.runtime.edits.push({
+      kind: 'Move',
+      start: this.event.start,
+      end: this.event.end,
+      destination,
+      owner: this.runtime.owner,
+      order: this.runtime.nextOrder(),
+    });
+  }
   unshiftContainer(key: 'body', code: Code | readonly Code[]): void {
     if (key !== 'body') throw new Error(`Unsupported container: ${key}`);
     this.#insert('AppendRight', Number(this.node.bodyStart ?? this.event.start), code);
@@ -3122,9 +3212,15 @@ function directivePrologueEnd(source: string): number {
   return offset;
 }
 
-interface HelperRegistration {
+/** A transform-level keyed intent: identical realized content dedupes to the first
+ * owner, divergent content fails loudly naming both owners. Helpers were the first
+ * intent kind; range intents (`ensureReplace`) bind a range within their phase. */
+interface IntentRegistration {
   owner: string;
   realized: RealizedContent;
+  phase: string;
+  start?: number;
+  end?: number;
 }
 
 function identicalRealizedContent(a: RealizedContent, b: RealizedContent): boolean {
@@ -3223,10 +3319,19 @@ function attributeEditConflict(error: unknown, edits: readonly EditCommand[]): u
   if (!(error instanceof Error)) return error;
   const match =
     /overlapping edits at (\d+)\.\.(\d+) and (\d+)\.\.(\d+)/.exec(error.message) ??
-    /copied range in edit (\d+)\.\.(\d+) partially overlaps edit (\d+)\.\.(\d+)/.exec(
+    /(?:copied|moved) range in edit (\d+)\.\.(\d+) partially overlaps edit (\d+)\.\.(\d+)/.exec(
       error.message,
     ) ??
-    /circular source copy in edit (\d+)\.\.(\d+) through edit (\d+)\.\.(\d+)/.exec(error.message);
+    /circular source copy in edit (\d+)\.\.(\d+) through edit (\d+)\.\.(\d+)/.exec(error.message) ??
+    /overlapping moved ranges at (\d+)\.\.(\d+) and (\d+)\.\.(\d+)/.exec(error.message) ??
+    /move of (\d+)\.\.(\d+) lands inside moved range (\d+)\.\.(\d+)/.exec(error.message) ??
+    /moved range at (\d+)\.\.(\d+) is partially overlapped by edit at (\d+)\.\.(\d+)/.exec(
+      error.message,
+    ) ??
+    /moved range at (\d+)\.\.(\d+) conflicts with covering edit at (\d+)\.\.(\d+)/.exec(
+      error.message,
+    ) ??
+    /edit at (\d+)\.\.(\d+) copies removed range (\d+)\.\.(\d+)/.exec(error.message);
   if (!match) return error;
   const findEdit = (start: number, end: number, exclude?: EditCommand) =>
     edits.find(
@@ -3243,10 +3348,13 @@ function attributeEditConflict(error: unknown, edits: readonly EditCommand[]): u
     sameRange ? firstEdit : undefined,
   );
   const first = firstEdit?.owner ?? 'unknown';
+  const owners =
+    sameRange && secondEdit == null ? [first] : [first, secondEdit?.owner ?? 'unknown'];
   error.message +=
-    sameRange && secondEdit == null
-      ? ` (owner: ${first})`
-      : ` (owners: ${first}, ${secondEdit?.owner ?? 'unknown'})`;
+    owners.length === 1 ? ` (owner: ${first})` : ` (owners: ${owners[0]}, ${owners[1]})`;
+  // Structured owners ride along so consumers can aggregate recurring conflict
+  // pairs from fallback telemetry without parsing messages.
+  (error as Error & { owners?: readonly string[] }).owners = owners;
   return error;
 }
 
@@ -3265,7 +3373,7 @@ function identicalContentParts(
 }
 
 function identicalConvergentEdit(a: EditCommand, b: EditCommand): boolean {
-  if (a.kind !== b.kind || a.content !== b.content) return false;
+  if (a.kind !== b.kind || a.content !== b.content || a.destination !== b.destination) return false;
   if ((a.mapping ?? 'Sourceless') !== (b.mapping ?? 'Sourceless')) return false;
   const aNames = a.names ?? [];
   const bNames = b.names ?? [];
@@ -3862,8 +3970,8 @@ function makeEditor(
   const leading = () => source.length - source.trimStart().length;
   const trailing = () => source.length - source.trimEnd().length;
   return {
-    append: content => push('AppendLeft', source.length, source.length, content),
-    prepend: content => push('PrependRight', 0, 0, content),
+    append: content => push('Suffix', source.length, source.length, content),
+    prepend: content => push('Prefix', 0, 0, content),
     appendLeft: (offset, content) => push('AppendLeft', offset, offset, content),
     prependLeft: (offset, content) => push('PrependLeft', offset, offset, content),
     appendRight: (offset, content) => push('AppendRight', offset, offset, content),
@@ -3874,8 +3982,7 @@ function makeEditor(
     move(start, end, destination) {
       if (destination > start && destination < end)
         throw new Error('move destination cannot be inside moved range');
-      push('Remove', start, end);
-      push('PrependRight', destination, destination, source.slice(start, end));
+      edits.push({ kind: 'Move', start, end, destination, owner, order: nextOrder() });
     },
     reset(start, end) {
       for (let index = edits.length - 1; index >= 0; index--)

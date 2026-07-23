@@ -12,7 +12,9 @@ use oxc_syntax::node::NodeId;
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::constant_eval::constant_for_kind;
-pub use crate::event_types::{NativeCommitResult, NativeVlqMap, NodeField, ParseClassification};
+pub use crate::event_types::{
+    NativeCommitResult, NativeDecodedCommit, NativeVlqMap, NodeField, ParseClassification,
+};
 use crate::function_map::{FunctionMap, FunctionMapCollector};
 use crate::generated_event_schema::{
     NODE_TYPE_COUNT, ast_kind_protocol_id, field_key_id, field_key_name, node_type_id,
@@ -2094,7 +2096,9 @@ fn decode_route_manifest(data: &[u8]) -> Result<CompiledManifest> {
                 "invalid compiled node type id",
             ));
         }
-        if plugin_id >= plugin_count || order >= route_count.max(1) {
+        // `order` is a plugin ordinal (route-less plugins still advance it), so it is
+        // bounded by the plugin count, not the route count.
+        if plugin_id >= plugin_count || order >= plugin_count.max(1) {
             return Err(Error::new(
                 Status::InvalidArg,
                 "invalid compiled plugin or order id",
@@ -2785,15 +2789,15 @@ pub fn commit(
     commands: Vec<editor::EditCommand>,
     mode: Option<&str>,
 ) -> Result<NativeCommitResult> {
-    let edits = editor::resolve_copies(source, editor::normalize(source, commands)?)?;
+    let pieces = editor::build(source, commands)?;
     let (code, mappings, names) = if mode == Some("none") {
         (
-            sourcemap::render_code(source, &edits),
+            sourcemap::render_code(source, &pieces),
             String::new(),
             Vec::new(),
         )
     } else {
-        sourcemap::render(source, &edits, mode.unwrap_or("boundary"))
+        sourcemap::render(source, &pieces, mode.unwrap_or("boundary"))
     };
     Ok(NativeCommitResult {
         code,
@@ -2801,13 +2805,7 @@ pub fn commit(
     })
 }
 
-pub fn commit_packed(
-    source: &str,
-    filename: &str,
-    data: &[u8],
-    strings: Vec<String>,
-    mode: Option<&str>,
-) -> Result<NativeCommitResult> {
+fn decode_packed_words(data: &[u8], strings: Vec<String>) -> Result<Vec<editor::EditCommand>> {
     if !data.len().is_multiple_of(4) || data.len() < 4 {
         return Err(Error::new(Status::InvalidArg, "invalid packed edit buffer"));
     }
@@ -2868,6 +2866,10 @@ pub fn commit_packed(
             4 => editor::EditKind::AppendRight,
             5 => editor::EditKind::PrependRight,
             6 => editor::EditKind::AddSourceMapLocation,
+            7 => editor::EditKind::Prefix,
+            8 => editor::EditKind::Prologue,
+            9 => editor::EditKind::Suffix,
+            10 => editor::EditKind::Move,
             _ => return Err(Error::new(Status::InvalidArg, "invalid packed edit kind")),
         };
         let content_id = word(cursor + 3);
@@ -2899,9 +2901,13 @@ pub fn commit_packed(
             })
             .collect::<Result<Vec<_>>>()?;
         const PARTS_TAG: u32 = 0x8000_0000;
-        let (content, parts) =
-            if content_id == u32::MAX {
-                (None, Vec::new())
+        // Move edits reuse the content word as their destination offset.
+        let (content, parts, destination) =
+            if kind == editor::EditKind::Move {
+                let destination = (content_id != u32::MAX).then_some(content_id);
+                (None, Vec::new(), destination)
+            } else if content_id == u32::MAX {
+                (None, Vec::new(), None)
             } else if content_id & PARTS_TAG != 0 {
                 let entry = (content_id & !PARTS_TAG) as usize;
                 (
@@ -2910,6 +2916,7 @@ pub fn commit_packed(
                         .get(entry)
                         .cloned()
                         .ok_or_else(|| Error::new(Status::InvalidArg, "invalid packed parts id"))?,
+                    None,
                 )
             } else {
                 (
@@ -2917,6 +2924,7 @@ pub fn commit_packed(
                         Error::new(Status::InvalidArg, "invalid packed string id")
                     })?),
                     Vec::new(),
+                    None,
                 )
             };
         edits.push(editor::EditCommand {
@@ -2925,21 +2933,17 @@ pub fn commit_packed(
             end: word(cursor + 2),
             content,
             parts,
+            destination,
             mapping: Some(mapping),
             order: Some(word(cursor + 5)),
             names: Some(names),
         });
         cursor += 7 + name_count;
     }
-    commit(source, filename, edits, mode)
+    Ok(edits)
 }
 
-pub fn commit_packed_buffer(
-    source: &str,
-    filename: &str,
-    data: &[u8],
-    mode: Option<&str>,
-) -> Result<NativeCommitResult> {
+fn decode_packed_commands(data: &[u8]) -> Result<Vec<editor::EditCommand>> {
     if data.len() < 8 {
         return Err(Error::new(
             Status::InvalidArg,
@@ -2981,7 +2985,42 @@ pub fn commit_packed_buffer(
         );
         cursor += length;
     }
-    commit_packed(source, filename, &data[words_offset..], strings, mode)
+    decode_packed_words(&data[words_offset..], strings)
+}
+
+pub fn commit_packed_buffer(
+    source: &str,
+    filename: &str,
+    data: &[u8],
+    mode: Option<&str>,
+) -> Result<NativeCommitResult> {
+    commit(source, filename, decode_packed_commands(data)?, mode)
+}
+
+/// Commit that keeps the phase's mapping in packed decoded form instead of encoding
+/// VLQ: the rendered code feeds the next phase's parse while the layer buffer feeds
+/// `compose_decoded_chain` once the pipeline finishes.
+pub fn commit_decoded_buffer(
+    source: &str,
+    _filename: &str,
+    data: &[u8],
+    mode: Option<&str>,
+) -> Result<NativeDecodedCommit> {
+    let commands = decode_packed_commands(data)?;
+    let pieces = editor::build(source, commands)?;
+    let (code, layer) = sourcemap::render_decoded(source, &pieces, mode.unwrap_or("boundary"));
+    Ok(NativeDecodedCommit {
+        code,
+        map: layer.into(),
+    })
+}
+
+/// Compose packed decoded phase layers (earliest phase first) into the final
+/// encoded map, in one native call with a single VLQ encode.
+pub fn compose_decoded_chain(layers: &[&[u8]]) -> Result<NativeVlqMap> {
+    let (mappings, names) = sourcemap::compose_layer_chain(layers)
+        .ok_or_else(|| Error::new(Status::InvalidArg, "invalid decoded map layer chain"))?;
+    Ok(NativeVlqMap { mappings, names })
 }
 
 pub fn validate_expression(code: &str, parser_mode: Option<&str>) -> Result<()> {

@@ -25,6 +25,10 @@ const EDIT_KINDS: Record<EditCommand['kind'], number> = {
   AppendRight: 4,
   PrependRight: 5,
   AddSourceMapLocation: 6,
+  Prefix: 7,
+  Prologue: 8,
+  Suffix: 9,
+  Move: 10,
 };
 
 const EDIT_MAPPINGS: Record<NonNullable<EditCommand['mapping']>, number> = {
@@ -446,7 +450,10 @@ export function packEdits(edits: readonly EditCommand[]): Buffer {
   let partsEntryCount = 0;
   for (let index = 0; index < edits.length; index++) {
     const edit = edits[index];
-    if (edit.contentParts != null) {
+    if (edit.kind === 'Move') {
+      // Move edits reuse the content word as their destination offset.
+      contentWords[index] = edit.destination ?? MISSING_VALUE;
+    } else if (edit.contentParts != null) {
       contentWords[index] = PARTS_TAG | partsEntryCount++;
       partsData.push(edit.contentParts.length);
       for (const part of edit.contentParts) {

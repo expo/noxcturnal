@@ -40,6 +40,24 @@ pub fn commit_packed_buffer(
 }
 
 #[napi]
+pub fn commit_decoded_buffer(
+    source: String,
+    filename: String,
+    data: napi::bindgen_prelude::Buffer,
+    source_map_mode: Option<String>,
+) -> napi::Result<engine::NativeDecodedCommit> {
+    engine::commit_decoded_buffer(&source, &filename, &data, source_map_mode.as_deref())
+}
+
+#[napi]
+pub fn compose_decoded_chain(
+    layers: Vec<napi::bindgen_prelude::Buffer>,
+) -> napi::Result<engine::NativeVlqMap> {
+    let layers: Vec<&[u8]> = layers.iter().map(|layer| layer.as_ref()).collect();
+    engine::compose_decoded_chain(&layers)
+}
+
+#[napi]
 pub fn compose_mappings(outer: String, inner: String, outer_name_count: u32) -> String {
     sourcemap::compose(&outer, &inner, outer_name_count)
 }

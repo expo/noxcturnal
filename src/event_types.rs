@@ -26,3 +26,11 @@ pub struct NativeCommitResult {
     pub code: String,
     pub map: NativeVlqMap,
 }
+
+/// Commit result whose mapping stays in packed decoded layer form: an opaque buffer
+/// consumed by `composeDecodedChain`, never VLQ until final output.
+#[napi(object)]
+pub struct NativeDecodedCommit {
+    pub code: String,
+    pub map: napi::bindgen_prelude::Buffer,
+}

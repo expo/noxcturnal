@@ -39,6 +39,7 @@ The lazy decorators wrapper intentionally delegates to the complete Babel decora
 - Binding renames use Oxc semantic identities, not textual name matching, and preserve shorthand object/destructuring keys.
 - Scope ancestry comes from Oxc's complete semantic scope table through an on-demand packed integer buffer, so empty intermediate scopes are preserved without adding object transfer to ordinary event batches.
 - Ancestry and scope payloads are similarly opt-in through `PluginPlan.ancestry` and `semantics: ['scope']`; unused parent and scope words are omitted from the stateless packed hot path.
+- Transforms that legitimately share responsibility for the same tokens — dependency registration, ESM lowering, and polyfill rewrites converging on one import statement — should adopt `context.ensureReplace` intent keys instead of raw replacement, so the shared claim is an explicit contract (first owner wins, divergence is loud) rather than a byte-identical collision resolved by the convergent-edit fallback. `test/fitment.test.ts` expresses one such shared import-statement lowering.
 
 ## Remaining evidence gates
 

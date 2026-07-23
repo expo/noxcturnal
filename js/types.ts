@@ -47,7 +47,16 @@ export type EditKind =
   | 'PrependLeft'
   | 'AppendRight'
   | 'PrependRight'
-  | 'AddSourceMapLocation';
+  | 'AddSourceMapLocation'
+  // Output sections: prefix and suffix content assembles around the body instead of
+  // competing with body edits in insertion-affinity order; prologue content joins the
+  // body stream at the directive-prologue boundary in first-ensure order.
+  | 'Prefix'
+  | 'Prologue'
+  | 'Suffix'
+  // Relocation: the range leaves its place and its original-backed pieces render at
+  // `destination` with every contained edit applied.
+  | 'Move';
 
 export interface EditCommand {
   kind: EditKind;
@@ -57,6 +66,8 @@ export interface EditCommand {
   /** Deferred content: literal text and source-range copies realized at commit
    * against the same phase's edits. Mutually exclusive with `content`. */
   contentParts?: readonly (string | { start: number; end: number })[];
+  /** Relocation target for `Move` edits. */
+  destination?: number;
   mapping?: MappingPolicy;
   owner?: string;
   order?: number;

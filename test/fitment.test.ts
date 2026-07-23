@@ -247,3 +247,47 @@ test('expresses server-action extraction with captures, directives, scopes, and 
     names: ['_inlineAction'],
   });
 });
+
+test('expresses shared-token responsibility over one import statement through an intent key', () => {
+  // Two independent transforms both need the same import statement rewritten — the
+  // dependency collector lowers it to a require, and the polyfill rewriter needs the
+  // same lowering as its anchor. One intent key makes that shared responsibility an
+  // explicit contract instead of an accidental byte-identical collision.
+  const source = "import { fetch } from 'whatwg-fetch';\nfetch('/api');\n";
+  const claimImportLowering = (context: {
+    source: string;
+    ensureReplace(key: string, start: number, end: number, code: string): void;
+  }) => {
+    const statementEnd = context.source.indexOf(';\n') + 1;
+    context.ensureReplace(
+      'shared/import:whatwg-fetch',
+      0,
+      statementEnd,
+      "const { fetch } = require('whatwg-fetch');",
+    );
+  };
+  const dependencyCollector = defineNativePlugin({
+    name: 'dependency-collector',
+    prepare: () => ({ metadataWrites: ['dependencies'] }),
+    pre(context) {
+      claimImportLowering(context);
+      context.metadata.set('dependencies', ['whatwg-fetch']);
+    },
+  });
+  const polyfillRewriter = defineNativePlugin({
+    name: 'polyfill-rewriter',
+    pre(context) {
+      claimImportLowering(context);
+    },
+  });
+  const result = transform(
+    source,
+    'fixture.js',
+    defineNativePipeline({
+      phases: [{ name: 'lower', plugins: [dependencyCollector, polyfillRewriter] }],
+    }),
+  );
+  assert.equal(result.status, 'complete');
+  assert.equal(result.code, "const { fetch } = require('whatwg-fetch');\nfetch('/api');\n");
+  assert.deepEqual(result.metadata.dependencies, ['whatwg-fetch']);
+});
