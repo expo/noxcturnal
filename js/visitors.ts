@@ -16,7 +16,6 @@ import {
   packEdits,
   packFieldRequests,
   packRouteManifest,
-  routedParentIds,
   type NativeRouteManifestEntry,
   type PackedEventBatch,
   type RoutedEventBatch,
@@ -490,6 +489,7 @@ export class NativeTransformSession {
   #nativeFilename: string;
   #lineStarts: number[] | null = null;
   #scopeParents: Uint32Array | null = null;
+  #bindingIndex: { nameIds: Map<string, number>; keys: Set<number> } | null = null;
   #nativeParseCount = 0;
   constructor(
     readonly source: string,
@@ -756,20 +756,13 @@ export class NativeTransformSession {
     const words = new Uint32Array(data.buffer, data.byteOffset, 7);
     return this.#cacheSummary(nodeId, words, 0);
   }
-  prefetchEvents(nodeIds: readonly number[]): void {
+  /** Seed the event cache from a routed envelope's parent-summary sidecar. */
+  seedSummaries(entries: Uint32Array): void {
     this.#assertOpen();
-    const missing = [...new Set(nodeIds)].filter(nodeId => this.#eventCache[nodeId] === undefined);
-    if (missing.length === 0) return;
-    const data = this.#binding().nodeSummaryBuffers(missing);
-    if (data.byteLength !== missing.length * 7 * 4)
-      throw new Error('invalid native node summary buffer');
-    const words = new Uint32Array(
-      data.buffer,
-      data.byteOffset,
-      data.byteLength / Uint32Array.BYTES_PER_ELEMENT,
-    );
-    for (let index = 0; index < missing.length; index++)
-      this.#cacheSummary(missing[index]!, words, index * 7);
+    for (let offset = 0; offset < entries.length; offset += 8) {
+      const nodeId = entries[offset]!;
+      if (this.#eventCache[nodeId] === undefined) this.#cacheSummary(nodeId, entries, offset + 1);
+    }
   }
   #cacheSummary(nodeId: number, words: Uint32Array, offset: number): NativeEvent | undefined {
     const type = NODE_TYPES[words[offset]!] || 'Unknown';
@@ -795,12 +788,46 @@ export class NativeTransformSession {
     if (event) this.#eventCache[nodeId] = event;
     return event;
   }
-  /** The scope owning the nearest binding visible from `scopeId`, or null. */
+  /** The scope owning the nearest binding visible from `scopeId`, or null.
+   *
+   * Resolution is local: the binding name table and key set transfer once per session,
+   * so hasBinding-style lookups perform no per-call native request.
+   */
   resolveBindingScope(name: string, scopeId: number): number | null {
-    return this.#binding().resolveBindingScope(name, scopeId);
+    this.#assertOpen();
+    const index = (this.#bindingIndex ??= this.#loadBindingIndex());
+    const nameId = index.nameIds.get(name);
+    if (nameId == null) return null;
+    const parents = this.#scopeParentTable();
+    let scope = scopeId;
+    while (true) {
+      if (index.keys.has(scope * 0x200000 + nameId)) return scope;
+      const parent = parents[scope];
+      if (parent === undefined || parent === 0xffffffff) return null;
+      scope = parent;
+    }
+  }
+  #loadBindingIndex(): { nameIds: Map<string, number>; keys: Set<number> } {
+    const data = this.#binding().bindingIndexBuffer();
+    const nameCount = data.readUInt32LE(0);
+    const keyCount = data.readUInt32LE(4);
+    if (nameCount >= 0x200000) throw new Error('binding name table exceeds packed key space');
+    const nameIds = new Map<string, number>();
+    let offset = 8;
+    for (let id = 0; id < nameCount; id++) {
+      const length = data.readUInt32LE(offset);
+      offset += 4;
+      nameIds.set(data.toString('utf8', offset, offset + length), id);
+      offset += length + ((4 - (length % 4)) % 4);
+    }
+    const words = new Uint32Array(data.buffer, data.byteOffset + offset, keyCount * 2);
+    const keys = new Set<number>();
+    for (let index = 0; index < keyCount; index++)
+      keys.add(words[index * 2] * 0x200000 + words[index * 2 + 1]);
+    return { nameIds, keys };
   }
   resolveBinding(name: string, scopeId: number): QueryResult['bindings'][number] | undefined {
-    const scope = this.#binding().resolveBindingScope(name, scopeId);
+    const scope = this.resolveBindingScope(name, scopeId);
     const fact = scope == null ? undefined : this.#binding().queryBindings(name, scope)[0];
     return fact && adaptBindingFact(fact);
   }
@@ -818,12 +845,15 @@ export class NativeTransformSession {
   }
   scopeParentId(scopeId: number): number | null {
     this.#assertOpen();
+    const parent = this.#scopeParentTable()[scopeId];
+    return parent === undefined || parent === 0xffffffff ? null : parent;
+  }
+  #scopeParentTable(): Uint32Array {
     if (this.#scopeParents == null) {
       const data = this.#binding().scopeParentsBuffer();
       this.#scopeParents = new Uint32Array(data.buffer, data.byteOffset, data.byteLength / 4);
     }
-    const parent = this.#scopeParents[scopeId];
-    return parent === undefined || parent === 0xffffffff ? null : parent;
+    return this.#scopeParents;
   }
   generateUid(name = 'temp'): string {
     const base = `_${name.replace(/[^A-Za-z0-9_$]/g, '') || 'temp'}`;
@@ -1769,7 +1799,7 @@ export function transform(
         Object.keys(plans.get(plugin)?.children ?? {}),
       );
       if (childParentTypes.length > 0) session.prefetchChildren([], childParentTypes);
-      if (batch.includeParent) session.prefetchEvents(routedParentIds(batch));
+      if (batch.includeParent) session.seedSummaries(batch.parentSummaries);
       const dispatcherStarted = options.debugPerformance ? performance.now() : 0;
       const dispatch = createDispatcher(
         session,

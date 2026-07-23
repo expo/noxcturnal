@@ -44,7 +44,7 @@ const MISSING_VALUE = 0xffffffff;
 const PACKED_HEADER_BYTES = 16;
 const ROUTE_MANIFEST_MAGIC = 0x4e524d46;
 const ROUTED_TAPE_MAGIC = 0x4e525446;
-const ROUTED_HEADER_BYTES = 28;
+const ROUTED_HEADER_BYTES = 32;
 const EMPTY_FIELDS = Object.freeze([]) as unknown as NativeEvent['fields'];
 
 export interface NativeRouteManifestEntry {
@@ -65,6 +65,8 @@ export interface RoutedEventBatch {
   nodeCount: number;
   nodeRecordCount: number;
   routeDeliveryCount: number;
+  /** Eight-word [id, type, start, end, parentId, parentTypeId, scopeId, scopeParentId] entries. */
+  parentSummaries: Uint32Array;
   includeParent: boolean;
   includeScope: boolean;
   includeExit: boolean;
@@ -197,30 +199,37 @@ export function decodeRoutedEnvelope(buffer: Buffer): RoutedEventBatch {
   const flags = buffer.readUInt32LE(4);
   const stringCount = buffer.readUInt32LE(20);
   const recordsOffset = buffer.readUInt32LE(24);
-  if (stringCount > (recordsOffset - ROUTED_HEADER_BYTES) / 4)
+  const parentCount = buffer.readUInt32LE(28);
+  const stringsEnd = recordsOffset - parentCount * 32;
+  if (stringsEnd < ROUTED_HEADER_BYTES || stringCount > (stringsEnd - ROUTED_HEADER_BYTES) / 4)
     throw new Error('invalid routed tape string count');
   const stringOffsets = new Uint32Array(stringCount);
   const stringLengths = new Uint32Array(stringCount);
   let offset = ROUTED_HEADER_BYTES;
   for (let index = 0; index < stringCount; index++) {
-    if (offset + 4 > recordsOffset) throw new Error('invalid routed tape string table');
+    if (offset + 4 > stringsEnd) throw new Error('invalid routed tape string table');
     const length = buffer.readUInt32LE(offset);
     offset += 4;
-    if (length > recordsOffset - offset) throw new Error('invalid routed tape string length');
+    if (length > stringsEnd - offset) throw new Error('invalid routed tape string length');
     stringOffsets[index] = offset;
     stringLengths[index] = length;
     offset += length + paddingFor(length);
   }
-  if (offset !== recordsOffset || recordsOffset > buffer.length)
+  if (offset !== stringsEnd || recordsOffset > buffer.length)
     throw new Error('invalid routed tape offsets');
   return {
     data: buffer.subarray(recordsOffset),
     stringAt: lazyStringLookup(buffer, stringOffsets, stringLengths),
     recordBytes: buffer.length - recordsOffset,
-    stringSlabBytes: recordsOffset - ROUTED_HEADER_BYTES,
+    stringSlabBytes: stringsEnd - ROUTED_HEADER_BYTES,
     nodeCount: buffer.readUInt32LE(8),
     nodeRecordCount: buffer.readUInt32LE(12),
     routeDeliveryCount: buffer.readUInt32LE(16),
+    parentSummaries: new Uint32Array(
+      buffer.buffer,
+      buffer.byteOffset + stringsEnd,
+      parentCount * 8,
+    ),
     includeParent: (flags & 1) !== 0,
     includeScope: (flags & 2) !== 0,
     includeExit: (flags & 4) !== 0,
@@ -249,16 +258,14 @@ export function dispatchRoutedEvents(
   handlers: readonly ((event: NativeEvent) => void)[],
   onEvent?: (event: NativeEvent) => void,
 ): void {
-  const words = new Uint32Array(
-    batch.data.buffer,
-    batch.data.byteOffset,
-    batch.data.byteLength / 4,
-  );
+  // Signed reads keep every tape word SMI-representable: exit tags surface as negative
+  // values and absent-id sentinels as -1, so no heap numbers are allocated per record.
+  const words = new Int32Array(batch.data.buffer, batch.data.byteOffset, batch.data.byteLength / 4);
   const enterEvents: (NativeEvent | undefined)[] | null = batch.includeExit ? [] : null;
   let offset = 0;
   for (let record = 0; record < batch.nodeRecordCount; record++) {
     const sequenceWord = words[offset++];
-    if ((sequenceWord & DYNAMIC_TAG) !== 0) {
+    if (sequenceWord < 0) {
       const id = words[offset++];
       const routeCount = words[offset++];
       const routeStart = offset;
@@ -281,10 +288,10 @@ export function dispatchRoutedEvents(
     if (!type) throw new Error('invalid routed node type');
     const start = words[offset++];
     const end = words[offset++];
-    const parentId = batch.includeParent ? words[offset++] : MISSING_VALUE;
-    const parentTypeId = batch.includeParent ? words[offset++] : MISSING_VALUE;
+    const parentId = batch.includeParent ? words[offset++] : -1;
+    const parentTypeId = batch.includeParent ? words[offset++] : -1;
     const scopeId = batch.includeScope ? words[offset++] : 0;
-    const scopeParentId = batch.includeScope ? words[offset++] : MISSING_VALUE;
+    const scopeParentId = batch.includeScope ? words[offset++] : -1;
     const fieldCount = words[offset++];
     const event: NativeEvent = {
       sequence,
@@ -293,10 +300,10 @@ export function dispatchRoutedEvents(
       type,
       start,
       end,
-      parentId: parentId === MISSING_VALUE ? undefined : parentId,
-      parentType: parentTypeId === MISSING_VALUE ? undefined : NODE_TYPES[parentTypeId],
+      parentId: parentId === -1 ? undefined : parentId,
+      parentType: parentTypeId === -1 ? undefined : NODE_TYPES[parentTypeId],
       scopeId,
-      scopeParentId: scopeParentId === MISSING_VALUE ? undefined : scopeParentId,
+      scopeParentId: scopeParentId === -1 ? undefined : scopeParentId,
       fields: EMPTY_FIELDS,
     };
     const node = event as NativeEvent & Record<string, unknown>;
@@ -315,36 +322,6 @@ export function dispatchRoutedEvents(
       handlers[words[index]](event);
   }
   if (offset !== words.length) throw new Error('trailing routed tape words');
-}
-
-export function routedParentIds(batch: RoutedEventBatch): number[] {
-  if (!batch.includeParent) return [];
-  const words = new Uint32Array(
-    batch.data.buffer,
-    batch.data.byteOffset,
-    batch.data.byteLength / 4,
-  );
-  const parents = new Set<number>();
-  let offset = 0;
-  for (let record = 0; record < batch.nodeRecordCount; record++) {
-    const sequence = words[offset++];
-    if ((sequence & DYNAMIC_TAG) !== 0) {
-      offset++;
-      const routeCount = words[offset++];
-      offset += routeCount;
-      continue;
-    }
-    offset += 4;
-    const parentId = words[offset++];
-    offset++;
-    if (parentId !== MISSING_VALUE) parents.add(parentId);
-    if (batch.includeScope) offset += 2;
-    const fieldCount = words[offset++];
-    offset += fieldCount * 2;
-    const routeCount = words[offset++];
-    offset += routeCount;
-  }
-  return [...parents];
 }
 
 function requiredId(map: ReadonlyMap<string, number>, value: string, kind: string): number {
@@ -465,23 +442,18 @@ export function packEdits(edits: readonly EditCommand[]): Buffer {
     for (const name of edit.names ?? []) addString(name);
     wordCount += 7 + (edit.names?.length ?? 0);
   }
-  const stringsSize = stringLengths.reduce(
-    (size, length) => size + 4 + length + paddingFor(length),
-    0,
-  );
-  const wordsOffset = 8 + stringsSize;
+  // Strings pack as one lengths table plus a single concatenated slab: one utf8 encode
+  // instead of one native write call per string.
+  const slabBytes = stringLengths.reduce((size, length) => size + length, 0);
+  const wordsOffset = alignToWord(8 + strings.length * 4 + slabBytes);
   const data = Buffer.allocUnsafe(wordsOffset + wordCount * 4);
   data.writeUInt32LE(strings.length, 0);
   data.writeUInt32LE(wordsOffset, 4);
-  let offset = 8;
-  for (let index = 0; index < strings.length; index++) {
-    const value = strings[index];
-    const length = stringLengths[index];
-    data.writeUInt32LE(length, offset);
-    offset += 4;
-    data.write(value, offset, length, 'utf8');
-    offset = alignToWord(offset + length);
-  }
+  for (let index = 0; index < strings.length; index++)
+    data.writeUInt32LE(stringLengths[index], 8 + index * 4);
+  const slabOffset = 8 + strings.length * 4;
+  data.write(strings.join(''), slabOffset, slabBytes, 'utf8');
+  data.fill(0, slabOffset + slabBytes, wordsOffset);
   let wordIndex = 0;
   let stringId = 0;
   const words = new Uint32Array(wordCount);

@@ -251,29 +251,29 @@ impl RetainedIndex {
             .collect()
     }
 
-    /// Locate the nearest scope binding `name` visible from `scope_id`, walking the
-    /// scope-parent chain natively so callers issue one N-API request per lookup.
-    /// References are not materialized; callers fetch the full fact by scope when needed.
-    pub fn resolve_binding_scope(
-        &self,
-        name: &str,
-        scope_id: u32,
-        scope_parents: &[u32],
-    ) -> Option<u32> {
-        let &name_id = self.name_ids.get(name)?;
-        let mut scope = scope_id;
-        loop {
-            if self.bindings.contains_key(&(scope, name_id)) {
-                return Some(scope);
-            }
-            scope = scope_parents
-                .get(scope as usize)
-                .copied()
-                .unwrap_or(ABSENT_ID);
-            if scope == ABSENT_ID {
-                return None;
-            }
+    /// The interned name table plus every `(scopeId, nameId)` binding key as one packed
+    /// buffer, so JavaScript answers hasBinding-style lookups without per-call N-API
+    /// round trips. Layout: `[nameCount, keyCount]`, then each name as length-prefixed
+    /// padded UTF-8 in id order, then the key pairs as u32 words.
+    pub fn binding_index_buffer(&self) -> Buffer {
+        let names_size: usize = self
+            .names
+            .iter()
+            .map(|name| 4 + name.len().next_multiple_of(4))
+            .sum();
+        let mut output = Vec::with_capacity(8 + names_size + self.bindings.len() * 8);
+        output.extend_from_slice(&(self.names.len() as u32).to_le_bytes());
+        output.extend_from_slice(&(self.bindings.len() as u32).to_le_bytes());
+        for name in &self.names {
+            output.extend_from_slice(&(name.len() as u32).to_le_bytes());
+            output.extend_from_slice(name.as_bytes());
+            output.resize(output.len().next_multiple_of(4), 0);
         }
+        for &(scope_id, name_id) in self.bindings.keys() {
+            output.extend_from_slice(&scope_id.to_le_bytes());
+            output.extend_from_slice(&name_id.to_le_bytes());
+        }
+        output.into()
     }
 
     fn binding_fact(
@@ -675,12 +675,36 @@ impl RetainedIndex {
         output.into()
     }
 
-    pub fn summary_buffers(&self, node_ids: &[u32], scope_parents: &[u32]) -> Buffer {
-        let mut output = Vec::with_capacity(node_ids.len() * 7 * 4);
+    /// Eight-word `[id, type, start, end, parentId, parentTypeId, scopeId, scopeParentId]`
+    /// entries for the given nodes, used as the routed envelope's parent sidecar.
+    pub fn parent_summary_words(&self, node_ids: &[u32], scope_parents: &[u32]) -> Vec<u32> {
+        let mut words = Vec::with_capacity(node_ids.len() * 8);
         for &node_id in node_ids {
-            self.write_summary(node_id, scope_parents, &mut output);
+            let index = node_id as usize;
+            let Some(&type_id) = self.type_ids.get(index) else {
+                continue;
+            };
+            let parent_id = self.parent_ids[index];
+            let scope_id = self.scope_ids[index];
+            words.extend([
+                node_id,
+                type_id,
+                self.starts[index],
+                self.ends[index],
+                parent_id,
+                if parent_id == ABSENT_ID {
+                    ABSENT_ID
+                } else {
+                    self.type_ids[parent_id as usize]
+                },
+                scope_id,
+                scope_parents
+                    .get(scope_id as usize)
+                    .copied()
+                    .unwrap_or(ABSENT_ID),
+            ]);
         }
-        output.into()
+        words
     }
 
     pub fn children(&self, parent_id: u32) -> Children<'_> {

@@ -231,14 +231,6 @@ impl NativeIndexedSession {
     }
 
     #[napi]
-    pub fn node_summary_buffers(&self, node_ids: Vec<u32>) -> Result<Buffer> {
-        self.ensure_open()?;
-        Ok(self
-            .retained_index
-            .summary_buffers(&node_ids, &self.scope_parents))
-    }
-
-    #[napi]
     pub fn children_packed_buffer(
         &mut self,
         parent_ids: Vec<u32>,
@@ -374,13 +366,11 @@ impl NativeIndexedSession {
         Ok(output.into())
     }
 
-    /// Resolve the scope owning the nearest binding visible from `scope_id` in one call.
+    /// The binding-name table and key set for local JavaScript binding resolution.
     #[napi]
-    pub fn resolve_binding_scope(&self, name: String, scope_id: u32) -> Result<Option<u32>> {
+    pub fn binding_index_buffer(&self) -> Result<Buffer> {
         self.ensure_open()?;
-        Ok(self
-            .retained_index
-            .resolve_binding_scope(&name, scope_id, &self.scope_parents))
+        Ok(self.retained_index.binding_index_buffer())
     }
 
     #[napi]
@@ -1634,9 +1624,16 @@ pub fn materialize_routed_buffer(
         string_ids: FxHashMap::default(),
         counts: RoutedCounts::default(),
         route_scratch: Vec::new(),
+        parent_ids: FxHashSet::default(),
     };
     collector.visit_program(&parsed.program);
     let node_count = collector.node_count;
+    let parents = stateless_parent_summaries(
+        &collector.parent_ids,
+        collector.nodes,
+        collector.scoping,
+        collector.utf16,
+    );
     let data = collector.words.into_bytes();
     let mut strings = (0..collector.string_ids.len())
         .map(|_| String::new())
@@ -1644,7 +1641,65 @@ pub fn materialize_routed_buffer(
     for (value, id) in collector.string_ids {
         strings[id as usize] = value;
     }
-    encode_routed_envelope(&manifest, node_count, strings, data, collector.counts)
+    encode_routed_envelope(
+        &manifest,
+        node_count,
+        strings,
+        data,
+        collector.counts,
+        parents,
+    )
+}
+
+/// Eight-word `[id, type, start, end, parentId, parentTypeId, scopeId, scopeParentId]`
+/// summaries for every unique routed parent, delivered with the envelope so JavaScript
+/// never issues a separate summary request for parent access.
+fn stateless_parent_summaries(
+    parent_ids: &FxHashSet<u32>,
+    nodes: Option<&AstNodes<'_>>,
+    scoping: Option<&Scoping>,
+    utf16: Option<&[u32]>,
+) -> Vec<u32> {
+    let (Some(nodes), Some(scoping)) = (nodes, scoping) else {
+        return Vec::new();
+    };
+    let mut ordered = parent_ids.iter().copied().collect::<Vec<_>>();
+    ordered.sort_unstable();
+    let mut words = Vec::with_capacity(ordered.len() * 8);
+    for id in ordered {
+        let node = nodes.get_node(NodeId::new(id as usize));
+        let kind = node.kind();
+        let span = kind.span();
+        let is_root = id == 0;
+        let scope_id = match kind {
+            AstKind::Function(function) => function.scope_id.get().unwrap_or(node.scope_id()),
+            AstKind::ArrowFunctionExpression(function) => {
+                function.scope_id.get().unwrap_or(node.scope_id())
+            }
+            _ => node.scope_id(),
+        };
+        words.extend([
+            id,
+            ast_kind_protocol_id(kind),
+            utf16.map_or(span.start, |index| index[span.start as usize]),
+            utf16.map_or(span.end, |index| index[span.end as usize]),
+            if is_root {
+                u32::MAX
+            } else {
+                nodes.parent_id(node.id()).index() as u32
+            },
+            if is_root {
+                u32::MAX
+            } else {
+                ast_kind_protocol_id(nodes.parent_kind(node.id()))
+            },
+            scope_id.index() as u32,
+            scoping
+                .scope_parent_id(scope_id)
+                .map_or(u32::MAX, |parent| parent.index() as u32),
+        ]);
+    }
+    words
 }
 
 fn routed_buffer_from_index(
@@ -1664,7 +1719,7 @@ fn routed_buffer_from_index(
         let node_id = record & 0x7fff_ffff;
         writer.record(manifest, index, node_id, side, scope_parents, root);
     }
-    writer.finish(manifest, index.len() as u32)
+    writer.finish(manifest, index.len() as u32, index, scope_parents)
 }
 
 struct RetainedRouteWriter {
@@ -1673,6 +1728,7 @@ struct RetainedRouteWriter {
     counts: RoutedCounts,
     sequence: u32,
     route_scratch: Vec<u32>,
+    parent_ids: FxHashSet<u32>,
 }
 
 impl RetainedRouteWriter {
@@ -1683,6 +1739,7 @@ impl RetainedRouteWriter {
             counts: RoutedCounts::default(),
             sequence: 0,
             route_scratch: Vec::new(),
+            parent_ids: FxHashSet::default(),
         }
     }
 
@@ -1768,6 +1825,9 @@ impl RetainedRouteWriter {
             .extend([event_sequence, node_id, protocol_id, start, end]);
         if manifest.include_parent {
             let parent_id = index.parent_id(node_id);
+            if let Some(parent_id) = parent_id {
+                self.parent_ids.insert(parent_id);
+            }
             self.words.extend([
                 parent_id.unwrap_or(u32::MAX),
                 parent_id
@@ -1815,7 +1875,13 @@ impl RetainedRouteWriter {
         self.route_scratch = matched_routes;
     }
 
-    fn finish(self, manifest: &CompiledManifest, node_count: u32) -> Result<Buffer> {
+    fn finish(
+        self,
+        manifest: &CompiledManifest,
+        node_count: u32,
+        index: &RetainedIndex,
+        scope_parents: &[u32],
+    ) -> Result<Buffer> {
         let data = self.words.into_bytes();
         let mut strings = (0..self.string_ids.len())
             .map(|_| String::new())
@@ -1823,7 +1889,10 @@ impl RetainedRouteWriter {
         for (value, id) in self.string_ids {
             strings[id as usize] = value;
         }
-        encode_routed_envelope(manifest, node_count, strings, data, self.counts)
+        let mut parent_ids = self.parent_ids.into_iter().collect::<Vec<_>>();
+        parent_ids.sort_unstable();
+        let parents = index.parent_summary_words(&parent_ids, scope_parents);
+        encode_routed_envelope(manifest, node_count, strings, data, self.counts, parents)
     }
 }
 
@@ -1893,12 +1962,13 @@ fn encode_routed_envelope(
     strings: Vec<String>,
     data: Vec<u8>,
     counts: RoutedCounts,
+    parent_summaries: Vec<u32>,
 ) -> Result<Buffer> {
     let strings_size: usize = strings
         .iter()
         .map(|value| 4 + value.len() + (4 - value.len() % 4) % 4)
         .sum();
-    let records_offset = 28 + strings_size;
+    let records_offset = 32 + strings_size + parent_summaries.len() * 4;
     let shape_flags = u32::from(manifest.include_parent)
         | (u32::from(manifest.include_scope) << 1)
         | (u32::from(manifest.include_exit) << 2);
@@ -1911,6 +1981,7 @@ fn encode_routed_envelope(
         counts.route_deliveries,
         strings.len() as u32,
         records_offset as u32,
+        (parent_summaries.len() / 8) as u32,
     ] {
         output.extend_from_slice(&word.to_le_bytes());
     }
@@ -1918,6 +1989,9 @@ fn encode_routed_envelope(
         output.extend_from_slice(&(value.len() as u32).to_le_bytes());
         output.extend_from_slice(value.as_bytes());
         output.resize(output.len().next_multiple_of(4), 0);
+    }
+    for word in parent_summaries {
+        output.extend_from_slice(&word.to_le_bytes());
     }
     output.extend_from_slice(&data);
     Ok(output.into())
@@ -2309,6 +2383,7 @@ struct RoutedEventCollector<'a> {
     string_ids: FxHashMap<String, u32>,
     counts: RoutedCounts,
     route_scratch: Vec<u32>,
+    parent_ids: FxHashSet<u32>,
 }
 
 impl RoutedEventCollector<'_> {
@@ -2493,6 +2568,9 @@ impl RoutedEventCollector<'_> {
         self.words
             .extend([sequence, id.index() as u32, protocol_id, start, end]);
         if self.manifest.include_parent {
+            if let Some(parent_id) = parent_id {
+                self.parent_ids.insert(parent_id);
+            }
             self.words
                 .extend([parent_id.unwrap_or(u32::MAX), parent_type_id]);
         }
@@ -2832,17 +2910,20 @@ pub fn commit_packed_buffer(
             "invalid packed edit word offset",
         ));
     }
+    // Strings arrive as one lengths table followed by a single concatenated UTF-8 slab,
+    // so JavaScript performs one encode instead of one write call per string.
+    if 8 + string_count * 4 > words_offset {
+        return Err(Error::new(
+            Status::InvalidArg,
+            "truncated packed edit string",
+        ));
+    }
     let mut strings = Vec::with_capacity(string_count);
-    let mut cursor = 8;
-    for _ in 0..string_count {
-        if cursor + 4 > words_offset {
-            return Err(Error::new(
-                Status::InvalidArg,
-                "truncated packed edit string",
-            ));
-        }
-        let length = u32::from_le_bytes(data[cursor..cursor + 4].try_into().unwrap()) as usize;
-        cursor += 4;
+    let mut cursor = 8 + string_count * 4;
+    for index in 0..string_count {
+        let length_at = 8 + index * 4;
+        let length =
+            u32::from_le_bytes(data[length_at..length_at + 4].try_into().unwrap()) as usize;
         if cursor + length > words_offset {
             return Err(Error::new(
                 Status::InvalidArg,
@@ -2854,7 +2935,7 @@ pub fn commit_packed_buffer(
                 .map_err(|_| Error::new(Status::InvalidArg, "invalid packed edit UTF-8"))?
                 .to_owned(),
         );
-        cursor = (cursor + length + 3) & !3;
+        cursor += length;
     }
     commit_packed(source, filename, &data[words_offset..], strings, mode)
 }

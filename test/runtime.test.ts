@@ -36,22 +36,28 @@ test('loads the Noxcturnal binding and classifies parser routes', () => {
 });
 
 test('rejects malformed routed string tables before decoding records', () => {
-  const invalidCount = Buffer.alloc(28);
+  const invalidCount = Buffer.alloc(32);
   invalidCount.writeUInt32LE(0x4e525446, 0);
   invalidCount.writeUInt32LE(1, 20);
-  invalidCount.writeUInt32LE(28, 24);
+  invalidCount.writeUInt32LE(32, 24);
   assert.throws(() => decodeRoutedEnvelope(invalidCount), /string count/);
 
-  const invalidLength = Buffer.alloc(32);
+  const invalidLength = Buffer.alloc(36);
   invalidLength.writeUInt32LE(0x4e525446, 0);
   invalidLength.writeUInt32LE(1, 20);
-  invalidLength.writeUInt32LE(32, 24);
-  invalidLength.writeUInt32LE(100, 28);
+  invalidLength.writeUInt32LE(36, 24);
+  invalidLength.writeUInt32LE(100, 32);
   assert.throws(() => decodeRoutedEnvelope(invalidLength), /string length/);
 
-  const empty = Buffer.alloc(28);
+  const invalidParents = Buffer.alloc(32);
+  invalidParents.writeUInt32LE(0x4e525446, 0);
+  invalidParents.writeUInt32LE(32, 24);
+  invalidParents.writeUInt32LE(4, 28);
+  assert.throws(() => decodeRoutedEnvelope(invalidParents), /string count/);
+
+  const empty = Buffer.alloc(32);
   empty.writeUInt32LE(0x4e525446, 0);
-  empty.writeUInt32LE(28, 24);
+  empty.writeUInt32LE(32, 24);
   assert.throws(() => decodeRoutedEnvelope(empty).stringAt(0), /string id/);
 });
 

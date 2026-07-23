@@ -39,7 +39,7 @@ interface NativeBinding {
         write: boolean;
       }[];
     }[];
-    resolveBindingScope(name: string, scopeId: number): number | null;
+    bindingIndexBuffer(): Buffer;
     scopeParentsBuffer(): Buffer;
     queryCaptures(functionId: number): {
       id: number;
@@ -55,7 +55,6 @@ interface NativeBinding {
     }[];
     inspectPackedBuffer(nodeIds: number[]): Buffer;
     nodeSummaryBuffer(nodeId: number): Buffer;
-    nodeSummaryBuffers(nodeIds: number[]): Buffer;
     childrenPackedBuffer(
       parentIds: number[],
       parentTypes: string[],
