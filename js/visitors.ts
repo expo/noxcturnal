@@ -892,6 +892,7 @@ interface PreparedPhase {
   includeScope: boolean;
   retentionCapabilities: number;
   compiledRoutes: readonly CompiledRouteTemplate[];
+  dispatchRoutes: readonly DispatchRoute[];
   manifest: Buffer;
 }
 
@@ -900,11 +901,19 @@ interface CompiledRouteTemplate extends NativeRouteManifestEntry {
   callbacks: readonly Handler<any>[];
   fast: boolean;
 }
+/** One native route delivering to the callbacks of one or more coalesced plugins. */
+interface DispatchRoute extends NativeRouteManifestEntry {
+  fast: boolean;
+  contract: string;
+  members: { plugin: NativePlugin<any, any>; callbacks: readonly Handler<any>[] }[];
+}
+interface CompiledPhaseRoutes {
+  routes: CompiledRouteTemplate[];
+  dispatchRoutes: DispatchRoute[];
+  manifest: Buffer;
+}
 const preparedPhaseCaches = new WeakMap<PipelinePhase, Map<string, Omit<PreparedPhase, 'plans'>>>();
-const compiledPhaseCaches = new WeakMap<
-  PipelinePhase,
-  Map<string, { routes: CompiledRouteTemplate[]; manifest: Buffer }>
->();
+const compiledPhaseCaches = new WeakMap<PipelinePhase, Map<string, CompiledPhaseRoutes>>();
 
 const RETAIN_IDENTIFIERS = 1 << 0;
 const RETAIN_CONSTANTS = 1 << 1;
@@ -1063,6 +1072,7 @@ function preparePhase(
     includeScope,
     retentionCapabilities,
     compiledRoutes: routed.routes,
+    dispatchRoutes: routed.dispatchRoutes,
     manifest: routed.manifest,
   };
   let preparedCache = preparedPhaseCaches.get(phase);
@@ -1112,7 +1122,7 @@ function compilePhaseRoutes(
   includeParent: boolean,
   includeScope: boolean,
   retentionCapabilities: number,
-): { routes: CompiledRouteTemplate[]; manifest: Buffer } {
+): CompiledPhaseRoutes {
   const cacheKey = stableJson({
     includeParent,
     includeScope,
@@ -1194,20 +1204,50 @@ function compilePhaseRoutes(
       });
     }
   }
+  // Coalesce runs of identical-contract fast routes into one dispatch route with member
+  // callbacks. The native side then evaluates and records each matching node once instead
+  // of once per plugin, and JS fans out from a single monomorphic delivery. Grouping only
+  // merges a route into the newest group of its (type, side) bucket, preserving plugin
+  // order for both enter and (reversed) exit dispatch.
+  const dispatchRoutes: DispatchRoute[] = [];
+  const openGroups = new Map<string, DispatchRoute>();
+  for (const route of routes) {
+    const bucket = `${route.nodeType}:${route.side}`;
+    const contract = `${route.fast}:${stableJson(route.predicates)}:${route.payloadFields.join(',')}`;
+    const open = openGroups.get(bucket);
+    if (open != null && route.fast && open.contract === contract) {
+      open.members.push({ plugin: route.plugin, callbacks: route.callbacks });
+      continue;
+    }
+    const grouped: DispatchRoute = {
+      id: dispatchRoutes.length,
+      pluginId: route.pluginId,
+      nodeType: route.nodeType,
+      side: route.side,
+      order: route.order,
+      predicates: route.predicates,
+      payloadFields: route.payloadFields,
+      fast: route.fast,
+      contract,
+      members: [{ plugin: route.plugin, callbacks: route.callbacks }],
+    };
+    openGroups.set(bucket, grouped);
+    dispatchRoutes.push(grouped);
+  }
   const structuralParentTypes = [
     ...new Set(plugins.flatMap(plugin => Object.keys(plans.get(plugin)?.children ?? {}))),
   ];
   const retainedFields: Record<string, string[]> = {};
   for (const plugin of plugins) mergeFieldRequests(retainedFields, plans.get(plugin)?.fields ?? {});
   const manifest = packRouteManifest(
-    routes,
+    dispatchRoutes,
     includeParent,
     includeScope,
     retentionCapabilities,
     structuralParentTypes,
     retainedFields,
   );
-  const compiled = { routes, manifest };
+  const compiled = { routes, dispatchRoutes, manifest };
   if (cache.size < 64) cache.set(cacheKey, compiled);
   return compiled;
 }
@@ -1549,6 +1589,7 @@ export function transform(
         includeScope,
         retentionCapabilities,
         compiledRoutes,
+        dispatchRoutes,
         manifest,
       } = prepared;
       const runtimeEditEffect =
@@ -1741,6 +1782,7 @@ export function transform(
         diagnostics,
         requiresIndex || includeParent || includeScope,
         compiledRoutes,
+        dispatchRoutes,
       );
       if (options.debugPerformance)
         performanceCounters(metadata).dispatcherSetupMs += performance.now() - dispatcherStarted;
@@ -1976,6 +2018,7 @@ function createDispatcher(
   diagnostics: Diagnostic[],
   cacheEvents: boolean,
   compiledRoutes: readonly CompiledRouteTemplate[],
+  dispatchRoutes: readonly DispatchRoute[],
 ): Dispatcher {
   let order = 0;
   let stopAll = false;
@@ -2230,28 +2273,50 @@ function createDispatcher(
       },
     );
   };
-  const routedThunks = compiledRoutes.map(route => {
-    const entry = contexts.get(route.plugin)!;
-    if (!route.fast)
+  const counters = optionsPerformance(metadata);
+  const routedThunks = dispatchRoutes.map(route => {
+    if (!route.fast) {
+      const { plugin, callbacks } = route.members[0];
+      const entry = contexts.get(plugin)!;
       return (event: NativeEvent) =>
         dispatchOne(
           event,
-          route.plugin,
+          plugin,
           entry,
           entry.context,
           undefined,
           undefined,
-          route.callbacks as Handler<any>[],
+          callbacks as Handler<any>[],
         );
-    const callback = route.callbacks.length === 1 ? route.callbacks[0] : undefined;
+    }
+    // Fast routes bind their runtimes once at dispatcher creation. Exit groups run
+    // members in reverse order to preserve the reverse-exit contract across plugins.
+    const members = route.members.map(({ plugin, callbacks }) => {
+      const entry = contexts.get(plugin)!;
+      const runtime = (entry.pathRuntime ??= createPathRuntime(plugin, entry, entry.context));
+      return { entry, runtime, callbacks };
+    });
+    if (route.side === 'exit') members.reverse();
+    if (members.length === 1 && members[0].callbacks.length === 1) {
+      const { entry, runtime, callbacks } = members[0];
+      const callback = callbacks[0];
+      if (counters == null)
+        return (event: NativeEvent) => {
+          currentSequence = event.sequence;
+          callback(new NodePathImpl(runtime, event), entry.state);
+        };
+      return (event: NativeEvent) => {
+        currentSequence = event.sequence;
+        invokeCallback(runtime, callback, makePath(runtime, event), entry.state);
+      };
+    }
     return (event: NativeEvent) => {
-      const runtime = (entry.pathRuntime ??= createPathRuntime(route.plugin, entry, entry.context));
-      const path = makePath(runtime, event);
       currentSequence = event.sequence;
-      if (callback) invokeCallback(runtime, callback, path, entry.state);
-      else
-        for (const routeCallback of route.callbacks)
-          invokeCallback(runtime, routeCallback, path, entry.state);
+      for (const member of members) {
+        const path = makePath(member.runtime, event);
+        for (const callback of member.callbacks)
+          invokeCallback(member.runtime, callback, path, member.entry.state);
+      }
     };
   });
   return {
@@ -2352,7 +2417,7 @@ function optionsPerformance(
 ): PerformanceAllocationCounters | undefined {
   return metadata.performance as PerformanceAllocationCounters | undefined;
 }
-function allocatePath(runtime: PathRuntime, event: NativeEvent): NodePathImpl {
+function makePath(runtime: PathRuntime, event: NativeEvent): NativeNodePath {
   const counters = runtime.performance;
   if (!counters) return new NodePathImpl(runtime, event);
   const started = performance.now();
@@ -2361,14 +2426,13 @@ function allocatePath(runtime: PathRuntime, event: NativeEvent): NodePathImpl {
   counters.pathConstructionMs += performance.now() - started;
   return path;
 }
-function makePath(runtime: PathRuntime, event: NativeEvent): NativeNodePath {
-  return allocatePath(runtime, event);
-}
 
 class NodePathImpl implements NativeNodePath {
-  #node?: NodeView;
-  #parent?: NodeSummary | null;
-  #scope?: NativeScope;
+  // Plain properties instead of #private fields: this class is allocated once per
+  // route delivery, and private-field initialization is measurably slower in V8.
+  private lazyNode: NodeView | undefined = undefined;
+  private lazyParent: NodeSummary | null | undefined = undefined;
+  private lazyScope: NativeScope | undefined = undefined;
   constructor(
     readonly runtime: PathRuntime,
     readonly event: NativeEvent,
@@ -2386,18 +2450,18 @@ class NodePathImpl implements NativeNodePath {
     return this.event.end;
   }
   get node(): NodeView {
-    if (!this.#node) {
+    if (!this.lazyNode) {
       if (this.runtime.performance) this.runtime.performance.nodeFacades++;
-      this.#node = this.runtime.session.nodeView(this.event);
+      this.lazyNode = this.runtime.session.nodeView(this.event);
     }
-    return this.#node;
+    return this.lazyNode;
   }
   get context(): PluginContext {
     return this.runtime.context;
   }
   get parent(): NodeSummary | null {
     this.#assertAncestry();
-    return (this.#parent ??=
+    return (this.lazyParent ??=
       this.event.parentId == null
         ? null
         : { id: this.event.parentId, type: this.event.parentType! });
@@ -2411,7 +2475,7 @@ class NodePathImpl implements NativeNodePath {
   get scope(): NativeScope {
     if (!this.runtime.allowsScope())
       throw new Error(`${this.runtime.owner}: undeclared scope semantics`);
-    return (this.#scope ??= makeScope(
+    return (this.lazyScope ??= makeScope(
       this.runtime,
       this.event.scopeId,
       this.event.scopeParentId ?? null,
