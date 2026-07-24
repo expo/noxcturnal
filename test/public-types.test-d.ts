@@ -1,6 +1,7 @@
 import {
   defineNativePipeline,
   defineNativePlugin,
+  defineVisitor as defineVisitorTop,
   type NativeNodePath,
   type NodeOfType,
   type PluginPlan,
@@ -9,60 +10,60 @@ import {
 
 const typedVisitor = defineNativePlugin({
   name: 'typed-visitor',
-  visitor: {
-    Identifier(path) {
+  visitors: [
+    defineVisitorTop('Identifier', { fields: ['name'] }, path => {
       path.node.name.toUpperCase();
-      // @ts-expect-error Identifier views do not expose typed literal values.
-      path.node.value.toUpperCase();
-    },
-    StringLiteral: {
-      exit(path) {
-        path.node.value.toUpperCase();
-        // @ts-expect-error String literal values are not numbers.
-        path.node.value.toFixed();
+      // @ts-expect-error Identifier contracts do not expose literal values.
+      path.node.value;
+    }),
+    defineVisitorTop(
+      'StringLiteral',
+      { fields: ['value'] },
+      {
+        exit(path) {
+          path.node.value.toUpperCase();
+          // @ts-expect-error String literal values are not numbers.
+          path.node.value.toFixed();
+        },
       },
-    },
-    FunctionDeclaration(path) {
+    ),
+    defineVisitorTop('FunctionDeclaration', { fields: ['bodyStart'] }, path => {
       path.node.bodyStart.toFixed();
-    },
-    'Identifier|StringLiteral'(path) {
+    }),
+    defineVisitorTop('Identifier|StringLiteral', {}, path => {
       path.node.type.toUpperCase();
-    },
-    // @ts-expect-error Unknown visitor route names should be rejected.
-    Identifer() {},
-  },
-  prepare(context) {
-    context.subscribe('Identifier', 'ReferencedIdentifier');
-    // @ts-expect-error Unknown subscription names should be rejected.
-    context.subscribe('Identifer');
-    return {
-      subscriptions: ['CallExpression'],
-      fields: { CallExpression: ['calleeName', 'argumentCount'] },
-      where: { CallExpression: { optional: { equals: false } } },
-      controlFlow: ['nested-traverse', 'dynamic-subscriptions', 'stop-all'],
-      semantics: ['scope'],
-      children: { Identifier: ['name'] },
-    };
+    }),
+  ],
+  prepare() {
+    return { enabled: true };
   },
 });
 
+// Lifecycle-only plans reject route declarations.
 const invalidPlan: PluginPlan = {
-  // @ts-expect-error Unknown node names should be rejected in plans.
+  // @ts-expect-error Route requirements live on visitor contracts, not plans.
   fields: { UnknownNode: ['name'] },
 };
 void invalidPlan;
 
-const invalidPredicate: PluginPlan = {
-  where: {
-    VariableDeclaration: {
+defineVisitorTop(
+  'VariableDeclaration',
+  {
+    where: {
       // @ts-expect-error Scalar predicates must use a supported declarative operation.
       kind: { matches: /const/ },
     },
   },
-  // @ts-expect-error Unknown control-flow capabilities should be rejected.
-  controlFlow: ['pause'],
-};
-void invalidPredicate;
+  () => {},
+);
+defineVisitorTop(
+  'Identifier',
+  {
+    // @ts-expect-error Unknown control-flow capabilities should be rejected.
+    controlFlow: ['pause'],
+  },
+  () => {},
+);
 
 const analyzed = defineNativePlugin<undefined, undefined, { count: number }>({
   name: 'analyzed',
@@ -121,3 +122,151 @@ path.snapshot({ fields: ['name'], ancestry: 'parent' });
 path.snapshot({ ancestry: 'all' });
 // @ts-expect-error Unknown concrete node types should be rejected by path.is.
 path.is('Identifer');
+
+// ---------------------------------------------------------------------------
+// Typed per-visitor contracts
+// ---------------------------------------------------------------------------
+import { defineVisitor, type DefinedVisitor } from '../js/index.js';
+
+interface BlockState {
+  renamed: number;
+}
+
+// Declared fields are visible and typed; undeclared fields are TypeScript errors.
+defineVisitor('Identifier', { fields: ['name'] }, path => {
+  path.node.name.toUpperCase();
+  path.node.start.toFixed();
+  // @ts-expect-error `binding` was not declared in the contract.
+  path.node.binding;
+  // @ts-expect-error capability methods require declarations.
+  path.skip();
+  // @ts-expect-error scope requires `scope: true`.
+  path.scope;
+  // @ts-expect-error ancestry requires a declaration.
+  path.parentPath;
+  // @ts-expect-error children require a declaration.
+  path.getChildList('declarations');
+  path.replaceWith('renamed');
+  path.getSource();
+});
+
+// Match-only predicate fields are not callback-visible.
+defineVisitor('VariableDeclaration', { where: { kind: { equals: 'const' } } }, path => {
+  // @ts-expect-error `kind` was used for native matching but not transferred.
+  path.node.kind;
+});
+
+// Wrong fields for a known route are rejected.
+defineVisitor(
+  'Identifier',
+  {
+    // @ts-expect-error `value` is not an Identifier field.
+    fields: ['value'],
+  },
+  () => {},
+);
+
+// Capabilities unlock their exact methods.
+defineVisitor(
+  'VariableDeclaration',
+  {
+    fields: ['kind'],
+    scope: true,
+    ancestry: 'findParent',
+    children: { declarations: { route: 'VariableDeclarator', fields: ['name'] } },
+    controlFlow: ['skip', 'nested-traverse'],
+  },
+  (path, state: BlockState) => {
+    path.node.kind;
+    path.scope.getBinding('value');
+    path.parentPath;
+    path.findParent(() => true);
+    // @ts-expect-error `functionParent` mode was not declared.
+    path.getFunctionParent();
+    path.skip();
+    // @ts-expect-error `stop` was not declared.
+    path.stop();
+    path.traverse([defineVisitor('Function', {}, () => {})]);
+    const declarator = path.getChildList('declarations')[0];
+    declarator?.node;
+    // @ts-expect-error undeclared child role.
+    path.getChildList('id');
+    state.renamed++;
+  },
+);
+
+// State flows from the annotated handler parameter into the plugin definition.
+const stateful: DefinedVisitor<BlockState> = defineVisitor(
+  'Identifier',
+  { fields: ['name'] },
+  (_path, state: BlockState) => {
+    state.renamed++;
+  },
+);
+defineNativePlugin({
+  name: 'stateful',
+  visitors: [stateful],
+  createState: (): BlockState => ({ renamed: 0 }),
+});
+// Stateless visitors compose into stateful plugins.
+defineNativePlugin({
+  name: 'compose',
+  visitors: [stateful, defineVisitor('StringLiteral', {}, () => {})],
+  createState: (): BlockState => ({ renamed: 0 }),
+});
+defineNativePlugin({
+  name: 'state-mismatch',
+  visitors: [stateful],
+  // @ts-expect-error visitor state must match the plugin state.
+  createState: () => ({ other: true }),
+});
+
+// `configure` returns values, never capability shape.
+defineVisitor(
+  'Identifier',
+  {
+    fields: ['name'],
+    configure: () => ({ enabled: true, where: { name: { oneOf: ['__DEV__'] } } }),
+  },
+  () => {},
+);
+defineVisitor(
+  'Identifier',
+  {
+    // @ts-expect-error configure may not return capability shape.
+    configure: () => ({ scope: true }),
+  },
+  () => {},
+);
+
+// Unknown routes are rejected.
+defineVisitor(
+  // @ts-expect-error unknown route name.
+  'Identifer',
+  {},
+  () => {},
+);
+
+// Plugin contracts narrow metadata keys for lifecycle hooks.
+defineNativePlugin({
+  name: 'contracted',
+  contract: {
+    metadata: { writes: ['dependencies'], reads: ['module-kind'] },
+  },
+  post(context) {
+    context.metadata.set('dependencies', []);
+    context.metadata.get('module-kind');
+    context.metadata.get('dependencies');
+    // @ts-expect-error undeclared metadata write key.
+    context.metadata.set('other', 1);
+    // @ts-expect-error undeclared metadata read key.
+    context.metadata.get('other');
+  },
+});
+// Without a contract, metadata keys stay open.
+defineNativePlugin({
+  name: 'uncontracted',
+  post(context) {
+    context.metadata.set('anything', 1);
+  },
+});

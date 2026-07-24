@@ -1,138 +1,156 @@
 import assert from 'node:assert/strict';
 import { test } from 'vitest';
 
-import { defineNativePipeline, defineNativePlugin, transform } from '../dist/index.js';
+import {
+  defineNativePipeline,
+  defineNativePlugin,
+  defineVisitor,
+  transform,
+} from '../dist/index.js';
 
 type ImportState = { modules: Map<string, string> };
 
 const metroImports = defineNativePlugin<ImportState>({
   name: 'metro-import-fitment',
-  prepare() {
-    return {
-      semantics: ['scope'],
-      ancestry: 'parent',
-      fields: { ImportDeclaration: ['source'] },
-      children: { ImportDeclaration: ['specifiers'] },
-    };
-  },
   createState: () => ({ modules: new Map() }),
-  visitor: {
-    ImportDeclaration(path, state) {
-      const source = String(path.node.source);
-      let moduleId = state.modules.get(source);
-      const firstImport = moduleId == null;
-      if (!moduleId) {
-        moduleId = path.scope.getProgramParent().generateUid(source);
-        state.modules.set(source, moduleId);
-      }
-      const specifiers = path.getChildList('specifiers');
-      if (specifiers.length === 0) {
-        path.replaceWith(
-          firstImport ? `var ${moduleId} = require(${JSON.stringify(source)});` : '',
-        );
-        return;
-      }
-      const declarations = firstImport
-        ? [`var ${moduleId} = require(${JSON.stringify(source)});`]
-        : [];
-      for (const specifier of specifiers) {
-        const local = String(specifier.node.local);
-        const imported = String(specifier.node.imported);
-        const expression =
-          imported === '*'
-            ? moduleId
-            : /^[$A-Z_a-z][$\w]*$/.test(imported)
-              ? `${moduleId}.${imported}`
-              : `${moduleId}[${JSON.stringify(imported)}]`;
-        declarations.push(`var ${local} = ${expression};`);
-        const binding = path.scope.getBinding(local);
-        assert.ok(binding, `missing import binding ${local}`);
-        const parentIds = binding.references.flatMap(reference =>
-          reference.parentId == null ? [] : [reference.parentId],
-        );
-        const parents = new Map(
-          path.context
-            .inspect(parentIds.map(nodeId => ({ nodeId, fields: [] })))
-            .map(parent => [parent.id, parent]),
-        );
-        for (const reference of binding.references) {
-          if (reference.parentType === 'ExportSpecifier') continue;
-          const parent = reference.parentId == null ? undefined : parents.get(reference.parentId);
-          const isDirectCall =
-            reference.parentType === 'CallExpression' && parent?.start === reference.start;
-          const preservesShorthand =
-            reference.parentType === 'ObjectProperty' && parent?.start === reference.start;
-          const replacement = isDirectCall
-            ? `(0, ${expression})`
-            : preservesShorthand
-              ? `${local}: ${expression}`
-              : expression;
-          path.context.editor.overwrite(reference.start!, reference.end!, replacement);
+  visitors: [
+    defineVisitor(
+      'ImportDeclaration',
+      {
+        fields: ['source'],
+        scope: true,
+        ancestry: 'parent',
+        children: {
+          specifiers: { route: 'ImportSpecifier', fields: ['local', 'imported'] },
+        },
+      },
+      (path, state: ImportState) => {
+        const source = String(path.node.source);
+        let moduleId = state.modules.get(source);
+        const firstImport = moduleId == null;
+        if (!moduleId) {
+          moduleId = path.scope.getProgramParent().generateUid(source);
+          state.modules.set(source, moduleId);
         }
-      }
-      path.replaceWith(declarations.join('\n'));
-    },
-  },
+        const specifiers = path.getChildList('specifiers');
+        if (specifiers.length === 0) {
+          path.replaceWith(
+            firstImport ? `var ${moduleId} = require(${JSON.stringify(source)});` : '',
+          );
+          return;
+        }
+        const declarations = firstImport
+          ? [`var ${moduleId} = require(${JSON.stringify(source)});`]
+          : [];
+        for (const specifier of specifiers) {
+          const local = String(specifier.node.local);
+          const imported = String(specifier.node.imported);
+          const expression =
+            imported === '*'
+              ? moduleId
+              : /^[$A-Z_a-z][$\w]*$/.test(imported)
+                ? `${moduleId}.${imported}`
+                : `${moduleId}[${JSON.stringify(imported)}]`;
+          declarations.push(`var ${local} = ${expression};`);
+          const binding = path.scope.getBinding(local);
+          assert.ok(binding, `missing import binding ${local}`);
+          const parentIds = binding.references.flatMap(reference =>
+            reference.parentId == null ? [] : [reference.parentId],
+          );
+          const parents = new Map(
+            path.context
+              .inspect(parentIds.map(nodeId => ({ nodeId, fields: [] })))
+              .map(parent => [parent.id, parent]),
+          );
+          for (const reference of binding.references) {
+            if (reference.parentType === 'ExportSpecifier') continue;
+            const parent = reference.parentId == null ? undefined : parents.get(reference.parentId);
+            const isDirectCall =
+              reference.parentType === 'CallExpression' && parent?.start === reference.start;
+            const preservesShorthand =
+              reference.parentType === 'ObjectProperty' && parent?.start === reference.start;
+            const replacement = isDirectCall
+              ? `(0, ${expression})`
+              : preservesShorthand
+                ? `${local}: ${expression}`
+                : expression;
+            path.context.editor.overwrite(reference.start!, reference.end!, replacement);
+          }
+        }
+        path.replaceWith(declarations.join('\n'));
+      },
+    ),
+  ],
 });
 
 type ExportState = { statements: string[] };
 
+const boundIdentifiers = defineVisitor('Identifier', { fields: ['name', 'binding'] }, () => {});
+
 const metroExports = defineNativePlugin<ExportState>({
   name: 'metro-export-fitment',
-  prepare() {
-    return {
-      controlFlow: ['nested-traverse'],
-      semantics: ['scope'],
-      fields: { Identifier: ['name', 'binding'] },
-      children: {
-        ExportNamedDeclaration: ['declaration', 'specifiers'],
-        ExportDefaultDeclaration: ['declaration'],
-      },
-    };
-  },
   createState: () => ({ statements: [] }),
-  visitor: {
-    ExportNamedDeclaration(path, state) {
-      const declaration = path.getChild('declaration');
-      if (declaration) {
-        const names = new Set<string>();
-        declaration.traverse({
-          Identifier(identifier) {
-            if (identifier.node.binding === true) names.add(String(identifier.node.name));
-          },
-        });
-        path.replaceWith(declaration.getSource());
-        for (const name of names) state.statements.push(`exports.${name} = ${name};`);
-        return;
-      }
-      for (const specifier of path.getChildList('specifiers')) {
-        const local = String(specifier.node.local);
-        const exported = String(specifier.node.exported);
-        state.statements.push(
-          `Object.defineProperty(exports, ${JSON.stringify(exported)}, { enumerable: true, get: () => ${local} });`,
-        );
-      }
-      path.remove();
-    },
-    ExportDefaultDeclaration(path, state) {
-      const declaration = path.getChild('declaration');
-      assert.ok(declaration);
-      const local = path.scope.generateUid('default');
-      path.replaceWith(path.context.code.template`var ${local} = ${declaration};`);
-      state.statements.push(`exports.default = ${local};`);
-    },
-    Program: {
-      exit(path, state) {
-        if (state.statements.length > 0) {
-          path.unshiftContainer(
-            'body',
-            `Object.defineProperty(exports, '__esModule', { value: true });`,
-          );
-          path.pushContainer('body', state.statements.join('\n'));
-        }
+  visitors: [
+    defineVisitor(
+      'ExportNamedDeclaration',
+      {
+        controlFlow: ['nested-traverse'],
+        nested: [boundIdentifiers],
+        children: {
+          declaration: { route: 'Declaration' },
+          specifiers: { route: 'ExportSpecifier', fields: ['local', 'exported'] },
+        },
       },
-    },
-  },
+      (path, state: ExportState) => {
+        const declaration = path.getChild('declaration');
+        if (declaration) {
+          const names = new Set<string>();
+          declaration.traverse([
+            defineVisitor('Identifier', { fields: ['name', 'binding'] }, identifier => {
+              if (identifier.node.binding === true) names.add(String(identifier.node.name));
+            }),
+          ]);
+          path.replaceWith(declaration.getSource());
+          for (const name of names) state.statements.push(`exports.${name} = ${name};`);
+          return;
+        }
+        for (const specifier of path.getChildList('specifiers')) {
+          const local = String(specifier.node.local);
+          const exported = String(specifier.node.exported);
+          state.statements.push(
+            `Object.defineProperty(exports, ${JSON.stringify(exported)}, { enumerable: true, get: () => ${local} });`,
+          );
+        }
+        path.remove();
+      },
+    ),
+    defineVisitor(
+      'ExportDefaultDeclaration',
+      { scope: true, children: { declaration: { route: 'Declaration' } } },
+      (path, state: ExportState) => {
+        const declaration = path.getChild('declaration');
+        assert.ok(declaration);
+        const local = path.scope.generateUid('default');
+        path.replaceWith(path.context.code.template`var ${local} = ${declaration};`);
+        state.statements.push(`exports.default = ${local};`);
+      },
+    ),
+    defineVisitor(
+      'Program',
+      {},
+      {
+        exit(path, state: ExportState) {
+          if (state.statements.length > 0) {
+            path.unshiftContainer(
+              'body',
+              `Object.defineProperty(exports, '__esModule', { value: true });`,
+            );
+            path.pushContainer('body', state.statements.join('\n'));
+          }
+        },
+      },
+    ),
+  ],
 });
 
 test('expresses Metro-style import/export lowering with semantic references and JSX', () => {
@@ -176,49 +194,54 @@ type ActionState = { names: string[] };
 
 const serverActions = defineNativePlugin<ActionState>({
   name: 'server-actions-fitment',
-  prepare() {
-    return {
-      subscriptions: ['Directive'],
-      semantics: ['scope'],
-      ancestry: 'programParent',
-      fields: { ArrowFunctionExpression: ['async', 'bodyEnd'] },
-      metadataWrites: ['reactServerActions'],
-      children: {
-        ArrowFunctionExpression: ['body', 'params'],
-        FunctionBody: ['directives'],
-        FormalParameters: ['*'],
-      },
-    };
-  },
+  contract: { metadata: { writes: ['reactServerActions'] } },
   createState: () => ({ names: [] }),
-  visitor: {
-    ArrowFunctionExpression(path, state) {
-      const body = path.getChild('body');
-      if (!body || body.node.type !== 'FunctionBody') return;
-      const directive = body
-        .getChildList('directives')
-        .find(item => item.node.value === 'use server');
-      if (!directive) return;
-      if (path.node.async !== true)
-        throw path.buildCodeFrameError('functions marked with "use server" must be async');
-      const captures = path.context.query({ captures: [{ functionId: path.node.id }] }).captures[
-        path.node.id
-      ];
-      const names = [...new Set(captures.map(capture => String(capture.name)))].sort();
-      const actionId = path.scope.getProgramParent().generateUid('inlineAction');
-      const parameters = path.getChildList('params').map(parameter => parameter.sourceText());
-      const closureParameter = names.length > 0 ? ['$$closure'] : [];
-      const bodyEnd = Number(path.node.bodyEnd);
-      const bodySource = path.context.source.slice(directive.node.end, bodyEnd);
-      const closureInit = names.length > 0 ? `var [${names.join(', ')}] = $$closure;` : '';
-      const extracted = `export var ${actionId} = registerServerReference(async function(${[...closureParameter, ...parameters].join(', ')}) {${closureInit}${bodySource}}, "./fixture", ${JSON.stringify(actionId)});`;
-      path.getProgramParent()!.unshiftContainer('body', extracted);
-      path.replaceWith(
-        names.length > 0 ? `${actionId}.bind(null, [${names.join(', ')}])` : actionId,
-      );
-      state.names.push(actionId);
-    },
-  },
+  visitors: [
+    defineVisitor(
+      'ArrowFunctionExpression',
+      {
+        fields: ['async', 'bodyEnd'],
+        scope: true,
+        ancestry: 'programParent',
+        children: {
+          body: {
+            route: 'FunctionBody',
+            children: { directives: { route: 'Directive', fields: ['value'] } },
+          },
+          params: {
+            route: 'FormalParameters',
+            children: { '*': { route: '*' } },
+          },
+        },
+      },
+      (path, state: ActionState) => {
+        const body = path.getChild('body');
+        if (!body || body.node.type !== 'FunctionBody') return;
+        const directive = body
+          .getChildList('directives')
+          .find(item => item.node.value === 'use server');
+        if (!directive) return;
+        if (path.node.async !== true)
+          throw path.buildCodeFrameError('functions marked with "use server" must be async');
+        const captures = path.context.query({ captures: [{ functionId: path.node.id }] }).captures[
+          path.node.id
+        ];
+        const names = [...new Set(captures.map(capture => String(capture.name)))].sort();
+        const actionId = path.scope.getProgramParent().generateUid('inlineAction');
+        const parameters = path.getChildList('params').map(parameter => parameter.sourceText());
+        const closureParameter = names.length > 0 ? ['$$closure'] : [];
+        const bodyEnd = Number(path.node.bodyEnd);
+        const bodySource = path.context.source.slice(directive.node.end, bodyEnd);
+        const closureInit = names.length > 0 ? `var [${names.join(', ')}] = $$closure;` : '';
+        const extracted = `export var ${actionId} = registerServerReference(async function(${[...closureParameter, ...parameters].join(', ')}) {${closureInit}${bodySource}}, "./fixture", ${JSON.stringify(actionId)});`;
+        path.getProgramParent()!.unshiftContainer('body', extracted);
+        path.replaceWith(
+          names.length > 0 ? `${actionId}.bind(null, [${names.join(', ')}])` : actionId,
+        );
+        state.names.push(actionId);
+      },
+    ),
+  ],
   post(context, state) {
     context.metadata.set('reactServerActions', { id: './fixture', names: state.names });
   },
@@ -268,7 +291,7 @@ test('expresses shared-token responsibility over one import statement through an
   };
   const dependencyCollector = defineNativePlugin({
     name: 'dependency-collector',
-    prepare: () => ({ metadataWrites: ['dependencies'] }),
+    contract: { metadata: { writes: ['dependencies'] } },
     pre(context) {
       claimImportLowering(context);
       context.metadata.set('dependencies', ['whatwg-fetch']);

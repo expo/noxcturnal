@@ -253,27 +253,14 @@ export interface InspectRequest {
   fields: readonly NativeFieldKey[];
 }
 
+/**
+ * Per-file lifecycle settings returned by `prepare()`. Route requirements live on
+ * typed visitor contracts; context requirements live on the plugin contract.
+ */
 export interface PluginPlan {
   /** Disable this plugin, including its lifecycle and subscriptions, for the current file. */
   enabled?: boolean;
-  subscriptions?: readonly NativeVisitorRoute[];
-  /** Restrict Identifier/ReferencedIdentifier delivery to these semantic names. The filter is used only when every Identifier subscriber in the phase declares one. */
-  identifierNames?: readonly string[];
-  /** Restrict StaticMemberExpression/MemberExpression delivery to exact non-computed member paths when every matching subscriber opts in. */
-  staticMemberPatterns?: readonly string[];
-  fields?: Readonly<Partial<Record<NativeNodeType, readonly NativeFieldKey[]>>>;
-  /** Exact, type-sensitive scalar filters evaluated before a route callback is delivered. */
-  where?: Readonly<
-    Partial<Record<NativeVisitorRoute, Readonly<Partial<Record<NativeFieldKey, ScalarPredicate>>>>>
-  >;
-  /** Dynamic path operations used by this plugin. Omitted capabilities are rejected at runtime. */
-  controlFlow?: readonly ControlFlowCapability[];
-  semantics?: readonly 'scope'[];
-  queries?: readonly QueryRequest[];
-  metadataWrites?: readonly string[];
   phases?: readonly string[];
-  ancestry?: 'parent' | 'findParent' | 'functionParent' | 'programParent' | number;
-  children?: Readonly<Partial<Record<NativeVisitorRoute, readonly string[]>>>;
   /** Conservative effect of editor/native actions performed by this plugin. */
   editEffect?: EditEffect;
 }
@@ -290,6 +277,9 @@ export interface TransformOptions {
   functionMap?: boolean;
   /** Include phase decisions and counters in metadata. Intended for benchmarks/debugging only. */
   debugPerformance?: boolean;
+  /** Development/test-only: report undeclared contract access with suggested
+   * fragments and declared-but-unused contract entries as diagnostics. */
+  verifyVisitorContracts?: boolean;
 }
 
 export interface ParserAdapter {

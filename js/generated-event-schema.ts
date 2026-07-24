@@ -7,3 +7,36 @@ export const FIELD_KEYS = ["","name","global","read","write","bindingScopeId","b
 export type NativeFieldKey = Exclude<(typeof FIELD_KEYS)[number], ''>;
 export const FIELD_KEY_IDS = new Map<string, number>(FIELD_KEYS.map((value, index) => [value, index]));
 export const PREDICATE_FIELDS: Readonly<Record<string, readonly string[]>> = {"Identifier":["name","global","read","write","bindingScopeId","binding"],"StringLiteral":["value","constantKind","constantValue"],"NumericLiteral":["value","constantKind","constantValue"],"BooleanLiteral":["value","constantKind","constantValue"],"NullLiteral":["constantKind","constantValue"],"ObjectProperty":["kind","computed","method","shorthand","key"],"UpdateExpression":["operator","prefix"],"UnaryExpression":["operator","prefix","constantKind","constantValue"],"BinaryExpression":["operator","constantKind","constantValue"],"LogicalExpression":["operator","constantKind","constantValue"],"AssignmentExpression":["operator"],"CallExpression":["optional","argumentCount","calleeName","calleeGlobal","staticArgument"],"NewExpression":["argumentCount","calleeName","staticArgument"],"StaticMemberExpression":["computed","property","memberPath","rootName","rootGlobal"],"ComputedMemberExpression":["computed","property","memberPath"],"Function":["nodeKind","async","generator","parameterCount","name","bodyStart","bodyEnd"],"ArrowFunctionExpression":["async","expression","parameterCount","bodyStart","bodyEnd"],"Class":["nodeKind","name"],"ImportDeclaration":["source","importKind","specifierCount"],"ImportSpecifier":["imported","local","importKind"],"ImportDefaultSpecifier":["imported","local"],"ImportNamespaceSpecifier":["imported","local"],"ExportNamedDeclaration":["source","exportKind","specifierCount"],"ExportAllDeclaration":["source","exported","exportKind"],"ExportSpecifier":["local","exported","exportKind"],"VariableDeclaration":["kind","declarationCount"],"VariableDeclarator":["kind","hasInitializer"],"Directive":["value"],"YieldExpression":["delegate"],"ImportMeta":["meta","property"],"NewTarget":["meta","property"]};
+export interface NativeRouteFieldNames {
+  Identifier: "name" | "global" | "read" | "write" | "bindingScopeId" | "binding";
+  StringLiteral: "value" | "constantKind" | "constantValue";
+  NumericLiteral: "value" | "constantKind" | "constantValue";
+  BooleanLiteral: "value" | "constantKind" | "constantValue";
+  NullLiteral: "constantKind" | "constantValue";
+  ObjectProperty: "kind" | "computed" | "method" | "shorthand" | "key";
+  UpdateExpression: "operator" | "prefix";
+  UnaryExpression: "operator" | "prefix" | "constantKind" | "constantValue";
+  BinaryExpression: "operator" | "constantKind" | "constantValue";
+  LogicalExpression: "operator" | "constantKind" | "constantValue";
+  AssignmentExpression: "operator";
+  CallExpression: "optional" | "argumentCount" | "calleeName" | "calleeGlobal" | "staticArgument";
+  NewExpression: "argumentCount" | "calleeName" | "staticArgument";
+  StaticMemberExpression: "computed" | "property" | "memberPath" | "rootName" | "rootGlobal";
+  ComputedMemberExpression: "computed" | "property" | "memberPath";
+  Function: "nodeKind" | "async" | "generator" | "parameterCount" | "name" | "bodyStart" | "bodyEnd";
+  ArrowFunctionExpression: "async" | "expression" | "parameterCount" | "bodyStart" | "bodyEnd";
+  Class: "nodeKind" | "name";
+  ImportDeclaration: "source" | "importKind" | "specifierCount";
+  ImportSpecifier: "imported" | "local" | "importKind";
+  ImportDefaultSpecifier: "imported" | "local";
+  ImportNamespaceSpecifier: "imported" | "local";
+  ExportNamedDeclaration: "source" | "exportKind" | "specifierCount";
+  ExportAllDeclaration: "source" | "exported" | "exportKind";
+  ExportSpecifier: "local" | "exported" | "exportKind";
+  VariableDeclaration: "kind" | "declarationCount";
+  VariableDeclarator: "kind" | "hasInitializer";
+  Directive: "value";
+  YieldExpression: "delegate";
+  ImportMeta: "meta" | "property";
+  NewTarget: "meta" | "property";
+}

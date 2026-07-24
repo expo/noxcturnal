@@ -9,6 +9,7 @@ import {
   compilePhasePlan,
   defineNativePipeline,
   defineNativePlugin,
+  defineVisitor,
   NativeTransformError,
   pipelineCacheKey,
   registerParserAdapter,
@@ -113,11 +114,11 @@ test('rejects edits that violate a none effect contract', () => {
   const plugin = defineNativePlugin({
     name: 'false-none-contract',
     editEffect: 'none',
-    visitor: {
-      Identifier(path) {
+    visitors: [
+      defineVisitor('Identifier', {}, path => {
         path.replaceWith('changed');
-      },
-    },
+      }),
+    ],
   });
   assert.throws(
     () =>
@@ -135,19 +136,19 @@ test('defers text-only rendering across phases that observe the retained AST', (
   const edit = defineNativePlugin({
     name: 'edit-text',
     prepare: () => ({ editEffect: 'text-only' }),
-    visitor: {
-      Identifier(path) {
+    visitors: [
+      defineVisitor('Identifier', {}, path => {
         path.replaceWith('renamed');
-      },
-    },
+      }),
+    ],
   });
   const observe = defineNativePlugin({
     name: 'observe-original-ast',
-    visitor: {
-      Identifier(path) {
+    visitors: [
+      defineVisitor('Identifier', {}, path => {
         observed = path.sourceText();
-      },
-    },
+      }),
+    ],
   });
   const result = transform(
     'const value = 1',
@@ -184,20 +185,20 @@ test('runs original observers against pristine source after a rendered boundary'
   const edit = defineNativePlugin({
     name: 'rendered-edit',
     editEffect: 'whole-program',
-    visitor: {
-      Identifier(path) {
+    visitors: [
+      defineVisitor('Identifier', {}, path => {
         path.replaceWith('renamed');
-      },
-    },
+      }),
+    ],
   });
   const observe = defineNativePlugin({
     name: 'original-observer',
     editEffect: 'none',
-    visitor: {
-      Identifier(path) {
+    visitors: [
+      defineVisitor('Identifier', {}, path => {
         observed = path.sourceText();
-      },
-    },
+      }),
+    ],
   });
   const result = transform(
     'const value = 1',
@@ -233,11 +234,11 @@ test('rejects ambiguous original-source edits after rendering', () => {
     defineNativePlugin({
       name,
       editEffect: 'whole-program',
-      visitor: {
-        Identifier(path) {
+      visitors: [
+        defineVisitor('Identifier', {}, path => {
           path.replaceWith('renamed');
-        },
-      },
+        }),
+      ],
     });
   assert.throws(
     () =>
@@ -259,15 +260,15 @@ test('realizes an explicitly required map once and reuses it at final compositio
   const edit = defineNativePlugin({
     name: 'mapped-edit',
     editEffect: 'text-only',
-    visitor: {
-      Identifier(path) {
+    visitors: [
+      defineVisitor('Identifier', {}, path => {
         path.replaceWith({
           code: 'renamed',
           mapping: 'anchor-boundaries',
           names: ['value'],
         });
-      },
-    },
+      }),
+    ],
   });
   const result = transform(
     'const value = 1',
@@ -303,18 +304,14 @@ test('provides direct path fields and retained snapshots', () => {
   let retained: Readonly<Record<string, unknown>> | undefined;
   const plugin = defineNativePlugin({
     name: 'snapshot',
-    prepare: () => ({
-      fields: { Identifier: ['name'] },
-      ancestry: 'parent',
-    }),
-    visitor: {
-      Identifier(path) {
+    visitors: [
+      defineVisitor('Identifier', { fields: ['name'], ancestry: 'parent' }, path => {
         assert.equal(path.type, 'Identifier');
         assert.equal(path.id, path.node.id);
         assert.equal(path.start, path.node.start);
         retained = path.snapshot({ fields: ['name'], ancestry: 'parent' });
-      },
-    },
+      }),
+    ],
   });
   const result = transform(
     'const value = 1',
@@ -440,21 +437,20 @@ test('hydrates targeted snapshots once and retains exit ancestry and scope', () 
   const snapshots: Readonly<Record<string, unknown>>[] = [];
   const plugin = defineNativePlugin({
     name: 'targeted-snapshot',
-    prepare: () => ({
-      ancestry: 'parent',
-      semantics: ['scope'],
-      fields: { Identifier: ['name'] },
-    }),
-    visitor: {
-      Identifier: {
-        enter(path) {
-          snapshots.push(path.snapshot({ fields: ['name'], ancestry: 'parent' }));
+    visitors: [
+      defineVisitor(
+        'Identifier',
+        { fields: ['name'], scope: true, ancestry: 'parent' },
+        {
+          enter(path) {
+            snapshots.push(path.snapshot({ fields: ['name'], ancestry: 'parent' }));
+          },
+          exit(path) {
+            snapshots.push(path.snapshot({ fields: ['name'], ancestry: 'parent' }));
+          },
         },
-        exit(path) {
-          snapshots.push(path.snapshot({ fields: ['name'], ancestry: 'parent' }));
-        },
-      },
-    },
+      ),
+    ],
   });
   const result = transform(
     'const value = other',
@@ -484,11 +480,11 @@ test('hydrates targeted snapshots once and retains exit ancestry and scope', () 
               plugins: [
                 defineNativePlugin({
                   name: 'invalid-snapshot',
-                  visitor: {
-                    Identifier(path) {
+                  visitors: [
+                    defineVisitor('Identifier', {}, path => {
                       path.snapshot({ fields: ['notAField'] });
-                    },
-                  },
+                    }),
+                  ],
                 }),
               ],
             },
@@ -502,7 +498,7 @@ test('hydrates targeted snapshots once and retains exit ancestry and scope', () 
 test('skips native rendering when a phase produces no edits', () => {
   const plugin = defineNativePlugin({
     name: 'analysis-only',
-    visitor: { Identifier() {} },
+    visitors: [defineVisitor('Identifier', {}, () => {})],
   });
   const source = 'const answer = value;';
   const result = transform(
@@ -518,7 +514,7 @@ test('reuses identical packed events across unchanged phases', () => {
   const plugin = (name: string) =>
     defineNativePlugin({
       name,
-      visitor: { Identifier() {} },
+      visitors: [defineVisitor('Identifier', {}, () => {})],
     });
   const result = transform(
     'const answer = value;',
@@ -537,17 +533,15 @@ test('applies exact scalar route predicates without exposing a new visitor shape
   const seen: string[] = [];
   const plugin = defineNativePlugin({
     name: 'predicates',
-    prepare() {
-      return {
-        where: { VariableDeclaration: { kind: { oneOf: ['let', 'const'] } } },
-        controlFlow: [],
-      };
-    },
-    visitor: {
-      VariableDeclaration(path) {
-        seen.push(path.sourceText().slice(0, 5));
-      },
-    },
+    visitors: [
+      defineVisitor(
+        'VariableDeclaration',
+        { where: { kind: { oneOf: ['let', 'const'] } } },
+        path => {
+          seen.push(path.sourceText().slice(0, 5));
+        },
+      ),
+    ],
   });
   const result = transform(
     'var first = 1; let second = 2; const third = 3;',
@@ -562,12 +556,11 @@ test('supports absent predicates and rejects undeclared dynamic control flow', (
   let absent = 0;
   const predicatePlugin = defineNativePlugin({
     name: 'absent',
-    prepare: () => ({ where: { ExportNamedDeclaration: { source: { present: false } } } }),
-    visitor: {
-      ExportNamedDeclaration() {
+    visitors: [
+      defineVisitor('ExportNamedDeclaration', { where: { source: { present: false } } }, () => {
         absent++;
-      },
-    },
+      }),
+    ],
   });
   transform(
     "export const local = 1; export { value } from 'module';",
@@ -578,12 +571,11 @@ test('supports absent predicates and rejects undeclared dynamic control flow', (
 
   const staticPlugin = defineNativePlugin({
     name: 'static',
-    prepare: () => ({ controlFlow: [] }),
-    visitor: {
-      Identifier(path) {
+    visitors: [
+      defineVisitor('Identifier', {}, path => {
         path.stop();
-      },
-    },
+      }),
+    ],
   });
   assert.throws(
     () =>
@@ -603,17 +595,20 @@ test('routes static enter and exit callbacks by integer id in native order', () 
   const plugin = (name: string) =>
     defineNativePlugin({
       name,
-      prepare: () => ({ controlFlow: [] }),
-      visitor: {
-        Function: {
-          enter(path) {
-            calls.push(`${name}:enter:${path.node.type}`);
+      visitors: [
+        defineVisitor(
+          'Function',
+          {},
+          {
+            enter(path) {
+              calls.push(`${name}:enter:${path.node.type}`);
+            },
+            exit(path) {
+              calls.push(`${name}:exit:${path.node.type}`);
+            },
           },
-          exit(path) {
-            calls.push(`${name}:exit:${path.node.type}`);
-          },
-        },
-      },
+        ),
+      ],
     });
   const result = transform(
     'function example() {}',
@@ -635,17 +630,16 @@ test('keeps predicate-only fields native', () => {
   let calls = 0;
   const plugin = defineNativePlugin({
     name: 'selective',
-    prepare: () => ({
-      controlFlow: [],
-      fields: { VariableDeclaration: [] },
-      where: { VariableDeclaration: { kind: { equals: 'const' } } },
-    }),
-    visitor: {
-      VariableDeclaration(path) {
-        calls++;
-        assert.equal(path.node.kind, undefined);
-      },
-    },
+    visitors: [
+      defineVisitor(
+        'VariableDeclaration',
+        { fields: [], where: { kind: { equals: 'const' } } },
+        path => {
+          calls++;
+          assert.equal(path.node.kind, undefined);
+        },
+      ),
+    ],
   });
   const result = transform(
     'var first = 1; let second = 2; const third = 3;',
@@ -666,12 +660,7 @@ test('keeps scalar predicates type-sensitive for false, zero, and empty strings'
   ) =>
     defineNativePlugin({
       name,
-      prepare: () => ({
-        controlFlow: [],
-        fields: { [route]: [] },
-        where: { [route]: { value: predicate } },
-      }),
-      visitor: { [route]: visit },
+      visitors: [defineVisitor(route, { where: { value: predicate } }, visit)],
     });
   const result = transform(
     'false; true; 0; 1; ""; "x";',
@@ -793,11 +782,7 @@ test('retains only semantic and query sidecars declared by the compiled manifest
 test('validates predicate fields across every concrete alias route', () => {
   const plugin = defineNativePlugin({
     name: 'invalid-alias-predicate',
-    prepare: () => ({
-      controlFlow: [],
-      where: { Expression: { kind: { equals: 'const' } } },
-    }),
-    visitor: { Expression() {} },
+    visitors: [defineVisitor('Expression', { where: { kind: { equals: 'const' } } }, () => {})],
   });
   assert.throws(
     () =>
@@ -816,12 +801,11 @@ test('deduplicates overlapping parts of a compiled composite visitor key', () =>
   let calls = 0;
   const plugin = defineNativePlugin({
     name: 'compiled-composite',
-    prepare: () => ({ controlFlow: [] }),
-    visitor: {
-      'Identifier|Expression'() {
+    visitors: [
+      defineVisitor('Identifier|Expression', {}, () => {
         calls++;
-      },
-    },
+      }),
+    ],
   });
   transform(
     'value;',
@@ -837,19 +821,26 @@ test('reverses overlapping compiled exit callbacks within one plugin', () => {
   const calls: string[] = [];
   const plugin = defineNativePlugin({
     name: 'compiled-exit-order',
-    prepare: () => ({ controlFlow: [] }),
-    visitor: {
-      Identifier: {
-        exit() {
-          calls.push('identifier');
+    visitors: [
+      defineVisitor(
+        'Identifier',
+        {},
+        {
+          exit() {
+            calls.push('identifier');
+          },
         },
-      },
-      Expression: {
-        exit() {
-          calls.push('expression');
+      ),
+      defineVisitor(
+        'Expression',
+        {},
+        {
+          exit() {
+            calls.push('expression');
+          },
         },
-      },
-    },
+      ),
+    ],
   });
   transform(
     'value;',
@@ -865,16 +856,15 @@ test('keeps declared skip semantics on the compiled slow lane', () => {
   const calls: string[] = [];
   const plugin = defineNativePlugin({
     name: 'compiled-skip',
-    prepare: () => ({ controlFlow: ['skip'] }),
-    visitor: {
-      Function(path) {
+    visitors: [
+      defineVisitor('Function', { controlFlow: ['skip'] }, path => {
         calls.push('function');
         path.skip();
-      },
-      Identifier() {
+      }),
+      defineVisitor('Identifier', { controlFlow: ['skip'] }, () => {
         calls.push('identifier');
-      },
-    },
+      }),
+    ],
   });
   const result = transform(
     'function example(parameter) { return parameter; }',
@@ -887,22 +877,22 @@ test('keeps declared skip semantics on the compiled slow lane', () => {
 
 test('uses cached routed tapes for declared nested traversal', () => {
   const names: string[] = [];
-  const nestedVisitor = {
-    Identifier(path: any) {
+  const nestedVisitor = [
+    defineVisitor('Identifier', { fields: ['name'] }, path => {
       names.push(String(path.node.name));
-    },
-  };
+    }),
+  ];
   const plugin = defineNativePlugin({
     name: 'routed-nested',
-    prepare: () => ({
-      controlFlow: ['nested-traverse'],
-      fields: { Identifier: ['name'] },
-    }),
-    visitor: {
-      Function(path) {
-        path.traverse(nestedVisitor);
-      },
-    },
+    visitors: [
+      defineVisitor(
+        'Function',
+        { controlFlow: ['nested-traverse'], nested: nestedVisitor },
+        path => {
+          path.traverse(nestedVisitor);
+        },
+      ),
+    ],
   });
   const result = transform(
     'function example(parameter) { return parameter; }',
@@ -917,16 +907,19 @@ test('expands Function aliases to arrow functions in nested routed traversal', (
   const functions: string[] = [];
   const plugin = defineNativePlugin({
     name: 'nested-function-alias',
-    prepare: () => ({ ancestry: 'parent', controlFlow: ['nested-traverse'] }),
-    visitor: {
-      VariableDeclaration(path) {
-        path.parentPath?.traverse({
-          Function(fn) {
-            functions.push(fn.node.type);
-          },
-        });
-      },
-    },
+    visitors: [
+      defineVisitor(
+        'VariableDeclaration',
+        { ancestry: 'parent', controlFlow: ['nested-traverse'] },
+        path => {
+          path.parentPath?.traverse([
+            defineVisitor('Function', {}, fn => {
+              functions.push(fn.node.type);
+            }),
+          ]);
+        },
+      ),
+    ],
   });
   const result = transform(
     'for (const value of values) callbacks.push(() => value);',
@@ -993,24 +986,21 @@ test('runs ordered phases and reparses edited code', () => {
   const observations = [];
   const replace = defineNativePlugin({
     name: 'replace-number',
-    prepare: () => ({ fields: { NumericLiteral: ['value'] } }),
-    visitor: {
-      NumericLiteral(path) {
+    visitors: [
+      defineVisitor('NumericLiteral', { fields: ['value'] }, path => {
         if (path.node.value === 1) path.replaceWith('2');
-      },
-    },
+      }),
+    ],
   });
   const observe = defineNativePlugin({
     name: 'observe-number',
-    prepare() {
-      return { fields: { NumericLiteral: ['value'] }, metadataWrites: ['observed'] };
-    },
-    visitor: {
-      NumericLiteral(path) {
+    contract: { metadata: { writes: ['observed'] } },
+    visitors: [
+      defineVisitor('NumericLiteral', { fields: ['value'] }, path => {
         observations.push(path.node.value);
         path.context.metadata.set('observed', path.node.value);
-      },
-    },
+      }),
+    ],
   });
   const result = transform(
     'export const value = 1;',
@@ -1038,16 +1028,20 @@ test('supports aliases, enter/exit order, state, skip, and stop', () => {
       order.push('pre');
       state.count++;
     },
-    visitor: {
-      Function: {
-        enter(_path, state) {
-          order.push(`enter:${state.count}`);
+    visitors: [
+      defineVisitor(
+        'Function',
+        {},
+        {
+          enter(_path, state) {
+            order.push(`enter:${state.count}`);
+          },
+          exit() {
+            order.push('exit');
+          },
         },
-        exit() {
-          order.push('exit');
-        },
-      },
-    },
+      ),
+    ],
     post() {
       order.push('post');
     },
@@ -1075,26 +1069,26 @@ test('routes Babel-compatible semantic and collapsed Oxc visitor keys', () => {
   };
   const plugin = defineNativePlugin({
     name: 'babel-routes',
-    visitor: {
-      ReferencedIdentifier(path) {
+    visitors: [
+      defineVisitor('ReferencedIdentifier', { fields: ['name'] }, path => {
         seen.references.push(String(path.node.name));
-      },
-      MetaProperty(path) {
+      }),
+      defineVisitor('MetaProperty', {}, path => {
         seen.meta.push(path.node.type);
-      },
-      FunctionDeclaration(path) {
+      }),
+      defineVisitor('FunctionDeclaration', { fields: ['name'] }, path => {
         seen.functionDeclarations.push(String(path.node.name));
-      },
-      FunctionExpression() {
+      }),
+      defineVisitor('FunctionExpression', {}, () => {
         seen.functionExpressions++;
-      },
-      ClassDeclaration(path) {
+      }),
+      defineVisitor('ClassDeclaration', { fields: ['name'] }, path => {
         seen.classDeclarations.push(String(path.node.name));
-      },
-      ClassExpression() {
+      }),
+      defineVisitor('ClassExpression', {}, () => {
         seen.classExpressions++;
-      },
-    },
+      }),
+    ],
   });
   transform(
     'const local = globalValue; use(local); function declared() {} const expression = function () {}; class Declared {} const ClassExpressionValue = class {}; import.meta; function target() { return new.target }',
@@ -1113,18 +1107,12 @@ test('matches static member chains without traversing child objects', () => {
   const matches: string[] = [];
   const plugin = defineNativePlugin({
     name: 'member-patterns',
-    prepare: () => ({
-      fields: {
-        StaticMemberExpression: ['memberPath'],
-        ComputedMemberExpression: ['memberPath'],
-      },
-    }),
-    visitor: {
-      MemberExpression(path) {
+    visitors: [
+      defineVisitor('MemberExpression', { fields: ['memberPath'] }, path => {
         if (path.matchesPattern('process.env.NODE_ENV')) matches.push(path.sourceText());
         if (path.matchesPattern('process.env', true)) matches.push(`partial:${path.sourceText()}`);
-      },
-    },
+      }),
+    ],
   });
   transform(
     "process.env.NODE_ENV; process['env'].EXPO_PUBLIC_VALUE; process[key].dynamic",
@@ -1145,16 +1133,20 @@ test('orders multiple plugins forward on enter and in reverse on exit', () => {
   const plugin = (name: string) =>
     defineNativePlugin({
       name,
-      visitor: {
-        Function: {
-          enter() {
-            order.push(`${name}:enter`);
+      visitors: [
+        defineVisitor(
+          'Function',
+          {},
+          {
+            enter() {
+              order.push(`${name}:enter`);
+            },
+            exit() {
+              order.push(`${name}:exit`);
+            },
           },
-          exit() {
-            order.push(`${name}:exit`);
-          },
-        },
-      },
+        ),
+      ],
     });
   transform(
     'function fixture() {}',
@@ -1170,19 +1162,22 @@ test('supports targeted nested traversal and semantic global queries', () => {
   const names = [];
   const plugin = defineNativePlugin({
     name: 'targeted',
-    prepare: () => ({
-      controlFlow: ['nested-traverse'],
-      fields: { Identifier: ['name', 'global'] },
-    }),
-    visitor: {
-      Function(path) {
-        path.traverse({
-          Identifier(identifier) {
-            names.push([identifier.node.name, identifier.node.global]);
-          },
-        });
-      },
-    },
+    visitors: [
+      defineVisitor(
+        'Function',
+        {
+          controlFlow: ['nested-traverse'],
+          nested: [defineVisitor('Identifier', { fields: ['name', 'global'] }, () => {})],
+        },
+        path => {
+          path.traverse([
+            defineVisitor('Identifier', { fields: ['name', 'global'] }, identifier => {
+              names.push([identifier.node.name, identifier.node.global]);
+            }),
+          ]);
+        },
+      ),
+    ],
   });
   const result = transform(
     'const outside = 1; function f(local) { return local + external }',
@@ -1198,18 +1193,15 @@ test('resolves bindings through identifier-free intermediate scopes', () => {
   const observations: unknown[] = [];
   const plugin = defineNativePlugin({
     name: 'complete-scope-tree',
-    prepare() {
-      return { semantics: ['scope'] };
-    },
-    visitor: {
-      ArrowFunctionExpression(path) {
+    visitors: [
+      defineVisitor('ArrowFunctionExpression', { scope: true }, path => {
         const binding = path.scope.getBinding('outer');
         const program = path.scope.getProgramParent();
         let depth = 0;
         for (let scope = path.scope.parent; scope; scope = scope.parent) depth++;
         observations.push([binding?.name, binding?.scope === program, depth]);
-      },
-    },
+      }),
+    ],
   });
   transform(
     'const outer = 1; { { (() => outer); } }',
@@ -1301,12 +1293,12 @@ test('returns pristine source on explicit bailout and calls cleanup', () => {
   let cleanup;
   const plugin = defineNativePlugin({
     name: 'bail',
-    visitor: {
-      Identifier(path) {
+    visitors: [
+      defineVisitor('Identifier', {}, path => {
         path.replaceWith('changed');
         path.unsupported('fixture');
-      },
-    },
+      }),
+    ],
     cleanup(reason) {
       cleanup = reason;
     },
@@ -1357,7 +1349,7 @@ test('analyzes every plugin before applying edits and bails out pristine', () =>
 test('builds deterministic cache keys and returns pristine bailout source', () => {
   const plugin = defineNativePlugin({
     name: 'unsupported',
-    visitor: { Program: path => path.unsupported('test') },
+    visitors: [defineVisitor('Program', {}, path => path.unsupported('test'))],
   });
   const pipeline = defineNativePipeline({
     phases: [{ name: 'source', plugins: [plugin] }],
@@ -1393,11 +1385,11 @@ test('creates immutable pipelines and reusable option-bound plugin definitions',
 test('requires explicit pipeline phases', () => {
   const plugin = defineNativePlugin({
     name: 'concise',
-    visitor: {
-      NumericLiteral(path) {
+    visitors: [
+      defineVisitor('NumericLiteral', {}, path => {
         path.replaceWith('2');
-      },
-    },
+      }),
+    ],
   });
   const pipeline = defineNativePipeline({ phases: [{ name: 'transform', plugins: [plugin] }] });
   assert.equal(pipeline.phases[0].name, 'transform');
@@ -1416,7 +1408,7 @@ test('rejects conflicting edits transactionally', () => {
   const plugin = name =>
     defineNativePlugin({
       name,
-      visitor: { Identifier: path => path.replaceWith(name) },
+      visitors: [defineVisitor('Identifier', {}, path => path.replaceWith(name))],
     });
   assert.throws(
     () =>
@@ -1435,7 +1427,11 @@ test('expands union visitor keys before native subscription planning', () => {
   const seen: string[] = [];
   const plugin = defineNativePlugin({
     name: 'union',
-    visitor: { 'ImportDeclaration|ExportNamedDeclaration': path => seen.push(path.node.type) },
+    visitors: [
+      defineVisitor('ImportDeclaration|ExportNamedDeclaration', {}, path =>
+        seen.push(path.node.type),
+      ),
+    ],
   });
   transform(
     "import value from 'source'; export { value }",
@@ -1449,7 +1445,7 @@ test('expands the Expression alias consistently for literal expressions', () => 
   const seen: string[] = [];
   const plugin = defineNativePlugin({
     name: 'expressions',
-    visitor: { Expression: path => seen.push(path.node.type) },
+    visitors: [defineVisitor('Expression', {}, path => seen.push(path.node.type))],
   });
   transform(
     'true; 1; "value"; null; /value/;',
@@ -1468,14 +1464,14 @@ test('treats declarations as Babel statements despite collapsed Oxc node kinds',
   const statements: string[] = [];
   const plugin = defineNativePlugin({
     name: 'declaration-alias',
-    visitor: {
-      Declaration(path) {
+    visitors: [
+      defineVisitor('Declaration', {}, path => {
         declarations.push(path.node.type);
-      },
-      Statement(path) {
+      }),
+      defineVisitor('Statement', {}, path => {
         statements.push(path.node.type);
-      },
-    },
+      }),
+    ],
   });
   transform(
     "import value from 'pkg'; const item = value; function fn() {} class Example {} export { item };",
@@ -1496,14 +1492,11 @@ test('provides parent paths backed by native indexed records', () => {
   let parentType: string | undefined;
   const plugin = defineNativePlugin({
     name: 'parent',
-    prepare() {
-      return { ancestry: 'parent' };
-    },
-    visitor: {
-      NumericLiteral(path) {
+    visitors: [
+      defineVisitor('NumericLiteral', { ancestry: 'parent' }, path => {
         parentType = path.parentPath?.node.type;
-      },
-    },
+      }),
+    ],
   });
   transform(
     'const value = 1',
@@ -1517,18 +1510,15 @@ test('provides lazy ancestor helpers without recursive node materialization', ()
   let ancestors: unknown;
   const plugin = defineNativePlugin({
     name: 'ancestors',
-    prepare() {
-      return { ancestry: 'findParent' };
-    },
-    visitor: {
-      NumericLiteral(path) {
+    visitors: [
+      defineVisitor('NumericLiteral', { ancestry: 'findParent' }, path => {
         ancestors = [
           path.findParent(parent => parent.node.type === 'ReturnStatement')?.node.type,
           path.getFunctionParent()?.node.type,
           path.getProgramParent()?.node.type,
         ];
-      },
-    },
+      }),
+    ],
   });
   transform(
     'function fixture() { return 1 }',
@@ -1541,19 +1531,19 @@ test('provides lazy ancestor helpers without recursive node materialization', ()
 test('requires ancestry and scope payloads to be declared', () => {
   const ancestry = defineNativePlugin({
     name: 'undeclared-ancestry',
-    visitor: {
-      Identifier(path) {
+    visitors: [
+      defineVisitor('Identifier', {}, path => {
         void path.parentPath;
-      },
-    },
+      }),
+    ],
   });
   const scope = defineNativePlugin({
     name: 'undeclared-scope',
-    visitor: {
-      Identifier(path) {
+    visitors: [
+      defineVisitor('Identifier', {}, path => {
         void path.scope;
-      },
-    },
+      }),
+    ],
   });
   assert.throws(
     () =>
@@ -1579,18 +1569,16 @@ test('honors plan phase filters and validates expression fragments natively', ()
   const visited: string[] = [];
   const plugin = defineNativePlugin({
     name: 'phased',
-    prepare() {
-      return { phases: ['second'] };
-    },
-    visitor: {
-      Program(path) {
+    prepare: () => ({ phases: ['second'] }),
+    visitors: [
+      defineVisitor('Program', {}, path => {
         visited.push(path.context.phase);
         assert.throws(
           () => path.context.code.parseExpression('value +'),
           /invalid expression fragment/,
         );
-      },
-    },
+      }),
+    ],
   });
   transform(
     'value',
@@ -1608,8 +1596,8 @@ test('honors plan phase filters and validates expression fragments natively', ()
 test('builds escaped primitive literals and validates statement fragments', () => {
   const plugin = defineNativePlugin({
     name: 'code-factory',
-    visitor: {
-      Program(path) {
+    visitors: [
+      defineVisitor('Program', {}, path => {
         assert.equal(path.context.code.literal('quoted\nvalue').code, '"quoted\\nvalue"');
         assert.equal(path.context.code.literal(12n).code, '12n');
         path.appendToBody(
@@ -1619,8 +1607,8 @@ test('builds escaped primitive literals and validates statement fragments', () =
           () => path.context.code.parseStatements('export const ='),
           /invalid statement fragment/,
         );
-      },
-    },
+      }),
+    ],
   });
   const result = transform(
     'const original = true;',
@@ -1634,15 +1622,19 @@ test('builds escaped primitive literals and validates statement fragments', () =
 test('composes source maps across phases', () => {
   const first = defineNativePlugin({
     name: 'first',
-    visitor: {
-      NumericLiteral: path => path.replaceWith({ code: '20', mapping: 'anchor-boundaries' }),
-    },
+    visitors: [
+      defineVisitor('NumericLiteral', {}, path =>
+        path.replaceWith({ code: '20', mapping: 'anchor-boundaries' }),
+      ),
+    ],
   });
   const second = defineNativePlugin({
     name: 'second',
-    visitor: {
-      NumericLiteral: path => path.replaceWith({ code: '300', mapping: 'anchor-boundaries' }),
-    },
+    visitors: [
+      defineVisitor('NumericLiteral', {}, path =>
+        path.replaceWith({ code: '300', mapping: 'anchor-boundaries' }),
+      ),
+    ],
   });
   const result = transform(
     'const value = 1',
@@ -1709,18 +1701,22 @@ test('widens over only the remaining traversal and suppresses duplicates', () =>
   const seen: string[] = [];
   const plugin = defineNativePlugin({
     name: 'widen',
-    prepare: () => ({
-      controlFlow: ['dynamic-subscriptions'],
-      fields: { CallExpression: ['calleeName'], Identifier: ['name'] },
-    }),
-    visitor: {
-      CallExpression(path) {
-        if (path.node.calleeName === 'mark') path.context.subscribeRemaining('Identifier');
-      },
-      Identifier(path) {
-        seen.push(String(path.node.name));
-      },
-    },
+    visitors: [
+      defineVisitor(
+        'CallExpression',
+        { fields: ['calleeName'], controlFlow: ['dynamic-subscriptions'] },
+        path => {
+          if (path.node.calleeName === 'mark') path.context.subscribeRemaining('Identifier');
+        },
+      ),
+      defineVisitor(
+        'Identifier',
+        { fields: ['name'], controlFlow: ['dynamic-subscriptions'] },
+        path => {
+          seen.push(String(path.node.name));
+        },
+      ),
+    ],
   });
   transform(
     'before; mark(); after;',
@@ -1735,25 +1731,23 @@ test('implements per-plugin skip and stop', () => {
   const stopped: string[] = [];
   const skipPlugin = defineNativePlugin({
     name: 'skip',
-    prepare: () => ({ controlFlow: ['skip'], fields: { Identifier: ['name'] } }),
-    visitor: {
-      Function(path) {
+    visitors: [
+      defineVisitor('Function', { controlFlow: ['skip'] }, path => {
         path.skip();
-      },
-      Identifier(path) {
+      }),
+      defineVisitor('Identifier', { fields: ['name'], controlFlow: ['skip'] }, path => {
         skipped.push(String(path.node.name));
-      },
-    },
+      }),
+    ],
   });
   const stopPlugin = defineNativePlugin({
     name: 'stop',
-    prepare: () => ({ controlFlow: ['stop'] }),
-    visitor: {
-      Identifier(path) {
+    visitors: [
+      defineVisitor('Identifier', { controlFlow: ['stop'] }, path => {
         stopped.push(String(path.node.name));
         path.stop();
-      },
-    },
+      }),
+    ],
   });
   transform(
     'outside; function fn(inside) { return inside } trailing;',
@@ -1771,12 +1765,11 @@ test('requires an explicit global stop capability', () => {
   let peerCalls = 0;
   const localStopOnly = defineNativePlugin({
     name: 'local-stop-only',
-    prepare: () => ({ controlFlow: ['stop'] }),
-    visitor: {
-      Identifier(path) {
+    visitors: [
+      defineVisitor('Identifier', { controlFlow: ['stop'] }, path => {
         path.context.stopAll();
-      },
-    },
+      }),
+    ],
   });
   assert.throws(
     () =>
@@ -1790,20 +1783,19 @@ test('requires an explicit global stop capability', () => {
 
   const globalStop = defineNativePlugin({
     name: 'global-stop',
-    prepare: () => ({ controlFlow: ['stop-all'] }),
-    visitor: {
-      Identifier(path) {
+    visitors: [
+      defineVisitor('Identifier', { controlFlow: ['stop-all'] }, path => {
         path.context.stopAll();
-      },
-    },
+      }),
+    ],
   });
   const peer = defineNativePlugin({
     name: 'global-stop-peer',
-    visitor: {
-      Identifier() {
+    visitors: [
+      defineVisitor('Identifier', {}, () => {
         peerCalls++;
-      },
-    },
+      }),
+    ],
   });
   transform(
     'value;',
@@ -1818,24 +1810,22 @@ test('keeps static routes independent from another plugin dynamic skip state', (
   let staticIdentifiers = 0;
   const dynamic = defineNativePlugin({
     name: 'dynamic-skip',
-    prepare: () => ({ controlFlow: ['skip'] }),
-    visitor: {
-      Function(path) {
+    visitors: [
+      defineVisitor('Function', { controlFlow: ['skip'] }, path => {
         path.skip();
-      },
-      Identifier() {
+      }),
+      defineVisitor('Identifier', { controlFlow: ['skip'] }, () => {
         dynamicIdentifiers++;
-      },
-    },
+      }),
+    ],
   });
   const fixed = defineNativePlugin({
     name: 'fixed-route',
-    prepare: () => ({ controlFlow: [] }),
-    visitor: {
-      Identifier() {
+    visitors: [
+      defineVisitor('Identifier', {}, () => {
         staticIdentifiers++;
-      },
-    },
+      }),
+    ],
   });
   const result = transform(
     'const outside = 1; function example(argument) { return argument }',
@@ -1852,22 +1842,22 @@ test('provides call and capture query declarations', () => {
   let captures: unknown[] = [];
   const plugin = defineNativePlugin({
     name: 'queries',
-    prepare: () => ({
+    contract: {
       queries: [
         { calls: [{ callee: 'load', globalOnly: true, staticArguments: true }] },
         { captures: [{ functionId: 0 }] },
       ],
-    }),
-    visitor: {
-      Function(path) {
+    },
+    visitors: [
+      defineVisitor('Function', {}, path => {
         calls = path.context.query({
           calls: [{ callee: 'load', globalOnly: true, staticArguments: true }],
         }).calls.load.length;
         captures = path.context.query({ captures: [{ functionId: path.node.id }] }).captures[
           path.node.id
         ];
-      },
-    },
+      }),
+    ],
   });
   transform(
     "const outer = 1; load('x'); function fn() { return outer }",
@@ -1903,16 +1893,13 @@ test('indexes repeated scope lookups without consuming follow-up batches', () =>
   let globals = 0;
   const plugin = defineNativePlugin({
     name: 'many-scope-lookups',
-    prepare() {
-      return { semantics: ['scope'], fields: { Identifier: ['name'] } };
-    },
-    visitor: {
-      Identifier(path) {
+    visitors: [
+      defineVisitor('Identifier', { fields: ['name'], scope: true }, path => {
         const name = String(path.node.name);
         if (path.scope.hasBinding(name)) bindings++;
         if (path.scope.hasGlobal(name)) globals++;
-      },
-    },
+      }),
+    ],
   });
   const result = transform(
     source,
@@ -1929,39 +1916,41 @@ test('filters hot event families only when every subscriber opts in', () => {
   const secondSeen = new Set();
   const first = defineNativePlugin({
     name: 'first-filter',
-    prepare() {
-      return {
-        identifierNames: ['first'],
-        staticMemberPatterns: ['process.env.FIRST'],
-        fields: { Identifier: ['name'], StaticMemberExpression: ['memberPath'] },
-      };
-    },
-    visitor: {
-      ReferencedIdentifier(path) {
-        firstSeen.add(String(path.node.name));
-      },
-      StaticMemberExpression(path) {
-        firstSeen.add(String(path.node.memberPath));
-      },
-    },
+    visitors: [
+      defineVisitor(
+        'ReferencedIdentifier',
+        { fields: ['name'], where: { name: { oneOf: ['first'] } } },
+        path => {
+          firstSeen.add(String(path.node.name));
+        },
+      ),
+      defineVisitor(
+        'StaticMemberExpression',
+        { fields: ['memberPath'], where: { memberPath: { oneOf: ['process.env.FIRST'] } } },
+        path => {
+          firstSeen.add(String(path.node.memberPath));
+        },
+      ),
+    ],
   });
   const second = defineNativePlugin({
     name: 'second-filter',
-    prepare() {
-      return {
-        identifierNames: ['second'],
-        staticMemberPatterns: ['process.env.SECOND'],
-        fields: { Identifier: ['name'], StaticMemberExpression: ['memberPath'] },
-      };
-    },
-    visitor: {
-      ReferencedIdentifier(path) {
-        secondSeen.add(String(path.node.name));
-      },
-      StaticMemberExpression(path) {
-        secondSeen.add(String(path.node.memberPath));
-      },
-    },
+    visitors: [
+      defineVisitor(
+        'ReferencedIdentifier',
+        { fields: ['name'], where: { name: { oneOf: ['second'] } } },
+        path => {
+          secondSeen.add(String(path.node.name));
+        },
+      ),
+      defineVisitor(
+        'StaticMemberExpression',
+        { fields: ['memberPath'], where: { memberPath: { oneOf: ['process.env.SECOND'] } } },
+        path => {
+          secondSeen.add(String(path.node.memberPath));
+        },
+      ),
+    ],
   });
   transform(
     'first; second; third; process.env.FIRST; process.env.SECOND; process.env.THIRD;',
@@ -1974,12 +1963,11 @@ test('filters hot event families only when every subscriber opts in', () => {
   const unfiltered = new Set();
   const broad = defineNativePlugin({
     name: 'unfiltered',
-    prepare: () => ({ fields: { Identifier: ['name'] } }),
-    visitor: {
-      ReferencedIdentifier(path) {
+    visitors: [
+      defineVisitor('ReferencedIdentifier', { fields: ['name'] }, path => {
         unfiltered.add(String(path.node.name));
-      },
-    },
+      }),
+    ],
   });
   transform(
     'first; second; third;',
@@ -1993,20 +1981,18 @@ test('can disable a plugin and its lifecycle for the current file', () => {
   let lifecycleCalls = 0;
   const plugin = defineNativePlugin({
     name: 'disabled',
-    prepare() {
-      return { enabled: false };
-    },
+    prepare: () => ({ enabled: false }),
     createState() {
       lifecycleCalls++;
     },
     pre() {
       lifecycleCalls++;
     },
-    visitor: {
-      Identifier() {
+    visitors: [
+      defineVisitor('Identifier', {}, () => {
         lifecycleCalls++;
-      },
-    },
+      }),
+    ],
     post() {
       lifecycleCalls++;
     },
@@ -2022,11 +2008,8 @@ test('can disable a plugin and its lifecycle for the current file', () => {
 test('resolves the nearest binding and renames only its semantic references', () => {
   const plugin = defineNativePlugin({
     name: 'rename-binding',
-    prepare() {
-      return { semantics: ['scope'], fields: { Function: ['name'] } };
-    },
-    visitor: {
-      Program(path) {
+    visitors: [
+      defineVisitor('Program', { scope: true }, path => {
         const binding = path.scope.getBinding('value');
         assert.equal(binding?.global, false);
         assert.equal(binding?.references.length, 3);
@@ -2034,8 +2017,8 @@ test('resolves the nearest binding and renames only its semantic references', ()
         assert.equal(binding?.scope?.id, path.scope.id);
         assert.equal(binding?.scope?.getProgramParent().id, path.scope.id);
         assert.equal(path.scope.rename('value', 'renamed'), 'renamed');
-      },
-    },
+      }),
+    ],
   });
   const source =
     'let value = 1; use(value); const object = { value }; ({ value } = object); function nested(value) { return value }';
@@ -2055,11 +2038,8 @@ test('exposes lazy Babel-shaped binding paths and scope parent chains', () => {
   let observed: unknown;
   const plugin = defineNativePlugin({
     name: 'binding-path',
-    prepare() {
-      return { semantics: ['scope'], fields: { Function: ['name', 'bodyStart'] } };
-    },
-    visitor: {
-      Function(path) {
+    visitors: [
+      defineVisitor('Function', { fields: ['name', 'bodyStart'], scope: true }, path => {
         if (path.node.name !== 'nested') return;
         const binding = path.scope.getBinding('parameter');
         observed = [
@@ -2069,8 +2049,8 @@ test('exposes lazy Babel-shaped binding paths and scope parent chains', () => {
           binding?.scope?.parent?.id,
           binding?.scope?.getProgramParent().id,
         ];
-      },
-    },
+      }),
+    ],
   });
   transform(
     'function nested(parameter) { return parameter }',
@@ -2083,15 +2063,12 @@ test('exposes lazy Babel-shaped binding paths and scope parent chains', () => {
 test('pushes generated declarations into a scope after its directive prologue', () => {
   const plugin = defineNativePlugin({
     name: 'scope-push',
-    prepare() {
-      return { semantics: ['scope'], fields: { Function: ['name', 'bodyStart'] } };
-    },
-    visitor: {
-      Function(path) {
+    visitors: [
+      defineVisitor('Function', { fields: ['name', 'bodyStart'], scope: true }, path => {
         if (path.node.name === 'action')
           path.scope.push(path.context.code.parseStatements('var injected = 1;'));
-      },
-    },
+      }),
+    ],
   });
   const result = transform(
     'function action() { "use action"; return injected }',
@@ -2108,16 +2085,16 @@ test('pushes generated declarations into a scope after its directive prologue', 
 test('provides Babel-shaped multi-replacement, container, comment, and code-frame helpers', () => {
   const plugin = defineNativePlugin({
     name: 'path-conveniences',
-    visitor: {
-      Program(path) {
+    visitors: [
+      defineVisitor('Program', {}, path => {
         path.unshiftContainer('body', '/* first */\n');
         path.pushContainer('body', '\n/* last */');
-      },
-      NumericLiteral(path) {
+      }),
+      defineVisitor('NumericLiteral', {}, path => {
         path.replaceWithMultiple(['2', '3']);
         assert.match(path.buildCodeFrameError('fixture').message, /fixture/);
-      },
-    },
+      }),
+    ],
   });
   const result = transform(
     'const value = 1;',
@@ -2134,49 +2111,68 @@ test('provides lazy compact structural child roles without recursive ESTree tran
     (Array.isArray(value) ? value : value ? [value] : []).map(path => path.sourceText());
   const plugin = defineNativePlugin({
     name: 'child-roles',
-    prepare() {
-      return {
-        children: {
-          Program: ['body'],
-          ImportDeclaration: ['specifiers', 'source'],
-          VariableDeclarator: ['id', 'init'],
-          CallExpression: ['callee', 'arguments'],
-          ObjectProperty: ['key', 'value'],
-          Function: ['params'],
-          FormalParameters: ['*'],
-          ExportDefaultDeclaration: ['declaration'],
-        },
-      };
-    },
-    visitor: {
-      Program(path) {
+    visitors: [
+      defineVisitor('Program', { children: { body: { route: 'Statement' } } }, path => {
         observed.body = sources(path.get('body'));
-      },
-      ImportDeclaration(path) {
-        observed.specifiers = sources(path.get('specifiers'));
-        observed.source = sources(path.get('source'));
-      },
-      VariableDeclarator(path) {
-        if (path.sourceText().includes('result')) {
-          observed.id = sources(path.get('id'));
-          observed.init = sources(path.get('init'));
-        }
-      },
-      CallExpression(path) {
-        observed.callee = sources(path.get('callee'));
-        observed.arguments = sources(path.get('arguments'));
-      },
-      ObjectProperty(path) {
-        observed.key = sources(path.get('key'));
-        observed.value = sources(path.get('value'));
-      },
-      Function(path) {
-        observed.params = sources(path.get('params'));
-      },
-      ExportDefaultDeclaration(path) {
-        observed.declaration = sources(path.get('declaration'));
-      },
-    },
+      }),
+      defineVisitor(
+        'ImportDeclaration',
+        {
+          children: {
+            specifiers: { route: 'ImportSpecifier' },
+            source: { route: 'StringLiteral' },
+          },
+        },
+        path => {
+          observed.specifiers = sources(path.get('specifiers'));
+          observed.source = sources(path.get('source'));
+        },
+      ),
+      defineVisitor(
+        'VariableDeclarator',
+        { children: { id: { route: 'Identifier' }, init: { route: 'Expression' } } },
+        path => {
+          if (path.sourceText().includes('result')) {
+            observed.id = sources(path.get('id'));
+            observed.init = sources(path.get('init'));
+          }
+        },
+      ),
+      defineVisitor(
+        'CallExpression',
+        { children: { callee: { route: 'Expression' }, arguments: { route: 'Expression' } } },
+        path => {
+          observed.callee = sources(path.get('callee'));
+          observed.arguments = sources(path.get('arguments'));
+        },
+      ),
+      defineVisitor(
+        'ObjectProperty',
+        { children: { key: { route: 'Identifier' }, value: { route: 'Expression' } } },
+        path => {
+          observed.key = sources(path.get('key'));
+          observed.value = sources(path.get('value'));
+        },
+      ),
+      defineVisitor(
+        'Function',
+        {
+          children: {
+            params: { route: 'FormalParameters', children: { '*': { route: '*' } } },
+          },
+        },
+        path => {
+          observed.params = sources(path.get('params'));
+        },
+      ),
+      defineVisitor(
+        'ExportDefaultDeclaration',
+        { children: { declaration: { route: 'Expression' } } },
+        path => {
+          observed.declaration = sources(path.get('declaration'));
+        },
+      ),
+    ],
   });
   transform(
     "import item, { x as y } from 'pkg'; function f(a, { b }) {} const result = fn({ platform: 1 }, y); export default result;",
@@ -2200,11 +2196,11 @@ test('provides lazy compact structural child roles without recursive ESTree tran
 test('requires structural child roles to be declared before parsing', () => {
   const plugin = defineNativePlugin({
     name: 'undeclared-child',
-    visitor: {
-      CallExpression(path) {
+    visitors: [
+      defineVisitor('CallExpression', {}, path => {
         path.get('arguments');
-      },
-    },
+      }),
+    ],
   });
   assert.throws(
     () =>
@@ -2223,26 +2219,34 @@ test('distinguishes control-flow and class child roles needed by structural fixe
     value && !Array.isArray(value) ? (value as { sourceText(): string }) : null;
   const plugin = defineNativePlugin({
     name: 'structural-roles',
-    prepare() {
-      return {
-        fields: { Class: ['name'] },
-        children: {
-          TryStatement: ['block', 'handler', 'finalizer'],
-          Class: ['superClass', 'body'],
+    visitors: [
+      defineVisitor(
+        'TryStatement',
+        {
+          children: {
+            block: { route: 'BlockStatement' },
+            handler: { route: 'CatchClause' },
+            finalizer: { route: 'BlockStatement' },
+          },
         },
-      };
-    },
-    visitor: {
-      TryStatement(path) {
-        observed.block = one(path.get('block'))?.sourceText() ?? null;
-        observed.handler = one(path.get('handler'))?.sourceText() ?? null;
-        observed.finalizer = one(path.get('finalizer'))?.sourceText() ?? null;
-      },
-      Class(path) {
-        observed.superClass = one(path.get('superClass'))?.sourceText() ?? null;
-        observed.classBody = one(path.get('body'))?.sourceText() ?? null;
-      },
-    },
+        path => {
+          observed.block = one(path.get('block'))?.sourceText() ?? null;
+          observed.handler = one(path.get('handler'))?.sourceText() ?? null;
+          observed.finalizer = one(path.get('finalizer'))?.sourceText() ?? null;
+        },
+      ),
+      defineVisitor(
+        'Class',
+        {
+          fields: ['name'],
+          children: { superClass: { route: 'Expression' }, body: { route: 'ClassBody' } },
+        },
+        path => {
+          observed.superClass = one(path.get('superClass'))?.sourceText() ?? null;
+          observed.classBody = one(path.get('body'))?.sourceText() ?? null;
+        },
+      ),
+    ],
   });
   transform(
     'try { work() } catch (error) { recover(error) } finally { cleanup() } class Child extends Parent { method() {} }',
@@ -2261,36 +2265,45 @@ test('distinguishes control-flow and class child roles needed by structural fixe
 test('implements a Platform.select-style transform through declared compact roles', () => {
   const plugin = defineNativePlugin({
     name: 'platform-select',
-    prepare() {
-      return {
-        children: {
-          CallExpression: ['callee', 'arguments'],
-          ObjectExpression: ['properties'],
-          ObjectProperty: ['value'],
+    visitors: [
+      defineVisitor(
+        'CallExpression',
+        {
+          children: {
+            callee: { route: 'Expression' },
+            arguments: {
+              route: 'ObjectExpression',
+              children: {
+                properties: {
+                  route: 'ObjectProperty',
+                  children: { value: { route: 'Expression' } },
+                },
+              },
+            },
+          },
         },
-      };
-    },
-    visitor: {
-      CallExpression(path) {
-        const callee = path.getChild('callee');
-        if (!callee?.matchesPattern('Platform.select')) return;
-        const argument = path.getChildList('arguments')[0];
-        if (!argument?.is('ObjectExpression')) return;
-        const properties = argument.getChildList('properties');
-        if (
-          properties.some(
-            property => property.node.type !== 'ObjectProperty' || property.node.computed === true,
+        path => {
+          const callee = path.getChild('callee');
+          if (!callee?.matchesPattern('Platform.select')) return;
+          const argument = path.getChildList('arguments')[0];
+          if (!argument?.is('ObjectExpression')) return;
+          const properties = argument.getChildList('properties');
+          if (
+            properties.some(
+              property =>
+                property.node.type !== 'ObjectProperty' || property.node.computed === true,
+            )
           )
-        )
-          return;
-        const selected =
-          properties.find(property => property.node.key === 'ios') ??
-          properties.find(property => property.node.key === 'native') ??
-          properties.find(property => property.node.key === 'default');
-        const value = selected?.getChild('value');
-        if (value) path.replaceWith(value.getSource());
-      },
-    },
+            return;
+          const selected =
+            properties.find(property => property.node.key === 'ios') ??
+            properties.find(property => property.node.key === 'native') ??
+            properties.find(property => property.node.key === 'default');
+          const value = selected?.getChild('value');
+          if (value) path.replaceWith(value.getSource());
+        },
+      ),
+    ],
   });
   const result = transform(
     "const selected = Platform.select({ web: 'web', native: makeNative(), ios: 'ios' });",
@@ -2348,10 +2361,11 @@ test('supports caller-provided parser adapters for unsupported syntax', () => {
 test('produces traceable Unicode-aware VLQ mappings', () => {
   const plugin = defineNativePlugin({
     name: 'map',
-    visitor: {
-      NumericLiteral: path =>
+    visitors: [
+      defineVisitor('NumericLiteral', {}, path =>
         path.replaceWith({ code: '200', mapping: 'anchor-start', names: ['generatedValue'] }),
-    },
+      ),
+    ],
   });
   const result = transform(
     "const emoji = '😀';\nconst value = 1;",
@@ -2482,24 +2496,26 @@ test('composes an unwrap replacement with inner edits from another plugin', () =
   const source = `export function setup() {\n    const toast = require('./toast');\n}\n`;
   const unwrapExports = defineNativePlugin({
     name: 'unwrap-exports',
-    prepare: () => ({ children: { ExportNamedDeclaration: ['declaration'] } }),
-    visitor: {
-      ExportNamedDeclaration(path) {
-        const declaration = path.getChild('declaration');
-        assert.ok(declaration);
-        path.replaceWith(declaration.getSource());
-      },
-    },
+    visitors: [
+      defineVisitor(
+        'ExportNamedDeclaration',
+        { children: { declaration: { route: 'Declaration' } } },
+        path => {
+          const declaration = path.getChild('declaration');
+          assert.ok(declaration);
+          path.replaceWith(declaration.getSource());
+        },
+      ),
+    ],
   });
   const rewriteRequires = defineNativePlugin({
     name: 'rewrite-requires',
-    prepare: () => ({ fields: { CallExpression: ['calleeName', 'staticArgument'] } }),
-    visitor: {
-      CallExpression(path) {
+    visitors: [
+      defineVisitor('CallExpression', { fields: ['calleeName', 'staticArgument'] }, path => {
         if (path.node.calleeName !== 'require') return;
         path.replaceWith(`_REQ(${JSON.stringify(path.node.staticArgument)})`);
-      },
-    },
+      }),
+    ],
   });
   const result = transform(
     source,
@@ -2516,24 +2532,26 @@ test('composes template slots with glue text and inner edits', () => {
   const source = `export default function main() { return require('./impl'); }\n`;
   const lowerDefault = defineNativePlugin({
     name: 'lower-default-export',
-    prepare: () => ({ children: { ExportDefaultDeclaration: ['declaration'] } }),
-    visitor: {
-      ExportDefaultDeclaration(path) {
-        const declaration = path.getChild('declaration');
-        assert.ok(declaration);
-        path.replaceWith(path.context.code.template`var _default = ${declaration};`);
-      },
-    },
+    visitors: [
+      defineVisitor(
+        'ExportDefaultDeclaration',
+        { children: { declaration: { route: 'Declaration' } } },
+        path => {
+          const declaration = path.getChild('declaration');
+          assert.ok(declaration);
+          path.replaceWith(path.context.code.template`var _default = ${declaration};`);
+        },
+      ),
+    ],
   });
   const rewriteRequires = defineNativePlugin({
     name: 'rewrite-requires',
-    prepare: () => ({ fields: { CallExpression: ['calleeName', 'staticArgument'] } }),
-    visitor: {
-      CallExpression(path) {
+    visitors: [
+      defineVisitor('CallExpression', { fields: ['calleeName', 'staticArgument'] }, path => {
         if (path.node.calleeName !== 'require') return;
         path.replaceWith(`_REQ(${JSON.stringify(path.node.staticArgument)})`);
-      },
-    },
+      }),
+    ],
   });
   const result = transform(
     source,
@@ -2559,11 +2577,11 @@ test('rejects string coercion of source fragments with guidance', () => {
               plugins: [
                 defineNativePlugin({
                   name: 'coerce-fragment',
-                  visitor: {
-                    VariableDeclaration(path) {
+                  visitors: [
+                    defineVisitor('VariableDeclaration', {}, path => {
                       path.replaceWith(`copied: ${path.getSource()}`);
-                    },
-                  },
+                    }),
+                  ],
                 }),
               ],
             },
@@ -2580,15 +2598,14 @@ test('degrades out-of-place source fragments to plain text copies', () => {
   const source = 'const value = compute();\n';
   const duplicate = defineNativePlugin({
     name: 'duplicate-initializer',
-    prepare: () => ({ children: { VariableDeclarator: ['init'] } }),
-    visitor: {
-      VariableDeclarator(path) {
+    visitors: [
+      defineVisitor('VariableDeclarator', { children: { init: { route: 'Expression' } } }, path => {
         const init = path.getChild('init');
         assert.ok(init);
         const fragment = init.getSource();
         path.replaceWith(path.context.code.template`checked = ${fragment} ?? ${fragment}`);
-      },
-    },
+      }),
+    ],
   });
   const result = transform(
     source,
@@ -2603,20 +2620,19 @@ test('attributes overlapping edit conflicts to their owning plugins', () => {
   const source = 'const value = 1;\n';
   const wide = defineNativePlugin({
     name: 'wide-owner',
-    visitor: {
-      VariableDeclaration(path) {
+    visitors: [
+      defineVisitor('VariableDeclaration', {}, path => {
         path.replaceWith('var value = 2;');
-      },
-    },
+      }),
+    ],
   });
   const inner = defineNativePlugin({
     name: 'inner-owner',
-    prepare: () => ({ fields: { Identifier: ['name'] } }),
-    visitor: {
-      Identifier(path) {
+    visitors: [
+      defineVisitor('Identifier', { fields: ['name'] }, path => {
         if (path.node.name === 'value') path.replaceWith('renamed');
-      },
-    },
+      }),
+    ],
   });
   assert.throws(
     () =>
@@ -2633,20 +2649,19 @@ test('inserted copies reflect same-phase edits at commit time', () => {
   const source = `function helper() { return require('./impl'); }\n`;
   const duplicateHelper = defineNativePlugin({
     name: 'duplicate-helper',
-    visitor: {
-      Function(path) {
+    visitors: [
+      defineVisitor('Function', {}, path => {
         path.insertAfter(path.getSource());
-      },
-    },
+      }),
+    ],
   });
   const rewriteRequires = defineNativePlugin({
     name: 'rewrite-requires',
-    prepare: () => ({ fields: { CallExpression: ['calleeName', 'staticArgument'] } }),
-    visitor: {
-      CallExpression(path) {
+    visitors: [
+      defineVisitor('CallExpression', { fields: ['calleeName', 'staticArgument'] }, path => {
         if (path.node.calleeName === 'require') path.replaceWith(`_REQ("./impl")`);
-      },
-    },
+      }),
+    ],
   });
   const result = transform(
     source,
@@ -2664,24 +2679,22 @@ test('duplicated template slots reflect same-phase edits', () => {
   const source = 'const value = compute();\n';
   const duplicate = defineNativePlugin({
     name: 'duplicate-initializer',
-    prepare: () => ({ children: { VariableDeclarator: ['init'] } }),
-    visitor: {
-      VariableDeclarator(path) {
+    visitors: [
+      defineVisitor('VariableDeclarator', { children: { init: { route: 'Expression' } } }, path => {
         const init = path.getChild('init');
         assert.ok(init);
         const fragment = init.getSource();
         path.replaceWith(path.context.code.template`checked = ${fragment} ?? ${fragment}`);
-      },
-    },
+      }),
+    ],
   });
   const upgradeCalls = defineNativePlugin({
     name: 'upgrade-calls',
-    prepare: () => ({ fields: { CallExpression: ['calleeName'] } }),
-    visitor: {
-      CallExpression(path) {
+    visitors: [
+      defineVisitor('CallExpression', { fields: ['calleeName'] }, path => {
         if (path.node.calleeName === 'compute') path.replaceWith('compute2()');
-      },
-    },
+      }),
+    ],
   });
   const result = transform(
     source,
@@ -2698,12 +2711,11 @@ test('rejects circular source copies', () => {
   const source = 'function loop() { seed(); }\n';
   const selfCopy = defineNativePlugin({
     name: 'self-copy',
-    prepare: () => ({ fields: { Function: ['bodyStart', 'bodyEnd'] } }),
-    visitor: {
-      Function(path) {
+    visitors: [
+      defineVisitor('Function', { fields: ['bodyStart', 'bodyEnd'] }, path => {
         path.prependToBody(path.getSource());
-      },
-    },
+      }),
+    ],
   });
   assert.throws(
     () =>
@@ -2721,20 +2733,20 @@ test('rejects copies whose range is partially overlapped by another edit', () =>
   const secondDeclaration = source.indexOf('const b');
   const copySecond = defineNativePlugin({
     name: 'copy-second',
-    visitor: {
-      VariableDeclaration(path) {
+    visitors: [
+      defineVisitor('VariableDeclaration', {}, path => {
         if (path.start === secondDeclaration) path.insertAfter(path.getSource());
-      },
-    },
+      }),
+    ],
   });
   const straddle = defineNativePlugin({
     name: 'straddler',
-    visitor: {
-      Program(path) {
+    visitors: [
+      defineVisitor('Program', {}, path => {
         // Replace across the copied declaration's start boundary.
         path.context.editor.update(secondDeclaration - 2, secondDeclaration + 5, 'X');
-      },
-    },
+      }),
+    ],
   });
   assert.throws(
     () =>
@@ -2751,25 +2763,28 @@ test('degrades cross-phase fragments to text with a debug diagnostic', () => {
   const source = 'const first = 1;\nconst second = target();\n';
   const capture = defineNativePlugin({
     name: 'capture-fragment',
-    prepare: () => ({ metadataWrites: ['captured'], fields: { CallExpression: ['calleeName'] } }),
-    visitor: {
-      CallExpression(path, _state) {
+    contract: { metadata: { writes: ['captured'] } },
+    visitors: [
+      defineVisitor('CallExpression', { fields: ['calleeName'] }, (path, _state) => {
         if (path.node.calleeName === 'target') {
           path.context.metadata.set('captured', path.getSource());
           path.replaceWith('renamed()');
         }
-      },
-    },
+      }),
+    ],
   });
   const reuse = defineNativePlugin({
     name: 'reuse-fragment',
-    prepare: () => ({ identifierNames: ['first'], fields: { Identifier: ['name'] } }),
-    visitor: {
-      Identifier(path) {
-        const captured = path.context.metadata.get('captured') as SourceFragment | undefined;
-        if (captured) path.replaceWith(captured);
-      },
-    },
+    visitors: [
+      defineVisitor(
+        'Identifier',
+        { fields: ['name'], where: { name: { oneOf: ['first'] } } },
+        path => {
+          const captured = path.context.metadata.get('captured') as SourceFragment | undefined;
+          if (captured) path.replaceWith(captured);
+        },
+      ),
+    ],
   });
   const result = transform(
     source,
@@ -2793,25 +2808,28 @@ test('counts provenance degradations in metadata without debug tracing', () => {
   const source = 'const first = 1;\nconst second = target();\n';
   const capture = defineNativePlugin({
     name: 'capture-fragment',
-    prepare: () => ({ metadataWrites: ['captured'], fields: { CallExpression: ['calleeName'] } }),
-    visitor: {
-      CallExpression(path) {
+    contract: { metadata: { writes: ['captured'] } },
+    visitors: [
+      defineVisitor('CallExpression', { fields: ['calleeName'] }, path => {
         if (path.node.calleeName === 'target') {
           path.context.metadata.set('captured', path.getSource());
           path.replaceWith('renamed()');
         }
-      },
-    },
+      }),
+    ],
   });
   const reuse = defineNativePlugin({
     name: 'reuse-fragment',
-    prepare: () => ({ identifierNames: ['first'], fields: { Identifier: ['name'] } }),
-    visitor: {
-      Identifier(path) {
-        const captured = path.context.metadata.get('captured') as SourceFragment | undefined;
-        if (captured) path.replaceWith(captured);
-      },
-    },
+    visitors: [
+      defineVisitor(
+        'Identifier',
+        { fields: ['name'], where: { name: { oneOf: ['first'] } } },
+        path => {
+          const captured = path.context.metadata.get('captured') as SourceFragment | undefined;
+          if (captured) path.replaceWith(captured);
+        },
+      ),
+    ],
   });
   const result = transform(
     source,
@@ -2913,12 +2931,11 @@ test('collapses byte-identical convergent edits to the first owner', () => {
   const upgrade = (name: string) =>
     defineNativePlugin({
       name,
-      prepare: () => ({ fields: { CallExpression: ['calleeName'] } }),
-      visitor: {
-        CallExpression(path) {
+      visitors: [
+        defineVisitor('CallExpression', { fields: ['calleeName'] }, path => {
           if (path.node.calleeName === 'compute') path.replaceWith('compute2()');
-        },
-      },
+        }),
+      ],
     });
   const result = transform(
     source,
@@ -2941,12 +2958,11 @@ test('still rejects convergent edits whose content differs', () => {
   const upgrade = (name: string, replacement: string) =>
     defineNativePlugin({
       name,
-      prepare: () => ({ fields: { CallExpression: ['calleeName'] } }),
-      visitor: {
-        CallExpression(path) {
+      visitors: [
+        defineVisitor('CallExpression', { fields: ['calleeName'] }, path => {
           if (path.node.calleeName === 'compute') path.replaceWith(replacement);
-        },
-      },
+        }),
+      ],
     });
   assert.throws(
     () =>
@@ -2973,15 +2989,14 @@ test('sourceSlice returns a provenance-carrying fragment', () => {
   const source = 'const value = compute();\n';
   const guard = defineNativePlugin({
     name: 'guard-calls',
-    prepare: () => ({ fields: { CallExpression: ['calleeName'] } }),
-    visitor: {
-      CallExpression(path) {
+    visitors: [
+      defineVisitor('CallExpression', { fields: ['calleeName'] }, path => {
         const slice = path.context.sourceSlice(path.start, path.end);
         assert.throws(() => `${slice}`, /carries provenance/);
         assert.throws(() => path.context.sourceSlice(path.start, source.length + 1));
         path.replaceWith(path.context.code.template`guard(${slice})`);
-      },
-    },
+      }),
+    ],
   });
   const result = transform(
     source,
@@ -2996,27 +3011,25 @@ test('repeated copies of one range share a render and reflect inner edits', () =
   const source = 'function seed() { return compute(); }\nalpha();\nbeta();\n';
   const mirror = defineNativePlugin({
     name: 'mirror',
-    prepare: () => ({ fields: { CallExpression: ['calleeName'] } }),
     createState: () => ({ fragment: undefined as SourceFragment | undefined }),
-    visitor: {
-      Function(path, state) {
+    visitors: [
+      defineVisitor('Function', {}, (path, state) => {
         state.fragment = path.getSource();
-      },
-      CallExpression(path, state) {
+      }),
+      defineVisitor('CallExpression', { fields: ['calleeName'] }, (path, state) => {
         if (path.node.calleeName !== 'compute' && state.fragment) {
           path.insertAfter(state.fragment);
         }
-      },
-    },
+      }),
+    ],
   });
   const rewrite = defineNativePlugin({
     name: 'rewrite',
-    prepare: () => ({ fields: { CallExpression: ['calleeName'] } }),
-    visitor: {
-      CallExpression(path) {
+    visitors: [
+      defineVisitor('CallExpression', { fields: ['calleeName'] }, path => {
         if (path.node.calleeName === 'compute') path.replaceWith('compute2()');
-      },
-    },
+      }),
+    ],
   });
   const result = transform(
     source,
@@ -3032,21 +3045,24 @@ test('maps copied content back to its original tokens', () => {
   const source = 'function helper() { return VALUE; }\nlater();\n';
   const duplicate = defineNativePlugin({
     name: 'duplicate-helper',
-    visitor: {
-      Function(path) {
+    visitors: [
+      defineVisitor('Function', {}, path => {
         path.insertAfter(path.getSource());
-      },
-    },
+      }),
+    ],
   });
   const rename = defineNativePlugin({
     name: 'rename-value',
-    prepare: () => ({ identifierNames: ['VALUE'], fields: { Identifier: ['name'] } }),
-    visitor: {
-      Identifier(path) {
-        if (path.node.name === 'VALUE')
-          path.replaceWith({ code: 'WRAPPED', mapping: 'anchor-start', names: ['VALUE'] });
-      },
-    },
+    visitors: [
+      defineVisitor(
+        'Identifier',
+        { fields: ['name'], where: { name: { oneOf: ['VALUE'] } } },
+        path => {
+          if (path.node.name === 'VALUE')
+            path.replaceWith({ code: 'WRAPPED', mapping: 'anchor-start', names: ['VALUE'] });
+        },
+      ),
+    ],
   });
   const result = transform(
     source,
@@ -3119,12 +3135,15 @@ test('relocates a range as piece reordering with contained edits composing', () 
   });
   const rename = defineNativePlugin({
     name: 'rename-value',
-    prepare: () => ({ identifierNames: ['value'], fields: { Identifier: ['name'] } }),
-    visitor: {
-      Identifier(path) {
-        if (path.node.name === 'value') path.replaceWith('value_');
-      },
-    },
+    visitors: [
+      defineVisitor(
+        'Identifier',
+        { fields: ['name'], where: { name: { oneOf: ['value'] } } },
+        path => {
+          if (path.node.name === 'value') path.replaceWith('value_');
+        },
+      ),
+    ],
   });
   const result = transform(
     source,
@@ -3139,15 +3158,14 @@ test('path.moveTo relocates a node and endpoint insertions stay behind', () => {
   const source = 'const hoisted = 1;\nconst rest = 2;\n';
   const mover = defineNativePlugin({
     name: 'hoister',
-    prepare: () => ({ controlFlow: ['skip'] }),
-    visitor: {
-      VariableDeclaration(path) {
+    visitors: [
+      defineVisitor('VariableDeclaration', { controlFlow: ['skip'] }, path => {
         if (path.start === 0) {
           path.moveTo(source.length);
           path.skip();
         }
-      },
-    },
+      }),
+    ],
   });
   const inserter = defineNativePlugin({
     name: 'inserter',
@@ -3263,12 +3281,12 @@ test('removing and copying the same range is rejected toward move', () => {
   const source = 'function util() { return 1; }\nlater();\n';
   const oldSpelling = defineNativePlugin({
     name: 'old-spelling',
-    visitor: {
-      Function(path) {
+    visitors: [
+      defineVisitor('Function', {}, path => {
         path.insertAfter(path.getSource());
         path.remove();
-      },
-    },
+      }),
+    ],
   });
   assert.throws(
     () =>
@@ -3292,13 +3310,16 @@ test('moved content keeps identity mappings and names to original tokens', () =>
   });
   const rename = defineNativePlugin({
     name: 'rename-value',
-    prepare: () => ({ identifierNames: ['VALUE'], fields: { Identifier: ['name'] } }),
-    visitor: {
-      Identifier(path) {
-        if (path.node.name === 'VALUE')
-          path.replaceWith({ code: 'WRAPPED', mapping: 'anchor-start', names: ['VALUE'] });
-      },
-    },
+    visitors: [
+      defineVisitor(
+        'Identifier',
+        { fields: ['name'], where: { name: { oneOf: ['VALUE'] } } },
+        path => {
+          if (path.node.name === 'VALUE')
+            path.replaceWith({ code: 'WRAPPED', mapping: 'anchor-start', names: ['VALUE'] });
+        },
+      ),
+    ],
   });
   const result = transform(
     source,
@@ -3477,4 +3498,368 @@ test('distinct ensureReplace keys on overlapping ranges stay ordinary conflicts'
     assert.match(error.message, /overlapping edits/);
     assert.deepEqual(error.owners, ['key-a', 'key-b']);
   }
+});
+
+test('typed visitors compile contracts locally and narrow the payload', () => {
+  const source = 'let a = 1; const b = 2; var c = 3;';
+  const kinds: unknown[] = [];
+  const declaration = defineVisitor(
+    'VariableDeclaration',
+    { fields: ['kind'], where: { kind: { oneOf: ['let', 'const'] } } },
+    path => {
+      kinds.push(path.node.kind);
+    },
+  );
+  const result = transform(
+    source,
+    'fixture.js',
+    defineNativePipeline({
+      phases: [
+        { name: 'scan', plugins: [defineNativePlugin({ name: 'typed', visitors: [declaration] })] },
+      ],
+    }),
+  );
+  assert.equal(result.status, 'complete');
+  assert.deepEqual(kinds.sort(), ['const', 'let']);
+});
+
+test('typed visitor match-only predicate fields are not callback-visible', () => {
+  const source = 'const value = 1;';
+  let observedKind: unknown = 'unset';
+  const declaration = defineVisitor(
+    'VariableDeclaration',
+    { where: { kind: { equals: 'const' } } },
+    path => {
+      observedKind = (path.node as Record<string, unknown>).kind;
+    },
+  );
+  const result = transform(
+    source,
+    'fixture.js',
+    defineNativePipeline({
+      phases: [
+        { name: 'scan', plugins: [defineNativePlugin({ name: 'typed', visitors: [declaration] })] },
+      ],
+    }),
+  );
+  assert.equal(result.status, 'complete');
+  assert.equal(observedKind, undefined);
+});
+
+test('typed visitor capabilities are contract-scoped, not plugin-wide', () => {
+  const source = 'const value = compute();';
+  let scopedOk = false;
+  let unscopedError: Error | null = null;
+  const scoped = defineVisitor('VariableDeclaration', { scope: true }, path => {
+    scopedOk = (path as { scope: { getBinding(name: string): unknown } }).scope != null;
+  });
+  const unscoped = defineVisitor('CallExpression', {}, path => {
+    try {
+      void (path as unknown as { scope: unknown }).scope;
+    } catch (error) {
+      unscopedError = error as Error;
+    }
+  });
+  const result = transform(
+    source,
+    'fixture.js',
+    defineNativePipeline({
+      phases: [
+        {
+          name: 'scan',
+          plugins: [defineNativePlugin({ name: 'typed', visitors: [scoped, unscoped] })],
+        },
+      ],
+    }),
+  );
+  assert.equal(result.status, 'complete');
+  assert.ok(scopedOk);
+  assert.match(String(unscopedError), /undeclared scope access|scope/);
+});
+
+test('typed visitors reject undeclared control flow at the exact route', () => {
+  const source = 'const value = 1;';
+  const undeclared = defineVisitor('VariableDeclaration', {}, path => {
+    (path as unknown as { skip(): void }).skip();
+  });
+  assert.throws(
+    () =>
+      transform(
+        source,
+        'fixture.js',
+        defineNativePipeline({
+          phases: [
+            {
+              name: 'scan',
+              plugins: [defineNativePlugin({ name: 'typed', visitors: [undeclared] })],
+            },
+          ],
+        }),
+      ),
+    /typed: undeclared control-flow capability skip/,
+  );
+});
+
+test('two typed visitors on one route keep independent predicates', () => {
+  const source = "require('./a'); importAll('./b', './c'); other();";
+  const requires: string[] = [];
+  const contexts: number[] = [];
+  const plainRequire = defineVisitor(
+    'CallExpression',
+    { fields: ['staticArgument'], where: { calleeName: { equals: 'require' } } },
+    path => {
+      requires.push(String(path.node.staticArgument));
+    },
+  );
+  const contextRequire = defineVisitor(
+    'CallExpression',
+    { fields: ['argumentCount'], where: { calleeName: { equals: 'importAll' } } },
+    path => {
+      contexts.push(Number(path.node.argumentCount));
+    },
+  );
+  const result = transform(
+    source,
+    'fixture.js',
+    defineNativePipeline({
+      phases: [
+        {
+          name: 'scan',
+          plugins: [
+            defineNativePlugin({ name: 'typed', visitors: [plainRequire, contextRequire] }),
+          ],
+        },
+      ],
+    }),
+  );
+  assert.equal(result.status, 'complete');
+  assert.deepEqual(requires, ['./a']);
+  assert.deepEqual(contexts, [2]);
+});
+
+test('configure resolves enablement and predicate values per file', () => {
+  const seen: string[] = [];
+  const defines = defineVisitor(
+    'Identifier',
+    {
+      fields: ['name'],
+      configure: () => ({ enabled: true, where: { name: { oneOf: ['__DEV__'] } } }),
+    },
+    path => {
+      seen.push(String(path.node.name));
+    },
+  );
+  const disabled = defineVisitor(
+    'Identifier',
+    { fields: ['name'], configure: () => ({ enabled: false }) },
+    path => {
+      seen.push(`disabled:${String(path.node.name)}`);
+    },
+  );
+  const result = transform(
+    'const flag = __DEV__ && other;',
+    'fixture.js',
+    defineNativePipeline({
+      phases: [
+        {
+          name: 'scan',
+          plugins: [defineNativePlugin({ name: 'typed', visitors: [defines, disabled] })],
+        },
+      ],
+    }),
+  );
+  assert.equal(result.status, 'complete');
+  assert.deepEqual(seen, ['__DEV__']);
+});
+
+test('typed enter and exit handlers share one contract and reverse exits', () => {
+  const order: string[] = [];
+  const fn = defineVisitor(
+    'Function',
+    {},
+    {
+      enter(path) {
+        order.push(`enter:${path.start}`);
+      },
+      exit(path) {
+        order.push(`exit:${path.start}`);
+      },
+    },
+  );
+  const result = transform(
+    'function outer() { function inner() {} }',
+    'fixture.js',
+    defineNativePipeline({
+      phases: [{ name: 'scan', plugins: [defineNativePlugin({ name: 'typed', visitors: [fn] })] }],
+    }),
+  );
+  assert.equal(result.status, 'complete');
+  assert.deepEqual(order, ['enter:0', 'enter:19', 'exit:19', 'exit:0']);
+});
+
+test('typed plugins reject aggregate route plans and mixed visitor forms', () => {
+  assert.throws(
+    () =>
+      defineNativePlugin({
+        name: 'mixed',
+        visitor: { Identifier() {} },
+      } as never),
+    /the visitor-object form was removed/,
+  );
+  const plugin = defineNativePlugin({
+    name: 'typed',
+    prepare: () => ({ fields: { Identifier: ['name'] } }),
+    visitors: [defineVisitor('Identifier', {}, () => {})],
+  });
+  assert.throws(
+    () =>
+      transform(
+        'const value = 1;',
+        'fixture.js',
+        defineNativePipeline({ phases: [{ name: 'scan', plugins: [plugin] }] }),
+      ),
+    /typed: prepare\(\) may not declare fields; route requirements live on visitor contracts/,
+  );
+});
+
+test('typed children access declared roles with prefetched fields', () => {
+  const locals: string[] = [];
+  const imports = defineVisitor(
+    'ImportDeclaration',
+    {
+      fields: ['source'],
+      children: { specifiers: { route: 'ImportSpecifier', fields: ['local', 'imported'] } },
+    },
+    path => {
+      for (const specifier of path.getChildList('specifiers'))
+        locals.push(String((specifier.node as Record<string, unknown>).local));
+    },
+  );
+  const undeclaredRole = defineVisitor(
+    'ImportDeclaration',
+    { children: { specifiers: { route: 'ImportSpecifier' } } },
+    path => {
+      assert.throws(
+        () =>
+          (path as unknown as { getChildList(role: string): unknown }).getChildList('assertions'),
+        /undeclared child access|child/,
+      );
+    },
+  );
+  const result = transform(
+    "import { one, two } from 'module';",
+    'fixture.js',
+    defineNativePipeline({
+      phases: [
+        {
+          name: 'scan',
+          plugins: [defineNativePlugin({ name: 'typed', visitors: [imports, undeclaredRole] })],
+        },
+      ],
+    }),
+  );
+  assert.equal(result.status, 'complete');
+  assert.deepEqual(locals, ['one', 'two']);
+});
+
+test('typed nested traversal includes arrow functions through the Function alias', () => {
+  const found: string[] = [];
+  const outer = defineVisitor('Program', { controlFlow: ['nested-traverse'], fields: [] }, path => {
+    path.traverse([
+      defineVisitor('Function', {}, fn => {
+        found.push(fn.type);
+      }),
+    ]);
+  });
+  const result = transform(
+    'function named() {} const arrow = () => {};',
+    'fixture.js',
+    defineNativePipeline({
+      phases: [
+        { name: 'scan', plugins: [defineNativePlugin({ name: 'typed', visitors: [outer] })] },
+      ],
+    }),
+  );
+  assert.equal(result.status, 'complete');
+  assert.deepEqual(found.sort(), ['ArrowFunctionExpression', 'Function']);
+});
+
+test('plugin contracts type and union metadata and query requirements', () => {
+  const plugin = defineNativePlugin({
+    name: 'contracted',
+    contract: {
+      metadata: { writes: ['dependencies'] },
+      queries: [{ calls: [{ callee: 'require', staticArguments: true }] }],
+    },
+    post(context) {
+      const calls = context.query({ calls: [{ callee: 'require', staticArguments: true }] });
+      context.metadata.set(
+        'dependencies',
+        calls.calls.require?.map(call => call.staticArgument) ?? [],
+      );
+    },
+  });
+  const result = transform(
+    "require('./a'); require('./b');",
+    'fixture.js',
+    defineNativePipeline({ phases: [{ name: 'scan', plugins: [plugin] }] }),
+  );
+  assert.equal(result.status, 'complete');
+  assert.deepEqual(result.metadata.dependencies, ['./a', './b']);
+});
+
+test('verifyVisitorContracts reports undeclared reads and unused declarations', () => {
+  const visitor = defineVisitor(
+    'VariableDeclaration',
+    { fields: ['declarationCount'], scope: true },
+    path => {
+      // Reads an undeclared field (silently undefined) and never uses scope or
+      // the declared declarationCount.
+      void (path.node as Record<string, unknown>).kind;
+    },
+  );
+  const result = transform(
+    'const value = 1;',
+    'fixture.js',
+    defineNativePipeline({
+      phases: [
+        { name: 'scan', plugins: [defineNativePlugin({ name: 'verified', visitors: [visitor] })] },
+      ],
+    }),
+    { verifyVisitorContracts: true },
+  );
+  assert.equal(result.status, 'complete');
+  const messages = result.diagnostics
+    .filter(diagnostic => diagnostic.code === 'visitor-contract')
+    .map(diagnostic => diagnostic.message);
+  assert.ok(
+    messages.some(message => /read undeclared field kind.*fields: \['kind'\]/.test(message)),
+    messages.join('\n'),
+  );
+  assert.ok(
+    messages.some(message => /declared field declarationCount but never read it/.test(message)),
+  );
+  assert.ok(messages.some(message => /declared scope but never used it/.test(message)));
+});
+
+test('verification is silent for clean contracts and off by default', () => {
+  const visitor = defineVisitor('VariableDeclaration', { fields: ['kind'] }, path => {
+    void path.node.kind;
+  });
+  const pipeline = defineNativePipeline({
+    phases: [
+      { name: 'scan', plugins: [defineNativePlugin({ name: 'clean', visitors: [visitor] })] },
+    ],
+  });
+  const verified = transform('const value = 1;', 'fixture.js', pipeline, {
+    verifyVisitorContracts: true,
+  });
+  assert.equal(verified.status, 'complete');
+  assert.deepEqual(
+    verified.diagnostics.filter(diagnostic => diagnostic.code === 'visitor-contract'),
+    [],
+  );
+  const production = transform('const value = 1;', 'fixture.js', pipeline);
+  assert.equal(production.status, 'complete');
+  assert.deepEqual(production.diagnostics, []);
 });

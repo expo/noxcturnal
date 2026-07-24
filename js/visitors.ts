@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import type { NativeRouteFieldNames } from './generated-event-schema.js';
 
 import { native, type NativeIndexedSessionBinding } from './native.js';
 import {
@@ -54,7 +55,6 @@ export interface PrepareContext {
   readonly options: TransformOptions;
   readonly parser: ReturnType<typeof native.classify>;
   readonly sourceHints: ReadonlySet<string>;
-  subscribe(...types: NativeVisitorRoute[]): void;
 }
 
 export interface NativeScope {
@@ -92,7 +92,7 @@ export interface PluginContext {
   unsupported(reason: string): never;
   stopAll(): void;
   subscribeRemaining(...types: string[]): void;
-  revisitProgram(visitor: Visitor<any>, state?: unknown): void;
+  revisitProgram(visitors: readonly DefinedVisitor<any>[], state?: unknown): void;
   /**
    * Insert a helper at the end of the directive prologue, once per transform.
    *
@@ -238,7 +238,7 @@ export interface NativeNodePath<T extends NodeView = NodeView> {
   appendToBody(code: Code): void;
   skip(): void;
   stop(): void;
-  traverse<State>(visitor: Visitor<State>, state?: State): void;
+  traverse<State>(visitors: readonly DefinedVisitor<State>[], state?: State): void;
   subscribeWithin(types: NativeVisitorRoute | readonly NativeVisitorRoute[]): void;
   subscribeForScope(types: NativeVisitorRoute | readonly NativeVisitorRoute[]): void;
   unsupported(reason: string): never;
@@ -249,26 +249,347 @@ export interface SnapshotOptions {
   ancestry?: 'none' | 'parent';
 }
 
-type NodeForRoute<Route extends NativeVisitorRoute> = Route extends 'ReferencedIdentifier'
-  ? NodeOfType<'Identifier'>
-  : Route extends 'FunctionDeclaration' | 'FunctionExpression' | 'TSDeclareFunction'
-    ? NodeOfType<'Function'>
-    : Route extends 'ClassDeclaration' | 'ClassExpression'
-      ? NodeOfType<'Class'>
-      : Route extends NativeNodeType
-        ? NodeOfType<Route>
-        : NodeView;
+type NodeForRoute<Route extends VisitorRouteSpec> =
+  RouteFieldLookup<Route> extends infer Carrier
+    ? Carrier extends NativeNodeType
+      ? NodeOfType<Carrier>
+      : NodeView
+    : never;
+/** Internal callback shape after normalization; typing happens at `defineVisitor`. */
 type Handler<State, Node extends NodeView = NodeView> = (
   path: NativeNodePath<Node>,
   state: State,
 ) => void;
-export type VisitorHandler<State, Node extends NodeView = NodeView> =
-  | Handler<State, Node>
-  | { enter?: Handler<State, Node>; exit?: Handler<State, Node> };
-export type Visitor<State> = {
-  [Route in NativeVisitorRoute]?: VisitorHandler<State, NodeForRoute<Route>>;
+
+// ---------------------------------------------------------------------------
+// Typed per-visitor contracts: the contract lives beside the callback that uses
+// it, the callback's path type is derived from the contract, and the compiled
+// native route manifest is generated from the same normalized object.
+// ---------------------------------------------------------------------------
+
+export type AncestryCapability =
+  | 'parent'
+  | 'findParent'
+  | 'functionParent'
+  | 'programParent'
+  | number;
+
+/** A visitor route: one route name or a `|`-joined composite. */
+export type VisitorRouteSpec = NativeVisitorRoute | `${NativeVisitorRoute}|${string}`;
+
+/** Literal keys of `T`, with index signatures stripped. */
+type KnownKeys<T> = keyof { [K in keyof T as string extends K ? never : K]: 0 };
+
+/** Collapsed and semantic routes read their fields (and node view) from the
+ * concrete carrier type. */
+type RouteFieldLookup<Route extends VisitorRouteSpec> = Route extends 'ReferencedIdentifier'
+  ? 'Identifier'
+  : Route extends 'FunctionDeclaration' | 'FunctionExpression' | 'TSDeclareFunction'
+    ? 'Function'
+    : Route extends 'ClassDeclaration' | 'ClassExpression'
+      ? 'Class'
+      : Route;
+
+/** Payload fields declarable for a route, generated from the protocol schema;
+ * routes without generated field data accept any field key and rely on runtime
+ * validation. */
+type DeclaredFieldKey<Route extends VisitorRouteSpec> =
+  RouteFieldLookup<Route> extends keyof NativeRouteFieldNames
+    ? Extract<NativeRouteFieldNames[RouteFieldLookup<Route>], NativeFieldKey>
+    : NativeFieldKey;
+
+/** One declared child role: the expected route and the fields its paths carry. */
+export interface ChildContract {
+  route: VisitorRouteSpec;
+  fields?: readonly NativeFieldKey[];
+  /** Grandchild declarations for deep structural reads. Only the first level is
+   * statically typed; deeper paths are base-typed and runtime-validated. */
+  children?: Readonly<Record<string, ChildContract>>;
+}
+
+/** Values resolved per file by `configure`; never capability shape. */
+export interface VisitorConfiguration {
+  enabled?: boolean;
+  where?: Readonly<Partial<Record<NativeFieldKey, ScalarPredicate>>>;
+}
+
+export interface VisitorContract<Route extends VisitorRouteSpec = VisitorRouteSpec> {
+  /** Scalar payload fields transferred to the callback's `path.node`. */
+  fields?: readonly DeclaredFieldKey<Route>[];
+  /** Native match predicates. Match-only fields are not callback-visible. */
+  where?: Readonly<Partial<Record<NativeFieldKey, ScalarPredicate>>>;
+  scope?: boolean;
+  ancestry?: AncestryCapability;
+  children?: Readonly<Record<string, ChildContract>>;
+  controlFlow?: readonly ControlFlowCapability[];
+  /** Typed visitors this handler may run via `path.traverse`; their payload and
+   * predicate fields join the phase plan so the retained index can serve them. */
+  nested?: readonly DefinedVisitor<any>[];
+  /** Per-file dynamism with a static shape: enablement and predicate values. */
+  configure?(context: PrepareContext, options: never): VisitorConfiguration;
+}
+
+/** Base identity always present in routed records. */
+export interface ContractNodeBase {
+  readonly id: number;
+  readonly type: string;
+  readonly start: number;
+  readonly end: number;
+}
+
+/** The callback-visible node: base identity plus declared payload fields. */
+export type ContractNode<
+  Route extends VisitorRouteSpec,
+  Fields extends string,
+> = ContractNodeBase & {
+  readonly [F in Extract<KnownKeys<NodeForRoute<Route>>, Fields>]: NodeForRoute<Route>[F];
 } & {
-  [compositeRoute: `${NativeVisitorRoute}|${string}`]: VisitorHandler<State> | undefined;
+  readonly [F in Exclude<
+    Fields,
+    KnownKeys<NodeForRoute<Route>> | keyof ContractNodeBase
+  >]?: unknown;
+};
+
+/** The always-available path surface: identity, source access, edits, diagnostics. */
+export interface ContractPathBase<Node> {
+  readonly id: number;
+  readonly type: string;
+  readonly start: number;
+  readonly end: number;
+  readonly node: Node;
+  readonly context: PluginContext;
+  getSource(): SourceFragment;
+  sourceText(): string;
+  snapshot(options?: SnapshotOptions): Readonly<Node>;
+  getLocation(): SourceLocation;
+  is<TType extends NativeNodeType>(type: TType): this is this & { readonly type: TType };
+  matchesPattern(pattern: string, allowPartial?: boolean): boolean;
+  replaceWith(code: Code): void;
+  replaceWithMultiple(code: readonly Code[]): void;
+  update(code: Code): void;
+  overwrite(code: Code): void;
+  remove(): void;
+  insertBefore(code: Code): void;
+  insertAfter(code: Code): void;
+  moveTo(destination: number): void;
+  unshiftContainer(key: 'body', code: Code | readonly Code[]): void;
+  pushContainer(key: 'body', code: Code | readonly Code[]): void;
+  prependToBody(code: Code): void;
+  appendToBody(code: Code): void;
+  addComment(position: 'leading' | 'trailing' | 'inner', content: string, line?: boolean): void;
+  buildCodeFrameError(message: string): NativeTransformError;
+  unsupported(reason: string): never;
+}
+
+interface ParentAccess {
+  readonly parent: NodeSummary | null;
+  readonly parentPath: NativeNodePath | null;
+}
+interface FindParentAccess {
+  findParent(predicate: (path: NativeNodePath) => boolean): NativeNodePath | null;
+  find(predicate: (path: NativeNodePath) => boolean): NativeNodePath | null;
+}
+interface FunctionParentAccess {
+  getFunctionParent(): NativeNodePath | null;
+}
+interface ProgramParentAccess {
+  getProgramParent(): NativeNodePath | null;
+}
+interface NestedTraverseAccess {
+  traverse<State>(visitors: readonly DefinedVisitor<State>[], state?: State): void;
+}
+interface SubscribeAccess {
+  subscribeWithin(types: NativeVisitorRoute | readonly NativeVisitorRoute[]): void;
+  subscribeForScope(types: NativeVisitorRoute | readonly NativeVisitorRoute[]): void;
+}
+
+type ScopePart<Contract> = Contract extends { scope: true } ? { readonly scope: NativeScope } : {};
+type AncestryPart<Contract> = Contract extends { ancestry: infer Mode }
+  ? Mode extends 'parent'
+    ? ParentAccess
+    : Mode extends 'findParent'
+      ? ParentAccess & FindParentAccess
+      : Mode extends 'functionParent'
+        ? ParentAccess & FindParentAccess & FunctionParentAccess
+        : Mode extends 'programParent' | number
+          ? ParentAccess & FindParentAccess & FunctionParentAccess & ProgramParentAccess
+          : {}
+  : {};
+type ControlPart<Contract> = Contract extends { controlFlow: readonly (infer C extends string)[] }
+  ? ('skip' extends C ? { skip(): void } : {}) &
+      ('stop' extends C ? { stop(): void } : {}) &
+      ('nested-traverse' extends C ? NestedTraverseAccess : {}) &
+      ('dynamic-subscriptions' extends C ? SubscribeAccess : {})
+  : {};
+type ChildFieldsOf<C> = C extends { fields: readonly (infer F extends string)[] } ? F : never;
+/** Child paths share the visitor's runtime, so they inherit its scope, ancestry,
+ * and control-flow capabilities, and expose their own declared child chains. */
+type ChildPathOf<C extends ChildContract, Owner> = ContractPathBase<
+  ContractNode<C['route'], ChildFieldsOf<C>>
+> &
+  ScopePart<Owner> &
+  AncestryPart<Owner> &
+  ControlPart<Owner> &
+  ChildrenPart<C, Owner>;
+type ChildrenPart<Contract, Owner> = Contract extends {
+  children: infer Children extends Readonly<Record<string, ChildContract>>;
+}
+  ? {
+      getChild<Role extends Extract<keyof Children, string>>(
+        role: Role,
+      ): ChildPathOf<Children[Role], Owner> | null;
+      getChildList<Role extends Extract<keyof Children, string>>(
+        role: Role,
+      ): readonly ChildPathOf<Children[Role], Owner>[];
+      get<Role extends Extract<keyof Children, string>>(
+        role: Role,
+      ): ChildPathOf<Children[Role], Owner> | readonly ChildPathOf<Children[Role], Owner>[] | null;
+    } & ('*' extends keyof Children ? { getChildren(): readonly NativeNodePath[] } : {})
+  : {};
+
+type ContractFieldsOf<Contract> = Contract extends { fields: readonly (infer F extends string)[] }
+  ? F
+  : never;
+
+/** The capability-narrowed path a typed visitor callback receives. */
+export type ContractPath<
+  Route extends VisitorRouteSpec,
+  Contract extends VisitorContract<Route>,
+> = ContractPathBase<ContractNode<Route, ContractFieldsOf<Contract>>> &
+  ScopePart<Contract> &
+  AncestryPart<Contract> &
+  ChildrenPart<Contract, Contract> &
+  ControlPart<Contract>;
+
+export type TypedVisitorHandler<
+  Route extends VisitorRouteSpec,
+  Contract extends VisitorContract<Route>,
+  State,
+> =
+  | ((path: ContractPath<Route, Contract>, state: State) => void)
+  | {
+      enter?(path: ContractPath<Route, Contract>, state: State): void;
+      exit?(path: ContractPath<Route, Contract>, state: State): void;
+    };
+
+/** Normalized, route-erased runtime shape of one typed visitor. */
+export interface DefinedVisitor<in State = unknown> {
+  readonly route: VisitorRouteSpec;
+  readonly contract: StoredVisitorContract;
+  readonly enter: ((path: never, state: State) => void) | undefined;
+  readonly exit: ((path: never, state: State) => void) | undefined;
+}
+
+/** The contract as stored: normalized, frozen, identity-stable per visitor. */
+export interface StoredVisitorContract {
+  readonly fields: readonly NativeFieldKey[];
+  readonly where: Readonly<Partial<Record<string, ScalarPredicate>>> | undefined;
+  readonly scope: boolean;
+  readonly ancestry: AncestryCapability | undefined;
+  readonly children: Readonly<Record<string, ChildContract>> | undefined;
+  readonly controlFlow: readonly ControlFlowCapability[];
+  readonly nested: readonly DefinedVisitor<any>[];
+  readonly configure:
+    | ((context: PrepareContext, options: unknown) => VisitorConfiguration)
+    | undefined;
+}
+
+const MAX_CHILD_CONTRACT_DEPTH = 8;
+
+function freezeChildContracts(
+  children: Readonly<Record<string, ChildContract>> | undefined,
+  depth = 0,
+): Readonly<Record<string, ChildContract>> | undefined {
+  if (children == null) return undefined;
+  if (depth >= MAX_CHILD_CONTRACT_DEPTH)
+    throw new Error('child contracts exceed the supported depth');
+  return Object.freeze(
+    Object.fromEntries(
+      Object.entries(children).map(([role, child]) => [
+        role,
+        Object.freeze({
+          route: child.route,
+          fields: Object.freeze([...(child.fields ?? [])]),
+          children: freezeChildContracts(child.children, depth + 1),
+        }),
+      ]),
+    ),
+  );
+}
+
+/**
+ * Define a typed visitor: the contract beside the callback that uses it.
+ *
+ * The route is an explicit generic anchor; the contract narrows the callback's
+ * path (declared payload fields on `node`, capability-gated scope/ancestry/
+ * children/control-flow methods); state is typed by annotating the handler's
+ * second parameter. Definitions are frozen data consumed at plugin compile time —
+ * no wrapper runs per event.
+ */
+export function defineVisitor<
+  Route extends VisitorRouteSpec,
+  const Contract extends VisitorContract<Route>,
+  State = unknown,
+>(
+  route: Route,
+  contract: Contract,
+  handler: TypedVisitorHandler<Route, Contract, State>,
+): DefinedVisitor<State> {
+  if (typeof route !== 'string' || route.length === 0)
+    throw new Error('defineVisitor requires a route name');
+  const callable = typeof handler === 'function' ? { enter: handler } : handler;
+  if (callable.enter == null && callable.exit == null)
+    throw new Error(`defineVisitor(${route}) requires an enter or exit handler`);
+  const stored: StoredVisitorContract = Object.freeze({
+    fields: Object.freeze([...((contract.fields as readonly NativeFieldKey[] | undefined) ?? [])]),
+    where: contract.where == null ? undefined : Object.freeze({ ...contract.where }),
+    scope: contract.scope === true,
+    ancestry: contract.ancestry,
+    children: freezeChildContracts(contract.children),
+    controlFlow: Object.freeze([...(contract.controlFlow ?? [])]),
+    nested: Object.freeze([...(contract.nested ?? [])]),
+    configure: contract.configure as StoredVisitorContract['configure'],
+  });
+  return Object.freeze({
+    route,
+    contract: stored,
+    enter: callable.enter as DefinedVisitor<State>['enter'],
+    exit: callable.exit as DefinedVisitor<State>['exit'],
+  });
+}
+
+/**
+ * Plugin-level requirements and typings for `context`: metadata ownership and
+ * semantic queries. The visitor contract types the path; the plugin contract
+ * types the context.
+ */
+export interface PluginContract {
+  metadata?: { writes?: readonly string[]; reads?: readonly string[] };
+  queries?: readonly QueryRequest[];
+}
+
+type ContractMetadataWrites<Contract> = Contract extends {
+  metadata: { writes: readonly (infer Writes extends string)[] };
+}
+  ? Writes
+  : string;
+type ContractMetadataReads<Contract> = Contract extends {
+  metadata: { reads: readonly (infer Reads extends string)[] };
+}
+  ? Reads
+  : string;
+
+export interface ContractMetadataWriter<Writes extends string, Reads extends string> {
+  set(key: Writes, value: unknown): void;
+  get(key: Reads): unknown;
+}
+
+/** `PluginContext` with metadata keys narrowed by the plugin contract. */
+export type PluginContextFor<Contract extends PluginContract> = Omit<PluginContext, 'metadata'> & {
+  readonly metadata: ContractMetadataWriter<
+    ContractMetadataWrites<Contract>,
+    ContractMetadataReads<Contract> | ContractMetadataWrites<Contract>
+  >;
 };
 
 /**
@@ -278,16 +599,24 @@ export type Visitor<State> = {
  * hooks and visitors then operate on that prepared snapshot, while edits stay
  * buffered until the containing phase completes.
  */
-export interface NativePlugin<State = unknown, Options = unknown, Analysis = unknown> {
+export interface NativePlugin<
+  State = unknown,
+  Options = unknown,
+  Analysis = unknown,
+  Contract extends PluginContract = PluginContract,
+> {
   name: string;
   options?: Options;
+  /** Plugin-level context requirements: metadata ownership and queries. */
+  contract?: Contract;
   prepare?(context: PrepareContext, options: Options): PluginPlan | void;
   createState?(): State;
-  pre?(context: PluginContext, state: State): void;
-  analyze?(context: PluginContext, state: State): TransformDecision<Analysis> | void;
-  apply?(context: PluginContext, analysis: Analysis, state: State): void;
-  visitor?: Visitor<State>;
-  post?(context: PluginContext, state: State): void;
+  pre?(context: PluginContextFor<Contract>, state: State): void;
+  analyze?(context: PluginContextFor<Contract>, state: State): TransformDecision<Analysis> | void;
+  apply?(context: PluginContextFor<Contract>, analysis: Analysis, state: State): void;
+  /** Typed per-visitor contracts created with `defineVisitor`. */
+  visitors?: readonly DefinedVisitor<State>[];
+  post?(context: PluginContextFor<Contract>, state: State): void;
   cleanup?(reason: 'complete' | 'bailout' | 'error', state: State): void;
   /** Static fallback used by phase planning when prepare() is source-dependent. */
   editEffect?: EditEffect;
@@ -296,13 +625,15 @@ export type NativePluginDefinition<
   State = unknown,
   Options = unknown,
   Analysis = unknown,
-> = NativePlugin<State, Options, Analysis>;
+  Contract extends PluginContract = PluginContract,
+> = NativePlugin<State, Options, Analysis, Contract>;
 export interface DefinedNativePlugin<
   State = unknown,
   Options = unknown,
   Analysis = unknown,
-> extends NativePlugin<State, Options, Analysis> {
-  withOptions(options: Options): DefinedNativePlugin<State, Options, Analysis>;
+  Contract extends PluginContract = PluginContract,
+> extends NativePlugin<State, Options, Analysis, Contract> {
+  withOptions(options: Options): DefinedNativePlugin<State, Options, Analysis, Contract>;
 }
 
 /**
@@ -353,13 +684,23 @@ export class NativeTransformError extends Error {
 }
 
 /** Define and freeze a reusable plugin, including its visitor table. */
-export function defineNativePlugin<State = undefined, Options = undefined, Analysis = unknown>(
-  plugin: NativePluginDefinition<State, Options, Analysis>,
-): DefinedNativePlugin<State, Options, Analysis> {
+export function defineNativePlugin<
+  State = undefined,
+  Options = undefined,
+  Analysis = unknown,
+  const Contract extends PluginContract = PluginContract,
+>(
+  plugin: NativePluginDefinition<State, Options, Analysis, Contract>,
+): DefinedNativePlugin<State, Options, Analysis, Contract> {
+  if ('visitor' in plugin)
+    throw new Error(
+      `${plugin.name}: the visitor-object form was removed; define typed visitors with defineVisitor and pass them as visitors`,
+    );
   const definition = {
     ...plugin,
-    visitor: plugin.visitor == null ? undefined : Object.freeze({ ...plugin.visitor }),
-  } as DefinedNativePlugin<State, Options, Analysis>;
+    visitors: plugin.visitors == null ? undefined : Object.freeze([...plugin.visitors]),
+    contract: plugin.contract == null ? undefined : Object.freeze({ ...plugin.contract }),
+  } as DefinedNativePlugin<State, Options, Analysis, Contract>;
   Object.defineProperty(definition, 'withOptions', {
     enumerable: false,
     value: (options: Options) => defineNativePlugin({ ...plugin, options }),
@@ -590,6 +931,16 @@ export class NativeTransformSession {
   cacheEvent(event: NativeEvent): void {
     if (event.side === 'enter') {
       this.#eventCache[event.id] = event;
+    }
+  }
+  /** Pre-size the event cache to the parse's node count: scattered id stores into a
+   * short array degrade to dictionary elements in V8; a packed array stays fast. */
+  reserveEventCache(nodeCount: number): void {
+    if (this.#eventCache.length < nodeCount) {
+      const previous = this.#eventCache;
+      this.#eventCache = new Array<NativeEvent | undefined>(nodeCount).fill(undefined);
+      for (let id = 0; id < previous.length; id++)
+        if (previous[id] !== undefined) this.#eventCache[id] = previous[id];
     }
   }
   nodeView(event: NativeEvent): NodeView {
@@ -983,9 +1334,195 @@ function commitWithDedupe<Committed extends object>(
   }
 }
 
+/** The internal per-file phase requirements aggregated from visitor contracts,
+ * the plugin contract, and `prepare()`'s lifecycle settings. */
 type PreparedPluginPlan = PluginPlan & {
-  subscriptions: readonly NativeVisitorRoute[];
+  subscriptions: readonly VisitorRouteSpec[];
+  fields?: Readonly<Partial<Record<NativeNodeType, readonly NativeFieldKey[]>>>;
+  controlFlow?: readonly ControlFlowCapability[];
+  scope?: boolean;
+  queries?: readonly QueryRequest[];
+  metadataWrites?: readonly string[];
+  ancestry?: AncestryCapability;
+  children?: Readonly<Partial<Record<string, readonly string[]>>>;
+  /** Per-visitor contracts with `configure` resolved. */
+  resolvedVisitors: readonly ResolvedVisitor[];
 };
+
+/** One typed visitor with its per-file configuration applied. */
+interface ResolvedVisitor {
+  definition: DefinedVisitor<any>;
+  enabled: boolean;
+  /** Static `where` intersected with `configure` values. */
+  where: Readonly<Record<string, ScalarPredicate>> | undefined;
+}
+
+const REMOVED_PLAN_FIELDS = [
+  'subscriptions',
+  'identifierNames',
+  'staticMemberPatterns',
+  'fields',
+  'where',
+  'children',
+  'controlFlow',
+  'semantics',
+  'ancestry',
+  'queries',
+  'metadataWrites',
+] as const;
+
+/** The shape `validatePredicates` checks: per-route predicates and control flow. */
+interface PredicateRequirements {
+  where?: Readonly<
+    Partial<Record<string, Readonly<Partial<Record<string, ScalarPredicate>>> | undefined>>
+  >;
+  controlFlow?: readonly ControlFlowCapability[];
+}
+
+const visitorStaticKeys = new WeakMap<DefinedVisitor<any>, string>();
+/** The per-file cache key contribution of a visitor's static contract. Contracts
+ * are frozen at definition, so this is computed once per `DefinedVisitor`. */
+function visitorStaticKey(defined: DefinedVisitor<any>): string {
+  let key = visitorStaticKeys.get(defined);
+  if (key == null) {
+    key = `${defined.route}:${stableJson(defined.contract.where ?? null)}:${stableJson(
+      defined.contract.children ?? null,
+    )}:${defined.contract.fields.join(',')}:${defined.contract.nested
+      .map(nested => `${nested.route}/${nested.contract.fields.join(',')}`)
+      .join(';')}`;
+    visitorStaticKeys.set(defined, key);
+  }
+  return key;
+}
+
+const validatedVisitors = new WeakSet<DefinedVisitor<any>>();
+
+function validateDefinedVisitor(pluginName: string, defined: DefinedVisitor<any>): void {
+  if (validatedVisitors.has(defined)) return;
+  if (concreteRouteTypes(defined.route).length === 0)
+    throw new Error(`${pluginName}: unknown visitor route ${defined.route}`);
+  validatePredicates(pluginName, {
+    where: defined.contract.where == null ? undefined : { [defined.route]: defined.contract.where },
+    controlFlow: defined.contract.controlFlow,
+  } as PredicateRequirements);
+  const validateChildren = (children: Readonly<Record<string, ChildContract>> | undefined) => {
+    for (const [role, child] of Object.entries(children ?? {})) {
+      if (concreteRouteTypes(child.route).length === 0)
+        throw new Error(`${pluginName}: unknown child route ${child.route} for role ${role}`);
+      validateChildren(child.children);
+    }
+  };
+  validateChildren(defined.contract.children);
+  validatedVisitors.add(defined);
+}
+
+function resolveTypedVisitors(
+  plugin: NativePlugin<any, any>,
+  context: PrepareContext,
+): ResolvedVisitor[] {
+  const resolved: ResolvedVisitor[] = [];
+  for (const defined of plugin.visitors!) {
+    validateDefinedVisitor(plugin.name, defined);
+    const contract = defined.contract;
+    let enabled = true;
+    let where: Record<string, ScalarPredicate> | undefined =
+      contract.where == null
+        ? undefined
+        : (Object.fromEntries(
+            Object.entries(contract.where).filter(([, predicate]) => predicate != null),
+          ) as Record<string, ScalarPredicate>);
+    if (contract.configure) {
+      const configuration = contract.configure(context, plugin.options) ?? {};
+      if (configuration.enabled === false) enabled = false;
+      if (configuration.where != null) {
+        validatePredicates(plugin.name, {
+          where: { [defined.route]: configuration.where },
+        } as PredicateRequirements);
+        where ??= {};
+        for (const [field, predicate] of Object.entries(configuration.where)) {
+          if (predicate == null) continue;
+          where[field] = where[field] ? intersectPredicates(where[field], predicate) : predicate;
+        }
+      }
+    }
+    resolved.push({ definition: defined, enabled, where });
+  }
+  return resolved;
+}
+
+/**
+ * Aggregate the native phase requirements of a typed plugin's enabled visitors
+ * into the plan shape the phase machinery consumes. Predicates deliberately stay
+ * per-visitor (they compile per route); everything here is unioned native work.
+ */
+function synthesizeVisitorPlan(
+  plugin: NativePlugin<any, any>,
+  plan: PluginPlan,
+  resolved: readonly ResolvedVisitor[],
+): PreparedPluginPlan & { metadataWrites?: readonly string[]; queries?: readonly QueryRequest[] } {
+  for (const field of REMOVED_PLAN_FIELDS) {
+    if ((plan as Record<string, unknown>)[field] != null)
+      throw new Error(
+        `${plugin.name}: prepare() may not declare ${field}; route requirements live on visitor contracts and context requirements on the plugin contract`,
+      );
+  }
+  const subscriptions: VisitorRouteSpec[] = [];
+  const fields: Record<string, NativeFieldKey[]> = {};
+  const children: Record<string, string[]> = {};
+  const controlFlow = new Set<ControlFlowCapability>();
+  let scope = false;
+  let ancestry: AncestryCapability | undefined;
+  for (const { definition, enabled } of resolved) {
+    if (!enabled) continue;
+    const contract = definition.contract;
+    subscriptions.push(definition.route);
+    if (contract.fields.length > 0)
+      for (const concrete of concreteRouteTypes(definition.route))
+        mergeFieldRequests(fields, { [concrete]: contract.fields });
+    const attachChildren = (
+      parentTypes: readonly string[],
+      declared: Readonly<Record<string, ChildContract>> | undefined,
+    ) => {
+      if (declared == null) return;
+      for (const parentType of parentTypes) {
+        const roles = (children[parentType] ??= []);
+        for (const role of Object.keys(declared)) if (!roles.includes(role)) roles.push(role);
+      }
+      for (const child of Object.values(declared)) {
+        const childTypes = concreteRouteTypes(child.route);
+        if ((child.fields?.length ?? 0) > 0)
+          for (const concrete of childTypes)
+            mergeFieldRequests(fields, { [concrete]: child.fields! });
+        attachChildren(childTypes, child.children);
+      }
+    };
+    attachChildren(concreteRouteTypes(definition.route), contract.children);
+    for (const capability of contract.controlFlow) controlFlow.add(capability);
+    scope ||= contract.scope;
+    if (contract.ancestry != null && ancestry == null) ancestry = contract.ancestry;
+    for (const nested of contract.nested) {
+      validateDefinedVisitor(plugin.name, nested);
+      for (const concrete of concreteRouteTypes(nested.route)) {
+        const nestedFields = [
+          ...nested.contract.fields,
+          ...Object.keys(nested.contract.where ?? {}),
+        ];
+        if (nestedFields.length > 0)
+          mergeFieldRequests(fields, { [concrete]: nestedFields as NativeFieldKey[] });
+      }
+    }
+  }
+  return {
+    ...plan,
+    subscriptions,
+    fields: fields as PreparedPluginPlan['fields'],
+    children: Object.keys(children).length > 0 ? children : undefined,
+    controlFlow: controlFlow.size > 0 ? [...controlFlow] : undefined,
+    scope: scope || undefined,
+    ancestry,
+    resolvedVisitors: resolved,
+  };
+}
 
 interface PreparedPhase {
   activePlugins: NativePlugin<any, any>[];
@@ -1000,22 +1537,141 @@ interface PreparedPhase {
   manifest: Buffer;
 }
 
+/**
+ * The path capabilities one compiled route grants its callbacks. Native phase
+ * requirements are unioned across a plugin; path permissions are not — every
+ * route binds the exact contract it was compiled from.
+ */
+interface RouteCapabilities {
+  scope: boolean;
+  ancestry: boolean;
+  /** Declared child roles per parent node type; null declares nothing. */
+  childRules: Readonly<Partial<Record<string, readonly string[]>>> | null;
+  controlFlow: readonly ControlFlowCapability[];
+  /** Payload fields of the owning typed visitor. */
+  declaredFields: readonly NativeFieldKey[];
+}
+
+const typedCapabilitiesCache = new WeakMap<DefinedVisitor<any>, RouteCapabilities>();
+function typedCapabilities(defined: DefinedVisitor<any>): RouteCapabilities {
+  let capabilities = typedCapabilitiesCache.get(defined);
+  if (!capabilities) {
+    const contract = defined.contract;
+    let childRules: Record<string, string[]> | null = null;
+    if (contract.children != null) {
+      const rules: Record<string, string[]> = {};
+      const attach = (
+        parentTypes: readonly string[],
+        children: Readonly<Record<string, ChildContract>>,
+      ) => {
+        for (const parentType of parentTypes) {
+          const roles = (rules[parentType] ??= []);
+          for (const role of Object.keys(children)) if (!roles.includes(role)) roles.push(role);
+        }
+        for (const child of Object.values(children))
+          if (child.children != null) attach(concreteRouteTypes(child.route), child.children);
+      };
+      attach(concreteRouteTypes(defined.route), contract.children);
+      childRules = rules;
+    }
+    capabilities = {
+      scope: contract.scope,
+      ancestry: contract.ancestry != null,
+      childRules,
+      controlFlow: contract.controlFlow,
+      declaredFields: contract.fields,
+    };
+    typedCapabilitiesCache.set(defined, capabilities);
+  }
+  return capabilities;
+}
+
+/**
+ * Development-mode contract verification: reports undeclared field reads with a
+ * paste-able contract fragment, and declared fields/capabilities that were never
+ * used. Applies to typed visitor routes only; capability *violations* throw in
+ * every mode.
+ */
+class ContractVerifier {
+  private readonly visitors = new Map<
+    RouteCapabilities,
+    { plugin: string; nodeType: string; usedFields: Set<string>; usedCapabilities: Set<string> }
+  >();
+  private readonly undeclared = new Map<string, Diagnostic>();
+  register(capabilities: RouteCapabilities, plugin: string, nodeType: string): void {
+    if (!this.visitors.has(capabilities))
+      this.visitors.set(capabilities, {
+        plugin,
+        nodeType,
+        usedFields: new Set(),
+        usedCapabilities: new Set(),
+      });
+  }
+  fieldRead(
+    capabilities: RouteCapabilities,
+    plugin: string,
+    nodeType: string,
+    field: string,
+  ): void {
+    const declared = capabilities.declaredFields;
+    if (declared.includes(field as NativeFieldKey)) {
+      this.visitors.get(capabilities)?.usedFields.add(field);
+      return;
+    }
+    const id = `${plugin}:${nodeType}.${field}`;
+    if (!this.undeclared.has(id))
+      this.undeclared.set(id, {
+        code: 'visitor-contract',
+        plugin,
+        message: `${nodeType} visitor read undeclared field ${field}; add it to the contract: fields: ['${field}']`,
+      });
+  }
+  capabilityUsed(capabilities: RouteCapabilities, name: string): void {
+    this.visitors.get(capabilities)?.usedCapabilities.add(name);
+  }
+  finish(diagnostics: Diagnostic[]): void {
+    for (const report of this.undeclared.values()) diagnostics.push(report);
+    for (const [capabilities, info] of this.visitors) {
+      const unused = (message: string) =>
+        diagnostics.push({ code: 'visitor-contract', plugin: info.plugin, message });
+      for (const field of capabilities.declaredFields)
+        if (!info.usedFields.has(field))
+          unused(`${info.nodeType} visitor declared field ${field} but never read it`);
+      if (capabilities.scope && !info.usedCapabilities.has('scope'))
+        unused(`${info.nodeType} visitor declared scope but never used it`);
+      if (capabilities.ancestry && !info.usedCapabilities.has('ancestry'))
+        unused(`${info.nodeType} visitor declared ancestry but never used it`);
+      if (capabilities.childRules != null && !info.usedCapabilities.has('children'))
+        unused(`${info.nodeType} visitor declared children but never accessed them`);
+      for (const capability of capabilities.controlFlow)
+        if (!info.usedCapabilities.has(capability))
+          unused(`${info.nodeType} visitor declared ${capability} but never used it`);
+    }
+  }
+}
+
 interface CompiledRouteTemplate extends NativeRouteManifestEntry {
   plugin: NativePlugin<any, any>;
   callbacks: readonly Handler<any>[];
   fast: boolean;
+  capabilities: RouteCapabilities;
 }
 /** One native route delivering to the callbacks of one or more coalesced plugins. */
 interface DispatchRoute extends NativeRouteManifestEntry {
   fast: boolean;
   contract: string;
-  members: { plugin: NativePlugin<any, any>; callbacks: readonly Handler<any>[] }[];
+  members: {
+    plugin: NativePlugin<any, any>;
+    callbacks: readonly Handler<any>[];
+    capabilities: RouteCapabilities;
+  }[];
 }
 interface CompiledPhaseRoutes {
   routes: CompiledRouteTemplate[];
   dispatchRoutes: DispatchRoute[];
   manifest: Buffer;
 }
+const staticPlanCache = new WeakMap<NativePlugin<any, any>, PreparedPluginPlan>();
 const preparedPhaseCaches = new WeakMap<PipelinePhase, Map<string, Omit<PreparedPhase, 'plans'>>>();
 const compiledPhaseCaches = new WeakMap<PipelinePhase, Map<string, CompiledPhaseRoutes>>();
 
@@ -1031,13 +1687,6 @@ function phaseIsEnabled(plan: PreparedPluginPlan, phaseName: string): boolean {
   if (plan.phases == null || plan.phases.length === 0) return true;
   for (const enabledPhase of plan.phases) {
     if (enabledPhase === phaseName) return true;
-  }
-  return false;
-}
-
-function routeContains(subscription: string, first: string, second: string): boolean {
-  for (const route of subscription.split('|')) {
-    if (route === first || route === second) return true;
   }
   return false;
 }
@@ -1071,31 +1720,43 @@ function preparePhase(
   const hints = sourceHints(phaseSource);
   const plans = new Map<NativePlugin<any, any>, PreparedPluginPlan>();
   for (const plugin of phase.plugins) {
-    const prepareSubscriptions = new Set<NativeVisitorRoute>();
-    const plan =
-      plugin.prepare?.(
-        {
-          filename,
-          options,
-          parser,
-          sourceHints: hints,
-          subscribe: (...types) => {
-            for (const type of types) prepareSubscriptions.add(type);
-          },
-        },
-        plugin.options as any,
-      ) ?? {};
-    validatePredicates(plugin.name, plan);
-    if (plan.editEffect != null && !EDIT_EFFECTS.has(plan.editEffect))
-      throw new Error(`${plugin.name}: invalid edit effect ${String(plan.editEffect)}`);
-    plans.set(plugin, {
-      ...plan,
-      subscriptions: [
-        ...(plan.subscriptions ?? []),
-        ...prepareSubscriptions,
-        ...visitorSubscriptions(plugin.visitor),
-      ],
-    });
+    // Plugins with no per-file hooks (`prepare`, `configure`) have a fully static
+    // plan; synthesize it once per plugin definition.
+    const staticPlan = staticPlanCache.get(plugin);
+    if (staticPlan != null) {
+      plans.set(plugin, staticPlan);
+      continue;
+    }
+    const prepareContext: PrepareContext = {
+      filename,
+      options,
+      parser,
+      sourceHints: hints,
+    };
+    const prepared = plugin.prepare?.(prepareContext, plugin.options as any) ?? {};
+    if (prepared.editEffect != null && !EDIT_EFFECTS.has(prepared.editEffect))
+      throw new Error(`${plugin.name}: invalid edit effect ${String(prepared.editEffect)}`);
+    const synthesized = synthesizeVisitorPlan(
+      plugin,
+      prepared,
+      plugin.visitors == null ? [] : resolveTypedVisitors(plugin, prepareContext),
+    );
+    // Plugin-contract requirements union with the visitor-derived plan.
+    if (plugin.contract != null) {
+      synthesized.metadataWrites = [
+        ...new Set([
+          ...(synthesized.metadataWrites ?? []),
+          ...(plugin.contract.metadata?.writes ?? []),
+        ]),
+      ];
+      synthesized.queries = [...(synthesized.queries ?? []), ...(plugin.contract.queries ?? [])];
+    }
+    plans.set(plugin, synthesized);
+    if (
+      plugin.prepare == null &&
+      (plugin.visitors ?? []).every(visitor => visitor.contract.configure == null)
+    )
+      staticPlanCache.set(plugin, synthesized);
   }
 
   const preparedKey = phase.plugins
@@ -1117,26 +1778,28 @@ function preparePhase(
     for (const type of plan.subscriptions) {
       subscriptions.add(type);
     }
-    if (plan.semantics?.[0] === 'scope') {
-      includeScope = true;
-    }
+    includeScope ||= plan.scope === true;
     includeParent ||= plan.ancestry != null;
     mergeFieldRequests(fieldRequests, plan.fields ?? {});
-    for (const [route, predicates] of Object.entries(plan.where ?? {})) {
-      for (const concrete of concreteRouteTypes(route)) {
-        mergeFieldRequests(fieldRequests, {
-          [concrete]: Object.keys(predicates ?? {}),
-        });
+    for (const { definition, enabled, where } of plan.resolvedVisitors) {
+      if (!enabled) continue;
+      const matchFields = Object.keys(where ?? {});
+      for (const part of definition.route.split('|')) {
+        if (part === 'ReferencedIdentifier') matchFields.push('global');
+        else if (isCollapsedFunctionKey(part) || isCollapsedClassKey(part))
+          matchFields.push('nodeKind');
       }
+      if (matchFields.length > 0)
+        for (const concrete of concreteRouteTypes(definition.route))
+          mergeFieldRequests(fieldRequests, { [concrete]: matchFields });
     }
-    mergeFieldRequests(fieldRequests, visitorRoutingFields(plugin.visitor));
   }
 
   let retentionCapabilities = 0;
   for (const plugin of activePlugins) {
     const plan = plans.get(plugin)!;
     if (
-      plan.semantics?.includes('scope') ||
+      plan.scope === true ||
       plan.queries?.some(
         query =>
           (query.globals?.length ?? 0) > 0 ||
@@ -1189,33 +1852,41 @@ function preparePhase(
   return prepared;
 }
 
+const planCacheKeys = new WeakMap<PreparedPluginPlan, string>();
+/** Prepared plans are immutable once built (and shared across files when fully
+ * static), so their cache-key serialization is computed once per plan object. */
 function pluginPlanCacheKey(plan: PreparedPluginPlan): string {
+  let key = planCacheKeys.get(plan);
+  if (key == null) {
+    key = computePluginPlanCacheKey(plan);
+    planCacheKeys.set(plan, key);
+  }
+  return key;
+}
+
+function computePluginPlanCacheKey(plan: PreparedPluginPlan): string {
   const fields = Object.entries(plan.fields ?? {})
     .map(([type, values]) => `${type}:${values?.join(',') ?? ''}`)
-    .join(';');
-  const where = Object.entries(plan.where ?? {})
-    .map(
-      ([route, predicates]) =>
-        `${route}:${Object.entries(predicates ?? {})
-          .map(([field, predicate]) => `${field}=${stableJson(predicate)}`)
-          .join(',')}`,
-    )
     .join(';');
   return [
     plan.enabled === false ? '0' : '1',
     plan.subscriptions.join(','),
-    plan.identifierNames?.join(',') ?? '',
-    plan.staticMemberPatterns?.join(',') ?? '',
     fields,
-    where,
     plan.controlFlow?.join(',') ?? '*',
-    plan.semantics?.join(',') ?? '',
+    plan.scope ? 'scope' : '',
     plan.metadataWrites?.join(',') ?? '',
     plan.phases?.join(',') ?? '',
     String(plan.ancestry ?? ''),
     stableJson(plan.children ?? null),
     stableJson(plan.queries ?? null),
     plan.editEffect ?? '',
+    plan.resolvedVisitors
+      .map(({ definition, enabled, where }) =>
+        definition.contract.configure == null
+          ? `${visitorStaticKey(definition)}:${enabled ? '1' : '0'}`
+          : `${visitorStaticKey(definition)}:${enabled ? '1' : '0'}:${stableJson(where ?? null)}`,
+      )
+      .join('|'),
   ].join('\u001f');
 }
 
@@ -1237,10 +1908,21 @@ function compilePhaseRoutes(
       return {
         name: plugin.name,
         fields: plan.fields ?? null,
-        where: plan.where ?? null,
-        identifierNames: plan.identifierNames ?? null,
-        staticMemberPatterns: plan.staticMemberPatterns ?? null,
         controlFlow: plan.controlFlow,
+        visitors: plan.resolvedVisitors.map(({ definition, enabled, where }) => ({
+          route: definition.route,
+          enabled,
+          where: where ?? null,
+          fields: definition.contract.fields,
+          children: definition.contract.children ?? null,
+          controlFlow: definition.contract.controlFlow,
+          scope: definition.contract.scope,
+          ancestry: definition.contract.ancestry ?? null,
+          nested: definition.contract.nested.map(nested => ({
+            route: nested.route,
+            fields: nested.contract.fields,
+          })),
+        })),
       };
     }),
   });
@@ -1257,55 +1939,33 @@ function compilePhaseRoutes(
   const routes: CompiledRouteTemplate[] = [];
   for (let pluginId = 0; pluginId < plugins.length; pluginId++) {
     const plugin = plugins[pluginId];
-    const plan = plans.get(plugin)!;
-    const variants = visitorRouteVariants(plugin.visitor);
-    for (const variant of variants) {
-      const predicates: Record<string, ScalarPredicate> = { ...variant.predicates };
-      const matchOnlyFields = new Set<string>();
-      for (const [declaredRoute, fields] of Object.entries(plan.where ?? {})) {
-        if (
-          declaredRoute
-            .split('|')
-            .some(route =>
-              route === 'ReferencedIdentifier' ||
-              isCollapsedFunctionKey(route) ||
-              isCollapsedClassKey(route)
-                ? variant.visitorKeys.includes(route)
-                : route === variant.nodeType || alias(route, variant.nodeType),
-            )
-        )
-          for (const [field, predicate] of Object.entries(fields ?? {})) {
-            matchOnlyFields.add(field);
-            predicates[field] = predicates[field]
-              ? intersectPredicates(predicates[field], predicate)
-              : predicate;
-          }
+    // Typed visitors compile directly: one route per (visitor, concrete type,
+    // side), with the visitor's own predicates and payload — never lowered into
+    // a plugin-wide aggregate.
+    for (const { definition, enabled, where } of plans.get(plugin)!.resolvedVisitors) {
+      if (!enabled) continue;
+      const fast =
+        !hasGlobalStop && definition.contract.controlFlow.length === 0 && plugin.analyze == null;
+      const capabilities = typedCapabilities(definition);
+      for (const { nodeType, predicates } of typedRouteExpansion(definition, where)) {
+        for (const side of ['enter', 'exit'] as const) {
+          const callback = definition[side];
+          if (callback == null) continue;
+          routes.push({
+            id: routes.length,
+            pluginId,
+            nodeType,
+            side,
+            order: pluginId,
+            predicates,
+            payloadFields: definition.contract.fields,
+            plugin,
+            callbacks: [callback as Handler<any>],
+            fast,
+            capabilities,
+          });
+        }
       }
-      if (variant.nodeType === 'Identifier' && plan.identifierNames)
-        predicates.name = predicates.name
-          ? intersectPredicates(predicates.name, { oneOf: plan.identifierNames })
-          : { oneOf: plan.identifierNames };
-      if (variant.nodeType === 'StaticMemberExpression' && plan.staticMemberPatterns)
-        predicates.memberPath = predicates.memberPath
-          ? intersectPredicates(predicates.memberPath, { oneOf: plan.staticMemberPatterns })
-          : { oneOf: plan.staticMemberPatterns };
-      const explicitlyRequested = plan.fields?.[variant.nodeType as NativeNodeType];
-      const payloadFields = (explicitlyRequested ?? []).slice();
-      for (const field of visitorRoutingFields(plugin.visitor)[variant.nodeType] ?? [])
-        if (!payloadFields.includes(field as NativeFieldKey))
-          payloadFields.push(field as NativeFieldKey);
-      routes.push({
-        id: routes.length,
-        pluginId,
-        nodeType: variant.nodeType,
-        side: variant.side,
-        order: pluginId,
-        predicates,
-        payloadFields,
-        plugin,
-        callbacks: variant.callbacks,
-        fast: !hasGlobalStop && (plan.controlFlow?.length ?? 0) === 0 && plugin.analyze == null,
-      });
     }
   }
   // Coalesce runs of identical-contract fast routes into one dispatch route with member
@@ -1320,7 +1980,11 @@ function compilePhaseRoutes(
     const contract = `${route.fast}:${stableJson(route.predicates)}:${route.payloadFields.join(',')}`;
     const open = openGroups.get(bucket);
     if (open != null && route.fast && open.contract === contract) {
-      open.members.push({ plugin: route.plugin, callbacks: route.callbacks });
+      open.members.push({
+        plugin: route.plugin,
+        callbacks: route.callbacks,
+        capabilities: route.capabilities,
+      });
       continue;
     }
     const grouped: DispatchRoute = {
@@ -1333,7 +1997,9 @@ function compilePhaseRoutes(
       payloadFields: route.payloadFields,
       fast: route.fast,
       contract,
-      members: [{ plugin: route.plugin, callbacks: route.callbacks }],
+      members: [
+        { plugin: route.plugin, callbacks: route.callbacks, capabilities: route.capabilities },
+      ],
     };
     openGroups.set(bucket, grouped);
     dispatchRoutes.push(grouped);
@@ -1356,6 +2022,39 @@ function compilePhaseRoutes(
   return compiled;
 }
 
+/** Expand one typed visitor's route into concrete node types with merged predicates. */
+function typedRouteExpansion(
+  defined: DefinedVisitor<any>,
+  where: Readonly<Partial<Record<string, ScalarPredicate>>> | undefined,
+): { nodeType: string; predicates: Record<string, ScalarPredicate> }[] {
+  const expansions: { nodeType: string; predicates: Record<string, ScalarPredicate> }[] = [];
+  for (const part of defined.route.split('|')) {
+    const aliasPredicates: Record<string, ScalarPredicate> = {};
+    if (part === 'ReferencedIdentifier') aliasPredicates.global = { present: true };
+    else if (isCollapsedFunctionKey(part) || isCollapsedClassKey(part))
+      aliasPredicates.nodeKind = { equals: part };
+    for (const nodeType of concreteRouteTypes(part)) {
+      const predicates: Record<string, ScalarPredicate> = { ...aliasPredicates };
+      for (const [field, predicate] of Object.entries(where ?? {})) {
+        if (predicate == null) continue;
+        predicates[field] = predicates[field]
+          ? intersectPredicates(predicates[field], predicate)
+          : predicate;
+      }
+      expansions.push({ nodeType, predicates });
+    }
+  }
+  // Composite parts can expand to the same concrete route with identical
+  // predicates (for example `Identifier|Expression`); one delivery, not two.
+  const seen = new Set<string>();
+  return expansions.filter(({ nodeType, predicates }) => {
+    const key = `${nodeType}:${stableJson(predicates)}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 function intersectPredicates(left: ScalarPredicate, right: ScalarPredicate): ScalarPredicate {
   if ('present' in left) {
     if ('present' in right) return left.present === right.present ? left : { oneOf: [] };
@@ -1368,106 +2067,44 @@ function intersectPredicates(left: ScalarPredicate, right: ScalarPredicate): Sca
   return values.length === 1 ? { equals: values[0] } : { oneOf: values };
 }
 
-function visitorRouteVariants(visitor?: Visitor<any>): {
-  nodeType: string;
-  side: 'enter' | 'exit';
-  predicates: Record<string, ScalarPredicate>;
-  callbacks: Handler<any>[];
-  visitorKeys: string[];
-}[] {
-  if (!visitor) return [];
-  const grouped = new Map<
-    string,
-    {
-      nodeType: string;
-      side: 'enter' | 'exit';
-      predicates: Record<string, ScalarPredicate>;
-      callbacks: Handler<any>[];
-      visitorKeys: string[];
-      registrations: Set<number>;
-    }
-  >();
-  const add = (
-    nodeType: string,
-    side: 'enter' | 'exit',
-    predicates: Record<string, ScalarPredicate>,
-    callback: Handler<any>,
-    visitorKey: string,
-    registration: number,
-  ) => {
-    const key = `${nodeType}:${side}:${stableJson(predicates)}`;
-    const route = grouped.get(key) ?? {
-      nodeType,
-      side,
-      predicates,
-      callbacks: [],
-      visitorKeys: [],
-      registrations: new Set(),
-    };
-    if (!route.registrations.has(registration)) {
-      if (side === 'exit') route.callbacks.unshift(callback);
-      else route.callbacks.push(callback);
-      route.registrations.add(registration);
-    }
-    if (!route.visitorKeys.includes(visitorKey)) route.visitorKeys.push(visitorKey);
-    grouped.set(key, route);
-  };
-  let registration = 0;
-  for (const [key, handler] of Object.entries(visitor)) {
-    if (!handler) continue;
-    for (const visitorKey of key.split('|')) {
-      const nodeTypes = concreteRouteTypes(visitorKey);
-      const predicates: Record<string, ScalarPredicate> = {};
-      if (visitorKey === 'ReferencedIdentifier') predicates.global = { present: true };
-      else if (isCollapsedFunctionKey(visitorKey) || isCollapsedClassKey(visitorKey))
-        predicates.nodeKind = { equals: visitorKey };
-      for (const nodeType of nodeTypes) {
-        if (typeof handler === 'function')
-          add(nodeType, 'enter', predicates, handler as Handler<any>, visitorKey, registration);
-        else {
-          if (handler.enter)
-            add(
-              nodeType,
-              'enter',
-              predicates,
-              handler.enter as Handler<any>,
-              visitorKey,
-              registration,
-            );
-          if (handler.exit)
-            add(
-              nodeType,
-              'exit',
-              predicates,
-              handler.exit as Handler<any>,
-              visitorKey,
-              registration,
-            );
-        }
-      }
-    }
-    registration++;
-  }
-  return [...grouped.values()].map(({ registrations: _, ...route }) => route);
-}
-
-const nestedRouteCaches = new WeakMap<
-  object,
-  {
-    manifest: Buffer;
-    callbacks: readonly (readonly Handler<any>[])[];
-    routes: readonly NativeRouteManifestEntry[];
-  }
->();
-
-function compileNestedVisitor(visitor: Visitor<any>): {
+interface CompiledNestedRoutes {
   manifest: Buffer;
   callbacks: readonly (readonly Handler<any>[])[];
   routes: readonly NativeRouteManifestEntry[];
-} {
+  /** Per-route path capabilities: the exact contract each nested visitor declared. */
+  capabilities: readonly RouteCapabilities[];
+}
+
+type NestedVisitor = readonly DefinedVisitor<any>[];
+
+const nestedRouteCaches = new WeakMap<object, CompiledNestedRoutes>();
+
+function compileNestedVisitor(visitor: NestedVisitor): CompiledNestedRoutes {
   const cached = nestedRouteCaches.get(visitor);
   if (cached) return cached;
-  const variants = visitorRouteVariants(visitor);
+  const variants: {
+    nodeType: string;
+    side: 'enter' | 'exit';
+    predicates: Record<string, ScalarPredicate>;
+    callbacks: readonly Handler<any>[];
+  }[] = [];
+  const capabilities: RouteCapabilities[] = [];
+  const payloads: (readonly NativeFieldKey[])[] = [];
+  for (const defined of visitor) {
+    validateDefinedVisitor('nested', defined);
+    if (defined.contract.configure != null)
+      throw new Error(`nested visitor for ${defined.route} may not use configure`);
+    const caps = typedCapabilities(defined);
+    for (const { nodeType, predicates } of typedRouteExpansion(defined, defined.contract.where)) {
+      for (const side of ['enter', 'exit'] as const) {
+        const callback = defined[side];
+        if (callback == null) continue;
+        variants.push({ nodeType, side, predicates, callbacks: [callback as Handler<any>] });
+        capabilities.push(caps);
+        payloads.push([...defined.contract.fields]);
+      }
+    }
+  }
   const routes: NativeRouteManifestEntry[] = variants.map((variant, id) => ({
     id,
     pluginId: 0,
@@ -1475,25 +2112,26 @@ function compileNestedVisitor(visitor: Visitor<any>): {
     side: variant.side,
     order: 0,
     predicates: variant.predicates,
-    payloadFields: [],
+    payloadFields: payloads[id],
   }));
-  const compiled = {
+  const compiled: CompiledNestedRoutes = {
     manifest: packRouteManifest(routes, true, true),
     callbacks: variants.map(variant => variant.callbacks),
     routes,
+    capabilities,
   };
-  nestedRouteCaches.set(visitor, compiled);
+  nestedRouteCaches.set(visitor as object, compiled);
   return compiled;
 }
 
 function assertNestedFieldsDeclared(
   plugin: NativePlugin<any, any>,
-  plan: Pick<PluginPlan, 'fields'> | undefined,
+  plan: Pick<PreparedPluginPlan, 'fields'> | undefined,
   routes: readonly NativeRouteManifestEntry[],
 ): void {
   for (const route of routes) {
     const declared = plan?.fields?.[route.nodeType as NativeNodeType] ?? [];
-    for (const field of Object.keys(route.predicates))
+    for (const field of [...Object.keys(route.predicates), ...route.payloadFields])
       if (!declared.includes(field as NativeFieldKey))
         throw new Error(
           `${plugin.name}: nested traversal requires declared field ${route.nodeType}.${field}`,
@@ -1503,14 +2141,14 @@ function assertNestedFieldsDeclared(
 
 function nestedManifest(
   plugin: NativePlugin<any, any>,
-  plan: Pick<PluginPlan, 'fields'> | undefined,
-  compiled: ReturnType<typeof compileNestedVisitor>,
+  plan: Pick<PreparedPluginPlan, 'fields'> | undefined,
+  compiled: CompiledNestedRoutes,
 ): Buffer {
   assertNestedFieldsDeclared(plugin, plan, compiled.routes);
   return packRouteManifest(
     compiled.routes.map(route => ({
       ...route,
-      payloadFields: plan?.fields?.[route.nodeType as NativeNodeType] ?? [],
+      payloadFields: route.payloadFields,
     })),
     true,
     true,
@@ -1528,7 +2166,7 @@ function concreteRouteTypes(route: string): string[] {
   return [...new Set(concrete)];
 }
 
-function validatePredicates(plugin: string, plan: PluginPlan): void {
+function validatePredicates(plugin: string, plan: PredicateRequirements): void {
   const controlCapabilities = new Set<ControlFlowCapability>([
     'skip',
     'stop',
@@ -1599,7 +2237,7 @@ export function transform(
           const state = plugin.createState?.();
           prepared.push({ plugin, state });
           plugin.prepare?.(
-            { filename, options, parser, sourceHints: sourceHints(source), subscribe() {} },
+            { filename, options, parser, sourceHints: sourceHints(source) },
             plugin.options as any,
           );
         }
@@ -1622,6 +2260,7 @@ export function transform(
   const diagnostics: Diagnostic[] = [];
   const intents = new Map<string, IntentRegistration>();
   const provenance = { degradations: 0 };
+  const verifier = options.verifyVisitorContracts ? new ContractVerifier() : undefined;
   if (options.debugPerformance)
     metadata.performance = {
       phases: phasePlan,
@@ -1874,6 +2513,8 @@ export function transform(
       const childParentTypes = activePlugins.flatMap(plugin =>
         Object.keys(plans.get(plugin)?.children ?? {}),
       );
+      if (requiresIndex || includeParent || includeScope)
+        session.reserveEventCache(batch.nodeCount);
       if (childParentTypes.length > 0) session.prefetchChildren([], childParentTypes);
       if (batch.includeParent) session.seedSummaries(batch.parentSummaries);
       const dispatcherStarted = options.debugPerformance ? performance.now() : 0;
@@ -1891,6 +2532,7 @@ export function transform(
         dispatchRoutes,
         intents,
         provenance,
+        verifier,
       );
       if (options.debugPerformance)
         performanceCounters(metadata).dispatcherSetupMs += performance.now() - dispatcherStarted;
@@ -2066,6 +2708,7 @@ export function transform(
     // Always-on observability: a count only, so production consumers can notice
     // weakened maps or stale cross-phase text without debug tracing enabled.
     if (provenance.degradations > 0) metadata.provenanceDegradations = provenance.degradations;
+    verifier?.finish(diagnostics);
     return {
       status: 'complete',
       code: phaseSource,
@@ -2123,7 +2766,8 @@ interface DispatcherEntry extends PathState {
   context: PluginContext;
   state: any;
   delivered?: Set<number>;
-  pathRuntime?: PathRuntime;
+  /** Path runtimes keyed by the exact route capabilities they enforce. */
+  pathRuntimes?: Map<RouteCapabilities, PathRuntime>;
 }
 
 interface Dispatcher {
@@ -2135,7 +2779,7 @@ function createDispatcher(
   session: NativeTransformSession,
   phase: PipelinePhase,
   activePlugins: readonly NativePlugin<any, any>[],
-  plans: ReadonlyMap<NativePlugin<any, any>, PluginPlan>,
+  plans: ReadonlyMap<NativePlugin<any, any>, PreparedPluginPlan>,
   batch: RoutedEventBatch,
   edits: EditCommand[],
   metadata: Record<string, unknown>,
@@ -2145,6 +2789,7 @@ function createDispatcher(
   dispatchRoutes: readonly DispatchRoute[],
   intents: Map<string, IntentRegistration>,
   provenance: { degradations: number },
+  verifier: ContractVerifier | undefined,
 ): Dispatcher {
   let order = 0;
   let stopAll = false;
@@ -2242,12 +2887,12 @@ function createDispatcher(
           event => event.sequence > currentSequence,
         );
       },
-      revisitProgram: (visitor, state) => {
+      revisitProgram: (visitors, state) => {
         assertDeclaredControl(plugin, plans.get(plugin), 'dynamic-subscriptions');
-        const compiled = compileNestedVisitor(visitor);
+        const compiled = compileNestedVisitor(visitors);
         replayCustomRouted(
           session.nextRoutedPacked(nestedManifest(plugin, plans.get(plugin), compiled)),
-          visitor,
+          visitors,
           state,
           context,
         );
@@ -2311,10 +2956,25 @@ function createDispatcher(
     entry.context = context;
     contexts.set(plugin, entry);
   }
+  const runtimeFor = (
+    plugin: NativePlugin<any, any>,
+    entry: DispatcherEntry,
+    context: PluginContext,
+    capabilities: RouteCapabilities,
+  ): PathRuntime => {
+    const runtimes = (entry.pathRuntimes ??= new Map());
+    let runtime = runtimes.get(capabilities);
+    if (!runtime) {
+      runtime = createPathRuntime(plugin, entry, context, capabilities);
+      runtimes.set(capabilities, runtime);
+    }
+    return runtime;
+  };
   const createPathRuntime = (
     plugin: NativePlugin<any, any>,
     entry: DispatcherEntry,
     context: PluginContext,
+    capabilities: RouteCapabilities,
   ): PathRuntime => {
     let runtime: PathRuntime;
     runtime = {
@@ -2367,24 +3027,41 @@ function createDispatcher(
         return session.children(target.id).map(child => makePath(runtime, child));
       },
       allowsChild(type, role) {
-        const declared = plans.get(plugin)?.children;
-        if (declared == null) return plugin.name === 'nested';
+        const declared = capabilities.childRules;
+        if (declared == null) return false;
         for (const [parent, roles] of Object.entries(declared)) {
-          if ((parent === type || alias(parent, type)) && childRoleIsDeclared(roles, role))
+          if (
+            roles != null &&
+            (parent === type || alias(parent, type)) &&
+            childRoleIsDeclared(roles, role)
+          ) {
+            verifier?.capabilityUsed(capabilities, 'children');
             return true;
+          }
         }
         return false;
       },
       allowsAncestry() {
-        return plugin.name === 'nested' || plans.get(plugin)?.ancestry != null;
+        if (capabilities.ancestry) verifier?.capabilityUsed(capabilities, 'ancestry');
+        return capabilities.ancestry;
       },
       allowsScope() {
-        return plugin.name === 'nested' || plans.get(plugin)?.semantics?.[0] === 'scope';
+        if (capabilities.scope) verifier?.capabilityUsed(capabilities, 'scope');
+        return capabilities.scope;
       },
       scopeCache: new Map(),
       assertControl(capability) {
-        assertDeclaredControl(plugin, plans.get(plugin), capability);
+        if (capabilities.controlFlow.includes(capability)) {
+          verifier?.capabilityUsed(capabilities, capability);
+          return;
+        }
+        throw new Error(
+          `${plugin.name}: undeclared control-flow capability ${capability} ` +
+            `(declare it on the visitor contract: controlFlow: ['${capability}'])`,
+        );
       },
+      capabilities,
+      verify: verifier,
       performance: optionsPerformance(metadata),
       provenance,
     };
@@ -2395,7 +3072,9 @@ function createDispatcher(
     plugin: NativePlugin<any, any>,
     entry: DispatcherEntry,
     context: PluginContext,
-    override?: Visitor<any>,
+    boundRuntime: PathRuntime | null,
+    capabilities: RouteCapabilities,
+    override?: readonly DefinedVisitor<any>[],
     overrideState?: any,
     routedCallbacks: readonly Handler<any>[] = [],
   ) => {
@@ -2404,9 +3083,7 @@ function createDispatcher(
     if (delivered?.has(deliveryKey)) return;
     if (entry.stopped || stopAll || eventIsSkipped(event, entry.skipped)) return;
     if (routedCallbacks.length === 0) return;
-    const runtime = override
-      ? createPathRuntime(plugin, entry, context)
-      : (entry.pathRuntime ??= createPathRuntime(plugin, entry, context));
+    const runtime = boundRuntime ?? createPathRuntime(plugin, entry, context, capabilities);
     const path = makePath(runtime, event);
     currentSequence = event.sequence;
     if (routedCallbacks.length === 1) {
@@ -2421,12 +3098,12 @@ function createDispatcher(
   };
   const replayCustomRouted = (
     routedBatch: RoutedEventBatch,
-    visitor: Visitor<any>,
+    visitor: NestedVisitor,
     state: any,
     context: PluginContext,
   ) => {
     const compiled = compileNestedVisitor(visitor);
-    const synthetic = { name: 'nested', visitor };
+    const synthetic = { name: 'nested' };
     const entry = {
       context,
       state,
@@ -2436,8 +3113,18 @@ function createDispatcher(
     dispatchRoutedEvents(
       routedBatch,
       compiled.callbacks.map(
-        callbacks => (event: NativeEvent) =>
-          dispatchOne(event, synthetic, entry, context, visitor, state, callbacks),
+        (callbacks, index) => (event: NativeEvent) =>
+          dispatchOne(
+            event,
+            synthetic,
+            entry,
+            context,
+            null,
+            compiled.capabilities[index],
+            visitor,
+            state,
+            callbacks,
+          ),
       ),
     );
   };
@@ -2474,34 +3161,45 @@ function createDispatcher(
     const accepted = new WeakSet<NativeEvent>();
     dispatchRoutedEvents(
       routed,
-      followup.routes.map(route => (event: NativeEvent) => {
-        if (accepted.has(event))
-          dispatchOne(
-            event,
-            plugin,
-            entry,
-            context,
-            undefined,
-            undefined,
-            route.callbacks as Handler<any>[],
-          );
+      followup.routes.map(route => {
+        const runtime = runtimeFor(plugin, entry, context, route.capabilities);
+        return (event: NativeEvent) => {
+          if (accepted.has(event))
+            dispatchOne(
+              event,
+              plugin,
+              entry,
+              context,
+              runtime,
+              route.capabilities,
+              undefined,
+              undefined,
+              route.callbacks as Handler<any>[],
+            );
+        };
       }),
       event => {
         if (filter(event)) accepted.add(event);
       },
     );
   };
+  if (verifier)
+    for (const route of compiledRoutes)
+      verifier.register(route.capabilities, route.plugin.name, route.nodeType);
   const counters = optionsPerformance(metadata);
   const routedThunks = dispatchRoutes.map(route => {
     if (!route.fast) {
-      const { plugin, callbacks } = route.members[0];
+      const { plugin, callbacks, capabilities } = route.members[0];
       const entry = contexts.get(plugin)!;
+      const runtime = runtimeFor(plugin, entry, entry.context, capabilities);
       return (event: NativeEvent) =>
         dispatchOne(
           event,
           plugin,
           entry,
           entry.context,
+          runtime,
+          capabilities,
           undefined,
           undefined,
           callbacks as Handler<any>[],
@@ -2509,9 +3207,9 @@ function createDispatcher(
     }
     // Fast routes bind their runtimes once at dispatcher creation. Exit groups run
     // members in reverse order to preserve the reverse-exit contract across plugins.
-    const members = route.members.map(({ plugin, callbacks }) => {
+    const members = route.members.map(({ plugin, callbacks, capabilities }) => {
       const entry = contexts.get(plugin)!;
-      const runtime = (entry.pathRuntime ??= createPathRuntime(plugin, entry, entry.context));
+      const runtime = runtimeFor(plugin, entry, entry.context, capabilities);
       return { entry, runtime, callbacks };
     });
     if (route.side === 'exit') members.reverse();
@@ -2567,7 +3265,7 @@ function invokeCallback(
 
 function assertDeclaredControl(
   plugin: Pick<NativePlugin<any, any>, 'name'>,
-  plan: PluginPlan | undefined,
+  plan: PreparedPluginPlan | undefined,
   capability: ControlFlowCapability,
 ): void {
   if (plan?.controlFlow?.includes(capability)) return;
@@ -2600,7 +3298,7 @@ type PathRuntime = {
   owner: string;
   nextOrder: () => number;
   state: PathState;
-  nested: (target: NativeEvent, visitor: Visitor<any>, value: any) => void;
+  nested: (target: NativeEvent, visitor: NestedVisitor, value: any) => void;
   widen: (target: NativeEvent, types: string[], scopeOnly: boolean) => void;
   parent: (target: NativeEvent, id: number) => NativeNodePath | null;
   children: (target: NativeEvent) => NativeNodePath[];
@@ -2609,6 +3307,8 @@ type PathRuntime = {
   allowsScope: () => boolean;
   scopeCache: Map<number, NativeScope>;
   assertControl: (capability: ControlFlowCapability) => void;
+  capabilities: RouteCapabilities;
+  verify?: ContractVerifier;
   performance?: PerformanceAllocationCounters;
   provenance: { degradations: number };
 };
@@ -2672,6 +3372,18 @@ class NodePathImpl implements NativeNodePath {
     if (!this.lazyNode) {
       if (this.runtime.performance) this.runtime.performance.nodeFacades++;
       this.lazyNode = this.runtime.session.nodeView(this.event);
+      const verify = this.runtime.verify;
+      if (verify) {
+        const { capabilities, owner } = this.runtime;
+        const nodeType = this.event.type;
+        this.lazyNode = new Proxy(this.lazyNode, {
+          get(target, property, receiver) {
+            if (typeof property === 'string' && FIELD_KEY_IDS.has(property))
+              verify.fieldRead(capabilities, owner, nodeType, property);
+            return Reflect.get(target, property, receiver);
+          },
+        });
+      }
     }
     return this.lazyNode;
   }
@@ -2993,9 +3705,9 @@ class NodePathImpl implements NativeNodePath {
     this.runtime.assertControl('stop');
     this.runtime.state.stopped = true;
   }
-  traverse<State>(visitor: Visitor<State>, state?: State): void {
+  traverse<State>(visitors: readonly DefinedVisitor<State>[], state?: State): void {
     this.runtime.assertControl('nested-traverse');
-    this.runtime.nested(this.event, visitor, state);
+    this.runtime.nested(this.event, visitors, state);
   }
   subscribeWithin(types: string | readonly string[]): void {
     this.runtime.assertControl('dynamic-subscriptions');
@@ -3011,8 +3723,6 @@ class NodePathImpl implements NativeNodePath {
 }
 
 type EditKind = EditCommand['kind'];
-const visitorSubscriptionsCache = new WeakMap<object, NativeVisitorRoute[]>();
-const visitorRoutingFieldsCache = new WeakMap<object, Record<string, string[]>>();
 function alias(key: string, type: string): boolean {
   if (key === '*') return true;
   if (key === 'Function') {
@@ -3088,76 +3798,6 @@ function array(value: string | readonly string[]): string[] {
 }
 function expandSubscriptions(values: readonly string[]): string[] {
   return [...new Set(values.flatMap(value => value.split('|')))];
-}
-const encodedSubscriptionsCache = new Map<string, { ids: number[]; fallback: string[] }>();
-function encodeSubscriptions(subscriptions: readonly string[]): {
-  ids: number[];
-  fallback: string[];
-} {
-  const key = subscriptions.join('|');
-  const cached = encodedSubscriptionsCache.get(key);
-  if (cached) return cached;
-  const ids = new Set<number>();
-  const fallback: string[] = [];
-  for (const subscription of subscriptions) {
-    const id = NODE_TYPE_IDS.get(subscription);
-    if (id != null) {
-      ids.add(id);
-      continue;
-    }
-    let expanded = false;
-    for (let typeId = 1; typeId < NODE_TYPES.length; typeId++) {
-      if (alias(subscription, NODE_TYPES[typeId])) {
-        ids.add(typeId);
-        expanded = true;
-      }
-    }
-    if (!expanded) fallback.push(subscription);
-  }
-  const encoded = { ids: [...ids], fallback };
-  encodedSubscriptionsCache.set(key, encoded);
-  return encoded;
-}
-function visitorSubscriptions(visitor?: Visitor<any>): NativeVisitorRoute[] {
-  if (!visitor) return [];
-  const cached = visitorSubscriptionsCache.get(visitor);
-  if (cached) return cached;
-  const subscriptions = expandSubscriptions(Object.keys(visitor)) as NativeVisitorRoute[];
-  visitorSubscriptionsCache.set(visitor, subscriptions);
-  return subscriptions;
-}
-function visitorRoutingFields(visitor?: Visitor<any>): Record<string, string[]> {
-  if (!visitor) return {};
-  const cached = visitorRoutingFieldsCache.get(visitor);
-  if (cached) return cached;
-  let functionFields = false;
-  let classFields = false;
-  let identifierFields = false;
-  for (const route of Object.keys(visitor)) {
-    for (const key of route.split('|')) {
-      functionFields ||=
-        key === 'FunctionDeclaration' ||
-        key === 'FunctionExpression' ||
-        key === 'TSDeclareFunction';
-      classFields ||= key === 'ClassDeclaration' || key === 'ClassExpression';
-      identifierFields ||= key === 'ReferencedIdentifier';
-    }
-  }
-  const fields: Record<string, string[]> = {};
-  if (functionFields)
-    fields.Function = [
-      'nodeKind',
-      'name',
-      'async',
-      'generator',
-      'parameterCount',
-      'bodyStart',
-      'bodyEnd',
-    ];
-  if (classFields) fields.Class = ['nodeKind', 'name'];
-  if (identifierFields) fields.Identifier = ['name', 'global', 'read', 'write', 'bindingScopeId'];
-  visitorRoutingFieldsCache.set(visitor, fields);
-  return fields;
 }
 function querySubscriptions(request: QueryRequest): string[] {
   const types: string[] = [];

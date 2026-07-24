@@ -1,5 +1,10 @@
 import { bench } from 'vitest';
-import { defineNativePipeline, defineNativePlugin, transform } from '../dist/index.js';
+import {
+  defineNativePipeline,
+  defineNativePlugin,
+  defineVisitor,
+  transform,
+} from '../dist/index.js';
 import { generateLargeFileSource } from './large-file-corpus.js';
 
 const source = Array.from(
@@ -13,8 +18,7 @@ const visitorPipeline = defineNativePipeline({
       plugins: [
         defineNativePlugin({
           name: 'identifier-count',
-          prepare: () => ({ controlFlow: [] }),
-          visitor: { Identifier() {} },
+          visitors: [defineVisitor('Identifier', {}, () => {})],
         }),
       ],
     },
@@ -31,11 +35,9 @@ const rejectedIdentifierPipeline = defineNativePipeline({
       plugins: [
         defineNativePlugin({
           name: 'rejected-identifiers',
-          prepare: () => ({
-            controlFlow: [],
-            where: { Identifier: { name: { equals: '__never__' } } },
-          }),
-          visitor: { Identifier() {} },
+          visitors: [
+            defineVisitor('Identifier', { where: { name: { equals: '__never__' } } }, () => {}),
+          ],
         }),
       ],
     },
@@ -52,11 +54,9 @@ const rejectedDeclarationPipeline = defineNativePipeline({
       plugins: [
         defineNativePlugin({
           name: 'rejected-declarations',
-          prepare: () => ({
-            controlFlow: [],
-            where: { VariableDeclaration: { kind: { equals: 'let' } } },
-          }),
-          visitor: { VariableDeclaration() {} },
+          visitors: [
+            defineVisitor('VariableDeclaration', { where: { kind: { equals: 'let' } } }, () => {}),
+          ],
         }),
       ],
     },
@@ -79,12 +79,9 @@ const selectiveDeclarationPipeline = defineNativePipeline({
       plugins: [
         defineNativePlugin({
           name: 'selective-declarations',
-          prepare: () => ({
-            controlFlow: [],
-            fields: { VariableDeclaration: [] },
-            where: { VariableDeclaration: { kind: { equals: 'let' } } },
-          }),
-          visitor: { VariableDeclaration() {} },
+          visitors: [
+            defineVisitor('VariableDeclaration', { where: { kind: { equals: 'let' } } }, () => {}),
+          ],
         }),
       ],
     },
@@ -107,8 +104,7 @@ const exitVisitorPipeline = defineNativePipeline({
       plugins: [
         defineNativePlugin({
           name: 'identifier-enter-exit',
-          prepare: () => ({ controlFlow: [] }),
-          visitor: { Identifier: { enter() {}, exit() {} } },
+          visitors: [defineVisitor('Identifier', {}, { enter() {}, exit() {} })],
         }),
       ],
     },
@@ -125,8 +121,7 @@ const pluginFanoutPipeline = defineNativePipeline({
       plugins: Array.from({ length: 12 }, (_, index) =>
         defineNativePlugin({
           name: `identifier-plugin-${index}`,
-          prepare: () => ({ controlFlow: [] }),
-          visitor: { Identifier() {} },
+          visitors: [defineVisitor('Identifier', {}, () => {})],
         }),
       ),
     },
@@ -143,18 +138,16 @@ const mixedExecutorPipeline = defineNativePipeline({
       plugins: [
         defineNativePlugin({
           name: 'dynamic-owner',
-          prepare: () => ({ controlFlow: ['skip'] }),
-          visitor: {
-            Function(path) {
+          visitors: [
+            defineVisitor('Function', { controlFlow: ['skip'] }, path => {
               path.skip();
-            },
-          },
+            }),
+          ],
         }),
         ...Array.from({ length: 11 }, (_, index) =>
           defineNativePlugin({
             name: `static-peer-${index}`,
-            prepare: () => ({ controlFlow: [] }),
-            visitor: { Identifier() {} },
+            visitors: [defineVisitor('Identifier', {}, () => {})],
           }),
         ),
       ],
@@ -172,14 +165,12 @@ const globallySlowExecutorPipeline = defineNativePipeline({
       plugins: [
         defineNativePlugin({
           name: 'global-stop-capable-owner',
-          prepare: () => ({ controlFlow: ['stop-all'] }),
-          visitor: { Function() {} },
+          visitors: [defineVisitor('Function', { controlFlow: ['stop-all'] }, () => {})],
         }),
         ...Array.from({ length: 11 }, (_, index) =>
           defineNativePlugin({
             name: `globally-slow-peer-${index}`,
-            prepare: () => ({ controlFlow: [] }),
-            visitor: { Identifier() {} },
+            visitors: [defineVisitor('Identifier', {}, () => {})],
           }),
         ),
       ],
@@ -194,19 +185,20 @@ const disjointPluginPipeline = defineNativePipeline({
   phases: [
     {
       name: 'visit',
-      plugins: [
-        'Program',
-        'ExportNamedDeclaration',
-        'VariableDeclaration',
-        'VariableDeclarator',
-        'Identifier',
-        'BinaryExpression',
-        'NumericLiteral',
-      ].map((type, index) =>
+      plugins: (
+        [
+          'Program',
+          'ExportNamedDeclaration',
+          'VariableDeclaration',
+          'VariableDeclarator',
+          'Identifier',
+          'BinaryExpression',
+          'NumericLiteral',
+        ] as const
+      ).map((type, index) =>
         defineNativePlugin({
           name: `disjoint-plugin-${index}`,
-          prepare: () => ({ controlFlow: [] }),
-          visitor: { [type]() {} },
+          visitors: [defineVisitor(type, {}, () => {})],
         }),
       ),
     },
@@ -223,14 +215,11 @@ const denseEditPipeline = defineNativePipeline({
       plugins: [
         defineNativePlugin({
           name: 'rename-identifiers',
-          prepare() {
-            return { fields: { Identifier: ['name'] } };
-          },
-          visitor: {
-            Identifier(path) {
+          visitors: [
+            defineVisitor('Identifier', { fields: ['name'] }, path => {
               path.replaceWith(`${path.node.name}_renamed`);
-            },
-          },
+            }),
+          ],
         }),
       ],
     },
@@ -247,17 +236,16 @@ const denseNamedEditPipeline = defineNativePipeline({
       plugins: [
         defineNativePlugin({
           name: 'rename-identifiers-with-names',
-          prepare: () => ({ fields: { Identifier: ['name'] } }),
-          visitor: {
-            Identifier(path) {
+          visitors: [
+            defineVisitor('Identifier', { fields: ['name'] }, path => {
               const name = path.node.name;
               path.replaceWith({
                 code: `${name}_renamed`,
                 mapping: 'anchor-boundaries',
                 names: [name],
               });
-            },
-          },
+            }),
+          ],
         }),
       ],
     },
@@ -274,7 +262,7 @@ const broadVisitorPipeline = defineNativePipeline({
       plugins: [
         defineNativePlugin({
           name: 'broad-visitor',
-          visitor: { '*'() {} },
+          visitors: [defineVisitor('*', {}, () => {})],
         }),
       ],
     },
@@ -284,6 +272,8 @@ bench('broad catch-all streaming transform', () => {
   transform(source, 'benchmark.js', broadVisitorPipeline, { allowBroadVisitors: true });
 });
 
+// Unlike the pre-typed-contract version of this bench, `name` is declared and
+// transferred, so hasBinding receives real names and performs real lookups.
 const scopeAncestryPipeline = defineNativePipeline({
   phases: [
     {
@@ -291,15 +281,16 @@ const scopeAncestryPipeline = defineNativePipeline({
       plugins: [
         defineNativePlugin({
           name: 'scope-and-ancestry',
-          prepare() {
-            return { semantics: ['scope'], ancestry: 'parent' };
-          },
-          visitor: {
-            Identifier(path) {
-              path.scope.hasBinding(String(path.node.name));
-              void path.parent;
-            },
-          },
+          visitors: [
+            defineVisitor(
+              'Identifier',
+              { fields: ['name'], scope: true, ancestry: 'parent' },
+              path => {
+                path.scope.hasBinding(String(path.node.name));
+                void path.parent;
+              },
+            ),
+          ],
         }),
       ],
     },
@@ -316,7 +307,7 @@ const threePhasePipeline = defineNativePipeline({
     plugins: [
       defineNativePlugin({
         name: `phase-plugin-${index}`,
-        visitor: { Identifier() {} },
+        visitors: [defineVisitor('Identifier', {}, () => {})],
       }),
     ],
   })),
@@ -334,15 +325,15 @@ function changedPhasePipeline(count: number, rendered: boolean) {
         defineNativePlugin({
           name: `changed-plugin-${index}`,
           editEffect: 'text-only',
-          prepare: () => ({
-            identifierNames: [`source${index}`],
-            fields: { Identifier: ['name'] },
-          }),
-          visitor: {
-            Identifier(path) {
-              path.replaceWith(`renamed${index}`);
-            },
-          },
+          visitors: [
+            defineVisitor(
+              'Identifier',
+              { fields: ['name'], where: { name: { oneOf: [`source${index}`] } } },
+              path => {
+                path.replaceWith(`renamed${index}`);
+              },
+            ),
+          ],
         }),
       ],
     })),
@@ -367,14 +358,11 @@ const structuralPipeline = defineNativePipeline({
       plugins: [
         defineNativePlugin({
           name: 'program-children',
-          prepare() {
-            return { children: { Program: ['body'] } };
-          },
-          visitor: {
-            Program(path) {
+          visitors: [
+            defineVisitor('Program', { children: { body: { route: 'Statement' } } }, path => {
               path.getChildList('body');
-            },
-          },
+            }),
+          ],
         }),
       ],
     },
@@ -385,32 +373,20 @@ bench('declared structural child transform', () => {
 });
 
 function allocationVisitor(name: string) {
-  const plan =
-    name === 'scalar' || name === 'snapshot'
-      ? { fields: { Identifier: ['name'] as const } }
-      : name === 'parent'
-        ? { ancestry: 'parent' as const }
-        : {};
+  const visitor =
+    name === 'scalar'
+      ? defineVisitor('Identifier', { fields: ['name'] }, path => void path.node.name)
+      : name === 'snapshot'
+        ? defineVisitor('Identifier', { fields: ['name'] }, path =>
+            path.snapshot({ fields: ['name'] }),
+          )
+        : name === 'parent'
+          ? defineVisitor('Identifier', { ancestry: 'parent' }, path => void path.parent)
+          : name === 'ranges'
+            ? defineVisitor('Identifier', {}, path => void (path.type + path.start + path.end))
+            : defineVisitor('Identifier', {}, () => {});
   return defineNativePipeline({
-    phases: [
-      {
-        name: 'transform',
-        plugins: [
-          defineNativePlugin({
-            name,
-            prepare: () => plan,
-            visitor: {
-              Identifier(path) {
-                if (name === 'ranges') void (path.type + path.start + path.end);
-                else if (name === 'scalar') void path.node.name;
-                else if (name === 'parent') void path.parent;
-                else if (name === 'snapshot') path.snapshot({ fields: ['name'] });
-              },
-            },
-          }),
-        ],
-      },
-    ],
+    phases: [{ name: 'transform', plugins: [defineNativePlugin({ name, visitors: [visitor] })] }],
   });
 }
 
@@ -439,13 +415,12 @@ const sparseEditPipeline = defineNativePipeline({
       plugins: [
         defineNativePlugin({
           name: 'sparse-edit-plugin',
-          prepare: () => ({ fields: { Identifier: ['name'] } }),
-          visitor: {
-            Identifier(path) {
+          visitors: [
+            defineVisitor('Identifier', { fields: ['name'] }, path => {
               if (String(path.node.name).startsWith('EDIT_'))
                 path.replaceWith(String(path.node.name).slice(5));
-            },
-          },
+            }),
+          ],
         }),
       ],
     },
@@ -468,6 +443,18 @@ bench('650 KiB dense edits', () => {
 // commit-time copy resolution to its binary-search bound (distinct ranges) and its
 // shared sub-render cache (one range copied per node).
 const copyHeavySource = generateLargeFileSource(650 * 1024, 'functions');
+const rewriteParameters = defineNativePlugin({
+  name: 'rewrite-parameters',
+  visitors: [
+    defineVisitor(
+      'Identifier',
+      { fields: ['name'], where: { name: { oneOf: ['value'] } } },
+      path => {
+        if (path.node.name === 'value') path.replaceWith('value_');
+      },
+    ),
+  ],
+});
 const copyHeavyPipeline = defineNativePipeline({
   phases: [
     {
@@ -475,21 +462,13 @@ const copyHeavyPipeline = defineNativePipeline({
       plugins: [
         defineNativePlugin({
           name: 'duplicate-functions',
-          visitor: {
-            Function(path) {
+          visitors: [
+            defineVisitor('Function', {}, path => {
               path.insertAfter(path.getSource());
-            },
-          },
+            }),
+          ],
         }),
-        defineNativePlugin({
-          name: 'rewrite-parameters',
-          prepare: () => ({ identifierNames: ['value'], fields: { Identifier: ['name'] } }),
-          visitor: {
-            Identifier(path) {
-              if (path.node.name === 'value') path.replaceWith('value_');
-            },
-          },
-        }),
+        rewriteParameters,
       ],
     },
   ],
@@ -498,6 +477,9 @@ bench('650 KiB per-node duplication with contained edits', () => {
   transform(copyHeavySource, 'generated.js', copyHeavyPipeline, { sourceMapMode: 'boundary' });
 });
 
+interface MirrorState {
+  fragment: import('../dist/index.js').SourceFragment | undefined;
+}
 const repeatedCopyPipeline = defineNativePipeline({
   phases: [
     {
@@ -505,25 +487,15 @@ const repeatedCopyPipeline = defineNativePipeline({
       plugins: [
         defineNativePlugin({
           name: 'mirror-first-function',
-          createState: () => ({
-            fragment: undefined as import('../dist/index.js').SourceFragment | undefined,
-          }),
-          visitor: {
-            Function(path, state) {
+          createState: (): MirrorState => ({ fragment: undefined }),
+          visitors: [
+            defineVisitor('Function', {}, (path, state: MirrorState) => {
               if (state.fragment) path.insertAfter(state.fragment);
               else state.fragment = path.getSource();
-            },
-          },
+            }),
+          ],
         }),
-        defineNativePlugin({
-          name: 'rewrite-parameters',
-          prepare: () => ({ identifierNames: ['value'], fields: { Identifier: ['name'] } }),
-          visitor: {
-            Identifier(path) {
-              if (path.node.name === 'value') path.replaceWith('value_');
-            },
-          },
-        }),
+        rewriteParameters,
       ],
     },
   ],

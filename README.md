@@ -28,24 +28,23 @@ fixed release group.
 ## Transform contract
 
 ```ts
-import { defineNativePipeline, defineNativePlugin, transform } from 'noxcturnal';
+import { defineNativePipeline, defineNativePlugin, defineVisitor, transform } from 'noxcturnal';
 
 const replaceConstants = defineNativePlugin({
   name: 'replace-constants',
-  prepare() {
-    return {
-      subscriptions: ['Identifier'],
-      metadataWrites: ['replaced'],
-    };
-  },
-  visitor: {
-    Identifier(path) {
-      if (path.node.name === '__BUILD_ID__' && path.node.global) {
-        path.replaceWith(path.context.code.stringLiteral('development'));
-        path.context.metadata.set('replaced', true);
-      }
-    },
-  },
+  contract: { metadata: { writes: ['replaced'] } },
+  visitors: [
+    defineVisitor(
+      'Identifier',
+      { fields: ['name', 'global'], where: { name: { equals: '__BUILD_ID__' } } },
+      path => {
+        if (path.node.global) {
+          path.replaceWith(path.context.code.stringLiteral('development'));
+          path.context.metadata.set('replaced', true);
+        }
+      },
+    ),
+  ],
 });
 
 const result = transform(
@@ -59,13 +58,13 @@ Within a phase every plugin observes the same immutable source. Mutations become
 
 `defineNativePlugin` returns an immutable reusable definition. Bind per-pipeline options with `plugin.withOptions(options)`. Pipelines always declare explicit phases and snapshot and freeze their phase and plugin arrays so cache identity cannot drift after construction. Every transform phase is compiled to numeric native routes.
 
-`prepare` may return `{ enabled: false }` to remove a plugin and its lifecycle from the current file, which is useful with `sourceHints` for directive-driven transforms. Consumers declare every scalar property read by a callback in `fields`; undeclared payload fields are not transferred. They also declare `skip`, `stop`, nested traversal, and dynamic subscriptions in `controlFlow`; undeclared operations fail. Hot define-style visitors may declare `identifierNames`, exact `staticMemberPatterns`, or typed `where` predicates, all evaluated before native route delivery.
+Every visitor is a typed contract beside its callback: `defineVisitor(route, contract, handler)` declares the payload `fields`, native `where` predicates, `scope`, `ancestry`, `children`, `controlFlow`, and (when needed) `nested` visitor requirements — and the callback's path type is derived from exactly that contract, so undeclared fields and capability methods are TypeScript errors as well as runtime errors. The compiled native route manifest is generated from the same normalized contract object. The plugin `contract` declares context-level requirements (metadata ownership, semantic queries); `prepare` keeps only per-file lifecycle settings and may return `{ enabled: false }` to remove a plugin for the current file, which is useful with `sourceHints` for directive-driven transforms. Per-file dynamism with a static shape goes through the contract's `configure` hook (enablement and predicate values). A development-only `verifyVisitorContracts` option reports undeclared reads with paste-able contract fragments and declared-but-unused contract entries.
 
-The TypeScript API derives its node and scalar-field names from the generated Oxc protocol schema. Visitor keys contextually narrow `path.node` (including `ReferencedIdentifier` and collapsed function/class routes), invalid route/field/capability literals are rejected, and the generic analysis value returned by `analyze` flows into `apply`. Composite routes such as `'Identifier|StringLiteral'` intentionally receive the common `NodeView`; use `path.is(...)` when a branch needs a specific view.
+The TypeScript API derives its node and scalar-field names from the generated Oxc protocol schema: per-route declarable fields come from the same generated table the native predicate validator uses. Contracts narrow `path.node` to base identity plus declared fields (including `ReferencedIdentifier` and collapsed function/class routes), invalid route/field/capability literals are rejected, and the generic analysis value returned by `analyze` flows into `apply`. Composite routes such as `'Identifier|StringLiteral'` intentionally receive open field typing; use `path.is(...)` when a branch needs a specific view.
 
 ## Implemented surface
 
-- Declarative plugin plans, static subscriptions, safe all-subscriber event filters, per-file enablement, aliases, lifecycle hooks, state, metadata ownership, diagnostics, and cleanup.
+- Typed per-visitor contracts compiled into the native route manifest, safe all-subscriber event filters, per-file enablement, aliases, lifecycle hooks, state, contract-declared metadata ownership and queries, diagnostics, and cleanup. Path capabilities are contract-scoped, not plugin-wide: one broad visitor cannot grant undeclared access to its siblings.
 - Compiled binary route manifests and routed tapes with native scalar predicates, numeric JavaScript dispatch, explicit payload fields, and no runtime timing instrumentation.
 - Optional analyze/apply lifecycle: every plugin decision is collected before any apply hook runs, so unsupported files bail out from pristine input without speculative mutation.
 - Arbitrary compact Oxc node events with stable per-parse node IDs, parent summaries, scope IDs, typed scalar fields, semantic global-reference facts, and UTF-16 ranges. The integer node/field protocol is generated and checked against the pinned Oxc `AstKind` definition.
@@ -75,7 +74,7 @@ The TypeScript API derives its node and scalar-field names from the generated Ox
 - Binding queries include declaration, read/write references, and lexical captures as ready-to-use compact node views. Constant queries conservatively evaluate side-effect-free literal, unary, binary, logical, conditional, parenthesized, and sequence expressions; requested IDs return through a targeted packed buffer rather than transferring every expression. Module events expose import/export specifiers, declaration kinds, directives, and common call/construction summaries needed by source transformers.
 - Scope views are interned for stable identity, use Oxc's complete semantic parent table (including empty intermediate scopes), expose lazy parent/program-owner paths, resolve bindings with lazy declaration paths and owning scopes, can insert generated declarations after directive prologues, and can rename a declaration plus its Oxc-resolved references in one transactional edit batch, including shorthand object and assignment properties. The scope table crosses N-API only as an on-demand packed integer buffer. Path views include Babel-shaped `replaceWithMultiple`, body-container, comment, and code-frame conveniences where those operations map cleanly to immutable source edits.
 - Compact views expose frequently matched scalar discriminants—including property keys/flags, expression operators, function arity, yield delegation, and export-all facts—without transferring recursive child objects.
-- Structural reads are declared with `PluginPlan.children`; direct children for matching parents are prefetched in one packed native batch. Paths expose Babel-shaped `get()` plus typed `getChild()` and `getChildList()` alternatives. Undeclared roles fail instead of causing hidden property-level FFI.
+- Structural reads are declared with the contract's `children` (one statically-typed level, with runtime-validated deeper chains); direct children for matching parents are prefetched in one packed native batch. Paths expose Babel-shaped `get()` plus typed `getChild()` and `getChildList()` alternatives. Undeclared roles fail instead of causing hidden property-level FFI.
 - Babel-compatible routes used by Expo include `ReferencedIdentifier`, `MetaProperty`, and declaration/expression variants collapsed by Oxc for functions and classes. Static member chains support `path.matchesPattern()` without child traversal.
 - Replacement, removal, all four insertion affinities, append/prepend, move/reset/indent/trim/replace lowering, source-map marks, code fragments, overlap detection, Unicode-safe offsets, and direct encoded VLQ output. The committed document is a piece table: every piece records its source provenance, and rendering and mapping derive from piece structure.
 - Output sections: `editor.prepend` and `editor.append` are prefix/suffix sections assembled around the body — a wrapper's opener always precedes body insertions at offset 0 (so helpers land inside the wrapper), rather than competing with them in insertion-affinity order. `ensureHelper` content is a prologue section pinned to the directive-prologue boundary.
