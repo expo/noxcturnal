@@ -15,6 +15,7 @@ import {
   NODE_TYPE_IDS,
   NODE_TYPES,
   PREDICATE_FIELDS,
+  PREDICATE_VALUE_DOMAINS,
 } from './generated-event-schema.js';
 import {
   decodeEventBatch,
@@ -426,18 +427,25 @@ type ValidateChildren<Route extends string, Children> = {
   readonly [Role in keyof Children]: ValidateChildEntry<Route, Role & string, Children[Role]>;
 };
 type ValidateChildEntry<Route extends string, Role extends string, Entry> = Role extends '*'
-  ? unknown
+  ? Entry extends { route: infer ChildRoute extends string }
+    ? ValidRouteSpec<ChildRoute> extends string
+      ? ValidRouteSpec<ChildRoute>
+      : ValidateChildShape<ChildRoute, Entry>
+    : never
   : Role extends RouteChildRoleNames<Route>
     ? Entry extends { route: infer ChildRoute extends string }
-      ? [RouteNodeTypes<ChildRoute>] extends [RouteChildTypes<Route, Role>]
-        ? { readonly fields?: readonly DeclaredFieldKey<ChildRoute>[] } & (Entry extends {
-            children: infer Grandchildren;
-          }
-            ? { readonly children: ValidateChildren<ChildRoute, Grandchildren> }
-            : unknown)
-        : `Child role '${Role}' of route '${Route}' cannot deliver route '${ChildRoute}'`
+      ? ValidRouteSpec<ChildRoute> extends string
+        ? ValidRouteSpec<ChildRoute>
+        : [RouteNodeTypes<ChildRoute>] extends [RouteChildTypes<Route, Role>]
+          ? ValidateChildShape<ChildRoute, Entry>
+          : `Child role '${Role}' of route '${Route}' cannot deliver route '${ChildRoute}'`
       : never
     : `Unknown child role '${Role}' for route '${Route}'`;
+type ValidateChildShape<ChildRoute extends string, Entry> = {
+  readonly fields?: readonly DeclaredFieldKey<ChildRoute>[];
+} & (Entry extends { children: infer Grandchildren }
+  ? { readonly children: ValidateChildren<ChildRoute, Grandchildren> }
+  : unknown);
 
 /** Base identity always present in routed records. */
 export interface ContractNodeBase {
@@ -1566,8 +1574,7 @@ const validatedVisitors = new WeakSet<DefinedVisitor<any>>();
 
 function validateDefinedVisitor(pluginName: string, defined: DefinedVisitor<any>): void {
   if (validatedVisitors.has(defined)) return;
-  if (concreteRouteTypes(defined.route).length === 0)
-    throw new Error(`${pluginName}: unknown visitor route ${defined.route}`);
+  validateRouteSpec(pluginName, 'visitor route', defined.route);
   validatePredicates(pluginName, {
     where: defined.contract.where == null ? undefined : { [defined.route]: defined.contract.where },
     controlFlow: defined.contract.controlFlow,
@@ -1577,9 +1584,8 @@ function validateDefinedVisitor(pluginName: string, defined: DefinedVisitor<any>
     children: Readonly<Record<string, ChildContract>> | undefined,
   ) => {
     for (const [role, child] of Object.entries(children ?? {})) {
+      validateRouteSpec(pluginName, `child route for role ${role}`, child.route);
       const childTypes = concreteRouteTypes(child.route);
-      if (childTypes.length === 0)
-        throw new Error(`${pluginName}: unknown child route ${child.route} for role ${role}`);
       if (role !== '*') {
         // Generated role data: the role must exist for at least one concrete type
         // of the route, and the declared route must be able to deliver it.
@@ -1611,6 +1617,15 @@ function validateDefinedVisitor(pluginName: string, defined: DefinedVisitor<any>
   };
   validateChildren(defined.route, defined.contract.children);
   validatedVisitors.add(defined);
+}
+
+function validateRouteSpec(pluginName: string, description: string, route: string): void {
+  const invalid = route.split('|').find(part => {
+    if (part === '*') return false;
+    return !NODE_TYPE_IDS.has(part) && ALIAS_EXPANSIONS[part] == null;
+  });
+  if (invalid != null || route.length === 0)
+    throw new Error(`${pluginName}: unknown ${description} ${invalid ?? route}`);
 }
 
 function resolveTypedVisitors(
@@ -2404,6 +2419,18 @@ function validatePredicates(plugin: string, plan: PredicateRequirements): void {
         'equals' in predicate ? [predicate.equals] : 'oneOf' in predicate ? predicate.oneOf : [];
       if (values.length > 1024 || values.some(value => !isScalarPredicateValue(value)))
         throw new Error(`${plugin}: invalid scalar value for ${route}.${field}`);
+      for (const concreteType of concreteTypes) {
+        const domain = PREDICATE_VALUE_DOMAINS[concreteType]?.[field];
+        if (
+          domain != null &&
+          values.some(
+            value =>
+              !domain.kinds.includes(scalarPredicateKind(value)) ||
+              (domain.values != null && !domain.values.includes(value)),
+          )
+        )
+          throw new Error(`${plugin}: incompatible scalar value for ${route}.${field}`);
+      }
     }
   }
 }
@@ -2415,6 +2442,15 @@ function isScalarPredicateValue(value: unknown): value is string | number | bool
     typeof value === 'boolean' ||
     (typeof value === 'number' && Number.isFinite(value))
   );
+}
+
+function scalarPredicateKind(
+  value: string | number | boolean | null,
+): 'string' | 'number' | 'boolean' | 'null' {
+  if (value === null) return 'null';
+  if (typeof value === 'string') return 'string';
+  if (typeof value === 'number') return 'number';
+  return 'boolean';
 }
 
 /** Execute a native pipeline synchronously. */
@@ -3227,19 +3263,13 @@ function createDispatcher(
         return session.children(target.id).map(child => makePath(runtime, child));
       },
       allowsChild(type, role) {
-        const declared = capabilities.childRules;
-        if (declared == null) return false;
-        for (const [parent, roles] of Object.entries(declared)) {
-          if (
-            roles != null &&
-            (parent === type || alias(parent, type)) &&
-            childRoleIsDeclared(roles, role)
-          ) {
-            verifier?.capabilityUsed(capabilities, 'children');
-            return true;
-          }
-        }
-        return false;
+        // childRules is normalized to concrete parent types when the visitor is
+        // compiled, and path node types are concrete. Avoid rescanning every rule
+        // (and redoing alias matching) on each structural access.
+        const roles = capabilities.childRules?.[type];
+        if (roles == null || !childRoleIsDeclared(roles, role)) return false;
+        verifier?.capabilityUsed(capabilities, 'children');
+        return true;
       },
       allowsAncestry() {
         if (capabilities.ancestry) verifier?.capabilityUsed(capabilities, 'ancestry');

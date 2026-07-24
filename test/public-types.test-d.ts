@@ -423,6 +423,26 @@ defineVisitor(
   {},
   () => {},
 );
+defineVisitor(
+  'VariableDeclarator',
+  {
+    children: {
+      // @ts-expect-error every segment of a child route is validated recursively.
+      init: { route: 'Identifier|Garbage' },
+    },
+  },
+  () => {},
+);
+defineVisitor(
+  'VariableDeclarator',
+  {
+    children: {
+      // @ts-expect-error wildcard child contracts still validate every route segment.
+      '*': { route: 'Identifier|Garbage' },
+    },
+  },
+  () => {},
+);
 // Composite nodes discriminate on their `type` literal.
 defineVisitor('Identifier|StringLiteral', { fields: ['name', 'value'] }, path => {
   if (path.node.type === 'Identifier') path.node.name.toUpperCase();

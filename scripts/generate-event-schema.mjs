@@ -1,8 +1,11 @@
 import fs from 'node:fs';
+import { createRequire } from 'node:module';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
+const require = createRequire(import.meta.url);
+const tsCompiler = require('typescript');
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const schema = JSON.parse(fs.readFileSync(path.join(root, 'protocol/event-schema.json'), 'utf8'));
 
@@ -97,6 +100,80 @@ for (const route of Object.keys(routeRows)) {
   const row = predicateRow(route);
   if (Object.keys(row).length > 0) predicateRows[route] = row;
 }
+
+// Runtime predicate domains preserve the same scalar compatibility guarantees for
+// JavaScript consumers and callers using unsafe casts. Named literal unions are
+// resolved from the version-locked @oxc-project/types declaration file.
+const oxcTypesPath = path.join(root, 'node_modules/@oxc-project/types/types.d.ts');
+const oxcTypesSource = tsCompiler.createSourceFile(
+  oxcTypesPath,
+  fs.readFileSync(oxcTypesPath, 'utf8'),
+  tsCompiler.ScriptTarget.Latest,
+  false,
+);
+const scalarAliases = new Map(
+  oxcTypesSource.statements
+    .filter(tsCompiler.isTypeAliasDeclaration)
+    .map(declaration => [declaration.name.text, declaration.type]),
+);
+function scalarDomain(node, seen = new Set()) {
+  if (tsCompiler.isUnionTypeNode(node)) {
+    const members = node.types.map(member => scalarDomain(member, seen));
+    const kinds = [...new Set(members.flatMap(member => member.kinds))];
+    const values = members.every(member => member.values != null)
+      ? [...new Set(members.flatMap(member => member.values))]
+      : null;
+    return { kinds, values };
+  }
+  if (tsCompiler.isLiteralTypeNode(node)) {
+    const literal = node.literal;
+    if (tsCompiler.isStringLiteral(literal)) return { kinds: ['string'], values: [literal.text] };
+    if (tsCompiler.isNumericLiteral(literal))
+      return { kinds: ['number'], values: [Number(literal.text)] };
+    if (literal.kind === tsCompiler.SyntaxKind.TrueKeyword)
+      return { kinds: ['boolean'], values: [true] };
+    if (literal.kind === tsCompiler.SyntaxKind.FalseKeyword)
+      return { kinds: ['boolean'], values: [false] };
+    if (literal.kind === tsCompiler.SyntaxKind.NullKeyword)
+      return { kinds: ['null'], values: [null] };
+  }
+  const primitiveKinds = new Map([
+    [tsCompiler.SyntaxKind.StringKeyword, 'string'],
+    [tsCompiler.SyntaxKind.NumberKeyword, 'number'],
+    [tsCompiler.SyntaxKind.BooleanKeyword, 'boolean'],
+  ]);
+  const primitive = primitiveKinds.get(node.kind);
+  if (primitive != null) return { kinds: [primitive], values: null };
+  if (tsCompiler.isTypeReferenceNode(node) && tsCompiler.isIdentifier(node.typeName)) {
+    const name = node.typeName.text;
+    const alias = scalarAliases.get(name);
+    if (alias != null && !seen.has(name)) return scalarDomain(alias, new Set(seen).add(name));
+  }
+  throw new Error(`cannot derive runtime scalar domain for ${node.getText(oxcTypesSource)}`);
+}
+function domainForType(type) {
+  const source = tsCompiler.createSourceFile(
+    'predicate-domain.ts',
+    `type PredicateDomain = ${type};`,
+    tsCompiler.ScriptTarget.Latest,
+    false,
+  );
+  return scalarDomain(source.statements[0].type);
+}
+const predicateValueDomains = Object.fromEntries(
+  Object.entries(carrierRows).map(([route, fields]) => [
+    route,
+    Object.fromEntries(
+      Object.entries(fields).map(([field, spec]) => {
+        const domain = domainForType(spec.type);
+        return [
+          field,
+          { kinds: domain.kinds, ...(domain.values == null ? {} : { values: domain.values }) },
+        ];
+      }),
+    ),
+  ]),
+);
 
 /** Child-role rows: concrete types from the authored table; alias and collapsed
  * routes take the intersection of their expansion members' roles. */
@@ -261,6 +338,14 @@ export const FIELD_KEYS = ${JSON.stringify(['', ...schema.fieldKeys])} as const;
 export type NativeFieldKey = Exclude<(typeof FIELD_KEYS)[number], ''>;
 export const FIELD_KEY_IDS = new Map<string, number>(FIELD_KEYS.map((value, index) => [value, index]));
 export const PREDICATE_FIELDS: Readonly<Record<string, readonly string[]>> = ${JSON.stringify(schema.predicateFields)};
+/** Runtime scalar domains for predicate validation, generated from the same
+ * field types that drive RouteWhere. */
+export const PREDICATE_VALUE_DOMAINS: Readonly<
+  Record<string, Readonly<Record<string, {
+    readonly kinds: readonly ('string' | 'number' | 'boolean' | 'null')[];
+    readonly values?: readonly (string | number | boolean | null)[];
+  }>>>
+> = ${JSON.stringify(predicateValueDomains)};
 /** Alias route expansions: every concrete node type an alias route delivers.
  * Aliases that shadow a concrete type (\`Function\`) include it. */
 export const ALIAS_EXPANSIONS: Readonly<Record<string, readonly string[]>> = ${JSON.stringify(ALIASES)};

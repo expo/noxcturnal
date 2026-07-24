@@ -651,7 +651,7 @@ test('keeps predicate-only fields native', () => {
 });
 
 test('keeps scalar predicates type-sensitive for false, zero, and empty strings', () => {
-  const seen = { boolean: 0, number: 0, string: 0, wrongType: 0 };
+  const seen = { boolean: 0, number: 0, string: 0 };
   const predicatePlugin = (
     name: string,
     route: 'BooleanLiteral' | 'NumericLiteral' | 'StringLiteral',
@@ -673,14 +673,13 @@ test('keeps scalar predicates type-sensitive for false, zero, and empty strings'
             predicatePlugin('false', 'BooleanLiteral', { equals: false }, () => seen.boolean++),
             predicatePlugin('zero', 'NumericLiteral', { equals: 0 }, () => seen.number++),
             predicatePlugin('empty', 'StringLiteral', { equals: '' }, () => seen.string++),
-            predicatePlugin('typed', 'NumericLiteral', { equals: '0' }, () => seen.wrongType++),
           ],
         },
       ],
     }),
   );
   assert.equal(result.status, 'complete');
-  assert.deepEqual(seen, { boolean: 1, number: 1, string: 1, wrongType: 0 });
+  assert.deepEqual(seen, { boolean: 1, number: 1, string: 1 });
 });
 
 test('rejects malformed routed manifests at the native boundary', () => {
@@ -2383,6 +2382,68 @@ test('rejects child routes a role cannot deliver at definition time', () => {
         defineNativePipeline({ phases: [{ name: 'visit', plugins: [plugin] }] }),
       ),
     /child role VariableDeclaration\.declarations cannot deliver route Identifier/,
+  );
+});
+
+test('rejects unknown segments in composite child routes at definition time', () => {
+  const plugin = defineNativePlugin({
+    name: 'bad-composite-child-route',
+    visitors: [
+      defineVisitor(
+        'VariableDeclarator',
+        { children: { init: { route: 'Identifier|Garbage' } } } as never,
+        () => {},
+      ),
+    ],
+  });
+  assert.throws(
+    () =>
+      transform(
+        'let x = value;',
+        'fixture.js',
+        defineNativePipeline({ phases: [{ name: 'visit', plugins: [plugin] }] }),
+      ),
+    /unknown child route for role init Garbage/,
+  );
+});
+
+test('rejects predicate values incompatible with their generated field type', () => {
+  const incompatibleKind = defineNativePlugin({
+    name: 'bad-predicate-kind',
+    visitors: [
+      defineVisitor('VariableDeclaration', { where: { kind: { equals: 42 } } } as never, () => {}),
+    ],
+  });
+  assert.throws(
+    () =>
+      transform(
+        'let x = 1;',
+        'fixture.js',
+        defineNativePipeline({ phases: [{ name: 'visit', plugins: [incompatibleKind] }] }),
+      ),
+    /incompatible scalar value for VariableDeclaration\.kind/,
+  );
+
+  const invalidUnionMember = defineNativePlugin({
+    name: 'bad-predicate-union-member',
+    visitors: [
+      defineVisitor(
+        'VariableDeclaration',
+        { where: { kind: { equals: 'sideways' } } } as never,
+        () => {},
+      ),
+    ],
+  });
+  assert.throws(
+    () =>
+      transform(
+        'let x = 1;',
+        'fixture.js',
+        defineNativePipeline({
+          phases: [{ name: 'visit', plugins: [invalidUnionMember] }],
+        }),
+      ),
+    /incompatible scalar value for VariableDeclaration\.kind/,
   );
 });
 
