@@ -312,6 +312,78 @@ const threePhasePipeline = defineNativePipeline({
     ],
   })),
 });
+
+const nativeTypeScriptPreflight = defineNativePipeline({
+  phases: [
+    {
+      name: 'preflight',
+      native: { typescript: 'strip' },
+    },
+  ],
+});
+const nativeJsxPreflight = defineNativePipeline({
+  phases: [
+    {
+      name: 'preflight',
+      native: { jsx: 'automatic' },
+    },
+  ],
+});
+const nativeAsyncGeneratorPreflight = defineNativePipeline({
+  phases: [
+    {
+      name: 'preflight',
+      native: {
+        transforms: { asyncGeneratorFunctions: true },
+        helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.2' },
+      },
+    },
+  ],
+});
+const nativeReactCompilerPreflight = defineNativePipeline({
+  phases: [
+    {
+      name: 'preflight',
+      native: {
+        reactCompiler: {
+          compilationMode: 'infer',
+          panicThreshold: 'none',
+          target: '19',
+          enableResetCacheOnSourceFileChanges: true,
+          customOptOutDirectives: ['widget'],
+        },
+        jsx: 'preserve',
+      },
+    },
+  ],
+});
+
+bench('native TypeScript preflight', () => {
+  transform(
+    'enum Kind { A, B } class Value { constructor(public kind: Kind) {} }',
+    'fixture.ts',
+    nativeTypeScriptPreflight,
+  );
+});
+
+bench('native automatic JSX preflight', () => {
+  transform('export const view = <Widget value={1} />;', 'fixture.jsx', nativeJsxPreflight);
+});
+
+bench('native async-generator preflight', () => {
+  transform(
+    'var iterable = { async *values() { yield await 1; } };',
+    'fixture.js',
+    nativeAsyncGeneratorPreflight,
+  );
+});
+bench('native React Compiler preflight', () => {
+  transform(
+    'function Component(props) { return <View onPress={() => props.onPress()}>{props.text}</View>; }',
+    'fixture.jsx',
+    nativeReactCompilerPreflight,
+  );
+});
 bench('three-phase reparse transform', () => {
   transform(source, 'benchmark.js', threePhasePipeline);
 });

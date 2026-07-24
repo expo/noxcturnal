@@ -5,6 +5,15 @@ import type {
   NativePluginDefinition,
   PluginContract,
 } from '../contracts/visitor.js';
+import type { PreflightPlan } from '../preflight/types.js';
+import {
+  NATIVE_TRANSFORM_NAMES,
+  NATIVE_TRANSFORM_OPTION_NAMES,
+  NATIVE_TRANSFORM_OPTION_KEYS,
+} from '../preflight/schema.js';
+
+const NATIVE_TRANSFORMS = new Set<string>(NATIVE_TRANSFORM_NAMES);
+const NATIVE_TRANSFORM_OPTIONS = new Set<string>(NATIVE_TRANSFORM_OPTION_NAMES);
 
 /** Define and freeze a reusable plugin, including its visitor table. */
 export function defineNativePlugin<
@@ -34,9 +43,91 @@ export function defineNativePlugin<
 export function defineNativePipeline(pipeline: NativePipelineDefinition): NativePipeline {
   return Object.freeze({
     phases: Object.freeze(
-      pipeline.phases.map(phase =>
-        Object.freeze({ ...phase, plugins: Object.freeze([...phase.plugins]) }),
-      ),
+      pipeline.phases.map(phase => {
+        if (phase.native != null && phase.plugins != null)
+          throw new Error(`${phase.name}: native phases cannot contain visitor plugins`);
+        if (phase.native != null) {
+          validateNativePlan(phase.name, phase.native);
+          return Object.freeze({
+            ...phase,
+            native: deepFreeze(structuredClone(phase.native)),
+          });
+        }
+        return Object.freeze({
+          ...phase,
+          plugins: Object.freeze([...(phase.plugins ?? [])]),
+        });
+      }),
     ),
   });
+}
+
+function validateNativePlan(phaseName: string, plan: PreflightPlan): void {
+  if (plan.reactCompiler != null) {
+    const compiler = plan.reactCompiler;
+    const keys = Object.keys(compiler);
+    const allowed = new Set([
+      'compilationMode',
+      'panicThreshold',
+      'target',
+      'enableResetCacheOnSourceFileChanges',
+      'customOptOutDirectives',
+    ]);
+    if (keys.some(key => !allowed.has(key)))
+      throw new Error(`${phaseName}: unknown React Compiler option`);
+    if (!['infer', 'syntax', 'annotation', 'all'].includes(compiler.compilationMode))
+      throw new Error(`${phaseName}: invalid React Compiler compilationMode`);
+    if (!['none', 'critical_errors', 'all_errors'].includes(compiler.panicThreshold))
+      throw new Error(`${phaseName}: invalid React Compiler panicThreshold`);
+    if (!['17', '18', '19'].includes(compiler.target))
+      throw new Error(`${phaseName}: invalid React Compiler target`);
+    if (typeof compiler.enableResetCacheOnSourceFileChanges !== 'boolean')
+      throw new Error(`${phaseName}: invalid React Compiler enableResetCacheOnSourceFileChanges`);
+    if (
+      compiler.customOptOutDirectives != null &&
+      (!Array.isArray(compiler.customOptOutDirectives) ||
+        compiler.customOptOutDirectives.some(
+          directive => typeof directive !== 'string' || directive.length === 0,
+        ))
+    )
+      throw new Error(`${phaseName}: invalid React Compiler customOptOutDirectives`);
+  }
+  if (plan.transforms == null) return;
+  for (const [name, value] of Object.entries(plan.transforms)) {
+    if (!NATIVE_TRANSFORMS.has(name))
+      throw new Error(`${phaseName}: unknown native transform ${name}`);
+    if (value === false)
+      throw new Error(`${phaseName}: native transform ${name} must be true or absent`);
+    if (NATIVE_TRANSFORM_OPTIONS.has(name) && (value == null || typeof value !== 'object'))
+      throw new Error(`${phaseName}: native transform ${name} requires an options object`);
+    if (!NATIVE_TRANSFORM_OPTIONS.has(name) && value !== true)
+      throw new Error(`${phaseName}: native transform ${name} must be true`);
+    if (NATIVE_TRANSFORM_OPTIONS.has(name)) {
+      const expected =
+        NATIVE_TRANSFORM_OPTION_KEYS[name as keyof typeof NATIVE_TRANSFORM_OPTION_KEYS];
+      const actual = Object.keys(value as object);
+      if (
+        actual.length !== expected.length ||
+        expected.some(
+          key =>
+            !Object.hasOwn(value as object, key) ||
+            typeof (value as Record<string, unknown>)[key] !== 'boolean',
+        ) ||
+        actual.some(key => !(expected as readonly string[]).includes(key))
+      )
+        throw new Error(
+          `${phaseName}: native transform ${name} requires { ${expected
+            .map(key => `${key}: boolean`)
+            .join(', ')} }`,
+        );
+    }
+  }
+}
+
+function deepFreeze<T>(value: T): T {
+  if (value && typeof value === 'object') {
+    for (const nested of Object.values(value)) deepFreeze(nested);
+    Object.freeze(value);
+  }
+  return value;
 }

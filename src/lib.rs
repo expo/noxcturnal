@@ -20,6 +20,15 @@ pub fn classify(filename: String, source: String) -> ParseClassification {
 }
 
 #[napi]
+pub fn native_preflight_transform(
+    source: String,
+    filename: String,
+    options: preflight::NativePreflightOptions,
+) -> napi::Result<preflight::NativePreflightResult> {
+    preflight::transform::transform(source, filename, options)
+}
+
+#[napi]
 pub fn materialize_routed_buffer(
     source: String,
     filename: String,

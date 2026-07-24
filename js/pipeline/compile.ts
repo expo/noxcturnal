@@ -32,14 +32,18 @@ export function compilePhasePlan(pipeline: NativePipeline): readonly CompiledPha
         throw new Error(`${phase.name}: invalid phase observation ${String(phase.observes)}`);
       if (phase.editEffect != null && !EDIT_EFFECTS.has(phase.editEffect))
         throw new Error(`${phase.name}: invalid edit effect ${String(phase.editEffect)}`);
-      for (const plugin of phase.plugins)
+      const plugins = phase.plugins ?? [];
+      for (const plugin of plugins)
         if (plugin.editEffect != null && !EDIT_EFFECTS.has(plugin.editEffect))
           throw new Error(`${plugin.name}: invalid edit effect ${String(plugin.editEffect)}`);
       const observes =
-        phase.observes ?? (phase.requiresPrintedInput ? 'rendered-source' : 'current-ast');
+        phase.observes ??
+        (phase.native != null || phase.requiresPrintedInput ? 'rendered-source' : 'current-ast');
       const editEffect =
         phase.editEffect ??
-        maxEditEffect(phase.plugins.map(plugin => plugin.editEffect ?? 'whole-program'));
+        (phase.native == null
+          ? maxEditEffect(plugins.map(plugin => plugin.editEffect ?? 'whole-program'))
+          : 'whole-program');
       const boundaryBefore =
         index > 0 &&
         (observes === 'rendered-source' ||
@@ -47,7 +51,9 @@ export function compilePhasePlan(pipeline: NativePipeline): readonly CompiledPha
           (EDIT_EFFECT_RANK[previousEffect] >= EDIT_EFFECT_RANK.bindings &&
             phase.requiresFreshSemantics !== false));
       const requiresPrintedInput =
-        phase.requiresPrintedInput === true || observes === 'rendered-source';
+        phase.native != null ||
+        phase.requiresPrintedInput === true ||
+        observes === 'rendered-source';
       const requiresFreshSemantics =
         phase.requiresFreshSemantics ??
         (index > 0 && EDIT_EFFECT_RANK[previousEffect] >= EDIT_EFFECT_RANK.bindings);

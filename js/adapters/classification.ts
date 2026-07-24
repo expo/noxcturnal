@@ -59,21 +59,27 @@ export function parserFilename(filename: string, parser: TransformOptions['parse
   return `${filename.replace(/(?:\.d)?\.[^.]+$/, '')}.${extension}`;
 }
 
-export function classifyForTransform(filename: string, source: string): ParseClassification {
+export function classifyForTransform(
+  filename: string,
+  source: string,
+  syntaxOverride?: 'js' | 'jsx',
+): ParseClassification {
   const lower = filename.toLowerCase();
-  const syntax = lower.endsWith('.d.ts')
-    ? 'dts'
-    : lower.endsWith('.tsx')
-      ? 'tsx'
-      : lower.endsWith('.ts') || lower.endsWith('.mts') || lower.endsWith('.cts')
-        ? 'ts'
-        : lower.endsWith('.jsx')
-          ? 'jsx'
-          : lower.endsWith('.js') || lower.endsWith('.mjs') || lower.endsWith('.cjs')
-            ? source.includes('@flow')
-              ? 'flow'
-              : 'js'
-            : 'unknown';
+  const syntax =
+    syntaxOverride ??
+    (lower.endsWith('.d.ts')
+      ? 'dts'
+      : lower.endsWith('.tsx')
+        ? 'tsx'
+        : lower.endsWith('.ts') || lower.endsWith('.mts') || lower.endsWith('.cts')
+          ? 'ts'
+          : lower.endsWith('.jsx')
+            ? 'jsx'
+            : lower.endsWith('.js') || lower.endsWith('.mjs') || lower.endsWith('.cjs')
+              ? source.includes('@flow')
+                ? 'flow'
+                : 'js'
+              : 'unknown');
   const supported = syntax !== 'flow' && syntax !== 'unknown';
   return {
     syntax,

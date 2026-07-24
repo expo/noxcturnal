@@ -4,4 +4,5 @@ pub mod helpers;
 pub mod options;
 pub mod transform;
 
-pub use options::{HelperStrategy, JsxProfile, PreflightPlan, TargetProfile, TypeScriptProfile};
+pub use options::NativePreflightOptions;
+pub use transform::NativePreflightResult;

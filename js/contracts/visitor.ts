@@ -798,7 +798,10 @@ export interface DefinedNativePlugin<
  */
 export interface PipelinePhase {
   name: string;
-  plugins: readonly NativePlugin<any, any>[];
+  /** JavaScript visitor plugins. Mutually exclusive with `native`. */
+  plugins?: readonly NativePlugin<any, any>[];
+  /** Fused parse/transform/codegen phase executed entirely in Rust. */
+  native?: import('../preflight/types.js').PreflightPlan;
   observes?: PhaseObservation;
   editEffect?: EditEffect;
   requiresPrintedInput?: boolean;

@@ -1,40 +1,62 @@
-/// Target families supported by the planned native preflight phase.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TargetProfile {
-    EsNext,
-    HermesV0,
-    WebView,
-}
+use napi_derive::napi;
 
-/// Type-syntax handling requested from the planned native preflight phase.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TypeScriptProfile {
-    Strip,
-}
-
-/// JSX handling requested from the planned native preflight phase.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum JsxProfile {
-    Preserve,
-    Classic,
-    Automatic,
-    AutomaticDevelopment,
-}
-
-/// Runtime-helper ABI requested from the planned native preflight phase.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum HelperStrategy {
-    None,
-    ExpoRuntime,
-}
-
-/// Declarative configuration reserved for native preflight phases.
+/// Declarative options accepted by one native preflight phase.
 ///
-/// `Default` is disabled. Native phase compilation will consume these fields in N1.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct PreflightPlan {
-    pub target: Option<TargetProfile>,
-    pub typescript: Option<TypeScriptProfile>,
-    pub jsx: Option<JsxProfile>,
-    pub helpers: Option<HelperStrategy>,
+/// Strings are validated at the Rust boundary. Keeping the N-API object flat avoids
+/// allocating nested option objects on every transform while the JavaScript public
+/// type remains the more descriptive source of truth.
+#[napi(object)]
+#[derive(Default)]
+pub struct NativePreflightOptions {
+    pub react_compiler: Option<bool>,
+    pub react_compiler_compilation_mode: Option<String>,
+    pub react_compiler_panic_threshold: Option<String>,
+    pub react_compiler_target: Option<String>,
+    pub react_compiler_enable_reset_cache_on_source_file_changes: Option<bool>,
+    pub react_compiler_custom_opt_out_directives: Option<Vec<String>>,
+    pub typescript: Option<String>,
+    pub jsx: Option<String>,
+    pub jsx_import_source: Option<String>,
+    pub jsx_pragma: Option<String>,
+    pub jsx_pragma_frag: Option<String>,
+    pub helpers_mode: Option<String>,
+    pub helpers_module_name: Option<String>,
+    pub helpers_version: Option<String>,
+    pub compact: Option<bool>,
+    pub comments: Option<bool>,
+    pub block_scoping: Option<bool>,
+    pub classes: Option<bool>,
+    pub destructuring: Option<bool>,
+    pub destructuring_use_built_ins: Option<bool>,
+    pub parameters: Option<bool>,
+    pub for_of: Option<bool>,
+    pub explicit_resource_management: Option<bool>,
+    pub class_static_block: Option<bool>,
+    pub class_properties: Option<bool>,
+    pub class_properties_loose: Option<bool>,
+    pub logical_assignment_operators: Option<bool>,
+    pub optional_chaining: Option<bool>,
+    pub optional_chaining_loose: Option<bool>,
+    pub nullish_coalescing_operator: Option<bool>,
+    pub nullish_coalescing_operator_loose: Option<bool>,
+    pub export_namespace_from: Option<bool>,
+    pub optional_catch_binding: Option<bool>,
+    pub object_rest_spread: Option<bool>,
+    pub object_rest_spread_loose: Option<bool>,
+    pub object_rest_spread_use_built_ins: Option<bool>,
+    pub async_generator_functions: Option<bool>,
+    pub async_functions: Option<bool>,
+    pub exponentiation_operator: Option<bool>,
+    pub private_methods: Option<bool>,
+    pub private_methods_loose: Option<bool>,
+    pub private_property_in_object: Option<bool>,
+    pub private_property_in_object_loose: Option<bool>,
+    pub regexp_sticky: Option<bool>,
+    pub regexp_unicode: Option<bool>,
+    pub regexp_unicode_property_escapes: Option<bool>,
+    pub regexp_dot_all: Option<bool>,
+    pub regexp_named_capture_groups: Option<bool>,
+    pub regexp_look_behind: Option<bool>,
+    pub regexp_match_indices: Option<bool>,
+    pub regexp_unicode_sets: Option<bool>,
 }

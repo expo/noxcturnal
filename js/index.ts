@@ -1,10 +1,10 @@
 export type * from './types.js';
 export type {
-  PreflightHelperStrategy,
-  PreflightJsxProfile,
+  PreflightHelpers,
+  PreflightJsxMode,
   PreflightPlan,
-  PreflightTargetProfile,
-  PreflightTypeScriptProfile,
+  PreflightTransforms,
+  PreflightTypeScriptMode,
 } from './preflight/types.js';
 export type {
   AncestryCapability,

@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 
 import { classifyForTransform, parserFilename } from '../adapters/classification.js';
+import { parserAdapterCacheDescriptor } from '../adapters/registry.js';
 import type { NativePipeline } from '../contracts/visitor.js';
 import type { TransformOptions } from '../types.js';
 import { compilePhasePlan } from './compile.js';
@@ -13,6 +14,7 @@ export function pipelineCacheKey(
   const descriptor = {
     filename,
     options,
+    parserAdapter: parserAdapterCacheDescriptor(options.parserAdapter),
     phaseGraph: compilePhasePlan(pipeline),
     phases: pipeline.phases.map(phase => ({
       name: phase.name,
@@ -21,7 +23,8 @@ export function pipelineCacheKey(
       requiresPrintedInput: phase.requiresPrintedInput,
       requiresFreshSemantics: phase.requiresFreshSemantics,
       requiresRealizedMap: phase.requiresRealizedMap,
-      plugins: phase.plugins.map(plugin => ({
+      native: phase.native ?? null,
+      plugins: (phase.plugins ?? []).map(plugin => ({
         name: plugin.name,
         editEffect: plugin.editEffect,
         options: plugin.options ?? null,
@@ -48,6 +51,7 @@ export function transformClassificationCacheKey(
           codegenCandidate: classification.codegenCandidate,
           reason: classification.reason,
         },
+        parserAdapter: parserAdapterCacheDescriptor(options.parserAdapter, classification),
       }),
     )
     .digest('hex');

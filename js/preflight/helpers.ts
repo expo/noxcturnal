@@ -1,1 +1,1 @@
-export type { PreflightHelperStrategy } from './types.js';
+export type { PreflightHelpers } from './types.js';

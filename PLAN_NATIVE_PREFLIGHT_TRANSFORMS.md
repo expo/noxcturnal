@@ -5,9 +5,11 @@ Date: 2026-07-24
 Scope: give Noxcturnal built-in, toggleable "preflight" transforms that run natively
 before the visitor phases, covering the base language work that `babel-preset-expo`
 currently does with Babel: Flow handling, TypeScript erasure, JSX/TSX lowering, and
-per-target syntax lowering matching the preset's base configs
+individually selected syntax transforms covering the preset's base configs
 (`~/git/expo/expo/packages/babel-preset-expo/src/configs`: `flow`, `typescript`,
-`react`, `hermes-v0`, `hermes-v1`, `web`, `webview`). The goal is that ordinary
+`react`, `hermes-v0`, `hermes-v1`, `web`, `webview`). Noxcturnal does not define
+target or preset names: consumers own those recipes and compose them from orthogonal
+transform toggles. The goal is that ordinary
 application and dependency code no longer needs Babel at all; Babel remains only an
 explicit consumer-side fallback boundary for custom transformers and external
 compilers (React Compiler, Worklets, Codegen).
@@ -28,9 +30,12 @@ phases: rendered` ~0.35 ms, `650 KiB dense edits` ~12.5 ms, copy benches ~15.1 /
   dedicated interleaved A/B (swap `.node` + `dist` between alternating rounds) before
   accepting or rejecting a change. A pipeline with no preflight options enabled must
   cost nothing: the 1-phase and dense benches are the guard.
-- **Toggleable means declarative.** Every preflight option is plain data on the
-  pipeline (profile names mirroring the preset configs), participates in
-  `pipelineCacheKey`, and is snapshotted/frozen at definition like phases are today.
+- **Toggleable means declarative and orthogonal.** Every syntax lowering or
+  compatibility transform has its own plain-data toggle on the pipeline, participates
+  in `pipelineCacheKey`, and is snapshotted/frozen at definition like phases are
+  today. Noxcturnal exposes capabilities, not target groups: names such as
+  `hermes-v1`, `web`, or `webview` belong only to consumer-owned preset recipes.
+  Enabling one transform must not implicitly enable another.
 - **No legacy or compatibility paths inside Noxcturnal.** One transform pipeline;
   preflight stages are native phases in the existing phase model, not a parallel
   engine. The Babel fallback lives in the consumer as an explicit boundary for files
@@ -49,7 +54,7 @@ latest documentation in the abstract:
 - `TransformOptions` evaluates React Compiler first, then TypeScript, decorators,
   built-in plugins, JSX, and environment lowering. It exposes `react_compiler`,
   `typescript`, `jsx`, `env`, `assumptions`, and `helper_loader` directly.
-- Target lowering is ESNext → ES2015, not a general ES5 compiler. In 0.141 the
+- Available lowering is ESNext → ES2015, not a general ES5 compiler. In 0.141 the
   documented transformations are: explicit resource management; regexp `v`; class
   static blocks/fields/private members; logical assignment; nullish coalescing;
   optional chaining; export-namespace-from; optional catch binding; object
@@ -58,7 +63,8 @@ latest documentation in the abstract:
   dotAll, sticky, and unicode). Numeric separators are removed by codegen.
 - The consequential missing ES2015 transforms are block scoping, classes,
   destructuring, parameters, and `for...of`. Oxc also does not promise ES5 output.
-  These are known gaps for `hermes-v0`/`webview`, not merely “suspected gaps.”
+  These are known gaps for the transform recipes currently used by older Hermes and
+  webview consumers, not merely “suspected gaps.”
 - Oxc runtime helpers default to `@oxc-project/runtime`; that package describes its
   helpers as copied from `@babel/runtime`, but package/path compatibility is not API
   parity. Noxcturnal therefore needs an explicit helper ABI rather than leaking the
@@ -88,8 +94,9 @@ crate fixtures and Expo differentials rather than rediscovering the architecture
   lowered; async functions and async generators are lowered; TypeScript erasure, JSX
   (classic/automatic/dev), regexp transforms, and the ES2016–ES2022 features listed
   above are covered. For every covered item record the exact Oxc option, helpers
-  emitted, target threshold, assumptions used, and Babel semantic differences.
-- The matrix decides N3/N5 sequencing and is the stop/go evidence for each profile.
+  emitted, applicable runtime threshold, assumptions used, and Babel semantic
+  differences.
+- The matrix decides N3/N5 sequencing and is the stop/go evidence for each transform.
 - Gate: spike lands only the dependency + matrix (in FITMENT.md), no behavior change.
 
 ## N1: native transform phase infrastructure
@@ -101,9 +108,20 @@ crate fixtures and Expo differentials rather than rediscovering the architecture
   into the packed decoded layer format (`pack_decoded_layer`) — no VLQ encode at the
   phase boundary — and let `composeDecodedChain` compose it with visitor-phase layers
   exactly like any committed layer today.
-- Options object (target profile, typescript, jsx, helper strategy) is part of the
+- Options object (individual transform toggles, TypeScript, JSX, helper strategy) is part of the
   phase definition, frozen at `defineNativePipeline`, and hashed into
   `pipelineCacheKey`.
+- The public shape has no `target` or `preset` field. Syntax work lives under an
+  orthogonal `transforms` object, for example:
+  `{ classStaticBlock: true, asyncGeneratorFunctions: true }`. Boolean transforms
+  use `true`; transforms with semantic choices own a small options object. Unknown
+  keys and `false` are rejected rather than normalized into an implicit group.
+  TypeScript, JSX, helpers, comments, and compact output remain independent sibling
+  concerns.
+- Consumer packages may export recipe builders such as `expoHermesSdk56()` or
+  `expoModernWeb()`, but those builders resolve to ordinary frozen preflight data
+  before reaching Noxcturnal. Recipe identity is not part of execution or caching;
+  the resolved toggle data is.
 - Unsupported syntax or semantics produce a structured `unsupported` result (same
   shape as today's classification bailout) so the consumer can route the file to its
   fallback; never silently change semantics.
@@ -113,7 +131,7 @@ crate fixtures and Expo differentials rather than rediscovering the architecture
 - Ordering: expose one fused Oxc preflight where possible, but retain named hook
   boundaries for Expo visitors. Recommended order:
   source classification/Flow frontend → React Compiler → type strip →
-  React-aware analysis and Expo source visitors → Refresh → JSX → target lowering →
+  React-aware analysis and Expo source visitors → Refresh → JSX → selected lowering →
   helper materialization → module/dependency transforms. Oxc's own fixed traversal
   order already matches Compiler → TS → JSX → env; do not split it into repeated
   parse/codegen cycles merely to mimic Babel plugin boundaries. If an Expo visitor
@@ -124,7 +142,7 @@ crate fixtures and Expo differentials rather than rediscovering the architecture
   a Rust test proving decoded-layer equivalence for a native phase (map from a native
   phase composed with a visitor phase matches the VLQ-composed reference).
 
-## N2: TypeScript and JSX/TSX profiles
+## N2: TypeScript and JSX/TSX transforms
 
 - TypeScript erasure via the Oxc TS transform: annotations, type-only imports/exports
   (removed before module conversion and dependency collection), `as`/`satisfies`,
@@ -143,14 +161,14 @@ crate fixtures and Expo differentials rather than rediscovering the architecture
 - Gate: run `babel-preset-expo`'s TypeScript and React fixture suites through both
   pipelines (classic/automatic × dev/prod × JS/JSX/TSX × client/server); dependency
   metadata and TraceMap positions compared, runtime behavior fixtures pass; consumer
-  eligibility gate `typed-or-jsx-extension` deleted for files the profile covers.
+  eligibility gate `typed-or-jsx-extension` deleted for files the enabled transforms cover.
 
 ## N2a: helper ABI, runtime imports, and polyfill policy
 
 Treat generated helpers as part of the transform contract, not as an incidental
 codegen detail:
 
-- Add `helpers: { mode: 'runtime' | 'inline', moduleName, version }`. Expo profiles
+- Add `helpers: { mode: 'runtime' | 'inline', moduleName, version }`. Expo consumer recipes
   default to `runtime`, `moduleName: '@babel/runtime'`, and the same resolved version
   used by `babel-preset-expo`. `inline` exists for scripts, because Metro's
   `metroSourceType === 'script'` cannot gain dependencies and Expo disables
@@ -166,7 +184,7 @@ codegen detail:
   `Oxc helper → Babel helper path → minimum @babel/runtime version → export shape →
 semantic differential`. A missing or non-equivalent helper produces structured
   `unsupported`; it never silently falls back to an inline Oxc helper in an Expo
-  runtime profile.
+  runtime-helper configuration.
 - Keep helper imports visible to the normal dependency collector. Module lowering
   must happen after helper insertion so Metro sees the same generated dependencies
   it sees today. Test ESM/CJS, lazy imports, name collisions, duplicate helpers, and
@@ -181,34 +199,42 @@ semantic differential`. A missing or non-equivalent helper produces structured
   future target needs built-ins, add a separate declarative `polyfills` phase with an
   explicit compatibility dataset, entry-vs-usage policy, dependency metadata, and
   cache key; do not overload `helpers`.
-- Gate: every helper reachable from the enabled profiles has a fixture compared with
+- Gate: every helper reachable from the enabled transform toggles has a fixture compared with
   `@babel/plugin-transform-runtime` at the pinned runtime version. Runtime behavior,
   dependency metadata, script-mode inlining, and no-global-regenerator assertions
   must pass.
 
-## N3: syntax lowering profiles — `hermes-v1` and `web` first
+## N3: individually toggleable modern syntax lowering
 
-These two have the smallest plugin sets and unblock the modern targets:
+Implement the smallest modern transform inventory first. The Expo consumer may
+compose these into recipes currently called `hermes-v1` or `web`, but those recipe
+names and groupings are not part of Noxcturnal's API:
 
-- `hermes-v1` (SDK 56+): block scoping, class static blocks (`loose`), async
-  generator functions, plus the three Hermes fix plugins
-  (`fix-hermes-v1-async-arrow-non-simple-params`, `fix-hermes-v1-super-in-object-accessor`,
-  `fix-hermes-v1-class-in-finally`) ported as small native passes with the upstream
-  plugins' own test fixtures.
-- `web` (modern): class static blocks, private methods, private property-in-object
-  (all `loose`).
-- Express profiles as declarative target descriptors that select Oxc transform
-  options plus Noxcturnal-native passes for anything the matrix marked missing
-  (block scoping is the expected native-pass candidate for `hermes-v1`).
+- Independent toggles: block scoping, class static blocks, async generator functions,
+  private methods, and private property-in-object. Options such as `loose` live on
+  the transform that consumes them; they are never inherited from a target name.
+- Each declarative transform toggle selects exactly one Oxc transform option or one
+  Noxcturnal-native pass. Missing matrix items remain explicit unsupported results
+  only when that exact toggle is requested (block scoping is the expected native-pass
+  candidate).
+- The one-off Hermes workarounds
+  (`fix-hermes-v1-async-arrow-non-simple-params`,
+  `fix-hermes-v1-super-in-object-accessor`, and
+  `fix-hermes-v1-class-in-finally`) are explicitly **not** native preflight
+  transforms. Keep them as separately maintained typed visitor plugins in ordinary
+  pipeline phases, with the upstream plugins' fixtures. Consumers choose them in
+  their recipes; their plugin identity/options already participate in the pipeline
+  cache key.
 - Loose-mode parity: differential tests for `loose: true` class/private semantics
   (define vs assign, getter/setter shadowing), not just snapshots.
-- Match the preset's output posture per profile (`comments: false`, `compact: true`
-  for Hermes profiles) via `oxc_codegen` options; decide and document whether comment
-  stripping is part of the profile or left to minification.
-- Gate: differential fixtures against the Babel profile output (behavioral tests plus
-  representative snapshots); traced consumer run shows the Hermes eligibility gates
-  for covered features removed; benchmark suite holds (preflight phases add cost only
-  where enabled — record per-file native-phase time in the trace).
+- Code-generation posture (`comments`, `compact`) remains independent from syntax
+  selection. A consumer recipe may set both, but enabling a Hermes workaround cannot
+  silently strip comments or compact output.
+- Gate each native toggle independently against the corresponding Babel language
+  transform and each maintained one-off visitor against its upstream plugin fixtures
+  (behavioral tests plus representative snapshots). Then gate consumer-owned recipes
+  against the full Babel config. The benchmark suite must show that disabled toggles
+  add no cost and record per-file native-phase time for enabled transforms.
 
 ## N4: Flow
 
@@ -217,7 +243,8 @@ are Flow files (React Native core).
 
 - **Delivery path: a narrow Hermes frontend, not a general Babel fallback.** Extend
   the parser-adapter surface with a source-stage contract:
-  `supports(classification) → compile(source, filename, options) → { code, map, metadata } | unsupported`.
+  `supports(classification) → compile(source, filename, options) →
+{ code, map, syntax: 'js' | 'jsx', metadata } | unsupported`.
   The consumer registers a worker-local Flow adapter built on `hermes-parser`, the
   same frontend family used by React Native/Expo. Parse once with Flow detection,
   enable Hermes's built-in `TransformEnumSyntax`, strip type-only syntax/imports/
@@ -259,6 +286,42 @@ Flow AST. A native token stripper is not the default: modern Flow component/hook
 syntax, enums, comments/directives, and grammar ambiguities make a second parser in
 Rust a high-maintenance optimization unless profiling proves the adapter dominates.
 
+Decision record (2026-07-24): use the focused Hermes path and do not transform the
+Flow input with Babel. On all 637 non-Codegen `@flow` JS/JSX files in the installed
+React Native 0.86 corpus (2.29 MB), three interleaved hot-worker rounds produced:
+
+| path                                                                                                                           | coverage |  hot time/file |
+| ------------------------------------------------------------------------------------------------------------------------------ | -------: | -------------: |
+| Hermes ESTree parse → enum/match/component/record transforms → full Flow strip → bundled ESTree-to-Babel converter → generator |  637/637 | 0.421–0.451 ms |
+| Hermes Babel AST → `@babel/plugin-transform-flow-strip-types` → generator                                                      |  637/637 | 1.026–1.134 ms |
+| complete `babel-preset-expo` Hermes route                                                                                      |  637/637 | 1.987–2.075 ms |
+
+The focused path is about 2.4x faster than the Babel Flow transform and 4.7x faster
+than the complete preset route. The Expo adapter therefore depends only on the
+already-required `hermes-parser` and `@babel/generator`; it does not add or execute
+the Babel Flow transform plugin. The converter is loaded from the versioned Hermes
+package because Hermes does not publicly export it; the actual Hermes and generator
+versions are both included in adapter identity/cache keys. A consumer test guards
+type-only import removal, annotation removal, maps, preserved `@flow` comments, and
+continuation through native visitors.
+
+The Expo consumer recipe selects a native language phase only when source inspection
+finds work owned by that recipe (class static blocks, async generators, or JSX).
+Flow without JSX is printed once by the adapter and does not pay a second native
+parse/codegen boundary. The language phase stays non-compact because Metro's
+dependency collector must still see ordinary string literals; final compaction is a
+later consumer concern. Flow+JSX, helper-import collection, and the full source →
+language → Metro module ordering have direct integration tests.
+
+Helper versioning follows the existing Babel caller contract. Metro's
+`config.enableBabelRuntime` is passed into the recipe. `ExpoMetroConfig` populates
+that field with the project's resolved `@babel/runtime` version, and the Babel
+transformer exposes the same string to Babel as caller `babelRuntimeVersion`.
+Consequently, a string is the project runtime version targeted by both paths,
+`false` selects dependency-free inline helpers, and only an absent/boolean value
+uses Babel preset Expo's 7.20.0 fallback minimum. The recipe does not infer
+compatibility from Metro-config's own installed runtime.
+
 ## N4a: React Compiler integration
 
 React Compiler is an optional source compiler boundary, not an ordinary post-lowering
@@ -268,7 +331,7 @@ visitor:
   client only, non-server, non-`node_modules`, and per-platform opt-out. Preserve the
   default opt-out directives (`use no memo`, `use no forget`) plus Expo's `widget`
   directive and user additions.
-- Run it on original JSX and before target lowering. For TS/TSX, use Oxc's native
+- Run it on original JSX and before selected syntax lowering. For TS/TSX, use Oxc's native
   `react_compiler` pass before its TypeScript pass. For Flow, the ordering must retain
   Flow component/hook syntax when `compilationMode: 'syntax'`; therefore either:
   (1) feed the Hermes/Babel-compatible original AST to the external compiler before
@@ -288,53 +351,165 @@ visitor:
   Refresh ordering, Flow syntax mode, and “never compile node_modules.” Base
   preflight ships without waiting for this gate.
 
-## N5: legacy profiles — `hermes-v0` and `webview`
+Implementation checkpoint (2026-07-24): Noxcturnal enables Oxc 0.141's pinned
+`react_compiler` feature behind an independent `reactCompiler` conformance object.
+The exposed boundary is limited to compilation mode, panic threshold, React
+17/18/19 target, development cache-reset policy, and additive opt-out directives;
+unknown options are rejected. The conformance layer preserves `use no memo` and
+`use no forget` because Oxc 0.141 treats custom directives as replacements despite
+documenting them as additions. Tests cover all three runtime-module targets, fused
+Compiler → TypeScript → JSX order, compiler-runtime dependency collection, maps,
+the default and Expo `widget` opt-outs, and refusal to compile parser-adapted Flow
+after stripping. Representative app TSX fixtures also run through the real
+`babel-preset-expo` compiler route and the native route.
+
+The Expo consumer now selects a dedicated app-source prepass when React Compiler is
+explicitly enabled. It runs Oxc's fixed Compiler → TypeScript front-end on pristine
+JS/JSX/TS/TSX, preserves JSX, and then runs the ordinary resolved Babel recipe with
+Compiler disabled. Expo source plugins therefore still follow Compiler, Refresh
+still follows those plugins, and Babel still owns JSX and module handling. The
+end-to-end worker fixture proves compiler-runtime injection, `$RefreshReg$`, TS/JSX
+handling, and a composed original TSX position. Node modules, Flow, Codegen, server
+environments, custom transformers, and non-default project configs remain on Babel.
+Because a project config can branch on Babel's caller, the consumer resolves and
+compares the config again under the exact post-prepass caller before accepting
+native output. The latest enabled native compiler microfixture measures 0.0427
+ms/file; absent `reactCompiler` leaves the existing preflight paths unchanged. The
+full benchmark guard remains green (0.3422 ms static visitor,
+12.0249 ms dense 650 KiB edits, 13.8711/11.1010 ms copy cases, 7.3260 ms rendered
+three-phase case). A five-round hot language-pipeline comparison on the
+representative app TSX fixture measured Babel Compiler+TS+Refresh+JSX at
+1.437/1.354/1.160/1.130/1.067 ms and native Compiler+TS followed by Babel
+Refresh+JSX at 0.413/0.381/0.328/0.283/0.293 ms (3.48–3.99× faster); both outputs
+contained the compiler runtime and Refresh registration. The
+compiler raises the default release binary from about 3.2 MB to 4.8 MB, so it is
+also an explicit Cargo feature. `--no-default-features` builds the smaller base and
+returns `react-compiler-not-built` only when that exact option is requested; both
+feature configurations pass `cargo check`.
+
+## N5: remaining legacy transform toggles
 
 The largest confirmed Oxc coverage gap lives here (classes, destructuring with `useBuiltIns`,
 parameters, `for...of`, async-to-generator, unicode/named-group regex, block scoping,
 plus `react-display-name`):
 
-- For each feature the N0 matrix marks missing: prefer contributing/adopting the Oxc
+- Add one independent toggle for each feature that passes its semantic gate; never
+  add a `hermes-v0` or `webview` switch. For each feature the N0 matrix marks missing:
+  prefer contributing/adopting the Oxc
   transform upstream; implement as a Noxcturnal-native pass only when the feature is
-  small and stable (regex transforms, display-name); otherwise the profile declares
-  the feature `unsupported` and the consumer keeps those files on Babel.
+  small and stable (regex transforms, display-name); otherwise that transform toggle
+  declares the feature `unsupported` and the consumer keeps those files on Babel.
+- The missing ES2015 inventory is still declarative one by one:
+  `classes`, `destructuring: { useBuiltIns }`, `parameters`, and `forOf`. Each
+  structured boundary is syntax-specific, so enabling `classes` does not reject a
+  class-free file merely because the capability is unavailable in Oxc 0.141.
 - `react-display-name` fits the existing visitor/edit architecture — implement it as
-  an Expo-owned visitor, not a preflight pass.
-- Explicit stop condition: if `hermes-v0`/`webview` cannot reach behavioral parity
+  an Expo-owned visitor, not a preflight pass. The Metro-config consumer now owns
+  this visitor for the legacy/default profile: it matches Babel's one-object-argument
+  `React.createClass`/`createReactClass` cases, preserves explicit names, infers
+  assignment/property/declarator and default-export names, and remains disabled for
+  Hermes V1. This removes the former blanket `react-display-name` fallback without
+  adding a Noxcturnal native-transform toggle.
+- Explicit stop condition: if the consumer's older-Hermes or webview recipe cannot
+  reach behavioral parity
   without reimplementing a large fraction of Babel's ES2015 lowering, ship them as
-  partial profiles (native for what Oxc covers, Babel for the rest) and record that
-  boundary in FITMENT.md rather than forcing completeness. SDK 56+ (`hermes-v1`) is
-  the strategic target; `hermes-v0`/`webview` are long-tail.
+  partial consumer recipes (native for what Oxc covers, Babel for the rest) and
+  record that boundary in FITMENT.md rather than forcing completeness. Noxcturnal's
+  individual toggles remain runtime-agnostic.
 
 ## N6: consumer integration and evidence
 
-- Replace the consumer's per-feature eligibility gates
-  (`expo-metro-eligibility:*`, `typed-or-jsx-extension`,
-  `flow-requires-parser-adapter`) with preflight configuration selected per
-  platform/SDK profile; fallback telemetry keeps counting whatever remains.
+- Replace the consumer's per-feature eligibility gates with a consumer-owned recipe
+  of preflight toggles selected per platform/SDK; fallback telemetry keeps counting
+  whatever remains. The `typed-or-jsx-extension` gate and supported
+  `flow-requires-parser-adapter` cases are now removed: JS/JSX/TS/TSX select their
+  parser and language capabilities independently, while Flow selects the registered
+  source adapter before the same recipe continues.
 - Traced cold-bundle procedure (2g spans, direct iOS bundle request against
-  `apps/router-e2e`, matched-file comparison) before/after each profile lands.
-- Targets: full-route coverage from 296/1,166 modules to >90% of JS modules on
-  `hermes-v1`; controlled cold bundle at or below ~1.25 s (prior estimate for a
+  `apps/router-e2e`, matched-file comparison) before/after each consumer recipe change.
+- Consumer evidence target: full-route coverage from 296/1,166 modules to >90% of JS
+  modules for the SDK 56+ Hermes recipe; controlled cold bundle at or below ~1.25 s (prior estimate for a
   Babel-free default pipeline was ~0.9–1.2 s). If an expanded route cannot get below
   ~1.3 s with output-graph parity, reassess preflight scope rather than pushing
   through.
 - metro-config jest suites green throughout; new suites for preflight routing.
 
+Evidence checkpoint (2026-07-24): a clean Hermes iOS request against
+`apps/router-e2e` transformed 1,257 JS modules, completed 1,155 (91.9%) through the
+full native route, and invoked Babel 86 times. The final request completed in 1.234 s.
+Before the Expo-owned maintained `super` visitor, the matched trace completed 1,129
+modules natively, invoked Babel 112 times, and took 1.320 s. Both bundles contain
+1,278 module wrappers. The final graph has one additional, correct dependency edge:
+the focused Hermes Flow stripper was found to drop value-bearing side-effect imports
+alongside type-only imports, so the adapter now preserves those nodes and directly
+tests Metro collection. This clears the numeric N6 coverage and cold-time gates;
+behavioral suites and the remaining completion audit still apply.
+
+Project Babel configs are resolved by Babel and compared with the default Expo
+preset descriptor and effective top-level options. The canonical
+`apps/router-e2e` config is equivalent and retains this route; added plugins,
+changed preset options, or other effective options fall back. This comparison does
+not inspect config source or bless filenames. Babel still resolves the project side
+for every filename so overrides remain authoritative; only the invariant default
+descriptor is cached by caller and resolution roots.
+
+The Expo consumer now also runs representative TS runtime constructs, source-map
+positions, namespaces, and automatic JSX selection through the real
+`babel-preset-expo` configuration and the native route. That differential exposed
+and fixed an ordering bug: TypeScript/JSX language work now runs before ordinary
+Expo visitors, so a visitor such as block scoping cannot edit a declaration inside
+a namespace before Oxc expands it. Expo's Babel configuration selects
+`react/jsx-runtime` in both development and production; development policy outside
+this language phase must not silently select `jsx-dev-runtime`. The complete
+consumer differential also compares the surviving TS/TSX dependency edges: type-only
+imports disappear while runtime and JSX-runtime imports remain. A default Expo
+transformer is not sufficient proof that this recipe applies, because a project
+Babel config can replace the preset or its JSX/runtime policy. The consumer now
+compares Babel's resolved descriptors and effective options with the default recipe
+and falls back only when they differ; explicitly disabled lookup remains
+authoritative. A hot classifier microbenchmark measured 31.5 ms for 1,000 distinct
+filenames after caching the invariant default side. Independent Babel-plugin
+behavior differentials also cover class static blocks, logical assignment,
+loose/spec optional chaining and nullish coalescing, optional catch binding,
+exponentiation, sticky regexp, export namespace, spec object rest/spread, explicit
+resource management, and both class-property modes. Async-function and
+async-generator fixtures additionally
+compare Promise/await, delegation, and `for await` runtime behavior against their
+Babel transforms. A behavioral 12-case JSX matrix covers classic/automatic ×
+development/production × JS/JSX/TSX, and 12 real-preset cases cover
+client/server × development/production × JS/JSX/TSX. Each fixture selects exactly
+one native transform toggle;
+the consumer remains the only owner of transform recipes. The complete metro-config
+check is 48 suites, 1,004 passing tests, 4 skipped, and 374 snapshots. The upstream
+`babel-preset-expo` matrix is also green at 28 suites, 598 passing tests, 4 skipped,
+and 339 snapshots. The one-off `fix-hermes-v1-*` transforms remain ordinary
+Expo-maintained visitors: none is a native preflight lowering toggle.
+
+The matched cold `apps/router-e2e` compiler trace measured native-prepass medians
+of 1.327 s versus 1.360 s for the former all-Babel compiler route, while preserving
+1,278 Metro module wrappers and reducing the bundle by 2,817 bytes. The compiler-off
+baseline was 1.205/1.182 s. Although the opt-in compiler route crosses the plan's
+1.3 s reassessment threshold, reverting it is slower; the added time is compiler
+work rather than a disabled-path regression. Across 1,284 transformed files the
+native route retained 86 Babel spans, made 1,253 full Nox attempts, and produced
+184 Nox spans, so unsupported/config-sensitive files still route explicitly.
+
 ## Order and gates
 
 1. N0 → N1 land first (spike, then infrastructure with a no-op default).
-2. N2 (TypeScript + JSX) is the first user-visible profile — it unlocks app code and
+2. N2 (TypeScript + JSX) is the first user-visible transform set — it unlocks app code and
    the 63 typed-extension fallbacks with the least semantic risk.
-3. N3 (`hermes-v1`, `web`) next; N4 (Flow) can proceed in parallel with N3 since it
-   is adapter work, not Oxc transform work.
+3. N3 modern individual toggles next; N4 (Flow) can proceed in parallel with N3
+   since it is adapter work, not Oxc transform work. Consumer-owned Hermes and web
+   recipes are integration fixtures, not library API.
    - Related workstream: `PLAN_TYPED_VISITOR_CONTRACTS.md` (typed per-visitor
      contracts) is independent of preflight, but its phases 1–2 should land before
      this plan adds new first-party visitors (display-name, Refresh, RSC analysis),
      so those are written against the typed surface once instead of migrated later.
 4. N5 last, gated on the N0 matrix and an explicit go/partial/stop decision.
-5. N6 evidence runs continuously; each profile's consumer gate flips only with its
-   traced parity proof.
+5. N6 evidence runs continuously; each consumer recipe gate flips only with its
+   traced parity proof, while each library toggle retains its own unit/differential
+   gate.
 
 ## Verification discipline
 

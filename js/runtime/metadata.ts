@@ -8,6 +8,7 @@ export interface PerformanceAllocationCounters {
   phasePreparationMs: number;
   sessionOpenMs: number;
   nativeAndDecodeMs: number;
+  nativeTransformMs: number;
   dispatcherSetupMs: number;
   dispatchMs: number;
   pathConstructionMs: number;
@@ -49,6 +50,7 @@ export function createTransformMetadata(
       phasePreparationMs: 0,
       sessionOpenMs: 0,
       nativeAndDecodeMs: 0,
+      nativeTransformMs: 0,
       dispatcherSetupMs: 0,
       dispatchMs: 0,
       pathConstructionMs: 0,

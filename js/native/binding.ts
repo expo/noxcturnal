@@ -1,6 +1,7 @@
 import { join } from 'node:path';
 
 import type { FunctionMap, NativeVlqMap, ParseClassification } from '../types.js';
+import type { PreflightPlan } from '../preflight/types.js';
 
 interface NativeBinding {
   NativeIndexedSession: new (
@@ -81,6 +82,70 @@ interface NativeBinding {
     takeFunctionMap(): FunctionMap | null;
   };
   classify(filename: string, source: string): ParseClassification;
+  nativePreflightTransform(
+    source: string,
+    filename: string,
+    options: {
+      reactCompiler?: boolean;
+      reactCompilerCompilationMode?: string;
+      reactCompilerPanicThreshold?: string;
+      reactCompilerTarget?: string;
+      reactCompilerEnableResetCacheOnSourceFileChanges?: boolean;
+      reactCompilerCustomOptOutDirectives?: string[];
+      typescript?: string;
+      jsx?: string;
+      jsxImportSource?: string;
+      jsxPragma?: string;
+      jsxPragmaFrag?: string;
+      helpersMode?: string;
+      helpersModuleName?: string;
+      helpersVersion?: string;
+      compact?: boolean;
+      comments?: boolean;
+      blockScoping?: boolean;
+      classes?: boolean;
+      destructuring?: boolean;
+      destructuringUseBuiltIns?: boolean;
+      parameters?: boolean;
+      forOf?: boolean;
+      explicitResourceManagement?: boolean;
+      classStaticBlock?: boolean;
+      classProperties?: boolean;
+      classPropertiesLoose?: boolean;
+      logicalAssignmentOperators?: boolean;
+      optionalChaining?: boolean;
+      optionalChainingLoose?: boolean;
+      nullishCoalescingOperator?: boolean;
+      nullishCoalescingOperatorLoose?: boolean;
+      exportNamespaceFrom?: boolean;
+      optionalCatchBinding?: boolean;
+      objectRestSpread?: boolean;
+      objectRestSpreadLoose?: boolean;
+      objectRestSpreadUseBuiltIns?: boolean;
+      asyncGeneratorFunctions?: boolean;
+      asyncFunctions?: boolean;
+      exponentiationOperator?: boolean;
+      privateMethods?: boolean;
+      privateMethodsLoose?: boolean;
+      privatePropertyInObject?: boolean;
+      privatePropertyInObjectLoose?: boolean;
+      regexpSticky?: boolean;
+      regexpUnicode?: boolean;
+      regexpUnicodePropertyEscapes?: boolean;
+      regexpDotAll?: boolean;
+      regexpNamedCaptureGroups?: boolean;
+      regexpLookBehind?: boolean;
+      regexpMatchIndices?: boolean;
+      regexpUnicodeSets?: boolean;
+    },
+  ): {
+    status: 'complete' | 'unsupported';
+    reason?: string;
+    code?: string;
+    map?: Buffer;
+    diagnostics: string[];
+    helpersUsed: string[];
+  };
   commitPackedBuffer(
     source: string,
     filename: string,
@@ -132,3 +197,63 @@ function platformSuffix(): string {
 }
 export const native = loadBinding();
 export type NativeIndexedSessionBinding = InstanceType<NativeBinding['NativeIndexedSession']>;
+
+export function nativePreflightOptions(plan: PreflightPlan) {
+  return {
+    reactCompiler: plan.reactCompiler != null,
+    reactCompilerCompilationMode: plan.reactCompiler?.compilationMode,
+    reactCompilerPanicThreshold: plan.reactCompiler?.panicThreshold,
+    reactCompilerTarget: plan.reactCompiler?.target,
+    reactCompilerEnableResetCacheOnSourceFileChanges:
+      plan.reactCompiler?.enableResetCacheOnSourceFileChanges,
+    reactCompilerCustomOptOutDirectives:
+      plan.reactCompiler?.customOptOutDirectives == null
+        ? undefined
+        : [...plan.reactCompiler.customOptOutDirectives],
+    typescript: plan.typescript,
+    jsx: plan.jsx,
+    jsxImportSource: plan.jsxImportSource,
+    jsxPragma: plan.jsxPragma,
+    jsxPragmaFrag: plan.jsxPragmaFrag,
+    helpersMode: plan.helpers?.mode,
+    helpersModuleName: plan.helpers?.moduleName,
+    helpersVersion: plan.helpers?.version,
+    compact: plan.compact,
+    comments: plan.comments,
+    blockScoping: plan.transforms?.blockScoping,
+    classes: plan.transforms?.classes,
+    destructuring: plan.transforms?.destructuring != null,
+    destructuringUseBuiltIns: plan.transforms?.destructuring?.useBuiltIns,
+    parameters: plan.transforms?.parameters,
+    forOf: plan.transforms?.forOf,
+    explicitResourceManagement: plan.transforms?.explicitResourceManagement,
+    classStaticBlock: plan.transforms?.classStaticBlock,
+    classProperties: plan.transforms?.classProperties != null,
+    classPropertiesLoose: plan.transforms?.classProperties?.loose,
+    logicalAssignmentOperators: plan.transforms?.logicalAssignmentOperators,
+    optionalChaining: plan.transforms?.optionalChaining != null,
+    optionalChainingLoose: plan.transforms?.optionalChaining?.loose,
+    nullishCoalescingOperator: plan.transforms?.nullishCoalescingOperator != null,
+    nullishCoalescingOperatorLoose: plan.transforms?.nullishCoalescingOperator?.loose,
+    exportNamespaceFrom: plan.transforms?.exportNamespaceFrom,
+    optionalCatchBinding: plan.transforms?.optionalCatchBinding,
+    objectRestSpread: plan.transforms?.objectRestSpread != null,
+    objectRestSpreadLoose: plan.transforms?.objectRestSpread?.loose,
+    objectRestSpreadUseBuiltIns: plan.transforms?.objectRestSpread?.useBuiltIns,
+    asyncGeneratorFunctions: plan.transforms?.asyncGeneratorFunctions,
+    asyncFunctions: plan.transforms?.asyncFunctions,
+    exponentiationOperator: plan.transforms?.exponentiationOperator,
+    privateMethods: plan.transforms?.privateMethods != null,
+    privateMethodsLoose: plan.transforms?.privateMethods?.loose,
+    privatePropertyInObject: plan.transforms?.privatePropertyInObject != null,
+    privatePropertyInObjectLoose: plan.transforms?.privatePropertyInObject?.loose,
+    regexpSticky: plan.transforms?.regexpSticky,
+    regexpUnicode: plan.transforms?.regexpUnicode,
+    regexpUnicodePropertyEscapes: plan.transforms?.regexpUnicodePropertyEscapes,
+    regexpDotAll: plan.transforms?.regexpDotAll,
+    regexpNamedCaptureGroups: plan.transforms?.regexpNamedCaptureGroups,
+    regexpLookBehind: plan.transforms?.regexpLookBehind,
+    regexpMatchIndices: plan.transforms?.regexpMatchIndices,
+    regexpUnicodeSets: plan.transforms?.regexpUnicodeSets,
+  };
+}

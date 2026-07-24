@@ -21,3 +21,18 @@ export function selectParserAdapter(
   }
   return undefined;
 }
+
+export function parserAdapterCacheDescriptor(
+  name: string | undefined,
+  classification?: ParseClassification,
+): { name: string; version: string; options: unknown } | null {
+  const adapter =
+    classification == null
+      ? name == null
+        ? undefined
+        : parserAdapters.get(name)
+      : selectParserAdapter(name, classification);
+  return adapter == null
+    ? null
+    : { name: adapter.name, version: adapter.version, options: adapter.options ?? null };
+}

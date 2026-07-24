@@ -243,12 +243,22 @@ export interface TransformOptions {
 }
 
 export interface ParserAdapter {
+  /** Stable implementation identity used in transform cache keys. */
   name: string;
+  version: string;
+  /** Serializable configuration that affects emitted code or mappings. */
+  options?: unknown;
   supports(route: ParseClassification): boolean;
-  transform(
-    source: string,
-    filename: string,
-    pipeline: unknown,
-    options: TransformOptions,
-  ): TransformResult;
+  compile(source: string, filename: string, options: TransformOptions): ParserAdapterResult;
 }
+
+export type ParserAdapterResult =
+  | {
+      status: 'complete';
+      code: string;
+      map: NativeVlqMap;
+      /** Plain syntax emitted for the normal native pipeline. */
+      syntax: 'js' | 'jsx';
+      metadata?: Record<string, unknown>;
+    }
+  | { status: 'unsupported'; reason: string; diagnostics?: Diagnostic[] };

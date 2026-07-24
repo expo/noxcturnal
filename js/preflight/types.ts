@@ -1,14 +1,60 @@
-/** Target families supported by the planned native preflight phase. */
-export type PreflightTargetProfile = 'esnext' | 'hermes-v0' | 'webview';
-
 /** Type-syntax handling requested from the planned native preflight phase. */
-export type PreflightTypeScriptProfile = 'strip';
+export type PreflightTypeScriptMode = 'strip';
 
 /** JSX handling requested from the planned native preflight phase. */
-export type PreflightJsxProfile = 'preserve' | 'classic' | 'automatic' | 'automatic-development';
+export type PreflightJsxMode =
+  | 'preserve'
+  | 'classic'
+  | 'classic-development'
+  | 'automatic'
+  | 'automatic-development';
 
 /** Runtime-helper ABI requested from the planned native preflight phase. */
-export type PreflightHelperStrategy = 'none' | 'expo-runtime';
+export interface PreflightHelpers {
+  mode: 'runtime' | 'inline';
+  moduleName?: string;
+  version?: string;
+}
+
+/** Version-coupled React Compiler options exposed through Noxcturnal's conformance layer. */
+export interface PreflightReactCompiler {
+  compilationMode: 'infer' | 'syntax' | 'annotation' | 'all';
+  panicThreshold: 'none' | 'critical_errors' | 'all_errors';
+  target: '17' | '18' | '19';
+  enableResetCacheOnSourceFileChanges: boolean;
+  customOptOutDirectives?: readonly string[];
+}
+
+/** Orthogonal native syntax transforms. Consumers compose runtime presets from these toggles. */
+export interface PreflightTransforms {
+  blockScoping?: true;
+  classes?: true;
+  destructuring?: { useBuiltIns: boolean };
+  parameters?: true;
+  forOf?: true;
+  explicitResourceManagement?: true;
+  classStaticBlock?: true;
+  classProperties?: { loose: boolean };
+  logicalAssignmentOperators?: true;
+  optionalChaining?: { loose: boolean };
+  nullishCoalescingOperator?: { loose: boolean };
+  exportNamespaceFrom?: true;
+  optionalCatchBinding?: true;
+  objectRestSpread?: { loose: boolean; useBuiltIns: boolean };
+  asyncGeneratorFunctions?: true;
+  asyncFunctions?: true;
+  exponentiationOperator?: true;
+  privateMethods?: { loose: boolean };
+  privatePropertyInObject?: { loose: boolean };
+  regexpSticky?: true;
+  regexpUnicode?: true;
+  regexpUnicodePropertyEscapes?: true;
+  regexpDotAll?: true;
+  regexpNamedCaptureGroups?: true;
+  regexpLookBehind?: true;
+  regexpMatchIndices?: true;
+  regexpUnicodeSets?: true;
+}
 
 /**
  * Declarative configuration reserved for native preflight phases.
@@ -17,8 +63,14 @@ export type PreflightHelperStrategy = 'none' | 'expo-runtime';
  * this data no runtime behavior; native phase compilation will consume it in N1.
  */
 export interface PreflightPlan {
-  target?: PreflightTargetProfile;
-  typescript?: PreflightTypeScriptProfile;
-  jsx?: PreflightJsxProfile;
-  helpers?: PreflightHelperStrategy;
+  transforms?: PreflightTransforms;
+  reactCompiler?: PreflightReactCompiler;
+  typescript?: PreflightTypeScriptMode;
+  jsx?: PreflightJsxMode;
+  jsxImportSource?: string;
+  jsxPragma?: string;
+  jsxPragmaFrag?: string;
+  helpers?: PreflightHelpers;
+  compact?: boolean;
+  comments?: boolean;
 }

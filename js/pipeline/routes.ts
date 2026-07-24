@@ -376,7 +376,7 @@ export function preparePhase(
 ): PreparedPhase {
   const hints = sourceHints(phaseSource);
   const plans = new Map<NativePlugin<any, any>, PreparedPluginPlan>();
-  for (const plugin of phase.plugins) {
+  for (const plugin of phase.plugins ?? []) {
     // Plugins with no per-file hooks (`prepare`, `configure`) have a fully static
     // plan; synthesize it once per plugin definition.
     const staticPlan = staticPlanCache.get(plugin);
@@ -416,13 +416,13 @@ export function preparePhase(
       staticPlanCache.set(plugin, synthesized);
   }
 
-  const preparedKey = phase.plugins
+  const preparedKey = (phase.plugins ?? [])
     .map(plugin => `${plugin.name}:${pluginPlanCacheKey(plans.get(plugin)!)}`)
     .join('\u001e');
   const cachedPrepared = preparedPhaseCaches.get(phase)?.get(preparedKey);
   if (cachedPrepared) return { ...cachedPrepared, plans };
 
-  const activePlugins = phase.plugins.filter(plugin =>
+  const activePlugins = (phase.plugins ?? []).filter(plugin =>
     phaseIsEnabled(plans.get(plugin)!, phase.name),
   );
   const subscriptions = new Set<string>();

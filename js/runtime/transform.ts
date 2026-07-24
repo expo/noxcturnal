@@ -13,7 +13,7 @@ import { Bailout, createDispatcher } from './dispatch.js';
 import { createTransformMetadata, performanceCounters } from './metadata.js';
 import { locationOffset } from './path.js';
 import type { IntentRegistration } from './fragments.js';
-import { native } from '../native/binding.js';
+import { native, nativePreflightOptions } from '../native/binding.js';
 import { decodeRoutedEnvelope, type RoutedEventBatch } from '../protocol/events.js';
 import { packRouteManifest } from '../protocol/manifest.js';
 import type {
@@ -21,6 +21,7 @@ import type {
   EditCommand,
   NativeBailoutResult,
   NativeTransformResult,
+  NativeVlqMap,
   TransformOptions,
   TransformResult,
   FunctionMap,
@@ -40,14 +41,36 @@ export function transform(
   pipeline: NativePipeline,
   options: TransformOptions = {},
 ): TransformResult {
-  const parser = classifyForTransform(parserFilename(filename, options.parser), source);
+  const originalSource = source;
+  let parseFilename = parserFilename(filename, options.parser);
+  let parser = classifyForTransform(parseFilename, source);
+  let adapterMap: NativeVlqMap | null = null;
+  let adapterMetadata: Record<string, unknown> | undefined;
   if (!parser.supported) {
     const adapter = selectParserAdapter(options.parserAdapter, parser);
-    if (adapter) return adapter.transform(source, filename, pipeline, options);
+    if (adapter) {
+      const adapted = adapter.compile(source, filename, options);
+      if (adapted.status === 'unsupported')
+        return {
+          status: 'bailout',
+          reason: adapted.reason,
+          source: originalSource,
+          diagnostics: adapted.diagnostics ?? [],
+        };
+      source = adapted.code;
+      adapterMap = adapted.map;
+      adapterMetadata = adapted.metadata;
+      parseFilename = parserFilename(filename, adapted.syntax);
+      // The adapter's declared output syntax is authoritative even when it
+      // intentionally preserves an `@flow` comment in otherwise plain JS.
+      parser = classifyForTransform(parseFilename, source, adapted.syntax);
+    }
+  }
+  if (!parser.supported) {
     const prepared: { plugin: NativePlugin<any, any>; state: any }[] = [];
     try {
       for (const phase of pipeline.phases)
-        for (const plugin of phase.plugins) {
+        for (const plugin of phase.plugins ?? []) {
           const state = plugin.createState?.();
           prepared.push({ plugin, state });
           plugin.prepare?.(
@@ -62,13 +85,33 @@ export function transform(
       throw error;
     }
   }
-  const originalSource = source;
   const transformStarted = options.debugPerformance ? performance.now() : 0;
   const phasePlanStarted = options.debugPerformance ? performance.now() : 0;
   const phasePlan = compilePhasePlan(pipeline);
+  if (adapterMap != null && pipeline.phases.some(phase => phase.native?.reactCompiler != null)) {
+    return {
+      status: 'bailout',
+      reason: 'react-compiler-original-source-required',
+      source: originalSource,
+      diagnostics: [],
+    };
+  }
   const phasePlanMs = options.debugPerformance ? performance.now() - phasePlanStarted : 0;
   let phaseSource = source;
-  const inputMap = options.inputSourceMap ?? null;
+  let inputMap = options.inputSourceMap ?? null;
+  if (adapterMap != null) {
+    inputMap =
+      inputMap == null
+        ? adapterMap
+        : {
+            mappings: native.composeMappings(
+              adapterMap.mappings,
+              inputMap.mappings,
+              adapterMap.names.length,
+            ),
+            names: [...adapterMap.names, ...inputMap.names],
+          };
+  }
   let finalMap: NativeTransformResult['map'] | null = null;
   const metadata = createTransformMetadata(
     options.debugPerformance,
@@ -76,6 +119,7 @@ export function transform(
     Buffer.byteLength(source),
     phasePlanMs,
   );
+  if (adapterMetadata != null) metadata.sourceAdapter = adapterMetadata;
   const diagnostics: Diagnostic[] = [];
   const intents = new Map<string, IntentRegistration>();
   const provenance = { degradations: 0 };
@@ -96,6 +140,65 @@ export function transform(
       const phase = pipeline.phases[phaseIndex];
       const observationSource =
         phasePlan[phaseIndex].observes === 'original' ? originalSource : phaseSource;
+      if (phase.native != null) {
+        reusableSession?.close();
+        reusableSession = null;
+        reusableRoutedBatch = null;
+        openSession = null;
+        if (pendingEdits.length > 0)
+          throw new Error(`${phase.name}: native phase received uncommitted visitor edits`);
+        if (observationSource !== phaseSource)
+          throw new Error(`${phase.name}: native phases must observe rendered source`);
+        const nativeStarted = options.debugPerformance ? performance.now() : 0;
+        const result = native.nativePreflightTransform(
+          observationSource,
+          parseFilename,
+          nativePreflightOptions(phase.native),
+        );
+        if (options.debugPerformance) {
+          const elapsed = performance.now() - nativeStarted;
+          performanceCounters(metadata).nativeTransformMs += elapsed;
+          performanceCounters(metadata).nativeAndDecodeMs += elapsed;
+          const performanceMetadata = metadata.performance as {
+            nativeParses: number;
+            reparses: number;
+            renderedBytes: number;
+            mappingSegments: number;
+            phaseExecutions: unknown[];
+          };
+          performanceMetadata.nativeParses++;
+          if (phaseIndex + 1 < pipeline.phases.length) performanceMetadata.reparses++;
+          performanceMetadata.renderedBytes += Buffer.byteLength(result.code ?? '');
+          performanceMetadata.mappingSegments += result.map ? decodedSegmentCount(result.map) : 0;
+          performanceMetadata.phaseExecutions.push({
+            name: phase.name,
+            observes: phasePlan[phaseIndex].observes,
+            editEffect: 'whole-program',
+            source: 'rendered',
+            reusedParse: false,
+            render: result.status === 'complete' ? 'committed' : 'unchanged',
+            nativeTransformMs: elapsed,
+          });
+        }
+        for (const message of result.diagnostics)
+          diagnostics.push({
+            code: result.status === 'unsupported' ? 'unsupported' : 'native-transform',
+            message,
+            phase: phase.name,
+          });
+        if (result.status === 'unsupported')
+          throw new Bailout(`${phase.name}:${result.reason ?? 'unsupported'}`);
+        if (result.code == null || result.map == null)
+          throw new Error(`${phase.name}: native transform returned an incomplete result`);
+        phaseSource = result.code;
+        mapLayers.push(result.map);
+        if (result.helpersUsed.length > 0)
+          metadata.nativeHelpers = [
+            ...((metadata.nativeHelpers as string[] | undefined) ?? []),
+            ...result.helpersUsed,
+          ];
+        continue;
+      }
       if (reusableSession && reusableSession.source !== observationSource) {
         reusableSession.close();
         reusableSession = null;
@@ -226,8 +329,11 @@ export function transform(
         retainedSession ??
         new NativeTransformSession(
           observationSource,
-          filename,
-          options,
+          parseFilename,
+          // `parseFilename` is already normalized, including an adapter's
+          // authoritative JS/JSX output mode. Do not apply the caller's original
+          // parser override a second time inside NativeTransformSession.
+          { ...options, parser: 'auto' },
           requiresIndex ? retentionManifest : undefined,
           requiresIndex ? manifest : undefined,
           true,
@@ -264,7 +370,7 @@ export function transform(
             session.recordStatelessParse();
             const routedBuffer = native.materializeRoutedBuffer(
               observationSource,
-              parserFilename(filename, options.parser),
+              parseFilename,
               manifest,
             );
             if (
@@ -485,7 +591,7 @@ export function transform(
     const functionMapStarted = options.debugPerformance ? performance.now() : 0;
     const functionMap = options.functionMap
       ? (nativeFunctionMap ??
-        native.generateFunctionMap(originalSource, parserFilename(filename, options.parser)))
+        native.generateFunctionMap(adapterMap == null ? originalSource : source, parseFilename))
       : null;
     if (options.debugPerformance)
       performanceCounters(metadata).functionMapMs = performance.now() - functionMapStarted;
