@@ -1,25 +1,20 @@
-import type { NativeFieldKey, NativeNodeType } from './generated-event-schema.js';
+import type {
+  NativeFieldKey,
+  NativeNodeFields,
+  NativeNodeType,
+  NativeRouteFields,
+  NativeRouteTypes,
+} from './generated-event-schema.js';
 
 export type { NativeFieldKey, NativeNodeType } from './generated-event-schema.js';
-export type NativeVisitorAlias =
-  | 'Function'
-  | 'Statement'
-  | 'Declaration'
-  | 'Expression'
-  | 'MemberExpression'
-  | 'MetaProperty'
-  | 'ReferencedIdentifier'
-  | 'FunctionDeclaration'
-  | 'FunctionExpression'
-  | 'TSDeclareFunction'
-  | 'ClassDeclaration'
-  | 'ClassExpression'
-  | '*';
+/** Alias route names, derived from the generated expansion table. */
+export type NativeVisitorAlias = Extract<keyof NativeRouteTypes, string>;
 export type NativeVisitorRoute = NativeNodeType | NativeVisitorAlias;
 export type ScalarValue = string | number | boolean | null;
-export type ScalarPredicate =
-  | { equals: ScalarValue }
-  | { oneOf: readonly ScalarValue[] }
+/** A declarative native match operation, typed by the field's wire value. */
+export type ScalarPredicate<V extends ScalarValue = ScalarValue> =
+  | { equals: V }
+  | { oneOf: readonly V[] }
   | { present: boolean };
 export type ControlFlowCapability =
   | 'skip'
@@ -109,66 +104,28 @@ export interface NodeView {
   readonly [field: string]: unknown;
 }
 
-export interface IdentifierView extends NodeView {
-  readonly type: 'Identifier';
-  readonly name: string;
-  readonly global?: boolean;
-  readonly binding?: boolean;
-  readonly bindingScopeId?: ScopeId;
-  readonly read?: boolean;
-  readonly write?: boolean;
-}
-export interface StringLiteralView extends NodeView {
-  readonly type: 'StringLiteral';
-  readonly value: string;
-}
-export interface NumericLiteralView extends NodeView {
-  readonly type: 'NumericLiteral';
-  readonly value: number;
-}
-export interface BooleanLiteralView extends NodeView {
-  readonly type: 'BooleanLiteral';
-  readonly value: boolean;
-}
-export interface CallExpressionView extends NodeView {
-  readonly type: 'CallExpression';
-  readonly optional: boolean;
-  readonly argumentCount: number;
-  readonly calleeName?: string;
-  readonly calleeGlobal?: boolean;
-  readonly staticArgument?: string;
-}
-export interface FunctionView extends NodeView {
-  readonly type: 'Function' | 'ArrowFunctionExpression';
-  readonly name?: string;
-  readonly async: boolean;
-  readonly generator?: boolean;
-  readonly bodyStart: number;
-  readonly bodyEnd: number;
-}
-export interface ImportDeclarationView extends NodeView {
-  readonly type: 'ImportDeclaration';
-  readonly source: string;
-}
-export interface ExportNamedDeclarationView extends NodeView {
-  readonly type: 'ExportNamedDeclaration';
-  readonly source?: string;
-}
-export interface NativeNodeMap {
-  Identifier: IdentifierView;
-  StringLiteral: StringLiteralView;
-  NumericLiteral: NumericLiteralView;
-  BooleanLiteral: BooleanLiteralView;
-  CallExpression: CallExpressionView;
-  Function: FunctionView;
-  ArrowFunctionExpression: FunctionView;
-  ImportDeclaration: ImportDeclarationView;
-  ExportNamedDeclaration: ExportNamedDeclarationView;
-}
+/** Typed node views for every concrete node type with generated field data. */
+export type NativeNodeMap = {
+  [K in Extract<keyof NativeNodeFields, string>]: NodeView & {
+    readonly type: K;
+  } & NativeNodeFields[K];
+};
 export type KnownNodeType = keyof NativeNodeMap;
 export type NodeOfType<T extends string> = T extends KnownNodeType
   ? NativeNodeMap[T]
   : NodeView & { readonly type: T };
+
+export type IdentifierView = NativeNodeMap['Identifier'];
+export type StringLiteralView = NativeNodeMap['StringLiteral'];
+export type NumericLiteralView = NativeNodeMap['NumericLiteral'];
+export type BooleanLiteralView = NativeNodeMap['BooleanLiteral'];
+export type CallExpressionView = NativeNodeMap['CallExpression'];
+/** Function and arrow-function events, as the `Function` alias route sees them. */
+export type FunctionView = NodeView & {
+  readonly type: NativeRouteTypes['Function'];
+} & NativeRouteFields['Function'];
+export type ImportDeclarationView = NativeNodeMap['ImportDeclaration'];
+export type ExportNamedDeclarationView = NativeNodeMap['ExportNamedDeclaration'];
 
 export interface NodeSummary {
   id: NodeId;

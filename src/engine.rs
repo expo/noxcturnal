@@ -17,8 +17,8 @@ pub use crate::event_types::{
 };
 use crate::function_map::{FunctionMap, FunctionMapCollector};
 use crate::generated_event_schema::{
-    NODE_TYPE_COUNT, ast_kind_protocol_id, field_key_id, field_key_name, node_type_id,
-    node_type_name, predicate_field_supported,
+    NODE_TYPE_COUNT, alias_matches, ast_kind_protocol_id, field_key_id, field_key_name,
+    node_type_id, node_type_name, predicate_field_supported,
 };
 use crate::retained_index::{
     NativeBindingFact, NativeCallFact, NativeCaptureReference, NativeConstantFact, RetainedIndex,
@@ -492,64 +492,6 @@ fn utf16_index<'a>(source: &str, allocator: &'a Allocator) -> ArenaVec<'a, u32> 
     }
     offsets[source.len()] = utf16;
     offsets
-}
-
-fn alias_matches(subscription: &str, node_type: &str) -> bool {
-    subscription == "*"
-        || subscription == node_type
-        || (subscription == "Function"
-            && matches!(
-                node_type,
-                "Function"
-                    | "ArrowFunctionExpression"
-                    | "FunctionDeclaration"
-                    | "FunctionExpression"
-            ))
-        || (subscription == "Statement"
-            && (node_type.ends_with("Statement") || declaration_subscription(node_type)))
-        || (subscription == "Declaration" && declaration_subscription(node_type))
-        || (subscription == "MemberExpression"
-            && matches!(
-                node_type,
-                "StaticMemberExpression" | "ComputedMemberExpression" | "PrivateFieldExpression"
-            ))
-        || (subscription == "Expression" && expression_subscription(node_type))
-        || (subscription == "ReferencedIdentifier" && node_type == "Identifier")
-        || (subscription == "MetaProperty" && matches!(node_type, "ImportMeta" | "NewTarget"))
-        || (matches!(
-            subscription,
-            "FunctionDeclaration" | "FunctionExpression" | "TSDeclareFunction"
-        ) && node_type == "Function")
-        || (matches!(subscription, "ClassDeclaration" | "ClassExpression") && node_type == "Class")
-}
-
-fn expression_subscription(node_type: &str) -> bool {
-    node_type.ends_with("Expression")
-        || matches!(
-            node_type,
-            "Identifier"
-                | "StringLiteral"
-                | "NumericLiteral"
-                | "BooleanLiteral"
-                | "BigIntLiteral"
-                | "RegExpLiteral"
-                | "NullLiteral"
-                | "TemplateLiteral"
-        )
-}
-
-fn declaration_subscription(node_type: &str) -> bool {
-    node_type.ends_with("Declaration")
-        || matches!(
-            node_type,
-            "Function"
-                | "Class"
-                | "TSEnumDeclaration"
-                | "TSInterfaceDeclaration"
-                | "TSTypeAliasDeclaration"
-                | "TSModuleDeclaration"
-                | "TSImportEqualsDeclaration"
-        )
 }
 
 fn packed_scalar(key: &str, value: &str) -> Option<u32> {

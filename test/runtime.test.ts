@@ -2262,6 +2262,130 @@ test('distinguishes control-flow and class child roles needed by structural fixe
   });
 });
 
+test('serves every generated child role family through the runtime selector', () => {
+  const observed: Record<string, string[]> = {};
+  const collect = (key: string, value: unknown) => {
+    const paths = Array.isArray(value) ? value : value == null ? [] : [value];
+    (observed[key] ??= []).push(
+      ...paths.map(path => (path as { sourceText(): string }).sourceText()),
+    );
+  };
+  const plugin = defineNativePlugin({
+    name: 'generated-child-roles',
+    visitors: [
+      defineVisitor(
+        'IfStatement',
+        {
+          children: {
+            test: { route: 'Expression' },
+            consequent: { route: 'Statement' },
+            alternate: { route: 'Statement' },
+          },
+        },
+        path => {
+          collect('test', path.get('test'));
+          collect('consequent', path.get('consequent'));
+          collect('alternate', path.get('alternate'));
+        },
+      ),
+      defineVisitor(
+        'BinaryExpression',
+        { children: { left: { route: 'Expression' }, right: { route: 'Expression' } } },
+        path => {
+          collect('left', path.get('left'));
+          collect('right', path.get('right'));
+        },
+      ),
+      defineVisitor(
+        'StaticMemberExpression',
+        { children: { object: { route: 'Expression' }, property: { route: 'Identifier' } } },
+        path => {
+          collect('object', path.get('object'));
+          collect('property', path.get('property'));
+        },
+      ),
+      defineVisitor(
+        'ReturnStatement',
+        { children: { argument: { route: 'Expression' } } },
+        path => {
+          collect('argument', path.get('argument'));
+        },
+      ),
+      defineVisitor(
+        'ArrayExpression',
+        { children: { elements: { route: 'Expression' } } },
+        path => {
+          collect('elements', path.get('elements'));
+        },
+      ),
+      defineVisitor('Program', { children: { directives: { route: 'Directive' } } }, path => {
+        collect('directives', path.get('directives'));
+      }),
+    ],
+  });
+  transform(
+    "'use strict';\nfunction pick() { if (flags.enabled === true) { return [first, second]; } else { return null; } }",
+    'fixture.js',
+    defineNativePipeline({ phases: [{ name: 'inspect', plugins: [plugin] }] }),
+  );
+  assert.deepEqual(observed, {
+    test: ['flags.enabled === true'],
+    consequent: ['{ return [first, second]; }'],
+    alternate: ['{ return null; }'],
+    left: ['flags.enabled'],
+    right: ['true'],
+    object: ['flags'],
+    property: ['enabled'],
+    argument: ['[first, second]', 'null'],
+    elements: ['first', 'second'],
+    directives: ["'use strict';"],
+  });
+});
+
+test('rejects unknown child roles at definition time and names the valid set', () => {
+  const plugin = defineNativePlugin({
+    name: 'bad-child-role',
+    visitors: [
+      defineVisitor(
+        'VariableDeclaration',
+        { children: { nonsenseRole: { route: 'VariableDeclarator' } } } as never,
+        () => {},
+      ),
+    ],
+  });
+  assert.throws(
+    () =>
+      transform(
+        'let x = 1;',
+        'fixture.js',
+        defineNativePipeline({ phases: [{ name: 'visit', plugins: [plugin] }] }),
+      ),
+    /unknown child role nonsenseRole for route VariableDeclaration \(valid roles: declarations\)/,
+  );
+});
+
+test('rejects child routes a role cannot deliver at definition time', () => {
+  const plugin = defineNativePlugin({
+    name: 'bad-child-route',
+    visitors: [
+      defineVisitor(
+        'VariableDeclaration',
+        { children: { declarations: { route: 'Identifier' } } } as never,
+        () => {},
+      ),
+    ],
+  });
+  assert.throws(
+    () =>
+      transform(
+        'let x = 1;',
+        'fixture.js',
+        defineNativePipeline({ phases: [{ name: 'visit', plugins: [plugin] }] }),
+      ),
+    /child role VariableDeclaration\.declarations cannot deliver route Identifier/,
+  );
+});
+
 test('implements a Platform.select-style transform through declared compact roles', () => {
   const plugin = defineNativePlugin({
     name: 'platform-select',

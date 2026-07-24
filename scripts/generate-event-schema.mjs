@@ -6,6 +6,135 @@ import { fileURLToPath } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const schema = JSON.parse(fs.readFileSync(path.join(root, 'protocol/event-schema.json'), 'utf8'));
 
+// ---------------------------------------------------------------------------
+// Route model shared by every emitted table. A route expands to the concrete
+// node types it can deliver; carriers are the concrete types with field data.
+// ---------------------------------------------------------------------------
+const ALIASES = schema.aliases;
+const expansionOf = route =>
+  route === '*'
+    ? schema.nodeTypes
+    : (ALIASES[route] ?? (schema.nodeTypes.includes(route) ? [route] : []));
+
+/** Normalized field rows: route -> field -> { type, optional }. */
+const carrierRows = Object.fromEntries(
+  Object.entries(schema.fieldTypes).map(([route, fields]) => [
+    route,
+    Object.fromEntries(
+      Object.entries(fields).map(([key, type]) => [
+        key.replace(/\?$/, ''),
+        { type, optional: key.endsWith('?') },
+      ]),
+    ),
+  ]),
+);
+
+/** Union semantics across an expansion: a field is present when any member emits
+ * it, and required only when every member requires it. */
+function unionRow(members) {
+  const row = {};
+  for (const member of members) {
+    for (const [field, spec] of Object.entries(carrierRows[member] ?? {})) {
+      const entry = (row[field] ??= { types: [], optional: false });
+      if (!entry.types.includes(spec.type)) entry.types.push(spec.type);
+      entry.optional ||= spec.optional;
+    }
+  }
+  for (const [field, entry] of Object.entries(row)) {
+    entry.optional ||= members.some(member => carrierRows[member]?.[field] == null);
+  }
+  return Object.fromEntries(
+    Object.entries(row).map(([field, entry]) => [
+      field,
+      { type: entry.types.join(' | '), optional: entry.optional },
+    ]),
+  );
+}
+
+const routeRows = {};
+for (const carrier of Object.keys(carrierRows)) routeRows[carrier] = carrierRows[carrier];
+for (const alias of Object.keys(ALIASES)) routeRows[alias] = unionRow(ALIASES[alias]);
+routeRows['*'] = unionRow(schema.nodeTypes);
+// Collapsed function/class keys and ReferencedIdentifier compile an implicit
+// native predicate (nodeKind equals / global present), so their rows narrow.
+for (const key of ['FunctionDeclaration', 'FunctionExpression', 'TSDeclareFunction']) {
+  routeRows[key] = { ...carrierRows.Function, nodeKind: { type: `'${key}'`, optional: false } };
+}
+for (const key of ['ClassDeclaration', 'ClassExpression']) {
+  routeRows[key] = { ...carrierRows.Class, nodeKind: { type: `'${key}'`, optional: false } };
+}
+{
+  const { binding: _binding, ...identifier } = carrierRows.Identifier;
+  routeRows.ReferencedIdentifier = {
+    ...identifier,
+    global: { type: 'boolean', optional: false },
+  };
+}
+
+/** Predicate rows mirror runtime intersection semantics: a predicate field must be
+ * valid for every concrete type the route expands to. */
+function predicateRow(route) {
+  const members = expansionOf(route);
+  if (members.length === 0) return {};
+  let keys = schema.predicateFields[members[0]] ?? [];
+  for (const member of members.slice(1)) {
+    const memberFields = schema.predicateFields[member] ?? [];
+    keys = keys.filter(field => memberFields.includes(field));
+  }
+  const row = {};
+  for (const field of keys) {
+    const types = [];
+    for (const member of members) {
+      const spec = routeRows[route]?.[field] ?? carrierRows[member]?.[field];
+      if (spec && !types.includes(spec.type)) types.push(spec.type);
+    }
+    row[field] = types.join(' | ') || 'string | number | boolean | null';
+  }
+  return row;
+}
+const predicateRows = {};
+for (const route of Object.keys(routeRows)) {
+  const row = predicateRow(route);
+  if (Object.keys(row).length > 0) predicateRows[route] = row;
+}
+
+/** Child-role rows: concrete types from the authored table; alias and collapsed
+ * routes take the intersection of their expansion members' roles. */
+function childRow(route) {
+  const members = expansionOf(route);
+  if (members.length === 0) return {};
+  const first = schema.childRoles[members[0]];
+  if (first == null) return {};
+  const row = {};
+  for (const [role, declaration] of Object.entries(first)) {
+    const declarations = [declaration];
+    let shared = true;
+    for (const member of members.slice(1)) {
+      const other = schema.childRoles[member]?.[role];
+      if (other == null) {
+        shared = false;
+        break;
+      }
+      declarations.push(other);
+    }
+    if (!shared) continue;
+    const childTypes = [
+      ...new Set(declarations.flatMap(entry => entry.routes.flatMap(expansionOf))),
+    ];
+    const listFlags = [...new Set(declarations.map(entry => entry.list))];
+    row[role] = { childTypes, list: listFlags.length === 1 ? listFlags[0] : 'mixed' };
+  }
+  return row;
+}
+const childRows = {};
+for (const route of [...Object.keys(schema.childRoles), ...Object.keys(ALIASES)]) {
+  const row = childRow(route);
+  if (Object.keys(row).length > 0) childRows[route] = row;
+}
+
+// ---------------------------------------------------------------------------
+// Rust output
+// ---------------------------------------------------------------------------
 function rustMatch(name, values) {
   const arms = values
     .map((value, index) => `        ${JSON.stringify(value)} => ${index + 1},`)
@@ -32,12 +161,132 @@ const rustPredicateFields = `pub(crate) fn predicate_field_supported(node_type_i
     ),
   )
   .join('\n            | ')}\n    )\n}\n`;
-const rust = `// Generated by scripts/generate-event-schema.mjs. Do not edit.\n\npub(crate) const NODE_TYPE_COUNT: usize = ${schema.nodeTypes.length};\n\n${rustMatch('node_type_id', schema.nodeTypes)}\n${rustReverse}\n${rustMatch('field_key_id', schema.fieldKeys)}\n${rustFieldReverse}\n${rustPredicateFields}\n${rustAstKind}`;
-const ts = `// Generated by scripts/generate-event-schema.mjs. Do not edit.\n\nexport const NODE_TYPES = ${JSON.stringify(['', ...schema.nodeTypes])} as const;\nexport type NativeNodeType = Exclude<(typeof NODE_TYPES)[number], ''>;\nexport const NODE_TYPE_IDS = new Map<string, number>(NODE_TYPES.map((value, index) => [value, index]));\nexport const FIELD_KEYS = ${JSON.stringify(['', ...schema.fieldKeys])} as const;\nexport type NativeFieldKey = Exclude<(typeof FIELD_KEYS)[number], ''>;\nexport const FIELD_KEY_IDS = new Map<string, number>(FIELD_KEYS.map((value, index) => [value, index]));\nexport const PREDICATE_FIELDS: Readonly<Record<string, readonly string[]>> = ${JSON.stringify(schema.predicateFields)};\nexport interface NativeRouteFieldNames {\n${Object.entries(
-  schema.predicateFields,
-)
-  .map(([type, fields]) => `  ${type}: ${fields.map(field => JSON.stringify(field)).join(' | ')};`)
-  .join('\n')}\n}\n`;
+const aliasArms = Object.entries(ALIASES)
+  .map(([alias, expansion]) => {
+    const members = expansion.filter(type => type !== alias).map(type => JSON.stringify(type));
+    // Match rustfmt: a single-line matches! when it fits in 100 columns.
+    const singleLine = `        ${JSON.stringify(alias)} => matches!(node_type, ${members.join(' | ')}),`;
+    if (singleLine.length <= 100) return singleLine;
+    const multiLineMembers = members.join('\n                | ');
+    const packed = `            ${members.join(' | ')}`;
+    return `        ${JSON.stringify(alias)} => matches!(\n            node_type,\n${
+      packed.length <= 100 ? packed : `            ${multiLineMembers}`
+    }\n        ),`;
+  })
+  .join('\n');
+const rustAliasMatches = `pub(crate) fn alias_matches(subscription: &str, node_type: &str) -> bool {\n    if subscription == "*" || subscription == node_type {\n        return true;\n    }\n    match subscription {\n${aliasArms}\n        _ => false,\n    }\n}\n`;
+const rust = `// Generated by scripts/generate-event-schema.mjs. Do not edit.\n\npub(crate) const NODE_TYPE_COUNT: usize = ${schema.nodeTypes.length};\n\n${rustMatch('node_type_id', schema.nodeTypes)}\n${rustReverse}\n${rustMatch('field_key_id', schema.fieldKeys)}\n${rustFieldReverse}\n${rustPredicateFields}\n${rustAliasMatches}\n${rustAstKind}`;
+
+// ---------------------------------------------------------------------------
+// TypeScript output
+// ---------------------------------------------------------------------------
+const namedImports = [
+  ...new Set(
+    Object.values(schema.fieldTypes).flatMap(fields =>
+      Object.values(fields).flatMap(type => type.match(/\b[A-Z][A-Za-z0-9]*\b/g) ?? []),
+    ),
+  ),
+].sort();
+
+const renderRow = row =>
+  Object.entries(row)
+    .map(([field, spec]) => `    readonly ${field}${spec.optional ? '?' : ''}: ${spec.type};`)
+    .join('\n');
+const renderInterface = (name, rows, renderValue) =>
+  `export interface ${name} {\n${Object.entries(rows)
+    .map(([route, row]) => `  ${JSON.stringify(route)}: ${renderValue(row)};`)
+    .join('\n')}\n}\n`;
+const objectRow = row => `{\n${renderRow(row)}\n  }`;
+const literalUnion = values => values.map(value => JSON.stringify(value)).join(' | ');
+
+const tsRouteTypes = `export interface NativeRouteTypes {\n${[
+  ...Object.entries(ALIASES).map(
+    ([alias, expansion]) => `  ${JSON.stringify(alias)}: ${literalUnion(expansion)};`,
+  ),
+  `  '*': NativeNodeType;`,
+].join('\n')}\n}\n`;
+
+// Routes whose row equals their carrier row resolve through the type-level
+// fallback onto NativeNodeFields; only divergent rows are emitted. A carrier
+// name diverges only when it doubles as an alias (`Function`).
+const divergesFromCarrier = route =>
+  !(route in carrierRows) || expansionOf(route).join('|') !== route;
+const pickDivergent = rows =>
+  Object.fromEntries(Object.entries(rows).filter(([route]) => divergesFromCarrier(route)));
+
+const tsNodeFields = renderInterface('NativeNodeFields', carrierRows, objectRow);
+const tsRouteFields = renderInterface('NativeRouteFields', pickDivergent(routeRows), objectRow);
+const tsRoutePredicates = renderInterface(
+  'NativeRoutePredicates',
+  pickDivergent(predicateRows),
+  row =>
+    `{\n${Object.entries(row)
+      .map(([field, type]) => `    readonly ${field}: ${type};`)
+      .join('\n')}\n  }`,
+);
+const tsChildRoles = renderInterface(
+  'NativeChildRoles',
+  childRows,
+  row =>
+    `{\n${Object.entries(row)
+      .map(
+        ([role, spec]) =>
+          `    readonly ${JSON.stringify(role)}: { readonly child: ${literalUnion(spec.childTypes)}; readonly list: ${
+            spec.list === 'mixed' ? 'boolean' : spec.list
+          } };`,
+      )
+      .join('\n')}\n  }`,
+);
+
+const runtimeChildRoles = Object.fromEntries(
+  Object.entries(schema.childRoles).map(([type, roles]) => [
+    type,
+    Object.fromEntries(
+      Object.entries(roles).map(([role, declaration]) => [
+        role,
+        { types: [...new Set(declaration.routes.flatMap(expansionOf))], list: declaration.list },
+      ]),
+    ),
+  ]),
+);
+
+const ts = `// Generated by scripts/generate-event-schema.mjs. Do not edit.
+
+import type { ${namedImports.join(', ')} } from '@oxc-project/types';
+
+export const NODE_TYPES = ${JSON.stringify(['', ...schema.nodeTypes])} as const;
+export type NativeNodeType = Exclude<(typeof NODE_TYPES)[number], ''>;
+export const NODE_TYPE_IDS = new Map<string, number>(NODE_TYPES.map((value, index) => [value, index]));
+export const FIELD_KEYS = ${JSON.stringify(['', ...schema.fieldKeys])} as const;
+export type NativeFieldKey = Exclude<(typeof FIELD_KEYS)[number], ''>;
+export const FIELD_KEY_IDS = new Map<string, number>(FIELD_KEYS.map((value, index) => [value, index]));
+export const PREDICATE_FIELDS: Readonly<Record<string, readonly string[]>> = ${JSON.stringify(schema.predicateFields)};
+/** Alias route expansions: every concrete node type an alias route delivers.
+ * Aliases that shadow a concrete type (\`Function\`) include it. */
+export const ALIAS_EXPANSIONS: Readonly<Record<string, readonly string[]>> = ${JSON.stringify(ALIASES)};
+/** Child roles per concrete node type: the concrete types a declared child
+ * contract may claim for the role, and whether the role selects a list. */
+export const CHILD_ROLES: Readonly<
+  Record<string, Readonly<Record<string, { readonly types: readonly string[]; readonly list: boolean }>>>
+> = ${JSON.stringify(runtimeChildRoles)};
+/** Concrete expansions of alias routes as literal unions. Concrete routes expand
+ * to themselves and are resolved structurally by consumers. */
+${tsRouteTypes}
+/** Wire field value types per concrete node type. */
+${tsNodeFields}
+/** Wire field value types for routes that diverge from their concrete carrier:
+ * alias routes with union semantics across their expansion and implicit-predicate
+ * specializations. Concrete routes resolve through NativeNodeFields. */
+${tsRouteFields}
+/** Native predicate fields for routes that diverge from their concrete carrier,
+ * with runtime intersection semantics: a predicate must be valid for every
+ * concrete type in the route's expansion. Concrete routes resolve through
+ * NativeNodeFields with optionality stripped (their predicate fields and field
+ * types coincide by schema validation). */
+${tsRoutePredicates}
+/** Statically declarable child roles per route (intersection across expansions). */
+${tsChildRoles}`;
+
 const outputs = [
   [path.join(root, 'src/generated_event_schema.rs'), rust],
   [path.join(root, 'js/generated-event-schema.ts'), ts],

@@ -1,8 +1,16 @@
 import { createHash } from 'node:crypto';
-import type { NativeRouteFieldNames } from './generated-event-schema.js';
+import type {
+  NativeChildRoles,
+  NativeNodeFields,
+  NativeRouteFields,
+  NativeRoutePredicates,
+  NativeRouteTypes,
+} from './generated-event-schema.js';
 
 import { native, type NativeIndexedSessionBinding } from './native.js';
 import {
+  ALIAS_EXPANSIONS,
+  CHILD_ROLES,
   FIELD_KEY_IDS,
   NODE_TYPE_IDS,
   NODE_TYPES,
@@ -46,6 +54,7 @@ import type {
   FunctionMap,
   ControlFlowCapability,
   ScalarPredicate,
+  ScalarValue,
   EditEffect,
   PhaseObservation,
 } from './types.js';
@@ -92,7 +101,10 @@ export interface PluginContext {
   unsupported(reason: string): never;
   stopAll(): void;
   subscribeRemaining(...types: string[]): void;
-  revisitProgram(visitors: readonly DefinedVisitor<any>[], state?: unknown): void;
+  /** Revisit the program with visitors whose handlers require no state. */
+  revisitProgram(visitors: readonly DefinedVisitor<unknown>[]): void;
+  /** Revisit the program with stateful visitors; their state is mandatory. */
+  revisitProgram<State>(visitors: readonly DefinedVisitor<State>[], state: State): void;
   /**
    * Insert a helper at the end of the directive prologue, once per transform.
    *
@@ -238,7 +250,10 @@ export interface NativeNodePath<T extends NodeView = NodeView> {
   appendToBody(code: Code): void;
   skip(): void;
   stop(): void;
-  traverse<State>(visitors: readonly DefinedVisitor<State>[], state?: State): void;
+  /** Traverse with visitors whose handlers require no state. */
+  traverse(visitors: readonly DefinedVisitor<unknown>[]): void;
+  /** Traverse with stateful visitors; the state they require is mandatory. */
+  traverse<State>(visitors: readonly DefinedVisitor<State>[], state: State): void;
   subscribeWithin(types: NativeVisitorRoute | readonly NativeVisitorRoute[]): void;
   subscribeForScope(types: NativeVisitorRoute | readonly NativeVisitorRoute[]): void;
   unsupported(reason: string): never;
@@ -249,12 +264,6 @@ export interface SnapshotOptions {
   ancestry?: 'none' | 'parent';
 }
 
-type NodeForRoute<Route extends VisitorRouteSpec> =
-  RouteFieldLookup<Route> extends infer Carrier
-    ? Carrier extends NativeNodeType
-      ? NodeOfType<Carrier>
-      : NodeView
-    : never;
 /** Internal callback shape after normalization; typing happens at `defineVisitor`. */
 type Handler<State, Node extends NodeView = NodeView> = (
   path: NativeNodePath<Node>,
@@ -277,26 +286,95 @@ export type AncestryCapability =
 /** A visitor route: one route name or a `|`-joined composite. */
 export type VisitorRouteSpec = NativeVisitorRoute | `${NativeVisitorRoute}|${string}`;
 
-/** Literal keys of `T`, with index signatures stripped. */
-type KnownKeys<T> = keyof { [K in keyof T as string extends K ? never : K]: 0 };
+/** The segments of a composite route, as a union. */
+type RouteSegments<Route extends string> = Route extends `${infer Head}|${infer Rest}`
+  ? Head | RouteSegments<Rest>
+  : Route;
 
-/** Collapsed and semantic routes read their fields (and node view) from the
- * concrete carrier type. */
-type RouteFieldLookup<Route extends VisitorRouteSpec> = Route extends 'ReferencedIdentifier'
-  ? 'Identifier'
-  : Route extends 'FunctionDeclaration' | 'FunctionExpression' | 'TSDeclareFunction'
-    ? 'Function'
-    : Route extends 'ClassDeclaration' | 'ClassExpression'
-      ? 'Class'
-      : Route;
+/** Compile-time mirror of `concreteRouteTypes`: every composite segment must be a
+ * route name. Valid specs resolve to `unknown` (an identity intersection); invalid
+ * segments resolve to an explanatory literal the compiler surfaces. */
+type ValidRouteSpec<Route extends string> = Route extends `${infer Head}|${infer Rest}`
+  ? Head extends NativeVisitorRoute
+    ? ValidRouteSpec<Rest>
+    : `Unknown route segment '${Head}'`
+  : Route extends NativeVisitorRoute
+    ? unknown
+    : `Unknown route segment '${Route}'`;
 
-/** Payload fields declarable for a route, generated from the protocol schema;
- * routes without generated field data accept any field key and rely on runtime
- * validation. */
-type DeclaredFieldKey<Route extends VisitorRouteSpec> =
-  RouteFieldLookup<Route> extends keyof NativeRouteFieldNames
-    ? Extract<NativeRouteFieldNames[RouteFieldLookup<Route>], NativeFieldKey>
-    : NativeFieldKey;
+/** The concrete node types one route segment can deliver. */
+type SegmentNodeTypes<Segment extends string> = Segment extends keyof NativeRouteTypes
+  ? NativeRouteTypes[Segment]
+  : Extract<Segment, NativeNodeType>;
+
+/** The concrete node types a route (or composite) can deliver. */
+type RouteNodeTypes<Route extends string> = SegmentNodeTypes<RouteSegments<Route>>;
+
+/** A segment's field row: explicit route rows cover aliases and specializations;
+ * concrete carriers resolve straight to their generated node row. */
+type SegmentFieldsRow<Segment extends string> = Segment extends keyof NativeRouteFields
+  ? NativeRouteFields[Segment]
+  : Segment extends keyof NativeNodeFields
+    ? NativeNodeFields[Segment]
+    : {};
+
+/** Payload fields declarable for a route: any field some concrete type in the
+ * expansion emits (union semantics, matching how the native side realizes them). */
+type DeclaredFieldKey<Route extends string> =
+  RouteSegments<Route> extends infer Segment
+    ? Segment extends string
+      ? Extract<keyof SegmentFieldsRow<Segment>, NativeFieldKey>
+      : never
+    : never;
+
+/** A segment's predicate row. Concrete carriers derive it from their node row:
+ * the schema validates that predicate fields and typed fields coincide, and
+ * predicates ignore emission optionality (a missing field simply never matches). */
+type SegmentPredicateRow<Segment extends string> = Segment extends keyof NativeRoutePredicates
+  ? NativeRoutePredicates[Segment]
+  : Segment extends keyof NativeNodeFields
+    ? { [K in keyof NativeNodeFields[Segment]]-?: Exclude<NativeNodeFields[Segment][K], undefined> }
+    : {};
+/** Union of the segments' predicate rows; `keyof` over it intersects the keys,
+ * mirroring the runtime rule that a predicate must hold for every concrete type. */
+type RoutePredicateRows<Route extends string> = SegmentPredicateRow<RouteSegments<Route>>;
+type RoutePredicateKeys<Route extends string> = keyof RoutePredicateRows<Route> & string;
+
+/** Native match predicates declarable for a route, typed by the field's wire
+ * value. Routes whose expansion shares no predicate fields accept none. */
+export type RouteWhere<Route extends string> = {
+  readonly [K in RoutePredicateKeys<Route>]?: ScalarPredicate<
+    Extract<RoutePredicateRows<Route>[K], ScalarValue>
+  >;
+};
+
+type SegmentChildRow<Segment extends string> = Segment extends keyof NativeChildRoles
+  ? NativeChildRoles[Segment]
+  : {};
+type RouteChildRows<Route extends string> = SegmentChildRow<RouteSegments<Route>>;
+/** Child roles declarable for a route: the role must exist on every segment. */
+type RouteChildRoleNames<Route extends string> = keyof RouteChildRows<Route> & string;
+/** The concrete node types a role may deliver across the route's segments. */
+type RouteChildTypes<Route extends string, Role extends string> =
+  RouteChildRows<Route> extends infer Row
+    ? Row extends object
+      ? Role extends keyof Row
+        ? Row[Role] extends { readonly child: infer Child }
+          ? Child
+          : never
+        : never
+      : never
+    : never;
+type RouteChildIsList<Route extends string, Role extends string> =
+  RouteChildRows<Route> extends infer Row
+    ? Row extends object
+      ? Role extends keyof Row
+        ? Row[Role] extends { readonly list: infer IsList }
+          ? IsList
+          : never
+        : never
+      : never
+    : never;
 
 /** One declared child role: the expected route and the fields its paths carry. */
 export interface ChildContract {
@@ -308,26 +386,58 @@ export interface ChildContract {
 }
 
 /** Values resolved per file by `configure`; never capability shape. */
-export interface VisitorConfiguration {
+export interface VisitorConfiguration<Route extends VisitorRouteSpec = VisitorRouteSpec> {
   enabled?: boolean;
-  where?: Readonly<Partial<Record<NativeFieldKey, ScalarPredicate>>>;
+  where?: RouteWhere<Route>;
+}
+
+/** The configuration as stored: route-erased for runtime consumption. */
+export interface StoredVisitorConfiguration {
+  enabled?: boolean;
+  where?: Readonly<Partial<Record<string, ScalarPredicate>>>;
 }
 
 export interface VisitorContract<Route extends VisitorRouteSpec = VisitorRouteSpec> {
   /** Scalar payload fields transferred to the callback's `path.node`. */
   fields?: readonly DeclaredFieldKey<Route>[];
   /** Native match predicates. Match-only fields are not callback-visible. */
-  where?: Readonly<Partial<Record<NativeFieldKey, ScalarPredicate>>>;
+  where?: RouteWhere<Route>;
   scope?: boolean;
   ancestry?: AncestryCapability;
-  children?: Readonly<Record<string, ChildContract>>;
+  children?: Readonly<Partial<Record<RouteChildRoleNames<Route> | '*', ChildContract>>>;
   controlFlow?: readonly ControlFlowCapability[];
   /** Typed visitors this handler may run via `path.traverse`; their payload and
    * predicate fields join the phase plan so the retained index can serve them. */
   nested?: readonly DefinedVisitor<any>[];
   /** Per-file dynamism with a static shape: enablement and predicate values. */
-  configure?(context: PrepareContext, options: never): VisitorConfiguration;
+  configure?(context: PrepareContext, options: never): VisitorConfiguration<Route>;
 }
+
+/** Deep contract validation applied in `defineVisitor`'s signature: child roles
+ * must exist on the route, a role's declared route must stay within what the role
+ * delivers, and child fields must be declarable for the child's route. Valid
+ * contracts resolve to identity; violations surface an explanatory literal. */
+type ValidateContract<Route extends string, Contract> = Contract extends {
+  children: infer Children;
+}
+  ? { readonly children: ValidateChildren<Route, Children> }
+  : unknown;
+type ValidateChildren<Route extends string, Children> = {
+  readonly [Role in keyof Children]: ValidateChildEntry<Route, Role & string, Children[Role]>;
+};
+type ValidateChildEntry<Route extends string, Role extends string, Entry> = Role extends '*'
+  ? unknown
+  : Role extends RouteChildRoleNames<Route>
+    ? Entry extends { route: infer ChildRoute extends string }
+      ? [RouteNodeTypes<ChildRoute>] extends [RouteChildTypes<Route, Role>]
+        ? { readonly fields?: readonly DeclaredFieldKey<ChildRoute>[] } & (Entry extends {
+            children: infer Grandchildren;
+          }
+            ? { readonly children: ValidateChildren<ChildRoute, Grandchildren> }
+            : unknown)
+        : `Child role '${Role}' of route '${Route}' cannot deliver route '${ChildRoute}'`
+      : never
+    : `Unknown child role '${Role}' for route '${Route}'`;
 
 /** Base identity always present in routed records. */
 export interface ContractNodeBase {
@@ -337,23 +447,38 @@ export interface ContractNodeBase {
   readonly end: number;
 }
 
-/** The callback-visible node: base identity plus declared payload fields. */
-export type ContractNode<
-  Route extends VisitorRouteSpec,
-  Fields extends string,
-> = ContractNodeBase & {
-  readonly [F in Extract<KnownKeys<NodeForRoute<Route>>, Fields>]: NodeForRoute<Route>[F];
-} & {
-  readonly [F in Exclude<
-    Fields,
-    KnownKeys<NodeForRoute<Route>> | keyof ContractNodeBase
-  >]?: unknown;
-};
+/** The callback-visible node: base identity, the segment's concrete `type`
+ * literal(s), and the declared payload fields with generated value types.
+ * Composite routes produce a union discriminated by `type`. */
+export type ContractNode<Route extends VisitorRouteSpec, Fields extends string> =
+  RouteSegments<Route> extends infer Segment
+    ? Segment extends string
+      ? ContractNodeBase & { readonly type: SegmentNodeTypes<Segment> } & Pick<
+            SegmentFieldsRow<Segment>,
+            Extract<Fields, keyof SegmentFieldsRow<Segment>>
+          >
+      : never
+    : never;
+
+/** The `type` literal(s) a path's node can carry, `string` when unknown. */
+type PathNodeTypeOf<Node> = Node extends { readonly type: infer T extends string } ? T : string;
+type PathIsTypes<Node> =
+  string extends PathNodeTypeOf<Node> ? NativeNodeType : PathNodeTypeOf<Node>;
+/** Narrow a (possibly union) node to the members whose `type` covers `T`. */
+type NarrowNodeByType<Node, T extends string> = Node extends {
+  readonly type: infer U extends string;
+}
+  ? string extends U
+    ? NodeOfType<T>
+    : T extends U
+      ? Node & { readonly type: T }
+      : never
+  : never;
 
 /** The always-available path surface: identity, source access, edits, diagnostics. */
 export interface ContractPathBase<Node> {
   readonly id: number;
-  readonly type: string;
+  readonly type: PathNodeTypeOf<Node>;
   readonly start: number;
   readonly end: number;
   readonly node: Node;
@@ -362,7 +487,9 @@ export interface ContractPathBase<Node> {
   sourceText(): string;
   snapshot(options?: SnapshotOptions): Readonly<Node>;
   getLocation(): SourceLocation;
-  is<TType extends NativeNodeType>(type: TType): this is this & { readonly type: TType };
+  is<TType extends PathIsTypes<Node>>(
+    type: TType,
+  ): this is this & { readonly type: TType; readonly node: NarrowNodeByType<Node, TType> };
   matchesPattern(pattern: string, allowPartial?: boolean): boolean;
   replaceWith(code: Code): void;
   replaceWithMultiple(code: readonly Code[]): void;
@@ -381,22 +508,37 @@ export interface ContractPathBase<Node> {
   unsupported(reason: string): never;
 }
 
-interface ParentAccess {
+/**
+ * A path derived from a typed visitor's path — ancestors reached through
+ * `parentPath`/`findParent`/`getFunctionParent`/`getProgramParent` and `'*'`-role
+ * children. Derived paths share the owning route's runtime, so they carry exactly
+ * the owner's declared capabilities and a generic node view rather than the
+ * contract's declared payload.
+ */
+export type DerivedNodePath<Owner> = ContractPathBase<NodeView> &
+  ScopePart<Owner> &
+  AncestryPart<Owner> &
+  ControlPart<Owner>;
+
+interface ParentAccess<Owner> {
   readonly parent: NodeSummary | null;
-  readonly parentPath: NativeNodePath | null;
+  readonly parentPath: DerivedNodePath<Owner> | null;
 }
-interface FindParentAccess {
-  findParent(predicate: (path: NativeNodePath) => boolean): NativeNodePath | null;
-  find(predicate: (path: NativeNodePath) => boolean): NativeNodePath | null;
+interface FindParentAccess<Owner> {
+  findParent(predicate: (path: DerivedNodePath<Owner>) => boolean): DerivedNodePath<Owner> | null;
+  find(predicate: (path: DerivedNodePath<Owner>) => boolean): DerivedNodePath<Owner> | null;
 }
-interface FunctionParentAccess {
-  getFunctionParent(): NativeNodePath | null;
+interface FunctionParentAccess<Owner> {
+  getFunctionParent(): DerivedNodePath<Owner> | null;
 }
-interface ProgramParentAccess {
-  getProgramParent(): NativeNodePath | null;
+interface ProgramParentAccess<Owner> {
+  getProgramParent(): DerivedNodePath<Owner> | null;
 }
 interface NestedTraverseAccess {
-  traverse<State>(visitors: readonly DefinedVisitor<State>[], state?: State): void;
+  /** Traverse with visitors whose handlers require no state. */
+  traverse(visitors: readonly DefinedVisitor<unknown>[]): void;
+  /** Traverse with stateful visitors; the state they require is mandatory. */
+  traverse<State>(visitors: readonly DefinedVisitor<State>[], state: State): void;
 }
 interface SubscribeAccess {
   subscribeWithin(types: NativeVisitorRoute | readonly NativeVisitorRoute[]): void;
@@ -406,13 +548,16 @@ interface SubscribeAccess {
 type ScopePart<Contract> = Contract extends { scope: true } ? { readonly scope: NativeScope } : {};
 type AncestryPart<Contract> = Contract extends { ancestry: infer Mode }
   ? Mode extends 'parent'
-    ? ParentAccess
+    ? ParentAccess<Contract>
     : Mode extends 'findParent'
-      ? ParentAccess & FindParentAccess
+      ? ParentAccess<Contract> & FindParentAccess<Contract>
       : Mode extends 'functionParent'
-        ? ParentAccess & FindParentAccess & FunctionParentAccess
+        ? ParentAccess<Contract> & FindParentAccess<Contract> & FunctionParentAccess<Contract>
         : Mode extends 'programParent' | number
-          ? ParentAccess & FindParentAccess & FunctionParentAccess & ProgramParentAccess
+          ? ParentAccess<Contract> &
+              FindParentAccess<Contract> &
+              FunctionParentAccess<Contract> &
+              ProgramParentAccess<Contract>
           : {}
   : {};
 type ControlPart<Contract> = Contract extends { controlFlow: readonly (infer C extends string)[] }
@@ -430,21 +575,37 @@ type ChildPathOf<C extends ChildContract, Owner> = ContractPathBase<
   ScopePart<Owner> &
   AncestryPart<Owner> &
   ControlPart<Owner> &
-  ChildrenPart<C, Owner>;
-type ChildrenPart<Contract, Owner> = Contract extends {
-  children: infer Children extends Readonly<Record<string, ChildContract>>;
+  ChildrenPart<C['route'], C, Owner>;
+type DeclaredRoleNames<Children> = Exclude<Extract<keyof Children, string>, '*'>;
+/** Declared roles steered to `getChild`/`getChildList` by generated cardinality;
+ * roles with mixed cardinality across a composite keep only `get`. */
+type SingleChildRoles<Route extends string, Children> = {
+  [Role in DeclaredRoleNames<Children>]: [RouteChildIsList<Route, Role>] extends [false]
+    ? Role
+    : never;
+}[DeclaredRoleNames<Children>];
+type ListChildRoles<Route extends string, Children> = {
+  [Role in DeclaredRoleNames<Children>]: [RouteChildIsList<Route, Role>] extends [true]
+    ? Role
+    : never;
+}[DeclaredRoleNames<Children>];
+type ChildrenPart<Route extends string, Contract, Owner> = Contract extends {
+  children: infer Children extends Readonly<Record<string, ChildContract | undefined>>;
 }
   ? {
-      getChild<Role extends Extract<keyof Children, string>>(
+      getChild<Role extends SingleChildRoles<Route, Children>>(
         role: Role,
-      ): ChildPathOf<Children[Role], Owner> | null;
-      getChildList<Role extends Extract<keyof Children, string>>(
+      ): ChildPathOf<NonNullable<Children[Role]>, Owner> | null;
+      getChildList<Role extends ListChildRoles<Route, Children>>(
         role: Role,
-      ): readonly ChildPathOf<Children[Role], Owner>[];
-      get<Role extends Extract<keyof Children, string>>(
+      ): readonly ChildPathOf<NonNullable<Children[Role]>, Owner>[];
+      get<Role extends DeclaredRoleNames<Children>>(
         role: Role,
-      ): ChildPathOf<Children[Role], Owner> | readonly ChildPathOf<Children[Role], Owner>[] | null;
-    } & ('*' extends keyof Children ? { getChildren(): readonly NativeNodePath[] } : {})
+      ):
+        | ChildPathOf<NonNullable<Children[Role]>, Owner>
+        | readonly ChildPathOf<NonNullable<Children[Role]>, Owner>[]
+        | null;
+    } & ('*' extends keyof Children ? { getChildren(): readonly DerivedNodePath<Owner>[] } : {})
   : {};
 
 type ContractFieldsOf<Contract> = Contract extends { fields: readonly (infer F extends string)[] }
@@ -458,7 +619,7 @@ export type ContractPath<
 > = ContractPathBase<ContractNode<Route, ContractFieldsOf<Contract>>> &
   ScopePart<Contract> &
   AncestryPart<Contract> &
-  ChildrenPart<Contract, Contract> &
+  ChildrenPart<Route, Contract, Contract> &
   ControlPart<Contract>;
 
 export type TypedVisitorHandler<
@@ -490,14 +651,14 @@ export interface StoredVisitorContract {
   readonly controlFlow: readonly ControlFlowCapability[];
   readonly nested: readonly DefinedVisitor<any>[];
   readonly configure:
-    | ((context: PrepareContext, options: unknown) => VisitorConfiguration)
+    | ((context: PrepareContext, options: unknown) => StoredVisitorConfiguration)
     | undefined;
 }
 
 const MAX_CHILD_CONTRACT_DEPTH = 8;
 
 function freezeChildContracts(
-  children: Readonly<Record<string, ChildContract>> | undefined,
+  children: Readonly<Partial<Record<string, ChildContract>>> | undefined,
   depth = 0,
 ): Readonly<Record<string, ChildContract>> | undefined {
   if (children == null) return undefined;
@@ -505,14 +666,20 @@ function freezeChildContracts(
     throw new Error('child contracts exceed the supported depth');
   return Object.freeze(
     Object.fromEntries(
-      Object.entries(children).map(([role, child]) => [
-        role,
-        Object.freeze({
-          route: child.route,
-          fields: Object.freeze([...(child.fields ?? [])]),
-          children: freezeChildContracts(child.children, depth + 1),
-        }),
-      ]),
+      Object.entries(children).flatMap(([role, child]) =>
+        child == null
+          ? []
+          : [
+              [
+                role,
+                Object.freeze({
+                  route: child.route,
+                  fields: Object.freeze([...(child.fields ?? [])]),
+                  children: freezeChildContracts(child.children, depth + 1),
+                }),
+              ],
+            ],
+      ),
     ),
   );
 }
@@ -531,8 +698,8 @@ export function defineVisitor<
   const Contract extends VisitorContract<Route>,
   State = unknown,
 >(
-  route: Route,
-  contract: Contract,
+  route: Route & ValidRouteSpec<Route>,
+  contract: Contract & ValidateContract<Route, Contract>,
   handler: TypedVisitorHandler<Route, Contract, State>,
 ): DefinedVisitor<State> {
   if (typeof route !== 'string' || route.length === 0)
@@ -1405,14 +1572,44 @@ function validateDefinedVisitor(pluginName: string, defined: DefinedVisitor<any>
     where: defined.contract.where == null ? undefined : { [defined.route]: defined.contract.where },
     controlFlow: defined.contract.controlFlow,
   } as PredicateRequirements);
-  const validateChildren = (children: Readonly<Record<string, ChildContract>> | undefined) => {
+  const validateChildren = (
+    route: string,
+    children: Readonly<Record<string, ChildContract>> | undefined,
+  ) => {
     for (const [role, child] of Object.entries(children ?? {})) {
-      if (concreteRouteTypes(child.route).length === 0)
+      const childTypes = concreteRouteTypes(child.route);
+      if (childTypes.length === 0)
         throw new Error(`${pluginName}: unknown child route ${child.route} for role ${role}`);
-      validateChildren(child.children);
+      if (role !== '*') {
+        // Generated role data: the role must exist for at least one concrete type
+        // of the route, and the declared route must be able to deliver it.
+        const parents = concreteRouteTypes(route);
+        const allowed = new Set<string>();
+        let known = false;
+        for (const parent of parents) {
+          const declaration = CHILD_ROLES[parent]?.[role];
+          if (declaration == null) continue;
+          known = true;
+          for (const type of declaration.types) allowed.add(type);
+        }
+        if (!known) {
+          const roles = [
+            ...new Set(parents.flatMap(parent => Object.keys(CHILD_ROLES[parent] ?? {}))),
+          ];
+          throw new Error(
+            `${pluginName}: unknown child role ${role} for route ${route}` +
+              (roles.length > 0 ? ` (valid roles: ${roles.join(', ')})` : ''),
+          );
+        }
+        if (!childTypes.some(type => allowed.has(type)))
+          throw new Error(
+            `${pluginName}: child role ${route}.${role} cannot deliver route ${child.route}`,
+          );
+      }
+      validateChildren(child.route, child.children);
     }
   };
-  validateChildren(defined.contract.children);
+  validateChildren(defined.route, defined.contract.children);
   validatedVisitors.add(defined);
 }
 
@@ -2158,10 +2355,13 @@ function nestedManifest(
 function concreteRouteTypes(route: string): string[] {
   const concrete: string[] = [];
   for (const part of route.split('|')) {
-    for (let index = 1; index < NODE_TYPES.length; index++)
-      if (part === NODE_TYPES[index] || alias(part, NODE_TYPES[index])) {
-        concrete.push(NODE_TYPES[index]);
-      }
+    if (part === '*') {
+      for (let index = 1; index < NODE_TYPES.length; index++) concrete.push(NODE_TYPES[index]);
+    } else {
+      const expansion = ALIAS_EXPANSIONS[part];
+      if (expansion != null) concrete.push(...expansion);
+      else if (NODE_TYPE_IDS.has(part)) concrete.push(part);
+    }
   }
   return [...new Set(concrete)];
 }
@@ -2887,7 +3087,7 @@ function createDispatcher(
           event => event.sequence > currentSequence,
         );
       },
-      revisitProgram: (visitors, state) => {
+      revisitProgram: (visitors: readonly DefinedVisitor<any>[], state?: unknown) => {
         assertDeclaredControl(plugin, plans.get(plugin), 'dynamic-subscriptions');
         const compiled = compileNestedVisitor(visitors);
         replayCustomRouted(
@@ -3723,44 +3923,16 @@ class NodePathImpl implements NativeNodePath {
 }
 
 type EditKind = EditCommand['kind'];
+/** Alias-route matching backed by the generated expansion table: the same data
+ * drives the type-level expansions and the generated Rust `alias_matches`. */
+const ALIAS_SETS = new Map<string, ReadonlySet<string>>(
+  Object.entries(ALIAS_EXPANSIONS).map(([key, expansion]) => [key, new Set(expansion)]),
+);
 function alias(key: string, type: string): boolean {
-  if (key === '*') return true;
-  if (key === 'Function') {
-    return (
-      type === 'Function' ||
-      type === 'ArrowFunctionExpression' ||
-      type.endsWith('FunctionDeclaration') ||
-      type.endsWith('FunctionExpression')
-    );
-  }
-  if (key === 'Statement') return type.endsWith('Statement') || isDeclarationType(type);
-  if (key === 'Declaration') return isDeclarationType(type);
-  if (key === 'Expression') return type.endsWith('Expression') || isLiteralExpressionType(type);
-  if (key === 'MemberExpression') return isMemberExpressionType(type);
-  if (key === 'MetaProperty') return type === 'ImportMeta' || type === 'NewTarget';
-  if (key === 'ReferencedIdentifier') return type === 'Identifier';
-  if (isCollapsedFunctionKey(key)) return type === 'Function';
-  if (isCollapsedClassKey(key)) return type === 'Class';
-  return false;
-}
-function isLiteralExpressionType(type: string): boolean {
-  return (
-    type === 'Identifier' ||
-    type === 'StringLiteral' ||
-    type === 'NumericLiteral' ||
-    type === 'BooleanLiteral' ||
-    type === 'BigIntLiteral' ||
-    type === 'RegExpLiteral' ||
-    type === 'NullLiteral' ||
-    type === 'TemplateLiteral'
-  );
+  return key === '*' || (ALIAS_SETS.get(key)?.has(type) ?? false);
 }
 function isMemberExpressionType(type: string): boolean {
-  return (
-    type === 'StaticMemberExpression' ||
-    type === 'ComputedMemberExpression' ||
-    type === 'PrivateFieldExpression'
-  );
+  return alias('MemberExpression', type);
 }
 function isCollapsedFunctionKey(key: string): boolean {
   return (
@@ -3769,18 +3941,6 @@ function isCollapsedFunctionKey(key: string): boolean {
 }
 function isCollapsedClassKey(key: string): boolean {
   return key === 'ClassDeclaration' || key === 'ClassExpression';
-}
-function isDeclarationType(type: string): boolean {
-  return (
-    type.endsWith('Declaration') ||
-    type === 'Function' ||
-    type === 'Class' ||
-    type === 'TSEnumDeclaration' ||
-    type === 'TSInterfaceDeclaration' ||
-    type === 'TSTypeAliasDeclaration' ||
-    type === 'TSModuleDeclaration' ||
-    type === 'TSImportEqualsDeclaration'
-  );
 }
 function toNodeView(event: NativeEvent): NodeView {
   if (event.fields.length === 0) return event as unknown as NodeView;

@@ -379,6 +379,117 @@
     "JSDocNonNullableType": "JSDocNonNullableType",
     "JSDocUnknownType": "JSDocUnknownType"
   },
+  "aliases": {
+    "Function": ["Function", "ArrowFunctionExpression"],
+    "Statement": [
+      "BlockStatement",
+      "VariableDeclaration",
+      "EmptyStatement",
+      "ExpressionStatement",
+      "IfStatement",
+      "DoWhileStatement",
+      "WhileStatement",
+      "ForStatement",
+      "ForInStatement",
+      "ForOfStatement",
+      "ContinueStatement",
+      "BreakStatement",
+      "ReturnStatement",
+      "WithStatement",
+      "SwitchStatement",
+      "LabeledStatement",
+      "ThrowStatement",
+      "TryStatement",
+      "DebuggerStatement",
+      "Function",
+      "Class",
+      "ImportDeclaration",
+      "ExportNamedDeclaration",
+      "ExportDefaultDeclaration",
+      "ExportAllDeclaration",
+      "TSEnumDeclaration",
+      "TSTypeParameterDeclaration",
+      "TSTypeAliasDeclaration",
+      "TSInterfaceDeclaration",
+      "TSCallSignatureDeclaration",
+      "TSConstructSignatureDeclaration",
+      "TSModuleDeclaration",
+      "TSGlobalDeclaration",
+      "TSImportEqualsDeclaration",
+      "TSNamespaceExportDeclaration"
+    ],
+    "Declaration": [
+      "VariableDeclaration",
+      "Function",
+      "Class",
+      "ImportDeclaration",
+      "ExportNamedDeclaration",
+      "ExportDefaultDeclaration",
+      "ExportAllDeclaration",
+      "TSEnumDeclaration",
+      "TSTypeParameterDeclaration",
+      "TSTypeAliasDeclaration",
+      "TSInterfaceDeclaration",
+      "TSCallSignatureDeclaration",
+      "TSConstructSignatureDeclaration",
+      "TSModuleDeclaration",
+      "TSGlobalDeclaration",
+      "TSImportEqualsDeclaration",
+      "TSNamespaceExportDeclaration"
+    ],
+    "Expression": [
+      "Identifier",
+      "ThisExpression",
+      "ArrayExpression",
+      "ObjectExpression",
+      "TemplateLiteral",
+      "TaggedTemplateExpression",
+      "ComputedMemberExpression",
+      "StaticMemberExpression",
+      "PrivateFieldExpression",
+      "CallExpression",
+      "NewExpression",
+      "UpdateExpression",
+      "UnaryExpression",
+      "BinaryExpression",
+      "PrivateInExpression",
+      "LogicalExpression",
+      "ConditionalExpression",
+      "AssignmentExpression",
+      "SequenceExpression",
+      "AwaitExpression",
+      "ChainExpression",
+      "ParenthesizedExpression",
+      "ArrowFunctionExpression",
+      "YieldExpression",
+      "ImportExpression",
+      "V8IntrinsicExpression",
+      "BooleanLiteral",
+      "NullLiteral",
+      "NumericLiteral",
+      "StringLiteral",
+      "BigIntLiteral",
+      "RegExpLiteral",
+      "JSXMemberExpression",
+      "JSXEmptyExpression",
+      "TSAsExpression",
+      "TSSatisfiesExpression",
+      "TSNonNullExpression",
+      "TSInstantiationExpression"
+    ],
+    "MemberExpression": [
+      "ComputedMemberExpression",
+      "StaticMemberExpression",
+      "PrivateFieldExpression"
+    ],
+    "MetaProperty": ["ImportMeta", "NewTarget"],
+    "ReferencedIdentifier": ["Identifier"],
+    "FunctionDeclaration": ["Function"],
+    "FunctionExpression": ["Function"],
+    "TSDeclareFunction": ["Function"],
+    "ClassDeclaration": ["Class"],
+    "ClassExpression": ["Class"]
+  },
   "predicateFields": {
     "Identifier": ["name", "global", "read", "write", "bindingScopeId", "binding"],
     "StringLiteral": ["value", "constantKind", "constantValue"],
@@ -464,5 +575,712 @@
     "delegate",
     "nodeKind",
     "memberPath"
-  ]
+  ],
+  "fieldTypes": {
+    "Identifier": {
+      "name": "string",
+      "global?": "boolean",
+      "read?": "boolean",
+      "write?": "boolean",
+      "bindingScopeId?": "number",
+      "binding?": "boolean"
+    },
+    "StringLiteral": {
+      "value": "string",
+      "constantKind?": "'null' | 'boolean' | 'number' | 'string'",
+      "constantValue?": "string | number | boolean | null"
+    },
+    "NumericLiteral": {
+      "value": "number",
+      "constantKind?": "'null' | 'boolean' | 'number' | 'string'",
+      "constantValue?": "string | number | boolean | null"
+    },
+    "BooleanLiteral": {
+      "value": "boolean",
+      "constantKind?": "'null' | 'boolean' | 'number' | 'string'",
+      "constantValue?": "string | number | boolean | null"
+    },
+    "NullLiteral": {
+      "constantKind?": "'null' | 'boolean' | 'number' | 'string'",
+      "constantValue?": "string | number | boolean | null"
+    },
+    "ObjectProperty": {
+      "kind": "PropertyKind",
+      "computed": "boolean",
+      "method": "boolean",
+      "shorthand": "boolean",
+      "key?": "string"
+    },
+    "UpdateExpression": {
+      "operator": "UpdateOperator",
+      "prefix": "boolean"
+    },
+    "UnaryExpression": {
+      "operator": "UnaryOperator",
+      "prefix": "true",
+      "constantKind?": "'null' | 'boolean' | 'number' | 'string'",
+      "constantValue?": "string | number | boolean | null"
+    },
+    "BinaryExpression": {
+      "operator": "BinaryOperator",
+      "constantKind?": "'null' | 'boolean' | 'number' | 'string'",
+      "constantValue?": "string | number | boolean | null"
+    },
+    "LogicalExpression": {
+      "operator": "LogicalOperator",
+      "constantKind?": "'null' | 'boolean' | 'number' | 'string'",
+      "constantValue?": "string | number | boolean | null"
+    },
+    "AssignmentExpression": {
+      "operator": "AssignmentOperator"
+    },
+    "CallExpression": {
+      "optional": "boolean",
+      "argumentCount": "number",
+      "calleeName?": "string",
+      "calleeGlobal?": "boolean",
+      "staticArgument?": "string"
+    },
+    "NewExpression": {
+      "argumentCount": "number",
+      "calleeName?": "string",
+      "staticArgument?": "string"
+    },
+    "StaticMemberExpression": {
+      "computed": "false",
+      "property": "string",
+      "memberPath?": "string",
+      "rootName?": "string",
+      "rootGlobal?": "boolean"
+    },
+    "ComputedMemberExpression": {
+      "computed": "true",
+      "property?": "string",
+      "memberPath?": "string"
+    },
+    "Function": {
+      "nodeKind": "FunctionType",
+      "async": "boolean",
+      "generator": "boolean",
+      "parameterCount": "number",
+      "name?": "string",
+      "bodyStart?": "number",
+      "bodyEnd?": "number"
+    },
+    "ArrowFunctionExpression": {
+      "async": "boolean",
+      "expression": "boolean",
+      "parameterCount": "number",
+      "bodyStart": "number",
+      "bodyEnd": "number"
+    },
+    "Class": {
+      "nodeKind": "ClassType",
+      "name?": "string"
+    },
+    "ImportDeclaration": {
+      "source": "string",
+      "importKind": "ImportOrExportKind",
+      "specifierCount": "number"
+    },
+    "ImportSpecifier": {
+      "imported": "string",
+      "local": "string",
+      "importKind": "ImportOrExportKind"
+    },
+    "ImportDefaultSpecifier": {
+      "imported": "'default'",
+      "local": "string"
+    },
+    "ImportNamespaceSpecifier": {
+      "imported": "'*'",
+      "local": "string"
+    },
+    "ExportNamedDeclaration": {
+      "source?": "string",
+      "exportKind": "ImportOrExportKind",
+      "specifierCount": "number"
+    },
+    "ExportAllDeclaration": {
+      "source": "string",
+      "exported?": "string",
+      "exportKind": "ImportOrExportKind"
+    },
+    "ExportSpecifier": {
+      "local": "string",
+      "exported": "string",
+      "exportKind": "ImportOrExportKind"
+    },
+    "VariableDeclaration": {
+      "kind": "VariableDeclarationKind",
+      "declarationCount": "number"
+    },
+    "VariableDeclarator": {
+      "kind": "VariableDeclarationKind",
+      "hasInitializer": "boolean"
+    },
+    "Directive": {
+      "value": "string"
+    },
+    "YieldExpression": {
+      "delegate": "boolean"
+    },
+    "ImportMeta": {
+      "meta": "'import'",
+      "property": "'meta'"
+    },
+    "NewTarget": {
+      "meta": "'new'",
+      "property": "'target'"
+    }
+  },
+  "childRoles": {
+    "Program": {
+      "body": {
+        "routes": ["Statement"],
+        "list": true
+      },
+      "directives": {
+        "routes": ["Directive"],
+        "list": true
+      }
+    },
+    "BlockStatement": {
+      "body": {
+        "routes": ["Statement"],
+        "list": true
+      }
+    },
+    "FunctionBody": {
+      "body": {
+        "routes": ["Statement"],
+        "list": true
+      },
+      "directives": {
+        "routes": ["Directive"],
+        "list": true
+      }
+    },
+    "ClassBody": {
+      "body": {
+        "routes": [
+          "MethodDefinition",
+          "PropertyDefinition",
+          "AccessorProperty",
+          "StaticBlock",
+          "TSIndexSignature"
+        ],
+        "list": true
+      }
+    },
+    "TSModuleBlock": {
+      "body": {
+        "routes": ["Statement"],
+        "list": true
+      }
+    },
+    "TSModuleDeclaration": {
+      "body": {
+        "routes": ["TSModuleBlock"],
+        "list": false
+      }
+    },
+    "Function": {
+      "body": {
+        "routes": ["FunctionBody"],
+        "list": false
+      },
+      "params": {
+        "routes": ["FormalParameters", "FormalParameter", "FormalParameterRest"],
+        "list": true
+      },
+      "id": {
+        "routes": ["Identifier"],
+        "list": false
+      }
+    },
+    "ArrowFunctionExpression": {
+      "body": {
+        "routes": ["FunctionBody"],
+        "list": false
+      },
+      "params": {
+        "routes": ["FormalParameters", "FormalParameter", "FormalParameterRest"],
+        "list": true
+      }
+    },
+    "Class": {
+      "body": {
+        "routes": ["ClassBody"],
+        "list": false
+      },
+      "id": {
+        "routes": ["Identifier"],
+        "list": false
+      },
+      "superClass": {
+        "routes": ["Expression"],
+        "list": false
+      },
+      "decorators": {
+        "routes": ["Decorator"],
+        "list": true
+      }
+    },
+    "WhileStatement": {
+      "body": {
+        "routes": ["Statement"],
+        "list": false
+      },
+      "test": {
+        "routes": ["Expression"],
+        "list": false
+      }
+    },
+    "DoWhileStatement": {
+      "body": {
+        "routes": ["Statement"],
+        "list": false
+      },
+      "test": {
+        "routes": ["Expression"],
+        "list": false
+      }
+    },
+    "ForStatement": {
+      "body": {
+        "routes": ["Statement"],
+        "list": false
+      },
+      "test": {
+        "routes": ["Expression"],
+        "list": false
+      }
+    },
+    "ForInStatement": {
+      "body": {
+        "routes": ["Statement"],
+        "list": false
+      }
+    },
+    "ForOfStatement": {
+      "body": {
+        "routes": ["Statement"],
+        "list": false
+      }
+    },
+    "LabeledStatement": {
+      "body": {
+        "routes": ["Statement"],
+        "list": false
+      }
+    },
+    "WithStatement": {
+      "body": {
+        "routes": ["Statement"],
+        "list": false
+      }
+    },
+    "CatchClause": {
+      "body": {
+        "routes": ["BlockStatement"],
+        "list": false
+      }
+    },
+    "CallExpression": {
+      "callee": {
+        "routes": ["Expression"],
+        "list": false
+      },
+      "arguments": {
+        "routes": ["Expression", "SpreadElement"],
+        "list": true
+      }
+    },
+    "NewExpression": {
+      "callee": {
+        "routes": ["Expression"],
+        "list": false
+      },
+      "arguments": {
+        "routes": ["Expression", "SpreadElement"],
+        "list": true
+      }
+    },
+    "VariableDeclaration": {
+      "declarations": {
+        "routes": ["VariableDeclarator"],
+        "list": true
+      }
+    },
+    "VariableDeclarator": {
+      "id": {
+        "routes": ["Identifier", "ObjectPattern", "ArrayPattern"],
+        "list": false
+      },
+      "init": {
+        "routes": ["Expression"],
+        "list": false
+      }
+    },
+    "ImportDeclaration": {
+      "specifiers": {
+        "routes": ["ImportSpecifier", "ImportDefaultSpecifier", "ImportNamespaceSpecifier"],
+        "list": true
+      },
+      "source": {
+        "routes": ["StringLiteral"],
+        "list": false
+      }
+    },
+    "ExportNamedDeclaration": {
+      "specifiers": {
+        "routes": ["ExportSpecifier"],
+        "list": true
+      },
+      "source": {
+        "routes": ["StringLiteral"],
+        "list": false
+      },
+      "declaration": {
+        "routes": ["Declaration"],
+        "list": false
+      }
+    },
+    "ExportDefaultDeclaration": {
+      "declaration": {
+        "routes": ["Declaration", "Expression"],
+        "list": false
+      }
+    },
+    "ExportAllDeclaration": {
+      "source": {
+        "routes": ["StringLiteral"],
+        "list": false
+      }
+    },
+    "ImportExpression": {
+      "source": {
+        "routes": ["StringLiteral"],
+        "list": false
+      }
+    },
+    "ExpressionStatement": {
+      "expression": {
+        "routes": ["Expression"],
+        "list": false
+      }
+    },
+    "ObjectExpression": {
+      "properties": {
+        "routes": ["ObjectProperty", "SpreadElement"],
+        "list": true
+      }
+    },
+    "ObjectPattern": {
+      "properties": {
+        "routes": ["BindingProperty", "BindingRestElement"],
+        "list": true
+      }
+    },
+    "ObjectAssignmentTarget": {
+      "properties": {
+        "routes": [
+          "AssignmentTargetPropertyIdentifier",
+          "AssignmentTargetPropertyProperty",
+          "AssignmentTargetRest"
+        ],
+        "list": true
+      }
+    },
+    "ArrayExpression": {
+      "elements": {
+        "routes": ["Expression", "SpreadElement", "Elision"],
+        "list": true
+      }
+    },
+    "ArrayPattern": {
+      "elements": {
+        "routes": [
+          "Identifier",
+          "ObjectPattern",
+          "ArrayPattern",
+          "AssignmentPattern",
+          "BindingRestElement",
+          "Elision"
+        ],
+        "list": true
+      }
+    },
+    "ArrayAssignmentTarget": {
+      "elements": {
+        "routes": [
+          "Expression",
+          "ArrayAssignmentTarget",
+          "ObjectAssignmentTarget",
+          "AssignmentTargetWithDefault",
+          "AssignmentTargetRest",
+          "Elision"
+        ],
+        "list": true
+      }
+    },
+    "ObjectProperty": {
+      "key": {
+        "routes": ["Expression", "PrivateIdentifier"],
+        "list": false
+      },
+      "value": {
+        "routes": ["Expression"],
+        "list": false
+      }
+    },
+    "BindingProperty": {
+      "key": {
+        "routes": ["Expression", "PrivateIdentifier"],
+        "list": false
+      },
+      "value": {
+        "routes": ["Identifier", "ObjectPattern", "ArrayPattern", "AssignmentPattern"],
+        "list": false
+      }
+    },
+    "AssignmentTargetPropertyProperty": {
+      "key": {
+        "routes": ["Expression", "PrivateIdentifier"],
+        "list": false
+      },
+      "value": {
+        "routes": [
+          "Expression",
+          "AssignmentTargetWithDefault",
+          "ArrayAssignmentTarget",
+          "ObjectAssignmentTarget"
+        ],
+        "list": false
+      }
+    },
+    "MethodDefinition": {
+      "key": {
+        "routes": ["Expression", "PrivateIdentifier"],
+        "list": false
+      },
+      "value": {
+        "routes": ["Function"],
+        "list": false
+      },
+      "decorators": {
+        "routes": ["Decorator"],
+        "list": true
+      }
+    },
+    "PropertyDefinition": {
+      "key": {
+        "routes": ["Expression", "PrivateIdentifier"],
+        "list": false
+      },
+      "value": {
+        "routes": ["Expression"],
+        "list": false
+      },
+      "decorators": {
+        "routes": ["Decorator"],
+        "list": true
+      }
+    },
+    "AccessorProperty": {
+      "key": {
+        "routes": ["Expression", "PrivateIdentifier"],
+        "list": false
+      },
+      "value": {
+        "routes": ["Expression"],
+        "list": false
+      }
+    },
+    "FormalParameter": {
+      "decorators": {
+        "routes": ["Decorator"],
+        "list": true
+      }
+    },
+    "StaticMemberExpression": {
+      "object": {
+        "routes": ["Expression"],
+        "list": false
+      },
+      "property": {
+        "routes": ["Identifier"],
+        "list": false
+      }
+    },
+    "ComputedMemberExpression": {
+      "object": {
+        "routes": ["Expression"],
+        "list": false
+      },
+      "property": {
+        "routes": ["Expression"],
+        "list": false
+      }
+    },
+    "PrivateFieldExpression": {
+      "object": {
+        "routes": ["Expression"],
+        "list": false
+      },
+      "property": {
+        "routes": ["PrivateIdentifier"],
+        "list": false
+      }
+    },
+    "BinaryExpression": {
+      "left": {
+        "routes": ["Expression"],
+        "list": false
+      },
+      "right": {
+        "routes": ["Expression"],
+        "list": false
+      }
+    },
+    "LogicalExpression": {
+      "left": {
+        "routes": ["Expression"],
+        "list": false
+      },
+      "right": {
+        "routes": ["Expression"],
+        "list": false
+      }
+    },
+    "AssignmentExpression": {
+      "left": {
+        "routes": ["Expression", "ArrayAssignmentTarget", "ObjectAssignmentTarget"],
+        "list": false
+      },
+      "right": {
+        "routes": ["Expression"],
+        "list": false
+      }
+    },
+    "PrivateInExpression": {
+      "left": {
+        "routes": ["PrivateIdentifier"],
+        "list": false
+      },
+      "right": {
+        "routes": ["Expression"],
+        "list": false
+      }
+    },
+    "UnaryExpression": {
+      "argument": {
+        "routes": ["Expression"],
+        "list": false
+      }
+    },
+    "UpdateExpression": {
+      "argument": {
+        "routes": ["Expression"],
+        "list": false
+      }
+    },
+    "AwaitExpression": {
+      "argument": {
+        "routes": ["Expression"],
+        "list": false
+      }
+    },
+    "YieldExpression": {
+      "argument": {
+        "routes": ["Expression"],
+        "list": false
+      }
+    },
+    "ReturnStatement": {
+      "argument": {
+        "routes": ["Expression"],
+        "list": false
+      }
+    },
+    "ThrowStatement": {
+      "argument": {
+        "routes": ["Expression"],
+        "list": false
+      }
+    },
+    "SpreadElement": {
+      "argument": {
+        "routes": ["Expression"],
+        "list": false
+      }
+    },
+    "IfStatement": {
+      "test": {
+        "routes": ["Expression"],
+        "list": false
+      },
+      "consequent": {
+        "routes": ["Statement"],
+        "list": false
+      },
+      "alternate": {
+        "routes": ["Statement"],
+        "list": false
+      }
+    },
+    "ConditionalExpression": {
+      "test": {
+        "routes": ["Expression"],
+        "list": false
+      },
+      "consequent": {
+        "routes": ["Expression"],
+        "list": false
+      },
+      "alternate": {
+        "routes": ["Expression"],
+        "list": false
+      }
+    },
+    "SwitchStatement": {
+      "test": {
+        "routes": ["Expression"],
+        "list": false
+      }
+    },
+    "TryStatement": {
+      "block": {
+        "routes": ["BlockStatement"],
+        "list": false
+      },
+      "handler": {
+        "routes": ["CatchClause"],
+        "list": false
+      },
+      "finalizer": {
+        "routes": ["BlockStatement"],
+        "list": false
+      }
+    },
+    "TSEnumDeclaration": {
+      "id": {
+        "routes": ["Identifier"],
+        "list": false
+      }
+    },
+    "TSInterfaceDeclaration": {
+      "id": {
+        "routes": ["Identifier"],
+        "list": false
+      }
+    },
+    "TSTypeAliasDeclaration": {
+      "id": {
+        "routes": ["Identifier"],
+        "list": false
+      }
+    }
+  }
 }

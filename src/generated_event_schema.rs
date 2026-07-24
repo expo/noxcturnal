@@ -586,6 +586,126 @@ pub(crate) fn predicate_field_supported(node_type_id: u32, field_id: u32) -> boo
     )
 }
 
+pub(crate) fn alias_matches(subscription: &str, node_type: &str) -> bool {
+    if subscription == "*" || subscription == node_type {
+        return true;
+    }
+    match subscription {
+        "Function" => matches!(node_type, "ArrowFunctionExpression"),
+        "Statement" => matches!(
+            node_type,
+            "BlockStatement"
+                | "VariableDeclaration"
+                | "EmptyStatement"
+                | "ExpressionStatement"
+                | "IfStatement"
+                | "DoWhileStatement"
+                | "WhileStatement"
+                | "ForStatement"
+                | "ForInStatement"
+                | "ForOfStatement"
+                | "ContinueStatement"
+                | "BreakStatement"
+                | "ReturnStatement"
+                | "WithStatement"
+                | "SwitchStatement"
+                | "LabeledStatement"
+                | "ThrowStatement"
+                | "TryStatement"
+                | "DebuggerStatement"
+                | "Function"
+                | "Class"
+                | "ImportDeclaration"
+                | "ExportNamedDeclaration"
+                | "ExportDefaultDeclaration"
+                | "ExportAllDeclaration"
+                | "TSEnumDeclaration"
+                | "TSTypeParameterDeclaration"
+                | "TSTypeAliasDeclaration"
+                | "TSInterfaceDeclaration"
+                | "TSCallSignatureDeclaration"
+                | "TSConstructSignatureDeclaration"
+                | "TSModuleDeclaration"
+                | "TSGlobalDeclaration"
+                | "TSImportEqualsDeclaration"
+                | "TSNamespaceExportDeclaration"
+        ),
+        "Declaration" => matches!(
+            node_type,
+            "VariableDeclaration"
+                | "Function"
+                | "Class"
+                | "ImportDeclaration"
+                | "ExportNamedDeclaration"
+                | "ExportDefaultDeclaration"
+                | "ExportAllDeclaration"
+                | "TSEnumDeclaration"
+                | "TSTypeParameterDeclaration"
+                | "TSTypeAliasDeclaration"
+                | "TSInterfaceDeclaration"
+                | "TSCallSignatureDeclaration"
+                | "TSConstructSignatureDeclaration"
+                | "TSModuleDeclaration"
+                | "TSGlobalDeclaration"
+                | "TSImportEqualsDeclaration"
+                | "TSNamespaceExportDeclaration"
+        ),
+        "Expression" => matches!(
+            node_type,
+            "Identifier"
+                | "ThisExpression"
+                | "ArrayExpression"
+                | "ObjectExpression"
+                | "TemplateLiteral"
+                | "TaggedTemplateExpression"
+                | "ComputedMemberExpression"
+                | "StaticMemberExpression"
+                | "PrivateFieldExpression"
+                | "CallExpression"
+                | "NewExpression"
+                | "UpdateExpression"
+                | "UnaryExpression"
+                | "BinaryExpression"
+                | "PrivateInExpression"
+                | "LogicalExpression"
+                | "ConditionalExpression"
+                | "AssignmentExpression"
+                | "SequenceExpression"
+                | "AwaitExpression"
+                | "ChainExpression"
+                | "ParenthesizedExpression"
+                | "ArrowFunctionExpression"
+                | "YieldExpression"
+                | "ImportExpression"
+                | "V8IntrinsicExpression"
+                | "BooleanLiteral"
+                | "NullLiteral"
+                | "NumericLiteral"
+                | "StringLiteral"
+                | "BigIntLiteral"
+                | "RegExpLiteral"
+                | "JSXMemberExpression"
+                | "JSXEmptyExpression"
+                | "TSAsExpression"
+                | "TSSatisfiesExpression"
+                | "TSNonNullExpression"
+                | "TSInstantiationExpression"
+        ),
+        "MemberExpression" => matches!(
+            node_type,
+            "ComputedMemberExpression" | "StaticMemberExpression" | "PrivateFieldExpression"
+        ),
+        "MetaProperty" => matches!(node_type, "ImportMeta" | "NewTarget"),
+        "ReferencedIdentifier" => matches!(node_type, "Identifier"),
+        "FunctionDeclaration" => matches!(node_type, "Function"),
+        "FunctionExpression" => matches!(node_type, "Function"),
+        "TSDeclareFunction" => matches!(node_type, "Function"),
+        "ClassDeclaration" => matches!(node_type, "Class"),
+        "ClassExpression" => matches!(node_type, "Class"),
+        _ => false,
+    }
+}
+
 pub(crate) fn ast_kind_protocol_id(kind: oxc_ast::AstKind<'_>) -> u32 {
     match kind {
         oxc_ast::AstKind::Program(..) => 1,
