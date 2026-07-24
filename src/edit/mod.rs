@@ -1,4 +1,6 @@
 use napi::{Error, Result, Status};
+
+pub(crate) mod commit;
 use napi_derive::napi;
 use rustc_hash::FxHashMap;
 use std::rc::Rc;

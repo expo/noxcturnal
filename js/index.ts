@@ -1,5 +1,12 @@
 export type * from './types.js';
 export type {
+  PreflightHelperStrategy,
+  PreflightJsxProfile,
+  PreflightPlan,
+  PreflightTargetProfile,
+  PreflightTypeScriptProfile,
+} from './preflight/types.js';
+export type {
   AncestryCapability,
   ChildContract,
   Code,
@@ -36,18 +43,13 @@ export type {
   VisitorRouteSpec,
   VisitorConfiguration,
   VisitorContract,
-} from './visitors.js';
-export {
-  defineNativePipeline,
-  defineNativePlugin,
-  defineVisitor,
-  compilePhasePlan,
-  NativeTransformError,
-  pipelineCacheKey,
-  registerParserAdapter,
-  transform,
-  transformClassificationCacheKey,
-} from './visitors.js';
+} from './contracts/visitor.js';
+export { defineVisitor, NativeTransformError } from './contracts/visitor.js';
+export { defineNativePipeline, defineNativePlugin } from './pipeline/define.js';
+export { compilePhasePlan } from './pipeline/compile.js';
+export { pipelineCacheKey, transformClassificationCacheKey } from './pipeline/cache-key.js';
+export { registerParserAdapter } from './adapters/registry.js';
+export { transform } from './runtime/transform.js';
 
-import { native } from './native.js';
+import { native } from './native/binding.js';
 export const classify = native.classify;

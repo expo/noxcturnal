@@ -1,0 +1,109 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const failures = [];
+
+function sourceFiles(directory, extension) {
+  const output = [];
+  for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+    const filename = path.join(directory, entry.name);
+    if (entry.isDirectory()) output.push(...sourceFiles(filename, extension));
+    else if (entry.name.endsWith(extension)) output.push(filename);
+  }
+  return output;
+}
+
+const importPattern = /\b(?:import|export)\s+(?:type\s+)?(?:[^'"]*?\s+from\s+)?['"]([^'"]+)['"]/g;
+const typescriptGraph = new Map();
+for (const filename of sourceFiles(path.join(root, 'js'), '.ts')) {
+  const relative = path.relative(root, filename);
+  const source = fs.readFileSync(filename, 'utf8');
+  const dependencies = [];
+  for (const match of source.matchAll(importPattern)) {
+    const specifier = match[1];
+    if (specifier.startsWith('.')) {
+      const resolved = path.resolve(path.dirname(filename), specifier.replace(/\.js$/, '.ts'));
+      if (fs.existsSync(resolved)) dependencies.push(path.relative(root, resolved));
+    }
+    if (relative !== 'js/index.ts' && /(?:^|\/)index\.js$/.test(specifier))
+      failures.push(`${relative}: internal modules must not import the package composition root`);
+    if (
+      relative.startsWith('js/protocol/') &&
+      /(?:^|\/)(?:runtime|pipeline)(?:\/|\.js$)/.test(specifier)
+    )
+      failures.push(`${relative}: protocol must not depend on runtime or pipeline`);
+    if (relative.startsWith('js/pipeline/') && /(?:^|\/)runtime(?:\/|\.js$)/.test(specifier))
+      failures.push(`${relative}: pipeline must not depend on runtime`);
+    if (
+      relative.startsWith('js/contracts/') &&
+      /(?:^|\/)(?:runtime|pipeline)(?:\/|\.js$)/.test(specifier)
+    )
+      failures.push(`${relative}: contracts must not depend on runtime or pipeline`);
+  }
+  typescriptGraph.set(relative, dependencies);
+}
+
+const visiting = new Set();
+const visited = new Set();
+function visitTypescriptModule(module, ancestry) {
+  if (visiting.has(module)) {
+    const start = ancestry.indexOf(module);
+    failures.push(
+      `TypeScript dependency cycle: ${[...ancestry.slice(start), module].join(' -> ')}`,
+    );
+    return;
+  }
+  if (visited.has(module)) return;
+  visiting.add(module);
+  for (const dependency of typescriptGraph.get(module) ?? [])
+    visitTypescriptModule(dependency, [...ancestry, module]);
+  visiting.delete(module);
+  visited.add(module);
+}
+for (const module of typescriptGraph.keys()) visitTypescriptModule(module, []);
+
+const rustProtocol = path.join(root, 'src/protocol');
+if (fs.existsSync(rustProtocol)) {
+  for (const filename of sourceFiles(rustProtocol, '.rs')) {
+    if (/\b(?:crate::)?engine(?:::|\b)/.test(fs.readFileSync(filename, 'utf8')))
+      failures.push(`${path.relative(root, filename)}: protocol must not depend on engine`);
+  }
+}
+
+for (const obsolete of [
+  'js/native.ts',
+  'js/generated-event-schema.ts',
+  'js/protocol.ts',
+  'js/visitors.ts',
+  'src/engine.rs',
+  'src/sourcemap.rs',
+  'src/editor.rs',
+  'src/function_map.rs',
+  'src/generated_event_schema.rs',
+  'src/retained_index.rs',
+  'src/constant_eval.rs',
+]) {
+  if (fs.existsSync(path.join(root, obsolete)))
+    failures.push(`${obsolete}: obsolete module path must not be restored`);
+}
+
+for (const obsolete of [
+  'dist/native.js',
+  'dist/native.d.ts',
+  'dist/protocol.js',
+  'dist/protocol.d.ts',
+  'dist/visitors.js',
+  'dist/visitors.d.ts',
+  'dist/generated-event-schema.js',
+  'dist/generated-event-schema.d.ts',
+]) {
+  if (fs.existsSync(path.join(root, obsolete)))
+    failures.push(`${obsolete}: stale generated compatibility artifact must not be packaged`);
+}
+
+if (failures.length > 0) {
+  console.error(failures.join('\n'));
+  process.exitCode = 1;
+}

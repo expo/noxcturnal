@@ -9,8 +9,8 @@ use oxc_span::{GetSpan, Span};
 use oxc_syntax::node::NodeId;
 use rustc_hash::FxHashMap;
 
-use crate::engine::source_type;
-use crate::sourcemap::vlq;
+use super::vlq;
+use crate::syntax::classification::source_type;
 
 #[derive(Clone)]
 #[napi(object)]
@@ -377,10 +377,10 @@ impl MappingEncoder {
         } else if self.line_has_segment {
             self.mappings.push(',');
         }
-        vlq(column - self.previous_column, &mut self.mappings);
-        vlq(name_index - self.previous_name, &mut self.mappings);
+        vlq::encode(column - self.previous_column, &mut self.mappings);
+        vlq::encode(name_index - self.previous_name, &mut self.mappings);
         if first_of_line {
-            vlq(line_delta, &mut self.mappings);
+            vlq::encode(line_delta, &mut self.mappings);
         }
         self.previous_line = line;
         self.previous_column = column;

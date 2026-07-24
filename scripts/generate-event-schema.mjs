@@ -373,8 +373,8 @@ ${tsRoutePredicates}
 ${tsChildRoles}`;
 
 const outputs = [
-  [path.join(root, 'src/generated_event_schema.rs'), rust],
-  [path.join(root, 'js/generated-event-schema.ts'), ts],
+  [path.join(root, 'src/generated/event_schema.rs'), rust],
+  [path.join(root, 'js/generated/event-schema.ts'), ts],
 ];
 if (process.argv[2] === '--check') {
   for (const [filename, expected] of outputs) {

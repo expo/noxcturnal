@@ -4,8 +4,8 @@ use oxc_ast::AstKind;
 use oxc_semantic::Scoping;
 use rustc_hash::{FxHashMap, FxHashSet};
 
-use crate::constant_eval::{EvaluatedConstant, constant_for_kind};
-use crate::generated_event_schema::node_type_name;
+use super::constant_eval::{EvaluatedConstant, constant_for_kind};
+use crate::generated::event_schema::node_type_name;
 
 pub const ABSENT_ID: u32 = u32::MAX;
 

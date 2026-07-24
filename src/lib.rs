@@ -1,21 +1,22 @@
-mod constant_eval;
-mod editor;
+mod edit;
 mod engine;
 mod event_types;
-mod function_map;
-mod generated_event_schema;
-mod retained_index;
+mod generated;
+pub mod preflight;
+mod protocol;
+mod semantic;
 mod sourcemap;
+mod syntax;
 
 use napi_derive::napi;
 
-pub use editor::{EditCommand, EditKind, MappingPolicy};
-pub use engine::ParseClassification;
-pub use function_map::FunctionMap;
+pub use edit::{EditCommand, EditKind, MappingPolicy};
+pub use event_types::ParseClassification;
+pub use sourcemap::function_map::FunctionMap;
 
 #[napi]
 pub fn classify(filename: String, source: String) -> ParseClassification {
-    engine::classify_source(&filename, &source)
+    syntax::classification::classify_source(&filename, &source)
 }
 
 #[napi]
@@ -36,7 +37,7 @@ pub fn commit_packed_buffer(
     data: napi::bindgen_prelude::Buffer,
     source_map_mode: Option<String>,
 ) -> napi::Result<engine::NativeCommitResult> {
-    engine::commit_packed_buffer(&source, &filename, &data, source_map_mode.as_deref())
+    edit::commit::commit_packed_buffer(&source, &filename, &data, source_map_mode.as_deref())
 }
 
 #[napi]
@@ -46,7 +47,7 @@ pub fn commit_decoded_buffer(
     data: napi::bindgen_prelude::Buffer,
     source_map_mode: Option<String>,
 ) -> napi::Result<engine::NativeDecodedCommit> {
-    engine::commit_decoded_buffer(&source, &filename, &data, source_map_mode.as_deref())
+    edit::commit::commit_decoded_buffer(&source, &filename, &data, source_map_mode.as_deref())
 }
 
 #[napi]
@@ -64,15 +65,15 @@ pub fn compose_mappings(outer: String, inner: String, outer_name_count: u32) -> 
 
 #[napi]
 pub fn generate_function_map(source: String, filename: String) -> napi::Result<FunctionMap> {
-    function_map::generate(&source, &filename)
+    sourcemap::function_map::generate(&source, &filename)
 }
 
 #[napi]
 pub fn validate_expression(code: String, parser_mode: Option<String>) -> napi::Result<()> {
-    engine::validate_expression(&code, parser_mode.as_deref())
+    syntax::fragments::validate_expression(&code, parser_mode.as_deref())
 }
 
 #[napi]
 pub fn validate_statements(code: String, parser_mode: Option<String>) -> napi::Result<()> {
-    engine::validate_statements(&code, parser_mode.as_deref())
+    syntax::fragments::validate_statements(&code, parser_mode.as_deref())
 }

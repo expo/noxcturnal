@@ -4,9 +4,10 @@ import type {
   NativeNodeType,
   NativeRouteFields,
   NativeRouteTypes,
-} from './generated-event-schema.js';
+} from './generated/event-schema.js';
+import type { PreflightPlan } from './preflight/types.js';
 
-export type { NativeFieldKey, NativeNodeType } from './generated-event-schema.js';
+export type { NativeFieldKey, NativeNodeType } from './generated/event-schema.js';
 /** Alias route names, derived from the generated expansion table. */
 export type NativeVisitorAlias = Extract<keyof NativeRouteTypes, string>;
 export type NativeVisitorRoute = NativeNodeType | NativeVisitorAlias;
@@ -223,6 +224,8 @@ export interface PluginPlan {
 }
 
 export interface TransformOptions {
+  /** Reserved declarative configuration for native preflight phases. */
+  preflight?: PreflightPlan;
   sourceMapMode?: SourceMapMode;
   parser?: 'auto' | 'js' | 'jsx' | 'ts' | 'tsx' | 'dts';
   maxFollowUpBatches?: number;

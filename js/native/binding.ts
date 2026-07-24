@@ -1,6 +1,6 @@
 import { join } from 'node:path';
 
-import type { EditCommand, FunctionMap, NativeVlqMap, ParseClassification } from './types.js';
+import type { FunctionMap, NativeVlqMap, ParseClassification } from '../types.js';
 
 interface NativeBinding {
   NativeIndexedSession: new (
@@ -108,7 +108,7 @@ interface NativeBinding {
 }
 
 function loadBinding(): NativeBinding {
-  const root = join(__dirname, '..');
+  const root = join(__dirname, '../..');
   const suffix = platformSuffix();
   // Probe by requiring rather than fs-checking: test environments routinely mock `fs`,
   // and module resolution is the authority on loadability anyway.
