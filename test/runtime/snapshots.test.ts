@@ -308,6 +308,7 @@ test('supports absent predicates and rejects undeclared dynamic control flow', (
     name: 'static',
     visitors: [
       defineVisitor('Identifier', {}, path => {
+        // @ts-expect-error This test verifies the runtime guard for undeclared control flow.
         path.stop();
       }),
     ],
@@ -371,6 +372,7 @@ test('keeps predicate-only fields native', () => {
         { fields: [], where: { kind: { equals: 'const' } } },
         path => {
           calls++;
+          // @ts-expect-error Match-only fields are deliberately absent from the callback payload.
           assert.equal(path.node.kind, undefined);
         },
       ),

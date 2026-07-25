@@ -268,6 +268,9 @@ export const PREDICATE_FIELDS: Readonly<Record<string, readonly string[]>> = {
   UnaryExpression: ['operator', 'prefix', 'constantKind', 'constantValue'],
   BinaryExpression: ['operator', 'constantKind', 'constantValue'],
   LogicalExpression: ['operator', 'constantKind', 'constantValue'],
+  ConditionalExpression: ['constantKind', 'constantValue'],
+  ParenthesizedExpression: ['constantKind', 'constantValue'],
+  SequenceExpression: ['constantKind', 'constantValue'],
   AssignmentExpression: ['operator'],
   CallExpression: ['optional', 'argumentCount', 'calleeName', 'calleeGlobal', 'staticArgument'],
   NewExpression: ['argumentCount', 'calleeName', 'staticArgument'],
@@ -383,6 +386,18 @@ export const PREDICATE_VALUE_DOMAINS: Readonly<
   },
   LogicalExpression: {
     operator: { kinds: ['string'], values: ['||', '&&', '??'] },
+    constantKind: { kinds: ['string'], values: ['null', 'boolean', 'number', 'string'] },
+    constantValue: { kinds: ['string', 'number', 'boolean', 'null'] },
+  },
+  ConditionalExpression: {
+    constantKind: { kinds: ['string'], values: ['null', 'boolean', 'number', 'string'] },
+    constantValue: { kinds: ['string', 'number', 'boolean', 'null'] },
+  },
+  ParenthesizedExpression: {
+    constantKind: { kinds: ['string'], values: ['null', 'boolean', 'number', 'string'] },
+    constantValue: { kinds: ['string', 'number', 'boolean', 'null'] },
+  },
+  SequenceExpression: {
     constantKind: { kinds: ['string'], values: ['null', 'boolean', 'number', 'string'] },
     constantValue: { kinds: ['string', 'number', 'boolean', 'null'] },
   },
@@ -3527,6 +3542,18 @@ export interface NativeNodeFields {
   };
   LogicalExpression: {
     readonly operator: LogicalOperator;
+    readonly constantKind?: 'null' | 'boolean' | 'number' | 'string';
+    readonly constantValue?: string | number | boolean | null;
+  };
+  ConditionalExpression: {
+    readonly constantKind?: 'null' | 'boolean' | 'number' | 'string';
+    readonly constantValue?: string | number | boolean | null;
+  };
+  ParenthesizedExpression: {
+    readonly constantKind?: 'null' | 'boolean' | 'number' | 'string';
+    readonly constantValue?: string | number | boolean | null;
+  };
+  SequenceExpression: {
     readonly constantKind?: 'null' | 'boolean' | 'number' | 'string';
     readonly constantValue?: string | number | boolean | null;
   };

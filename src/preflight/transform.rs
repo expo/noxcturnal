@@ -5,8 +5,8 @@ use napi_derive::napi;
 use oxc_allocator::Allocator;
 use oxc_ast::ast::{
     AssignmentTargetPattern, CatchClause, Class, Decorator, ForOfStatement, FormalParameters,
-    IdentifierReference, MethodDefinition, PropertyDefinition, PropertyKey, RegExpFlags,
-    RegExpLiteral, VariableDeclaration, VariableDeclarationKind, VariableDeclarator,
+    IdentifierReference, MethodDefinition, PrivateInExpression, PropertyDefinition, PropertyKey,
+    RegExpFlags, RegExpLiteral, VariableDeclarator,
 };
 use oxc_ast_visit::{Visit, VisitMut, walk, walk_mut};
 use oxc_codegen::{Codegen, CodegenOptions, CommentOptions};
@@ -16,12 +16,17 @@ use oxc_react_compiler::{
     CompilationMode, CompilerTarget, PanicThreshold, PluginOptions as ReactCompilerOptions,
 };
 use oxc_semantic::SemanticBuilder;
-use oxc_transformer::{HelperLoaderMode, JsxOptions, JsxRuntime, TransformOptions, Transformer};
+use oxc_transformer::{
+    HelperLoaderMode, JsxOptions, JsxRuntime, ReactRefreshOptions, TransformOptions, Transformer,
+};
 
-use crate::sourcemap::pack_decoded_layer;
+use crate::edit::build as build_edits;
+use crate::sourcemap::{compose_packed_layer_chain, pack_decoded_layer, render_decoded};
 use crate::syntax::classification::source_type;
 
+use super::block_scoping;
 use super::helpers::{inline_helpers, validate_runtime_helpers};
+use super::optimize;
 use super::options::NativePreflightOptions;
 
 #[napi(object)]
@@ -35,7 +40,7 @@ pub struct NativePreflightResult {
 }
 
 pub fn transform(
-    source: String,
+    mut source: String,
     filename: String,
     options: NativePreflightOptions,
 ) -> Result<NativePreflightResult> {
@@ -43,6 +48,320 @@ pub fn transform(
         return Ok(unsupported("react-compiler-not-built", [] as [String; 0]));
     }
     let transform_options = compile_options(&options)?;
+    let mut rewrite_layers = Vec::new();
+    let loose_object_rest = options.object_rest_spread == Some(true)
+        && options.object_rest_spread_loose == Some(true)
+        && options.object_rest_spread_use_built_ins == Some(true);
+    if options.block_scoping == Some(true) {
+        for _ in 0..64 {
+            let rewrite_allocator = Allocator::default();
+            let rewrite_source_type = source_type(&filename, &source)?;
+            let rewritten = Parser::new(&rewrite_allocator, &source, rewrite_source_type).parse();
+            if !rewritten.diagnostics.is_empty() {
+                break;
+            }
+            let semantic = SemanticBuilder::new()
+                .with_build_nodes(true)
+                .with_excess_capacity(2.0)
+                .build(&rewritten.program);
+            if !semantic.diagnostics.is_empty() {
+                break;
+            }
+            let Some(edits) = block_scoping::captured_loop_edits(&source, &semantic.semantic)
+            else {
+                break;
+            };
+            let pieces = match build_preflight_edits(&source, edits) {
+                Ok(pieces) => pieces,
+                Err(_) => {
+                    return Ok(unsupported(
+                        "captured-loop-edit-conflict",
+                        [] as [String; 0],
+                    ));
+                }
+            };
+            let (rewritten_source, layer) = render_decoded(&source, &pieces, "character");
+            if rewritten_source == source {
+                break;
+            }
+            source = rewritten_source;
+            rewrite_layers.push(layer);
+        }
+    }
+    if options.parameters == Some(true) {
+        for _ in 0..64 {
+            let rewrite_allocator = Allocator::default();
+            let rewrite_source_type = source_type(&filename, &source)?;
+            let parsed = Parser::new(&rewrite_allocator, &source, rewrite_source_type).parse();
+            if !parsed.diagnostics.is_empty() {
+                break;
+            }
+            let semantic = SemanticBuilder::new()
+                .with_build_nodes(true)
+                .with_excess_capacity(2.0)
+                .build(&parsed.program);
+            if !semantic.diagnostics.is_empty() {
+                break;
+            }
+            let edits = match super::parameters::edits(&source, &semantic.semantic) {
+                Ok(edits) => edits,
+                Err(reason) => return Ok(unsupported(reason, [] as [String; 0])),
+            };
+            let Some(edits) = edits else {
+                break;
+            };
+            let pieces = match build_preflight_edits(&source, edits) {
+                Ok(pieces) => pieces,
+                Err(_) => {
+                    return Ok(unsupported("parameters-edit-conflict", [] as [String; 0]));
+                }
+            };
+            let (rewritten_source, layer) = render_decoded(&source, &pieces, "boundary");
+            source = rewritten_source;
+            rewrite_layers.push(layer);
+        }
+    }
+    let mut destructuring_done = false;
+    if options.for_of == Some(true) {
+        for _ in 0..64 {
+            let rewrite_allocator = Allocator::default();
+            let rewrite_source_type = source_type(&filename, &source)?;
+            let parsed = Parser::new(&rewrite_allocator, &source, rewrite_source_type).parse();
+            if !parsed.diagnostics.is_empty() {
+                break;
+            }
+            let semantic = SemanticBuilder::new()
+                .with_build_nodes(true)
+                .with_excess_capacity(2.0)
+                .build(&parsed.program);
+            if !semantic.diagnostics.is_empty() {
+                break;
+            }
+            let edits = match super::for_of::edits(&source, &semantic.semantic) {
+                Ok(edits) => edits,
+                Err(reason) => return Ok(unsupported(reason, [] as [String; 0])),
+            };
+            let Some(edits) = edits else {
+                if options.destructuring == Some(true) {
+                    let destructuring_edits = match super::destructuring::edits(
+                        &source,
+                        &semantic.semantic,
+                        loose_object_rest,
+                        false,
+                    ) {
+                        Ok(edits) => edits,
+                        Err(reason) => {
+                            return Ok(unsupported(reason, [] as [String; 0]));
+                        }
+                    };
+                    if let Some(destructuring_edits) = destructuring_edits {
+                        let pieces = match build_preflight_edits(&source, destructuring_edits) {
+                            Ok(pieces) => pieces,
+                            Err(_) => {
+                                return Ok(unsupported(
+                                    "destructuring-edit-conflict",
+                                    [] as [String; 0],
+                                ));
+                            }
+                        };
+                        let (rewritten_source, layer) =
+                            render_decoded(&source, &pieces, "boundary");
+                        source = rewritten_source;
+                        rewrite_layers.push(layer);
+                    }
+                    destructuring_done = true;
+                }
+                break;
+            };
+            let pieces = match build_preflight_edits(&source, edits) {
+                Ok(pieces) => pieces,
+                Err(_) => return Ok(unsupported("for-of-edit-conflict", [] as [String; 0])),
+            };
+            let (rewritten_source, layer) = render_decoded(&source, &pieces, "boundary");
+            source = rewritten_source;
+            rewrite_layers.push(layer);
+        }
+    }
+    if options.destructuring == Some(true) && !destructuring_done {
+        let rewrite_allocator = Allocator::default();
+        let rewrite_source_type = source_type(&filename, &source)?;
+        let parsed = Parser::new(&rewrite_allocator, &source, rewrite_source_type).parse();
+        if parsed.diagnostics.is_empty() {
+            let semantic = SemanticBuilder::new()
+                .with_build_nodes(true)
+                .with_excess_capacity(2.0)
+                .build(&parsed.program);
+            if semantic.diagnostics.is_empty() {
+                let edits = match super::destructuring::edits(
+                    &source,
+                    &semantic.semantic,
+                    loose_object_rest,
+                    false,
+                ) {
+                    Ok(edits) => edits,
+                    Err(reason) => return Ok(unsupported(reason, [] as [String; 0])),
+                };
+                if let Some(edits) = edits {
+                    let pieces = match build_preflight_edits(&source, edits) {
+                        Ok(pieces) => pieces,
+                        Err(_) => {
+                            return Ok(unsupported(
+                                "destructuring-edit-conflict",
+                                [] as [String; 0],
+                            ));
+                        }
+                    };
+                    let (rewritten_source, layer) = render_decoded(&source, &pieces, "boundary");
+                    source = rewritten_source;
+                    rewrite_layers.push(layer);
+                }
+            }
+        }
+    }
+    let focused_private_features =
+        options.private_methods == Some(true) || options.private_property_in_object == Some(true);
+    if options.classes == Some(true) || focused_private_features {
+        for _ in 0..64 {
+            let rewrite_allocator = Allocator::default();
+            let rewrite_source_type = source_type(&filename, &source)?;
+            let parsed = Parser::new(&rewrite_allocator, &source, rewrite_source_type).parse();
+            if !parsed.diagnostics.is_empty() {
+                break;
+            }
+            let semantic = SemanticBuilder::new()
+                .with_build_nodes(true)
+                .with_excess_capacity(2.0)
+                .build(&parsed.program);
+            if !semantic.diagnostics.is_empty() {
+                break;
+            }
+            let edits = match super::classes::edits(
+                &source,
+                &semantic.semantic,
+                options.classes == Some(true),
+                if options.classes == Some(true) {
+                    options
+                        .class_properties
+                        .filter(|enabled| *enabled)
+                        .map(|_| options.class_properties_loose.unwrap_or(false))
+                } else {
+                    Some(true)
+                },
+                options.class_static_block == Some(true),
+                options
+                    .private_methods
+                    .filter(|enabled| *enabled)
+                    .map(|_| options.private_methods_loose.unwrap_or(false)),
+                options
+                    .private_property_in_object
+                    .filter(|enabled| *enabled)
+                    .map(|_| options.private_property_in_object_loose.unwrap_or(false)),
+            ) {
+                Ok(edits) => edits,
+                Err(reason) => return Ok(unsupported(reason, [] as [String; 0])),
+            };
+            let Some(edits) = edits else {
+                break;
+            };
+            let pieces = match build_preflight_edits(&source, edits) {
+                Ok(pieces) => pieces,
+                Err(_) => return Ok(unsupported("classes-edit-conflict", [] as [String; 0])),
+            };
+            let (rewritten_source, layer) = render_decoded(&source, &pieces, "boundary");
+            source = rewritten_source;
+            rewrite_layers.push(layer);
+        }
+    }
+    if options.object_rest_spread == Some(true)
+        && options.object_rest_spread_loose == Some(true)
+        && options.object_rest_spread_use_built_ins == Some(true)
+    {
+        for _ in 0..64 {
+            let rewrite_allocator = Allocator::default();
+            let rewrite_source_type = source_type(&filename, &source)?;
+            let parsed = Parser::new(&rewrite_allocator, &source, rewrite_source_type).parse();
+            if !parsed.diagnostics.is_empty() {
+                break;
+            }
+            let semantic = SemanticBuilder::new()
+                .with_build_nodes(true)
+                .with_excess_capacity(2.0)
+                .build(&parsed.program);
+            if !semantic.diagnostics.is_empty() {
+                break;
+            }
+            let Some(edits) = super::object_spread::edits(&source, &semantic.semantic) else {
+                let rest_edits =
+                    match super::destructuring::edits(&source, &semantic.semantic, true, true) {
+                        Ok(edits) => edits,
+                        Err(reason) => return Ok(unsupported(reason, [] as [String; 0])),
+                    };
+                if let Some(rest_edits) = rest_edits {
+                    let pieces = match build_preflight_edits(&source, rest_edits) {
+                        Ok(pieces) => pieces,
+                        Err(_) => {
+                            return Ok(unsupported("object-rest-edit-conflict", [] as [String; 0]));
+                        }
+                    };
+                    let (rewritten_source, layer) = render_decoded(&source, &pieces, "boundary");
+                    source = rewritten_source;
+                    rewrite_layers.push(layer);
+                }
+                break;
+            };
+            let pieces = match build_preflight_edits(&source, edits) {
+                Ok(pieces) => pieces,
+                Err(_) => {
+                    return Ok(unsupported(
+                        "object-spread-edit-conflict",
+                        [] as [String; 0],
+                    ));
+                }
+            };
+            let (rewritten_source, layer) = render_decoded(&source, &pieces, "boundary");
+            source = rewritten_source;
+            rewrite_layers.push(layer);
+        }
+    }
+    if options.regexp_unicode == Some(true)
+        || options.regexp_unicode_property_escapes == Some(true)
+        || options.regexp_dot_all == Some(true)
+        || options.regexp_named_capture_groups == Some(true)
+    {
+        let rewrite_allocator = Allocator::default();
+        let rewrite_source_type = source_type(&filename, &source)?;
+        let parsed = Parser::new(&rewrite_allocator, &source, rewrite_source_type).parse();
+        if parsed.diagnostics.is_empty() {
+            let semantic = SemanticBuilder::new()
+                .with_build_nodes(true)
+                .with_excess_capacity(2.0)
+                .build(&parsed.program);
+            if semantic.diagnostics.is_empty() {
+                let edits = match super::regexp::edits(
+                    &source,
+                    &semantic.semantic,
+                    options.regexp_unicode == Some(true),
+                    options.regexp_unicode_property_escapes == Some(true),
+                    options.regexp_dot_all == Some(true),
+                    options.regexp_named_capture_groups == Some(true),
+                ) {
+                    Ok(edits) => edits,
+                    Err(reason) => return Ok(unsupported(reason, [] as [String; 0])),
+                };
+                if let Some(edits) = edits {
+                    let pieces = match build_preflight_edits(&source, edits) {
+                        Ok(pieces) => pieces,
+                        Err(_) => {
+                            return Ok(unsupported("regexp-edit-conflict", [] as [String; 0]));
+                        }
+                    };
+                    let (rewritten_source, layer) = render_decoded(&source, &pieces, "boundary");
+                    source = rewritten_source;
+                    rewrite_layers.push(layer);
+                }
+            }
+        }
+    }
     let allocator = Allocator::default();
     let source_type = source_type(&filename, &source)?;
     let parsed = Parser::new(&allocator, &source, source_type).parse();
@@ -108,26 +427,6 @@ pub fn transform(
             ));
         }
     }
-    if options.private_methods == Some(true) || options.private_property_in_object == Some(true) {
-        let mut detector = ClassFeaturesUnsupportedDetector(false);
-        detector.visit_program(&program);
-        if detector.0 {
-            return Ok(unsupported(
-                "class-features-semantic-mismatch",
-                [] as [String; 0],
-            ));
-        }
-    }
-    if options.block_scoping == Some(true) {
-        let mut detector = BlockScopingDetector::default();
-        detector.visit_program(&program);
-        if detector.block_scoping {
-            return Ok(unsupported(
-                "block-scoping-not-implemented",
-                [] as [String; 0],
-            ));
-        }
-    }
     if options.classes == Some(true) {
         let mut detector = ClassesDetector(false);
         detector.visit_program(&program);
@@ -149,7 +448,10 @@ pub fn transform(
         let mut detector = ParametersDetector(false);
         detector.visit_program(&program);
         if detector.0 {
-            return Ok(unsupported("parameters-not-implemented", [] as [String; 0]));
+            return Ok(unsupported(
+                "parameters-postcondition-failed",
+                [] as [String; 0],
+            ));
         }
     }
     if options.for_of == Some(true) {
@@ -160,19 +462,98 @@ pub fn transform(
         }
     }
     let semantic = SemanticBuilder::new()
+        .with_build_nodes(options.block_scoping == Some(true))
         .with_excess_capacity(2.0)
         .with_enum_eval(true)
         .build(&program);
     if !semantic.diagnostics.is_empty() {
         return Ok(unsupported("semantic-error", semantic.diagnostics));
     }
+    let had_block_scoping_syntax =
+        options.block_scoping == Some(true) && block_scoping::has_remaining_syntax(&program);
+    let block_scoping_plan = if options.block_scoping == Some(true) {
+        match block_scoping::prepare(&semantic.semantic) {
+            Ok(plan) => Some(plan),
+            Err(reason) => return Ok(unsupported(reason, [] as [String; 0])),
+        }
+    } else {
+        None
+    };
+    let scoping = semantic.semantic.into_scoping();
+    if let Some(plan) = block_scoping_plan {
+        block_scoping::run(&allocator, &mut program, plan);
+    }
     let transformed = Transformer::new(&allocator, Path::new(&filename), &transform_options)
-        .build_with_scoping(semantic.semantic.into_scoping(), &mut program);
+        .build_with_scoping(scoping, &mut program);
     if !transformed.diagnostics.is_empty() {
         return Ok(unsupported("transform-error", transformed.diagnostics));
     }
+    if options.private_methods == Some(true) || options.private_property_in_object == Some(true) {
+        let mut detector = ClassFeaturesUnsupportedDetector(false);
+        detector.visit_program(&program);
+        if detector.0 {
+            return Ok(unsupported(
+                "class-features-postcondition-failed",
+                [] as [String; 0],
+            ));
+        }
+    }
+    if options.block_scoping == Some(true) && block_scoping::has_remaining_syntax(&program) {
+        return Ok(unsupported(
+            "block-scoping-postcondition-failed",
+            [] as [String; 0],
+        ));
+    }
+    optimize::run(
+        &allocator,
+        &mut program,
+        options.constant_folding == Some(true),
+        options.dead_code_elimination == Some(true),
+    );
     #[expect(deprecated)]
     let helper_requests: Vec<_> = transformed.helpers_used.into_iter().collect();
+    let oxc_codegen_only_transform_selected = options.explicit_resource_management == Some(true)
+        || options.logical_assignment_operators == Some(true)
+        || options.optional_chaining == Some(true)
+        || options.nullish_coalescing_operator == Some(true)
+        || options.export_namespace_from == Some(true)
+        || options.optional_catch_binding == Some(true)
+        || options.exponentiation_operator == Some(true)
+        || options.regexp_sticky == Some(true)
+        || (options.class_static_block == Some(true) && options.classes != Some(true))
+        || (options.object_rest_spread == Some(true)
+            && !(options.object_rest_spread_loose == Some(true)
+                && options.object_rest_spread_use_built_ins == Some(true)))
+        || (options.class_properties == Some(true) && options.classes != Some(true))
+        || (options.private_methods == Some(true) && options.classes != Some(true))
+        || (options.private_property_in_object == Some(true) && options.classes != Some(true));
+    if rewrite_layers.is_empty()
+        && helper_requests.is_empty()
+        && !had_block_scoping_syntax
+        && !oxc_codegen_only_transform_selected
+        && options.typescript.is_none()
+        && options.jsx.is_none()
+        && options.react_compiler != Some(true)
+        && options.react_refresh != Some(true)
+        && options.constant_folding != Some(true)
+        && options.dead_code_elimination != Some(true)
+        && options.compact != Some(true)
+        && !(options.comments == Some(false) && (source.contains("//") || source.contains("/*")))
+    {
+        let line_count = source.bytes().filter(|byte| *byte == b'\n').count() as u32 + 1;
+        let mut words = Vec::with_capacity(line_count as usize * 5);
+        for line in 0..line_count {
+            words.extend_from_slice(&[line, 0, line, 0, 0]);
+        }
+        return Ok(NativePreflightResult {
+            status: "complete".into(),
+            reason: None,
+            code: Some(source),
+            map: Some(pack_decoded_layer(&words, &[], line_count).into()),
+            diagnostics: Vec::new(),
+            helpers_used: Vec::new(),
+        });
+    }
     let helper_mode = options.helpers_mode.as_deref().unwrap_or("runtime");
     let helper_module = options
         .helpers_module_name
@@ -254,7 +635,19 @@ pub fn transform(
             token.get_name_id().map_or(0, |id| id + 1),
         ]);
     }
-    let layer = pack_decoded_layer(&words, &names, line_count);
+    let codegen_layer = pack_decoded_layer(&words, &names, line_count);
+    let layer = if rewrite_layers.is_empty() {
+        codegen_layer
+    } else {
+        let mut layers: Vec<&[u8]> = rewrite_layers.iter().map(Vec::as_slice).collect();
+        layers.push(codegen_layer.as_slice());
+        compose_packed_layer_chain(&layers).ok_or_else(|| {
+            Error::new(
+                Status::GenericFailure,
+                "native captured-loop map composition failed",
+            )
+        })?
+    };
     Ok(NativePreflightResult {
         status: "complete".into(),
         reason: None,
@@ -273,6 +666,19 @@ fn compile_options(options: &NativePreflightOptions) -> Result<TransformOptions>
         jsx: JsxOptions::disable(),
         ..TransformOptions::default()
     };
+    if options.react_refresh == Some(true) {
+        compiled.jsx.refresh = Some(ReactRefreshOptions {
+            refresh_reg: options
+                .react_refresh_reg
+                .clone()
+                .unwrap_or_else(|| "$RefreshReg$".into()),
+            refresh_sig: options
+                .react_refresh_sig
+                .clone()
+                .unwrap_or_else(|| "$RefreshSig$".into()),
+            emit_full_signatures: options.react_refresh_emit_full_signatures.unwrap_or(false),
+        });
+    }
     #[cfg(feature = "react_compiler")]
     if options.react_compiler == Some(true) {
         let compilation_mode = options
@@ -342,11 +748,17 @@ fn compile_options(options: &NativePreflightOptions) -> Result<TransformOptions>
     if options.object_rest_spread == Some(true) {
         compiled.env.es2018.object_rest_spread = Some(Default::default());
         let object_rest_spread = compiled.env.es2018.object_rest_spread.as_mut().unwrap();
-        object_rest_spread.loose = options.object_rest_spread_loose.unwrap_or(false);
+        // Loose+built-in object spread is lowered by the focused mapped prepass.
+        // Oxc 0.141 reports these two Babel-compatible options as unimplemented
+        // even after no spread syntax remains, so do not forward them.
+        let focused_loose_built_in = options.object_rest_spread_loose == Some(true)
+            && options.object_rest_spread_use_built_ins == Some(true);
+        object_rest_spread.loose =
+            options.object_rest_spread_loose.unwrap_or(false) && !focused_loose_built_in;
         object_rest_spread.use_built_ins =
-            options.object_rest_spread_use_built_ins.unwrap_or(false);
+            options.object_rest_spread_use_built_ins.unwrap_or(false) && !focused_loose_built_in;
     }
-    let mut class_feature_loose = None;
+    let mut selected_class_feature_loose = None;
     for (enabled, loose) in [
         (options.class_properties, options.class_properties_loose),
         (options.private_methods, options.private_methods_loose),
@@ -357,16 +769,17 @@ fn compile_options(options: &NativePreflightOptions) -> Result<TransformOptions>
     ] {
         if enabled == Some(true) {
             let loose = loose.unwrap_or(false);
-            if class_feature_loose.is_some_and(|selected| selected != loose) {
+            if selected_class_feature_loose.is_some_and(|selected| selected != loose) {
                 return Err(Error::new(
                     Status::InvalidArg,
                     "classProperties, privateMethods, and privatePropertyInObject must use the same loose value",
                 ));
             }
-            class_feature_loose = Some(loose);
+            selected_class_feature_loose = Some(loose);
         }
     }
-    if let Some(loose) = class_feature_loose {
+    if options.class_properties == Some(true) {
+        let loose = options.class_properties_loose.unwrap_or(false);
         compiled.env.es2022.class_properties =
             Some(oxc_transformer::ClassPropertiesOptions { loose });
         compiled.assumptions.set_public_class_fields = loose;
@@ -418,7 +831,9 @@ fn compile_options(options: &NativePreflightOptions) -> Result<TransformOptions>
         Some(
             mode @ ("classic" | "classic-development" | "automatic" | "automatic-development"),
         ) => {
+            let refresh = compiled.jsx.refresh.take();
             compiled.jsx = JsxOptions::enable();
+            compiled.jsx.refresh = refresh;
             compiled.jsx.runtime = if matches!(mode, "classic" | "classic-development") {
                 JsxRuntime::Classic
             } else {
@@ -514,12 +929,7 @@ struct ClassFeaturesUnsupportedDetector(bool);
 
 impl<'a> Visit<'a> for ClassFeaturesUnsupportedDetector {
     fn visit_property_definition(&mut self, property: &PropertyDefinition<'a>) {
-        // Enabling Oxc's combined class-properties pass is necessary for private
-        // syntax but also lowers public fields that some consumer recipes preserve.
-        // Oxc 0.141 additionally mixes spec private-method initialization with loose
-        // access and lowers private-in through WeakMap `.has`, which is invalid for
-        // its loose string keys. Keep those cases on the explicit fallback.
-        self.0 = true;
+        self.0 |= matches!(property.key, PropertyKey::PrivateIdentifier(_));
         walk::walk_property_definition(self, property);
     }
 
@@ -529,11 +939,11 @@ impl<'a> Visit<'a> for ClassFeaturesUnsupportedDetector {
         }
         walk::walk_method_definition(self, method);
     }
-}
 
-#[derive(Default)]
-struct BlockScopingDetector {
-    block_scoping: bool,
+    fn visit_private_in_expression(&mut self, expression: &PrivateInExpression<'a>) {
+        self.0 = true;
+        walk::walk_private_in_expression(self, expression);
+    }
 }
 
 struct ClassesDetector(bool);
@@ -551,18 +961,6 @@ impl<'a> VisitMut<'a> for InlineHelperRenamer<'a> {
             identifier.name = self.binding.into();
         }
         walk_mut::walk_identifier_reference(self, identifier);
-    }
-}
-
-impl<'a> Visit<'a> for BlockScopingDetector {
-    fn visit_variable_declaration(&mut self, declaration: &VariableDeclaration<'a>) {
-        if matches!(
-            declaration.kind,
-            VariableDeclarationKind::Let | VariableDeclarationKind::Const
-        ) {
-            self.block_scoping = true;
-        }
-        walk::walk_variable_declaration(self, declaration);
     }
 }
 
@@ -625,6 +1023,52 @@ fn unsupported(
             .collect(),
         helpers_used: Vec::new(),
     }
+}
+
+/// Oxc spans are UTF-8 byte offsets while the shared edit protocol deliberately
+/// uses JavaScript UTF-16 coordinates. Native preflight passes operate directly
+/// on Oxc nodes, so normalize their commands once at this boundary.
+fn build_preflight_edits(
+    source: &str,
+    mut edits: Vec<crate::edit::EditCommand>,
+) -> Result<Vec<crate::edit::Piece>> {
+    if source.is_ascii() {
+        return build_edits(source, edits);
+    }
+    let mut utf16 = vec![u32::MAX; source.len() + 1];
+    let mut units = 0u32;
+    for (byte, character) in source.char_indices() {
+        utf16[byte] = units;
+        units += character.len_utf16() as u32;
+    }
+    utf16[source.len()] = units;
+    let convert = |offset: u32| -> Result<u32> {
+        utf16
+            .get(offset as usize)
+            .copied()
+            .filter(|offset| *offset != u32::MAX)
+            .ok_or_else(|| {
+                Error::new(
+                    Status::GenericFailure,
+                    format!("native edit byte offset {offset} is not a character boundary"),
+                )
+            })
+    };
+    for edit in &mut edits {
+        edit.start = convert(edit.start)?;
+        edit.end = convert(edit.end)?;
+        if let Some(destination) = edit.destination.as_mut() {
+            *destination = convert(*destination)?;
+        }
+        for part in &mut edit.parts {
+            let crate::edit::RawContentPart::Copy { start, end } = part else {
+                continue;
+            };
+            *start = convert(*start)?;
+            *end = convert(*end)?;
+        }
+    }
+    build_edits(source, edits)
 }
 
 #[cfg(test)]

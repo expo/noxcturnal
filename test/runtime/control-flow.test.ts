@@ -159,7 +159,7 @@ test('implements per-plugin skip and stop', () => {
   const stopPlugin = defineNativePlugin({
     name: 'stop',
     visitors: [
-      defineVisitor('Identifier', { controlFlow: ['stop'] }, path => {
+      defineVisitor('Identifier', { fields: ['name'], controlFlow: ['stop'] }, path => {
         stopped.push(String(path.node.name));
         path.stop();
       }),

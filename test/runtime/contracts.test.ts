@@ -65,7 +65,7 @@ test('typed visitor match-only predicate fields are not callback-visible', () =>
     'VariableDeclaration',
     { where: { kind: { equals: 'const' } } },
     path => {
-      observedKind = (path.node as Record<string, unknown>).kind;
+      observedKind = (path.node as unknown as Record<string, unknown>).kind;
     },
   );
   const result = transform(
@@ -243,6 +243,7 @@ test('typed plugins reject aggregate route plans and mixed visitor forms', () =>
   );
   const plugin = defineNativePlugin({
     name: 'typed',
+    // @ts-expect-error This test verifies that legacy prepare-time field plans are rejected.
     prepare: () => ({ fields: { Identifier: ['name'] } }),
     visitors: [defineVisitor('Identifier', {}, () => {})],
   });
@@ -267,7 +268,7 @@ test('typed children access declared roles with prefetched fields', () => {
     },
     path => {
       for (const specifier of path.getChildList('specifiers'))
-        locals.push(String((specifier.node as Record<string, unknown>).local));
+        locals.push(String((specifier.node as unknown as Record<string, unknown>).local));
     },
   );
   const undeclaredRole = defineVisitor(
@@ -350,7 +351,7 @@ test('verifyVisitorContracts reports undeclared reads and unused declarations', 
     path => {
       // Reads an undeclared field (silently undefined) and never uses scope or
       // the declared declarationCount.
-      void (path.node as Record<string, unknown>).kind;
+      void (path.node as unknown as Record<string, unknown>).kind;
     },
   );
   const result = transform(

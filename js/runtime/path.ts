@@ -698,6 +698,7 @@ function selectChildRole(
       type === 'TSModuleBlock'
     )
       return children;
+    if (type === 'DoWhileStatement') return at(0);
     return last();
   }
   if (key === 'arguments' && (type === 'CallExpression' || type === 'NewExpression'))
@@ -780,7 +781,7 @@ function selectChildRole(
       type === 'ForStatement' ||
       type === 'SwitchStatement')
   )
-    return at(0);
+    return type === 'DoWhileStatement' ? last() : at(0);
   if (key === 'consequent' && (type === 'IfStatement' || type === 'ConditionalExpression'))
     return at(1);
   if (key === 'alternate' && (type === 'IfStatement' || type === 'ConditionalExpression'))

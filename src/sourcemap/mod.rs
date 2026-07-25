@@ -577,7 +577,7 @@ pub fn compose(outer: &str, inner: &str, outer_name_count: u32) -> String {
 /// original line, original column, name id + 1).
 mod decoded;
 
-pub(crate) use decoded::{compose_layer_chain, pack_decoded_layer};
+pub(crate) use decoded::{compose_layer_chain, compose_packed_layer_chain, pack_decoded_layer};
 
 #[cfg(test)]
 mod tests {

@@ -3,6 +3,7 @@ export type {
   PreflightHelpers,
   PreflightJsxMode,
   PreflightPlan,
+  PreflightReactCompiler,
   PreflightTransforms,
   PreflightTypeScriptMode,
 } from './preflight/types.js';

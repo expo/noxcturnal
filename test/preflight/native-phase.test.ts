@@ -100,6 +100,137 @@ test('runs a fused native TypeScript phase and reports its own timing', () => {
   assert.ok(performance.phaseExecutions[0].nativeTransformMs > 0);
 });
 
+test('runs React Fast Refresh instrumentation in the native JSX transform', () => {
+  const result = transform(
+    [
+      "import { useState } from 'react';",
+      'export default function App() {',
+      '  const [count, setCount] = useState(0);',
+      '  return <button onClick={() => setCount(count + 1)}>{count}</button>;',
+      '}',
+    ].join('\n'),
+    'App.tsx',
+    defineNativePipeline({
+      phases: [
+        {
+          name: 'development-react',
+          native: {
+            typescript: 'strip',
+            jsx: 'automatic',
+            jsxImportSource: 'react',
+            reactRefresh: {},
+          },
+        },
+      ],
+    }),
+  );
+
+  assert.equal(result.status, 'complete');
+  assert.match(result.code, /\$RefreshReg\$/);
+  assert.match(result.code, /\$RefreshSig\$/);
+  assert.match(result.code, /App/);
+  assert.doesNotMatch(result.code, /<button/);
+});
+
+test('validates React Fast Refresh options', () => {
+  assert.throws(
+    () =>
+      defineNativePipeline({
+        phases: [
+          {
+            name: 'refresh',
+            native: { reactRefresh: { refreshReg: '' } },
+          },
+        ],
+      }),
+    /invalid React Refresh refreshReg/,
+  );
+});
+
+test('runs Metro-compatible constant folding and DCE as one native postflight', () => {
+  const result = transform(
+    [
+      'function leaf() { return 1 + 2 * 3; }',
+      'function dead() { return leaf(); }',
+      'const unusedArrow = () => 42;',
+      'const liveArrow = () => (false ? 1 : 2);',
+      'if (0) { sideEffect(); } else { module.exports = liveArrow(); }',
+    ].join('\n'),
+    'fixture.js',
+    defineNativePipeline({
+      phases: [
+        {
+          name: 'metro-optimization',
+          native: {
+            optimize: { constantFolding: true, deadCodeElimination: true },
+          },
+        },
+      ],
+    }),
+  );
+
+  assert.equal(result.status, 'complete');
+  assert.doesNotMatch(result.code, /function (?:leaf|dead)/);
+  assert.doesNotMatch(result.code, /unusedArrow/);
+  assert.match(result.code, /const liveArrow = \(\) => 2;/);
+  assert.match(result.code, /module\.exports = liveArrow\(\);/);
+  assert.doesNotMatch(result.code, /sideEffect/);
+});
+
+test('keeps a native legacy no-op byte-identical with an identity map', () => {
+  const source = '  var value= require("dep");\nmodule.exports=value;';
+  const result = transform(
+    source,
+    'fixture.js',
+    defineNativePipeline({
+      phases: [
+        {
+          name: 'legacy-language',
+          native: {
+            transforms: {
+              blockScoping: true,
+              parameters: true,
+              destructuring: { useBuiltIns: true },
+              classes: true,
+              classProperties: { loose: true },
+              classStaticBlock: true,
+              asyncFunctions: true,
+            },
+            comments: false,
+          },
+        },
+      ],
+    }),
+  );
+  assert.equal(result.status, 'complete');
+  assert.equal(result.code, source);
+  assert.ok(result.map.mappings.length > 0);
+});
+
+test('keeps Metro postflight operations independently selectable', () => {
+  const source = 'function dead() { return 1 + 2; } module.exports = 0;';
+  const foldOnly = transform(
+    source,
+    'fixture.js',
+    defineNativePipeline({
+      phases: [{ name: 'fold', native: { optimize: { constantFolding: true } } }],
+    }),
+  );
+  const dceOnly = transform(
+    source,
+    'fixture.js',
+    defineNativePipeline({
+      phases: [{ name: 'dce', native: { optimize: { deadCodeElimination: true } } }],
+    }),
+  );
+
+  assert.equal(foldOnly.status, 'complete');
+  assert.match(foldOnly.code, /function dead\(\)/);
+  assert.match(foldOnly.code, /return 3;/);
+  assert.equal(dceOnly.status, 'complete');
+  assert.doesNotMatch(dceOnly.code, /function dead/);
+});
+
 test('composes a native decoded layer with a following visitor layer', () => {
   const replace = defineNativePlugin({
     name: 'replace',
@@ -136,7 +267,7 @@ test('composes a native decoded layer with a following visitor layer', () => {
   });
 });
 
-test('returns a pristine structured bailout for a requested unavailable transform', () => {
+test('lowers block scoping through the native preflight capability', () => {
   const source = 'const pristine = true;';
   const result = transform(
     source,
@@ -146,10 +277,20 @@ test('returns a pristine structured bailout for a requested unavailable transfor
     }),
   );
 
-  assert.deepEqual(result, {
-    status: 'bailout',
-    reason: 'preflight:block-scoping-not-implemented',
-    source,
-    diagnostics: [],
+  assert.equal(result.status, 'complete');
+  assert.match(result.code, /var pristine = true/);
+
+  const map = new TraceMap({
+    version: 3,
+    sources: ['fixture.js'],
+    names: result.map.names,
+    mappings: result.map.mappings,
+  });
+  const generatedColumn = result.code.indexOf('pristine');
+  assert.deepEqual(originalPositionFor(map, { line: 1, column: generatedColumn }), {
+    source: 'fixture.js',
+    line: 1,
+    column: source.indexOf('pristine'),
+    name: null,
   });
 });

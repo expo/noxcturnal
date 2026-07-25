@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
 
 import { originalPositionFor, TraceMap } from '@jridgewell/trace-mapping';
-import { test } from 'vitest';
+import { expect, test } from 'vitest';
 
 import type { PreflightTransforms } from '../../dist/index.js';
 import { defineNativePipeline, transform } from '../../dist/index.js';
+import { NATIVE_TRANSFORM_NAMES } from '../../dist/preflight/schema.js';
 
 const pipeline = (
   transforms: PreflightTransforms,
@@ -22,6 +23,87 @@ const pipeline = (
       },
     ],
   });
+
+type TransformName = (typeof NATIVE_TRANSFORM_NAMES)[number];
+
+const TRANSFORM_OWNERSHIP_FIXTURES = {
+  blockScoping: ['let value = 1;', true],
+  classes: ['class Value {}', true],
+  destructuring: ['var { value } = input;', { useBuiltIns: true }],
+  parameters: ['function read(value = 1) { return value; }', true],
+  forOf: ['for (var value of values) consume(value);', true],
+  explicitResourceManagement: ['using value = acquire();', true],
+  classStaticBlock: ['class Value { static { this.value = 1; } }', true],
+  classProperties: ['class Value { field = 1; }', { loose: true }],
+  logicalAssignmentOperators: ['value ||= 1;', true],
+  optionalChaining: ['value?.field;', { loose: false }],
+  nullishCoalescingOperator: ['value ?? fallback;', { loose: false }],
+  exportNamespaceFrom: ['export * as value from "pkg";', true],
+  optionalCatchBinding: ['try {} catch {}', true],
+  objectRestSpread: ['var value = { ...input };', { loose: true, useBuiltIns: true }],
+  asyncGeneratorFunctions: ['async function* values() { yield 1; }', true],
+  asyncFunctions: ['async function value() { return 1; }', true],
+  exponentiationOperator: ['value **= 2;', true],
+  privateMethods: ['class Value { #read() {} }', { loose: true }],
+  privatePropertyInObject: [
+    'class Value { #field; has(input) { return #field in input; } }',
+    { loose: true },
+  ],
+  regexpSticky: ['var value = /a/y;', true],
+  regexpUnicode: ['var value = /😀/u;', true],
+  regexpUnicodePropertyEscapes: ['var value = /\\p{ASCII}/u;', true],
+  regexpDotAll: ['var value = /a.b/s;', true],
+  regexpNamedCaptureGroups: ['var value = /(?<value>a)/;', true],
+  regexpLookBehind: ['var value = /(?<=a)b/;', true],
+  regexpMatchIndices: ['var value = /a/d;', true],
+  regexpUnicodeSets: ['var value = /[a&&b]/v;', true],
+} as const satisfies Record<TransformName, readonly [string, PreflightTransforms[TransformName]]>;
+
+test('every public native transform has an explicit ownership fixture', () => {
+  assert.deepEqual(Object.keys(TRANSFORM_OWNERSHIP_FIXTURES), [...NATIVE_TRANSFORM_NAMES]);
+
+  const documentedStandaloneBoundaries = new Set<TransformName>([
+    'regexpLookBehind',
+    'regexpMatchIndices',
+    'regexpUnicodeSets',
+  ]);
+  for (const name of NATIVE_TRANSFORM_NAMES) {
+    const [source, option] = TRANSFORM_OWNERSHIP_FIXTURES[name];
+    const result = transform(
+      source,
+      'fixture.js',
+      pipeline({ [name]: option } as PreflightTransforms),
+    );
+    expect({
+      name,
+      source,
+      option,
+      status: result.status,
+      code: result.status === 'complete' ? result.code : undefined,
+      helpers:
+        result.status === 'complete'
+          ? ((result.metadata.nativeHelpers as string[] | undefined) ?? [])
+          : undefined,
+      map:
+        result.status === 'complete'
+          ? { mappings: result.map.mappings, names: result.map.names }
+          : undefined,
+      reason: result.status === 'bailout' ? result.reason : undefined,
+    }).toMatchSnapshot();
+    assert.equal(
+      result.status,
+      documentedStandaloneBoundaries.has(name) ? 'bailout' : 'complete',
+      `${name} has no matching ownership disposition`,
+    );
+    const noOp = transform(
+      'var untouched = 1;',
+      'fixture.js',
+      pipeline({ [name]: option } as PreflightTransforms),
+    );
+    assert.equal(noOp.status, 'complete', `${name} does not preserve unrelated syntax`);
+    if (noOp.status === 'complete') assert.match(noOp.code, /untouched=1/);
+  }
+});
 
 test('classStaticBlock lowers independently with explicit compact/comment posture', () => {
   const result = transform(
@@ -41,19 +123,77 @@ test('classStaticBlock lowers independently with explicit compact/comment postur
   assert.equal(context.fields, 5);
 });
 
-test('private toggles explicitly route Oxc 0.141 semantic mismatches to fallback', () => {
+test('private toggles lower owned classes without lowering unrelated class syntax', () => {
+  const result = transform(
+    `class Unrelated { field = 1 }
+     class Example {
+       #field;
+       constructor(value) { this.#field = value; }
+       #method(value) { return this.#field + value; }
+       read(input) { return [this.#method(3), #field in input]; }
+     }
+     class Accessors {
+       #field = 1;
+       get #value() { return this.#field; }
+       set #value(value) { this.#field = value; }
+       read() { this.#value = 4; return this.#value; }
+     }
+     var value = new Example(2);
+     globalThis.answer = [value.read(value), value.read({}), new Unrelated().field, new Accessors().read()];`,
+    'fixture.js',
+    pipeline({
+      privateMethods: { loose: true },
+      privatePropertyInObject: { loose: true },
+    }),
+  );
+  assert.equal(result.status, 'complete');
+  assert.match(result.code, /class Unrelated\{field=1\}/);
+  assert.doesNotMatch(result.code, /#(?:field|method)/);
+  const context: { answer?: unknown } = {};
+  new Function('globalThis', result.code)(context);
+  assert.deepEqual(context.answer, [[5, true], [5, false], 1, 4]);
+});
+
+test('spec private feature options retain a structured semantic boundary', () => {
   for (const [source, transforms] of [
-    ['class Example { field = 1 }', { privateMethods: { loose: true } }],
+    ['class Value { #method() {} }', { privateMethods: { loose: false } }],
     [
-      'class Example { #field = 1; read() { return #field in this } }',
-      { privatePropertyInObject: { loose: true } },
+      'class Value { #field; has(input) { return #field in input; } }',
+      { privatePropertyInObject: { loose: false } },
     ],
-    ['class Example { #method() {} }', { privateMethods: { loose: true } }],
   ] satisfies [string, PreflightTransforms][]) {
     const result = transform(source, 'fixture.js', pipeline(transforms));
     assert.equal(result.status, 'bailout');
-    assert.equal(result.reason, 'syntax:class-features-semantic-mismatch');
+    assert.equal(result.reason, 'syntax:classes-spec-private-features-not-implemented');
   }
+});
+
+test('native classes lower loose private fields, methods, calls, access, and private-in', () => {
+  const source = `
+    class Secret {
+      #value = 2;
+      #double(input) { return this.#value * input; }
+      read() { return this.#double(3); }
+      has(input) { return #value in input; }
+    }
+    var value = new Secret();
+    globalThis.answer = [value.read(), value.has(value), value.has({})];
+  `;
+  const result = transform(
+    source,
+    'fixture.js',
+    pipeline({
+      classes: true,
+      classProperties: { loose: true },
+      privateMethods: { loose: true },
+      privatePropertyInObject: { loose: true },
+    }),
+  );
+  assert.equal(result.status, 'complete');
+  assert.doesNotMatch(result.code, /#(?:value|double)/);
+  const context: { answer?: unknown } = {};
+  new Function('globalThis', result.code)(context);
+  assert.deepEqual(context.answer, [6, true, false]);
 });
 
 test('language transforms are selected independently rather than as a target group', () => {
@@ -76,20 +216,7 @@ test('language transforms are selected independently rather than as a target gro
 });
 
 test('missing ES2015 transforms are independent syntax-specific boundaries', () => {
-  const cases = [
-    ['class Value {}', { classes: true }, 'classes-not-implemented'],
-    [
-      'var { value } = input;',
-      { destructuring: { useBuiltIns: true } },
-      'destructuring-not-implemented',
-    ],
-    [
-      'function read(value = 1) { return value }',
-      { parameters: true },
-      'parameters-not-implemented',
-    ],
-    ['for (var value of input) consume(value);', { forOf: true }, 'for-of-not-implemented'],
-  ] satisfies [string, PreflightTransforms, string][];
+  const cases: [string, PreflightTransforms, string][] = [];
 
   for (const [source, transforms, reason] of cases) {
     const result = transform(source, 'fixture.js', pipeline(transforms));
@@ -105,6 +232,202 @@ test('missing ES2015 transforms are independent syntax-specific boundaries', () 
     );
     assert.equal(result.status, 'complete');
   }
+});
+
+test('native classes preserve methods, accessors, computed keys, expressions, and default inheritance', () => {
+  const source = `
+    var key = "double", trace = [];
+    class Base {
+      field = 1;
+      static staticField = (trace.push("field"), 2);
+      static { trace.push("block"); this.fromBlock = 3; }
+      constructor(value) { this.value = value; }
+      get current() { return this.value; }
+      set current(value) { this.value = value; }
+      [key]() { return this.value * 2; }
+      static create(value) { return new this(value); }
+      static kind() { return "base"; }
+    }
+    class Derived extends Base {
+      derivedField = this.value + 1;
+      constructor(value) { super(value + 1); this.derived = true; }
+      readSuper() { return super.current + super.double(); }
+      static kind() { return super.kind() + "-derived"; }
+    }
+    var Expression = class Named { method() { return Named.name; } };
+    var value = Derived.create(3);
+    value.current = 4;
+    globalThis.answer = [value.current, value.double(), value.readSuper(), Derived.kind(), value instanceof Base, value.field, value.derivedField, Base.staticField, Base.fromBlock, trace, value.derived, Expression.name, new Expression().method()];
+  `;
+  const result = transform(
+    source,
+    'fixture.js',
+    pipeline({
+      classes: true,
+      classProperties: { loose: true },
+      classStaticBlock: true,
+    }),
+  );
+  assert.equal(result.status, 'complete');
+  assert.doesNotMatch(result.code, /\bclass\s+(?:Base|Derived|Named)\b/);
+  const context: { answer?: unknown } = {};
+  new Function('globalThis', result.code)(context);
+  assert.deepEqual(context.answer, [
+    4,
+    8,
+    12,
+    'base-derived',
+    true,
+    1,
+    5,
+    2,
+    3,
+    ['field', 'block'],
+    true,
+    'Named',
+    'Named',
+  ]);
+});
+
+test('native for-of preserves iterable closing, control flow, nesting, and destructured heads', () => {
+  const source = `
+    var closed = 0, values = [];
+    function* items() { try { yield { value: 1 }; yield { value: 2 }; yield { value: 3 }; } finally { closed++; } }
+    for (var { value } of items()) {
+      if (value === 1) continue;
+      for (var nested of [value]) values.push(nested);
+      if (value === 2) break;
+    }
+    var labeled = [];
+    outer: for (var x of [1, 2]) {
+      for (var y of [1, 2]) {
+        if (y === 1) continue outer;
+        labeled.push([x, y]);
+      }
+    }
+    globalThis.answer = [values, closed, labeled];
+  `;
+  const result = transform(
+    source,
+    'fixture.js',
+    pipeline({ forOf: true, destructuring: { useBuiltIns: true } }),
+  );
+  assert.equal(result.status, 'complete');
+  assert.doesNotMatch(result.code, /\bof\b/);
+  const context: { answer?: unknown } = {};
+  new Function('globalThis', result.code)(context);
+  assert.deepEqual(context.answer, [[2], 1, []]);
+});
+
+test('native destructuring preserves getters, iterators, defaults, rest, nesting, and catch bindings', () => {
+  const source = `
+    var reads = 0, closed = false;
+    var key = "value";
+    var input = { get value() { reads++; return { nested: 3 }; }, extra: 4 };
+    var { [key]: { nested = 2 }, ...rest } = input;
+    function* values() { try { yield 5; yield 6; yield 7; } finally { closed = true; } }
+    var [first, second = 9] = values();
+    var assigned, tail, assignmentValue = ([assigned, ...tail] = [8, 9, 10]);
+    try { throw { message: "ok" }; } catch ({ message }) { globalThis.caught = message; }
+    globalThis.answer = [nested, rest.extra, first, second, reads, closed, assigned, tail, assignmentValue];
+  `;
+  const result = transform(
+    source,
+    'fixture.js',
+    pipeline({ destructuring: { useBuiltIns: true } }),
+  );
+  assert.equal(result.status, 'complete');
+  assert.doesNotMatch(result.code, /var\s*[{[]|catch\s*\(\s*{/);
+  const context: { answer?: unknown; caught?: string } = {};
+  new Function('globalThis', result.code)(context);
+  assert.deepEqual(context.answer, [3, 4, 5, 6, 1, true, 8, [9, 10], [8, 9, 10]]);
+  assert.equal(context.caught, 'ok');
+});
+
+test('native parameters preserve defaults, rest, destructuring, length, and mappings', () => {
+  const source =
+    'function read(first, { value } = { value: 2 }, ...rest) { return [first, value, rest, read.length]; }';
+  const result = transform(source, 'fixture.js', pipeline({ parameters: true }));
+  assert.equal(result.status, 'complete');
+  const read = new Function(`${result.code}; return read;`)() as (
+    first: number,
+    value?: { value: number },
+    ...rest: number[]
+  ) => unknown;
+  assert.deepEqual(read(1, undefined, 3, 4), [1, 2, [3, 4], 1]);
+
+  const generatedOffset = result.code.indexOf('return[');
+  const before = result.code.slice(0, generatedOffset).split('\n');
+  const map = new TraceMap({
+    version: 3,
+    sources: ['fixture.js'],
+    names: result.map.names,
+    mappings: result.map.mappings,
+  });
+  assert.deepEqual(
+    originalPositionFor(map, {
+      line: before.length,
+      column: before.at(-1)!.length,
+    }),
+    {
+      source: 'fixture.js',
+      line: 1,
+      column: source.indexOf('return ['),
+      name: null,
+    },
+  );
+});
+
+test('native parameters preserve arrow lexical state and nested defaults', () => {
+  const source =
+    'function outer(input) { return (first = 1) => (second = 2) => [first, second, this.value, arguments[0]]; }';
+  const result = transform(source, 'fixture.js', pipeline({ parameters: true }));
+  assert.equal(result.status, 'complete');
+  const outer = new Function(`${result.code}; return outer;`)() as Function;
+  assert.deepEqual(outer.call({ value: 3 }, 4)()(), [1, 2, 3, 4]);
+});
+
+test('native parameters isolate defaults from body bindings', () => {
+  const source =
+    'var shadow = 7; function read(value = shadow) { var shadow = 1; return [value, shadow, this.flag, arguments.length]; }';
+  const result = transform(source, 'fixture.js', pipeline({ parameters: true }));
+  assert.equal(result.status, 'complete');
+  const read = new Function(`${result.code}; return read;`)() as Function;
+  assert.deepEqual(read.call({ flag: 2 }), [7, 1, 2, 0]);
+
+  const arrowResult = transform(
+    'var shadow = 8; function make() { return (value = shadow) => { var shadow = 2; return [value, shadow, this.flag, arguments[0]]; }; }',
+    'fixture.js',
+    pipeline({ parameters: true }),
+  );
+  assert.equal(arrowResult.status, 'complete');
+  const make = new Function(`${arrowResult.code}; return make;`)() as Function;
+  assert.deepEqual(make.call({ flag: 3 }, 4)(), [8, 2, 3, 4]);
+});
+
+test('native parameters preserve arrow lexical new.target', () => {
+  const result = transform(
+    'function Factory() { return (value = 1) => [value, new.target && new.target.name]; }',
+    'fixture.js',
+    pipeline({ parameters: true }),
+  );
+  assert.equal(result.status, 'complete');
+  const Factory = new Function(`${result.code}; return Factory;`)() as {
+    new (): () => unknown;
+    (): () => unknown;
+  };
+  assert.deepEqual(new Factory()(), [1, 'Factory']);
+  assert.deepEqual(Factory()(), [1, undefined]);
+});
+
+test('native parameters retain an explicit boundary for arrow lexical super', () => {
+  const result = transform(
+    'class Base { method(value) { return value; } } class Derived extends Base { method() { return (value = 1) => super.method(value); } }',
+    'fixture.js',
+    pipeline({ parameters: true }),
+  );
+  assert.equal(result.status, 'bailout');
+  assert.equal(result.reason, 'syntax:arrow-parameters-lexical-super-not-implemented');
 });
 
 test('transform option objects reject missing and unrelated fields', () => {
@@ -216,14 +539,17 @@ test('runtime helpers deduplicate and avoid source binding collisions', () => {
   assert.deepEqual(context.result, [7, 3]);
 });
 
-test('unsupported object-rest options remain an explicit transform boundary', () => {
+test('loose built-in object rest/spread lowers through the focused native pass', () => {
   const result = transform(
-    'var { value, ...rest } = input;',
+    'var symbol=Symbol("s"),calls=0,input={get value(){calls++;return 2},extra:3,[symbol]:4};var copy={first:1,...input,last:5};var {value,...rest}=copy;globalThis.result=[value,rest.extra,rest[symbol],copy[symbol],calls,copy.first,copy.last];',
     'fixture.js',
     pipeline({ objectRestSpread: { loose: true, useBuiltIns: true } }),
   );
-  assert.equal(result.status, 'bailout');
-  assert.equal(result.reason, 'syntax:transform-error');
+  assert.equal(result.status, 'complete');
+  assert.doesNotMatch(result.code, /\.\.\./);
+  const context: { result?: unknown } = {};
+  new Function('globalThis', result.code)(context);
+  assert.deepEqual(context.result, [2, 3, undefined, 4, 1, 1, 5]);
 });
 
 test('inline object and class helpers preserve symbols, getters, and field definition', () => {
@@ -262,18 +588,6 @@ test('inline object and class helpers preserve symbols, getters, and field defin
 
 test('regexp toggles reject Oxc constructor-only output that is not Babel lowering', () => {
   for (const [source, transforms, reason] of [
-    ['var expression = /😀/u;', { regexpUnicode: true }, 'regexp-unicode-semantic-mismatch'],
-    [
-      'var expression = /\\p{ASCII}/u;',
-      { regexpUnicodePropertyEscapes: true },
-      'regexp-unicode-property-escapes-semantic-mismatch',
-    ],
-    ['var expression = /./s;', { regexpDotAll: true }, 'regexp-dot-all-semantic-mismatch'],
-    [
-      'var expression = /(?<word>a)/;',
-      { regexpNamedCaptureGroups: true },
-      'regexp-named-capture-groups-semantic-mismatch',
-    ],
     [
       'var expression = /(?<=a)b/;',
       { regexpLookBehind: true },
@@ -294,6 +608,39 @@ test('regexp toggles reject Oxc constructor-only output that is not Babel loweri
     assert.equal(result.status, 'bailout');
     assert.equal(result.reason, `syntax:${reason}`);
   }
+});
+
+test('native regexp lowering preserves dotAll and named capture behavior', () => {
+  const source =
+    'var expression=/(?<word>a).\\k<word>/s;var match=expression.exec("a\\na");globalThis.result=[match&&match[0],match&&match.groups.word,"a\\na".replace(expression,"$<word>!"),/😀+/u.test("😀😀"),/\\u{1F600}/u.test("😀"),/^.$/u.test("😀"),/^.$/u.test("\\n"),/\\p{ASCII}/u.test("A"),/\\p{Script=Greek}/u.test("λ"),/\\p{Letter}/u.test("𐐀"),/\\P{ASCII}/u.test("λ")];';
+  const result = transform(
+    source,
+    'fixture.js',
+    pipeline({
+      regexpUnicode: true,
+      regexpUnicodePropertyEscapes: true,
+      regexpDotAll: true,
+      regexpNamedCaptureGroups: true,
+    }),
+  );
+  assert.equal(result.status, 'complete');
+  assert.doesNotMatch(result.code, /\(\?<word>/);
+  assert.match(result.code, /\[\^\]/);
+  const context: { result?: unknown } = {};
+  new Function('globalThis', result.code)(context);
+  assert.deepEqual(context.result, [
+    'a\na',
+    'a',
+    'a!',
+    true,
+    true,
+    true,
+    false,
+    true,
+    true,
+    true,
+    true,
+  ]);
 });
 
 test('regexp semantic boundaries only reject syntax owned by the selected toggle', () => {
@@ -403,6 +750,7 @@ test('asyncFunctions is independently selectable and runs with inline helpers', 
 
   assert.equal(result.status, 'complete');
   assert.doesNotMatch(result.code, /\basync\s+function\b|regeneratorRuntime|require\(/);
+  assert.doesNotMatch(result.code, /wrapAsyncGenerator|asyncGeneratorDelegate|asyncIterator/);
   assert.deepEqual(result.metadata.nativeHelpers, ['asyncToGenerator']);
   const load = new Function(`${result.code}; return load;`)() as (value: number) => Promise<number>;
   assert.equal(await load(4), 5);
@@ -492,6 +840,65 @@ test('async-generator helper requirements and unavailable block scoping are stru
     'fixture.js',
     pipeline({ blockScoping: true }),
   );
-  assert.equal(blockScoping.status, 'bailout');
-  assert.equal(blockScoping.reason, 'syntax:block-scoping-not-implemented');
+  assert.equal(blockScoping.status, 'complete');
+  assert.match(blockScoping.code, /var value\s*=\s*1/);
+});
+
+test('native block scoping renames colliding lexical bindings', () => {
+  const result = transform(
+    'let value = 0; if (true) { let value = 1; consume(value); } consume(value);',
+    'fixture.js',
+    pipeline({ blockScoping: true }),
+  );
+  assert.equal(result.status, 'complete');
+  assert.match(
+    result.code,
+    /var value\s*=\s*0;[\s\S]*var _value\s*=\s*1;[\s\S]*consume\(_value\)[\s\S]*consume\(value\)/,
+  );
+  const observed: number[] = [];
+  new Function('consume', result.code)((value: number) => observed.push(value));
+  assert.deepEqual(observed, [1, 0]);
+});
+
+test('native block scoping preserves captured loop bindings and relocated mappings', () => {
+  const source = 'var callbacks = []; for (let value of [1, 2, 3]) callbacks.push(() => value);';
+  const result = transform(source, 'fixture.js', pipeline({ blockScoping: true }));
+  assert.equal(result.status, 'complete');
+  const callbacks = new Function(`${result.code}; return callbacks;`)() as Array<() => number>;
+  assert.deepEqual(
+    callbacks.map(callback => callback()),
+    [1, 2, 3],
+  );
+
+  const generatedOffset = result.code.indexOf('callbacks.push');
+  const before = result.code.slice(0, generatedOffset).split('\n');
+  const map = new TraceMap({
+    version: 3,
+    sources: ['fixture.js'],
+    names: result.map.names,
+    mappings: result.map.mappings,
+  });
+  assert.deepEqual(
+    originalPositionFor(map, {
+      line: before.length,
+      column: before.at(-1)!.length,
+    }),
+    {
+      source: 'fixture.js',
+      line: 1,
+      column: source.indexOf('callbacks.push'),
+      name: null,
+    },
+  );
+});
+
+test('native captured-loop lowering preserves nested loops and abrupt control flow', () => {
+  const source =
+    'function read() { var values = []; outer: for (let i of [1, 2]) for (let j of [3, 4]) { if (j === 4) continue outer; values.push(() => [i, j]); } return values.map(read => read()); }';
+  const result = transform(source, 'fixture.js', pipeline({ blockScoping: true }));
+  assert.equal(result.status, 'complete');
+  assert.deepEqual(new Function(`${result.code}; return read();`)(), [
+    [1, 3],
+    [2, 3],
+  ]);
 });

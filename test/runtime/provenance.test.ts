@@ -118,7 +118,7 @@ test('composes template slots with glue text and inner edits', () => {
         path => {
           const declaration = path.getChild('declaration');
           assert.ok(declaration);
-          path.replaceWith(path.context.code.template`var _default = ${declaration};`);
+          path.replaceWith(path.context.code.template`var _default = ${declaration.getSource()};`);
         },
       ),
     ],
@@ -588,7 +588,7 @@ test('sourceSlice returns a provenance-carrying fragment', () => {
 
 test('repeated copies of one range share a render and reflect inner edits', () => {
   const source = 'function seed() { return compute(); }\nalpha();\nbeta();\n';
-  const mirror = defineNativePlugin({
+  const mirror = defineNativePlugin<{ fragment: SourceFragment | undefined }>({
     name: 'mirror',
     createState: () => ({ fragment: undefined as SourceFragment | undefined }),
     visitors: [

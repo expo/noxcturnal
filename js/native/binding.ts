@@ -92,6 +92,10 @@ interface NativeBinding {
       reactCompilerTarget?: string;
       reactCompilerEnableResetCacheOnSourceFileChanges?: boolean;
       reactCompilerCustomOptOutDirectives?: string[];
+      reactRefresh?: boolean;
+      reactRefreshReg?: string;
+      reactRefreshSig?: string;
+      reactRefreshEmitFullSignatures?: boolean;
       typescript?: string;
       jsx?: string;
       jsxImportSource?: string;
@@ -210,6 +214,10 @@ export function nativePreflightOptions(plan: PreflightPlan) {
       plan.reactCompiler?.customOptOutDirectives == null
         ? undefined
         : [...plan.reactCompiler.customOptOutDirectives],
+    reactRefresh: plan.reactRefresh != null,
+    reactRefreshReg: plan.reactRefresh?.refreshReg,
+    reactRefreshSig: plan.reactRefresh?.refreshSig,
+    reactRefreshEmitFullSignatures: plan.reactRefresh?.emitFullSignatures,
     typescript: plan.typescript,
     jsx: plan.jsx,
     jsxImportSource: plan.jsxImportSource,
@@ -220,6 +228,8 @@ export function nativePreflightOptions(plan: PreflightPlan) {
     helpersVersion: plan.helpers?.version,
     compact: plan.compact,
     comments: plan.comments,
+    constantFolding: plan.optimize?.constantFolding,
+    deadCodeElimination: plan.optimize?.deadCodeElimination,
     blockScoping: plan.transforms?.blockScoping,
     classes: plan.transforms?.classes,
     destructuring: plan.transforms?.destructuring != null,

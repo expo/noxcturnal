@@ -9,13 +9,13 @@ import {
   defineVisitor,
   transform,
 } from '../../dist/index.js';
-import type { PreflightJsxProfile } from '../../dist/index.js';
+import type { PreflightJsxMode } from '../../dist/index.js';
 
 const nativePipeline = (
   filename: string,
   options: {
     typescript?: 'strip';
-    jsx?: PreflightJsxProfile;
+    jsx?: PreflightJsxMode;
     jsxImportSource?: string;
   },
 ) => ({

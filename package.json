@@ -33,7 +33,7 @@
     "test": "vitest run",
     "benchmark": "vitest bench --run",
     "package:check": "node scripts/check-package.mjs",
-    "typecheck": "tsc -p tsconfig.json --noEmit && vitest --run --typecheck.only --typecheck.tsconfig tsconfig.type-tests.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.tests.json && vitest --run --typecheck.only --typecheck.tsconfig tsconfig.type-tests.json",
     "format": "oxfmt .",
     "rust:format": "cargo fmt --check",
     "rust:lint": "cargo clippy --all-targets -- -D warnings",

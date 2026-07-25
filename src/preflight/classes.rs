@@ -1,0 +1,795 @@
+#![allow(clippy::format_push_string)]
+
+use oxc_ast::{
+    AstKind,
+    ast::{
+        Class, ClassElement, ClassType, Expression, MethodDefinition, MethodDefinitionKind,
+        PropertyKey, Statement,
+    },
+};
+use oxc_semantic::{NodeId, Semantic};
+use oxc_span::{GetSpan, Span};
+use rustc_hash::{FxHashMap, FxHashSet};
+
+use crate::edit::{EditCommand, EditKind, MappingPolicy};
+
+const CONSTRUCT_HELPER: &str = r#"function _noxConstruct(S,args,D){if(typeof Reflect!="undefined"&&Reflect.construct)return Reflect.construct(S,args,D);var values=[null];values.push.apply(values,args);var instance=new(Function.bind.apply(S,values));if(Object.setPrototypeOf)Object.setPrototypeOf(instance,D.prototype);return instance}"#;
+const SUPER_GET_HELPER: &str = r#"function _noxSuperGet(base,key,receiver){while(base){var descriptor=Object.getOwnPropertyDescriptor(base,key);if(descriptor)return descriptor.get?descriptor.get.call(receiver):descriptor.value;base=Object.getPrototypeOf(base)}}"#;
+const PRIVATE_HELPERS: &str = r#"function _noxPrivateBase(receiver,key){if(!Object.prototype.hasOwnProperty.call(Object(receiver),key))throw new TypeError("attempted to use private field on non-instance");return receiver}function _noxPrivateCall(receiver,key,args){return _noxPrivateBase(receiver,key)[key].apply(receiver,args)}"#;
+
+pub(super) fn edits(
+    source: &str,
+    semantic: &Semantic<'_>,
+    lower_all_classes: bool,
+    class_properties_loose: Option<bool>,
+    class_static_blocks: bool,
+    private_methods_loose: Option<bool>,
+    private_in_loose: Option<bool>,
+) -> Result<Option<Vec<EditCommand>>, &'static str> {
+    let nodes = semantic.nodes();
+    let classes: FxHashSet<NodeId> = nodes
+        .iter_enumerated()
+        .filter_map(|(id, node)| {
+            let AstKind::Class(class) = node.kind() else {
+                return None;
+            };
+            let owns_private_method = private_methods_loose.is_some()
+                && class.body.body.iter().any(|element| {
+                    matches!(element, ClassElement::MethodDefinition(method)
+                        if matches!(method.key, PropertyKey::PrivateIdentifier(_)))
+                });
+            let owns_private_in = private_in_loose.is_some()
+                && nodes.iter().any(|node| {
+                    let span = node.kind().span();
+                    span.start >= class.span.start
+                        && span.end <= class.span.end
+                        && matches!(node.kind(), AstKind::PrivateInExpression(_))
+                });
+            (lower_all_classes || owns_private_method || owns_private_in).then_some(id)
+        })
+        .collect();
+    let mut reserved: FxHashSet<String> = semantic
+        .scoping()
+        .symbol_names()
+        .map(str::to_owned)
+        .collect();
+    let mut edits = Vec::new();
+    for (id, node) in nodes.iter_enumerated() {
+        let AstKind::Class(class) = node.kind() else {
+            continue;
+        };
+        if !classes.contains(&id) {
+            continue;
+        }
+        if nodes
+            .ancestor_ids(id)
+            .any(|ancestor| classes.contains(&ancestor))
+        {
+            continue;
+        }
+        edits.push(lower(
+            source,
+            semantic,
+            class,
+            class_properties_loose,
+            class_static_blocks,
+            private_methods_loose,
+            private_in_loose,
+            &mut reserved,
+        )?);
+    }
+    Ok((!edits.is_empty()).then_some(edits))
+}
+
+#[expect(clippy::too_many_arguments)]
+fn lower(
+    source: &str,
+    semantic: &Semantic<'_>,
+    class: &Class<'_>,
+    class_properties_loose: Option<bool>,
+    class_static_blocks: bool,
+    private_methods_loose: Option<bool>,
+    private_in_loose: Option<bool>,
+    reserved: &mut FxHashSet<String>,
+) -> Result<EditCommand, &'static str> {
+    let name = class
+        .id
+        .as_ref()
+        .map_or_else(|| reserve("_Class", reserved), |id| id.name.to_string());
+    let constructor = class.body.body.iter().find_map(|element| match element {
+        ClassElement::MethodDefinition(method)
+            if method.kind == MethodDefinitionKind::Constructor =>
+        {
+            Some(method.as_ref())
+        }
+        _ => None,
+    });
+    if private_methods_loose == Some(false) || private_in_loose == Some(false) {
+        return Err("classes-spec-private-features-not-implemented");
+    }
+    let mut private_keys = FxHashMap::default();
+    for element in &class.body.body {
+        let key = match element {
+            ClassElement::MethodDefinition(method) => match &method.key {
+                PropertyKey::PrivateIdentifier(identifier) => Some(identifier.name.as_str()),
+                _ => None,
+            },
+            ClassElement::PropertyDefinition(property) => match &property.key {
+                PropertyKey::PrivateIdentifier(identifier) => Some(identifier.name.as_str()),
+                _ => None,
+            },
+            _ => None,
+        };
+        if let Some(key) = key {
+            private_keys
+                .entry(key.to_owned())
+                .or_insert_with(|| reserve(&format!("_{key}"), reserved));
+        }
+    }
+    for element in &class.body.body {
+        match element {
+            ClassElement::MethodDefinition(method) => {
+                if matches!(method.key, PropertyKey::PrivateIdentifier(_))
+                    && private_methods_loose != Some(true)
+                {
+                    return Err("classes-private-elements-require-private-transform");
+                }
+            }
+            ClassElement::PropertyDefinition(property) => {
+                if matches!(property.key, PropertyKey::PrivateIdentifier(_))
+                    && class_properties_loose != Some(true)
+                {
+                    return Err("classes-private-elements-require-private-transform");
+                }
+                if class_properties_loose.is_none() {
+                    return Err("classes-fields-require-class-properties-transform");
+                }
+            }
+            ClassElement::AccessorProperty(_) => {
+                return Err("classes-accessor-properties-not-implemented");
+            }
+            ClassElement::StaticBlock(_) => {
+                if !class_static_blocks {
+                    return Err("classes-static-block-requires-static-block-transform");
+                }
+            }
+            ClassElement::TSIndexSignature(_) => {}
+        }
+    }
+    let has_private_in = semantic.nodes().iter().any(|node| {
+        let span = node.kind().span();
+        span.start >= class.span.start
+            && span.end <= class.span.end
+            && matches!(node.kind(), AstKind::PrivateInExpression(_))
+    });
+    if has_private_in && private_in_loose != Some(true) {
+        return Err("classes-private-in-requires-private-property-in-object-transform");
+    }
+    if class.super_class.is_some()
+        && constructor.is_some_and(|constructor| {
+            let body = constructor.value.body.as_ref().unwrap();
+            private_keys
+                .keys()
+                .any(|private| slice(source, body.span).contains(&format!("#{private}")))
+        })
+    {
+        return Err("classes-private-constructor-access-not-implemented");
+    }
+    let mut body = String::from("(()=>{\"use strict\";");
+    if !private_keys.is_empty() {
+        body.push_str(PRIVATE_HELPERS);
+        for (private_name, binding) in &private_keys {
+            body.push_str(&format!(
+                "var {binding}=\"__private_{}_{}\";",
+                name, private_name
+            ));
+        }
+    }
+    let super_name = class
+        .super_class
+        .as_ref()
+        .map(|super_class| slice(source, super_class.span()).to_owned());
+    let mut instance_initializers = String::new();
+    let mut static_initializers: Vec<(u32, String)> = Vec::new();
+    if let Some(loose) = class_properties_loose {
+        for element in &class.body.body {
+            let ClassElement::PropertyDefinition(property) = element else {
+                continue;
+            };
+            let is_private = matches!(property.key, PropertyKey::PrivateIdentifier(_));
+            let key = if let PropertyKey::PrivateIdentifier(identifier) = &property.key {
+                private_keys[identifier.name.as_str()].clone()
+            } else if property.computed {
+                let temporary = reserve("_key", reserved);
+                body.push_str(&format!(
+                    "var {temporary}={};",
+                    slice(source, property.key.span())
+                ));
+                temporary
+            } else if loose {
+                match &property.key {
+                    PropertyKey::StaticIdentifier(identifier) => identifier.name.to_string(),
+                    _ => property_key(source, &property.key, false),
+                }
+            } else {
+                property_key(source, &property.key, false)
+            };
+            let value = property
+                .value
+                .as_ref()
+                .map_or("void 0", |value| slice(source, value.span()));
+            let target = if property.r#static { &name } else { "this" };
+            let initializer = if is_private {
+                format!("Object.defineProperty({target},{key},{{writable:true,value:{value}}});")
+            } else if loose {
+                if is_identifier_key(&property.key, property.computed) {
+                    format!("{target}.{key}={value};")
+                } else {
+                    format!("{target}[{key}]={value};")
+                }
+            } else {
+                format!(
+                    "Object.defineProperty({target},{key},{{value:{value},enumerable:true,configurable:true,writable:true}});"
+                )
+            };
+            if property.r#static {
+                static_initializers.push((property.span.start, initializer));
+            } else {
+                instance_initializers.push_str(&initializer);
+            }
+        }
+    }
+    if class_static_blocks {
+        for element in &class.body.body {
+            if let ClassElement::StaticBlock(block) = element {
+                let block_source = slice(source, block.span);
+                let open = block_source.find('{').unwrap();
+                static_initializers.push((
+                    block.span.start,
+                    format!(
+                        "(function(){{{}}}).call({name});",
+                        &block_source[open + 1..block_source.len().saturating_sub(1)]
+                    ),
+                ));
+            }
+        }
+    }
+    let mut private_accessors: FxHashMap<String, (bool, Option<String>, Option<String>, u32)> =
+        FxHashMap::default();
+    for element in &class.body.body {
+        let ClassElement::MethodDefinition(method) = element else {
+            continue;
+        };
+        let PropertyKey::PrivateIdentifier(identifier) = &method.key else {
+            continue;
+        };
+        let key = &private_keys[identifier.name.as_str()];
+        let function = private_method_function(source, semantic, method, &private_keys)?;
+        let target = if method.r#static { &name } else { "this" };
+        if method.kind != MethodDefinitionKind::Method {
+            let accessor = private_accessors.entry(key.clone()).or_insert((
+                method.r#static,
+                None,
+                None,
+                method.span.start,
+            ));
+            if method.kind == MethodDefinitionKind::Get {
+                accessor.1 = Some(function);
+            } else {
+                accessor.2 = Some(function);
+            }
+            accessor.3 = accessor.3.min(method.span.start);
+            continue;
+        }
+        let initializer = format!("Object.defineProperty({target},{key},{{value:{function}}});");
+        if method.r#static {
+            static_initializers.push((method.span.start, initializer));
+        } else {
+            instance_initializers.push_str(&initializer);
+        }
+    }
+    for (key, (is_static, getter, setter, start)) in private_accessors {
+        let target = if is_static { &name } else { "this" };
+        let mut descriptor = String::new();
+        if let Some(getter) = getter {
+            descriptor.push_str(&format!("get:{getter},"));
+        }
+        if let Some(setter) = setter {
+            descriptor.push_str(&format!("set:{setter},"));
+        }
+        let initializer = format!("Object.defineProperty({target},{key},{{{descriptor}}});");
+        if is_static {
+            static_initializers.push((start, initializer));
+        } else {
+            instance_initializers.push_str(&initializer);
+        }
+    }
+    if super_name.is_some() {
+        body.push_str(CONSTRUCT_HELPER);
+    }
+    let has_super_methods = class.body.body.iter().any(|element| {
+        matches!(element, ClassElement::MethodDefinition(method)
+            if method.kind != MethodDefinitionKind::Constructor && contains_super(source, method))
+    });
+    if has_super_methods {
+        body.push_str(SUPER_GET_HELPER);
+    }
+    if let Some(constructor) = constructor {
+        if let Some(super_name) = &super_name {
+            body.push_str(&derived_constructor(
+                source,
+                &name,
+                super_name,
+                constructor,
+                &instance_initializers,
+            )?);
+        } else {
+            body.push_str(&constructor_function(
+                source,
+                semantic,
+                &name,
+                constructor,
+                &instance_initializers,
+                &private_keys,
+            )?);
+        }
+    } else if let Some(super_name) = &super_name {
+        body.push_str(&format!(
+            "function {name}(){{if(!(this instanceof {name}))throw new TypeError(\"Cannot call a class as a function\");var _this=_noxConstruct({super_name},arguments,{name});(function(){{{instance_initializers}}}).call(_this);return _this}}"
+        ));
+    } else {
+        body.push_str(&format!(
+            "function {name}(){{if(!(this instanceof {name}))throw new TypeError(\"Cannot call a class as a function\");{instance_initializers}}}"
+        ));
+    }
+    if let Some(super_name) = &super_name {
+        body.push_str(&format!(
+            "if(Object.setPrototypeOf)Object.setPrototypeOf({name},{super_name});else {name}.__proto__={super_name};{name}.prototype=Object.create({super_name}&&{super_name}.prototype,{{constructor:{{value:{name},writable:true,configurable:true}}}});"
+        ));
+    }
+    for element in &class.body.body {
+        let ClassElement::MethodDefinition(method) = element else {
+            continue;
+        };
+        if method.kind == MethodDefinitionKind::Constructor {
+            continue;
+        }
+        if matches!(method.key, PropertyKey::PrivateIdentifier(_)) {
+            continue;
+        }
+        let target = if method.r#static {
+            name.clone()
+        } else {
+            format!("{name}.prototype")
+        };
+        let key = property_key(source, &method.key, method.computed);
+        let has_private_syntax = private_keys.keys().any(|name| {
+            let body = method.value.body.as_ref().unwrap();
+            let body = slice(source, body.span);
+            body.contains(&format!("#{name}"))
+        });
+        let function = if contains_super(source, method) && has_private_syntax {
+            return Err("classes-combined-super-private-method-not-implemented");
+        } else if contains_super(source, method) {
+            let Some(_) = &super_name else {
+                return Err("classes-super-without-heritage");
+            };
+            method_function_with_super(source, semantic, &name, method)?
+        } else if has_private_syntax {
+            private_method_function(source, semantic, method, &private_keys)?
+        } else {
+            method_function(source, "", method, false, "")
+        };
+        let descriptor = match method.kind {
+            MethodDefinitionKind::Get => {
+                format!("{{get:{function},configurable:true}}")
+            }
+            MethodDefinitionKind::Set => {
+                format!("{{set:{function},configurable:true}}")
+            }
+            MethodDefinitionKind::Method => {
+                format!("{{value:{function},writable:true,configurable:true}}")
+            }
+            MethodDefinitionKind::Constructor => unreachable!(),
+        };
+        body.push_str(&format!(
+            "Object.defineProperty({target},{key},{descriptor});"
+        ));
+    }
+    static_initializers.sort_unstable_by_key(|(start, _)| *start);
+    for (_, initializer) in static_initializers {
+        body.push_str(&initializer);
+    }
+    body.push_str(&format!("return {name}}})()"));
+    let mut start = class.span.start;
+    let mut default_export = false;
+    if class.r#type == ClassType::ClassDeclaration {
+        let prefix = &source[..class.span.start as usize];
+        let trimmed = prefix.trim_end();
+        if trimmed.ends_with("export default") {
+            start = (trimmed.len() - "export default".len()) as u32;
+            default_export = true;
+        }
+    }
+    let content = if default_export {
+        format!("var {name}={body};export default {name};")
+    } else if class.r#type == ClassType::ClassDeclaration {
+        format!("var {name}={body};")
+    } else {
+        body
+    };
+    Ok(EditCommand {
+        kind: EditKind::Replace,
+        start,
+        end: class.span.end,
+        content: Some(content),
+        parts: Vec::new(),
+        destination: None,
+        mapping: Some(MappingPolicy::AnchorBoundaries),
+        order: None,
+        names: None,
+    })
+}
+
+fn is_identifier_key(key: &PropertyKey<'_>, computed: bool) -> bool {
+    !computed && matches!(key, PropertyKey::StaticIdentifier(_))
+}
+
+fn private_body_contents(
+    source: &str,
+    semantic: &Semantic<'_>,
+    body: &oxc_ast::ast::FunctionBody<'_>,
+    private_keys: &FxHashMap<String, String>,
+) -> Result<String, &'static str> {
+    let mut replacements: Vec<(Span, String)> = Vec::new();
+    let mut occupied = Vec::new();
+    for node in semantic.nodes().iter() {
+        let span = node.kind().span();
+        if span.start < body.span.start || span.end > body.span.end {
+            continue;
+        }
+        match node.kind() {
+            AstKind::CallExpression(call) => {
+                let Expression::PrivateFieldExpression(field) = &call.callee else {
+                    continue;
+                };
+                let Some(key) = private_keys.get(field.field.name.as_str()) else {
+                    return Err("classes-private-name-resolution-failed");
+                };
+                let call_source = slice(source, call.span);
+                let open = call_source[field.span.size() as usize..]
+                    .find('(')
+                    .map(|offset| offset + field.span.size() as usize)
+                    .ok_or("classes-private-call-shape-not-implemented")?;
+                let arguments = &call_source[open + 1..call_source.len() - 1];
+                replacements.push((
+                    call.span,
+                    format!(
+                        "_noxPrivateCall({}, {key}, [{arguments}])",
+                        slice(source, field.object.span())
+                    ),
+                ));
+                occupied.push(call.span);
+            }
+            AstKind::PrivateInExpression(expression) => {
+                let Some(key) = private_keys.get(expression.left.name.as_str()) else {
+                    return Err("classes-private-name-resolution-failed");
+                };
+                replacements.push((
+                    expression.span,
+                    format!(
+                        "Object.prototype.hasOwnProperty.call({}, {key})",
+                        slice(source, expression.right.span())
+                    ),
+                ));
+                occupied.push(expression.span);
+            }
+            _ => {}
+        }
+    }
+    for node in semantic.nodes().iter() {
+        let AstKind::PrivateFieldExpression(field) = node.kind() else {
+            continue;
+        };
+        if field.span.start < body.span.start
+            || field.span.end > body.span.end
+            || occupied
+                .iter()
+                .any(|span| field.span.start >= span.start && field.span.end <= span.end)
+        {
+            continue;
+        }
+        let Some(key) = private_keys.get(field.field.name.as_str()) else {
+            return Err("classes-private-name-resolution-failed");
+        };
+        replacements.push((
+            field.span,
+            format!(
+                "_noxPrivateBase({}, {key})[{key}]",
+                slice(source, field.object.span())
+            ),
+        ));
+    }
+    replacements.sort_unstable_by_key(|(span, _)| span.start);
+    for pair in replacements.windows(2) {
+        if pair[0].0.end > pair[1].0.start {
+            return Err("classes-private-edit-conflict");
+        }
+    }
+    let mut contents = String::new();
+    let mut cursor = body.span.start + 1;
+    for (span, replacement) in replacements {
+        contents.push_str(slice(source, Span::new(cursor, span.start)));
+        contents.push_str(&replacement);
+        cursor = span.end;
+    }
+    contents.push_str(slice(
+        source,
+        Span::new(cursor, body.span.end.saturating_sub(1)),
+    ));
+    Ok(contents)
+}
+
+fn private_method_function(
+    source: &str,
+    semantic: &Semantic<'_>,
+    method: &MethodDefinition<'_>,
+    private_keys: &FxHashMap<String, String>,
+) -> Result<String, &'static str> {
+    let function = &method.value;
+    let body = function.body.as_ref().unwrap();
+    let contents = private_body_contents(source, semantic, body, private_keys)?;
+    let prefix = match (function.r#async, function.generator) {
+        (true, true) => "async function*",
+        (true, false) => "async function",
+        (false, true) => "function*",
+        (false, false) => "function",
+    };
+    Ok(format!(
+        "{prefix}{}{{{contents}}}",
+        slice(source, function.params.span)
+    ))
+}
+
+fn method_function_with_super(
+    source: &str,
+    semantic: &Semantic<'_>,
+    class_name: &str,
+    method: &MethodDefinition<'_>,
+) -> Result<String, &'static str> {
+    let function = &method.value;
+    let body = function.body.as_ref().unwrap();
+    let base = if method.r#static {
+        format!("Object.getPrototypeOf({class_name})")
+    } else {
+        format!("Object.getPrototypeOf({class_name}.prototype)")
+    };
+    let mut replacements: Vec<(Span, String)> = Vec::new();
+    let mut call_spans = Vec::new();
+    for node in semantic.nodes().iter() {
+        let span = node.kind().span();
+        if span.start < body.span.start || span.end > body.span.end {
+            continue;
+        }
+        if matches!(
+            node.kind(),
+            AstKind::AssignmentExpression(_) | AstKind::UpdateExpression(_)
+        ) && slice(source, span).contains("super")
+        {
+            return Err("classes-super-write-not-implemented");
+        }
+        let AstKind::CallExpression(call) = node.kind() else {
+            continue;
+        };
+        let Some((member_span, key)) = super_member(source, &call.callee) else {
+            continue;
+        };
+        let call_source = slice(source, call.span);
+        let open = call_source[member_span.size() as usize..]
+            .find('(')
+            .map(|offset| offset + member_span.size() as usize)
+            .ok_or("classes-super-call-shape-not-implemented")?;
+        let arguments = &call_source[open + 1..call_source.len() - 1];
+        let separator = if !arguments.trim().is_empty() {
+            ","
+        } else {
+            ""
+        };
+        replacements.push((
+            call.span,
+            format!("_noxSuperGet({base},{key},this).call(this{separator}{arguments})"),
+        ));
+        call_spans.push(call.span);
+    }
+    for node in semantic.nodes().iter() {
+        let span = node.kind().span();
+        if span.start < body.span.start
+            || span.end > body.span.end
+            || call_spans
+                .iter()
+                .any(|call| span.start >= call.start && span.end <= call.end)
+        {
+            continue;
+        }
+        let key = match node.kind() {
+            AstKind::StaticMemberExpression(member) if member.object.is_super() => {
+                format!("{:?}", member.property.name.as_str())
+            }
+            AstKind::ComputedMemberExpression(member) if member.object.is_super() => {
+                slice(source, member.expression.span()).to_owned()
+            }
+            _ => continue,
+        };
+        replacements.push((span, format!("_noxSuperGet({base},{key},this)")));
+    }
+    replacements.sort_unstable_by_key(|(span, _)| span.start);
+    for pair in replacements.windows(2) {
+        if pair[0].0.end > pair[1].0.start {
+            return Err("classes-super-edit-conflict");
+        }
+    }
+    let mut contents = String::new();
+    let mut cursor = body.span.start + 1;
+    for (span, replacement) in replacements {
+        contents.push_str(slice(source, Span::new(cursor, span.start)));
+        contents.push_str(&replacement);
+        cursor = span.end;
+    }
+    contents.push_str(slice(
+        source,
+        Span::new(cursor, body.span.end.saturating_sub(1)),
+    ));
+    let prefix = match (function.r#async, function.generator) {
+        (true, true) => "async function*",
+        (true, false) => "async function",
+        (false, true) => "function*",
+        (false, false) => "function",
+    };
+    Ok(format!(
+        "{prefix}{}{{{contents}}}",
+        slice(source, function.params.span)
+    ))
+}
+
+fn super_member(source: &str, expression: &Expression<'_>) -> Option<(Span, String)> {
+    match expression {
+        Expression::StaticMemberExpression(member) if member.object.is_super() => {
+            Some((member.span, format!("{:?}", member.property.name.as_str())))
+        }
+        Expression::ComputedMemberExpression(member) if member.object.is_super() => Some((
+            member.span,
+            slice(source, member.expression.span()).to_owned(),
+        )),
+        _ => None,
+    }
+}
+
+fn derived_constructor(
+    source: &str,
+    name: &str,
+    super_name: &str,
+    constructor: &MethodDefinition<'_>,
+    instance_initializers: &str,
+) -> Result<String, &'static str> {
+    let function = &constructor.value;
+    let body = function.body.as_ref().unwrap();
+    if slice(source, body.span).contains("new.target") {
+        return Err("classes-derived-new-target-not-implemented");
+    }
+    let Some((statement_span, call_span)) =
+        body.statements
+            .iter()
+            .find_map(|statement| match statement {
+                Statement::ExpressionStatement(statement)
+                    if statement.expression.is_super_call_expression() =>
+                {
+                    let oxc_ast::ast::Expression::CallExpression(call) = &statement.expression
+                    else {
+                        unreachable!()
+                    };
+                    Some((statement.span, call.span))
+                }
+                _ => None,
+            })
+    else {
+        return Err("classes-derived-constructor-super-flow-not-implemented");
+    };
+    let params = slice(source, function.params.span);
+    let call = slice(source, call_span);
+    let open = call.find('(').unwrap();
+    let arguments = &call[open + 1..call.len() - 1];
+    let before = slice(source, Span::new(body.span.start + 1, statement_span.start));
+    let after = slice(
+        source,
+        Span::new(statement_span.end, body.span.end.saturating_sub(1)),
+    );
+    Ok(format!(
+        "function {name}{params}{{if(!(this instanceof {name}))throw new TypeError(\"Cannot call a class as a function\");{before}var _this=_noxConstruct({super_name},[{arguments}],{name});(function(){{{instance_initializers}}}).call(_this);var _result=(function(){{{after}}}).apply(_this,arguments);if(_result!==void 0){{if((typeof _result===\"object\"&&_result!==null)||typeof _result===\"function\")return _result;throw new TypeError(\"Derived constructors may only return object or undefined\")}}return _this}}"
+    ))
+}
+
+fn method_function(
+    source: &str,
+    name: &str,
+    method: &MethodDefinition<'_>,
+    constructor: bool,
+    instance_initializers: &str,
+) -> String {
+    let function = &method.value;
+    let prefix = match (function.r#async, function.generator) {
+        (true, true) => "async function*",
+        (true, false) => "async function",
+        (false, true) => "function*",
+        (false, false) => "function",
+    };
+    let params = slice(source, function.params.span);
+    let body = function.body.as_ref().unwrap();
+    let contents = slice(
+        source,
+        Span::new(body.span.start + 1, body.span.end.saturating_sub(1)),
+    );
+    if constructor {
+        format!(
+            "{prefix} {name}{params}{{if(!(this instanceof {name}))throw new TypeError(\"Cannot call a class as a function\");{instance_initializers}{contents}}}"
+        )
+    } else {
+        format!("{prefix}{params}{{{contents}}}")
+    }
+}
+
+fn constructor_function(
+    source: &str,
+    semantic: &Semantic<'_>,
+    name: &str,
+    constructor: &MethodDefinition<'_>,
+    instance_initializers: &str,
+    private_keys: &FxHashMap<String, String>,
+) -> Result<String, &'static str> {
+    let function = &constructor.value;
+    let body = function.body.as_ref().unwrap();
+    let contents = if private_keys.is_empty() {
+        slice(
+            source,
+            Span::new(body.span.start + 1, body.span.end.saturating_sub(1)),
+        )
+        .to_owned()
+    } else {
+        private_body_contents(source, semantic, body, private_keys)?
+    };
+    Ok(format!(
+        "function {name}{}{{if(!(this instanceof {name}))throw new TypeError(\"Cannot call a class as a function\");{instance_initializers}{contents}}}",
+        slice(source, function.params.span)
+    ))
+}
+
+fn property_key(source: &str, key: &PropertyKey<'_>, computed: bool) -> String {
+    if computed {
+        return slice(source, key.span()).to_owned();
+    }
+    match key {
+        PropertyKey::StaticIdentifier(identifier) => format!("{:?}", identifier.name.as_str()),
+        _ => slice(source, key.span()).to_owned(),
+    }
+}
+
+fn contains_super(source: &str, method: &MethodDefinition<'_>) -> bool {
+    let body = method.value.body.as_ref().unwrap();
+    slice(source, body.span).contains("super")
+}
+
+fn reserve(base: &str, reserved: &mut FxHashSet<String>) -> String {
+    if reserved.insert(base.to_owned()) {
+        return base.to_owned();
+    }
+    for suffix in reserved.len().max(2).. {
+        let candidate = format!("{base}{suffix}");
+        if reserved.insert(candidate.clone()) {
+            return candidate;
+        }
+    }
+    unreachable!()
+}
+
+fn slice(source: &str, span: Span) -> &str {
+    &source[span.start as usize..span.end as usize]
+}

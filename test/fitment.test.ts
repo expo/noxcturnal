@@ -131,7 +131,7 @@ const metroExports = defineNativePlugin<ExportState>({
         const declaration = path.getChild('declaration');
         assert.ok(declaration);
         const local = path.scope.generateUid('default');
-        path.replaceWith(path.context.code.template`var ${local} = ${declaration};`);
+        path.replaceWith(path.context.code.template`var ${local} = ${declaration.getSource()};`);
         state.statements.push(`exports.default = ${local};`);
       },
     ),

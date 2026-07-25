@@ -113,6 +113,16 @@ pub fn inline_helpers(
                 | Helper::AsyncToGenerator
         )
     });
+    let async_to_generator_only = has_async
+        && helpers.iter().all(|helper| {
+            !matches!(
+                helper,
+                Helper::AwaitAsyncGenerator
+                    | Helper::AsyncGeneratorDelegate
+                    | Helper::AsyncIterator
+                    | Helper::WrapAsyncGenerator
+            )
+        });
     for helper in &helpers {
         if *helper != Helper::UsingCtx
             && !matches!(
@@ -149,7 +159,11 @@ pub fn inline_helpers(
         // are locally scoped and introduce no runtime dependency or global.
         prefix: {
             let prefixes = [
-                has_async.then_some(INLINE_ASYNC_HELPERS),
+                has_async.then_some(if async_to_generator_only {
+                    INLINE_ASYNC_TO_GENERATOR
+                } else {
+                    INLINE_ASYNC_HELPERS
+                }),
                 has_using_ctx.then_some(INLINE_USING_CTX),
                 has_object_helpers.then_some(INLINE_OBJECT_HELPERS),
             ]
@@ -171,6 +185,8 @@ pub struct InlineHelpers {
 }
 
 const INLINE_ASYNC_HELPERS: &str = r#"(()=>{function O(v,k){this.v=v,this.k=k}function awaitAsyncGenerator(v){return new O(v,0)}function asyncGeneratorDelegate(i){let waiting=false,out={};function pump(k,v){waiting=true;return{done:false,value:new O(new Promise(r=>r(i[k](v))),1)}}let iterator=typeof Symbol!="undefined"&&Symbol.iterator||"@@iterator";out[iterator]=function(){return this};out.next=v=>waiting?(waiting=false,v):pump("next",v);if(typeof i.throw=="function")out.throw=v=>{if(waiting)throw waiting=false,v;return pump("throw",v)};if(typeof i.return=="function")out.return=v=>waiting?(waiting=false,v):pump("return",v);return out}function asyncIterator(value){let method,asyncKey,iteratorKey,tries=2;for(typeof Symbol!="undefined"&&(asyncKey=Symbol.asyncIterator,iteratorKey=Symbol.iterator);tries--;){if(asyncKey&&(method=value[asyncKey])!=null)return method.call(value);if(iteratorKey&&(method=value[iteratorKey])!=null)return new FromSync(method.call(value));asyncKey="@@asyncIterator",iteratorKey="@@iterator"}throw new TypeError("Object is not async iterable")}function FromSync(iterator){function cont(result){if(Object(result)!==result)return Promise.reject(new TypeError(result+" is not an object."));let done=result.done;return Promise.resolve(result.value).then(value=>({value,done}))}this.s=iterator;this.n=iterator.next;this.next=function(){return cont(this.n.apply(this.s,arguments))};this.return=function(value){let method=this.s.return;return method===void 0?Promise.resolve({value,done:true}):cont(method.apply(this.s,arguments))};this.throw=function(value){let method=this.s.throw;return method===void 0?Promise.reject(value):cont(method.apply(this.s,arguments))}}function wrapAsyncGenerator(generator){return function(){return new AsyncGenerator(generator.apply(this,arguments))}}function AsyncGenerator(iterator){let front,back;function resume(key,arg){try{let result=iterator[key](arg),value=result.value,overload=value instanceof O;Promise.resolve(overload?value.v:value).then(value=>{if(overload){let next=key==="return"&&result.value.k?key:"next";if(!result.value.k||value.done)return resume(next,value);value=iterator[next](value).value}settle(!!result.done,value)},error=>resume("throw",error))}catch(error){settle(2,error)}}function settle(done,value){done===2?front.reject(value):front.resolve({value,done});front=front.next;if(front)resume(front.key,front.arg);else back=null}this._invoke=function(key,arg){return new Promise((resolve,reject)=>{let request={key,arg,resolve,reject,next:null};back?back=back.next=request:(front=back=request,resume(key,arg))})};if(typeof iterator.return!="function")this.return=void 0}let asyncKey=typeof Symbol=="function"&&Symbol.asyncIterator||"@@asyncIterator";AsyncGenerator.prototype[asyncKey]=function(){return this};AsyncGenerator.prototype.next=function(value){return this._invoke("next",value)};AsyncGenerator.prototype.throw=function(value){return this._invoke("throw",value)};AsyncGenerator.prototype.return=function(value){return this._invoke("return",value)};function step(iterator,resolve,reject,next,fail,key,arg){let result;try{result=iterator[key](arg)}catch(error){reject(error);return}result.done?resolve(result.value):Promise.resolve(result.value).then(next,fail)}function asyncToGenerator(fn){return function(){let self=this,args=arguments;return new Promise((resolve,reject)=>{let iterator=fn.apply(self,args);function next(value){step(iterator,resolve,reject,next,fail,"next",value)}function fail(value){step(iterator,resolve,reject,next,fail,"throw",value)}next(void 0)})}}return{awaitAsyncGenerator,asyncGeneratorDelegate,asyncIterator,wrapAsyncGenerator,asyncToGenerator}})()"#;
+
+const INLINE_ASYNC_TO_GENERATOR: &str = r#"(()=>{function step(iterator,resolve,reject,next,fail,key,arg){let result;try{result=iterator[key](arg)}catch(error){reject(error);return}result.done?resolve(result.value):Promise.resolve(result.value).then(next,fail)}function asyncToGenerator(fn){return function(){let self=this,args=arguments;return new Promise((resolve,reject)=>{let iterator=fn.apply(self,args);function next(value){step(iterator,resolve,reject,next,fail,"next",value)}function fail(value){step(iterator,resolve,reject,next,fail,"throw",value)}next(void 0)})}}return{asyncToGenerator}})()"#;
 
 const INLINE_USING_CTX: &str = r#"(()=>{function usingCtx(){let Suppressed="function"==typeof SuppressedError?SuppressedError:function(error,suppressed){let value=Error();return value.name="SuppressedError",value.error=error,value.suppressed=suppressed,value},empty={},stack=[];function using(isAwait,value){if(value!=null){if(Object(value)!==value)throw new TypeError("using declarations can only be used with objects, functions, null, or undefined.");let dispose;if(isAwait)dispose=value[Symbol.asyncDispose||Symbol.for("Symbol.asyncDispose")];let sync;if(dispose===void 0&&(dispose=value[Symbol.dispose||Symbol.for("Symbol.dispose")],isAwait))sync=dispose;if(typeof dispose!="function")throw new TypeError("Object is not disposable.");if(sync)dispose=function(){try{return sync.call(value)}catch(error){return Promise.reject(error)}};stack.push({v:value,d:dispose,a:isAwait})}else if(isAwait)stack.push({d:value,a:isAwait});return value}return{e:empty,u:using.bind(null,false),a:using.bind(null,true),d:function(){let record,error=this.e,state=0;function next(){while(record=stack.pop())try{if(!record.a&&state===1)return state=0,stack.push(record),Promise.resolve().then(next);if(record.d){let result=record.d.call(record.v);if(record.a)return state|=2,Promise.resolve(result).then(next,fail)}else state|=1}catch(value){return fail(value)}if(state===1)return error!==empty?Promise.reject(error):Promise.resolve();if(error!==empty)throw error}function fail(value){return error=error!==empty?new Suppressed(value,error):value,next()}return next()}}}return{usingCtx}})()"#;
 
@@ -227,6 +243,16 @@ mod tests {
             assert_eq!(contract.babel_path, helper.name());
             assert_eq!(contract.export_shape, "default");
         }
+    }
+
+    #[test]
+    fn ordinary_async_inline_helper_excludes_async_generator_runtime() {
+        let helpers = inline_helpers([Helper::AsyncToGenerator], "")
+            .unwrap()
+            .unwrap();
+        assert!(helpers.prefix.contains("asyncToGenerator"));
+        assert!(!helpers.prefix.contains("wrapAsyncGenerator"));
+        assert!(helpers.prefix.len() < INLINE_ASYNC_HELPERS.len() / 2);
     }
 
     #[test]

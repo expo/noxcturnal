@@ -36,7 +36,7 @@ const openRetained = (
   );
 
 test('runs ordered phases and reparses edited code', () => {
-  const observations = [];
+  const observations: unknown[] = [];
   const replace = defineNativePlugin({
     name: 'replace-number',
     visitors: [
@@ -73,8 +73,8 @@ test('runs ordered phases and reparses edited code', () => {
 });
 
 test('supports aliases, enter/exit order, state, skip, and stop', () => {
-  const order = [];
-  const plugin = defineNativePlugin({
+  const order: string[] = [];
+  const plugin = defineNativePlugin<{ count: number }>({
     name: 'lifecycle',
     createState: () => ({ count: 0 }),
     pre(_context, state) {
@@ -212,7 +212,7 @@ test('orders multiple plugins forward on enter and in reverse on exit', () => {
 });
 
 test('supports targeted nested traversal and semantic global queries', () => {
-  const names = [];
+  const names: [string, boolean | undefined][] = [];
   const plugin = defineNativePlugin({
     name: 'targeted',
     visitors: [
@@ -464,14 +464,14 @@ test('requires explicit pipeline phases', () => {
   assert.equal(result.code, 'const value = 2;');
 });
 
-function definitionPipeline(
-  plugin: ReturnType<typeof defineNativePlugin>,
+function definitionPipeline<State, Options, Analysis>(
+  plugin: ReturnType<typeof defineNativePlugin<State, Options, Analysis>>,
 ): ReturnType<typeof defineNativePipeline> {
   return defineNativePipeline({ phases: [{ name: 'visit', plugins: [plugin] }] });
 }
 
 test('rejects conflicting edits transactionally', () => {
-  const plugin = name =>
+  const plugin = (name: string) =>
     defineNativePlugin({
       name,
       visitors: [defineVisitor('Identifier', {}, path => path.replaceWith(name))],
@@ -577,7 +577,7 @@ test('provides lazy ancestor helpers without recursive node materialization', ()
   const plugin = defineNativePlugin({
     name: 'ancestors',
     visitors: [
-      defineVisitor('NumericLiteral', { ancestry: 'findParent' }, path => {
+      defineVisitor('NumericLiteral', { ancestry: 'programParent' }, path => {
         ancestors = [
           path.findParent(parent => parent.node.type === 'ReturnStatement')?.node.type,
           path.getFunctionParent()?.node.type,
@@ -599,6 +599,7 @@ test('requires ancestry and scope payloads to be declared', () => {
     name: 'undeclared-ancestry',
     visitors: [
       defineVisitor('Identifier', {}, path => {
+        // @ts-expect-error This test verifies the runtime guard for undeclared ancestry.
         void path.parentPath;
       }),
     ],
@@ -607,6 +608,7 @@ test('requires ancestry and scope payloads to be declared', () => {
     name: 'undeclared-scope',
     visitors: [
       defineVisitor('Identifier', {}, path => {
+        // @ts-expect-error This test verifies the runtime guard for undeclared scope.
         void path.scope;
       }),
     ],

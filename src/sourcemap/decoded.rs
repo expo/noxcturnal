@@ -185,3 +185,32 @@ pub(crate) fn compose_layer_chain(layers: &[&[u8]]) -> Option<(String, Vec<Strin
     }
     Some((encode_decoded(&map), names))
 }
+
+/// Compose packed phase layers and keep the result in the packed representation
+/// used between native and JavaScript pipeline phases.
+pub(crate) fn compose_packed_layer_chain(layers: &[&[u8]]) -> Option<Vec<u8>> {
+    let mut layers = layers.iter();
+    let (mut map, mut names) = unpack_decoded_layer(layers.next()?)?;
+    for layer in layers {
+        let (outer, outer_names) = unpack_decoded_layer(layer)?;
+        map = compose_decoded(&outer, &map, outer_names.len() as u32);
+        let mut combined = outer_names;
+        combined.extend(names);
+        names = combined;
+    }
+    let mut words = Vec::with_capacity(map.segments.len() * 5);
+    for line in 0..map.line_count() {
+        for segment in map.line(line).unwrap_or_default() {
+            words.extend_from_slice(&[
+                line as u32,
+                u32::try_from(segment.generated_column).ok()?,
+                u32::try_from(segment.original_line).ok()?,
+                u32::try_from(segment.original_column).ok()?,
+                segment
+                    .name
+                    .map_or(Some(0), |name| u32::try_from(name + 1).ok())?,
+            ]);
+        }
+    }
+    Some(pack_decoded_layer(&words, &names, map.line_count() as u32))
+}

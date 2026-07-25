@@ -1,0 +1,445 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`every public native transform has an explicit ownership fixture 1`] = `
+{
+  "code": "var value=1;",
+  "helpers": [],
+  "map": {
+    "mappings": "AAAA,IAAI,MAAQ;",
+    "names": [],
+  },
+  "name": "blockScoping",
+  "option": true,
+  "reason": undefined,
+  "source": "let value = 1;",
+  "status": "complete",
+}
+`;
+
+exports[`every public native transform has an explicit ownership fixture 2`] = `
+{
+  "code": "var Value=(()=>{"use strict";function Value(){if(!(this instanceof Value))throw new TypeError(\`Cannot call a class as a function\`)}return Value})();",
+  "helpers": [],
+  "map": {
+    "mappings": "AAAA,IAAI,WAAW,CAAC,aAAa,SAAS,OAAO,CAAC,GAAG,EAAE,gBAAgB,OAAO,MAAM,IAAI,UAAU,mCAAmC,CAAE,CAAC,OAAO,KAAK,EAAC,AAAC,CAAC;;",
+    "names": [],
+  },
+  "name": "classes",
+  "option": true,
+  "reason": undefined,
+  "source": "class Value {}",
+  "status": "complete",
+}
+`;
+
+exports[`every public native transform has an explicit ownership fixture 3`] = `
+{
+  "code": "function _noxObj(value){if(value==null)throw new TypeError(\`Cannot destructure \`+value);return value}var _ref=input,_obj=_noxObj(_ref),value=_obj.value;",
+  "helpers": [],
+  "map": {
+    "mappings": "AAAA,SAAS,QAAQ,MAAM,CAAC,GAAG,OAAO,KAAK,MAAM,IAAI,UAAU,sBAAsB,KAAK,EAAE,OAAO,KAAK,CAApG,IAAI,KAAK,MAAM,KAAK,QAAQ,IAAI,EAAE,MAAM,KAAK;;",
+    "names": [],
+  },
+  "name": "destructuring",
+  "option": {
+    "useBuiltIns": true,
+  },
+  "reason": undefined,
+  "source": "var { value } = input;",
+  "status": "complete",
+}
+`;
+
+exports[`every public native transform has an explicit ownership fixture 4`] = `
+{
+  "code": "function read(){let value=arguments.length>0&&arguments[0]!==void 0?arguments[0]:1;return value}",
+  "helpers": [],
+  "map": {
+    "mappings": "AAAA,SAAS,MAAgB,CAAC,IAAI,MAAM,UAAU,OAAO,GAAG,UAAU,KAAK,IAAK,GAAE,UAAU,GAAG,EAAhE,OAAO,KAAO;;",
+    "names": [],
+  },
+  "name": "parameters",
+  "option": true,
+  "reason": undefined,
+  "source": "function read(value = 1) { return value; }",
+  "status": "complete",
+}
+`;
+
+exports[`every public native transform has an explicit ownership fixture 5`] = `
+{
+  "code": "{var _iteratorNormalCompletion=true,_didIteratorError=false,_iteratorError;try{for(var _iterator=values[Symbol.iterator](),_step;!(_iteratorNormalCompletion=(_step=_iterator.next()).done);_iteratorNormalCompletion=true){var value=_step.value;consume(value)}}catch(_iteratorError2){_didIteratorError=true;_iteratorError=_iteratorError2}finally{try{if(!_iteratorNormalCompletion&&_iterator.return!=null)_iterator.return()}finally{if(_didIteratorError)throw _iteratorError}}}",
+  "helpers": [],
+  "map": {
+    "mappings": "AAAA,CAAC,IAAI,0BAA0B,KAAK,kBAAkB,MAAM,eAAe,GAAG,CAAC,IAAI,IAAI,UAAW,OAAQ,OAAO,SAAS,CAAC,EAAE,MAAM,EAAE,2BAA2B,MAAM,UAAU,KAAK,EAAC,AAAC,CAAC,MAAM,0BAA0B,KAAK,CAAC,IAAI,MAAM,MAAM,MAAM,QAAQ,KAAK,CAAE,CAAC,OAAO,gBAAgB,CAAC,kBAAkB,KAAK,eAAe,eAAe,QAAQ,CAAC,GAAG,CAAC,GAAG,CAAC,2BAA2B,UAAU,QAAQ,KAAK,UAAU,OAAO,CAAC,QAAQ,CAAC,GAAG,kBAAkB,MAAM,cAAc,CAAC,CAAC;;",
+    "names": [],
+  },
+  "name": "forOf",
+  "option": true,
+  "reason": undefined,
+  "source": "for (var value of values) consume(value);",
+  "status": "complete",
+}
+`;
+
+exports[`every public native transform has an explicit ownership fixture 6`] = `
+{
+  "code": "var _usingCtx2=require("@babel/runtime/helpers/usingCtx");try{var _usingCtx=_usingCtx2();var value=_usingCtx.u(acquire())}catch(_){_usingCtx.e=_}finally{_usingCtx.d()}",
+  "helpers": [
+    "usingCtx",
+  ],
+  "map": {
+    "mappings": "yFAAA,IAAM,kBAAQ,QAAQ;",
+    "names": [],
+  },
+  "name": "explicitResourceManagement",
+  "option": true,
+  "reason": undefined,
+  "source": "using value = acquire();",
+  "status": "complete",
+}
+`;
+
+exports[`every public native transform has an explicit ownership fixture 7`] = `
+{
+  "code": "class Value{static#_=this.value=1}",
+  "helpers": [],
+  "map": {
+    "mappings": "AAAA,MAAM,KAAM,CAAE,SAAS,KAAK,MAAQ,CAAK;",
+    "names": [],
+  },
+  "name": "classStaticBlock",
+  "option": true,
+  "reason": undefined,
+  "source": "class Value { static { this.value = 1; } }",
+  "status": "complete",
+}
+`;
+
+exports[`every public native transform has an explicit ownership fixture 8`] = `
+{
+  "code": "class Value{constructor(){this.field=1}}",
+  "helpers": [],
+  "map": {
+    "mappings": "AAAA,MAAM,KAAM,eAAE,WAAQ,EAAG;",
+    "names": [],
+  },
+  "name": "classProperties",
+  "option": {
+    "loose": true,
+  },
+  "reason": undefined,
+  "source": "class Value { field = 1; }",
+  "status": "complete",
+}
+`;
+
+exports[`every public native transform has an explicit ownership fixture 9`] = `
+{
+  "code": "value||(value=1);",
+  "helpers": [],
+  "map": {
+    "mappings": "AAAA,cAAU;",
+    "names": [],
+  },
+  "name": "logicalAssignmentOperators",
+  "option": true,
+  "reason": undefined,
+  "source": "value ||= 1;",
+  "status": "complete",
+}
+`;
+
+exports[`every public native transform has an explicit ownership fixture 10`] = `
+{
+  "code": "var _value;(_value=value)===null||_value===void 0?void 0:_value.field;",
+  "helpers": [],
+  "map": {
+    "mappings": "mBAAA,6CAAO;",
+    "names": [],
+  },
+  "name": "optionalChaining",
+  "option": {
+    "loose": false,
+  },
+  "reason": undefined,
+  "source": "value?.field;",
+  "status": "complete",
+}
+`;
+
+exports[`every public native transform has an explicit ownership fixture 11`] = `
+{
+  "code": "var _value;(_value=value)!==null&&_value!==void 0?_value:fallback;",
+  "helpers": [],
+  "map": {
+    "mappings": "mBAAA,sCAAS;",
+    "names": [],
+  },
+  "name": "nullishCoalescingOperator",
+  "option": {
+    "loose": false,
+  },
+  "reason": undefined,
+  "source": "value ?? fallback;",
+  "status": "complete",
+}
+`;
+
+exports[`every public native transform has an explicit ownership fixture 12`] = `
+{
+  "code": "import*as _value from"pkg";export{_value as value};",
+  "helpers": [],
+  "map": {
+    "mappings": "qBAAuB,MAAvB,iBAAY;",
+    "names": [],
+  },
+  "name": "exportNamespaceFrom",
+  "option": true,
+  "reason": undefined,
+  "source": "export * as value from "pkg";",
+  "status": "complete",
+}
+`;
+
+exports[`every public native transform has an explicit ownership fixture 13`] = `
+{
+  "code": "try{}catch(_unused){}",
+  "helpers": [],
+  "map": {
+    "mappings": "AAAA,GAAI,CAAC,eAAQ,CAAC;",
+    "names": [],
+  },
+  "name": "optionalCatchBinding",
+  "option": true,
+  "reason": undefined,
+  "source": "try {} catch {}",
+  "status": "complete",
+}
+`;
+
+exports[`every public native transform has an explicit ownership fixture 14`] = `
+{
+  "code": "var value=Object.assign({},input);",
+  "helpers": [],
+  "map": {
+    "mappings": "AAAA,IAAI,MAAQ,OAAO,OAAO,CAAC,EAAE,KAAK;;",
+    "names": [],
+  },
+  "name": "objectRestSpread",
+  "option": {
+    "loose": true,
+    "useBuiltIns": true,
+  },
+  "reason": undefined,
+  "source": "var value = { ...input };",
+  "status": "complete",
+}
+`;
+
+exports[`every public native transform has an explicit ownership fixture 15`] = `
+{
+  "code": "var _wrapAsyncGenerator=require("@babel/runtime/helpers/wrapAsyncGenerator");function values(){return _values.apply(this,arguments)}function _values(){_values=_wrapAsyncGenerator(function*(){yield 1});return _values.apply(this,arguments)}",
+  "helpers": [
+    "wrapAsyncGenerator",
+  ],
+  "map": {
+    "mappings": "6EAAA,SAAgB,wGAAS,CAAE,KAAM,EAAG;",
+    "names": [],
+  },
+  "name": "asyncGeneratorFunctions",
+  "option": true,
+  "reason": undefined,
+  "source": "async function* values() { yield 1; }",
+  "status": "complete",
+}
+`;
+
+exports[`every public native transform has an explicit ownership fixture 16`] = `
+{
+  "code": "var _asyncToGenerator=require("@babel/runtime/helpers/asyncToGenerator");function value(){return _value.apply(this,arguments)}function _value(){_value=_asyncToGenerator(function*(){return 1});return _value.apply(this,arguments)}",
+  "helpers": [
+    "asyncToGenerator",
+  ],
+  "map": {
+    "mappings": "yEAAA,SAAe,kGAAQ,CAAE,MAAO,EAAG;",
+    "names": [],
+  },
+  "name": "asyncFunctions",
+  "option": true,
+  "reason": undefined,
+  "source": "async function value() { return 1; }",
+  "status": "complete",
+}
+`;
+
+exports[`every public native transform has an explicit ownership fixture 17`] = `
+{
+  "code": "var _value;_value=value,value=Math.pow(_value,2);",
+  "helpers": [],
+  "map": {
+    "mappings": "wBAAA,sBAAU;",
+    "names": [],
+  },
+  "name": "exponentiationOperator",
+  "option": true,
+  "reason": undefined,
+  "source": "value **= 2;",
+  "status": "complete",
+}
+`;
+
+exports[`every public native transform has an explicit ownership fixture 18`] = `
+{
+  "code": "var Value=(()=>{"use strict";function _noxPrivateBase(receiver,key){if(!Object.prototype.hasOwnProperty.call(Object(receiver),key))throw new TypeError(\`attempted to use private field on non-instance\`);return receiver}function _noxPrivateCall(receiver,key,args){return _noxPrivateBase(receiver,key)[key].apply(receiver,args)}var _read=\`__private_Value_read\`;function Value(){if(!(this instanceof Value))throw new TypeError(\`Cannot call a class as a function\`);Object.defineProperty(this,_read,{value:function(){}})}return Value})();",
+  "helpers": [],
+  "map": {
+    "mappings": "AAAA,IAAI,WAAW,CAAC,aAAa,SAAS,gBAAgB,SAAS,IAAI,CAAC,GAAG,CAAC,OAAO,UAAU,eAAe,KAAK,OAAO,QAAQ,EAAE,GAAG,EAAE,MAAM,IAAI,UAAU,gDAAgD,EAAE,OAAO,QAAQ,CAAC,SAAS,gBAAgB,SAAS,IAAI,KAAK,CAAC,OAAO,gBAAgB,SAAS,GAAG,CAAC,CAAC,IAAI,CAAC,MAAM,SAAS,IAAI,CAAC,CAAC,IAAI,MAAM,uBAAuB,SAAS,OAAO,CAAC,GAAG,EAAE,gBAAgB,OAAO,MAAM,IAAI,UAAU,mCAAmC,EAAE,OAAO,eAAe,KAAK,MAAM,CAAC,MAAM,UAAU,CAAC,CAAC,CAAC,CAAE,CAAC,OAAO,KAAK,EAAC,AAAC,CAAC;;",
+    "names": [],
+  },
+  "name": "privateMethods",
+  "option": {
+    "loose": true,
+  },
+  "reason": undefined,
+  "source": "class Value { #read() {} }",
+  "status": "complete",
+}
+`;
+
+exports[`every public native transform has an explicit ownership fixture 19`] = `
+{
+  "code": "var Value=(()=>{"use strict";function _noxPrivateBase(receiver,key){if(!Object.prototype.hasOwnProperty.call(Object(receiver),key))throw new TypeError(\`attempted to use private field on non-instance\`);return receiver}function _noxPrivateCall(receiver,key,args){return _noxPrivateBase(receiver,key)[key].apply(receiver,args)}var _field=\`__private_Value_field\`;function Value(){if(!(this instanceof Value))throw new TypeError(\`Cannot call a class as a function\`);Object.defineProperty(this,_field,{writable:true,value:void 0})}Object.defineProperty(Value.prototype,"has",{value:function(input){return Object.prototype.hasOwnProperty.call(input,_field)},writable:true,configurable:true});return Value})();",
+  "helpers": [],
+  "map": {
+    "mappings": "AAAA,IAAI,WAAW,CAAC,aAAa,SAAS,gBAAgB,SAAS,IAAI,CAAC,GAAG,CAAC,OAAO,UAAU,eAAe,KAAK,OAAO,QAAQ,EAAE,GAAG,EAAE,MAAM,IAAI,UAAU,gDAAgD,EAAE,OAAO,QAAQ,CAAC,SAAS,gBAAgB,SAAS,IAAI,KAAK,CAAC,OAAO,gBAAgB,SAAS,GAAG,CAAC,CAAC,IAAI,CAAC,MAAM,SAAS,IAAI,CAAC,CAAC,IAAI,OAAO,wBAAwB,SAAS,OAAO,CAAC,GAAG,EAAE,gBAAgB,OAAO,MAAM,IAAI,UAAU,mCAAmC,EAAE,OAAO,eAAe,KAAK,OAAO,CAAC,SAAS,KAAK,MAAM,IAAK,EAAC,CAAC,CAAE,CAAC,OAAO,eAAe,MAAM,UAAU,MAAM,CAAC,MAAM,SAAS,MAAM,CAAE,OAAO,OAAO,UAAU,eAAe,KAAK,MAAO,MAAM,CAAG,EAAE,SAAS,KAAK,aAAa,IAAI,CAAC,EAAE,OAAO,KAAK,EAAC,AAAC,CAAC;;",
+    "names": [],
+  },
+  "name": "privatePropertyInObject",
+  "option": {
+    "loose": true,
+  },
+  "reason": undefined,
+  "source": "class Value { #field; has(input) { return #field in input; } }",
+  "status": "complete",
+}
+`;
+
+exports[`every public native transform has an explicit ownership fixture 20`] = `
+{
+  "code": "var value=new RegExp(\`a\`,\`y\`);",
+  "helpers": [],
+  "map": {
+    "mappings": "AAAA,IAAI,MAAQ,kBAAG;",
+    "names": [],
+  },
+  "name": "regexpSticky",
+  "option": true,
+  "reason": undefined,
+  "source": "var value = /a/y;",
+  "status": "complete",
+}
+`;
+
+exports[`every public native transform has an explicit ownership fixture 21`] = `
+{
+  "code": "var value=/(?:\\uD83D\\uDE00)/;",
+  "helpers": [],
+  "map": {
+    "mappings": "AAAA,IAAI,MAAQ;;",
+    "names": [],
+  },
+  "name": "regexpUnicode",
+  "option": true,
+  "reason": undefined,
+  "source": "var value = /😀/u;",
+  "status": "complete",
+}
+`;
+
+exports[`every public native transform has an explicit ownership fixture 22`] = `
+{
+  "code": "var value=/[\\u0000-\\u007F]/u;",
+  "helpers": [],
+  "map": {
+    "mappings": "AAAA,IAAI,MAAQ;;",
+    "names": [],
+  },
+  "name": "regexpUnicodePropertyEscapes",
+  "option": true,
+  "reason": undefined,
+  "source": "var value = /\\p{ASCII}/u;",
+  "status": "complete",
+}
+`;
+
+exports[`every public native transform has an explicit ownership fixture 23`] = `
+{
+  "code": "var value=/a[^]b/;",
+  "helpers": [],
+  "map": {
+    "mappings": "AAAA,IAAI,MAAQ;;",
+    "names": [],
+  },
+  "name": "regexpDotAll",
+  "option": true,
+  "reason": undefined,
+  "source": "var value = /a.b/s;",
+  "status": "complete",
+}
+`;
+
+exports[`every public native transform has an explicit ownership fixture 24`] = `
+{
+  "code": "function _noxWrapRegExp(expression,groups){var exec=expression.exec;expression.exec=function(input){var match=exec.call(this,input);if(match){match.groups={};for(var name in groups)match.groups[name]=match[groups[name]]}return match};if(typeof Symbol!=\`undefined\`&&Symbol.replace){expression[Symbol.replace]=function(input,replacement){if(typeof replacement===\`string\`)replacement=replacement.replace(/\\$<([^>]+)>/g,function(_,name){return\`$\`+groups[name]});return RegExp.prototype[Symbol.replace].call(this,input,replacement)}}return expression}var value=_noxWrapRegExp(/(a)/,{"value":1});",
+  "helpers": [],
+  "map": {
+    "mappings": "AAAA,SAAS,eAAe,WAAW,OAAO,CAAC,IAAI,KAAK,WAAW,KAAK,WAAW,KAAK,SAAS,MAAM,CAAC,IAAI,MAAM,KAAK,KAAK,KAAK,KAAK,EAAE,GAAG,MAAM,CAAC,MAAM,OAAO,CAAC,EAAE,IAAI,IAAI,QAAQ,OAAO,MAAM,OAAO,MAAM,MAAM,OAAO,MAAM,CAAC,OAAO,KAAK,EAAE,GAAG,OAAO,QAAQ,aAAa,OAAO,QAAQ,CAAC,WAAW,OAAO,SAAS,SAAS,MAAM,YAAY,CAAC,GAAG,OAAO,cAAc,SAAS,YAAY,YAAY,QAAQ,eAAe,SAAS,EAAE,KAAK,CAAC,MAAO,IAAI,OAAO,KAAK,CAAC,EAAE,OAAO,OAAO,UAAU,OAAO,QAAQ,CAAC,KAAK,KAAK,MAAM,WAAW,CAAC,CAAC,CAAC,OAAO,UAAU,CAAliB,IAAI,MAAQ,eAAe,MAAM,CAAC,QAAQ,CAAC,CAAC;;",
+    "names": [],
+  },
+  "name": "regexpNamedCaptureGroups",
+  "option": true,
+  "reason": undefined,
+  "source": "var value = /(?<value>a)/;",
+  "status": "complete",
+}
+`;
+
+exports[`every public native transform has an explicit ownership fixture 25`] = `
+{
+  "code": undefined,
+  "helpers": undefined,
+  "map": undefined,
+  "name": "regexpLookBehind",
+  "option": true,
+  "reason": "syntax:regexp-look-behind-semantic-mismatch",
+  "source": "var value = /(?<=a)b/;",
+  "status": "bailout",
+}
+`;
+
+exports[`every public native transform has an explicit ownership fixture 26`] = `
+{
+  "code": undefined,
+  "helpers": undefined,
+  "map": undefined,
+  "name": "regexpMatchIndices",
+  "option": true,
+  "reason": "syntax:regexp-match-indices-semantic-mismatch",
+  "source": "var value = /a/d;",
+  "status": "bailout",
+}
+`;
+
+exports[`every public native transform has an explicit ownership fixture 27`] = `
+{
+  "code": undefined,
+  "helpers": undefined,
+  "map": undefined,
+  "name": "regexpUnicodeSets",
+  "option": true,
+  "reason": "syntax:regexp-unicode-sets-semantic-mismatch",
+  "source": "var value = /[a&&b]/v;",
+  "status": "bailout",
+}
+`;

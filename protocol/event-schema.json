@@ -501,6 +501,9 @@
     "UnaryExpression": ["operator", "prefix", "constantKind", "constantValue"],
     "BinaryExpression": ["operator", "constantKind", "constantValue"],
     "LogicalExpression": ["operator", "constantKind", "constantValue"],
+    "ConditionalExpression": ["constantKind", "constantValue"],
+    "ParenthesizedExpression": ["constantKind", "constantValue"],
+    "SequenceExpression": ["constantKind", "constantValue"],
     "AssignmentExpression": ["operator"],
     "CallExpression": ["optional", "argumentCount", "calleeName", "calleeGlobal", "staticArgument"],
     "NewExpression": ["argumentCount", "calleeName", "staticArgument"],
@@ -628,6 +631,18 @@
     },
     "LogicalExpression": {
       "operator": "LogicalOperator",
+      "constantKind?": "'null' | 'boolean' | 'number' | 'string'",
+      "constantValue?": "string | number | boolean | null"
+    },
+    "ConditionalExpression": {
+      "constantKind?": "'null' | 'boolean' | 'number' | 'string'",
+      "constantValue?": "string | number | boolean | null"
+    },
+    "ParenthesizedExpression": {
+      "constantKind?": "'null' | 'boolean' | 'number' | 'string'",
+      "constantValue?": "string | number | boolean | null"
+    },
+    "SequenceExpression": {
       "constantKind?": "'null' | 'boolean' | 'number' | 'string'",
       "constantValue?": "string | number | boolean | null"
     },

@@ -128,6 +128,7 @@ test('requires structural child roles to be declared before parsing', () => {
     name: 'undeclared-child',
     visitors: [
       defineVisitor('CallExpression', {}, path => {
+        // @ts-expect-error This test verifies the runtime guard for an undeclared child capability.
         path.get('arguments');
       }),
     ],
@@ -176,10 +177,18 @@ test('distinguishes control-flow and class child roles needed by structural fixe
           observed.classBody = one(path.get('body'))?.sourceText() ?? null;
         },
       ),
+      defineVisitor(
+        'DoWhileStatement',
+        { children: { body: { route: 'Statement' }, test: { route: 'Expression' } } },
+        path => {
+          observed.doWhileBody = one(path.get('body'))?.sourceText() ?? null;
+          observed.doWhileTest = one(path.get('test'))?.sourceText() ?? null;
+        },
+      ),
     ],
   });
   transform(
-    'try { work() } catch (error) { recover(error) } finally { cleanup() } class Child extends Parent { method() {} }',
+    'try { work() } catch (error) { recover(error) } finally { cleanup() } class Child extends Parent { method() {} } do { tick() } while (ready)',
     'fixture.js',
     defineNativePipeline({ phases: [{ name: 'inspect', plugins: [plugin] }] }),
   );
@@ -189,6 +198,8 @@ test('distinguishes control-flow and class child roles needed by structural fixe
     finalizer: '{ cleanup() }',
     superClass: 'Parent',
     classBody: '{ method() {} }',
+    doWhileBody: '{ tick() }',
+    doWhileTest: 'ready',
   });
 });
 
@@ -392,6 +403,7 @@ test('implements a Platform.select-style transform through declared compact role
               children: {
                 properties: {
                   route: 'ObjectProperty',
+                  fields: ['computed', 'key'],
                   children: { value: { route: 'Expression' } },
                 },
               },

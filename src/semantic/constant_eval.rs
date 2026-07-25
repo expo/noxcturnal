@@ -28,7 +28,7 @@ impl EvaluatedConstant {
         }
     }
 
-    fn truthy(&self) -> bool {
+    pub(crate) fn truthy(&self) -> bool {
         match self {
             Self::Null => false,
             Self::Boolean(value) => *value,
@@ -77,7 +77,7 @@ pub(crate) fn constant_for_kind(kind: AstKind<'_>) -> Option<EvaluatedConstant> 
     }
 }
 
-fn evaluate_expression(expression: &Expression<'_>) -> Option<EvaluatedConstant> {
+pub(crate) fn evaluate_expression(expression: &Expression<'_>) -> Option<EvaluatedConstant> {
     match expression {
         Expression::NullLiteral(_) => Some(EvaluatedConstant::Null),
         Expression::BooleanLiteral(value) => Some(EvaluatedConstant::Boolean(value.value)),
@@ -163,11 +163,8 @@ fn evaluate_binary(
             constant_string(&right)?
         )));
     }
-    if matches!(
-        operator,
-        Op::StrictEquality | Op::StrictInequality | Op::Equality | Op::Inequality
-    ) {
-        let equal = constants_equal(&left, &right)?;
+    if matches!(operator, Op::StrictEquality | Op::StrictInequality) {
+        let equal = constants_strictly_equal(&left, &right);
         return Some(EvaluatedConstant::Boolean(
             if matches!(operator, Op::StrictInequality | Op::Inequality) {
                 !equal
@@ -175,6 +172,28 @@ fn evaluate_binary(
                 equal
             },
         ));
+    }
+    if matches!(operator, Op::Equality | Op::Inequality) {
+        let equal = constants_loosely_equal(&left, &right)?;
+        return Some(EvaluatedConstant::Boolean(if operator == Op::Inequality {
+            !equal
+        } else {
+            equal
+        }));
+    }
+    if matches!(
+        operator,
+        Op::LessThan | Op::LessEqualThan | Op::GreaterThan | Op::GreaterEqualThan
+    ) && let (EvaluatedConstant::String(left), EvaluatedConstant::String(right)) =
+        (&left, &right)
+    {
+        return Some(EvaluatedConstant::Boolean(match operator {
+            Op::LessThan => left < right,
+            Op::LessEqualThan => left <= right,
+            Op::GreaterThan => left > right,
+            Op::GreaterEqualThan => left >= right,
+            _ => unreachable!(),
+        }));
     }
 
     let left = left.number()?;
@@ -205,15 +224,29 @@ fn evaluate_binary(
     Some(value)
 }
 
-fn constants_equal(left: &EvaluatedConstant, right: &EvaluatedConstant) -> Option<bool> {
+fn constants_strictly_equal(left: &EvaluatedConstant, right: &EvaluatedConstant) -> bool {
     match (left, right) {
-        (EvaluatedConstant::Null, EvaluatedConstant::Null) => Some(true),
-        (EvaluatedConstant::Boolean(left), EvaluatedConstant::Boolean(right)) => {
-            Some(left == right)
+        (EvaluatedConstant::Null, EvaluatedConstant::Null) => true,
+        (EvaluatedConstant::Boolean(left), EvaluatedConstant::Boolean(right)) => left == right,
+        (EvaluatedConstant::Number(left), EvaluatedConstant::Number(right)) => left == right,
+        (EvaluatedConstant::String(left), EvaluatedConstant::String(right)) => left == right,
+        _ => false,
+    }
+}
+
+fn constants_loosely_equal(left: &EvaluatedConstant, right: &EvaluatedConstant) -> Option<bool> {
+    if std::mem::discriminant(left) == std::mem::discriminant(right) {
+        return Some(constants_strictly_equal(left, right));
+    }
+    match (left, right) {
+        (EvaluatedConstant::Null, _) | (_, EvaluatedConstant::Null) => Some(false),
+        (EvaluatedConstant::Boolean(_), _)
+        | (_, EvaluatedConstant::Boolean(_))
+        | (EvaluatedConstant::Number(_), EvaluatedConstant::String(_))
+        | (EvaluatedConstant::String(_), EvaluatedConstant::Number(_)) => {
+            Some(left.number()? == right.number()?)
         }
-        (EvaluatedConstant::Number(left), EvaluatedConstant::Number(right)) => Some(left == right),
-        (EvaluatedConstant::String(left), EvaluatedConstant::String(right)) => Some(left == right),
-        _ => None,
+        _ => Some(false),
     }
 }
 

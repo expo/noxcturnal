@@ -25,6 +25,19 @@ export interface PreflightReactCompiler {
   customOptOutDirectives?: readonly string[];
 }
 
+/** React Fast Refresh instrumentation emitted by Oxc's native JSX pass. */
+export interface PreflightReactRefresh {
+  refreshReg?: string;
+  refreshSig?: string;
+  emitFullSignatures?: boolean;
+}
+
+/** Focused Metro-compatible post-processing. Each operation is independently selectable. */
+export interface PreflightOptimize {
+  constantFolding?: true;
+  deadCodeElimination?: true;
+}
+
 /** Orthogonal native syntax transforms. Consumers compose runtime presets from these toggles. */
 export interface PreflightTransforms {
   blockScoping?: true;
@@ -64,7 +77,9 @@ export interface PreflightTransforms {
  */
 export interface PreflightPlan {
   transforms?: PreflightTransforms;
+  optimize?: PreflightOptimize;
   reactCompiler?: PreflightReactCompiler;
+  reactRefresh?: PreflightReactRefresh;
   typescript?: PreflightTypeScriptMode;
   jsx?: PreflightJsxMode;
   jsxImportSource?: string;

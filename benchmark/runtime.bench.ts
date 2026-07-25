@@ -11,6 +11,155 @@ const source = Array.from(
   { length: 2_000 },
   (_, index) => `export const value${index} = source${index} + ${index};`,
 ).join('\n');
+
+const metroOptimizationSource = Array.from(
+  { length: 500 },
+  (_, index) =>
+    `function dead${index}(){return ${index}+2*3} const live${index}=(${index}+2*3)>4?"yes":"no"; sink(live${index});`,
+).join('\n');
+const metroOptimizationPipeline = defineNativePipeline({
+  phases: [
+    {
+      name: 'metro-optimization',
+      native: {
+        optimize: {
+          constantFolding: true,
+          deadCodeElimination: true,
+        },
+      },
+    },
+  ],
+});
+bench('fused native Metro constant folding and DCE', () => {
+  transform(metroOptimizationSource, 'benchmark.js', metroOptimizationPipeline);
+});
+
+const legacySyntaxPipeline = defineNativePipeline({
+  phases: [
+    {
+      name: 'legacy-syntax',
+      native: {
+        transforms: {
+          blockScoping: true,
+          parameters: true,
+          destructuring: { useBuiltIns: true },
+          forOf: true,
+          classes: true,
+          classProperties: { loose: true },
+          classStaticBlock: true,
+        },
+        comments: false,
+      },
+    },
+  ],
+});
+const nativeClassesSource = Array.from(
+  { length: 500 },
+  (_, index) =>
+    `class Value${index}{field=${index};constructor(value){this.value=value}read(){return this.value+this.field}static create(value){return new this(value)}}sink(Value${index}.create(${index}).read());`,
+).join('\n');
+bench('500 native legacy classes', () => {
+  transform(nativeClassesSource, 'benchmark.js', legacySyntaxPipeline);
+});
+const focusedPrivatePipeline = defineNativePipeline({
+  phases: [
+    {
+      name: 'modern-private-features',
+      native: {
+        transforms: {
+          privateMethods: { loose: true },
+          privatePropertyInObject: { loose: true },
+        },
+        comments: false,
+      },
+    },
+  ],
+});
+const focusedPrivateSource = Array.from(
+  { length: 200 },
+  (_, index) =>
+    `class Unrelated${index}{field=${index}}class Secret${index}{#value=${index};#read(input){return this.#value+input}read(input){return[this.#read(1),#value in input]}}sink(new Secret${index}().read(new Secret${index}()),new Unrelated${index}().field);`,
+).join('\n');
+bench('200 focused modern private-feature classes', () => {
+  transform(focusedPrivateSource, 'benchmark.js', focusedPrivatePipeline);
+});
+const legacySyntaxNoopSource = Array.from(
+  { length: 500 },
+  (_, index) => `var value${index}=${index};sink(value${index});`,
+).join('\n');
+bench('legacy syntax no-op discovery', () => {
+  transform(legacySyntaxNoopSource, 'benchmark.js', legacySyntaxPipeline);
+});
+
+const nonHermesLegacyPipeline = defineNativePipeline({
+  phases: [
+    {
+      name: 'non-hermes-language',
+      native: {
+        transforms: {
+          blockScoping: true,
+          parameters: true,
+          destructuring: { useBuiltIns: true },
+          classes: true,
+          classProperties: { loose: true },
+          classStaticBlock: true,
+          asyncFunctions: true,
+          objectRestSpread: { loose: true, useBuiltIns: true },
+        },
+        helpers: { mode: 'inline' },
+        comments: false,
+      },
+    },
+  ],
+});
+const nonHermesLegacySource = Array.from(
+  { length: 200 },
+  (_, index) =>
+    `const input${index}={kept:${index},extra:${index + 1}};const {kept,...rest${index}}=input${index};async function read${index}(value=${index}){class Box{field=value;read(){return {...rest${index},kept,value:this.field}}}return new Box().read()}sink(read${index}());`,
+).join('\n');
+bench('200 non-Hermes legacy modules fused language pass', () => {
+  transform(nonHermesLegacySource, 'benchmark.js', nonHermesLegacyPipeline);
+});
+
+const productionAppLanguagePipeline = defineNativePipeline({
+  phases: [
+    {
+      name: 'production-app-language',
+      native: {
+        typescript: 'strip',
+        jsx: 'automatic',
+        jsxImportSource: 'react',
+        comments: false,
+      },
+    },
+  ],
+});
+const productionAppSource = Array.from(
+  { length: 200 },
+  (_, index) =>
+    `type Props${index}={value:number};export function Component${index}({value}:Props${index}){return <View testID="value-${index}">{value}</View>}`,
+).join('\n');
+bench('200 production app TypeScript JSX components', () => {
+  transform(productionAppSource, 'App.tsx', productionAppLanguagePipeline);
+});
+
+const developmentRefreshPipeline = defineNativePipeline({
+  phases: [
+    {
+      name: 'development-react',
+      native: {
+        typescript: 'strip',
+        jsx: 'automatic',
+        jsxImportSource: 'react',
+        reactRefresh: {},
+      },
+    },
+  ],
+});
+bench('200 development React Refresh components', () => {
+  transform(productionAppSource, 'App.tsx', developmentRefreshPipeline);
+});
+
 const visitorPipeline = defineNativePipeline({
   phases: [
     {
