@@ -16,6 +16,7 @@ import type {
   CompiledRouteTemplate,
   DispatchRoute,
   PreparedPhase,
+  SharedPhasePlan,
   PreparedPluginPlan,
   ResolvedVisitor,
   RouteCapabilities,
@@ -338,7 +339,7 @@ export class ContractVerifier {
 }
 
 const staticPlanCache = new WeakMap<NativePlugin<any, any>, PreparedPluginPlan>();
-const preparedPhaseCaches = new WeakMap<PipelinePhase, Map<string, Omit<PreparedPhase, 'plans'>>>();
+const preparedPhaseCaches = new WeakMap<PipelinePhase, Map<string, SharedPhasePlan>>();
 const compiledPhaseCaches = new WeakMap<PipelinePhase, Map<string, CompiledPhaseRoutes>>();
 
 const RETAIN_IDENTIFIERS = 1 << 0;
@@ -430,7 +431,7 @@ export function preparePhase(
     .map(plugin => `${plugin.name}:${pluginPlanCacheKey(plans.get(plugin)!)}`)
     .join('\u001e');
   const cachedPrepared = preparedPhaseCaches.get(phase)?.get(preparedKey);
-  if (cachedPrepared) return { ...cachedPrepared, plans };
+  if (cachedPrepared) return { ...cachedPrepared, plans, shared: cachedPrepared };
 
   const activePlugins = (phase.plugins ?? []).filter(plugin =>
     phaseIsEnabled(plans.get(plugin)!, phase.name),
@@ -497,9 +498,8 @@ export function preparePhase(
     includeScope,
     retentionCapabilities,
   );
-  const prepared: PreparedPhase = {
+  const cacheable: SharedPhasePlan = {
     activePlugins,
-    plans,
     subscriptions,
     fieldRequests,
     includeParent,
@@ -514,9 +514,8 @@ export function preparePhase(
     preparedCache = new Map();
     preparedPhaseCaches.set(phase, preparedCache);
   }
-  const { plans: _, ...cacheable } = prepared;
   if (preparedCache.size < 64) preparedCache.set(preparedKey, cacheable);
-  return prepared;
+  return { ...cacheable, plans, shared: cacheable };
 }
 
 const planCacheKeys = new WeakMap<PreparedPluginPlan, string>();

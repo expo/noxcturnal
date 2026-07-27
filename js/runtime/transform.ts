@@ -1,7 +1,7 @@
 import { classifyForTransform, parserFilename, sourceHints } from '../adapters/classification.js';
 import { selectParserAdapter } from '../adapters/registry.js';
 import { compilePhasePlan, maxEditEffect } from '../pipeline/compile.js';
-import type { CompiledRouteTemplate, PreparedPhase } from '../pipeline/types.js';
+import type { CompiledRouteTemplate, PreparedPhase, SharedPhasePlan } from '../pipeline/types.js';
 import {
   compileNestedVisitor,
   ContractVerifier,
@@ -38,6 +38,69 @@ import {
   NativeTransformError,
 } from '../contracts/visitor.js';
 import { NativeTransformSession } from './session.js';
+
+interface RetainedPlan {
+  futureSubscriptions: ReadonlySet<string>;
+  futureRetentionCapabilities: number;
+  retentionManifest: Buffer;
+}
+
+interface RetainedChainNode {
+  children: WeakMap<SharedPhasePlan, RetainedChainNode>;
+  plan?: RetainedPlan;
+}
+
+const retainedChainRoot: RetainedChainNode = { children: new WeakMap() };
+
+/** Walk (and extend) the interned chain of prepared phase shapes. */
+function retainedChains(
+  shape: SharedPhasePlan,
+  parent: RetainedChainNode = retainedChainRoot,
+): RetainedChainNode {
+  let node = parent.children.get(shape);
+  if (node == null) {
+    node = { children: new WeakMap() };
+    parent.children.set(shape, node);
+  }
+  return node;
+}
+
+function buildRetainedPlan(
+  prepared: PreparedPhase,
+  lookahead: readonly PreparedPhase[],
+): RetainedPlan {
+  const futureSubscriptions = new Set<string>();
+  const structuralParentTypes = new Set<string>();
+  const retainedFields: Record<string, string[]> = {};
+  const retainedRoutes: CompiledRouteTemplate[] = [...prepared.compiledRoutes];
+  let futureRetentionCapabilities = 0;
+  const collect = (phase: PreparedPhase) => {
+    for (const plugin of phase.activePlugins) {
+      const plan = phase.plans.get(plugin);
+      for (const type of Object.keys(plan?.children ?? {})) structuralParentTypes.add(type);
+      mergeFieldRequests(retainedFields, plan?.fields ?? {});
+    }
+  };
+  collect(prepared);
+  for (const future of lookahead) {
+    for (const subscription of future.subscriptions) futureSubscriptions.add(subscription);
+    retainedRoutes.push(...future.compiledRoutes);
+    futureRetentionCapabilities |= future.retentionCapabilities;
+    collect(future);
+  }
+  return {
+    futureSubscriptions,
+    futureRetentionCapabilities,
+    retentionManifest: packRouteManifest(
+      retainedRoutes.map((route, id) => ({ ...route, id })),
+      prepared.includeParent,
+      prepared.includeScope,
+      prepared.retentionCapabilities | futureRetentionCapabilities,
+      [...structuralParentTypes],
+      retainedFields,
+    ),
+  };
+}
 
 /** Execute a native pipeline synchronously. */
 export function transform(
@@ -270,7 +333,6 @@ export function transform(
         subscriptions,
         includeParent,
         includeScope,
-        retentionCapabilities,
         compiledRoutes,
         dispatchRoutes,
         manifest,
@@ -305,15 +367,13 @@ export function transform(
           phase: phase.name,
         });
       }
-      const futureSubscriptions = new Set<string>();
-      const futureRetentionRoutes: CompiledRouteTemplate[] = [];
-      const structuralParentTypes = new Set(
-        activePlugins.flatMap(plugin => Object.keys(plans.get(plugin)?.children ?? {})),
-      );
-      const retainedFields: Record<string, string[]> = {};
-      for (const plugin of activePlugins)
-        mergeFieldRequests(retainedFields, plans.get(plugin)?.fields ?? {});
-      let futureRetentionCapabilities = 0;
+      // The retained plan — future subscriptions, retention capabilities, and the
+      // packed retention manifest — is a function of this phase's plan shape and
+      // the shapes of the phases that observe the same source after it. Those
+      // shapes are interned, so the whole derivation is cached on their identity
+      // chain instead of being repacked for every file.
+      const lookahead: PreparedPhase[] = [];
+      let chain = retainedChains(prepared.shared);
       for (let futureIndex = phaseIndex + 1; futureIndex < pipeline.phases.length; futureIndex++) {
         if (phasePlan[futureIndex].requiresPrintedInput) break;
         const futureObservationSource =
@@ -329,16 +389,11 @@ export function transform(
           source: futureObservationSource,
           prepared: futurePrepared,
         });
-        for (const subscription of futurePrepared.subscriptions)
-          futureSubscriptions.add(subscription);
-        futureRetentionRoutes.push(...(futurePrepared.compiledRoutes ?? []));
-        futureRetentionCapabilities |= futurePrepared.retentionCapabilities;
-        for (const plugin of futurePrepared.activePlugins)
-          for (const type of Object.keys(futurePrepared.plans.get(plugin)?.children ?? {}))
-            structuralParentTypes.add(type);
-        for (const plugin of futurePrepared.activePlugins)
-          mergeFieldRequests(retainedFields, futurePrepared.plans.get(plugin)?.fields ?? {});
+        lookahead.push(futurePrepared);
+        chain = retainedChains(futurePrepared.shared, chain);
       }
+      const retained = (chain.plan ??= buildRetainedPlan(prepared, lookahead));
+      const { futureSubscriptions, retentionManifest } = retained;
       const requiresNativeQueries = activePlugins.some(
         plugin => (plans.get(plugin)?.queries?.length ?? 0) > 0,
       );
@@ -361,18 +416,6 @@ export function transform(
         includeScope ||
         options.functionMap === true ||
         futureSubscriptions.size > 0;
-      const retainedRoutes = [...compiledRoutes, ...futureRetentionRoutes].map((route, id) => ({
-        ...route,
-        id,
-      }));
-      const retentionManifest = packRouteManifest(
-        retainedRoutes,
-        includeParent,
-        includeScope,
-        retentionCapabilities | futureRetentionCapabilities,
-        [...structuralParentTypes],
-        retainedFields,
-      );
       const retainedSession = reusableSession;
       const sessionStarted = options.debugPerformance ? performance.now() : 0;
       const session: NativeTransformSession =

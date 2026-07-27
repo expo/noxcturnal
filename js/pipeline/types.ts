@@ -70,9 +70,12 @@ export interface CompiledNestedRoutes {
   capabilities: readonly RouteCapabilities[];
 }
 
-export interface PreparedPhase {
+/** Everything about a prepared phase that depends only on its plan shape.
+ *
+ * Interned per `(phase, plan shape)`, so its object identity is a cache key for
+ * work derived from a sequence of prepared phases. */
+export interface SharedPhasePlan {
   activePlugins: NativePlugin<any, any>[];
-  plans: Map<NativePlugin<any, any>, PreparedPluginPlan>;
   subscriptions: Set<string>;
   fieldRequests: Record<string, string[]>;
   includeParent: boolean;
@@ -81,4 +84,10 @@ export interface PreparedPhase {
   compiledRoutes: readonly CompiledRouteTemplate[];
   dispatchRoutes: readonly DispatchRoute[];
   manifest: Buffer;
+}
+
+export interface PreparedPhase extends SharedPhasePlan {
+  plans: Map<NativePlugin<any, any>, PreparedPluginPlan>;
+  /** Identity of the interned plan shape behind this preparation. */
+  shared: SharedPhasePlan;
 }
