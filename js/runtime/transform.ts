@@ -161,12 +161,16 @@ export function transform(
           performanceCounters(metadata).nativeAndDecodeMs += elapsed;
           const performanceMetadata = metadata.performance as {
             nativeParses: number;
+            nativeSemanticBuilds: number;
+            nativeRenders: number;
             reparses: number;
             renderedBytes: number;
             mappingSegments: number;
             phaseExecutions: unknown[];
           };
-          performanceMetadata.nativeParses++;
+          performanceMetadata.nativeParses += result.parseCount ?? 1;
+          performanceMetadata.nativeSemanticBuilds += result.semanticBuildCount ?? 0;
+          performanceMetadata.nativeRenders += result.renderCount ?? 0;
           if (phaseIndex + 1 < pipeline.phases.length) performanceMetadata.reparses++;
           performanceMetadata.renderedBytes += Buffer.byteLength(result.code ?? '');
           performanceMetadata.mappingSegments += result.map ? decodedSegmentCount(result.map) : 0;
@@ -178,6 +182,9 @@ export function transform(
             reusedParse: false,
             render: result.status === 'complete' ? 'committed' : 'unchanged',
             nativeTransformMs: elapsed,
+            nativeParses: result.parseCount ?? 1,
+            nativeSemanticBuilds: result.semanticBuildCount ?? 0,
+            nativeRenders: result.renderCount ?? 0,
           });
         }
         for (const message of result.diagnostics)

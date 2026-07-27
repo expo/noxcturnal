@@ -7,8 +7,11 @@ use regex_syntax::hir::{Class, HirKind};
 use rustc_hash::FxHashMap;
 
 use crate::edit::{EditCommand, EditKind, MappingPolicy};
+use crate::generated::inline_helpers::{
+    INLINE_REGEXP_NAMED_CAPTURE_HELPER, INLINE_REGEXP_NAMED_CAPTURE_HELPER_RUNTIME,
+};
 
-const NAMED_HELPER: &str = r#"function _noxWrapRegExp(expression,groups){var exec=expression.exec;expression.exec=function(input){var match=exec.call(this,input);if(match){match.groups={};for(var name in groups)match.groups[name]=match[groups[name]]}return match};if(typeof Symbol!="undefined"&&Symbol.replace){expression[Symbol.replace]=function(input,replacement){if(typeof replacement==="string")replacement=replacement.replace(/\$<([^>]+)>/g,function(_,name){return "$"+groups[name]});return RegExp.prototype[Symbol.replace].call(this,input,replacement)}}return expression}"#;
+const NAMED_CAPTURE_PLACEHOLDER: &str = "__BABEL_GENERATED_REGEXP_NAMED_CAPTURE_HELPER__";
 
 pub(super) fn edits(
     source: &str,
@@ -17,7 +20,10 @@ pub(super) fn edits(
     unicode_properties: bool,
     dot_all: bool,
     named_groups: bool,
+    inline_helpers: bool,
 ) -> Result<Option<Vec<EditCommand>>, &'static str> {
+    let named_helper = reserve_source_name("_wrapRegExp", source);
+    let named_runtime = reserve_source_name("_wrapRegExp2", source);
     let mut edits = Vec::new();
     let mut needs_named_helper = false;
     for node in semantic.nodes().iter() {
@@ -66,7 +72,7 @@ pub(super) fn edits(
                 .map(|(name, index)| format!("{name:?}:{index}"))
                 .collect::<Vec<_>>()
                 .join(",");
-            format!("_noxWrapRegExp({expression},{{{entries}}})")
+            format!("{NAMED_CAPTURE_PLACEHOLDER}({expression},{{{entries}}})")
         } else {
             expression
         };
@@ -76,6 +82,11 @@ pub(super) fn edits(
         return Ok(None);
     }
     if needs_named_helper {
+        let helper = if inline_helpers {
+            INLINE_REGEXP_NAMED_CAPTURE_HELPER
+        } else {
+            INLINE_REGEXP_NAMED_CAPTURE_HELPER_RUNTIME
+        };
         let insertion = semantic
             .nodes()
             .iter()
@@ -89,9 +100,33 @@ pub(super) fn edits(
                 _ => None,
             })
             .unwrap_or(0);
-        edits.push(insert(insertion, NAMED_HELPER.to_owned()));
+        edits.push(insert(
+            insertion,
+            helper
+                .replace("_wrapRegExp2", "__BABEL_WRAP_REGEXP_RUNTIME__")
+                .replace("_wrapRegExp", &named_helper)
+                .replace("__BABEL_WRAP_REGEXP_RUNTIME__", &named_runtime),
+        ));
+    }
+    for edit in &mut edits {
+        if let Some(content) = &mut edit.content {
+            *content = content.replace(NAMED_CAPTURE_PLACEHOLDER, &named_helper);
+        }
     }
     Ok(Some(edits))
+}
+
+fn reserve_source_name(base: &str, source: &str) -> String {
+    if !source.contains(base) {
+        return base.to_owned();
+    }
+    for suffix in 2.. {
+        let candidate = format!("{base}{suffix}");
+        if !source.contains(&candidate) {
+            return candidate;
+        }
+    }
+    unreachable!()
 }
 
 fn lower_unicode_properties(pattern: &str) -> Result<String, &'static str> {

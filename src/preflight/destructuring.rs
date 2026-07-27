@@ -7,23 +7,37 @@ use oxc_span::{GetSpan, Span};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::edit::{EditCommand, EditKind, MappingPolicy};
+use crate::generated::inline_helpers::{
+    INLINE_DESTRUCTURING_ITER_HELPER, INLINE_DESTRUCTURING_ITER_HELPER_RUNTIME,
+    INLINE_DESTRUCTURING_LOOSE_REST_HELPER, INLINE_DESTRUCTURING_LOOSE_REST_HELPER_RUNTIME,
+    INLINE_DESTRUCTURING_OBJECT_HELPER, INLINE_DESTRUCTURING_OBJECT_HELPER_RUNTIME,
+    INLINE_DESTRUCTURING_REST_HELPER, INLINE_DESTRUCTURING_REST_HELPER_RUNTIME,
+};
 
-const ITER_HELPER: &str = r#"function _noxIter(value,count,all){if(Array.isArray(value))return all?value.slice():value;var method=value!=null&&(typeof Symbol!="undefined"&&value[Symbol.iterator]||value["@@iterator"]);if(method==null)throw new TypeError("Invalid attempt to destructure non-iterable instance.");var iterator=method.call(value),result=[],step,error;try{while((all||result.length<count)&&!(step=iterator.next()).done)result.push(step.value)}catch(e){error=e}finally{try{if(step&&!step.done&&iterator.return!=null)iterator.return()}finally{if(error)throw error}}return result}"#;
-const OBJECT_HELPER: &str = r#"function _noxObj(value){if(value==null)throw new TypeError("Cannot destructure "+value);return value}"#;
-const REST_HELPER: &str = r#"function _noxRest(source,excluded){source=_noxObj(source);var target={};for(var key in source)if(Object.prototype.hasOwnProperty.call(source,key)&&excluded.indexOf(key)<0)target[key]=source[key];if(Object.getOwnPropertySymbols)for(var symbols=Object.getOwnPropertySymbols(source),i=0;i<symbols.length;i++){key=symbols[i];if(excluded.indexOf(key)<0&&Object.prototype.propertyIsEnumerable.call(source,key))target[key]=source[key]}return target}"#;
-const LOOSE_REST_HELPER: &str = r#"function _noxRest(source,excluded){source=_noxObj(source);var target={};for(var key in source)if(Object.prototype.hasOwnProperty.call(source,key)&&excluded.indexOf(key)<0)target[key]=source[key];return target}"#;
+const ITER_PLACEHOLDER: &str = "__BABEL_GENERATED_ITER_HELPER__";
+const OBJECT_PLACEHOLDER: &str = "__BABEL_GENERATED_OBJECT_HELPER__";
+const REST_PLACEHOLDER: &str = "__BABEL_GENERATED_REST_HELPER__";
 
 pub(super) fn edits(
     source: &str,
     semantic: &Semantic<'_>,
     object_rest_loose: bool,
     only_object_rest: bool,
+    inline_helpers: bool,
 ) -> Result<Option<Vec<EditCommand>>, &'static str> {
     let mut reserved: FxHashSet<String> = semantic
         .scoping()
         .symbol_names()
         .map(str::to_owned)
         .collect();
+    let helper_names = HelperNames {
+        iter: reserve("_toArray", &mut reserved),
+        iter_runtime: reserve("_toArray2", &mut reserved),
+        object: reserve("_objectDestructuringEmpty", &mut reserved),
+        object_runtime: reserve("_objectDestructuringEmpty2", &mut reserved),
+        rest: reserve("_objectWithoutProperties", &mut reserved),
+        rest_runtime: reserve("_objectWithoutProperties2", &mut reserved),
+    };
     let mut edits = Vec::new();
     let mut temporary_declarations: FxHashMap<u32, Vec<String>> = FxHashMap::default();
     let mut used_helpers = false;
@@ -138,22 +152,81 @@ pub(super) fn edits(
             .filter_map(|edit| edit.content.as_deref())
             .collect::<String>();
         let mut helpers = String::new();
-        if generated.contains("_noxIter(") {
-            helpers.push_str(ITER_HELPER);
-        }
-        if generated.contains("_noxObj(") {
-            helpers.push_str(OBJECT_HELPER);
-        }
-        if generated.contains("_noxRest(") {
-            helpers.push_str(if object_rest_loose {
-                LOOSE_REST_HELPER
+        if generated.contains(ITER_PLACEHOLDER) {
+            let helper = if inline_helpers {
+                INLINE_DESTRUCTURING_ITER_HELPER
             } else {
-                REST_HELPER
-            });
+                INLINE_DESTRUCTURING_ITER_HELPER_RUNTIME
+            };
+            helpers.push_str(
+                &helper
+                    .replace("_toArray2", "__BABEL_TO_ARRAY_RUNTIME__")
+                    .replace("_toArray", &helper_names.iter)
+                    .replace("__BABEL_TO_ARRAY_RUNTIME__", &helper_names.iter_runtime),
+            );
+        }
+        if generated.contains(OBJECT_PLACEHOLDER) {
+            let helper = if inline_helpers {
+                INLINE_DESTRUCTURING_OBJECT_HELPER
+            } else {
+                INLINE_DESTRUCTURING_OBJECT_HELPER_RUNTIME
+            };
+            helpers.push_str(
+                &helper
+                    .replace(
+                        "_objectDestructuringEmpty2",
+                        "__BABEL_OBJECT_DESTRUCTURING_EMPTY_RUNTIME__",
+                    )
+                    .replace("_objectDestructuringEmpty", &helper_names.object)
+                    .replace(
+                        "__BABEL_OBJECT_DESTRUCTURING_EMPTY_RUNTIME__",
+                        &helper_names.object_runtime,
+                    ),
+            );
+        }
+        if generated.contains(REST_PLACEHOLDER) {
+            let helper = if object_rest_loose && inline_helpers {
+                INLINE_DESTRUCTURING_LOOSE_REST_HELPER
+            } else if object_rest_loose {
+                INLINE_DESTRUCTURING_LOOSE_REST_HELPER_RUNTIME
+            } else if inline_helpers {
+                INLINE_DESTRUCTURING_REST_HELPER
+            } else {
+                INLINE_DESTRUCTURING_REST_HELPER_RUNTIME
+            };
+            helpers.push_str(
+                &helper
+                    .replace(
+                        "_objectWithoutProperties2",
+                        "__BABEL_OBJECT_WITHOUT_PROPERTIES_RUNTIME__",
+                    )
+                    .replace("_objectWithoutProperties", &helper_names.rest)
+                    .replace(
+                        "__BABEL_OBJECT_WITHOUT_PROPERTIES_RUNTIME__",
+                        &helper_names.rest_runtime,
+                    ),
+            );
         }
         edits.push(insert(helper_position, helpers));
     }
+    for edit in &mut edits {
+        if let Some(content) = &mut edit.content {
+            *content = content
+                .replace(ITER_PLACEHOLDER, &helper_names.iter)
+                .replace(OBJECT_PLACEHOLDER, &helper_names.object)
+                .replace(REST_PLACEHOLDER, &helper_names.rest);
+        }
+    }
     Ok(Some(edits))
+}
+
+struct HelperNames {
+    iter: String,
+    iter_runtime: String,
+    object: String,
+    object_runtime: String,
+    rest: String,
+    rest_runtime: String,
 }
 
 fn binding_has_object_rest(pattern: &BindingPattern<'_>) -> bool {
@@ -234,7 +307,7 @@ fn emit_assignment(
             *used_helpers = true;
             let array = reserve("_arr", reserved);
             out.push(format!(
-                "{array}=_noxIter({value},{},{})",
+                "{array}={ITER_PLACEHOLDER}({value},{},{})",
                 pattern.elements.len(),
                 pattern.rest.is_some()
             ));
@@ -265,7 +338,7 @@ fn emit_assignment(
             use oxc_ast::ast::AssignmentTargetProperty;
             *used_helpers = true;
             let object = reserve("_obj", reserved);
-            out.push(format!("{object}=_noxObj({value})"));
+            out.push(format!("{object}={OBJECT_PLACEHOLDER}({value})"));
             let mut excluded = Vec::new();
             for property in &pattern.properties {
                 match property {
@@ -308,7 +381,7 @@ fn emit_assignment(
                 emit_assignment(
                     source,
                     &rest.target,
-                    format!("_noxRest({object},[{}])", excluded.join(",")),
+                    format!("{REST_PLACEHOLDER}({object},[{}])", excluded.join(",")),
                     out,
                     reserved,
                     used_helpers,
@@ -412,7 +485,7 @@ fn emit_binding(
             let array = reserve("_arr", reserved);
             let all = pattern.rest.is_some();
             out.push(format!(
-                "{array}=_noxIter({value},{},{all})",
+                "{array}={ITER_PLACEHOLDER}({value},{},{all})",
                 pattern.elements.len()
             ));
             for (index, element) in pattern.elements.iter().enumerate() {
@@ -455,7 +528,7 @@ fn emit_object(
 ) -> Result<(), &'static str> {
     *used_helpers = true;
     let object = reserve("_obj", reserved);
-    out.push(format!("{object}=_noxObj({value})"));
+    out.push(format!("{object}={OBJECT_PLACEHOLDER}({value})"));
     let mut excluded = Vec::new();
     for property in &pattern.properties {
         let (access, exclusion) = if property.computed {
@@ -472,7 +545,7 @@ fn emit_object(
         emit_binding(
             source,
             &rest.argument,
-            format!("_noxRest({object},[{}])", excluded.join(",")),
+            format!("{REST_PLACEHOLDER}({object},[{}])", excluded.join(",")),
             out,
             reserved,
             used_helpers,

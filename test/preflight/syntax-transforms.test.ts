@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
 
 import { originalPositionFor, TraceMap } from '@jridgewell/trace-mapping';
 import { expect, test } from 'vitest';
@@ -12,7 +13,7 @@ const pipeline = (
   helpers: { mode: 'runtime'; moduleName: string; version: string } = {
     mode: 'runtime',
     moduleName: '@babel/runtime',
-    version: '7.29.2',
+    version: '7.29.7',
   },
 ) =>
   defineNativePipeline({
@@ -23,6 +24,8 @@ const pipeline = (
       },
     ],
   });
+
+const runtimeRequire = createRequire(import.meta.url);
 
 type TransformName = (typeof NATIVE_TRANSFORM_NAMES)[number];
 
@@ -118,7 +121,7 @@ test('classStaticBlock lowers independently with explicit compact/comment postur
   assert.match(result.code, /field=2/);
   assert.match(result.code, /#private=3/);
   const context: { answer?: number; fields?: number } = {};
-  new Function('globalThis', result.code)(context);
+  new Function('globalThis', 'require', result.code)(context, runtimeRequire);
   assert.equal(context.answer, 42);
   assert.equal(context.fields, 5);
 });
@@ -150,8 +153,39 @@ test('private toggles lower owned classes without lowering unrelated class synta
   assert.match(result.code, /class Unrelated\{field=1\}/);
   assert.doesNotMatch(result.code, /#(?:field|method)/);
   const context: { answer?: unknown } = {};
-  new Function('globalThis', result.code)(context);
+  new Function('globalThis', 'require', result.code)(context, runtimeRequire);
   assert.deepEqual(context.answer, [[5, true], [5, false], 1, 4]);
+});
+
+test('classProperties rejects pinned Oxc private-method and private-in fusion bugs', () => {
+  for (const [source, reason] of [
+    [
+      'class Value { #method() { return 1 } read() { return this.#method() } }',
+      'oxc-class-properties-private-method-fusion',
+    ],
+    [
+      'class Value { #field; has(value) { return #field in value } }',
+      'oxc-class-properties-private-in-fusion',
+    ],
+  ]) {
+    const result = transform(source, 'fixture.js', pipeline({ classProperties: { loose: true } }));
+    assert.equal(result.status, 'bailout');
+    assert.equal(result.reason, `syntax:${reason}`);
+    assert.equal(result.source, source);
+  }
+
+  const repaired = transform(
+    'class Value { #method() { return 1 } read() { return this.#method() } } globalThis.result = new Value().read();',
+    'fixture.js',
+    pipeline({
+      classProperties: { loose: true },
+      privateMethods: { loose: true },
+    }),
+  );
+  assert.equal(repaired.status, 'complete');
+  const context: { result?: unknown } = {};
+  new Function('globalThis', 'require', repaired.code)(context, runtimeRequire);
+  assert.equal(context.result, 1);
 });
 
 test('spec private feature options retain a structured semantic boundary', () => {
@@ -192,8 +226,30 @@ test('native classes lower loose private fields, methods, calls, access, and pri
   assert.equal(result.status, 'complete');
   assert.doesNotMatch(result.code, /#(?:value|double)/);
   const context: { answer?: unknown } = {};
-  new Function('globalThis', result.code)(context);
+  new Function('globalThis', 'require', result.code)(context, runtimeRequire);
   assert.deepEqual(context.answer, [6, true, false]);
+});
+
+test('native class helpers avoid source binding collisions', () => {
+  const source =
+    'var _construct=1,_construct2=2,_get=3,_get2=4,_classPrivateFieldLooseBase=5,_classPrivateMethodCall=6,_classPrivateFieldLooseBase2=7;class Base{value(){return 8}}class Value extends Base{#value(){return 9}privateValue(){return this.#value()}superValue(){return super.value()}bindings(){return [_construct,_construct2,_get,_get2,_classPrivateFieldLooseBase,_classPrivateMethodCall,_classPrivateFieldLooseBase2]}}var instance=new Value;globalThis.result=[instance.privateValue(),instance.superValue(),instance.bindings()];';
+  const result = transform(
+    source,
+    'fixture.js',
+    pipeline({
+      classes: true,
+      privateMethods: { loose: true },
+      privatePropertyInObject: { loose: true },
+    }),
+  );
+  assert.equal(result.status, 'complete');
+  const context: { result?: unknown } = {};
+  new Function('globalThis', 'require', result.code)(context, runtimeRequire);
+  assert.deepEqual(context.result, [9, 8, [1, 2, 3, 4, 5, 6, 7]]);
+  assert.match(
+    result.code,
+    /_construct\d+|_classPrivateFieldLooseBase\d+|_classPrivateMethodCall\d+|_get\d+/,
+  );
 });
 
 test('language transforms are selected independently rather than as a target group', () => {
@@ -271,7 +327,7 @@ test('native classes preserve methods, accessors, computed keys, expressions, an
   assert.equal(result.status, 'complete');
   assert.doesNotMatch(result.code, /\bclass\s+(?:Base|Derived|Named)\b/);
   const context: { answer?: unknown } = {};
-  new Function('globalThis', result.code)(context);
+  new Function('globalThis', 'require', result.code)(context, runtimeRequire);
   assert.deepEqual(context.answer, [
     4,
     8,
@@ -315,7 +371,7 @@ test('native for-of preserves iterable closing, control flow, nesting, and destr
   assert.equal(result.status, 'complete');
   assert.doesNotMatch(result.code, /\bof\b/);
   const context: { answer?: unknown } = {};
-  new Function('globalThis', result.code)(context);
+  new Function('globalThis', 'require', result.code)(context, runtimeRequire);
   assert.deepEqual(context.answer, [[2], 1, []]);
 });
 
@@ -339,9 +395,27 @@ test('native destructuring preserves getters, iterators, defaults, rest, nesting
   assert.equal(result.status, 'complete');
   assert.doesNotMatch(result.code, /var\s*[{[]|catch\s*\(\s*{/);
   const context: { answer?: unknown; caught?: string } = {};
-  new Function('globalThis', result.code)(context);
+  new Function('globalThis', 'require', result.code)(context, runtimeRequire);
   assert.deepEqual(context.answer, [3, 4, 5, 6, 1, true, 8, [9, 10], [8, 9, 10]]);
   assert.equal(context.caught, 'ok');
+});
+
+test('native destructuring helpers avoid source binding collisions', () => {
+  const source =
+    'var _toArray=1,_toArray2=2,_objectDestructuringEmpty=3,_objectDestructuringEmpty2=4,_objectWithoutProperties=5,_objectWithoutProperties2=6;var [first]=[7];var {value,...rest}={value:8,other:9};globalThis.result=[_toArray,_toArray2,_objectDestructuringEmpty,_objectDestructuringEmpty2,_objectWithoutProperties,_objectWithoutProperties2,first,value,rest.other];';
+  const result = transform(
+    source,
+    'fixture.js',
+    pipeline({
+      destructuring: { useBuiltIns: true },
+      objectRestSpread: { loose: false, useBuiltIns: false },
+    }),
+  );
+  assert.equal(result.status, 'complete');
+  const context: { result?: unknown } = {};
+  new Function('globalThis', 'require', result.code)(context, runtimeRequire);
+  assert.deepEqual(context.result, [1, 2, 3, 4, 5, 6, 7, 8, 9]);
+  assert.match(result.code, /_toArray\d+|_objectWithoutProperties\d+/);
 });
 
 test('native parameters preserve defaults, rest, destructuring, length, and mappings', () => {
@@ -548,7 +622,7 @@ test('loose built-in object rest/spread lowers through the focused native pass',
   assert.equal(result.status, 'complete');
   assert.doesNotMatch(result.code, /\.\.\./);
   const context: { result?: unknown } = {};
-  new Function('globalThis', result.code)(context);
+  new Function('globalThis', 'require', result.code)(context, runtimeRequire);
   assert.deepEqual(context.result, [2, 3, undefined, 4, 1, 1, 5]);
 });
 
@@ -582,7 +656,7 @@ test('inline object and class helpers preserve symbols, getters, and field defin
     'objectWithoutProperties',
   ]);
   const context: { result?: unknown } = {};
-  new Function('globalThis', result.code)(context);
+  new Function('globalThis', 'require', result.code)(context, runtimeRequire);
   assert.deepEqual(context.result, [2, 1, 3, 4]);
 });
 
@@ -612,7 +686,7 @@ test('regexp toggles reject Oxc constructor-only output that is not Babel loweri
 
 test('native regexp lowering preserves dotAll and named capture behavior', () => {
   const source =
-    'var expression=/(?<word>a).\\k<word>/s;var match=expression.exec("a\\na");globalThis.result=[match&&match[0],match&&match.groups.word,"a\\na".replace(expression,"$<word>!"),/😀+/u.test("😀😀"),/\\u{1F600}/u.test("😀"),/^.$/u.test("😀"),/^.$/u.test("\\n"),/\\p{ASCII}/u.test("A"),/\\p{Script=Greek}/u.test("λ"),/\\p{Letter}/u.test("𐐀"),/\\P{ASCII}/u.test("λ")];';
+    'var expression=/(?<word>a).\\k<word>/s;var match=expression.exec("a\\na");var replaced="a\\na".replace(expression,function(_,word,offset,input,groups){return groups.word+":"+word+":"+offset+":"+input});globalThis.result=[match&&match[0],match&&match.groups.word,"a\\na".replace(expression,"$<word>!"),replaced,/😀+/u.test("😀😀"),/\\u{1F600}/u.test("😀"),/^.$/u.test("😀"),/^.$/u.test("\\n"),/\\p{ASCII}/u.test("A"),/\\p{Script=Greek}/u.test("λ"),/\\p{Letter}/u.test("𐐀"),/\\P{ASCII}/u.test("λ")];';
   const result = transform(
     source,
     'fixture.js',
@@ -627,11 +701,12 @@ test('native regexp lowering preserves dotAll and named capture behavior', () =>
   assert.doesNotMatch(result.code, /\(\?<word>/);
   assert.match(result.code, /\[\^\]/);
   const context: { result?: unknown } = {};
-  new Function('globalThis', result.code)(context);
+  new Function('globalThis', 'require', result.code)(context, runtimeRequire);
   assert.deepEqual(context.result, [
     'a\na',
     'a',
     'a!',
+    'a:a:0:a\na',
     true,
     true,
     true,
@@ -641,6 +716,19 @@ test('native regexp lowering preserves dotAll and named capture behavior', () =>
     true,
     true,
   ]);
+});
+
+test('native regexp helpers avoid source binding collisions', () => {
+  const result = transform(
+    'var _wrapRegExp=1,_wrapRegExp2=2;var match=/(?<value>a)/.exec("a");globalThis.result=[_wrapRegExp,_wrapRegExp2,match.groups.value];',
+    'fixture.js',
+    pipeline({ regexpNamedCaptureGroups: true }),
+  );
+  assert.equal(result.status, 'complete');
+  const context: { result?: unknown } = {};
+  new Function('globalThis', 'require', result.code)(context, runtimeRequire);
+  assert.deepEqual(context.result, [1, 2, 'a']);
+  assert.match(result.code, /_wrapRegExp\d+/);
 });
 
 test('regexp semantic boundaries only reject syntax owned by the selected toggle', () => {
@@ -790,7 +878,8 @@ test('async-generator helper requirements and unavailable block scoping are stru
     }),
   );
   assert.equal(inline.status, 'complete');
-  assert.doesNotMatch(inline.code, /require\(|babelHelpers|regeneratorRuntime/);
+  assert.doesNotMatch(inline.code, /require\(|regeneratorRuntime/);
+  assert.match(inline.code, /var babelHelpers=/);
   const iterator = new Function(
     `${inline.code}; return iterable.values([2]);`,
   )() as AsyncIterator<number>;
@@ -812,7 +901,7 @@ test('async-generator helper requirements and unavailable block scoping are stru
   });
 
   const collision = transform(
-    'var _noxHelpers = 7; var iterable = { async *values() { yield _noxHelpers; } };',
+    'var babelHelpers = 7; var iterable = { async *values() { yield babelHelpers; } };',
     'fixture.js',
     defineNativePipeline({
       phases: [
@@ -829,7 +918,7 @@ test('async-generator helper requirements and unavailable block scoping are stru
     }),
   );
   assert.equal(collision.status, 'complete');
-  assert.match(collision.code, /var _noxHelpers2=/);
+  assert.match(collision.code, /var babelHelpers2=/);
   const collisionIterator = new Function(
     `${collision.code}; return iterable.values();`,
   )() as AsyncIterator<number>;
@@ -842,6 +931,40 @@ test('async-generator helper requirements and unavailable block scoping are stru
   );
   assert.equal(blockScoping.status, 'complete');
   assert.match(blockScoping.code, /var value\s*=\s*1/);
+});
+
+test('focused runtime adapters expose and validate canonical Babel dependencies', () => {
+  const current = transform(
+    'var [value] = input;',
+    'fixture.js',
+    pipeline(
+      { destructuring: { useBuiltIns: true } },
+      {
+        mode: 'runtime',
+        moduleName: '@babel/runtime',
+        version: '7.29.7',
+      },
+    ),
+  );
+  assert.equal(current.status, 'complete');
+  assert.match(current.code, /require\("@babel\/runtime\/helpers\/slicedToArray"\)/);
+  assert.match(current.code, /require\("@babel\/runtime\/helpers\/toArray"\)/);
+  assert.deepEqual(current.metadata.nativeHelpers, ['slicedToArray', 'toArray']);
+
+  const old = transform(
+    'var [value] = input;',
+    'fixture.js',
+    pipeline(
+      { destructuring: { useBuiltIns: true } },
+      {
+        mode: 'runtime',
+        moduleName: '@babel/runtime',
+        version: '6.0.0',
+      },
+    ),
+  );
+  assert.equal(old.status, 'bailout');
+  assert.match(old.reason, /helper-runtime-too-old/);
 });
 
 test('native block scoping renames colliding lexical bindings', () => {
@@ -890,6 +1013,18 @@ test('native block scoping preserves captured loop bindings and relocated mappin
       name: null,
     },
   );
+});
+
+test('native block scoping preserves loop bindings captured by deferred class fields', () => {
+  const result = transform(
+    'var classes=[];for(let value of [1,2,3]){classes.push(class { field=value })}globalThis.result=classes.map(Value=>new Value().field);',
+    'fixture.js',
+    pipeline({ blockScoping: true }),
+  );
+  assert.equal(result.status, 'complete');
+  const context: { result?: number[] } = {};
+  new Function('globalThis', 'require', result.code)(context, runtimeRequire);
+  assert.deepEqual(context.result, [1, 2, 3]);
 });
 
 test('native captured-loop lowering preserves nested loops and abrupt control flow', () => {

@@ -34,10 +34,12 @@ exports[`every public native transform has an explicit ownership fixture 2`] = `
 
 exports[`every public native transform has an explicit ownership fixture 3`] = `
 {
-  "code": "function _noxObj(value){if(value==null)throw new TypeError(\`Cannot destructure \`+value);return value}var _ref=input,_obj=_noxObj(_ref),value=_obj.value;",
-  "helpers": [],
+  "code": "var _objectDestructuringEmpty2={objectDestructuringEmpty:require("@babel/runtime/helpers/objectDestructuringEmpty")};function _objectDestructuringEmpty(t){return _objectDestructuringEmpty2.objectDestructuringEmpty(t),t}var _ref=input,_obj=_objectDestructuringEmpty(_ref),value=_obj.value;",
+  "helpers": [
+    "objectDestructuringEmpty",
+  ],
   "map": {
-    "mappings": "AAAA,SAAS,QAAQ,MAAM,CAAC,GAAG,OAAO,KAAK,MAAM,IAAI,UAAU,sBAAsB,KAAK,EAAE,OAAO,KAAK,CAApG,IAAI,KAAK,MAAM,KAAK,QAAQ,IAAI,EAAE,MAAM,KAAK;;",
+    "mappings": "AAAA,IAAI,2BAA2B,CAAC,yBAAyB,QAAQ,iDAAiD,CAAC,EAAE,SAAS,0BAA0B,EAAE,CAAC,OAAO,2BAA2B,yBAAyB,CAAC,EAAE,CAAC,CAA1N,IAAI,KAAK,MAAM,KAAK,0BAA0B,IAAI,EAAE,MAAM,KAAK;;",
     "names": [],
   },
   "name": "destructuring",
@@ -291,10 +293,12 @@ exports[`every public native transform has an explicit ownership fixture 17`] = 
 
 exports[`every public native transform has an explicit ownership fixture 18`] = `
 {
-  "code": "var Value=(()=>{"use strict";function _noxPrivateBase(receiver,key){if(!Object.prototype.hasOwnProperty.call(Object(receiver),key))throw new TypeError(\`attempted to use private field on non-instance\`);return receiver}function _noxPrivateCall(receiver,key,args){return _noxPrivateBase(receiver,key)[key].apply(receiver,args)}var _read=\`__private_Value_read\`;function Value(){if(!(this instanceof Value))throw new TypeError(\`Cannot call a class as a function\`);Object.defineProperty(this,_read,{value:function(){}})}return Value})();",
-  "helpers": [],
+  "code": "var Value=(()=>{"use strict";var _classPrivateFieldLooseBase2={classPrivateFieldLooseBase:require("@babel/runtime/helpers/classPrivateFieldLooseBase")};function _classPrivateFieldLooseBase(e,s){return _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e,s)}function _classPrivateMethodCall(e,s,a){return _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e,s)[s].apply(e,a)}var _read=\`__private_Value_read\`;function Value(){if(!(this instanceof Value))throw new TypeError(\`Cannot call a class as a function\`);Object.defineProperty(this,_read,{value:function(){}})}return Value})();",
+  "helpers": [
+    "classPrivateFieldLooseBase",
+  ],
   "map": {
-    "mappings": "AAAA,IAAI,WAAW,CAAC,aAAa,SAAS,gBAAgB,SAAS,IAAI,CAAC,GAAG,CAAC,OAAO,UAAU,eAAe,KAAK,OAAO,QAAQ,EAAE,GAAG,EAAE,MAAM,IAAI,UAAU,gDAAgD,EAAE,OAAO,QAAQ,CAAC,SAAS,gBAAgB,SAAS,IAAI,KAAK,CAAC,OAAO,gBAAgB,SAAS,GAAG,CAAC,CAAC,IAAI,CAAC,MAAM,SAAS,IAAI,CAAC,CAAC,IAAI,MAAM,uBAAuB,SAAS,OAAO,CAAC,GAAG,EAAE,gBAAgB,OAAO,MAAM,IAAI,UAAU,mCAAmC,EAAE,OAAO,eAAe,KAAK,MAAM,CAAC,MAAM,UAAU,CAAC,CAAC,CAAC,CAAE,CAAC,OAAO,KAAK,EAAC,AAAC,CAAC;;",
+    "mappings": "AAAA,IAAI,WAAW,CAAC,aAAa,IAAI,6BAA6B,CAAC,2BAA2B,QAAQ,mDAAmD,CAAC,EAAE,SAAS,4BAA4B,EAAE,EAAE,CAAC,OAAO,6BAA6B,2BAA2B,EAAE,CAAC,CAAC,CAAC,SAAS,wBAAwB,EAAE,EAAE,EAAE,CAAC,OAAO,6BAA6B,2BAA2B,EAAE,CAAC,CAAC,CAAC,EAAE,CAAC,MAAM,EAAE,CAAC,CAAC,CAAC,IAAI,MAAM,uBAAuB,SAAS,OAAO,CAAC,GAAG,EAAE,gBAAgB,OAAO,MAAM,IAAI,UAAU,mCAAmC,EAAE,OAAO,eAAe,KAAK,MAAM,CAAC,MAAM,UAAU,CAAC,CAAC,CAAC,CAAE,CAAC,OAAO,KAAK,EAAC,AAAC,CAAC;;",
     "names": [],
   },
   "name": "privateMethods",
@@ -309,10 +313,12 @@ exports[`every public native transform has an explicit ownership fixture 18`] = 
 
 exports[`every public native transform has an explicit ownership fixture 19`] = `
 {
-  "code": "var Value=(()=>{"use strict";function _noxPrivateBase(receiver,key){if(!Object.prototype.hasOwnProperty.call(Object(receiver),key))throw new TypeError(\`attempted to use private field on non-instance\`);return receiver}function _noxPrivateCall(receiver,key,args){return _noxPrivateBase(receiver,key)[key].apply(receiver,args)}var _field=\`__private_Value_field\`;function Value(){if(!(this instanceof Value))throw new TypeError(\`Cannot call a class as a function\`);Object.defineProperty(this,_field,{writable:true,value:void 0})}Object.defineProperty(Value.prototype,"has",{value:function(input){return Object.prototype.hasOwnProperty.call(input,_field)},writable:true,configurable:true});return Value})();",
-  "helpers": [],
+  "code": "var Value=(()=>{"use strict";var _classPrivateFieldLooseBase2={classPrivateFieldLooseBase:require("@babel/runtime/helpers/classPrivateFieldLooseBase")};function _classPrivateFieldLooseBase(e,s){return _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e,s)}function _classPrivateMethodCall(e,s,a){return _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e,s)[s].apply(e,a)}var _field=\`__private_Value_field\`;function Value(){if(!(this instanceof Value))throw new TypeError(\`Cannot call a class as a function\`);Object.defineProperty(this,_field,{writable:true,value:void 0})}Object.defineProperty(Value.prototype,"has",{value:function(input){return Object.prototype.hasOwnProperty.call(input,_field)},writable:true,configurable:true});return Value})();",
+  "helpers": [
+    "classPrivateFieldLooseBase",
+  ],
   "map": {
-    "mappings": "AAAA,IAAI,WAAW,CAAC,aAAa,SAAS,gBAAgB,SAAS,IAAI,CAAC,GAAG,CAAC,OAAO,UAAU,eAAe,KAAK,OAAO,QAAQ,EAAE,GAAG,EAAE,MAAM,IAAI,UAAU,gDAAgD,EAAE,OAAO,QAAQ,CAAC,SAAS,gBAAgB,SAAS,IAAI,KAAK,CAAC,OAAO,gBAAgB,SAAS,GAAG,CAAC,CAAC,IAAI,CAAC,MAAM,SAAS,IAAI,CAAC,CAAC,IAAI,OAAO,wBAAwB,SAAS,OAAO,CAAC,GAAG,EAAE,gBAAgB,OAAO,MAAM,IAAI,UAAU,mCAAmC,EAAE,OAAO,eAAe,KAAK,OAAO,CAAC,SAAS,KAAK,MAAM,IAAK,EAAC,CAAC,CAAE,CAAC,OAAO,eAAe,MAAM,UAAU,MAAM,CAAC,MAAM,SAAS,MAAM,CAAE,OAAO,OAAO,UAAU,eAAe,KAAK,MAAO,MAAM,CAAG,EAAE,SAAS,KAAK,aAAa,IAAI,CAAC,EAAE,OAAO,KAAK,EAAC,AAAC,CAAC;;",
+    "mappings": "AAAA,IAAI,WAAW,CAAC,aAAa,IAAI,6BAA6B,CAAC,2BAA2B,QAAQ,mDAAmD,CAAC,EAAE,SAAS,4BAA4B,EAAE,EAAE,CAAC,OAAO,6BAA6B,2BAA2B,EAAE,CAAC,CAAC,CAAC,SAAS,wBAAwB,EAAE,EAAE,EAAE,CAAC,OAAO,6BAA6B,2BAA2B,EAAE,CAAC,CAAC,CAAC,EAAE,CAAC,MAAM,EAAE,CAAC,CAAC,CAAC,IAAI,OAAO,wBAAwB,SAAS,OAAO,CAAC,GAAG,EAAE,gBAAgB,OAAO,MAAM,IAAI,UAAU,mCAAmC,EAAE,OAAO,eAAe,KAAK,OAAO,CAAC,SAAS,KAAK,MAAM,IAAK,EAAC,CAAC,CAAE,CAAC,OAAO,eAAe,MAAM,UAAU,MAAM,CAAC,MAAM,SAAS,MAAM,CAAE,OAAO,OAAO,UAAU,eAAe,KAAK,MAAO,MAAM,CAAG,EAAE,SAAS,KAAK,aAAa,IAAI,CAAC,EAAE,OAAO,KAAK,EAAC,AAAC,CAAC;;",
     "names": [],
   },
   "name": "privatePropertyInObject",
@@ -391,10 +397,12 @@ exports[`every public native transform has an explicit ownership fixture 23`] = 
 
 exports[`every public native transform has an explicit ownership fixture 24`] = `
 {
-  "code": "function _noxWrapRegExp(expression,groups){var exec=expression.exec;expression.exec=function(input){var match=exec.call(this,input);if(match){match.groups={};for(var name in groups)match.groups[name]=match[groups[name]]}return match};if(typeof Symbol!=\`undefined\`&&Symbol.replace){expression[Symbol.replace]=function(input,replacement){if(typeof replacement===\`string\`)replacement=replacement.replace(/\\$<([^>]+)>/g,function(_,name){return\`$\`+groups[name]});return RegExp.prototype[Symbol.replace].call(this,input,replacement)}}return expression}var value=_noxWrapRegExp(/(a)/,{"value":1});",
-  "helpers": [],
+  "code": "var _wrapRegExp2={wrapRegExp:require("@babel/runtime/helpers/wrapRegExp")},_wrapRegExp=_wrapRegExp2.wrapRegExp;var value=_wrapRegExp(/(a)/,{"value":1});",
+  "helpers": [
+    "wrapRegExp",
+  ],
   "map": {
-    "mappings": "AAAA,SAAS,eAAe,WAAW,OAAO,CAAC,IAAI,KAAK,WAAW,KAAK,WAAW,KAAK,SAAS,MAAM,CAAC,IAAI,MAAM,KAAK,KAAK,KAAK,KAAK,EAAE,GAAG,MAAM,CAAC,MAAM,OAAO,CAAC,EAAE,IAAI,IAAI,QAAQ,OAAO,MAAM,OAAO,MAAM,MAAM,OAAO,MAAM,CAAC,OAAO,KAAK,EAAE,GAAG,OAAO,QAAQ,aAAa,OAAO,QAAQ,CAAC,WAAW,OAAO,SAAS,SAAS,MAAM,YAAY,CAAC,GAAG,OAAO,cAAc,SAAS,YAAY,YAAY,QAAQ,eAAe,SAAS,EAAE,KAAK,CAAC,MAAO,IAAI,OAAO,KAAK,CAAC,EAAE,OAAO,OAAO,UAAU,OAAO,QAAQ,CAAC,KAAK,KAAK,MAAM,WAAW,CAAC,CAAC,CAAC,OAAO,UAAU,CAAliB,IAAI,MAAQ,eAAe,MAAM,CAAC,QAAQ,CAAC,CAAC;;",
+    "mappings": "AAAA,IAAI,aAAa,CAAC,WAAW,QAAQ,mCAAmC,CAAC,EAAE,YAAY,aAAa,WAApG,IAAI,MAAQ,YAAY,MAAM,CAAC,QAAQ,CAAC,CAAC;;",
     "names": [],
   },
   "name": "regexpNamedCaptureGroups",

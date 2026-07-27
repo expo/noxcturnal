@@ -12,6 +12,9 @@ importers:
         specifier: 0.141.0
         version: 0.141.0
     devDependencies:
+      '@babel/runtime':
+        specifier: 7.29.7
+        version: 7.29.7
       '@changesets/cli':
         specifier: ^2.31.1
         version: 2.31.1(@types/node@22.20.1)
@@ -30,6 +33,9 @@ importers:
       dotenv:
         specifier: ^17.2.3
         version: 17.4.2
+      esbuild:
+        specifier: 0.28.1
+        version: 0.28.1
       lint-staged:
         specifier: ^17.1.1
         version: 17.1.1

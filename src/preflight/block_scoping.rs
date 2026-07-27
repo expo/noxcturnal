@@ -105,11 +105,21 @@ fn crosses_function_before(
     loop_id: NodeId,
 ) -> bool {
     let mut crossed = false;
+    let reference_span = nodes.kind(node_id).span();
     for ancestor in nodes.ancestor_ids(node_id) {
         if ancestor == loop_id {
             return crossed;
         }
-        crossed |= nodes.kind(ancestor).is_function_like();
+        crossed |= nodes.kind(ancestor).is_function_like()
+            || matches!(
+                nodes.kind(ancestor),
+                AstKind::PropertyDefinition(property)
+                    if !property.r#static
+                        && property
+                            .value
+                            .as_ref()
+                            .is_some_and(|value| value.span().contains_inclusive(reference_span))
+            );
     }
     false
 }

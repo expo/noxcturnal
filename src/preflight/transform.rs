@@ -25,7 +25,10 @@ use crate::sourcemap::{compose_packed_layer_chain, pack_decoded_layer, render_de
 use crate::syntax::classification::source_type;
 
 use super::block_scoping;
-use super::helpers::{inline_helpers, validate_runtime_helpers};
+use super::helpers::{
+    custom_helpers_introduced, inline_helpers, validate_custom_runtime_helpers,
+    validate_runtime_helpers,
+};
 use super::optimize;
 use super::options::NativePreflightOptions;
 
@@ -37,6 +40,9 @@ pub struct NativePreflightResult {
     pub map: Option<Buffer>,
     pub diagnostics: Vec<String>,
     pub helpers_used: Vec<String>,
+    pub parse_count: Option<u32>,
+    pub semantic_build_count: Option<u32>,
+    pub render_count: Option<u32>,
 }
 
 pub fn transform(
@@ -44,6 +50,10 @@ pub fn transform(
     filename: String,
     options: NativePreflightOptions,
 ) -> Result<NativePreflightResult> {
+    let original_source = source.clone();
+    let mut parse_count = 0;
+    let mut semantic_build_count = 0;
+    let mut render_count = 0;
     if options.react_compiler == Some(true) && !cfg!(feature = "react_compiler") {
         return Ok(unsupported("react-compiler-not-built", [] as [String; 0]));
     }
@@ -56,10 +66,12 @@ pub fn transform(
         for _ in 0..64 {
             let rewrite_allocator = Allocator::default();
             let rewrite_source_type = source_type(&filename, &source)?;
+            parse_count += 1;
             let rewritten = Parser::new(&rewrite_allocator, &source, rewrite_source_type).parse();
             if !rewritten.diagnostics.is_empty() {
                 break;
             }
+            semantic_build_count += 1;
             let semantic = SemanticBuilder::new()
                 .with_build_nodes(true)
                 .with_excess_capacity(2.0)
@@ -81,6 +93,7 @@ pub fn transform(
                 }
             };
             let (rewritten_source, layer) = render_decoded(&source, &pieces, "character");
+            render_count += 1;
             if rewritten_source == source {
                 break;
             }
@@ -92,10 +105,12 @@ pub fn transform(
         for _ in 0..64 {
             let rewrite_allocator = Allocator::default();
             let rewrite_source_type = source_type(&filename, &source)?;
+            parse_count += 1;
             let parsed = Parser::new(&rewrite_allocator, &source, rewrite_source_type).parse();
             if !parsed.diagnostics.is_empty() {
                 break;
             }
+            semantic_build_count += 1;
             let semantic = SemanticBuilder::new()
                 .with_build_nodes(true)
                 .with_excess_capacity(2.0)
@@ -117,6 +132,7 @@ pub fn transform(
                 }
             };
             let (rewritten_source, layer) = render_decoded(&source, &pieces, "boundary");
+            render_count += 1;
             source = rewritten_source;
             rewrite_layers.push(layer);
         }
@@ -126,10 +142,12 @@ pub fn transform(
         for _ in 0..64 {
             let rewrite_allocator = Allocator::default();
             let rewrite_source_type = source_type(&filename, &source)?;
+            parse_count += 1;
             let parsed = Parser::new(&rewrite_allocator, &source, rewrite_source_type).parse();
             if !parsed.diagnostics.is_empty() {
                 break;
             }
+            semantic_build_count += 1;
             let semantic = SemanticBuilder::new()
                 .with_build_nodes(true)
                 .with_excess_capacity(2.0)
@@ -148,6 +166,7 @@ pub fn transform(
                         &semantic.semantic,
                         loose_object_rest,
                         false,
+                        options.helpers_mode.as_deref() == Some("inline"),
                     ) {
                         Ok(edits) => edits,
                         Err(reason) => {
@@ -166,6 +185,7 @@ pub fn transform(
                         };
                         let (rewritten_source, layer) =
                             render_decoded(&source, &pieces, "boundary");
+                        render_count += 1;
                         source = rewritten_source;
                         rewrite_layers.push(layer);
                     }
@@ -178,6 +198,7 @@ pub fn transform(
                 Err(_) => return Ok(unsupported("for-of-edit-conflict", [] as [String; 0])),
             };
             let (rewritten_source, layer) = render_decoded(&source, &pieces, "boundary");
+            render_count += 1;
             source = rewritten_source;
             rewrite_layers.push(layer);
         }
@@ -185,8 +206,10 @@ pub fn transform(
     if options.destructuring == Some(true) && !destructuring_done {
         let rewrite_allocator = Allocator::default();
         let rewrite_source_type = source_type(&filename, &source)?;
+        parse_count += 1;
         let parsed = Parser::new(&rewrite_allocator, &source, rewrite_source_type).parse();
         if parsed.diagnostics.is_empty() {
+            semantic_build_count += 1;
             let semantic = SemanticBuilder::new()
                 .with_build_nodes(true)
                 .with_excess_capacity(2.0)
@@ -197,6 +220,7 @@ pub fn transform(
                     &semantic.semantic,
                     loose_object_rest,
                     false,
+                    options.helpers_mode.as_deref() == Some("inline"),
                 ) {
                     Ok(edits) => edits,
                     Err(reason) => return Ok(unsupported(reason, [] as [String; 0])),
@@ -212,6 +236,7 @@ pub fn transform(
                         }
                     };
                     let (rewritten_source, layer) = render_decoded(&source, &pieces, "boundary");
+                    render_count += 1;
                     source = rewritten_source;
                     rewrite_layers.push(layer);
                 }
@@ -224,10 +249,12 @@ pub fn transform(
         for _ in 0..64 {
             let rewrite_allocator = Allocator::default();
             let rewrite_source_type = source_type(&filename, &source)?;
+            parse_count += 1;
             let parsed = Parser::new(&rewrite_allocator, &source, rewrite_source_type).parse();
             if !parsed.diagnostics.is_empty() {
                 break;
             }
+            semantic_build_count += 1;
             let semantic = SemanticBuilder::new()
                 .with_build_nodes(true)
                 .with_excess_capacity(2.0)
@@ -256,6 +283,7 @@ pub fn transform(
                     .private_property_in_object
                     .filter(|enabled| *enabled)
                     .map(|_| options.private_property_in_object_loose.unwrap_or(false)),
+                options.helpers_mode.as_deref() == Some("inline"),
             ) {
                 Ok(edits) => edits,
                 Err(reason) => return Ok(unsupported(reason, [] as [String; 0])),
@@ -268,6 +296,7 @@ pub fn transform(
                 Err(_) => return Ok(unsupported("classes-edit-conflict", [] as [String; 0])),
             };
             let (rewritten_source, layer) = render_decoded(&source, &pieces, "boundary");
+            render_count += 1;
             source = rewritten_source;
             rewrite_layers.push(layer);
         }
@@ -279,10 +308,12 @@ pub fn transform(
         for _ in 0..64 {
             let rewrite_allocator = Allocator::default();
             let rewrite_source_type = source_type(&filename, &source)?;
+            parse_count += 1;
             let parsed = Parser::new(&rewrite_allocator, &source, rewrite_source_type).parse();
             if !parsed.diagnostics.is_empty() {
                 break;
             }
+            semantic_build_count += 1;
             let semantic = SemanticBuilder::new()
                 .with_build_nodes(true)
                 .with_excess_capacity(2.0)
@@ -291,11 +322,16 @@ pub fn transform(
                 break;
             }
             let Some(edits) = super::object_spread::edits(&source, &semantic.semantic) else {
-                let rest_edits =
-                    match super::destructuring::edits(&source, &semantic.semantic, true, true) {
-                        Ok(edits) => edits,
-                        Err(reason) => return Ok(unsupported(reason, [] as [String; 0])),
-                    };
+                let rest_edits = match super::destructuring::edits(
+                    &source,
+                    &semantic.semantic,
+                    true,
+                    true,
+                    options.helpers_mode.as_deref() == Some("inline"),
+                ) {
+                    Ok(edits) => edits,
+                    Err(reason) => return Ok(unsupported(reason, [] as [String; 0])),
+                };
                 if let Some(rest_edits) = rest_edits {
                     let pieces = match build_preflight_edits(&source, rest_edits) {
                         Ok(pieces) => pieces,
@@ -304,6 +340,7 @@ pub fn transform(
                         }
                     };
                     let (rewritten_source, layer) = render_decoded(&source, &pieces, "boundary");
+                    render_count += 1;
                     source = rewritten_source;
                     rewrite_layers.push(layer);
                 }
@@ -319,6 +356,7 @@ pub fn transform(
                 }
             };
             let (rewritten_source, layer) = render_decoded(&source, &pieces, "boundary");
+            render_count += 1;
             source = rewritten_source;
             rewrite_layers.push(layer);
         }
@@ -330,8 +368,10 @@ pub fn transform(
     {
         let rewrite_allocator = Allocator::default();
         let rewrite_source_type = source_type(&filename, &source)?;
+        parse_count += 1;
         let parsed = Parser::new(&rewrite_allocator, &source, rewrite_source_type).parse();
         if parsed.diagnostics.is_empty() {
+            semantic_build_count += 1;
             let semantic = SemanticBuilder::new()
                 .with_build_nodes(true)
                 .with_excess_capacity(2.0)
@@ -344,6 +384,7 @@ pub fn transform(
                     options.regexp_unicode_property_escapes == Some(true),
                     options.regexp_dot_all == Some(true),
                     options.regexp_named_capture_groups == Some(true),
+                    options.helpers_mode.as_deref() == Some("inline"),
                 ) {
                     Ok(edits) => edits,
                     Err(reason) => return Ok(unsupported(reason, [] as [String; 0])),
@@ -356,6 +397,7 @@ pub fn transform(
                         }
                     };
                     let (rewritten_source, layer) = render_decoded(&source, &pieces, "boundary");
+                    render_count += 1;
                     source = rewritten_source;
                     rewrite_layers.push(layer);
                 }
@@ -364,6 +406,7 @@ pub fn transform(
     }
     let allocator = Allocator::default();
     let source_type = source_type(&filename, &source)?;
+    parse_count += 1;
     let parsed = Parser::new(&allocator, &source, source_type).parse();
     if !parsed.diagnostics.is_empty() {
         return Ok(unsupported("parse-error", parsed.diagnostics));
@@ -373,6 +416,22 @@ pub fn transform(
     decorator_detector.visit_program(&program);
     if decorator_detector.0 {
         return Ok(unsupported("decorators-not-supported", [] as [String; 0]));
+    }
+    if options.class_properties == Some(true) {
+        let mut detector = PinnedOxcClassFusionDetector::default();
+        detector.visit_program(&program);
+        if options.private_methods != Some(true) && detector.private_method {
+            return Ok(unsupported(
+                "oxc-class-properties-private-method-fusion",
+                [] as [String; 0],
+            ));
+        }
+        if options.private_property_in_object != Some(true) && detector.private_in {
+            return Ok(unsupported(
+                "oxc-class-properties-private-in-fusion",
+                [] as [String; 0],
+            ));
+        }
     }
     if options.regexp_unicode == Some(true)
         || options.regexp_unicode_property_escapes == Some(true)
@@ -461,6 +520,7 @@ pub fn transform(
             return Ok(unsupported("for-of-not-implemented", [] as [String; 0]));
         }
     }
+    semantic_build_count += 1;
     let semantic = SemanticBuilder::new()
         .with_build_nodes(options.block_scoping == Some(true))
         .with_excess_capacity(2.0)
@@ -552,6 +612,9 @@ pub fn transform(
             map: Some(pack_decoded_layer(&words, &[], line_count).into()),
             diagnostics: Vec::new(),
             helpers_used: Vec::new(),
+            parse_count: Some(parse_count),
+            semantic_build_count: Some(semantic_build_count),
+            render_count: Some(render_count),
         });
     }
     let helper_mode = options.helpers_mode.as_deref().unwrap_or("runtime");
@@ -559,6 +622,7 @@ pub fn transform(
         .helpers_module_name
         .as_deref()
         .unwrap_or("@babel/runtime");
+    let custom_helper_requests = custom_helpers_introduced(&original_source, &source);
     let inline = if helper_mode == "inline" {
         match inline_helpers(helper_requests.iter().map(|(helper, _)| *helper), &source) {
             Ok(inline) => inline,
@@ -570,6 +634,15 @@ pub fn transform(
     if helper_mode == "runtime"
         && let Err(reason) = validate_runtime_helpers(
             helper_requests.iter().map(|(helper, _)| *helper),
+            helper_module,
+            options.helpers_version.as_deref(),
+        )
+    {
+        return Ok(unsupported(&reason, [] as [String; 0]));
+    }
+    if helper_mode == "runtime"
+        && let Err(reason) = validate_custom_runtime_helpers(
+            &custom_helper_requests,
             helper_module,
             options.helpers_version.as_deref(),
         )
@@ -591,7 +664,9 @@ pub fn transform(
         .into_iter()
         .map(|(helper, _)| helper.name().to_string())
         .collect();
+    helpers_used.extend(custom_helper_requests.into_iter().map(str::to_string));
     helpers_used.sort_unstable();
+    helpers_used.dedup();
     let inline_prefix = inline.map(|inline| {
         let binding = allocator.alloc_str(&inline.binding);
         InlineHelperRenamer { binding }.visit_program(&mut program);
@@ -658,6 +733,9 @@ pub fn transform(
         map: Some(layer.into()),
         diagnostics: Vec::new(),
         helpers_used,
+        parse_count: Some(parse_count),
+        semantic_build_count: Some(semantic_build_count),
+        render_count: Some(render_count + 1),
     })
 }
 
@@ -927,6 +1005,24 @@ impl<'a> Visit<'a> for RegExpSemanticMismatchDetector {
 
 struct ClassFeaturesUnsupportedDetector(bool);
 
+#[derive(Default)]
+struct PinnedOxcClassFusionDetector {
+    private_method: bool,
+    private_in: bool,
+}
+
+impl<'a> Visit<'a> for PinnedOxcClassFusionDetector {
+    fn visit_method_definition(&mut self, method: &MethodDefinition<'a>) {
+        self.private_method |= matches!(method.key, PropertyKey::PrivateIdentifier(_));
+        walk::walk_method_definition(self, method);
+    }
+
+    fn visit_private_in_expression(&mut self, expression: &PrivateInExpression<'a>) {
+        self.private_in = true;
+        walk::walk_private_in_expression(self, expression);
+    }
+}
+
 impl<'a> Visit<'a> for ClassFeaturesUnsupportedDetector {
     fn visit_property_definition(&mut self, property: &PropertyDefinition<'a>) {
         self.0 |= matches!(property.key, PropertyKey::PrivateIdentifier(_));
@@ -1022,6 +1118,9 @@ fn unsupported(
             .map(|diagnostic| format!("{diagnostic:?}"))
             .collect(),
         helpers_used: Vec::new(),
+        parse_count: None,
+        semantic_build_count: None,
+        render_count: None,
     }
 }
 

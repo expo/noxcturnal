@@ -12,11 +12,18 @@ use oxc_span::{GetSpan, Span};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::edit::{EditCommand, EditKind, MappingPolicy};
+use crate::generated::inline_helpers::{
+    INLINE_CLASS_CONSTRUCT_HELPER, INLINE_CLASS_CONSTRUCT_HELPER_RUNTIME,
+    INLINE_CLASS_PRIVATE_HELPERS, INLINE_CLASS_PRIVATE_HELPERS_RUNTIME,
+    INLINE_CLASS_SUPER_GET_HELPER, INLINE_CLASS_SUPER_GET_HELPER_RUNTIME,
+};
 
-const CONSTRUCT_HELPER: &str = r#"function _noxConstruct(S,args,D){if(typeof Reflect!="undefined"&&Reflect.construct)return Reflect.construct(S,args,D);var values=[null];values.push.apply(values,args);var instance=new(Function.bind.apply(S,values));if(Object.setPrototypeOf)Object.setPrototypeOf(instance,D.prototype);return instance}"#;
-const SUPER_GET_HELPER: &str = r#"function _noxSuperGet(base,key,receiver){while(base){var descriptor=Object.getOwnPropertyDescriptor(base,key);if(descriptor)return descriptor.get?descriptor.get.call(receiver):descriptor.value;base=Object.getPrototypeOf(base)}}"#;
-const PRIVATE_HELPERS: &str = r#"function _noxPrivateBase(receiver,key){if(!Object.prototype.hasOwnProperty.call(Object(receiver),key))throw new TypeError("attempted to use private field on non-instance");return receiver}function _noxPrivateCall(receiver,key,args){return _noxPrivateBase(receiver,key)[key].apply(receiver,args)}"#;
+const CONSTRUCT_PLACEHOLDER: &str = "__BABEL_GENERATED_CONSTRUCT_HELPER__";
+const SUPER_GET_PLACEHOLDER: &str = "__BABEL_GENERATED_SUPER_GET_HELPER__";
+const PRIVATE_BASE_PLACEHOLDER: &str = "__BABEL_GENERATED_PRIVATE_BASE_HELPER__";
+const PRIVATE_CALL_PLACEHOLDER: &str = "__BABEL_GENERATED_PRIVATE_CALL_HELPER__";
 
+#[expect(clippy::too_many_arguments)]
 pub(super) fn edits(
     source: &str,
     semantic: &Semantic<'_>,
@@ -25,6 +32,7 @@ pub(super) fn edits(
     class_static_blocks: bool,
     private_methods_loose: Option<bool>,
     private_in_loose: Option<bool>,
+    inline_helpers: bool,
 ) -> Result<Option<Vec<EditCommand>>, &'static str> {
     let nodes = semantic.nodes();
     let classes: FxHashSet<NodeId> = nodes
@@ -75,6 +83,7 @@ pub(super) fn edits(
             class_static_blocks,
             private_methods_loose,
             private_in_loose,
+            inline_helpers,
             &mut reserved,
         )?);
     }
@@ -90,6 +99,7 @@ fn lower(
     class_static_blocks: bool,
     private_methods_loose: Option<bool>,
     private_in_loose: Option<bool>,
+    inline_helpers: bool,
     reserved: &mut FxHashSet<String>,
 ) -> Result<EditCommand, &'static str> {
     let name = class
@@ -175,9 +185,35 @@ fn lower(
     {
         return Err("classes-private-constructor-access-not-implemented");
     }
+    let helper_names = ClassHelperNames {
+        construct: reserve("_construct", reserved),
+        construct_runtime: reserve("_construct2", reserved),
+        super_get: reserve("_get", reserved),
+        super_get_runtime: reserve("_get2", reserved),
+        private_base: reserve("_classPrivateFieldLooseBase", reserved),
+        private_call: reserve("_classPrivateMethodCall", reserved),
+        private_runtime: reserve("_classPrivateFieldLooseBase2", reserved),
+    };
     let mut body = String::from("(()=>{\"use strict\";");
     if !private_keys.is_empty() {
-        body.push_str(PRIVATE_HELPERS);
+        let helper = if inline_helpers {
+            INLINE_CLASS_PRIVATE_HELPERS
+        } else {
+            INLINE_CLASS_PRIVATE_HELPERS_RUNTIME
+        };
+        body.push_str(
+            &helper
+                .replace(
+                    "_classPrivateFieldLooseBase2",
+                    "__BABEL_PRIVATE_FIELD_LOOSE_BASE_RUNTIME__",
+                )
+                .replace("_classPrivateFieldLooseBase", &helper_names.private_base)
+                .replace("_classPrivateMethodCall", &helper_names.private_call)
+                .replace(
+                    "__BABEL_PRIVATE_FIELD_LOOSE_BASE_RUNTIME__",
+                    &helper_names.private_runtime,
+                ),
+        );
         for (private_name, binding) in &private_keys {
             body.push_str(&format!(
                 "var {binding}=\"__private_{}_{}\";",
@@ -305,14 +341,37 @@ fn lower(
         }
     }
     if super_name.is_some() {
-        body.push_str(CONSTRUCT_HELPER);
+        let helper = if inline_helpers {
+            INLINE_CLASS_CONSTRUCT_HELPER
+        } else {
+            INLINE_CLASS_CONSTRUCT_HELPER_RUNTIME
+        };
+        body.push_str(
+            &helper
+                .replace("_construct2", "__BABEL_CONSTRUCT_RUNTIME__")
+                .replace("_construct", &helper_names.construct)
+                .replace(
+                    "__BABEL_CONSTRUCT_RUNTIME__",
+                    &helper_names.construct_runtime,
+                ),
+        );
     }
     let has_super_methods = class.body.body.iter().any(|element| {
         matches!(element, ClassElement::MethodDefinition(method)
             if method.kind != MethodDefinitionKind::Constructor && contains_super(source, method))
     });
     if has_super_methods {
-        body.push_str(SUPER_GET_HELPER);
+        let helper = if inline_helpers {
+            INLINE_CLASS_SUPER_GET_HELPER
+        } else {
+            INLINE_CLASS_SUPER_GET_HELPER_RUNTIME
+        };
+        body.push_str(
+            &helper
+                .replace("_get2", "__BABEL_GET_RUNTIME__")
+                .replace("_get", &helper_names.super_get)
+                .replace("__BABEL_GET_RUNTIME__", &helper_names.super_get_runtime),
+        );
     }
     if let Some(constructor) = constructor {
         if let Some(super_name) = &super_name {
@@ -335,7 +394,7 @@ fn lower(
         }
     } else if let Some(super_name) = &super_name {
         body.push_str(&format!(
-            "function {name}(){{if(!(this instanceof {name}))throw new TypeError(\"Cannot call a class as a function\");var _this=_noxConstruct({super_name},arguments,{name});(function(){{{instance_initializers}}}).call(_this);return _this}}"
+            "function {name}(){{if(!(this instanceof {name}))throw new TypeError(\"Cannot call a class as a function\");var _this={CONSTRUCT_PLACEHOLDER}({super_name},arguments,{name});(function(){{{instance_initializers}}}).call(_this);return _this}}"
         ));
     } else {
         body.push_str(&format!(
@@ -417,7 +476,11 @@ fn lower(
         format!("var {name}={body};")
     } else {
         body
-    };
+    }
+    .replace(CONSTRUCT_PLACEHOLDER, &helper_names.construct)
+    .replace(SUPER_GET_PLACEHOLDER, &helper_names.super_get)
+    .replace(PRIVATE_BASE_PLACEHOLDER, &helper_names.private_base)
+    .replace(PRIVATE_CALL_PLACEHOLDER, &helper_names.private_call);
     Ok(EditCommand {
         kind: EditKind::Replace,
         start,
@@ -429,6 +492,16 @@ fn lower(
         order: None,
         names: None,
     })
+}
+
+struct ClassHelperNames {
+    construct: String,
+    construct_runtime: String,
+    super_get: String,
+    super_get_runtime: String,
+    private_base: String,
+    private_call: String,
+    private_runtime: String,
 }
 
 fn is_identifier_key(key: &PropertyKey<'_>, computed: bool) -> bool {
@@ -465,7 +538,7 @@ fn private_body_contents(
                 replacements.push((
                     call.span,
                     format!(
-                        "_noxPrivateCall({}, {key}, [{arguments}])",
+                        "{PRIVATE_CALL_PLACEHOLDER}({}, {key}, [{arguments}])",
                         slice(source, field.object.span())
                     ),
                 ));
@@ -505,7 +578,7 @@ fn private_body_contents(
         replacements.push((
             field.span,
             format!(
-                "_noxPrivateBase({}, {key})[{key}]",
+                "{PRIVATE_BASE_PLACEHOLDER}({}, {key})[{key}]",
                 slice(source, field.object.span())
             ),
         ));
@@ -597,7 +670,7 @@ fn method_function_with_super(
         };
         replacements.push((
             call.span,
-            format!("_noxSuperGet({base},{key},this).call(this{separator}{arguments})"),
+            format!("{SUPER_GET_PLACEHOLDER}({base},{key},this).call(this{separator}{arguments})"),
         ));
         call_spans.push(call.span);
     }
@@ -620,7 +693,7 @@ fn method_function_with_super(
             }
             _ => continue,
         };
-        replacements.push((span, format!("_noxSuperGet({base},{key},this)")));
+        replacements.push((span, format!("{SUPER_GET_PLACEHOLDER}({base},{key},this)")));
     }
     replacements.sort_unstable_by_key(|(span, _)| span.start);
     for pair in replacements.windows(2) {
@@ -704,7 +777,7 @@ fn derived_constructor(
         Span::new(statement_span.end, body.span.end.saturating_sub(1)),
     );
     Ok(format!(
-        "function {name}{params}{{if(!(this instanceof {name}))throw new TypeError(\"Cannot call a class as a function\");{before}var _this=_noxConstruct({super_name},[{arguments}],{name});(function(){{{instance_initializers}}}).call(_this);var _result=(function(){{{after}}}).apply(_this,arguments);if(_result!==void 0){{if((typeof _result===\"object\"&&_result!==null)||typeof _result===\"function\")return _result;throw new TypeError(\"Derived constructors may only return object or undefined\")}}return _this}}"
+        "function {name}{params}{{if(!(this instanceof {name}))throw new TypeError(\"Cannot call a class as a function\");{before}var _this={CONSTRUCT_PLACEHOLDER}({super_name},[{arguments}],{name});(function(){{{instance_initializers}}}).call(_this);var _result=(function(){{{after}}}).apply(_this,arguments);if(_result!==void 0){{if((typeof _result===\"object\"&&_result!==null)||typeof _result===\"function\")return _result;throw new TypeError(\"Derived constructors may only return object or undefined\")}}return _this}}"
     ))
 }
 

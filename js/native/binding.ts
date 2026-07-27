@@ -149,6 +149,9 @@ interface NativeBinding {
     map?: Buffer;
     diagnostics: string[];
     helpersUsed: string[];
+    parseCount?: number;
+    semanticBuildCount?: number;
+    renderCount?: number;
   };
   commitPackedBuffer(
     source: string,

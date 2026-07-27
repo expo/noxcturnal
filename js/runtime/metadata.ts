@@ -31,6 +31,8 @@ export function createTransformMetadata(
       phaseExecutions: [],
       reparses: 0,
       nativeParses: 0,
+      nativeSemanticBuilds: 0,
+      nativeRenders: 0,
       routeDeliveries: 0,
       nodeRecords: 0,
       payloadBytes: 0,

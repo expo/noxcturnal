@@ -24,8 +24,10 @@
     "provenance": true
   },
   "scripts": {
-    "codegen": "node scripts/sync-oxc-event-schema.mjs && node scripts/generate-event-schema.mjs",
-    "codegen:check": "node scripts/sync-oxc-event-schema.mjs --check && node scripts/generate-event-schema.mjs --check",
+    "audit:generate": "node scripts/generate-audits.mjs",
+    "audit:check": "node scripts/generate-audits.mjs --check",
+    "codegen": "node scripts/sync-oxc-event-schema.mjs && node scripts/generate-event-schema.mjs && node scripts/generate-inline-helpers.mjs && pnpm audit:generate",
+    "codegen:check": "node scripts/sync-oxc-event-schema.mjs --check && node scripts/generate-event-schema.mjs --check && node scripts/generate-inline-helpers.mjs --check && pnpm audit:check",
     "architecture:check": "node scripts/check-architecture.mjs",
     "build:native": "napi build --platform --release",
     "build:js": "node scripts/clean-dist.mjs && tsc -p tsconfig.json",
@@ -50,12 +52,14 @@
     "@oxc-project/types": "0.141.0"
   },
   "devDependencies": {
+    "@babel/runtime": "7.29.7",
     "@changesets/cli": "^2.31.1",
     "@changesets/get-github-info": "^0.6.0",
     "@jridgewell/trace-mapping": "^0.3.31",
     "@napi-rs/cli": "^3.4.5",
     "@types/node": "^22.15.0",
     "dotenv": "^17.2.3",
+    "esbuild": "0.28.1",
     "lint-staged": "^17.1.1",
     "oxfmt": "^0.60.0",
     "typescript": "^5.8.3",

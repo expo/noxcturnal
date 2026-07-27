@@ -92,12 +92,47 @@ test('runs a fused native TypeScript phase and reports its own timing', () => {
   const performance = result.metadata.performance as {
     nativeTransformMs: number;
     nativeParses: number;
+    nativeSemanticBuilds: number;
+    nativeRenders: number;
     phaseExecutions: { name: string; nativeTransformMs: number }[];
   };
   assert.equal(performance.nativeParses, 1);
+  assert.equal(performance.nativeSemanticBuilds, 1);
+  assert.equal(performance.nativeRenders, 1);
   assert.ok(performance.nativeTransformMs > 0);
   assert.equal(performance.phaseExecutions[0].name, 'preflight');
   assert.ok(performance.phaseExecutions[0].nativeTransformMs > 0);
+});
+
+test('reports internal reparses and semantic rebuilds for focused legacy lowering', () => {
+  const result = transform(
+    'let [value] = input;',
+    'fixture.js',
+    defineNativePipeline({
+      phases: [
+        {
+          name: 'legacy',
+          native: {
+            transforms: {
+              blockScoping: true,
+              destructuring: { useBuiltIns: true },
+            },
+            helpers: { mode: 'inline' },
+          },
+        },
+      ],
+    }),
+    { debugPerformance: true },
+  );
+  assert.equal(result.status, 'complete');
+  const performance = result.metadata.performance as {
+    nativeParses: number;
+    nativeSemanticBuilds: number;
+    nativeRenders: number;
+  };
+  assert.ok(performance.nativeParses >= 3);
+  assert.equal(performance.nativeSemanticBuilds, performance.nativeParses);
+  assert.ok(performance.nativeRenders >= 2);
 });
 
 test('runs React Fast Refresh instrumentation in the native JSX transform', () => {
