@@ -7,9 +7,9 @@ import type {
 import type { NativeRouteManifestEntry } from '../protocol/manifest.js';
 import type {
   ControlFlowCapability,
+  EditEffect,
   NativeFieldKey,
   NativeNodeType,
-  PluginPlan,
   QueryRequest,
   ScalarPredicate,
 } from '../types.js';
@@ -22,7 +22,8 @@ export interface RouteCapabilities {
   declaredFields: readonly NativeFieldKey[];
 }
 
-export type PreparedPluginPlan = PluginPlan & {
+export type PreparedPluginPlan = {
+  editEffect?: EditEffect;
   subscriptions: readonly string[];
   fields?: Readonly<Partial<Record<NativeNodeType, readonly NativeFieldKey[]>>>;
   controlFlow?: readonly ControlFlowCapability[];
@@ -36,7 +37,6 @@ export type PreparedPluginPlan = PluginPlan & {
 
 export interface ResolvedVisitor {
   definition: DefinedVisitor<any>;
-  enabled: boolean;
   where: Readonly<Record<string, ScalarPredicate>> | undefined;
 }
 
@@ -70,12 +70,13 @@ export interface CompiledNestedRoutes {
   capabilities: readonly RouteCapabilities[];
 }
 
-/** Everything about a prepared phase that depends only on its plan shape.
+/** A phase prepared from its definitions.
  *
- * Interned per `(phase, plan shape)`, so its object identity is a cache key for
- * work derived from a sequence of prepared phases. */
-export interface SharedPhasePlan {
+ * Memoised on the phase's identity: every plugin plan is fixed by its definition,
+ * so there is nothing per-file to key on and this object is shared across files. */
+export interface PreparedPhase {
   activePlugins: NativePlugin<any, any>[];
+  plans: Map<NativePlugin<any, any>, PreparedPluginPlan>;
   subscriptions: Set<string>;
   fieldRequests: Record<string, string[]>;
   includeParent: boolean;
@@ -84,10 +85,4 @@ export interface SharedPhasePlan {
   compiledRoutes: readonly CompiledRouteTemplate[];
   dispatchRoutes: readonly DispatchRoute[];
   manifest: Buffer;
-}
-
-export interface PreparedPhase extends SharedPhasePlan {
-  plans: Map<NativePlugin<any, any>, PreparedPluginPlan>;
-  /** Identity of the interned plan shape behind this preparation. */
-  shared: SharedPhasePlan;
 }

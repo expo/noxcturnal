@@ -108,7 +108,7 @@ test('defers text-only rendering across phases that observe the retained AST', (
   let observed = '';
   const edit = defineNativePlugin({
     name: 'edit-text',
-    prepare: () => ({ editEffect: 'text-only' }),
+    editEffect: 'text-only',
     visitors: [
       defineVisitor('Identifier', {}, path => {
         path.replaceWith('renamed');
@@ -281,6 +281,40 @@ test('reusable phases preserve identity across dynamic pipeline composition', ()
   assert.equal(first.phases[0], phase);
   assert.equal(second.phases[0], phase);
   assert.equal(composeNativePipeline([phase]), composeNativePipeline([phase]));
+});
+
+test('phases intern structurally whether they are named or written inline', () => {
+  const plugin = defineNativePlugin({
+    name: 'interned-plugin',
+    visitors: [defineVisitor('Identifier', {}, () => {})],
+  });
+  // Structural identity: the same name, flags, and ordered plugins are the same
+  // phase, so plan and route compilation are memoised on it either way.
+  const inline = () => defineNativePipeline({ phases: [{ name: 'inline', plugins: [plugin] }] });
+  assert.equal(inline().phases[0], inline().phases[0]);
+  assert.equal(inline(), inline());
+  const native = () =>
+    defineNativePipeline({ phases: [{ name: 'native', native: { transforms: { forOf: true } } }] });
+  assert.equal(native().phases[0], native().phases[0]);
+  // A different shape is a different phase.
+  assert.notEqual(
+    inline().phases[0],
+    defineNativePipeline({ phases: [{ name: 'inline', plugins: [] }] }).phases[0],
+  );
+});
+
+test('phases defined after transforming still intern', () => {
+  // The first transform closes the definition scope, which only changes whether
+  // interning is budgeted — never whether it happens.
+  const plugin = defineNativePlugin({
+    name: 'post-transform-plugin',
+    visitors: [defineVisitor('Identifier', {}, () => {})],
+  });
+  transform('const value = 1;', 'fixture.js', defineNativePipeline({ phases: [] }));
+  const build = () =>
+    defineNativePipeline({ phases: [{ name: 'post-transform', plugins: [plugin] }] });
+  assert.equal(build().phases[0], build().phases[0]);
+  assert.equal(transform('const value = 1;', 'fixture.js', build()).status, 'complete');
 });
 
 test('rejects ambiguous original-source edits after rendering', () => {

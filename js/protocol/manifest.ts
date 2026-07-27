@@ -4,7 +4,7 @@ import {
   NODE_TYPES,
   PREDICATE_FIELDS,
 } from '../generated/event-schema.js';
-import type { ScalarPredicate } from '../types.js';
+import type { ScalarPredicate, ScalarValue } from '../types.js';
 import { ROUTE_MANIFEST_MAGIC, paddingFor } from './constants.js';
 
 export interface NativeRouteManifestEntry {
@@ -79,11 +79,12 @@ export function packRouteManifest(
       route.payloadFields.length,
     );
     for (const [field, predicate] of predicates) {
-      const values =
+      // Predicates reaching the manifest are validated, so no parameter survives.
+      const values: readonly ScalarValue[] =
         'equals' in predicate
-          ? [predicate.equals]
+          ? [predicate.equals as ScalarValue]
           : 'oneOf' in predicate
-            ? predicate.oneOf
+            ? (predicate.oneOf as readonly ScalarValue[])
             : [predicate.present];
       words.push(
         requiredId(FIELD_KEY_IDS, field, 'field'),

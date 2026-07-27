@@ -56,15 +56,22 @@ const result = transform(
 
 Within a phase every plugin observes the same immutable source. Mutations become visible after the native commit and optional reparse boundary. A bailout discards attempted edits and returns the pristine input source.
 
-`defineNativePlugin` returns an immutable reusable definition. Bind per-pipeline options with `plugin.withOptions(options)`. Pipelines always declare explicit phases and snapshot and freeze their phase and plugin arrays so cache identity cannot drift after construction. Every transform phase is compiled to numeric native routes.
+`defineNativePlugin` returns an immutable reusable definition. Bind per-pipeline options with `plugin.withOptions(options)` and declared predicate values with `plugin.withParameters(values)`. Pipelines always declare explicit phases and snapshot and freeze their phase and plugin arrays so cache identity cannot drift after construction. Every transform phase is compiled to numeric native routes.
 
-### Pipeline identity and preparation
+### Configuration scopes
 
-Treat plugin, phase, and pipeline definitions as program configuration, not as
-per-file values. Define the finite set of plugins and phases at module scope.
-For a fixed pipeline, define it once with `defineNativePipeline`. When the
-ordered phase set varies per file, define each phase once with
-`definePipelinePhase` and select among them with `composeNativePipeline`:
+Plugin, phase, and pipeline definitions are program configuration, not per-file
+values, and the API is arranged so that nothing about a plugin's plan can depend
+on the file being transformed. Three scopes, three mechanisms:
+
+1. **Definition** — `defineNativePlugin`, `defineVisitor`, and
+   `plugin.withOptions(options)`. Whether a plugin runs at all is decided here,
+   by putting it in a phase or leaving it out.
+2. **Binding** — predicate values that vary per configuration but not per file.
+   Declare them with `parameter(name)` and resolve them once with
+   `plugin.withParameters(values)`.
+3. **Per file** — `createState` and `pluginData`, read by lifecycle hooks and
+   visitor callbacks. Neither can change a plan.
 
 ```ts
 import {
@@ -72,11 +79,11 @@ import {
   defineNativePlugin,
   definePipelinePhase,
   defineVisitor,
+  parameter,
   transform,
 } from 'noxcturnal';
 
 interface FileData {
-  development: boolean;
   replacement: string;
 }
 
@@ -87,13 +94,7 @@ const replaceBuildId = defineNativePlugin({
   visitors: [
     defineVisitor(
       'Identifier',
-      {
-        fields: ['name'],
-        configure: context => ({
-          enabled: fileData(context.pluginData).development,
-          where: { name: { equals: '__BUILD_ID__' } },
-        }),
-      },
+      { fields: ['name'], where: { name: { oneOf: parameter('names') } } },
       path => {
         path.replaceWith(
           path.context.code.stringLiteral(fileData(path.context.pluginData).replacement),
@@ -105,7 +106,7 @@ const replaceBuildId = defineNativePlugin({
 
 const sourcePhase = definePipelinePhase({
   name: 'source',
-  plugins: [replaceBuildId],
+  plugins: [replaceBuildId.withParameters({ names: ['__BUILD_ID__'] })],
 });
 const legacySyntaxPhase = definePipelinePhase({
   name: 'legacy-syntax',
@@ -116,32 +117,38 @@ const sourceOnly = composeNativePipeline([sourcePhase]);
 const sourceAndLegacySyntax = composeNativePipeline([sourcePhase, legacySyntaxPhase]);
 
 const result = transform(source, filename, needsLegacySyntax ? sourceAndLegacySyntax : sourceOnly, {
-  pluginData: { development, replacement },
+  pluginData: { replacement },
 });
 ```
 
-`composeNativePipeline` interns an ordered sequence of already-defined phase
-objects. Repeating the same composition returns the same pipeline, so dynamic
-selection is cheap while phase preparation and compiled native routes remain
-keyed by stable object identity. It deliberately rejects anonymous phase
-objects; use `defineNativePipeline` when reusable composition is unnecessary.
+`withParameters` interns on the values, so binding the same configuration twice
+returns the same plugin. A parameter stands for the value inside a predicate, not
+for the operator or the matched field, so the contract still declares the shape
+the native route manifest is compiled from. Reaching a transform with an
+unresolved parameter is a contract error rather than a silent wildcard.
 
-Use static plugin options (`plugin.withOptions`) for the finite configuration
-that changes a plugin's declared behavior. Use `pluginData` for current-file
-inputs such as filenames, manifest values, feature flags, and shared
-transform state. It is available to `prepare`, `createState`, visitor
-`configure`, lifecycle hooks, and visitor callbacks. `pluginData` may change
-enablement and native predicate values, but it must not mutate definitions or
-change a visitor's declared fields, children, scope, ancestry, control-flow, or
-query capabilities. Put those shape differences in separate top-level plugin
-or phase definitions.
+Phases and pipelines are interned structurally. Two phases with the same name,
+flags, and either the same native plan or the same ordered plugin identities are
+the same object, and pipelines are interned on their ordered phases. Plan and
+route compilation are therefore memoised on identity, with no per-file cache key
+to build or hash — and a phase written inline is as cheap as one created with
+`definePipelinePhase`. `composeNativePipeline` still requires phases created with
+`definePipelinePhase`; use `defineNativePipeline` when reusable composition is
+unnecessary.
 
-Plugins with neither `prepare` nor visitor `configure` have a fully static
-preparation plan, which Noxcturnal prepares once per plugin identity. Dynamic
-plans are prepared per file, while their normalized phase route layouts are
-reused when the resulting plan shape matches. Do not close over per-file data
-in a top-level plugin: read it from the current context and create mutable
-per-file collections in `createState`.
+Because every plugin plan follows from its definition, a plugin's plan is
+synthesized once per plugin and a phase is prepared once per phase — never per
+file. Building a distinct phase _shape_ for every file is the one remaining way to
+pay compilation repeatedly; the intern table is bounded, so shapes it has already
+seen keep hitting and only new ones recompile.
+
+Use `plugin.withOptions` for the finite configuration that changes a plugin's
+declared behavior, `plugin.withParameters` for predicate values fixed per
+configuration, and `pluginData` for current-file inputs such as filenames,
+manifest values, feature flags, and shared transform state. `pluginData` is
+available to `createState`, lifecycle hooks, and visitor callbacks. Do not close
+over per-file data in a top-level plugin: read it from the current context and
+create mutable per-file collections in `createState`.
 
 `pluginData` is intentionally excluded from `pipelineCacheKey`, because it is
 consumer-owned and may not be serializable. If it affects emitted code,
@@ -149,13 +156,13 @@ metadata, or diagnostics, the consumer must include the relevant values in
 its own transform-result cache key. Parser selection, preflight options, and
 other Noxcturnal-owned transform options remain part of the library key.
 
-Every visitor is a typed contract beside its callback: `defineVisitor(route, contract, handler)` declares the payload `fields`, native `where` predicates, `scope`, `ancestry`, `children`, `controlFlow`, and (when needed) `nested` visitor requirements — and the callback's path type is derived from exactly that contract, so undeclared fields and capability methods are TypeScript errors as well as runtime errors. The compiled native route manifest is generated from the same normalized contract object. The plugin `contract` declares context-level requirements (metadata ownership, semantic queries); `prepare` keeps only per-file lifecycle settings and may return `{ enabled: false }` to remove a plugin for the current file, which is useful with `sourceHints` for directive-driven transforms. Per-file dynamism with a static shape goes through the contract's `configure` hook (enablement and predicate values). A development-only `verifyVisitorContracts` option reports undeclared reads with paste-able contract fragments and declared-but-unused contract entries.
+Every visitor is a typed contract beside its callback: `defineVisitor(route, contract, handler)` declares the payload `fields`, native `where` predicates, `scope`, `ancestry`, `children`, `controlFlow`, and (when needed) `nested` visitor requirements — and the callback's path type is derived from exactly that contract, so undeclared fields and capability methods are TypeScript errors as well as runtime errors. The compiled native route manifest is generated from the same normalized contract object. The plugin `contract` declares context-level requirements (metadata ownership, semantic queries). Predicate values that vary per configuration are declared with `parameter(name)` and bound with `plugin.withParameters(values)`; there is no per-file hook that can change a contract. A development-only `verifyVisitorContracts` option reports undeclared reads with paste-able contract fragments and declared-but-unused contract entries.
 
 The TypeScript API derives its node and scalar-field names from the generated Oxc protocol schema: per-route declarable fields come from the same generated table the native predicate validator uses. Contracts narrow `path.node` to base identity plus declared fields (including `ReferencedIdentifier` and collapsed function/class routes), invalid route/field/capability literals are rejected, and the generic analysis value returned by `analyze` flows into `apply`. Composite routes such as `'Identifier|StringLiteral'` intentionally receive open field typing; use `path.is(...)` when a branch needs a specific view.
 
 ## Implemented surface
 
-- Typed per-visitor contracts compiled into the native route manifest, safe all-subscriber event filters, per-file enablement, aliases, lifecycle hooks, state, contract-declared metadata ownership and queries, diagnostics, and cleanup. Path capabilities are contract-scoped, not plugin-wide: one broad visitor cannot grant undeclared access to its siblings.
+- Typed per-visitor contracts compiled into the native route manifest, safe all-subscriber event filters, configuration-bound predicate parameters, aliases, lifecycle hooks, state, contract-declared metadata ownership and queries, diagnostics, and cleanup. Path capabilities are contract-scoped, not plugin-wide: one broad visitor cannot grant undeclared access to its siblings.
 - Compiled binary route manifests and routed tapes with native scalar predicates, numeric JavaScript dispatch, explicit payload fields, and no runtime timing instrumentation.
 - Optional analyze/apply lifecycle: every plugin decision is collected before any apply hook runs, so unsupported files bail out from pristine input without speculative mutation.
 - Arbitrary compact Oxc node events with stable per-parse node IDs, parent summaries, scope IDs, typed scalar fields, semantic global-reference facts, and UTF-16 ranges. The integer node/field protocol is generated and checked against the pinned Oxc `AstKind` definition.

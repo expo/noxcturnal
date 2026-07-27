@@ -4,7 +4,6 @@ import {
   defineVisitor as defineVisitorTop,
   type NativeNodePath,
   type NodeOfType,
-  type PluginPlan,
   type EditEffect,
 } from '../js/index.js';
 
@@ -41,17 +40,7 @@ const typedVisitor = defineNativePlugin({
       path.node.type.toUpperCase();
     }),
   ],
-  prepare() {
-    return { enabled: true };
-  },
 });
-
-// Lifecycle-only plans reject route declarations.
-const invalidPlan: PluginPlan = {
-  // @ts-expect-error Route requirements live on visitor contracts, not plans.
-  fields: { UnknownNode: ['name'] },
-};
-void invalidPlan;
 
 defineVisitorTop(
   'VariableDeclaration',
@@ -97,9 +86,6 @@ void inferredAnalysis;
 
 const configured = defineNativePlugin<undefined, { mode: 'development' | 'production' }>({
   name: 'configured',
-  prepare(_context, options) {
-    options.mode;
-  },
 });
 configured.withOptions({ mode: 'production' });
 // @ts-expect-error Invalid plugin options should be rejected.
@@ -133,7 +119,7 @@ path.is('Identifer');
 // ---------------------------------------------------------------------------
 // Typed per-visitor contracts
 // ---------------------------------------------------------------------------
-import { defineVisitor, type DefinedVisitor } from '../js/index.js';
+import { defineVisitor, parameter, type DefinedVisitor } from '../js/index.js';
 
 interface BlockState {
   renamed: number;
@@ -228,23 +214,39 @@ defineNativePlugin({
   createState: () => ({ other: true }),
 });
 
-// `configure` returns values, never capability shape.
+// Predicate values may be declared as bound parameters.
 defineVisitor(
   'Identifier',
-  {
-    fields: ['name'],
-    configure: () => ({ enabled: true, where: { name: { oneOf: ['__DEV__'] } } }),
-  },
+  { fields: ['name'], where: { name: { oneOf: parameter('names') } } },
   () => {},
 );
 defineVisitor(
   'Identifier',
+  { fields: ['name'], where: { name: { equals: parameter('name') } } },
+  () => {},
+);
+// A parameter stands for the value, never for the operator or the matched field.
+defineVisitor(
+  'Identifier',
   {
-    // @ts-expect-error configure may not return capability shape.
-    configure: () => ({ scope: true }),
+    // @ts-expect-error a predicate parameter is not itself a predicate.
+    where: { name: parameter('name') },
   },
   () => {},
 );
+const parameterised = defineNativePlugin({
+  name: 'parameterised',
+  visitors: [
+    defineVisitor(
+      'Identifier',
+      { fields: ['name'], where: { name: { oneOf: parameter('names') } } },
+      () => {},
+    ),
+  ],
+});
+parameterised.withParameters({ names: ['__DEV__'] });
+// @ts-expect-error parameter values are scalars or lists of scalars.
+parameterised.withParameters({ names: { nested: true } });
 
 // Unknown routes are rejected.
 defineVisitor(

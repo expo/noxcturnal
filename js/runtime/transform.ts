@@ -1,7 +1,8 @@
 import { classifyForTransform, parserFilename, sourceHints } from '../adapters/classification.js';
 import { selectParserAdapter } from '../adapters/registry.js';
 import { compilePhasePlan, maxEditEffect } from '../pipeline/compile.js';
-import type { CompiledRouteTemplate, PreparedPhase, SharedPhasePlan } from '../pipeline/types.js';
+import { closeDefinitionScope } from '../pipeline/define.js';
+import type { CompiledRouteTemplate, PreparedPhase } from '../pipeline/types.js';
 import {
   compileNestedVisitor,
   ContractVerifier,
@@ -46,7 +47,7 @@ interface RetainedPlan {
 }
 
 interface RetainedChainNode {
-  children: WeakMap<SharedPhasePlan, RetainedChainNode>;
+  children: WeakMap<PreparedPhase, RetainedChainNode>;
   plan?: RetainedPlan;
 }
 
@@ -54,7 +55,7 @@ const retainedChainRoot: RetainedChainNode = { children: new WeakMap() };
 
 /** Walk (and extend) the interned chain of prepared phase shapes. */
 function retainedChains(
-  shape: SharedPhasePlan,
+  shape: PreparedPhase,
   parent: RetainedChainNode = retainedChainRoot,
 ): RetainedChainNode {
   let node = parent.children.get(shape);
@@ -109,6 +110,9 @@ export function transform(
   pipeline: NativePipeline,
   options: TransformOptions = {},
 ): TransformResult {
+  // Any pipeline reaching a transform was defined before it, so this is where
+  // program configuration stops and per-file discovery begins.
+  closeDefinitionScope();
   const overallStarted = options.debugPerformance ? performance.now() : 0;
   const originalSource = source;
   let parseFilename = parserFilename(filename, options.parser);
@@ -147,9 +151,7 @@ export function transform(
             sourceHints: sourceHints(source),
             pluginData: options.pluginData,
           };
-          const state = plugin.createState?.(prepareContext);
-          prepared.push({ plugin, state });
-          plugin.prepare?.(prepareContext, plugin.options as any);
+          prepared.push({ plugin, state: plugin.createState?.(prepareContext) });
         }
       for (const { plugin, state } of prepared) plugin.cleanup?.('bailout', state);
       return { status: 'bailout', reason: parser.reason, source, diagnostics: [] };
@@ -206,7 +208,6 @@ export function transform(
   let openSession: NativeTransformSession | null = null;
   let reusableSession: NativeTransformSession | null = null;
   let reusableRoutedBatch: { manifest: Buffer; batch: RoutedEventBatch } | null = null;
-  const preparedAhead = new Map<number, { source: string; prepared: PreparedPhase }>();
   let pendingEdits: EditCommand[] = [];
   let nativeFunctionMap: FunctionMap | null = null;
   const recordedParseCounts = new WeakMap<NativeTransformSession, number>();
@@ -319,12 +320,7 @@ export function transform(
       }
       const edits: EditCommand[] = [];
       const preparationStarted = options.debugPerformance ? performance.now() : 0;
-      const ahead = preparedAhead.get(phaseIndex);
-      preparedAhead.delete(phaseIndex);
-      const prepared =
-        ahead?.source === observationSource
-          ? ahead.prepared
-          : preparePhase(phase, observationSource, filename, options, parser);
+      const prepared = preparePhase(phase);
       if (options.debugPerformance)
         performanceCounters(metadata).phasePreparationMs += performance.now() - preparationStarted;
       const {
@@ -373,24 +369,15 @@ export function transform(
       // shapes are interned, so the whole derivation is cached on their identity
       // chain instead of being repacked for every file.
       const lookahead: PreparedPhase[] = [];
-      let chain = retainedChains(prepared.shared);
+      let chain = retainedChains(prepared);
       for (let futureIndex = phaseIndex + 1; futureIndex < pipeline.phases.length; futureIndex++) {
         if (phasePlan[futureIndex].requiresPrintedInput) break;
         const futureObservationSource =
           phasePlan[futureIndex].observes === 'original' ? originalSource : observationSource;
         if (futureObservationSource !== observationSource) continue;
-        const futurePhase = pipeline.phases[futureIndex];
-        const existingFuture = preparedAhead.get(futureIndex);
-        const futurePrepared =
-          existingFuture?.source === futureObservationSource
-            ? existingFuture.prepared
-            : preparePhase(futurePhase, futureObservationSource, filename, options, parser);
-        preparedAhead.set(futureIndex, {
-          source: futureObservationSource,
-          prepared: futurePrepared,
-        });
+        const futurePrepared = preparePhase(pipeline.phases[futureIndex]);
         lookahead.push(futurePrepared);
-        chain = retainedChains(futurePrepared.shared, chain);
+        chain = retainedChains(futurePrepared, chain);
       }
       const retained = (chain.plan ??= buildRetainedPlan(prepared, lookahead));
       const { futureSubscriptions, retentionManifest } = retained;

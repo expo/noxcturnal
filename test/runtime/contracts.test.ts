@@ -11,6 +11,7 @@ import {
   defineNativePlugin,
   defineVisitor,
   NativeTransformError,
+  parameter,
   pipelineCacheKey,
   registerParserAdapter,
   transform,
@@ -172,39 +173,61 @@ test('two typed visitors on one route keep independent predicates', () => {
   assert.deepEqual(contexts, [2]);
 });
 
-test('configure resolves enablement and predicate values per file', () => {
+test('bound predicate parameters resolve to values and intern by value', () => {
   const seen: string[] = [];
-  const defines = defineVisitor(
-    'Identifier',
-    {
-      fields: ['name'],
-      configure: () => ({ enabled: true, where: { name: { oneOf: ['__DEV__'] } } }),
-    },
-    path => {
-      seen.push(String(path.node.name));
-    },
-  );
-  const disabled = defineVisitor(
-    'Identifier',
-    { fields: ['name'], configure: () => ({ enabled: false }) },
-    path => {
-      seen.push(`disabled:${String(path.node.name)}`);
-    },
-  );
-  const result = transform(
-    'const flag = __DEV__ && other;',
-    'fixture.js',
-    defineNativePipeline({
-      phases: [
-        {
-          name: 'scan',
-          plugins: [defineNativePlugin({ name: 'typed', visitors: [defines, disabled] })],
+  const plugin = defineNativePlugin({
+    name: 'typed',
+    visitors: [
+      defineVisitor(
+        'Identifier',
+        { fields: ['name'], where: { name: { oneOf: parameter('names') } } },
+        path => {
+          seen.push(String(path.node.name));
         },
-      ],
-    }),
-  );
-  assert.equal(result.status, 'complete');
+      ),
+    ],
+  });
+  const bound = plugin.withParameters({ names: ['__DEV__'] });
+  assert.equal(bound, plugin.withParameters({ names: ['__DEV__'] }));
+  assert.notEqual(bound, plugin.withParameters({ names: ['other'] }));
+  const run = (selected: typeof plugin) =>
+    transform(
+      'const flag = __DEV__ && other;',
+      'fixture.js',
+      defineNativePipeline({ phases: [{ name: 'scan', plugins: [selected] }] }),
+    );
+  assert.equal(run(bound).status, 'complete');
   assert.deepEqual(seen, ['__DEV__']);
+  seen.length = 0;
+  assert.equal(run(plugin.withParameters({ names: ['other'] })).status, 'complete');
+  assert.deepEqual(seen, ['other']);
+});
+
+test('an unbound predicate parameter is a contract error', () => {
+  const plugin = defineNativePlugin({
+    name: 'unbound',
+    visitors: [
+      defineVisitor(
+        'Identifier',
+        { fields: ['name'], where: { name: { equals: parameter('name') } } },
+        () => {},
+      ),
+    ],
+  });
+  assert.throws(
+    () =>
+      transform(
+        'const value = 1;',
+        'fixture.js',
+        defineNativePipeline({ phases: [{ name: 'scan', plugins: [plugin] }] }),
+      ),
+    /predicate parameter for Identifier.name was never bound/,
+  );
+  assert.throws(() => plugin.withParameters({ name: ['a'] }), /must be a scalar/);
+  assert.throws(
+    () => plugin.withParameters({ name: 'a', other: 'b' }),
+    /no predicate declares parameter other/,
+  );
 });
 
 test('typed enter and exit handlers share one contract and reverse exits', () => {
@@ -232,7 +255,7 @@ test('typed enter and exit handlers share one contract and reverse exits', () =>
   assert.deepEqual(order, ['enter:0', 'enter:19', 'exit:19', 'exit:0']);
 });
 
-test('typed plugins reject aggregate route plans and mixed visitor forms', () => {
+test('typed plugins reject the removed visitor-object form', () => {
   assert.throws(
     () =>
       defineNativePlugin({
@@ -240,21 +263,6 @@ test('typed plugins reject aggregate route plans and mixed visitor forms', () =>
         visitor: { Identifier() {} },
       } as never),
     /the visitor-object form was removed/,
-  );
-  const plugin = defineNativePlugin({
-    name: 'typed',
-    // @ts-expect-error This test verifies that legacy prepare-time field plans are rejected.
-    prepare: () => ({ fields: { Identifier: ['name'] } }),
-    visitors: [defineVisitor('Identifier', {}, () => {})],
-  });
-  assert.throws(
-    () =>
-      transform(
-        'const value = 1;',
-        'fixture.js',
-        defineNativePipeline({ phases: [{ name: 'scan', plugins: [plugin] }] }),
-      ),
-    /typed: prepare\(\) may not declare fields; route requirements live on visitor contracts/,
   );
 });
 

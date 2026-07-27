@@ -20,6 +20,7 @@ test('preserves the public package and native ABI surfaces', () => {
     'defineNativePlugin',
     'definePipelinePhase',
     'defineVisitor',
+    'parameter',
     'pipelineCacheKey',
     'registerParserAdapter',
     'transform',

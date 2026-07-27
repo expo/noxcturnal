@@ -6,7 +6,7 @@ import {
   PREDICATE_FIELDS,
   PREDICATE_VALUE_DOMAINS,
 } from '../generated/event-schema.js';
-import type { ControlFlowCapability, ScalarPredicate } from '../types.js';
+import type { ControlFlowCapability, ScalarPredicate, ScalarValue } from '../types.js';
 
 export interface PredicateRequirements {
   where?: Readonly<
@@ -78,12 +78,27 @@ export function validatePredicates(plugin: string, plan: PredicateRequirements):
         Number('present' in predicate);
       if (
         operations !== 1 ||
-        ('oneOf' in predicate && !Array.isArray(predicate.oneOf)) ||
+        ('oneOf' in predicate &&
+          !Array.isArray(predicate.oneOf) &&
+          !isPredicateParameter(predicate.oneOf)) ||
         ('present' in predicate && typeof predicate.present !== 'boolean')
       )
         throw new Error(`${plugin}: invalid predicate for ${route}.${field}`);
-      const values =
-        'equals' in predicate ? [predicate.equals] : 'oneOf' in predicate ? predicate.oneOf : [];
+      // An unresolved parameter never reaches compilation: it means the plugin was
+      // used without `withParameters`, which would otherwise compile as a value.
+      if (
+        ('equals' in predicate && isPredicateParameter(predicate.equals)) ||
+        ('oneOf' in predicate && isPredicateParameter(predicate.oneOf))
+      )
+        throw new Error(
+          `${plugin}: predicate parameter for ${route}.${field} was never bound; call plugin.withParameters(...)`,
+        );
+      const values: readonly ScalarValue[] =
+        'equals' in predicate
+          ? [predicate.equals as ScalarValue]
+          : 'oneOf' in predicate
+            ? (predicate.oneOf as readonly ScalarValue[])
+            : [];
       if (values.length > 1024 || values.some(value => !isScalarPredicateValue(value)))
         throw new Error(`${plugin}: invalid scalar value for ${route}.${field}`);
       for (const concreteType of concreteTypes) {
@@ -118,4 +133,14 @@ function scalarPredicateKind(
   if (typeof value === 'string') return 'string';
   if (typeof value === 'number') return 'number';
   return 'boolean';
+}
+
+/** A predicate value still carrying an unbound `parameter(name)` declaration. */
+export function isPredicateParameter(value: unknown): boolean {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    !Array.isArray(value) &&
+    typeof (value as { parameter?: unknown }).parameter === 'string'
+  );
 }

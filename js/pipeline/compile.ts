@@ -23,8 +23,20 @@ export function maxEditEffect(effects: readonly EditEffect[]): EditEffect {
   return selected;
 }
 
+/** Pipelines are interned structurally, so their compiled phase boundaries are a
+ * property of the pipeline object rather than per-file work. */
+const compiledPipelinePlans = new WeakMap<NativePipeline, readonly CompiledPhasePlan[]>();
+
 /** Compile conservative phase boundaries without parsing a source file. */
 export function compilePhasePlan(pipeline: NativePipeline): readonly CompiledPhasePlan[] {
+  const cached = compiledPipelinePlans.get(pipeline);
+  if (cached != null) return cached;
+  const compiled = computePhasePlan(pipeline);
+  compiledPipelinePlans.set(pipeline, compiled);
+  return compiled;
+}
+
+function computePhasePlan(pipeline: NativePipeline): readonly CompiledPhasePlan[] {
   let previousEffect: EditEffect = 'none';
   return Object.freeze(
     pipeline.phases.map((phase, index) => {

@@ -448,11 +448,14 @@ test('keeps the absent preflight seam disabled and cache-visible only when decla
 });
 
 test('creates immutable pipelines and reusable option-bound plugin definitions', () => {
+  let observed: string | undefined;
   const definition = defineNativePlugin<undefined, { value: string }>({
     name: 'configured',
-    prepare(_context, options) {
-      assert.equal(options.value, 'configured');
-    },
+    visitors: [
+      defineVisitor('Program', {}, () => {
+        observed = 'visited';
+      }),
+    ],
   });
   const configured = definition.withOptions({ value: 'configured' });
   const pipeline = defineNativePipeline({
@@ -467,6 +470,8 @@ test('creates immutable pipelines and reusable option-bound plugin definitions',
     pipelineCacheKey(definitionPipeline(configured), 'fixture.js'),
   );
   transform('value', 'fixture.js', pipeline);
+  assert.equal(observed, 'visited');
+  assert.equal(configured.options?.value, 'configured');
 });
 
 test('requires explicit pipeline phases', () => {
@@ -654,11 +659,10 @@ test('requires ancestry and scope payloads to be declared', () => {
   );
 });
 
-test('honors plan phase filters and validates expression fragments natively', () => {
+test('selects the phases a plugin runs in by inclusion and validates expression fragments natively', () => {
   const visited: string[] = [];
   const plugin = defineNativePlugin({
     name: 'phased',
-    prepare: () => ({ phases: ['second'] }),
     visitors: [
       defineVisitor('Program', {}, path => {
         visited.push(path.context.phase);
@@ -674,7 +678,7 @@ test('honors plan phase filters and validates expression fragments natively', ()
     'fixture.js',
     defineNativePipeline({
       phases: [
-        { name: 'first', plugins: [plugin] },
+        { name: 'first', plugins: [] },
         { name: 'second', plugins: [plugin] },
       ],
     }),

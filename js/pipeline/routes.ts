@@ -1,7 +1,5 @@
-import { sourceHints } from '../adapters/classification.js';
 import { CHILD_ROLES } from '../generated/event-schema.js';
 import { stableJson } from './cache-key.js';
-import { EDIT_EFFECTS } from './compile.js';
 import {
   concreteRouteTypes,
   isCollapsedClassKey,
@@ -16,7 +14,6 @@ import type {
   CompiledRouteTemplate,
   DispatchRoute,
   PreparedPhase,
-  SharedPhasePlan,
   PreparedPluginPlan,
   ResolvedVisitor,
   RouteCapabilities,
@@ -29,7 +26,6 @@ import type {
   Handler,
   NativePlugin,
   PipelinePhase,
-  PrepareContext,
   VisitorRouteSpec,
 } from '../contracts/visitor.js';
 import type {
@@ -37,26 +33,10 @@ import type {
   Diagnostic,
   NativeFieldKey,
   NativeNodeType,
-  ParseClassification,
-  PluginPlan,
   QueryRequest,
   ScalarPredicate,
-  TransformOptions,
+  ScalarValue,
 } from '../types.js';
-
-const REMOVED_PLAN_FIELDS = [
-  'subscriptions',
-  'identifierNames',
-  'staticMemberPatterns',
-  'fields',
-  'where',
-  'children',
-  'controlFlow',
-  'semantics',
-  'ancestry',
-  'queries',
-  'metadataWrites',
-] as const;
 
 const validatedVisitors = new WeakSet<DefinedVisitor<any>>();
 
@@ -107,36 +87,18 @@ function validateDefinedVisitor(pluginName: string, defined: DefinedVisitor<any>
   validatedVisitors.add(defined);
 }
 
-function resolveTypedVisitors(
-  plugin: NativePlugin<any, any>,
-  context: PrepareContext,
-): ResolvedVisitor[] {
+function resolveTypedVisitors(plugin: NativePlugin<any, any>): ResolvedVisitor[] {
   const resolved: ResolvedVisitor[] = [];
   for (const defined of plugin.visitors!) {
     validateDefinedVisitor(plugin.name, defined);
     const contract = defined.contract;
-    let enabled = true;
-    let where: Record<string, ScalarPredicate> | undefined =
+    const where: Record<string, ScalarPredicate> | undefined =
       contract.where == null
         ? undefined
         : (Object.fromEntries(
             Object.entries(contract.where).filter(([, predicate]) => predicate != null),
           ) as Record<string, ScalarPredicate>);
-    if (contract.configure) {
-      const configuration = contract.configure(context, plugin.options) ?? {};
-      if (configuration.enabled === false) enabled = false;
-      if (configuration.where != null) {
-        validatePredicates(plugin.name, {
-          where: { [defined.route]: configuration.where },
-        } as PredicateRequirements);
-        where ??= {};
-        for (const [field, predicate] of Object.entries(configuration.where)) {
-          if (predicate == null) continue;
-          where[field] = where[field] ? intersectPredicates(where[field], predicate) : predicate;
-        }
-      }
-    }
-    resolved.push({ definition: defined, enabled, where });
+    resolved.push({ definition: defined, where });
   }
   return resolved;
 }
@@ -148,23 +110,15 @@ function resolveTypedVisitors(
  */
 function synthesizeVisitorPlan(
   plugin: NativePlugin<any, any>,
-  plan: PluginPlan,
   resolved: readonly ResolvedVisitor[],
 ): PreparedPluginPlan & { metadataWrites?: readonly string[]; queries?: readonly QueryRequest[] } {
-  for (const field of REMOVED_PLAN_FIELDS) {
-    if ((plan as Record<string, unknown>)[field] != null)
-      throw new Error(
-        `${plugin.name}: prepare() may not declare ${field}; route requirements live on visitor contracts and context requirements on the plugin contract`,
-      );
-  }
   const subscriptions: VisitorRouteSpec[] = [];
   const fields: Record<string, NativeFieldKey[]> = {};
   const children: Record<string, string[]> = {};
   const controlFlow = new Set<ControlFlowCapability>();
   let scope = false;
   let ancestry: AncestryCapability | undefined;
-  for (const { definition, enabled } of resolved) {
-    if (!enabled) continue;
+  for (const { definition } of resolved) {
     const contract = definition.contract;
     subscriptions.push(definition.route);
     if (contract.fields.length > 0)
@@ -204,7 +158,6 @@ function synthesizeVisitorPlan(
     }
   }
   return {
-    ...plan,
     subscriptions,
     fields: fields as PreparedPluginPlan['fields'],
     children: Object.keys(children).length > 0 ? children : undefined,
@@ -313,9 +266,18 @@ export class ContractVerifier {
   }
 }
 
-const staticPlanCache = new WeakMap<NativePlugin<any, any>, PreparedPluginPlan>();
-const preparedPhaseCaches = new WeakMap<PipelinePhase, Map<string, SharedPhasePlan>>();
-const compiledPhaseCaches = new WeakMap<PipelinePhase, Map<string, CompiledPhaseRoutes>>();
+/** A plugin's plan is fixed by its definition, and a phase's preparation by the
+ * frozen plugin list behind it, so both are stored on identity. There is no
+ * per-file value to key on: predicate values are bound with
+ * `plugin.withParameters` at configuration scope, and enablement is expressed by
+ * whether a plugin is in the phase at all.
+ *
+ * `definePipelinePhase` and `defineNativePipeline` prepare plugin phases as soon as
+ * they intern them, so these hold results rather than acting as caches. The
+ * get-or-compute below only matters for a phase that reached a transform without
+ * being defined through either. */
+const pluginPlans = new WeakMap<NativePlugin<any, any>, PreparedPluginPlan>();
+const preparedPhases = new WeakMap<PipelinePhase, PreparedPhase>();
 
 const RETAIN_IDENTIFIERS = 1 << 0;
 const RETAIN_CONSTANTS = 1 << 1;
@@ -323,15 +285,6 @@ const RETAIN_CALLS = 1 << 2;
 const RETAIN_CHILDREN = 1 << 3;
 const RETAIN_INSPECTION = 1 << 4;
 const RETAIN_MODULE_FACTS = 1 << 5;
-
-function phaseIsEnabled(plan: PreparedPluginPlan, phaseName: string): boolean {
-  if (plan.enabled === false) return false;
-  if (plan.phases == null || plan.phases.length === 0) return true;
-  for (const enabledPhase of plan.phases) {
-    if (enabledPhase === phaseName) return true;
-  }
-  return false;
-}
 
 export function mergeFieldRequests(
   target: Record<string, string[]>,
@@ -352,67 +305,28 @@ export function mergeFieldRequests(
   }
 }
 
-export function preparePhase(
-  phase: PipelinePhase,
-  phaseSource: string,
-  filename: string,
-  options: TransformOptions,
-  parser: ParseClassification,
-): PreparedPhase {
-  const hints = sourceHints(phaseSource);
-  const plans = new Map<NativePlugin<any, any>, PreparedPluginPlan>();
-  for (const plugin of phase.plugins ?? []) {
-    // Plugins with no per-file hooks (`prepare`, `configure`) have a fully static
-    // plan; synthesize it once per plugin definition.
-    const staticPlan = staticPlanCache.get(plugin);
-    if (staticPlan != null) {
-      plans.set(plugin, staticPlan);
-      continue;
-    }
-    const prepareContext: PrepareContext = {
-      filename,
-      options,
-      parser,
-      sourceHints: hints,
-      pluginData: options.pluginData,
-    };
-    const prepared = plugin.prepare?.(prepareContext, plugin.options as any) ?? {};
-    if (prepared.editEffect != null && !EDIT_EFFECTS.has(prepared.editEffect))
-      throw new Error(`${plugin.name}: invalid edit effect ${String(prepared.editEffect)}`);
-    const synthesized = synthesizeVisitorPlan(
-      plugin,
-      prepared,
-      plugin.visitors == null ? [] : resolveTypedVisitors(plugin, prepareContext),
-    );
-    // Plugin-contract requirements union with the visitor-derived plan.
-    if (plugin.contract != null) {
-      synthesized.metadataWrites = [
-        ...new Set([
-          ...(synthesized.metadataWrites ?? []),
-          ...(plugin.contract.metadata?.writes ?? []),
-        ]),
-      ];
-      synthesized.queries = [...(synthesized.queries ?? []), ...(plugin.contract.queries ?? [])];
-    }
-    plans.set(plugin, synthesized);
-    if (
-      plugin.prepare == null &&
-      (plugin.visitors ?? []).every(visitor => visitor.contract.configure == null)
-    )
-      staticPlanCache.set(plugin, synthesized);
+/** The plan a plugin's definition implies, synthesized once per plugin. */
+function pluginPlan(plugin: NativePlugin<any, any>): PreparedPluginPlan {
+  let plan = pluginPlans.get(plugin);
+  if (plan != null) return plan;
+  plan = synthesizeVisitorPlan(plugin, plugin.visitors == null ? [] : resolveTypedVisitors(plugin));
+  // Plugin-contract requirements union with the visitor-derived plan.
+  if (plugin.contract != null) {
+    plan.metadataWrites = [
+      ...new Set([...(plan.metadataWrites ?? []), ...(plugin.contract.metadata?.writes ?? [])]),
+    ];
+    plan.queries = [...(plan.queries ?? []), ...(plugin.contract.queries ?? [])];
   }
+  pluginPlans.set(plugin, plan);
+  return plan;
+}
 
-  // Positional: the phase's plugin list is frozen, so join order identifies each
-  // plugin and no name needs to appear in the key.
-  const preparedKey = (phase.plugins ?? [])
-    .map(plugin => computePluginPlanCacheKey(plans.get(plugin)!))
-    .join('\u001e');
-  const cachedPrepared = preparedPhaseCaches.get(phase)?.get(preparedKey);
-  if (cachedPrepared) return { ...cachedPrepared, plans, shared: cachedPrepared };
-
-  const activePlugins = (phase.plugins ?? []).filter(plugin =>
-    phaseIsEnabled(plans.get(plugin)!, phase.name),
-  );
+export function preparePhase(phase: PipelinePhase): PreparedPhase {
+  const cached = preparedPhases.get(phase);
+  if (cached != null) return cached;
+  const activePlugins = [...(phase.plugins ?? [])];
+  const plans = new Map<NativePlugin<any, any>, PreparedPluginPlan>();
+  for (const plugin of activePlugins) plans.set(plugin, pluginPlan(plugin));
   const subscriptions = new Set<string>();
   const fieldRequests: Record<string, string[]> = {};
   let includeParent = false;
@@ -426,8 +340,7 @@ export function preparePhase(
     includeScope ||= plan.scope === true;
     includeParent ||= plan.ancestry != null;
     mergeFieldRequests(fieldRequests, plan.fields ?? {});
-    for (const { definition, enabled, where } of plan.resolvedVisitors) {
-      if (!enabled) continue;
+    for (const { definition, where } of plan.resolvedVisitors) {
       const matchFields = Object.keys(where ?? {});
       for (const part of definition.route.split('|')) {
         if (part === 'ReferencedIdentifier') matchFields.push('global');
@@ -475,8 +388,9 @@ export function preparePhase(
     includeScope,
     retentionCapabilities,
   );
-  const cacheable: SharedPhasePlan = {
+  const prepared: PreparedPhase = {
     activePlugins,
+    plans,
     subscriptions,
     fieldRequests,
     includeParent,
@@ -486,34 +400,8 @@ export function preparePhase(
     dispatchRoutes: routed.dispatchRoutes,
     manifest: routed.manifest,
   };
-  let preparedCache = preparedPhaseCaches.get(phase);
-  if (!preparedCache) {
-    preparedCache = new Map();
-    preparedPhaseCaches.set(phase, preparedCache);
-  }
-  if (preparedCache.size < 64) preparedCache.set(preparedKey, cacheable);
-  return { ...cacheable, plans, shared: cacheable };
-}
-
-/** Serialize only what a prepared plan's per-file hooks can change.
- *
- * Everything else is identified by position rather than by content. A phase's
- * plugin list is frozen when the phase is defined, and each plugin's visitor list
- * is frozen when the plugin is defined, so the definition at a given position is
- * always the same object. That leaves only the values `prepare` returned and, per
- * visitor, whether `configure` enabled it and which predicate values it chose.
- * Serializing the contracts as well produced keys averaging 1,749 bytes — 2.6MB
- * per bundle to build and to hash — for information the position already fixes.
- */
-function computePluginPlanCacheKey(plan: PreparedPluginPlan): string {
-  let key = plan.enabled === false ? '0' : '1';
-  if (plan.phases != null) key += `\u001dp${plan.phases.join(',')}`;
-  if (plan.editEffect != null) key += `\u001de${plan.editEffect}`;
-  for (const { definition, enabled, where } of plan.resolvedVisitors) {
-    key += enabled ? '\u001d1' : '\u001d0';
-    if (definition.contract.configure != null) key += stableJson(where ?? null);
-  }
-  return key;
+  preparedPhases.set(phase, prepared);
+  return prepared;
 }
 
 function compilePhaseRoutes(
@@ -524,41 +412,6 @@ function compilePhaseRoutes(
   includeScope: boolean,
   retentionCapabilities: number,
 ): CompiledPhaseRoutes {
-  const cacheKey = stableJson({
-    includeParent,
-    includeScope,
-    retentionCapabilities,
-    children: plugins.map(plugin => plans.get(plugin)?.children ?? null),
-    plugins: plugins.map(plugin => {
-      const plan = plans.get(plugin)!;
-      return {
-        name: plugin.name,
-        fields: plan.fields ?? null,
-        controlFlow: plan.controlFlow,
-        visitors: plan.resolvedVisitors.map(({ definition, enabled, where }) => ({
-          route: definition.route,
-          enabled,
-          where: where ?? null,
-          fields: definition.contract.fields,
-          children: definition.contract.children ?? null,
-          controlFlow: definition.contract.controlFlow,
-          scope: definition.contract.scope,
-          ancestry: definition.contract.ancestry ?? null,
-          nested: definition.contract.nested.map(nested => ({
-            route: nested.route,
-            fields: nested.contract.fields,
-          })),
-        })),
-      };
-    }),
-  });
-  let cache = compiledPhaseCaches.get(phase);
-  if (!cache) {
-    cache = new Map();
-    compiledPhaseCaches.set(phase, cache);
-  }
-  const cached = cache.get(cacheKey);
-  if (cached) return cached;
   const hasGlobalStop = plugins.some(plugin =>
     plans.get(plugin)?.controlFlow?.includes('stop-all'),
   );
@@ -568,8 +421,7 @@ function compilePhaseRoutes(
     // Typed visitors compile directly: one route per (visitor, concrete type,
     // side), with the visitor's own predicates and payload — never lowered into
     // a plugin-wide aggregate.
-    for (const { definition, enabled, where } of plans.get(plugin)!.resolvedVisitors) {
-      if (!enabled) continue;
+    for (const { definition, where } of plans.get(plugin)!.resolvedVisitors) {
       const fast =
         !hasGlobalStop && definition.contract.controlFlow.length === 0 && plugin.analyze == null;
       const capabilities = typedCapabilities(definition);
@@ -643,9 +495,7 @@ function compilePhaseRoutes(
     structuralParentTypes,
     retainedFields,
   );
-  const compiled = { routes, dispatchRoutes, manifest };
-  if (cache.size < 64) cache.set(cacheKey, compiled);
-  return compiled;
+  return { routes, dispatchRoutes, manifest };
 }
 
 /** Expand one typed visitor's route into concrete node types with merged predicates. */
@@ -687,8 +537,9 @@ function intersectPredicates(left: ScalarPredicate, right: ScalarPredicate): Sca
     return left.present ? right : { oneOf: [] };
   }
   if ('present' in right) return right.present ? left : { oneOf: [] };
-  const leftValues = 'equals' in left ? [left.equals] : left.oneOf;
-  const rightValues = 'equals' in right ? [right.equals] : right.oneOf;
+  // Both sides are validated predicates by now, so neither carries a parameter.
+  const leftValues = ('equals' in left ? [left.equals] : left.oneOf) as readonly ScalarValue[];
+  const rightValues = ('equals' in right ? [right.equals] : right.oneOf) as readonly ScalarValue[];
   const values = leftValues.filter(value => rightValues.some(candidate => candidate === value));
   return values.length === 1 ? { equals: values[0] } : { oneOf: values };
 }
@@ -710,8 +561,6 @@ export function compileNestedVisitor(visitor: NestedVisitor): CompiledNestedRout
   const payloads: (readonly NativeFieldKey[])[] = [];
   for (const defined of visitor) {
     validateDefinedVisitor('nested', defined);
-    if (defined.contract.configure != null)
-      throw new Error(`nested visitor for ${defined.route} may not use configure`);
     const caps = typedCapabilities(defined);
     for (const { nodeType, predicates } of typedRouteExpansion(defined, defined.contract.where)) {
       for (const side of ['enter', 'exit'] as const) {

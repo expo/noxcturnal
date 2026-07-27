@@ -13,9 +13,19 @@ export type NativeVisitorAlias = Extract<keyof NativeRouteTypes, string>;
 export type NativeVisitorRoute = NativeNodeType | NativeVisitorAlias;
 export type ScalarValue = string | number | boolean | null;
 /** A declarative native match operation, typed by the field's wire value. */
+/** A predicate value supplied when a plugin is bound, not when it is defined.
+ *
+ * Declared with `parameter(name)` inside a visitor contract and resolved by
+ * `plugin.withParameters(values)`. Binding happens once per configuration, so the
+ * bound plugin's plan is fixed by its identity and never depends on the file being
+ * transformed. An unresolved parameter is a contract error, not a wildcard. */
+export interface PredicateParameter {
+  readonly parameter: string;
+}
+
 export type ScalarPredicate<V extends ScalarValue = ScalarValue> =
-  | { equals: V }
-  | { oneOf: readonly V[] }
+  | { equals: V | PredicateParameter }
+  | { oneOf: readonly V[] | PredicateParameter }
   | { present: boolean };
 export type ControlFlowCapability =
   | 'skip'
@@ -215,13 +225,6 @@ export interface InspectRequest {
  * Per-file lifecycle settings returned by `prepare()`. Route requirements live on
  * typed visitor contracts; context requirements live on the plugin contract.
  */
-export interface PluginPlan {
-  /** Disable this plugin, including its lifecycle and subscriptions, for the current file. */
-  enabled?: boolean;
-  phases?: readonly string[];
-  /** Conservative effect of editor/native actions performed by this plugin. */
-  editEffect?: EditEffect;
-}
 
 export interface TransformOptions {
   /** Reserved declarative configuration for native preflight phases. */

@@ -42,7 +42,6 @@ export type {
   TransformDecision,
   TypedVisitorHandler,
   VisitorRouteSpec,
-  VisitorConfiguration,
   VisitorContract,
 } from './contracts/visitor.js';
 export { defineVisitor, NativeTransformError } from './contracts/visitor.js';
@@ -51,6 +50,7 @@ export {
   defineNativePipeline,
   defineNativePlugin,
   definePipelinePhase,
+  parameter,
 } from './pipeline/define.js';
 export { compilePhasePlan } from './pipeline/compile.js';
 export { pipelineCacheKey, transformClassificationCacheKey } from './pipeline/cache-key.js';

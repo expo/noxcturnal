@@ -393,11 +393,10 @@ test('filters hot event families only when every subscriber opts in', () => {
   assert.ok(unfiltered.has('third'));
 });
 
-test('can disable a plugin and its lifecycle for the current file', () => {
+test('a plugin left out of a phase runs no lifecycle at all', () => {
   let lifecycleCalls = 0;
   const plugin = defineNativePlugin({
-    name: 'disabled',
-    prepare: () => ({ enabled: false }),
+    name: 'excluded',
     createState() {
       lifecycleCalls++;
     },
@@ -413,10 +412,15 @@ test('can disable a plugin and its lifecycle for the current file', () => {
       lifecycleCalls++;
     },
   });
+  // Enablement is inclusion: a plugin that should not run for this file is not put
+  // in the phase, so its plan stays a property of its definition.
+  const include = false;
   transform(
     'const value = source;',
     'fixture.js',
-    defineNativePipeline({ phases: [{ name: 'transform', plugins: [plugin] }] }),
+    defineNativePipeline({
+      phases: [{ name: 'transform', plugins: include ? [plugin] : [] }],
+    }),
   );
   assert.equal(lifecycleCalls, 0);
 });

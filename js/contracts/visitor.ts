@@ -18,7 +18,6 @@ import type {
   NodeSummary,
   NodeView,
   PhaseObservation,
-  PluginPlan,
   QueryRequest,
   QueryResult,
   ScalarPredicate,
@@ -367,18 +366,6 @@ export interface ChildContract {
   children?: Readonly<Record<string, ChildContract>>;
 }
 
-/** Values resolved per file by `configure`; never capability shape. */
-export interface VisitorConfiguration<Route extends VisitorRouteSpec = VisitorRouteSpec> {
-  enabled?: boolean;
-  where?: RouteWhere<Route>;
-}
-
-/** The configuration as stored: route-erased for runtime consumption. */
-export interface StoredVisitorConfiguration {
-  enabled?: boolean;
-  where?: Readonly<Partial<Record<string, ScalarPredicate>>>;
-}
-
 export interface VisitorContract<Route extends VisitorRouteSpec = VisitorRouteSpec> {
   /** Scalar payload fields transferred to the callback's `path.node`. */
   fields?: readonly DeclaredFieldKey<Route>[];
@@ -391,8 +378,6 @@ export interface VisitorContract<Route extends VisitorRouteSpec = VisitorRouteSp
   /** Typed visitors this handler may run via `path.traverse`; their payload and
    * predicate fields join the phase plan so the retained index can serve them. */
   nested?: readonly DefinedVisitor<any>[];
-  /** Per-file dynamism with a static shape: enablement and predicate values. */
-  configure?(context: PrepareContext, options: never): VisitorConfiguration<Route>;
 }
 
 /** Deep contract validation applied in `defineVisitor`'s signature: child roles
@@ -639,9 +624,6 @@ export interface StoredVisitorContract {
   readonly children: Readonly<Record<string, ChildContract>> | undefined;
   readonly controlFlow: readonly ControlFlowCapability[];
   readonly nested: readonly DefinedVisitor<any>[];
-  readonly configure:
-    | ((context: PrepareContext, options: unknown) => StoredVisitorConfiguration)
-    | undefined;
 }
 
 const MAX_CHILD_CONTRACT_DEPTH = 8;
@@ -704,7 +686,6 @@ export function defineVisitor<
     children: freezeChildContracts(contract.children),
     controlFlow: Object.freeze([...(contract.controlFlow ?? [])]),
     nested: Object.freeze([...(contract.nested ?? [])]),
-    configure: contract.configure as StoredVisitorContract['configure'],
   });
   return Object.freeze({
     route,
@@ -765,7 +746,6 @@ export interface NativePlugin<
   options?: Options;
   /** Plugin-level context requirements: metadata ownership and queries. */
   contract?: Contract;
-  prepare?(context: PrepareContext, options: Options): PluginPlan | void;
   createState?(context: PrepareContext): State;
   pre?(context: PluginContextFor<Contract>, state: State): void;
   analyze?(context: PluginContextFor<Contract>, state: State): TransformDecision<Analysis> | void;
@@ -774,7 +754,7 @@ export interface NativePlugin<
   visitors?: readonly DefinedVisitor<State>[];
   post?(context: PluginContextFor<Contract>, state: State): void;
   cleanup?(reason: 'complete' | 'bailout' | 'error', state: State): void;
-  /** Static fallback used by phase planning when prepare() is source-dependent. */
+  /** Conservative effect of this plugin's editor and native actions. */
   editEffect?: EditEffect;
 }
 export type NativePluginDefinition<
@@ -790,6 +770,13 @@ export interface DefinedNativePlugin<
   Contract extends PluginContract = PluginContract,
 > extends NativePlugin<State, Options, Analysis, Contract> {
   withOptions(options: Options): DefinedNativePlugin<State, Options, Analysis, Contract>;
+  /** Resolve the predicate parameters declared by this plugin's visitor contracts.
+   *
+   * Interned on the values, so binding the same configuration twice returns the
+   * same plugin and its compiled routes stay keyed by identity. */
+  withParameters(
+    values: Readonly<Record<string, ScalarValue | readonly ScalarValue[]>>,
+  ): DefinedNativePlugin<State, Options, Analysis, Contract>;
 }
 
 /**

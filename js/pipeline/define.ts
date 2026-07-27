@@ -1,11 +1,16 @@
 import type {
   DefinedNativePlugin,
+  DefinedVisitor,
   NativePipeline,
   NativePipelineDefinition,
+  NativePlugin,
   NativePluginDefinition,
   PipelinePhase,
   PluginContract,
 } from '../contracts/visitor.js';
+import type { PredicateParameter, ScalarPredicate, ScalarValue } from '../types.js';
+import { stableJson } from './cache-key.js';
+import { preparePhase } from './routes.js';
 import type { PreflightPlan } from '../preflight/types.js';
 import {
   NATIVE_TRANSFORM_NAMES,
@@ -44,17 +49,103 @@ export function defineNativePlugin<
     enumerable: false,
     value: (options: Options) => defineNativePlugin({ ...plugin, options }),
   });
+  Object.defineProperty(definition, 'withParameters', {
+    enumerable: false,
+    value: (values: ParameterValues) => bindParameters(definition, values),
+  });
   return Object.freeze(definition);
 }
 
-export function defineNativePipeline(pipeline: NativePipelineDefinition): NativePipeline {
+/** Declare a predicate value supplied when the plugin is bound.
+ *
+ * `where: { name: { oneOf: parameter('identifierKeys') } }` keeps the operator and
+ * the matched field in the contract while deferring the values. Bind them once per
+ * configuration with `plugin.withParameters({ identifierKeys: [...] })`; equal
+ * values return the same plugin, so the bound plugin's plan is fixed by identity
+ * and never depends on the file being transformed. */
+export function parameter(name: string): PredicateParameter {
+  if (typeof name !== 'string' || name.length === 0) throw new Error('parameter requires a name');
+  return Object.freeze({ parameter: name });
+}
+
+function isParameter(value: unknown): value is PredicateParameter {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    !Array.isArray(value) &&
+    typeof (value as PredicateParameter).parameter === 'string'
+  );
+}
+
+type ParameterValues = Readonly<Record<string, ScalarValue | readonly ScalarValue[]>>;
+
+function bindPredicate(
+  pluginName: string,
+  field: string,
+  predicate: ScalarPredicate,
+  values: ParameterValues,
+  seen: Set<string>,
+): ScalarPredicate {
+  const resolve = (
+    declared: PredicateParameter,
+    expectsList: boolean,
+  ): ScalarValue | readonly ScalarValue[] => {
+    const { parameter: name } = declared;
+    if (!Object.hasOwn(values, name))
+      throw new Error(`${pluginName}: unbound predicate parameter ${name} for ${field}`);
+    seen.add(name);
+    const value = values[name];
+    if (expectsList !== Array.isArray(value))
+      throw new Error(
+        `${pluginName}: predicate parameter ${name} must be ${expectsList ? 'a list of scalars' : 'a scalar'}`,
+      );
+    return value;
+  };
+  if ('equals' in predicate && isParameter(predicate.equals))
+    return { equals: resolve(predicate.equals, false) as ScalarValue };
+  if ('oneOf' in predicate && isParameter(predicate.oneOf))
+    return {
+      oneOf: Object.freeze([...(resolve(predicate.oneOf, true) as readonly ScalarValue[])]),
+    };
+  return predicate;
+}
+
+function bindVisitorParameters(
+  pluginName: string,
+  visitor: DefinedVisitor<any>,
+  values: ParameterValues,
+  seen: Set<string>,
+): DefinedVisitor<any> {
+  const contract = visitor.contract;
+  let where = contract.where;
+  if (where != null) {
+    let bound: Record<string, ScalarPredicate> | undefined;
+    for (const [field, predicate] of Object.entries(where)) {
+      if (predicate == null) continue;
+      const resolved = bindPredicate(pluginName, field, predicate, values, seen);
+      if (resolved === predicate) continue;
+      bound ??= { ...(where as Record<string, ScalarPredicate>) };
+      bound[field] = resolved;
+    }
+    if (bound != null) where = Object.freeze(bound);
+  }
+  const nested = contract.nested.map(inner =>
+    bindVisitorParameters(pluginName, inner, values, seen),
+  );
+  const nestedChanged = nested.some((inner, index) => inner !== contract.nested[index]);
+  if (where === contract.where && !nestedChanged) return visitor;
   return Object.freeze({
-    phases: Object.freeze(
-      pipeline.phases.map(phase =>
-        definedPhases.has(phase) ? phase : normalizePipelinePhase(phase),
-      ),
-    ),
+    ...visitor,
+    contract: Object.freeze({ ...contract, where, nested: Object.freeze(nested) }),
   });
+}
+
+export function defineNativePipeline(pipeline: NativePipelineDefinition): NativePipeline {
+  return composeInternedPhases(
+    pipeline.phases.map(phase =>
+      definedPhases.has(phase) ? phase : normalizePipelinePhase(phase),
+    ),
+  );
 }
 
 /**
@@ -75,10 +166,16 @@ export function definePipelinePhase(phase: PipelinePhase): PipelinePhase {
  * compilation can be paid once without retaining per-file configuration.
  */
 export function composeNativePipeline(phases: readonly PipelinePhase[]): NativePipeline {
-  let node = pipelineCompositions;
-  for (const phase of phases) {
+  for (const phase of phases)
     if (!definedPhases.has(phase))
       throw new Error('composeNativePipeline requires phases created with definePipelinePhase');
+  return composeInternedPhases(phases);
+}
+
+/** Intern an ordered sequence of already-interned phases. */
+function composeInternedPhases(phases: readonly PipelinePhase[]): NativePipeline {
+  let node = pipelineCompositions;
+  for (const phase of phases) {
     let child = node.children.get(phase);
     if (child == null) {
       child = { children: new WeakMap() };
@@ -86,9 +183,82 @@ export function composeNativePipeline(phases: readonly PipelinePhase[]): NativeP
     }
     node = child;
   }
-  return (node.pipeline ??= Object.freeze({
-    phases: Object.freeze([...phases]),
-  }));
+  return (node.pipeline ??= Object.freeze({ phases: Object.freeze([...phases]) }));
+}
+
+/** Stable integer identity per plugin definition, for structural phase keys. */
+const pluginIds = new WeakMap<object, number>();
+let nextPluginId = 0;
+function pluginId(plugin: NativePlugin<any, any>): number {
+  let id = pluginIds.get(plugin);
+  if (id == null) {
+    id = nextPluginId++;
+    pluginIds.set(plugin, id);
+  }
+  return id;
+}
+
+const internedPhases = new Map<string, PipelinePhase>();
+/** Budget for phases first seen while transforming. */
+const MAX_RUNTIME_INTERNED_PHASES = 1024;
+/** Null while the definition scope is open. */
+let runtimeInternLimit: number | null = null;
+
+/**
+ * End the definition scope; the first transform calls this.
+ *
+ * Phases interned before any transform are program configuration and finite by
+ * construction, so they are not counted against the runtime budget and cannot be
+ * crowded out by shapes discovered later. Everything after this point shares a
+ * bounded budget on top of whatever definition scope used.
+ *
+ * A consumer that memoises its phases lazily — on the first file rather than at
+ * module scope — reaches this boundary before most of its reusable phases exist, so
+ * those compete for the runtime budget like any other. Define phases at module
+ * scope to get the guarantee.
+ */
+export function closeDefinitionScope(): void {
+  runtimeInternLimit ??= internedPhases.size + MAX_RUNTIME_INTERNED_PHASES;
+}
+
+/** Phase identity is structural, so a consumer cannot lose it by accident.
+ *
+ * Plan and route compilation are memoised on the phase object, so an anonymous
+ * phase rebuilt for every file would recompile for every file. A phase is fully
+ * described by its name, its flags, and either its native plan or its ordered
+ * plugin identities, so building the same phase twice returns the same object and
+ * those memos hit — whether the consumer reached for `definePipelinePhase` or
+ * wrote the phase inline. */
+function internPhase(phase: PipelinePhase, normalize: () => PipelinePhase): PipelinePhase {
+  const flags = [
+    phase.name,
+    phase.observes ?? '',
+    phase.editEffect ?? '',
+    phase.requiresPrintedInput ?? '',
+    phase.requiresFreshSemantics ?? '',
+    phase.requiresRealizedMap ?? '',
+  ].join(':');
+  const key =
+    phase.native != null
+      ? `n${flags}${stableJson(phase.native)}`
+      : `p${flags}:${(phase.plugins ?? []).map(pluginId).join(',')}`;
+  const interned = internedPhases.get(key);
+  if (interned != null) return interned;
+  const normalized = normalize();
+  definedPhases.add(normalized);
+  // Every plan a plugin phase compiles from is fixed by its definitions, so compile
+  // it now rather than on the first file that reaches it. Contract errors surface
+  // here, where the offending definition is, and the transform path is left with a
+  // lookup. Native phases have no routes to compile and are skipped.
+  if (normalized.native == null) preparePhase(normalized);
+  // Bounded after the definition scope closes, so a consumer that genuinely builds
+  // a distinct phase shape per file cannot grow this table without limit. Entries
+  // already interned keep hitting once it is full, so the phases a pipeline reuses
+  // stay cheap and only newly seen shapes degrade to recompilation. Interned phases
+  // are retained for the process, along with their compiled routes and manifest.
+  if (runtimeInternLimit == null || internedPhases.size < runtimeInternLimit)
+    internedPhases.set(key, normalized);
+  return normalized;
 }
 
 function normalizePipelinePhase(phase: PipelinePhase): PipelinePhase {
@@ -96,15 +266,19 @@ function normalizePipelinePhase(phase: PipelinePhase): PipelinePhase {
     throw new Error(`${phase.name}: native phases cannot contain visitor plugins`);
   if (phase.native != null) {
     validateNativePlan(phase.name, phase.native);
-    return Object.freeze({
-      ...phase,
-      native: deepFreeze(structuredClone(phase.native)),
-    });
+    return internPhase(phase, () =>
+      Object.freeze({
+        ...phase,
+        native: deepFreeze(structuredClone(phase.native)),
+      }),
+    );
   }
-  return Object.freeze({
-    ...phase,
-    plugins: Object.freeze([...(phase.plugins ?? [])]),
-  });
+  return internPhase(phase, () =>
+    Object.freeze({
+      ...phase,
+      plugins: Object.freeze([...(phase.plugins ?? [])]),
+    }),
+  );
 }
 
 function validateNativePlan(phaseName: string, plan: PreflightPlan): void {
@@ -225,4 +399,37 @@ function deepFreeze<T>(value: T): T {
     Object.freeze(value);
   }
   return value;
+}
+
+const boundPlugins = new WeakMap<object, Map<string, DefinedNativePlugin<any, any, any, any>>>();
+
+/** Resolve a plugin's declared predicate parameters, interning on the values.
+ *
+ * Binding is a configuration-scope operation: repeating it with equal values
+ * returns the same plugin, so downstream plan and route compilation stay keyed by
+ * identity rather than by a serialization of per-file state. */
+function bindParameters<State, Options, Analysis, Contract extends PluginContract>(
+  plugin: DefinedNativePlugin<State, Options, Analysis, Contract>,
+  values: ParameterValues,
+): DefinedNativePlugin<State, Options, Analysis, Contract> {
+  const key = stableJson(values);
+  let bound = boundPlugins.get(plugin);
+  if (bound == null) {
+    bound = new Map();
+    boundPlugins.set(plugin, bound);
+  }
+  const cached = bound.get(key);
+  if (cached != null) return cached as DefinedNativePlugin<State, Options, Analysis, Contract>;
+  const seen = new Set<string>();
+  const visitors = (plugin.visitors ?? []).map(visitor =>
+    bindVisitorParameters(plugin.name, visitor, values, seen),
+  );
+  for (const name of Object.keys(values))
+    if (!seen.has(name)) throw new Error(`${plugin.name}: no predicate declares parameter ${name}`);
+  const result = defineNativePlugin({
+    ...(plugin as unknown as NativePluginDefinition<State, Options, Analysis, Contract>),
+    visitors,
+  });
+  bound.set(key, result);
+  return result;
 }
