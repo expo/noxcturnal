@@ -413,6 +413,7 @@ pub(super) fn prepare(semantic: &Semantic<'_>) -> Result<BlockScopingPlan, &'sta
     }
     let mut groups: FxHashMap<(ScopeId, String), Vec<SymbolId>> = FxHashMap::default();
     let mut used_names: FxHashSet<String> = scoping.symbol_names().map(str::to_owned).collect();
+    let mut ancestor_collisions = FxHashSet::default();
 
     for symbol_id in scoping.symbol_ids() {
         let scope_id = scoping.symbol_scope_id(symbol_id);
@@ -420,15 +421,29 @@ pub(super) fn prepare(semantic: &Semantic<'_>) -> Result<BlockScopingPlan, &'sta
             .scope_ancestors(scope_id)
             .find(|scope_id| scoping.scope_flags(*scope_id).intersects(ScopeFlags::Var))
             .unwrap_or(scope_id);
+        let name = scoping.symbol_name(symbol_id);
+        if scoping
+            .symbol_flags(symbol_id)
+            .contains(SymbolFlags::BlockScopedVariable)
+            && scope_id != target_scope
+            && scoping
+                .scope_parent_id(scope_id)
+                .and_then(|parent_scope| scoping.find_binding(parent_scope, name.into()))
+                .is_some_and(|visible_symbol| visible_symbol != symbol_id)
+        {
+            // Lowering a block binding to `var` makes it shadow bindings that
+            // were previously visible elsewhere in the containing function.
+            ancestor_collisions.insert(symbol_id);
+        }
         groups
-            .entry((target_scope, scoping.symbol_name(symbol_id).to_owned()))
+            .entry((target_scope, name.to_owned()))
             .or_default()
             .push(symbol_id);
     }
 
     let mut renames = FxHashMap::default();
     for ((_scope_id, name), mut symbols) in groups {
-        if symbols.len() < 2 {
+        if symbols.len() < 2 && !symbols.iter().any(|id| ancestor_collisions.contains(id)) {
             continue;
         }
         // A function-scoped binding already occupies the name after lowering, so
@@ -442,11 +457,17 @@ pub(super) fn prepare(semantic: &Semantic<'_>) -> Result<BlockScopingPlan, &'sta
                 scoping.symbol_span(*symbol_id).start,
             )
         });
-        for symbol_id in symbols.into_iter().skip(1).filter(|symbol_id| {
-            scoping
-                .symbol_flags(*symbol_id)
-                .contains(SymbolFlags::BlockScopedVariable)
-        }) {
+        for (index, symbol_id) in symbols
+            .into_iter()
+            .enumerate()
+            .filter(|(index, symbol_id)| {
+                scoping
+                    .symbol_flags(*symbol_id)
+                    .contains(SymbolFlags::BlockScopedVariable)
+                    && (*index > 0 || ancestor_collisions.contains(symbol_id))
+            })
+        {
+            let _ = index;
             let mut suffix = 0_u32;
             let replacement = loop {
                 let candidate = if suffix == 0 {

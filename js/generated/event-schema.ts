@@ -210,6 +210,7 @@ export const NODE_TYPE_IDS = new Map<string, number>(
 export const FIELD_KEYS = [
   '',
   'name',
+  'declaredName',
   'global',
   'read',
   'write',
@@ -292,6 +293,7 @@ export const PREDICATE_FIELDS: Readonly<Record<string, readonly string[]>> = {
   ImportDefaultSpecifier: ['imported', 'local'],
   ImportNamespaceSpecifier: ['imported', 'local'],
   ExportNamedDeclaration: ['source', 'exportKind', 'specifierCount'],
+  ExportDefaultDeclaration: ['declaredName'],
   ExportAllDeclaration: ['source', 'exported', 'exportKind'],
   ExportSpecifier: ['local', 'exported', 'exportKind'],
   VariableDeclaration: ['kind', 'declarationCount'],
@@ -508,6 +510,7 @@ export const PREDICATE_VALUE_DOMAINS: Readonly<
     exportKind: { kinds: ['string'], values: ['value', 'type'] },
     specifierCount: { kinds: ['number'] },
   },
+  ExportDefaultDeclaration: { declaredName: { kinds: ['string'] } },
   ExportAllDeclaration: {
     source: { kinds: ['string'] },
     exported: { kinds: ['string'] },
@@ -3637,6 +3640,9 @@ export interface NativeNodeFields {
     readonly exportKind: ImportOrExportKind;
     readonly specifierCount: number;
   };
+  ExportDefaultDeclaration: {
+    readonly declaredName?: string;
+  };
   ExportAllDeclaration: {
     readonly source: string;
     readonly exported?: string;
@@ -3699,6 +3705,7 @@ export interface NativeRouteFields {
     readonly importKind?: ImportOrExportKind;
     readonly specifierCount?: number;
     readonly exportKind?: ImportOrExportKind;
+    readonly declaredName?: string;
     readonly exported?: string;
   };
   Declaration: {
@@ -3715,6 +3722,7 @@ export interface NativeRouteFields {
     readonly importKind?: ImportOrExportKind;
     readonly specifierCount?: number;
     readonly exportKind?: ImportOrExportKind;
+    readonly declaredName?: string;
     readonly exported?: string;
   };
   Expression: {
@@ -3854,6 +3862,7 @@ export interface NativeRouteFields {
     readonly imported?: string | 'default' | '*';
     readonly local?: string;
     readonly exportKind?: ImportOrExportKind;
+    readonly declaredName?: string;
     readonly exported?: string;
   };
 }

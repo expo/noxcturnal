@@ -1,7 +1,7 @@
 use oxc_allocator::{Allocator, Vec as ArenaVec};
 use oxc_ast::{
     AstKind,
-    ast::{Expression, IdentifierReference},
+    ast::{ExportDefaultDeclarationKind, Expression, IdentifierReference},
 };
 use oxc_semantic::Scoping;
 use rustc_hash::FxHashMap;
@@ -472,6 +472,24 @@ pub(crate) fn packed_fields_direct<T: AsRef<str>>(
                 0x4000_0000 | declaration.specifiers.len() as u32,
             );
         }
+        AstKind::ExportDefaultDeclaration(declaration) => {
+            if wants("declaredName") {
+                let name = match &declaration.declaration {
+                    ExportDefaultDeclarationKind::FunctionDeclaration(function) => function
+                        .id
+                        .as_ref()
+                        .map(|identifier| identifier.name.as_str()),
+                    ExportDefaultDeclarationKind::ClassDeclaration(class) => {
+                        class.id.as_ref().map(|identifier| identifier.name.as_str())
+                    }
+                    _ => None,
+                };
+                if let Some(name) = name {
+                    let name = intern_packed(strings, name);
+                    push("declaredName", name);
+                }
+            }
+        }
         AstKind::ExportAllDeclaration(declaration) => {
             if wants("source") {
                 let source = intern_packed(strings, &declaration.source.value);
@@ -775,6 +793,21 @@ pub(crate) fn fields(
                 format!("{:?}", declaration.export_kind).to_ascii_lowercase(),
             );
             push!("specifierCount", declaration.specifiers.len().to_string());
+        }
+        AstKind::ExportDefaultDeclaration(declaration) => {
+            let name = match &declaration.declaration {
+                ExportDefaultDeclarationKind::FunctionDeclaration(function) => function
+                    .id
+                    .as_ref()
+                    .map(|identifier| identifier.name.as_str()),
+                ExportDefaultDeclarationKind::ClassDeclaration(class) => {
+                    class.id.as_ref().map(|identifier| identifier.name.as_str())
+                }
+                _ => None,
+            };
+            if let Some(name) = name {
+                push!("declaredName", name.to_string());
+            }
         }
         AstKind::ExportAllDeclaration(declaration) => {
             push!("source", declaration.source.value.to_string());

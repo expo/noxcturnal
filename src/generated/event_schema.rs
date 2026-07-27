@@ -391,49 +391,50 @@ pub(crate) fn node_type_name(value: u32) -> Option<&'static str> {
 pub(crate) fn field_key_id(value: &str) -> Option<u32> {
     Some(match value {
         "name" => 1,
-        "global" => 2,
-        "read" => 3,
-        "write" => 4,
-        "bindingScopeId" => 5,
-        "binding" => 6,
-        "value" => 7,
-        "constantKind" => 8,
-        "constantValue" => 9,
-        "optional" => 10,
-        "argumentCount" => 11,
-        "calleeName" => 12,
-        "calleePath" => 13,
-        "calleeGlobal" => 14,
-        "staticArgument" => 15,
-        "computed" => 16,
-        "property" => 17,
-        "rootName" => 18,
-        "rootGlobal" => 19,
-        "async" => 20,
-        "generator" => 21,
-        "bodyStart" => 22,
-        "bodyEnd" => 23,
-        "expression" => 24,
-        "source" => 25,
-        "importKind" => 26,
-        "specifierCount" => 27,
-        "imported" => 28,
-        "local" => 29,
-        "exportKind" => 30,
-        "exported" => 31,
-        "kind" => 32,
-        "declarationCount" => 33,
-        "hasInitializer" => 34,
-        "meta" => 35,
-        "key" => 36,
-        "method" => 37,
-        "shorthand" => 38,
-        "operator" => 39,
-        "prefix" => 40,
-        "parameterCount" => 41,
-        "delegate" => 42,
-        "nodeKind" => 43,
-        "memberPath" => 44,
+        "declaredName" => 2,
+        "global" => 3,
+        "read" => 4,
+        "write" => 5,
+        "bindingScopeId" => 6,
+        "binding" => 7,
+        "value" => 8,
+        "constantKind" => 9,
+        "constantValue" => 10,
+        "optional" => 11,
+        "argumentCount" => 12,
+        "calleeName" => 13,
+        "calleePath" => 14,
+        "calleeGlobal" => 15,
+        "staticArgument" => 16,
+        "computed" => 17,
+        "property" => 18,
+        "rootName" => 19,
+        "rootGlobal" => 20,
+        "async" => 21,
+        "generator" => 22,
+        "bodyStart" => 23,
+        "bodyEnd" => 24,
+        "expression" => 25,
+        "source" => 26,
+        "importKind" => 27,
+        "specifierCount" => 28,
+        "imported" => 29,
+        "local" => 30,
+        "exportKind" => 31,
+        "exported" => 32,
+        "kind" => 33,
+        "declarationCount" => 34,
+        "hasInitializer" => 35,
+        "meta" => 36,
+        "key" => 37,
+        "method" => 38,
+        "shorthand" => 39,
+        "operator" => 40,
+        "prefix" => 41,
+        "parameterCount" => 42,
+        "delegate" => 43,
+        "nodeKind" => 44,
+        "memberPath" => 45,
         _ => return None,
     })
 }
@@ -441,49 +442,50 @@ pub(crate) fn field_key_id(value: &str) -> Option<u32> {
 pub(crate) fn field_key_name(value: u32) -> Option<&'static str> {
     Some(match value {
         1 => "name",
-        2 => "global",
-        3 => "read",
-        4 => "write",
-        5 => "bindingScopeId",
-        6 => "binding",
-        7 => "value",
-        8 => "constantKind",
-        9 => "constantValue",
-        10 => "optional",
-        11 => "argumentCount",
-        12 => "calleeName",
-        13 => "calleePath",
-        14 => "calleeGlobal",
-        15 => "staticArgument",
-        16 => "computed",
-        17 => "property",
-        18 => "rootName",
-        19 => "rootGlobal",
-        20 => "async",
-        21 => "generator",
-        22 => "bodyStart",
-        23 => "bodyEnd",
-        24 => "expression",
-        25 => "source",
-        26 => "importKind",
-        27 => "specifierCount",
-        28 => "imported",
-        29 => "local",
-        30 => "exportKind",
-        31 => "exported",
-        32 => "kind",
-        33 => "declarationCount",
-        34 => "hasInitializer",
-        35 => "meta",
-        36 => "key",
-        37 => "method",
-        38 => "shorthand",
-        39 => "operator",
-        40 => "prefix",
-        41 => "parameterCount",
-        42 => "delegate",
-        43 => "nodeKind",
-        44 => "memberPath",
+        2 => "declaredName",
+        3 => "global",
+        4 => "read",
+        5 => "write",
+        6 => "bindingScopeId",
+        7 => "binding",
+        8 => "value",
+        9 => "constantKind",
+        10 => "constantValue",
+        11 => "optional",
+        12 => "argumentCount",
+        13 => "calleeName",
+        14 => "calleePath",
+        15 => "calleeGlobal",
+        16 => "staticArgument",
+        17 => "computed",
+        18 => "property",
+        19 => "rootName",
+        20 => "rootGlobal",
+        21 => "async",
+        22 => "generator",
+        23 => "bodyStart",
+        24 => "bodyEnd",
+        25 => "expression",
+        26 => "source",
+        27 => "importKind",
+        28 => "specifierCount",
+        29 => "imported",
+        30 => "local",
+        31 => "exportKind",
+        32 => "exported",
+        33 => "kind",
+        34 => "declarationCount",
+        35 => "hasInitializer",
+        36 => "meta",
+        37 => "key",
+        38 => "method",
+        39 => "shorthand",
+        40 => "operator",
+        41 => "prefix",
+        42 => "parameterCount",
+        43 => "delegate",
+        44 => "nodeKind",
+        45 => "memberPath",
         _ => return None,
     })
 }
@@ -492,106 +494,107 @@ pub(crate) fn predicate_field_supported(node_type_id: u32, field_id: u32) -> boo
     matches!(
         (node_type_id, field_id),
         (2, 1)
-            | (2, 2)
             | (2, 3)
             | (2, 4)
             | (2, 5)
             | (2, 6)
-            | (97, 7)
+            | (2, 7)
             | (97, 8)
             | (97, 9)
-            | (96, 7)
+            | (97, 10)
             | (96, 8)
             | (96, 9)
-            | (94, 7)
+            | (96, 10)
             | (94, 8)
             | (94, 9)
-            | (95, 8)
+            | (94, 10)
             | (95, 9)
-            | (8, 32)
-            | (8, 16)
-            | (8, 37)
+            | (95, 10)
+            | (8, 33)
+            | (8, 17)
             | (8, 38)
-            | (8, 36)
-            | (20, 39)
+            | (8, 39)
+            | (8, 37)
             | (20, 40)
-            | (21, 39)
+            | (20, 41)
             | (21, 40)
-            | (21, 8)
+            | (21, 41)
             | (21, 9)
-            | (22, 39)
-            | (22, 8)
+            | (21, 10)
+            | (22, 40)
             | (22, 9)
-            | (24, 39)
-            | (24, 8)
+            | (22, 10)
+            | (24, 40)
             | (24, 9)
-            | (25, 8)
+            | (24, 10)
             | (25, 9)
-            | (37, 8)
+            | (25, 10)
             | (37, 9)
-            | (33, 8)
+            | (37, 10)
             | (33, 9)
-            | (26, 39)
-            | (15, 10)
+            | (33, 10)
+            | (26, 40)
             | (15, 11)
             | (15, 12)
             | (15, 13)
             | (15, 14)
             | (15, 15)
-            | (16, 11)
+            | (15, 16)
             | (16, 12)
-            | (16, 15)
-            | (13, 16)
+            | (16, 13)
+            | (16, 16)
             | (13, 17)
-            | (13, 44)
             | (13, 18)
+            | (13, 45)
             | (13, 19)
-            | (12, 16)
+            | (13, 20)
             | (12, 17)
-            | (12, 44)
-            | (68, 43)
-            | (68, 20)
+            | (12, 18)
+            | (12, 45)
+            | (68, 44)
             | (68, 21)
-            | (68, 41)
-            | (68, 1)
             | (68, 22)
+            | (68, 42)
+            | (68, 1)
             | (68, 23)
-            | (73, 20)
-            | (73, 24)
-            | (73, 41)
-            | (73, 22)
+            | (68, 24)
+            | (73, 21)
+            | (73, 25)
+            | (73, 42)
             | (73, 23)
-            | (75, 43)
+            | (73, 24)
+            | (75, 44)
             | (75, 1)
-            | (83, 25)
             | (83, 26)
             | (83, 27)
-            | (84, 28)
+            | (83, 28)
             | (84, 29)
-            | (84, 26)
-            | (85, 28)
+            | (84, 30)
+            | (84, 27)
             | (85, 29)
-            | (86, 28)
+            | (85, 30)
             | (86, 29)
-            | (89, 25)
-            | (89, 30)
-            | (89, 27)
-            | (91, 25)
+            | (86, 30)
+            | (89, 26)
+            | (89, 31)
+            | (89, 28)
+            | (90, 2)
+            | (91, 26)
+            | (91, 32)
             | (91, 31)
-            | (91, 30)
-            | (92, 29)
-            | (92, 31)
             | (92, 30)
-            | (41, 32)
+            | (92, 32)
+            | (92, 31)
             | (41, 33)
-            | (42, 32)
-            | (42, 34)
-            | (38, 7)
-            | (74, 42)
-            | (17, 35)
-            | (17, 17)
-            | (18, 35)
-            | (18, 17)
+            | (41, 34)
+            | (42, 33)
+            | (42, 35)
+            | (38, 8)
+            | (74, 43)
+            | (17, 36)
+            | (17, 18)
+            | (18, 36)
+            | (18, 18)
     )
 }
 

@@ -1001,6 +1001,19 @@ test('native block scoping renames colliding lexical bindings', () => {
   assert.deepEqual(observed, [1, 0]);
 });
 
+test('native block scoping renames a block binding that would shadow an outer binding', () => {
+  const result = transform(
+    'const matcher = /%/g; function decode(value) { for (let index = 0; index < value.length; index++) { const matcher = value.charCodeAt(index); if (matcher === 37) break; } return value.replace(matcher, "/"); } globalThis.output = decode("%2F");',
+    'fixture.js',
+    pipeline({ blockScoping: true }),
+  );
+  assert.equal(result.status, 'complete');
+  assert.match(result.code, /var _matcher\s*=\s*value\.charCodeAt\(index\)/);
+  const target: { output?: string } = {};
+  new Function('globalThis', result.code)(target);
+  assert.equal(target.output, '/2F');
+});
+
 test('native block scoping preserves captured loop bindings and relocated mappings', () => {
   const source = 'var callbacks = []; for (let value of [1, 2, 3]) callbacks.push(() => value);';
   const result = transform(source, 'fixture.js', pipeline({ blockScoping: true }));

@@ -156,6 +156,27 @@ test('routes Babel-compatible semantic and collapsed Oxc visitor keys', () => {
   assert.equal(seen.classExpressions, 1);
 });
 
+test('projects declared names from named default declarations', () => {
+  const names: Array<string | undefined> = [];
+  const plugin = defineNativePlugin({
+    name: 'default-declaration-names',
+    visitors: [
+      defineVisitor('ExportDefaultDeclaration', { fields: ['declaredName'] }, path => {
+        names.push(path.node.declaredName);
+      }),
+    ],
+  });
+  const pipeline = defineNativePipeline({ phases: [{ name: 'names', plugins: [plugin] }] });
+  for (const source of [
+    'export default class Value {}',
+    'export default function createValue() {}',
+    'export default 1;',
+  ]) {
+    assert.equal(transform(source, 'fixture.js', pipeline).status, 'complete');
+  }
+  assert.deepEqual(names, ['Value', 'createValue', undefined]);
+});
+
 test('matches static member chains without traversing child objects', () => {
   const matches: string[] = [];
   const plugin = defineNativePlugin({

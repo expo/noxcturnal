@@ -532,6 +532,7 @@
     "ImportDefaultSpecifier": ["imported", "local"],
     "ImportNamespaceSpecifier": ["imported", "local"],
     "ExportNamedDeclaration": ["source", "exportKind", "specifierCount"],
+    "ExportDefaultDeclaration": ["declaredName"],
     "ExportAllDeclaration": ["source", "exported", "exportKind"],
     "ExportSpecifier": ["local", "exported", "exportKind"],
     "VariableDeclaration": ["kind", "declarationCount"],
@@ -543,6 +544,7 @@
   },
   "fieldKeys": [
     "name",
+    "declaredName",
     "global",
     "read",
     "write",
@@ -724,6 +726,9 @@
       "source?": "string",
       "exportKind": "ImportOrExportKind",
       "specifierCount": "number"
+    },
+    "ExportDefaultDeclaration": {
+      "declaredName?": "string"
     },
     "ExportAllDeclaration": {
       "source": "string",
