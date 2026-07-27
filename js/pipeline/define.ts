@@ -3,6 +3,7 @@ import type {
   NativePipeline,
   NativePipelineDefinition,
   NativePluginDefinition,
+  PipelinePhase,
   PluginContract,
 } from '../contracts/visitor.js';
 import type { PreflightPlan } from '../preflight/types.js';
@@ -14,6 +15,12 @@ import {
 
 const NATIVE_TRANSFORMS = new Set<string>(NATIVE_TRANSFORM_NAMES);
 const NATIVE_TRANSFORM_OPTIONS = new Set<string>(NATIVE_TRANSFORM_OPTION_NAMES);
+const definedPhases = new WeakSet<PipelinePhase>();
+interface PipelineCompositionNode {
+  children: WeakMap<PipelinePhase, PipelineCompositionNode>;
+  pipeline?: NativePipeline;
+}
+const pipelineCompositions: PipelineCompositionNode = { children: new WeakMap() };
 
 /** Define and freeze a reusable plugin, including its visitor table. */
 export function defineNativePlugin<
@@ -43,22 +50,60 @@ export function defineNativePlugin<
 export function defineNativePipeline(pipeline: NativePipelineDefinition): NativePipeline {
   return Object.freeze({
     phases: Object.freeze(
-      pipeline.phases.map(phase => {
-        if (phase.native != null && phase.plugins != null)
-          throw new Error(`${phase.name}: native phases cannot contain visitor plugins`);
-        if (phase.native != null) {
-          validateNativePlan(phase.name, phase.native);
-          return Object.freeze({
-            ...phase,
-            native: deepFreeze(structuredClone(phase.native)),
-          });
-        }
-        return Object.freeze({
-          ...phase,
-          plugins: Object.freeze([...(phase.plugins ?? [])]),
-        });
-      }),
+      pipeline.phases.map(phase =>
+        definedPhases.has(phase) ? phase : normalizePipelinePhase(phase),
+      ),
     ),
+  });
+}
+
+/**
+ * Define a reusable phase once. Composing this phase into multiple pipelines
+ * preserves its identity, allowing phase preparation and route compilation to
+ * remain cached while consumers cheaply select a per-file phase sequence.
+ */
+export function definePipelinePhase(phase: PipelinePhase): PipelinePhase {
+  if (definedPhases.has(phase)) return phase;
+  const defined = normalizePipelinePhase(phase);
+  definedPhases.add(defined);
+  return defined;
+}
+
+/**
+ * Compose previously defined phases into an interned pipeline. Repeated phase
+ * sequences return the same pipeline object, so both phase- and pipeline-level
+ * compilation can be paid once without retaining per-file configuration.
+ */
+export function composeNativePipeline(phases: readonly PipelinePhase[]): NativePipeline {
+  let node = pipelineCompositions;
+  for (const phase of phases) {
+    if (!definedPhases.has(phase))
+      throw new Error('composeNativePipeline requires phases created with definePipelinePhase');
+    let child = node.children.get(phase);
+    if (child == null) {
+      child = { children: new WeakMap() };
+      node.children.set(phase, child);
+    }
+    node = child;
+  }
+  return (node.pipeline ??= Object.freeze({
+    phases: Object.freeze([...phases]),
+  }));
+}
+
+function normalizePipelinePhase(phase: PipelinePhase): PipelinePhase {
+  if (phase.native != null && phase.plugins != null)
+    throw new Error(`${phase.name}: native phases cannot contain visitor plugins`);
+  if (phase.native != null) {
+    validateNativePlan(phase.name, phase.native);
+    return Object.freeze({
+      ...phase,
+      native: deepFreeze(structuredClone(phase.native)),
+    });
+  }
+  return Object.freeze({
+    ...phase,
+    plugins: Object.freeze([...(phase.plugins ?? [])]),
   });
 }
 

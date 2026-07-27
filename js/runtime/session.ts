@@ -38,6 +38,7 @@ export class NativeTransformSession {
   #scopeParents: Uint32Array | null = null;
   #bindingIndex: { nameIds: Map<string, number>; keys: Set<number> } | null = null;
   #nativeParseCount = 0;
+  #nativeCrossings = 0;
   constructor(
     readonly source: string,
     readonly filename: string,
@@ -50,6 +51,7 @@ export class NativeTransformSession {
     // Without a retention plan or function map the native session holds no state, so its
     // construction (and the source copy it takes) is deferred until something needs it.
     if (options.functionMap === true || retentionManifest != null || initialManifest != null) {
+      if (options.debugPerformance) this.#nativeCrossings++;
       this.#native = new native.NativeIndexedSession(
         source,
         this.#nativeFilename,
@@ -73,7 +75,11 @@ export class NativeTransformSession {
   get nativeParseCount(): number {
     return this.#nativeParseCount + (this.#native?.parseCount() ?? 0);
   }
+  get nativeCrossingCount(): number {
+    return this.#nativeCrossings;
+  }
   takeFunctionMap(): FunctionMap | null {
+    if (this.options.debugPerformance && this.#native) this.#nativeCrossings++;
     return this.#native?.takeFunctionMap() ?? null;
   }
   recordStatelessParse(): void {
@@ -470,6 +476,7 @@ export class NativeTransformSession {
     if (this.#closed) throw new Error('session-closed');
   }
   #binding(): NativeIndexedSessionBinding {
+    if (this.options.debugPerformance) this.#nativeCrossings++;
     this.#assertOpen();
     return (this.#native ??= new native.NativeIndexedSession(this.source, this.#nativeFilename));
   }

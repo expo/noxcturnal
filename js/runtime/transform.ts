@@ -41,6 +41,7 @@ export function transform(
   pipeline: NativePipeline,
   options: TransformOptions = {},
 ): TransformResult {
+  const overallStarted = options.debugPerformance ? performance.now() : 0;
   const originalSource = source;
   let parseFilename = parserFilename(filename, options.parser);
   let parser = classifyForTransform(parseFilename, source);
@@ -71,12 +72,16 @@ export function transform(
     try {
       for (const phase of pipeline.phases)
         for (const plugin of phase.plugins ?? []) {
-          const state = plugin.createState?.();
+          const prepareContext = {
+            filename,
+            options,
+            parser,
+            sourceHints: sourceHints(source),
+            pluginData: options.pluginData,
+          };
+          const state = plugin.createState?.(prepareContext);
           prepared.push({ plugin, state });
-          plugin.prepare?.(
-            { filename, options, parser, sourceHints: sourceHints(source) },
-            plugin.options as any,
-          );
+          plugin.prepare?.(prepareContext, plugin.options as any);
         }
       for (const { plugin, state } of prepared) plugin.cleanup?.('bailout', state);
       return { status: 'bailout', reason: parser.reason, source, diagnostics: [] };
@@ -119,6 +124,8 @@ export function transform(
     Buffer.byteLength(source),
     phasePlanMs,
   );
+  if (options.debugPerformance)
+    performanceCounters(metadata).classificationMs = transformStarted - overallStarted;
   if (adapterMetadata != null) metadata.sourceAdapter = adapterMetadata;
   const diagnostics: Diagnostic[] = [];
   const intents = new Map<string, IntentRegistration>();
@@ -135,6 +142,7 @@ export function transform(
   let pendingEdits: EditCommand[] = [];
   let nativeFunctionMap: FunctionMap | null = null;
   const recordedParseCounts = new WeakMap<NativeTransformSession, number>();
+  const recordedCrossingCounts = new WeakMap<NativeTransformSession, number>();
   try {
     for (let phaseIndex = 0; phaseIndex < pipeline.phases.length; phaseIndex++) {
       const phase = pipeline.phases[phaseIndex];
@@ -163,6 +171,7 @@ export function transform(
             nativeParses: number;
             nativeSemanticBuilds: number;
             nativeRenders: number;
+            nativeCrossings: number;
             reparses: number;
             renderedBytes: number;
             mappingSegments: number;
@@ -171,6 +180,7 @@ export function transform(
           performanceMetadata.nativeParses += result.parseCount ?? 1;
           performanceMetadata.nativeSemanticBuilds += result.semanticBuildCount ?? 0;
           performanceMetadata.nativeRenders += result.renderCount ?? 0;
+          performanceMetadata.nativeCrossings++;
           if (phaseIndex + 1 < pipeline.phases.length) performanceMetadata.reparses++;
           performanceMetadata.renderedBytes += Buffer.byteLength(result.code ?? '');
           performanceMetadata.mappingSegments += result.map ? decodedSegmentCount(result.map) : 0;
@@ -375,6 +385,8 @@ export function transform(
               throw new Error('native-memory-budget-exceeded');
           } else {
             session.recordStatelessParse();
+            if (options.debugPerformance)
+              (metadata.performance as { nativeCrossings: number }).nativeCrossings++;
             const routedBuffer = native.materializeRoutedBuffer(
               observationSource,
               parseFilename,
@@ -394,12 +406,14 @@ export function transform(
       }
       if (options.debugPerformance) {
         const performance = metadata.performance as {
+          javascriptBatches: number;
           routeDeliveries: number;
           nodeRecords: number;
           payloadBytes: number;
           recordWords: number;
           utf8SlabBytes: number;
         };
+        performance.javascriptBatches++;
         performance.routeDeliveries += batch.routeDeliveryCount;
         performance.nodeRecords += batch.nodeRecordCount;
         performance.payloadBytes += batch.data.byteLength;
@@ -432,11 +446,18 @@ export function transform(
         provenance,
         verifier,
         { compileNestedVisitor, nestedManifest },
+        options.pluginData,
       );
       if (options.debugPerformance)
         performanceCounters(metadata).dispatcherSetupMs += performance.now() - dispatcherStarted;
       for (const plugin of activePlugins) {
-        const state = plugin.createState?.();
+        const state = plugin.createState?.({
+          filename,
+          options,
+          parser,
+          sourceHints: sourceHints(observationSource),
+          pluginData: options.pluginData,
+        });
         allStates.push({ plugin, state });
         dispatch.contexts.get(plugin)!.state = state;
         plugin.pre?.(dispatch.contexts.get(plugin)!.context, state);
@@ -485,9 +506,15 @@ export function transform(
         throw new Error(`${phase.name}: phase declared edit effect none but emitted edits`);
       if (options.debugPerformance) {
         const previous = recordedParseCounts.get(session) ?? 0;
-        const performance = metadata.performance as { nativeParses: number };
+        const previousCrossings = recordedCrossingCounts.get(session) ?? 0;
+        const performance = metadata.performance as {
+          nativeParses: number;
+          nativeCrossings: number;
+        };
         performance.nativeParses += session.nativeParseCount - previous;
+        performance.nativeCrossings += session.nativeCrossingCount - previousCrossings;
         recordedParseCounts.set(session, session.nativeParseCount);
+        recordedCrossingCounts.set(session, session.nativeCrossingCount);
       }
       const isFinalPhase = phaseIndex === pipeline.phases.length - 1;
       if (edits.length > 0 && observationSource !== phaseSource)
@@ -525,6 +552,8 @@ export function transform(
       // its mapping in packed decoded form so the chain encodes once at the end.
       const decodedLayer = !(isFinalPhase && mapLayers.length === 0);
       const renderStarted = options.debugPerformance ? performance.now() : 0;
+      if (options.debugPerformance)
+        (metadata.performance as { nativeCrossings: number }).nativeCrossings++;
       const recordCommit = (
         committed: { edits: EditCommand[]; deduped: number; code: string },
         segments: number,
@@ -574,6 +603,8 @@ export function transform(
     openSession = null;
     if (mapLayers.length > 0) {
       const composeStarted = options.debugPerformance ? performance.now() : 0;
+      if (options.debugPerformance)
+        (metadata.performance as { nativeCrossings: number }).nativeCrossings++;
       finalMap = native.composeDecodedChain(mapLayers);
       if (options.debugPerformance) {
         performanceCounters(metadata).renderAndMapMs += performance.now() - composeStarted;
@@ -582,6 +613,8 @@ export function transform(
     }
     // Input source maps compose once at the boundary where they enter.
     if (inputMap != null) {
+      if (options.debugPerformance && finalMap != null)
+        (metadata.performance as { nativeCrossings: number }).nativeCrossings++;
       finalMap =
         finalMap == null
           ? inputMap
@@ -596,14 +629,18 @@ export function transform(
     }
     for (const { plugin, state } of allStates) plugin.cleanup?.('complete', state);
     const functionMapStarted = options.debugPerformance ? performance.now() : 0;
+    if (options.debugPerformance && options.functionMap && nativeFunctionMap == null)
+      (metadata.performance as { nativeCrossings: number }).nativeCrossings++;
     const functionMap = options.functionMap
       ? (nativeFunctionMap ??
         native.generateFunctionMap(adapterMap == null ? originalSource : source, parseFilename))
       : null;
     if (options.debugPerformance)
       performanceCounters(metadata).functionMapMs = performance.now() - functionMapStarted;
-    if (options.debugPerformance)
+    if (options.debugPerformance) {
       performanceCounters(metadata).totalMs = performance.now() - transformStarted;
+      performanceCounters(metadata).overallMs = performance.now() - overallStarted;
+    }
     // Always-on observability: a count only, so production consumers can notice
     // weakened maps or stale cross-phase text without debug tracing enabled.
     if (provenance.degradations > 0) metadata.provenanceDegradations = provenance.degradations;

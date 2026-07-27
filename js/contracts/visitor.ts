@@ -44,6 +44,7 @@ export interface PrepareContext {
   readonly options: TransformOptions;
   readonly parser: ReturnType<typeof native.classify>;
   readonly sourceHints: ReadonlySet<string>;
+  readonly pluginData: unknown;
 }
 
 export interface NativeScope {
@@ -73,6 +74,7 @@ export interface NativeBinding {
 export interface PluginContext {
   readonly filename: string;
   readonly phase: string;
+  readonly pluginData: unknown;
   readonly source: string;
   readonly metadata: MetadataWriter;
   query(request: QueryRequest): QueryResult;
@@ -764,7 +766,7 @@ export interface NativePlugin<
   /** Plugin-level context requirements: metadata ownership and queries. */
   contract?: Contract;
   prepare?(context: PrepareContext, options: Options): PluginPlan | void;
-  createState?(): State;
+  createState?(context: PrepareContext): State;
   pre?(context: PluginContextFor<Contract>, state: State): void;
   analyze?(context: PluginContextFor<Contract>, state: State): TransformDecision<Analysis> | void;
   apply?(context: PluginContextFor<Contract>, analysis: Analysis, state: State): void;

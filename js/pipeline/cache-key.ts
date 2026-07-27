@@ -11,9 +11,10 @@ export function pipelineCacheKey(
   filename: string,
   options: TransformOptions = {},
 ): string {
+  const { pluginData: _pluginData, ...serializableOptions } = options;
   const descriptor = {
     filename,
-    options,
+    options: serializableOptions,
     parserAdapter: parserAdapterCacheDescriptor(options.parserAdapter),
     phaseGraph: compilePhasePlan(pipeline),
     phases: pipeline.phases.map(phase => ({

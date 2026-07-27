@@ -5,6 +5,7 @@ export interface PerformanceAllocationCounters {
   nodeFacades: number;
   snapshots: number;
   scopeFacades: number;
+  classificationMs: number;
   phasePreparationMs: number;
   sessionOpenMs: number;
   nativeAndDecodeMs: number;
@@ -16,6 +17,7 @@ export interface PerformanceAllocationCounters {
   renderAndMapMs: number;
   functionMapMs: number;
   totalMs: number;
+  overallMs: number;
 }
 
 export function createTransformMetadata(
@@ -33,6 +35,8 @@ export function createTransformMetadata(
       nativeParses: 0,
       nativeSemanticBuilds: 0,
       nativeRenders: 0,
+      nativeCrossings: 0,
+      javascriptBatches: 0,
       routeDeliveries: 0,
       nodeRecords: 0,
       payloadBytes: 0,
@@ -47,6 +51,7 @@ export function createTransformMetadata(
       nodeFacades: 0,
       snapshots: 0,
       scopeFacades: 0,
+      classificationMs: 0,
       sourceBytes,
       phasePlanMs,
       phasePreparationMs: 0,
@@ -60,6 +65,7 @@ export function createTransformMetadata(
       renderAndMapMs: 0,
       functionMapMs: 0,
       totalMs: 0,
+      overallMs: 0,
     },
   };
 }

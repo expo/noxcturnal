@@ -66,8 +66,17 @@ function visitorStaticKey(defined: DefinedVisitor<any>): string {
     key = `${defined.route}:${stableJson(defined.contract.where ?? null)}:${stableJson(
       defined.contract.children ?? null,
     )}:${defined.contract.fields.join(',')}:${defined.contract.nested
-      .map(nested => `${nested.route}/${nested.contract.fields.join(',')}`)
-      .join(';')}`;
+      .map(
+        nested =>
+          `${nested.route}/${stableJson(nested.contract.where ?? null)}/${nested.contract.fields.join(
+            ',',
+          )}/${nested.contract.controlFlow.join(',')}/${nested.contract.scope ? '1' : '0'}/${
+            nested.contract.ancestry ?? ''
+          }`,
+      )
+      .join(';')}:${defined.contract.controlFlow.join(',')}:${
+      defined.contract.scope ? '1' : '0'
+    }:${defined.contract.ancestry ?? ''}`;
     visitorStaticKeys.set(defined, key);
   }
   return key;
@@ -389,6 +398,7 @@ export function preparePhase(
       options,
       parser,
       sourceHints: hints,
+      pluginData: options.pluginData,
     };
     const prepared = plugin.prepare?.(prepareContext, plugin.options as any) ?? {};
     if (prepared.editEffect != null && !EDIT_EFFECTS.has(prepared.editEffect))

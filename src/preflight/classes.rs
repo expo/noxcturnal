@@ -35,6 +35,14 @@ pub(super) fn edits(
     inline_helpers: bool,
 ) -> Result<Option<Vec<EditCommand>>, &'static str> {
     let nodes = semantic.nodes();
+    let mut private_in_spans: Vec<Span> = nodes
+        .iter()
+        .filter_map(|node| match node.kind() {
+            AstKind::PrivateInExpression(expression) => Some(expression.span),
+            _ => None,
+        })
+        .collect();
+    private_in_spans.sort_unstable_by_key(|span| span.start);
     let classes: FxHashSet<NodeId> = nodes
         .iter_enumerated()
         .filter_map(|(id, node)| {
@@ -46,13 +54,8 @@ pub(super) fn edits(
                     matches!(element, ClassElement::MethodDefinition(method)
                         if matches!(method.key, PropertyKey::PrivateIdentifier(_)))
                 });
-            let owns_private_in = private_in_loose.is_some()
-                && nodes.iter().any(|node| {
-                    let span = node.kind().span();
-                    span.start >= class.span.start
-                        && span.end <= class.span.end
-                        && matches!(node.kind(), AstKind::PrivateInExpression(_))
-                });
+            let owns_private_in =
+                private_in_loose.is_some() && contains_span(&private_in_spans, class.span);
             (lower_all_classes || owns_private_method || owns_private_in).then_some(id)
         })
         .collect();
@@ -84,6 +87,7 @@ pub(super) fn edits(
             private_methods_loose,
             private_in_loose,
             inline_helpers,
+            &private_in_spans,
             &mut reserved,
         )?);
     }
@@ -100,6 +104,7 @@ fn lower(
     private_methods_loose: Option<bool>,
     private_in_loose: Option<bool>,
     inline_helpers: bool,
+    private_in_spans: &[Span],
     reserved: &mut FxHashSet<String>,
 ) -> Result<EditCommand, &'static str> {
     let name = class
@@ -166,12 +171,7 @@ fn lower(
             ClassElement::TSIndexSignature(_) => {}
         }
     }
-    let has_private_in = semantic.nodes().iter().any(|node| {
-        let span = node.kind().span();
-        span.start >= class.span.start
-            && span.end <= class.span.end
-            && matches!(node.kind(), AstKind::PrivateInExpression(_))
-    });
+    let has_private_in = contains_span(private_in_spans, class.span);
     if has_private_in && private_in_loose != Some(true) {
         return Err("classes-private-in-requires-private-property-in-object-transform");
     }
@@ -185,14 +185,30 @@ fn lower(
     {
         return Err("classes-private-constructor-access-not-implemented");
     }
+    let super_name = class
+        .super_class
+        .as_ref()
+        .map(|super_class| slice(source, super_class.span()).to_owned());
+    let has_super_methods = class.body.body.iter().any(|element| {
+        matches!(element, ClassElement::MethodDefinition(method)
+            if method.kind != MethodDefinitionKind::Constructor && contains_super(source, method))
+    });
+    let has_private_keys = !private_keys.is_empty();
+    let mut reserve_if = |needed: bool, base: &str| {
+        if needed {
+            reserve(base, reserved)
+        } else {
+            String::new()
+        }
+    };
     let helper_names = ClassHelperNames {
-        construct: reserve("_construct", reserved),
-        construct_runtime: reserve("_construct2", reserved),
-        super_get: reserve("_get", reserved),
-        super_get_runtime: reserve("_get2", reserved),
-        private_base: reserve("_classPrivateFieldLooseBase", reserved),
-        private_call: reserve("_classPrivateMethodCall", reserved),
-        private_runtime: reserve("_classPrivateFieldLooseBase2", reserved),
+        construct: reserve_if(super_name.is_some(), "_construct"),
+        construct_runtime: reserve_if(super_name.is_some(), "_construct2"),
+        super_get: reserve_if(has_super_methods, "_get"),
+        super_get_runtime: reserve_if(has_super_methods, "_get2"),
+        private_base: reserve_if(has_private_keys, "_classPrivateFieldLooseBase"),
+        private_call: reserve_if(has_private_keys, "_classPrivateMethodCall"),
+        private_runtime: reserve_if(has_private_keys, "_classPrivateFieldLooseBase2"),
     };
     let mut body = String::from("(()=>{\"use strict\";");
     if !private_keys.is_empty() {
@@ -221,10 +237,6 @@ fn lower(
             ));
         }
     }
-    let super_name = class
-        .super_class
-        .as_ref()
-        .map(|super_class| slice(source, super_class.span()).to_owned());
     let mut instance_initializers = String::new();
     let mut static_initializers: Vec<(u32, String)> = Vec::new();
     if let Some(loose) = class_properties_loose {
@@ -356,10 +368,6 @@ fn lower(
                 ),
         );
     }
-    let has_super_methods = class.body.body.iter().any(|element| {
-        matches!(element, ClassElement::MethodDefinition(method)
-            if method.kind != MethodDefinitionKind::Constructor && contains_super(source, method))
-    });
     if has_super_methods {
         let helper = if inline_helpers {
             INLINE_CLASS_SUPER_GET_HELPER
@@ -492,6 +500,14 @@ fn lower(
         order: None,
         names: None,
     })
+}
+
+fn contains_span(sorted_spans: &[Span], container: Span) -> bool {
+    let first = sorted_spans.partition_point(|span| span.start < container.start);
+    sorted_spans[first..]
+        .iter()
+        .take_while(|span| span.start <= container.end)
+        .any(|span| span.end <= container.end)
 }
 
 struct ClassHelperNames {

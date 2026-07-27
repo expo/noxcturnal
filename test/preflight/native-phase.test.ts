@@ -94,11 +94,15 @@ test('runs a fused native TypeScript phase and reports its own timing', () => {
     nativeParses: number;
     nativeSemanticBuilds: number;
     nativeRenders: number;
+    nativeCrossings: number;
+    javascriptBatches: number;
     phaseExecutions: { name: string; nativeTransformMs: number }[];
   };
   assert.equal(performance.nativeParses, 1);
   assert.equal(performance.nativeSemanticBuilds, 1);
   assert.equal(performance.nativeRenders, 1);
+  assert.equal(performance.nativeCrossings, 2);
+  assert.equal(performance.javascriptBatches, 0);
   assert.ok(performance.nativeTransformMs > 0);
   assert.equal(performance.phaseExecutions[0].name, 'preflight');
   assert.ok(performance.phaseExecutions[0].nativeTransformMs > 0);

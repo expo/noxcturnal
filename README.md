@@ -58,6 +58,97 @@ Within a phase every plugin observes the same immutable source. Mutations become
 
 `defineNativePlugin` returns an immutable reusable definition. Bind per-pipeline options with `plugin.withOptions(options)`. Pipelines always declare explicit phases and snapshot and freeze their phase and plugin arrays so cache identity cannot drift after construction. Every transform phase is compiled to numeric native routes.
 
+### Pipeline identity and preparation
+
+Treat plugin, phase, and pipeline definitions as program configuration, not as
+per-file values. Define the finite set of plugins and phases at module scope.
+For a fixed pipeline, define it once with `defineNativePipeline`. When the
+ordered phase set varies per file, define each phase once with
+`definePipelinePhase` and select among them with `composeNativePipeline`:
+
+```ts
+import {
+  composeNativePipeline,
+  defineNativePlugin,
+  definePipelinePhase,
+  defineVisitor,
+  transform,
+} from 'noxcturnal';
+
+interface FileData {
+  development: boolean;
+  replacement: string;
+}
+
+const fileData = (value: unknown): FileData => value as FileData;
+
+const replaceBuildId = defineNativePlugin({
+  name: 'replace-build-id',
+  visitors: [
+    defineVisitor(
+      'Identifier',
+      {
+        fields: ['name'],
+        configure: context => ({
+          enabled: fileData(context.pluginData).development,
+          where: { name: { equals: '__BUILD_ID__' } },
+        }),
+      },
+      path => {
+        path.replaceWith(
+          path.context.code.stringLiteral(fileData(path.context.pluginData).replacement),
+        );
+      },
+    ),
+  ],
+});
+
+const sourcePhase = definePipelinePhase({
+  name: 'source',
+  plugins: [replaceBuildId],
+});
+const legacySyntaxPhase = definePipelinePhase({
+  name: 'legacy-syntax',
+  native: { transforms: { blockScoping: true } },
+});
+
+const sourceOnly = composeNativePipeline([sourcePhase]);
+const sourceAndLegacySyntax = composeNativePipeline([sourcePhase, legacySyntaxPhase]);
+
+const result = transform(source, filename, needsLegacySyntax ? sourceAndLegacySyntax : sourceOnly, {
+  pluginData: { development, replacement },
+});
+```
+
+`composeNativePipeline` interns an ordered sequence of already-defined phase
+objects. Repeating the same composition returns the same pipeline, so dynamic
+selection is cheap while phase preparation and compiled native routes remain
+keyed by stable object identity. It deliberately rejects anonymous phase
+objects; use `defineNativePipeline` when reusable composition is unnecessary.
+
+Use static plugin options (`plugin.withOptions`) for the finite configuration
+that changes a plugin's declared behavior. Use `pluginData` for current-file
+inputs such as filenames, manifest values, feature flags, and shared
+transform state. It is available to `prepare`, `createState`, visitor
+`configure`, lifecycle hooks, and visitor callbacks. `pluginData` may change
+enablement and native predicate values, but it must not mutate definitions or
+change a visitor's declared fields, children, scope, ancestry, control-flow, or
+query capabilities. Put those shape differences in separate top-level plugin
+or phase definitions.
+
+Plugins with neither `prepare` nor visitor `configure` have a fully static
+preparation plan, which Noxcturnal prepares once per plugin identity. Dynamic
+plans are prepared per file, while their normalized phase route layouts are
+reused when the resulting plan shape matches. Do not close over per-file data
+in a top-level plugin: read it from the current context and create mutable
+per-file collections in `createState`.
+
+`pluginData` is intentionally excluded from `pipelineCacheKey`, because it is
+consumer-owned and may not be serializable. If it affects emitted code,
+metadata, or diagnostics, the consumer must include the relevant values in
+its own transform-result cache key. Parser selection, preflight options, and
+other Noxcturnal-owned transform options remain part of the library key.
+
 Every visitor is a typed contract beside its callback: `defineVisitor(route, contract, handler)` declares the payload `fields`, native `where` predicates, `scope`, `ancestry`, `children`, `controlFlow`, and (when needed) `nested` visitor requirements — and the callback's path type is derived from exactly that contract, so undeclared fields and capability methods are TypeScript errors as well as runtime errors. The compiled native route manifest is generated from the same normalized contract object. The plugin `contract` declares context-level requirements (metadata ownership, semantic queries); `prepare` keeps only per-file lifecycle settings and may return `{ enabled: false }` to remove a plugin for the current file, which is useful with `sourceHints` for directive-driven transforms. Per-file dynamism with a static shape goes through the contract's `configure` hook (enablement and predicate values). A development-only `verifyVisitorContracts` option reports undeclared reads with paste-able contract fragments and declared-but-unused contract entries.
 
 The TypeScript API derives its node and scalar-field names from the generated Oxc protocol schema: per-route declarable fields come from the same generated table the native predicate validator uses. Contracts narrow `path.node` to base identity plus declared fields (including `ReferencedIdentifier` and collapsed function/class routes), invalid route/field/capability literals are rejected, and the generic analysis value returned by `analyze` flows into `apply`. Composite routes such as `'Identifier|StringLiteral'` intentionally receive open field typing; use `path.is(...)` when a branch needs a specific view.

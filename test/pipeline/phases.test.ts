@@ -7,8 +7,10 @@ import type { SourceFragment } from '../../dist/index.js';
 import {
   classify,
   compilePhasePlan,
+  composeNativePipeline,
   defineNativePipeline,
   defineNativePlugin,
+  definePipelinePhase,
   defineVisitor,
   NativeTransformError,
   pipelineCacheKey,
@@ -138,10 +140,14 @@ test('defers text-only rendering across phases that observe the retained AST', (
   const performance = result.metadata.performance as {
     reparses: number;
     nativeParses: number;
+    nativeCrossings: number;
+    javascriptBatches: number;
     phaseExecutions: { editEffect: string; render: string; reusedParse: boolean }[];
   };
   assert.equal(performance.reparses, 0);
   assert.equal(performance.nativeParses, 1);
+  assert.ok(performance.nativeCrossings >= 2);
+  assert.equal(performance.javascriptBatches, 2);
   assert.deepEqual(
     performance.phaseExecutions.map(phase => [phase.editEffect, phase.render, phase.reusedParse]),
     [
@@ -198,6 +204,83 @@ test('runs original observers against pristine source after a rendered boundary'
     reusedParse: false,
     render: 'unchanged',
   });
+});
+
+test('structural static-plan caching rebinds callbacks from recreated plugins', () => {
+  const run = (replacement: string) => {
+    const plugin = defineNativePlugin({
+      name: 'recreated-static-plugin',
+      editEffect: 'text-only',
+      visitors: [
+        defineVisitor('Identifier', {}, path => {
+          path.replaceWith(replacement);
+        }),
+      ],
+    });
+    return transform(
+      'value;',
+      'fixture.js',
+      defineNativePipeline({ phases: [{ name: 'replace', plugins: [plugin] }] }),
+    );
+  };
+
+  const first = run('first');
+  const second = run('second');
+  assert.equal(first.status, 'complete');
+  assert.equal(second.status, 'complete');
+  if (first.status !== 'complete' || second.status !== 'complete') return;
+  assert.equal(first.code, 'first;');
+  assert.equal(second.code, 'second;');
+});
+
+test('stable plugin definitions receive current per-transform plugin data', () => {
+  const plugin = defineNativePlugin<{ replacement: string }>({
+    name: 'stable-plugin-data',
+    editEffect: 'text-only',
+    createState: context => ({
+      replacement: (context.pluginData as { replacement: string }).replacement,
+    }),
+    visitors: [
+      defineVisitor('Identifier', {}, (path, state: { replacement: string }) => {
+        assert.equal(
+          (path.context.pluginData as { replacement: string }).replacement,
+          state.replacement,
+        );
+        path.replaceWith(state.replacement);
+      }),
+    ],
+  });
+  const pipeline = defineNativePipeline({
+    phases: [{ name: 'replace', plugins: [plugin] }],
+  });
+  const run = (replacement: string) =>
+    transform('value;', 'fixture.js', pipeline, { pluginData: { replacement } });
+
+  const first = run('first');
+  const second = run('second');
+  assert.equal(first.status, 'complete');
+  assert.equal(second.status, 'complete');
+  if (first.status !== 'complete' || second.status !== 'complete') return;
+  assert.equal(first.code, 'first;');
+  assert.equal(second.code, 'second;');
+  assert.equal(
+    pipelineCacheKey(pipeline, 'fixture.js', { pluginData: { replacement: 'first' } }),
+    pipelineCacheKey(pipeline, 'fixture.js', { pluginData: { replacement: 'second' } }),
+  );
+});
+
+test('reusable phases preserve identity across dynamic pipeline composition', () => {
+  const plugin = defineNativePlugin({
+    name: 'stable-composed-plugin',
+    visitors: [defineVisitor('Identifier', {}, () => {})],
+  });
+  const phase = definePipelinePhase({ name: 'stable', plugins: [plugin] });
+  const first = defineNativePipeline({ phases: [phase] });
+  const second = defineNativePipeline({ phases: [phase] });
+
+  assert.equal(first.phases[0], phase);
+  assert.equal(second.phases[0], phase);
+  assert.equal(composeNativePipeline([phase]), composeNativePipeline([phase]));
 });
 
 test('rejects ambiguous original-source edits after rendering', () => {

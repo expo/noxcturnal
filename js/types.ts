@@ -240,6 +240,13 @@ export interface TransformOptions {
   /** Development/test-only: report undeclared contract access with suggested
    * fragments and declared-but-unused contract entries as diagnostics. */
   verifyVisitorContracts?: boolean;
+  /**
+   * Consumer-owned, per-transform data exposed to plugin preparation,
+   * lifecycle hooks, and visitor contexts. This is deliberately excluded from
+   * Noxcturnal's serializable cache keys; plugins own any configuration keys
+   * derived from it.
+   */
+  pluginData?: unknown;
 }
 
 export interface ParserAdapter {

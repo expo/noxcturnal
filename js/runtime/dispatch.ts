@@ -89,6 +89,7 @@ export function createDispatcher(
   provenance: { degradations: number },
   verifier: DispatchVerifier | undefined,
   services: DispatchServices,
+  pluginData: unknown,
 ): Dispatcher {
   let order = 0;
   let stopAll = false;
@@ -154,6 +155,7 @@ export function createDispatcher(
     const context: PluginContext = {
       filename: session.filename,
       phase: phase.name,
+      pluginData,
       source: session.source,
       metadata: {
         set(key, value) {
