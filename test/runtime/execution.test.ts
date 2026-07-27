@@ -686,3 +686,33 @@ test('builds escaped primitive literals and validates statement fragments', () =
   assert.equal(result.status, 'complete');
   assert.equal(result.code, 'const original = true;\nexport const generated = null;');
 });
+
+test('projects static call paths and their root globality without child or scope access', () => {
+  const calls: unknown[] = [];
+  const plugin = defineNativePlugin({
+    name: 'static-call-facts',
+    visitors: [
+      defineVisitor(
+        'CallExpression',
+        { fields: ['calleeName', 'calleePath', 'calleeGlobal'] },
+        path => {
+          calls.push({
+            name: path.node.calleeName,
+            path: path.node.calleePath,
+            global: path.node.calleeGlobal,
+          });
+        },
+      ),
+    ],
+  });
+  transform(
+    'require.resolveWeak("a"); function local(require){require.context("./b")} invoke();',
+    'fixture.js',
+    defineNativePipeline({ phases: [{ name: 'calls', plugins: [plugin] }] }),
+  );
+  assert.deepEqual(calls, [
+    { name: undefined, path: 'require.resolveWeak', global: true },
+    { name: undefined, path: 'require.context', global: false },
+    { name: 'invoke', path: 'invoke', global: true },
+  ]);
+});

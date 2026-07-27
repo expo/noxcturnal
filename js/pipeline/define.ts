@@ -108,6 +108,33 @@ function normalizePipelinePhase(phase: PipelinePhase): PipelinePhase {
 }
 
 function validateNativePlan(phaseName: string, plan: PreflightPlan): void {
+  if (plan.jsx === 'automatic-if-present') {
+    const hasTransforms = plan.transforms != null && Object.keys(plan.transforms).length > 0;
+    const hasOptimization =
+      plan.optimize?.constantFolding === true || plan.optimize?.deadCodeElimination === true;
+    if (
+      hasTransforms ||
+      hasOptimization ||
+      plan.typescript != null ||
+      plan.reactCompiler != null ||
+      plan.reactRefresh != null ||
+      plan.compact === true ||
+      plan.comments === false
+    ) {
+      const active = [
+        ...(hasTransforms ? [`transforms:${Object.keys(plan.transforms!).join(',')}`] : []),
+        ...(hasOptimization ? ['optimize'] : []),
+        ...(plan.typescript != null ? ['typescript'] : []),
+        ...(plan.reactCompiler != null ? ['reactCompiler'] : []),
+        ...(plan.reactRefresh != null ? ['reactRefresh'] : []),
+        ...(plan.compact === true ? ['compact'] : []),
+        ...(plan.comments === false ? ['comments'] : []),
+      ];
+      throw new Error(
+        `${phaseName}: automatic-if-present JSX must be a standalone conditional native phase; also requested ${active.join(', ')}`,
+      );
+    }
+  }
   if (plan.reactRefresh != null) {
     const refresh = plan.reactRefresh;
     const allowed = new Set(['refreshReg', 'refreshSig', 'emitFullSignatures']);

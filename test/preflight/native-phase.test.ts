@@ -93,22 +93,52 @@ test('runs a fused native TypeScript phase and reports its own timing', () => {
     nativeTransformMs: number;
     nativeParses: number;
     nativeSemanticBuilds: number;
+    nativeAstTraversals: number;
     nativeRenders: number;
+    nativeParseMs: number;
+    nativeSemanticBuildMs: number;
+    nativeCustomRewriteMs: number;
+    nativeOxcTransformMs: number;
+    nativeOptimizationMs: number;
+    nativeCodegenAndMapMs: number;
+    nativeHelperDiscoveryMs: number;
+    nativeHelperMaterializationMs: number;
     nativeCrossings: number;
     javascriptBatches: number;
+    processRssStartBytes: number;
+    processRssEndBytes: number;
+    processRssPeakObservedBytes: number;
+    processHeapUsedStartBytes: number;
+    processHeapUsedEndBytes: number;
+    processHeapUsedPeakObservedBytes: number;
     phaseExecutions: { name: string; nativeTransformMs: number }[];
   };
   assert.equal(performance.nativeParses, 1);
   assert.equal(performance.nativeSemanticBuilds, 1);
+  assert.equal(performance.nativeAstTraversals, 2);
   assert.equal(performance.nativeRenders, 1);
+  assert.ok(performance.nativeParseMs > 0);
+  assert.ok(performance.nativeSemanticBuildMs > 0);
+  assert.ok(performance.nativeCustomRewriteMs >= 0);
+  assert.ok(performance.nativeOxcTransformMs >= 0);
+  assert.ok(performance.nativeOptimizationMs >= 0);
+  assert.ok(performance.nativeCodegenAndMapMs >= 0);
+  assert.ok(performance.nativeHelperDiscoveryMs >= 0);
+  assert.ok(performance.nativeHelperMaterializationMs >= 0);
   assert.equal(performance.nativeCrossings, 2);
   assert.equal(performance.javascriptBatches, 0);
+  assert.ok(performance.processRssStartBytes > 0);
+  assert.ok(performance.processRssEndBytes > 0);
+  assert.ok(performance.processRssPeakObservedBytes >= performance.processRssStartBytes);
+  assert.ok(performance.processHeapUsedStartBytes > 0);
+  assert.ok(performance.processHeapUsedEndBytes > 0);
+  assert.ok(performance.processHeapUsedPeakObservedBytes >= performance.processHeapUsedStartBytes);
   assert.ok(performance.nativeTransformMs > 0);
   assert.equal(performance.phaseExecutions[0].name, 'preflight');
   assert.ok(performance.phaseExecutions[0].nativeTransformMs > 0);
 });
 
-test('reports internal reparses and semantic rebuilds for focused legacy lowering', () => {
+test('reports only the required internal reparse and semantic rebuild for legacy lowering', () => {
   const result = transform(
     'let [value] = input;',
     'fixture.js',
@@ -134,9 +164,9 @@ test('reports internal reparses and semantic rebuilds for focused legacy lowerin
     nativeSemanticBuilds: number;
     nativeRenders: number;
   };
-  assert.ok(performance.nativeParses >= 3);
+  assert.equal(performance.nativeParses, 2);
   assert.equal(performance.nativeSemanticBuilds, performance.nativeParses);
-  assert.ok(performance.nativeRenders >= 2);
+  assert.equal(performance.nativeRenders, 2);
 });
 
 test('runs React Fast Refresh instrumentation in the native JSX transform', () => {
@@ -214,6 +244,62 @@ test('runs Metro-compatible constant folding and DCE as one native postflight', 
   assert.match(result.code, /const liveArrow = \(\) => 2;/);
   assert.match(result.code, /module\.exports = liveArrow\(\);/);
   assert.doesNotMatch(result.code, /sideEffect/);
+});
+
+test('computes chained dead functions to a fixed point while retaining referenced cycles', () => {
+  const result = transform(
+    [
+      'function dead0() { return 0; }',
+      ...Array.from(
+        { length: 99 },
+        (_, index) => `function dead${index + 1}() { return dead${index}(); }`,
+      ),
+      'function cycleA() { return cycleB(); }',
+      'function cycleB() { return cycleA(); }',
+    ].join('\n'),
+    'fixture.js',
+    defineNativePipeline({
+      phases: [
+        {
+          name: 'metro-optimization',
+          native: { optimize: { deadCodeElimination: true } },
+        },
+      ],
+    }),
+    { debugPerformance: true },
+  );
+
+  assert.equal(result.status, 'complete');
+  assert.doesNotMatch(result.code, /dead\d/);
+  assert.match(result.code, /function cycleA\(\)/);
+  assert.match(result.code, /function cycleB\(\)/);
+  const performance = result.metadata.performance as {
+    nativeParses: number;
+    nativeSemanticBuilds: number;
+    nativeAstTraversals: number;
+  };
+  assert.equal(performance.nativeParses, 1);
+  assert.equal(performance.nativeSemanticBuilds, 2);
+  assert.ok(performance.nativeAstTraversals <= 6);
+});
+
+test('retains dependencies reached from an exported function', () => {
+  const result = transform(
+    'const wrap = () => 1; export function factory() { return wrap(); }',
+    'fixture.js',
+    defineNativePipeline({
+      phases: [
+        {
+          name: 'metro-optimization',
+          native: { optimize: { deadCodeElimination: true } },
+        },
+      ],
+    }),
+  );
+
+  assert.equal(result.status, 'complete');
+  assert.match(result.code, /const wrap = \(\) => 1;/);
+  assert.match(result.code, /export function factory\(\)/);
 });
 
 test('keeps a native legacy no-op byte-identical with an identity map', () => {
@@ -314,10 +400,19 @@ test('lowers block scoping through the native preflight capability', () => {
     defineNativePipeline({
       phases: [{ name: 'preflight', native: { transforms: { blockScoping: true } } }],
     }),
+    { debugPerformance: true },
   );
 
   assert.equal(result.status, 'complete');
   assert.match(result.code, /var pristine = true/);
+  const performance = result.metadata.performance as {
+    nativeParses: number;
+    nativeSemanticBuilds: number;
+    nativeAstTraversals: number;
+  };
+  assert.equal(performance.nativeParses, 1);
+  assert.equal(performance.nativeSemanticBuilds, 1);
+  assert.equal(performance.nativeAstTraversals, 2);
 
   const map = new TraceMap({
     version: 3,

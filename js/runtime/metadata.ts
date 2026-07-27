@@ -5,11 +5,30 @@ export interface PerformanceAllocationCounters {
   nodeFacades: number;
   snapshots: number;
   scopeFacades: number;
+  nativeRetainedBytesPeak: number;
+  processRssStartBytes: number;
+  processRssEndBytes: number;
+  processRssPeakObservedBytes: number;
+  processHeapUsedStartBytes: number;
+  processHeapUsedEndBytes: number;
+  processHeapUsedPeakObservedBytes: number;
+  nativeCrossings: number;
+  nativeWorkCrossings: number;
+  nativeInstrumentationCrossings: number;
+  nativeCrossingOperations: Record<string, number>;
   classificationMs: number;
   phasePreparationMs: number;
   sessionOpenMs: number;
   nativeAndDecodeMs: number;
   nativeTransformMs: number;
+  nativeParseMs: number;
+  nativeSemanticBuildMs: number;
+  nativeCustomRewriteMs: number;
+  nativeOxcTransformMs: number;
+  nativeOptimizationMs: number;
+  nativeCodegenAndMapMs: number;
+  nativeHelperDiscoveryMs: number;
+  nativeHelperMaterializationMs: number;
   dispatcherSetupMs: number;
   dispatchMs: number;
   pathConstructionMs: number;
@@ -27,6 +46,7 @@ export function createTransformMetadata(
   phasePlanMs: number,
 ): Record<string, unknown> {
   if (!debugPerformance) return {};
+  const memory = process.memoryUsage();
   return {
     performance: {
       phases,
@@ -35,7 +55,11 @@ export function createTransformMetadata(
       nativeParses: 0,
       nativeSemanticBuilds: 0,
       nativeRenders: 0,
+      nativeAstTraversals: 0,
       nativeCrossings: 0,
+      nativeWorkCrossings: 0,
+      nativeInstrumentationCrossings: 0,
+      nativeCrossingOperations: {},
       javascriptBatches: 0,
       routeDeliveries: 0,
       nodeRecords: 0,
@@ -51,6 +75,13 @@ export function createTransformMetadata(
       nodeFacades: 0,
       snapshots: 0,
       scopeFacades: 0,
+      nativeRetainedBytesPeak: 0,
+      processRssStartBytes: memory.rss,
+      processRssEndBytes: memory.rss,
+      processRssPeakObservedBytes: memory.rss,
+      processHeapUsedStartBytes: memory.heapUsed,
+      processHeapUsedEndBytes: memory.heapUsed,
+      processHeapUsedPeakObservedBytes: memory.heapUsed,
       classificationMs: 0,
       sourceBytes,
       phasePlanMs,
@@ -58,6 +89,14 @@ export function createTransformMetadata(
       sessionOpenMs: 0,
       nativeAndDecodeMs: 0,
       nativeTransformMs: 0,
+      nativeParseMs: 0,
+      nativeSemanticBuildMs: 0,
+      nativeCustomRewriteMs: 0,
+      nativeOxcTransformMs: 0,
+      nativeOptimizationMs: 0,
+      nativeCodegenAndMapMs: 0,
+      nativeHelperDiscoveryMs: 0,
+      nativeHelperMaterializationMs: 0,
       dispatcherSetupMs: 0,
       dispatchMs: 0,
       pathConstructionMs: 0,
@@ -68,6 +107,31 @@ export function createTransformMetadata(
       overallMs: 0,
     },
   };
+}
+
+export function recordNativeCrossing(
+  metadata: Record<string, unknown>,
+  operation: string,
+  instrumentation = false,
+): void {
+  const counters = performanceCounters(metadata);
+  counters.nativeCrossings++;
+  if (instrumentation) counters.nativeInstrumentationCrossings++;
+  else counters.nativeWorkCrossings++;
+  counters.nativeCrossingOperations[operation] =
+    (counters.nativeCrossingOperations[operation] ?? 0) + 1;
+}
+
+export function sampleProcessMemory(metadata: Record<string, unknown>): void {
+  const counters = performanceCounters(metadata);
+  const memory = process.memoryUsage();
+  counters.processRssEndBytes = memory.rss;
+  counters.processRssPeakObservedBytes = Math.max(counters.processRssPeakObservedBytes, memory.rss);
+  counters.processHeapUsedEndBytes = memory.heapUsed;
+  counters.processHeapUsedPeakObservedBytes = Math.max(
+    counters.processHeapUsedPeakObservedBytes,
+    memory.heapUsed,
+  );
 }
 
 export function performanceCounters(

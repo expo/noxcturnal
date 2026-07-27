@@ -93,9 +93,13 @@ test('generates Metro-compatible function maps natively', () => {
   });
   const performance = result.metadata.performance as {
     nativeParses: number;
+    nativeAstTraversals: number;
+    nativeRetainedBytesPeak: number;
     routeDeliveries: number;
   };
   assert.equal(performance.nativeParses, 1);
+  assert.equal(performance.nativeAstTraversals, 2);
+  assert.ok(performance.nativeRetainedBytesPeak > source.length);
   assert.equal(performance.routeDeliveries, 0);
 });
 

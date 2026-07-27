@@ -1,11 +1,33 @@
-import { bench } from 'vitest';
+import { bench as vitestBench } from 'vitest';
 import {
   defineNativePipeline,
   defineNativePlugin,
   defineVisitor,
   transform,
 } from '../dist/index.js';
+import type { Pipeline, PreflightTransforms } from '../dist/index.js';
+import {
+  NATIVE_TRANSFORM_COMPATIBILITY_BOUNDARIES,
+  NATIVE_TRANSFORM_OWNERSHIP_FIXTURES,
+  type NativeTransformName,
+} from '../test/preflight/native-transform-fixtures.js';
 import { generateLargeFileSource } from './large-file-corpus.js';
+
+function benchmarkTransform(...args: Parameters<typeof transform>) {
+  const result = transform(...args);
+  if (result.status !== 'complete') {
+    throw new Error(`benchmark transform bailed out: ${result.reason}`);
+  }
+  return result;
+}
+
+function verifiedBench(name: string, run: () => unknown) {
+  // Vitest's benchmark runner may report a callback exception as a NaN row
+  // without failing the process. Execute every workload once during module
+  // registration so a bailout or setup error fails the benchmark gate.
+  run();
+  vitestBench(name, run);
+}
 
 const source = Array.from(
   { length: 2_000 },
@@ -30,8 +52,19 @@ const metroOptimizationPipeline = defineNativePipeline({
     },
   ],
 });
-bench('fused native Metro constant folding and DCE', () => {
-  transform(metroOptimizationSource, 'benchmark.js', metroOptimizationPipeline);
+verifiedBench('fused native Metro constant folding and DCE', () => {
+  benchmarkTransform(metroOptimizationSource, 'benchmark.js', metroOptimizationPipeline);
+});
+
+const deadFunctionChainSource = [
+  'function dead0(){return 0}',
+  ...Array.from(
+    { length: 499 },
+    (_, index) => `function dead${index + 1}(){return dead${index}()}`,
+  ),
+].join('\n');
+verifiedBench('500-function adversarial DCE chain', () => {
+  benchmarkTransform(deadFunctionChainSource, 'benchmark.js', metroOptimizationPipeline);
 });
 
 const legacySyntaxPipeline = defineNativePipeline({
@@ -58,8 +91,8 @@ const nativeClassesSource = Array.from(
   (_, index) =>
     `class Value${index}{field=${index};constructor(value){this.value=value}read(){return this.value+this.field}static create(value){return new this(value)}}sink(Value${index}.create(${index}).read());`,
 ).join('\n');
-bench('500 native legacy classes', () => {
-  transform(nativeClassesSource, 'benchmark.js', legacySyntaxPipeline);
+verifiedBench('500 native legacy classes', () => {
+  benchmarkTransform(nativeClassesSource, 'benchmark.js', legacySyntaxPipeline);
 });
 const focusedPrivatePipeline = defineNativePipeline({
   phases: [
@@ -70,6 +103,7 @@ const focusedPrivatePipeline = defineNativePipeline({
           privateMethods: { loose: true },
           privatePropertyInObject: { loose: true },
         },
+        helpers: { mode: 'inline' },
         comments: false,
       },
     },
@@ -80,15 +114,15 @@ const focusedPrivateSource = Array.from(
   (_, index) =>
     `class Unrelated${index}{field=${index}}class Secret${index}{#value=${index};#read(input){return this.#value+input}read(input){return[this.#read(1),#value in input]}}sink(new Secret${index}().read(new Secret${index}()),new Unrelated${index}().field);`,
 ).join('\n');
-bench('200 focused modern private-feature classes', () => {
-  transform(focusedPrivateSource, 'benchmark.js', focusedPrivatePipeline);
+verifiedBench('200 focused modern private-feature classes', () => {
+  benchmarkTransform(focusedPrivateSource, 'benchmark.js', focusedPrivatePipeline);
 });
 const legacySyntaxNoopSource = Array.from(
   { length: 500 },
   (_, index) => `var value${index}=${index};sink(value${index});`,
 ).join('\n');
-bench('legacy syntax no-op discovery', () => {
-  transform(legacySyntaxNoopSource, 'benchmark.js', legacySyntaxPipeline);
+verifiedBench('legacy syntax no-op discovery', () => {
+  benchmarkTransform(legacySyntaxNoopSource, 'benchmark.js', legacySyntaxPipeline);
 });
 
 const nonHermesLegacyPipeline = defineNativePipeline({
@@ -106,19 +140,25 @@ const nonHermesLegacyPipeline = defineNativePipeline({
           asyncFunctions: true,
           objectRestSpread: { loose: true, useBuiltIns: true },
         },
-        helpers: { mode: 'inline' },
+        helpers: {
+          mode: 'runtime',
+          moduleName: '@babel/runtime',
+          version: '7.29.7',
+        },
         comments: false,
       },
     },
   ],
 });
-const nonHermesLegacySource = Array.from(
+const nonHermesLegacySources = Array.from(
   { length: 200 },
   (_, index) =>
     `const input${index}={kept:${index},extra:${index + 1}};const {kept,...rest${index}}=input${index};async function read${index}(value=${index}){class Box{field=value;read(){return {...rest${index},kept,value:this.field}}}return new Box().read()}sink(read${index}());`,
-).join('\n');
-bench('200 non-Hermes legacy modules fused language pass', () => {
-  transform(nonHermesLegacySource, 'benchmark.js', nonHermesLegacyPipeline);
+);
+verifiedBench('200 non-Hermes legacy modules fused language pass', () => {
+  for (const [index, moduleSource] of nonHermesLegacySources.entries()) {
+    benchmarkTransform(moduleSource, `benchmark-${index}.js`, nonHermesLegacyPipeline);
+  }
 });
 
 const productionAppLanguagePipeline = defineNativePipeline({
@@ -139,8 +179,8 @@ const productionAppSource = Array.from(
   (_, index) =>
     `type Props${index}={value:number};export function Component${index}({value}:Props${index}){return <View testID="value-${index}">{value}</View>}`,
 ).join('\n');
-bench('200 production app TypeScript JSX components', () => {
-  transform(productionAppSource, 'App.tsx', productionAppLanguagePipeline);
+verifiedBench('200 production app TypeScript JSX components', () => {
+  benchmarkTransform(productionAppSource, 'App.tsx', productionAppLanguagePipeline);
 });
 
 const developmentRefreshPipeline = defineNativePipeline({
@@ -156,8 +196,8 @@ const developmentRefreshPipeline = defineNativePipeline({
     },
   ],
 });
-bench('200 development React Refresh components', () => {
-  transform(productionAppSource, 'App.tsx', developmentRefreshPipeline);
+verifiedBench('200 development React Refresh components', () => {
+  benchmarkTransform(productionAppSource, 'App.tsx', developmentRefreshPipeline);
 });
 
 const visitorPipeline = defineNativePipeline({
@@ -173,8 +213,8 @@ const visitorPipeline = defineNativePipeline({
     },
   ],
 });
-bench('static JavaScript visitor transform', () => {
-  transform(source, 'benchmark.js', visitorPipeline);
+verifiedBench('static JavaScript visitor transform', () => {
+  benchmarkTransform(source, 'benchmark.js', visitorPipeline);
 });
 
 const rejectedIdentifierPipeline = defineNativePipeline({
@@ -192,8 +232,8 @@ const rejectedIdentifierPipeline = defineNativePipeline({
     },
   ],
 });
-bench('native Identifier predicate with 0% selectivity', () => {
-  transform(source, 'benchmark.js', rejectedIdentifierPipeline);
+verifiedBench('native Identifier predicate with 0% selectivity', () => {
+  benchmarkTransform(source, 'benchmark.js', rejectedIdentifierPipeline);
 });
 
 const rejectedDeclarationPipeline = defineNativePipeline({
@@ -211,8 +251,8 @@ const rejectedDeclarationPipeline = defineNativePipeline({
     },
   ],
 });
-bench('native predicate with 0% selectivity', () => {
-  transform(source, 'benchmark.js', rejectedDeclarationPipeline);
+verifiedBench('native predicate with 0% selectivity', () => {
+  benchmarkTransform(source, 'benchmark.js', rejectedDeclarationPipeline);
 });
 
 function selectiveDeclarations(matchEvery: number): string {
@@ -241,8 +281,8 @@ for (const [label, selectiveSource] of [
   ['10%', selectiveDeclarations(10)],
   ['1%', selectiveDeclarations(100)],
 ] as const) {
-  bench(`native predicate with ${label} selectivity`, () => {
-    transform(selectiveSource, 'benchmark.js', selectiveDeclarationPipeline);
+  verifiedBench(`native predicate with ${label} selectivity`, () => {
+    benchmarkTransform(selectiveSource, 'benchmark.js', selectiveDeclarationPipeline);
   });
 }
 
@@ -259,8 +299,8 @@ const exitVisitorPipeline = defineNativePipeline({
     },
   ],
 });
-bench('enter/exit JavaScript visitor transform', () => {
-  transform(source, 'benchmark.js', exitVisitorPipeline);
+verifiedBench('enter/exit JavaScript visitor transform', () => {
+  benchmarkTransform(source, 'benchmark.js', exitVisitorPipeline);
 });
 
 const pluginFanoutPipeline = defineNativePipeline({
@@ -276,8 +316,8 @@ const pluginFanoutPipeline = defineNativePipeline({
     },
   ],
 });
-bench('12-plugin JavaScript visitor fan-out', () => {
-  transform(source, 'benchmark.js', pluginFanoutPipeline);
+verifiedBench('12-plugin JavaScript visitor fan-out', () => {
+  benchmarkTransform(source, 'benchmark.js', pluginFanoutPipeline);
 });
 
 const mixedExecutorPipeline = defineNativePipeline({
@@ -303,8 +343,8 @@ const mixedExecutorPipeline = defineNativePipeline({
     },
   ],
 });
-bench('11 static executors beside one dynamic plugin', () => {
-  transform(source, 'benchmark.js', mixedExecutorPipeline);
+verifiedBench('11 static executors beside one dynamic plugin', () => {
+  benchmarkTransform(source, 'benchmark.js', mixedExecutorPipeline);
 });
 
 const globallySlowExecutorPipeline = defineNativePipeline({
@@ -326,8 +366,8 @@ const globallySlowExecutorPipeline = defineNativePipeline({
     },
   ],
 });
-bench('11 globally deoptimized peers beside stop capability', () => {
-  transform(source, 'benchmark.js', globallySlowExecutorPipeline);
+verifiedBench('11 globally deoptimized peers beside stop capability', () => {
+  benchmarkTransform(source, 'benchmark.js', globallySlowExecutorPipeline);
 });
 
 const disjointPluginPipeline = defineNativePipeline({
@@ -353,8 +393,8 @@ const disjointPluginPipeline = defineNativePipeline({
     },
   ],
 });
-bench('7-plugin disjoint visitor dispatch', () => {
-  transform(source, 'benchmark.js', disjointPluginPipeline);
+verifiedBench('7-plugin disjoint visitor dispatch', () => {
+  benchmarkTransform(source, 'benchmark.js', disjointPluginPipeline);
 });
 
 const denseEditPipeline = defineNativePipeline({
@@ -374,8 +414,8 @@ const denseEditPipeline = defineNativePipeline({
     },
   ],
 });
-bench('dense identifier edit transform', () => {
-  transform(source, 'benchmark.js', denseEditPipeline);
+verifiedBench('dense identifier edit transform', () => {
+  benchmarkTransform(source, 'benchmark.js', denseEditPipeline);
 });
 
 const denseNamedEditPipeline = defineNativePipeline({
@@ -400,8 +440,8 @@ const denseNamedEditPipeline = defineNativePipeline({
     },
   ],
 });
-bench('dense named edit and map transform', () => {
-  transform(source, 'benchmark.js', denseNamedEditPipeline, { sourceMapMode: 'boundary' });
+verifiedBench('dense named edit and map transform', () => {
+  benchmarkTransform(source, 'benchmark.js', denseNamedEditPipeline, { sourceMapMode: 'boundary' });
 });
 
 const broadVisitorPipeline = defineNativePipeline({
@@ -417,8 +457,8 @@ const broadVisitorPipeline = defineNativePipeline({
     },
   ],
 });
-bench('broad catch-all streaming transform', () => {
-  transform(source, 'benchmark.js', broadVisitorPipeline, { allowBroadVisitors: true });
+verifiedBench('broad catch-all streaming transform', () => {
+  benchmarkTransform(source, 'benchmark.js', broadVisitorPipeline, { allowBroadVisitors: true });
 });
 
 // Unlike the pre-typed-contract version of this bench, `name` is declared and
@@ -445,8 +485,8 @@ const scopeAncestryPipeline = defineNativePipeline({
     },
   ],
 });
-bench('identifier scope and ancestry transform', () => {
-  transform(source, 'benchmark.js', scopeAncestryPipeline);
+verifiedBench('identifier scope and ancestry transform', () => {
+  benchmarkTransform(source, 'benchmark.js', scopeAncestryPipeline);
 });
 
 const threePhasePipeline = defineNativePipeline({
@@ -507,34 +547,101 @@ const nativeReactCompilerPreflight = defineNativePipeline({
   ],
 });
 
-bench('native TypeScript preflight', () => {
-  transform(
+verifiedBench('native TypeScript preflight', () => {
+  benchmarkTransform(
     'enum Kind { A, B } class Value { constructor(public kind: Kind) {} }',
     'fixture.ts',
     nativeTypeScriptPreflight,
   );
 });
 
-bench('native automatic JSX preflight', () => {
-  transform('export const view = <Widget value={1} />;', 'fixture.jsx', nativeJsxPreflight);
+verifiedBench('native automatic JSX preflight', () => {
+  benchmarkTransform(
+    'export const view = <Widget value={1} />;',
+    'fixture.jsx',
+    nativeJsxPreflight,
+  );
 });
 
-bench('native async-generator preflight', () => {
-  transform(
+verifiedBench('native async-generator preflight', () => {
+  benchmarkTransform(
     'var iterable = { async *values() { yield await 1; } };',
     'fixture.js',
     nativeAsyncGeneratorPreflight,
   );
 });
-bench('native React Compiler preflight', () => {
-  transform(
+verifiedBench('native React Compiler preflight', () => {
+  benchmarkTransform(
     'function Component(props) { return <View onPress={() => props.onPress()}>{props.text}</View>; }',
     'fixture.jsx',
     nativeReactCompilerPreflight,
   );
 });
-bench('three-phase reparse transform', () => {
-  transform(source, 'benchmark.js', threePhasePipeline);
+
+const nativeTransformFamilyPipelines = Object.fromEntries(
+  Object.entries(NATIVE_TRANSFORM_OWNERSHIP_FIXTURES).map(([name, [, option]]) => [
+    name,
+    defineNativePipeline({
+      phases: [
+        {
+          name: `family-${name}`,
+          native: {
+            transforms: { [name]: option } as PreflightTransforms,
+            helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
+          },
+        },
+      ],
+    }),
+  ]),
+) as Record<NativeTransformName, Pipeline>;
+
+const transformFamilyPadding = Array.from(
+  { length: 5_000 },
+  (_, index) => `var familyPadding${index}=${index};`,
+).join('\n');
+const transformFamilyAdversarialPrefix = String.raw`
+// class async for of static using value ||= value ?? value?.field
+/* let const ... #private /(?<name>.)/su sticky unicode JSX <Widget /> */
+var misleadingTransformText =
+  "class async for of static using ||= ?? ?. ... #private /regexp/suydv";
+`;
+
+function runNativeTransformFamilyCohort(prefix: string): void {
+  for (const [name, [ownedSource]] of Object.entries(NATIVE_TRANSFORM_OWNERSHIP_FIXTURES) as [
+    NativeTransformName,
+    (typeof NATIVE_TRANSFORM_OWNERSHIP_FIXTURES)[NativeTransformName],
+  ][]) {
+    const result = transform(
+      `${prefix}\n${ownedSource}`,
+      `family-${name}.js`,
+      nativeTransformFamilyPipelines[name],
+    );
+    const expected = NATIVE_TRANSFORM_COMPATIBILITY_BOUNDARIES.has(name) ? 'bailout' : 'complete';
+    if (result.status !== expected) {
+      throw new Error(
+        `${name} ${expected === 'complete' ? 'bailed out' : 'unexpectedly completed'}${
+          result.status === 'bailout' ? `: ${result.reason}` : ''
+        }`,
+      );
+    }
+  }
+}
+
+verifiedBench('all native transform families: small cohort', () => {
+  runNativeTransformFamilyCohort('');
+});
+verifiedBench('all native transform families: medium cohort', () => {
+  runNativeTransformFamilyCohort(transformFamilyPadding.slice(0, 8 * 1024));
+});
+verifiedBench('all native transform families: large cohort', () => {
+  runNativeTransformFamilyCohort(transformFamilyPadding.slice(0, 100 * 1024));
+});
+verifiedBench('all native transform families: adversarial cohort', () => {
+  runNativeTransformFamilyCohort(transformFamilyAdversarialPrefix);
+});
+
+verifiedBench('three-phase reparse transform', () => {
+  benchmarkTransform(source, 'benchmark.js', threePhasePipeline);
 });
 
 function changedPhasePipeline(count: number, rendered: boolean) {
@@ -564,11 +671,11 @@ function changedPhasePipeline(count: number, rendered: boolean) {
 for (const phaseCount of [1, 3, 5]) {
   const fused = changedPhasePipeline(phaseCount, false);
   const rendered = changedPhasePipeline(phaseCount, true);
-  bench(`${phaseCount} changed text phases: fused`, () => {
-    transform(source, 'benchmark.js', fused);
+  verifiedBench(`${phaseCount} changed text phases: fused`, () => {
+    benchmarkTransform(source, 'benchmark.js', fused);
   });
-  bench(`${phaseCount} changed text phases: rendered`, () => {
-    transform(source, 'benchmark.js', rendered);
+  verifiedBench(`${phaseCount} changed text phases: rendered`, () => {
+    benchmarkTransform(source, 'benchmark.js', rendered);
   });
 }
 
@@ -589,8 +696,8 @@ const structuralPipeline = defineNativePipeline({
     },
   ],
 });
-bench('declared structural child transform', () => {
-  transform(source, 'benchmark.js', structuralPipeline);
+verifiedBench('declared structural child transform', () => {
+  benchmarkTransform(source, 'benchmark.js', structuralPipeline);
 });
 
 function allocationVisitor(name: string) {
@@ -618,14 +725,14 @@ function generatedSource(minimumBytes: number): string {
 for (const shape of ['nested', 'functions', 'dependencies'] as const) {
   const generated = generateLargeFileSource(650 * 1024, shape);
   const pipeline = allocationVisitor('ranges');
-  bench(`650 KiB ${shape} range visitor`, () => {
-    transform(generated, 'generated.js', pipeline);
+  verifiedBench(`650 KiB ${shape} range visitor`, () => {
+    benchmarkTransform(generated, 'generated.js', pipeline);
   });
 }
 
 const functionMapSource = generateLargeFileSource(650 * 1024, 'functions');
-bench('650 KiB native function map', () => {
-  transform(functionMapSource, 'generated.js', visitorPipeline, { functionMap: true });
+verifiedBench('650 KiB native function map', () => {
+  benchmarkTransform(functionMapSource, 'generated.js', visitorPipeline, { functionMap: true });
 });
 
 const sparseEditSource = generateLargeFileSource(650 * 1024, 'sparse-edits');
@@ -647,15 +754,15 @@ const sparseEditPipeline = defineNativePipeline({
     },
   ],
 });
-bench('650 KiB sparse edits', () => {
-  transform(sparseEditSource, 'generated.js', sparseEditPipeline, {
+verifiedBench('650 KiB sparse edits', () => {
+  benchmarkTransform(sparseEditSource, 'generated.js', sparseEditPipeline, {
     sourceMapMode: 'boundary',
   });
 });
 
 const denseEditSource = generateLargeFileSource(650 * 1024, 'dense-edits');
-bench('650 KiB dense edits', () => {
-  transform(denseEditSource, 'generated.js', denseEditPipeline, {
+verifiedBench('650 KiB dense edits', () => {
+  benchmarkTransform(denseEditSource, 'generated.js', denseEditPipeline, {
     sourceMapMode: 'boundary',
   });
 });
@@ -694,8 +801,10 @@ const copyHeavyPipeline = defineNativePipeline({
     },
   ],
 });
-bench('650 KiB per-node duplication with contained edits', () => {
-  transform(copyHeavySource, 'generated.js', copyHeavyPipeline, { sourceMapMode: 'boundary' });
+verifiedBench('650 KiB per-node duplication with contained edits', () => {
+  benchmarkTransform(copyHeavySource, 'generated.js', copyHeavyPipeline, {
+    sourceMapMode: 'boundary',
+  });
 });
 
 interface MirrorState {
@@ -721,13 +830,17 @@ const repeatedCopyPipeline = defineNativePipeline({
     },
   ],
 });
-bench('650 KiB repeated single-range copies', () => {
-  transform(copyHeavySource, 'generated.js', repeatedCopyPipeline, { sourceMapMode: 'boundary' });
+verifiedBench('650 KiB repeated single-range copies', () => {
+  benchmarkTransform(copyHeavySource, 'generated.js', repeatedCopyPipeline, {
+    sourceMapMode: 'boundary',
+  });
 });
 
 for (const name of ['no-properties', 'ranges', 'scalar', 'parent', 'snapshot']) {
   const pipeline = allocationVisitor(name);
-  bench(`allocation profile: ${name}`, () => transform(source, 'benchmark.js', pipeline));
+  verifiedBench(`allocation profile: ${name}`, () =>
+    benchmarkTransform(source, 'benchmark.js', pipeline),
+  );
 }
 
 for (const [label, generated] of [
@@ -738,8 +851,8 @@ for (const [label, generated] of [
   ['5 MiB', generatedSource(5 * 1024 * 1024)],
 ] as const) {
   const pipeline = allocationVisitor('ranges');
-  bench(`${label} range visitor`, () => {
-    transform(generated, 'generated.js', pipeline);
+  verifiedBench(`${label} range visitor`, () => {
+    benchmarkTransform(generated, 'generated.js', pipeline);
   });
 }
 
@@ -750,17 +863,17 @@ for (const [label, generated] of [
   ['10 KiB', generatedSource(10 * 1024)],
   ['100 KiB', generatedSource(100 * 1024)],
 ] as const) {
-  bench(`fixed-cost profile: ${label}`, () => {
-    transform(generated, 'generated.js', visitorPipeline, { debugPerformance: true });
+  verifiedBench(`fixed-cost profile: ${label}`, () => {
+    benchmarkTransform(generated, 'generated.js', visitorPipeline, { debugPerformance: true });
   });
 }
 
 const largeChangedSource = generatedSource(650 * 1024);
 const largeFusedPhases = changedPhasePipeline(3, false);
 const largeRenderedPhases = changedPhasePipeline(3, true);
-bench('650 KiB, 3 changed text phases: fused', () => {
-  transform(largeChangedSource, 'generated.js', largeFusedPhases);
+verifiedBench('650 KiB, 3 changed text phases: fused', () => {
+  benchmarkTransform(largeChangedSource, 'generated.js', largeFusedPhases);
 });
-bench('650 KiB, 3 changed text phases: rendered', () => {
-  transform(largeChangedSource, 'generated.js', largeRenderedPhases);
+verifiedBench('650 KiB, 3 changed text phases: rendered', () => {
+  benchmarkTransform(largeChangedSource, 'generated.js', largeRenderedPhases);
 });

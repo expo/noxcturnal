@@ -7,6 +7,10 @@ import { expect, test } from 'vitest';
 import type { PreflightTransforms } from '../../dist/index.js';
 import { defineNativePipeline, transform } from '../../dist/index.js';
 import { NATIVE_TRANSFORM_NAMES } from '../../dist/preflight/schema.js';
+import {
+  NATIVE_TRANSFORM_COMPATIBILITY_BOUNDARIES,
+  NATIVE_TRANSFORM_OWNERSHIP_FIXTURES,
+} from './native-transform-fixtures.js';
 
 const pipeline = (
   transforms: PreflightTransforms,
@@ -27,51 +31,11 @@ const pipeline = (
 
 const runtimeRequire = createRequire(import.meta.url);
 
-type TransformName = (typeof NATIVE_TRANSFORM_NAMES)[number];
-
-const TRANSFORM_OWNERSHIP_FIXTURES = {
-  blockScoping: ['let value = 1;', true],
-  classes: ['class Value {}', true],
-  destructuring: ['var { value } = input;', { useBuiltIns: true }],
-  parameters: ['function read(value = 1) { return value; }', true],
-  forOf: ['for (var value of values) consume(value);', true],
-  explicitResourceManagement: ['using value = acquire();', true],
-  classStaticBlock: ['class Value { static { this.value = 1; } }', true],
-  classProperties: ['class Value { field = 1; }', { loose: true }],
-  logicalAssignmentOperators: ['value ||= 1;', true],
-  optionalChaining: ['value?.field;', { loose: false }],
-  nullishCoalescingOperator: ['value ?? fallback;', { loose: false }],
-  exportNamespaceFrom: ['export * as value from "pkg";', true],
-  optionalCatchBinding: ['try {} catch {}', true],
-  objectRestSpread: ['var value = { ...input };', { loose: true, useBuiltIns: true }],
-  asyncGeneratorFunctions: ['async function* values() { yield 1; }', true],
-  asyncFunctions: ['async function value() { return 1; }', true],
-  exponentiationOperator: ['value **= 2;', true],
-  privateMethods: ['class Value { #read() {} }', { loose: true }],
-  privatePropertyInObject: [
-    'class Value { #field; has(input) { return #field in input; } }',
-    { loose: true },
-  ],
-  regexpSticky: ['var value = /a/y;', true],
-  regexpUnicode: ['var value = /😀/u;', true],
-  regexpUnicodePropertyEscapes: ['var value = /\\p{ASCII}/u;', true],
-  regexpDotAll: ['var value = /a.b/s;', true],
-  regexpNamedCaptureGroups: ['var value = /(?<value>a)/;', true],
-  regexpLookBehind: ['var value = /(?<=a)b/;', true],
-  regexpMatchIndices: ['var value = /a/d;', true],
-  regexpUnicodeSets: ['var value = /[a&&b]/v;', true],
-} as const satisfies Record<TransformName, readonly [string, PreflightTransforms[TransformName]]>;
-
 test('every public native transform has an explicit ownership fixture', () => {
-  assert.deepEqual(Object.keys(TRANSFORM_OWNERSHIP_FIXTURES), [...NATIVE_TRANSFORM_NAMES]);
+  assert.deepEqual(Object.keys(NATIVE_TRANSFORM_OWNERSHIP_FIXTURES), [...NATIVE_TRANSFORM_NAMES]);
 
-  const documentedStandaloneBoundaries = new Set<TransformName>([
-    'regexpLookBehind',
-    'regexpMatchIndices',
-    'regexpUnicodeSets',
-  ]);
   for (const name of NATIVE_TRANSFORM_NAMES) {
-    const [source, option] = TRANSFORM_OWNERSHIP_FIXTURES[name];
+    const [source, option] = NATIVE_TRANSFORM_OWNERSHIP_FIXTURES[name];
     const result = transform(
       source,
       'fixture.js',
@@ -95,7 +59,7 @@ test('every public native transform has an explicit ownership fixture', () => {
     }).toMatchSnapshot();
     assert.equal(
       result.status,
-      documentedStandaloneBoundaries.has(name) ? 'bailout' : 'complete',
+      NATIVE_TRANSFORM_COMPATIBILITY_BOUNDARIES.has(name) ? 'bailout' : 'complete',
       `${name} has no matching ownership disposition`,
     );
     const noOp = transform(
@@ -230,6 +194,37 @@ test('native classes lower loose private fields, methods, calls, access, and pri
   assert.deepEqual(context.answer, [6, true, false]);
 });
 
+test('native classes rewrite private references inside field initializers and static blocks', () => {
+  const source = `
+    class Registry {
+      #value = 2;
+      #read = () => this.#value;
+      #callback = () => this.#read();
+      static #staticValue = 3;
+      static { globalThis.staticValue = this.#staticValue; }
+      result() { return this.#callback(); }
+    }
+    globalThis.result = new Registry().result();
+  `;
+  const result = transform(
+    source,
+    'fixture.js',
+    pipeline({
+      classes: true,
+      classProperties: { loose: true },
+      classStaticBlock: true,
+      privateMethods: { loose: true },
+      privatePropertyInObject: { loose: true },
+    }),
+  );
+  assert.equal(result.status, 'complete');
+  assert.doesNotMatch(result.code, /#[A-Za-z_$]/);
+  const context: { result?: unknown; staticValue?: unknown } = {};
+  new Function('globalThis', 'require', result.code)(context, runtimeRequire);
+  assert.equal(context.result, 2);
+  assert.equal(context.staticValue, 3);
+});
+
 test('native class helpers avoid source binding collisions', () => {
   const source =
     'var _construct=1,_construct2=2,_get=3,_get2=4,_classPrivateFieldLooseBase=5,_classPrivateMethodCall=6,_classPrivateFieldLooseBase2=7;class Base{value(){return 8}}class Value extends Base{#value(){return 9}privateValue(){return this.#value()}superValue(){return super.value()}bindings(){return [_construct,_construct2,_get,_get2,_classPrivateFieldLooseBase,_classPrivateMethodCall,_classPrivateFieldLooseBase2]}}var instance=new Value;globalThis.result=[instance.privateValue(),instance.superValue(),instance.bindings()];';
@@ -250,6 +245,29 @@ test('native class helpers avoid source binding collisions', () => {
     result.code,
     /_construct\d+|_classPrivateFieldLooseBase\d+|_classPrivateMethodCall\d+|_get\d+/,
   );
+});
+
+test('native class helpers materialize once for sibling classes after the directive prologue', () => {
+  const source =
+    '"use strict";class First{#read(){return 1}read(){return this.#read()}}class Second{#read(){return 2}read(){return this.#read()}}globalThis.result=[new First().read(),new Second().read()];';
+  const result = transform(
+    source,
+    'fixture.js',
+    pipeline({
+      classes: true,
+      privateMethods: { loose: true },
+      privatePropertyInObject: { loose: true },
+    }),
+  );
+  assert.equal(result.status, 'complete');
+  assert.ok(result.code.startsWith('"use strict";'));
+  assert.equal(
+    result.code.match(/require\("@babel\/runtime\/helpers\/classPrivateFieldLooseBase"\)/g)?.length,
+    1,
+  );
+  const context: { result?: unknown } = {};
+  new Function('globalThis', 'require', result.code)(context, runtimeRequire);
+  assert.deepEqual(context.result, [1, 2]);
 });
 
 test('language transforms are selected independently rather than as a target group', () => {

@@ -7,6 +7,7 @@ export type PreflightJsxMode =
   | 'classic'
   | 'classic-development'
   | 'automatic'
+  | 'automatic-if-present'
   | 'automatic-development';
 
 /** Runtime-helper ABI requested from the planned native preflight phase. */

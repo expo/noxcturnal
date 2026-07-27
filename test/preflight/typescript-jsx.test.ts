@@ -135,6 +135,30 @@ test.each([
   }
 });
 
+test('conditionally lowers JSX from parsed syntax without reprinting false lexical matches', () => {
+  const pipeline = nativePipeline('fixture.jsx', { jsx: 'automatic-if-present' }).pipeline;
+  const jsx = transform('const view = <><Widget /></>;', 'fixture.jsx', pipeline);
+  assert.equal(jsx.status, 'complete');
+  assert.match(jsx.code, /react\/jsx-runtime/);
+  assert.doesNotMatch(jsx.code, /<Widget|<>/);
+
+  const generated =
+    '/* @generated SignedSource<<e7f6759bcc8955193867c6ab42bd07ad>> */\nmodule.exports=1;';
+  const noJsx = transform(generated, 'fixture.jsx', pipeline, { debugPerformance: true });
+  assert.equal(noJsx.status, 'complete');
+  assert.equal(noJsx.code, generated);
+  const performance = noJsx.metadata.performance as {
+    nativeParses: number;
+    nativeSemanticBuilds: number;
+    nativeAstTraversals: number;
+    nativeRenders: number;
+  };
+  assert.equal(performance.nativeParses, 1);
+  assert.equal(performance.nativeSemanticBuilds, 0);
+  assert.equal(performance.nativeAstTraversals, 1);
+  assert.equal(performance.nativeRenders, 0);
+});
+
 test('honors JSX import-source and classic pragma comments', () => {
   const automatic = transform(
     '/** @jsxImportSource preact */ const view = <Widget />;',

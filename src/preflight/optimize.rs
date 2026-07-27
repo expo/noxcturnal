@@ -1,12 +1,18 @@
 use oxc_allocator::{Allocator, TakeIn};
 use oxc_ast::{
     AstBuilder,
-    ast::{Expression, NumberBase, Program, Statement, VariableDeclaration},
+    ast::{
+        Declaration, ExportNamedDeclaration, Expression, Function, FunctionType,
+        IdentifierReference, NumberBase, Program, Statement, VariableDeclaration,
+        VariableDeclarator,
+    },
 };
-use oxc_ast_visit::{VisitMut, walk_mut};
-use oxc_semantic::{SemanticBuilder, SymbolId};
+use oxc_ast_visit::{Visit, VisitMut, walk, walk_mut};
+use oxc_semantic::{Scoping, SemanticBuilder, SymbolId};
 use oxc_span::{GetSpan, SPAN};
-use rustc_hash::FxHashSet;
+use oxc_syntax::scope::ScopeFlags;
+use rustc_hash::{FxHashMap, FxHashSet};
+use std::time::Instant;
 
 use crate::semantic::constant_eval::{EvaluatedConstant, evaluate_expression};
 
@@ -18,16 +24,25 @@ pub(super) fn run<'a>(
     program: &mut Program<'a>,
     constant_folding: bool,
     dead_code_elimination: bool,
-) {
+    debug_performance: bool,
+) -> (u32, u32, f64) {
+    let mut traversal_count = 0;
+    let mut semantic_build_count = 0;
+    let mut semantic_build_ms = 0.0;
     if constant_folding {
         ConstantFolder {
             ast: AstBuilder::new(allocator),
         }
         .visit_program(program);
+        traversal_count += 1;
     }
     if dead_code_elimination {
-        eliminate_dead_functions(program);
+        let (traversals, elapsed) = eliminate_dead_functions(program, debug_performance);
+        traversal_count += traversals;
+        semantic_build_ms += elapsed;
+        semantic_build_count += 1;
     }
+    (traversal_count, semantic_build_count, semantic_build_ms)
 }
 
 struct ConstantFolder<'a> {
@@ -127,31 +142,214 @@ impl<'a> VisitMut<'a> for ConstantFolder<'a> {
     }
 }
 
-fn eliminate_dead_functions(program: &mut Program<'_>) {
-    loop {
-        let semantic = SemanticBuilder::new().build(program);
-        if !semantic.diagnostics.is_empty() {
-            return;
+fn eliminate_dead_functions(program: &mut Program<'_>, debug_performance: bool) -> (u32, f64) {
+    // Metro's Babel pass repeatedly removes unreferenced function bindings and
+    // recrawls scope until reaching a fixed point. Rebuilding the complete
+    // semantic graph on every layer makes a dead chain quadratic. Compute the
+    // same peeling fixed point from one semantic graph instead: removing an
+    // unreferenced candidate subtracts all references originating in its body,
+    // which may make the functions it called removable next. Cycles retain an
+    // incoming reference exactly as they do in Metro's binding-based pass.
+    let semantic_started = debug_performance.then(Instant::now);
+    let semantic = SemanticBuilder::new().build(program);
+    let semantic_ms =
+        semantic_started.map_or(0.0, |started| started.elapsed().as_secs_f64() * 1_000.0);
+    if !semantic.diagnostics.is_empty() {
+        return (1, semantic_ms);
+    }
+    let scoping = semantic.semantic.into_scoping();
+    // SemanticBuilder refreshes the symbol cells after preceding transforms
+    // have changed the program. Collect only after that rebuild; IDs retained
+    // from an older transformed graph may now refer to a different binding.
+    let mut collector = DeadFunctionCandidateCollector::default();
+    collector.visit_program(program);
+    if collector.candidates.is_empty() {
+        return (2, semantic_ms);
+    }
+    let mut analysis =
+        DeadFunctionDependencyAnalysis::new(&collector.candidates, &collector.roots, &scoping);
+    analysis.visit_program(program);
+    let unused = analysis.peel();
+    DeadFunctionRemover { unused }.visit_program(program);
+    (4, semantic_ms)
+}
+
+#[derive(Default)]
+struct DeadFunctionCandidateCollector {
+    candidates: FxHashSet<SymbolId>,
+    roots: FxHashSet<SymbolId>,
+}
+
+impl<'a> Visit<'a> for DeadFunctionCandidateCollector {
+    fn visit_export_named_declaration(&mut self, export: &ExportNamedDeclaration<'a>) {
+        match export.declaration.as_ref() {
+            Some(Declaration::FunctionDeclaration(function)) => {
+                if let Some(symbol_id) = function.id.as_ref().and_then(|id| id.symbol_id.get()) {
+                    self.roots.insert(symbol_id);
+                }
+            }
+            Some(Declaration::VariableDeclaration(declaration)) => {
+                for declarator in &declaration.declarations {
+                    if matches!(
+                        declarator.init,
+                        Some(
+                            Expression::FunctionExpression(_)
+                                | Expression::ArrowFunctionExpression(_)
+                        )
+                    ) && let Some(symbol_id) = declarator
+                        .id
+                        .get_binding_identifier()
+                        .and_then(|id| id.symbol_id.get())
+                    {
+                        self.roots.insert(symbol_id);
+                    }
+                }
+            }
+            _ => {}
         }
-        let scoping = semantic.semantic.into_scoping();
-        let unused = scoping
-            .symbol_ids()
-            .filter(|symbol_id| scoping.get_resolved_reference_ids(*symbol_id).is_empty())
+        walk::walk_export_named_declaration(self, export);
+    }
+
+    fn visit_function(&mut self, function: &Function<'a>, flags: ScopeFlags) {
+        if function.r#type == FunctionType::FunctionDeclaration
+            && let Some(symbol_id) = function.id.as_ref().and_then(|id| id.symbol_id.get())
+        {
+            self.candidates.insert(symbol_id);
+        }
+        walk::walk_function(self, function, flags);
+    }
+
+    fn visit_variable_declarator(&mut self, declaration: &VariableDeclarator<'a>) {
+        if matches!(
+            declaration.init,
+            Some(Expression::FunctionExpression(_) | Expression::ArrowFunctionExpression(_))
+        ) && let Some(symbol_id) = declaration
+            .id
+            .get_binding_identifier()
+            .and_then(|id| id.symbol_id.get())
+        {
+            self.candidates.insert(symbol_id);
+        }
+        walk::walk_variable_declarator(self, declaration);
+    }
+}
+
+struct DeadFunctionDependencyAnalysis<'s> {
+    candidates: &'s FxHashSet<SymbolId>,
+    scoping: &'s Scoping,
+    owner: Option<SymbolId>,
+    incoming: FxHashMap<SymbolId, usize>,
+    outgoing: FxHashMap<SymbolId, Vec<SymbolId>>,
+}
+
+impl<'s> DeadFunctionDependencyAnalysis<'s> {
+    fn new(
+        candidates: &'s FxHashSet<SymbolId>,
+        roots: &FxHashSet<SymbolId>,
+        scoping: &'s Scoping,
+    ) -> Self {
+        Self {
+            candidates,
+            scoping,
+            owner: None,
+            incoming: candidates
+                .iter()
+                .map(|id| (*id, usize::from(roots.contains(id))))
+                .collect(),
+            outgoing: FxHashMap::default(),
+        }
+    }
+
+    fn peel(mut self) -> FxHashSet<SymbolId> {
+        let mut pending: Vec<SymbolId> = self
+            .incoming
+            .iter()
+            .filter_map(|(id, count)| (*count == 0).then_some(*id))
             .collect();
-        let mut remover = DeadFunctionRemover {
-            unused,
-            changed: false,
-        };
-        remover.visit_program(program);
-        if !remover.changed {
+        let mut unused = FxHashSet::default();
+        while let Some(owner) = pending.pop() {
+            if !unused.insert(owner) {
+                continue;
+            }
+            for target in self.outgoing.remove(&owner).unwrap_or_default() {
+                let count = self
+                    .incoming
+                    .get_mut(&target)
+                    .expect("candidate reference must have an incoming count");
+                *count -= 1;
+                if *count == 0 {
+                    pending.push(target);
+                }
+            }
+        }
+        unused
+    }
+
+    fn with_owner(&mut self, owner: SymbolId, visit: impl FnOnce(&mut Self)) {
+        let previous = self.owner.replace(owner);
+        visit(self);
+        self.owner = previous;
+    }
+}
+
+impl<'a> Visit<'a> for DeadFunctionDependencyAnalysis<'_> {
+    fn visit_function(&mut self, function: &Function<'a>, flags: ScopeFlags) {
+        let owner = (function.r#type == FunctionType::FunctionDeclaration)
+            .then(|| function.id.as_ref().and_then(|id| id.symbol_id.get()))
+            .flatten()
+            .filter(|id| self.candidates.contains(id));
+        if let Some(owner) = owner {
+            self.with_owner(owner, |analysis| {
+                walk::walk_function(analysis, function, flags);
+            });
+        } else {
+            walk::walk_function(self, function, flags);
+        }
+    }
+
+    fn visit_variable_declarator(&mut self, declaration: &VariableDeclarator<'a>) {
+        let owner = matches!(
+            declaration.init,
+            Some(Expression::FunctionExpression(_) | Expression::ArrowFunctionExpression(_))
+        )
+        .then(|| {
+            declaration
+                .id
+                .get_binding_identifier()
+                .and_then(|id| id.symbol_id.get())
+        })
+        .flatten()
+        .filter(|id| self.candidates.contains(id));
+        if let Some(owner) = owner {
+            self.with_owner(owner, |analysis| {
+                walk::walk_variable_declarator(analysis, declaration);
+            });
+        } else {
+            walk::walk_variable_declarator(self, declaration);
+        }
+    }
+
+    fn visit_identifier_reference(&mut self, identifier: &IdentifierReference<'a>) {
+        let Some(target) = identifier
+            .reference_id
+            .get()
+            .and_then(|id| self.scoping.get_reference(id).symbol_id())
+            .filter(|id| self.candidates.contains(id))
+        else {
             return;
+        };
+        *self
+            .incoming
+            .get_mut(&target)
+            .expect("candidate reference must have an incoming count") += 1;
+        if let Some(owner) = self.owner {
+            self.outgoing.entry(owner).or_default().push(target);
         }
     }
 }
 
 struct DeadFunctionRemover {
     unused: FxHashSet<SymbolId>,
-    changed: bool,
 }
 
 impl DeadFunctionRemover {
@@ -168,11 +366,9 @@ impl DeadFunctionRemover {
     }
 
     fn remove_declarators(&mut self, declaration: &mut VariableDeclaration<'_>) {
-        let before = declaration.declarations.len();
         declaration
             .declarations
             .retain(|declarator| !self.unused_binding(declarator));
-        self.changed |= declaration.declarations.len() != before;
     }
 }
 
@@ -184,7 +380,6 @@ impl<'a> VisitMut<'a> for DeadFunctionRemover {
 
     fn visit_statements(&mut self, statements: &mut oxc_allocator::Vec<'a, Statement<'a>>) {
         walk_mut::walk_statements(self, statements);
-        let before = statements.len();
         statements.retain(|statement| match statement {
             Statement::FunctionDeclaration(function) => function
                 .id
@@ -194,6 +389,5 @@ impl<'a> VisitMut<'a> for DeadFunctionRemover {
             Statement::VariableDeclaration(declaration) => !declaration.declarations.is_empty(),
             _ => true,
         });
-        self.changed |= statements.len() != before;
     }
 }

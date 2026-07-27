@@ -505,7 +505,14 @@
     "ParenthesizedExpression": ["constantKind", "constantValue"],
     "SequenceExpression": ["constantKind", "constantValue"],
     "AssignmentExpression": ["operator"],
-    "CallExpression": ["optional", "argumentCount", "calleeName", "calleeGlobal", "staticArgument"],
+    "CallExpression": [
+      "optional",
+      "argumentCount",
+      "calleeName",
+      "calleePath",
+      "calleeGlobal",
+      "staticArgument"
+    ],
     "NewExpression": ["argumentCount", "calleeName", "staticArgument"],
     "StaticMemberExpression": ["computed", "property", "memberPath", "rootName", "rootGlobal"],
     "ComputedMemberExpression": ["computed", "property", "memberPath"],
@@ -547,6 +554,7 @@
     "optional",
     "argumentCount",
     "calleeName",
+    "calleePath",
     "calleeGlobal",
     "staticArgument",
     "computed",
@@ -653,6 +661,7 @@
       "optional": "boolean",
       "argumentCount": "number",
       "calleeName?": "string",
+      "calleePath?": "string",
       "calleeGlobal?": "boolean",
       "staticArgument?": "string"
     },

@@ -64,6 +64,16 @@ pub(super) fn edits(
         .symbol_names()
         .map(str::to_owned)
         .collect();
+    let helper_names = ClassHelperNames {
+        construct: reserve("_construct", &mut reserved),
+        construct_runtime: reserve("_construct2", &mut reserved),
+        super_get: reserve("_get", &mut reserved),
+        super_get_runtime: reserve("_get2", &mut reserved),
+        private_base: reserve("_classPrivateFieldLooseBase", &mut reserved),
+        private_call: reserve("_classPrivateMethodCall", &mut reserved),
+        private_runtime: reserve("_classPrivateFieldLooseBase2", &mut reserved),
+    };
+    let mut helper_usage = ClassHelperUsage::default();
     let mut edits = Vec::new();
     for (id, node) in nodes.iter_enumerated() {
         let AstKind::Class(class) = node.kind() else {
@@ -86,10 +96,37 @@ pub(super) fn edits(
             class_static_blocks,
             private_methods_loose,
             private_in_loose,
-            inline_helpers,
             &private_in_spans,
             &mut reserved,
+            &helper_names,
+            &mut helper_usage,
         )?);
+    }
+    if !edits.is_empty() {
+        let helper_prefix = class_helper_prefix(&helper_names, helper_usage, inline_helpers);
+        if !helper_prefix.is_empty() {
+            let prologue_offset = nodes
+                .iter()
+                .find_map(|node| match node.kind() {
+                    AstKind::Program(program) => program
+                        .directives
+                        .last()
+                        .map_or(Some(0), |directive| Some(directive.span.end)),
+                    _ => None,
+                })
+                .unwrap_or(0);
+            edits.push(EditCommand {
+                kind: EditKind::Prologue,
+                start: prologue_offset,
+                end: prologue_offset,
+                content: Some(format!("\n{helper_prefix}")),
+                parts: Vec::new(),
+                destination: None,
+                mapping: Some(MappingPolicy::Sourceless),
+                order: None,
+                names: None,
+            });
+        }
     }
     Ok((!edits.is_empty()).then_some(edits))
 }
@@ -103,9 +140,10 @@ fn lower(
     class_static_blocks: bool,
     private_methods_loose: Option<bool>,
     private_in_loose: Option<bool>,
-    inline_helpers: bool,
     private_in_spans: &[Span],
     reserved: &mut FxHashSet<String>,
+    helper_names: &ClassHelperNames,
+    helper_usage: &mut ClassHelperUsage,
 ) -> Result<EditCommand, &'static str> {
     let name = class
         .id
@@ -194,42 +232,11 @@ fn lower(
             if method.kind != MethodDefinitionKind::Constructor && contains_super(source, method))
     });
     let has_private_keys = !private_keys.is_empty();
-    let mut reserve_if = |needed: bool, base: &str| {
-        if needed {
-            reserve(base, reserved)
-        } else {
-            String::new()
-        }
-    };
-    let helper_names = ClassHelperNames {
-        construct: reserve_if(super_name.is_some(), "_construct"),
-        construct_runtime: reserve_if(super_name.is_some(), "_construct2"),
-        super_get: reserve_if(has_super_methods, "_get"),
-        super_get_runtime: reserve_if(has_super_methods, "_get2"),
-        private_base: reserve_if(has_private_keys, "_classPrivateFieldLooseBase"),
-        private_call: reserve_if(has_private_keys, "_classPrivateMethodCall"),
-        private_runtime: reserve_if(has_private_keys, "_classPrivateFieldLooseBase2"),
-    };
+    helper_usage.construct |= super_name.is_some();
+    helper_usage.super_get |= has_super_methods;
+    helper_usage.private |= has_private_keys;
     let mut body = String::from("(()=>{\"use strict\";");
-    if !private_keys.is_empty() {
-        let helper = if inline_helpers {
-            INLINE_CLASS_PRIVATE_HELPERS
-        } else {
-            INLINE_CLASS_PRIVATE_HELPERS_RUNTIME
-        };
-        body.push_str(
-            &helper
-                .replace(
-                    "_classPrivateFieldLooseBase2",
-                    "__BABEL_PRIVATE_FIELD_LOOSE_BASE_RUNTIME__",
-                )
-                .replace("_classPrivateFieldLooseBase", &helper_names.private_base)
-                .replace("_classPrivateMethodCall", &helper_names.private_call)
-                .replace(
-                    "__BABEL_PRIVATE_FIELD_LOOSE_BASE_RUNTIME__",
-                    &helper_names.private_runtime,
-                ),
-        );
+    if has_private_keys {
         for (private_name, binding) in &private_keys {
             body.push_str(&format!(
                 "var {binding}=\"__private_{}_{}\";",
@@ -262,10 +269,12 @@ fn lower(
             } else {
                 property_key(source, &property.key, false)
             };
-            let value = property
-                .value
-                .as_ref()
-                .map_or("void 0", |value| slice(source, value.span()));
+            let value = match &property.value {
+                Some(value) => {
+                    private_contents(source, semantic, value.span(), value.span(), &private_keys)?
+                }
+                None => "void 0".to_owned(),
+            };
             let target = if property.r#static { &name } else { "this" };
             let initializer = if is_private {
                 format!("Object.defineProperty({target},{key},{{writable:true,value:{value}}});")
@@ -292,12 +301,15 @@ fn lower(
             if let ClassElement::StaticBlock(block) = element {
                 let block_source = slice(source, block.span);
                 let open = block_source.find('{').unwrap();
+                let contents_span = Span::new(
+                    block.span.start + open as u32 + 1,
+                    block.span.end.saturating_sub(1),
+                );
+                let contents =
+                    private_contents(source, semantic, block.span, contents_span, &private_keys)?;
                 static_initializers.push((
                     block.span.start,
-                    format!(
-                        "(function(){{{}}}).call({name});",
-                        &block_source[open + 1..block_source.len().saturating_sub(1)]
-                    ),
+                    format!("(function(){{{contents}}}).call({name});"),
                 ));
             }
         }
@@ -351,35 +363,6 @@ fn lower(
         } else {
             instance_initializers.push_str(&initializer);
         }
-    }
-    if super_name.is_some() {
-        let helper = if inline_helpers {
-            INLINE_CLASS_CONSTRUCT_HELPER
-        } else {
-            INLINE_CLASS_CONSTRUCT_HELPER_RUNTIME
-        };
-        body.push_str(
-            &helper
-                .replace("_construct2", "__BABEL_CONSTRUCT_RUNTIME__")
-                .replace("_construct", &helper_names.construct)
-                .replace(
-                    "__BABEL_CONSTRUCT_RUNTIME__",
-                    &helper_names.construct_runtime,
-                ),
-        );
-    }
-    if has_super_methods {
-        let helper = if inline_helpers {
-            INLINE_CLASS_SUPER_GET_HELPER
-        } else {
-            INLINE_CLASS_SUPER_GET_HELPER_RUNTIME
-        };
-        body.push_str(
-            &helper
-                .replace("_get2", "__BABEL_GET_RUNTIME__")
-                .replace("_get", &helper_names.super_get)
-                .replace("__BABEL_GET_RUNTIME__", &helper_names.super_get_runtime),
-        );
     }
     if let Some(constructor) = constructor {
         if let Some(super_name) = &super_name {
@@ -520,6 +503,68 @@ struct ClassHelperNames {
     private_runtime: String,
 }
 
+#[derive(Clone, Copy, Default)]
+struct ClassHelperUsage {
+    construct: bool,
+    super_get: bool,
+    private: bool,
+}
+
+fn class_helper_prefix(
+    names: &ClassHelperNames,
+    usage: ClassHelperUsage,
+    inline_helpers: bool,
+) -> String {
+    let mut prefix = String::new();
+    if usage.private {
+        let helper = if inline_helpers {
+            INLINE_CLASS_PRIVATE_HELPERS
+        } else {
+            INLINE_CLASS_PRIVATE_HELPERS_RUNTIME
+        };
+        prefix.push_str(
+            &helper
+                .replace(
+                    "_classPrivateFieldLooseBase2",
+                    "__BABEL_PRIVATE_FIELD_LOOSE_BASE_RUNTIME__",
+                )
+                .replace("_classPrivateFieldLooseBase", &names.private_base)
+                .replace("_classPrivateMethodCall", &names.private_call)
+                .replace(
+                    "__BABEL_PRIVATE_FIELD_LOOSE_BASE_RUNTIME__",
+                    &names.private_runtime,
+                ),
+        );
+    }
+    if usage.construct {
+        let helper = if inline_helpers {
+            INLINE_CLASS_CONSTRUCT_HELPER
+        } else {
+            INLINE_CLASS_CONSTRUCT_HELPER_RUNTIME
+        };
+        prefix.push_str(
+            &helper
+                .replace("_construct2", "__BABEL_CONSTRUCT_RUNTIME__")
+                .replace("_construct", &names.construct)
+                .replace("__BABEL_CONSTRUCT_RUNTIME__", &names.construct_runtime),
+        );
+    }
+    if usage.super_get {
+        let helper = if inline_helpers {
+            INLINE_CLASS_SUPER_GET_HELPER
+        } else {
+            INLINE_CLASS_SUPER_GET_HELPER_RUNTIME
+        };
+        prefix.push_str(
+            &helper
+                .replace("_get2", "__BABEL_GET_RUNTIME__")
+                .replace("_get", &names.super_get)
+                .replace("__BABEL_GET_RUNTIME__", &names.super_get_runtime),
+        );
+    }
+    prefix
+}
+
 fn is_identifier_key(key: &PropertyKey<'_>, computed: bool) -> bool {
     !computed && matches!(key, PropertyKey::StaticIdentifier(_))
 }
@@ -530,11 +575,34 @@ fn private_body_contents(
     body: &oxc_ast::ast::FunctionBody<'_>,
     private_keys: &FxHashMap<String, String>,
 ) -> Result<String, &'static str> {
+    private_contents(
+        source,
+        semantic,
+        body.span,
+        Span::new(body.span.start + 1, body.span.end.saturating_sub(1)),
+        private_keys,
+    )
+}
+
+fn private_contents(
+    source: &str,
+    semantic: &Semantic<'_>,
+    container: Span,
+    contents: Span,
+    private_keys: &FxHashMap<String, String>,
+) -> Result<String, &'static str> {
+    // Walking the semantic node table is intentionally reserved for containers
+    // that can contain a private reference. Field initializers make this helper
+    // run once per field, so scanning every node for ordinary public fields
+    // would make class lowering quadratic in otherwise unrelated syntax.
+    if private_keys.is_empty() || !slice(source, container).contains('#') {
+        return Ok(slice(source, contents).to_owned());
+    }
     let mut replacements: Vec<(Span, String)> = Vec::new();
     let mut occupied = Vec::new();
     for node in semantic.nodes().iter() {
         let span = node.kind().span();
-        if span.start < body.span.start || span.end > body.span.end {
+        if span.start < container.start || span.end > container.end {
             continue;
         }
         match node.kind() {
@@ -580,8 +648,8 @@ fn private_body_contents(
         let AstKind::PrivateFieldExpression(field) = node.kind() else {
             continue;
         };
-        if field.span.start < body.span.start
-            || field.span.end > body.span.end
+        if field.span.start < container.start
+            || field.span.end > container.end
             || occupied
                 .iter()
                 .any(|span| field.span.start >= span.start && field.span.end <= span.end)
@@ -605,18 +673,18 @@ fn private_body_contents(
             return Err("classes-private-edit-conflict");
         }
     }
-    let mut contents = String::new();
-    let mut cursor = body.span.start + 1;
+    let mut output = String::new();
+    let mut cursor = contents.start;
     for (span, replacement) in replacements {
-        contents.push_str(slice(source, Span::new(cursor, span.start)));
-        contents.push_str(&replacement);
+        if span.start < contents.start || span.end > contents.end {
+            continue;
+        }
+        output.push_str(slice(source, Span::new(cursor, span.start)));
+        output.push_str(&replacement);
         cursor = span.end;
     }
-    contents.push_str(slice(
-        source,
-        Span::new(cursor, body.span.end.saturating_sub(1)),
-    ));
-    Ok(contents)
+    output.push_str(slice(source, Span::new(cursor, contents.end)));
+    Ok(output)
 }
 
 fn private_method_function(

@@ -79,6 +79,12 @@ interface NativeBinding {
     close(): void;
     memoryUsage(): number;
     parseCount(): number;
+    astTraversalCount(): number;
+    performanceCounters(): {
+      memoryBytes: number;
+      parseCount: number;
+      astTraversalCount: number;
+    };
     takeFunctionMap(): FunctionMap | null;
   };
   classify(filename: string, source: string): ParseClassification;
@@ -86,6 +92,7 @@ interface NativeBinding {
     source: string,
     filename: string,
     options: {
+      debugPerformance?: boolean;
       reactCompiler?: boolean;
       reactCompilerCompilationMode?: string;
       reactCompilerPanicThreshold?: string;
@@ -151,7 +158,16 @@ interface NativeBinding {
     helpersUsed: string[];
     parseCount?: number;
     semanticBuildCount?: number;
+    astTraversalCount?: number;
     renderCount?: number;
+    parseMs?: number;
+    semanticBuildMs?: number;
+    customRewriteMs?: number;
+    oxcTransformMs?: number;
+    optimizationMs?: number;
+    codegenAndMapMs?: number;
+    helperDiscoveryMs?: number;
+    helperMaterializationMs?: number;
   };
   commitPackedBuffer(
     source: string,
@@ -205,8 +221,9 @@ function platformSuffix(): string {
 export const native = loadBinding();
 export type NativeIndexedSessionBinding = InstanceType<NativeBinding['NativeIndexedSession']>;
 
-export function nativePreflightOptions(plan: PreflightPlan) {
+export function nativePreflightOptions(plan: PreflightPlan, debugPerformance = false) {
   return {
+    debugPerformance,
     reactCompiler: plan.reactCompiler != null,
     reactCompilerCompilationMode: plan.reactCompiler?.compilationMode,
     reactCompilerPanicThreshold: plan.reactCompiler?.panicThreshold,

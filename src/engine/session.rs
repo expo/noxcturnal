@@ -21,11 +21,19 @@ pub struct NativeIndexedSession {
     retained_index: RetainedIndex,
     scope_parents: Vec<u32>,
     parse_count: u32,
+    ast_traversal_count: u32,
     function_map: Option<FunctionMap>,
     initial_route_manifest: Option<Vec<u8>>,
     initial_routed_buffer: Option<Vec<u8>>,
     initial_routed_served: bool,
     closed: bool,
+}
+
+#[napi(object)]
+pub struct NativeSessionPerformanceCounters {
+    pub memory_bytes: u32,
+    pub parse_count: u32,
+    pub ast_traversal_count: u32,
 }
 
 #[napi]
@@ -43,6 +51,9 @@ impl NativeIndexedSession {
         let has_retention = retention_manifest.is_some();
         let has_initial_route = initial_route_manifest.is_some();
         let parse_count = u32::from(collect_function_map || has_retention || has_initial_route);
+        // Materialization builds Oxc semantics and then walks the AST once to
+        // populate the retained columnar index and optional initial route.
+        let ast_traversal_count = parse_count.saturating_mul(2);
         let parts = if !collect_function_map && !has_retention && !has_initial_route {
             MaterializedSessionParts {
                 scope_parents: Vec::new(),
@@ -72,6 +83,7 @@ impl NativeIndexedSession {
             retained_index,
             scope_parents,
             parse_count,
+            ast_traversal_count,
             function_map,
             initial_route_manifest: initial_route_manifest.map(|manifest| manifest.to_vec()),
             initial_routed_buffer,
@@ -304,6 +316,20 @@ impl NativeIndexedSession {
     #[napi]
     pub fn parse_count(&self) -> u32 {
         self.parse_count
+    }
+
+    #[napi]
+    pub fn ast_traversal_count(&self) -> u32 {
+        self.ast_traversal_count
+    }
+
+    #[napi]
+    pub fn performance_counters(&self) -> NativeSessionPerformanceCounters {
+        NativeSessionPerformanceCounters {
+            memory_bytes: self.memory_usage(),
+            parse_count: self.parse_count,
+            ast_traversal_count: self.ast_traversal_count,
+        }
     }
 
     #[napi]

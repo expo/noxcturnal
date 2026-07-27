@@ -1,5 +1,8 @@
 use oxc_allocator::{Allocator, Vec as ArenaVec};
-use oxc_ast::{AstKind, ast::Expression};
+use oxc_ast::{
+    AstKind,
+    ast::{Expression, IdentifierReference},
+};
 use oxc_semantic::Scoping;
 use rustc_hash::FxHashMap;
 
@@ -89,6 +92,21 @@ pub(crate) fn static_member_path(expression: &Expression<'_>) -> Option<String> 
             )),
             _ => None,
         },
+        _ => None,
+    }
+}
+
+fn static_member_root<'a, 'b>(
+    expression: &'b Expression<'a>,
+) -> Option<&'b IdentifierReference<'a>> {
+    match expression {
+        Expression::Identifier(identifier) => Some(identifier),
+        Expression::StaticMemberExpression(member) => static_member_root(&member.object),
+        Expression::ComputedMemberExpression(member)
+            if matches!(member.expression, Expression::StringLiteral(_)) =>
+        {
+            static_member_root(&member.object)
+        }
         _ => None,
     }
 }
@@ -233,10 +251,16 @@ pub(crate) fn packed_fields_direct<T: AsRef<str>>(
         AstKind::CallExpression(call) => {
             push("optional", 0x8000_0000 | u32::from(call.optional));
             push("argumentCount", 0x4000_0000 | call.arguments.len() as u32);
-            if let Expression::Identifier(identifier) = &call.callee {
-                if wants("calleeName") {
+            if let Some(identifier) = static_member_root(&call.callee) {
+                if wants("calleeName") && matches!(call.callee, Expression::Identifier(_)) {
                     let value = intern_packed(strings, &identifier.name);
                     push("calleeName", value);
+                }
+                if wants("calleePath")
+                    && let Some(path) = static_member_path(&call.callee)
+                {
+                    let value = intern_packed(strings, &path);
+                    push("calleePath", value);
                 }
                 if let Some(scoping) = scoping {
                     let global = identifier
@@ -620,8 +644,13 @@ pub(crate) fn fields(
         AstKind::CallExpression(call) => {
             push!("optional", call.optional.to_string());
             push!("argumentCount", call.arguments.len().to_string());
-            if let Expression::Identifier(identifier) = &call.callee {
-                push!("calleeName", identifier.name.to_string());
+            if let Some(identifier) = static_member_root(&call.callee) {
+                if matches!(call.callee, Expression::Identifier(_)) {
+                    push!("calleeName", identifier.name.to_string());
+                }
+                if let Some(path) = static_member_path(&call.callee) {
+                    push!("calleePath", path);
+                }
                 if let Some(scoping) = scoping {
                     let global = identifier
                         .reference_id

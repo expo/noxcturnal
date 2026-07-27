@@ -344,8 +344,8 @@ pub fn materialize_routed_buffer(
 }
 
 /// Eight-word `[id, type, start, end, parentId, parentTypeId, scopeId, scopeParentId]`
-/// summaries for every unique routed parent, delivered with the envelope so JavaScript
-/// never issues a separate summary request for parent access.
+/// summaries for every unique routed ancestor, delivered with the envelope so
+/// JavaScript never issues a separate summary request while walking ancestry.
 fn stateless_parent_summaries(
     parent_ids: &FxHashSet<u32>,
     nodes: Option<&AstNodes<'_>>,
@@ -355,7 +355,19 @@ fn stateless_parent_summaries(
     let (Some(nodes), Some(scoping)) = (nodes, scoping) else {
         return Vec::new();
     };
-    let mut ordered = parent_ids.iter().copied().collect::<Vec<_>>();
+    let mut ancestor_ids = parent_ids.clone();
+    let seeds = ancestor_ids.iter().copied().collect::<Vec<_>>();
+    for seed in seeds {
+        let mut current = NodeId::new(seed as usize);
+        while current.index() != 0 {
+            let parent = nodes.parent_id(current);
+            if !ancestor_ids.insert(parent.index() as u32) {
+                break;
+            }
+            current = parent;
+        }
+    }
+    let mut ordered = ancestor_ids.into_iter().collect::<Vec<_>>();
     ordered.sort_unstable();
     let mut words = Vec::with_capacity(ordered.len() * 8);
     for id in ordered {

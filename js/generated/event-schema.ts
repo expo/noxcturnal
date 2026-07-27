@@ -221,6 +221,7 @@ export const FIELD_KEYS = [
   'optional',
   'argumentCount',
   'calleeName',
+  'calleePath',
   'calleeGlobal',
   'staticArgument',
   'computed',
@@ -272,7 +273,14 @@ export const PREDICATE_FIELDS: Readonly<Record<string, readonly string[]>> = {
   ParenthesizedExpression: ['constantKind', 'constantValue'],
   SequenceExpression: ['constantKind', 'constantValue'],
   AssignmentExpression: ['operator'],
-  CallExpression: ['optional', 'argumentCount', 'calleeName', 'calleeGlobal', 'staticArgument'],
+  CallExpression: [
+    'optional',
+    'argumentCount',
+    'calleeName',
+    'calleePath',
+    'calleeGlobal',
+    'staticArgument',
+  ],
   NewExpression: ['argumentCount', 'calleeName', 'staticArgument'],
   StaticMemberExpression: ['computed', 'property', 'memberPath', 'rootName', 'rootGlobal'],
   ComputedMemberExpression: ['computed', 'property', 'memberPath'],
@@ -428,6 +436,7 @@ export const PREDICATE_VALUE_DOMAINS: Readonly<
     optional: { kinds: ['boolean'] },
     argumentCount: { kinds: ['number'] },
     calleeName: { kinds: ['string'] },
+    calleePath: { kinds: ['string'] },
     calleeGlobal: { kinds: ['boolean'] },
     staticArgument: { kinds: ['string'] },
   },
@@ -3564,6 +3573,7 @@ export interface NativeNodeFields {
     readonly optional: boolean;
     readonly argumentCount: number;
     readonly calleeName?: string;
+    readonly calleePath?: string;
     readonly calleeGlobal?: boolean;
     readonly staticArgument?: string;
   };
@@ -3722,6 +3732,7 @@ export interface NativeRouteFields {
     readonly optional?: boolean;
     readonly argumentCount?: number;
     readonly calleeName?: string;
+    readonly calleePath?: string;
     readonly calleeGlobal?: boolean;
     readonly staticArgument?: string;
     readonly operator?:
@@ -3813,6 +3824,7 @@ export interface NativeRouteFields {
     readonly optional?: boolean;
     readonly argumentCount?: number;
     readonly calleeName?: string;
+    readonly calleePath?: string;
     readonly calleeGlobal?: boolean;
     readonly staticArgument?: string;
     readonly meta?: 'import' | 'new';

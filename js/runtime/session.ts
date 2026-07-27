@@ -30,6 +30,7 @@ export class NativeTransformSession {
   #uids = new Set<string>();
   #eventCache: (NativeEvent | undefined)[] = [];
   #queryCache = new Map<string, QueryResult>();
+  #globalReferencesCache = new Map<string, NodeSummary[]>();
   #childrenCache = new Map<number, number[]>();
   #prefetchedChildTypes = new Set<string>();
   #native: NativeIndexedSessionBinding | null = null;
@@ -38,6 +39,14 @@ export class NativeTransformSession {
   #scopeParents: Uint32Array | null = null;
   #bindingIndex: { nameIds: Map<string, number>; keys: Set<number> } | null = null;
   #nativeParseCount = 0;
+  #nativeAstTraversalCount = 0;
+  #reportedNativeParseCount: number | null = null;
+  #reportedNativeAstTraversalCount: number | null = null;
+  #performanceSnapshot: {
+    memoryBytes: number;
+    parseCount: number;
+    astTraversalCount: number;
+  } | null = null;
   #nativeCrossings = 0;
   constructor(
     readonly source: string,
@@ -46,12 +55,13 @@ export class NativeTransformSession {
     retentionManifest?: Buffer,
     initialManifest?: Buffer,
     buildInitialRoute = true,
+    readonly recordNativeCrossing?: (operation: string, instrumentation?: boolean) => void,
   ) {
     this.#nativeFilename = parserFilename(filename, options.parser);
     // Without a retention plan or function map the native session holds no state, so its
     // construction (and the source copy it takes) is deferred until something needs it.
     if (options.functionMap === true || retentionManifest != null || initialManifest != null) {
-      if (options.debugPerformance) this.#nativeCrossings++;
+      this.#crossing('session.create');
       this.#native = new native.NativeIndexedSession(
         source,
         this.#nativeFilename,
@@ -60,30 +70,42 @@ export class NativeTransformSession {
         initialManifest,
         buildInitialRoute,
       );
-      if (
-        options.maxNativeMemoryBytes != null &&
-        this.#native.memoryUsage() > options.maxNativeMemoryBytes
-      ) {
-        this.#native.close();
-        throw new Error('native-memory-budget-exceeded');
+      if (options.maxNativeMemoryBytes != null) {
+        this.#crossing('memory-budget');
+        if (this.#native.memoryUsage() > options.maxNativeMemoryBytes) {
+          this.#crossing('session.close');
+          this.#native.close();
+          throw new Error('native-memory-budget-exceeded');
+        }
       }
     }
   }
   get nativeMemoryBytes(): number {
-    return this.#binding().memoryUsage();
+    return this.#nativePerformanceSnapshot().memoryBytes;
   }
   get nativeParseCount(): number {
-    return this.#nativeParseCount + (this.#native?.parseCount() ?? 0);
+    if (this.#native && this.#reportedNativeParseCount == null)
+      this.#reportedNativeParseCount = this.#nativePerformanceSnapshot().parseCount;
+    return this.#nativeParseCount + (this.#reportedNativeParseCount ?? 0);
+  }
+  get nativeAstTraversalCount(): number {
+    if (this.#native && this.#reportedNativeAstTraversalCount == null)
+      this.#reportedNativeAstTraversalCount = this.#nativePerformanceSnapshot().astTraversalCount;
+    return this.#nativeAstTraversalCount + (this.#reportedNativeAstTraversalCount ?? 0);
   }
   get nativeCrossingCount(): number {
     return this.#nativeCrossings;
   }
   takeFunctionMap(): FunctionMap | null {
-    if (this.options.debugPerformance && this.#native) this.#nativeCrossings++;
+    if (this.#native) this.#crossing('function-map.take');
     return this.#native?.takeFunctionMap() ?? null;
   }
   recordStatelessParse(): void {
     this.#nativeParseCount++;
+    // Stateless routing always walks the parsed AST once. Semantic construction,
+    // when requested by the manifest, is accounted separately only by retained
+    // sessions until the stateless envelope exposes that detail.
+    this.#nativeAstTraversalCount++;
   }
   nextRoutedPacked(
     manifest: Buffer,
@@ -91,9 +113,15 @@ export class NativeTransformSession {
     followUp = true,
   ): RoutedEventBatch {
     this.#assertOpen();
-    if (followUp && ++this.#batches > (this.options.maxFollowUpBatches ?? 64))
-      throw new Error('follow-up-batch-budget-exceeded');
-    const buffer = this.#binding().nextRoutedPacked(manifest, root?.start, root?.end);
+    if (followUp) {
+      this.#batches++;
+      if (
+        this.options.maxFollowUpBatches != null &&
+        this.#batches > this.options.maxFollowUpBatches
+      )
+        throw new Error('follow-up-batch-budget-exceeded');
+    }
+    const buffer = this.#binding('route.next').nextRoutedPacked(manifest, root?.start, root?.end);
     return decodeRoutedEnvelope(buffer);
   }
   cacheEvent(event: NativeEvent): void {
@@ -122,20 +150,22 @@ export class NativeTransformSession {
     const types = querySubscriptions(request);
     const nodes = types.length
       ? decodeEventBatch(
-          decodePackedEnvelope(this.#binding().queryNodesPackedBuffer(types)),
+          decodePackedEnvelope(this.#binding('query.nodes').queryNodesPackedBuffer(types)),
         ).events.map(toNodeView)
       : [];
     const globals: QueryResult['globals'] = {};
     if (request.globals?.length) {
-      for (const fact of this.#binding().queryGlobals(request.globals.map(query => query.name))) {
-        globals[fact.name] = {
-          references: fact.references.map(reference => ({
-            id: reference.id,
-            type: 'Identifier',
-            start: reference.start,
-            end: reference.end,
-          })),
-        };
+      for (const fact of this.#binding('query.globals').queryGlobals(
+        request.globals.map(query => query.name),
+      )) {
+        const references = fact.references.map(reference => ({
+          id: reference.id,
+          type: 'Identifier',
+          start: reference.start,
+          end: reference.end,
+        }));
+        globals[fact.name] = { references };
+        this.#globalReferencesCache.set(fact.name, references);
       }
     }
     const constants: QueryResult['constants'] = {};
@@ -159,7 +189,7 @@ export class NativeTransformSession {
       calls: Object.fromEntries(
         (request.calls ?? []).map(call => [
           call.callee,
-          this.#binding()
+          this.#binding('query.calls')
             .queryCalls(call.callee, call.globalOnly, call.staticArguments)
             .map(fact => ({
               id: fact.id,
@@ -176,7 +206,7 @@ export class NativeTransformSession {
       captures: Object.fromEntries(
         (request.captures ?? []).map(capture => [
           capture.functionId,
-          this.#binding()
+          this.#binding('query.captures')
             .queryCaptures(capture.functionId)
             .map(reference => ({
               id: reference.id,
@@ -194,7 +224,7 @@ export class NativeTransformSession {
         ]),
       ),
       bindings: (request.bindings ?? []).flatMap(binding =>
-        this.#binding()
+        this.#binding('query.bindings')
           .queryBindings(binding.name, binding.scopeId, binding.reads, binding.writes)
           .map(adaptBindingFact),
       ),
@@ -219,7 +249,9 @@ export class NativeTransformSession {
     if (missing.length > 0)
       for (const node of decodeEventBatch(
         decodePackedEnvelope(
-          this.#binding().inspectPackedBuffer(missing.map(request => request.nodeId)),
+          this.#binding('inspect.nodes').inspectPackedBuffer(
+            missing.map(request => request.nodeId),
+          ),
         ),
       ).events.map(toNodeView))
         resolved.set(node.id, node);
@@ -255,7 +287,7 @@ export class NativeTransformSession {
   }
   constantNodes(nodeIds: readonly number[]): NodeView[] {
     this.#assertOpen();
-    return this.#binding()
+    return this.#binding('query.constants')
       .queryConstants([...nodeIds])
       .flatMap(fact => {
         const event = this.event(fact.id);
@@ -273,7 +305,7 @@ export class NativeTransformSession {
   nodes(nodeTypes: readonly string[]): NodeView[] {
     this.#assertOpen();
     return decodeEventBatch(
-      decodePackedEnvelope(this.#binding().queryNodesPackedBuffer([...nodeTypes])),
+      decodePackedEnvelope(this.#binding('query.nodes').queryNodesPackedBuffer([...nodeTypes])),
     ).events.map(toNodeView);
   }
   prefetchChildren(parentIds: readonly number[] = [], parentTypes: readonly string[] = []): void {
@@ -281,7 +313,8 @@ export class NativeTransformSession {
     const missing = parentIds.filter(parentId => !this.#childrenCache.has(parentId));
     const missingTypes = parentTypes.filter(type => !this.#prefetchedChildTypes.has(type));
     if (missing.length === 0 && missingTypes.length === 0) return;
-    if (++this.#batches > (this.options.maxFollowUpBatches ?? 64))
+    this.#batches++;
+    if (this.options.maxFollowUpBatches != null && this.#batches > this.options.maxFollowUpBatches)
       throw new Error('follow-up-batch-budget-exceeded');
     const typeIds: number[] = [];
     const fallbackTypes: string[] = [];
@@ -291,7 +324,9 @@ export class NativeTransformSession {
       else typeIds.push(id);
     }
     const batch = decodeEventBatch(
-      decodePackedEnvelope(this.#binding().childrenPackedBuffer(missing, fallbackTypes, typeIds)),
+      decodePackedEnvelope(
+        this.#binding('children.prefetch').childrenPackedBuffer(missing, fallbackTypes, typeIds),
+      ),
     );
     for (const parentId of missing) this.#childrenCache.set(parentId, []);
     for (const event of batch.events) {
@@ -306,7 +341,7 @@ export class NativeTransformSession {
     for (const type of missingTypes) this.#prefetchedChildTypes.add(type);
     if (
       this.options.maxNativeMemoryBytes != null &&
-      this.#binding().memoryUsage() > this.options.maxNativeMemoryBytes
+      this.#binding('memory-budget').memoryUsage() > this.options.maxNativeMemoryBytes
     )
       throw new Error('native-memory-budget-exceeded');
   }
@@ -314,7 +349,7 @@ export class NativeTransformSession {
     this.#assertOpen();
     const cached = this.#eventCache[nodeId];
     if (cached) return cached;
-    const data = this.#binding().nodeSummaryBuffer(nodeId);
+    const data = this.#binding('node.summary').nodeSummaryBuffer(nodeId);
     if (data.byteLength !== 7 * 4) return undefined;
     const words = new Uint32Array(data.buffer, data.byteOffset, 7);
     return this.#cacheSummary(nodeId, words, 0);
@@ -371,7 +406,7 @@ export class NativeTransformSession {
     }
   }
   #loadBindingIndex(): { nameIds: Map<string, number>; keys: Set<number> } {
-    const data = this.#binding().bindingIndexBuffer();
+    const data = this.#binding('binding-index').bindingIndexBuffer();
     const nameCount = data.readUInt32LE(0);
     const keyCount = data.readUInt32LE(4);
     if (nameCount >= 0x200000) throw new Error('binding name table exceeds packed key space');
@@ -391,20 +426,24 @@ export class NativeTransformSession {
   }
   resolveBinding(name: string, scopeId: number): QueryResult['bindings'][number] | undefined {
     const scope = this.resolveBindingScope(name, scopeId);
-    const fact = scope == null ? undefined : this.#binding().queryBindings(name, scope)[0];
+    const fact =
+      scope == null ? undefined : this.#binding('query.bindings').queryBindings(name, scope)[0];
     return fact && adaptBindingFact(fact);
   }
   globalReferences(name: string): NodeSummary[] {
-    return (
-      this.#binding()
+    const cached = this.#globalReferencesCache.get(name);
+    if (cached) return cached;
+    const references =
+      this.#binding('query.globals')
         .queryGlobals([name])[0]
         ?.references.map(reference => ({
           id: reference.id,
           type: 'Identifier',
           start: reference.start,
           end: reference.end,
-        })) ?? []
-    );
+        })) ?? [];
+    this.#globalReferencesCache.set(name, references);
+    return references;
   }
   scopeParentId(scopeId: number): number | null {
     this.#assertOpen();
@@ -413,7 +452,7 @@ export class NativeTransformSession {
   }
   #scopeParentTable(): Uint32Array {
     if (this.#scopeParents == null) {
-      const data = this.#binding().scopeParentsBuffer();
+      const data = this.#binding('scope-parents').scopeParentsBuffer();
       this.#scopeParents = new Uint32Array(data.buffer, data.byteOffset, data.byteLength / 4);
     }
     return this.#scopeParents;
@@ -457,6 +496,7 @@ export class NativeTransformSession {
   }
   commit(edits: EditCommand[], mode?: string) {
     this.#assertOpen();
+    this.#crossing('edit.commit');
     return commitWithDedupe(edits, data =>
       native.commitPackedBuffer(this.source, this.#nativeFilename, data, mode),
     );
@@ -464,20 +504,39 @@ export class NativeTransformSession {
   /** Commit whose map stays a packed decoded layer for later chain composition. */
   commitDecoded(edits: EditCommand[], mode?: string) {
     this.#assertOpen();
+    this.#crossing('edit.commit-decoded');
     return commitWithDedupe(edits, data =>
       native.commitDecodedBuffer(this.source, this.#nativeFilename, data, mode),
     );
   }
   close(): void {
-    if (!this.#closed) this.#native?.close();
+    if (!this.#closed && this.#native) {
+      this.#crossing('session.close');
+      this.#native.close();
+    }
     this.#closed = true;
   }
   #assertOpen(): void {
     if (this.#closed) throw new Error('session-closed');
   }
-  #binding(): NativeIndexedSessionBinding {
-    if (this.options.debugPerformance) this.#nativeCrossings++;
+  #binding(operation: string, instrumentation = false): NativeIndexedSessionBinding {
+    this.#crossing(operation, instrumentation);
     this.#assertOpen();
-    return (this.#native ??= new native.NativeIndexedSession(this.source, this.#nativeFilename));
+    if (this.#native == null) {
+      this.#crossing('session.create');
+      this.#native = new native.NativeIndexedSession(this.source, this.#nativeFilename);
+    }
+    return this.#native;
+  }
+  #nativePerformanceSnapshot() {
+    return (this.#performanceSnapshot ??= this.#binding(
+      'instrumentation.session-counters',
+      true,
+    ).performanceCounters());
+  }
+  #crossing(operation: string, instrumentation = false): void {
+    if (!this.options.debugPerformance) return;
+    this.#nativeCrossings++;
+    this.recordNativeCrossing?.(operation, instrumentation);
   }
 }

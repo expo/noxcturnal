@@ -198,7 +198,22 @@ impl RetainedRouteWriter {
         for (value, id) in self.string_ids {
             strings[id as usize] = value;
         }
-        let mut parent_ids = self.parent_ids.into_iter().collect::<Vec<_>>();
+        // Parent access commonly continues through several ancestors. Ship the
+        // compact summary closure once with the routed batch instead of forcing
+        // JavaScript to issue one synchronous N-API request per additional
+        // level.
+        let mut parent_ids = self.parent_ids;
+        let seeds = parent_ids.iter().copied().collect::<Vec<_>>();
+        for seed in seeds {
+            let mut current = seed;
+            while let Some(parent_id) = index.parent_id(current) {
+                if !parent_ids.insert(parent_id) {
+                    break;
+                }
+                current = parent_id;
+            }
+        }
+        let mut parent_ids = parent_ids.into_iter().collect::<Vec<_>>();
         parent_ids.sort_unstable();
         let parents = index.parent_summary_words(&parent_ids, scope_parents);
         encode_routed_envelope(

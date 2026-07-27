@@ -676,7 +676,7 @@ impl RetainedIndex {
     }
 
     /// Eight-word `[id, type, start, end, parentId, parentTypeId, scopeId, scopeParentId]`
-    /// entries for the given nodes, used as the routed envelope's parent sidecar.
+    /// entries for the given nodes, used as the routed envelope's ancestor sidecar.
     pub fn parent_summary_words(&self, node_ids: &[u32], scope_parents: &[u32]) -> Vec<u32> {
         let mut words = Vec::with_capacity(node_ids.len() * 8);
         for &node_id in node_ids {

@@ -1,12 +1,16 @@
 use std::path::{Path, PathBuf};
+use std::time::Instant;
 
 use napi::{Error, Result, Status, bindgen_prelude::Buffer};
 use napi_derive::napi;
 use oxc_allocator::Allocator;
-use oxc_ast::ast::{
-    AssignmentTargetPattern, CatchClause, Class, Decorator, ForOfStatement, FormalParameters,
-    IdentifierReference, MethodDefinition, PrivateInExpression, PropertyDefinition, PropertyKey,
-    RegExpFlags, RegExpLiteral, VariableDeclarator,
+use oxc_ast::{
+    AstKind,
+    ast::{
+        AssignmentTargetPattern, CatchClause, Class, Decorator, ForOfStatement, FormalParameters,
+        IdentifierReference, MethodDefinition, PrivateInExpression, PropertyDefinition,
+        PropertyKey, RegExpFlags, RegExpLiteral, VariableDeclarator,
+    },
 };
 use oxc_ast_visit::{Visit, VisitMut, walk, walk_mut};
 use oxc_codegen::{Codegen, CodegenOptions, CommentOptions};
@@ -42,40 +46,71 @@ pub struct NativePreflightResult {
     pub helpers_used: Vec<String>,
     pub parse_count: Option<u32>,
     pub semantic_build_count: Option<u32>,
+    pub ast_traversal_count: Option<u32>,
     pub render_count: Option<u32>,
+    pub parse_ms: Option<f64>,
+    pub semantic_build_ms: Option<f64>,
+    pub custom_rewrite_ms: Option<f64>,
+    pub oxc_transform_ms: Option<f64>,
+    pub optimization_ms: Option<f64>,
+    pub codegen_and_map_ms: Option<f64>,
+    pub helper_discovery_ms: Option<f64>,
+    pub helper_materialization_ms: Option<f64>,
 }
 
 pub fn transform(
     mut source: String,
     filename: String,
-    options: NativePreflightOptions,
+    mut options: NativePreflightOptions,
 ) -> Result<NativePreflightResult> {
     let original_source = source.clone();
     let mut parse_count = 0;
     let mut semantic_build_count = 0;
+    let mut ast_traversal_count = 0;
     let mut render_count = 0;
+    let debug_performance = options.debug_performance.unwrap_or(false);
+    let mut parse_ms = 0.0;
+    let mut semantic_build_ms = 0.0;
     if options.react_compiler == Some(true) && !cfg!(feature = "react_compiler") {
         return Ok(unsupported("react-compiler-not-built", [] as [String; 0]));
     }
+    let conditional_jsx = options.jsx.as_deref() == Some("automatic-if-present");
+    if conditional_jsx {
+        options.jsx = Some("automatic".into());
+    }
     let transform_options = compile_options(&options)?;
+    let custom_rewrite_started = debug_performance.then(Instant::now);
     let mut rewrite_layers = Vec::new();
     let loose_object_rest = options.object_rest_spread == Some(true)
         && options.object_rest_spread_loose == Some(true)
         && options.object_rest_spread_use_built_ins == Some(true);
-    if options.block_scoping == Some(true) {
+    // The structural prepass exists only for block-scoped bindings captured
+    // across an iteration boundary. Every JavaScript iteration statement
+    // contains either the `for` or `while` keyword, so files containing neither
+    // can proceed directly to the ordinary block-scoping transform without an
+    // otherwise redundant parse and semantic build. Raw substring checks are a
+    // deliberate lossless prerequisite: comments and identifiers may cause
+    // false positives, but valid captured loops cannot cause false negatives.
+    let may_have_captured_loop = source.contains("for") || source.contains("while");
+    if options.block_scoping == Some(true) && may_have_captured_loop {
         for _ in 0..64 {
             let rewrite_allocator = Allocator::default();
             let rewrite_source_type = source_type(&filename, &source)?;
             parse_count += 1;
-            let rewritten = Parser::new(&rewrite_allocator, &source, rewrite_source_type).parse();
+            let rewritten = timed(debug_performance, &mut parse_ms, || {
+                Parser::new(&rewrite_allocator, &source, rewrite_source_type).parse()
+            });
             if !rewritten.diagnostics.is_empty() {
                 break;
             }
             semantic_build_count += 1;
-            let semantic = SemanticBuilder::new()
-                .with_build_nodes(true)
-                .with_excess_capacity(2.0)
-                .build(&rewritten.program);
+            ast_traversal_count += 1;
+            let semantic = timed(debug_performance, &mut semantic_build_ms, || {
+                SemanticBuilder::new()
+                    .with_build_nodes(true)
+                    .with_excess_capacity(2.0)
+                    .build(&rewritten.program)
+            });
             if !semantic.diagnostics.is_empty() {
                 break;
             }
@@ -106,15 +141,20 @@ pub fn transform(
             let rewrite_allocator = Allocator::default();
             let rewrite_source_type = source_type(&filename, &source)?;
             parse_count += 1;
-            let parsed = Parser::new(&rewrite_allocator, &source, rewrite_source_type).parse();
+            let parsed = timed(debug_performance, &mut parse_ms, || {
+                Parser::new(&rewrite_allocator, &source, rewrite_source_type).parse()
+            });
             if !parsed.diagnostics.is_empty() {
                 break;
             }
             semantic_build_count += 1;
-            let semantic = SemanticBuilder::new()
-                .with_build_nodes(true)
-                .with_excess_capacity(2.0)
-                .build(&parsed.program);
+            ast_traversal_count += 1;
+            let semantic = timed(debug_performance, &mut semantic_build_ms, || {
+                SemanticBuilder::new()
+                    .with_build_nodes(true)
+                    .with_excess_capacity(2.0)
+                    .build(&parsed.program)
+            });
             if !semantic.diagnostics.is_empty() {
                 break;
             }
@@ -143,15 +183,20 @@ pub fn transform(
             let rewrite_allocator = Allocator::default();
             let rewrite_source_type = source_type(&filename, &source)?;
             parse_count += 1;
-            let parsed = Parser::new(&rewrite_allocator, &source, rewrite_source_type).parse();
+            let parsed = timed(debug_performance, &mut parse_ms, || {
+                Parser::new(&rewrite_allocator, &source, rewrite_source_type).parse()
+            });
             if !parsed.diagnostics.is_empty() {
                 break;
             }
             semantic_build_count += 1;
-            let semantic = SemanticBuilder::new()
-                .with_build_nodes(true)
-                .with_excess_capacity(2.0)
-                .build(&parsed.program);
+            ast_traversal_count += 1;
+            let semantic = timed(debug_performance, &mut semantic_build_ms, || {
+                SemanticBuilder::new()
+                    .with_build_nodes(true)
+                    .with_excess_capacity(2.0)
+                    .build(&parsed.program)
+            });
             if !semantic.diagnostics.is_empty() {
                 break;
             }
@@ -207,13 +252,18 @@ pub fn transform(
         let rewrite_allocator = Allocator::default();
         let rewrite_source_type = source_type(&filename, &source)?;
         parse_count += 1;
-        let parsed = Parser::new(&rewrite_allocator, &source, rewrite_source_type).parse();
+        let parsed = timed(debug_performance, &mut parse_ms, || {
+            Parser::new(&rewrite_allocator, &source, rewrite_source_type).parse()
+        });
         if parsed.diagnostics.is_empty() {
             semantic_build_count += 1;
-            let semantic = SemanticBuilder::new()
-                .with_build_nodes(true)
-                .with_excess_capacity(2.0)
-                .build(&parsed.program);
+            ast_traversal_count += 1;
+            let semantic = timed(debug_performance, &mut semantic_build_ms, || {
+                SemanticBuilder::new()
+                    .with_build_nodes(true)
+                    .with_excess_capacity(2.0)
+                    .build(&parsed.program)
+            });
             if semantic.diagnostics.is_empty() {
                 let edits = match super::destructuring::edits(
                     &source,
@@ -250,15 +300,20 @@ pub fn transform(
             let rewrite_allocator = Allocator::default();
             let rewrite_source_type = source_type(&filename, &source)?;
             parse_count += 1;
-            let parsed = Parser::new(&rewrite_allocator, &source, rewrite_source_type).parse();
+            let parsed = timed(debug_performance, &mut parse_ms, || {
+                Parser::new(&rewrite_allocator, &source, rewrite_source_type).parse()
+            });
             if !parsed.diagnostics.is_empty() {
                 break;
             }
             semantic_build_count += 1;
-            let semantic = SemanticBuilder::new()
-                .with_build_nodes(true)
-                .with_excess_capacity(2.0)
-                .build(&parsed.program);
+            ast_traversal_count += 1;
+            let semantic = timed(debug_performance, &mut semantic_build_ms, || {
+                SemanticBuilder::new()
+                    .with_build_nodes(true)
+                    .with_excess_capacity(2.0)
+                    .build(&parsed.program)
+            });
             if !semantic.diagnostics.is_empty() {
                 break;
             }
@@ -309,15 +364,20 @@ pub fn transform(
             let rewrite_allocator = Allocator::default();
             let rewrite_source_type = source_type(&filename, &source)?;
             parse_count += 1;
-            let parsed = Parser::new(&rewrite_allocator, &source, rewrite_source_type).parse();
+            let parsed = timed(debug_performance, &mut parse_ms, || {
+                Parser::new(&rewrite_allocator, &source, rewrite_source_type).parse()
+            });
             if !parsed.diagnostics.is_empty() {
                 break;
             }
             semantic_build_count += 1;
-            let semantic = SemanticBuilder::new()
-                .with_build_nodes(true)
-                .with_excess_capacity(2.0)
-                .build(&parsed.program);
+            ast_traversal_count += 1;
+            let semantic = timed(debug_performance, &mut semantic_build_ms, || {
+                SemanticBuilder::new()
+                    .with_build_nodes(true)
+                    .with_excess_capacity(2.0)
+                    .build(&parsed.program)
+            });
             if !semantic.diagnostics.is_empty() {
                 break;
             }
@@ -369,13 +429,18 @@ pub fn transform(
         let rewrite_allocator = Allocator::default();
         let rewrite_source_type = source_type(&filename, &source)?;
         parse_count += 1;
-        let parsed = Parser::new(&rewrite_allocator, &source, rewrite_source_type).parse();
+        let parsed = timed(debug_performance, &mut parse_ms, || {
+            Parser::new(&rewrite_allocator, &source, rewrite_source_type).parse()
+        });
         if parsed.diagnostics.is_empty() {
             semantic_build_count += 1;
-            let semantic = SemanticBuilder::new()
-                .with_build_nodes(true)
-                .with_excess_capacity(2.0)
-                .build(&parsed.program);
+            ast_traversal_count += 1;
+            let semantic = timed(debug_performance, &mut semantic_build_ms, || {
+                SemanticBuilder::new()
+                    .with_build_nodes(true)
+                    .with_excess_capacity(2.0)
+                    .build(&parsed.program)
+            });
             if semantic.diagnostics.is_empty() {
                 let edits = match super::regexp::edits(
                     &source,
@@ -405,21 +470,48 @@ pub fn transform(
         }
     }
     let allocator = Allocator::default();
+    let custom_rewrite_ms =
+        custom_rewrite_started.map(|started| started.elapsed().as_secs_f64() * 1_000.0);
     let source_type = source_type(&filename, &source)?;
     parse_count += 1;
-    let parsed = Parser::new(&allocator, &source, source_type).parse();
+    let parsed = timed(debug_performance, &mut parse_ms, || {
+        Parser::new(&allocator, &source, source_type).parse()
+    });
     if !parsed.diagnostics.is_empty() {
         return Ok(unsupported("parse-error", parsed.diagnostics));
     }
     let mut program = parsed.program;
-    let mut decorator_detector = DecoratorDetector(false);
-    decorator_detector.visit_program(&program);
-    if decorator_detector.0 {
-        return Ok(unsupported("decorators-not-supported", [] as [String; 0]));
+    if conditional_jsx {
+        let mut detector = JsxDetector(false);
+        detector.visit_program(&program);
+        ast_traversal_count += 1;
+        if !detector.0 {
+            return Ok(identity_result(
+                source,
+                parse_count,
+                semantic_build_count,
+                ast_traversal_count,
+                render_count,
+                debug_performance.then_some(parse_ms),
+                debug_performance.then_some(semantic_build_ms),
+            ));
+        }
+    }
+    // Decorator syntax necessarily contains `@`. Avoid a whole-program walk
+    // for the common case while leaving the parsed AST authoritative whenever
+    // the token may be present.
+    if source.contains('@') {
+        let mut decorator_detector = DecoratorDetector(false);
+        decorator_detector.visit_program(&program);
+        ast_traversal_count += 1;
+        if decorator_detector.0 {
+            return Ok(unsupported("decorators-not-supported", [] as [String; 0]));
+        }
     }
     if options.class_properties == Some(true) {
         let mut detector = PinnedOxcClassFusionDetector::default();
         detector.visit_program(&program);
+        ast_traversal_count += 1;
         if options.private_methods != Some(true) && detector.private_method {
             return Ok(unsupported(
                 "oxc-class-properties-private-method-fusion",
@@ -443,6 +535,7 @@ pub fn transform(
     {
         let mut detector = RegExpSemanticMismatchDetector::default();
         detector.visit_program(&program);
+        ast_traversal_count += 1;
         if options.regexp_unicode == Some(true) && detector.unicode {
             return Ok(unsupported(
                 "regexp-unicode-semantic-mismatch",
@@ -489,6 +582,7 @@ pub fn transform(
     if options.classes == Some(true) {
         let mut detector = ClassesDetector(false);
         detector.visit_program(&program);
+        ast_traversal_count += 1;
         if detector.0 {
             return Ok(unsupported("classes-not-implemented", [] as [String; 0]));
         }
@@ -496,6 +590,7 @@ pub fn transform(
     if options.destructuring == Some(true) {
         let mut detector = DestructuringDetector(false);
         detector.visit_program(&program);
+        ast_traversal_count += 1;
         if detector.0 {
             return Ok(unsupported(
                 "destructuring-not-implemented",
@@ -506,6 +601,7 @@ pub fn transform(
     if options.parameters == Some(true) {
         let mut detector = ParametersDetector(false);
         detector.visit_program(&program);
+        ast_traversal_count += 1;
         if detector.0 {
             return Ok(unsupported(
                 "parameters-postcondition-failed",
@@ -516,16 +612,20 @@ pub fn transform(
     if options.for_of == Some(true) {
         let mut detector = ForOfDetector(false);
         detector.visit_program(&program);
+        ast_traversal_count += 1;
         if detector.0 {
             return Ok(unsupported("for-of-not-implemented", [] as [String; 0]));
         }
     }
     semantic_build_count += 1;
-    let semantic = SemanticBuilder::new()
-        .with_build_nodes(options.block_scoping == Some(true))
-        .with_excess_capacity(2.0)
-        .with_enum_eval(true)
-        .build(&program);
+    ast_traversal_count += 1;
+    let semantic = timed(debug_performance, &mut semantic_build_ms, || {
+        SemanticBuilder::new()
+            .with_build_nodes(options.block_scoping == Some(true))
+            .with_excess_capacity(2.0)
+            .with_enum_eval(true)
+            .build(&program)
+    });
     if !semantic.diagnostics.is_empty() {
         return Ok(unsupported("semantic-error", semantic.diagnostics));
     }
@@ -543,14 +643,19 @@ pub fn transform(
     if let Some(plan) = block_scoping_plan {
         block_scoping::run(&allocator, &mut program, plan);
     }
+    ast_traversal_count += 1;
+    let oxc_transform_started = debug_performance.then(Instant::now);
     let transformed = Transformer::new(&allocator, Path::new(&filename), &transform_options)
         .build_with_scoping(scoping, &mut program);
+    let oxc_transform_ms =
+        oxc_transform_started.map(|started| started.elapsed().as_secs_f64() * 1_000.0);
     if !transformed.diagnostics.is_empty() {
         return Ok(unsupported("transform-error", transformed.diagnostics));
     }
     if options.private_methods == Some(true) || options.private_property_in_object == Some(true) {
         let mut detector = ClassFeaturesUnsupportedDetector(false);
         detector.visit_program(&program);
+        ast_traversal_count += 1;
         if detector.0 {
             return Ok(unsupported(
                 "class-features-postcondition-failed",
@@ -564,12 +669,21 @@ pub fn transform(
             [] as [String; 0],
         ));
     }
-    optimize::run(
-        &allocator,
-        &mut program,
-        options.constant_folding == Some(true),
-        options.dead_code_elimination == Some(true),
-    );
+    let optimization_started = debug_performance.then(Instant::now);
+    let (optimization_traversals, optimization_semantic_builds, optimization_semantic_ms) =
+        optimize::run(
+            &allocator,
+            &mut program,
+            options.constant_folding == Some(true),
+            options.dead_code_elimination == Some(true),
+            debug_performance,
+        );
+    let optimization_ms =
+        optimization_started.map(|started| started.elapsed().as_secs_f64() * 1_000.0);
+    ast_traversal_count += optimization_traversals;
+    semantic_build_count += optimization_semantic_builds;
+    semantic_build_ms += optimization_semantic_ms;
+    let helper_discovery_started = debug_performance.then(Instant::now);
     #[expect(deprecated)]
     let helper_requests: Vec<_> = transformed.helpers_used.into_iter().collect();
     let oxc_codegen_only_transform_selected = options.explicit_resource_management == Some(true)
@@ -600,22 +714,15 @@ pub fn transform(
         && options.compact != Some(true)
         && !(options.comments == Some(false) && (source.contains("//") || source.contains("/*")))
     {
-        let line_count = source.bytes().filter(|byte| *byte == b'\n').count() as u32 + 1;
-        let mut words = Vec::with_capacity(line_count as usize * 5);
-        for line in 0..line_count {
-            words.extend_from_slice(&[line, 0, line, 0, 0]);
-        }
-        return Ok(NativePreflightResult {
-            status: "complete".into(),
-            reason: None,
-            code: Some(source),
-            map: Some(pack_decoded_layer(&words, &[], line_count).into()),
-            diagnostics: Vec::new(),
-            helpers_used: Vec::new(),
-            parse_count: Some(parse_count),
-            semantic_build_count: Some(semantic_build_count),
-            render_count: Some(render_count),
-        });
+        return Ok(identity_result(
+            source,
+            parse_count,
+            semantic_build_count,
+            ast_traversal_count,
+            render_count,
+            debug_performance.then_some(parse_ms),
+            debug_performance.then_some(semantic_build_ms),
+        ));
     }
     let helper_mode = options.helpers_mode.as_deref().unwrap_or("runtime");
     let helper_module = options
@@ -623,6 +730,9 @@ pub fn transform(
         .as_deref()
         .unwrap_or("@babel/runtime");
     let custom_helper_requests = custom_helpers_introduced(&original_source, &source);
+    let helper_discovery_ms =
+        helper_discovery_started.map(|started| started.elapsed().as_secs_f64() * 1_000.0);
+    let helper_materialization_started = debug_performance.then(Instant::now);
     let inline = if helper_mode == "inline" {
         match inline_helpers(helper_requests.iter().map(|(helper, _)| *helper), &source) {
             Ok(inline) => inline,
@@ -670,8 +780,11 @@ pub fn transform(
     let inline_prefix = inline.map(|inline| {
         let binding = allocator.alloc_str(&inline.binding);
         InlineHelperRenamer { binding }.visit_program(&mut program);
+        ast_traversal_count += 1;
         format!("var {binding}={};\n", inline.prefix)
     });
+    let helper_materialization_ms =
+        helper_materialization_started.map(|started| started.elapsed().as_secs_f64() * 1_000.0);
 
     let codegen_options = CodegenOptions {
         minify: options.compact.unwrap_or(false),
@@ -683,6 +796,7 @@ pub fn transform(
         source_map_path: Some(PathBuf::from(&filename)),
         ..CodegenOptions::default()
     };
+    let codegen_and_map_started = debug_performance.then(Instant::now);
     let generated = Codegen::new().with_options(codegen_options).build(&program);
     let map = generated.map.ok_or_else(|| {
         Error::new(
@@ -723,6 +837,8 @@ pub fn transform(
             )
         })?
     };
+    let codegen_and_map_ms =
+        codegen_and_map_started.map(|started| started.elapsed().as_secs_f64() * 1_000.0);
     Ok(NativePreflightResult {
         status: "complete".into(),
         reason: None,
@@ -735,7 +851,16 @@ pub fn transform(
         helpers_used,
         parse_count: Some(parse_count),
         semantic_build_count: Some(semantic_build_count),
+        ast_traversal_count: Some(ast_traversal_count),
         render_count: Some(render_count + 1),
+        parse_ms: debug_performance.then_some(parse_ms),
+        semantic_build_ms: debug_performance.then_some(semantic_build_ms),
+        custom_rewrite_ms,
+        oxc_transform_ms,
+        optimization_ms,
+        codegen_and_map_ms,
+        helper_discovery_ms,
+        helper_materialization_ms,
     })
 }
 
@@ -907,7 +1032,11 @@ fn compile_options(options: &NativePreflightOptions) -> Result<TransformOptions>
     match options.jsx.as_deref() {
         None | Some("preserve") => {}
         Some(
-            mode @ ("classic" | "classic-development" | "automatic" | "automatic-development"),
+            mode @ ("classic"
+            | "classic-development"
+            | "automatic"
+            | "automatic-if-present"
+            | "automatic-development"),
         ) => {
             let refresh = compiled.jsx.refresh.take();
             compiled.jsx = JsxOptions::enable();
@@ -963,6 +1092,14 @@ fn compile_options(options: &NativePreflightOptions) -> Result<TransformOptions>
 }
 
 struct DecoratorDetector(bool);
+
+struct JsxDetector(bool);
+
+impl<'a> Visit<'a> for JsxDetector {
+    fn enter_node(&mut self, kind: AstKind<'a>) {
+        self.0 |= matches!(kind, AstKind::JSXElement(_) | AstKind::JSXFragment(_));
+    }
+}
 
 impl<'a> Visit<'a> for DecoratorDetector {
     fn visit_decorator(&mut self, decorator: &Decorator<'a>) {
@@ -1104,6 +1241,17 @@ impl<'a> Visit<'a> for ForOfDetector {
     }
 }
 
+#[inline]
+fn timed<T>(enabled: bool, total_ms: &mut f64, operation: impl FnOnce() -> T) -> T {
+    if !enabled {
+        return operation();
+    }
+    let started = Instant::now();
+    let result = operation();
+    *total_ms += started.elapsed().as_secs_f64() * 1_000.0;
+    result
+}
+
 fn unsupported(
     reason: &str,
     diagnostics: impl IntoIterator<Item = impl std::fmt::Debug>,
@@ -1120,7 +1268,52 @@ fn unsupported(
         helpers_used: Vec::new(),
         parse_count: None,
         semantic_build_count: None,
+        ast_traversal_count: None,
         render_count: None,
+        parse_ms: None,
+        semantic_build_ms: None,
+        custom_rewrite_ms: None,
+        oxc_transform_ms: None,
+        optimization_ms: None,
+        codegen_and_map_ms: None,
+        helper_discovery_ms: None,
+        helper_materialization_ms: None,
+    }
+}
+
+fn identity_result(
+    source: String,
+    parse_count: u32,
+    semantic_build_count: u32,
+    ast_traversal_count: u32,
+    render_count: u32,
+    parse_ms: Option<f64>,
+    semantic_build_ms: Option<f64>,
+) -> NativePreflightResult {
+    let line_count = source.bytes().filter(|byte| *byte == b'\n').count() as u32 + 1;
+    let mut words = Vec::with_capacity(line_count as usize * 5);
+    for line in 0..line_count {
+        words.extend_from_slice(&[line, 0, line, 0, 0]);
+    }
+    NativePreflightResult {
+        status: "complete".into(),
+        reason: None,
+        code: Some(source),
+        map: Some(pack_decoded_layer(&words, &[], line_count).into()),
+        diagnostics: Vec::new(),
+        helpers_used: Vec::new(),
+        parse_count: Some(parse_count),
+        semantic_build_count: Some(semantic_build_count),
+        ast_traversal_count: Some(ast_traversal_count),
+        render_count: Some(render_count),
+        parse_ms,
+        semantic_build_ms,
+        custom_rewrite_ms: None,
+        oxc_transform_ms: None,
+        optimization_ms: None,
+        codegen_and_map_ms: None,
+        helper_discovery_ms: None,
+        helper_materialization_ms: None,
     }
 }
 
@@ -1177,6 +1370,21 @@ mod tests {
         edit::{EditCommand, EditKind, MappingPolicy, build},
         sourcemap::{compose, compose_layer_chain, render, render_decoded},
     };
+
+    #[test]
+    fn detects_jsx_from_the_parsed_ast() {
+        let allocator = Allocator::default();
+        let parsed = Parser::new(
+            &allocator,
+            "const view = <><Widget /></>;",
+            source_type("fixture.jsx", "").unwrap(),
+        )
+        .parse();
+        assert!(parsed.diagnostics.is_empty());
+        let mut detector = JsxDetector(false);
+        detector.visit_program(&parsed.program);
+        assert!(detector.0);
+    }
 
     #[test]
     fn native_layer_composed_with_visitor_layer_matches_vlq_reference() {
