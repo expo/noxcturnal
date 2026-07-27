@@ -58,31 +58,6 @@ const REMOVED_PLAN_FIELDS = [
   'metadataWrites',
 ] as const;
 
-const visitorStaticKeys = new WeakMap<DefinedVisitor<any>, string>();
-/** The per-file cache key contribution of a visitor's static contract. Contracts
- * are frozen at definition, so this is computed once per `DefinedVisitor`. */
-function visitorStaticKey(defined: DefinedVisitor<any>): string {
-  let key = visitorStaticKeys.get(defined);
-  if (key == null) {
-    key = `${defined.route}:${stableJson(defined.contract.where ?? null)}:${stableJson(
-      defined.contract.children ?? null,
-    )}:${defined.contract.fields.join(',')}:${defined.contract.nested
-      .map(
-        nested =>
-          `${nested.route}/${stableJson(nested.contract.where ?? null)}/${nested.contract.fields.join(
-            ',',
-          )}/${nested.contract.controlFlow.join(',')}/${nested.contract.scope ? '1' : '0'}/${
-            nested.contract.ancestry ?? ''
-          }`,
-      )
-      .join(';')}:${defined.contract.controlFlow.join(',')}:${
-      defined.contract.scope ? '1' : '0'
-    }:${defined.contract.ancestry ?? ''}`;
-    visitorStaticKeys.set(defined, key);
-  }
-  return key;
-}
-
 const validatedVisitors = new WeakSet<DefinedVisitor<any>>();
 
 function validateDefinedVisitor(pluginName: string, defined: DefinedVisitor<any>): void {
@@ -427,8 +402,10 @@ export function preparePhase(
       staticPlanCache.set(plugin, synthesized);
   }
 
+  // Positional: the phase's plugin list is frozen, so join order identifies each
+  // plugin and no name needs to appear in the key.
   const preparedKey = (phase.plugins ?? [])
-    .map(plugin => `${plugin.name}:${pluginPlanCacheKey(plans.get(plugin)!)}`)
+    .map(plugin => computePluginPlanCacheKey(plans.get(plugin)!))
     .join('\u001e');
   const cachedPrepared = preparedPhaseCaches.get(phase)?.get(preparedKey);
   if (cachedPrepared) return { ...cachedPrepared, plans, shared: cachedPrepared };
@@ -518,42 +495,25 @@ export function preparePhase(
   return { ...cacheable, plans, shared: cacheable };
 }
 
-const planCacheKeys = new WeakMap<PreparedPluginPlan, string>();
-/** Prepared plans are immutable once built (and shared across files when fully
- * static), so their cache-key serialization is computed once per plan object. */
-function pluginPlanCacheKey(plan: PreparedPluginPlan): string {
-  let key = planCacheKeys.get(plan);
-  if (key == null) {
-    key = computePluginPlanCacheKey(plan);
-    planCacheKeys.set(plan, key);
+/** Serialize only what a prepared plan's per-file hooks can change.
+ *
+ * Everything else is identified by position rather than by content. A phase's
+ * plugin list is frozen when the phase is defined, and each plugin's visitor list
+ * is frozen when the plugin is defined, so the definition at a given position is
+ * always the same object. That leaves only the values `prepare` returned and, per
+ * visitor, whether `configure` enabled it and which predicate values it chose.
+ * Serializing the contracts as well produced keys averaging 1,749 bytes — 2.6MB
+ * per bundle to build and to hash — for information the position already fixes.
+ */
+function computePluginPlanCacheKey(plan: PreparedPluginPlan): string {
+  let key = plan.enabled === false ? '0' : '1';
+  if (plan.phases != null) key += `\u001dp${plan.phases.join(',')}`;
+  if (plan.editEffect != null) key += `\u001de${plan.editEffect}`;
+  for (const { definition, enabled, where } of plan.resolvedVisitors) {
+    key += enabled ? '\u001d1' : '\u001d0';
+    if (definition.contract.configure != null) key += stableJson(where ?? null);
   }
   return key;
-}
-
-function computePluginPlanCacheKey(plan: PreparedPluginPlan): string {
-  const fields = Object.entries(plan.fields ?? {})
-    .map(([type, values]) => `${type}:${values?.join(',') ?? ''}`)
-    .join(';');
-  return [
-    plan.enabled === false ? '0' : '1',
-    plan.subscriptions.join(','),
-    fields,
-    plan.controlFlow?.join(',') ?? '*',
-    plan.scope ? 'scope' : '',
-    plan.metadataWrites?.join(',') ?? '',
-    plan.phases?.join(',') ?? '',
-    String(plan.ancestry ?? ''),
-    stableJson(plan.children ?? null),
-    stableJson(plan.queries ?? null),
-    plan.editEffect ?? '',
-    plan.resolvedVisitors
-      .map(({ definition, enabled, where }) =>
-        definition.contract.configure == null
-          ? `${visitorStaticKey(definition)}:${enabled ? '1' : '0'}`
-          : `${visitorStaticKey(definition)}:${enabled ? '1' : '0'}:${stableJson(where ?? null)}`,
-      )
-      .join('|'),
-  ].join('\u001f');
 }
 
 function compilePhaseRoutes(
