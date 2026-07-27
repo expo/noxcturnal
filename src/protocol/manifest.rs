@@ -1,11 +1,13 @@
 use napi::{Error, Result, Status};
 use rustc_hash::FxHashSet;
 
-use crate::generated::event_schema::{NODE_TYPE_COUNT, field_key_name, predicate_field_supported};
+use crate::generated::event_schema::{
+    NODE_TYPE_COUNT, field_key_id, field_key_name, predicate_field_supported,
+};
 
 use super::constants::{
-    MAX_COMPILED_ROUTES, MAX_PREDICATE_VALUES, MAX_ROUTE_MANIFEST_BYTES, MAX_ROUTE_PAYLOAD_FIELDS,
-    MAX_ROUTE_PREDICATES, ROUTE_MANIFEST_MAGIC,
+    FieldMask, MAX_COMPILED_ROUTES, MAX_PREDICATE_VALUES, MAX_ROUTE_MANIFEST_BYTES,
+    MAX_ROUTE_PAYLOAD_FIELDS, MAX_ROUTE_PREDICATES, NodeTypeSet, ROUTE_MANIFEST_MAGIC,
 };
 
 #[derive(Clone)]
@@ -30,9 +32,9 @@ pub(crate) struct CompiledRoute {
     pub(crate) side: VisitSide,
     pub(crate) predicates: Vec<CompiledPredicate>,
     pub(crate) payload_field_ids: Vec<u32>,
-    /// Field names for `payload_field_ids`, resolved once at manifest decode so the
-    /// per-node collectors never rebuild name lists.
-    pub(crate) payload_names: Vec<String>,
+    /// `payload_field_ids` as a mask, so a matching route's payload selection is one
+    /// word and coalescing several matched routes is a bitwise union.
+    pub(crate) payload_mask: FieldMask,
 }
 
 pub(crate) struct CompiledManifest {
@@ -41,13 +43,13 @@ pub(crate) struct CompiledManifest {
     pub(crate) include_scope: bool,
     pub(crate) include_exit: bool,
     pub(crate) retention_capabilities: u32,
-    pub(crate) structural_parent_types: FxHashSet<u32>,
-    /// Union of route payload/predicate and retained-plan field names per node type,
-    /// precomputed so the retained collector performs no per-node field-name work.
-    pub(crate) merged_field_names_by_type: Vec<Vec<String>>,
+    pub(crate) structural_parent_types: NodeTypeSet,
+    /// Union of route payload/predicate and retained-plan fields per node type,
+    /// precomputed so the retained collector performs no per-node selection work.
+    pub(crate) merged_field_mask_by_type: Vec<FieldMask>,
     /// Predicate fields without direct scalar accessors; only these fields need
     /// materialization before matching.
-    pub(crate) fallback_predicate_names_by_type: Vec<Vec<String>>,
+    pub(crate) fallback_predicate_mask_by_type: Vec<FieldMask>,
     pub(crate) needs_semantics: bool,
 }
 
@@ -264,17 +266,16 @@ pub(crate) fn decode_route_manifest(
             }
             payload_field_ids.push(field_id);
         }
-        let payload_names = payload_field_ids
+        let payload_mask = payload_field_ids
             .iter()
-            .filter_map(|&field_id| field_key_name(field_id).map(str::to_owned))
-            .collect();
+            .fold(FieldMask::none(), |mask, &field_id| mask.with(field_id));
         routes_by_type[node_type_id as usize].push(CompiledRoute {
             id,
             node_type_id,
             side,
             predicates,
             payload_field_ids,
-            payload_names,
+            payload_mask,
         });
     }
     if cursor + structural_parent_count > word_limit {
@@ -283,7 +284,7 @@ pub(crate) fn decode_route_manifest(
             "truncated structural parent types",
         ));
     }
-    let mut structural_parent_types = FxHashSet::default();
+    let mut structural_parent_types = NodeTypeSet::default();
     for _ in 0..structural_parent_count {
         let type_id = word(cursor);
         cursor += 1;
@@ -348,12 +349,11 @@ pub(crate) fn decode_route_manifest(
         .any(|route| route.side == VisitSide::Exit);
     let include_parent = flags & 1 != 0;
     let include_scope = flags & 2 != 0;
-    let merged_field_names_by_type = routes_by_type
+    let merged_field_mask_by_type = routes_by_type
         .iter()
         .zip(&retained_fields_by_type)
         .map(|(routes, retained_field_ids)| {
-            let mut names = Vec::new();
-            let field_ids = routes
+            routes
                 .iter()
                 .flat_map(|route| {
                     route
@@ -362,38 +362,33 @@ pub(crate) fn decode_route_manifest(
                         .copied()
                         .chain(route.predicates.iter().map(|predicate| predicate.field_id))
                 })
-                .chain(retained_field_ids.iter().copied());
-            for field_id in field_ids {
-                let name = field_key_name(field_id)
-                    .expect("validated manifest field")
-                    .to_owned();
-                if !names.contains(&name) {
-                    names.push(name);
-                }
-            }
-            names
+                .chain(retained_field_ids.iter().copied())
+                .fold(FieldMask::none(), |mask, field_id| mask.with(field_id))
         })
         .collect::<Vec<_>>();
+    let semantic_mask = semantic_field_keys
+        .iter()
+        .filter_map(|name| field_key_id(name))
+        .fold(FieldMask::none(), |mask, field_id| mask.with(field_id));
     let needs_semantics = include_parent
         || include_scope
-        || merged_field_names_by_type
+        || merged_field_mask_by_type
             .iter()
-            .flatten()
-            .any(|name| semantic_field_keys.contains(&name.as_str()));
-    let fallback_predicate_names_by_type = routes_by_type
+            .any(|mask| mask.intersects(semantic_mask));
+    let fallback_predicate_mask_by_type = routes_by_type
         .iter()
         .enumerate()
         .map(|(type_id, routes)| {
-            let mut names: Vec<String> = Vec::new();
-            for predicate in routes.iter().flat_map(|route| route.predicates.iter()) {
-                if let Some(name) = field_key_name(predicate.field_id)
-                    && !has_direct_predicate_scalar(type_id as u32, name)
-                    && !names.iter().any(|existing| existing == name)
-                {
-                    names.push(name.to_owned());
-                }
-            }
-            names
+            routes
+                .iter()
+                .flat_map(|route| route.predicates.iter())
+                .filter(|predicate| {
+                    field_key_name(predicate.field_id)
+                        .is_some_and(|name| !has_direct_predicate_scalar(type_id as u32, name))
+                })
+                .fold(FieldMask::none(), |mask, predicate| {
+                    mask.with(predicate.field_id)
+                })
         })
         .collect::<Vec<_>>();
     Ok(CompiledManifest {
@@ -403,8 +398,8 @@ pub(crate) fn decode_route_manifest(
         include_exit,
         retention_capabilities: flags >> 2,
         structural_parent_types,
-        merged_field_names_by_type,
-        fallback_predicate_names_by_type,
+        merged_field_mask_by_type,
+        fallback_predicate_mask_by_type,
         needs_semantics,
     })
 }

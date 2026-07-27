@@ -2,10 +2,11 @@ use napi::bindgen_prelude::Buffer;
 use napi_derive::napi;
 use oxc_ast::AstKind;
 use oxc_semantic::Scoping;
-use rustc_hash::{FxHashMap, FxHashSet};
+use rustc_hash::FxHashMap;
 
 use super::constant_eval::{EvaluatedConstant, constant_for_kind};
 use crate::generated::event_schema::node_type_name;
+use crate::protocol::constants::NodeTypeSet;
 
 pub const ABSENT_ID: u32 = u32::MAX;
 
@@ -24,7 +25,7 @@ pub struct RetainedIndex {
     first_children: Option<Vec<u32>>,
     next_siblings: Option<Vec<u32>>,
     last_children: Option<Vec<u32>>,
-    structural_parent_types: FxHashSet<u32>,
+    structural_parent_types: NodeTypeSet,
     names: Vec<String>,
     name_ids: FxHashMap<String, u32>,
     bindings: FxHashMap<(u32, u32), BindingRecord>,
@@ -129,7 +130,7 @@ impl RetainedIndex {
 
     pub fn with_node_count(
         node_count: usize,
-        structural_parent_types: Option<&FxHashSet<u32>>,
+        structural_parent_types: Option<&NodeTypeSet>,
         retain_constants: bool,
         retain_scalar_fields: bool,
     ) -> Self {
@@ -568,10 +569,7 @@ impl RetainedIndex {
             return;
         };
         let parent = parent_id as usize;
-        if !self
-            .structural_parent_types
-            .contains(&self.type_ids[parent])
-        {
+        if !self.structural_parent_types.contains(self.type_ids[parent]) {
             return;
         }
         let previous = last_children[parent];
@@ -749,7 +747,7 @@ impl RetainedIndex {
                 .last_children
                 .as_ref()
                 .map_or(0, |column| column.capacity() * size_of::<u32>())
-            + self.structural_parent_types.capacity() * size_of::<u32>()
+            + size_of::<NodeTypeSet>()
             + self.names.capacity() * size_of::<String>()
             + self.names.iter().map(String::capacity).sum::<usize>()
             + self.name_ids.capacity() * size_of::<(String, u32)>()

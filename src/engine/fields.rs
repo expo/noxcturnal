@@ -7,22 +7,25 @@ use oxc_semantic::Scoping;
 use rustc_hash::FxHashMap;
 
 use crate::event_types::NodeField;
-use crate::generated::event_schema::{field_key_id, node_type_name};
+use crate::generated::event_schema::{field_ids, node_type_name};
+use crate::protocol::constants::FieldMask;
 use crate::semantic::constant_eval::constant_for_kind;
 
+/// Byte offset to UTF-16 offset, one entry per byte plus the end of source.
+///
+/// Every byte of a multi-byte character maps to that character's starting UTF-16
+/// offset, so the table is filled in one forward pass: each character appends its
+/// own start offset once per byte it occupies.
 pub(crate) fn utf16_index<'a>(source: &str, allocator: &'a Allocator) -> ArenaVec<'a, u32> {
     let mut offsets = ArenaVec::with_capacity_in(source.len() + 1, &allocator);
-    for _ in 0..=source.len() {
-        offsets.push(0);
-    }
     let mut utf16 = 0u32;
-    for (byte, ch) in source.char_indices() {
-        for slot in offsets.iter_mut().take(byte + ch.len_utf8()).skip(byte) {
-            *slot = utf16;
+    for ch in source.chars() {
+        for _ in 0..ch.len_utf8() {
+            offsets.push(utf16);
         }
         utf16 += ch.len_utf16() as u32;
     }
-    offsets[source.len()] = utf16;
+    offsets.push(utf16);
     offsets
 }
 
@@ -77,22 +80,51 @@ pub(crate) fn intern_packed(strings: &mut FxHashMap<String, u32>, value: &str) -
 }
 
 pub(crate) fn static_member_path(expression: &Expression<'_>) -> Option<String> {
+    static_member_path_with(expression, None)
+}
+
+/// The dotted path of a static member chain, optionally with one more property
+/// appended. The chain is written into a single buffer, so a chain of depth `n`
+/// costs one allocation rather than one per level.
+pub(crate) fn static_member_path_with(
+    expression: &Expression<'_>,
+    property: Option<&str>,
+) -> Option<String> {
+    let mut path = String::new();
+    if !write_static_member_path(expression, &mut path) {
+        return None;
+    }
+    if let Some(property) = property {
+        path.push('.');
+        path.push_str(property);
+    }
+    Some(path)
+}
+
+fn write_static_member_path(expression: &Expression<'_>, path: &mut String) -> bool {
     match expression {
-        Expression::Identifier(identifier) => Some(identifier.name.to_string()),
-        Expression::StaticMemberExpression(member) => Some(format!(
-            "{}.{}",
-            static_member_path(&member.object)?,
-            member.property.name
-        )),
+        Expression::Identifier(identifier) => {
+            path.push_str(&identifier.name);
+            true
+        }
+        Expression::StaticMemberExpression(member) => {
+            write_static_member_path(&member.object, path) && {
+                path.push('.');
+                path.push_str(&member.property.name);
+                true
+            }
+        }
         Expression::ComputedMemberExpression(member) => match &member.expression {
-            Expression::StringLiteral(property) => Some(format!(
-                "{}.{}",
-                static_member_path(&member.object)?,
-                property.value
-            )),
-            _ => None,
+            Expression::StringLiteral(property) => {
+                write_static_member_path(&member.object, path) && {
+                    path.push('.');
+                    path.push_str(&property.value);
+                    true
+                }
+            }
+            _ => false,
         },
-        _ => None,
+        _ => false,
     }
 }
 
@@ -116,37 +148,35 @@ pub(crate) struct DirectPackedFields {
     pub(crate) len: usize,
 }
 
-pub(crate) fn packed_fields_direct<T: AsRef<str>>(
+pub(crate) fn packed_fields_direct(
     kind: AstKind<'_>,
     scoping: Option<&Scoping>,
     utf16: Option<&[u32]>,
-    requested: Option<&[T]>,
-    precomputed_member_path: Option<&str>,
+    requested: FieldMask,
     strings: &mut FxHashMap<String, u32>,
 ) -> Option<DirectPackedFields> {
-    let wants =
-        |key: &str| requested.is_none_or(|fields| fields.iter().any(|field| field.as_ref() == key));
+    let wants = |key: u32| requested.wants(key);
     let mut result = DirectPackedFields {
         words: [0; 32],
         len: 0,
     };
     // An explicitly empty request can push nothing; skip the kind match and constant
     // evaluation entirely for the common "routed without payload fields" case.
-    if requested.is_some_and(<[T]>::is_empty) {
+    if requested.is_empty() {
         return Some(result);
     }
-    let mut push = |key: &str, value: u32| {
+    let mut push = |key: u32, value: u32| {
         if wants(key) {
-            result.words[result.len] = field_key_id(key).expect("field protocol id");
+            result.words[result.len] = key;
             result.words[result.len + 1] = value;
             result.len += 2;
         }
     };
     match kind {
         AstKind::IdentifierReference(identifier) => {
-            if wants("name") {
+            if wants(field_ids::NAME) {
                 let value = intern_packed(strings, &identifier.name);
-                push("name", value);
+                push(field_ids::NAME, value);
             }
             if let Some(scoping) = scoping {
                 let reference = identifier
@@ -154,18 +184,24 @@ pub(crate) fn packed_fields_direct<T: AsRef<str>>(
                     .get()
                     .map(|id| scoping.get_reference(id));
                 push(
-                    "global",
+                    field_ids::GLOBAL,
                     0x8000_0000
                         | u32::from(
                             reference.is_some_and(|reference| reference.symbol_id().is_none()),
                         ),
                 );
                 if let Some(reference) = reference {
-                    push("read", 0x8000_0000 | u32::from(reference.is_read()));
-                    push("write", 0x8000_0000 | u32::from(reference.is_write()));
+                    push(
+                        field_ids::READ,
+                        0x8000_0000 | u32::from(reference.is_read()),
+                    );
+                    push(
+                        field_ids::WRITE,
+                        0x8000_0000 | u32::from(reference.is_write()),
+                    );
                     if let Some(symbol_id) = reference.symbol_id() {
                         push(
-                            "bindingScopeId",
+                            field_ids::BINDING_SCOPE_ID,
                             0x4000_0000 | scoping.symbol_scope_id(symbol_id).index() as u32,
                         );
                     }
@@ -173,250 +209,269 @@ pub(crate) fn packed_fields_direct<T: AsRef<str>>(
             }
         }
         AstKind::BindingIdentifier(identifier) => {
-            if wants("name") {
+            if wants(field_ids::NAME) {
                 let value = intern_packed(strings, &identifier.name);
-                push("name", value);
+                push(field_ids::NAME, value);
             }
-            push("binding", 0x8000_0001);
+            push(field_ids::BINDING, 0x8000_0001);
         }
         AstKind::IdentifierName(identifier) => {
-            if wants("name") {
+            if wants(field_ids::NAME) {
                 let value = intern_packed(strings, &identifier.name);
-                push("name", value);
+                push(field_ids::NAME, value);
             }
         }
         AstKind::StringLiteral(literal) => {
-            if wants("value") {
+            if wants(field_ids::VALUE) {
                 let value = intern_packed(strings, &literal.value);
-                push("value", value);
+                push(field_ids::VALUE, value);
             }
         }
         AstKind::NumericLiteral(literal) => {
-            if wants("value") {
+            if wants(field_ids::VALUE) {
                 let value = intern_packed(strings, &literal.value.to_string());
-                push("value", value);
+                push(field_ids::VALUE, value);
             }
         }
         AstKind::BooleanLiteral(literal) => {
-            push("value", 0x8000_0000 | u32::from(literal.value));
+            push(field_ids::VALUE, 0x8000_0000 | u32::from(literal.value));
         }
         AstKind::ObjectProperty(property) => {
-            if wants("kind") {
+            if wants(field_ids::KIND) {
                 let kind = format!("{:?}", property.kind).to_ascii_lowercase();
                 let kind = intern_packed(strings, &kind);
-                push("kind", kind);
+                push(field_ids::KIND, kind);
             }
-            push("computed", 0x8000_0000 | u32::from(property.computed));
-            push("method", 0x8000_0000 | u32::from(property.method));
-            push("shorthand", 0x8000_0000 | u32::from(property.shorthand));
-            if wants("key")
+            push(
+                field_ids::COMPUTED,
+                0x8000_0000 | u32::from(property.computed),
+            );
+            push(field_ids::METHOD, 0x8000_0000 | u32::from(property.method));
+            push(
+                field_ids::SHORTHAND,
+                0x8000_0000 | u32::from(property.shorthand),
+            );
+            if wants(field_ids::KEY)
                 && let Some(key) = property.key.static_name()
             {
                 let key = intern_packed(strings, &key);
-                push("key", key);
+                push(field_ids::KEY, key);
             }
         }
         AstKind::BinaryExpression(expression) => {
-            if wants("operator") {
+            if wants(field_ids::OPERATOR) {
                 let operator = intern_packed(strings, expression.operator.as_str());
-                push("operator", operator);
+                push(field_ids::OPERATOR, operator);
             }
         }
         AstKind::LogicalExpression(expression) => {
-            if wants("operator") {
+            if wants(field_ids::OPERATOR) {
                 let operator = intern_packed(strings, expression.operator.as_str());
-                push("operator", operator);
+                push(field_ids::OPERATOR, operator);
             }
         }
         AstKind::AssignmentExpression(expression) => {
-            if wants("operator") {
+            if wants(field_ids::OPERATOR) {
                 let operator = intern_packed(strings, expression.operator.as_str());
-                push("operator", operator);
+                push(field_ids::OPERATOR, operator);
             }
         }
         AstKind::UpdateExpression(expression) => {
-            if wants("operator") {
+            if wants(field_ids::OPERATOR) {
                 let operator = intern_packed(strings, expression.operator.as_str());
-                push("operator", operator);
+                push(field_ids::OPERATOR, operator);
             }
-            push("prefix", 0x8000_0000 | u32::from(expression.prefix));
+            push(
+                field_ids::PREFIX,
+                0x8000_0000 | u32::from(expression.prefix),
+            );
         }
         AstKind::UnaryExpression(expression) => {
-            if wants("operator") {
+            if wants(field_ids::OPERATOR) {
                 let operator = intern_packed(strings, expression.operator.as_str());
-                push("operator", operator);
+                push(field_ids::OPERATOR, operator);
             }
-            push("prefix", 0x8000_0001);
+            push(field_ids::PREFIX, 0x8000_0001);
         }
         AstKind::CallExpression(call) => {
-            push("optional", 0x8000_0000 | u32::from(call.optional));
-            push("argumentCount", 0x4000_0000 | call.arguments.len() as u32);
+            push(field_ids::OPTIONAL, 0x8000_0000 | u32::from(call.optional));
+            push(
+                field_ids::ARGUMENT_COUNT,
+                0x4000_0000 | call.arguments.len() as u32,
+            );
             if let Some(identifier) = static_member_root(&call.callee) {
-                if wants("calleeName") && matches!(call.callee, Expression::Identifier(_)) {
+                if wants(field_ids::CALLEE_NAME) && matches!(call.callee, Expression::Identifier(_))
+                {
                     let value = intern_packed(strings, &identifier.name);
-                    push("calleeName", value);
+                    push(field_ids::CALLEE_NAME, value);
                 }
-                if wants("calleePath")
+                if wants(field_ids::CALLEE_PATH)
                     && let Some(path) = static_member_path(&call.callee)
                 {
                     let value = intern_packed(strings, &path);
-                    push("calleePath", value);
+                    push(field_ids::CALLEE_PATH, value);
                 }
                 if let Some(scoping) = scoping {
                     let global = identifier
                         .reference_id
                         .get()
                         .is_some_and(|id| !scoping.has_binding(id));
-                    push("calleeGlobal", 0x8000_0000 | u32::from(global));
+                    push(field_ids::CALLEE_GLOBAL, 0x8000_0000 | u32::from(global));
                 }
             }
             if let Some(oxc_ast::ast::Argument::StringLiteral(literal)) = call.arguments.first()
-                && wants("staticArgument")
+                && wants(field_ids::STATIC_ARGUMENT)
             {
                 let value = intern_packed(strings, &literal.value);
-                push("staticArgument", value);
+                push(field_ids::STATIC_ARGUMENT, value);
             }
         }
         AstKind::NewExpression(call) => {
-            push("argumentCount", 0x4000_0000 | call.arguments.len() as u32);
+            push(
+                field_ids::ARGUMENT_COUNT,
+                0x4000_0000 | call.arguments.len() as u32,
+            );
             if let Expression::Identifier(identifier) = &call.callee
-                && wants("calleeName")
+                && wants(field_ids::CALLEE_NAME)
             {
                 let value = intern_packed(strings, &identifier.name);
-                push("calleeName", value);
+                push(field_ids::CALLEE_NAME, value);
             }
             if let Some(oxc_ast::ast::Argument::StringLiteral(literal)) = call.arguments.first()
-                && wants("staticArgument")
+                && wants(field_ids::STATIC_ARGUMENT)
             {
                 let value = intern_packed(strings, &literal.value);
-                push("staticArgument", value);
+                push(field_ids::STATIC_ARGUMENT, value);
             }
         }
         AstKind::StaticMemberExpression(member) => {
-            push("computed", 0x8000_0000);
-            if wants("property") {
+            push(field_ids::COMPUTED, 0x8000_0000);
+            if wants(field_ids::PROPERTY) {
                 let value = intern_packed(strings, &member.property.name);
-                push("property", value);
+                push(field_ids::PROPERTY, value);
             }
-            if wants("memberPath") {
-                if let Some(path) = precomputed_member_path {
-                    let value = intern_packed(strings, path);
-                    push("memberPath", value);
-                } else if let Some(path) = static_member_path(&member.object) {
-                    let path = format!("{path}.{}", member.property.name);
-                    let value = intern_packed(strings, &path);
-                    push("memberPath", value);
-                }
+            if wants(field_ids::MEMBER_PATH)
+                && let Some(path) =
+                    static_member_path_with(&member.object, Some(&member.property.name))
+            {
+                let value = intern_packed(strings, &path);
+                push(field_ids::MEMBER_PATH, value);
             }
             let mut object = &member.object;
             while let Expression::StaticMemberExpression(parent) = object {
                 object = &parent.object;
             }
             if let Expression::Identifier(identifier) = object {
-                if wants("rootName") {
+                if wants(field_ids::ROOT_NAME) {
                     let value = intern_packed(strings, &identifier.name);
-                    push("rootName", value);
+                    push(field_ids::ROOT_NAME, value);
                 }
                 if let Some(scoping) = scoping {
                     let global = identifier
                         .reference_id
                         .get()
                         .is_some_and(|id| scoping.get_reference(id).symbol_id().is_none());
-                    push("rootGlobal", 0x8000_0000 | u32::from(global));
+                    push(field_ids::ROOT_GLOBAL, 0x8000_0000 | u32::from(global));
                 }
             }
         }
         AstKind::ComputedMemberExpression(member) => {
-            push("computed", 0x8000_0001);
+            push(field_ids::COMPUTED, 0x8000_0001);
             if let Expression::StringLiteral(property) = &member.expression {
-                if wants("property") {
+                if wants(field_ids::PROPERTY) {
                     let value = intern_packed(strings, &property.value);
-                    push("property", value);
+                    push(field_ids::PROPERTY, value);
                 }
-                if wants("memberPath")
-                    && let Some(path) = static_member_path(&member.object)
+                if wants(field_ids::MEMBER_PATH)
+                    && let Some(path) =
+                        static_member_path_with(&member.object, Some(&property.value))
                 {
-                    let path = format!("{path}.{}", property.value);
                     let value = intern_packed(strings, &path);
-                    push("memberPath", value);
+                    push(field_ids::MEMBER_PATH, value);
                 }
             }
         }
         AstKind::Function(function) => {
-            if wants("nodeKind") {
+            if wants(field_ids::NODE_KIND) {
                 let node_kind = format!("{:?}", function.r#type);
                 let node_kind = intern_packed(strings, &node_kind);
-                push("nodeKind", node_kind);
+                push(field_ids::NODE_KIND, node_kind);
             }
-            push("async", 0x8000_0000 | u32::from(function.r#async));
-            push("generator", 0x8000_0000 | u32::from(function.generator));
+            push(field_ids::ASYNC, 0x8000_0000 | u32::from(function.r#async));
             push(
-                "parameterCount",
+                field_ids::GENERATOR,
+                0x8000_0000 | u32::from(function.generator),
+            );
+            push(
+                field_ids::PARAMETER_COUNT,
                 0x4000_0000 | function.params.items.len() as u32,
             );
-            if wants("name")
+            if wants(field_ids::NAME)
                 && let Some(identifier) = &function.id
             {
                 let name = intern_packed(strings, &identifier.name);
-                push("name", name);
+                push(field_ids::NAME, name);
             }
             if let Some(body) = &function.body {
                 let body_start = body.span.start + 1;
                 let body_end = body.span.end.saturating_sub(1);
                 push(
-                    "bodyStart",
+                    field_ids::BODY_START,
                     0x4000_0000 | utf16.map_or(body_start, |index| index[body_start as usize]),
                 );
                 push(
-                    "bodyEnd",
+                    field_ids::BODY_END,
                     0x4000_0000 | utf16.map_or(body_end, |index| index[body_end as usize]),
                 );
             }
         }
         AstKind::ArrowFunctionExpression(function) => {
-            push("async", 0x8000_0000 | u32::from(function.r#async));
-            push("expression", 0x8000_0000 | u32::from(function.expression));
+            push(field_ids::ASYNC, 0x8000_0000 | u32::from(function.r#async));
             push(
-                "parameterCount",
+                field_ids::EXPRESSION,
+                0x8000_0000 | u32::from(function.expression),
+            );
+            push(
+                field_ids::PARAMETER_COUNT,
                 0x4000_0000 | function.params.items.len() as u32,
             );
             let inset = u32::from(!function.expression);
             let body_start = function.body.span.start + inset;
             let body_end = function.body.span.end.saturating_sub(inset);
             push(
-                "bodyStart",
+                field_ids::BODY_START,
                 0x4000_0000 | utf16.map_or(body_start, |index| index[body_start as usize]),
             );
             push(
-                "bodyEnd",
+                field_ids::BODY_END,
                 0x4000_0000 | utf16.map_or(body_end, |index| index[body_end as usize]),
             );
         }
         AstKind::Class(class) => {
-            if wants("nodeKind") {
+            if wants(field_ids::NODE_KIND) {
                 let node_kind = format!("{:?}", class.r#type);
                 let node_kind = intern_packed(strings, &node_kind);
-                push("nodeKind", node_kind);
+                push(field_ids::NODE_KIND, node_kind);
             }
-            if wants("name")
+            if wants(field_ids::NAME)
                 && let Some(identifier) = &class.id
             {
                 let name = intern_packed(strings, &identifier.name);
-                push("name", name);
+                push(field_ids::NAME, name);
             }
         }
         AstKind::ImportDeclaration(declaration) => {
-            if wants("source") {
+            if wants(field_ids::SOURCE) {
                 let source = intern_packed(strings, &declaration.source.value);
-                push("source", source);
+                push(field_ids::SOURCE, source);
             }
-            if wants("importKind") {
+            if wants(field_ids::IMPORT_KIND) {
                 let import_kind = format!("{:?}", declaration.import_kind).to_ascii_lowercase();
                 let import_kind = intern_packed(strings, &import_kind);
-                push("importKind", import_kind);
+                push(field_ids::IMPORT_KIND, import_kind);
             }
             push(
-                "specifierCount",
+                field_ids::SPECIFIER_COUNT,
                 0x4000_0000
                     | declaration
                         .specifiers
@@ -425,55 +480,55 @@ pub(crate) fn packed_fields_direct<T: AsRef<str>>(
             );
         }
         AstKind::ImportSpecifier(specifier) => {
-            if wants("imported") {
+            if wants(field_ids::IMPORTED) {
                 let imported = intern_packed(strings, &specifier.imported.name());
-                push("imported", imported);
+                push(field_ids::IMPORTED, imported);
             }
-            if wants("local") {
+            if wants(field_ids::LOCAL) {
                 let local = intern_packed(strings, &specifier.local.name);
-                push("local", local);
+                push(field_ids::LOCAL, local);
             }
-            if wants("importKind") {
+            if wants(field_ids::IMPORT_KIND) {
                 let import_kind = format!("{:?}", specifier.import_kind).to_ascii_lowercase();
                 let import_kind = intern_packed(strings, &import_kind);
-                push("importKind", import_kind);
+                push(field_ids::IMPORT_KIND, import_kind);
             }
         }
         AstKind::ImportDefaultSpecifier(specifier) => {
             let imported = intern_packed(strings, "default");
-            push("imported", imported);
-            if wants("local") {
+            push(field_ids::IMPORTED, imported);
+            if wants(field_ids::LOCAL) {
                 let local = intern_packed(strings, &specifier.local.name);
-                push("local", local);
+                push(field_ids::LOCAL, local);
             }
         }
         AstKind::ImportNamespaceSpecifier(specifier) => {
             let imported = intern_packed(strings, "*");
-            push("imported", imported);
-            if wants("local") {
+            push(field_ids::IMPORTED, imported);
+            if wants(field_ids::LOCAL) {
                 let local = intern_packed(strings, &specifier.local.name);
-                push("local", local);
+                push(field_ids::LOCAL, local);
             }
         }
         AstKind::ExportNamedDeclaration(declaration) => {
-            if wants("source")
+            if wants(field_ids::SOURCE)
                 && let Some(source) = &declaration.source
             {
                 let source = intern_packed(strings, &source.value);
-                push("source", source);
+                push(field_ids::SOURCE, source);
             }
-            if wants("exportKind") {
+            if wants(field_ids::EXPORT_KIND) {
                 let export_kind = format!("{:?}", declaration.export_kind).to_ascii_lowercase();
                 let export_kind = intern_packed(strings, &export_kind);
-                push("exportKind", export_kind);
+                push(field_ids::EXPORT_KIND, export_kind);
             }
             push(
-                "specifierCount",
+                field_ids::SPECIFIER_COUNT,
                 0x4000_0000 | declaration.specifiers.len() as u32,
             );
         }
         AstKind::ExportDefaultDeclaration(declaration) => {
-            if wants("declaredName") {
+            if wants(field_ids::DECLARED_NAME) {
                 let name = match &declaration.declaration {
                     ExportDefaultDeclarationKind::FunctionDeclaration(function) => function
                         .id
@@ -486,96 +541,99 @@ pub(crate) fn packed_fields_direct<T: AsRef<str>>(
                 };
                 if let Some(name) = name {
                     let name = intern_packed(strings, name);
-                    push("declaredName", name);
+                    push(field_ids::DECLARED_NAME, name);
                 }
             }
         }
         AstKind::ExportAllDeclaration(declaration) => {
-            if wants("source") {
+            if wants(field_ids::SOURCE) {
                 let source = intern_packed(strings, &declaration.source.value);
-                push("source", source);
+                push(field_ids::SOURCE, source);
             }
-            if wants("exported")
+            if wants(field_ids::EXPORTED)
                 && let Some(exported) = &declaration.exported
             {
                 let exported = intern_packed(strings, &exported.name());
-                push("exported", exported);
+                push(field_ids::EXPORTED, exported);
             }
-            if wants("exportKind") {
+            if wants(field_ids::EXPORT_KIND) {
                 let export_kind = format!("{:?}", declaration.export_kind).to_ascii_lowercase();
                 let export_kind = intern_packed(strings, &export_kind);
-                push("exportKind", export_kind);
+                push(field_ids::EXPORT_KIND, export_kind);
             }
         }
         AstKind::ExportSpecifier(specifier) => {
-            if wants("local") {
+            if wants(field_ids::LOCAL) {
                 let local = intern_packed(strings, &specifier.local.name());
-                push("local", local);
+                push(field_ids::LOCAL, local);
             }
-            if wants("exported") {
+            if wants(field_ids::EXPORTED) {
                 let exported = intern_packed(strings, &specifier.exported.name());
-                push("exported", exported);
+                push(field_ids::EXPORTED, exported);
             }
-            if wants("exportKind") {
+            if wants(field_ids::EXPORT_KIND) {
                 let export_kind = format!("{:?}", specifier.export_kind).to_ascii_lowercase();
                 let export_kind = intern_packed(strings, &export_kind);
-                push("exportKind", export_kind);
+                push(field_ids::EXPORT_KIND, export_kind);
             }
         }
         AstKind::VariableDeclaration(declaration) => {
-            if wants("kind") {
+            if wants(field_ids::KIND) {
                 let kind = declaration.kind.to_string();
                 let kind = intern_packed(strings, &kind);
-                push("kind", kind);
+                push(field_ids::KIND, kind);
             }
             push(
-                "declarationCount",
+                field_ids::DECLARATION_COUNT,
                 0x4000_0000 | declaration.declarations.len() as u32,
             );
         }
         AstKind::VariableDeclarator(declarator) => {
-            if wants("kind") {
+            if wants(field_ids::KIND) {
                 let kind = declarator.kind.to_string();
                 let kind = intern_packed(strings, &kind);
-                push("kind", kind);
+                push(field_ids::KIND, kind);
             }
             push(
-                "hasInitializer",
+                field_ids::HAS_INITIALIZER,
                 0x8000_0000 | u32::from(declarator.init.is_some()),
             );
         }
         AstKind::Directive(directive) => {
-            if wants("value") {
+            if wants(field_ids::VALUE) {
                 let value = intern_packed(strings, &directive.directive);
-                push("value", value);
+                push(field_ids::VALUE, value);
             }
         }
         AstKind::YieldExpression(expression) => {
-            push("delegate", 0x8000_0000 | u32::from(expression.delegate));
+            push(
+                field_ids::DELEGATE,
+                0x8000_0000 | u32::from(expression.delegate),
+            );
         }
         AstKind::ImportMeta(_) => {
             let meta = intern_packed(strings, "import");
-            push("meta", meta);
+            push(field_ids::META, meta);
             let property = intern_packed(strings, "meta");
-            push("property", property);
+            push(field_ids::PROPERTY, property);
         }
         AstKind::NewTarget(_) => {
             let meta = intern_packed(strings, "new");
-            push("meta", meta);
+            push(field_ids::META, meta);
             let property = intern_packed(strings, "target");
-            push("property", property);
+            push(field_ids::PROPERTY, property);
         }
         _ => return None,
     }
     if let Some(value) = constant_for_kind(kind) {
-        if wants("constantKind") {
+        if wants(field_ids::CONSTANT_KIND) {
             let kind = intern_packed(strings, value.kind());
-            push("constantKind", kind);
+            push(field_ids::CONSTANT_KIND, kind);
         }
-        if wants("constantValue") {
+        if wants(field_ids::CONSTANT_VALUE) {
             let encoded = value.encode();
             let value = intern_packed(strings, &encoded);
-            push("constantValue", value);
+            push(field_ids::CONSTANT_VALUE, value);
         }
     }
     Some(result)
@@ -584,16 +642,14 @@ pub(crate) fn packed_fields_direct<T: AsRef<str>>(
 pub(crate) fn fields(
     kind: AstKind<'_>,
     scoping: Option<&Scoping>,
-    requested: Option<&[String]>,
+    requested: FieldMask,
 ) -> Vec<NodeField> {
     let mut result = Vec::new();
+    // Selection is by protocol id; the emitted key stays a name because byte-offset
+    // fields are renamed to their UTF-16 counterparts after materialization.
     macro_rules! push {
-        ($key:expr, $value:expr $(,)?) => {
-            if requested.is_none_or(|fields| {
-                fields.iter().any(|field| {
-                    field == $key || $key.strip_suffix("Byte").is_some_and(|name| field == name)
-                })
-            }) {
+        ($field:expr, $key:expr, $value:expr $(,)?) => {
+            if requested.wants($field) {
                 result.push(NodeField {
                     key: $key.into(),
                     value: $value,
@@ -603,22 +659,23 @@ pub(crate) fn fields(
     }
     match kind {
         AstKind::IdentifierReference(identifier) => {
-            push!("name", identifier.name.to_string());
+            push!(field_ids::NAME, "name", identifier.name.to_string());
             if let Some(scoping) = scoping {
                 let reference = identifier
                     .reference_id
                     .get()
                     .map(|id| scoping.get_reference(id));
                 let global = reference.is_some_and(|reference| reference.symbol_id().is_none());
-                push!("global", global.to_string());
+                push!(field_ids::GLOBAL, "global", global.to_string());
                 if let Some(reference) = reference {
-                    push!("read", reference.is_read().to_string());
-                    push!("write", reference.is_write().to_string());
+                    push!(field_ids::READ, "read", reference.is_read().to_string());
+                    push!(field_ids::WRITE, "write", reference.is_write().to_string());
                 }
                 if let Some(reference_id) = identifier.reference_id.get()
                     && let Some(symbol_id) = scoping.get_reference(reference_id).symbol_id()
                 {
                     push!(
+                        field_ids::BINDING_SCOPE_ID,
                         "bindingScopeId",
                         scoping.symbol_scope_id(symbol_id).index().to_string(),
                     );
@@ -626,140 +683,260 @@ pub(crate) fn fields(
             }
         }
         AstKind::BindingIdentifier(identifier) => {
-            push!("name", identifier.name.to_string());
-            push!("binding", "true".into());
+            push!(field_ids::NAME, "name", identifier.name.to_string());
+            push!(field_ids::BINDING, "binding", "true".into());
         }
-        AstKind::IdentifierName(identifier) => push!("name", identifier.name.to_string()),
-        AstKind::StringLiteral(literal) => push!("value", literal.value.to_string()),
-        AstKind::NumericLiteral(literal) => push!("value", literal.value.to_string()),
-        AstKind::BooleanLiteral(literal) => push!("value", literal.value.to_string()),
+        AstKind::IdentifierName(identifier) => {
+            push!(field_ids::NAME, "name", identifier.name.to_string())
+        }
+        AstKind::StringLiteral(literal) => {
+            push!(field_ids::VALUE, "value", literal.value.to_string())
+        }
+        AstKind::NumericLiteral(literal) => {
+            push!(field_ids::VALUE, "value", literal.value.to_string())
+        }
+        AstKind::BooleanLiteral(literal) => {
+            push!(field_ids::VALUE, "value", literal.value.to_string())
+        }
         AstKind::ObjectProperty(property) => {
-            push!("kind", format!("{:?}", property.kind).to_ascii_lowercase());
-            push!("computed", property.computed.to_string());
-            push!("method", property.method.to_string());
-            push!("shorthand", property.shorthand.to_string());
+            push!(
+                field_ids::KIND,
+                "kind",
+                format!("{:?}", property.kind).to_ascii_lowercase()
+            );
+            push!(
+                field_ids::COMPUTED,
+                "computed",
+                property.computed.to_string()
+            );
+            push!(field_ids::METHOD, "method", property.method.to_string());
+            push!(
+                field_ids::SHORTHAND,
+                "shorthand",
+                property.shorthand.to_string()
+            );
             if let Some(key) = property.key.static_name() {
-                push!("key", key.to_string());
+                push!(field_ids::KEY, "key", key.to_string());
             }
         }
         AstKind::UpdateExpression(expression) => {
-            push!("operator", expression.operator.as_str().into());
-            push!("prefix", expression.prefix.to_string());
+            push!(
+                field_ids::OPERATOR,
+                "operator",
+                expression.operator.as_str().into()
+            );
+            push!(field_ids::PREFIX, "prefix", expression.prefix.to_string());
         }
         AstKind::UnaryExpression(expression) => {
-            push!("operator", expression.operator.as_str().into());
-            push!("prefix", "true".into());
+            push!(
+                field_ids::OPERATOR,
+                "operator",
+                expression.operator.as_str().into()
+            );
+            push!(field_ids::PREFIX, "prefix", "true".into());
         }
         AstKind::BinaryExpression(expression) => {
-            push!("operator", expression.operator.as_str().into());
+            push!(
+                field_ids::OPERATOR,
+                "operator",
+                expression.operator.as_str().into()
+            );
         }
         AstKind::LogicalExpression(expression) => {
-            push!("operator", expression.operator.as_str().into());
+            push!(
+                field_ids::OPERATOR,
+                "operator",
+                expression.operator.as_str().into()
+            );
         }
         AstKind::AssignmentExpression(expression) => {
-            push!("operator", expression.operator.as_str().into());
+            push!(
+                field_ids::OPERATOR,
+                "operator",
+                expression.operator.as_str().into()
+            );
         }
         AstKind::CallExpression(call) => {
-            push!("optional", call.optional.to_string());
-            push!("argumentCount", call.arguments.len().to_string());
+            push!(field_ids::OPTIONAL, "optional", call.optional.to_string());
+            push!(
+                field_ids::ARGUMENT_COUNT,
+                "argumentCount",
+                call.arguments.len().to_string()
+            );
             if let Some(identifier) = static_member_root(&call.callee) {
                 if matches!(call.callee, Expression::Identifier(_)) {
-                    push!("calleeName", identifier.name.to_string());
+                    push!(
+                        field_ids::CALLEE_NAME,
+                        "calleeName",
+                        identifier.name.to_string()
+                    );
                 }
                 if let Some(path) = static_member_path(&call.callee) {
-                    push!("calleePath", path);
+                    push!(field_ids::CALLEE_PATH, "calleePath", path);
                 }
                 if let Some(scoping) = scoping {
                     let global = identifier
                         .reference_id
                         .get()
                         .is_some_and(|id| !scoping.has_binding(id));
-                    push!("calleeGlobal", global.to_string());
+                    push!(field_ids::CALLEE_GLOBAL, "calleeGlobal", global.to_string());
                 }
             }
             if let Some(oxc_ast::ast::Argument::StringLiteral(literal)) = call.arguments.first() {
-                push!("staticArgument", literal.value.to_string());
+                push!(
+                    field_ids::STATIC_ARGUMENT,
+                    "staticArgument",
+                    literal.value.to_string()
+                );
             }
         }
         AstKind::NewExpression(call) => {
-            push!("argumentCount", call.arguments.len().to_string());
+            push!(
+                field_ids::ARGUMENT_COUNT,
+                "argumentCount",
+                call.arguments.len().to_string()
+            );
             if let Expression::Identifier(identifier) = &call.callee {
-                push!("calleeName", identifier.name.to_string());
+                push!(
+                    field_ids::CALLEE_NAME,
+                    "calleeName",
+                    identifier.name.to_string()
+                );
             }
             if let Some(oxc_ast::ast::Argument::StringLiteral(literal)) = call.arguments.first() {
-                push!("staticArgument", literal.value.to_string());
+                push!(
+                    field_ids::STATIC_ARGUMENT,
+                    "staticArgument",
+                    literal.value.to_string()
+                );
             }
         }
         AstKind::StaticMemberExpression(member) => {
-            push!("computed", "false".into());
-            push!("property", member.property.name.to_string());
+            push!(field_ids::COMPUTED, "computed", "false".into());
+            push!(
+                field_ids::PROPERTY,
+                "property",
+                member.property.name.to_string()
+            );
             if let Some(path) = static_member_path(&member.object) {
-                push!("memberPath", format!("{path}.{}", member.property.name));
+                push!(
+                    field_ids::MEMBER_PATH,
+                    "memberPath",
+                    format!("{path}.{}", member.property.name)
+                );
             }
             let mut object = &member.object;
             while let Expression::StaticMemberExpression(parent) = object {
                 object = &parent.object;
             }
             if let Expression::Identifier(identifier) = object {
-                push!("rootName", identifier.name.to_string());
+                push!(
+                    field_ids::ROOT_NAME,
+                    "rootName",
+                    identifier.name.to_string()
+                );
                 if let Some(scoping) = scoping {
                     let global = identifier
                         .reference_id
                         .get()
                         .is_some_and(|id| scoping.get_reference(id).symbol_id().is_none());
-                    push!("rootGlobal", global.to_string());
+                    push!(field_ids::ROOT_GLOBAL, "rootGlobal", global.to_string());
                 }
             }
         }
         AstKind::ComputedMemberExpression(member) => {
-            push!("computed", "true".into());
+            push!(field_ids::COMPUTED, "computed", "true".into());
             if let Expression::StringLiteral(property) = &member.expression {
-                push!("property", property.value.to_string());
+                push!(field_ids::PROPERTY, "property", property.value.to_string());
                 if let Some(path) = static_member_path(&member.object) {
-                    push!("memberPath", format!("{path}.{}", property.value));
+                    push!(
+                        field_ids::MEMBER_PATH,
+                        "memberPath",
+                        format!("{path}.{}", property.value)
+                    );
                 }
             }
         }
         AstKind::Function(function) => {
-            push!("nodeKind", format!("{:?}", function.r#type));
-            push!("async", function.r#async.to_string());
-            push!("generator", function.generator.to_string());
-            push!("parameterCount", function.params.items.len().to_string());
+            push!(
+                field_ids::NODE_KIND,
+                "nodeKind",
+                format!("{:?}", function.r#type)
+            );
+            push!(field_ids::ASYNC, "async", function.r#async.to_string());
+            push!(
+                field_ids::GENERATOR,
+                "generator",
+                function.generator.to_string()
+            );
+            push!(
+                field_ids::PARAMETER_COUNT,
+                "parameterCount",
+                function.params.items.len().to_string()
+            );
             if let Some(identifier) = &function.id {
-                push!("name", identifier.name.to_string());
+                push!(field_ids::NAME, "name", identifier.name.to_string());
             }
             if let Some(body) = &function.body {
-                push!("bodyStartByte", (body.span.start + 1).to_string());
-                push!("bodyEndByte", body.span.end.saturating_sub(1).to_string());
+                push!(
+                    field_ids::BODY_START,
+                    "bodyStartByte",
+                    (body.span.start + 1).to_string()
+                );
+                push!(
+                    field_ids::BODY_END,
+                    "bodyEndByte",
+                    body.span.end.saturating_sub(1).to_string()
+                );
             }
         }
         AstKind::ArrowFunctionExpression(function) => {
-            push!("async", function.r#async.to_string());
-            push!("expression", function.expression.to_string());
-            push!("parameterCount", function.params.items.len().to_string());
+            push!(field_ids::ASYNC, "async", function.r#async.to_string());
+            push!(
+                field_ids::EXPRESSION,
+                "expression",
+                function.expression.to_string()
+            );
+            push!(
+                field_ids::PARAMETER_COUNT,
+                "parameterCount",
+                function.params.items.len().to_string()
+            );
             let inset = u32::from(!function.expression);
             push!(
+                field_ids::BODY_START,
                 "bodyStartByte",
                 (function.body.span.start + inset).to_string(),
             );
             push!(
+                field_ids::BODY_END,
                 "bodyEndByte",
                 function.body.span.end.saturating_sub(inset).to_string(),
             );
         }
         AstKind::Class(class) => {
-            push!("nodeKind", format!("{:?}", class.r#type));
+            push!(
+                field_ids::NODE_KIND,
+                "nodeKind",
+                format!("{:?}", class.r#type)
+            );
             if let Some(identifier) = &class.id {
-                push!("name", identifier.name.to_string());
+                push!(field_ids::NAME, "name", identifier.name.to_string());
             }
         }
         AstKind::ImportDeclaration(declaration) => {
-            push!("source", declaration.source.value.to_string());
             push!(
+                field_ids::SOURCE,
+                "source",
+                declaration.source.value.to_string()
+            );
+            push!(
+                field_ids::IMPORT_KIND,
                 "importKind",
                 format!("{:?}", declaration.import_kind).to_ascii_lowercase(),
             );
             push!(
+                field_ids::SPECIFIER_COUNT,
                 "specifierCount",
                 declaration
                     .specifiers
@@ -769,30 +946,40 @@ pub(crate) fn fields(
             );
         }
         AstKind::ImportSpecifier(specifier) => {
-            push!("imported", specifier.imported.name().to_string());
-            push!("local", specifier.local.name.to_string());
             push!(
+                field_ids::IMPORTED,
+                "imported",
+                specifier.imported.name().to_string()
+            );
+            push!(field_ids::LOCAL, "local", specifier.local.name.to_string());
+            push!(
+                field_ids::IMPORT_KIND,
                 "importKind",
                 format!("{:?}", specifier.import_kind).to_ascii_lowercase(),
             );
         }
         AstKind::ImportDefaultSpecifier(specifier) => {
-            push!("imported", "default".into());
-            push!("local", specifier.local.name.to_string());
+            push!(field_ids::IMPORTED, "imported", "default".into());
+            push!(field_ids::LOCAL, "local", specifier.local.name.to_string());
         }
         AstKind::ImportNamespaceSpecifier(specifier) => {
-            push!("imported", "*".into());
-            push!("local", specifier.local.name.to_string());
+            push!(field_ids::IMPORTED, "imported", "*".into());
+            push!(field_ids::LOCAL, "local", specifier.local.name.to_string());
         }
         AstKind::ExportNamedDeclaration(declaration) => {
             if let Some(source) = &declaration.source {
-                push!("source", source.value.to_string());
+                push!(field_ids::SOURCE, "source", source.value.to_string());
             }
             push!(
+                field_ids::EXPORT_KIND,
                 "exportKind",
                 format!("{:?}", declaration.export_kind).to_ascii_lowercase(),
             );
-            push!("specifierCount", declaration.specifiers.len().to_string());
+            push!(
+                field_ids::SPECIFIER_COUNT,
+                "specifierCount",
+                declaration.specifiers.len().to_string()
+            );
         }
         AstKind::ExportDefaultDeclaration(declaration) => {
             let name = match &declaration.declaration {
@@ -806,57 +993,84 @@ pub(crate) fn fields(
                 _ => None,
             };
             if let Some(name) = name {
-                push!("declaredName", name.to_string());
+                push!(field_ids::DECLARED_NAME, "declaredName", name.to_string());
             }
         }
         AstKind::ExportAllDeclaration(declaration) => {
-            push!("source", declaration.source.value.to_string());
+            push!(
+                field_ids::SOURCE,
+                "source",
+                declaration.source.value.to_string()
+            );
             if let Some(exported) = &declaration.exported {
-                push!("exported", exported.name().to_string());
+                push!(field_ids::EXPORTED, "exported", exported.name().to_string());
             }
             push!(
+                field_ids::EXPORT_KIND,
                 "exportKind",
                 format!("{:?}", declaration.export_kind).to_ascii_lowercase(),
             );
         }
         AstKind::ExportSpecifier(specifier) => {
-            push!("local", specifier.local.name().to_string());
-            push!("exported", specifier.exported.name().to_string());
             push!(
+                field_ids::LOCAL,
+                "local",
+                specifier.local.name().to_string()
+            );
+            push!(
+                field_ids::EXPORTED,
+                "exported",
+                specifier.exported.name().to_string()
+            );
+            push!(
+                field_ids::EXPORT_KIND,
                 "exportKind",
                 format!("{:?}", specifier.export_kind).to_ascii_lowercase(),
             );
         }
         AstKind::VariableDeclaration(declaration) => {
-            push!("kind", declaration.kind.to_string());
+            push!(field_ids::KIND, "kind", declaration.kind.to_string());
             push!(
+                field_ids::DECLARATION_COUNT,
                 "declarationCount",
                 declaration.declarations.len().to_string(),
             );
         }
         AstKind::VariableDeclarator(declarator) => {
-            push!("kind", declarator.kind.to_string());
-            push!("hasInitializer", declarator.init.is_some().to_string());
+            push!(field_ids::KIND, "kind", declarator.kind.to_string());
+            push!(
+                field_ids::HAS_INITIALIZER,
+                "hasInitializer",
+                declarator.init.is_some().to_string()
+            );
         }
         AstKind::Directive(directive) => {
-            push!("value", directive.directive.to_string());
+            push!(field_ids::VALUE, "value", directive.directive.to_string());
         }
         AstKind::YieldExpression(expression) => {
-            push!("delegate", expression.delegate.to_string());
+            push!(
+                field_ids::DELEGATE,
+                "delegate",
+                expression.delegate.to_string()
+            );
         }
         AstKind::ImportMeta(_) => {
-            push!("meta", "import".into());
-            push!("property", "meta".into());
+            push!(field_ids::META, "meta", "import".into());
+            push!(field_ids::PROPERTY, "property", "meta".into());
         }
         AstKind::NewTarget(_) => {
-            push!("meta", "new".into());
-            push!("property", "target".into());
+            push!(field_ids::META, "meta", "new".into());
+            push!(field_ids::PROPERTY, "property", "target".into());
         }
         _ => {}
     }
     if let Some(value) = constant_for_kind(kind) {
-        push!("constantKind", value.kind().into());
-        push!("constantValue", value.encode());
+        push!(
+            field_ids::CONSTANT_KIND,
+            "constantKind",
+            value.kind().into()
+        );
+        push!(field_ids::CONSTANT_VALUE, "constantValue", value.encode());
     }
     result
 }

@@ -14,16 +14,15 @@ use crate::event_types::NodeField;
 use crate::generated::event_schema::{
     ast_kind_protocol_id, field_key_id, field_key_name, node_type_name,
 };
-use crate::protocol::manifest::{
-    CompiledManifest, CompiledPredicate, CompiledRoute, CompiledScalar, VisitSide,
-};
+use crate::protocol::constants::FieldMask;
+use crate::protocol::manifest::{CompiledManifest, CompiledPredicate, CompiledScalar, VisitSide};
 use crate::protocol::routed::{PackedWords, encode_routed_envelope};
 use crate::semantic::retained_index::RetainedIndex;
 use crate::sourcemap::function_map::FunctionMapCollector;
 use crate::syntax::classification::source_type;
 
 use super::fields::{
-    fields, packed_fields_direct, packed_scalar, predicate_scalar_type, static_member_path,
+    fields, packed_fields_direct, packed_scalar, predicate_scalar_type, static_member_path_with,
     utf16_index,
 };
 use super::retained::routed_buffer_from_index;
@@ -64,9 +63,10 @@ impl<'a> EventCollector<'a> {
             _ => node.scope_id(),
         };
         let is_root = id.index() == 0;
+        let protocol_id = ast_kind_protocol_id(kind);
         self.retained_index.record(
             id.index() as u32,
-            ast_kind_protocol_id(kind),
+            protocol_id,
             self.utf16
                 .map_or(span.start, |index| index[span.start as usize]),
             self.utf16
@@ -105,29 +105,26 @@ impl<'a> EventCollector<'a> {
         let retain_all_fields = self.retention_capabilities & RETAIN_MODULE_FACTS != 0;
         let retain_structural_fields = self.retention_routes.is_some_and(|manifest| {
             id.index() != 0
+                && !manifest.structural_parent_types.is_empty()
                 && manifest
                     .structural_parent_types
-                    .contains(&ast_kind_protocol_id(self.nodes.parent_kind(id)))
+                    .contains(ast_kind_protocol_id(self.nodes.parent_kind(id)))
         });
-        let protocol_id = ast_kind_protocol_id(kind);
         // A node without requested fields records nothing: an absent range and an empty
         // range read back identically.
-        let requested_fields: &[String] = self.retention_routes.map_or(&[], |manifest| {
-            &manifest.merged_field_names_by_type[protocol_id as usize]
+        let requested = self.retention_routes.map_or(FieldMask::none(), |manifest| {
+            manifest.merged_field_mask_by_type[protocol_id as usize]
         });
-        if retain_all_fields || retain_structural_fields || !requested_fields.is_empty() {
-            let member_path = if let AstKind::StaticMemberExpression(member) = kind {
-                static_member_path(&member.object)
-                    .map(|object| format!("{object}.{}", member.property.name))
-            } else {
-                None
-            };
+        if retain_all_fields || retain_structural_fields || !requested.is_empty() {
             let retained_fields = packed_fields_direct(
                 kind,
                 Some(self.scoping),
                 self.utf16,
-                (!retain_all_fields && !retain_structural_fields).then_some(requested_fields),
-                member_path.as_deref(),
+                if retain_all_fields || retain_structural_fields {
+                    FieldMask::all()
+                } else {
+                    requested
+                },
                 &mut self.retained_string_ids,
             );
             if let Some(retained_fields) = retained_fields {
@@ -495,19 +492,19 @@ impl RoutedEventCollector<'_> {
         {
             return;
         }
-        let fallback_names = &self.manifest.fallback_predicate_names_by_type[protocol_id as usize];
-        let mut predicate_fields = if fallback_names.is_empty() {
+        let fallback_predicates =
+            self.manifest.fallback_predicate_mask_by_type[protocol_id as usize];
+        let mut predicate_fields = if fallback_predicates.is_empty() {
             Vec::new()
         } else {
-            fields(kind, self.scoping, Some(fallback_names))
+            fields(kind, self.scoping, fallback_predicates)
         };
         normalize_routed_fields(&mut predicate_fields, self.utf16);
         let mut matched_route_ids = std::mem::take(&mut self.route_scratch);
         matched_route_ids.clear();
-        // Coalesced manifests make a single payload-carrying matched route the common
-        // case; a union list is built only when distinct payload contracts match at once.
-        let mut payload_route: Option<&CompiledRoute> = None;
-        let mut payload_union: Vec<String> = Vec::new();
+        // Several matched routes may carry different payload contracts; the union of
+        // their selections is a bitwise or, so coalescing costs nothing.
+        let mut payload_mask = FieldMask::none();
         let mut matched_exit_carrier = false;
         for route in candidates
             .iter()
@@ -524,20 +521,7 @@ impl RoutedEventCollector<'_> {
                 } else {
                     matched_exit_carrier = true;
                 }
-                if !route.payload_names.is_empty() {
-                    if payload_route.is_none() && payload_union.is_empty() {
-                        payload_route = Some(route);
-                    } else {
-                        if let Some(previous) = payload_route.take() {
-                            payload_union.extend(previous.payload_names.iter().cloned());
-                        }
-                        for name in &route.payload_names {
-                            if !payload_union.contains(name) {
-                                payload_union.push(name.clone());
-                            }
-                        }
-                    }
-                }
+                payload_mask = payload_mask.union(route.payload_mask);
             }
         }
         if matched_route_ids.is_empty() && !matched_exit_carrier {
@@ -557,18 +541,15 @@ impl RoutedEventCollector<'_> {
             self.route_scratch = matched_route_ids;
             return;
         }
-        let payload_names: &[String] =
-            payload_route.map_or(&payload_union, |route| &route.payload_names);
         let direct_payload = packed_fields_direct(
             kind,
             self.scoping,
             self.utf16,
-            Some(payload_names),
-            None,
+            payload_mask,
             &mut self.string_ids,
         );
-        let mut fallback_payload = if direct_payload.is_none() && !payload_names.is_empty() {
-            fields(kind, self.scoping, Some(payload_names))
+        let mut fallback_payload = if direct_payload.is_none() && !payload_mask.is_empty() {
+            fields(kind, self.scoping, payload_mask)
         } else {
             Vec::new()
         };
@@ -716,9 +697,8 @@ fn direct_predicate_scalar<'a>(
             PredicateScalar::String(Cow::Owned(declarator.kind.to_string())),
         ),
         AstKind::StaticMemberExpression(member) if field == "memberPath" => {
-            static_member_path(&member.object).map(|object| {
-                PredicateScalar::String(Cow::Owned(format!("{object}.{}", member.property.name)))
-            })
+            static_member_path_with(&member.object, Some(&member.property.name))
+                .map(|path| PredicateScalar::String(Cow::Owned(path)))
         }
         AstKind::Function(function) if field == "nodeKind" => Some(PredicateScalar::String(
             Cow::Owned(format!("{:?}", function.r#type)),

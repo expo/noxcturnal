@@ -499,10 +499,11 @@ pub fn transform(
             ));
         }
     }
-    // Decorator syntax necessarily contains `@`. Avoid a whole-program walk
-    // for the common case while leaving the parsed AST authoritative whenever
-    // the token may be present.
-    if source.contains('@') {
+    // Decorator syntax necessarily contains both `@` and the `class` keyword,
+    // because every decorator attaches to a class or a class element. Avoid a
+    // whole-program walk unless both prerequisites hold; the parsed AST stays
+    // authoritative whenever they do.
+    if source.contains('@') && source.contains("class") {
         let mut decorator_detector = DecoratorDetector(false);
         decorator_detector.visit_program(&program);
         ast_traversal_count += 1;
