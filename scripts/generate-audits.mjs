@@ -60,15 +60,14 @@ const representativeBailoutCorpus = {
   name: 'Expo router-e2e iOS Hermes-stable development',
   measurementDate: '2026-07-27',
   modules: 1284,
-  completedNativeFiles: 1167,
+  completedNativeFiles: 1170,
   internalNoxcturnalBailouts: 0,
 };
 const consumerRoutingFrequency = {
   'flow-requires-parser-adapter': 3,
   'worklets-candidate': 1,
   'react-native-codegen': 79,
-  'unsupported-source-extension': 5,
-  'non-module-input': 4,
+  'non-module-input': 6,
 };
 
 const transformOwnership = {
@@ -442,16 +441,16 @@ const performance = {
       note: 'Per-file comparison uses exactly the 1,167 filenames completed by Noxcturnal. The graph totals are reported separately because forced Babel discovers 11 additional modules and emits a larger development bundle.',
     },
     retainedBabelFallback: {
-      files: 89,
-      aggregateMs: 812.928,
-      meanMs: 9.134017,
-      medianMs: 2.563375,
-      p75Ms: 5.415875,
-      p95Ms: 74.823,
-      p99Ms: 93.886417,
-      confidence95Ms: 4.294824,
+      files: 83,
+      aggregateMs: 727.971751,
+      meanMs: 8.770744,
+      medianMs: 2.312458,
+      p75Ms: 5.842625,
+      p95Ms: 72.56875,
+      p99Ms: 87.080042,
+      confidence95Ms: 4.161108,
       primaryReason:
-        '79 React Native Codegen files; remaining files cover Flow adapter, Worklets, and application/configuration boundaries',
+        '79 React Native Codegen files; the remaining files are three Flow adapter boundaries and one Worklets candidate',
     },
     note: 'Cold-cache debug decomposition plus alternating uninstrumented 4/9/6/6/9/4-worker runs. Every run produced the same 1,284 modules and output bytes. Instrumentation overhead remains excluded from the uninstrumented bundle-time samples.',
   },
