@@ -72,6 +72,36 @@ pub(super) fn captured_loop_edits(
                 .push(scoping.symbol_name(symbol_id).to_owned());
         }
     }
+    // Once a loop body is moved into a helper, pass every lexical header
+    // binding through that helper. Even an otherwise-uncaptured header binding
+    // must not be left as a free reference: a later block-scoping rename can
+    // otherwise rebind the moved text to an earlier function-scoped `var`.
+    for captured in loops.values_mut() {
+        for symbol_id in scoping.symbol_ids() {
+            if !scoping
+                .symbol_flags(symbol_id)
+                .contains(SymbolFlags::BlockScopedVariable)
+            {
+                continue;
+            }
+            let declaration_id = scoping.symbol_declaration(symbol_id);
+            let belongs_to_loop = nodes
+                .ancestor_ids(declaration_id)
+                .find(|node_id| nodes.kind(*node_id).is_iteration_statement())
+                == Some(captured.node_id);
+            if belongs_to_loop && nodes.kind(declaration_id).span().start < captured.body_span.start
+            {
+                let name = scoping.symbol_name(symbol_id);
+                if !captured
+                    .header_bindings
+                    .iter()
+                    .any(|binding| binding == name)
+                {
+                    captured.header_bindings.push(name.to_owned());
+                }
+            }
+        }
+    }
     let loop_ids: FxHashSet<NodeId> = loops.keys().copied().collect();
     // Lower every disjoint outermost loop in one edit batch. Inserting a helper
     // before a nested loop whose parent uses it as a single-statement body would

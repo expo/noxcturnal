@@ -136,6 +136,71 @@ pub fn transform(
             rewrite_layers.push(layer);
         }
     }
+    // Lower classes before parameters so arrows in class-field initializers are
+    // first relocated into the constructor that owns their lexical `this`.
+    let focused_private_features =
+        options.private_methods == Some(true) || options.private_property_in_object == Some(true);
+    if options.classes == Some(true) || focused_private_features {
+        for _ in 0..64 {
+            let rewrite_allocator = Allocator::default();
+            let rewrite_source_type = source_type(&filename, &source)?;
+            parse_count += 1;
+            let parsed = timed(debug_performance, &mut parse_ms, || {
+                Parser::new(&rewrite_allocator, &source, rewrite_source_type).parse()
+            });
+            if !parsed.diagnostics.is_empty() {
+                break;
+            }
+            semantic_build_count += 1;
+            ast_traversal_count += 1;
+            let semantic = timed(debug_performance, &mut semantic_build_ms, || {
+                SemanticBuilder::new()
+                    .with_build_nodes(true)
+                    .with_excess_capacity(2.0)
+                    .build(&parsed.program)
+            });
+            if !semantic.diagnostics.is_empty() {
+                break;
+            }
+            let edits = match super::classes::edits(
+                &source,
+                &semantic.semantic,
+                options.classes == Some(true),
+                if options.classes == Some(true) {
+                    options
+                        .class_properties
+                        .filter(|enabled| *enabled)
+                        .map(|_| options.class_properties_loose.unwrap_or(false))
+                } else {
+                    Some(true)
+                },
+                options.class_static_block == Some(true),
+                options
+                    .private_methods
+                    .filter(|enabled| *enabled)
+                    .map(|_| options.private_methods_loose.unwrap_or(false)),
+                options
+                    .private_property_in_object
+                    .filter(|enabled| *enabled)
+                    .map(|_| options.private_property_in_object_loose.unwrap_or(false)),
+                options.helpers_mode.as_deref() == Some("inline"),
+            ) {
+                Ok(edits) => edits,
+                Err(reason) => return Ok(unsupported(reason, [] as [String; 0])),
+            };
+            let Some(edits) = edits else {
+                break;
+            };
+            let pieces = match build_preflight_edits(&source, edits) {
+                Ok(pieces) => pieces,
+                Err(_) => return Ok(unsupported("classes-edit-conflict", [] as [String; 0])),
+            };
+            let (rewritten_source, layer) = render_decoded(&source, &pieces, "boundary");
+            render_count += 1;
+            source = rewritten_source;
+            rewrite_layers.push(layer);
+        }
+    }
     if options.parameters == Some(true) {
         for _ in 0..64 {
             let rewrite_allocator = Allocator::default();
@@ -291,69 +356,6 @@ pub fn transform(
                     rewrite_layers.push(layer);
                 }
             }
-        }
-    }
-    let focused_private_features =
-        options.private_methods == Some(true) || options.private_property_in_object == Some(true);
-    if options.classes == Some(true) || focused_private_features {
-        for _ in 0..64 {
-            let rewrite_allocator = Allocator::default();
-            let rewrite_source_type = source_type(&filename, &source)?;
-            parse_count += 1;
-            let parsed = timed(debug_performance, &mut parse_ms, || {
-                Parser::new(&rewrite_allocator, &source, rewrite_source_type).parse()
-            });
-            if !parsed.diagnostics.is_empty() {
-                break;
-            }
-            semantic_build_count += 1;
-            ast_traversal_count += 1;
-            let semantic = timed(debug_performance, &mut semantic_build_ms, || {
-                SemanticBuilder::new()
-                    .with_build_nodes(true)
-                    .with_excess_capacity(2.0)
-                    .build(&parsed.program)
-            });
-            if !semantic.diagnostics.is_empty() {
-                break;
-            }
-            let edits = match super::classes::edits(
-                &source,
-                &semantic.semantic,
-                options.classes == Some(true),
-                if options.classes == Some(true) {
-                    options
-                        .class_properties
-                        .filter(|enabled| *enabled)
-                        .map(|_| options.class_properties_loose.unwrap_or(false))
-                } else {
-                    Some(true)
-                },
-                options.class_static_block == Some(true),
-                options
-                    .private_methods
-                    .filter(|enabled| *enabled)
-                    .map(|_| options.private_methods_loose.unwrap_or(false)),
-                options
-                    .private_property_in_object
-                    .filter(|enabled| *enabled)
-                    .map(|_| options.private_property_in_object_loose.unwrap_or(false)),
-                options.helpers_mode.as_deref() == Some("inline"),
-            ) {
-                Ok(edits) => edits,
-                Err(reason) => return Ok(unsupported(reason, [] as [String; 0])),
-            };
-            let Some(edits) = edits else {
-                break;
-            };
-            let pieces = match build_preflight_edits(&source, edits) {
-                Ok(pieces) => pieces,
-                Err(_) => return Ok(unsupported("classes-edit-conflict", [] as [String; 0])),
-            };
-            let (rewritten_source, layer) = render_decoded(&source, &pieces, "boundary");
-            render_count += 1;
-            source = rewritten_source;
-            rewrite_layers.push(layer);
         }
     }
     if options.object_rest_spread == Some(true)

@@ -385,7 +385,7 @@ fn lower(
         }
     } else if let Some(super_name) = &super_name {
         body.push_str(&format!(
-            "function {name}(){{if(!(this instanceof {name}))throw new TypeError(\"Cannot call a class as a function\");var _this={CONSTRUCT_PLACEHOLDER}({super_name},arguments,{name});(function(){{{instance_initializers}}}).call(_this);return _this}}"
+            "function {name}(){{if(!(this instanceof {name}))throw new TypeError(\"Cannot call a class as a function\");var _this={CONSTRUCT_PLACEHOLDER}({super_name},arguments,new.target||{name});(function(){{{instance_initializers}}}).call(_this);return _this}}"
         ));
     } else {
         body.push_str(&format!(
@@ -861,7 +861,7 @@ fn derived_constructor(
         Span::new(statement_span.end, body.span.end.saturating_sub(1)),
     );
     Ok(format!(
-        "function {name}{params}{{if(!(this instanceof {name}))throw new TypeError(\"Cannot call a class as a function\");{before}var _this={CONSTRUCT_PLACEHOLDER}({super_name},[{arguments}],{name});(function(){{{instance_initializers}}}).call(_this);var _result=(function(){{{after}}}).apply(_this,arguments);if(_result!==void 0){{if((typeof _result===\"object\"&&_result!==null)||typeof _result===\"function\")return _result;throw new TypeError(\"Derived constructors may only return object or undefined\")}}return _this}}"
+        "function {name}{params}{{if(!(this instanceof {name}))throw new TypeError(\"Cannot call a class as a function\");{before}var _this={CONSTRUCT_PLACEHOLDER}({super_name},[{arguments}],new.target||{name});(function(){{{instance_initializers}}}).call(_this);var _result=(function(){{{after}}}).apply(_this,arguments);if(_result!==void 0){{if((typeof _result===\"object\"&&_result!==null)||typeof _result===\"function\")return _result;throw new TypeError(\"Derived constructors may only return object or undefined\")}}return _this}}"
     ))
 }
 

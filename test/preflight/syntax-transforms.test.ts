@@ -606,6 +606,31 @@ test('classProperties owns loose assignment semantics explicitly', () => {
   assert.deepEqual(run(true), [0, undefined, 2]);
 });
 
+test('class lowering preserves the most-derived prototype through an inheritance chain', () => {
+  const result = transform(
+    'class Root {} class Middle extends Root {} class Leaf extends Middle { method() { return 42 } } var value = new Leaf(); globalThis.result = [value.constructor.name, value instanceof Leaf, value instanceof Middle, value.method()];',
+    'fixture.js',
+    pipeline({ classes: true }),
+  );
+  assert.equal(result.status, 'complete');
+  const context: { result?: unknown } = {};
+  new Function('globalThis', 'require', result.code)(context, runtimeRequire);
+  assert.deepEqual(context.result, ['Leaf', true, true, 42]);
+});
+
+test('class lowering preserves lexical this in field arrows with rest parameters', () => {
+  const result = transform(
+    'class Events { listeners = []; call = (...args) => this.listeners.map(listener => listener(...args)); } var events = new Events(); events.listeners.push(value => value + 1); globalThis.result = events.call(2);',
+    'fixture.js',
+    pipeline({ classes: true, classProperties: { loose: true }, parameters: true }),
+  );
+  assert.equal(result.status, 'complete');
+  const context: { result?: unknown } = {};
+  new Function('globalThis', result.code)(context);
+  assert.deepEqual(context.result, [3]);
+  assert.doesNotMatch(result.code, /var _this\d*=this;[\s\S]*var Events/);
+});
+
 test('runtime helpers deduplicate and avoid source binding collisions', () => {
   const result = transform(
     'var _defineProperty = 7; class Value { first = 1; second = 2; } globalThis.result = [_defineProperty, new Value().first + new Value().second];',
@@ -1044,6 +1069,19 @@ test('native block scoping preserves captured loop bindings and relocated mappin
       name: null,
     },
   );
+});
+
+test('captured-loop helpers preserve colliding header bindings as parameters', () => {
+  const result = transform(
+    'var values = []; for (let ii = 0; ii < 1; ii++) values.push(ii); for (let ii = 0; ii < 2; ii++) { let value = ii; values.push(() => value); } globalThis.result = [values[0], values[1](), values[2]()];',
+    'fixture.js',
+    pipeline({ blockScoping: true }),
+  );
+  assert.equal(result.status, 'complete');
+  const context: { result?: unknown } = {};
+  new Function('globalThis', result.code)(context);
+  assert.deepEqual(context.result, [0, 0, 1]);
+  assert.match(result.code, /_loop\d*\(_ii\)/);
 });
 
 test('native block scoping preserves loop bindings captured by deferred class fields', () => {
