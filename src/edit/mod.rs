@@ -187,13 +187,14 @@ pub fn build(source: &str, commands: Vec<EditCommand>) -> Result<Vec<Piece>> {
     let byte_offsets = if source.is_ascii() {
         None
     } else {
-        let mut offsets = vec![None; source.encode_utf16().count() + 1];
-        let mut utf16 = 0usize;
+        let mut offsets = Vec::with_capacity(source.len() + 1);
         for (byte, character) in source.char_indices() {
-            offsets[utf16] = Some(byte);
-            utf16 += character.len_utf16();
+            offsets.push(byte as u32);
+            if character.len_utf16() == 2 {
+                offsets.push(u32::MAX);
+            }
         }
-        offsets[utf16] = Some(source.len());
+        offsets.push(source.len() as u32);
         Some(offsets)
     };
     let resolve = |offset: u32| -> Result<usize> {
@@ -203,7 +204,8 @@ pub fn build(source: &str, commands: Vec<EditCommand>) -> Result<Vec<Piece>> {
             byte_offsets
                 .as_ref()
                 .and_then(|offsets| offsets.get(offset as usize))
-                .and_then(|offset| *offset)
+                .filter(|offset| **offset != u32::MAX)
+                .map(|offset| *offset as usize)
                 .ok_or_else(|| {
                     Error::new(
                         Status::InvalidArg,

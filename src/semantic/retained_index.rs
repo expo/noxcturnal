@@ -39,10 +39,36 @@ pub struct RetainedIndex {
 
 #[derive(Clone)]
 struct SemanticReference {
-    node_id: u32,
+    node_id_and_flags: u32,
     scope_id: u32,
-    read: bool,
-    write: bool,
+}
+
+const REFERENCE_READ: u32 = 1 << 31;
+const REFERENCE_WRITE: u32 = 1 << 30;
+const REFERENCE_NODE_MASK: u32 = REFERENCE_WRITE - 1;
+
+impl SemanticReference {
+    fn new(node_id: u32, scope_id: u32, read: bool, write: bool) -> Self {
+        debug_assert_eq!(node_id & !REFERENCE_NODE_MASK, 0);
+        Self {
+            node_id_and_flags: node_id
+                | if read { REFERENCE_READ } else { 0 }
+                | if write { REFERENCE_WRITE } else { 0 },
+            scope_id,
+        }
+    }
+
+    fn node_id(&self) -> u32 {
+        self.node_id_and_flags & REFERENCE_NODE_MASK
+    }
+
+    fn read(&self) -> bool {
+        self.node_id_and_flags & REFERENCE_READ != 0
+    }
+
+    fn write(&self) -> bool {
+        self.node_id_and_flags & REFERENCE_WRITE != 0
+    }
 }
 
 struct BindingRecord {
@@ -52,14 +78,26 @@ struct BindingRecord {
 
 struct CallRecord {
     node_id: u32,
-    callee_name_id: u32,
-    callee_global: bool,
-    static_argument: Option<String>,
+    callee_name_id_and_global: u32,
+    static_argument_id: u32,
+}
+
+const CALL_GLOBAL: u32 = 1 << 31;
+const CALL_NAME_MASK: u32 = CALL_GLOBAL - 1;
+
+impl CallRecord {
+    fn callee_name_id(&self) -> u32 {
+        self.callee_name_id_and_global & CALL_NAME_MASK
+    }
+
+    fn callee_global(&self) -> bool {
+        self.callee_name_id_and_global & CALL_GLOBAL != 0
+    }
 }
 
 struct RetainedField {
     key_id: u32,
-    value: RetainedFieldValue,
+    value: u32,
 }
 
 #[derive(Clone, Copy)]
@@ -193,12 +231,12 @@ impl RetainedIndex {
                     return;
                 };
                 let reference = scoping.get_reference(reference_id);
-                let semantic_reference = SemanticReference {
+                let semantic_reference = SemanticReference::new(
                     node_id,
-                    scope_id: node_scope_id,
-                    read: reference.is_read(),
-                    write: reference.is_write(),
-                };
+                    node_scope_id,
+                    reference.is_read(),
+                    reference.is_write(),
+                );
                 let name_id = self.intern_name(identifier.name.as_str());
                 if let Some(symbol_id) = reference.symbol_id() {
                     let binding_scope_id = scoping.symbol_scope_id(symbol_id).index() as u32;
@@ -305,7 +343,7 @@ impl RetainedIndex {
             references: binding
                 .references
                 .iter()
-                .filter(|reference| (!reads || reference.read) && (!writes || reference.write))
+                .filter(|reference| (!reads || reference.read()) && (!writes || reference.write()))
                 .map(|reference| self.native_reference(reference))
                 .collect(),
         }
@@ -340,22 +378,23 @@ impl RetainedIndex {
             })
             .flat_map(|(&(binding_scope_id, name_id), binding)| {
                 binding.references.iter().filter_map(move |reference| {
-                    let start = self.starts[reference.node_id as usize];
-                    let end = self.ends[reference.node_id as usize];
+                    let node_id = reference.node_id();
+                    let start = self.starts[node_id as usize];
+                    let end = self.ends[node_id as usize];
                     (start >= function_start
                         && end <= function_end
                         && scope_contains(scope_parents, function_scope_id, reference.scope_id))
                     .then(|| NativeCaptureReference {
-                        id: reference.node_id,
+                        id: node_id,
                         start,
                         end,
                         scope_id: reference.scope_id,
                         binding_scope_id,
-                        parent_id: self.parent_id(reference.node_id),
-                        parent_type: self.parent_type(reference.node_id),
+                        parent_id: self.parent_id(node_id),
+                        parent_type: self.parent_type(node_id),
                         name: self.names[name_id as usize].as_ref().to_owned(),
-                        read: reference.read,
-                        write: reference.write,
+                        read: reference.read(),
+                        write: reference.write(),
                     })
                 })
             })
@@ -384,14 +423,17 @@ impl RetainedIndex {
         node_id: u32,
         callee_name: &str,
         callee_global: bool,
-        static_argument: Option<String>,
+        static_argument: Option<&str>,
     ) {
         let callee_name_id = self.intern_name(callee_name);
+        debug_assert_eq!(callee_name_id & !CALL_NAME_MASK, 0);
+        let static_argument_id = static_argument
+            .map(|value| self.intern_name(value))
+            .unwrap_or(ABSENT_ID);
         self.calls.push(CallRecord {
             node_id,
-            callee_name_id,
-            callee_global,
-            static_argument,
+            callee_name_id_and_global: callee_name_id | if callee_global { CALL_GLOBAL } else { 0 },
+            static_argument_id,
         });
     }
 
@@ -403,11 +445,7 @@ impl RetainedIndex {
         for pair in words.chunks_exact(2) {
             self.scalar_fields.push(RetainedField {
                 key_id: pair[0],
-                value: if pair[1] & 0xc000_0000 == 0 {
-                    RetainedFieldValue::String(pair[1])
-                } else {
-                    RetainedFieldValue::Packed(pair[1])
-                },
+                value: pair[1],
             });
         }
         ranges[node_id as usize] = (start, (words.len() / 2) as u32);
@@ -450,10 +488,7 @@ impl RetainedIndex {
             ]);
             for field in fields {
                 words.push(field.key_id);
-                words.push(match field.value {
-                    RetainedFieldValue::Packed(value) => value,
-                    RetainedFieldValue::String(id) => id,
-                });
+                words.push(field.value);
             }
         }
         let strings_size: usize = self
@@ -494,32 +529,39 @@ impl RetainedIndex {
         self.calls
             .iter()
             .filter(|call| {
-                call.callee_name_id == callee_name_id
-                    && (!global_only || call.callee_global)
-                    && (!static_arguments || call.static_argument.is_some())
+                call.callee_name_id() == callee_name_id
+                    && (!global_only || call.callee_global())
+                    && (!static_arguments || call.static_argument_id != ABSENT_ID)
             })
             .map(|call| NativeCallFact {
                 id: call.node_id,
                 start: self.starts[call.node_id as usize],
                 end: self.ends[call.node_id as usize],
                 scope_id: self.scope_ids[call.node_id as usize],
-                callee_name: self.names[call.callee_name_id as usize].as_ref().to_owned(),
-                callee_global: call.callee_global,
-                static_argument: call.static_argument.clone(),
+                callee_name: self.names[call.callee_name_id() as usize]
+                    .as_ref()
+                    .to_owned(),
+                callee_global: call.callee_global(),
+                static_argument: (call.static_argument_id != ABSENT_ID).then(|| {
+                    self.names[call.static_argument_id as usize]
+                        .as_ref()
+                        .to_owned()
+                }),
             })
             .collect()
     }
 
     fn native_reference(&self, reference: &SemanticReference) -> NativeSemanticReference {
+        let node_id = reference.node_id();
         NativeSemanticReference {
-            id: reference.node_id,
-            start: self.starts[reference.node_id as usize],
-            end: self.ends[reference.node_id as usize],
+            id: node_id,
+            start: self.starts[node_id as usize],
+            end: self.ends[node_id as usize],
             scope_id: reference.scope_id,
-            parent_id: self.parent_id(reference.node_id),
-            parent_type: self.parent_type(reference.node_id),
-            read: reference.read,
-            write: reference.write,
+            parent_id: self.parent_id(node_id),
+            parent_type: self.parent_type(node_id),
+            read: reference.read(),
+            write: reference.write(),
         }
     }
 
@@ -621,7 +663,13 @@ impl RetainedIndex {
         self.scalar_fields_for(node_id)
             .iter()
             .find(|field| field.key_id == key_id)
-            .map(|field| field.value)
+            .map(|field| {
+                if field.value & 0xc000_0000 == 0 {
+                    RetainedFieldValue::String(field.value)
+                } else {
+                    RetainedFieldValue::Packed(field.value)
+                }
+            })
     }
 
     pub(crate) fn scalar_string(&self, id: u32) -> Option<&str> {
@@ -782,12 +830,6 @@ impl RetainedIndex {
                 })
                 .sum::<usize>()
             + self.calls.capacity() * size_of::<CallRecord>()
-            + self
-                .calls
-                .iter()
-                .filter_map(|call| call.static_argument.as_ref())
-                .map(String::capacity)
-                .sum::<usize>()
             + self.scalar_strings.capacity() * size_of::<String>()
             + self
                 .scalar_strings

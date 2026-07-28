@@ -442,7 +442,7 @@ fn render_into<'a, S: SegmentSink>(
 pub fn render(source: &str, pieces: &[Piece], mode: &str) -> (String, String, Vec<String>) {
     let sink = VlqSink {
         mappings: String::with_capacity(if mode == "character" {
-            source.len() * 5
+            source.len()
         } else {
             source.len() / 16
         }),

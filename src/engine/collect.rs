@@ -91,7 +91,7 @@ impl<'a> EventCollector<'a> {
                 .is_some_and(|reference_id| !self.scoping.has_binding(reference_id));
             let static_argument = match call.arguments.first() {
                 Some(oxc_ast::ast::Argument::StringLiteral(literal)) => {
-                    Some(literal.value.to_string())
+                    Some(literal.value.as_str())
                 }
                 _ => None,
             };

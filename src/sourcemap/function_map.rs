@@ -57,9 +57,9 @@ pub(crate) struct FunctionMapCollector<'a> {
     source: &'a str,
     nodes: &'a AstNodes<'a>,
     encoder: MappingEncoder,
-    stack: Vec<String>,
+    stack: Vec<Rc<str>>,
     tail: Position,
-    tail_name: Option<String>,
+    tail_name: Option<Rc<str>>,
     line_starts: Vec<usize>,
     filename_prefix: Option<String>,
 }
@@ -97,7 +97,7 @@ impl FunctionMapCollector<'_> {
         ) {
             self.advance(self.position(self.frame_span(kind).start));
             let name = self.remove_filename_prefix(self.frame_name(kind));
-            self.stack.push(name);
+            self.stack.push(Rc::from(name));
         }
     }
 
@@ -151,11 +151,11 @@ impl FunctionMapCollector<'_> {
 
     fn advance(&mut self, position: Position) {
         if position_greater(position, self.tail)
-            && let Some(name) = self.stack.last()
-            && self.tail_name.as_ref() != Some(name)
+            && let Some(name) = self.stack.last().cloned()
+            && self.tail_name.as_ref() != Some(&name)
         {
-            self.encoder.push(name, self.tail);
-            self.tail_name = Some(name.clone());
+            self.encoder.push(Rc::clone(&name), self.tail);
+            self.tail_name = Some(name);
         }
         self.tail = position;
     }
@@ -362,12 +362,11 @@ struct MappingEncoder {
 }
 
 impl MappingEncoder {
-    fn push(&mut self, name: &str, position: Position) {
-        let name_index = if let Some(index) = self.name_indexes.get(name) {
+    fn push(&mut self, name: Rc<str>, position: Position) {
+        let name_index = if let Some(index) = self.name_indexes.get(name.as_ref()) {
             *index
         } else {
             let index = self.names.len() as i64;
-            let name: Rc<str> = Rc::from(name);
             self.names.push(Rc::clone(&name));
             self.name_indexes.insert(name, index);
             index
