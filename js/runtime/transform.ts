@@ -103,6 +103,18 @@ function buildRetainedPlan(
   };
 }
 
+/**
+ * What the native Flow erasure did with a file, reported under
+ * `debugPerformance` so the erase/bail split is a number per bundle.
+ */
+interface FlowErasureOutcome {
+  status: 'erased' | 'bailed' | 'unsupported';
+  reason?: string;
+  detail?: string;
+  erasedBytes: number;
+  spanCount: number;
+}
+
 /** Execute a native pipeline synchronously. */
 export function transform(
   source: string,
@@ -119,6 +131,35 @@ export function transform(
   let parser = classifyForTransform(parseFilename, source);
   let adapterMap: NativeVlqMap | null = null;
   let adapterMetadata: Record<string, unknown> | undefined;
+  let flowErasure: FlowErasureOutcome | undefined;
+  // Native erasure runs ahead of the auto-selected adapter. It deletes byte
+  // ranges instead of reprinting, so the file keeps its formatting and the map
+  // it produces is deletion-only. The adapter stays the fallback for proposal
+  // syntax, for a file this Hermes cannot parse, and for a binary built
+  // without the `flow_parser` feature.
+  //
+  // An adapter the caller names by hand wins outright: naming one is how a
+  // caller pins which implementation runs, and silently overriding that would
+  // make the option meaningless.
+  if (!parser.supported && parser.syntax === 'flow' && options.parserAdapter == null) {
+    const erased = native.nativeFlowErase(source, filename);
+    flowErasure = {
+      status: erased.status,
+      reason: erased.reason,
+      detail: erased.detail,
+      erasedBytes: erased.erasedBytes,
+      spanCount: erased.spanCount,
+    };
+    if (erased.status === 'erased' && erased.code != null) {
+      source = erased.code;
+      adapterMap = erased.map ?? null;
+      // Flow files routinely contain JSX, and the erased source still carries
+      // its `@flow` comment, so the syntax has to be declared rather than
+      // re-derived.
+      parseFilename = parserFilename(filename, 'jsx');
+      parser = classifyForTransform(parseFilename, source, 'jsx');
+    }
+  }
   if (!parser.supported) {
     const adapter = selectParserAdapter(options.parserAdapter, parser);
     if (adapter) {
@@ -154,7 +195,13 @@ export function transform(
           prepared.push({ plugin, state: plugin.createState?.(prepareContext) });
         }
       for (const { plugin, state } of prepared) plugin.cleanup?.('bailout', state);
-      return { status: 'bailout', reason: parser.reason, source, diagnostics: [] };
+      return {
+        status: 'bailout',
+        reason: parser.reason,
+        source,
+        diagnostics: [],
+        ...(flowErasure != null && options.debugPerformance ? { metadata: { flowErasure } } : {}),
+      };
     } catch (error) {
       for (const { plugin, state } of prepared) plugin.cleanup?.('error', state);
       throw error;
@@ -197,6 +244,9 @@ export function transform(
   if (options.debugPerformance)
     performanceCounters(metadata).classificationMs = transformStarted - overallStarted;
   if (adapterMetadata != null) metadata.sourceAdapter = adapterMetadata;
+  // The coverage counter the plan asks for: a regression after a Hermes or
+  // React Native bump shows up as a rising bail rate rather than as a slowdown.
+  if (flowErasure != null && options.debugPerformance) metadata.flowErasure = flowErasure;
   const diagnostics: Diagnostic[] = [];
   const intents = new Map<string, IntentRegistration>();
   const provenance = { degradations: 0 };

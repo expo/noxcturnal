@@ -1,6 +1,7 @@
 mod edit;
 mod engine;
 mod event_types;
+mod flow;
 mod generated;
 pub mod preflight;
 mod protocol;
@@ -12,6 +13,7 @@ use napi_derive::napi;
 
 pub use edit::{EditCommand, EditKind, MappingPolicy};
 pub use event_types::ParseClassification;
+pub use flow::NativeFlowErasure;
 pub use sourcemap::function_map::FunctionMap;
 
 #[napi]
@@ -26,6 +28,20 @@ pub fn native_preflight_transform(
     options: preflight::NativePreflightOptions,
 ) -> napi::Result<preflight::NativePreflightResult> {
     preflight::transform::transform(source, filename, options)
+}
+
+/// Erases the Flow syntax in `source` so the ordinary Oxc path can parse it.
+///
+/// Reports `unsupported` when built without the `flow_parser` feature, and
+/// `bailed` when the rules decline the file; either way the caller falls back
+/// to its registered parser adapter.
+#[napi]
+pub fn native_flow_erase(
+    source: String,
+    filename: String,
+    source_map_mode: Option<String>,
+) -> napi::Result<NativeFlowErasure> {
+    flow::erase(&source, &filename, source_map_mode.as_deref())
 }
 
 #[napi]

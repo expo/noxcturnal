@@ -166,6 +166,24 @@ test('spec private feature options retain a structured semantic boundary', () =>
   }
 });
 
+// Bundling `apps/native-component-list` for iOS aborted the Metro worker here:
+// a `MethodDefinition` with no body reached `body.as_ref().unwrap()` in the
+// class lowering, and a panic across the napi boundary takes the process with
+// it rather than failing the file. TypeScript declaration syntax produces these
+// — an overload signature or an `abstract` member — and both reach the lowering
+// because it runs on the pre-strip AST.
+test('bodiless TypeScript methods bail instead of aborting the class lowering', () => {
+  for (const source of [
+    'class Value { read(input: string): void; read(input: unknown) { super.read(input); } }',
+    'abstract class Value { abstract read(): void; write() { return 1; } }',
+    'class Value { constructor(input: string); constructor(input: unknown) {} }',
+  ]) {
+    const result = transform(source, 'fixture.ts', pipeline({ classes: true }));
+    assert.equal(result.status, 'bailout');
+    assert.equal(result.reason, 'syntax:classes-bodiless-method-not-implemented');
+  }
+});
+
 test('native classes lower loose private fields, methods, calls, access, and private-in', () => {
   const source = `
     class Secret {

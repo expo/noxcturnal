@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { classifyForTransform, parserFilename } from '../adapters/classification.js';
 import { parserAdapterCacheDescriptor } from '../adapters/registry.js';
 import type { NativePipeline } from '../contracts/visitor.js';
+import { nativeFlowErasureBuilt } from '../native/binding.js';
 import type { TransformOptions } from '../types.js';
 import { compilePhasePlan } from './compile.js';
 
@@ -53,6 +54,10 @@ export function transformClassificationCacheKey(
           reason: classification.reason,
         },
         parserAdapter: parserAdapterCacheDescriptor(options.parserAdapter, classification),
+        // A Flow file's output depends on whether this binary can erase it
+        // natively, and two builds of the same package version can differ on
+        // that. Only asked when it can matter.
+        flowErasure: classification.syntax === 'flow' ? nativeFlowErasureBuilt() : null,
       }),
     )
     .digest('hex');

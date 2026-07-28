@@ -37,6 +37,7 @@ test('preserves the public package and native ABI surfaces', () => {
     'composeMappings',
     'generateFunctionMap',
     'materializeRoutedBuffer',
+    'nativeFlowErase',
     'nativePreflightTransform',
     'validateExpression',
     'validateStatements',

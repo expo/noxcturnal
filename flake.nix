@@ -38,6 +38,17 @@
                 nodejs_22
                 pnpm
               ]
+              # Only `--features flow_parser` needs these: that feature builds
+              # Hermes through its own CMake, and Hermes' generator scripts are
+              # Python. The default build stays Rust and Node, so a shell
+              # without a C++ toolchain still builds, tests, and releases the
+              # package unchanged.
+              ++ [
+                cmake
+                ninja
+                python3
+                stdenv.cc
+              ]
               ++ platformPackages;
 
             RUST_BACKTRACE = "1";

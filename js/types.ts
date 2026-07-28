@@ -190,6 +190,12 @@ export interface NativeBailoutResult {
   reason: string;
   source: string;
   diagnostics: Diagnostic[];
+  /**
+   * Present only under `debugPerformance`. A Flow file the native erasure
+   * declined and no adapter picked up ends here, and that is exactly the case
+   * the erase/bail coverage counter needs to see.
+   */
+  metadata?: Record<string, unknown>;
 }
 export type TransformResult = NativeTransformResult | NativeBailoutResult;
 

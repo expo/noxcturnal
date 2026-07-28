@@ -190,6 +190,20 @@ interface NativeBinding {
     rootStart?: number,
     rootEnd?: number,
   ): Buffer;
+  nativeFlowErase(
+    source: string,
+    filename: string,
+    sourceMapMode?: string,
+  ): {
+    /** `unsupported` when the binary was built without the `flow_parser` feature. */
+    status: 'erased' | 'bailed' | 'unsupported';
+    code?: string;
+    map?: NativeVlqMap;
+    reason?: string;
+    detail?: string;
+    erasedBytes: number;
+    spanCount: number;
+  };
   generateFunctionMap(source: string, filename: string): FunctionMap;
   validateExpression(code: string, parserMode?: string): void;
   validateStatements(code: string, parserMode?: string): void;
@@ -220,6 +234,20 @@ function platformSuffix(): string {
 }
 export const native = loadBinding();
 export type NativeIndexedSessionBinding = InstanceType<NativeBinding['NativeIndexedSession']>;
+
+let flowErasureBuilt: boolean | undefined;
+
+/**
+ * Whether this binary was built with the `flow_parser` feature.
+ *
+ * Two builds of the same package version produce different output for a Flow
+ * file depending on this, so it belongs in the transform cache key rather than
+ * only in the code path that uses it. Probed once against an empty source.
+ */
+export function nativeFlowErasureBuilt(): boolean {
+  return (flowErasureBuilt ??=
+    native.nativeFlowErase('', 'probe.js', 'none').status !== 'unsupported');
+}
 
 export function nativePreflightOptions(plan: PreflightPlan, debugPerformance = false) {
   return {

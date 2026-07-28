@@ -187,6 +187,17 @@ fn lower(
                 {
                     return Err("classes-private-elements-require-private-transform");
                 }
+                // A method with no body is TypeScript declaration syntax: an
+                // overload signature, or an `abstract` member. It emits no
+                // runtime code, but every site below this loop reaches for
+                // `value.body` and unwraps it, so the class goes to the
+                // fallback rather than each of them guessing. Skipping the
+                // member instead would keep the coverage and is the better
+                // fix; it needs the constructor search and the emission loop
+                // to agree, which is more than this guard is worth.
+                if method.value.body.is_none() {
+                    return Err("classes-bodiless-method-not-implemented");
+                }
             }
             ClassElement::PropertyDefinition(property) => {
                 if matches!(property.key, PropertyKey::PrivateIdentifier(_))

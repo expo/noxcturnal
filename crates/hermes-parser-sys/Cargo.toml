@@ -1,0 +1,17 @@
+[package]
+name = "hermes-parser-sys"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+publish = false
+description = "Raw bindings to the native Hermes parser's extern \"C\" surface"
+links = "hermes_flow_shim"
+
+[lib]
+doctest = false
+
+[build-dependencies]
+cmake = "0.1.54"
+
+[lints]
+workspace = true

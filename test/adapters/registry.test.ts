@@ -51,7 +51,11 @@ test('supports caller-provided parser adapters for unsupported syntax', () => {
     }),
   });
   try {
-    const result = transform('// @flow\nconst value: number = 1', 'fixture.js', pipeline);
+    // Named explicitly: a build with the `flow_parser` feature would otherwise
+    // erase the file natively before any adapter is consulted.
+    const result = transform('// @flow\nconst value: number = 1', 'fixture.js', pipeline, {
+      parserAdapter: 'flow-fixture',
+    });
     assert.equal(result.status, 'complete');
     assert.deepEqual(result.metadata.sourceAdapter, { adapter: true });
     assert.equal(result.code, '// @flow\nconst value = 1');

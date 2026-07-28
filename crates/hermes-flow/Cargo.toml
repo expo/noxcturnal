@@ -1,0 +1,23 @@
+[package]
+name = "hermes-flow"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+publish = false
+description = "Span-based Flow erasure over the Hermes parser's serialized AST buffer"
+
+[lib]
+doctest = false
+
+[features]
+default = []
+# Links the native Hermes parser. Without it the buffer reader and the erasure
+# rules still build and test against recorded fixture buffers, so neither CMake
+# nor a C++ toolchain is needed to work on the reviewable half of this crate.
+parser = ["dep:hermes-parser-sys"]
+
+[dependencies]
+hermes-parser-sys = { path = "../hermes-parser-sys", optional = true }
+
+[lints]
+workspace = true
