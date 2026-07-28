@@ -189,6 +189,7 @@ pub(crate) fn materialize_with_scope_parents(
             ),
         ));
     }
+    let uid_prefix = Some(shortest_uid_prefix(semantic_return.semantic.scoping()));
     let utf16 = (!source.is_ascii()).then(|| utf16_index(source, &allocator));
     let compiled_manifest = initial_route_manifest
         .map(decode_route_manifest)
@@ -257,7 +258,65 @@ pub(crate) fn materialize_with_scope_parents(
         retained_index: collector.retained_index,
         function_map,
         initial_routed_buffer,
+        uid_prefix,
     })
+}
+
+/// Find the shortest `_`/`$` prefix absent from every bound or unresolved name.
+///
+/// The complete binary prefix tree through depth 12 is an 8191-bit stack bitset.
+/// Marking it is allocation-free and one pass over semantic names; almost every
+/// file resolves at depth one or two. The fallback remains exact for a
+/// deliberately adversarial file that occupies all 4096 depth-12 prefixes.
+fn shortest_uid_prefix(scoping: &Scoping) -> String {
+    const DEPTH: usize = 12;
+    let mut occupied = [0u64; 128];
+    // Single-character `_` and `$` namespaces are common conventions and are
+    // disproportionately likely to be introduced by a later transform.
+    occupied[0] = (1 << 1) | (1 << 2);
+    for name in scoping.symbol_names().chain(
+        scoping
+            .root_unresolved_references()
+            .keys()
+            .map(|name| name.as_str()),
+    ) {
+        let mut node = 0usize;
+        for byte in name.bytes().take(DEPTH) {
+            node = match byte {
+                b'_' => node * 2 + 1,
+                b'$' => node * 2 + 2,
+                _ => break,
+            };
+            occupied[node / 64] |= 1 << (node % 64);
+        }
+    }
+    let node = (1..((1usize << (DEPTH + 1)) - 1))
+        .find(|node| occupied[node / 64] & (1 << (node % 64)) == 0);
+    if let Some(mut node) = node {
+        let depth = usize::BITS as usize - (node + 1).leading_zeros() as usize - 1;
+        let mut bytes = [0u8; DEPTH];
+        for index in (0..depth).rev() {
+            bytes[index] = if node % 2 == 1 { b'_' } else { b'$' };
+            node = (node - 1) / 2;
+        }
+        return String::from_utf8(bytes[..depth].to_vec()).expect("ASCII UID prefix");
+    }
+    let mut candidate = "_".repeat(DEPTH + 1);
+    loop {
+        let occupied = scoping.symbol_names().chain(
+            scoping
+                .root_unresolved_references()
+                .keys()
+                .map(|name| name.as_str()),
+        );
+        if !occupied
+            .into_iter()
+            .any(|name| name.starts_with(&candidate))
+        {
+            return candidate;
+        }
+        candidate.push('_');
+    }
 }
 
 pub fn materialize_routed_buffer(

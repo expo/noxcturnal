@@ -1,7 +1,6 @@
 import { parserFilename } from '../adapters/classification.js';
 import { NODE_TYPE_IDS, NODE_TYPES } from '../generated/event-schema.js';
 import { native, type NativeIndexedSessionBinding } from '../native/binding.js';
-import { stableJson } from '../pipeline/cache-key.js';
 import {
   decodeEventBatch,
   decodePackedEnvelope,
@@ -24,12 +23,37 @@ import { commitWithDedupe } from './editor.js';
 import { adaptBindingFact, toNodeView } from './node-utils.js';
 import { alias, querySubscriptions } from '../pipeline/route-utils.js';
 
+/** One allocator spans every native parse of a transform. The native side only
+ * chooses a namespace once; reparses neither rescan names nor lengthen it. */
+export class TransformUidAllocator {
+  #prefix: string | undefined;
+  #uids = new Set<string>();
+
+  get initialized(): boolean {
+    return this.#prefix !== undefined;
+  }
+
+  initialize(prefix: string | null): void {
+    if (this.#prefix === undefined) this.#prefix = prefix ?? '_';
+  }
+
+  generate(hint: string): string {
+    const base = `${this.#prefix ?? '_'}${hint}`;
+    let uid = base;
+    let index = 2;
+    while (this.#uids.has(uid)) uid = `${base}${index++}`;
+    this.#uids.add(uid);
+    return uid;
+  }
+}
+
 export class NativeTransformSession {
   #closed = false;
   #batches = 0;
   #uids = new Set<string>();
+  #sourceIdentifiers: Set<string> | null = null;
   #eventCache: (NativeEvent | undefined)[] = [];
-  #queryCache = new Map<string, QueryResult>();
+  #queryCache = new WeakMap<QueryRequest, QueryResult>();
   #globalReferencesCache = new Map<string, NodeSummary[]>();
   #childrenCache = new Map<number, number[]>();
   #prefetchedChildTypes = new Set<string>();
@@ -56,6 +80,7 @@ export class NativeTransformSession {
     initialManifest?: Buffer,
     buildInitialRoute = true,
     readonly recordNativeCrossing?: (operation: string, instrumentation?: boolean) => void,
+    readonly uidAllocator = new TransformUidAllocator(),
   ) {
     this.#nativeFilename = parserFilename(filename, options.parser);
     // Without a retention plan or function map the native session holds no state, so its
@@ -144,8 +169,7 @@ export class NativeTransformSession {
   }
   query(request: QueryRequest): QueryResult {
     this.#assertOpen();
-    const cacheKey = stableJson(request);
-    const cached = this.#queryCache.get(cacheKey);
+    const cached = this.#queryCache.get(request);
     if (cached) return cached;
     const types = querySubscriptions(request);
     const nodes = types.length
@@ -229,7 +253,7 @@ export class NativeTransformSession {
           .map(adaptBindingFact),
       ),
     };
-    this.#queryCache.set(cacheKey, result);
+    this.#queryCache.set(request, result);
     return result;
   }
   inspect(requests: readonly InspectRequest[]): NodeView[] {
@@ -458,13 +482,26 @@ export class NativeTransformSession {
     return this.#scopeParents;
   }
   generateUid(name = 'temp'): string {
-    const base = `_${name.replace(/[^A-Za-z0-9_$]/g, '') || 'temp'}`;
+    const hint = name.replace(/[^A-Za-z0-9_$]/g, '') || 'temp';
+    // A materialized native session selected this namespace while its semantic
+    // name tables were already hot. Crossing one short string is substantially
+    // cheaper than transferring the identifier table or rescanning source in JS.
+    if (this.#native != null) {
+      if (!this.uidAllocator.initialized) {
+        this.#crossing('uid-prefix');
+        this.uidAllocator.initialize(this.#native.uidPrefix());
+      }
+      return this.uidAllocator.generate(hint);
+    }
+    const base = `_${hint}`;
+    // Stateless sessions have no native semantic data to reuse. Tokenize once
+    // locally, then use O(1) collision checks for every generated candidate.
+    this.#sourceIdentifiers ??= new Set(
+      this.source.match(/[$_\p{ID_Start}][$\u200c\u200d\p{ID_Continue}]*/gu) ?? [],
+    );
     let uid = base;
     let index = 2;
-    // A textual match is deliberately conservative: occurrences in comments, strings, or
-    // longer identifiers can only make the generated name more unique. This avoids widening the
-    // native subscription and transferring every Identifier solely to test a handful of names.
-    while (this.#uids.has(uid) || this.source.includes(uid)) uid = `${base}${index++}`;
+    while (this.#uids.has(uid) || this.#sourceIdentifiers?.has(uid)) uid = `${base}${index++}`;
     this.#uids.add(uid);
     return uid;
   }

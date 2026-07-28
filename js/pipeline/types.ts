@@ -82,6 +82,9 @@ export interface PreparedPhase {
   includeParent: boolean;
   includeScope: boolean;
   retentionCapabilities: number;
+  requiresIndexBase: boolean;
+  structuralParentTypes: readonly string[];
+  runtimeEditEffect: EditEffect;
   compiledRoutes: readonly CompiledRouteTemplate[];
   dispatchRoutes: readonly DispatchRoute[];
   manifest: Buffer;

@@ -27,6 +27,7 @@ pub struct NativeIndexedSession {
     function_map: Option<FunctionMap>,
     initial_route_manifest: Option<Vec<u8>>,
     initial_routed_buffer: Option<Vec<u8>>,
+    uid_prefix: Option<String>,
     initial_routed_served: bool,
     closed: bool,
 }
@@ -62,6 +63,7 @@ impl NativeIndexedSession {
                 retained_index: RetainedIndex::default(),
                 function_map: None,
                 initial_routed_buffer: None,
+                uid_prefix: None,
             }
         } else {
             materialize_with_scope_parents(
@@ -78,6 +80,7 @@ impl NativeIndexedSession {
             retained_index,
             function_map,
             initial_routed_buffer,
+            uid_prefix,
         } = parts;
         Ok(Self {
             source,
@@ -89,6 +92,7 @@ impl NativeIndexedSession {
             function_map,
             initial_route_manifest: initial_route_manifest.map(|manifest| manifest.to_vec()),
             initial_routed_buffer,
+            uid_prefix,
             initial_routed_served: false,
             closed: false,
         })
@@ -290,6 +294,14 @@ impl NativeIndexedSession {
     pub fn binding_index_buffer(&self) -> Result<Buffer> {
         self.ensure_open()?;
         Ok(self.retained_index.binding_index_buffer())
+    }
+
+    /// A short identifier namespace proven absent from every binding and
+    /// unresolved reference while semantics were already resident.
+    #[napi]
+    pub fn uid_prefix(&self) -> Result<Option<String>> {
+        self.ensure_open()?;
+        Ok(self.uid_prefix.clone())
     }
 
     /// Apply a packed edit buffer to the source this session already holds,

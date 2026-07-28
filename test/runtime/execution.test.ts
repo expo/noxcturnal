@@ -298,6 +298,32 @@ test('executes coarse global queries and targeted inspection', () => {
   assert.equal(inspected.global, true);
 });
 
+test('caches queries by request identity without structural serialization', () => {
+  const session = openRetained('globalValue', 'fixture.js');
+  const request = { globals: [{ name: 'globalValue', references: true }] };
+  const first = session.query(request);
+  assert.equal(session.query(request), first);
+  assert.notEqual(session.query({ globals: [{ name: 'globalValue', references: true }] }), first);
+  session.close();
+});
+
+test('indexes source identifiers once for collision-free uid generation', () => {
+  const session = new NativeTransformSession(
+    'const _temp = 1; const _other2 = 2; /* _comment */',
+    'fixture.js',
+  );
+  assert.equal(session.generateUid('temp'), '_temp2');
+  assert.equal(session.generateUid('temp'), '_temp3');
+  assert.equal(session.generateUid('other'), '_other');
+  assert.equal(session.generateUid('comment'), '_comment2');
+  session.close();
+
+  const retained = openRetained('const _nox$existing = external;', 'fixture.js');
+  assert.equal(retained.generateUid('temp'), '__temp');
+  assert.equal(retained.generateUid('temp'), '__temp2');
+  retained.close();
+});
+
 test('conservatively evaluates side-effect-free constant expressions', () => {
   const source = `const a = 1 + 2 * 3; const b = !0 && "yes"; const c = true ? "123" : "x"; const d = sideEffect();`;
   const session = openRetained(source, 'fixture.js');

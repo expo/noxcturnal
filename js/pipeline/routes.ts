@@ -1,4 +1,5 @@
 import { CHILD_ROLES } from '../generated/event-schema.js';
+import { maxEditEffect } from './compile.js';
 import { stableJson } from './cache-key.js';
 import {
   concreteRouteTypes,
@@ -388,6 +389,12 @@ export function preparePhase(phase: PipelinePhase): PreparedPhase {
     includeScope,
     retentionCapabilities,
   );
+  const requiresNativeQueries = activePlugins.some(
+    plugin => (plans.get(plugin)?.queries?.length ?? 0) > 0,
+  );
+  const structuralParentTypes = [
+    ...new Set(activePlugins.flatMap(plugin => Object.keys(plans.get(plugin)?.children ?? {}))),
+  ];
   const prepared: PreparedPhase = {
     activePlugins,
     plans,
@@ -396,6 +403,17 @@ export function preparePhase(phase: PipelinePhase): PreparedPhase {
     includeParent,
     includeScope,
     retentionCapabilities,
+    requiresIndexBase:
+      requiresNativeQueries ||
+      (retentionCapabilities & (RETAIN_CHILDREN | RETAIN_INSPECTION)) !== 0,
+    structuralParentTypes,
+    runtimeEditEffect:
+      phase.editEffect ??
+      maxEditEffect(
+        activePlugins.map(
+          plugin => plans.get(plugin)?.editEffect ?? plugin.editEffect ?? 'whole-program',
+        ),
+      ),
     compiledRoutes: routed.routes,
     dispatchRoutes: routed.dispatchRoutes,
     manifest: routed.manifest,

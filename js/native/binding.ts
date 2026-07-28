@@ -128,6 +128,7 @@ interface NativeBinding {
       }[];
     }[];
     bindingIndexBuffer(): Buffer;
+    uidPrefix(): string | null;
     scopeParentsBuffer(): Buffer;
     queryCaptures(functionId: number): {
       id: number;

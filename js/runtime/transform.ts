@@ -1,6 +1,6 @@
 import { classifyForTransform, parserFilename, sourceHints } from '../adapters/classification.js';
 import { selectParserAdapter } from '../adapters/registry.js';
-import { compilePhasePlan, maxEditEffect } from '../pipeline/compile.js';
+import { compilePhasePlan } from '../pipeline/compile.js';
 import { closeDefinitionScope } from '../pipeline/define.js';
 import type { CompiledRouteTemplate, PreparedPhase } from '../pipeline/types.js';
 import {
@@ -42,7 +42,7 @@ import {
   TransformDecision,
   NativeTransformError,
 } from '../contracts/visitor.js';
-import { NativeTransformSession } from './session.js';
+import { NativeTransformSession, TransformUidAllocator } from './session.js';
 import { commitWithDedupe } from './editor.js';
 
 interface RetainedPlan {
@@ -132,6 +132,7 @@ export function transform(
   closeDefinitionScope();
   const overallStarted = options.debugPerformance ? performance.now() : 0;
   const originalSource = source;
+  const uidAllocator = new TransformUidAllocator();
   let parseFilename = parserFilename(filename, options.parser);
   let parser = classifyForTransform(parseFilename, source);
   let adapterMap: NativeVlqMap | null = null;
@@ -187,6 +188,7 @@ export function transform(
   }
   if (!parser.supported) {
     const prepared: { plugin: NativePlugin<any, any>; state: any }[] = [];
+    let hints: ReadonlySet<string> | undefined;
     try {
       for (const phase of pipeline.phases)
         for (const plugin of phase.plugins ?? []) {
@@ -194,7 +196,7 @@ export function transform(
             filename,
             options,
             parser,
-            sourceHints: sourceHints(source),
+            sourceHints: (hints ??= sourceHints(source)),
             pluginData: options.pluginData,
           };
           prepared.push({ plugin, state: plugin.createState?.(prepareContext) });
@@ -517,17 +519,13 @@ export function transform(
         subscriptions,
         includeParent,
         includeScope,
+        requiresIndexBase,
+        structuralParentTypes,
+        runtimeEditEffect,
         compiledRoutes,
         dispatchRoutes,
         manifest,
       } = prepared;
-      const runtimeEditEffect =
-        phase.editEffect ??
-        maxEditEffect(
-          activePlugins.map(
-            plugin => plans.get(plugin)?.editEffect ?? plugin.editEffect ?? 'whole-program',
-          ),
-        );
       const phaseExecution = options.debugPerformance
         ? {
             name: phase.name,
@@ -569,24 +567,8 @@ export function transform(
       }
       const retained = (chain.plan ??= buildRetainedPlan(prepared, lookahead));
       const { futureSubscriptions, retentionManifest } = retained;
-      const requiresNativeQueries = activePlugins.some(
-        plugin => (plans.get(plugin)?.queries?.length ?? 0) > 0,
-      );
-      const requiresStructuralIndex = activePlugins.some(
-        plugin => Object.keys(plans.get(plugin)?.children ?? {}).length > 0,
-      );
-      const requiresRetainedInspection = activePlugins.some(plugin =>
-        plans
-          .get(plugin)
-          ?.controlFlow?.some(
-            capability =>
-              capability === 'nested-traverse' || capability === 'dynamic-subscriptions',
-          ),
-      );
       const requiresIndex =
-        requiresNativeQueries ||
-        requiresStructuralIndex ||
-        requiresRetainedInspection ||
+        requiresIndexBase ||
         includeParent ||
         includeScope ||
         options.functionMap === true ||
@@ -609,6 +591,7 @@ export function transform(
             ? (operation, instrumentation) =>
                 recordNativeCrossing(metadata, operation, instrumentation)
             : undefined,
+          uidAllocator,
         );
       if (options.debugPerformance)
         performanceCounters(metadata).sessionOpenMs += performance.now() - sessionStarted;
@@ -684,12 +667,9 @@ export function transform(
       }
       if (options.functionMap && nativeFunctionMap == null)
         nativeFunctionMap = session.takeFunctionMap();
-      const childParentTypes = activePlugins.flatMap(plugin =>
-        Object.keys(plans.get(plugin)?.children ?? {}),
-      );
       if (requiresIndex || includeParent || includeScope)
         session.reserveEventCache(batch.nodeCount);
-      if (childParentTypes.length > 0) session.prefetchChildren([], childParentTypes);
+      if (structuralParentTypes.length > 0) session.prefetchChildren([], structuralParentTypes);
       if (batch.includeParent) session.seedSummaries(batch.parentSummaries);
       const dispatcherStarted = options.debugPerformance ? performance.now() : 0;
       const dispatch = createDispatcher(
@@ -712,12 +692,13 @@ export function transform(
       );
       if (options.debugPerformance)
         performanceCounters(metadata).dispatcherSetupMs += performance.now() - dispatcherStarted;
+      let phaseSourceHints: ReadonlySet<string> | undefined;
       for (const plugin of activePlugins) {
         const state = plugin.createState?.({
           filename,
           options,
           parser,
-          sourceHints: sourceHints(observationSource),
+          sourceHints: (phaseSourceHints ??= sourceHints(observationSource)),
           pluginData: options.pluginData,
         });
         allStates.push({ plugin, state });
