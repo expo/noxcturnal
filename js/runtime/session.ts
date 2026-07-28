@@ -497,16 +497,25 @@ export class NativeTransformSession {
   commit(edits: EditCommand[], mode?: string) {
     this.#assertOpen();
     this.#crossing('edit.commit');
+    // A live native session already holds this exact source; commit against it
+    // rather than re-copying the whole source across the boundary. Only the
+    // stateless path (no retained index) has no session to reach.
+    const session = this.#native;
     return commitWithDedupe(edits, data =>
-      native.commitPackedBuffer(this.source, this.#nativeFilename, data, mode),
+      session != null
+        ? session.commitPacked(data, mode)
+        : native.commitPackedBuffer(this.source, this.#nativeFilename, data, mode),
     );
   }
   /** Commit whose map stays a packed decoded layer for later chain composition. */
   commitDecoded(edits: EditCommand[], mode?: string) {
     this.#assertOpen();
     this.#crossing('edit.commit-decoded');
+    const session = this.#native;
     return commitWithDedupe(edits, data =>
-      native.commitDecodedBuffer(this.source, this.#nativeFilename, data, mode),
+      session != null
+        ? session.commitDecoded(data, mode)
+        : native.commitDecodedBuffer(this.source, this.#nativeFilename, data, mode),
     );
   }
   close(): void {

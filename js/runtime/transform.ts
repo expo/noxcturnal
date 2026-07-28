@@ -19,7 +19,11 @@ import {
 } from './metadata.js';
 import { locationOffset } from './path.js';
 import type { IntentRegistration } from './fragments.js';
-import { native, nativePreflightOptions } from '../native/binding.js';
+import {
+  native,
+  nativePreflightOptions,
+  type NativePreflightResultOutput,
+} from '../native/binding.js';
 import { decodeRoutedEnvelope, type RoutedEventBatch } from '../protocol/events.js';
 import { packRouteManifest } from '../protocol/manifest.js';
 import type {
@@ -39,6 +43,7 @@ import {
   NativeTransformError,
 } from '../contracts/visitor.js';
 import { NativeTransformSession } from './session.js';
+import { commitWithDedupe } from './editor.js';
 
 interface RetainedPlan {
   futureSubscriptions: ReadonlySet<string>;
@@ -220,6 +225,37 @@ export function transform(
   }
   const phasePlanMs = options.debugPerformance ? performance.now() - phasePlanStarted : 0;
   let phaseSource = source;
+  // An all-native pipeline has no visitor phase, so it never needs the source
+  // text in JS: the whole run collapses into one `runNativePipeline` crossing,
+  // no resident session object required.
+  const allNative =
+    pipeline.phases.length > 0 &&
+    pipeline.phases.every(phase => phase.native != null) &&
+    phasePlan.every(plan => plan.observes !== 'original');
+  // The resident source: native phases and visitor commits mutate it in place
+  // and accumulate their map layers natively, so the intermediate phase source
+  // and per-phase map layers never cross the boundary — only the final composed
+  // map, and the source text a visitor phase asks for, do. A mixed pipeline needs
+  // it across its JS phases; an all-native one does not.
+  // Visitor-only analysis pipelines never produce a resident layer. Avoid
+  // copying their source into a second native session merely to return it
+  // unchanged at the end; create the session lazily if a visitor actually edits.
+  let pipelineSession =
+    !allNative && pipeline.phases.some(phase => phase.native != null)
+      ? new native.NativePipelineSession(parseFilename, source)
+      : null;
+  // A native phase or commit leaves `phaseSource` stale — the session holds the
+  // truth — so consecutive native phases hand the source along as a resident
+  // handle rather than crossing the whole string out and back. It is only
+  // materialized when a visitor phase reads source text, or for the final result.
+  let phaseSourceStale = false;
+  const currentSource = (): string => {
+    if (phaseSourceStale) {
+      phaseSource = pipelineSession!.sourceText();
+      phaseSourceStale = false;
+    }
+    return phaseSource;
+  };
   let inputMap = options.inputSourceMap ?? null;
   if (adapterMap != null) {
     inputMap =
@@ -238,7 +274,7 @@ export function transform(
   const metadata = createTransformMetadata(
     options.debugPerformance,
     phasePlan,
-    Buffer.byteLength(source),
+    options.debugPerformance ? Buffer.byteLength(source) : 0,
     phasePlanMs,
   );
   if (options.debugPerformance)
@@ -252,9 +288,6 @@ export function transform(
   const provenance = { degradations: 0 };
   const verifier = options.verifyVisitorContracts ? new ContractVerifier() : undefined;
   const allStates: { plugin: NativePlugin<any, any>; state: any }[] = [];
-  // Committed phase mappings in packed decoded form, earliest phase first; the
-  // chain composes and encodes once after the last phase.
-  const mapLayers: Buffer[] = [];
   let openSession: NativeTransformSession | null = null;
   let reusableSession: NativeTransformSession | null = null;
   let reusableRoutedBatch: { manifest: Buffer; batch: RoutedEventBatch } | null = null;
@@ -262,11 +295,169 @@ export function transform(
   let nativeFunctionMap: FunctionMap | null = null;
   const recordedParseCounts = new WeakMap<NativeTransformSession, number>();
   const recordedTraversalCounts = new WeakMap<NativeTransformSession, number>();
+  // Record one native run's per-phase results into diagnostics/metadata and bail
+  // on the first phase that did not complete. Shared by the mixed-pipeline loop
+  // and the all-native single-call path.
+  const recordNativeResults = (
+    results: readonly NativePreflightResultOutput[],
+    batch: readonly { phase: (typeof pipeline.phases)[number]; index: number }[],
+    runWall: number,
+  ): void => {
+    if (options.debugPerformance) {
+      performanceCounters(metadata).nativeTransformMs += runWall;
+      performanceCounters(metadata).nativeAndDecodeMs += runWall;
+      recordNativeCrossing(metadata, 'preflight.transform');
+    }
+    for (let resultIndex = 0; resultIndex < results.length; resultIndex++) {
+      const result = results[resultIndex];
+      const { phase: batchPhase, index } = batch[resultIndex];
+      const complete = result.status === 'complete';
+      if (options.debugPerformance) {
+        const phaseMs =
+          (result.parseMs ?? 0) +
+          (result.semanticBuildMs ?? 0) +
+          (result.customRewriteMs ?? 0) +
+          (result.oxcTransformMs ?? 0) +
+          (result.optimizationMs ?? 0) +
+          (result.codegenAndMapMs ?? 0) +
+          (result.helperDiscoveryMs ?? 0) +
+          (result.helperMaterializationMs ?? 0);
+        const performanceMetadata = metadata.performance as {
+          nativeParses: number;
+          nativeSemanticBuilds: number;
+          nativeAstTraversals: number;
+          nativeRenders: number;
+          nativeParseMs: number;
+          nativeSemanticBuildMs: number;
+          nativeCustomRewriteMs: number;
+          nativeOxcTransformMs: number;
+          nativeOptimizationMs: number;
+          nativeCodegenAndMapMs: number;
+          nativeHelperDiscoveryMs: number;
+          nativeHelperMaterializationMs: number;
+          nativeCrossings: number;
+          reparses: number;
+          renderedBytes: number;
+          mappingSegments: number;
+          phaseExecutions: unknown[];
+        };
+        performanceMetadata.nativeParses += result.parseCount ?? 1;
+        performanceMetadata.nativeSemanticBuilds += result.semanticBuildCount ?? 0;
+        performanceMetadata.nativeAstTraversals += result.astTraversalCount ?? 0;
+        performanceMetadata.nativeRenders += result.renderCount ?? 0;
+        performanceMetadata.nativeParseMs += result.parseMs ?? 0;
+        performanceMetadata.nativeSemanticBuildMs += result.semanticBuildMs ?? 0;
+        performanceMetadata.nativeCustomRewriteMs += result.customRewriteMs ?? 0;
+        performanceMetadata.nativeOxcTransformMs += result.oxcTransformMs ?? 0;
+        performanceMetadata.nativeOptimizationMs += result.optimizationMs ?? 0;
+        performanceMetadata.nativeCodegenAndMapMs += result.codegenAndMapMs ?? 0;
+        performanceMetadata.nativeHelperDiscoveryMs += result.helperDiscoveryMs ?? 0;
+        performanceMetadata.nativeHelperMaterializationMs += result.helperMaterializationMs ?? 0;
+        if (index + 1 < pipeline.phases.length) performanceMetadata.reparses++;
+        performanceMetadata.renderedBytes += result.renderedBytes ?? 0;
+        performanceMetadata.mappingSegments += result.mappingSegments ?? 0;
+        performanceMetadata.phaseExecutions.push({
+          name: batchPhase.name,
+          observes: phasePlan[index].observes,
+          editEffect: 'whole-program',
+          source: 'rendered',
+          reusedParse: false,
+          render: complete ? 'committed' : 'unchanged',
+          nativeTransformMs: phaseMs,
+          nativeParses: result.parseCount ?? 1,
+          nativeSemanticBuilds: result.semanticBuildCount ?? 0,
+          nativeAstTraversals: result.astTraversalCount ?? 0,
+          nativeRenders: result.renderCount ?? 0,
+          nativeParseMs: result.parseMs ?? 0,
+          nativeSemanticBuildMs: result.semanticBuildMs ?? 0,
+          nativeCustomRewriteMs: result.customRewriteMs ?? 0,
+          nativeOxcTransformMs: result.oxcTransformMs ?? 0,
+          nativeOptimizationMs: result.optimizationMs ?? 0,
+          nativeCodegenAndMapMs: result.codegenAndMapMs ?? 0,
+          nativeHelperDiscoveryMs: result.helperDiscoveryMs ?? 0,
+          nativeHelperMaterializationMs: result.helperMaterializationMs ?? 0,
+        });
+        sampleProcessMemory(metadata);
+      }
+      for (const message of result.diagnostics)
+        diagnostics.push({
+          code: complete ? 'native-transform' : 'unsupported',
+          message,
+          phase: batchPhase.name,
+        });
+      if (result.helpersUsed.length > 0)
+        metadata.nativeHelpers = [
+          ...((metadata.nativeHelpers as string[] | undefined) ?? []),
+          ...result.helpersUsed,
+        ];
+      // A native run stops at the first phase that did not complete.
+      if (!complete) throw new Bailout(`${batchPhase.name}:${result.reason ?? 'unsupported'}`);
+    }
+  };
+  // The shared success tail: plugin cleanup, function map, final metadata, and
+  // the completed result. `phaseSource`/`finalMap` are already set by the loop or
+  // the all-native path.
+  const completeResult = (): TransformResult => {
+    for (const { plugin, state } of allStates) plugin.cleanup?.('complete', state);
+    const functionMapStarted = options.debugPerformance ? performance.now() : 0;
+    if (options.debugPerformance && options.functionMap && nativeFunctionMap == null)
+      recordNativeCrossing(metadata, 'function-map.generate');
+    const functionMap = options.functionMap
+      ? (nativeFunctionMap ??
+        native.generateFunctionMap(adapterMap == null ? originalSource : source, parseFilename))
+      : null;
+    if (options.debugPerformance)
+      performanceCounters(metadata).functionMapMs = performance.now() - functionMapStarted;
+    if (options.debugPerformance) {
+      performanceCounters(metadata).totalMs = performance.now() - transformStarted;
+      performanceCounters(metadata).overallMs = performance.now() - overallStarted;
+      sampleProcessMemory(metadata);
+    }
+    // Always-on observability: a count only, so production consumers can notice
+    // weakened maps or stale cross-phase text without debug tracing enabled.
+    if (provenance.degradations > 0) metadata.provenanceDegradations = provenance.degradations;
+    verifier?.finish(diagnostics);
+    return {
+      status: 'complete',
+      code: phaseSource,
+      map: finalMap ?? { mappings: '', names: [] },
+      functionMap,
+      metadata,
+      diagnostics,
+    };
+  };
   try {
+    // All-native fast path: one crossing runs every phase and returns the final
+    // { code, map }. No visitor phase means no source text is needed in JS.
+    if (allNative) {
+      const batch = pipeline.phases.map((phase, index) => ({ phase, index }));
+      const nativeStarted = options.debugPerformance ? performance.now() : 0;
+      const pipelineResult = native.runNativePipeline(
+        parseFilename,
+        source,
+        batch.map(({ phase }) => nativePreflightOptions(phase.native!, options.debugPerformance)),
+        inputMap?.mappings,
+        inputMap?.names,
+      );
+      const runWall = options.debugPerformance ? performance.now() - nativeStarted : 0;
+      recordNativeResults(pipelineResult.results, batch, runWall); // throws on any bail
+      phaseSource = pipelineResult.code!; // every phase completed, else recordNativeResults bailed
+      if (pipelineResult.map != null) {
+        finalMap = pipelineResult.map;
+        if (options.debugPerformance) {
+          recordNativeCrossing(metadata, 'source-map.compose-chain');
+          if (inputMap != null) recordNativeCrossing(metadata, 'source-map.compose-input');
+          (metadata.performance as { mapEncodes: number }).mapEncodes++;
+        }
+      } else if (inputMap != null) {
+        if (options.debugPerformance) recordNativeCrossing(metadata, 'source-map.compose-input');
+        finalMap = inputMap;
+      }
+      return completeResult();
+    }
     for (let phaseIndex = 0; phaseIndex < pipeline.phases.length; phaseIndex++) {
       const phase = pipeline.phases[phaseIndex];
-      const observationSource =
-        phasePlan[phaseIndex].observes === 'original' ? originalSource : phaseSource;
+      const observesOriginal = phasePlan[phaseIndex].observes === 'original';
       if (phase.native != null) {
         reusableSession?.close();
         reusableSession = null;
@@ -274,95 +465,42 @@ export function transform(
         openSession = null;
         if (pendingEdits.length > 0)
           throw new Error(`${phase.name}: native phase received uncommitted visitor edits`);
-        if (observationSource !== phaseSource)
-          throw new Error(`${phase.name}: native phases must observe rendered source`);
-        const nativeStarted = options.debugPerformance ? performance.now() : 0;
-        const result = native.nativePreflightTransform(
-          observationSource,
-          parseFilename,
-          nativePreflightOptions(phase.native, options.debugPerformance),
-        );
-        if (options.debugPerformance) {
-          const elapsed = performance.now() - nativeStarted;
-          performanceCounters(metadata).nativeTransformMs += elapsed;
-          performanceCounters(metadata).nativeAndDecodeMs += elapsed;
-          const performanceMetadata = metadata.performance as {
-            nativeParses: number;
-            nativeSemanticBuilds: number;
-            nativeAstTraversals: number;
-            nativeRenders: number;
-            nativeParseMs: number;
-            nativeSemanticBuildMs: number;
-            nativeCustomRewriteMs: number;
-            nativeOxcTransformMs: number;
-            nativeOptimizationMs: number;
-            nativeCodegenAndMapMs: number;
-            nativeHelperDiscoveryMs: number;
-            nativeHelperMaterializationMs: number;
-            nativeCrossings: number;
-            reparses: number;
-            renderedBytes: number;
-            mappingSegments: number;
-            phaseExecutions: unknown[];
-          };
-          performanceMetadata.nativeParses += result.parseCount ?? 1;
-          performanceMetadata.nativeSemanticBuilds += result.semanticBuildCount ?? 0;
-          performanceMetadata.nativeAstTraversals += result.astTraversalCount ?? 0;
-          performanceMetadata.nativeRenders += result.renderCount ?? 0;
-          performanceMetadata.nativeParseMs += result.parseMs ?? 0;
-          performanceMetadata.nativeSemanticBuildMs += result.semanticBuildMs ?? 0;
-          performanceMetadata.nativeCustomRewriteMs += result.customRewriteMs ?? 0;
-          performanceMetadata.nativeOxcTransformMs += result.oxcTransformMs ?? 0;
-          performanceMetadata.nativeOptimizationMs += result.optimizationMs ?? 0;
-          performanceMetadata.nativeCodegenAndMapMs += result.codegenAndMapMs ?? 0;
-          performanceMetadata.nativeHelperDiscoveryMs += result.helperDiscoveryMs ?? 0;
-          performanceMetadata.nativeHelperMaterializationMs += result.helperMaterializationMs ?? 0;
-          recordNativeCrossing(metadata, 'preflight.transform');
-          if (phaseIndex + 1 < pipeline.phases.length) performanceMetadata.reparses++;
-          performanceMetadata.renderedBytes += Buffer.byteLength(result.code ?? '');
-          performanceMetadata.mappingSegments += result.map ? decodedSegmentCount(result.map) : 0;
-          performanceMetadata.phaseExecutions.push({
-            name: phase.name,
-            observes: phasePlan[phaseIndex].observes,
-            editEffect: 'whole-program',
-            source: 'rendered',
-            reusedParse: false,
-            render: result.status === 'complete' ? 'committed' : 'unchanged',
-            nativeTransformMs: elapsed,
-            nativeParses: result.parseCount ?? 1,
-            nativeSemanticBuilds: result.semanticBuildCount ?? 0,
-            nativeAstTraversals: result.astTraversalCount ?? 0,
-            nativeRenders: result.renderCount ?? 0,
-            nativeParseMs: result.parseMs ?? 0,
-            nativeSemanticBuildMs: result.semanticBuildMs ?? 0,
-            nativeCustomRewriteMs: result.customRewriteMs ?? 0,
-            nativeOxcTransformMs: result.oxcTransformMs ?? 0,
-            nativeOptimizationMs: result.optimizationMs ?? 0,
-            nativeCodegenAndMapMs: result.codegenAndMapMs ?? 0,
-            nativeHelperDiscoveryMs: result.helperDiscoveryMs ?? 0,
-            nativeHelperMaterializationMs: result.helperMaterializationMs ?? 0,
-          });
-          sampleProcessMemory(metadata);
+        // Collect the run of consecutive native phases and execute them in a
+        // single crossing: native phases hand the source and their map layers
+        // along resident, never bouncing back to JS between themselves. The
+        // for-loop's `++` resumes at the first non-native phase after the run.
+        const batch: { phase: (typeof pipeline.phases)[number]; index: number }[] = [];
+        while (phaseIndex < pipeline.phases.length && pipeline.phases[phaseIndex].native != null) {
+          const batchPhase = pipeline.phases[phaseIndex];
+          // A native phase runs on the resident source; observing the original —
+          // once an adapter rewrite or a prior render has diverged it — would run
+          // it on the wrong text. Only a phase that observes the original pays to
+          // materialize the source here; the common case does not.
+          if (phasePlan[phaseIndex].observes === 'original' && originalSource !== currentSource())
+            throw new Error(`${batchPhase.name}: native phases must observe rendered source`);
+          batch.push({ phase: batchPhase, index: phaseIndex });
+          phaseIndex++;
         }
-        for (const message of result.diagnostics)
-          diagnostics.push({
-            code: result.status === 'unsupported' ? 'unsupported' : 'native-transform',
-            message,
-            phase: phase.name,
-          });
-        if (result.status === 'unsupported')
-          throw new Bailout(`${phase.name}:${result.reason ?? 'unsupported'}`);
-        if (result.code == null || result.map == null)
-          throw new Error(`${phase.name}: native transform returned an incomplete result`);
-        phaseSource = result.code;
-        mapLayers.push(result.map);
-        if (result.helpersUsed.length > 0)
-          metadata.nativeHelpers = [
-            ...((metadata.nativeHelpers as string[] | undefined) ?? []),
-            ...result.helpersUsed,
-          ];
+        phaseIndex--;
+        const nativeStarted = options.debugPerformance ? performance.now() : 0;
+        const results = pipelineSession!.runNativePhases(
+          batch.map(({ phase: batchPhase }) =>
+            nativePreflightOptions(batchPhase.native!, options.debugPerformance),
+          ),
+        );
+        const runWall = options.debugPerformance ? performance.now() - nativeStarted : 0;
+        // The rendered source stays resident; materialized lazily only if a later
+        // visitor phase needs its text, or once at the end.
+        if (results.length > 0 && results[results.length - 1].status === 'complete')
+          phaseSourceStale = true;
+        recordNativeResults(results, batch, runWall);
         continue;
       }
+      // A visitor phase reads source text, so materialize the resident source
+      // once for this phase; `observationSource` and the edit-boundary checks
+      // below then compare against a real, current string.
+      const materializedSource = currentSource();
+      const observationSource = observesOriginal ? originalSource : materializedSource;
       if (reusableSession && reusableSession.source !== observationSource) {
         reusableSession.close();
         reusableSession = null;
@@ -672,43 +810,30 @@ export function transform(
         reusableRoutedBatch = { manifest, batch };
         continue;
       }
-      // The sole final layer encodes VLQ directly; any earlier committed layer keeps
-      // its mapping in packed decoded form so the chain encodes once at the end.
-      const decodedLayer = !(isFinalPhase && mapLayers.length === 0);
+      // The edits address the resident source directly, so the commit renders
+      // in the pipeline session: the new source and the map layer stay resident,
+      // and the chain composes once at the end.
       const renderStarted = options.debugPerformance ? performance.now() : 0;
-      const recordCommit = (
-        committed: { edits: EditCommand[]; deduped: number; code: string },
-        segments: number,
-        encoded: boolean,
-      ) => {
+      pipelineSession ??= new native.NativePipelineSession(parseFilename, phaseSource);
+      const residentPipeline = pipelineSession;
+      const committed = commitWithDedupe(effectiveEdits, data =>
+        residentPipeline.commitDecoded(data, options.sourceMapMode),
+      );
+      // The rendered source stays resident; a following native phase reads it
+      // without a crossing, and a following visitor phase materializes it lazily.
+      phaseSourceStale = true;
+      if (options.debugPerformance) {
         performanceCounters(metadata).renderAndMapMs += performance.now() - renderStarted;
         const performanceMetadata = metadata.performance as {
           editCount: number;
           convergentEditsDeduped: number;
           renderedBytes: number;
           mappingSegments: number;
-          mapEncodes: number;
         };
         performanceMetadata.editCount += committed.edits.length;
         performanceMetadata.convergentEditsDeduped += committed.deduped;
-        performanceMetadata.renderedBytes += Buffer.byteLength(committed.code);
-        performanceMetadata.mappingSegments += segments;
-        if (encoded) performanceMetadata.mapEncodes++;
-      };
-      if (decodedLayer) {
-        const committed = session.commitDecoded(effectiveEdits, options.sourceMapMode);
-        phaseSource = committed.code;
-        mapLayers.push(committed.map);
-        if (options.debugPerformance)
-          recordCommit(committed, decodedSegmentCount(committed.map), false);
-      } else {
-        const committed = session.commit(effectiveEdits, options.sourceMapMode);
-        phaseSource = committed.code;
-        // The sole final layer: the pipeline's own map is exactly this commit's map,
-        // pending only input-map composition at the boundary below.
-        finalMap = committed.map;
-        if (options.debugPerformance)
-          recordCommit(committed, countMappingSegments(committed.map.mappings), true);
+        performanceMetadata.renderedBytes += committed.renderedBytes;
+        performanceMetadata.mappingSegments += committed.mappingSegments;
       }
       if (phaseExecution) phaseExecution.render = 'committed';
       pendingEdits = [];
@@ -723,58 +848,33 @@ export function transform(
     }
     reusableSession?.close();
     openSession = null;
-    if (mapLayers.length > 0) {
-      const composeStarted = options.debugPerformance ? performance.now() : 0;
-      if (options.debugPerformance) recordNativeCrossing(metadata, 'source-map.compose-chain');
-      finalMap = native.composeDecodedChain(mapLayers);
+    // The single terminal crossing: the resident source becomes the final code
+    // and every retained layer composes into the final map — with the input map
+    // folded in natively — in one call.
+    if (pipelineSession == null) {
+      // No native phase and no visitor edit: nothing crossed into the resident
+      // pipeline and no map layer needs composing.
+      finalMap = inputMap;
+      return completeResult();
+    }
+    const composeStarted = options.debugPerformance ? performance.now() : 0;
+    const finished = pipelineSession.finish(inputMap?.mappings, inputMap?.names);
+    phaseSource = finished.code;
+    phaseSourceStale = false;
+    if (finished.map != null) {
+      finalMap = finished.map;
       if (options.debugPerformance) {
+        recordNativeCrossing(metadata, 'source-map.compose-chain');
+        if (inputMap != null) recordNativeCrossing(metadata, 'source-map.compose-input');
         performanceCounters(metadata).renderAndMapMs += performance.now() - composeStarted;
         (metadata.performance as { mapEncodes: number }).mapEncodes++;
       }
+    } else if (inputMap != null) {
+      // No pipeline layer: the input/adapter map is the whole map.
+      if (options.debugPerformance) recordNativeCrossing(metadata, 'source-map.compose-input');
+      finalMap = inputMap;
     }
-    // Input source maps compose once at the boundary where they enter.
-    if (inputMap != null) {
-      if (options.debugPerformance && finalMap != null)
-        recordNativeCrossing(metadata, 'source-map.compose-input');
-      finalMap =
-        finalMap == null
-          ? inputMap
-          : {
-              mappings: native.composeMappings(
-                finalMap.mappings,
-                inputMap.mappings,
-                finalMap.names.length,
-              ),
-              names: [...finalMap.names, ...inputMap.names],
-            };
-    }
-    for (const { plugin, state } of allStates) plugin.cleanup?.('complete', state);
-    const functionMapStarted = options.debugPerformance ? performance.now() : 0;
-    if (options.debugPerformance && options.functionMap && nativeFunctionMap == null)
-      recordNativeCrossing(metadata, 'function-map.generate');
-    const functionMap = options.functionMap
-      ? (nativeFunctionMap ??
-        native.generateFunctionMap(adapterMap == null ? originalSource : source, parseFilename))
-      : null;
-    if (options.debugPerformance)
-      performanceCounters(metadata).functionMapMs = performance.now() - functionMapStarted;
-    if (options.debugPerformance) {
-      performanceCounters(metadata).totalMs = performance.now() - transformStarted;
-      performanceCounters(metadata).overallMs = performance.now() - overallStarted;
-      sampleProcessMemory(metadata);
-    }
-    // Always-on observability: a count only, so production consumers can notice
-    // weakened maps or stale cross-phase text without debug tracing enabled.
-    if (provenance.degradations > 0) metadata.provenanceDegradations = provenance.degradations;
-    verifier?.finish(diagnostics);
-    return {
-      status: 'complete',
-      code: phaseSource,
-      map: finalMap ?? { mappings: '', names: [] },
-      functionMap,
-      metadata,
-      diagnostics,
-    };
+    return completeResult();
   } catch (error) {
     openSession?.close();
     const bailout = error instanceof Bailout;
@@ -796,26 +896,4 @@ export function transform(
       (error as Error & { owners?: readonly string[] }).owners,
     );
   }
-}
-
-/** Segment count of a packed decoded layer buffer (see the native layer layout). */
-function decodedSegmentCount(layer: Buffer): number {
-  if (layer.length < 12) return 0;
-  const segmentsOffset = layer.readUInt32LE(4);
-  return (layer.length / 4 - segmentsOffset) / 5;
-}
-
-function countMappingSegments(mappings: string): number {
-  if (mappings.length === 0) return 0;
-  let count = 0;
-  let inSegment = false;
-  for (const character of mappings) {
-    if (character === ',' || character === ';') {
-      inSegment = false;
-    } else if (!inSegment) {
-      count++;
-      inSegment = true;
-    }
-  }
-  return count;
 }

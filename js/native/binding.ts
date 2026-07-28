@@ -3,6 +3,94 @@ import { join } from 'node:path';
 import type { FunctionMap, NativeVlqMap, ParseClassification } from '../types.js';
 import type { PreflightPlan } from '../preflight/types.js';
 
+interface NativePreflightOptionsInput {
+  debugPerformance?: boolean;
+  reactCompiler?: boolean;
+  reactCompilerCompilationMode?: string;
+  reactCompilerPanicThreshold?: string;
+  reactCompilerTarget?: string;
+  reactCompilerEnableResetCacheOnSourceFileChanges?: boolean;
+  reactCompilerCustomOptOutDirectives?: string[];
+  reactRefresh?: boolean;
+  reactRefreshReg?: string;
+  reactRefreshSig?: string;
+  reactRefreshEmitFullSignatures?: boolean;
+  typescript?: string;
+  jsx?: string;
+  jsxImportSource?: string;
+  jsxPragma?: string;
+  jsxPragmaFrag?: string;
+  helpersMode?: string;
+  helpersModuleName?: string;
+  helpersVersion?: string;
+  compact?: boolean;
+  comments?: boolean;
+  constantFolding?: boolean;
+  deadCodeElimination?: boolean;
+  blockScoping?: boolean;
+  classes?: boolean;
+  destructuring?: boolean;
+  destructuringUseBuiltIns?: boolean;
+  parameters?: boolean;
+  forOf?: boolean;
+  explicitResourceManagement?: boolean;
+  classStaticBlock?: boolean;
+  classProperties?: boolean;
+  classPropertiesLoose?: boolean;
+  logicalAssignmentOperators?: boolean;
+  optionalChaining?: boolean;
+  optionalChainingLoose?: boolean;
+  nullishCoalescingOperator?: boolean;
+  nullishCoalescingOperatorLoose?: boolean;
+  exportNamespaceFrom?: boolean;
+  optionalCatchBinding?: boolean;
+  objectRestSpread?: boolean;
+  objectRestSpreadLoose?: boolean;
+  objectRestSpreadUseBuiltIns?: boolean;
+  asyncGeneratorFunctions?: boolean;
+  asyncFunctions?: boolean;
+  exponentiationOperator?: boolean;
+  privateMethods?: boolean;
+  privateMethodsLoose?: boolean;
+  privatePropertyInObject?: boolean;
+  privatePropertyInObjectLoose?: boolean;
+  regexpSticky?: boolean;
+  regexpUnicode?: boolean;
+  regexpUnicodePropertyEscapes?: boolean;
+  regexpDotAll?: boolean;
+  regexpNamedCaptureGroups?: boolean;
+  regexpLookBehind?: boolean;
+  regexpMatchIndices?: boolean;
+  regexpUnicodeSets?: boolean;
+}
+
+export interface NativePreflightResultOutput {
+  status: 'complete' | 'unsupported';
+  reason?: string;
+  /** Present only on the free-function path; the pipeline session keeps it resident. */
+  code?: string;
+  /** Present only on the free-function path; the pipeline session keeps it resident. */
+  map?: Buffer;
+  /** Layer segment count, reported by the pipeline session in place of `map`. */
+  mappingSegments?: number;
+  /** Rendered-code byte length, reported by the pipeline session in place of `code`. */
+  renderedBytes?: number;
+  diagnostics: string[];
+  helpersUsed: string[];
+  parseCount?: number;
+  semanticBuildCount?: number;
+  astTraversalCount?: number;
+  renderCount?: number;
+  parseMs?: number;
+  semanticBuildMs?: number;
+  customRewriteMs?: number;
+  oxcTransformMs?: number;
+  optimizationMs?: number;
+  codegenAndMapMs?: number;
+  helperDiscoveryMs?: number;
+  helperMaterializationMs?: number;
+}
+
 interface NativeBinding {
   NativeIndexedSession: new (
     source: string,
@@ -86,88 +174,50 @@ interface NativeBinding {
       astTraversalCount: number;
     };
     takeFunctionMap(): FunctionMap | null;
+    commitPacked(data: Buffer, sourceMapMode?: string): { code: string; map: NativeVlqMap };
+    commitDecoded(data: Buffer, sourceMapMode?: string): { code: string; map: Buffer };
+  };
+  /**
+   * A transform pipeline's resident source. Native phases and visitor commits
+   * mutate the held source and accumulate map layers natively; only the final
+   * composed map, and the source text a visitor phase asks for, ever cross out.
+   */
+  NativePipelineSession: new (
+    filename: string,
+    source: string,
+  ) => {
+    runNativePhases(optionsList: NativePreflightOptionsInput[]): NativePreflightResultOutput[];
+    commitDecoded(
+      data: Buffer,
+      sourceMapMode?: string,
+    ): { mappingSegments: number; renderedBytes: number };
+    sourceText(): string;
+    finish(
+      inputMappings?: string,
+      inputNames?: string[],
+    ): { code: string; map: NativeVlqMap | null };
   };
   classify(filename: string, source: string): ParseClassification;
   nativePreflightTransform(
     source: string,
     filename: string,
-    options: {
-      debugPerformance?: boolean;
-      reactCompiler?: boolean;
-      reactCompilerCompilationMode?: string;
-      reactCompilerPanicThreshold?: string;
-      reactCompilerTarget?: string;
-      reactCompilerEnableResetCacheOnSourceFileChanges?: boolean;
-      reactCompilerCustomOptOutDirectives?: string[];
-      reactRefresh?: boolean;
-      reactRefreshReg?: string;
-      reactRefreshSig?: string;
-      reactRefreshEmitFullSignatures?: boolean;
-      typescript?: string;
-      jsx?: string;
-      jsxImportSource?: string;
-      jsxPragma?: string;
-      jsxPragmaFrag?: string;
-      helpersMode?: string;
-      helpersModuleName?: string;
-      helpersVersion?: string;
-      compact?: boolean;
-      comments?: boolean;
-      blockScoping?: boolean;
-      classes?: boolean;
-      destructuring?: boolean;
-      destructuringUseBuiltIns?: boolean;
-      parameters?: boolean;
-      forOf?: boolean;
-      explicitResourceManagement?: boolean;
-      classStaticBlock?: boolean;
-      classProperties?: boolean;
-      classPropertiesLoose?: boolean;
-      logicalAssignmentOperators?: boolean;
-      optionalChaining?: boolean;
-      optionalChainingLoose?: boolean;
-      nullishCoalescingOperator?: boolean;
-      nullishCoalescingOperatorLoose?: boolean;
-      exportNamespaceFrom?: boolean;
-      optionalCatchBinding?: boolean;
-      objectRestSpread?: boolean;
-      objectRestSpreadLoose?: boolean;
-      objectRestSpreadUseBuiltIns?: boolean;
-      asyncGeneratorFunctions?: boolean;
-      asyncFunctions?: boolean;
-      exponentiationOperator?: boolean;
-      privateMethods?: boolean;
-      privateMethodsLoose?: boolean;
-      privatePropertyInObject?: boolean;
-      privatePropertyInObjectLoose?: boolean;
-      regexpSticky?: boolean;
-      regexpUnicode?: boolean;
-      regexpUnicodePropertyEscapes?: boolean;
-      regexpDotAll?: boolean;
-      regexpNamedCaptureGroups?: boolean;
-      regexpLookBehind?: boolean;
-      regexpMatchIndices?: boolean;
-      regexpUnicodeSets?: boolean;
-    },
+    options: NativePreflightOptionsInput,
+  ): NativePreflightResultOutput;
+  /**
+   * Run an all-native pipeline (no visitor phases) in a single crossing. The
+   * per-phase results plus the one final `{ code, map }` — `code`/`map` absent
+   * when a phase bailed, so the caller bails on the offending result.
+   */
+  runNativePipeline(
+    filename: string,
+    source: string,
+    optionsList: NativePreflightOptionsInput[],
+    inputMappings?: string,
+    inputNames?: string[],
   ): {
-    status: 'complete' | 'unsupported';
-    reason?: string;
+    results: NativePreflightResultOutput[];
     code?: string;
-    map?: Buffer;
-    diagnostics: string[];
-    helpersUsed: string[];
-    parseCount?: number;
-    semanticBuildCount?: number;
-    astTraversalCount?: number;
-    renderCount?: number;
-    parseMs?: number;
-    semanticBuildMs?: number;
-    customRewriteMs?: number;
-    oxcTransformMs?: number;
-    optimizationMs?: number;
-    codegenAndMapMs?: number;
-    helperDiscoveryMs?: number;
-    helperMaterializationMs?: number;
+    map?: NativeVlqMap | null;
   };
   commitPackedBuffer(
     source: string,
@@ -255,8 +305,17 @@ export function nativeFlowErasureBuilt(): boolean {
     native.nativeFlowErase('', 'probe.js', 'none').status !== 'unsupported');
 }
 
-export function nativePreflightOptions(plan: PreflightPlan, debugPerformance = false) {
-  return {
+const nativePreflightOptionsCache = new WeakMap<PreflightPlan, NativePreflightOptionsInput>();
+const debugNativePreflightOptionsCache = new WeakMap<PreflightPlan, NativePreflightOptionsInput>();
+
+export function nativePreflightOptions(
+  plan: PreflightPlan,
+  debugPerformance = false,
+): NativePreflightOptionsInput {
+  const cache = debugPerformance ? debugNativePreflightOptionsCache : nativePreflightOptionsCache;
+  const cached = cache.get(plan);
+  if (cached != null) return cached;
+  const options: NativePreflightOptionsInput = {
     debugPerformance,
     reactCompiler: plan.reactCompiler != null,
     reactCompilerCompilationMode: plan.reactCompiler?.compilationMode,
@@ -320,4 +379,6 @@ export function nativePreflightOptions(plan: PreflightPlan, debugPerformance = f
     regexpMatchIndices: plan.transforms?.regexpMatchIndices,
     regexpUnicodeSets: plan.transforms?.regexpUnicodeSets,
   };
+  cache.set(plan, options);
+  return options;
 }

@@ -32,8 +32,8 @@ use crate::syntax::classification::source_type;
 
 use super::block_scoping;
 use super::helpers::{
-    custom_helpers_introduced, inline_helpers, validate_custom_runtime_helpers,
-    validate_runtime_helpers,
+    custom_helpers_introduced, helper_adapter_markers, inline_helpers,
+    validate_custom_runtime_helpers, validate_runtime_helpers,
 };
 use super::optimize;
 use super::options::NativePreflightOptions;
@@ -44,6 +44,14 @@ pub struct NativePreflightResult {
     pub reason: Option<String>,
     pub code: Option<String>,
     pub map: Option<Buffer>,
+    /// Segment count of `map`, reported when the map layer is retained natively
+    /// (the pipeline-session path) instead of crossed out as a buffer JS can
+    /// measure. `None` on the free-function path, where JS reads `map` directly.
+    pub mapping_segments: Option<u32>,
+    /// UTF-8 byte length of the rendered code, reported alongside `mapping_segments`
+    /// when the code stays resident so `debugPerformance` can size it without the
+    /// code crossing out.
+    pub rendered_bytes: Option<u32>,
     pub diagnostics: Vec<String>,
     pub helpers_used: Vec<String>,
     pub parse_count: Option<u32>,
@@ -65,7 +73,11 @@ pub fn transform(
     filename: String,
     mut options: NativePreflightOptions,
 ) -> Result<NativePreflightResult> {
-    let original_source = source.clone();
+    // The one thing the original text is needed for downstream is telling which
+    // custom-helper preludes a rewrite *introduced* — seven `contains` checks.
+    // Precompute those booleans now instead of retaining a whole second copy of
+    // the source across the entire transform.
+    let before_helper_markers = helper_adapter_markers(&source);
     let mut parse_count = 0;
     let mut semantic_build_count = 0;
     let mut ast_traversal_count = 0;
@@ -768,7 +780,7 @@ pub fn transform(
         .helpers_module_name
         .as_deref()
         .unwrap_or("@babel/runtime");
-    let custom_helper_requests = custom_helpers_introduced(&original_source, &source);
+    let custom_helper_requests = custom_helpers_introduced(&before_helper_markers, &source);
     let helper_discovery_ms =
         helper_discovery_started.map(|started| started.elapsed().as_secs_f64() * 1_000.0);
     let helper_materialization_started = debug_performance.then(Instant::now);
@@ -856,6 +868,8 @@ pub fn transform(
             None => generated_code,
         }),
         map: Some(layer.into()),
+        mapping_segments: None,
+        rendered_bytes: None,
         diagnostics: Vec::new(),
         helpers_used,
         parse_count: Some(parse_count),
@@ -1393,6 +1407,8 @@ fn unsupported(
         reason: Some(reason.into()),
         code: None,
         map: None,
+        mapping_segments: None,
+        rendered_bytes: None,
         diagnostics: diagnostics
             .into_iter()
             .map(|diagnostic| format!("{diagnostic:?}"))
@@ -1432,6 +1448,8 @@ fn identity_result(
         reason: None,
         code: Some(source),
         map: Some(pack_decoded_layer(&words, &[], line_count).into()),
+        mapping_segments: None,
+        rendered_bytes: None,
         diagnostics: Vec::new(),
         helpers_used: Vec::new(),
         parse_count: Some(parse_count),

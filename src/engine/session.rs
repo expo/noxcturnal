@@ -2,6 +2,8 @@ use napi::{Error, Result, Status, bindgen_prelude::Buffer};
 use napi_derive::napi;
 use rustc_hash::FxHashSet;
 
+use crate::edit::commit::{commit_decoded_buffer, commit_packed_buffer};
+use crate::event_types::{NativeCommitResult, NativeDecodedCommit};
 use crate::generated::event_schema::{
     NODE_TYPE_COUNT, alias_matches, node_type_id, node_type_name,
 };
@@ -288,6 +290,42 @@ impl NativeIndexedSession {
     pub fn binding_index_buffer(&self) -> Result<Buffer> {
         self.ensure_open()?;
         Ok(self.retained_index.binding_index_buffer())
+    }
+
+    /// Apply a packed edit buffer to the source this session already holds,
+    /// returning rendered code and a VLQ map. The free `commitPackedBuffer`
+    /// re-takes `source` by value across the boundary on every call; committing
+    /// against the retained copy removes that whole-source copy-in.
+    #[napi]
+    pub fn commit_packed(
+        &self,
+        data: Buffer,
+        source_map_mode: Option<String>,
+    ) -> Result<NativeCommitResult> {
+        self.ensure_open()?;
+        commit_packed_buffer(
+            &self.source,
+            &self.filename,
+            &data,
+            source_map_mode.as_deref(),
+        )
+    }
+
+    /// As [`commit_packed`], but the map stays a packed decoded layer for later
+    /// chain composition (see `commitDecodedBuffer`).
+    #[napi]
+    pub fn commit_decoded(
+        &self,
+        data: Buffer,
+        source_map_mode: Option<String>,
+    ) -> Result<NativeDecodedCommit> {
+        self.ensure_open()?;
+        commit_decoded_buffer(
+            &self.source,
+            &self.filename,
+            &data,
+            source_map_mode.as_deref(),
+        )
     }
 
     #[napi]

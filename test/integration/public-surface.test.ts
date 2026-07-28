@@ -30,6 +30,7 @@ test('preserves the public package and native ABI surfaces', () => {
     'EditKind',
     'MappingPolicy',
     'NativeIndexedSession',
+    'NativePipelineSession',
     'classify',
     'commitDecodedBuffer',
     'commitPackedBuffer',
@@ -39,6 +40,7 @@ test('preserves the public package and native ABI surfaces', () => {
     'materializeRoutedBuffer',
     'nativeFlowErase',
     'nativePreflightTransform',
+    'runNativePipeline',
     'validateExpression',
     'validateStatements',
   ]);

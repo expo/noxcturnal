@@ -12,6 +12,7 @@ use crate::sourcemap::function_map::FunctionMap;
 
 mod collect;
 mod fields;
+mod pipeline;
 mod retained;
 mod session;
 pub(crate) use collect::materialize_routed_buffer;
