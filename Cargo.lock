@@ -424,6 +424,7 @@ dependencies = [
  "oxc_transformer",
  "regex-syntax",
  "rustc-hash",
+ "self_cell",
 ]
 
 [[package]]
