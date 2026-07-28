@@ -76,11 +76,7 @@ pub(super) fn edits(
             })
         })
     };
-    let mut reserved: FxHashSet<String> = semantic
-        .scoping()
-        .symbol_names()
-        .map(str::to_owned)
-        .collect();
+    let mut reserved = None;
     for (node_id, node) in nodes.iter_enumerated() {
         if !matches!(
             node.kind(),
@@ -93,8 +89,12 @@ pub(super) fn edits(
         }
         match node.kind() {
             AstKind::Function(function) => {
-                if let Some(body) = &function.body {
-                    lower_function(source, function, body, &symbols, &mut reserved, &mut edits)?;
+                if let Some(body) = &function.body
+                    && non_simple(&function.params).is_some()
+                {
+                    let reserved = reserved
+                        .get_or_insert_with(|| scoping.symbol_names().map(str::to_owned).collect());
+                    lower_function(source, function, body, &symbols, reserved, &mut edits)?;
                 }
             }
             AstKind::ArrowFunctionExpression(arrow)
@@ -103,14 +103,10 @@ pub(super) fn edits(
                         .ancestor_ids(node_id)
                         .any(|ancestor| non_simple_arrows.contains(&ancestor)) =>
             {
+                let reserved = reserved
+                    .get_or_insert_with(|| scoping.symbol_names().map(str::to_owned).collect());
                 lower_arrow(
-                    source,
-                    semantic,
-                    node_id,
-                    arrow,
-                    &symbols,
-                    &mut reserved,
-                    &mut edits,
+                    source, semantic, node_id, arrow, &symbols, reserved, &mut edits,
                 )?;
             }
             _ => {}

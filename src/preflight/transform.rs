@@ -481,126 +481,30 @@ pub fn transform(
                 ));
             }
         }
-        // Decorator syntax necessarily contains both `@` and the `class` keyword,
-        // because every decorator attaches to a class or a class element. Avoid a
-        // whole-program walk unless both prerequisites hold; the parsed AST stays
-        // authoritative whenever they do.
-        if source.contains('@') && source.contains("class") {
-            let mut decorator_detector = DecoratorDetector(false);
-            decorator_detector.visit_program(&program);
-            ast_traversal_count += 1;
-            if decorator_detector.0 {
-                return Ok(unsupported("decorators-not-supported", [] as [String; 0]));
-            }
-        }
-        if options.class_properties == Some(true) {
-            let mut detector = PinnedOxcClassFusionDetector::default();
-            detector.visit_program(&program);
-            ast_traversal_count += 1;
-            if options.private_methods != Some(true) && detector.private_method {
-                return Ok(unsupported(
-                    "oxc-class-properties-private-method-fusion",
-                    [] as [String; 0],
-                ));
-            }
-            if options.private_property_in_object != Some(true) && detector.private_in {
-                return Ok(unsupported(
-                    "oxc-class-properties-private-in-fusion",
-                    [] as [String; 0],
-                ));
-            }
-        }
-        if options.regexp_unicode == Some(true)
+        let check_decorators = source.contains('@') && source.contains("class");
+        let check_regexp = options.regexp_unicode == Some(true)
             || options.regexp_unicode_property_escapes == Some(true)
             || options.regexp_dot_all == Some(true)
             || options.regexp_named_capture_groups == Some(true)
             || options.regexp_look_behind == Some(true)
             || options.regexp_match_indices == Some(true)
-            || options.regexp_unicode_sets == Some(true)
-        {
-            let mut detector = RegExpSemanticMismatchDetector::default();
+            || options.regexp_unicode_sets == Some(true);
+        let mut detector = PostconditionDetector {
+            check_decorators,
+            check_class_fusion: options.class_properties == Some(true),
+            check_regexp,
+            check_classes: options.classes == Some(true),
+            check_destructuring: options.destructuring == Some(true),
+            check_parameters: options.parameters == Some(true),
+            check_for_of: options.for_of == Some(true),
+            ..PostconditionDetector::default()
+        };
+        if detector.is_active() {
             detector.visit_program(&program);
             ast_traversal_count += 1;
-            if options.regexp_unicode == Some(true) && detector.unicode {
-                return Ok(unsupported(
-                    "regexp-unicode-semantic-mismatch",
-                    [] as [String; 0],
-                ));
-            }
-            if options.regexp_unicode_property_escapes == Some(true) && detector.unicode_property {
-                return Ok(unsupported(
-                    "regexp-unicode-property-escapes-semantic-mismatch",
-                    [] as [String; 0],
-                ));
-            }
-            if options.regexp_dot_all == Some(true) && detector.dot_all {
-                return Ok(unsupported(
-                    "regexp-dot-all-semantic-mismatch",
-                    [] as [String; 0],
-                ));
-            }
-            if options.regexp_named_capture_groups == Some(true) && detector.named_capture_groups {
-                return Ok(unsupported(
-                    "regexp-named-capture-groups-semantic-mismatch",
-                    [] as [String; 0],
-                ));
-            }
-            if options.regexp_look_behind == Some(true) && detector.look_behind {
-                return Ok(unsupported(
-                    "regexp-look-behind-semantic-mismatch",
-                    [] as [String; 0],
-                ));
-            }
-            if options.regexp_match_indices == Some(true) && detector.match_indices {
-                return Ok(unsupported(
-                    "regexp-match-indices-semantic-mismatch",
-                    [] as [String; 0],
-                ));
-            }
-            if options.regexp_unicode_sets == Some(true) && detector.unicode_sets {
-                return Ok(unsupported(
-                    "regexp-unicode-sets-semantic-mismatch",
-                    [] as [String; 0],
-                ));
-            }
         }
-        if options.classes == Some(true) {
-            let mut detector = ClassesDetector(false);
-            detector.visit_program(&program);
-            ast_traversal_count += 1;
-            if detector.0 {
-                return Ok(unsupported("classes-not-implemented", [] as [String; 0]));
-            }
-        }
-        if options.destructuring == Some(true) {
-            let mut detector = DestructuringDetector(false);
-            detector.visit_program(&program);
-            ast_traversal_count += 1;
-            if detector.0 {
-                return Ok(unsupported(
-                    "destructuring-not-implemented",
-                    [] as [String; 0],
-                ));
-            }
-        }
-        if options.parameters == Some(true) {
-            let mut detector = ParametersDetector(false);
-            detector.visit_program(&program);
-            ast_traversal_count += 1;
-            if detector.0 {
-                return Ok(unsupported(
-                    "parameters-postcondition-failed",
-                    [] as [String; 0],
-                ));
-            }
-        }
-        if options.for_of == Some(true) {
-            let mut detector = ForOfDetector(false);
-            detector.visit_program(&program);
-            ast_traversal_count += 1;
-            if detector.0 {
-                return Ok(unsupported("for-of-not-implemented", [] as [String; 0]));
-            }
+        if let Some(reason) = detector.failure_reason(&options) {
+            return Ok(unsupported(reason, [] as [String; 0]));
         }
         semantic_build_count += 1;
         ast_traversal_count += 1;
@@ -1221,7 +1125,17 @@ impl<'a> Visit<'a> for DecoratorDetector {
 }
 
 #[derive(Default)]
-struct RegExpSemanticMismatchDetector {
+struct PostconditionDetector {
+    check_decorators: bool,
+    check_class_fusion: bool,
+    check_regexp: bool,
+    check_classes: bool,
+    check_destructuring: bool,
+    check_parameters: bool,
+    check_for_of: bool,
+    decorators: bool,
+    private_method: bool,
+    private_in: bool,
     unicode: bool,
     unicode_property: bool,
     dot_all: bool,
@@ -1229,10 +1143,85 @@ struct RegExpSemanticMismatchDetector {
     look_behind: bool,
     match_indices: bool,
     unicode_sets: bool,
+    classes: bool,
+    destructuring: bool,
+    parameters: bool,
+    for_of: bool,
 }
 
-impl<'a> Visit<'a> for RegExpSemanticMismatchDetector {
+impl PostconditionDetector {
+    fn is_active(&self) -> bool {
+        self.check_decorators
+            || self.check_class_fusion
+            || self.check_regexp
+            || self.check_classes
+            || self.check_destructuring
+            || self.check_parameters
+            || self.check_for_of
+    }
+
+    fn failure_reason(&self, options: &NativePreflightOptions) -> Option<&'static str> {
+        if self.check_decorators && self.decorators {
+            Some("decorators-not-supported")
+        } else if self.check_class_fusion
+            && options.private_methods != Some(true)
+            && self.private_method
+        {
+            Some("oxc-class-properties-private-method-fusion")
+        } else if self.check_class_fusion
+            && options.private_property_in_object != Some(true)
+            && self.private_in
+        {
+            Some("oxc-class-properties-private-in-fusion")
+        } else if options.regexp_unicode == Some(true) && self.unicode {
+            Some("regexp-unicode-semantic-mismatch")
+        } else if options.regexp_unicode_property_escapes == Some(true) && self.unicode_property {
+            Some("regexp-unicode-property-escapes-semantic-mismatch")
+        } else if options.regexp_dot_all == Some(true) && self.dot_all {
+            Some("regexp-dot-all-semantic-mismatch")
+        } else if options.regexp_named_capture_groups == Some(true) && self.named_capture_groups {
+            Some("regexp-named-capture-groups-semantic-mismatch")
+        } else if options.regexp_look_behind == Some(true) && self.look_behind {
+            Some("regexp-look-behind-semantic-mismatch")
+        } else if options.regexp_match_indices == Some(true) && self.match_indices {
+            Some("regexp-match-indices-semantic-mismatch")
+        } else if options.regexp_unicode_sets == Some(true) && self.unicode_sets {
+            Some("regexp-unicode-sets-semantic-mismatch")
+        } else if self.check_classes && self.classes {
+            Some("classes-not-implemented")
+        } else if self.check_destructuring && self.destructuring {
+            Some("destructuring-not-implemented")
+        } else if self.check_parameters && self.parameters {
+            Some("parameters-postcondition-failed")
+        } else if self.check_for_of && self.for_of {
+            Some("for-of-not-implemented")
+        } else {
+            None
+        }
+    }
+}
+
+impl<'a> Visit<'a> for PostconditionDetector {
+    fn visit_decorator(&mut self, decorator: &Decorator<'a>) {
+        self.decorators |= self.check_decorators;
+        walk::walk_decorator(self, decorator);
+    }
+
+    fn visit_method_definition(&mut self, method: &MethodDefinition<'a>) {
+        self.private_method |=
+            self.check_class_fusion && matches!(method.key, PropertyKey::PrivateIdentifier(_));
+        walk::walk_method_definition(self, method);
+    }
+
+    fn visit_private_in_expression(&mut self, expression: &PrivateInExpression<'a>) {
+        self.private_in |= self.check_class_fusion;
+        walk::walk_private_in_expression(self, expression);
+    }
+
     fn visit_reg_exp_literal(&mut self, literal: &RegExpLiteral<'a>) {
+        if !self.check_regexp {
+            return;
+        }
         self.unicode |= literal.regex.flags.contains(RegExpFlags::U);
         self.dot_all |= literal.regex.flags.contains(RegExpFlags::S);
         self.match_indices |= literal.regex.flags.contains(RegExpFlags::D);
@@ -1250,27 +1239,47 @@ impl<'a> Visit<'a> for RegExpSemanticMismatchDetector {
         }
         walk::walk_reg_exp_literal(self, literal);
     }
+
+    fn visit_class(&mut self, class: &Class<'a>) {
+        self.classes |= self.check_classes;
+        walk::walk_class(self, class);
+    }
+
+    fn visit_variable_declarator(&mut self, declarator: &VariableDeclarator<'a>) {
+        self.destructuring |= self.check_destructuring && !declarator.id.is_binding_identifier();
+        walk::walk_variable_declarator(self, declarator);
+    }
+
+    fn visit_catch_clause(&mut self, clause: &CatchClause<'a>) {
+        self.destructuring |= self.check_destructuring
+            && clause
+                .param
+                .as_ref()
+                .is_some_and(|param| !param.pattern.is_binding_identifier());
+        walk::walk_catch_clause(self, clause);
+    }
+
+    fn visit_assignment_target_pattern(&mut self, pattern: &AssignmentTargetPattern<'a>) {
+        self.destructuring |= self.check_destructuring;
+        walk::walk_assignment_target_pattern(self, pattern);
+    }
+
+    fn visit_formal_parameters(&mut self, parameters: &FormalParameters<'a>) {
+        self.parameters |= self.check_parameters
+            && (parameters.rest.is_some()
+                || parameters.items.iter().any(|parameter| {
+                    parameter.initializer.is_some() || !parameter.pattern.is_binding_identifier()
+                }));
+        walk::walk_formal_parameters(self, parameters);
+    }
+
+    fn visit_for_of_statement(&mut self, statement: &ForOfStatement<'a>) {
+        self.for_of |= self.check_for_of && !statement.r#await;
+        walk::walk_for_of_statement(self, statement);
+    }
 }
 
 struct ClassFeaturesUnsupportedDetector(bool);
-
-#[derive(Default)]
-struct PinnedOxcClassFusionDetector {
-    private_method: bool,
-    private_in: bool,
-}
-
-impl<'a> Visit<'a> for PinnedOxcClassFusionDetector {
-    fn visit_method_definition(&mut self, method: &MethodDefinition<'a>) {
-        self.private_method |= matches!(method.key, PropertyKey::PrivateIdentifier(_));
-        walk::walk_method_definition(self, method);
-    }
-
-    fn visit_private_in_expression(&mut self, expression: &PrivateInExpression<'a>) {
-        self.private_in = true;
-        walk::walk_private_in_expression(self, expression);
-    }
-}
 
 impl<'a> Visit<'a> for ClassFeaturesUnsupportedDetector {
     fn visit_property_definition(&mut self, property: &PropertyDefinition<'a>) {
@@ -1409,11 +1418,6 @@ fn plan_rewrite(
     }
 }
 
-struct ClassesDetector(bool);
-struct DestructuringDetector(bool);
-struct ParametersDetector(bool);
-struct ForOfDetector(bool);
-
 struct InlineHelperRenamer<'a> {
     binding: &'a str,
 }
@@ -1424,50 +1428,6 @@ impl<'a> VisitMut<'a> for InlineHelperRenamer<'a> {
             identifier.name = self.binding.into();
         }
         walk_mut::walk_identifier_reference(self, identifier);
-    }
-}
-
-impl<'a> Visit<'a> for ClassesDetector {
-    fn visit_class(&mut self, class: &Class<'a>) {
-        self.0 = true;
-        walk::walk_class(self, class);
-    }
-}
-
-impl<'a> Visit<'a> for DestructuringDetector {
-    fn visit_variable_declarator(&mut self, declarator: &VariableDeclarator<'a>) {
-        self.0 |= !declarator.id.is_binding_identifier();
-        walk::walk_variable_declarator(self, declarator);
-    }
-
-    fn visit_catch_clause(&mut self, clause: &CatchClause<'a>) {
-        self.0 |= clause
-            .param
-            .as_ref()
-            .is_some_and(|param| !param.pattern.is_binding_identifier());
-        walk::walk_catch_clause(self, clause);
-    }
-
-    fn visit_assignment_target_pattern(&mut self, pattern: &AssignmentTargetPattern<'a>) {
-        self.0 = true;
-        walk::walk_assignment_target_pattern(self, pattern);
-    }
-}
-
-impl<'a> Visit<'a> for ParametersDetector {
-    fn visit_formal_parameters(&mut self, parameters: &FormalParameters<'a>) {
-        self.0 |= parameters.rest.is_some()
-            || parameters.items.iter().any(|parameter| {
-                parameter.initializer.is_some() || !parameter.pattern.is_binding_identifier()
-            });
-        walk::walk_formal_parameters(self, parameters);
-    }
-}
-
-impl<'a> Visit<'a> for ForOfDetector {
-    fn visit_for_of_statement(&mut self, statement: &ForOfStatement<'a>) {
-        self.0 |= !statement.r#await;
-        walk::walk_for_of_statement(self, statement);
     }
 }
 

@@ -59,6 +59,9 @@ pub(super) fn edits(
             (lower_all_classes || owns_private_method || owns_private_in).then_some(id)
         })
         .collect();
+    if classes.is_empty() {
+        return Ok(None);
+    }
     let mut reserved: FxHashSet<String> = semantic
         .scoping()
         .symbol_names()

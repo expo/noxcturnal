@@ -80,6 +80,9 @@ pub(super) fn captured_loop_edits(
             }
         }
     }
+    if loops.is_empty() {
+        return None;
+    }
     let loop_ids: FxHashSet<NodeId> = loops.keys().copied().collect();
     // Lower every disjoint outermost loop in one edit batch. Inserting a helper
     // before a nested loop whose parent uses it as a single-statement body would
@@ -462,7 +465,7 @@ pub(super) fn prepare(semantic: &Semantic<'_>) -> Result<BlockScopingPlan, &'sta
     if has_captured_loop_binding(semantic) {
         return Err("captured-loop-block-scoping-postcondition-failed");
     }
-    let mut groups: FxHashMap<(ScopeId, String), Vec<SymbolId>> = FxHashMap::default();
+    let mut groups: FxHashMap<(ScopeId, &str), Vec<SymbolId>> = FxHashMap::default();
     let mut used_names: FxHashSet<String> = scoping.symbol_names().map(str::to_owned).collect();
     let mut ancestor_collisions = FxHashSet::default();
 
@@ -487,7 +490,7 @@ pub(super) fn prepare(semantic: &Semantic<'_>) -> Result<BlockScopingPlan, &'sta
             ancestor_collisions.insert(symbol_id);
         }
         groups
-            .entry((target_scope, name.to_owned()))
+            .entry((target_scope, name))
             .or_default()
             .push(symbol_id);
     }

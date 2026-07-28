@@ -22,6 +22,9 @@ pub(super) fn edits(
             _ => None,
         })
         .collect();
+    if loops.is_empty() {
+        return Ok(None);
+    }
     let mut reserved: FxHashSet<String> = semantic
         .scoping()
         .symbol_names()

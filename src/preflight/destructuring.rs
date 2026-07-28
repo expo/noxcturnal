@@ -41,6 +41,25 @@ pub(super) fn edits(
     only_object_rest: bool,
     inline_helpers: bool,
 ) -> Result<Option<Lowering>, &'static str> {
+    let nodes = semantic.nodes();
+    let has_candidate = nodes.iter().any(|node| match node.kind() {
+        AstKind::VariableDeclarator(declarator) => {
+            !declarator.id.is_binding_identifier()
+                && (!only_object_rest || binding_has_object_rest(&declarator.id))
+        }
+        AstKind::CatchClause(clause) => clause.param.as_ref().is_some_and(|param| {
+            !param.pattern.is_binding_identifier()
+                && (!only_object_rest || binding_has_object_rest(&param.pattern))
+        }),
+        AstKind::AssignmentExpression(assignment) => {
+            assignment.left.is_assignment_target_pattern()
+                && (!only_object_rest || assignment_has_object_rest(&assignment.left))
+        }
+        _ => false,
+    });
+    if !has_candidate {
+        return Ok(None);
+    }
     let mut reserved: FxHashSet<String> = semantic
         .scoping()
         .symbol_names()
@@ -65,7 +84,7 @@ pub(super) fn edits(
     // end.
     let mut claimed: Vec<Span> = Vec::new();
     let mut nested_remaining = false;
-    for (node_id, node) in semantic.nodes().iter_enumerated() {
+    for (node_id, node) in nodes.iter_enumerated() {
         let span = node.span();
         claimed.retain(|range| range.end > span.start);
         if claimed
