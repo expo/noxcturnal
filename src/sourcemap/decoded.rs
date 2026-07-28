@@ -1,7 +1,25 @@
+use std::rc::Rc;
+
 use super::{Segment, vlq};
 
-pub(crate) fn pack_decoded_layer(words: &[u32], names: &[String], line_count: u32) -> Vec<u8> {
-    let slab_len: usize = names.iter().map(|name| name.len()).sum();
+pub(crate) struct DecodedLayer {
+    pub(crate) words: Vec<u32>,
+    pub(crate) names: Vec<Rc<str>>,
+    pub(crate) line_count: u32,
+}
+
+impl DecodedLayer {
+    pub(crate) fn pack(&self) -> Vec<u8> {
+        pack_decoded_layer(&self.words, &self.names, self.line_count)
+    }
+}
+
+pub(crate) fn pack_decoded_layer<T: AsRef<str>>(
+    words: &[u32],
+    names: &[T],
+    line_count: u32,
+) -> Vec<u8> {
+    let slab_len: usize = names.iter().map(|name| name.as_ref().len()).sum();
     let padded_slab = slab_len.div_ceil(4) * 4;
     let header_words = 3 + names.len();
     let segments_offset = header_words + padded_slab / 4;
@@ -10,16 +28,48 @@ pub(crate) fn pack_decoded_layer(words: &[u32], names: &[String], line_count: u3
     buffer.extend_from_slice(&(segments_offset as u32).to_le_bytes());
     buffer.extend_from_slice(&line_count.to_le_bytes());
     for name in names {
-        buffer.extend_from_slice(&(name.len() as u32).to_le_bytes());
+        buffer.extend_from_slice(&(name.as_ref().len() as u32).to_le_bytes());
     }
     for name in names {
-        buffer.extend_from_slice(name.as_bytes());
+        buffer.extend_from_slice(name.as_ref().as_bytes());
     }
     buffer.resize(segments_offset * 4, 0);
     for word in words {
         buffer.extend_from_slice(&word.to_le_bytes());
     }
     buffer
+}
+
+fn decoded_map_from_words(words: &[u32], line_count: u32) -> Option<DecodedMap> {
+    if !words.len().is_multiple_of(5) {
+        return None;
+    }
+    let mut segments = Vec::with_capacity(words.len() / 5);
+    let mut line_offsets = Vec::with_capacity(line_count as usize + 2);
+    line_offsets.push(0);
+    for words in words.chunks_exact(5) {
+        let line = words[0] as usize;
+        if line > line_count as usize || line + 1 < line_offsets.len() {
+            return None;
+        }
+        while line_offsets.len() <= line {
+            line_offsets.push(segments.len() as u32);
+        }
+        segments.push(Segment {
+            generated_column: words[1],
+            source: 0,
+            original_line: words[2],
+            original_column: words[3],
+            name: words[4],
+        });
+    }
+    while line_offsets.len() <= line_count as usize + 1 {
+        line_offsets.push(segments.len() as u32);
+    }
+    Some(DecodedMap {
+        segments,
+        line_offsets,
+    })
 }
 
 /// Decoded map in flat form: one segment array plus per-line offsets, so unpacking
@@ -42,7 +92,7 @@ impl DecodedMap {
     }
 }
 
-fn unpack_decoded_layer(data: &[u8]) -> Option<(DecodedMap, Vec<String>)> {
+fn unpack_decoded_layer(data: &[u8]) -> Option<(DecodedMap, Vec<Rc<str>>)> {
     if !data.len().is_multiple_of(4) || data.len() < 12 {
         return None;
     }
@@ -62,7 +112,7 @@ fn unpack_decoded_layer(data: &[u8]) -> Option<(DecodedMap, Vec<String>)> {
     for index in 0..name_count {
         let length = word(3 + index)? as usize;
         let name = data.get(slab_cursor..slab_cursor + length)?;
-        names.push(std::str::from_utf8(name).ok()?.to_owned());
+        names.push(Rc::from(std::str::from_utf8(name).ok()?));
         slab_cursor += length;
     }
     if slab_cursor > segments_offset * 4 {
@@ -83,15 +133,11 @@ fn unpack_decoded_layer(data: &[u8]) -> Option<(DecodedMap, Vec<String>)> {
         }
         let name = word(base + 4)?;
         segments.push(Segment {
-            generated_column: i64::from(word(base + 1)?),
+            generated_column: word(base + 1)?,
             source: 0,
-            original_line: i64::from(word(base + 2)?),
-            original_column: i64::from(word(base + 3)?),
-            name: if name == 0 {
-                None
-            } else {
-                Some(i64::from(name) - 1)
-            },
+            original_line: word(base + 2)?,
+            original_column: word(base + 3)?,
+            name,
         });
     }
     while line_offsets.len() <= line_count + 1 {
@@ -142,9 +188,13 @@ fn compose_decoded(outer: &DecodedMap, inner: &DecodedMap, outer_name_count: u32
                 source: traced.source,
                 original_line: traced.original_line,
                 original_column,
-                name: segment
-                    .name
-                    .or_else(|| traced.name.map(|name| name + i64::from(outer_name_count))),
+                name: if segment.name != 0 {
+                    segment.name
+                } else if traced.name != 0 {
+                    traced.name + outer_name_count
+                } else {
+                    0
+                },
             });
         }
         line_offsets.push(segments.len() as u32);
@@ -167,11 +217,24 @@ fn encode_decoded(map: &DecodedMap) -> String {
             if index > 0 {
                 output.push(',');
             }
-            vlq::encode(segment.generated_column - prev_generated, &mut output);
-            vlq::encode(segment.source - prev_source, &mut output);
-            vlq::encode(segment.original_line - prev_line, &mut output);
-            vlq::encode(segment.original_column - prev_column, &mut output);
-            if let Some(name) = segment.name {
+            vlq::encode(
+                i64::from(segment.generated_column) - i64::from(prev_generated),
+                &mut output,
+            );
+            vlq::encode(
+                i64::from(segment.source) - i64::from(prev_source),
+                &mut output,
+            );
+            vlq::encode(
+                i64::from(segment.original_line) - i64::from(prev_line),
+                &mut output,
+            );
+            vlq::encode(
+                i64::from(segment.original_column) - i64::from(prev_column),
+                &mut output,
+            );
+            if segment.name != 0 {
+                let name = i64::from(segment.name - 1);
                 vlq::encode(name - prev_name, &mut output);
                 prev_name = name;
             }
@@ -196,32 +259,38 @@ pub(crate) fn compose_layer_chain(layers: &[&[u8]]) -> Option<(String, Vec<Strin
         combined.extend(names);
         names = combined;
     }
-    Some((encode_decoded(&map), names))
+    Some((
+        encode_decoded(&map),
+        names
+            .into_iter()
+            .map(|name| name.as_ref().to_owned())
+            .collect(),
+    ))
 }
 
-/// Compose packed phase layers and keep the result in the packed representation
-/// used between native and JavaScript pipeline phases.
-pub(crate) fn compose_packed_layer_chain(layers: &[&[u8]]) -> Option<Vec<u8>> {
-    let mut layers = layers.iter();
-    let (mut map, mut names) = unpack_decoded_layer(layers.next()?)?;
-    for layer in layers {
-        let (outer, outer_names) = unpack_decoded_layer(layer)?;
-        map = compose_decoded(&outer, &map, outer_names.len() as u32);
-        let mut combined = outer_names;
-        combined.extend(names);
-        names = combined;
+/// Compose layers that have not crossed N-API, avoiding pack/unpack at every
+/// rewrite boundary and assembling the cumulative name table only once.
+pub(crate) fn compose_decoded_layers(layers: &[DecodedLayer]) -> Option<Vec<u8>> {
+    let first = layers.first()?;
+    let mut map = decoded_map_from_words(&first.words, first.line_count)?;
+    for layer in &layers[1..] {
+        let outer = decoded_map_from_words(&layer.words, layer.line_count)?;
+        map = compose_decoded(&outer, &map, layer.names.len() as u32);
     }
+    let names: Vec<&str> = layers
+        .iter()
+        .rev()
+        .flat_map(|layer| layer.names.iter().map(AsRef::as_ref))
+        .collect();
     let mut words = Vec::with_capacity(map.segments.len() * 5);
     for line in 0..map.line_count() {
         for segment in map.line(line).unwrap_or_default() {
             words.extend_from_slice(&[
                 line as u32,
-                u32::try_from(segment.generated_column).ok()?,
-                u32::try_from(segment.original_line).ok()?,
-                u32::try_from(segment.original_column).ok()?,
-                segment
-                    .name
-                    .map_or(Some(0), |name| u32::try_from(name + 1).ok())?,
+                segment.generated_column,
+                segment.original_line,
+                segment.original_column,
+                segment.name,
             ]);
         }
     }

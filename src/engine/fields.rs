@@ -1,7 +1,10 @@
 use oxc_allocator::{Allocator, Vec as ArenaVec};
 use oxc_ast::{
     AstKind,
-    ast::{ExportDefaultDeclarationKind, Expression, IdentifierReference},
+    ast::{
+        ClassType, ExportDefaultDeclarationKind, Expression, FunctionType, IdentifierReference,
+        ImportOrExportKind, PropertyKind, VariableDeclarationKind,
+    },
 };
 use oxc_semantic::Scoping;
 use rustc_hash::FxHashMap;
@@ -77,6 +80,47 @@ pub(crate) fn intern_packed(strings: &mut FxHashMap<String, u32>, value: &str) -
     let id = strings.len() as u32;
     strings.insert(value.to_owned(), id);
     id
+}
+
+fn property_kind(kind: PropertyKind) -> &'static str {
+    match kind {
+        PropertyKind::Init => "init",
+        PropertyKind::Get => "get",
+        PropertyKind::Set => "set",
+    }
+}
+
+fn function_kind(kind: FunctionType) -> &'static str {
+    match kind {
+        FunctionType::FunctionDeclaration => "FunctionDeclaration",
+        FunctionType::FunctionExpression => "FunctionExpression",
+        FunctionType::TSDeclareFunction => "TSDeclareFunction",
+        FunctionType::TSEmptyBodyFunctionExpression => "TSEmptyBodyFunctionExpression",
+    }
+}
+
+fn class_kind(kind: ClassType) -> &'static str {
+    match kind {
+        ClassType::ClassDeclaration => "ClassDeclaration",
+        ClassType::ClassExpression => "ClassExpression",
+    }
+}
+
+fn import_export_kind(kind: ImportOrExportKind) -> &'static str {
+    match kind {
+        ImportOrExportKind::Value => "value",
+        ImportOrExportKind::Type => "type",
+    }
+}
+
+fn variable_kind(kind: VariableDeclarationKind) -> &'static str {
+    match kind {
+        VariableDeclarationKind::Var => "var",
+        VariableDeclarationKind::Let => "let",
+        VariableDeclarationKind::Const => "const",
+        VariableDeclarationKind::Using => "using",
+        VariableDeclarationKind::AwaitUsing => "await using",
+    }
 }
 
 pub(crate) fn static_member_path(expression: &Expression<'_>) -> Option<String> {
@@ -238,8 +282,8 @@ pub(crate) fn packed_fields_direct(
         }
         AstKind::ObjectProperty(property) => {
             if wants(field_ids::KIND) {
-                let kind = format!("{:?}", property.kind).to_ascii_lowercase();
-                let kind = intern_packed(strings, &kind);
+                let kind = property_kind(property.kind);
+                let kind = intern_packed(strings, kind);
                 push(field_ids::KIND, kind);
             }
             push(
@@ -393,8 +437,8 @@ pub(crate) fn packed_fields_direct(
         }
         AstKind::Function(function) => {
             if wants(field_ids::NODE_KIND) {
-                let node_kind = format!("{:?}", function.r#type);
-                let node_kind = intern_packed(strings, &node_kind);
+                let node_kind = function_kind(function.r#type);
+                let node_kind = intern_packed(strings, node_kind);
                 push(field_ids::NODE_KIND, node_kind);
             }
             push(field_ids::ASYNC, 0x8000_0000 | u32::from(function.r#async));
@@ -449,8 +493,8 @@ pub(crate) fn packed_fields_direct(
         }
         AstKind::Class(class) => {
             if wants(field_ids::NODE_KIND) {
-                let node_kind = format!("{:?}", class.r#type);
-                let node_kind = intern_packed(strings, &node_kind);
+                let node_kind = class_kind(class.r#type);
+                let node_kind = intern_packed(strings, node_kind);
                 push(field_ids::NODE_KIND, node_kind);
             }
             if wants(field_ids::NAME)
@@ -466,8 +510,8 @@ pub(crate) fn packed_fields_direct(
                 push(field_ids::SOURCE, source);
             }
             if wants(field_ids::IMPORT_KIND) {
-                let import_kind = format!("{:?}", declaration.import_kind).to_ascii_lowercase();
-                let import_kind = intern_packed(strings, &import_kind);
+                let import_kind = import_export_kind(declaration.import_kind);
+                let import_kind = intern_packed(strings, import_kind);
                 push(field_ids::IMPORT_KIND, import_kind);
             }
             push(
@@ -489,8 +533,8 @@ pub(crate) fn packed_fields_direct(
                 push(field_ids::LOCAL, local);
             }
             if wants(field_ids::IMPORT_KIND) {
-                let import_kind = format!("{:?}", specifier.import_kind).to_ascii_lowercase();
-                let import_kind = intern_packed(strings, &import_kind);
+                let import_kind = import_export_kind(specifier.import_kind);
+                let import_kind = intern_packed(strings, import_kind);
                 push(field_ids::IMPORT_KIND, import_kind);
             }
         }
@@ -518,8 +562,8 @@ pub(crate) fn packed_fields_direct(
                 push(field_ids::SOURCE, source);
             }
             if wants(field_ids::EXPORT_KIND) {
-                let export_kind = format!("{:?}", declaration.export_kind).to_ascii_lowercase();
-                let export_kind = intern_packed(strings, &export_kind);
+                let export_kind = import_export_kind(declaration.export_kind);
+                let export_kind = intern_packed(strings, export_kind);
                 push(field_ids::EXPORT_KIND, export_kind);
             }
             push(
@@ -557,8 +601,8 @@ pub(crate) fn packed_fields_direct(
                 push(field_ids::EXPORTED, exported);
             }
             if wants(field_ids::EXPORT_KIND) {
-                let export_kind = format!("{:?}", declaration.export_kind).to_ascii_lowercase();
-                let export_kind = intern_packed(strings, &export_kind);
+                let export_kind = import_export_kind(declaration.export_kind);
+                let export_kind = intern_packed(strings, export_kind);
                 push(field_ids::EXPORT_KIND, export_kind);
             }
         }
@@ -572,15 +616,15 @@ pub(crate) fn packed_fields_direct(
                 push(field_ids::EXPORTED, exported);
             }
             if wants(field_ids::EXPORT_KIND) {
-                let export_kind = format!("{:?}", specifier.export_kind).to_ascii_lowercase();
-                let export_kind = intern_packed(strings, &export_kind);
+                let export_kind = import_export_kind(specifier.export_kind);
+                let export_kind = intern_packed(strings, export_kind);
                 push(field_ids::EXPORT_KIND, export_kind);
             }
         }
         AstKind::VariableDeclaration(declaration) => {
             if wants(field_ids::KIND) {
-                let kind = declaration.kind.to_string();
-                let kind = intern_packed(strings, &kind);
+                let kind = variable_kind(declaration.kind);
+                let kind = intern_packed(strings, kind);
                 push(field_ids::KIND, kind);
             }
             push(
@@ -590,8 +634,8 @@ pub(crate) fn packed_fields_direct(
         }
         AstKind::VariableDeclarator(declarator) => {
             if wants(field_ids::KIND) {
-                let kind = declarator.kind.to_string();
-                let kind = intern_packed(strings, &kind);
+                let kind = variable_kind(declarator.kind);
+                let kind = intern_packed(strings, kind);
                 push(field_ids::KIND, kind);
             }
             push(
@@ -702,7 +746,7 @@ pub(crate) fn fields(
             push!(
                 field_ids::KIND,
                 "kind",
-                format!("{:?}", property.kind).to_ascii_lowercase()
+                property_kind(property.kind).to_owned()
             );
             push!(
                 field_ids::COMPUTED,
@@ -861,7 +905,7 @@ pub(crate) fn fields(
             push!(
                 field_ids::NODE_KIND,
                 "nodeKind",
-                format!("{:?}", function.r#type)
+                function_kind(function.r#type).to_owned()
             );
             push!(field_ids::ASYNC, "async", function.r#async.to_string());
             push!(
@@ -918,7 +962,7 @@ pub(crate) fn fields(
             push!(
                 field_ids::NODE_KIND,
                 "nodeKind",
-                format!("{:?}", class.r#type)
+                class_kind(class.r#type).to_owned()
             );
             if let Some(identifier) = &class.id {
                 push!(field_ids::NAME, "name", identifier.name.to_string());
@@ -933,7 +977,7 @@ pub(crate) fn fields(
             push!(
                 field_ids::IMPORT_KIND,
                 "importKind",
-                format!("{:?}", declaration.import_kind).to_ascii_lowercase(),
+                import_export_kind(declaration.import_kind).to_owned(),
             );
             push!(
                 field_ids::SPECIFIER_COUNT,
@@ -955,7 +999,7 @@ pub(crate) fn fields(
             push!(
                 field_ids::IMPORT_KIND,
                 "importKind",
-                format!("{:?}", specifier.import_kind).to_ascii_lowercase(),
+                import_export_kind(specifier.import_kind).to_owned(),
             );
         }
         AstKind::ImportDefaultSpecifier(specifier) => {
@@ -973,7 +1017,7 @@ pub(crate) fn fields(
             push!(
                 field_ids::EXPORT_KIND,
                 "exportKind",
-                format!("{:?}", declaration.export_kind).to_ascii_lowercase(),
+                import_export_kind(declaration.export_kind).to_owned(),
             );
             push!(
                 field_ids::SPECIFIER_COUNT,
@@ -1008,7 +1052,7 @@ pub(crate) fn fields(
             push!(
                 field_ids::EXPORT_KIND,
                 "exportKind",
-                format!("{:?}", declaration.export_kind).to_ascii_lowercase(),
+                import_export_kind(declaration.export_kind).to_owned(),
             );
         }
         AstKind::ExportSpecifier(specifier) => {
@@ -1025,11 +1069,15 @@ pub(crate) fn fields(
             push!(
                 field_ids::EXPORT_KIND,
                 "exportKind",
-                format!("{:?}", specifier.export_kind).to_ascii_lowercase(),
+                import_export_kind(specifier.export_kind).to_owned(),
             );
         }
         AstKind::VariableDeclaration(declaration) => {
-            push!(field_ids::KIND, "kind", declaration.kind.to_string());
+            push!(
+                field_ids::KIND,
+                "kind",
+                variable_kind(declaration.kind).to_owned()
+            );
             push!(
                 field_ids::DECLARATION_COUNT,
                 "declarationCount",
@@ -1037,7 +1085,11 @@ pub(crate) fn fields(
             );
         }
         AstKind::VariableDeclarator(declarator) => {
-            push!(field_ids::KIND, "kind", declarator.kind.to_string());
+            push!(
+                field_ids::KIND,
+                "kind",
+                variable_kind(declarator.kind).to_owned()
+            );
             push!(
                 field_ids::HAS_INITIALIZER,
                 "hasInitializer",

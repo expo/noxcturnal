@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use crate::edit::{MappingPolicy, Piece};
 use rustc_hash::FxHashMap;
 
@@ -6,11 +8,11 @@ pub(crate) mod vlq;
 
 #[derive(Debug, Clone, Copy)]
 struct Segment {
-    generated_column: i64,
-    source: i64,
-    original_line: i64,
-    original_column: i64,
-    name: Option<i64>,
+    generated_column: u32,
+    source: u32,
+    original_line: u32,
+    original_column: u32,
+    name: u32,
 }
 
 #[derive(Default)]
@@ -31,11 +33,24 @@ impl MapBuilder {
                 if index > 0 {
                     output.push(',');
                 }
-                vlq::encode(segment.generated_column - prev_generated, &mut output);
-                vlq::encode(segment.source - prev_source, &mut output);
-                vlq::encode(segment.original_line - prev_line, &mut output);
-                vlq::encode(segment.original_column - prev_column, &mut output);
-                if let Some(name) = segment.name {
+                vlq::encode(
+                    i64::from(segment.generated_column) - i64::from(prev_generated),
+                    &mut output,
+                );
+                vlq::encode(
+                    i64::from(segment.source) - i64::from(prev_source),
+                    &mut output,
+                );
+                vlq::encode(
+                    i64::from(segment.original_line) - i64::from(prev_line),
+                    &mut output,
+                );
+                vlq::encode(
+                    i64::from(segment.original_column) - i64::from(prev_column),
+                    &mut output,
+                );
+                if segment.name != 0 {
+                    let name = i64::from(segment.name - 1);
                     vlq::encode(name - prev_name, &mut output);
                     prev_name = name;
                 }
@@ -262,13 +277,14 @@ impl<S: SegmentSink> StreamingMap<S> {
     }
 }
 
-fn intern(names: &mut Vec<String>, name_ids: &mut FxHashMap<String, i64>, name: &str) -> i64 {
+fn intern(names: &mut Vec<Rc<str>>, name_ids: &mut FxHashMap<Rc<str>, i64>, name: &str) -> i64 {
     if let Some(index) = name_ids.get(name) {
         return *index;
     }
     let index = names.len() as i64;
-    names.push(name.to_string());
-    name_ids.insert(name.to_string(), index);
+    let name: Rc<str> = Rc::from(name);
+    names.push(Rc::clone(&name));
+    name_ids.insert(name, index);
     index
 }
 
@@ -315,8 +331,8 @@ struct Renderer<'a, S: SegmentSink> {
     map: StreamingMap<S>,
     character: bool,
     line: bool,
-    names: Vec<String>,
-    name_ids: FxHashMap<String, i64>,
+    names: Vec<Rc<str>>,
+    name_ids: FxHashMap<Rc<str>, i64>,
     /// Line index over the source, built lazily on the first repositioning:
     /// relocated pieces (copies) move the original cursor to arbitrary offsets.
     line_starts: Option<Vec<usize>>,
@@ -433,18 +449,35 @@ pub fn render(source: &str, pieces: &[Piece], mode: &str) -> (String, String, Ve
         ..VlqSink::default()
     };
     let renderer = render_into(source, pieces, mode, sink);
-    (renderer.code, renderer.map.sink.mappings, renderer.names)
+    (
+        renderer.code,
+        renderer.map.sink.mappings,
+        renderer
+            .names
+            .into_iter()
+            .map(|name| name.as_ref().to_owned())
+            .collect(),
+    )
 }
 
 /// Render code plus the mapping in packed decoded layer form, for phase boundaries
 /// that feed later composition instead of final output.
 pub fn render_decoded(source: &str, pieces: &[Piece], mode: &str) -> (String, Vec<u8>) {
+    let (code, layer) = render_decoded_layer(source, pieces, mode);
+    (code, layer.pack())
+}
+
+pub(crate) fn render_decoded_layer(
+    source: &str,
+    pieces: &[Piece],
+    mode: &str,
+) -> (String, DecodedLayer) {
     let renderer = render_into(source, pieces, mode, DecodedSink::default());
-    let layer = pack_decoded_layer(
-        &renderer.map.sink.words,
-        &renderer.names,
-        renderer.map.generated_line as u32,
-    );
+    let layer = DecodedLayer {
+        words: renderer.map.sink.words,
+        names: renderer.names,
+        line_count: renderer.map.generated_line as u32,
+    };
     (renderer.code, layer)
 }
 
@@ -511,12 +544,27 @@ fn decode(mappings: &str) -> Vec<Vec<Segment>> {
             } else {
                 None
             };
+            let Ok(generated_column) = u32::try_from(generated_column) else {
+                continue;
+            };
+            let Ok(source) = u32::try_from(source) else {
+                continue;
+            };
+            let Ok(original_line) = u32::try_from(original_line) else {
+                continue;
+            };
+            let Ok(original_column) = u32::try_from(original_column) else {
+                continue;
+            };
+            let name = decoded_name
+                .and_then(|name| u32::try_from(name).ok())
+                .map_or(0, |name| name + 1);
             line.push(Segment {
                 generated_column,
                 source,
                 original_line,
                 original_column,
-                name: decoded_name,
+                name,
             });
         }
         lines.push(line);
@@ -549,9 +597,13 @@ fn compose_lines(
                         original_line: traced.original_line,
                         original_column: traced.original_column + segment.original_column
                             - traced.generated_column,
-                        name: segment
-                            .name
-                            .or_else(|| traced.name.map(|name| name + i64::from(outer_name_count))),
+                        name: if segment.name != 0 {
+                            segment.name
+                        } else if traced.name != 0 {
+                            traced.name + outer_name_count
+                        } else {
+                            0
+                        },
                     })
                 })
                 .collect()
@@ -577,12 +629,23 @@ pub fn compose(outer: &str, inner: &str, outer_name_count: u32) -> String {
 /// original line, original column, name id + 1).
 mod decoded;
 
-pub(crate) use decoded::{compose_layer_chain, compose_packed_layer_chain, pack_decoded_layer};
+pub(crate) use decoded::{
+    DecodedLayer, compose_decoded_layers, compose_layer_chain, pack_decoded_layer,
+};
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::edit::{EditCommand, EditKind, build};
+
+    #[test]
+    fn segment_stays_word_packed() {
+        assert_eq!(
+            std::mem::size_of::<Segment>(),
+            5 * std::mem::size_of::<u32>()
+        );
+    }
+
     #[test]
     fn encodes_identity_lines() {
         let pieces = build("a\nb", Vec::new()).unwrap();
@@ -593,6 +656,11 @@ mod tests {
     #[test]
     fn composes_two_maps() {
         assert_eq!(compose("AAAA;AACA", "AAAA;AACA", 0), "AAAA;AACA");
+    }
+
+    #[test]
+    fn composition_preserves_nonzero_source_ids() {
+        assert_eq!(compose("AAAA", "ACAA", 0), "ACAA");
     }
 
     fn named_replace(start: u32, end: u32, content: &str, name: &str) -> EditCommand {
@@ -653,7 +721,7 @@ mod tests {
                 source: 0,
                 original_line: 0,
                 original_column: column * 2,
-                name: None,
+                name: 0,
             })
             .collect();
         let mappings = MapBuilder {

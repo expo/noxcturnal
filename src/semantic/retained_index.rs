@@ -26,8 +26,8 @@ pub struct RetainedIndex {
     next_siblings: Option<Vec<u32>>,
     last_children: Option<Vec<u32>>,
     structural_parent_types: NodeTypeSet,
-    names: Vec<String>,
-    name_ids: FxHashMap<String, u32>,
+    names: Vec<Rc<str>>,
+    name_ids: FxHashMap<Rc<str>, u32>,
     bindings: FxHashMap<(u32, u32), BindingRecord>,
     globals: FxHashMap<u32, Vec<SemanticReference>>,
     constants: Option<Vec<Option<EvaluatedConstant>>>,
@@ -293,7 +293,7 @@ impl RetainedIndex {
             )
         });
         NativeBindingFact {
-            name: self.names[name_id as usize].clone(),
+            name: self.names[name_id as usize].as_ref().to_owned(),
             scope_id,
             declaration_id: declaration.map(|value| value.0),
             declaration_start: declaration.map(|value| value.1),
@@ -353,7 +353,7 @@ impl RetainedIndex {
                         binding_scope_id,
                         parent_id: self.parent_id(reference.node_id),
                         parent_type: self.parent_type(reference.node_id),
-                        name: self.names[name_id as usize].clone(),
+                        name: self.names[name_id as usize].as_ref().to_owned(),
                         read: reference.read,
                         write: reference.write,
                     })
@@ -503,7 +503,7 @@ impl RetainedIndex {
                 start: self.starts[call.node_id as usize],
                 end: self.ends[call.node_id as usize],
                 scope_id: self.scope_ids[call.node_id as usize],
-                callee_name: self.names[call.callee_name_id as usize].clone(),
+                callee_name: self.names[call.callee_name_id as usize].as_ref().to_owned(),
                 callee_global: call.callee_global,
                 static_argument: call.static_argument.clone(),
             })
@@ -539,8 +539,9 @@ impl RetainedIndex {
             return *name_id;
         }
         let name_id = self.names.len() as u32;
-        self.names.push(name.to_owned());
-        self.name_ids.insert(name.to_owned(), name_id);
+        let name: Rc<str> = Rc::from(name);
+        self.names.push(Rc::clone(&name));
+        self.name_ids.insert(name, name_id);
         name_id
     }
 
@@ -748,9 +749,9 @@ impl RetainedIndex {
                 .as_ref()
                 .map_or(0, |column| column.capacity() * size_of::<u32>())
             + size_of::<NodeTypeSet>()
-            + self.names.capacity() * size_of::<String>()
-            + self.names.iter().map(String::capacity).sum::<usize>()
-            + self.name_ids.capacity() * size_of::<(String, u32)>()
+            + self.names.capacity() * size_of::<Rc<str>>()
+            + self.names.iter().map(|name| name.len()).sum::<usize>()
+            + self.name_ids.capacity() * size_of::<(Rc<str>, u32)>()
             + self
                 .bindings
                 .values()
@@ -842,3 +843,4 @@ impl Iterator for Children<'_> {
         Some(current)
     }
 }
+use std::rc::Rc;

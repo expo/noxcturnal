@@ -1,4 +1,5 @@
 use std::path::{Path, PathBuf};
+use std::rc::Rc;
 use std::time::Instant;
 
 use napi::{Error, Result, Status, bindgen_prelude::Buffer};
@@ -29,7 +30,9 @@ use self_cell::self_cell;
 
 use crate::edit::EditCommand;
 use crate::edit::build as build_edits;
-use crate::sourcemap::{compose_packed_layer_chain, pack_decoded_layer, render_decoded};
+use crate::sourcemap::{
+    DecodedLayer, compose_decoded_layers, pack_decoded_layer, render_decoded_layer,
+};
 use crate::syntax::classification::source_type;
 
 use super::block_scoping;
@@ -417,7 +420,7 @@ pub fn transform(
                     });
                 }
             };
-            let (next, layer) = render_decoded(round_source, &pieces, step.mapping());
+            let (next, layer) = render_decoded_layer(round_source, &pieces, step.mapping());
             if next == *round_source {
                 // A rewrite that reproduces its input has converged. Keeping the
                 // identity layer would also make an untouched file look rewritten
@@ -851,11 +854,10 @@ pub fn transform(
             generated_line_offset,
         )?;
         let layer = if rewrite_layers.is_empty() {
-            codegen_layer
+            codegen_layer.pack()
         } else {
-            let mut layers: Vec<&[u8]> = rewrite_layers.iter().map(Vec::as_slice).collect();
-            layers.push(codegen_layer.as_slice());
-            compose_packed_layer_chain(&layers).ok_or_else(|| {
+            rewrite_layers.push(codegen_layer);
+            compose_decoded_layers(&rewrite_layers).ok_or_else(|| {
                 Error::new(
                     Status::GenericFailure,
                     "native captured-loop map composition failed",
@@ -902,7 +904,7 @@ fn render_program(
     minify: bool,
     comments: bool,
     generated_line_offset: u32,
-) -> Result<(String, Vec<u8>)> {
+) -> Result<(String, DecodedLayer)> {
     let generated = Codegen::new()
         .with_options(CodegenOptions {
             minify,
@@ -921,10 +923,11 @@ fn render_program(
             "native preflight map was not emitted",
         )
     })?;
-    let names: Vec<String> = map.get_names().map(str::to_owned).collect();
-    let mut words = Vec::with_capacity(map.get_tokens().count() * 5);
+    let names: Vec<Rc<str>> = map.get_names().map(Rc::from).collect();
+    let tokens = map.get_tokens();
+    let mut words = Vec::with_capacity(tokens.size_hint().0 * 5);
     let mut line_count = 1 + generated_line_offset;
-    for token in map.get_tokens() {
+    for token in tokens {
         // The decoded-layer format represents a single input source. Codegen may
         // produce sourceless tokens for generated punctuation; those must remain
         // unmapped rather than being falsely anchored to the original.
@@ -942,7 +945,11 @@ fn render_program(
     }
     Ok((
         generated.code,
-        pack_decoded_layer(&words, &names, line_count),
+        DecodedLayer {
+            words,
+            names,
+            line_count,
+        },
     ))
 }
 
@@ -1524,7 +1531,7 @@ fn identity_result(
         status: "complete".into(),
         reason: None,
         code: Some(source),
-        map: Some(pack_decoded_layer(&words, &[], line_count).into()),
+        map: Some(pack_decoded_layer(&words, &[] as &[String], line_count).into()),
         mapping_segments: None,
         rendered_bytes: None,
         diagnostics: Vec::new(),
@@ -1595,7 +1602,7 @@ mod tests {
     use super::*;
     use crate::{
         edit::{EditCommand, EditKind, MappingPolicy, build},
-        sourcemap::{compose, compose_layer_chain, render, render_decoded},
+        sourcemap::{compose, compose_layer_chain, render},
     };
 
     #[test]
@@ -1645,7 +1652,7 @@ mod tests {
         )
         .unwrap();
         let (_, visitor_mappings, visitor_names) = render(&code, &pieces, "boundary");
-        let (_, visitor_layer) = render_decoded(&code, &pieces, "boundary");
+        let (_, visitor_layer) = crate::sourcemap::render_decoded(&code, &pieces, "boundary");
         let (composed, names) =
             compose_layer_chain(&[native_layer.as_ref(), visitor_layer.as_slice()]).unwrap();
 

@@ -116,7 +116,12 @@ impl FunctionMapCollector<'_> {
 
     pub(crate) fn finish(self) -> FunctionMap {
         FunctionMap {
-            names: self.encoder.names,
+            names: self
+                .encoder
+                .names
+                .into_iter()
+                .map(|name| name.as_ref().to_owned())
+                .collect(),
             mappings: self.encoder.mappings,
         }
     }
@@ -347,8 +352,8 @@ impl<'a> Visit<'a> for FunctionMapCollector<'a> {
 
 #[derive(Default)]
 struct MappingEncoder {
-    names: Vec<String>,
-    name_indexes: FxHashMap<String, i64>,
+    names: Vec<Rc<str>>,
+    name_indexes: FxHashMap<Rc<str>, i64>,
     mappings: String,
     previous_line: i64,
     previous_column: i64,
@@ -362,8 +367,9 @@ impl MappingEncoder {
             *index
         } else {
             let index = self.names.len() as i64;
-            self.names.push(name.to_owned());
-            self.name_indexes.insert(name.to_owned(), index);
+            let name: Rc<str> = Rc::from(name);
+            self.names.push(Rc::clone(&name));
+            self.name_indexes.insert(name, index);
             index
         };
         let line = i64::from(position.line);
@@ -403,3 +409,4 @@ fn line_starts(source: &str) -> Vec<usize> {
 fn position_greater(left: Position, right: Position) -> bool {
     left.line > right.line || (left.line == right.line && left.column > right.column)
 }
+use std::rc::Rc;
