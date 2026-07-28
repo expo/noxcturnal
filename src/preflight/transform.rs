@@ -3,7 +3,7 @@ use std::time::Instant;
 
 use napi::{Error, Result, Status, bindgen_prelude::Buffer};
 use napi_derive::napi;
-use oxc_allocator::Allocator;
+use oxc_allocator::{Allocator, CloneIn};
 use oxc_ast::{
     AstKind,
     ast::{
@@ -305,6 +305,12 @@ pub fn transform(
     const REWRITE_ROUNDS: u32 = 64;
     let mut cursor = 0;
     let mut budget = REWRITE_ROUNDS;
+    // The downstream AST arena outlives the rewrite loop. When the last rewrite
+    // parse converges, clone that program into this arena rather than lexing and
+    // parsing the same source again. CloneIn resets semantic ids, which the
+    // authoritative downstream semantic build repopulates.
+    let allocator = Allocator::default();
+    let mut rewrite_program = None;
     while cursor < rewrites.len() {
         let rewrite_allocator = Allocator::default();
         parse_count += 1;
@@ -446,21 +452,32 @@ pub fn transform(
             rendered = Some((next, layer));
             break;
         }
-        let Some((next, layer)) = rendered else { break };
+        let Some((next, layer)) = rendered else {
+            // Every selected rewrite has converged against this parse. Its AST
+            // is therefore exactly the final rewrite source and can proceed to
+            // the postcondition/Oxc pass without parsing the same text again.
+            // Both ASTs coexist only for this clone; the rewrite arena is
+            // released when the loop exits.
+            rewrite_program = Some(parsed.program.clone_in(&allocator));
+            break;
+        };
         source = next;
         rewrite_layers.push(layer);
     }
-    let allocator = Allocator::default();
     let custom_rewrite_ms =
         custom_rewrite_started.map(|started| started.elapsed().as_secs_f64() * 1_000.0);
-    parse_count += 1;
-    let parsed = timed(debug_performance, &mut parse_ms, || {
-        Parser::new(&allocator, &source, active_source_type).parse()
-    });
-    if !parsed.diagnostics.is_empty() {
-        return Ok(unsupported("parse-error", parsed.diagnostics));
-    }
-    let mut program = parsed.program;
+    let mut program = if let Some(program) = rewrite_program {
+        program
+    } else {
+        parse_count += 1;
+        let parsed = timed(debug_performance, &mut parse_ms, || {
+            Parser::new(&allocator, &source, active_source_type).parse()
+        });
+        if !parsed.diagnostics.is_empty() {
+            return Ok(unsupported("parse-error", parsed.diagnostics));
+        }
+        parsed.program
+    };
     if conditional_jsx {
         let mut detector = JsxDetector(false);
         detector.visit_program(&program);

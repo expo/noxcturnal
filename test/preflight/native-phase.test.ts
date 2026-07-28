@@ -169,6 +169,33 @@ test('reports only the required internal reparse and semantic rebuild for legacy
   assert.equal(performance.nativeRenders, 2);
 });
 
+test('reuses the converged final rewrite parse for the Oxc pass', () => {
+  const result = transform(
+    'function read(value = 1) { return value; }',
+    'fixture.js',
+    defineNativePipeline({
+      phases: [
+        {
+          name: 'parameters',
+          native: { transforms: { parameters: true } },
+        },
+      ],
+    }),
+    { debugPerformance: true },
+  );
+  assert.equal(result.status, 'complete');
+  const performance = result.metadata.performance as {
+    nativeParses: number;
+    nativeSemanticBuilds: number;
+    nativeRenders: number;
+  };
+  // One parse produces the edit and one confirms convergence. The latter AST
+  // feeds the final Oxc pass instead of parsing the same source a third time.
+  assert.equal(performance.nativeParses, 2);
+  assert.equal(performance.nativeSemanticBuilds, 3);
+  assert.equal(performance.nativeRenders, 2);
+});
+
 test('runs React Fast Refresh instrumentation in the native JSX transform', () => {
   const result = transform(
     [
