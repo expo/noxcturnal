@@ -1202,6 +1202,12 @@ impl<'a> VisitMut<'a> for InlineHelperRenamer<'a> {
 
 impl<'a> Visit<'a> for ClassesDetector {
     fn visit_class(&mut self, class: &Class<'a>) {
+        // An ambient class is a type declaration, and the TypeScript strip pass
+        // deletes it. `classes::edits` deliberately leaves it alone for that
+        // reason, so seeing one here is not an unlowered class.
+        if class.declare {
+            return;
+        }
         self.0 = true;
         walk::walk_class(self, class);
     }

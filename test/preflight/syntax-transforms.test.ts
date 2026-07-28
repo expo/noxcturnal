@@ -172,16 +172,96 @@ test('spec private feature options retain a structured semantic boundary', () =>
 // it rather than failing the file. TypeScript declaration syntax produces these
 // — an overload signature or an `abstract` member — and both reach the lowering
 // because it runs on the pre-strip AST.
-test('bodiless TypeScript methods bail instead of aborting the class lowering', () => {
-  for (const source of [
-    'class Value { read(input: string): void; read(input: unknown) { super.read(input); } }',
-    'abstract class Value { abstract read(): void; write() { return 1; } }',
-    'class Value { constructor(input: string); constructor(input: unknown) {} }',
-  ]) {
-    const result = transform(source, 'fixture.ts', pipeline({ classes: true }));
-    assert.equal(result.status, 'bailout');
-    assert.equal(result.reason, 'syntax:classes-bodiless-method-not-implemented');
+//
+// They carry no runtime code, so the lowering skips them. Two ways that can go
+// wrong and each is covered below: emitting an overload signature as if it were
+// a method, and mistaking one for the implementation it precedes.
+test('native classes skip bodiless TypeScript methods', () => {
+  const lowering = pipeline({
+    classes: true,
+    classProperties: { loose: true },
+    privateMethods: { loose: true },
+    privatePropertyInObject: { loose: true },
+  });
+  for (const [source, expected] of [
+    // An overload signature must not shadow the implementation that follows.
+    [
+      'class Value { read(input: string): number; read(input: any) { return 10 + input; } }\n' +
+        'globalThis.answer = new Value().read(2);',
+      12,
+    ],
+    // The same, for a constructor: the signature comes first in the body.
+    [
+      'class Value { x: number; constructor(input: string); constructor(input: any) { this.x = input + 1; } }\n' +
+        'globalThis.answer = new Value(1).x;',
+      2,
+    ],
+    // `abstract` members exist only in the type system.
+    [
+      'abstract class Base { abstract read(): void; write() { return 7; } }\n' +
+        'class Value extends Base { read() {} }\n' +
+        'globalThis.answer = new Value().write();',
+      7,
+    ],
+    // A private overload resolves through the same private-key binding.
+    [
+      'class Value { #v = 3; #d(input: string): number; #d(input: any) { return this.#v * input; } read() { return this.#d(4); } }\n' +
+        'globalThis.answer = new Value().read();',
+      12,
+    ],
+    // `super` in the implementation still lowers, and the signature above it
+    // must not be scanned for `super` on a body it does not have.
+    [
+      'class Base { m() { return 1; } }\n' +
+        'class Value extends Base { m(input: string): number; m(input: any) { return super.m() + input; } }\n' +
+        'globalThis.answer = new Value().m(4);',
+      5,
+    ],
+  ] satisfies [string, number][]) {
+    const result = transform(source, 'fixture.ts', lowering);
+    assert.equal(result.status, 'complete');
+    assert.ok(result.status === 'complete');
+    const context: { answer?: unknown } = {};
+    new Function('globalThis', 'require', result.code)(context, runtimeRequire);
+    assert.equal(context.answer, expected);
   }
+});
+
+// An ambient class emits nothing at all. Lowering one turned `declare class A {}`
+// into a real `var A`, because the TypeScript strip pass that would have deleted
+// it no longer saw a class — wrong independently of bodiless methods, and true
+// for `declare class Value { x: number }` with no methods at all.
+test('native classes leave ambient declarations to the TypeScript strip pass', () => {
+  const lowering = pipeline({ classes: true, classProperties: { loose: true } });
+  for (const source of [
+    'declare class Value { read(): void; }',
+    'declare class Value { x: number; }',
+  ]) {
+    const result = transform(
+      `${source}\nglobalThis.answer = typeof Value;`,
+      'fixture.ts',
+      lowering,
+    );
+    assert.equal(result.status, 'complete');
+    assert.ok(result.status === 'complete');
+    assert.doesNotMatch(result.code, /\bValue\s*=/);
+    const context: { answer?: unknown } = {};
+    new Function('globalThis', 'require', result.code)(context, runtimeRequire);
+    assert.equal(context.answer, 'undefined');
+  }
+
+  // A real class alongside an ambient one still lowers.
+  const mixed = transform(
+    'declare class Ambient { read(): void; }\nclass Value { read() { return 9; } }\n' +
+      'globalThis.answer = new Value().read();',
+    'fixture.ts',
+    lowering,
+  );
+  assert.equal(mixed.status, 'complete');
+  assert.ok(mixed.status === 'complete');
+  const context: { answer?: unknown } = {};
+  new Function('globalThis', 'require', mixed.code)(context, runtimeRequire);
+  assert.equal(context.answer, 9);
 });
 
 test('native classes lower loose private fields, methods, calls, access, and private-in', () => {

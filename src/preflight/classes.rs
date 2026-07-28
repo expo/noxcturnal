@@ -49,6 +49,13 @@ pub(super) fn edits(
             let AstKind::Class(class) = node.kind() else {
                 return None;
             };
+            // An ambient class declares a type and emits nothing. Lowering it
+            // would turn `declare class A {}` into a real `var A`, because the
+            // TypeScript strip pass that would have deleted it no longer sees a
+            // class. Leaving it alone is what makes it disappear.
+            if class.declare {
+                return None;
+            }
             let owns_private_method = private_methods_loose.is_some()
                 && class.body.body.iter().any(|element| {
                     matches!(element, ClassElement::MethodDefinition(method)
@@ -149,14 +156,11 @@ fn lower(
         .id
         .as_ref()
         .map_or_else(|| reserve("_Class", reserved), |id| id.name.to_string());
-    let constructor = class.body.body.iter().find_map(|element| match element {
-        ClassElement::MethodDefinition(method)
-            if method.kind == MethodDefinitionKind::Constructor =>
-        {
-            Some(method.as_ref())
-        }
-        _ => None,
-    });
+    // Not `find_map` over every method: an overload signature precedes the
+    // implementation it belongs to, so the first `constructor` in the body is
+    // often the one with no code in it.
+    let constructor =
+        emitted_methods(class).find(|method| method.kind == MethodDefinitionKind::Constructor);
     if private_methods_loose == Some(false) || private_in_loose == Some(false) {
         return Err("classes-spec-private-features-not-implemented");
     }
@@ -186,17 +190,6 @@ fn lower(
                     && private_methods_loose != Some(true)
                 {
                     return Err("classes-private-elements-require-private-transform");
-                }
-                // A method with no body is TypeScript declaration syntax: an
-                // overload signature, or an `abstract` member. It emits no
-                // runtime code, but every site below this loop reaches for
-                // `value.body` and unwraps it, so the class goes to the
-                // fallback rather than each of them guessing. Skipping the
-                // member instead would keep the coverage and is the better
-                // fix; it needs the constructor search and the emission loop
-                // to agree, which is more than this guard is worth.
-                if method.value.body.is_none() {
-                    return Err("classes-bodiless-method-not-implemented");
                 }
             }
             ClassElement::PropertyDefinition(property) => {
@@ -238,9 +231,8 @@ fn lower(
         .super_class
         .as_ref()
         .map(|super_class| slice(source, super_class.span()).to_owned());
-    let has_super_methods = class.body.body.iter().any(|element| {
-        matches!(element, ClassElement::MethodDefinition(method)
-            if method.kind != MethodDefinitionKind::Constructor && contains_super(source, method))
+    let has_super_methods = emitted_methods(class).any(|method| {
+        method.kind != MethodDefinitionKind::Constructor && contains_super(source, method)
     });
     let has_private_keys = !private_keys.is_empty();
     helper_usage.construct |= super_name.is_some();
@@ -327,10 +319,7 @@ fn lower(
     }
     let mut private_accessors: FxHashMap<String, (bool, Option<String>, Option<String>, u32)> =
         FxHashMap::default();
-    for element in &class.body.body {
-        let ClassElement::MethodDefinition(method) = element else {
-            continue;
-        };
+    for method in emitted_methods(class) {
         let PropertyKey::PrivateIdentifier(identifier) = &method.key else {
             continue;
         };
@@ -408,10 +397,7 @@ fn lower(
             "if(Object.setPrototypeOf)Object.setPrototypeOf({name},{super_name});else {name}.__proto__={super_name};{name}.prototype=Object.create({super_name}&&{super_name}.prototype,{{constructor:{{value:{name},writable:true,configurable:true}}}});"
         ));
     }
-    for element in &class.body.body {
-        let ClassElement::MethodDefinition(method) = element else {
-            continue;
-        };
+    for method in emitted_methods(class) {
         if method.kind == MethodDefinitionKind::Constructor {
             continue;
         }
@@ -938,6 +924,24 @@ fn property_key(source: &str, key: &PropertyKey<'_>, computed: bool) -> String {
         PropertyKey::StaticIdentifier(identifier) => format!("{:?}", identifier.name.as_str()),
         _ => slice(source, key.span()).to_owned(),
     }
+}
+
+/// The methods that produce runtime code.
+///
+/// A method with no body is TypeScript declaration syntax — an overload
+/// signature, or an `abstract` member — and TypeScript erases both. Two
+/// distinct things go wrong if the lowering sees one: it dereferences a body
+/// that is not there, and it can mistake an overload signature for the
+/// implementation that follows it. Filtering where methods are enumerated fixes
+/// both at once, and means the four walks over the class body cannot forget
+/// individually.
+fn emitted_methods<'a, 'c>(class: &'c Class<'a>) -> impl Iterator<Item = &'c MethodDefinition<'a>> {
+    class.body.body.iter().filter_map(|element| match element {
+        ClassElement::MethodDefinition(method) if method.value.body.is_some() => {
+            Some(method.as_ref())
+        }
+        _ => None,
+    })
 }
 
 fn contains_super(source: &str, method: &MethodDefinition<'_>) -> bool {
