@@ -117,18 +117,31 @@ fn compose_decoded(outer: &DecodedMap, inner: &DecodedMap, outer_name_count: u32
             };
             let traced_index = inner_line
                 .partition_point(|inner| inner.generated_column <= segment.original_column);
-            let Some(traced) = traced_index
+            // Ordinarily the segment at or before the column carries the answer,
+            // and the distance to it carries over. A layer printed by codegen
+            // has no segment at the start of a line, though — its first is the
+            // first token, past the indentation — so a segment addressing that
+            // gap has nothing before it. Clamping forward to the line's first
+            // segment costs the column offset; dropping it, which is what used
+            // to happen, costs the line every mapping it had.
+            let (traced, original_column) = match traced_index
                 .checked_sub(1)
                 .and_then(|index| inner_line.get(index))
-            else {
-                continue;
+            {
+                Some(traced) => (
+                    traced,
+                    traced.original_column + segment.original_column - traced.generated_column,
+                ),
+                None => match inner_line.first() {
+                    Some(traced) => (traced, traced.original_column),
+                    None => continue,
+                },
             };
             segments.push(Segment {
                 generated_column: segment.generated_column,
                 source: traced.source,
                 original_line: traced.original_line,
-                original_column: traced.original_column + segment.original_column
-                    - traced.generated_column,
+                original_column,
                 name: segment
                     .name
                     .or_else(|| traced.name.map(|name| name + i64::from(outer_name_count))),

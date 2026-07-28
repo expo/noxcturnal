@@ -100,3 +100,58 @@ test('traces CRLF, directive, wrapper, and explicit-location mappings', () => {
     name: null,
   });
 });
+
+test('traces a position back through the language prepass and a source rewrite', () => {
+  // The prepass prints an intermediate and contributes a layer of its own, so a
+  // TypeScript file that also runs a source-level rewrite composes one more
+  // layer than a plain JavaScript one does.
+  const source = [
+    'export function widen(input: string, factor: number = 2): string {',
+    '  const repeated = input.repeat(factor);',
+    '  return repeated;',
+    '}',
+  ].join('\n');
+  const result = transform(
+    source,
+    'fixture.ts',
+    defineNativePipeline({
+      phases: [
+        {
+          name: 'language',
+          native: {
+            typescript: 'strip',
+            transforms: { blockScoping: true, parameters: true },
+            helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
+            comments: false,
+          },
+        },
+      ],
+    }),
+  );
+  assert.equal(result.status, 'complete');
+  const map = new TraceMap({
+    version: 3,
+    sources: ['fixture.ts'],
+    names: result.map.names,
+    mappings: result.map.mappings,
+  });
+  const lines = result.code.split('\n');
+  const generatedLine = lines.findIndex(line => line.includes('input.repeat(factor)')) + 1;
+  assert.notEqual(generatedLine, 0);
+  const generatedColumn = lines[generatedLine - 1].indexOf('input.repeat(factor)');
+  const traced = originalPositionFor(map, {
+    line: generatedLine,
+    column: generatedColumn,
+  });
+  assert.equal(traced.source, 'fixture.ts');
+  // `const repeated = input.repeat(factor);` is the second line of the input.
+  assert.equal(traced.line, 2);
+  // The column can drift by the difference between the input's indentation and
+  // the intermediate's, because the prepass reprints the file and the layers
+  // compose through that reprint. Without a prepass in the chain it is exact.
+  const expectedColumn = source.split('\n')[1].indexOf('input.repeat(factor)');
+  assert.ok(
+    Math.abs(traced.column - expectedColumn) <= 2,
+    `expected column near ${expectedColumn}, got ${traced.column}`,
+  );
+});

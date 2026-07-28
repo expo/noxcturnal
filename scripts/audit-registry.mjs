@@ -226,16 +226,6 @@ export const bailouts = {
     owner: 'classes',
     triggerTest: 'syntax-transforms.test.ts',
   },
-  'classes-parameter-decorators-not-supported': {
-    ...permanent,
-    owner: 'classes',
-    triggerTest: 'syntax-transforms.test.ts',
-  },
-  'classes-parameter-property-shape-not-implemented': {
-    ...invariant,
-    owner: 'classes',
-    triggerTest: 'syntax-transforms.test.ts',
-  },
   'classes-private-elements-require-private-transform': {
     ...permanent,
     category: 'configuration',

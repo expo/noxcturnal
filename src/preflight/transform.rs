@@ -8,7 +8,7 @@ use oxc_ast::{
     AstKind,
     ast::{
         AssignmentTargetPattern, CatchClause, Class, Decorator, ForOfStatement, FormalParameters,
-        IdentifierReference, MethodDefinition, PrivateInExpression, PropertyDefinition,
+        IdentifierReference, MethodDefinition, PrivateInExpression, Program, PropertyDefinition,
         PropertyKey, RegExpFlags, RegExpLiteral, VariableDeclarator,
     },
 };
@@ -20,11 +20,12 @@ use oxc_react_compiler::{
     CompilationMode, CompilerTarget, PanicThreshold, PluginOptions as ReactCompilerOptions,
 };
 use oxc_semantic::SemanticBuilder;
-use oxc_syntax::scope::ScopeFlags;
 use oxc_transformer::{
-    HelperLoaderMode, JsxOptions, JsxRuntime, ReactRefreshOptions, TransformOptions, Transformer,
+    CompilerAssumptions, HelperLoaderMode, JsxOptions, JsxRuntime, ReactRefreshOptions,
+    TransformOptions, Transformer,
 };
 
+use crate::edit::EditCommand;
 use crate::edit::build as build_edits;
 use crate::sourcemap::{compose_packed_layer_chain, pack_decoded_layer, render_decoded};
 use crate::syntax::classification::source_type;
@@ -85,417 +86,364 @@ pub fn transform(
     let loose_object_rest = options.object_rest_spread == Some(true)
         && options.object_rest_spread_loose == Some(true)
         && options.object_rest_spread_use_built_ins == Some(true);
-    // The structural prepass exists only for block-scoped bindings captured
-    // across an iteration boundary. Every JavaScript iteration statement
-    // contains either the `for` or `while` keyword, so files containing neither
-    // can proceed directly to the ordinary block-scoping transform without an
-    // otherwise redundant parse and semantic build. Raw substring checks are a
-    // deliberate lossless prerequisite: comments and identifiers may cause
-    // false positives, but valid captured loops cannot cause false negatives.
-    let may_have_captured_loop = source.contains("for") || source.contains("while");
-    if options.block_scoping == Some(true) && may_have_captured_loop {
-        for _ in 0..64 {
-            let rewrite_allocator = Allocator::default();
-            let rewrite_source_type = source_type(&filename, &source)?;
-            parse_count += 1;
-            let rewritten = timed(debug_performance, &mut parse_ms, || {
-                Parser::new(&rewrite_allocator, &source, rewrite_source_type).parse()
-            });
-            if !rewritten.diagnostics.is_empty() {
-                break;
-            }
-            semantic_build_count += 1;
-            ast_traversal_count += 1;
-            let semantic = timed(debug_performance, &mut semantic_build_ms, || {
-                SemanticBuilder::new()
-                    .with_build_nodes(true)
-                    .with_excess_capacity(2.0)
-                    .build(&rewritten.program)
-            });
-            if !semantic.diagnostics.is_empty() {
-                break;
-            }
-            let Some(edits) = block_scoping::captured_loop_edits(&source, &semantic.semantic)
-            else {
-                break;
-            };
-            let pieces = match build_preflight_edits(&source, edits) {
-                Ok(pieces) => pieces,
-                Err(_) => {
-                    return Ok(unsupported(
-                        "captured-loop-edit-conflict",
-                        [] as [String; 0],
-                    ));
-                }
-            };
-            let (rewritten_source, layer) = render_decoded(&source, &pieces, "character");
-            render_count += 1;
-            if rewritten_source == source {
-                break;
-            }
-            source = rewritten_source;
-            rewrite_layers.push(layer);
-        }
-    }
-    // Lower classes before parameters so arrows in class-field initializers are
-    // first relocated into the constructor that owns their lexical `this`.
     let focused_private_features =
         options.private_methods == Some(true) || options.private_property_in_object == Some(true);
-    if options.classes == Some(true) || focused_private_features {
-        for _ in 0..64 {
-            let rewrite_allocator = Allocator::default();
-            let rewrite_source_type = source_type(&filename, &source)?;
-            parse_count += 1;
-            let parsed = timed(debug_performance, &mut parse_ms, || {
-                Parser::new(&rewrite_allocator, &source, rewrite_source_type).parse()
-            });
-            if !parsed.diagnostics.is_empty() {
-                break;
-            }
-            semantic_build_count += 1;
-            ast_traversal_count += 1;
-            let semantic = timed(debug_performance, &mut semantic_build_ms, || {
-                SemanticBuilder::new()
-                    .with_build_nodes(true)
-                    .with_excess_capacity(2.0)
-                    .build(&parsed.program)
-            });
-            if !semantic.diagnostics.is_empty() {
-                break;
-            }
-            let edits = match super::classes::edits(
-                &source,
-                &semantic.semantic,
-                options.classes == Some(true),
-                if options.classes == Some(true) {
-                    options
-                        .class_properties
-                        .filter(|enabled| *enabled)
-                        .map(|_| options.class_properties_loose.unwrap_or(false))
-                } else {
-                    Some(true)
-                },
-                options.class_static_block == Some(true),
-                options
-                    .private_methods
-                    .filter(|enabled| *enabled)
-                    .map(|_| options.private_methods_loose.unwrap_or(false)),
-                options
-                    .private_property_in_object
-                    .filter(|enabled| *enabled)
-                    .map(|_| options.private_property_in_object_loose.unwrap_or(false)),
-                options.helpers_mode.as_deref() == Some("inline"),
-            ) {
-                Ok(edits) => edits,
-                Err(reason) => return Ok(unsupported(reason, [] as [String; 0])),
-            };
-            let Some(edits) = edits else {
-                break;
-            };
-            let pieces = match build_preflight_edits(&source, edits) {
-                Ok(pieces) => pieces,
-                Err(_) => return Ok(unsupported("classes-edit-conflict", [] as [String; 0])),
-            };
-            let (rewritten_source, layer) = render_decoded(&source, &pieces, "boundary");
-            render_count += 1;
-            source = rewritten_source;
-            rewrite_layers.push(layer);
-        }
-    }
-    if options.parameters == Some(true) {
-        for _ in 0..64 {
-            let rewrite_allocator = Allocator::default();
-            let rewrite_source_type = source_type(&filename, &source)?;
-            parse_count += 1;
-            let parsed = timed(debug_performance, &mut parse_ms, || {
-                Parser::new(&rewrite_allocator, &source, rewrite_source_type).parse()
-            });
-            if !parsed.diagnostics.is_empty() {
-                break;
-            }
-            semantic_build_count += 1;
-            ast_traversal_count += 1;
-            let semantic = timed(debug_performance, &mut semantic_build_ms, || {
-                SemanticBuilder::new()
-                    .with_build_nodes(true)
-                    .with_excess_capacity(2.0)
-                    .build(&parsed.program)
-            });
-            if !semantic.diagnostics.is_empty() {
-                break;
-            }
-            let edits = match super::parameters::edits(&source, &semantic.semantic) {
-                Ok(edits) => edits,
-                Err(reason) => return Ok(unsupported(reason, [] as [String; 0])),
-            };
-            let Some(edits) = edits else {
-                break;
-            };
-            let pieces = match build_preflight_edits(&source, edits) {
-                Ok(pieces) => pieces,
-                Err(_) => {
-                    return Ok(unsupported("parameters-edit-conflict", [] as [String; 0]));
-                }
-            };
-            let (rewritten_source, layer) = render_decoded(&source, &pieces, "boundary");
-            render_count += 1;
-            source = rewritten_source;
-            rewrite_layers.push(layer);
-        }
-    }
-    let mut destructuring_done = false;
-    if options.for_of == Some(true) {
-        for _ in 0..64 {
-            let rewrite_allocator = Allocator::default();
-            let rewrite_source_type = source_type(&filename, &source)?;
-            parse_count += 1;
-            let parsed = timed(debug_performance, &mut parse_ms, || {
-                Parser::new(&rewrite_allocator, &source, rewrite_source_type).parse()
-            });
-            if !parsed.diagnostics.is_empty() {
-                break;
-            }
-            semantic_build_count += 1;
-            ast_traversal_count += 1;
-            let semantic = timed(debug_performance, &mut semantic_build_ms, || {
-                SemanticBuilder::new()
-                    .with_build_nodes(true)
-                    .with_excess_capacity(2.0)
-                    .build(&parsed.program)
-            });
-            if !semantic.diagnostics.is_empty() {
-                break;
-            }
-            let edits = match super::for_of::edits(&source, &semantic.semantic) {
-                Ok(edits) => edits,
-                Err(reason) => return Ok(unsupported(reason, [] as [String; 0])),
-            };
-            let Some(edits) = edits else {
-                if options.destructuring == Some(true) {
-                    let destructuring_edits = match super::destructuring::edits(
-                        &source,
-                        &semantic.semantic,
-                        loose_object_rest,
-                        false,
-                        options.helpers_mode.as_deref() == Some("inline"),
-                    ) {
-                        Ok(edits) => edits,
-                        Err(reason) => {
-                            return Ok(unsupported(reason, [] as [String; 0]));
-                        }
-                    };
-                    if let Some(destructuring_edits) = destructuring_edits {
-                        // Leave the standalone pass below to finish a nesting;
-                        // it re-parses, which is only worth it when there is
-                        // something left to lower.
-                        destructuring_done = !destructuring_edits.nested_remaining;
-                        let pieces = match build_preflight_edits(&source, destructuring_edits.edits)
-                        {
-                            Ok(pieces) => pieces,
-                            // The message names the two conflicting ranges, and
-                            // a conflict is a defect in the lowering rather than
-                            // unsupported input, so it is worth carrying.
-                            Err(error) => {
-                                return Ok(unsupported(
-                                    "destructuring-edit-conflict",
-                                    [error.reason],
-                                ));
-                            }
-                        };
-                        let (rewritten_source, layer) =
-                            render_decoded(&source, &pieces, "boundary");
-                        render_count += 1;
-                        source = rewritten_source;
-                        rewrite_layers.push(layer);
-                    } else {
-                        destructuring_done = true;
-                    }
-                }
-                break;
-            };
-            let pieces = match build_preflight_edits(&source, edits) {
-                Ok(pieces) => pieces,
-                Err(_) => return Ok(unsupported("for-of-edit-conflict", [] as [String; 0])),
-            };
-            let (rewritten_source, layer) = render_decoded(&source, &pieces, "boundary");
-            render_count += 1;
-            source = rewritten_source;
-            rewrite_layers.push(layer);
-        }
-    }
-    // Bounded like the other rewrite loops: each round lowers one more level of
-    // patterns nested inside a default value, and a file cannot nest deeper
-    // than it is long.
-    let mut destructuring_rounds = if destructuring_done { 0 } else { 64 };
-    while options.destructuring == Some(true) && destructuring_rounds > 0 {
-        destructuring_rounds -= 1;
-        let rewrite_allocator = Allocator::default();
-        let rewrite_source_type = source_type(&filename, &source)?;
+    let regexp_rewrite_selected = options.regexp_unicode == Some(true)
+        || options.regexp_unicode_property_escapes == Some(true)
+        || options.regexp_dot_all == Some(true)
+        || options.regexp_named_capture_groups == Some(true);
+    // Whether anything downstream of the language reads it.
+    let selects_source_rewrite = options.block_scoping == Some(true)
+        || options.classes == Some(true)
+        || focused_private_features
+        || options.parameters == Some(true)
+        || options.for_of == Some(true)
+        || options.destructuring == Some(true)
+        || loose_object_rest
+        || regexp_rewrite_selected;
+    // Language prepass.
+    //
+    // TypeScript describes the dialect a file is written in, not the ES feature
+    // level it targets — the same category as Flow, which the JavaScript entry
+    // point already erases before any of this runs. Oxc instead fuses it into
+    // one traversal with the ES lowerings, and that traversal runs after the
+    // rewrites below. Two things follow, and both have cost real bugs: the
+    // rewrites have to understand a dialect they do not implement — parameter
+    // properties, ambient classes, overload signatures, `declare` fields, a
+    // parameter list that only exists as a type — and Oxc's own lowerings land
+    // downstream of passes that needed to see them, its `enum` becoming a `let`
+    // that block scoping has already walked past.
+    //
+    // Erasing it first costs one parse and one codegen and saves about as much
+    // again on the smaller source the rewrites then read. It is here for the
+    // ordering, not for the speed.
+    //
+    // JSX and React Refresh stay behind. Refresh registers a `const Foo = f()`
+    // only when `Foo` is used as a JSX element name, so it has to run while the
+    // JSX is still JSX, and it inserts its `_s()` call at the top of a body that
+    // the parameter rewrite also writes to — running it early would reverse the
+    // two against what Babel emits. The React Compiler reads JSX for the same
+    // reason. None of them misread TypeScript, so none of them need to move.
+    let mut active_source_type = source_type(&filename, &source)?;
+    let language_prepass = active_source_type.is_typescript()
+        // Nothing downstream would read the language otherwise: the rewrites do,
+        // and so does block scoping, because Oxc's `enum` lowering emits a `let`.
+        // `automatic-if-present` is the one conditional phase, and the pipeline
+        // requires it to stand alone, so it selects nothing here either.
+        && selects_source_rewrite;
+    // Attributed to the phases they belong to, so a prepass does not look free.
+    let mut language_oxc_ms = 0.0;
+    let mut language_codegen_ms = 0.0;
+    if language_prepass {
+        let language_allocator = Allocator::default();
         parse_count += 1;
         let parsed = timed(debug_performance, &mut parse_ms, || {
-            Parser::new(&rewrite_allocator, &source, rewrite_source_type).parse()
+            Parser::new(&language_allocator, &source, active_source_type).parse()
         });
+        // A file that does not parse is reported by the parse below, with its
+        // original spans rather than the prepass's.
         if parsed.diagnostics.is_empty() {
+            let mut program = parsed.program;
+            // Decorators have to be caught here, on the file as written. Neither
+            // this pass nor the `classes` rewrite implements them, and both drop
+            // them on the way past — so by the time the check further down runs,
+            // on the rewritten source, there is nothing left for it to find and
+            // the class ships without its decorator. Every decorator attaches to
+            // a class or a class element, so the two substrings are a lossless
+            // prerequisite for the walk.
+            if source.contains('@') && source.contains("class") {
+                let mut decorator_detector = DecoratorDetector(false);
+                decorator_detector.visit_program(&program);
+                ast_traversal_count += 1;
+                if decorator_detector.0 {
+                    return Ok(unsupported("decorators-not-supported", [] as [String; 0]));
+                }
+            }
             semantic_build_count += 1;
             ast_traversal_count += 1;
-            let semantic = timed(debug_performance, &mut semantic_build_ms, || {
+            let built = timed(debug_performance, &mut semantic_build_ms, || {
                 SemanticBuilder::new()
-                    .with_build_nodes(true)
                     .with_excess_capacity(2.0)
-                    .build(&parsed.program)
+                    .with_enum_eval(true)
+                    .build(&program)
             });
-            if !semantic.diagnostics.is_empty() {
-                break;
-            }
-            let edits = match super::destructuring::edits(
-                &source,
-                &semantic.semantic,
-                loose_object_rest,
-                false,
-                options.helpers_mode.as_deref() == Some("inline"),
-            ) {
-                Ok(edits) => edits,
-                Err(reason) => return Ok(unsupported(reason, [] as [String; 0])),
-            };
-            let Some(edits) = edits else { break };
-            let nested_remaining = edits.nested_remaining;
-            let pieces = match build_preflight_edits(&source, edits.edits) {
-                Ok(pieces) => pieces,
-                Err(error) => {
-                    return Ok(unsupported("destructuring-edit-conflict", [error.reason]));
+            if built.diagnostics.is_empty() {
+                let language_options = TransformOptions {
+                    cwd: transform_options.cwd.clone(),
+                    assumptions: CompilerAssumptions {
+                        // Oxc's TypeScript pass owns class fields when this is
+                        // set and the class-properties plugin is not, lowering
+                        // `static x = 1` to `static { this.x = 1 }`. A class
+                        // field is an ES feature, so it stays for whoever the
+                        // caller selected to lower it — here, the `classes`
+                        // rewrite, which does not implement static blocks unless
+                        // the caller asked for them.
+                        set_public_class_fields: false,
+                        ..transform_options.assumptions
+                    },
+                    jsx: JsxOptions::disable(),
+                    // No helper loader, because `oxc_transformer::typescript`
+                    // requests no helper. That is what lets this run under inline
+                    // helper materialization as well: that mode recognises
+                    // `babelHelpers` references by their empty span, and printing
+                    // one here would give it a span it could no longer match.
+                    ..TransformOptions::default()
+                };
+                let language_started = debug_performance.then(Instant::now);
+                ast_traversal_count += 1;
+                let transformed =
+                    Transformer::new(&language_allocator, Path::new(&filename), &language_options)
+                        .build_with_scoping(built.semantic.into_scoping(), &mut program);
+                if let Some(started) = language_started {
+                    language_oxc_ms += started.elapsed().as_secs_f64() * 1_000.0;
                 }
-            };
-            let (rewritten_source, layer) = render_decoded(&source, &pieces, "boundary");
-            render_count += 1;
-            source = rewritten_source;
-            rewrite_layers.push(layer);
-            if !nested_remaining {
-                break;
+                if transformed.diagnostics.is_empty() {
+                    let render_started = debug_performance.then(Instant::now);
+                    // The intermediate is never the output, so it is printed
+                    // unminified whatever the caller asked for: the final codegen
+                    // does the minifying, and readable input keeps the rewrites'
+                    // own textual guards honest.
+                    let (printed, layer) = render_program(
+                        &program,
+                        &filename,
+                        false,
+                        options.comments.unwrap_or(true),
+                        0,
+                    )?;
+                    render_count += 1;
+                    if let Some(started) = render_started {
+                        language_codegen_ms += started.elapsed().as_secs_f64() * 1_000.0;
+                    }
+                    source = printed;
+                    rewrite_layers.push(layer);
+                    #[expect(deprecated)]
+                    {
+                        debug_assert!(
+                            transformed.helpers_used.is_empty(),
+                            "the language prepass must not request helpers"
+                        );
+                    }
+                    // The strip is selected by the program's source type rather
+                    // than by an option, so the intermediate is reclassified for
+                    // what it now is — the way the Flow adapter reclassifies its
+                    // own output. Left as TypeScript, the strip would run a
+                    // second time and, with no JSX pragma left to hold it,
+                    // elide the `React` import it had just decided to keep.
+                    // `with_typescript(false)` is a no-op — Oxc's `with_*`
+                    // setters only ever set — so the language has to be moved to
+                    // JavaScript outright. The JSX variant is separate and stays.
+                    active_source_type = active_source_type.with_javascript(true);
+                }
             }
-        } else {
-            break;
         }
     }
-    if options.object_rest_spread == Some(true)
-        && options.object_rest_spread_loose == Some(true)
-        && options.object_rest_spread_use_built_ins == Some(true)
-    {
-        for _ in 0..64 {
-            let rewrite_allocator = Allocator::default();
-            let rewrite_source_type = source_type(&filename, &source)?;
-            parse_count += 1;
-            let parsed = timed(debug_performance, &mut parse_ms, || {
-                Parser::new(&rewrite_allocator, &source, rewrite_source_type).parse()
-            });
-            if !parsed.diagnostics.is_empty() {
-                break;
-            }
-            semantic_build_count += 1;
-            ast_traversal_count += 1;
-            let semantic = timed(debug_performance, &mut semantic_build_ms, || {
-                SemanticBuilder::new()
-                    .with_build_nodes(true)
-                    .with_excess_capacity(2.0)
-                    .build(&parsed.program)
-            });
-            if !semantic.diagnostics.is_empty() {
-                break;
-            }
-            let Some(edits) = super::object_spread::edits(&source, &semantic.semantic) else {
-                let rest_edits = match super::destructuring::edits(
+    // The captured-loop rewrite exists only for block-scoped bindings captured
+    // across an iteration boundary. Every JavaScript iteration statement
+    // contains either the `for` or `while` keyword, so a source containing
+    // neither can proceed directly to the ordinary block-scoping transform.
+    // Raw substring checks are a deliberate lossless prerequisite: comments and
+    // identifiers may cause false positives, but valid captured loops cannot
+    // cause false negatives. Read after the prepass, because the source the
+    // rewrites see is the one the prepass printed.
+    let may_have_captured_loop = source.contains("for") || source.contains("while");
+    let mut rewrites: Vec<RewriteStep> = Vec::with_capacity(8);
+    // The rewrites read plain JavaScript, now that the prepass owns TypeScript
+    // and they no longer carry a branch for any of it. A source type that is
+    // still TypeScript here means the prepass declined — a file that does not
+    // parse, or one Oxc could not analyse — and there is nothing safe for them
+    // to do with it. Leaving the list empty hands the file to Oxc alone, whose
+    // postconditions below route it to Babel.
+    if !active_source_type.is_typescript() {
+        if options.block_scoping == Some(true) && may_have_captured_loop {
+            rewrites.push(RewriteStep::CapturedLoop);
+        }
+        // Lower classes before parameters so arrows in class-field initializers are
+        // first relocated into the constructor that owns their lexical `this`.
+        if options.classes == Some(true) || focused_private_features {
+            rewrites.push(RewriteStep::Classes);
+        }
+        if options.parameters == Some(true) {
+            rewrites.push(RewriteStep::Parameters);
+        }
+        if options.for_of == Some(true) {
+            rewrites.push(RewriteStep::ForOf);
+        }
+        if options.destructuring == Some(true) {
+            rewrites.push(RewriteStep::Destructuring);
+        }
+        if loose_object_rest {
+            rewrites.push(RewriteStep::ObjectSpread);
+            rewrites.push(RewriteStep::ObjectRest);
+        }
+        if regexp_rewrite_selected {
+            rewrites.push(RewriteStep::Regexp);
+        }
+    }
+    // One parse serves every rewrite until one of them renders.
+    //
+    // Each rewrite used to open with a parse and a semantic build of its own,
+    // and most of them have nothing to do: across a 5.4k-module graph 71% of
+    // parses produced no edit at all, and 61% of files rewrote nothing while
+    // still paying four of them. Only a render can invalidate a parse, so a
+    // rewrite that declines to act now hands its parse to the next one.
+    //
+    // `budget` is a runaway guard held per rewrite rather than for the section:
+    // each round of a rewrite lowers one more level of nesting, and a file
+    // cannot nest deeper than it is long.
+    const REWRITE_ROUNDS: u32 = 64;
+    let mut cursor = 0;
+    let mut budget = REWRITE_ROUNDS;
+    while cursor < rewrites.len() {
+        let rewrite_allocator = Allocator::default();
+        parse_count += 1;
+        let parsed = timed(debug_performance, &mut parse_ms, || {
+            Parser::new(&rewrite_allocator, &source, active_source_type).parse()
+        });
+        if !parsed.diagnostics.is_empty() {
+            // Nothing further can be rewritten, and the parse below reports the
+            // diagnostics rather than this loop swallowing them.
+            break;
+        }
+        semantic_build_count += 1;
+        ast_traversal_count += 1;
+        let built = timed(debug_performance, &mut semantic_build_ms, || {
+            SemanticBuilder::new()
+                .with_build_nodes(true)
+                .with_excess_capacity(2.0)
+                .build(&parsed.program)
+        });
+        if !built.diagnostics.is_empty() {
+            break;
+        }
+        let semantic = &built.semantic;
+        let mut rendered = None;
+        while let Some(step) = rewrites.get(cursor).copied() {
+            // `revisit` is whether the rewrite has to look at its own output
+            // before the next one runs.
+            let planned: Option<(Vec<EditCommand>, bool)> = match step {
+                RewriteStep::CapturedLoop => {
+                    block_scoping::captured_loop_edits(&source, semantic).map(|edits| (edits, true))
+                }
+                RewriteStep::Classes => match super::classes::edits(
                     &source,
-                    &semantic.semantic,
+                    semantic,
+                    options.classes == Some(true),
+                    if options.classes == Some(true) {
+                        options
+                            .class_properties
+                            .filter(|enabled| *enabled)
+                            .map(|_| options.class_properties_loose.unwrap_or(false))
+                    } else {
+                        Some(true)
+                    },
+                    options.class_static_block == Some(true),
+                    options
+                        .private_methods
+                        .filter(|enabled| *enabled)
+                        .map(|_| options.private_methods_loose.unwrap_or(false)),
+                    options
+                        .private_property_in_object
+                        .filter(|enabled| *enabled)
+                        .map(|_| options.private_property_in_object_loose.unwrap_or(false)),
+                    options.helpers_mode.as_deref() == Some("inline"),
+                ) {
+                    Ok(edits) => edits.map(|edits| (edits, true)),
+                    Err(reason) => return Ok(unsupported(reason, [] as [String; 0])),
+                },
+                RewriteStep::Parameters => match super::parameters::edits(&source, semantic) {
+                    Ok(edits) => edits.map(|edits| (edits, true)),
+                    Err(reason) => return Ok(unsupported(reason, [] as [String; 0])),
+                },
+                RewriteStep::ForOf => match super::for_of::edits(&source, semantic) {
+                    Ok(edits) => edits.map(|edits| (edits, true)),
+                    Err(reason) => return Ok(unsupported(reason, [] as [String; 0])),
+                },
+                RewriteStep::Destructuring => match super::destructuring::edits(
+                    &source,
+                    semantic,
+                    loose_object_rest,
+                    false,
+                    options.helpers_mode.as_deref() == Some("inline"),
+                ) {
+                    // A nesting is lowered one level per round, so the rewrite
+                    // only has to run again when one is left.
+                    Ok(edits) => edits.map(|edits| (edits.edits, edits.nested_remaining)),
+                    Err(reason) => return Ok(unsupported(reason, [] as [String; 0])),
+                },
+                RewriteStep::ObjectSpread => {
+                    super::object_spread::edits(&source, semantic).map(|edits| (edits, true))
+                }
+                // Object rest is what remains once every spread is lowered, so
+                // it runs once, after `ObjectSpread` has settled.
+                RewriteStep::ObjectRest => match super::destructuring::edits(
+                    &source,
+                    semantic,
                     true,
                     true,
                     options.helpers_mode.as_deref() == Some("inline"),
                 ) {
-                    Ok(edits) => edits,
+                    Ok(edits) => edits.map(|edits| (edits.edits, false)),
                     Err(reason) => return Ok(unsupported(reason, [] as [String; 0])),
-                };
-                if let Some(rest_edits) = rest_edits {
-                    let pieces = match build_preflight_edits(&source, rest_edits.edits) {
-                        Ok(pieces) => pieces,
-                        Err(_) => {
-                            return Ok(unsupported("object-rest-edit-conflict", [] as [String; 0]));
-                        }
-                    };
-                    let (rewritten_source, layer) = render_decoded(&source, &pieces, "boundary");
-                    render_count += 1;
-                    source = rewritten_source;
-                    rewrite_layers.push(layer);
-                }
-                break;
-            };
-            let pieces = match build_preflight_edits(&source, edits) {
-                Ok(pieces) => pieces,
-                Err(_) => {
-                    return Ok(unsupported(
-                        "object-spread-edit-conflict",
-                        [] as [String; 0],
-                    ));
-                }
-            };
-            let (rewritten_source, layer) = render_decoded(&source, &pieces, "boundary");
-            render_count += 1;
-            source = rewritten_source;
-            rewrite_layers.push(layer);
-        }
-    }
-    if options.regexp_unicode == Some(true)
-        || options.regexp_unicode_property_escapes == Some(true)
-        || options.regexp_dot_all == Some(true)
-        || options.regexp_named_capture_groups == Some(true)
-    {
-        let rewrite_allocator = Allocator::default();
-        let rewrite_source_type = source_type(&filename, &source)?;
-        parse_count += 1;
-        let parsed = timed(debug_performance, &mut parse_ms, || {
-            Parser::new(&rewrite_allocator, &source, rewrite_source_type).parse()
-        });
-        if parsed.diagnostics.is_empty() {
-            semantic_build_count += 1;
-            ast_traversal_count += 1;
-            let semantic = timed(debug_performance, &mut semantic_build_ms, || {
-                SemanticBuilder::new()
-                    .with_build_nodes(true)
-                    .with_excess_capacity(2.0)
-                    .build(&parsed.program)
-            });
-            if semantic.diagnostics.is_empty() {
-                let edits = match super::regexp::edits(
+                },
+                RewriteStep::Regexp => match super::regexp::edits(
                     &source,
-                    &semantic.semantic,
+                    semantic,
                     options.regexp_unicode == Some(true),
                     options.regexp_unicode_property_escapes == Some(true),
                     options.regexp_dot_all == Some(true),
                     options.regexp_named_capture_groups == Some(true),
                     options.helpers_mode.as_deref() == Some("inline"),
                 ) {
-                    Ok(edits) => edits,
+                    Ok(edits) => edits.map(|edits| (edits, false)),
                     Err(reason) => return Ok(unsupported(reason, [] as [String; 0])),
-                };
-                if let Some(edits) = edits {
-                    let pieces = match build_preflight_edits(&source, edits) {
-                        Ok(pieces) => pieces,
-                        Err(_) => {
-                            return Ok(unsupported("regexp-edit-conflict", [] as [String; 0]));
-                        }
-                    };
-                    let (rewritten_source, layer) = render_decoded(&source, &pieces, "boundary");
-                    render_count += 1;
-                    source = rewritten_source;
-                    rewrite_layers.push(layer);
+                },
+            };
+            let Some((edits, revisit)) = planned else {
+                cursor += 1;
+                budget = REWRITE_ROUNDS;
+                continue;
+            };
+            let pieces = match build_preflight_edits(&source, edits) {
+                Ok(pieces) => pieces,
+                // A conflict is a defect in the lowering rather than
+                // unsupported input, so where the message names the two
+                // conflicting ranges it is worth carrying.
+                Err(error) => {
+                    return Ok(if step.reports_conflicting_ranges() {
+                        unsupported(step.conflict_reason(), [error.reason])
+                    } else {
+                        unsupported(step.conflict_reason(), [] as [String; 0])
+                    });
                 }
+            };
+            let (next, layer) = render_decoded(&source, &pieces, step.mapping());
+            if next == source {
+                // A rewrite that reproduces its input has converged. Keeping the
+                // identity layer would also make an untouched file look rewritten
+                // to the shortcut further down.
+                cursor += 1;
+                budget = REWRITE_ROUNDS;
+                continue;
             }
+            render_count += 1;
+            budget -= 1;
+            if !revisit || budget == 0 {
+                cursor += 1;
+                budget = REWRITE_ROUNDS;
+            }
+            rendered = Some((next, layer));
+            break;
         }
+        let Some((next, layer)) = rendered else { break };
+        source = next;
+        rewrite_layers.push(layer);
     }
     let allocator = Allocator::default();
     let custom_rewrite_ms =
         custom_rewrite_started.map(|started| started.elapsed().as_secs_f64() * 1_000.0);
-    let source_type = source_type(&filename, &source)?;
     parse_count += 1;
     let parsed = timed(debug_performance, &mut parse_ms, || {
-        Parser::new(&allocator, &source, source_type).parse()
+        Parser::new(&allocator, &source, active_source_type).parse()
     });
     if !parsed.diagnostics.is_empty() {
         return Ok(unsupported("parse-error", parsed.diagnostics));
@@ -673,11 +621,12 @@ pub fn transform(
     // The result is a bare `yield` in a body that is still `async`, which the
     // next parse rejects. Babel avoids this by re-queuing replaced nodes.
     //
-    // Deferring async lowering to a second pass restores that ordering. The
-    // first pass hands back its updated scoping, so the extra pass costs one
-    // traversal and no semantic rebuild, and it only runs for the app source
-    // that enables Refresh in the first place.
-    let deferred_async = (options.react_refresh == Some(true)
+    // Refresh has to stay in this pass to see JSX, so separating the two is this
+    // pass's problem and not the language prepass's. Deferring async lowering to
+    // a second run restores the ordering; the first hands back its updated
+    // scoping, so it costs one traversal and no semantic rebuild, and it only
+    // happens for the app source that enables Refresh at all.
+    let deferred_async = (transform_options.jsx.refresh.is_some()
         && (transform_options.env.es2017.async_to_generator
             || transform_options.env.es2018.async_generator_functions))
         .then(|| {
@@ -708,8 +657,8 @@ pub fn transform(
         #[expect(deprecated)]
         transformed.helpers_used.extend(async_pass.helpers_used);
     }
-    let oxc_transform_ms =
-        oxc_transform_started.map(|started| started.elapsed().as_secs_f64() * 1_000.0);
+    let oxc_transform_ms = oxc_transform_started
+        .map(|started| started.elapsed().as_secs_f64() * 1_000.0 + language_oxc_ms);
     if !transformed.diagnostics.is_empty() {
         return Ok(unsupported("transform-error", transformed.diagnostics));
     }
@@ -876,18 +825,77 @@ pub fn transform(
     let helper_materialization_ms =
         helper_materialization_started.map(|started| started.elapsed().as_secs_f64() * 1_000.0);
 
-    let codegen_options = CodegenOptions {
-        minify: options.compact.unwrap_or(false),
-        comments: if options.comments.unwrap_or(true) {
-            CommentOptions::default()
-        } else {
-            CommentOptions::disabled()
-        },
-        source_map_path: Some(PathBuf::from(&filename)),
-        ..CodegenOptions::default()
-    };
     let codegen_and_map_started = debug_performance.then(Instant::now);
-    let generated = Codegen::new().with_options(codegen_options).build(&program);
+    let generated_line_offset = u32::from(inline_prefix.is_some());
+    let (generated_code, codegen_layer) = render_program(
+        &program,
+        &filename,
+        options.compact.unwrap_or(false),
+        options.comments.unwrap_or(true),
+        generated_line_offset,
+    )?;
+    let layer = if rewrite_layers.is_empty() {
+        codegen_layer
+    } else {
+        let mut layers: Vec<&[u8]> = rewrite_layers.iter().map(Vec::as_slice).collect();
+        layers.push(codegen_layer.as_slice());
+        compose_packed_layer_chain(&layers).ok_or_else(|| {
+            Error::new(
+                Status::GenericFailure,
+                "native captured-loop map composition failed",
+            )
+        })?
+    };
+    let codegen_and_map_ms = codegen_and_map_started
+        .map(|started| started.elapsed().as_secs_f64() * 1_000.0 + language_codegen_ms);
+    Ok(NativePreflightResult {
+        status: "complete".into(),
+        reason: None,
+        code: Some(match inline_prefix {
+            Some(prefix) => prefix + &generated_code,
+            None => generated_code,
+        }),
+        map: Some(layer.into()),
+        diagnostics: Vec::new(),
+        helpers_used,
+        parse_count: Some(parse_count),
+        semantic_build_count: Some(semantic_build_count),
+        ast_traversal_count: Some(ast_traversal_count),
+        render_count: Some(render_count + 1),
+        parse_ms: debug_performance.then_some(parse_ms),
+        semantic_build_ms: debug_performance.then_some(semantic_build_ms),
+        custom_rewrite_ms,
+        oxc_transform_ms,
+        optimization_ms,
+        codegen_and_map_ms,
+        helper_discovery_ms,
+        helper_materialization_ms,
+    })
+}
+
+/// Print a program and pack its map into a decoded layer.
+///
+/// `generated_line_offset` accounts for lines the caller prepends to the
+/// printed code after the fact, which the map has to be shifted past.
+fn render_program(
+    program: &Program<'_>,
+    filename: &str,
+    minify: bool,
+    comments: bool,
+    generated_line_offset: u32,
+) -> Result<(String, Vec<u8>)> {
+    let generated = Codegen::new()
+        .with_options(CodegenOptions {
+            minify,
+            comments: if comments {
+                CommentOptions::default()
+            } else {
+                CommentOptions::disabled()
+            },
+            source_map_path: Some(PathBuf::from(filename)),
+            ..CodegenOptions::default()
+        })
+        .build(program);
     let map = generated.map.ok_or_else(|| {
         Error::new(
             Status::GenericFailure,
@@ -895,7 +903,6 @@ pub fn transform(
         )
     })?;
     let names: Vec<String> = map.get_names().map(str::to_owned).collect();
-    let generated_line_offset = u32::from(inline_prefix.is_some());
     let mut words = Vec::with_capacity(map.get_tokens().count() * 5);
     let mut line_count = 1 + generated_line_offset;
     for token in map.get_tokens() {
@@ -914,44 +921,10 @@ pub fn transform(
             token.get_name_id().map_or(0, |id| id + 1),
         ]);
     }
-    let codegen_layer = pack_decoded_layer(&words, &names, line_count);
-    let layer = if rewrite_layers.is_empty() {
-        codegen_layer
-    } else {
-        let mut layers: Vec<&[u8]> = rewrite_layers.iter().map(Vec::as_slice).collect();
-        layers.push(codegen_layer.as_slice());
-        compose_packed_layer_chain(&layers).ok_or_else(|| {
-            Error::new(
-                Status::GenericFailure,
-                "native captured-loop map composition failed",
-            )
-        })?
-    };
-    let codegen_and_map_ms =
-        codegen_and_map_started.map(|started| started.elapsed().as_secs_f64() * 1_000.0);
-    Ok(NativePreflightResult {
-        status: "complete".into(),
-        reason: None,
-        code: Some(match inline_prefix {
-            Some(prefix) => prefix + &generated.code,
-            None => generated.code,
-        }),
-        map: Some(layer.into()),
-        diagnostics: Vec::new(),
-        helpers_used,
-        parse_count: Some(parse_count),
-        semantic_build_count: Some(semantic_build_count),
-        ast_traversal_count: Some(ast_traversal_count),
-        render_count: Some(render_count + 1),
-        parse_ms: debug_performance.then_some(parse_ms),
-        semantic_build_ms: debug_performance.then_some(semantic_build_ms),
-        custom_rewrite_ms,
-        oxc_transform_ms,
-        optimization_ms,
-        codegen_and_map_ms,
-        helper_discovery_ms,
-        helper_materialization_ms,
-    })
+    Ok((
+        generated.code,
+        pack_decoded_layer(&words, &names, line_count),
+    ))
 }
 
 fn compile_options(options: &NativePreflightOptions) -> Result<TransformOptions> {
@@ -1027,7 +1000,15 @@ fn compile_options(options: &NativePreflightOptions) -> Result<TransformOptions>
     }
     compiled.env.es2026.explicit_resource_management =
         options.explicit_resource_management == Some(true);
-    compiled.env.es2022.class_static_block = options.class_static_block == Some(true);
+    // Selecting `classes` hands every class to the source-level rewrite, which
+    // lowers its fields, static blocks and private members along with it. Oxc's
+    // class-feature transforms then have nothing left to visit, and the
+    // assumptions that configure them are read by passes that were never meant
+    // to act on them — `set_public_class_fields` is what makes Oxc's TypeScript
+    // strip lower `static x = 1` into a static block. Neither is selected here.
+    let class_features_owned_by_rewrite = options.classes == Some(true);
+    compiled.env.es2022.class_static_block =
+        options.class_static_block == Some(true) && !class_features_owned_by_rewrite;
     compiled.env.es2021.logical_assignment_operators =
         options.logical_assignment_operators == Some(true);
     compiled.env.es2020.optional_chaining = options.optional_chaining == Some(true);
@@ -1071,14 +1052,19 @@ fn compile_options(options: &NativePreflightOptions) -> Result<TransformOptions>
             selected_class_feature_loose = Some(loose);
         }
     }
-    if options.class_properties == Some(true) {
+    if options.class_properties == Some(true) && !class_features_owned_by_rewrite {
+        // `ClassProperties::new` already reads `loose` into both
+        // `set_public_class_fields` and `private_fields_as_properties`, and only
+        // ORs the assumptions of the same name on top
+        // (`es2022/class_properties/mod.rs:296,320`). Setting them here would add
+        // nothing for this plugin and would put `set_public_class_fields` where
+        // Oxc's TypeScript strip can read it — which is the one other place that
+        // does, and which lowers class fields of its own accord when it sees it.
         let loose = options.class_properties_loose.unwrap_or(false);
         compiled.env.es2022.class_properties =
             Some(oxc_transformer::ClassPropertiesOptions { loose });
-        compiled.assumptions.set_public_class_fields = loose;
-        compiled.assumptions.private_fields_as_properties = loose;
     }
-    let mut nullish_loose = None;
+    let mut nullish_loose: Option<bool> = None;
     for (enabled, loose) in [
         (options.optional_chaining, options.optional_chaining_loose),
         (
@@ -1097,8 +1083,18 @@ fn compile_options(options: &NativePreflightOptions) -> Result<TransformOptions>
             nullish_loose = Some(loose);
         }
     }
-    if let Some(loose) = nullish_loose {
-        compiled.assumptions.no_document_all = loose;
+    // `no_document_all` is an assumption about the whole program, and the only
+    // transforms that read it are optional chaining
+    // (`es2020/optional_chaining.rs`) and the optional chain that class
+    // properties builds around a private field
+    // (`es2022/class_properties/private_field.rs:1626`). Oxc's nullish
+    // coalescing does not read it at all, so deriving it from that option's
+    // `loose` would leave the nullish output untouched while quietly loosening
+    // two transforms the caller did not configure. The validation above already
+    // requires the two `loose` values to agree wherever both are selected, so
+    // reading only optional chaining's changes nothing when they are.
+    if options.optional_chaining == Some(true) {
+        compiled.assumptions.no_document_all = options.optional_chaining_loose.unwrap_or(false);
     }
     compiled.env.regexp.sticky_flag = options.regexp_sticky == Some(true);
     compiled.env.regexp.unicode_flag = options.regexp_unicode == Some(true);
@@ -1269,6 +1265,52 @@ impl<'a> Visit<'a> for ClassFeaturesUnsupportedDetector {
     }
 }
 
+/// A source-level rewrite, in the order the rewrites have to run.
+///
+/// They are steps of one loop rather than loops of their own so that a parse
+/// outlives every rewrite that declines to act on it.
+#[derive(Clone, Copy)]
+enum RewriteStep {
+    CapturedLoop,
+    Classes,
+    Parameters,
+    ForOf,
+    Destructuring,
+    ObjectSpread,
+    ObjectRest,
+    Regexp,
+}
+
+impl RewriteStep {
+    /// Granularity the render maps at.
+    fn mapping(self) -> &'static str {
+        match self {
+            // Relocating a loop body moves original text into a helper, so its
+            // mappings only survive if every character carries one.
+            Self::CapturedLoop => "character",
+            _ => "boundary",
+        }
+    }
+
+    fn conflict_reason(self) -> &'static str {
+        match self {
+            Self::CapturedLoop => "captured-loop-edit-conflict",
+            Self::Classes => "classes-edit-conflict",
+            Self::Parameters => "parameters-edit-conflict",
+            Self::ForOf => "for-of-edit-conflict",
+            Self::Destructuring => "destructuring-edit-conflict",
+            Self::ObjectSpread => "object-spread-edit-conflict",
+            Self::ObjectRest => "object-rest-edit-conflict",
+            Self::Regexp => "regexp-edit-conflict",
+        }
+    }
+
+    /// Whether a conflict here is worth reporting with the two ranges named.
+    fn reports_conflicting_ranges(self) -> bool {
+        matches!(self, Self::Destructuring)
+    }
+}
+
 struct ClassesDetector(bool);
 struct DestructuringDetector(bool);
 struct ParametersDetector(bool);
@@ -1289,12 +1331,6 @@ impl<'a> VisitMut<'a> for InlineHelperRenamer<'a> {
 
 impl<'a> Visit<'a> for ClassesDetector {
     fn visit_class(&mut self, class: &Class<'a>) {
-        // An ambient class is a type declaration, and the TypeScript strip pass
-        // deletes it. `classes::edits` deliberately leaves it alone for that
-        // reason, so seeing one here is not an unlowered class.
-        if class.declare {
-            return;
-        }
         self.0 = true;
         walk::walk_class(self, class);
     }
@@ -1327,48 +1363,6 @@ impl<'a> Visit<'a> for ParametersDetector {
                 parameter.initializer.is_some() || !parameter.pattern.is_binding_identifier()
             });
         walk::walk_formal_parameters(self, parameters);
-    }
-
-    // Everything below is TypeScript that emits nothing, and the lowering pass
-    // correspondingly leaves it alone. This postcondition runs before the
-    // TypeScript strip, though, so without pruning a parameter list that only
-    // ever existed as a type — `(({x}) => T)` in an annotation, `...args` in an
-    // interface method signature, an overload signature — reads as a parameter
-    // the pass forgot to lower.
-
-    fn visit_ts_type(&mut self, _: &oxc_ast::ast::TSType<'a>) {}
-
-    fn visit_ts_interface_declaration(&mut self, _: &oxc_ast::ast::TSInterfaceDeclaration<'a>) {}
-
-    fn visit_ts_type_alias_declaration(&mut self, _: &oxc_ast::ast::TSTypeAliasDeclaration<'a>) {}
-
-    fn visit_function(&mut self, function: &oxc_ast::ast::Function<'a>, flags: ScopeFlags) {
-        // No body is an overload signature or an ambient declaration.
-        if function.declare || function.body.is_none() {
-            return;
-        }
-        walk::walk_function(self, function, flags);
-    }
-
-    fn visit_method_definition(&mut self, method: &MethodDefinition<'a>) {
-        if method.value.body.is_none() {
-            return;
-        }
-        walk::walk_method_definition(self, method);
-    }
-
-    fn visit_class(&mut self, class: &Class<'a>) {
-        if class.declare {
-            return;
-        }
-        walk::walk_class(self, class);
-    }
-
-    fn visit_ts_module_declaration(&mut self, module: &oxc_ast::ast::TSModuleDeclaration<'a>) {
-        if module.declare {
-            return;
-        }
-        walk::walk_ts_module_declaration(self, module);
     }
 }
 

@@ -14,7 +14,7 @@ import {
 
 const pipeline = (
   transforms: PreflightTransforms,
-  helpers: { mode: 'runtime'; moduleName: string; version: string } = {
+  helpers: { mode: 'runtime'; moduleName: string; version: string } | { mode: 'inline' } = {
     mode: 'runtime',
     moduleName: '@babel/runtime',
     version: '7.29.7',
@@ -1711,4 +1711,272 @@ test('parameter lists that only exist as TypeScript types are not left unlowered
   const context: { answer?: unknown } = {};
   new Function('globalThis', 'require', result.code)(context, runtimeRequire);
   assert.deepEqual(context.answer, ['ok', 2]);
+});
+
+test('the language prepass erases TypeScript before the ES rewrites read it', () => {
+  // `declare` and `abstract` fields emit nothing, an overload signature and an
+  // ambient class emit nothing, a parameter property becomes a field plus an
+  // ordered constructor assignment, and an `enum` reaches block scoping already
+  // lowered. Every one of those used to be the ES rewrites' problem.
+  const result = transform(
+    `enum Kind { Wide, Tall }
+     declare class Ambient { gone: number }
+     abstract class Shape {
+       abstract label: () => string;
+       declare hint: string;
+       kind = Kind.Wide;
+       area(...sizes: number[]): number;
+       area(first: number): number { return first }
+     }
+     class Box extends Shape {
+       label = () => 'box';
+       constructor(public width: number, protected height = 2) {
+         super();
+         this.total = this.width * this.height;
+       }
+     }
+     const box = new Box(3);
+     globalThis.answer = [box.total, box.label(), box.kind, box.area(4), Object.keys(box).sort()];`,
+    'fixture.ts',
+    pipeline({ blockScoping: true, classes: true, classProperties: { loose: true } }),
+  );
+  assert.equal(result.status, 'complete');
+  assert.doesNotMatch(result.code, /\b(?:let|const)\s/);
+  assert.doesNotMatch(result.code, /\bAmbient\b/);
+  // An abstract or `declare`d field is a type, so it must not reach the instance.
+  assert.doesNotMatch(result.code, /\bhint\b/);
+  const context: { answer?: unknown } = {};
+  new Function('globalThis', 'require', result.code)(context, runtimeRequire);
+  assert.deepEqual(context.answer, [6, 'box', 0, 4, ['height', 'kind', 'label', 'total', 'width']]);
+});
+
+test('a parameter name that only collides with a type keeps its own name', () => {
+  // Type parameters and annotation parameters are symbols too, so before the
+  // prepass they made the ES rewrites rename bindings and wrap function bodies
+  // to avoid collisions that could not happen at runtime.
+  const result = transform(
+    `type Handler = (value: string) => void;
+     interface Props { value: string; onChange: (value: string) => void }
+     function render(props: Props) {
+       const { value } = props;
+       return value.toUpperCase();
+     }
+     globalThis.answer = render({ value: 'ok', onChange: () => {} });`,
+    'fixture.ts',
+    pipeline({ blockScoping: true, destructuring: { useBuiltIns: true }, parameters: true }),
+  );
+  assert.equal(result.status, 'complete');
+  assert.doesNotMatch(result.code, /_value\b/);
+  assert.doesNotMatch(result.code, /\}\.apply\(this, ?arguments\)/);
+  const context: { answer?: unknown } = {};
+  new Function('globalThis', 'require', result.code)(context, runtimeRequire);
+  assert.equal(context.answer, 'OK');
+});
+
+test('React Refresh still registers a context used as a JSX element', () => {
+  // Refresh only registers `const Foo = call()` when `Foo` appears as a JSX
+  // element name, so it has to run while the JSX is still JSX — which is why it
+  // stays out of the language prepass.
+  const result = transform(
+    `import { createContext, useState } from 'react';
+     export const ThemeContext = createContext<number>(1);
+     export function Provider({ children }: { children: unknown }) {
+       const [value] = useState(2);
+       return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
+     }`,
+    'fixture.tsx',
+    defineNativePipeline({
+      phases: [
+        {
+          name: 'refresh',
+          native: {
+            typescript: 'strip',
+            jsx: 'automatic',
+            jsxImportSource: 'react',
+            reactRefresh: {},
+            transforms: {
+              blockScoping: true,
+              destructuring: { useBuiltIns: true },
+              parameters: true,
+            },
+            helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
+            compact: true,
+            comments: false,
+          },
+        },
+      ],
+    }),
+  );
+  assert.equal(result.status, 'complete');
+  assert.match(result.code, /\$RefreshReg\$\(\w+, ?`ThemeContext`\)/);
+  assert.match(result.code, /\$RefreshReg\$\(\w+, ?`Provider`\)/);
+  // The signature call belongs at the top of the body, ahead of the prologue
+  // the parameter rewrite adds.
+  assert.match(result.code, /function Provider\(\)\{_s\(\)/);
+});
+
+test('Oxc keeps the class-feature transforms it owns and loses the ones it does not', () => {
+  // `set_public_class_fields` is how `classProperties: { loose }` reaches Oxc,
+  // so it has to survive when Oxc is the one lowering fields — and it must not
+  // be set when `classes` is, because there it configures nothing Oxc will run
+  // and is still read by Oxc's TypeScript strip, which lowers a static field
+  // into a static block on the strength of it.
+  const source = `class C { x = 1; static s = 2; static { globalThis.block = 3 } }
+    globalThis.answer = [new C().x, C.s, globalThis.block];`;
+  const expected = [1, 2, 3];
+
+  const loose = transform(
+    source,
+    'fixture.js',
+    pipeline({ classProperties: { loose: true }, classStaticBlock: true }),
+  );
+  assert.equal(loose.status, 'complete');
+  assert.match(loose.code, /this\.x\s*=\s*1/);
+  assert.doesNotMatch(loose.code, /_defineProperty/);
+
+  const spec = transform(
+    source,
+    'fixture.js',
+    pipeline({ classProperties: { loose: false }, classStaticBlock: true }),
+  );
+  assert.equal(spec.status, 'complete');
+  assert.match(spec.code, /_defineProperty\(this, ?`x`, ?1\)/);
+
+  const owned = transform(
+    source,
+    'fixture.js',
+    pipeline({ classes: true, classProperties: { loose: true }, classStaticBlock: true }),
+  );
+  assert.equal(owned.status, 'complete');
+  assert.doesNotMatch(owned.code, /\bclass\s+C\b/);
+  assert.doesNotMatch(owned.code, /_defineProperty/);
+
+  for (const result of [loose, spec, owned]) {
+    const context: { answer?: unknown; block?: unknown } = {};
+    new Function('globalThis', 'require', result.code)(context, runtimeRequire);
+    assert.deepEqual(context.answer, expected);
+  }
+});
+
+test('a loose option does not loosen a transform it was not given to', () => {
+  // `no_document_all` is a whole-program assumption, and the only readers are
+  // optional chaining and the optional chain class properties builds around a
+  // private field. Selecting it from `nullishCoalescingOperator` left the
+  // nullish output untouched — Oxc's nullish transform never reads it — while
+  // quietly rewriting `o?.#x` in a transform the caller configured separately.
+  const chain = 'class C { #x = 1; read(o) { return o?.#x } }';
+  const strict = /o===null\|\|o===void 0/;
+
+  const nullishLoose = transform(
+    chain,
+    'fixture.js',
+    pipeline({ classProperties: { loose: false }, nullishCoalescingOperator: { loose: true } }),
+  );
+  assert.equal(nullishLoose.status, 'complete');
+  assert.match(nullishLoose.code, strict);
+
+  // Asking for it where it belongs still works.
+  const chainLoose = transform(
+    chain,
+    'fixture.js',
+    pipeline({ classProperties: { loose: false }, optionalChaining: { loose: true } }),
+  );
+  assert.equal(chainLoose.status, 'complete');
+  assert.match(chainLoose.code, /o==null/);
+
+  const chainStrict = transform(
+    chain,
+    'fixture.js',
+    pipeline({ classProperties: { loose: false }, optionalChaining: { loose: false } }),
+  );
+  assert.equal(chainStrict.status, 'complete');
+  assert.match(chainStrict.code, strict);
+});
+
+test('inline helper materialization gets the same TypeScript treatment', () => {
+  // Inline helper materialization used to skip the language prepass, which left
+  // it running a second, separate implementation of TypeScript erasure inside
+  // the rewrites — one that every other test in this file had stopped covering.
+  // The prepass runs on every path now and that implementation is gone, so this
+  // pins that the mode which was the exception behaves like the rest.
+  const inline = { mode: 'inline' } as const;
+  const run = (source: string, transforms: Parameters<typeof pipeline>[0]) => {
+    const result = transform(source, 'fixture.ts', pipeline(transforms, inline));
+    assert.equal(result.status, 'complete', result.status === 'bailout' ? result.reason : '');
+    assert.ok(result.status === 'complete');
+    const context: { answer?: unknown } = {};
+    new Function('globalThis', 'require', result.code)(context, runtimeRequire);
+    return { code: result.code, answer: context.answer };
+  };
+  const classes = { classes: true, classProperties: { loose: true } } as const;
+
+  // A parameter property is not a parameter.
+  const parameterProperty = run(
+    `class Plain { offset = 10; constructor(private only: number) { this.total = this.only + this.offset } }
+     globalThis.answer = new Plain(5).total;`,
+    classes,
+  );
+  assert.doesNotMatch(parameterProperty.code, /\b(?:public|protected|private)\b/);
+  assert.equal(parameterProperty.answer, 15);
+
+  // An overload signature is not the implementation.
+  assert.equal(
+    run(
+      `class Value { read(input: string): number; read(input: any) { return 10 + input } }
+       globalThis.answer = new Value().read(2);`,
+      classes,
+    ).answer,
+    12,
+  );
+
+  // An ambient class emits nothing.
+  const ambient = run(
+    'declare class Value { x: number }\nglobalThis.answer = typeof Value;',
+    classes,
+  );
+  assert.doesNotMatch(ambient.code, /\bValue\s*=/);
+  assert.equal(ambient.answer, 'undefined');
+
+  // A `declare`d or `abstract` field never reaches the instance.
+  const fields = run(
+    `abstract class Shape { abstract label: () => string; declare hint: string; kind = 1 }
+     class Box extends Shape { label = () => 'box' }
+     globalThis.answer = Object.keys(new Box()).sort();`,
+    classes,
+  );
+  assert.doesNotMatch(fields.code, /\bhint\b/);
+  assert.deepEqual(fields.answer, ['kind', 'label']);
+
+  // A parameter list that only ever existed as a type is not unlowered work.
+  assert.equal(
+    run(
+      `interface Renderer { render(...items: string[]): string }
+       type Formatter = ({ value }: { value: string }) => string;
+       const format: Formatter = ({ value }) => value;
+       globalThis.answer = format({ value: 'ok' });`,
+      { parameters: true, destructuring: { useBuiltIns: true } },
+    ).answer,
+    'ok',
+  );
+});
+
+test('a decorator is refused rather than dropped on the way through', () => {
+  // Neither the TypeScript pass nor the `classes` rewrite implements decorators,
+  // and both discard them in passing. Checked only after the rewrites, as it
+  // used to be, there is nothing left to find and the class ships undecorated —
+  // which is what `ActionSheetScreen.tsx` had been doing.
+  for (const source of [
+    '@wrap\nclass App { render() { return 1 } }',
+    'class App { @bound method() { return 1 } }',
+    'class App { constructor(@inject() private service: Service) {} }',
+  ]) {
+    const result = transform(
+      `${source}\nglobalThis.answer = new App();`,
+      'fixture.ts',
+      pipeline({ classes: true, classProperties: { loose: true } }),
+    );
+    assert.equal(result.status, 'bailout');
+    assert.ok(result.status === 'bailout');
+    assert.equal(result.reason, 'syntax:decorators-not-supported');
+  }
 });

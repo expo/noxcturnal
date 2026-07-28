@@ -3,8 +3,8 @@
 use oxc_ast::{
     AstKind,
     ast::{
-        Class, ClassElement, ClassType, Expression, FormalParameter, Function, FunctionBody,
-        MethodDefinition, MethodDefinitionKind, PropertyKey, Statement,
+        Class, ClassElement, ClassType, Expression, Function, FunctionBody, MethodDefinition,
+        MethodDefinitionKind, PropertyKey, Statement,
     },
 };
 use oxc_semantic::{NodeId, Semantic};
@@ -49,13 +49,6 @@ pub(super) fn edits(
             let AstKind::Class(class) = node.kind() else {
                 return None;
             };
-            // An ambient class declares a type and emits nothing. Lowering it
-            // would turn `declare class A {}` into a real `var A`, because the
-            // TypeScript strip pass that would have deleted it no longer sees a
-            // class. Leaving it alone is what makes it disappear.
-            if class.declare {
-                return None;
-            }
             let owns_private_method = private_methods_loose.is_some()
                 && class.body.body.iter().any(|element| {
                     matches!(element, ClassElement::MethodDefinition(method)
@@ -985,56 +978,6 @@ fn super_member(source: &str, expression: &Expression<'_>) -> Option<(Span, Stri
     }
 }
 
-/// A constructor's parameter list with TypeScript parameter properties reduced
-/// to ordinary parameters, paired with the field assignments they stand for.
-///
-/// `constructor(private x: T)` declares a field and assigns it from the
-/// argument. This lowering copies parameter text straight into a `function`
-/// header, where `private x` is not a parameter, and the erasure that would
-/// have removed the modifier runs in the later Oxc pass — after the rewritten
-/// source has to parse. Rebuilding the list from each parameter's pattern
-/// onwards drops the modifiers while keeping type annotations and defaults, and
-/// the assignments join the constructor prologue where TypeScript emits them:
-/// after `super()` and after the instance field initializers.
-fn constructor_parameters(
-    source: &str,
-    function: &Function<'_>,
-    target: &str,
-) -> Result<(String, String), &'static str> {
-    let parameters = &function.params;
-    if !parameters.items.iter().any(FormalParameter::has_modifier) {
-        return Ok((slice(source, parameters.span).to_owned(), String::new()));
-    }
-    let mut rendered = Vec::with_capacity(parameters.items.len() + 1);
-    let mut assignments = String::new();
-    for parameter in &parameters.items {
-        // Rebuilding the list from the pattern would also drop parameter
-        // decorators, and the decorator guard only sees the rewritten source.
-        if !parameter.decorators.is_empty() {
-            return Err("classes-parameter-decorators-not-supported");
-        }
-        rendered.push(slice(
-            source,
-            Span::new(parameter.pattern.span().start, parameter.span.end),
-        ));
-        if !parameter.has_modifier() {
-            continue;
-        }
-        let Some(identifier) = parameter.pattern.get_binding_identifier() else {
-            // TypeScript rejects a destructured parameter property, so this is
-            // unreachable for input that type-checks. Bail rather than invent a
-            // field name for it.
-            return Err("classes-parameter-property-shape-not-implemented");
-        };
-        let field = identifier.name.as_str();
-        assignments.push_str(&format!("{target}.{field}={field};"));
-    }
-    if let Some(rest) = &parameters.rest {
-        rendered.push(slice(source, rest.span));
-    }
-    Ok((format!("({})", rendered.join(",")), assignments))
-}
-
 /// The `super()` call a derived constructor evaluates first, when the split
 /// lowering can be used at all.
 ///
@@ -1165,7 +1108,7 @@ fn derived_constructor(
         new_target_alias: captures_new_target.then_some(new_target_alias.as_str()),
         ..BodyRewrite::default()
     };
-    let (params, parameter_properties) = constructor_parameters(source, function, "this")?;
+    let params = slice(source, function.params.span);
     // Four ranges of one body, so the node table is walked once for all of them.
     let rewrites = body_rewrites(source, semantic, body.span, &rewrite)?;
     let emit = |span: Span| {
@@ -1198,7 +1141,7 @@ fn derived_constructor(
         String::from("new.target")
     };
     Ok(format!(
-        "function {name}{params}{{if(!(this instanceof {name}))throw new TypeError(\"Cannot call a class as a function\");{new_target_capture}{before}var {this_alias}={CONSTRUCT_PLACEHOLDER}({super_name},[{arguments}],{new_target_argument}||{name});{}var {result_alias}=(function(){{{parameter_properties}{tail}{after}}}).apply({this_alias},arguments);{}return {this_alias}}}",
+        "function {name}{params}{{if(!(this instanceof {name}))throw new TypeError(\"Cannot call a class as a function\");{new_target_capture}{before}var {this_alias}={CONSTRUCT_PLACEHOLDER}({super_name},[{arguments}],{new_target_argument}||{name});{}var {result_alias}=(function(){{{tail}{after}}}).apply({this_alias},arguments);{}return {this_alias}}}",
         initialize_instance(instance_initializers, &this_alias),
         possible_constructor_return(&result_alias)
     ))
@@ -1231,7 +1174,7 @@ fn general_derived_constructor(
     let result_alias = local_name("_result", reserved);
     let new_target_alias = local_name("_newtarget", reserved);
     let super_alias = local_name("_super", reserved);
-    let (params, parameter_properties) = constructor_parameters(source, function, &this_alias)?;
+    let params = slice(source, function.params.span);
     let contents = rewritten(
         source,
         semantic,
@@ -1246,7 +1189,7 @@ fn general_derived_constructor(
         },
     )?;
     Ok(format!(
-        "function {name}{params}{{if(!(this instanceof {name}))throw new TypeError(\"Cannot call a class as a function\");var {this_alias},{new_target_alias}=new.target;function {super_alias}(){{{this_alias}={CONSTRUCT_PLACEHOLDER}({super_name},arguments,{new_target_alias}||{name});{}{parameter_properties}return {this_alias}}}var {result_alias}=(function(){{{contents}}}).apply(void 0,arguments);{}if({this_alias}===void 0)throw new ReferenceError(\"this hasn't been initialised - super() hasn't been called\");return {this_alias}}}",
+        "function {name}{params}{{if(!(this instanceof {name}))throw new TypeError(\"Cannot call a class as a function\");var {this_alias},{new_target_alias}=new.target;function {super_alias}(){{{this_alias}={CONSTRUCT_PLACEHOLDER}({super_name},arguments,{new_target_alias}||{name});{}return {this_alias}}}var {result_alias}=(function(){{{contents}}}).apply(void 0,arguments);{}if({this_alias}===void 0)throw new ReferenceError(\"this hasn't been initialised - super() hasn't been called\");return {this_alias}}}",
         initialize_instance(instance_initializers, &this_alias),
         possible_constructor_return(&result_alias)
     ))
@@ -1290,9 +1233,9 @@ fn constructor_function(
             ..BodyRewrite::default()
         },
     )?;
-    let (params, parameter_properties) = constructor_parameters(source, function, "this")?;
+    let params = slice(source, function.params.span);
     Ok(format!(
-        "function {name}{params}{{if(!(this instanceof {name}))throw new TypeError(\"Cannot call a class as a function\");{instance_initializers}{parameter_properties}{contents}}}"
+        "function {name}{params}{{if(!(this instanceof {name}))throw new TypeError(\"Cannot call a class as a function\");{instance_initializers}{contents}}}"
     ))
 }
 
@@ -1308,13 +1251,10 @@ fn property_key(source: &str, key: &PropertyKey<'_>, computed: bool) -> String {
 
 /// The methods that produce runtime code.
 ///
-/// A method with no body is TypeScript declaration syntax — an overload
-/// signature, or an `abstract` member — and TypeScript erases both. Two
-/// distinct things go wrong if the lowering sees one: it dereferences a body
-/// that is not there, and it can mistake an overload signature for the
-/// implementation that follows it. Filtering where methods are enumerated fixes
-/// both at once, and means the four walks over the class body cannot forget
-/// individually.
+/// Only TypeScript declaration syntax — an overload signature, an `abstract`
+/// member — gives a method no body, and the language prepass has erased both
+/// before this runs. The filter stays because everything below dereferences the
+/// body, and a panic is a worse way to learn that something slipped through.
 fn emitted_methods<'a, 'c>(class: &'c Class<'a>) -> impl Iterator<Item = &'c MethodDefinition<'a>> {
     class.body.body.iter().filter_map(|element| match element {
         ClassElement::MethodDefinition(method) if method.value.body.is_some() => {
