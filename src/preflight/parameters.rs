@@ -11,6 +11,7 @@ use oxc_syntax::symbol::SymbolFlags;
 use rustc_hash::FxHashSet;
 
 use crate::edit::{EditCommand, EditKind, MappingPolicy};
+use crate::preflight::directive_prologue_insertion;
 
 struct SymbolFact<'a> {
     span: Span,
@@ -185,8 +186,10 @@ fn lower_arrow(
             _ => {}
         }
     }
+    // Set when the capture has to travel with the expression rather than being
+    // hoisted to a statement; see below.
+    let mut captured_in_place = None;
     if this_alias.is_some() || arguments_alias.is_some() || new_target_alias.is_some() {
-        let insertion = statement_insertion(nodes, node_id, arrow.span.start);
         let declarations = format!(
             "var {};",
             [
@@ -203,7 +206,10 @@ fn lower_arrow(
             .collect::<Vec<_>>()
             .join(",")
         );
-        edits.push(insert(insertion, declarations));
+        match statement_insertion(source, nodes, node_id) {
+            Some(insertion) => edits.push(insert(insertion, declarations)),
+            None => captured_in_place = Some(declarations),
+        }
     }
     edits.append(&mut aliases);
 
@@ -241,12 +247,26 @@ fn lower_arrow(
         ));
         edits.push(insert(arrow.body.span.end, ";}".to_owned()));
     } else {
-        let insertion = arrow
-            .body
-            .directives
-            .last()
-            .map_or(arrow.body.span.start + 1, |directive| directive.span.end);
-        edits.push(insert(insertion, prologue));
+        let (insertion, separator) =
+            directive_prologue_insertion(source, &arrow.body.directives, arrow.body.span.start + 1);
+        edits.push(insert(insertion, format!("{separator}{prologue}")));
+    }
+    if let Some(declarations) = captured_in_place {
+        // Nothing enclosing this arrow is both a statement and part of the same
+        // `this` scope — a class field initializer, or another arrow's concise
+        // body. An arrow IIFE is transparent to `this`, `arguments`, and
+        // `new.target` and is itself an expression, so it holds the capture
+        // wherever the original arrow stood. This mirrors what Babel emits for
+        // a class field whose initializer needs `arguments`.
+        //
+        // Pushed last so the closer renders outside every edit the branches
+        // above placed at the arrow's end.
+        edits.push(insert_kind(
+            EditKind::AppendLeft,
+            arrow.span.start,
+            format!("(()=>{{{declarations}return "),
+        ));
+        edits.push(insert(arrow.span.end, ";})()".to_owned()));
     }
     Ok(())
 }
@@ -263,21 +283,44 @@ fn belongs_to_arrow(nodes: &oxc_semantic::AstNodes<'_>, node_id: NodeId, arrow_i
     false
 }
 
-fn statement_insertion(nodes: &oxc_semantic::AstNodes<'_>, node_id: NodeId, fallback: u32) -> u32 {
+/// Offset of the statement enclosing `node_id`, when a `var` declaration hoisted
+/// there would still see the same `this`, `arguments`, and `new.target` as the
+/// arrow being lowered.
+///
+/// Arrows are transparent to all three, so the walk may cross them, but two
+/// containers stop it:
+///
+/// * A class field initializer or accessor property binds its own `this` — the
+///   instance under construction — so a declaration hoisted out of the class
+///   would capture the enclosing module's `this` instead.
+/// * An arrow written with a concise body parses to a `FunctionBody` like any
+///   other, but the source has no braces to hold a statement.
+///
+/// `None` means the caller has to keep the capture inside the expression.
+fn statement_insertion(
+    source: &str,
+    nodes: &oxc_semantic::AstNodes<'_>,
+    node_id: NodeId,
+) -> Option<u32> {
     let mut root = node_id;
     for ancestor in nodes.ancestor_ids(node_id) {
-        if matches!(
-            nodes.kind(ancestor),
+        match nodes.kind(ancestor) {
+            AstKind::FunctionBody(body) => {
+                if source.as_bytes().get(body.span.start as usize) != Some(&b'{') {
+                    return None;
+                }
+                return Some(nodes.kind(root).span().start);
+            }
             AstKind::Program(_)
-                | AstKind::BlockStatement(_)
-                | AstKind::FunctionBody(_)
-                | AstKind::SwitchCase(_)
-        ) {
-            return nodes.kind(root).span().start;
+            | AstKind::BlockStatement(_)
+            | AstKind::StaticBlock(_)
+            | AstKind::SwitchCase(_) => return Some(nodes.kind(root).span().start),
+            AstKind::PropertyDefinition(_) | AstKind::AccessorProperty(_) => return None,
+            _ => {}
         }
         root = ancestor;
     }
-    fallback
+    None
 }
 
 fn reserve_name(base: &str, used: &mut FxHashSet<String>) -> String {
@@ -361,11 +404,9 @@ fn lower_function(
         ));
         return Ok(());
     }
-    let insertion = body
-        .directives
-        .last()
-        .map_or(body.span.start + 1, |directive| directive.span.end);
-    edits.push(insert(insertion, prologue));
+    let (insertion, separator) =
+        directive_prologue_insertion(source, &body.directives, body.span.start + 1);
+    edits.push(insert(insertion, format!("{separator}{prologue}")));
     Ok(())
 }
 

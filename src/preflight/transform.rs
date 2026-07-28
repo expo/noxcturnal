@@ -78,7 +78,7 @@ pub fn transform(
     if conditional_jsx {
         options.jsx = Some("automatic".into());
     }
-    let transform_options = compile_options(&options)?;
+    let mut transform_options = compile_options(&options)?;
     let custom_rewrite_started = debug_performance.then(Instant::now);
     let mut rewrite_layers = Vec::new();
     let loose_object_rest = options.object_rest_spread == Some(true)
@@ -664,9 +664,49 @@ pub fn transform(
         block_scoping::run(&allocator, &mut program, plan);
     }
     ast_traversal_count += 1;
+    // Oxc visits React Refresh before async-to-generator on the same expression.
+    // Refresh replaces a hook-using async function expression with
+    // `_s(<function>, "…")`, so by the time the async visitor exits that
+    // expression there is no function left for it to wrap — while the `await`s
+    // inside it, visited earlier as descendants, have already become `yield`s.
+    // The result is a bare `yield` in a body that is still `async`, which the
+    // next parse rejects. Babel avoids this by re-queuing replaced nodes.
+    //
+    // Deferring async lowering to a second pass restores that ordering. The
+    // first pass hands back its updated scoping, so the extra pass costs one
+    // traversal and no semantic rebuild, and it only runs for the app source
+    // that enables Refresh in the first place.
+    let deferred_async = (options.react_refresh == Some(true)
+        && (transform_options.env.es2017.async_to_generator
+            || transform_options.env.es2018.async_generator_functions))
+        .then(|| {
+            let mut deferred = TransformOptions {
+                cwd: transform_options.cwd.clone(),
+                assumptions: transform_options.assumptions,
+                jsx: JsxOptions::disable(),
+                ..TransformOptions::default()
+            };
+            deferred.helper_loader = transform_options.helper_loader.clone();
+            deferred.env.es2017.async_to_generator =
+                std::mem::take(&mut transform_options.env.es2017.async_to_generator);
+            deferred.env.es2018.async_generator_functions =
+                std::mem::take(&mut transform_options.env.es2018.async_generator_functions);
+            deferred
+        });
     let oxc_transform_started = debug_performance.then(Instant::now);
-    let transformed = Transformer::new(&allocator, Path::new(&filename), &transform_options)
+    let mut transformed = Transformer::new(&allocator, Path::new(&filename), &transform_options)
         .build_with_scoping(scoping, &mut program);
+    if let Some(deferred) = deferred_async
+        && transformed.diagnostics.is_empty()
+    {
+        ast_traversal_count += 1;
+        let async_pass = Transformer::new(&allocator, Path::new(&filename), &deferred)
+            .build_with_scoping(transformed.scoping, &mut program);
+        transformed.diagnostics = async_pass.diagnostics;
+        transformed.scoping = async_pass.scoping;
+        #[expect(deprecated)]
+        transformed.helpers_used.extend(async_pass.helpers_used);
+    }
     let oxc_transform_ms =
         oxc_transform_started.map(|started| started.elapsed().as_secs_f64() * 1_000.0);
     if !transformed.diagnostics.is_empty() {

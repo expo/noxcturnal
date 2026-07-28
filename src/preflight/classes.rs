@@ -3,8 +3,8 @@
 use oxc_ast::{
     AstKind,
     ast::{
-        Class, ClassElement, ClassType, Expression, MethodDefinition, MethodDefinitionKind,
-        PropertyKey, Statement,
+        Class, ClassElement, ClassType, Expression, FormalParameter, Function, MethodDefinition,
+        MethodDefinitionKind, PropertyKey, Statement,
     },
 };
 use oxc_semantic::{NodeId, Semantic};
@@ -818,6 +818,55 @@ fn super_member(source: &str, expression: &Expression<'_>) -> Option<(Span, Stri
     }
 }
 
+/// A constructor's parameter list with TypeScript parameter properties reduced
+/// to ordinary parameters, paired with the field assignments they stand for.
+///
+/// `constructor(private x: T)` declares a field and assigns it from the
+/// argument. This lowering copies parameter text straight into a `function`
+/// header, where `private x` is not a parameter, and the erasure that would
+/// have removed the modifier runs in the later Oxc pass — after the rewritten
+/// source has to parse. Rebuilding the list from each parameter's pattern
+/// onwards drops the modifiers while keeping type annotations and defaults, and
+/// the assignments join the constructor prologue where TypeScript emits them:
+/// after `super()` and after the instance field initializers.
+fn constructor_parameters(
+    source: &str,
+    function: &Function<'_>,
+) -> Result<(String, String), &'static str> {
+    let parameters = &function.params;
+    if !parameters.items.iter().any(FormalParameter::has_modifier) {
+        return Ok((slice(source, parameters.span).to_owned(), String::new()));
+    }
+    let mut rendered = Vec::with_capacity(parameters.items.len() + 1);
+    let mut assignments = String::new();
+    for parameter in &parameters.items {
+        // Rebuilding the list from the pattern would also drop parameter
+        // decorators, and the decorator guard only sees the rewritten source.
+        if !parameter.decorators.is_empty() {
+            return Err("classes-parameter-decorators-not-supported");
+        }
+        rendered.push(slice(
+            source,
+            Span::new(parameter.pattern.span().start, parameter.span.end),
+        ));
+        if !parameter.has_modifier() {
+            continue;
+        }
+        let Some(identifier) = parameter.pattern.get_binding_identifier() else {
+            // TypeScript rejects a destructured parameter property, so this is
+            // unreachable for input that type-checks. Bail rather than invent a
+            // field name for it.
+            return Err("classes-parameter-property-shape-not-implemented");
+        };
+        let field = identifier.name.as_str();
+        assignments.push_str(&format!("this.{field}={field};"));
+    }
+    if let Some(rest) = &parameters.rest {
+        rendered.push(slice(source, rest.span));
+    }
+    Ok((format!("({})", rendered.join(",")), assignments))
+}
+
 fn derived_constructor(
     source: &str,
     name: &str,
@@ -848,7 +897,7 @@ fn derived_constructor(
     else {
         return Err("classes-derived-constructor-super-flow-not-implemented");
     };
-    let params = slice(source, function.params.span);
+    let (params, parameter_properties) = constructor_parameters(source, function)?;
     let call = slice(source, call_span);
     let open = call.find('(').unwrap();
     let arguments = &call[open + 1..call.len() - 1];
@@ -858,7 +907,7 @@ fn derived_constructor(
         Span::new(statement_span.end, body.span.end.saturating_sub(1)),
     );
     Ok(format!(
-        "function {name}{params}{{if(!(this instanceof {name}))throw new TypeError(\"Cannot call a class as a function\");{before}var _this={CONSTRUCT_PLACEHOLDER}({super_name},[{arguments}],new.target||{name});(function(){{{instance_initializers}}}).call(_this);var _result=(function(){{{after}}}).apply(_this,arguments);if(_result!==void 0){{if((typeof _result===\"object\"&&_result!==null)||typeof _result===\"function\")return _result;throw new TypeError(\"Derived constructors may only return object or undefined\")}}return _this}}"
+        "function {name}{params}{{if(!(this instanceof {name}))throw new TypeError(\"Cannot call a class as a function\");{before}var _this={CONSTRUCT_PLACEHOLDER}({super_name},[{arguments}],new.target||{name});(function(){{{instance_initializers}}}).call(_this);var _result=(function(){{{parameter_properties}{after}}}).apply(_this,arguments);if(_result!==void 0){{if((typeof _result===\"object\"&&_result!==null)||typeof _result===\"function\")return _result;throw new TypeError(\"Derived constructors may only return object or undefined\")}}return _this}}"
     ))
 }
 
@@ -910,9 +959,9 @@ fn constructor_function(
     } else {
         private_body_contents(source, semantic, body, private_keys)?
     };
+    let (params, parameter_properties) = constructor_parameters(source, function)?;
     Ok(format!(
-        "function {name}{}{{if(!(this instanceof {name}))throw new TypeError(\"Cannot call a class as a function\");{instance_initializers}{contents}}}",
-        slice(source, function.params.span)
+        "function {name}{params}{{if(!(this instanceof {name}))throw new TypeError(\"Cannot call a class as a function\");{instance_initializers}{parameter_properties}{contents}}}"
     ))
 }
 

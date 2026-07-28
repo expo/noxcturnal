@@ -10,6 +10,7 @@ use crate::edit::{EditCommand, EditKind, MappingPolicy};
 use crate::generated::inline_helpers::{
     INLINE_REGEXP_NAMED_CAPTURE_HELPER, INLINE_REGEXP_NAMED_CAPTURE_HELPER_RUNTIME,
 };
+use crate::preflight::directive_prologue_insertion;
 
 const NAMED_CAPTURE_PLACEHOLDER: &str = "__BABEL_GENERATED_REGEXP_NAMED_CAPTURE_HELPER__";
 
@@ -92,25 +93,27 @@ pub(super) fn edits(
         } else {
             INLINE_REGEXP_NAMED_CAPTURE_HELPER_RUNTIME
         };
-        let insertion = semantic
+        let (insertion, separator) = semantic
             .nodes()
             .iter()
             .find_map(|node| match node.kind() {
-                AstKind::Program(program) => Some(
-                    program
-                        .directives
-                        .last()
-                        .map_or(program.span.start, |directive| directive.span.end),
-                ),
+                AstKind::Program(program) => Some(directive_prologue_insertion(
+                    source,
+                    &program.directives,
+                    program.span.start,
+                )),
                 _ => None,
             })
-            .unwrap_or(0);
+            .unwrap_or((0, ""));
         edits.push(insert(
             insertion,
-            helper
-                .replace("_wrapRegExp2", "__BABEL_WRAP_REGEXP_RUNTIME__")
-                .replace("_wrapRegExp", &named_helper)
-                .replace("__BABEL_WRAP_REGEXP_RUNTIME__", &named_runtime),
+            format!(
+                "{separator}{}",
+                helper
+                    .replace("_wrapRegExp2", "__BABEL_WRAP_REGEXP_RUNTIME__")
+                    .replace("_wrapRegExp", &named_helper)
+                    .replace("__BABEL_WRAP_REGEXP_RUNTIME__", &named_runtime)
+            ),
         ));
     }
     for edit in &mut edits {

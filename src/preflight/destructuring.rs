@@ -13,6 +13,7 @@ use crate::generated::inline_helpers::{
     INLINE_DESTRUCTURING_OBJECT_HELPER, INLINE_DESTRUCTURING_OBJECT_HELPER_RUNTIME,
     INLINE_DESTRUCTURING_REST_HELPER, INLINE_DESTRUCTURING_REST_HELPER_RUNTIME,
 };
+use crate::preflight::directive_prologue_insertion;
 
 const ITER_PLACEHOLDER: &str = "__BABEL_GENERATED_ITER_HELPER__";
 const OBJECT_PLACEHOLDER: &str = "__BABEL_GENERATED_OBJECT_HELPER__";
@@ -54,7 +55,10 @@ pub(super) fn edits(
         rest_runtime: reserve("_objectWithoutProperties2", &mut reserved),
     };
     let mut edits = Vec::new();
-    let mut temporary_declarations: FxHashMap<u32, Vec<String>> = FxHashMap::default();
+    // Keyed by the insertion offset together with the separator that offset
+    // requires, so a directive-prologue insertion keeps its ASI guard.
+    let mut temporary_declarations: FxHashMap<(u32, &'static str), Vec<String>> =
+        FxHashMap::default();
     let mut used_helpers = false;
     // Source ranges an outer lowering has already claimed for replacement.
     // Nodes arrive parent first, so a range is closed once the walk passes its
@@ -142,20 +146,19 @@ pub(super) fn edits(
                     .nodes()
                     .ancestor_ids(node_id)
                     .find_map(|ancestor| match semantic.nodes().kind(ancestor) {
-                        AstKind::FunctionBody(body) => Some(
-                            body.directives
-                                .last()
-                                .map_or(body.span.start + 1, |directive| directive.span.end),
-                        ),
-                        AstKind::Program(program) => Some(
-                            program
-                                .directives
-                                .last()
-                                .map_or(program.span.start, |directive| directive.span.end),
-                        ),
+                        AstKind::FunctionBody(body) => Some(directive_prologue_insertion(
+                            source,
+                            &body.directives,
+                            body.span.start + 1,
+                        )),
+                        AstKind::Program(program) => Some(directive_prologue_insertion(
+                            source,
+                            &program.directives,
+                            program.span.start,
+                        )),
                         _ => None,
                     })
-                    .unwrap_or(0);
+                    .unwrap_or((0, ""));
                 temporary_declarations.entry(insertion).or_default().extend(
                     reserved
                         .iter()
@@ -169,23 +172,25 @@ pub(super) fn edits(
     if edits.is_empty() {
         return Ok(None);
     }
-    for (position, names) in temporary_declarations {
-        edits.push(insert(position, format!("var {};", names.join(","))));
+    for ((position, separator), names) in temporary_declarations {
+        edits.push(insert(
+            position,
+            format!("{separator}var {};", names.join(",")),
+        ));
     }
     if used_helpers {
-        let helper_position = semantic
+        let (helper_position, helper_separator) = semantic
             .nodes()
             .iter()
             .find_map(|node| match node.kind() {
-                AstKind::Program(program) => Some(
-                    program
-                        .directives
-                        .last()
-                        .map_or(program.span.start, |directive| directive.span.end),
-                ),
+                AstKind::Program(program) => Some(directive_prologue_insertion(
+                    source,
+                    &program.directives,
+                    program.span.start,
+                )),
                 _ => None,
             })
-            .unwrap_or(0);
+            .unwrap_or((0, ""));
         let generated = edits
             .iter()
             .filter_map(|edit| edit.content.as_deref())
@@ -246,7 +251,10 @@ pub(super) fn edits(
                     ),
             );
         }
-        edits.push(insert(helper_position, helpers));
+        edits.push(insert(
+            helper_position,
+            format!("{helper_separator}{helpers}"),
+        ));
     }
     for edit in &mut edits {
         if let Some(content) = &mut edit.content {

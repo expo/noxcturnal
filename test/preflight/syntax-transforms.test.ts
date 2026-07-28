@@ -1331,3 +1331,124 @@ test('native captured-loop lowering preserves nested loops and abrupt control fl
     [2, 3],
   ]);
 });
+
+test('generated prologue statements do not fuse with an unterminated directive', () => {
+  // `'use strict'` without a semicolon is closed by automatic semicolon
+  // insertion, so anything written at the directive's end joins the string
+  // literal instead of following it.
+  for (const [name, transforms, source, answer] of [
+    [
+      'destructuring',
+      { destructuring: { useBuiltIns: true } },
+      "'use strict'\nconst { value } = globalThis.input\nglobalThis.answer = value",
+      5,
+    ],
+    [
+      'parameters',
+      { parameters: true },
+      "'use strict'\nfunction read(value = 2) { return value }\nglobalThis.answer = read()",
+      2,
+    ],
+    [
+      'regexpNamedCaptureGroups',
+      { regexpNamedCaptureGroups: true },
+      "'use strict'\nglobalThis.answer = /(?<digit>\\d)/.exec('7').groups.digit",
+      '7',
+    ],
+    [
+      'function body directive',
+      { parameters: true },
+      "function read(value = 2) {\n  'use strict'\n  return value\n}\nglobalThis.answer = read()",
+      2,
+    ],
+  ] as const) {
+    const result = transform(source, 'fixture.js', pipeline(transforms));
+    assert.equal(
+      result.status,
+      'complete',
+      `${name}: ${result.status === 'bailout' ? result.reason : result.status}`,
+    );
+    assert.match(result.code, /"use strict";/, name);
+    const context: { input: { value: number }; answer?: unknown } = { input: { value: 5 } };
+    new Function('globalThis', 'require', result.code)(context, runtimeRequire);
+    assert.equal(context.answer, answer, name);
+  }
+});
+
+test('arrow parameter capture stays in the scope that owns its this', () => {
+  // A class field initializer binds its own `this`, and an enclosing arrow's
+  // concise body has no braces, so neither can host a hoisted `var _this`.
+  const result = transform(
+    `class Example {
+       value = 4;
+       read = ({ addend }) => this.value + addend;
+       curried = (factor) => ({ addend }) => this.value * factor + addend;
+     }
+     var example = new Example();
+     globalThis.answer = [example.read({ addend: 1 }), example.curried(2)({ addend: 3 })];`,
+    'fixture.js',
+    pipeline({ parameters: true }),
+  );
+  assert.equal(result.status, 'complete');
+  const context: { answer?: unknown } = {};
+  new Function('globalThis', 'require', result.code)(context, runtimeRequire);
+  assert.deepEqual(context.answer, [5, 11]);
+});
+
+test('classes lower TypeScript constructor parameter properties into fields', () => {
+  const result = transform(
+    `class Base { constructor(seed) { this.seed = seed } }
+     class Derived extends Base {
+       field = 1;
+       constructor(public named: number, protected fallback = 2) {
+         super(named);
+         this.total = this.named + this.fallback + this.field + this.seed;
+       }
+     }
+     class Plain { offset = 10; constructor(private only: number) { this.total = this.only + this.offset } }
+     globalThis.answer = [new Derived(3).total, new Plain(5).total];`,
+    'fixture.ts',
+    pipeline({ classes: true, classProperties: { loose: true } }),
+  );
+  assert.equal(result.status, 'complete');
+  assert.doesNotMatch(result.code, /\b(?:public|protected|private)\b/);
+  const context: { answer?: unknown } = {};
+  new Function('globalThis', 'require', result.code)(context, runtimeRequire);
+  assert.deepEqual(context.answer, [9, 15]);
+});
+
+test('React Refresh keeps the async wrapper the async lowering installs', () => {
+  // Oxc visits Refresh before async-to-generator, so the `_s(...)` wrapper it
+  // installs used to hide the function that still had to be wrapped, leaving a
+  // bare `yield` in an `async` body.
+  const result = transform(
+    "import { useState } from 'react';\nexport default async (input) => { useState(); return await input; };",
+    'fixture.jsx',
+    defineNativePipeline({
+      phases: [
+        {
+          name: 'refresh',
+          native: {
+            transforms: { asyncFunctions: true },
+            reactRefresh: {},
+            helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
+            compact: true,
+            comments: false,
+          },
+        },
+      ],
+    }),
+  );
+  assert.equal(result.status, 'complete');
+  assert.doesNotMatch(result.code, /\basync\s*(?:\(|function)/);
+  assert.match(result.code, /_asyncToGenerator\(function\*/);
+  // The phase output is re-parsed at every downstream boundary.
+  assert.equal(
+    transform(
+      result.code,
+      'fixture.jsx',
+      defineNativePipeline({ phases: [{ name: 'reparse', native: { compact: true } }] }),
+    ).status,
+    'complete',
+  );
+});
