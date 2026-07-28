@@ -897,6 +897,95 @@ test('native regexp lowering preserves dotAll and named capture behavior', () =>
   ]);
 });
 
+// A property escape inside a character class used to bail: its expansion is
+// itself a class, and the part above U+FFFF is a sequence of surrogate pairs
+// that no class can hold. The class is rewritten whole instead — basic-plane
+// ranges merged into one class, astral ranges hoisted out beside it — which is
+// the shape `regexpu-core` produces for Babel.
+test('native regexp lowers property escapes inside a character class', () => {
+  const lowering = pipeline({ regexpUnicodePropertyEscapes: true });
+  const source = [
+    'globalThis.result = [',
+    // Basic-plane only.
+    '  /[\\p{Script=Arabic}\\p{Script=Hebrew}]/u.test("\\u0631"),',
+    '  /[\\p{Script=Arabic}\\p{Script=Hebrew}]/u.test("\\u05D0"),',
+    '  /[\\p{Script=Arabic}\\p{Script=Hebrew}]/u.test("a"),',
+    // Mixed with literals and ranges.
+    '  /^[a-z\\p{Nd}]+$/u.test("ab\\u0669"),',
+    '  /^[\\p{Nd}_-]+$/u.test("_-\\u0660"),',
+    // Astral: the hoisted alternative has to match a surrogate pair.
+    '  /^[\\p{Script=Deseret}]$/u.test("\\u{10400}"),',
+    '  /^[\\p{Script=Deseret}]$/u.test("a"),',
+    // A negative lookahead wrapping a class, from the corpus.
+    '  /(?![\\p{Mark}\\p{Decimal_Number}])[\\p{Script=Arabic}]/u.test("\\u0631"),',
+    '  /(?![\\p{Mark}\\p{Decimal_Number}])[\\p{Script=Arabic}]/u.test("\\u0660"),',
+    // `\\p{Cs}` is refused by the Rust property tables because a Rust `char`
+    // cannot be a surrogate; it is a fixed range by definition.
+    '  /^\\p{Cs}$/u.test("\\uD800"),',
+    '  /^[\\p{Cs}]$/u.test("\\uDFFF"),',
+    '  /^[\\p{Cs}]$/u.test("a"),',
+    '];',
+  ].join('\n');
+  const result = transform(source, 'fixture.js', lowering);
+  assert.equal(result.status, 'complete');
+  assert.ok(result.status === 'complete');
+  assert.doesNotMatch(result.code, /\\p\{/);
+  const context: { result?: unknown } = {};
+  new Function('globalThis', 'require', result.code)(context, runtimeRequire);
+  assert.deepEqual(context.result, [
+    true,
+    true,
+    false,
+    true,
+    true,
+    true,
+    false,
+    true,
+    false,
+    true,
+    true,
+    false,
+  ]);
+});
+
+// The class rewrite must be exactly the union of the same properties lowered on
+// their own. Anything left over after that is the Unicode table difference
+// between `regex-syntax` and Babel's `@unicode/*` data, which predates this and
+// shows up outside classes too.
+test('a lowered property class equals the union of its properties', () => {
+  const lowering = pipeline({ regexpUnicodePropertyEscapes: true });
+  const lower = (pattern: string) => {
+    const result = transform(`var expression = /${pattern}/u;`, 'fixture.js', lowering);
+    assert.equal(result.status, 'complete');
+    assert.ok(result.status === 'complete');
+    return result.code.replace(/^var expression=\//, '').replace(/\/u;\s*$/, '');
+  };
+  for (const properties of [
+    ['Mark', 'Decimal_Number'],
+    ['Script=Arabic', 'Script=Hebrew'],
+    ['Nd', 'ASCII'],
+  ]) {
+    // The lowered form keeps its `u` flag — only `regexpUnicode` strips it, and
+    // `\u{...}` needs the flag — so both sides compile with it.
+    const asClass = new RegExp(
+      `^(?:${lower(`[${properties.map(name => `\\p{${name}}`).join('')}]`)})$`,
+      'u',
+    );
+    const asUnion = new RegExp(
+      `^(?:${properties.map(name => lower(`\\p{${name}}`)).join('|')})$`,
+      'u',
+    );
+    for (let code = 0; code < 0x2000; code += 1) {
+      const sample = String.fromCharCode(code);
+      assert.equal(
+        asClass.test(sample),
+        asUnion.test(sample),
+        `U+${code.toString(16)} differs for [${properties.join(', ')}]`,
+      );
+    }
+  }
+});
+
 test('native regexp helpers avoid source binding collisions', () => {
   const result = transform(
     'var _wrapRegExp=1,_wrapRegExp2=2;var match=/(?<value>a)/.exec("a");globalThis.result=[_wrapRegExp,_wrapRegExp2,match.groups.value];',

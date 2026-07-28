@@ -38,7 +38,12 @@ pub(super) fn edits(
         let mut flags = literal_source[separator + 1..].to_owned();
         let mut changed = false;
         if unicode_properties && (pattern.contains("\\p{") || pattern.contains("\\P{")) {
-            pattern = lower_unicode_properties(&pattern)?;
+            // Surrogate pairs are only a correct expansion once `u` is gone.
+            // While the flag is still on, the engine matches by code point and
+            // a lone `\uD801` in the pattern never pairs up with the next unit,
+            // so an astral property has to stay a code-point range.
+            let drops_unicode_flag = unicode && flags.contains('u');
+            pattern = lower_unicode_properties(&pattern, drops_unicode_flag)?;
             changed = true;
         }
         if unicode && flags.contains('u') {
@@ -129,32 +134,51 @@ fn reserve_source_name(base: &str, source: &str) -> String {
     unreachable!()
 }
 
-fn lower_unicode_properties(pattern: &str) -> Result<String, &'static str> {
+fn lower_unicode_properties(pattern: &str, surrogate_pairs: bool) -> Result<String, &'static str> {
     let mut output = String::with_capacity(pattern.len());
     let bytes = pattern.as_bytes();
     let mut index = 0usize;
-    let mut in_class = false;
     while index < bytes.len() {
+        // A property inside a character class cannot be substituted in place:
+        // its expansion is itself a class, and its astral half is a sequence of
+        // surrogate pairs, which no class can hold. The whole class is rewritten
+        // instead — see `lower_property_class`.
         if bytes[index] == b'[' {
-            in_class = true;
-        } else if bytes[index] == b']' {
-            in_class = false;
+            let end = class_end(pattern, index).ok_or("regexp-class-shape-not-implemented")?;
+            let body_start = index + 1;
+            let body = &pattern[body_start..end];
+            if body.contains("\\p{") || body.contains("\\P{") {
+                output.push_str(&lower_property_class(body, surrogate_pairs)?);
+            } else {
+                output.push_str(&pattern[index..=end]);
+            }
+            index = end + 1;
+            continue;
         }
         if bytes[index] == b'\\'
             && matches!(bytes.get(index + 1), Some(b'p') | Some(b'P'))
             && bytes.get(index + 2) == Some(&b'{')
         {
-            if in_class {
-                return Err("regexp-unicode-property-in-class-not-implemented");
-            }
             let end = pattern[index + 3..]
                 .find('}')
                 .map(|offset| index + 3 + offset)
                 .ok_or("regexp-unicode-property-shape-not-implemented")?;
             let negative = bytes[index + 1] == b'P';
             let property = pattern[index + 3..end].replace('=', ":");
-            output.push_str(&compile_unicode_property(&property, negative)?);
+            output.push_str(&render_ranges(
+                &unicode_property_ranges(&property, negative)?,
+                surrogate_pairs,
+            ));
             index = end + 1;
+            continue;
+        }
+        // An escape consumes the character after it, so a `\[` never opens a
+        // class and a `\p` outside the shape above stays as written.
+        if bytes[index] == b'\\' && index + 1 < bytes.len() {
+            let escaped = pattern[index + 1..].chars().next().unwrap();
+            output.push('\\');
+            output.push(escaped);
+            index += 1 + escaped.len_utf8();
             continue;
         }
         let character = pattern[index..].chars().next().unwrap();
@@ -164,31 +188,202 @@ fn lower_unicode_properties(pattern: &str) -> Result<String, &'static str> {
     Ok(output)
 }
 
-fn compile_unicode_property(property: &str, negative: bool) -> Result<String, &'static str> {
-    let expression = format!("\\{}{{{property}}}", if negative { 'P' } else { 'p' });
-    let hir = regex_syntax::ParserBuilder::new()
-        .unicode(true)
-        .build()
-        .parse(&expression)
-        .map_err(|_| "regexp-unicode-property-unsupported")?;
-    let HirKind::Class(Class::Unicode(class)) = hir.kind() else {
-        return Err("regexp-unicode-property-unsupported");
-    };
+/// Index of the `]` closing the class that opens at `start`.
+///
+/// `[` is an ordinary character inside a class, and an empty class cannot be
+/// written in JavaScript, so only `\]` and the opening position need care.
+fn class_end(pattern: &str, start: usize) -> Option<usize> {
+    let bytes = pattern.as_bytes();
+    let mut index = start + 1;
+    if bytes.get(index) == Some(&b'^') {
+        index += 1;
+    }
+    if bytes.get(index) == Some(&b']') {
+        index += 1;
+    }
+    while index < bytes.len() {
+        match bytes[index] {
+            b'\\' => index += 1 + pattern[index + 1..].chars().next()?.len_utf8(),
+            b']' => return Some(index),
+            _ => index += pattern[index..].chars().next()?.len_utf8(),
+        }
+    }
+    None
+}
+
+/// Rewrites a character class containing at least one `\p{...}`.
+///
+/// Every item is resolved to code-point ranges and unioned, then split: the
+/// ranges up to U+FFFF stay a class, and anything above becomes surrogate-pair
+/// alternatives beside it. `[\p{Cn}\p{Co}]` therefore becomes
+/// `(?:[…bmp…]|…pairs…)`, which is the shape `regexpu-core` produces for Babel.
+///
+/// Only the items observed alongside property escapes are handled; anything
+/// else bails rather than guessing, because a mis-parsed class is a silently
+/// wrong regular expression.
+fn lower_property_class(body: &str, surrogate_pairs: bool) -> Result<String, &'static str> {
+    if body.starts_with('^') {
+        // Complementing needs a decision about lone surrogates that no observed
+        // input requires.
+        return Err("regexp-unicode-property-negated-class-not-implemented");
+    }
+    let mut ranges: Vec<(u32, u32)> = Vec::new();
+    let mut pending: Option<u32> = None;
+    let bytes = body.as_bytes();
+    let mut index = 0usize;
+
+    // `-` is a literal at either edge of a class and a range otherwise.
+    while index < bytes.len() {
+        if bytes[index] == b'-' && pending.is_some() && index + 1 < bytes.len() {
+            index += 1;
+            let (upper, next) = class_atom(body, index)?;
+            let ClassAtom::Single(upper) = upper else {
+                return Err("regexp-unicode-property-class-range-not-implemented");
+            };
+            let lower = pending
+                .take()
+                .ok_or("regexp-unicode-property-class-shape")?;
+            if upper < lower {
+                return Err("regexp-unicode-property-class-range-not-implemented");
+            }
+            ranges.push((lower, upper));
+            index = next;
+            continue;
+        }
+        if let Some(single) = pending.take() {
+            ranges.push((single, single));
+        }
+        let (atom, next) = class_atom(body, index)?;
+        match atom {
+            ClassAtom::Single(code_point) => pending = Some(code_point),
+            ClassAtom::Ranges(mut property) => ranges.append(&mut property),
+        }
+        index = next;
+    }
+    if let Some(single) = pending {
+        ranges.push((single, single));
+    }
+
+    Ok(render_ranges(&union(ranges), surrogate_pairs))
+}
+
+enum ClassAtom {
+    Single(u32),
+    Ranges(Vec<(u32, u32)>),
+}
+
+/// Reads one item of a character class, returning it and the index after it.
+fn class_atom(body: &str, index: usize) -> Result<(ClassAtom, usize), &'static str> {
+    let bytes = body.as_bytes();
+    if bytes[index] != b'\\' {
+        let character = body[index..]
+            .chars()
+            .next()
+            .ok_or("regexp-unicode-property-class-shape")?;
+        return Ok((
+            ClassAtom::Single(character as u32),
+            index + character.len_utf8(),
+        ));
+    }
+    let escape = *bytes
+        .get(index + 1)
+        .ok_or("regexp-unicode-property-class-shape")?;
+    match escape {
+        b'p' | b'P' => {
+            if bytes.get(index + 2) != Some(&b'{') {
+                return Err("regexp-unicode-property-shape-not-implemented");
+            }
+            let end = body[index + 3..]
+                .find('}')
+                .map(|offset| index + 3 + offset)
+                .ok_or("regexp-unicode-property-shape-not-implemented")?;
+            let property = body[index + 3..end].replace('=', ":");
+            let ranges = unicode_property_ranges(&property, escape == b'P')?;
+            Ok((ClassAtom::Ranges(ranges), end + 1))
+        }
+        b'u' => {
+            if bytes.get(index + 2) == Some(&b'{') {
+                let end = body[index + 3..]
+                    .find('}')
+                    .map(|offset| index + 3 + offset)
+                    .ok_or("regexp-unicode-property-class-shape")?;
+                let value = u32::from_str_radix(&body[index + 3..end], 16)
+                    .map_err(|_| "regexp-unicode-property-class-shape")?;
+                return Ok((ClassAtom::Single(value), end + 1));
+            }
+            let digits = body
+                .get(index + 2..index + 6)
+                .ok_or("regexp-unicode-property-class-shape")?;
+            let value = u32::from_str_radix(digits, 16)
+                .map_err(|_| "regexp-unicode-property-class-shape")?;
+            Ok((ClassAtom::Single(value), index + 6))
+        }
+        b'x' => {
+            let digits = body
+                .get(index + 2..index + 4)
+                .ok_or("regexp-unicode-property-class-shape")?;
+            let value = u32::from_str_radix(digits, 16)
+                .map_err(|_| "regexp-unicode-property-class-shape")?;
+            Ok((ClassAtom::Single(value), index + 4))
+        }
+        b'n' => Ok((ClassAtom::Single(0x0A), index + 2)),
+        b'r' => Ok((ClassAtom::Single(0x0D), index + 2)),
+        b't' => Ok((ClassAtom::Single(0x09), index + 2)),
+        b'f' => Ok((ClassAtom::Single(0x0C), index + 2)),
+        b'v' => Ok((ClassAtom::Single(0x0B), index + 2)),
+        b'0' => Ok((ClassAtom::Single(0x00), index + 2)),
+        b'\\' | b']' | b'[' | b'-' | b'^' | b'/' | b'.' | b'$' | b'*' | b'+' | b'?' | b'('
+        | b')' | b'{' | b'}' | b'|' => Ok((ClassAtom::Single(escape as u32), index + 2)),
+        // `\d`, `\w`, `\s` and friends are sets rather than code points. They
+        // are easy to add and have simply never appeared beside a property.
+        _ => Err("regexp-unicode-property-class-escape-not-implemented"),
+    }
+}
+
+/// Sorts and merges overlapping or adjacent ranges.
+fn union(mut ranges: Vec<(u32, u32)>) -> Vec<(u32, u32)> {
+    ranges.sort_unstable();
+    let mut merged: Vec<(u32, u32)> = Vec::with_capacity(ranges.len());
+    for (start, end) in ranges {
+        match merged.last_mut() {
+            Some(last) if start <= last.1.saturating_add(1) => last.1 = last.1.max(end),
+            _ => merged.push((start, end)),
+        }
+    }
+    merged
+}
+
+/// Renders code-point ranges.
+///
+/// With the `u` flag on its way out, anything above U+FFFF has to become
+/// explicit surrogate-pair alternatives beside a basic-plane class. With the
+/// flag staying, the engine already matches by code point and one class of
+/// `\u{...}` ranges says the same thing far more compactly.
+fn render_ranges(ranges: &[(u32, u32)], surrogate_pairs: bool) -> String {
+    if !surrogate_pairs {
+        if ranges.is_empty() {
+            return "(?!)".to_owned();
+        }
+        let mut class = String::from("[");
+        for &(start, end) in ranges {
+            push_unicode_code_point(&mut class, start);
+            if start != end {
+                class.push('-');
+                push_unicode_code_point(&mut class, end);
+            }
+        }
+        class.push(']');
+        return class;
+    }
     let mut bmp = Vec::new();
     let mut astral = Vec::new();
-    for range in class.ranges() {
-        let start = range.start() as u32;
-        let end = range.end() as u32;
+    for &(start, end) in ranges {
         if start <= 0xFFFF {
             bmp.push((start, end.min(0xFFFF)));
         }
         if end > 0xFFFF {
             astral.push((start.max(0x1_0000), end));
         }
-    }
-    if negative {
-        bmp.push((0xD800, 0xDFFF));
-        bmp.sort_unstable_by_key(|range| range.0);
     }
     let mut alternatives = Vec::new();
     if !bmp.is_empty() {
@@ -202,11 +397,72 @@ fn compile_unicode_property(property: &str, negative: bool) -> Result<String, &'
     for (start, end) in astral {
         push_astral_range(&mut alternatives, start, end);
     }
-    Ok(match alternatives.as_slice() {
+    match alternatives.as_slice() {
         [] => "(?!)".to_owned(),
         [only] => only.clone(),
         _ => format!("(?:{})", alternatives.join("|")),
-    })
+    }
+}
+
+/// Whether a property escape names General_Category=Surrogate. `=` has already
+/// been rewritten to `:` by the caller.
+fn is_surrogate_category(property: &str) -> bool {
+    matches!(
+        property,
+        "Cs" | "Surrogate"
+            | "gc:Cs"
+            | "gc:Surrogate"
+            | "General_Category:Cs"
+            | "General_Category:Surrogate"
+    )
+}
+
+/// Code-point ranges of one `\p{...}` / `\P{...}` escape.
+fn unicode_property_ranges(
+    property: &str,
+    negative: bool,
+) -> Result<Vec<(u32, u32)>, &'static str> {
+    // `regex_syntax` rejects the surrogate category outright, because a Rust
+    // `char` cannot hold one. JavaScript can, and the category is a fixed range
+    // by definition rather than a table that moves with the Unicode version.
+    if is_surrogate_category(property) {
+        return Ok(if negative {
+            union(vec![(0x0000, 0xD7FF), (0xE000, 0x10_FFFF)])
+        } else {
+            vec![(0xD800, 0xDFFF)]
+        });
+    }
+    let expression = format!("\\{}{{{property}}}", if negative { 'P' } else { 'p' });
+    let hir = regex_syntax::ParserBuilder::new()
+        .unicode(true)
+        .build()
+        .parse(&expression)
+        .map_err(|_| "regexp-unicode-property-unsupported")?;
+    let HirKind::Class(Class::Unicode(class)) = hir.kind() else {
+        return Err("regexp-unicode-property-unsupported");
+    };
+    let mut ranges: Vec<(u32, u32)> = class
+        .ranges()
+        .iter()
+        .map(|range| (range.start() as u32, range.end() as u32))
+        .collect();
+    if negative {
+        // `regex_syntax` excludes the surrogate range from a complement because
+        // Rust strings cannot hold one; a JavaScript `\P{…}` matches them.
+        ranges.push((0xD800, 0xDFFF));
+    }
+    Ok(union(ranges))
+}
+
+/// Writes a code point for a pattern that keeps its `u` flag: `\uXXXX` while it
+/// fits, `\u{...}` above. The first form is what a basic-plane range has always
+/// rendered as, so this path does not rewrite output that was already correct.
+fn push_unicode_code_point(output: &mut String, code_point: u32) {
+    if code_point <= 0xFFFF {
+        output.push_str(&format!("\\u{code_point:04X}"));
+    } else {
+        output.push_str(&format!("\\u{{{code_point:X}}}"));
+    }
 }
 
 fn push_bmp_range(output: &mut String, start: u32, end: u32) {
