@@ -142,11 +142,15 @@ impl<'a> Cursor<'a> {
         Ok(self.word()? != 0)
     }
 
-    /// Numbers are two words of `f64` bits and are never needed here.
+    /// A number field: two words of `f64` bits, low word first.
+    pub fn number(&mut self) -> Result<f64, ReadError> {
+        let low = self.word()? as u64;
+        let high = self.word()? as u64;
+        Ok(f64::from_bits(high << 32 | low))
+    }
+
     pub fn skip_number(&mut self) -> Result<(), ReadError> {
-        self.word()?;
-        self.word()?;
-        Ok(())
+        self.number().map(drop)
     }
 
     /// Reads a string field. The bytes are Hermes' "modified UTF-8", which is

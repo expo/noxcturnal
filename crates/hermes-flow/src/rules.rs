@@ -47,6 +47,11 @@ pub enum BailKind {
     /// The buffer did not read back, or a rule could not find a marker it
     /// needs in the source. Either is a defect rather than unsupported input.
     Malformed,
+    /// A construct that has no lowering here *or* in `hermes-parser` — a `var`
+    /// binding in a match pattern, a `yield` in a case body that becomes a
+    /// function. Unlike every other kind this is not a fallback: it is the
+    /// answer, and the caller reports it.
+    Rejected,
 }
 
 impl BailKind {
@@ -59,7 +64,21 @@ impl BailKind {
             Self::UnhandledFlow => "unhandled-flow",
             Self::UnhandledSyntax => "unhandled-syntax",
             Self::Malformed => "malformed",
+            Self::Rejected => "rejected",
         }
+    }
+
+    /// Whether handing the file to the caller's parser adapter could do any
+    /// better than stopping here.
+    ///
+    /// It could for everything the rules merely do not cover. It could not for
+    /// [`BailKind::Rejected`]: the adapter runs the same transforms this one
+    /// mirrors, so it arrives at the same refusal by a longer route — or, where
+    /// that transform emits code that does not parse, at a syntax error
+    /// reported against a line nobody wrote. Reporting it here is the whole
+    /// difference between a diagnostic and a mystery.
+    pub fn has_fallback(self) -> bool {
+        !matches!(self, Self::Rejected)
     }
 }
 
@@ -142,6 +161,11 @@ pub const FIELD_RULES: &[(&str, &str, FieldRule)] = &[
     ("FunctionExpression",       "generator",      FieldRule::Plain),
     ("FunctionExpression",       "async",          FieldRule::Plain),
     ("ArrowFunctionExpression",  "params",         FieldRule::Hook),
+    // `hook useThing<T>(a: T): R {}` differs from a function only in its
+    // keyword, which `erase` swaps; the fields behave identically.
+    ("HookDeclaration",          "typeParameters", FieldRule::Erase),
+    ("HookDeclaration",          "returnType",     FieldRule::Erase),
+    ("HookDeclaration",          "async",          FieldRule::Plain),
     ("ArrowFunctionExpression",  "typeParameters", FieldRule::Erase),
     ("ArrowFunctionExpression",  "returnType",     FieldRule::Erase),
     ("ArrowFunctionExpression",  "predicate",      FieldRule::Erase),
@@ -305,6 +329,10 @@ fn build() -> Box<[Resolved; NODE_KIND_COUNT]> {
     for name in ERASE_TAIL {
         table[index_of(name)].node = NodeRule::EraseTail;
     }
+    // Handled by `erase`, which rewrites them rather than abandoning the file.
+    for name in ["EnumDeclaration", "ComponentDeclaration", "HookDeclaration"] {
+        table[index_of(name)].node = NodeRule::Walk;
+    }
     for (node, field, rule) in FIELD_RULES {
         let index = index_of(node);
         let position = NODE_KINDS[index]
@@ -324,12 +352,7 @@ fn build() -> Box<[Resolved; NODE_KIND_COUNT]> {
 /// The proposal syntax the plan measured at 17 of 464 corpus files. These are
 /// Flow-dialect nodes, so they already bail by default; naming them separately
 /// only sharpens the reason the coverage counter reports.
-const PROPOSAL: &[&str] = &[
-    "ComponentDeclaration",
-    "HookDeclaration",
-    "EnumDeclaration",
-    "ComponentParameter",
-];
+const PROPOSAL: &[&str] = &["ComponentParameter"];
 
 /// Refines a bail reason for reporting. Never changes whether a file bails.
 pub fn bail_kind_for(kind: u32) -> BailKind {
@@ -428,6 +451,24 @@ mod tests {
                 NODE_KINDS.iter().any(|kind| kind.name == *name),
                 "PROPOSAL names unknown node {name}"
             );
+        }
+    }
+
+    /// The distinction the caller acts on: everything but a rejection means
+    /// "try the parser adapter instead".
+    #[test]
+    fn only_a_rejection_has_no_fallback() {
+        assert!(!BailKind::Rejected.has_fallback());
+        for kind in [
+            BailKind::ParseFailed,
+            BailKind::Proposal,
+            BailKind::TypeScript,
+            BailKind::CoverGrammar,
+            BailKind::UnhandledFlow,
+            BailKind::UnhandledSyntax,
+            BailKind::Malformed,
+        ] {
+            assert!(kind.has_fallback(), "{}", kind.as_str());
         }
     }
 

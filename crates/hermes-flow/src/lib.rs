@@ -5,9 +5,14 @@
 //! built and no AST is translated, so the output keeps the original file's
 //! formatting and the resulting source map stays near-identity.
 //!
-//! The walk is bail-first: anything the rules do not recognise — proposal
+//! The walk is bail-first: anything the rules do not recognise — record
 //! syntax, a cover-grammar node, an unhandled Flow-bearing field — abandons the
 //! file to the caller's existing parser adapter rather than guessing.
+//!
+//! The proposals that declare runtime constructs — `enum`, `component`, `hook`,
+//! and `match` — are the exception, because deleting them would change what a
+//! program does. Each is rewritten in place instead, matching what
+//! `hermes-parser`'s own JavaScript transforms produce.
 //!
 //! # Layout
 //!
@@ -18,6 +23,7 @@
 //! - [`rules`] is the reviewable disposition table: what each node kind and
 //!   each attachment point means.
 //! - [`erase`] is the walk that turns those into spans.
+//! - [`proposals`] is what the four rewritten constructs turn into.
 //!
 //! The `parser` feature links Hermes. Without it everything above still builds
 //! and tests, because the buffer is a self-contained blob that a fixture file
@@ -25,10 +31,11 @@
 
 pub mod erase;
 pub mod generated;
+pub mod proposals;
 pub mod reader;
 pub mod rules;
 
-pub use erase::{Bail, Erasure, erase};
+pub use erase::{Bail, Edit, Erasure, erase};
 pub use reader::{Buffer, ReadError};
 pub use rules::BailKind;
 

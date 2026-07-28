@@ -9,6 +9,12 @@
 //! Behind the `flow_parser` feature. With it off this reports `unsupported`,
 //! the same shape `react-compiler-not-built` uses, and the caller falls back to
 //! its registered parser adapter.
+//!
+//! Three outcomes, not two. `erased` and `bailed` are the ordinary pair, and a
+//! bail means the adapter should try instead. A construct that no
+//! implementation compiles — the erasure mirrors `hermes-parser`'s transforms,
+//! including what they refuse — is neither: it throws, because handing it on
+//! only reaches the same refusal later and with a worse message.
 
 use napi_derive::napi;
 
@@ -85,12 +91,22 @@ pub(crate) fn erase(
 
     let erasure = match hermes_flow::erase_source(source) {
         Ok(erasure) => erasure,
-        Err(bail) => return Ok(NativeFlowErasure::bailed(&bail)),
+        // Every bail but one says the caller's parser adapter should try
+        // instead. A rejection says nothing can compile this, so it is reported
+        // here — against the line it was written on, rather than as a parse
+        // failure two steps later over code the user never saw.
+        Err(bail) if bail.kind.has_fallback() => return Ok(NativeFlowErasure::bailed(&bail)),
+        Err(bail) => {
+            return Err(napi::Error::new(
+                napi::Status::InvalidArg,
+                format!("{filename}: {}", bail.detail),
+            ));
+        }
     };
 
     let erased_bytes = erasure.erased_bytes();
-    let span_count = erasure.spans.len() as u32;
-    let commands = removals(source, &erasure.spans);
+    let span_count = erasure.edits.len() as u32;
+    let commands = edit_commands(source, &erasure.edits);
     let committed = crate::edit::commit::commit(source, filename, commands, mode)?;
 
     return Ok(NativeFlowErasure {
@@ -103,20 +119,27 @@ pub(crate) fn erase(
         span_count,
     });
 
-    /// Turns byte ranges into `Remove` edits.
+    /// Turns the erasure's edits into piece-table commands.
     ///
     /// Edit offsets are JavaScript UTF-16 code units and the erasure works in
     /// UTF-8 bytes, so the boundaries have to be translated. The spans are
     /// sorted, so one pass over the source covers all of them — and an ASCII
     /// source, which most are, skips the pass entirely.
-    fn removals(source: &str, spans: &[std::ops::Range<u32>]) -> Vec<EditCommand> {
-        let mut commands = Vec::with_capacity(spans.len());
+    fn edit_commands(source: &str, edits: &[hermes_flow::Edit]) -> Vec<EditCommand> {
+        let mut commands = Vec::with_capacity(edits.len());
+        let mut at = 0usize;
         let mut push = |start: u32, end: u32| {
+            let content = edits[at].content.clone();
+            at += 1;
             commands.push(EditCommand {
-                kind: EditKind::Remove,
+                kind: if content.is_some() {
+                    EditKind::Replace
+                } else {
+                    EditKind::Remove
+                },
                 start,
                 end,
-                content: None,
+                content,
                 parts: Vec::new(),
                 destination: None,
                 mapping: Some(MappingPolicy::Sourceless),
@@ -126,16 +149,16 @@ pub(crate) fn erase(
         };
 
         if source.is_ascii() {
-            for span in spans {
-                push(span.start, span.end);
+            for edit in edits {
+                push(edit.span.start, edit.span.end);
             }
             return commands;
         }
 
-        let mut boundaries: Vec<u32> = Vec::with_capacity(spans.len() * 2);
-        for span in spans {
-            boundaries.push(span.start);
-            boundaries.push(span.end);
+        let mut boundaries: Vec<u32> = Vec::with_capacity(edits.len() * 2);
+        for edit in edits {
+            boundaries.push(edit.span.start);
+            boundaries.push(edit.span.end);
         }
         let mut translated = Vec::with_capacity(boundaries.len());
         let mut next = 0usize;
@@ -173,9 +196,55 @@ mod tests {
 
     #[test]
     fn reports_a_bail_reason() {
-        let result = erase("component Foo() { return null; }\n", "a.js", Some("none")).unwrap();
+        let result = erase("const x = R {a: 1};\n", "a.js", Some("none")).unwrap();
         assert_eq!(result.status, "bailed");
         assert_eq!(result.reason.as_deref(), Some("proposal-syntax"));
+        assert_eq!(result.detail.as_deref(), Some("RecordExpression"));
+    }
+
+    /// A construct nothing can compile is reported rather than handed on: the
+    /// adapter would reach the same refusal, and saying so here points at the
+    /// line that was written instead of at generated code.
+    #[test]
+    fn reports_a_rejection_instead_of_falling_back() {
+        let Err(error) = erase(
+            "const e = match (a) { var y => y };\n",
+            "a.js",
+            Some("none"),
+        ) else {
+            panic!("expected a rejection");
+        };
+        assert_eq!(
+            error.reason,
+            "a.js: 'var' bindings are not allowed. Use 'const' or 'let'. (1:23)"
+        );
+    }
+
+    /// A transform that writes as well as deletes reaches the piece table as a
+    /// `Replace`, and the bytes it removes are not counted as erasure.
+    #[test]
+    fn commits_a_transform_as_a_replacement() {
+        let result = erase("match (a) { _ => { f(); } }\n", "a.js", Some("none")).unwrap();
+        assert_eq!(result.status, "erased");
+        assert_eq!(
+            result.code.as_deref(),
+            Some("$$gen$m0: { { f(); \nbreak $$gen$m0;}}\n")
+        );
+        assert_eq!(result.erased_bytes, 0, "nothing was deleted outright");
+    }
+
+    /// The same translation, over a transform rather than a deletion: its edits
+    /// include zero-width insertions, which are two boundaries at one offset.
+    #[test]
+    fn translates_a_transform_on_a_non_ascii_source() {
+        let source = "const s = '🙂';\nmatch (a) { _ => { f(s); } }\n";
+        let result = erase(source, "a.js", Some("none")).unwrap();
+        assert_eq!(
+            result.code.as_deref(),
+            Some("const s = '🙂';\n$$gen$m0: { { f(s); \nbreak $$gen$m0;}}\n"),
+            "bailed with {:?}",
+            result.reason
+        );
     }
 
     /// Edits are in UTF-16 code units; the erasure works in UTF-8 bytes. An
