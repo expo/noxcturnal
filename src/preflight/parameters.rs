@@ -133,14 +133,63 @@ fn lower_arrow(
     let needs_wrapper =
         body_scope_requires_wrapper(source, symbols, &arrow.params, &arrow.body, &param_bindings);
     let nodes = semantic.nodes();
-    if nodes.iter_enumerated().any(|(candidate_id, node)| {
+    let mut aliases = Vec::new();
+    let mut this_alias = None;
+    let mut arguments_alias = None;
+    let mut new_target_alias = None;
+    let shadows_arguments = param_bindings.contains("arguments");
+    // Semantic node ids are allocated in preorder, so an arrow's descendants
+    // form one contiguous range immediately after the arrow node. Stop at the
+    // first node beyond its body instead of walking the whole file once for
+    // `super` and again for lexical aliases. `belongs_to_arrow` still excludes
+    // nodes inside nested ordinary functions, which introduce their own lexical
+    // `this`, `arguments`, and `new.target`.
+    for (candidate_id, node) in nodes
+        .iter_enumerated()
+        .skip(node_id.index() + 1)
+        .take_while(|(_, node)| node.kind().span().start < arrow.body.span.end)
+    {
         let span = node.kind().span();
-        span.start >= arrow.body.span.start
-            && span.end <= arrow.body.span.end
-            && belongs_to_arrow(nodes, candidate_id, node_id)
-            && matches!(node.kind(), AstKind::Super(_))
-    }) {
-        return Err("arrow-parameters-lexical-super-not-implemented");
+        if span.start < arrow.body.span.start
+            || span.end > arrow.body.span.end
+            || !belongs_to_arrow(nodes, candidate_id, node_id)
+        {
+            continue;
+        }
+        match node.kind() {
+            AstKind::Super(_) => {
+                return Err("arrow-parameters-lexical-super-not-implemented");
+            }
+            AstKind::ThisExpression(_) => {
+                let alias = this_alias.get_or_insert_with(|| reserve_name("_this", reserved));
+                aliases.push(replace(
+                    span,
+                    alias.clone(),
+                    MappingPolicy::AnchorBoundaries,
+                ));
+            }
+            AstKind::IdentifierReference(identifier)
+                if identifier.name == "arguments" && !shadows_arguments =>
+            {
+                let alias =
+                    arguments_alias.get_or_insert_with(|| reserve_name("_arguments", reserved));
+                aliases.push(replace(
+                    span,
+                    alias.clone(),
+                    MappingPolicy::AnchorBoundaries,
+                ));
+            }
+            AstKind::NewTarget(_) => {
+                let alias =
+                    new_target_alias.get_or_insert_with(|| reserve_name("_newtarget", reserved));
+                aliases.push(replace(
+                    span,
+                    alias.clone(),
+                    MappingPolicy::AnchorBoundaries,
+                ));
+            }
+            _ => {}
+        }
     }
 
     let kept = arrow.params.items[..boundary]
@@ -179,51 +228,6 @@ fn lower_arrow(
         prologue.push_str(&lower_rest(pattern, index, reserved));
     }
 
-    let mut aliases = Vec::new();
-    let mut this_alias = None;
-    let mut arguments_alias = None;
-    let mut new_target_alias = None;
-    let shadows_arguments = param_bindings.contains("arguments");
-    for (candidate_id, node) in nodes.iter_enumerated() {
-        let span = node.kind().span();
-        if span.start < arrow.body.span.start
-            || span.end > arrow.body.span.end
-            || !belongs_to_arrow(nodes, candidate_id, node_id)
-        {
-            continue;
-        }
-        match node.kind() {
-            AstKind::ThisExpression(_) => {
-                let alias = this_alias.get_or_insert_with(|| reserve_name("_this", reserved));
-                aliases.push(replace(
-                    span,
-                    alias.clone(),
-                    MappingPolicy::AnchorBoundaries,
-                ));
-            }
-            AstKind::IdentifierReference(identifier)
-                if identifier.name == "arguments" && !shadows_arguments =>
-            {
-                let alias =
-                    arguments_alias.get_or_insert_with(|| reserve_name("_arguments", reserved));
-                aliases.push(replace(
-                    span,
-                    alias.clone(),
-                    MappingPolicy::AnchorBoundaries,
-                ));
-            }
-            AstKind::NewTarget(_) => {
-                let alias =
-                    new_target_alias.get_or_insert_with(|| reserve_name("_newtarget", reserved));
-                aliases.push(replace(
-                    span,
-                    alias.clone(),
-                    MappingPolicy::AnchorBoundaries,
-                ));
-            }
-            _ => {}
-        }
-    }
     // Set when the capture has to travel with the expression rather than being
     // hoisted to a statement; see below.
     let mut captured_in_place = None;

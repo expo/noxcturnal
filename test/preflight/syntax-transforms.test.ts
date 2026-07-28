@@ -648,6 +648,18 @@ test('native parameters preserve arrow lexical new.target', () => {
   assert.deepEqual(Factory()(), [1, undefined]);
 });
 
+test('native parameters do not capture lexical state from nested ordinary functions', () => {
+  const result = transform(
+    'function outer() { return (value = 1) => function inner() { return [value, this.flag, arguments[0], new.target && new.target.name]; }; }',
+    'fixture.js',
+    pipeline({ parameters: true }),
+  );
+  assert.equal(result.status, 'complete');
+  const outer = new Function(`${result.code}; return outer;`)() as Function;
+  const inner = outer.call({ flag: 'outer' })();
+  assert.deepEqual(inner.call({ flag: 'inner' }, 2), [1, 'inner', 2, undefined]);
+});
+
 test('native parameters retain an explicit boundary for arrow lexical super', () => {
   const result = transform(
     'class Base { method(value) { return value; } } class Derived extends Base { method() { return (value = 1) => super.method(value); } }',
