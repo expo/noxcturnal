@@ -39,7 +39,7 @@ exports[`every public native transform has an explicit ownership fixture 3`] = `
     "objectDestructuringEmpty",
   ],
   "map": {
-    "mappings": "AAAA,IAAI,2BAA2B,CAAC,yBAAyB,QAAQ,iDAAiD,CAAC,EAAE,SAAS,0BAA0B,EAAE,CAAC,OAAO,2BAA2B,yBAAyB,CAAC,EAAE,CAAC,CAA1N,IAAI,KAAK,MAAM,KAAK,0BAA0B,IAAI,EAAE,MAAM,KAAK;;",
+    "mappings": "AAAA,IAAI,2BAA2B,CAAC,yBAAyB,QAAQ,iDAAiD,CAAC,EAAE,SAAS,0BAA0B,EAAE,CAAC,OAAO,2BAA2B,yBAAyB,CAAC,EAAE,CAAC,CAA1N,IAAI,KAAY,MAAM,KAAK,0BAA0B,IAAI,EAAE,MAAM,KAAK;;",
     "names": [],
   },
   "name": "destructuring",

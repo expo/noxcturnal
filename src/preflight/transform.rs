@@ -284,12 +284,20 @@ pub fn transform(
                         }
                     };
                     if let Some(destructuring_edits) = destructuring_edits {
-                        let pieces = match build_preflight_edits(&source, destructuring_edits) {
+                        // Leave the standalone pass below to finish a nesting;
+                        // it re-parses, which is only worth it when there is
+                        // something left to lower.
+                        destructuring_done = !destructuring_edits.nested_remaining;
+                        let pieces = match build_preflight_edits(&source, destructuring_edits.edits)
+                        {
                             Ok(pieces) => pieces,
-                            Err(_) => {
+                            // The message names the two conflicting ranges, and
+                            // a conflict is a defect in the lowering rather than
+                            // unsupported input, so it is worth carrying.
+                            Err(error) => {
                                 return Ok(unsupported(
                                     "destructuring-edit-conflict",
-                                    [] as [String; 0],
+                                    [error.reason],
                                 ));
                             }
                         };
@@ -298,8 +306,9 @@ pub fn transform(
                         render_count += 1;
                         source = rewritten_source;
                         rewrite_layers.push(layer);
+                    } else {
+                        destructuring_done = true;
                     }
-                    destructuring_done = true;
                 }
                 break;
             };
@@ -313,7 +322,12 @@ pub fn transform(
             rewrite_layers.push(layer);
         }
     }
-    if options.destructuring == Some(true) && !destructuring_done {
+    // Bounded like the other rewrite loops: each round lowers one more level of
+    // patterns nested inside a default value, and a file cannot nest deeper
+    // than it is long.
+    let mut destructuring_rounds = if destructuring_done { 0 } else { 64 };
+    while options.destructuring == Some(true) && destructuring_rounds > 0 {
+        destructuring_rounds -= 1;
         let rewrite_allocator = Allocator::default();
         let rewrite_source_type = source_type(&filename, &source)?;
         parse_count += 1;
@@ -329,33 +343,36 @@ pub fn transform(
                     .with_excess_capacity(2.0)
                     .build(&parsed.program)
             });
-            if semantic.diagnostics.is_empty() {
-                let edits = match super::destructuring::edits(
-                    &source,
-                    &semantic.semantic,
-                    loose_object_rest,
-                    false,
-                    options.helpers_mode.as_deref() == Some("inline"),
-                ) {
-                    Ok(edits) => edits,
-                    Err(reason) => return Ok(unsupported(reason, [] as [String; 0])),
-                };
-                if let Some(edits) = edits {
-                    let pieces = match build_preflight_edits(&source, edits) {
-                        Ok(pieces) => pieces,
-                        Err(_) => {
-                            return Ok(unsupported(
-                                "destructuring-edit-conflict",
-                                [] as [String; 0],
-                            ));
-                        }
-                    };
-                    let (rewritten_source, layer) = render_decoded(&source, &pieces, "boundary");
-                    render_count += 1;
-                    source = rewritten_source;
-                    rewrite_layers.push(layer);
-                }
+            if !semantic.diagnostics.is_empty() {
+                break;
             }
+            let edits = match super::destructuring::edits(
+                &source,
+                &semantic.semantic,
+                loose_object_rest,
+                false,
+                options.helpers_mode.as_deref() == Some("inline"),
+            ) {
+                Ok(edits) => edits,
+                Err(reason) => return Ok(unsupported(reason, [] as [String; 0])),
+            };
+            let Some(edits) = edits else { break };
+            let nested_remaining = edits.nested_remaining;
+            let pieces = match build_preflight_edits(&source, edits.edits) {
+                Ok(pieces) => pieces,
+                Err(error) => {
+                    return Ok(unsupported("destructuring-edit-conflict", [error.reason]));
+                }
+            };
+            let (rewritten_source, layer) = render_decoded(&source, &pieces, "boundary");
+            render_count += 1;
+            source = rewritten_source;
+            rewrite_layers.push(layer);
+            if !nested_remaining {
+                break;
+            }
+        } else {
+            break;
         }
     }
     if options.object_rest_spread == Some(true)
@@ -395,7 +412,7 @@ pub fn transform(
                     Err(reason) => return Ok(unsupported(reason, [] as [String; 0])),
                 };
                 if let Some(rest_edits) = rest_edits {
-                    let pieces = match build_preflight_edits(&source, rest_edits) {
+                    let pieces = match build_preflight_edits(&source, rest_edits.edits) {
                         Ok(pieces) => pieces,
                         Err(_) => {
                             return Ok(unsupported("object-rest-edit-conflict", [] as [String; 0]));

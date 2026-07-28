@@ -18,13 +18,28 @@ const ITER_PLACEHOLDER: &str = "__BABEL_GENERATED_ITER_HELPER__";
 const OBJECT_PLACEHOLDER: &str = "__BABEL_GENERATED_OBJECT_HELPER__";
 const REST_PLACEHOLDER: &str = "__BABEL_GENERATED_REST_HELPER__";
 
+/// The result of one lowering pass.
+pub(super) struct Lowering {
+    pub edits: Vec<EditCommand>,
+    /// A pattern nested inside another pattern's *default value* was left for a
+    /// later pass.
+    ///
+    /// A default has to be relocated — `{a = D}` becomes
+    /// `_v=_ref.a, a = _v===void 0 ? D : _v` — so unlike an initializer its
+    /// bytes cannot stay where they are, and an edit inside them would land
+    /// inside the outer replacement. The default's text is copied through
+    /// unchanged, so the nested pattern reappears in the rewritten source and
+    /// is outermost the next time round.
+    pub nested_remaining: bool,
+}
+
 pub(super) fn edits(
     source: &str,
     semantic: &Semantic<'_>,
     object_rest_loose: bool,
     only_object_rest: bool,
     inline_helpers: bool,
-) -> Result<Option<Vec<EditCommand>>, &'static str> {
+) -> Result<Option<Lowering>, &'static str> {
     let mut reserved: FxHashSet<String> = semantic
         .scoping()
         .symbol_names()
@@ -41,7 +56,24 @@ pub(super) fn edits(
     let mut edits = Vec::new();
     let mut temporary_declarations: FxHashMap<u32, Vec<String>> = FxHashMap::default();
     let mut used_helpers = false;
+    // Source ranges an outer lowering has already claimed for replacement.
+    // Nodes arrive parent first, so a range is closed once the walk passes its
+    // end.
+    let mut claimed: Vec<Span> = Vec::new();
+    let mut nested_remaining = false;
     for (node_id, node) in semantic.nodes().iter_enumerated() {
+        let span = node.span();
+        claimed.retain(|range| range.end > span.start);
+        if claimed
+            .iter()
+            .any(|range| range.start <= span.start && span.end <= range.end)
+        {
+            nested_remaining |= matches!(
+                node.kind(),
+                AstKind::VariableDeclarator(_) | AstKind::AssignmentExpression(_)
+            );
+            continue;
+        }
         match node.kind() {
             AstKind::VariableDeclarator(declarator)
                 if !declarator.id.is_binding_identifier()
@@ -50,10 +82,12 @@ pub(super) fn edits(
                 lower_declarator(
                     source,
                     declarator,
+                    nesting_order(node_id),
                     &mut reserved,
                     &mut edits,
                     &mut used_helpers,
                 )?;
+                claimed.push(declarator.id.span());
             }
             AstKind::CatchClause(clause)
                 if clause.param.as_ref().is_some_and(|param| {
@@ -84,8 +118,7 @@ pub(super) fn edits(
             {
                 let before = reserved.clone();
                 let root = reserve("_ref", &mut reserved);
-                let mut assignments =
-                    vec![format!("{root}={}", slice(source, assignment.right.span()))];
+                let mut assignments = Vec::new();
                 emit_assignment(
                     source,
                     &assignment.left,
@@ -94,11 +127,17 @@ pub(super) fn edits(
                     &mut reserved,
                     &mut used_helpers,
                 )?;
-                assignments.push(root);
+                assignments.push(root.clone());
                 edits.push(replace(
-                    assignment.span,
-                    format!("({})", assignments.join(",")),
+                    Span::new(assignment.span.start, assignment.right.span().start),
+                    format!("({root}="),
                 ));
+                edits.push(insert_ordered(
+                    assignment.span.end,
+                    format!(",{})", assignments.join(",")),
+                    Some(nesting_order(node_id)),
+                ));
+                claimed.push(assignment.left.span());
                 let insertion = semantic
                     .nodes()
                     .ancestor_ids(node_id)
@@ -217,7 +256,10 @@ pub(super) fn edits(
                 .replace(REST_PLACEHOLDER, &helper_names.rest);
         }
     }
-    Ok(Some(edits))
+    Ok(Some(Lowering {
+        edits,
+        nested_remaining,
+    }))
 }
 
 struct HelperNames {
@@ -432,6 +474,7 @@ fn emit_assignment_maybe(
 fn lower_declarator(
     source: &str,
     declarator: &VariableDeclarator<'_>,
+    nesting_order: u32,
     reserved: &mut FxHashSet<String>,
     edits: &mut Vec<EditCommand>,
     used_helpers: &mut bool,
@@ -440,16 +483,29 @@ fn lower_declarator(
         return Err("destructuring-missing-initializer");
     };
     let root = reserve("_ref", reserved);
-    let mut declarations = vec![format!("{root}={}", slice(source, init.span()))];
+    let mut declarations = Vec::new();
     emit_binding(
         source,
         &declarator.id,
-        root,
+        root.clone(),
         &mut declarations,
         reserved,
         used_helpers,
     )?;
-    edits.push(replace(declarator.span, declarations.join(",")));
+    // The pattern and the `=` become `_ref=`, and the bindings are appended
+    // after the initializer. See `edits` for why the initializer's own bytes
+    // must not be inside a replacement.
+    edits.push(replace(
+        Span::new(declarator.span.start, init.span().start),
+        format!("{root}="),
+    ));
+    if !declarations.is_empty() {
+        edits.push(insert_ordered(
+            declarator.span.end,
+            format!(",{}", declarations.join(",")),
+            Some(nesting_order),
+        ));
+    }
     Ok(())
 }
 
@@ -584,6 +640,15 @@ fn slice(source: &str, span: Span) -> &str {
     &source[span.start as usize..span.end as usize]
 }
 
+/// Sort key for a suffix insertion, descending in node id.
+///
+/// Nodes are visited parent first, so a deeper construct has a larger id and
+/// therefore a smaller order — which is what puts its suffix first when two
+/// constructs end at the same offset.
+fn nesting_order(node_id: oxc_semantic::NodeId) -> u32 {
+    u32::MAX - node_id.index() as u32
+}
+
 fn replace(span: Span, content: String) -> EditCommand {
     EditCommand {
         kind: EditKind::Replace,
@@ -599,6 +664,17 @@ fn replace(span: Span, content: String) -> EditCommand {
 }
 
 fn insert(position: u32, content: String) -> EditCommand {
+    insert_ordered(position, content, None)
+}
+
+/// An insertion whose position may coincide with another's.
+///
+/// `let [a] = [b] = c;` ends both the outer declarator and the inner assignment
+/// at the same offset, and the inner suffix has to render first — it closes the
+/// initializer the outer suffix reads from. Ordering by descending node id puts
+/// the deeper construct first, because a child is always visited after its
+/// parent.
+fn insert_ordered(position: u32, content: String, order: Option<u32>) -> EditCommand {
     EditCommand {
         kind: EditKind::AppendRight,
         start: position,
@@ -607,7 +683,7 @@ fn insert(position: u32, content: String) -> EditCommand {
         parts: Vec::new(),
         destination: None,
         mapping: Some(MappingPolicy::AnchorBoundaries),
-        order: None,
+        order,
         names: None,
     }
 }

@@ -176,6 +176,44 @@ test('spec private feature options retain a structured semantic boundary', () =>
 // They carry no runtime code, so the lowering skips them. Two ways that can go
 // wrong and each is covered below: emitting an overload signature as if it were
 // a method, and mistaking one for the implementation it precedes.
+// Eight files in an iOS bundle of `apps/native-component-list` fell back to
+// Babel with `destructuring-edit-conflict`, at 70 ms each — the most expensive
+// fallback per file in the whole pass. Both destructuring lowerings replaced the
+// construct *including* its initializer, so a pattern nested anywhere inside
+// that initializer produced an edit inside the outer edit's range and the piece
+// table rejected the pair. The initializer's bytes are now left in place, which
+// is what lets the nested edit compose.
+test('native destructuring lowers patterns nested inside an initializer', () => {
+  const lowering = pipeline({ destructuring: { useBuiltIns: true } });
+  for (const [source, expected] of [
+    // The shape from the corpus: an assignment pattern whose right-hand side
+    // contains a function containing another pattern.
+    [
+      'var outer;\n' +
+        'outer = [[5]].map(function build() {\n' +
+        '  let [inner] = arguments.length > 0 ? arguments[0] : void 0;\n' +
+        '  return inner;\n' +
+        '});\n' +
+        'globalThis.answer = outer[0];',
+      5,
+    ],
+    // Both constructs end at the same offset, so the inner suffix has to render
+    // before the outer one.
+    ['var b;\nlet [a] = [b] = [7];\nglobalThis.answer = a + b;', 14],
+    ['var m, n;\n[m] = [n] = [8];\nglobalThis.answer = m + n;', 16],
+    // A parenthesized initializer must keep its parentheses.
+    ['let [a, b] = ([1, 2]);\nglobalThis.answer = a + b;', 3],
+    ['let [a] = (0, [9]);\nglobalThis.answer = a;', 9],
+  ] satisfies [string, number][]) {
+    const result = transform(source, 'fixture.js', lowering);
+    assert.equal(result.status, 'complete');
+    assert.ok(result.status === 'complete');
+    const context: { answer?: unknown } = {};
+    new Function('globalThis', 'require', result.code)(context, runtimeRequire);
+    assert.equal(context.answer, expected);
+  }
+});
+
 test('native classes skip bodiless TypeScript methods', () => {
   const lowering = pipeline({
     classes: true,
