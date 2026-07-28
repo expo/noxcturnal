@@ -293,12 +293,10 @@ exports[`every public native transform has an explicit ownership fixture 17`] = 
 
 exports[`every public native transform has an explicit ownership fixture 18`] = `
 {
-  "code": "var _classPrivateFieldLooseBase2={classPrivateFieldLooseBase:require("@babel/runtime/helpers/classPrivateFieldLooseBase")};function _classPrivateFieldLooseBase(e,s){return _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e,s)}function _classPrivateMethodCall(e,s,a){return _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e,s)[s].apply(e,a)}var Value=(()=>{"use strict";var _read=\`__private_Value_read\`;function Value(){if(!(this instanceof Value))throw new TypeError(\`Cannot call a class as a function\`);Object.defineProperty(this,_read,{value:function(){}})}return Value})();",
-  "helpers": [
-    "classPrivateFieldLooseBase",
-  ],
+  "code": "var Value=(()=>{"use strict";var _read=\`__private_Value_read\`;function Value(){if(!(this instanceof Value))throw new TypeError(\`Cannot call a class as a function\`);Object.defineProperty(this,_read,{value:function(){}})}return Value})();",
+  "helpers": [],
   "map": {
-    "mappings": "mWAAA,IAAI,WAAW,CAAC,aAAa,IAAI,MAAM,uBAAuB,SAAS,OAAO,CAAC,GAAG,EAAE,gBAAgB,OAAO,MAAM,IAAI,UAAU,mCAAmC,EAAE,OAAO,eAAe,KAAK,MAAM,CAAC,MAAM,UAAU,CAAC,CAAC,CAAC,CAAE,CAAC,OAAO,KAAK,EAAC,AAAC,CAAC;;",
+    "mappings": "AAAA,IAAI,WAAW,CAAC,aAAa,IAAI,MAAM,uBAAuB,SAAS,OAAO,CAAC,GAAG,EAAE,gBAAgB,OAAO,MAAM,IAAI,UAAU,mCAAmC,EAAE,OAAO,eAAe,KAAK,MAAM,CAAC,MAAM,UAAU,CAAC,CAAC,CAAC,CAAE,CAAC,OAAO,KAAK,EAAC,AAAC,CAAC;;",
     "names": [],
   },
   "name": "privateMethods",
@@ -313,12 +311,10 @@ exports[`every public native transform has an explicit ownership fixture 18`] = 
 
 exports[`every public native transform has an explicit ownership fixture 19`] = `
 {
-  "code": "var _classPrivateFieldLooseBase2={classPrivateFieldLooseBase:require("@babel/runtime/helpers/classPrivateFieldLooseBase")};function _classPrivateFieldLooseBase(e,s){return _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e,s)}function _classPrivateMethodCall(e,s,a){return _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e,s)[s].apply(e,a)}var Value=(()=>{"use strict";var _field=\`__private_Value_field\`;function Value(){if(!(this instanceof Value))throw new TypeError(\`Cannot call a class as a function\`);Object.defineProperty(this,_field,{writable:true,value:void 0})}Object.defineProperty(Value.prototype,"has",{value:function(input){return Object.prototype.hasOwnProperty.call(input,_field)},writable:true,configurable:true});return Value})();",
-  "helpers": [
-    "classPrivateFieldLooseBase",
-  ],
+  "code": "var Value=(()=>{"use strict";var _field=\`__private_Value_field\`;function Value(){if(!(this instanceof Value))throw new TypeError(\`Cannot call a class as a function\`);Object.defineProperty(this,_field,{writable:true,value:void 0})}Object.defineProperty(Value.prototype,"has",{value:function(input){return Object.prototype.hasOwnProperty.call(input,_field)},writable:true,configurable:true});return Value})();",
+  "helpers": [],
   "map": {
-    "mappings": "mWAAA,IAAI,WAAW,CAAC,aAAa,IAAI,OAAO,wBAAwB,SAAS,OAAO,CAAC,GAAG,EAAE,gBAAgB,OAAO,MAAM,IAAI,UAAU,mCAAmC,EAAE,OAAO,eAAe,KAAK,OAAO,CAAC,SAAS,KAAK,MAAM,IAAK,EAAC,CAAC,CAAE,CAAC,OAAO,eAAe,MAAM,UAAU,MAAM,CAAC,MAAM,SAAS,MAAM,CAAE,OAAO,OAAO,UAAU,eAAe,KAAK,MAAO,MAAM,CAAG,EAAE,SAAS,KAAK,aAAa,IAAI,CAAC,EAAE,OAAO,KAAK,EAAC,AAAC,CAAC;;",
+    "mappings": "AAAA,IAAI,WAAW,CAAC,aAAa,IAAI,OAAO,wBAAwB,SAAS,OAAO,CAAC,GAAG,EAAE,gBAAgB,OAAO,MAAM,IAAI,UAAU,mCAAmC,EAAE,OAAO,eAAe,KAAK,OAAO,CAAC,SAAS,KAAK,MAAM,IAAK,EAAC,CAAC,CAAE,CAAC,OAAO,eAAe,MAAM,UAAU,MAAM,CAAC,MAAM,SAAS,MAAM,CAAE,OAAO,OAAO,UAAU,eAAe,KAAK,MAAO,MAAM,CAAG,EAAE,SAAS,KAAK,aAAa,IAAI,CAAC,EAAE,OAAO,KAAK,EAAC,AAAC,CAAC;;",
     "names": [],
   },
   "name": "privatePropertyInObject",

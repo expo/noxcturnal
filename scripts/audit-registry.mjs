@@ -216,22 +216,7 @@ export const bailouts = {
     owner: 'classes',
     triggerTest: 'syntax-transforms.test.ts',
   },
-  'classes-private-constructor-access-not-implemented': {
-    ...temporary,
-    owner: 'classes',
-    triggerTest: 'syntax-transforms.test.ts',
-  },
-  'classes-combined-super-private-method-not-implemented': {
-    ...temporary,
-    owner: 'classes',
-    triggerTest: 'syntax-transforms.test.ts',
-  },
-  'classes-private-call-shape-not-implemented': {
-    ...temporary,
-    owner: 'classes',
-    triggerTest: 'syntax-transforms.test.ts',
-  },
-  'classes-private-edit-conflict': {
+  'classes-body-edit-conflict': {
     ...invariant,
     owner: 'classes',
     triggerTest: 'syntax-transforms.test.ts',
@@ -241,23 +226,13 @@ export const bailouts = {
     owner: 'classes',
     triggerTest: 'syntax-transforms.test.ts',
   },
-  'classes-super-call-shape-not-implemented': {
-    ...temporary,
+  'classes-parameter-decorators-not-supported': {
+    ...permanent,
     owner: 'classes',
     triggerTest: 'syntax-transforms.test.ts',
   },
-  'classes-super-edit-conflict': {
+  'classes-parameter-property-shape-not-implemented': {
     ...invariant,
-    owner: 'classes',
-    triggerTest: 'syntax-transforms.test.ts',
-  },
-  'classes-derived-new-target-not-implemented': {
-    ...temporary,
-    owner: 'classes',
-    triggerTest: 'syntax-transforms.test.ts',
-  },
-  'classes-derived-constructor-super-flow-not-implemented': {
-    ...temporary,
     owner: 'classes',
     triggerTest: 'syntax-transforms.test.ts',
   },
@@ -310,6 +285,11 @@ export const bailouts = {
     owner: 'blockScoping',
     triggerTest: 'syntax-transforms.test.ts',
   },
+  'block-scoping-postcondition-semantic-error': {
+    ...invariant,
+    owner: 'blockScoping',
+    triggerTest: 'syntax-transforms.test.ts',
+  },
   'destructuring-missing-initializer': {
     ...permanent,
     category: 'diagnostic-preserving',
@@ -321,8 +301,33 @@ export const bailouts = {
     owner: 'parameters',
     triggerTest: 'syntax-transforms.test.ts',
   },
+  'regexp-class-shape-not-implemented': {
+    ...temporary,
+    owner: 'regexp',
+    triggerTest: 'syntax-transforms.test.ts',
+  },
   'regexp-unicode-ignore-case-complex-not-implemented': {
     ...temporary,
+    owner: 'regexp',
+    triggerTest: 'syntax-transforms.test.ts',
+  },
+  'regexp-unicode-property-negated-class-not-implemented': {
+    ...temporary,
+    owner: 'regexp',
+    triggerTest: 'syntax-transforms.test.ts',
+  },
+  'regexp-unicode-property-class-range-not-implemented': {
+    ...temporary,
+    owner: 'regexp',
+    triggerTest: 'syntax-transforms.test.ts',
+  },
+  'regexp-unicode-property-class-escape-not-implemented': {
+    ...temporary,
+    owner: 'regexp',
+    triggerTest: 'syntax-transforms.test.ts',
+  },
+  'regexp-unicode-property-class-shape': {
+    ...invariant,
     owner: 'regexp',
     triggerTest: 'syntax-transforms.test.ts',
   },

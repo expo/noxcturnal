@@ -1452,3 +1452,263 @@ test('React Refresh keeps the async wrapper the async lowering installs', () => 
     'complete',
   );
 });
+
+test('derived constructors accept every shape of leading super call', () => {
+  const source = `
+    class Base { constructor(tag) { this.tag = tag } }
+    class Sequence extends Base {
+      field = 'f';
+      constructor(tag) { super(tag), this.extra = tag + '!'; }
+    }
+    class Returned extends Base {
+      constructor(tag) { return super(tag); }
+    }
+    class ReturnedSequence extends Base {
+      constructor(tag) { return super(tag), this.extra = 'tail', this; }
+    }
+    class Escapes extends Base {
+      constructor(tag) { super(tag); return { replaced: tag }; }
+    }
+    var sequence = new Sequence('a'), returned = new Returned('b'), tail = new ReturnedSequence('c');
+    globalThis.answer = [
+      [sequence.tag, sequence.field, sequence.extra],
+      [returned.tag, returned instanceof Returned],
+      [tail.tag, tail.extra, tail instanceof ReturnedSequence],
+      new Escapes('d').replaced,
+    ];
+  `;
+  const result = transform(
+    source,
+    'fixture.js',
+    pipeline({ classes: true, classProperties: { loose: true } }),
+  );
+  assert.equal(result.status, 'complete');
+  const context: { answer?: unknown } = {};
+  new Function('globalThis', 'require', result.code)(context, runtimeRequire);
+  assert.deepEqual(context.answer, [['a', 'f', 'a!'], ['b', true], ['c', 'tail', true], 'd']);
+});
+
+test('derived constructors lower a super call the body reaches conditionally', () => {
+  // Nothing here fits the split template: the call is inside a branch, and it
+  // appears twice. The general lowering renames `this` instead of splitting.
+  const source = `
+    class Base { constructor(tag) { this.tag = tag } }
+    class Derived extends Base {
+      field = 'f';
+      constructor(flag) {
+        if (!new.target) { throw new TypeError('needs new'); }
+        var prepared = flag ? 'yes' : 'no';
+        if (flag) { super(prepared); this.extra = 1; } else { super(prepared); this.extra = 2; }
+        this.seen = this.tag + this.field;
+      }
+    }
+    class Sub extends Derived { constructor() { super(true); this.sub = true } }
+    var yes = new Derived(true), no = new Derived(false), sub = new Sub();
+    var threw = false;
+    try { Derived.call({}, true) } catch (error) { threw = error instanceof TypeError }
+    globalThis.answer = [
+      [yes.tag, yes.field, yes.extra, yes.seen],
+      [no.tag, no.extra],
+      [sub.tag, sub.sub, sub instanceof Sub, sub instanceof Base],
+      threw,
+    ];
+  `;
+  const result = transform(
+    source,
+    'fixture.js',
+    pipeline({ classes: true, classProperties: { loose: true } }),
+  );
+  assert.equal(result.status, 'complete');
+  const context: { answer?: unknown } = {};
+  new Function('globalThis', 'require', result.code)(context, runtimeRequire);
+  assert.deepEqual(context.answer, [
+    ['yes', 'f', 1, 'yesf'],
+    ['no', 2],
+    ['yes', true, true, true],
+    true,
+  ]);
+});
+
+test('derived constructors keep new.target pointing at the constructed class', () => {
+  const source = `
+    class Base {}
+    class Derived extends Base {
+      constructor() { super(); this.target = new.target === Derived; this.name = new.target.name }
+    }
+    class Sub extends Derived {}
+    globalThis.answer = [new Derived().target, new Sub().target, new Sub().name];
+  `;
+  const result = transform(source, 'fixture.js', pipeline({ classes: true }));
+  assert.equal(result.status, 'complete');
+  const context: { answer?: unknown } = {};
+  new Function('globalThis', 'require', result.code)(context, runtimeRequire);
+  assert.deepEqual(context.answer, [true, false, 'Sub']);
+});
+
+test('derived constructors reach private names and super properties', () => {
+  const source = `
+    class Base {
+      constructor(seed) { this.seed = seed }
+      scale(input) { return input * 2 }
+    }
+    class Derived extends Base {
+      #secret;
+      #doubled = 0;
+      constructor(seed) {
+        super(seed);
+        this.#secret = seed + 1;
+        this.#doubled = super.scale(this.#secret);
+      }
+      read() { return [this.#secret, this.#doubled] }
+    }
+    globalThis.answer = new Derived(3).read();
+  `;
+  const result = transform(
+    source,
+    'fixture.js',
+    pipeline({
+      classes: true,
+      classProperties: { loose: true },
+      privateMethods: { loose: true },
+      privatePropertyInObject: { loose: true },
+    }),
+  );
+  assert.equal(result.status, 'complete');
+  assert.doesNotMatch(result.code, /#(?:secret|doubled)/);
+  const context: { answer?: unknown } = {};
+  new Function('globalThis', 'require', result.code)(context, runtimeRequire);
+  assert.deepEqual(context.answer, [4, 8]);
+});
+
+test('one method may use both super and private names', () => {
+  const source = `
+    class Base {
+      value() { return 1 }
+      wrap(input) { return ['wrapped', input] }
+      static kind() { return 'base' }
+    }
+    class Derived extends Base {
+      #bonus = 10;
+      #scale(input) { return input * 3 }
+      total() { return super.value() + this.#bonus }
+      nested() { return super.wrap(this.#scale(this.#bonus)) }
+      viaPrivate() { return this.#combine() }
+      #combine() { return super.value() + this.#bonus * 2 }
+      static kind() { return super.kind() + '-derived' }
+    }
+    var value = new Derived();
+    globalThis.answer = [value.total(), value.nested(), value.viaPrivate(), Derived.kind()];
+  `;
+  const result = transform(
+    source,
+    'fixture.js',
+    pipeline({
+      classes: true,
+      classProperties: { loose: true },
+      privateMethods: { loose: true },
+      privatePropertyInObject: { loose: true },
+    }),
+  );
+  assert.equal(result.status, 'complete');
+  assert.doesNotMatch(result.code, /#(?:bonus|scale|combine)/);
+  const context: { answer?: unknown } = {};
+  new Function('globalThis', 'require', result.code)(context, runtimeRequire);
+  assert.deepEqual(context.answer, [11, ['wrapped', 30], 21, 'base-derived']);
+});
+
+test('generated constructor locals do not capture the module bindings they shadow', () => {
+  const source = `
+    var _this = 'outer', _result = 'outer', _newtarget = 'outer', _super = 'outer';
+    class Base { constructor(tag) { this.tag = tag } }
+    class Split extends Base { constructor(tag) { super(tag); this.seen = _this + _result } }
+    class General extends Base {
+      constructor(tag) { if (tag) { super(tag) } else { super('none') } this.seen = _newtarget + _super }
+    }
+    globalThis.answer = [new Split('a').seen, new General('b').seen, new General(0).tag];
+  `;
+  const result = transform(source, 'fixture.js', pipeline({ classes: true }));
+  assert.equal(result.status, 'complete');
+  const context: { answer?: unknown } = {};
+  new Function('globalThis', 'require', result.code)(context, runtimeRequire);
+  assert.deepEqual(context.answer, ['outerouter', 'outerouter', 'none']);
+});
+
+test('TypeScript enums and namespaces lower past the block-scoping postcondition', () => {
+  const result = transform(
+    `export enum Style { Normal, Solid }
+     namespace Shapes { export const size = 2; }
+     const scale = Shapes.size;
+     globalThis.answer = [Style.Solid, Style[0], scale];`,
+    'fixture.ts',
+    pipeline({ blockScoping: true }),
+  );
+  assert.equal(result.status, 'complete');
+  assert.doesNotMatch(result.code, /\b(?:let|const)\s/);
+  const context: { answer?: unknown } = {};
+  new Function('globalThis', 'require', result.code.replace(/^export /gm, ''))(
+    context,
+    runtimeRequire,
+  );
+  assert.deepEqual(context.answer, [1, 'Normal', 2]);
+});
+
+test('a lexical binding declared inside a loop callback is not a captured loop binding', () => {
+  // The declaration's own function is not the closure that captures it, so
+  // `for (let i …) { xs.map(([a, b]) => …) }` needs no per-iteration environment.
+  const result = transform(
+    `function collect(...rows) {
+       var out = [];
+       for (let index = 0, total = rows.length; index < total; ++index) {
+         out.push(rows[index].map(([key, value]) => key + value + index));
+       }
+       return out;
+     }
+     globalThis.answer = collect([['a', 1]], [['b', 2]]);`,
+    'fixture.js',
+    pipeline({ blockScoping: true, destructuring: { useBuiltIns: true }, parameters: true }),
+  );
+  assert.equal(result.status, 'complete');
+  const context: { answer?: unknown } = {};
+  new Function('globalThis', 'require', result.code)(context, runtimeRequire);
+  assert.deepEqual(context.answer, [['a10'], ['b21']]);
+});
+
+test('a function inside a parameter default is lowered from the body it moves to', () => {
+  const result = transform(
+    `function useLinking(ref, { enabled = true, subscribe = (listener) => {
+       const callback = ({ url }) => listener(url);
+       return callback({ url: 'href' });
+     } } = {}) {
+       return [enabled, subscribe((value) => 'got:' + value)];
+     }
+     globalThis.answer = useLinking(null);`,
+    'fixture.js',
+    pipeline({ destructuring: { useBuiltIns: true }, parameters: true }),
+  );
+  assert.equal(result.status, 'complete');
+  const context: { answer?: unknown } = {};
+  new Function('globalThis', 'require', result.code)(context, runtimeRequire);
+  assert.deepEqual(context.answer, [true, 'got:href']);
+});
+
+test('parameter lists that only exist as TypeScript types are not left unlowered', () => {
+  const result = transform(
+    `interface Renderer { render(...items: string[]): string }
+     type Formatter = ({ value }: { value: string }) => string;
+     declare function ambient(...rest: number[]): void;
+     class Shape {
+       area(...sizes: number[]): number;
+       area(first: number): number {
+         return first;
+       }
+     }
+     const format: Formatter = ({ value }) => value;
+     globalThis.answer = [format({ value: 'ok' }), new Shape().area(2)];`,
+    'fixture.ts',
+    pipeline({ parameters: true, destructuring: { useBuiltIns: true } }),
+  );
+  assert.equal(result.status, 'complete');
+  const context: { answer?: unknown } = {};
+  new Function('globalThis', 'require', result.code)(context, runtimeRequire);
+  assert.deepEqual(context.answer, ['ok', 2]);
+});

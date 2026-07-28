@@ -20,6 +20,7 @@ use oxc_react_compiler::{
     CompilationMode, CompilerTarget, PanicThreshold, PluginOptions as ReactCompilerOptions,
 };
 use oxc_semantic::SemanticBuilder;
+use oxc_syntax::scope::ScopeFlags;
 use oxc_transformer::{
     HelperLoaderMode, JsxOptions, JsxRuntime, ReactRefreshOptions, TransformOptions, Transformer,
 };
@@ -724,10 +725,39 @@ pub fn transform(
         }
     }
     if options.block_scoping == Some(true) && block_scoping::has_remaining_syntax(&program) {
-        return Ok(unsupported(
-            "block-scoping-postcondition-failed",
-            [] as [String; 0],
-        ));
+        // The pass above runs before the Oxc transformer, and the transformer
+        // lowers TypeScript enums and namespaces into `let` bindings of its own
+        // — `enum E {}` becomes `let E = function(E){…}({})`. Babel does not hit
+        // this because its TypeScript plugin emits `var`. Rebuilding semantic
+        // over the transformed program and running the pass a second time
+        // lowers what the transformer introduced, with the same collision
+        // planning the first round used. Only files that would otherwise have
+        // been rejected here pay for the extra semantic build.
+        semantic_build_count += 1;
+        ast_traversal_count += 1;
+        let semantic = timed(debug_performance, &mut semantic_build_ms, || {
+            SemanticBuilder::new()
+                .with_build_nodes(true)
+                .with_excess_capacity(2.0)
+                .build(&program)
+        });
+        if !semantic.diagnostics.is_empty() {
+            return Ok(unsupported(
+                "block-scoping-postcondition-semantic-error",
+                semantic.diagnostics,
+            ));
+        }
+        match block_scoping::prepare(&semantic.semantic) {
+            Ok(plan) => block_scoping::run(&allocator, &mut program, plan),
+            Err(reason) => return Ok(unsupported(reason, [] as [String; 0])),
+        }
+        ast_traversal_count += 1;
+        if block_scoping::has_remaining_syntax(&program) {
+            return Ok(unsupported(
+                "block-scoping-postcondition-failed",
+                [] as [String; 0],
+            ));
+        }
     }
     let optimization_started = debug_performance.then(Instant::now);
     let (optimization_traversals, optimization_semantic_builds, optimization_semantic_ms) =
@@ -1297,6 +1327,48 @@ impl<'a> Visit<'a> for ParametersDetector {
                 parameter.initializer.is_some() || !parameter.pattern.is_binding_identifier()
             });
         walk::walk_formal_parameters(self, parameters);
+    }
+
+    // Everything below is TypeScript that emits nothing, and the lowering pass
+    // correspondingly leaves it alone. This postcondition runs before the
+    // TypeScript strip, though, so without pruning a parameter list that only
+    // ever existed as a type — `(({x}) => T)` in an annotation, `...args` in an
+    // interface method signature, an overload signature — reads as a parameter
+    // the pass forgot to lower.
+
+    fn visit_ts_type(&mut self, _: &oxc_ast::ast::TSType<'a>) {}
+
+    fn visit_ts_interface_declaration(&mut self, _: &oxc_ast::ast::TSInterfaceDeclaration<'a>) {}
+
+    fn visit_ts_type_alias_declaration(&mut self, _: &oxc_ast::ast::TSTypeAliasDeclaration<'a>) {}
+
+    fn visit_function(&mut self, function: &oxc_ast::ast::Function<'a>, flags: ScopeFlags) {
+        // No body is an overload signature or an ambient declaration.
+        if function.declare || function.body.is_none() {
+            return;
+        }
+        walk::walk_function(self, function, flags);
+    }
+
+    fn visit_method_definition(&mut self, method: &MethodDefinition<'a>) {
+        if method.value.body.is_none() {
+            return;
+        }
+        walk::walk_method_definition(self, method);
+    }
+
+    fn visit_class(&mut self, class: &Class<'a>) {
+        if class.declare {
+            return;
+        }
+        walk::walk_class(self, class);
+    }
+
+    fn visit_ts_module_declaration(&mut self, module: &oxc_ast::ast::TSModuleDeclaration<'a>) {
+        if module.declare {
+            return;
+        }
+        walk::walk_ts_module_declaration(self, module);
     }
 }
 

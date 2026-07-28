@@ -47,12 +47,50 @@ pub(super) fn edits(
             _ => None,
         })
         .collect();
+    let lowered = |node_id: NodeId| match nodes.kind(node_id) {
+        AstKind::Function(function) => function
+            .body
+            .is_some()
+            .then(|| non_simple(&function.params).map(|_| function.params.span))
+            .flatten(),
+        AstKind::ArrowFunctionExpression(arrow) => (non_simple_arrows.contains(&node_id)
+            && !nodes
+                .ancestor_ids(node_id)
+                .any(|ancestor| non_simple_arrows.contains(&ancestor)))
+        .then_some(arrow.params.span),
+        _ => None,
+    };
+    // Whether an enclosing function will have its parameter list rewritten
+    // wholesale this round, with this node inside it.
+    //
+    // A function written inside a default value is in exactly that position, so
+    // lowering it now would place edits inside a range that is about to be
+    // replaced — an edit conflict, and the reason `useLinking.native.js` and its
+    // two forks were rejected. Deferring costs nothing: `lower_parameter` copies
+    // the initializer into the body prologue verbatim, and the next round finds
+    // it there, outside any replaced range.
+    let deferred = |node_id: NodeId, span: Span| {
+        nodes.ancestor_ids(node_id).any(|ancestor| {
+            lowered(ancestor).is_some_and(|parameters| {
+                parameters.start <= span.start && span.end <= parameters.end
+            })
+        })
+    };
     let mut reserved: FxHashSet<String> = semantic
         .scoping()
         .symbol_names()
         .map(str::to_owned)
         .collect();
     for (node_id, node) in nodes.iter_enumerated() {
+        if !matches!(
+            node.kind(),
+            AstKind::Function(_) | AstKind::ArrowFunctionExpression(_)
+        ) {
+            continue;
+        }
+        if deferred(node_id, node.kind().span()) {
+            continue;
+        }
         match node.kind() {
             AstKind::Function(function) => {
                 if let Some(body) = &function.body {

@@ -33,32 +33,10 @@ pub(super) fn captured_loop_edits(
     let scoping = semantic.scoping();
     let mut loops: FxHashMap<NodeId, CapturedLoop> = FxHashMap::default();
     for symbol_id in scoping.symbol_ids() {
-        if !scoping
-            .symbol_flags(symbol_id)
-            .contains(SymbolFlags::BlockScopedVariable)
-        {
-            continue;
-        }
-        let declaration_id = scoping.symbol_declaration(symbol_id);
-        let Some(loop_id) = nodes
-            .ancestor_ids(declaration_id)
-            .find(|node_id| nodes.kind(*node_id).is_iteration_statement())
-        else {
+        let Some(loop_id) = captured_loop_of(nodes, scoping, symbol_id) else {
             continue;
         };
-        if !scoping
-            .get_resolved_reference_ids(symbol_id)
-            .iter()
-            .any(|reference_id| {
-                crosses_function_before(
-                    nodes,
-                    scoping.get_reference(*reference_id).node_id(),
-                    loop_id,
-                )
-            })
-        {
-            continue;
-        }
+        let declaration_id = scoping.symbol_declaration(symbol_id);
         let (span, body_span) = loop_spans(nodes.kind(loop_id))?;
         let captured = loops.entry(loop_id).or_insert_with(|| CapturedLoop {
             node_id: loop_id,
@@ -129,15 +107,58 @@ pub(super) fn captured_loop_edits(
     (!edits.is_empty()).then_some(edits)
 }
 
+/// The iteration statement that has to give `symbol_id` a per-iteration
+/// environment, if any.
+///
+/// A lexical binding declared inside a loop needs one only when a closure built
+/// during the iteration outlives it. That means a reference reached through a
+/// function boundary — but only a boundary that sits *between* the binding and
+/// the loop. A binding declared inside a function that the loop body creates,
+/// such as the `let` the parameter and destructuring rewrites hoist into a
+/// lowered callback, gets a fresh environment from that call already, and its
+/// own function must not be mistaken for the closure that captures it.
+fn captured_loop_of(
+    nodes: &oxc_semantic::AstNodes<'_>,
+    scoping: &oxc_semantic::Scoping,
+    symbol_id: SymbolId,
+) -> Option<NodeId> {
+    if !scoping
+        .symbol_flags(symbol_id)
+        .contains(SymbolFlags::BlockScopedVariable)
+    {
+        return None;
+    }
+    let declaration_id = scoping.symbol_declaration(symbol_id);
+    let loop_id = nodes
+        .ancestor_ids(declaration_id)
+        .find(|node_id| nodes.kind(*node_id).is_iteration_statement())?;
+    let barrier = nodes
+        .ancestor_ids(declaration_id)
+        .find(|node_id| nodes.kind(*node_id).is_function_like());
+    scoping
+        .get_resolved_reference_ids(symbol_id)
+        .iter()
+        .any(|reference_id| {
+            crosses_function_before(
+                nodes,
+                scoping.get_reference(*reference_id).node_id(),
+                loop_id,
+                barrier,
+            )
+        })
+        .then_some(loop_id)
+}
+
 fn crosses_function_before(
     nodes: &oxc_semantic::AstNodes<'_>,
     node_id: NodeId,
     loop_id: NodeId,
+    barrier: Option<NodeId>,
 ) -> bool {
     let mut crossed = false;
     let reference_span = nodes.kind(node_id).span();
     for ancestor in nodes.ancestor_ids(node_id) {
-        if ancestor == loop_id {
+        if ancestor == loop_id || Some(ancestor) == barrier {
             return crossed;
         }
         crossed |= nodes.kind(ancestor).is_function_like()
@@ -539,38 +560,16 @@ pub(super) fn has_remaining_syntax(program: &Program<'_>) -> bool {
     detector.0
 }
 
+/// Whether any lexical binding still needs the per-iteration environment the
+/// structural half of this pass builds. Shares [`captured_loop_of`] with that
+/// half so the two halves cannot disagree about what counts as captured; a
+/// disagreement would reject the file after the rewrite declined to touch it.
 fn has_captured_loop_binding(semantic: &Semantic<'_>) -> bool {
     let scoping = semantic.scoping();
     let nodes = semantic.nodes();
-    for symbol_id in scoping.symbol_ids() {
-        if !scoping
-            .symbol_flags(symbol_id)
-            .contains(SymbolFlags::BlockScopedVariable)
-        {
-            continue;
-        }
-        let declaration_id = scoping.symbol_declaration(symbol_id);
-        let Some(loop_id) = nodes
-            .ancestor_ids(declaration_id)
-            .find(|node_id| nodes.kind(*node_id).is_iteration_statement())
-        else {
-            continue;
-        };
-        for reference_id in scoping.get_resolved_reference_ids(symbol_id) {
-            let reference_node_id = scoping.get_reference(*reference_id).node_id();
-            let mut crossed_function = false;
-            for ancestor_id in nodes.ancestor_ids(reference_node_id) {
-                if ancestor_id == loop_id {
-                    if crossed_function {
-                        return true;
-                    }
-                    break;
-                }
-                crossed_function |= nodes.kind(ancestor_id).is_function_like();
-            }
-        }
-    }
-    false
+    scoping
+        .symbol_ids()
+        .any(|symbol_id| captured_loop_of(nodes, scoping, symbol_id).is_some())
 }
 
 pub(super) struct BlockScopingPlan {
