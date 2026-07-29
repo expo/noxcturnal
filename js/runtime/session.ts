@@ -64,12 +64,15 @@ export class NativeTransformSession {
   #bindingIndex: { nameIds: Map<string, number>; keys: Set<number> } | null = null;
   #nativeParseCount = 0;
   #nativeAstTraversalCount = 0;
+  #nativeSemanticBuildCount = 0;
   #reportedNativeParseCount: number | null = null;
   #reportedNativeAstTraversalCount: number | null = null;
+  #reportedNativeSemanticBuildCount: number | null = null;
   #performanceSnapshot: {
     memoryBytes: number;
     parseCount: number;
     astTraversalCount: number;
+    semanticBuildCount: number;
   } | null = null;
   #nativeCrossings = 0;
   constructor(
@@ -94,6 +97,7 @@ export class NativeTransformSession {
         retentionManifest,
         initialManifest,
         buildInitialRoute,
+        options.experimentalSyntaxOnlySessions,
       );
       if (options.maxNativeMemoryBytes != null) {
         this.#crossing('memory-budget');
@@ -117,6 +121,11 @@ export class NativeTransformSession {
     if (this.#native && this.#reportedNativeAstTraversalCount == null)
       this.#reportedNativeAstTraversalCount = this.#nativePerformanceSnapshot().astTraversalCount;
     return this.#nativeAstTraversalCount + (this.#reportedNativeAstTraversalCount ?? 0);
+  }
+  get nativeSemanticBuildCount(): number {
+    if (this.#native && this.#reportedNativeSemanticBuildCount == null)
+      this.#reportedNativeSemanticBuildCount = this.#nativePerformanceSnapshot().semanticBuildCount;
+    return this.#nativeSemanticBuildCount + (this.#reportedNativeSemanticBuildCount ?? 0);
   }
   get nativeCrossingCount(): number {
     return this.#nativeCrossings;
@@ -483,19 +492,10 @@ export class NativeTransformSession {
   }
   generateUid(name = 'temp'): string {
     const hint = name.replace(/[^A-Za-z0-9_$]/g, '') || 'temp';
-    // A materialized native session selected this namespace while its semantic
-    // name tables were already hot. Crossing one short string is substantially
-    // cheaper than transferring the identifier table or rescanning source in JS.
-    if (this.#native != null) {
-      if (!this.uidAllocator.initialized) {
-        this.#crossing('uid-prefix');
-        this.uidAllocator.initialize(this.#native.uidPrefix());
-      }
-      return this.uidAllocator.generate(hint);
-    }
     const base = `_${hint}`;
-    // Stateless sessions have no native semantic data to reuse. Tokenize once
-    // locally, then use O(1) collision checks for every generated candidate.
+    // UID spelling is part of output compatibility. Use the same source-based
+    // allocator whether this phase happens to own a retained syntax/semantic
+    // session or is routed statelessly; artifact selection must not change code.
     this.#sourceIdentifiers ??= new Set(
       this.source.match(/[$_\p{ID_Start}][$\u200c\u200d\p{ID_Continue}]*/gu) ?? [],
     );

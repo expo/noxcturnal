@@ -370,8 +370,9 @@ pub(crate) fn decode_route_manifest(
         .iter()
         .filter_map(|name| field_key_id(name))
         .fold(FieldMask::none(), |mask, field_id| mask.with(field_id));
-    let needs_semantics = include_parent
-        || include_scope
+    // Structural ancestry comes from the syntax traversal's parent stack.
+    // Only lexical scope data and semantic-only fields require SemanticBuilder.
+    let needs_semantics = include_scope
         || merged_field_mask_by_type
             .iter()
             .any(|mask| mask.intersects(semantic_mask));

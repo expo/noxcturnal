@@ -17,7 +17,6 @@ import type {
   NodeOfType,
   NodeSummary,
   NodeView,
-  PhaseObservation,
   QueryRequest,
   QueryResult,
   ScalarPredicate,
@@ -791,7 +790,6 @@ export interface PipelinePhase {
   plugins?: readonly NativePlugin<any, any>[];
   /** Fused parse/transform/codegen phase executed entirely in Rust. */
   native?: import('../preflight/types.js').PreflightPlan;
-  observes?: PhaseObservation;
   editEffect?: EditEffect;
   requiresPrintedInput?: boolean;
   requiresFreshSemantics?: boolean;
@@ -800,14 +798,12 @@ export interface PipelinePhase {
 
 export interface CompiledPhasePlan {
   name: string;
-  observes: PhaseObservation;
   editEffect: EditEffect;
   requiresPrintedInput: boolean;
   requiresFreshSemantics: boolean;
   requiresRealizedMap: boolean;
-  boundaryBefore: boolean;
-  canReuseAst: boolean;
-  canDeferRendering: boolean;
+  /** Closed bit set of derived artifacts declared before per-file routing. */
+  artifactDemand: import('../pipeline/artifacts.js').ArtifactDemand;
 }
 
 /** An immutable, reusable transform configuration. */

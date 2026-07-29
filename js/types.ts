@@ -44,7 +44,6 @@ export type EditEffect =
   | 'bindings'
   | 'module-structure'
   | 'whole-program';
-export type PhaseObservation = 'original' | 'current-ast' | 'rendered-source';
 export type CoordinateSpace = 'original' | 'current' | 'generated';
 export type EditKind =
   | 'Replace'
@@ -248,6 +247,9 @@ export interface TransformOptions {
   functionMap?: boolean;
   /** Include phase decisions and counters in metadata. Intended for benchmarks/debugging only. */
   debugPerformance?: boolean;
+  /** Experimental: retain structural indexes without constructing lexical
+   * semantics when the compiled artifact demand proves they are unnecessary. */
+  experimentalSyntaxOnlySessions?: boolean;
   /** Development/test-only: report undeclared contract access with suggested
    * fragments and declared-but-unused contract entries as diagnostics. */
   verifyVisitorContracts?: boolean;

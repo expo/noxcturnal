@@ -17,6 +17,8 @@ import {
   recordNativeCrossing,
   sampleProcessMemory,
 } from './metadata.js';
+import { SourceVersionStore, type SourceVersionId } from './source-versions.js';
+import { ArtifactDemand, hasSemanticDemand } from '../pipeline/artifacts.js';
 import { locationOffset } from './path.js';
 import type { IntentRegistration } from './fragments.js';
 import {
@@ -34,7 +36,6 @@ import type {
   NativeVlqMap,
   TransformOptions,
   TransformResult,
-  FunctionMap,
 } from '../types.js';
 import {
   NativePipeline,
@@ -54,6 +55,34 @@ interface RetainedPlan {
 interface RetainedChainNode {
   children: WeakMap<PreparedPhase, RetainedChainNode>;
   plan?: RetainedPlan;
+}
+
+const SEMANTIC_ROUTE_FIELDS = new Set([
+  'global',
+  'read',
+  'write',
+  'bindingScopeId',
+  'calleeGlobal',
+  'rootGlobal',
+]);
+
+function phaseArtifactDemand(base: ArtifactDemand, prepared: PreparedPhase): ArtifactDemand {
+  let demand = base;
+  if (prepared.includeParent) demand |= ArtifactDemand.StructuralParents;
+  if (prepared.structuralParentTypes.length > 0) demand |= ArtifactDemand.StructuralChildren;
+  if (prepared.includeScope) demand |= ArtifactDemand.LexicalScopes;
+  if (prepared.retentionCapabilities & (1 << 1)) demand |= ArtifactDemand.DirectScalarFields;
+  if (prepared.retentionCapabilities & (1 << 5)) demand |= ArtifactDemand.ModuleFacts;
+  if (
+    prepared.retentionCapabilities & ((1 << 0) | (1 << 2)) ||
+    prepared.compiledRoutes.some(
+      route =>
+        route.payloadFields.some(field => SEMANTIC_ROUTE_FIELDS.has(field)) ||
+        Object.keys(route.predicates).some(field => SEMANTIC_ROUTE_FIELDS.has(field)),
+    )
+  )
+    demand |= ArtifactDemand.BindingsReferences;
+  return demand;
 }
 
 const retainedChainRoot: RetainedChainNode = { children: new WeakMap() };
@@ -226,14 +255,21 @@ export function transform(
     };
   }
   const phasePlanMs = options.debugPerformance ? performance.now() - phasePlanStarted : 0;
-  let phaseSource = source;
+  const sourceVersions = new SourceVersionStore(originalSource);
+  let currentVersion = sourceVersions.original;
+  if (source !== originalSource || adapterMap != null) {
+    currentVersion = sourceVersions.commit(currentVersion, {
+      normalizedEditCount: 0,
+      codeChanged: source !== originalSource,
+      mapChanged: adapterMap != null,
+    });
+    sourceVersions.cacheRenderedText(currentVersion, source);
+  }
   // An all-native pipeline has no visitor phase, so it never needs the source
   // text in JS: the whole run collapses into one `runNativePipeline` crossing,
   // no resident session object required.
   const allNative =
-    pipeline.phases.length > 0 &&
-    pipeline.phases.every(phase => phase.native != null) &&
-    phasePlan.every(plan => plan.observes !== 'original');
+    pipeline.phases.length > 0 && pipeline.phases.every(phase => phase.native != null);
   // The resident source: native phases and visitor commits mutate it in place
   // and accumulate their map layers natively, so the intermediate phase source
   // and per-phase map layers never cross the boundary — only the final composed
@@ -246,17 +282,15 @@ export function transform(
     !allNative && pipeline.phases.some(phase => phase.native != null)
       ? new native.NativePipelineSession(parseFilename, source)
       : null;
-  // A native phase or commit leaves `phaseSource` stale — the session holds the
-  // truth — so consecutive native phases hand the source along as a resident
-  // handle rather than crossing the whole string out and back. It is only
-  // materialized when a visitor phase reads source text, or for the final result.
-  let phaseSourceStale = false;
+  // Rendered text is an optional artifact of the current source version. Native
+  // work leaves it resident; a visitor or final output materializes and caches
+  // it on that exact immutable version.
   const currentSource = (): string => {
-    if (phaseSourceStale) {
-      phaseSource = pipelineSession!.sourceText();
-      phaseSourceStale = false;
-    }
-    return phaseSource;
+    const cached = sourceVersions.renderedText(currentVersion);
+    if (cached != null) return cached;
+    const materialized = pipelineSession!.sourceText();
+    sourceVersions.cacheRenderedText(currentVersion, materialized);
+    return materialized;
   };
   let inputMap = options.inputSourceMap ?? null;
   if (adapterMap != null) {
@@ -293,10 +327,18 @@ export function transform(
   let openSession: NativeTransformSession | null = null;
   let reusableSession: NativeTransformSession | null = null;
   let reusableRoutedBatch: { manifest: Buffer; batch: RoutedEventBatch } | null = null;
-  let pendingEdits: EditCommand[] = [];
-  let nativeFunctionMap: FunctionMap | null = null;
   const recordedParseCounts = new WeakMap<NativeTransformSession, number>();
   const recordedTraversalCounts = new WeakMap<NativeTransformSession, number>();
+  const recordedSemanticBuildCounts = new WeakMap<NativeTransformSession, number>();
+  const recordBoundaryReason = (
+    kind: 'committedBoundaryReasons' | 'eliminatedBoundaryReasons',
+    reason: string,
+  ): void => {
+    if (!options.debugPerformance) return;
+    const counters = metadata.performance as Record<string, unknown>;
+    const reasons = counters[kind] as Record<string, number>;
+    reasons[reason] = (reasons[reason] ?? 0) + 1;
+  };
   // Record one native run's per-phase results into diagnostics/metadata and bail
   // on the first phase that did not complete. Shared by the mixed-pipeline loop
   // and the all-native single-call path.
@@ -314,6 +356,24 @@ export function transform(
       const result = results[resultIndex];
       const { phase: batchPhase, index } = batch[resultIndex];
       const complete = result.status === 'complete';
+      const observedVersion = currentVersion;
+      if (complete)
+        currentVersion = sourceVersions.commit(currentVersion, {
+          normalizedEditCount: 1,
+          codeChanged: true,
+          mapChanged: true,
+        });
+      const nativeBoundaryReason =
+        index + 1 === pipeline.phases.length
+          ? 'final-output'
+          : pipeline.phases[index + 1].native != null
+            ? 'native-boundary'
+            : phasePlan[index + 1].requiresRealizedMap
+              ? 'realized-map'
+              : phasePlan[index + 1].requiresPrintedInput
+                ? 'printed-input'
+                : 'ast-read-after-write';
+      if (complete) recordBoundaryReason('committedBoundaryReasons', nativeBoundaryReason);
       if (options.debugPerformance) {
         const phaseMs =
           (result.parseMs ?? 0) +
@@ -360,11 +420,16 @@ export function transform(
         performanceMetadata.mappingSegments += result.mappingSegments ?? 0;
         performanceMetadata.phaseExecutions.push({
           name: batchPhase.name,
-          observes: phasePlan[index].observes,
           editEffect: 'whole-program',
           source: 'rendered',
           reusedParse: false,
           render: complete ? 'committed' : 'unchanged',
+          observedVersion,
+          resultingVersion: currentVersion,
+          artifactDemand: phasePlan[index].artifactDemand,
+          artifactPlan:
+            (result.semanticBuildCount ?? 0) > 0 ? 'retained-semantic' : 'retained-syntax',
+          boundaryReason: complete ? nativeBoundaryReason : 'no-edits',
           nativeTransformMs: phaseMs,
           nativeParses: result.parseCount ?? 1,
           nativeSemanticBuilds: result.semanticBuildCount ?? 0,
@@ -398,23 +463,37 @@ export function transform(
     }
   };
   // The shared success tail: plugin cleanup, function map, final metadata, and
-  // the completed result. `phaseSource`/`finalMap` are already set by the loop or
+  // the completed result. The current version/final map are already set by the loop or
   // the all-native path.
   const completeResult = (): TransformResult => {
     for (const { plugin, state } of allStates) plugin.cleanup?.('complete', state);
     const functionMapStarted = options.debugPerformance ? performance.now() : 0;
-    if (options.debugPerformance && options.functionMap && nativeFunctionMap == null)
+    const cachedFunctionMap = sourceVersions.functionMap(currentVersion);
+    if (options.debugPerformance && options.functionMap && cachedFunctionMap == null)
       recordNativeCrossing(metadata, 'function-map.generate');
     const functionMap = options.functionMap
-      ? (nativeFunctionMap ??
-        native.generateFunctionMap(adapterMap == null ? originalSource : source, parseFilename))
+      ? (cachedFunctionMap ?? native.generateFunctionMap(currentSource(), parseFilename))
       : null;
+    if (functionMap != null && cachedFunctionMap == null)
+      sourceVersions.cacheFunctionMap(currentVersion, functionMap);
+    if (options.debugPerformance && options.functionMap) {
+      const performance = metadata.performance as Record<string, unknown>;
+      performance.finalFunctionMapCacheHit = cachedFunctionMap != null;
+      performance.finalFunctionMapSyntaxParses = cachedFunctionMap == null ? 1 : 0;
+      performance.functionMapTraversals = cachedFunctionMap == null ? 1 : 0;
+      performance.functionMapBytes =
+        functionMap == null
+          ? 0
+          : Buffer.byteLength(functionMap.mappings) +
+            functionMap.names.reduce((sum, name) => sum + Buffer.byteLength(name), 0);
+    }
     if (options.debugPerformance)
       performanceCounters(metadata).functionMapMs = performance.now() - functionMapStarted;
     if (options.debugPerformance) {
       performanceCounters(metadata).totalMs = performance.now() - transformStarted;
       performanceCounters(metadata).overallMs = performance.now() - overallStarted;
       sampleProcessMemory(metadata);
+      (metadata.performance as Record<string, unknown>).sourceVersions = sourceVersions.snapshot();
     }
     // Always-on observability: a count only, so production consumers can notice
     // weakened maps or stale cross-phase text without debug tracing enabled.
@@ -422,7 +501,7 @@ export function transform(
     verifier?.finish(diagnostics);
     return {
       status: 'complete',
-      code: phaseSource,
+      code: currentSource(),
       map: finalMap ?? { mappings: '', names: [] },
       functionMap,
       metadata,
@@ -444,7 +523,7 @@ export function transform(
       );
       const runWall = options.debugPerformance ? performance.now() - nativeStarted : 0;
       recordNativeResults(pipelineResult.results, batch, runWall); // throws on any bail
-      phaseSource = pipelineResult.code!; // every phase completed, else recordNativeResults bailed
+      sourceVersions.cacheRenderedText(currentVersion, pipelineResult.code!);
       if (pipelineResult.map != null) {
         finalMap = pipelineResult.map;
         if (options.debugPerformance) {
@@ -460,14 +539,14 @@ export function transform(
     }
     for (let phaseIndex = 0; phaseIndex < pipeline.phases.length; phaseIndex++) {
       const phase = pipeline.phases[phaseIndex];
-      const observesOriginal = phasePlan[phaseIndex].observes === 'original';
+      const executionPlan = phasePlan[phaseIndex];
+      const isFinalPhase = phaseIndex === pipeline.phases.length - 1;
+      const observedVersion: SourceVersionId = currentVersion;
       if (phase.native != null) {
         reusableSession?.close();
         reusableSession = null;
         reusableRoutedBatch = null;
         openSession = null;
-        if (pendingEdits.length > 0)
-          throw new Error(`${phase.name}: native phase received uncommitted visitor edits`);
         // Collect the run of consecutive native phases and execute them in a
         // single crossing: native phases hand the source and their map layers
         // along resident, never bouncing back to JS between themselves. The
@@ -475,12 +554,6 @@ export function transform(
         const batch: { phase: (typeof pipeline.phases)[number]; index: number }[] = [];
         while (phaseIndex < pipeline.phases.length && pipeline.phases[phaseIndex].native != null) {
           const batchPhase = pipeline.phases[phaseIndex];
-          // A native phase runs on the resident source; observing the original —
-          // once an adapter rewrite or a prior render has diverged it — would run
-          // it on the wrong text. Only a phase that observes the original pays to
-          // materialize the source here; the common case does not.
-          if (phasePlan[phaseIndex].observes === 'original' && originalSource !== currentSource())
-            throw new Error(`${batchPhase.name}: native phases must observe rendered source`);
           batch.push({ phase: batchPhase, index: phaseIndex });
           phaseIndex++;
         }
@@ -494,8 +567,6 @@ export function transform(
         const runWall = options.debugPerformance ? performance.now() - nativeStarted : 0;
         // The rendered source stays resident; materialized lazily only if a later
         // visitor phase needs its text, or once at the end.
-        if (results.length > 0 && results[results.length - 1].status === 'complete')
-          phaseSourceStale = true;
         recordNativeResults(results, batch, runWall);
         continue;
       }
@@ -503,7 +574,7 @@ export function transform(
       // once for this phase; `observationSource` and the edit-boundary checks
       // below then compare against a real, current string.
       const materializedSource = currentSource();
-      const observationSource = observesOriginal ? originalSource : materializedSource;
+      const observationSource = materializedSource;
       if (reusableSession && reusableSession.source !== observationSource) {
         reusableSession.close();
         reusableSession = null;
@@ -530,15 +601,20 @@ export function transform(
       const phaseExecution = options.debugPerformance
         ? {
             name: phase.name,
-            observes: phasePlan[phaseIndex].observes,
             editEffect: runtimeEditEffect,
             source:
               observationSource === originalSource ? ('original' as const) : ('rendered' as const),
             reusedParse: false,
             render: 'pending' as 'pending' | 'unchanged' | 'deferred' | 'committed',
+            observedVersion: 0,
+            resultingVersion: 0,
+            artifactDemand: phasePlan[phaseIndex].artifactDemand,
+            boundaryReason: undefined as string | undefined,
           }
         : undefined;
       if (phaseExecution) {
+        phaseExecution.observedVersion = observedVersion;
+        phaseExecution.resultingVersion = observedVersion;
         const performance = metadata.performance as { phaseExecutions: unknown[] };
         performance.phaseExecutions.push(phaseExecution);
       }
@@ -559,22 +635,43 @@ export function transform(
       let chain = retainedChains(prepared);
       for (let futureIndex = phaseIndex + 1; futureIndex < pipeline.phases.length; futureIndex++) {
         if (phasePlan[futureIndex].requiresPrintedInput) break;
-        const futureObservationSource =
-          phasePlan[futureIndex].observes === 'original' ? originalSource : observationSource;
-        if (futureObservationSource !== observationSource) continue;
+        if (runtimeEditEffect !== 'none') break;
         const futurePrepared = preparePhase(pipeline.phases[futureIndex]);
         lookahead.push(futurePrepared);
         chain = retainedChains(futurePrepared, chain);
       }
       const retained = (chain.plan ??= buildRetainedPlan(prepared, lookahead));
       const { futureSubscriptions, retentionManifest } = retained;
+      const retainedSession = reusableSession;
+      const canReuseForNextPhase =
+        phaseIndex + 1 === pipeline.phases.length ||
+        (pipeline.phases[phaseIndex + 1].native == null &&
+          lookahead[0] === preparePhase(pipeline.phases[phaseIndex + 1]));
+      const collectFinalFunctionMap =
+        options.functionMap === true && isFinalPhase && !/\n#!/.test(observationSource);
+      const artifactDemand =
+        phaseArtifactDemand(executionPlan.artifactDemand, prepared) |
+        (collectFinalFunctionMap ? ArtifactDemand.FunctionMap : ArtifactDemand.None);
       const requiresIndex =
         requiresIndexBase ||
         includeParent ||
         includeScope ||
-        options.functionMap === true ||
-        futureSubscriptions.size > 0;
-      const retainedSession = reusableSession;
+        collectFinalFunctionMap ||
+        futureSubscriptions.size > 0 ||
+        hasSemanticDemand(artifactDemand);
+      // Parsed/index artifacts live exactly as long as their retained native
+      // session. If orchestration dropped that owner, the generic planner must
+      // not report a logical cache hit for the version.
+      if (retainedSession == null) sourceVersions.dropParsedArtifacts(observedVersion);
+      const artifactSelection = sourceVersions.ensure(
+        observedVersion,
+        artifactDemand,
+        requiresIndex,
+      );
+      if (phaseExecution) {
+        phaseExecution.artifactDemand = artifactDemand;
+        Object.assign(phaseExecution, { artifactPlan: artifactSelection.plan });
+      }
       const sessionStarted = options.debugPerformance ? performance.now() : 0;
       const session: NativeTransformSession =
         retainedSession ??
@@ -584,7 +681,17 @@ export function transform(
           // `parseFilename` is already normalized, including an adapter's
           // authoritative JS/JSX output mode. Do not apply the caller's original
           // parser override a second time inside NativeTransformSession.
-          { ...options, parser: 'auto' },
+          {
+            ...options,
+            parser: 'auto',
+            // A map collected while opening the last phase belongs to that
+            // phase's immutable input. A code-changing commit invalidates it;
+            // a no-op or map-only child can reuse it in the success tail.
+            functionMap: collectFinalFunctionMap,
+            experimentalSyntaxOnlySessions:
+              options.experimentalSyntaxOnlySessions === true ||
+              (collectFinalFunctionMap && !hasSemanticDemand(artifactDemand)),
+          },
           requiresIndex ? retentionManifest : undefined,
           requiresIndex ? manifest : undefined,
           true,
@@ -632,6 +739,8 @@ export function transform(
               throw new Error('native-memory-budget-exceeded');
           } else {
             session.recordStatelessParse();
+            if (options.debugPerformance && artifactSelection.plan === 'stateless-syntax')
+              (metadata.performance as { statelessSyntaxRoutes: number }).statelessSyntaxRoutes++;
             if (options.debugPerformance) recordNativeCrossing(metadata, 'route.stateless');
             const routedBuffer = native.materializeRoutedBuffer(
               observationSource,
@@ -666,8 +775,11 @@ export function transform(
         performance.recordWords += batch.recordBytes / 4;
         performance.utf8SlabBytes += batch.stringSlabBytes;
       }
-      if (options.functionMap && nativeFunctionMap == null)
-        nativeFunctionMap = session.takeFunctionMap();
+      if (options.functionMap && isFinalPhase) {
+        const phaseFunctionMap = session.takeFunctionMap();
+        if (phaseFunctionMap != null)
+          sourceVersions.cacheFunctionMap(observedVersion, phaseFunctionMap);
+      }
       if (requiresIndex || includeParent || includeScope)
         session.reserveEventCache(batch.nodeCount);
       if (structuralParentTypes.length > 0) session.prefetchChildren([], structuralParentTypes);
@@ -751,24 +863,32 @@ export function transform(
       if (options.debugPerformance) {
         const previous = recordedParseCounts.get(session) ?? 0;
         const previousTraversals = recordedTraversalCounts.get(session) ?? 0;
+        const previousSemanticBuilds = recordedSemanticBuildCounts.get(session) ?? 0;
         const performance = metadata.performance as {
           nativeParses: number;
           nativeAstTraversals: number;
+          nativeSemanticBuilds: number;
+          retainedSyntaxMaterializations: number;
+          retainedSemanticMaterializations: number;
         };
         performance.nativeParses += session.nativeParseCount - previous;
         performance.nativeAstTraversals += session.nativeAstTraversalCount - previousTraversals;
+        const semanticBuilds = session.nativeSemanticBuildCount - previousSemanticBuilds;
+        performance.nativeSemanticBuilds += semanticBuilds;
+        if (session.nativeParseCount > previous) {
+          if (semanticBuilds > 0) performance.retainedSemanticMaterializations++;
+          else if (requiresIndex) performance.retainedSyntaxMaterializations++;
+        }
         recordedParseCounts.set(session, session.nativeParseCount);
         recordedTraversalCounts.set(session, session.nativeAstTraversalCount);
+        recordedSemanticBuildCounts.set(session, session.nativeSemanticBuildCount);
       }
-      const isFinalPhase = phaseIndex === pipeline.phases.length - 1;
-      if (edits.length > 0 && observationSource !== phaseSource)
-        throw new Error(
-          `${phase.name}: edits against original source are ambiguous after a rendered boundary`,
-        );
-      const effectiveEdits = pendingEdits.length === 0 ? edits : [...pendingEdits, ...edits];
+      const effectiveEdits: EditCommand[] = edits;
       if (effectiveEdits.length === 0) {
         if (phaseExecution) phaseExecution.render = 'unchanged';
-        if (observationSource === phaseSource) {
+        if (phaseExecution) phaseExecution.boundaryReason = 'no-edits';
+        recordBoundaryReason('eliminatedBoundaryReasons', 'no-edits');
+        if (observedVersion === currentVersion && canReuseForNextPhase) {
           reusableSession = session;
           reusableRoutedBatch = { manifest, batch };
         } else {
@@ -778,32 +898,27 @@ export function transform(
         continue;
       }
       const nextPlan = phasePlan[phaseIndex + 1];
-      const canDefer =
-        !isFinalPhase &&
-        runtimeEditEffect === 'text-only' &&
-        nextPlan != null &&
-        !nextPlan.requiresPrintedInput &&
-        pipeline.phases[phaseIndex + 1].requiresFreshSemantics !== true &&
-        !phasePlan[phaseIndex].requiresRealizedMap;
-      if (canDefer) {
-        if (phaseExecution) phaseExecution.render = 'deferred';
-        pendingEdits = effectiveEdits;
-        reusableSession = session;
-        reusableRoutedBatch = { manifest, batch };
-        continue;
-      }
       // The edits address the resident source directly, so the commit renders
       // in the pipeline session: the new source and the map layer stay resident,
       // and the chain composes once at the end.
       const renderStarted = options.debugPerformance ? performance.now() : 0;
-      pipelineSession ??= new native.NativePipelineSession(parseFilename, phaseSource);
+      pipelineSession ??= new native.NativePipelineSession(parseFilename, currentSource());
       const residentPipeline = pipelineSession;
       const committed = commitWithDedupe(effectiveEdits, data =>
         residentPipeline.commitDecoded(data, options.sourceMapMode),
       );
+      const codeChanged = committed.codeChanged;
+      const mapChanged = committed.mapChanged;
+      const resultingVersion = sourceVersions.commit(observedVersion, {
+        normalizedEditCount: committed.edits.length,
+        normalizedEdits: committed.edits,
+        codeChanged,
+        mapChanged,
+      });
+      currentVersion = resultingVersion;
+      if (phaseExecution) phaseExecution.resultingVersion = resultingVersion;
       // The rendered source stays resident; a following native phase reads it
       // without a crossing, and a following visitor phase materializes it lazily.
-      phaseSourceStale = true;
       if (options.debugPerformance) {
         performanceCounters(metadata).renderAndMapMs += performance.now() - renderStarted;
         const performanceMetadata = metadata.performance as {
@@ -817,8 +932,63 @@ export function transform(
         performanceMetadata.renderedBytes += committed.renderedBytes;
         performanceMetadata.mappingSegments += committed.mappingSegments;
       }
-      if (phaseExecution) phaseExecution.render = 'committed';
-      pendingEdits = [];
+      if (!codeChanged && !mapChanged) {
+        if (options.debugPerformance)
+          (metadata.performance as { effectiveNoopTransactions: number })
+            .effectiveNoopTransactions++;
+        if (phaseExecution) {
+          phaseExecution.render = 'unchanged';
+          phaseExecution.boundaryReason = 'no-effective-byte-change';
+        }
+        recordBoundaryReason('eliminatedBoundaryReasons', 'no-effective-byte-change');
+        if (canReuseForNextPhase) {
+          reusableSession = session;
+          reusableRoutedBatch = { manifest, batch };
+          openSession = session;
+        } else {
+          session.close();
+          openSession = null;
+        }
+        continue;
+      }
+      if (!codeChanged) {
+        if (phaseExecution) {
+          phaseExecution.render = 'committed';
+          phaseExecution.boundaryReason = 'realized-map';
+        }
+        recordBoundaryReason('committedBoundaryReasons', 'realized-map');
+        if (canReuseForNextPhase) {
+          reusableSession = session;
+          reusableRoutedBatch = { manifest, batch };
+          openSession = session;
+        } else {
+          session.close();
+          openSession = null;
+        }
+        continue;
+      }
+      const boundaryReason = isFinalPhase
+        ? 'final-output'
+        : nextPlan?.requiresRealizedMap
+          ? 'realized-map'
+          : pipeline.phases[phaseIndex + 1]?.native != null
+            ? 'native-boundary'
+            : nextPlan?.requiresPrintedInput
+              ? 'printed-input'
+              : nextPlan != null &&
+                  hasSemanticDemand(
+                    phaseArtifactDemand(
+                      nextPlan.artifactDemand,
+                      preparePhase(pipeline.phases[phaseIndex + 1]),
+                    ),
+                  )
+                ? 'semantic-read-after-write'
+                : 'ast-read-after-write';
+      if (phaseExecution) {
+        phaseExecution.render = 'committed';
+        phaseExecution.boundaryReason = boundaryReason;
+      }
+      recordBoundaryReason('committedBoundaryReasons', boundaryReason);
       session.close();
       if (options.debugPerformance && phaseIndex + 1 < pipeline.phases.length) {
         const performance = metadata.performance as { reparses: number };
@@ -841,8 +1011,7 @@ export function transform(
     }
     const composeStarted = options.debugPerformance ? performance.now() : 0;
     const finished = pipelineSession.finish(inputMap?.mappings, inputMap?.names);
-    phaseSource = finished.code;
-    phaseSourceStale = false;
+    sourceVersions.cacheRenderedText(currentVersion, finished.code);
     if (finished.map != null) {
       finalMap = finished.map;
       if (options.debugPerformance) {

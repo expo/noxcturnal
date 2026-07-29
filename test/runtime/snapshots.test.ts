@@ -94,11 +94,13 @@ test('generates Metro-compatible function maps natively', () => {
   const performance = result.metadata.performance as {
     nativeParses: number;
     nativeAstTraversals: number;
+    nativeSemanticBuilds: number;
     nativeRetainedBytesPeak: number;
     routeDeliveries: number;
   };
   assert.equal(performance.nativeParses, 1);
-  assert.equal(performance.nativeAstTraversals, 2);
+  assert.equal(performance.nativeAstTraversals, 1);
+  assert.equal(performance.nativeSemanticBuilds, 0);
   assert.ok(performance.nativeRetainedBytesPeak > source.length);
   assert.equal(performance.routeDeliveries, 0);
 });
@@ -170,6 +172,71 @@ test('matches Metro function naming and frame positions', () => {
     assert.equal(result.status, 'complete');
     if (result.status === 'complete') assert.deepEqual(result.functionMap, expected);
   }
+});
+
+test('generates a function map only from the final committed source version', () => {
+  const rename = (name: string, from: string, to: string) =>
+    defineNativePlugin({
+      name,
+      editEffect: 'bindings',
+      visitors: [
+        defineVisitor('Identifier', {}, path => {
+          if (path.sourceText() === from) path.replaceWith(to);
+        }),
+      ],
+    });
+  const result = transform(
+    'function alpha() { return 1 }',
+    'fixture.js',
+    defineNativePipeline({
+      phases: [
+        { name: 'first', plugins: [rename('alpha-beta', 'alpha', 'beta')] },
+        { name: 'second', plugins: [rename('beta-gamma', 'beta', 'gamma')] },
+      ],
+    }),
+    { functionMap: true, debugPerformance: true },
+  );
+  assert.equal(result.status, 'complete');
+  if (result.status !== 'complete') return;
+  assert.equal(result.code, 'function gamma() { return 1 }');
+  assert.deepEqual(result.functionMap?.names, ['gamma']);
+  assert.ok(!result.functionMap?.names.includes('alpha'));
+  assert.ok(!result.functionMap?.names.includes('beta'));
+  const performance = result.metadata.performance as {
+    finalFunctionMapCacheHit: boolean;
+    finalFunctionMapSyntaxParses: number;
+    nativeSemanticBuilds: number;
+  };
+  assert.equal(performance.finalFunctionMapCacheHit, false);
+  assert.equal(performance.finalFunctionMapSyntaxParses, 1);
+  assert.equal(performance.nativeSemanticBuilds, 0);
+});
+
+test('reuses a final-input function map across no-op and map-only commits', () => {
+  const mark = defineNativePlugin({
+    name: 'map-only-final',
+    editEffect: 'text-only',
+    visitors: [
+      defineVisitor('Identifier', {}, path => {
+        path.replaceWith({ code: path.sourceText(), mapping: 'anchor-boundaries' });
+      }),
+    ],
+  });
+  const result = transform(
+    'const callback = () => 1;',
+    'fixture.js',
+    defineNativePipeline({ phases: [{ name: 'mark', plugins: [mark] }] }),
+    { functionMap: true, debugPerformance: true },
+  );
+  assert.equal(result.status, 'complete');
+  if (result.status !== 'complete') return;
+  assert.deepEqual(result.functionMap?.names, ['<global>', 'callback']);
+  const performance = result.metadata.performance as {
+    finalFunctionMapCacheHit: boolean;
+    finalFunctionMapSyntaxParses: number;
+  };
+  assert.equal(performance.finalFunctionMapCacheHit, true);
+  assert.equal(performance.finalFunctionMapSyntaxParses, 0);
 });
 
 test('hydrates targeted snapshots once and retains exit ancestry and scope', () => {

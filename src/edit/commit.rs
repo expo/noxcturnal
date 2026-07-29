@@ -47,8 +47,19 @@ pub fn commit_decoded_buffer(
     let commands = decode_packed_commands(data)?;
     let pieces = super::build(source, commands)?;
     let (code, layer) = sourcemap::render_decoded(source, &pieces, mode.unwrap_or("boundary"));
+    let code_changed = code != source;
+    // Mapping effects are independent from byte effects. Compare with the
+    // renderer's canonical empty transaction so identity replacements and
+    // empty insertions can preserve the current source version, while explicit
+    // marks or non-identity mapping policies still create a map-only child.
+    let identity_pieces = super::build(source, Vec::new())?;
+    let (_, identity_layer) =
+        sourcemap::render_decoded(source, &identity_pieces, mode.unwrap_or("boundary"));
+    let map_changed = layer != identity_layer;
     Ok(NativeDecodedCommit {
         code,
         map: layer.into(),
+        code_changed,
+        map_changed,
     })
 }

@@ -348,7 +348,6 @@ test('ensureReplace re-ensures are no-ops in later phases', () => {
   const source = 'const value = compute();\n';
   const makePhase = (name: string) => ({
     name,
-    ...(name === 'two' ? { observes: 'rendered-source' as const } : {}),
     plugins: [
       defineNativePlugin({
         name: `${name}-claimer`,

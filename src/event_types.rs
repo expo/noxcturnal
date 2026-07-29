@@ -33,4 +33,6 @@ pub struct NativeCommitResult {
 pub struct NativeDecodedCommit {
     pub code: String,
     pub map: napi::bindgen_prelude::Buffer,
+    pub code_changed: bool,
+    pub map_changed: bool,
 }

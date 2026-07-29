@@ -18,6 +18,11 @@ import {
   transform,
   transformClassificationCacheKey,
 } from '../../dist/index.js';
+import {
+  ArtifactDemand,
+  closeArtifactDemand,
+  planArtifacts,
+} from '../../dist/pipeline/artifacts.js';
 import { NativeTransformSession } from '../../dist/runtime/session.js';
 import { native } from '../../dist/native/binding.js';
 import { packEdits } from '../../dist/protocol/edits.js';
@@ -55,15 +60,14 @@ test('compiles conservative phase boundaries and edit effects', () => {
   const plans = compilePhasePlan(
     defineNativePipeline({
       phases: [
-        { name: 'text', plugins: [text], observes: 'current-ast' },
-        { name: 'original-observer', plugins: [text], observes: 'original' },
-        { name: 'compiler', plugins: [unknown], observes: 'rendered-source' },
+        { name: 'text', plugins: [text] },
+        { name: 'printed', plugins: [text], requiresPrintedInput: true },
+        { name: 'compiler', plugins: [unknown] },
       ],
     }),
   );
   assert.equal(plans[0].editEffect, 'text-only');
-  assert.equal(plans[1].canReuseAst, true);
-  assert.equal(plans[2].boundaryBefore, true);
+  assert.equal(plans[1].requiresPrintedInput, true);
   assert.equal(plans[2].editEffect, 'whole-program');
   assert.ok(Object.isFrozen(plans));
   assert.throws(
@@ -80,6 +84,28 @@ test('compiles conservative phase boundaries and edit effects', () => {
         }),
       ),
     /invalid edit effect/,
+  );
+});
+
+test('closes artifact implications and chooses the minimal construction path', () => {
+  assert.equal(
+    closeArtifactDemand(ArtifactDemand.BindingsReferences),
+    ArtifactDemand.BindingsReferences | ArtifactDemand.SyntaxRoute | ArtifactDemand.RenderedText,
+  );
+  assert.equal(planArtifacts(ArtifactDemand.RenderedText), 'render-only');
+  assert.equal(planArtifacts(ArtifactDemand.RealizedMap), 'render-and-map');
+  assert.equal(planArtifacts(ArtifactDemand.StructuralParents), 'stateless-syntax');
+  assert.equal(
+    planArtifacts(ArtifactDemand.StructuralParents, ArtifactDemand.None, true),
+    'retained-syntax',
+  );
+  assert.equal(planArtifacts(ArtifactDemand.LexicalScopes), 'retained-semantic');
+  assert.equal(
+    planArtifacts(
+      ArtifactDemand.StructuralParents,
+      ArtifactDemand.SyntaxRoute | ArtifactDemand.RenderedText | ArtifactDemand.StructuralParents,
+    ),
+    'cached',
   );
 });
 
@@ -104,7 +130,7 @@ test('rejects edits that violate a none effect contract', () => {
   );
 });
 
-test('defers text-only rendering across phases that observe the retained AST', () => {
+test('plugins in one phase observe one immutable input and commit together', () => {
   let observed = '';
   const edit = defineNativePlugin({
     name: 'edit-text',
@@ -127,10 +153,7 @@ test('defers text-only rendering across phases that observe the retained AST', (
     'const value = 1',
     'fixture.js',
     defineNativePipeline({
-      phases: [
-        { name: 'edit', plugins: [edit], observes: 'current-ast' },
-        { name: 'observe', plugins: [observe], observes: 'current-ast' },
-      ],
+      phases: [{ name: 'shared-input', plugins: [edit, observe] }],
     }),
     { debugPerformance: true },
   );
@@ -147,21 +170,18 @@ test('defers text-only rendering across phases that observe the retained AST', (
   assert.equal(performance.reparses, 0);
   assert.equal(performance.nativeParses, 1);
   assert.ok(performance.nativeCrossings >= 2);
-  assert.equal(performance.javascriptBatches, 2);
+  assert.equal(performance.javascriptBatches, 1);
   assert.deepEqual(
     performance.phaseExecutions.map(phase => [phase.editEffect, phase.render, phase.reusedParse]),
-    [
-      ['text-only', 'deferred', false],
-      ['whole-program', 'committed', true],
-    ],
+    [['whole-program', 'committed', false]],
   );
 });
 
-test('runs original observers against pristine source after a rendered boundary', () => {
+test('reparses a changed version for the next current-source phase regardless of edit effect', () => {
   let observed = '';
   const edit = defineNativePlugin({
-    name: 'rendered-edit',
-    editEffect: 'whole-program',
+    name: 'text-effect-edit',
+    editEffect: 'text-only',
     visitors: [
       defineVisitor('Identifier', {}, path => {
         path.replaceWith('renamed');
@@ -169,7 +189,7 @@ test('runs original observers against pristine source after a rendered boundary'
     ],
   });
   const observe = defineNativePlugin({
-    name: 'original-observer',
+    name: 'current-version-observer',
     editEffect: 'none',
     visitors: [
       defineVisitor('Identifier', {}, path => {
@@ -182,28 +202,15 @@ test('runs original observers against pristine source after a rendered boundary'
     'fixture.js',
     defineNativePipeline({
       phases: [
-        { name: 'render', plugins: [edit], observes: 'current-ast' },
-        { name: 'original', plugins: [observe], observes: 'original' },
+        { name: 'edit', plugins: [edit] },
+        { name: 'observe', plugins: [observe] },
       ],
     }),
     { debugPerformance: true },
   );
   assert.equal(result.status, 'complete');
-  assert.equal(observed, 'value');
-  assert.equal(result.code, 'const renamed = 1');
-  const performance = result.metadata.performance as {
-    nativeParses: number;
-    phaseExecutions: { source: string; render: string; reusedParse: boolean }[];
-  };
-  assert.equal(performance.nativeParses, 2);
-  assert.deepEqual(performance.phaseExecutions[1], {
-    name: 'original',
-    observes: 'original',
-    editEffect: 'none',
-    source: 'original',
-    reusedParse: false,
-    render: 'unchanged',
-  });
+  assert.equal(observed, 'renamed');
+  assert.equal((result.metadata.performance as { reparses: number }).reparses, 1);
 });
 
 test('structural static-plan caching rebinds callbacks from recreated plugins', () => {
@@ -317,33 +324,6 @@ test('phases defined after transforming still intern', () => {
   assert.equal(transform('const value = 1;', 'fixture.js', build()).status, 'complete');
 });
 
-test('rejects ambiguous original-source edits after rendering', () => {
-  const edit = (name: string) =>
-    defineNativePlugin({
-      name,
-      editEffect: 'whole-program',
-      visitors: [
-        defineVisitor('Identifier', {}, path => {
-          path.replaceWith('renamed');
-        }),
-      ],
-    });
-  assert.throws(
-    () =>
-      transform(
-        'const value = 1',
-        'fixture.js',
-        defineNativePipeline({
-          phases: [
-            { name: 'render', plugins: [edit('first')] },
-            { name: 'original-edit', plugins: [edit('second')], observes: 'original' },
-          ],
-        }),
-      ),
-    /edits against original source are ambiguous/,
-  );
-});
-
 test('realizes an explicitly required map once and reuses it at final composition', () => {
   const edit = defineNativePlugin({
     name: 'mapped-edit',
@@ -371,7 +351,7 @@ test('realizes an explicitly required map once and reuses it at final compositio
         {
           name: 'observe-rendered',
           plugins: [],
-          observes: 'rendered-source',
+          requiresPrintedInput: true,
         },
       ],
     }),
@@ -386,4 +366,195 @@ test('realizes an explicitly required map once and reuses it at final compositio
   };
   assert.equal(performance.mapEncodes, 1);
   assert.ok(performance.mappingSegments > 0);
+});
+
+test('coalesces structural mutators by composing them in one phase', () => {
+  const rename = (name: string, from: string, to: string) =>
+    defineNativePlugin({
+      name,
+      editEffect: 'whole-program',
+      visitors: [
+        defineVisitor('Identifier', {}, path => {
+          if (path.sourceText() === from) path.replaceWith(to);
+        }),
+      ],
+    });
+  const result = transform(
+    'const first = second;',
+    'fixture.js',
+    defineNativePipeline({
+      phases: [
+        {
+          name: 'renames',
+          plugins: [
+            rename('first-owner', 'first', 'renamedFirst'),
+            rename('second-owner', 'second', 'renamedSecond'),
+          ],
+        },
+      ],
+    }),
+    { debugPerformance: true },
+  );
+  assert.equal(result.status, 'complete');
+  assert.equal(result.code, 'const renamedFirst = renamedSecond;');
+  const performance = result.metadata.performance as {
+    reparses: number;
+    eliminatedBoundaryReasons: Record<string, number>;
+    phaseExecutions: { observedVersion: number; boundaryReason: string }[];
+  };
+  assert.equal(performance.reparses, 0);
+  assert.deepEqual(
+    performance.phaseExecutions.map(phase => phase.observedVersion),
+    [0],
+  );
+});
+
+test('keeps the source version for an identity-equivalent transaction', () => {
+  const identity = defineNativePlugin({
+    name: 'identity-edit',
+    editEffect: 'whole-program',
+    visitors: [
+      defineVisitor('Identifier', {}, path => {
+        path.replaceWith({ code: path.sourceText(), mapping: 'identity' });
+      }),
+    ],
+  });
+  const emptyInsertion = defineNativePlugin({
+    name: 'empty-insertion',
+    editEffect: 'whole-program',
+    pre(context) {
+      context.editor.appendLeft(0, '');
+    },
+  });
+  const result = transform(
+    'const value = 1;',
+    'fixture.js',
+    defineNativePipeline({
+      phases: [{ name: 'identity', plugins: [identity, emptyInsertion] }],
+    }),
+    { debugPerformance: true },
+  );
+  assert.equal(result.status, 'complete');
+  assert.equal(result.code, 'const value = 1;');
+  const performance = result.metadata.performance as {
+    effectiveNoopTransactions: number;
+    eliminatedBoundaryReasons: Record<string, number>;
+    sourceVersions: readonly unknown[];
+  };
+  assert.equal(performance.effectiveNoopTransactions, 1);
+  assert.equal(performance.eliminatedBoundaryReasons['no-effective-byte-change'], 1);
+  assert.equal(performance.sourceVersions.length, 1);
+});
+
+test('does not reuse a no-op phase session without the next phase fields', () => {
+  const conservativeNoop = defineNativePlugin({
+    name: 'conservative-noop',
+    editEffect: 'whole-program',
+    visitors: [defineVisitor('Identifier', { fields: ['name'] }, () => {})],
+  });
+  let importedSource: string | undefined;
+  const readImport = defineNativePlugin({
+    name: 'read-import',
+    editEffect: 'none',
+    visitors: [
+      defineVisitor('ImportDeclaration', { fields: ['source'] }, path => {
+        importedSource = path.node.source;
+      }),
+    ],
+  });
+  const result = transform(
+    'import value from "./dependency"; value;',
+    'fixture.js',
+    defineNativePipeline({
+      phases: [
+        { name: 'conservative-noop', plugins: [conservativeNoop] },
+        { name: 'read-import', plugins: [readImport] },
+      ],
+    }),
+    { debugPerformance: true },
+  );
+  assert.equal(result.status, 'complete');
+  assert.equal(importedSource, './dependency');
+  const performance = result.metadata.performance as {
+    phaseExecutions: { reusedParse: boolean }[];
+  };
+  assert.deepEqual(
+    performance.phaseExecutions.map(phase => phase.reusedParse),
+    [false, false],
+  );
+});
+
+test('creates a map-only version without reparsing unchanged code', () => {
+  const mark = defineNativePlugin({
+    name: 'map-only-edit',
+    editEffect: 'text-only',
+    visitors: [
+      defineVisitor('Identifier', {}, path => {
+        path.context.editor.addSourceMapLocation(path.node.start);
+      }),
+    ],
+  });
+  const result = transform(
+    'const value = 1;',
+    'fixture.js',
+    defineNativePipeline({
+      phases: [
+        { name: 'mark', plugins: [mark] },
+        { name: 'observe', plugins: [] },
+      ],
+    }),
+    { debugPerformance: true },
+  );
+  assert.equal(result.status, 'complete');
+  assert.equal(result.code, 'const value = 1;');
+  const performance = result.metadata.performance as {
+    reparses: number;
+    sourceVersions: readonly unknown[];
+    committedBoundaryReasons: Record<string, number>;
+  };
+  assert.equal(performance.reparses, 0);
+  assert.equal(performance.sourceVersions.length, 2);
+  assert.equal(performance.committedBoundaryReasons['realized-map'], 1);
+});
+
+test('keeps bytes and maps identical across syntax-only render/reparse boundaries', () => {
+  const rename = (name: string, from: string, to: string) =>
+    defineNativePlugin({
+      name,
+      editEffect: 'whole-program',
+      visitors: [
+        defineVisitor('Identifier', {}, path => {
+          if (path.sourceText() === from)
+            path.replaceWith({ code: to, mapping: 'anchor-boundaries', names: [from] });
+        }),
+      ],
+    });
+  const pipeline = defineNativePipeline({
+    phases: [
+      { name: 'first', plugins: [rename('first-map', 'first', 'one')] },
+      { name: 'second', plugins: [rename('second-map', 'second', 'two')] },
+      {
+        name: 'parents',
+        plugins: [
+          defineNativePlugin({
+            name: 'parent-observer',
+            editEffect: 'none',
+            visitors: [defineVisitor('Identifier', { ancestry: 'parent' }, () => {})],
+          }),
+        ],
+      },
+    ],
+  });
+  const semantic = transform('const first = second;', 'fixture.js', pipeline, {
+    sourceMapMode: 'boundary',
+    experimentalSyntaxOnlySessions: false,
+  });
+  const syntax = transform('const first = second;', 'fixture.js', pipeline, {
+    sourceMapMode: 'boundary',
+    experimentalSyntaxOnlySessions: true,
+  });
+  assert.equal(semantic.status, 'complete');
+  assert.equal(syntax.status, 'complete');
+  assert.equal(syntax.code, semantic.code);
+  assert.deepEqual(syntax.map, semantic.map);
 });

@@ -111,7 +111,7 @@ test('runs a fused native TypeScript phase and reports its own timing', () => {
     processHeapUsedStartBytes: number;
     processHeapUsedEndBytes: number;
     processHeapUsedPeakObservedBytes: number;
-    phaseExecutions: { name: string; nativeTransformMs: number }[];
+    phaseExecutions: { name: string; nativeTransformMs: number; boundaryReason: string }[];
   };
   assert.equal(performance.nativeParses, 1);
   assert.equal(performance.nativeSemanticBuilds, 1);
@@ -135,6 +135,7 @@ test('runs a fused native TypeScript phase and reports its own timing', () => {
   assert.ok(performance.processHeapUsedPeakObservedBytes >= performance.processHeapUsedStartBytes);
   assert.ok(performance.nativeTransformMs > 0);
   assert.equal(performance.phaseExecutions[0].name, 'preflight');
+  assert.equal(performance.phaseExecutions[0].boundaryReason, 'final-output');
   assert.ok(performance.phaseExecutions[0].nativeTransformMs > 0);
 });
 

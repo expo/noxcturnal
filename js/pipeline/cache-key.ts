@@ -20,7 +20,6 @@ export function pipelineCacheKey(
     phaseGraph: compilePhasePlan(pipeline),
     phases: pipeline.phases.map(phase => ({
       name: phase.name,
-      observes: phase.observes,
       editEffect: phase.editEffect,
       requiresPrintedInput: phase.requiresPrintedInput,
       requiresFreshSemantics: phase.requiresFreshSemantics,

@@ -24,6 +24,7 @@ pub struct NativeIndexedSession {
     scope_parents: Vec<u32>,
     parse_count: u32,
     ast_traversal_count: u32,
+    semantic_build_count: u32,
     function_map: Option<FunctionMap>,
     initial_route_manifest: Option<Vec<u8>>,
     initial_routed_buffer: Option<Vec<u8>>,
@@ -37,6 +38,7 @@ pub struct NativeSessionPerformanceCounters {
     pub memory_bytes: u32,
     pub parse_count: u32,
     pub ast_traversal_count: u32,
+    pub semantic_build_count: u32,
 }
 
 #[napi]
@@ -49,14 +51,12 @@ impl NativeIndexedSession {
         retention_manifest: Option<Buffer>,
         initial_route_manifest: Option<Buffer>,
         build_initial_route: Option<bool>,
+        syntax_only: Option<bool>,
     ) -> Result<Self> {
         let collect_function_map = function_map.unwrap_or(false);
         let has_retention = retention_manifest.is_some();
         let has_initial_route = initial_route_manifest.is_some();
         let parse_count = u32::from(collect_function_map || has_retention || has_initial_route);
-        // Materialization builds Oxc semantics and then walks the AST once to
-        // populate the retained columnar index and optional initial route.
-        let ast_traversal_count = parse_count.saturating_mul(2);
         let parts = if !collect_function_map && !has_retention && !has_initial_route {
             MaterializedSessionParts {
                 scope_parents: Vec::new(),
@@ -64,6 +64,7 @@ impl NativeIndexedSession {
                 function_map: None,
                 initial_routed_buffer: None,
                 uid_prefix: None,
+                semantic_build_count: 0,
             }
         } else {
             materialize_with_scope_parents(
@@ -73,6 +74,7 @@ impl NativeIndexedSession {
                 retention_manifest.as_deref(),
                 initial_route_manifest.as_deref(),
                 build_initial_route.unwrap_or(true),
+                syntax_only.unwrap_or(false),
             )?
         };
         let MaterializedSessionParts {
@@ -81,7 +83,10 @@ impl NativeIndexedSession {
             function_map,
             initial_routed_buffer,
             uid_prefix,
+            semantic_build_count,
         } = parts;
+        let ast_traversal_count =
+            parse_count.saturating_mul(if semantic_build_count > 0 { 2 } else { 1 });
         Ok(Self {
             source,
             filename,
@@ -89,6 +94,7 @@ impl NativeIndexedSession {
             scope_parents,
             parse_count,
             ast_traversal_count,
+            semantic_build_count,
             function_map,
             initial_route_manifest: initial_route_manifest.map(|manifest| manifest.to_vec()),
             initial_routed_buffer,
@@ -379,6 +385,7 @@ impl NativeIndexedSession {
             memory_bytes: self.memory_usage(),
             parse_count: self.parse_count,
             ast_traversal_count: self.ast_traversal_count,
+            semantic_build_count: self.semantic_build_count,
         }
     }
 

@@ -319,8 +319,8 @@ test('indexes source identifiers once for collision-free uid generation', () => 
   session.close();
 
   const retained = openRetained('const _nox$existing = external;', 'fixture.js');
-  assert.equal(retained.generateUid('temp'), '__temp');
-  assert.equal(retained.generateUid('temp'), '__temp2');
+  assert.equal(retained.generateUid('temp'), '_temp');
+  assert.equal(retained.generateUid('temp'), '_temp2');
   retained.close();
 });
 

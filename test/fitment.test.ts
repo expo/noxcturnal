@@ -175,18 +175,18 @@ test('expresses Metro-style import/export lowering with semantic references and 
     { parser: 'jsx' },
   );
   assert.equal(result.status, 'complete');
-  assert.match(result.code, /var __pkg = require\("pkg"\);/);
-  assert.match(result.code, /var __other = require\("other"\);/);
-  assert.match(result.code, /var local = __pkg\.foo;/);
-  assert.match(result.code, /var __default = \(0, __pkg\.default\)\(\);/);
-  assert.match(result.code, /const shorthand = \{ local: __pkg\.foo \};/);
-  assert.match(result.code, /<__other\.Widget value=\{__pkg\.foo\} \/>/);
+  assert.match(result.code, /var _pkg = require\("pkg"\);/);
+  assert.match(result.code, /var _other = require\("other"\);/);
+  assert.match(result.code, /var local = _pkg\.foo;/);
+  assert.match(result.code, /var _default = \(0, _pkg\.default\)\(\);/);
+  assert.match(result.code, /const shorthand = \{ local: _pkg\.foo \};/);
+  assert.match(result.code, /<_other\.Widget value=\{_pkg\.foo\} \/>/);
   assert.match(
     result.code,
     /Object\.defineProperty\(exports, "renamed", \{ enumerable: true, get: \(\) => local \}\);/,
   );
   assert.match(result.code, /exports\.answer = answer;/);
-  assert.match(result.code, /exports\.default = __default;/);
+  assert.match(result.code, /exports\.default = _default;/);
   assert.doesNotMatch(result.code, /\b(?:import|export)\s/);
 });
 
@@ -259,15 +259,15 @@ test('expresses server-action extraction with captures, directives, scopes, and 
   assert.equal(result.status, 'complete');
   assert.match(
     result.code,
-    /export var __inlineAction = registerServerReference\(async function\(\$\$closure, argument\)/,
+    /export var _inlineAction = registerServerReference\(async function\(\$\$closure, argument\)/,
   );
   assert.match(result.code, /var \[captured\] = \$\$closure;/);
   assert.match(result.code, /return captured \+ argument;/);
-  assert.match(result.code, /return __inlineAction\.bind\(null, \[captured\]\);/);
+  assert.match(result.code, /return _inlineAction\.bind\(null, \[captured\]\);/);
   assert.doesNotMatch(result.code, /use server/);
   assert.deepEqual(result.metadata.reactServerActions, {
     id: './fixture',
-    names: ['__inlineAction'],
+    names: ['_inlineAction'],
   });
 });
 

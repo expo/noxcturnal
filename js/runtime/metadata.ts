@@ -35,6 +35,10 @@ export interface PerformanceAllocationCounters {
   callbackMs: number;
   renderAndMapMs: number;
   functionMapMs: number;
+  finalFunctionMapCacheHit: boolean;
+  finalFunctionMapSyntaxParses: number;
+  functionMapTraversals: number;
+  functionMapBytes: number;
   totalMs: number;
   overallMs: number;
 }
@@ -51,9 +55,26 @@ export function createTransformMetadata(
     performance: {
       phases,
       phaseExecutions: [],
+      committedBoundaryReasons: {
+        'ast-read-after-write': 0,
+        'printed-input': 0,
+        'semantic-read-after-write': 0,
+        'realized-map': 0,
+        'native-boundary': 0,
+        'final-output': 0,
+      },
+      eliminatedBoundaryReasons: {
+        'same-snapshot': 0,
+        'no-effective-byte-change': 0,
+        'text-only': 0,
+        'no-edits': 0,
+      },
       reparses: 0,
       nativeParses: 0,
       nativeSemanticBuilds: 0,
+      statelessSyntaxRoutes: 0,
+      retainedSyntaxMaterializations: 0,
+      retainedSemanticMaterializations: 0,
       nativeRenders: 0,
       nativeAstTraversals: 0,
       nativeCrossings: 0,
@@ -70,6 +91,7 @@ export function createTransformMetadata(
       mapEncodes: 0,
       editCount: 0,
       convergentEditsDeduped: 0,
+      effectiveNoopTransactions: 0,
       renderedBytes: 0,
       pathFacades: 0,
       nodeFacades: 0,
@@ -103,6 +125,10 @@ export function createTransformMetadata(
       callbackMs: 0,
       renderAndMapMs: 0,
       functionMapMs: 0,
+      finalFunctionMapCacheHit: false,
+      finalFunctionMapSyntaxParses: 0,
+      functionMapTraversals: 0,
+      functionMapBytes: 0,
       totalMs: 0,
       overallMs: 0,
     },

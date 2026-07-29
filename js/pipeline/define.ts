@@ -232,7 +232,6 @@ export function closeDefinitionScope(): void {
 function internPhase(phase: PipelinePhase, normalize: () => PipelinePhase): PipelinePhase {
   const flags = [
     phase.name,
-    phase.observes ?? '',
     phase.editEffect ?? '',
     phase.requiresPrintedInput ?? '',
     phase.requiresFreshSemantics ?? '',

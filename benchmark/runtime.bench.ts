@@ -644,11 +644,11 @@ verifiedBench('three-phase reparse transform', () => {
   benchmarkTransform(source, 'benchmark.js', threePhasePipeline);
 });
 
-function changedPhasePipeline(count: number, rendered: boolean) {
+function changedPhasePipeline(count: number, printed: boolean) {
   return defineNativePipeline({
     phases: Array.from({ length: count }, (_, index) => ({
       name: `changed-${index}`,
-      observes: rendered ? ('rendered-source' as const) : ('current-ast' as const),
+      requiresPrintedInput: printed,
       plugins: [
         defineNativePlugin({
           name: `changed-plugin-${index}`,

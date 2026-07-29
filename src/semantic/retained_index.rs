@@ -203,9 +203,7 @@ impl RetainedIndex {
         node_scope_id: u32,
         retain_identifiers: bool,
     ) {
-        if let Some(constants) = &mut self.constants {
-            constants[node_id as usize] = constant_for_kind(kind);
-        }
+        self.record_constant(kind, node_id);
         if !retain_identifiers {
             return;
         }
@@ -256,6 +254,12 @@ impl RetainedIndex {
                 }
             }
             _ => {}
+        }
+    }
+
+    pub fn record_constant(&mut self, kind: AstKind<'_>, node_id: u32) {
+        if let Some(constants) = &mut self.constants {
+            constants[node_id as usize] = constant_for_kind(kind);
         }
     }
 
@@ -597,6 +601,29 @@ impl RetainedIndex {
         scope_id: u32,
     ) {
         let index = node_id as usize;
+        if index >= self.type_ids.len() {
+            let new_len = index + 1;
+            self.type_ids.resize(new_len, ABSENT_ID);
+            self.starts.resize(new_len, 0);
+            self.ends.resize(new_len, 0);
+            self.parent_ids.resize(new_len, ABSENT_ID);
+            self.scope_ids.resize(new_len, 0);
+            if let Some(values) = &mut self.first_children {
+                values.resize(new_len, ABSENT_ID);
+            }
+            if let Some(values) = &mut self.next_siblings {
+                values.resize(new_len, ABSENT_ID);
+            }
+            if let Some(values) = &mut self.last_children {
+                values.resize(new_len, ABSENT_ID);
+            }
+            if let Some(values) = &mut self.constants {
+                values.resize(new_len, None);
+            }
+            if let Some(values) = &mut self.scalar_field_ranges {
+                values.resize(new_len, (0, 0));
+            }
+        }
         self.type_ids[index] = type_id;
         self.starts[index] = start;
         self.ends[index] = end;

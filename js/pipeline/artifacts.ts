@@ -1,0 +1,63 @@
+/**
+ * Derived products that a phase may demand from an immutable source version.
+ *
+ * Keep implication rules here rather than scattering them through the phase
+ * scheduler. The representation is a bit set so plans remain cheap to cache.
+ */
+export enum ArtifactDemand {
+  None = 0,
+  RenderedText = 1 << 0,
+  SyntaxRoute = 1 << 1,
+  StructuralParents = 1 << 2,
+  StructuralChildren = 1 << 3,
+  DirectScalarFields = 1 << 4,
+  LexicalScopes = 1 << 5,
+  BindingsReferences = 1 << 6,
+  ModuleFacts = 1 << 7,
+  FunctionMap = 1 << 8,
+  RealizedMap = 1 << 9,
+}
+
+const SYNTAX =
+  ArtifactDemand.SyntaxRoute |
+  ArtifactDemand.StructuralParents |
+  ArtifactDemand.StructuralChildren |
+  ArtifactDemand.DirectScalarFields |
+  ArtifactDemand.ModuleFacts |
+  ArtifactDemand.FunctionMap;
+const SEMANTICS = ArtifactDemand.LexicalScopes | ArtifactDemand.BindingsReferences;
+
+export type ArtifactPlan =
+  | 'cached'
+  | 'render-only'
+  | 'render-and-map'
+  | 'stateless-syntax'
+  | 'retained-syntax'
+  | 'retained-semantic';
+
+/** Close the generic demand implications for one source version. */
+export function closeArtifactDemand(demand: ArtifactDemand): ArtifactDemand {
+  let closed = demand;
+  if (closed & SEMANTICS) closed |= ArtifactDemand.SyntaxRoute;
+  if (closed & (SYNTAX | SEMANTICS)) closed |= ArtifactDemand.RenderedText;
+  if (closed & ArtifactDemand.RealizedMap) closed |= ArtifactDemand.RenderedText;
+  return closed;
+}
+
+/** Select the smallest construction path satisfying uncached demand. */
+export function planArtifacts(
+  demand: ArtifactDemand,
+  available: ArtifactDemand = ArtifactDemand.None,
+  retain = false,
+): ArtifactPlan {
+  const missing = closeArtifactDemand(demand) & ~closeArtifactDemand(available);
+  if (missing === ArtifactDemand.None) return 'cached';
+  if (missing & SEMANTICS) return 'retained-semantic';
+  if (missing & SYNTAX) return retain ? 'retained-syntax' : 'stateless-syntax';
+  if (missing & ArtifactDemand.RealizedMap) return 'render-and-map';
+  return 'render-only';
+}
+
+export function hasSemanticDemand(demand: ArtifactDemand): boolean {
+  return (closeArtifactDemand(demand) & SEMANTICS) !== 0;
+}

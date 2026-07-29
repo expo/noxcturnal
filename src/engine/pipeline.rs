@@ -36,6 +36,8 @@ pub struct NativePipelineSession {
 pub struct NativePipelineCommit {
     pub mapping_segments: u32,
     pub rendered_bytes: u32,
+    pub code_changed: bool,
+    pub map_changed: bool,
 }
 
 /// The full transform's final result, crossing out in one call: the resident
@@ -116,14 +118,31 @@ impl NativePipelineSession {
             .ok_or_else(|| incomplete("pipeline source already consumed"))?;
         let commit =
             commit_decoded_buffer(source, &self.filename, &data, source_map_mode.as_deref())?;
+        let code_changed = commit.code_changed;
+        let map_changed = commit.map_changed;
         let layer = commit.map.to_vec();
-        let mapping_segments = decoded_segment_count(&layer);
-        let rendered_bytes = commit.code.len() as u32;
-        self.current = Some(commit.code);
-        self.layers.push(layer);
+        let has_effect = code_changed || map_changed;
+        let mapping_segments = if has_effect {
+            decoded_segment_count(&layer)
+        } else {
+            0
+        };
+        let rendered_bytes = if has_effect {
+            commit.code.len() as u32
+        } else {
+            0
+        };
+        if code_changed {
+            self.current = Some(commit.code);
+        }
+        if has_effect {
+            self.layers.push(layer);
+        }
         Ok(NativePipelineCommit {
             mapping_segments,
             rendered_bytes,
+            code_changed,
+            map_changed,
         })
     }
 

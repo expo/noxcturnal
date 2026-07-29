@@ -108,7 +108,7 @@ test('provides lazy compact structural child roles without recursive ESTree tran
     "import item, { x as y } from 'pkg'; function f(a, { b }) {} const result = fn({ platform: 1 }, y); export default result;",
     'fixture.js',
     defineNativePipeline({ phases: [{ name: 'inspect', plugins: [plugin] }] }),
-    { maxFollowUpBatches: 2 },
+    { maxFollowUpBatches: 2, experimentalSyntaxOnlySessions: true },
   );
   assert.deepEqual(observed.callee, ['fn']);
   assert.deepEqual(observed.arguments, ['{ platform: 1 }', 'y']);

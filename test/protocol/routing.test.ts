@@ -109,6 +109,97 @@ test('constructs the retained index and initial routed tape in one native parse'
   session.close();
 });
 
+test('uses syntax-only retained materialization for structural ancestry', () => {
+  const source = 'function outer(value) { return value + 1; }';
+  const route = {
+    id: 0,
+    pluginId: 0,
+    nodeType: 'Identifier',
+    side: 'enter' as const,
+    order: 0,
+    predicates: {},
+    payloadFields: ['name'],
+  };
+  const syntaxManifest = packRouteManifest([route], true, false);
+  const semanticManifest = packRouteManifest([route], true, true);
+  const syntax = new native.NativeIndexedSession(
+    source,
+    'fixture.js',
+    false,
+    syntaxManifest,
+    syntaxManifest,
+    true,
+    true,
+  );
+  const semantic = new native.NativeIndexedSession(
+    source,
+    'fixture.js',
+    false,
+    semanticManifest,
+    semanticManifest,
+    true,
+    true,
+  );
+  const syntaxBatch = decodeRoutedEnvelope(syntax.nextRoutedPacked(syntaxManifest));
+  const semanticBatch = decodeRoutedEnvelope(semantic.nextRoutedPacked(semanticManifest));
+  assert.equal(syntax.performanceCounters().semanticBuildCount, 0);
+  assert.equal(syntax.performanceCounters().astTraversalCount, 1);
+  assert.equal(syntax.uidPrefix(), '__');
+  assert.equal(semantic.performanceCounters().semanticBuildCount, 1);
+  assert.equal(semantic.performanceCounters().astTraversalCount, 2);
+  assert.equal(syntaxBatch.nodeCount, semanticBatch.nodeCount);
+  assert.equal(syntaxBatch.nodeRecordCount, semanticBatch.nodeRecordCount);
+  const structural = (batch: ReturnType<typeof decodeRoutedEnvelope>) =>
+    [...batch.parentSummaries].filter((_, index) => index % 8 < 6);
+  assert.deepEqual(structural(syntaxBatch), structural(semanticBatch));
+  syntax.close();
+  semantic.close();
+});
+
+test('matches semantic retained structure across syntax families and UTF-16 offsets', () => {
+  const fixtures = [
+    ['fixture.js', "'use strict'; class Box { method(value) { return '😀' + value; } }"],
+    ['fixture.jsx', 'const view = <Panel title="😀"><Child /></Panel>;'],
+    [
+      'fixture.ts',
+      'interface Shape { value: number } class Box { constructor(readonly shape: Shape) {} }',
+    ],
+    ['fixture.tsx', 'const view: JSX.Element = <Panel value={1} />;'],
+  ];
+  for (const [filename, source] of fixtures) {
+    const run = (experimentalSyntaxOnlySessions: boolean) => {
+      const records: (string | number | null)[][] = [];
+      const plugin = defineNativePlugin({
+        name: `structure-${experimentalSyntaxOnlySessions}`,
+        editEffect: 'none',
+        visitors: [
+          defineVisitor('Identifier', { ancestry: 'parent' }, path => {
+            records.push([
+              path.node.id,
+              path.node.type,
+              path.node.start,
+              path.node.end,
+              path.parentPath?.node.id ?? null,
+              path.sourceText(),
+            ]);
+          }),
+        ],
+      });
+      const result = transform(
+        source,
+        filename,
+        defineNativePipeline({ phases: [{ name: 'structure', plugins: [plugin] }] }),
+        { experimentalSyntaxOnlySessions },
+      );
+      assert.equal(result.status, 'complete');
+      return { records, code: result.code, map: result.map };
+    };
+    const semantic = run(false);
+    const syntax = run(true);
+    assert.deepEqual(syntax, semantic, filename);
+  }
+});
+
 test('retains only semantic and query sidecars declared by the compiled manifest', () => {
   const source = "const outer = 1; load('x'); function fn() { return outer + 2 }";
   const open = (capabilities: number) =>
@@ -129,6 +220,31 @@ test('retains only semantic and query sidecars declared by the compiled manifest
   assert.equal(planned.queryCalls('load', true, true).length, 1);
   assert.ok(planned.queryConstants([...Array(32).keys()]).length > 0);
   planned.close();
+
+  const constants = new native.NativeIndexedSession(
+    source,
+    'fixture.js',
+    false,
+    packRouteManifest([], false, false, 1 << 1),
+    undefined,
+    true,
+    true,
+  );
+  assert.equal(constants.performanceCounters().semanticBuildCount, 0);
+  assert.ok(constants.queryConstants([...Array(32).keys()]).length > 0);
+  constants.close();
+
+  const calls = new native.NativeIndexedSession(
+    source,
+    'fixture.js',
+    false,
+    packRouteManifest([], false, false, 1 << 2),
+    undefined,
+    true,
+    true,
+  );
+  assert.equal(calls.performanceCounters().semanticBuildCount, 1);
+  calls.close();
 });
 
 test('validates predicate fields across every concrete alias route', () => {

@@ -1,5 +1,6 @@
-import type { EditEffect, PhaseObservation } from '../types.js';
+import type { EditEffect } from '../types.js';
 import type { CompiledPhasePlan, NativePipeline } from '../contracts/visitor.js';
+import { ArtifactDemand, closeArtifactDemand } from './artifacts.js';
 
 const EDIT_EFFECT_RANK: Readonly<Record<EditEffect, number>> = {
   none: 0,
@@ -10,12 +11,6 @@ const EDIT_EFFECT_RANK: Readonly<Record<EditEffect, number>> = {
   'whole-program': 5,
 };
 export const EDIT_EFFECTS = new Set<EditEffect>(Object.keys(EDIT_EFFECT_RANK) as EditEffect[]);
-const PHASE_OBSERVATIONS = new Set<PhaseObservation>([
-  'original',
-  'current-ast',
-  'rendered-source',
-]);
-
 export function maxEditEffect(effects: readonly EditEffect[]): EditEffect {
   let selected: EditEffect = 'none';
   for (const effect of effects)
@@ -37,57 +32,38 @@ export function compilePhasePlan(pipeline: NativePipeline): readonly CompiledPha
 }
 
 function computePhasePlan(pipeline: NativePipeline): readonly CompiledPhasePlan[] {
-  let previousEffect: EditEffect = 'none';
   return Object.freeze(
-    pipeline.phases.map((phase, index) => {
-      if (phase.observes != null && !PHASE_OBSERVATIONS.has(phase.observes))
-        throw new Error(`${phase.name}: invalid phase observation ${String(phase.observes)}`);
+    pipeline.phases.map(phase => {
       if (phase.editEffect != null && !EDIT_EFFECTS.has(phase.editEffect))
         throw new Error(`${phase.name}: invalid edit effect ${String(phase.editEffect)}`);
       const plugins = phase.plugins ?? [];
       for (const plugin of plugins)
         if (plugin.editEffect != null && !EDIT_EFFECTS.has(plugin.editEffect))
           throw new Error(`${plugin.name}: invalid edit effect ${String(plugin.editEffect)}`);
-      const observes =
-        phase.observes ??
-        (phase.native != null || phase.requiresPrintedInput ? 'rendered-source' : 'current-ast');
       const editEffect =
         phase.editEffect ??
         (phase.native == null
           ? maxEditEffect(plugins.map(plugin => plugin.editEffect ?? 'whole-program'))
           : 'whole-program');
-      const boundaryBefore =
-        index > 0 &&
-        (observes === 'rendered-source' ||
-          previousEffect === 'whole-program' ||
-          (EDIT_EFFECT_RANK[previousEffect] >= EDIT_EFFECT_RANK.bindings &&
-            phase.requiresFreshSemantics !== false));
-      const requiresPrintedInput =
-        phase.native != null ||
-        phase.requiresPrintedInput === true ||
-        observes === 'rendered-source';
-      const requiresFreshSemantics =
-        phase.requiresFreshSemantics ??
-        (index > 0 && EDIT_EFFECT_RANK[previousEffect] >= EDIT_EFFECT_RANK.bindings);
+      const requiresPrintedInput = phase.native != null || phase.requiresPrintedInput === true;
+      const requiresFreshSemantics = phase.requiresFreshSemantics === true;
+      let artifactDemand =
+        phase.native != null
+          ? ArtifactDemand.RenderedText | ArtifactDemand.SyntaxRoute
+          : requiresPrintedInput
+            ? ArtifactDemand.RenderedText
+            : ArtifactDemand.SyntaxRoute;
+      if (phase.requiresRealizedMap) artifactDemand |= ArtifactDemand.RealizedMap;
+      if (requiresFreshSemantics) artifactDemand |= ArtifactDemand.LexicalScopes;
+      artifactDemand = closeArtifactDemand(artifactDemand);
       const plan = Object.freeze({
         name: phase.name,
-        observes,
         editEffect,
         requiresPrintedInput,
         requiresFreshSemantics,
         requiresRealizedMap: phase.requiresRealizedMap === true,
-        boundaryBefore,
-        canReuseAst:
-          !boundaryBefore &&
-          (previousEffect === 'none' ||
-            (previousEffect === 'text-only' && observes !== 'rendered-source')),
-        canDeferRendering:
-          editEffect === 'none' ||
-          (editEffect === 'text-only' &&
-            !phase.requiresRealizedMap &&
-            observes !== 'rendered-source'),
+        artifactDemand,
       });
-      previousEffect = editEffect;
       return plan;
     }),
   );

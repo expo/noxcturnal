@@ -100,6 +100,7 @@ interface NativeBinding {
     retentionManifest?: Buffer,
     initialRouteManifest?: Buffer,
     buildInitialRoute?: boolean,
+    syntaxOnly?: boolean,
   ) => {
     nextRoutedPacked(manifest: Buffer, rootStart?: number, rootEnd?: number): Buffer;
     queryGlobals(
@@ -174,10 +175,14 @@ interface NativeBinding {
       memoryBytes: number;
       parseCount: number;
       astTraversalCount: number;
+      semanticBuildCount: number;
     };
     takeFunctionMap(): FunctionMap | null;
     commitPacked(data: Buffer, sourceMapMode?: string): { code: string; map: NativeVlqMap };
-    commitDecoded(data: Buffer, sourceMapMode?: string): { code: string; map: Buffer };
+    commitDecoded(
+      data: Buffer,
+      sourceMapMode?: string,
+    ): { code: string; map: Buffer; codeChanged: boolean; mapChanged: boolean };
   };
   /**
    * A transform pipeline's resident source. Native phases and visitor commits
@@ -192,7 +197,12 @@ interface NativeBinding {
     commitDecoded(
       data: Buffer,
       sourceMapMode?: string,
-    ): { mappingSegments: number; renderedBytes: number };
+    ): {
+      mappingSegments: number;
+      renderedBytes: number;
+      codeChanged: boolean;
+      mapChanged: boolean;
+    };
     sourceText(): string;
     finish(
       inputMappings?: string,
@@ -232,7 +242,7 @@ interface NativeBinding {
     filename: string,
     data: Buffer,
     sourceMapMode?: string,
-  ): { code: string; map: Buffer };
+  ): { code: string; map: Buffer; codeChanged: boolean; mapChanged: boolean };
   composeDecodedChain(layers: Buffer[]): NativeVlqMap;
   composeMappings(outer: string, inner: string, outerNameCount: number): string;
   materializeRoutedBuffer(

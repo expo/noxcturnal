@@ -43,6 +43,115 @@ struct EventCollector<'a> {
     retained_string_ids: FxHashMap<String, u32>,
 }
 
+struct SyntaxIndexCollector<'a> {
+    utf16: Option<&'a [u32]>,
+    retained_index: RetainedIndex,
+    retention_routes: Option<&'a CompiledManifest>,
+    retention_capabilities: u32,
+    retained_string_ids: FxHashMap<String, u32>,
+    parent_stack: Vec<(u32, u32)>,
+    node_count: u32,
+    uid_names: FxHashSet<String>,
+    function_map: Option<FunctionMapCollector<'a>>,
+}
+
+impl SyntaxIndexCollector<'_> {
+    fn retains_traversal_kind(&self, kind: AstKind<'_>) -> bool {
+        self.retention_capabilities & RETAIN_INSPECTION != 0
+            || self.retention_routes.is_some_and(|manifest| {
+                !manifest.routes_by_type[ast_kind_protocol_id(kind) as usize].is_empty()
+            })
+    }
+
+    fn record_uid_name(&mut self, kind: AstKind<'_>) {
+        let name = match kind {
+            AstKind::BindingIdentifier(identifier) => Some(identifier.name.as_str()),
+            AstKind::IdentifierReference(identifier) => Some(identifier.name.as_str()),
+            AstKind::IdentifierName(identifier) => Some(identifier.name.as_str()),
+            AstKind::LabelIdentifier(identifier) => Some(identifier.name.as_str()),
+            AstKind::PrivateIdentifier(identifier) => Some(identifier.name.as_str()),
+            _ => None,
+        };
+        if let Some(name) = name {
+            self.uid_names.insert(name.to_owned());
+        }
+    }
+}
+
+impl<'a> Visit<'a> for SyntaxIndexCollector<'a> {
+    fn enter_node(&mut self, kind: AstKind<'a>) {
+        let id = self.node_count;
+        self.node_count += 1;
+        kind.set_node_id(NodeId::new(id as usize));
+        let protocol_id = ast_kind_protocol_id(kind);
+        let parent_id = self.parent_stack.last().map(|(id, _)| *id);
+        let span = kind.span();
+        self.retained_index.record_enter(id);
+        self.retained_index.record(
+            id,
+            protocol_id,
+            self.utf16
+                .map_or(span.start, |index| index[span.start as usize]),
+            self.utf16
+                .map_or(span.end, |index| index[span.end as usize]),
+            parent_id,
+            0,
+        );
+        if self.retention_capabilities & RETAIN_CONSTANTS != 0 {
+            self.retained_index.record_constant(kind, id);
+        }
+        self.record_uid_name(kind);
+        if let Some(function_map) = &mut self.function_map {
+            function_map.enter(kind);
+        }
+        let retain_all_fields = self.retention_capabilities & RETAIN_MODULE_FACTS != 0;
+        let retain_structural_fields = self.parent_stack.last().is_some_and(|(_, parent_type)| {
+            self.retention_routes.is_some_and(|manifest| {
+                !manifest.structural_parent_types.is_empty()
+                    && manifest.structural_parent_types.contains(*parent_type)
+            })
+        });
+        let requested = self.retention_routes.map_or(FieldMask::none(), |manifest| {
+            manifest.merged_field_mask_by_type[protocol_id as usize]
+        });
+        if retain_all_fields || retain_structural_fields || !requested.is_empty() {
+            let retained_fields = packed_fields_direct(
+                kind,
+                None,
+                self.utf16,
+                if retain_all_fields || retain_structural_fields {
+                    FieldMask::all()
+                } else {
+                    requested
+                },
+                &mut self.retained_string_ids,
+            );
+            if let Some(retained_fields) = retained_fields {
+                self.retained_index
+                    .record_packed_fields(id, &retained_fields.words[..retained_fields.len]);
+            }
+        }
+        self.parent_stack.push((id, protocol_id));
+    }
+
+    fn leave_node(&mut self, kind: AstKind<'a>) {
+        let (id, _) = self
+            .parent_stack
+            .pop()
+            .expect("syntax traversal enter/leave balance");
+        if self.retains_traversal_kind(kind) {
+            self.retained_index.record_exit(id);
+        }
+        if let Some(function_map) = &mut self.function_map {
+            function_map.leave(kind);
+        }
+    }
+
+    fn visit_program(&mut self, program: &oxc_ast::ast::Program<'a>) {
+        walk::walk_program(self, program);
+    }
+}
+
 impl<'a> EventCollector<'a> {
     fn retains_traversal_kind(&self, kind: AstKind<'a>) -> bool {
         self.retention_capabilities & RETAIN_INSPECTION != 0
@@ -167,6 +276,7 @@ pub(crate) fn materialize_with_scope_parents(
     retention_manifest: Option<&[u8]>,
     initial_route_manifest: Option<&[u8]>,
     build_initial_route: bool,
+    syntax_only: bool,
 ) -> Result<MaterializedSessionParts> {
     let allocator = Allocator::default();
     let parsed = Parser::new(&allocator, source, source_type(filename, source)?).parse();
@@ -175,6 +285,75 @@ pub(crate) fn materialize_with_scope_parents(
             Status::InvalidArg,
             format!("Oxc parse failed: {:?}", parsed.diagnostics),
         ));
+    }
+    let utf16 = (!source.is_ascii()).then(|| utf16_index(source, &allocator));
+    let compiled_manifest = initial_route_manifest
+        .map(decode_route_manifest)
+        .transpose()?;
+    let retention_manifest = retention_manifest.map(decode_route_manifest).transpose()?;
+    let retention_capabilities = retention_manifest
+        .as_ref()
+        .or(compiled_manifest.as_ref())
+        .map_or(u32::MAX, |manifest| manifest.retention_capabilities);
+    let structural_parent_types = retention_manifest
+        .as_ref()
+        .or(compiled_manifest.as_ref())
+        .map(|manifest| &manifest.structural_parent_types);
+    let needs_semantics = !syntax_only
+        || retention_manifest
+            .as_ref()
+            .is_some_and(|manifest| manifest.needs_semantics)
+        || compiled_manifest
+            .as_ref()
+            .is_some_and(|manifest| manifest.needs_semantics)
+        || retention_capabilities & (RETAIN_IDENTIFIERS | RETAIN_CALLS) != 0;
+    if !needs_semantics {
+        let mut collector = SyntaxIndexCollector {
+            utf16: utf16.as_deref().map(|offsets| &**offsets),
+            retained_index: RetainedIndex::with_node_count(
+                0,
+                (retention_capabilities & RETAIN_CHILDREN != 0)
+                    .then_some(())
+                    .and(structural_parent_types),
+                retention_capabilities & RETAIN_CONSTANTS != 0,
+                retention_capabilities & (RETAIN_INSPECTION | RETAIN_MODULE_FACTS) != 0
+                    || retention_manifest.is_some(),
+            ),
+            retention_routes: retention_manifest.as_ref(),
+            retention_capabilities,
+            retained_string_ids: FxHashMap::default(),
+            parent_stack: Vec::new(),
+            node_count: 0,
+            uid_names: FxHashSet::default(),
+            function_map: collect_function_map.then(|| FunctionMapCollector::new(source, filename)),
+        };
+        collector.visit_program(&parsed.program);
+        collector
+            .retained_index
+            .set_scalar_strings(std::mem::take(&mut collector.retained_string_ids));
+        let initial_routed_buffer = if build_initial_route {
+            compiled_manifest
+                .as_ref()
+                .map(|manifest| {
+                    routed_buffer_from_index(manifest, &collector.retained_index, &[], None)
+                        .map(|buffer| buffer.to_vec())
+                })
+                .transpose()?
+        } else {
+            None
+        };
+        let function_map = collector
+            .function_map
+            .take()
+            .map(FunctionMapCollector::finish);
+        return Ok(MaterializedSessionParts {
+            scope_parents: Vec::new(),
+            retained_index: collector.retained_index,
+            function_map,
+            initial_routed_buffer,
+            uid_prefix: Some(shortest_uid_prefix_from_names(&collector.uid_names)),
+            semantic_build_count: 0,
+        });
     }
     let semantic_return = SemanticBuilder::new()
         .with_build_nodes(true)
@@ -190,19 +369,6 @@ pub(crate) fn materialize_with_scope_parents(
         ));
     }
     let uid_prefix = Some(shortest_uid_prefix(semantic_return.semantic.scoping()));
-    let utf16 = (!source.is_ascii()).then(|| utf16_index(source, &allocator));
-    let compiled_manifest = initial_route_manifest
-        .map(decode_route_manifest)
-        .transpose()?;
-    let retention_manifest = retention_manifest.map(decode_route_manifest).transpose()?;
-    let retention_capabilities = retention_manifest
-        .as_ref()
-        .or(compiled_manifest.as_ref())
-        .map_or(u32::MAX, |manifest| manifest.retention_capabilities);
-    let structural_parent_types = retention_manifest
-        .as_ref()
-        .or(compiled_manifest.as_ref())
-        .map(|manifest| &manifest.structural_parent_types);
     let scope_parents = semantic_return
         .semantic
         .scoping()
@@ -228,8 +394,7 @@ pub(crate) fn materialize_with_scope_parents(
             retention_capabilities & (RETAIN_INSPECTION | RETAIN_MODULE_FACTS) != 0
                 || retention_manifest.is_some(),
         ),
-        function_map: collect_function_map
-            .then(|| FunctionMapCollector::new(source, semantic_return.semantic.nodes(), filename)),
+        function_map: collect_function_map.then(|| FunctionMapCollector::new(source, filename)),
         retention_routes: retention_manifest.as_ref(),
         retention_capabilities,
         retained_string_ids: FxHashMap::default(),
@@ -259,6 +424,7 @@ pub(crate) fn materialize_with_scope_parents(
         function_map,
         initial_routed_buffer,
         uid_prefix,
+        semantic_build_count: 1,
     })
 }
 
@@ -317,6 +483,42 @@ fn shortest_uid_prefix(scoping: &Scoping) -> String {
         }
         candidate.push('_');
     }
+}
+
+/// Syntax-only sessions conservatively reserve against every identifier-like
+/// spelling, including property and label names. Over-reserving is safe and
+/// avoids constructing lexical symbols merely to allocate a collision-free UID.
+fn shortest_uid_prefix_from_names(names: &FxHashSet<String>) -> String {
+    const DEPTH: usize = 12;
+    let mut occupied = [0u64; 128];
+    occupied[0] = (1 << 1) | (1 << 2);
+    for name in names {
+        let mut node = 0usize;
+        for byte in name.bytes().take(DEPTH) {
+            node = match byte {
+                b'_' => node * 2 + 1,
+                b'$' => node * 2 + 2,
+                _ => break,
+            };
+            occupied[node / 64] |= 1 << (node % 64);
+        }
+    }
+    let node = (1..((1usize << (DEPTH + 1)) - 1))
+        .find(|node| occupied[node / 64] & (1 << (node % 64)) == 0);
+    if let Some(mut node) = node {
+        let depth = usize::BITS as usize - (node + 1).leading_zeros() as usize - 1;
+        let mut bytes = [0u8; DEPTH];
+        for index in (0..depth).rev() {
+            bytes[index] = if node % 2 == 1 { b'_' } else { b'$' };
+            node = (node - 1) / 2;
+        }
+        return String::from_utf8(bytes[..depth].to_vec()).expect("ASCII UID prefix");
+    }
+    let mut candidate = "_".repeat(DEPTH + 1);
+    while names.iter().any(|name| name.starts_with(&candidate)) {
+        candidate.push('_');
+    }
+    candidate
 }
 
 pub fn materialize_routed_buffer(

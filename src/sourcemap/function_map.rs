@@ -4,10 +4,9 @@ use oxc_allocator::Allocator;
 use oxc_ast::{AstKind, ast::MethodDefinitionKind};
 use oxc_ast_visit::{Visit, walk};
 use oxc_parser::Parser;
-use oxc_semantic::{AstNodes, SemanticBuilder};
 use oxc_span::{GetSpan, Span};
-use oxc_syntax::node::NodeId;
 use rustc_hash::FxHashMap;
+use std::borrow::Cow;
 
 use super::vlq;
 use crate::syntax::classification::source_type;
@@ -21,28 +20,28 @@ pub struct FunctionMap {
 
 pub fn generate(source: &str, filename: &str) -> napi::Result<FunctionMap> {
     let allocator = Allocator::default();
-    let parsed = Parser::new(&allocator, source, source_type(filename, source)?).parse();
+    // A preserved script hashbang can appear below a generated Metro wrapper.
+    // Oxc only accepts hashbang syntax at byte zero. Reinterpret those two bytes
+    // as a comment for this structural parse; byte offsets and UTF-16 columns
+    // remain identical to the returned source.
+    let parse_source = if source.as_bytes().windows(3).any(|window| window == b"\n#!") {
+        Cow::Owned(source.replace("\n#!", "\n//"))
+    } else {
+        Cow::Borrowed(source)
+    };
+    let parsed = Parser::new(
+        &allocator,
+        &parse_source,
+        source_type(filename, &parse_source)?,
+    )
+    .parse();
     if !parsed.diagnostics.is_empty() {
         return Err(Error::new(
             Status::InvalidArg,
             format!("Oxc parse failed: {:?}", parsed.diagnostics),
         ));
     }
-    let semantic_return = SemanticBuilder::new()
-        .with_build_nodes(true)
-        .with_check_syntax_error(true)
-        .build(&parsed.program);
-    if !semantic_return.diagnostics.is_empty() {
-        return Err(Error::new(
-            Status::InvalidArg,
-            format!(
-                "Oxc semantic analysis failed: {:?}",
-                semantic_return.diagnostics
-            ),
-        ));
-    }
-    let mut collector =
-        FunctionMapCollector::new(source, semantic_return.semantic.nodes(), filename);
+    let mut collector = FunctionMapCollector::new(source, filename);
     collector.visit_program(&parsed.program);
     Ok(collector.finish())
 }
@@ -55,7 +54,7 @@ struct Position {
 
 pub(crate) struct FunctionMapCollector<'a> {
     source: &'a str,
-    nodes: &'a AstNodes<'a>,
+    ancestors: Vec<AstKind<'a>>,
     encoder: MappingEncoder,
     stack: Vec<Rc<str>>,
     tail: Position,
@@ -64,15 +63,11 @@ pub(crate) struct FunctionMapCollector<'a> {
     filename_prefix: Option<String>,
 }
 
-impl FunctionMapCollector<'_> {
-    pub(crate) fn new<'a>(
-        source: &'a str,
-        nodes: &'a AstNodes<'a>,
-        filename: &str,
-    ) -> FunctionMapCollector<'a> {
+impl<'a> FunctionMapCollector<'a> {
+    pub(crate) fn new(source: &'a str, filename: &str) -> FunctionMapCollector<'a> {
         FunctionMapCollector {
             source,
-            nodes,
+            ancestors: Vec::new(),
             encoder: MappingEncoder::default(),
             stack: Vec::new(),
             tail: Position { line: 1, column: 0 },
@@ -87,7 +82,7 @@ impl FunctionMapCollector<'_> {
         }
     }
 
-    pub(crate) fn enter(&mut self, kind: AstKind<'_>) {
+    pub(crate) fn enter(&mut self, kind: AstKind<'a>) {
         if matches!(
             kind,
             AstKind::Program(_)
@@ -99,9 +94,11 @@ impl FunctionMapCollector<'_> {
             let name = self.remove_filename_prefix(self.frame_name(kind));
             self.stack.push(Rc::from(name));
         }
+        self.ancestors.push(kind);
     }
 
-    pub(crate) fn leave(&mut self, kind: AstKind<'_>) {
+    pub(crate) fn leave(&mut self, kind: AstKind<'a>) {
+        self.ancestors.pop();
         if matches!(
             kind,
             AstKind::Program(_)
@@ -127,11 +124,10 @@ impl FunctionMapCollector<'_> {
     }
 
     fn frame_span(&self, kind: AstKind<'_>) -> Span {
-        let id = kind.node_id();
-        if matches!(kind, AstKind::Function(_)) && id.index() != 0 {
-            match self.nodes.parent_kind(id) {
-                AstKind::MethodDefinition(method) => return method.span,
-                AstKind::ObjectProperty(property) if property.method => return property.span,
+        if matches!(kind, AstKind::Function(_)) {
+            match self.ancestors.last() {
+                Some(AstKind::MethodDefinition(method)) => return method.span,
+                Some(AstKind::ObjectProperty(property)) if property.method => return property.span,
                 _ => {}
             }
         }
@@ -177,9 +173,8 @@ impl FunctionMapCollector<'_> {
     }
 
     fn inferred_name(&self, kind: AstKind<'_>) -> String {
-        let id = kind.node_id();
-        if id.index() != 0 {
-            match self.nodes.parent_kind(id) {
+        if let Some(parent) = self.ancestors.last().copied() {
+            match parent {
                 AstKind::VariableDeclarator(declarator) => {
                     return self.name_from_span(declarator.id.span());
                 }
@@ -187,7 +182,7 @@ impl FunctionMapCollector<'_> {
                     return self.name_from_span(assignment.left.span());
                 }
                 AstKind::MethodDefinition(method) => {
-                    let class_name = self.nodes.ancestors(id).find_map(|node| match node.kind() {
+                    let class_name = self.ancestors.iter().rev().find_map(|node| match node {
                         AstKind::Class(class) => class
                             .id
                             .as_ref()
@@ -209,14 +204,16 @@ impl FunctionMapCollector<'_> {
                 }
                 AstKind::ObjectProperty(property) => {
                     let property_name = self.property_name(&property.key);
-                    if let Some(object_name) = self.container_name(self.nodes.parent_id(id)) {
+                    if let Some(object_name) =
+                        self.container_name(&self.ancestors[..self.ancestors.len() - 1])
+                    {
                         return format!("{object_name}.{property_name}");
                     }
                     return property_name;
                 }
                 AstKind::PropertyDefinition(property) => {
                     let property_name = self.property_name(&property.key);
-                    let class_name = self.nodes.ancestors(id).find_map(|node| match node.kind() {
+                    let class_name = self.ancestors.iter().rev().find_map(|node| match node {
                         AstKind::Class(class) => class
                             .id
                             .as_ref()
@@ -243,7 +240,7 @@ impl FunctionMapCollector<'_> {
                                 || callee == "React.useCallback")
                         {
                             return self
-                                .container_name(self.nodes.parent_id(id))
+                                .container_name(&self.ancestors[..self.ancestors.len() - 1])
                                 .unwrap_or_else(|| "<anonymous>".into());
                         }
                         return format!("{callee}$argument_{argument_index}");
@@ -310,9 +307,9 @@ impl FunctionMapCollector<'_> {
         }
     }
 
-    fn container_name(&self, id: NodeId) -> Option<String> {
-        for (ancestor_id, ancestor) in self.nodes.ancestors_enumerated(id) {
-            match ancestor.kind() {
+    fn container_name(&self, ancestors: &[AstKind<'_>]) -> Option<String> {
+        for (index, ancestor) in ancestors.iter().enumerate().rev() {
+            match ancestor {
                 AstKind::VariableDeclarator(declarator) => {
                     return Some(self.name_from_span(declarator.id.span()));
                 }
@@ -321,7 +318,7 @@ impl FunctionMapCollector<'_> {
                 }
                 AstKind::ObjectProperty(property) => {
                     let property_name = self.property_name(&property.key);
-                    if let Some(owner) = self.container_name(ancestor_id) {
+                    if let Some(owner) = self.container_name(&ancestors[..index]) {
                         return Some(format!("{owner}.{property_name}"));
                     }
                     return Some(property_name);
