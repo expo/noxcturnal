@@ -1,10 +1,12 @@
 use napi::{Error, Result, Status, bindgen_prelude::Buffer};
 use napi_derive::napi;
+use std::time::Instant;
 
 use crate::edit::commit::commit_decoded_buffer;
 use crate::event_types::NativeVlqMap;
 use crate::preflight::transform::transform as preflight_transform;
 use crate::preflight::{NativePreflightOptions, NativePreflightResult};
+use crate::sourcemap::function_map::{self, FunctionMap};
 
 use super::compose_decoded_chain;
 
@@ -46,6 +48,8 @@ pub struct NativePipelineCommit {
 pub struct NativePipelineFinish {
     pub code: String,
     pub map: Option<NativeVlqMap>,
+    pub function_map: Option<FunctionMap>,
+    pub function_map_ms: Option<f64>,
 }
 
 #[napi]
@@ -170,13 +174,26 @@ impl NativePipelineSession {
         &self,
         input_mappings: Option<String>,
         input_names: Option<Vec<String>>,
+        collect_function_map: Option<bool>,
     ) -> Result<NativePipelineFinish> {
         let code = self
             .current
             .clone()
             .ok_or_else(|| incomplete("pipeline source already consumed"))?;
+        let function_map_started = Instant::now();
+        let collect_function_map = collect_function_map.unwrap_or(false);
+        let function_map = collect_function_map
+            .then(|| function_map::generate(&code, &self.filename))
+            .transpose()?;
+        let function_map_ms =
+            collect_function_map.then(|| function_map_started.elapsed().as_secs_f64() * 1000.0);
         if self.layers.is_empty() {
-            return Ok(NativePipelineFinish { code, map: None });
+            return Ok(NativePipelineFinish {
+                code,
+                map: None,
+                function_map,
+                function_map_ms,
+            });
         }
         let slices: Vec<&[u8]> = self.layers.iter().map(Vec::as_slice).collect();
         let NativeVlqMap {
@@ -202,6 +219,8 @@ impl NativePipelineSession {
         Ok(NativePipelineFinish {
             code,
             map: Some(map),
+            function_map,
+            function_map_ms,
         })
     }
 
@@ -225,6 +244,7 @@ pub fn run_native_pipeline(
     options_list: Vec<NativePreflightOptions>,
     input_mappings: Option<String>,
     input_names: Option<Vec<String>>,
+    collect_function_map: Option<bool>,
 ) -> Result<NativeNativePipelineResult> {
     let mut session = NativePipelineSession::new(filename, source);
     let results = session.run_native_phases(options_list)?;
@@ -233,13 +253,17 @@ pub fn run_native_pipeline(
             results,
             code: None,
             map: None,
+            function_map: None,
+            function_map_ms: None,
         });
     }
-    let finish = session.finish(input_mappings, input_names)?;
+    let finish = session.finish(input_mappings, input_names, collect_function_map)?;
     Ok(NativeNativePipelineResult {
         results,
         code: Some(finish.code),
         map: finish.map,
+        function_map: finish.function_map,
+        function_map_ms: finish.function_map_ms,
     })
 }
 
@@ -250,6 +274,8 @@ pub struct NativeNativePipelineResult {
     pub results: Vec<NativePreflightResult>,
     pub code: Option<String>,
     pub map: Option<NativeVlqMap>,
+    pub function_map: Option<FunctionMap>,
+    pub function_map_ms: Option<f64>,
 }
 
 fn incomplete(message: &str) -> Error {
@@ -279,6 +305,7 @@ mod tests {
             "fixture.js".into(),
             "const x = 1;".into(),
             vec![],
+            None,
             None,
             None,
         )

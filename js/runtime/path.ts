@@ -512,6 +512,10 @@ function makeScope(runtime: PathRuntime, id: number, parentId: number | null): N
         return { name, global: true, declaration: null, references, path: null, scope: null };
       return null;
     },
+    getBindings(names) {
+      const bindings = session.resolveBindings(names, id);
+      return bindings.map(binding => makeBinding(runtime, binding));
+    },
     getProgramParent() {
       let current: NativeScope = this;
       while (current.parent) current = current.parent;

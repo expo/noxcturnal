@@ -265,10 +265,9 @@ const workloads = [
 ];
 
 const variants = [
-  ['baseline', 'baseline', { experimentalSyntaxOnlySessions: false }],
-  ['coalesced', 'optimized', { experimentalSyntaxOnlySessions: false }],
-  ['optimized', 'optimized', { experimentalSyntaxOnlySessions: true }],
-  ['final-function-map', 'optimized', { experimentalSyntaxOnlySessions: true, functionMap: true }],
+  ['baseline', 'baseline', {}],
+  ['coalesced', 'optimized', {}],
+  ['final-function-map', 'optimized', { functionMap: true }],
 ];
 
 function run(workload, variant, instrumented = false) {

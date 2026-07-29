@@ -517,7 +517,7 @@ test('creates a map-only version without reparsing unchanged code', () => {
   assert.equal(performance.committedBoundaryReasons['realized-map'], 1);
 });
 
-test('keeps bytes and maps identical across syntax-only render/reparse boundaries', () => {
+test('keeps bytes and maps correct across structural render/reparse boundaries', () => {
   const rename = (name: string, from: string, to: string) =>
     defineNativePlugin({
       name,
@@ -545,16 +545,10 @@ test('keeps bytes and maps identical across syntax-only render/reparse boundarie
       },
     ],
   });
-  const semantic = transform('const first = second;', 'fixture.js', pipeline, {
+  const result = transform('const first = second;', 'fixture.js', pipeline, {
     sourceMapMode: 'boundary',
-    experimentalSyntaxOnlySessions: false,
   });
-  const syntax = transform('const first = second;', 'fixture.js', pipeline, {
-    sourceMapMode: 'boundary',
-    experimentalSyntaxOnlySessions: true,
-  });
-  assert.equal(semantic.status, 'complete');
-  assert.equal(syntax.status, 'complete');
-  assert.equal(syntax.code, semantic.code);
-  assert.deepEqual(syntax.map, semantic.map);
+  assert.equal(result.status, 'complete');
+  assert.equal(result.code, 'const one = two;');
+  assert.ok(result.map);
 });

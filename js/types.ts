@@ -110,6 +110,7 @@ export interface NodeView {
   readonly scopeParentId?: ScopeId;
   readonly parentId?: NodeId;
   readonly parentType?: string;
+  readonly parentStart?: number;
   /** Scalar fields requested dynamically through a plugin plan are present as `unknown`. */
   readonly [field: string]: unknown;
 }
@@ -144,6 +145,7 @@ export interface NodeSummary {
   end?: number;
   parentId?: NodeId;
   parentType?: string;
+  parentStart?: number;
 }
 export interface SourceLocation {
   start: Position;
@@ -247,9 +249,6 @@ export interface TransformOptions {
   functionMap?: boolean;
   /** Include phase decisions and counters in metadata. Intended for benchmarks/debugging only. */
   debugPerformance?: boolean;
-  /** Experimental: retain structural indexes without constructing lexical
-   * semantics when the compiled artifact demand proves they are unnecessary. */
-  experimentalSyntaxOnlySessions?: boolean;
   /** Development/test-only: report undeclared contract access with suggested
    * fragments and declared-but-unused contract entries as diagnostics. */
   verifyVisitorContracts?: boolean;

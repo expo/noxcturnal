@@ -62,6 +62,7 @@ export class NativeTransformSession {
   #lineStarts: number[] | null = null;
   #scopeParents: Uint32Array | null = null;
   #bindingIndex: { nameIds: Map<string, number>; keys: Set<number> } | null = null;
+  #bindingsByScope = new Map<number, Map<string, QueryResult['bindings'][number]>>();
   #nativeParseCount = 0;
   #nativeAstTraversalCount = 0;
   #nativeSemanticBuildCount = 0;
@@ -97,7 +98,6 @@ export class NativeTransformSession {
         retentionManifest,
         initialManifest,
         buildInitialRoute,
-        options.experimentalSyntaxOnlySessions,
       );
       if (options.maxNativeMemoryBytes != null) {
         this.#crossing('memory-budget');
@@ -462,6 +462,28 @@ export class NativeTransformSession {
     const fact =
       scope == null ? undefined : this.#binding('query.bindings').queryBindings(name, scope)[0];
     return fact && adaptBindingFact(fact);
+  }
+  resolveBindings(names: readonly string[], scopeId: number): QueryResult['bindings'][number][] {
+    const resolved = names.flatMap(name => {
+      const bindingScope = this.resolveBindingScope(name, scopeId);
+      return bindingScope == null ? [] : [{ name, scopeId: bindingScope }];
+    });
+    for (const bindingScope of new Set(resolved.map(binding => binding.scopeId))) {
+      if (this.#bindingsByScope.has(bindingScope)) continue;
+      this.#bindingsByScope.set(
+        bindingScope,
+        new Map(
+          this.#binding('query.bindings.scope')
+            .queryBindings(undefined, bindingScope)
+            .map(adaptBindingFact)
+            .map(binding => [binding.name, binding]),
+        ),
+      );
+    }
+    return resolved.flatMap(binding => {
+      const fact = this.#bindingsByScope.get(binding.scopeId)?.get(binding.name);
+      return fact == null ? [] : [fact];
+    });
   }
   globalReferences(name: string): NodeSummary[] {
     const cached = this.#globalReferencesCache.get(name);

@@ -276,7 +276,6 @@ pub(crate) fn materialize_with_scope_parents(
     retention_manifest: Option<&[u8]>,
     initial_route_manifest: Option<&[u8]>,
     build_initial_route: bool,
-    syntax_only: bool,
 ) -> Result<MaterializedSessionParts> {
     let allocator = Allocator::default();
     let parsed = Parser::new(&allocator, source, source_type(filename, source)?).parse();
@@ -299,14 +298,14 @@ pub(crate) fn materialize_with_scope_parents(
         .as_ref()
         .or(compiled_manifest.as_ref())
         .map(|manifest| &manifest.structural_parent_types);
-    let needs_semantics = !syntax_only
-        || retention_manifest
-            .as_ref()
-            .is_some_and(|manifest| manifest.needs_semantics)
+    let needs_semantics = retention_manifest
+        .as_ref()
+        .is_some_and(|manifest| manifest.needs_semantics)
         || compiled_manifest
             .as_ref()
             .is_some_and(|manifest| manifest.needs_semantics)
-        || retention_capabilities & (RETAIN_IDENTIFIERS | RETAIN_CALLS) != 0;
+        || (retention_manifest.is_some() || compiled_manifest.is_some())
+            && retention_capabilities & (RETAIN_IDENTIFIERS | RETAIN_CALLS) != 0;
     if !needs_semantics {
         let mut collector = SyntaxIndexCollector {
             utf16: utf16.as_deref().map(|offsets| &**offsets),

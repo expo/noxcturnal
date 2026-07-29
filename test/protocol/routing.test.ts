@@ -129,7 +129,6 @@ test('uses syntax-only retained materialization for structural ancestry', () => 
     syntaxManifest,
     syntaxManifest,
     true,
-    true,
   );
   const semantic = new native.NativeIndexedSession(
     source,
@@ -137,7 +136,6 @@ test('uses syntax-only retained materialization for structural ancestry', () => 
     false,
     semanticManifest,
     semanticManifest,
-    true,
     true,
   );
   const syntaxBatch = decodeRoutedEnvelope(syntax.nextRoutedPacked(syntaxManifest));
@@ -156,7 +154,7 @@ test('uses syntax-only retained materialization for structural ancestry', () => 
   semantic.close();
 });
 
-test('matches semantic retained structure across syntax families and UTF-16 offsets', () => {
+test('retains structural records across syntax families and UTF-16 offsets', () => {
   const fixtures = [
     ['fixture.js', "'use strict'; class Box { method(value) { return '😀' + value; } }"],
     ['fixture.jsx', 'const view = <Panel title="😀"><Child /></Panel>;'],
@@ -167,36 +165,31 @@ test('matches semantic retained structure across syntax families and UTF-16 offs
     ['fixture.tsx', 'const view: JSX.Element = <Panel value={1} />;'],
   ];
   for (const [filename, source] of fixtures) {
-    const run = (experimentalSyntaxOnlySessions: boolean) => {
-      const records: (string | number | null)[][] = [];
-      const plugin = defineNativePlugin({
-        name: `structure-${experimentalSyntaxOnlySessions}`,
-        editEffect: 'none',
-        visitors: [
-          defineVisitor('Identifier', { ancestry: 'parent' }, path => {
-            records.push([
-              path.node.id,
-              path.node.type,
-              path.node.start,
-              path.node.end,
-              path.parentPath?.node.id ?? null,
-              path.sourceText(),
-            ]);
-          }),
-        ],
-      });
-      const result = transform(
-        source,
-        filename,
-        defineNativePipeline({ phases: [{ name: 'structure', plugins: [plugin] }] }),
-        { experimentalSyntaxOnlySessions },
-      );
-      assert.equal(result.status, 'complete');
-      return { records, code: result.code, map: result.map };
-    };
-    const semantic = run(false);
-    const syntax = run(true);
-    assert.deepEqual(syntax, semantic, filename);
+    const records: (string | number | null)[][] = [];
+    const plugin = defineNativePlugin({
+      name: `structure-${filename}`,
+      editEffect: 'none',
+      visitors: [
+        defineVisitor('Identifier', { ancestry: 'parent' }, path => {
+          records.push([
+            path.node.id,
+            path.node.type,
+            path.node.start,
+            path.node.end,
+            path.parentPath?.node.id ?? null,
+            path.sourceText(),
+          ]);
+        }),
+      ],
+    });
+    const result = transform(
+      source,
+      filename,
+      defineNativePipeline({ phases: [{ name: 'structure', plugins: [plugin] }] }),
+    );
+    assert.equal(result.status, 'complete');
+    assert.ok(records.length > 0, filename);
+    assert.equal(result.code, source, filename);
   }
 });
 
@@ -228,7 +221,6 @@ test('retains only semantic and query sidecars declared by the compiled manifest
     packRouteManifest([], false, false, 1 << 1),
     undefined,
     true,
-    true,
   );
   assert.equal(constants.performanceCounters().semanticBuildCount, 0);
   assert.ok(constants.queryConstants([...Array(32).keys()]).length > 0);
@@ -240,7 +232,6 @@ test('retains only semantic and query sidecars declared by the compiled manifest
     false,
     packRouteManifest([], false, false, 1 << 2),
     undefined,
-    true,
     true,
   );
   assert.equal(calls.performanceCounters().semanticBuildCount, 1);

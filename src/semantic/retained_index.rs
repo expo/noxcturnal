@@ -114,6 +114,7 @@ pub struct NativeSemanticReference {
     pub scope_id: u32,
     pub parent_id: Option<u32>,
     pub parent_type: Option<String>,
+    pub parent_start: Option<u32>,
     pub read: bool,
     pub write: bool,
 }
@@ -564,6 +565,9 @@ impl RetainedIndex {
             scope_id: reference.scope_id,
             parent_id: self.parent_id(node_id),
             parent_type: self.parent_type(node_id),
+            parent_start: self
+                .parent_id(node_id)
+                .map(|parent_id| self.starts[parent_id as usize]),
             read: reference.read(),
             write: reference.write(),
         }

@@ -9,16 +9,9 @@ import {
   defineVisitor,
   transform,
 } from '../../dist/index.js';
-import type { PreflightJsxMode } from '../../dist/index.js';
+import type { PreflightPlan } from '../../dist/index.js';
 
-const nativePipeline = (
-  filename: string,
-  options: {
-    typescript?: 'strip';
-    jsx?: PreflightJsxMode;
-    jsxImportSource?: string;
-  },
-) => ({
+const nativePipeline = (filename: string, options: PreflightPlan) => ({
   filename,
   pipeline: defineNativePipeline({
     phases: [{ name: 'preflight', native: options }],
@@ -157,6 +150,22 @@ test('conditionally lowers JSX from parsed syntax without reprinting false lexic
   assert.equal(performance.nativeSemanticBuilds, 0);
   assert.equal(performance.nativeAstTraversals, 1);
   assert.equal(performance.nativeRenders, 0);
+});
+
+test('fuses conditional JSX and block scoping when either transform has work', () => {
+  const pipeline = nativePipeline('fixture.jsx', {
+    jsx: 'automatic-if-present',
+    transforms: { blockScoping: true },
+    comments: false,
+  }).pipeline;
+  const jsx = transform('const view = <Widget />;', 'fixture.jsx', pipeline);
+  assert.equal(jsx.status, 'complete');
+  assert.match(jsx.code, /var view/);
+  assert.match(jsx.code, /react\/jsx-runtime/);
+
+  const blockOnly = transform('let value = 1;', 'fixture.jsx', pipeline);
+  assert.equal(blockOnly.status, 'complete');
+  assert.match(blockOnly.code, /var value/);
 });
 
 test('honors JSX import-source and classic pragma comments', () => {

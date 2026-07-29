@@ -38,6 +38,7 @@ export function adaptBindingFact(
       scopeId: reference.scopeId,
       parentId: reference.parentId,
       parentType: reference.parentType,
+      parentStart: reference.parentStart,
       name: fact.name,
       bindingScopeId: fact.scopeId,
       read: reference.read,

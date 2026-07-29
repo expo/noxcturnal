@@ -53,6 +53,7 @@ export interface NativeScope {
   hasBinding(name: string): boolean;
   hasGlobal(name: string): boolean;
   getBinding(name: string): NativeBinding | null;
+  getBindings(names: readonly string[]): NativeBinding[];
   getProgramParent(): NativeScope;
   push(content: Code): void;
   generateUid(name?: string): string;

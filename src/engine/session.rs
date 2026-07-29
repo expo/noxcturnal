@@ -51,7 +51,6 @@ impl NativeIndexedSession {
         retention_manifest: Option<Buffer>,
         initial_route_manifest: Option<Buffer>,
         build_initial_route: Option<bool>,
-        syntax_only: Option<bool>,
     ) -> Result<Self> {
         let collect_function_map = function_map.unwrap_or(false);
         let has_retention = retention_manifest.is_some();
@@ -74,7 +73,6 @@ impl NativeIndexedSession {
                 retention_manifest.as_deref(),
                 initial_route_manifest.as_deref(),
                 build_initial_route.unwrap_or(true),
-                syntax_only.unwrap_or(false),
             )?
         };
         let MaterializedSessionParts {

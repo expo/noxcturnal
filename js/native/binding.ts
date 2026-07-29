@@ -100,7 +100,6 @@ interface NativeBinding {
     retentionManifest?: Buffer,
     initialRouteManifest?: Buffer,
     buildInitialRoute?: boolean,
-    syntaxOnly?: boolean,
   ) => {
     nextRoutedPacked(manifest: Buffer, rootStart?: number, rootEnd?: number): Buffer;
     queryGlobals(
@@ -125,6 +124,7 @@ interface NativeBinding {
         scopeId: number;
         parentId?: number;
         parentType?: string;
+        parentStart?: number;
         read: boolean;
         write: boolean;
       }[];
@@ -207,7 +207,13 @@ interface NativeBinding {
     finish(
       inputMappings?: string,
       inputNames?: string[],
-    ): { code: string; map: NativeVlqMap | null };
+      collectFunctionMap?: boolean,
+    ): {
+      code: string;
+      map: NativeVlqMap | null;
+      functionMap: FunctionMap | null;
+      functionMapMs?: number;
+    };
   };
   classify(filename: string, source: string): ParseClassification;
   nativePreflightTransform(
@@ -226,10 +232,13 @@ interface NativeBinding {
     optionsList: NativePreflightOptionsInput[],
     inputMappings?: string,
     inputNames?: string[],
+    collectFunctionMap?: boolean,
   ): {
     results: NativePreflightResultOutput[];
     code?: string;
     map?: NativeVlqMap | null;
+    functionMap?: FunctionMap | null;
+    functionMapMs?: number;
   };
   commitPackedBuffer(
     source: string,

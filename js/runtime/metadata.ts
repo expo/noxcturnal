@@ -39,6 +39,7 @@ export interface PerformanceAllocationCounters {
   finalFunctionMapSyntaxParses: number;
   functionMapTraversals: number;
   functionMapBytes: number;
+  mapOnlyTransactions: number;
   totalMs: number;
   overallMs: number;
 }
@@ -92,6 +93,7 @@ export function createTransformMetadata(
       editCount: 0,
       convergentEditsDeduped: 0,
       effectiveNoopTransactions: 0,
+      mapOnlyTransactions: 0,
       renderedBytes: 0,
       pathFacades: 0,
       nodeFacades: 0,

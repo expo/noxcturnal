@@ -206,10 +206,12 @@ test('generates a function map only from the final committed source version', ()
     finalFunctionMapCacheHit: boolean;
     finalFunctionMapSyntaxParses: number;
     nativeSemanticBuilds: number;
+    nativeCrossingOperations: Record<string, number>;
   };
   assert.equal(performance.finalFunctionMapCacheHit, false);
   assert.equal(performance.finalFunctionMapSyntaxParses, 1);
   assert.equal(performance.nativeSemanticBuilds, 0);
+  assert.equal(performance.nativeCrossingOperations['function-map.generate'] ?? 0, 0);
 });
 
 test('reuses a final-input function map across no-op and map-only commits', () => {

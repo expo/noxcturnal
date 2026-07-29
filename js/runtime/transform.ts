@@ -167,6 +167,8 @@ export function transform(
   let adapterMap: NativeVlqMap | null = null;
   let adapterMetadata: Record<string, unknown> | undefined;
   let flowErasure: FlowErasureOutcome | undefined;
+  let finalFunctionMapGeneratedInPipeline = false;
+  let finalFunctionMapPipelineMs = 0;
   // Native erasure runs ahead of the auto-selected adapter. It deletes byte
   // ranges instead of reprinting, so the file keeps its formatting and the map
   // it produces is deletion-only. The adapter stays the fallback for proposal
@@ -478,9 +480,12 @@ export function transform(
       sourceVersions.cacheFunctionMap(currentVersion, functionMap);
     if (options.debugPerformance && options.functionMap) {
       const performance = metadata.performance as Record<string, unknown>;
-      performance.finalFunctionMapCacheHit = cachedFunctionMap != null;
-      performance.finalFunctionMapSyntaxParses = cachedFunctionMap == null ? 1 : 0;
-      performance.functionMapTraversals = cachedFunctionMap == null ? 1 : 0;
+      performance.finalFunctionMapCacheHit =
+        cachedFunctionMap != null && !finalFunctionMapGeneratedInPipeline;
+      performance.finalFunctionMapSyntaxParses =
+        cachedFunctionMap == null || finalFunctionMapGeneratedInPipeline ? 1 : 0;
+      performance.functionMapTraversals =
+        cachedFunctionMap == null || finalFunctionMapGeneratedInPipeline ? 1 : 0;
       performance.functionMapBytes =
         functionMap == null
           ? 0
@@ -488,7 +493,8 @@ export function transform(
             functionMap.names.reduce((sum, name) => sum + Buffer.byteLength(name), 0);
     }
     if (options.debugPerformance)
-      performanceCounters(metadata).functionMapMs = performance.now() - functionMapStarted;
+      performanceCounters(metadata).functionMapMs =
+        finalFunctionMapPipelineMs + performance.now() - functionMapStarted;
     if (options.debugPerformance) {
       performanceCounters(metadata).totalMs = performance.now() - transformStarted;
       performanceCounters(metadata).overallMs = performance.now() - overallStarted;
@@ -520,10 +526,16 @@ export function transform(
         batch.map(({ phase }) => nativePreflightOptions(phase.native!, options.debugPerformance)),
         inputMap?.mappings,
         inputMap?.names,
+        options.functionMap,
       );
       const runWall = options.debugPerformance ? performance.now() - nativeStarted : 0;
       recordNativeResults(pipelineResult.results, batch, runWall); // throws on any bail
       sourceVersions.cacheRenderedText(currentVersion, pipelineResult.code!);
+      if (pipelineResult.functionMap != null) {
+        sourceVersions.cacheFunctionMap(currentVersion, pipelineResult.functionMap);
+        finalFunctionMapGeneratedInPipeline = true;
+        finalFunctionMapPipelineMs = pipelineResult.functionMapMs ?? 0;
+      }
       if (pipelineResult.map != null) {
         finalMap = pipelineResult.map;
         if (options.debugPerformance) {
@@ -581,10 +593,20 @@ export function transform(
         reusableRoutedBatch = null;
       }
       const edits: EditCommand[] = [];
+      const phasePerformanceStart = options.debugPerformance
+        ? {
+            counters: { ...(metadata.performance as Record<string, number>) },
+            operations: {
+              ...((metadata.performance as { nativeCrossingOperations: Record<string, number> })
+                .nativeCrossingOperations ?? {}),
+            },
+          }
+        : undefined;
       const preparationStarted = options.debugPerformance ? performance.now() : 0;
       const prepared = preparePhase(phase);
+      const preparationMs = options.debugPerformance ? performance.now() - preparationStarted : 0;
       if (options.debugPerformance)
-        performanceCounters(metadata).phasePreparationMs += performance.now() - preparationStarted;
+        performanceCounters(metadata).phasePreparationMs += preparationMs;
       const {
         activePlugins,
         plans,
@@ -610,6 +632,8 @@ export function transform(
             resultingVersion: 0,
             artifactDemand: phasePlan[phaseIndex].artifactDemand,
             boundaryReason: undefined as string | undefined,
+            preparationMs,
+            plugins: activePlugins.map(plugin => plugin.name),
           }
         : undefined;
       if (phaseExecution) {
@@ -688,9 +712,6 @@ export function transform(
             // phase's immutable input. A code-changing commit invalidates it;
             // a no-op or map-only child can reuse it in the success tail.
             functionMap: collectFinalFunctionMap,
-            experimentalSyntaxOnlySessions:
-              options.experimentalSyntaxOnlySessions === true ||
-              (collectFinalFunctionMap && !hasSemanticDemand(artifactDemand)),
           },
           requiresIndex ? retentionManifest : undefined,
           requiresIndex ? manifest : undefined,
@@ -883,6 +904,45 @@ export function transform(
         recordedTraversalCounts.set(session, session.nativeAstTraversalCount);
         recordedSemanticBuildCounts.set(session, session.nativeSemanticBuildCount);
       }
+      const finalizePhaseExecution = (codeChanged: boolean, mapChanged: boolean) => {
+        if (!phaseExecution || !phasePerformanceStart) return;
+        const counters = metadata.performance as Record<string, number>;
+        for (const [field, counter] of [
+          ['sessionOpenMs', 'sessionOpenMs'],
+          ['nativeAndDecodeMs', 'nativeAndDecodeMs'],
+          ['dispatcherSetupMs', 'dispatcherSetupMs'],
+          ['dispatchMs', 'dispatchMs'],
+          ['callbackMs', 'callbackMs'],
+          ['commitMs', 'renderAndMapMs'],
+          ['routeDeliveries', 'routeDeliveries'],
+          ['nodeRecords', 'nodeRecords'],
+          ['payloadBytes', 'payloadBytes'],
+          ['stringSlabBytes', 'utf8SlabBytes'],
+          ['nativeWorkCrossings', 'nativeWorkCrossings'],
+          ['nativeInstrumentationCrossings', 'nativeInstrumentationCrossings'],
+          ['nativeParses', 'nativeParses'],
+          ['nativeSemanticBuilds', 'nativeSemanticBuilds'],
+          ['nativeAstTraversals', 'nativeAstTraversals'],
+          ['nativeRenders', 'nativeRenders'],
+        ] as const)
+          Object.assign(phaseExecution, {
+            [field]: (counters[counter] ?? 0) - (phasePerformanceStart.counters[counter] ?? 0),
+          });
+        const operationDeltas: Record<string, number> = {};
+        for (const [operation, count] of Object.entries(
+          (metadata.performance as { nativeCrossingOperations: Record<string, number> })
+            .nativeCrossingOperations,
+        )) {
+          const delta = count - (phasePerformanceStart.operations[operation] ?? 0);
+          if (delta > 0) operationDeltas[operation] = delta;
+        }
+        Object.assign(phaseExecution, {
+          nativeCrossingOperations: operationDeltas,
+          retainedBytes: session.nativeMemoryBytes,
+          codeChanged,
+          mapChanged,
+        });
+      };
       const effectiveEdits: EditCommand[] = edits;
       if (effectiveEdits.length === 0) {
         if (phaseExecution) phaseExecution.render = 'unchanged';
@@ -895,6 +955,7 @@ export function transform(
           session.close();
           openSession = null;
         }
+        finalizePhaseExecution(false, false);
         continue;
       }
       const nextPlan = phasePlan[phaseIndex + 1];
@@ -949,9 +1010,12 @@ export function transform(
           session.close();
           openSession = null;
         }
+        finalizePhaseExecution(false, false);
         continue;
       }
       if (!codeChanged) {
+        if (options.debugPerformance)
+          (metadata.performance as { mapOnlyTransactions: number }).mapOnlyTransactions++;
         if (phaseExecution) {
           phaseExecution.render = 'committed';
           phaseExecution.boundaryReason = 'realized-map';
@@ -965,6 +1029,7 @@ export function transform(
           session.close();
           openSession = null;
         }
+        finalizePhaseExecution(false, true);
         continue;
       }
       const boundaryReason = isFinalPhase
@@ -996,6 +1061,7 @@ export function transform(
       }
       reusableRoutedBatch = null;
       openSession = null;
+      finalizePhaseExecution(true, mapChanged);
       // Opening the next phase creates the explicit render/reparse boundary.
     }
     reusableSession?.close();
@@ -1010,8 +1076,17 @@ export function transform(
       return completeResult();
     }
     const composeStarted = options.debugPerformance ? performance.now() : 0;
-    const finished = pipelineSession.finish(inputMap?.mappings, inputMap?.names);
+    const finished = pipelineSession.finish(
+      inputMap?.mappings,
+      inputMap?.names,
+      options.functionMap === true && sourceVersions.functionMap(currentVersion) == null,
+    );
     sourceVersions.cacheRenderedText(currentVersion, finished.code);
+    if (finished.functionMap != null) {
+      sourceVersions.cacheFunctionMap(currentVersion, finished.functionMap);
+      finalFunctionMapGeneratedInPipeline = true;
+      finalFunctionMapPipelineMs = finished.functionMapMs ?? 0;
+    }
     if (finished.map != null) {
       finalMap = finished.map;
       if (options.debugPerformance) {

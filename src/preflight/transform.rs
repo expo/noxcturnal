@@ -447,7 +447,10 @@ pub fn transform(
             let mut detector = JsxDetector(false);
             detector.visit_program(&program);
             ast_traversal_count += 1;
-            if !detector.0 {
+            // A conditional JSX-only phase can return the original bytes
+            // without printing. A fused source rewrite still has work even
+            // when this particular file contains no JSX.
+            if !detector.0 && !selects_source_rewrite {
                 return Ok(identity_result(
                     source.to_owned(),
                     parse_count,
