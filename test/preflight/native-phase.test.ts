@@ -115,7 +115,7 @@ test('runs a fused native TypeScript phase and reports its own timing', () => {
   };
   assert.equal(performance.nativeParses, 1);
   assert.equal(performance.nativeSemanticBuilds, 1);
-  assert.equal(performance.nativeAstTraversals, 2);
+  assert.equal(performance.nativeAstTraversals, 1);
   assert.equal(performance.nativeRenders, 1);
   assert.ok(performance.nativeParseMs > 0);
   assert.ok(performance.nativeSemanticBuildMs > 0);
@@ -164,12 +164,69 @@ test('reports only the required internal reparse and semantic rebuild for legacy
     nativeSemanticBuilds: number;
     nativeRenders: number;
   };
-  assert.equal(performance.nativeParses, 2);
-  assert.equal(performance.nativeSemanticBuilds, performance.nativeParses);
-  assert.equal(performance.nativeRenders, 2);
+  assert.equal(performance.nativeParses, 1);
+  // Initial planning, the binding-changing destructuring pass before block
+  // scoping, and final scoping for Oxc each require a semantic view.
+  assert.equal(performance.nativeSemanticBuilds, 3);
+  assert.equal(performance.nativeRenders, 1);
 });
 
-test('reuses the converged final rewrite parse for the Oxc pass', () => {
+test('reports whether each selected internal rewrite acted', () => {
+  const result = transform(
+    'var value = { ...input }; var pattern = /./s;',
+    'fixture.js',
+    defineNativePipeline({
+      phases: [
+        {
+          name: 'legacy',
+          native: {
+            transforms: {
+              objectRestSpread: { loose: true, useBuiltIns: true },
+              regexpDotAll: true,
+            },
+          },
+        },
+      ],
+    }),
+    { debugPerformance: true },
+  );
+  assert.equal(result.status, 'complete');
+  const performance = result.metadata.performance as {
+    phaseExecutions: { rewriteSteps: { name: string; acted: boolean }[] }[];
+  };
+  assert.deepEqual(performance.phaseExecutions[0].rewriteSteps, [
+    { name: 'ObjectSpread', acted: true },
+    { name: 'ObjectRest', acted: false },
+    { name: 'Regexp', acted: true },
+  ]);
+});
+
+test('lowers standalone for-of on one parsed program and one final render', () => {
+  const result = transform(
+    'for (var value of values) consume(value);',
+    'fixture.js',
+    defineNativePipeline({
+      phases: [
+        {
+          name: 'legacy',
+          native: { transforms: { forOf: true } },
+        },
+      ],
+    }),
+    { debugPerformance: true },
+  );
+  assert.equal(result.status, 'complete');
+  const performance = result.metadata.performance as {
+    nativeParses: number;
+    nativeRenders: number;
+    phaseExecutions: { rewriteSteps: { name: string; acted: boolean }[] }[];
+  };
+  assert.equal(performance.nativeParses, 1);
+  assert.equal(performance.nativeRenders, 1);
+  assert.deepEqual(performance.phaseExecutions[0].rewriteSteps, [{ name: 'ForOf', acted: true }]);
+});
+
+test('lowers ordinary parameters on the shared parse', () => {
   const result = transform(
     'function read(value = 1) { return value; }',
     'fixture.js',
@@ -189,11 +246,12 @@ test('reuses the converged final rewrite parse for the Oxc pass', () => {
     nativeSemanticBuilds: number;
     nativeRenders: number;
   };
-  // One parse produces the edit and one confirms convergence. The latter AST
-  // feeds the final Oxc pass instead of parsing the same source a third time.
-  assert.equal(performance.nativeParses, 2);
-  assert.equal(performance.nativeSemanticBuilds, 3);
-  assert.equal(performance.nativeRenders, 2);
+  // The parameter plan and mutation share the final parsed program. Its new
+  // bindings require one semantic refresh, with no compatibility render or
+  // reparse round trip.
+  assert.equal(performance.nativeParses, 1);
+  assert.equal(performance.nativeSemanticBuilds, 2);
+  assert.equal(performance.nativeRenders, 1);
 });
 
 test('runs React Fast Refresh instrumentation in the native JSX transform', () => {

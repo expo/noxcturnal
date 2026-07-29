@@ -1,6 +1,7 @@
 //! Compatibility contract between Oxc 0.141 helper requests and Babel runtime.
 
 use oxc_transformer::Helper;
+use rustc_hash::FxHashSet;
 
 use crate::generated::inline_helpers::{
     INLINE_ASYNC_HELPERS as GENERATED_INLINE_ASYNC_HELPERS,
@@ -8,6 +9,65 @@ use crate::generated::inline_helpers::{
     INLINE_OBJECT_HELPERS as GENERATED_INLINE_OBJECT_HELPERS,
     INLINE_USING_CTX as GENERATED_INLINE_USING_CTX,
 };
+
+/// Custom (non-Oxc) helpers requested structurally by in-place preflight passes.
+///
+/// Passes record helper ABI names and generated source at the point where they
+/// emit a helper reference. Generated source is inserted once after final
+/// codegen, with the decoded map shifted structurally and no fragment parse.
+#[derive(Default)]
+pub(super) struct CustomHelperRequests {
+    names: FxHashSet<&'static str>,
+    fragments: Vec<(String, String)>,
+    scope_names: FxHashSet<String>,
+}
+
+impl CustomHelperRequests {
+    pub(super) fn request(&mut self, name: &'static str) {
+        self.names.insert(name);
+    }
+
+    pub(super) fn push_fragment(&mut self, compact: String, pretty: String) {
+        self.fragments.push((compact, pretty));
+    }
+
+    pub(super) fn reserve_scope_names(&mut self, names: impl IntoIterator<Item = String>) {
+        self.scope_names.extend(names);
+    }
+
+    pub(super) fn scope_names(&self) -> impl Iterator<Item = &str> {
+        self.scope_names.iter().map(String::as_str)
+    }
+
+    pub(super) fn prepend(&mut self, mut other: Self) {
+        self.names.extend(other.names);
+        self.scope_names.extend(other.scope_names);
+        other.fragments.append(&mut self.fragments);
+        self.fragments = other.fragments;
+    }
+
+    pub(super) fn extend_into(
+        self,
+        target: &mut Vec<&'static str>,
+        fragments: &mut Vec<String>,
+        compact: bool,
+    ) {
+        target.extend(self.names);
+        target.sort_unstable();
+        target.dedup();
+        fragments.extend(
+            self.fragments
+                .into_iter()
+                .map(|(compact_source, pretty_source)| {
+                    if compact {
+                        compact_source
+                    } else {
+                        pretty_source
+                    }
+                }),
+        );
+    }
+}
 
 /// The newest minimum below intentionally determines the default Expo runtime
 /// requirement. Older helpers retain their real lower bound so custom pipelines can

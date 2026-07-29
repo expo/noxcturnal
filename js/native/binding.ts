@@ -89,6 +89,7 @@ export interface NativePreflightResultOutput {
   codegenAndMapMs?: number;
   helperDiscoveryMs?: number;
   helperMaterializationMs?: number;
+  rewriteSteps?: { name: string; acted: boolean }[];
 }
 
 interface NativeBinding {

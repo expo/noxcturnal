@@ -1,53 +1,111 @@
 #![allow(clippy::format_push_string)]
 
-use oxc_ast::AstKind;
-use oxc_semantic::Semantic;
-use oxc_span::Span;
+use oxc_allocator::{Allocator, Box as ArenaBox, TakeIn, Vec as ArenaVec};
+use oxc_ast::{
+    AstBuilder,
+    ast::{Argument, Expression, Program, PropertyKind, TSTypeParameterInstantiation},
+};
+use oxc_ast_visit::{VisitMut, walk_mut};
+use oxc_span::GetSpan;
 use regex_syntax::hir::{Class, HirKind};
 use rustc_hash::FxHashMap;
 
-use crate::edit::{EditCommand, EditKind, MappingPolicy};
 use crate::generated::inline_helpers::{
-    INLINE_REGEXP_NAMED_CAPTURE_HELPER, INLINE_REGEXP_NAMED_CAPTURE_HELPER_RUNTIME,
+    INLINE_REGEXP_NAMED_CAPTURE_HELPER, INLINE_REGEXP_NAMED_CAPTURE_HELPER_BINDINGS,
+    INLINE_REGEXP_NAMED_CAPTURE_HELPER_PRETTY, INLINE_REGEXP_NAMED_CAPTURE_HELPER_RUNTIME,
+    INLINE_REGEXP_NAMED_CAPTURE_HELPER_RUNTIME_BINDINGS,
+    INLINE_REGEXP_NAMED_CAPTURE_HELPER_RUNTIME_PRETTY,
 };
-use crate::preflight::directive_prologue_insertion;
+use crate::preflight::helpers::CustomHelperRequests;
 
-const NAMED_CAPTURE_PLACEHOLDER: &str = "__BABEL_GENERATED_REGEXP_NAMED_CAPTURE_HELPER__";
+pub(super) struct Options {
+    pub(super) unicode: bool,
+    pub(super) unicode_properties: bool,
+    pub(super) dot_all: bool,
+    pub(super) named_groups: bool,
+    pub(super) inline_helpers: bool,
+}
 
-pub(super) fn edits(
+pub(super) fn run<'a>(
+    allocator: &'a Allocator,
+    program: &mut Program<'a>,
     source: &str,
-    semantic: &Semantic<'_>,
+    options: Options,
+) -> Result<(bool, CustomHelperRequests), &'static str> {
+    let named_helper = reserve_source_name("_wrapRegExp", source);
+    let named_runtime = reserve_source_name("_wrapRegExp2", source);
+    let mut pass = RegexpLowerer {
+        ast: AstBuilder::new(allocator),
+        unicode: options.unicode,
+        unicode_properties: options.unicode_properties,
+        dot_all: options.dot_all,
+        named_groups: options.named_groups,
+        named_helper: allocator.alloc_str(&named_helper),
+        changed: false,
+        needs_named_helper: false,
+        error: None,
+    };
+    pass.visit_program(program);
+    if let Some(error) = pass.error {
+        return Err(error);
+    }
+    let mut requests = CustomHelperRequests::default();
+    if pass.needs_named_helper {
+        requests.request("wrapRegExp");
+        let (helper, pretty_helper, bindings) = if options.inline_helpers {
+            (
+                INLINE_REGEXP_NAMED_CAPTURE_HELPER,
+                INLINE_REGEXP_NAMED_CAPTURE_HELPER_PRETTY,
+                INLINE_REGEXP_NAMED_CAPTURE_HELPER_BINDINGS,
+            )
+        } else {
+            (
+                INLINE_REGEXP_NAMED_CAPTURE_HELPER_RUNTIME,
+                INLINE_REGEXP_NAMED_CAPTURE_HELPER_RUNTIME_PRETTY,
+                INLINE_REGEXP_NAMED_CAPTURE_HELPER_RUNTIME_BINDINGS,
+            )
+        };
+        let rewrite = |source: &str| {
+            source
+                .replace("_wrapRegExp2", "__BABEL_WRAP_REGEXP_RUNTIME__")
+                .replace("_wrapRegExp", &named_helper)
+                .replace("__BABEL_WRAP_REGEXP_RUNTIME__", &named_runtime)
+        };
+        requests.push_fragment(rewrite(helper), rewrite(pretty_helper));
+        requests.reserve_scope_names(bindings.iter().map(|binding| rewrite(binding)));
+    }
+    Ok((pass.changed, requests))
+}
+
+struct RegexpLowerer<'a> {
+    ast: AstBuilder<'a>,
     unicode: bool,
     unicode_properties: bool,
     dot_all: bool,
     named_groups: bool,
-    inline_helpers: bool,
-) -> Result<Option<Vec<EditCommand>>, &'static str> {
-    let named_helper = reserve_source_name("_wrapRegExp", source);
-    let named_runtime = reserve_source_name("_wrapRegExp2", source);
-    let mut edits = Vec::new();
-    let mut needs_named_helper = false;
-    for node in semantic.nodes().iter() {
-        let AstKind::RegExpLiteral(literal) = node.kind() else {
-            continue;
+    named_helper: &'a str,
+    changed: bool,
+    needs_named_helper: bool,
+    error: Option<&'static str>,
+}
+
+impl<'a> RegexpLowerer<'a> {
+    fn lower(
+        &mut self,
+        expression: &mut Expression<'a>,
+    ) -> Result<Option<FxHashMap<String, usize>>, &'static str> {
+        let Expression::RegExpLiteral(literal) = expression else {
+            return Ok(None);
         };
-        let literal_source = slice(source, literal.span);
-        let Some(separator) = literal_source.rfind('/') else {
-            continue;
-        };
-        let mut pattern = literal_source[1..separator].to_owned();
-        let mut flags = literal_source[separator + 1..].to_owned();
+        let mut pattern = literal.regex.pattern.text.as_str().to_owned();
+        let mut flags = literal.regex.flags.to_string();
         let mut changed = false;
-        if unicode_properties && (pattern.contains("\\p{") || pattern.contains("\\P{")) {
-            // Surrogate pairs are only a correct expansion once `u` is gone.
-            // While the flag is still on, the engine matches by code point and
-            // a lone `\uD801` in the pattern never pairs up with the next unit,
-            // so an astral property has to stay a code-point range.
-            let drops_unicode_flag = unicode && flags.contains('u');
+        if self.unicode_properties && (pattern.contains("\\p{") || pattern.contains("\\P{")) {
+            let drops_unicode_flag = self.unicode && flags.contains('u');
             pattern = lower_unicode_properties(&pattern, drops_unicode_flag)?;
             changed = true;
         }
-        if unicode && flags.contains('u') {
+        if self.unicode && flags.contains('u') {
             if flags.contains('i') && !pattern.is_ascii() {
                 return Err("regexp-unicode-ignore-case-complex-not-implemented");
             }
@@ -55,73 +113,94 @@ pub(super) fn edits(
             flags.retain(|flag| flag != 'u');
             changed = true;
         }
-        if dot_all && flags.contains('s') {
+        if self.dot_all && flags.contains('s') {
             pattern = lower_dot_all(&pattern);
             flags.retain(|flag| flag != 's');
             changed = true;
         }
-        let mut groups = None;
-        if named_groups && pattern.contains("(?<") {
+        let groups = if self.named_groups && pattern.contains("(?<") {
             let (lowered, names) = lower_named_groups(&pattern)?;
             pattern = lowered;
-            groups = Some(names);
-            needs_named_helper = true;
+            self.needs_named_helper = true;
             changed = true;
-        }
+            Some(names)
+        } else {
+            None
+        };
         if !changed {
-            continue;
+            return Ok(None);
         }
-        let expression = format!("/{pattern}/{flags}");
-        let content = if let Some(groups) = groups {
-            let entries = groups
-                .iter()
-                .map(|(name, index)| format!("{name:?}:{index}"))
-                .collect::<Vec<_>>()
-                .join(",");
-            format!("{NAMED_CAPTURE_PLACEHOLDER}({expression},{{{entries}}})")
-        } else {
-            expression
-        };
-        edits.push(replace(literal.span, content));
-    }
-    if edits.is_empty() {
-        return Ok(None);
-    }
-    if needs_named_helper {
-        let helper = if inline_helpers {
-            INLINE_REGEXP_NAMED_CAPTURE_HELPER
-        } else {
-            INLINE_REGEXP_NAMED_CAPTURE_HELPER_RUNTIME
-        };
-        let (insertion, separator) = semantic
-            .nodes()
-            .iter()
-            .find_map(|node| match node.kind() {
-                AstKind::Program(program) => Some(directive_prologue_insertion(
-                    source,
-                    &program.directives,
-                    program.span.start,
-                )),
-                _ => None,
+        literal.regex.pattern.text = self.ast.allocator.alloc_str(&pattern).into();
+        literal.regex.pattern.pattern = None;
+        literal.regex.flags = flags
+            .bytes()
+            .try_fold(oxc_ast::ast::RegExpFlags::empty(), |flags, flag| {
+                oxc_ast::ast::RegExpFlags::try_from(flag).map(|parsed| flags | parsed)
             })
-            .unwrap_or((0, ""));
-        edits.push(insert(
-            insertion,
-            format!(
-                "{separator}{}",
-                helper
-                    .replace("_wrapRegExp2", "__BABEL_WRAP_REGEXP_RUNTIME__")
-                    .replace("_wrapRegExp", &named_helper)
-                    .replace("__BABEL_WRAP_REGEXP_RUNTIME__", &named_runtime)
-            ),
-        ));
+            .map_err(|_| "regexp-flags-not-implemented")?;
+        literal.raw = None;
+        self.changed = true;
+        Ok(groups)
     }
-    for edit in &mut edits {
-        if let Some(content) = &mut edit.content {
-            *content = content.replace(NAMED_CAPTURE_PLACEHOLDER, &named_helper);
+
+    fn wrap_named(&self, expression: &mut Expression<'a>, groups: FxHashMap<String, usize>) {
+        let span = expression.span();
+        let regexp = expression.take_in(&self.ast);
+        let mut properties = ArenaVec::new_in(&self.ast);
+        for (name, index) in groups {
+            #[expect(deprecated)]
+            let key = self
+                .ast
+                .expression_string_literal(span, self.ast.allocator.alloc_str(&name), None)
+                .into();
+            #[expect(deprecated)]
+            let value = self.ast.expression_numeric_literal(
+                span,
+                index as f64,
+                None,
+                oxc_ast::ast::NumberBase::Decimal,
+            );
+            #[expect(deprecated)]
+            properties.push(self.ast.object_property_kind_object_property(
+                span,
+                PropertyKind::Init,
+                key,
+                value,
+                false,
+                false,
+                false,
+            ));
+        }
+        #[expect(deprecated)]
+        let group_map = self.ast.expression_object(span, properties);
+        let mut arguments = ArenaVec::new_in(&self.ast);
+        arguments.push(Argument::from(regexp));
+        arguments.push(Argument::from(group_map));
+        #[expect(deprecated)]
+        {
+            *expression = self.ast.expression_call(
+                span,
+                self.ast.expression_identifier(span, self.named_helper),
+                None::<ArenaBox<'a, TSTypeParameterInstantiation<'a>>>,
+                arguments,
+                false,
+            );
         }
     }
-    Ok(Some(edits))
+}
+
+impl<'a> VisitMut<'a> for RegexpLowerer<'a> {
+    fn visit_expression(&mut self, expression: &mut Expression<'a>) {
+        if self.error.is_some() {
+            return;
+        }
+        walk_mut::walk_expression(self, expression);
+        match self.lower(expression) {
+            Ok(Some(groups)) => self.wrap_named(expression, groups),
+            Ok(None) => {}
+            Err(error) => self.error = Some(error),
+        }
+    }
 }
 
 fn reserve_source_name(base: &str, source: &str) -> String {
@@ -680,36 +759,4 @@ fn lower_named_groups(pattern: &str) -> Result<(String, FxHashMap<String, usize>
         index += character.len_utf8();
     }
     Ok((output, groups))
-}
-
-fn slice(source: &str, span: Span) -> &str {
-    &source[span.start as usize..span.end as usize]
-}
-
-fn replace(span: Span, content: String) -> EditCommand {
-    EditCommand {
-        kind: EditKind::Replace,
-        start: span.start,
-        end: span.end,
-        content: Some(content),
-        parts: Vec::new(),
-        destination: None,
-        mapping: Some(MappingPolicy::AnchorBoundaries),
-        order: None,
-        names: None,
-    }
-}
-
-fn insert(position: u32, content: String) -> EditCommand {
-    EditCommand {
-        kind: EditKind::AppendRight,
-        start: position,
-        end: position,
-        content: Some(content),
-        parts: Vec::new(),
-        destination: None,
-        mapping: Some(MappingPolicy::AnchorBoundaries),
-        order: None,
-        names: None,
-    }
 }

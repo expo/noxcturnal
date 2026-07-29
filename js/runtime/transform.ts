@@ -378,6 +378,7 @@ export function transform(
           nativeCodegenAndMapMs: result.codegenAndMapMs ?? 0,
           nativeHelperDiscoveryMs: result.helperDiscoveryMs ?? 0,
           nativeHelperMaterializationMs: result.helperMaterializationMs ?? 0,
+          rewriteSteps: result.rewriteSteps ?? [],
         });
         sampleProcessMemory(metadata);
       }

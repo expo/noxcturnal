@@ -79,7 +79,7 @@ test('classStaticBlock lowers independently with explicit compact/comment postur
     pipeline({ classStaticBlock: true }),
   );
 
-  assert.equal(result.status, 'complete');
+  assert.equal(result.status, 'complete', result.status === 'bailout' ? result.reason : undefined);
   assert.doesNotMatch(result.code, /static\s*\{|removed/);
   assert.match(result.code, /static#_=this\.answer=42/);
   assert.match(result.code, /field=2/);
@@ -309,9 +309,21 @@ test('native classes lower loose private fields, methods, calls, access, and pri
       #double(input) { return this.#value * input; }
       read() { return this.#double(3); }
       has(input) { return #value in input; }
+      increment(input) { return ++input.#value; }
+      callOther(input) { return input.#double(2); }
     }
     var value = new Secret();
-    globalThis.answer = [value.read(), value.has(value), value.has({})];
+    var readError = false, callError = false;
+    try { value.increment({}); } catch (error) { readError = error instanceof TypeError; }
+    try { value.callOther({}); } catch (error) { callError = error instanceof TypeError; }
+    globalThis.answer = [
+      value.read(),
+      value.increment(value),
+      value.has(value),
+      value.has({}),
+      readError,
+      callError,
+    ];
   `;
   const result = transform(
     source,
@@ -325,9 +337,10 @@ test('native classes lower loose private fields, methods, calls, access, and pri
   );
   assert.equal(result.status, 'complete');
   assert.doesNotMatch(result.code, /#(?:value|double)/);
+  assert.doesNotMatch(result.code, /\bclass\s+Secret\b/);
   const context: { answer?: unknown } = {};
   new Function('globalThis', 'require', result.code)(context, runtimeRequire);
-  assert.deepEqual(context.answer, [6, true, false]);
+  assert.deepEqual(context.answer, [6, 3, true, false, true, true]);
 });
 
 test('native classes rewrite private references inside field initializers and static blocks', () => {
@@ -355,10 +368,41 @@ test('native classes rewrite private references inside field initializers and st
   );
   assert.equal(result.status, 'complete');
   assert.doesNotMatch(result.code, /#[A-Za-z_$]/);
+  assert.doesNotMatch(result.code, /\bclass\s+Registry\b/);
   const context: { result?: unknown; staticValue?: unknown } = {};
   new Function('globalThis', 'require', result.code)(context, runtimeRequire);
   assert.equal(context.result, 2);
   assert.equal(context.staticValue, 3);
+});
+
+test('native classes structurally pair loose private accessors', () => {
+  const result = transform(
+    `
+      class Accessors {
+        #field = 1;
+        get #value() { return this.#field; }
+        set #value(value) { this.#field = value; }
+        static #staticField = 2;
+        static get #staticValue() { return this.#staticField; }
+        static set #staticValue(value) { this.#staticField = value; }
+        read() { this.#value = 4; return this.#value; }
+        static read() { this.#staticValue = 5; return this.#staticValue; }
+      }
+      globalThis.result = [new Accessors().read(), Accessors.read()];
+    `,
+    'fixture.js',
+    pipeline({
+      classes: true,
+      classProperties: { loose: true },
+      privateMethods: { loose: true },
+      privatePropertyInObject: { loose: true },
+    }),
+  );
+  assert.equal(result.status, 'complete');
+  assert.doesNotMatch(result.code, /\bclass\s+Accessors\b|#[A-Za-z_$]/);
+  const context: { result?: unknown[] } = {};
+  new Function('globalThis', 'require', result.code)(context, runtimeRequire);
+  assert.deepEqual(context.result, [4, 5]);
 });
 
 test('native class helpers avoid source binding collisions', () => {
@@ -383,7 +427,7 @@ test('native class helpers avoid source binding collisions', () => {
   );
 });
 
-test('native class helpers materialize once for sibling classes after the directive prologue', () => {
+test('native private methods lower structurally for sibling classes after the directive prologue', () => {
   const source =
     '"use strict";class First{#read(){return 1}read(){return this.#read()}}class Second{#read(){return 2}read(){return this.#read()}}globalThis.result=[new First().read(),new Second().read()];';
   const result = transform(
@@ -397,10 +441,6 @@ test('native class helpers materialize once for sibling classes after the direct
   );
   assert.equal(result.status, 'complete');
   assert.ok(result.code.startsWith('"use strict";'));
-  assert.equal(
-    result.code.match(/require\("@babel\/runtime\/helpers\/classPrivateFieldLooseBase"\)/g)?.length,
-    1,
-  );
   const context: { result?: unknown } = {};
   new Function('globalThis', 'require', result.code)(context, runtimeRequire);
   assert.deepEqual(context.result, [1, 2]);
@@ -446,7 +486,7 @@ test('missing ES2015 transforms are independent syntax-specific boundaries', () 
 
 test('native classes preserve methods, accessors, computed keys, expressions, and default inheritance', () => {
   const source = `
-    var key = "double", trace = [];
+    var key = "double", trace = [], keyReads = 0, rhsReads = 0;
     class Base {
       field = 1;
       static staticField = (trace.push("field"), 2);
@@ -462,12 +502,16 @@ test('native classes preserve methods, accessors, computed keys, expressions, an
       derivedField = this.value + 1;
       constructor(value) { super(value + 1); this.derived = true; }
       readSuper() { return super.current + super.double(); }
+      writeSuper(value) { return super.current = (trace.push("set"), value); }
+      addSuper(value) { return super[(keyReads++, "current")] += (rhsReads++, value); }
       static kind() { return super.kind() + "-derived"; }
     }
     var Expression = class Named { method() { return Named.name; } };
     var value = Derived.create(3);
     value.current = 4;
-    globalThis.answer = [value.current, value.double(), value.readSuper(), Derived.kind(), value instanceof Base, value.field, value.derivedField, Base.staticField, Base.fromBlock, trace, value.derived, Expression.name, new Expression().method()];
+    var assigned = value.writeSuper(6);
+    var added = value.addSuper(2);
+    globalThis.answer = [value.current, assigned, added, keyReads, rhsReads, value.double(), value.readSuper(), Derived.kind(), value instanceof Base, value.field, value.derivedField, Base.staticField, Base.fromBlock, trace, value.derived, Expression.name, new Expression().method()];
   `;
   const result = transform(
     source,
@@ -483,20 +527,373 @@ test('native classes preserve methods, accessors, computed keys, expressions, an
   const context: { answer?: unknown } = {};
   new Function('globalThis', 'require', result.code)(context, runtimeRequire);
   assert.deepEqual(context.answer, [
-    4,
     8,
-    12,
+    6,
+    8,
+    1,
+    1,
+    16,
+    24,
     'base-derived',
     true,
     1,
     5,
     2,
     3,
-    ['field', 'block'],
+    ['field', 'block', 'set'],
     true,
     'Named',
     'Named',
   ]);
+});
+
+test('native classes structurally lower plain declarations and expressions', () => {
+  const result = transform(
+    'class Value { constructor(value) { this.value = value; } read() { return this.value; } get doubled() { return this.value * 2; } static kind() { return "value"; } } var Expression = class Named { read() { return Named.name; } }; globalThis.result = [new Value(3).read(), new Value(3).doubled, Value.kind(), new Expression().read()];',
+    'fixture.js',
+    pipeline({ classes: true }),
+  );
+  assert.equal(result.status, 'complete');
+  assert.doesNotMatch(result.code, /\bclass\s+(?:Value|Named)\b/);
+  const context: { result?: unknown[] } = {};
+  new Function('globalThis', result.code)(context);
+  assert.deepEqual(context.result, [3, 6, 'value', 'Named']);
+});
+
+test('native classes evaluate computed field and method keys once in source order', () => {
+  const result = transform(
+    `
+      var trace = [];
+      function key(name) { trace.push("key:" + name); return name; }
+      class Computed {
+        [key("method")]() { return this.field; }
+        [key("field")] = (trace.push("instance"), 3);
+        static [key("staticField")] = (trace.push("static"), 4);
+        [key("second")]() { return this.field + 1; }
+        static { trace.push("block"); }
+      }
+      var first = new Computed(), second = new Computed();
+      globalThis.result = [
+        first.method(),
+        second.second(),
+        Computed.staticField,
+        trace,
+      ];
+    `,
+    'fixture.js',
+    pipeline({
+      classes: true,
+      classProperties: { loose: true },
+      classStaticBlock: true,
+    }),
+  );
+  assert.equal(result.status, 'complete');
+  assert.doesNotMatch(result.code, /\bclass\s+Computed\b/);
+  const context: { result?: unknown[] } = {};
+  new Function('globalThis', result.code)(context);
+  assert.deepEqual(context.result, [
+    3,
+    4,
+    4,
+    [
+      'key:method',
+      'key:field',
+      'key:staticField',
+      'key:second',
+      'static',
+      'block',
+      'instance',
+      'instance',
+    ],
+  ]);
+});
+
+test('native classes structurally lower exports and nested classes', async () => {
+  const result = transform(
+    `
+      export class Outer {
+        make() {
+          return class Inner {
+            static value() { return 7; }
+          };
+        }
+      }
+      export default class DefaultValue {
+        read() { return new Outer().make().value(); }
+      }
+    `,
+    'fixture.mjs',
+    pipeline({ classes: true }),
+  );
+  assert.equal(result.status, 'complete');
+  assert.doesNotMatch(result.code, /\bclass\s+(?:Outer|Inner|DefaultValue)\b/);
+  const module = await import(
+    `data:text/javascript;base64,${Buffer.from(result.code).toString('base64')}`
+  );
+  assert.equal(new module.default().read(), 7);
+  assert.equal(new module.Outer().make().value(), 7);
+});
+
+test('native classes structurally lower default derived constructors', () => {
+  const result = transform(
+    `
+      class Base {
+        constructor(value) { this.value = value; }
+        read() { return this.value; }
+        static kind() { return "base"; }
+      }
+      class Derived extends Base {
+        offset = this.value + 1;
+        doubled() { return this.value * 2; }
+        static own() { return "derived"; }
+      }
+      globalThis.result = [
+        new Derived(4).read(),
+        new Derived(4).doubled(),
+        Derived.kind(),
+        Derived.own(),
+        new Derived(4) instanceof Base,
+        new Derived(4).offset,
+      ];
+    `,
+    'fixture.js',
+    pipeline({ classes: true, classProperties: { loose: true } }),
+  );
+  assert.equal(result.status, 'complete');
+  assert.doesNotMatch(result.code, /\bclass\s+(?:Base|Derived)\b/);
+  const context: { result?: unknown[] } = {};
+  new Function('globalThis', 'require', result.code)(context, runtimeRequire);
+  assert.deepEqual(context.result, [4, 8, 'base', 'derived', true, 5]);
+});
+
+test('native classes structurally lower leading-super derived constructors', () => {
+  const result = transform(
+    `
+      class Base {
+        constructor(value) { this.value = value; }
+      }
+      class Derived extends Base {
+        offset = this.value + 2;
+        constructor(value) {
+          super(value + 1);
+          this.arrow = () => this.value;
+          this.normal = function () { return this === globalThis.marker; };
+        }
+      }
+      var value = new Derived(4);
+      globalThis.result = [
+        value.value,
+        value.arrow(),
+        value.normal.call(globalThis.marker),
+        value instanceof Base,
+        value.offset,
+      ];
+    `,
+    'fixture.js',
+    pipeline({ classes: true, classProperties: { loose: true } }),
+  );
+  assert.equal(result.status, 'complete');
+  assert.doesNotMatch(result.code, /\bclass\s+(?:Base|Derived)\b/);
+  const marker = {};
+  const context: { result?: unknown[]; marker: object } = { marker };
+  new Function('globalThis', 'require', result.code)(context, runtimeRequire);
+  assert.deepEqual(context.result, [5, 5, true, true, 7]);
+});
+
+test('native classes structurally lower short-circuiting super assignments', () => {
+  const result = transform(
+    `
+      var gets = 0, sets = 0, rhs = 0;
+      class Base {
+        get current() { gets++; return this._value; }
+        set current(value) { sets++; this._value = value; }
+      }
+      class Derived extends Base {
+        or(value) { return super.current ||= (rhs++, value); }
+        and(value) { return super.current &&= (rhs++, value); }
+        nullish(value) { return super.current ??= (rhs++, value); }
+      }
+      var value = new Derived();
+      var results = [value.or(3), value.or(4), value.and(5)];
+      value._value = 0;
+      results.push(value.and(6), value.nullish(6));
+      value._value = null;
+      results.push(value.nullish(7));
+      globalThis.result = [results, gets, sets, rhs, value._value];
+    `,
+    'fixture.js',
+    pipeline({ classes: true }),
+  );
+  assert.equal(result.status, 'complete');
+  assert.doesNotMatch(result.code, /\bclass\s+(?:Base|Derived)\b/);
+  const context: { result?: unknown[] } = {};
+  new Function('globalThis', 'require', result.code)(context, runtimeRequire);
+  assert.deepEqual(context.result, [[3, 3, 5, 0, 0, 7], 6, 3, 3, 7]);
+});
+
+test('native classes structurally lower prefix and postfix super updates', () => {
+  const result = transform(
+    `
+      var keys = 0, sets = 0;
+      class Base {
+        get current() { return this._value; }
+        set current(value) { sets++; this._value = value; }
+      }
+      class Derived extends Base {
+        post() { return super[(keys++, "current")]++; }
+        pre() { return --super.current; }
+      }
+      var value = new Derived();
+      value._value = 3;
+      var numberResults = [value.post(), value._value, value.pre(), value._value];
+      value._value = 1n;
+      var bigintResults = [value.post(), value._value];
+      globalThis.result = [numberResults, bigintResults, keys, sets];
+    `,
+    'fixture.js',
+    pipeline({ classes: true }),
+  );
+  assert.equal(result.status, 'complete');
+  assert.doesNotMatch(result.code, /\bclass\s+(?:Base|Derived)\b/);
+  const context: { result?: unknown[] } = {};
+  new Function('globalThis', 'require', result.code)(context, runtimeRequire);
+  assert.deepEqual(context.result, [[3, 4, 3, 3], [1n, 2n], 2, 3]);
+});
+
+test('native classes structurally validate explicit derived constructor returns', () => {
+  const result = transform(
+    `
+      class Base {}
+      class Derived extends Base {
+        constructor(kind) {
+          super();
+          this.nested = function () { return 1; };
+          if (kind === "object") return { kind };
+          if (kind === "function") return function returned() {};
+          if (kind === "undefined") return;
+          return 1;
+        }
+      }
+      var object = new Derived("object");
+      var callable = new Derived("function");
+      var normal = new Derived("undefined");
+      var error;
+      try { new Derived("primitive"); } catch (caught) { error = caught.message; }
+      globalThis.result = [
+        object.kind,
+        typeof callable,
+        normal instanceof Derived,
+        normal.nested(),
+        error,
+      ];
+    `,
+    'fixture.js',
+    pipeline({ classes: true }),
+  );
+  assert.equal(result.status, 'complete');
+  assert.doesNotMatch(result.code, /\bclass\s+(?:Base|Derived)\b/);
+  const context: { result?: unknown[] } = {};
+  new Function('globalThis', 'require', result.code)(context, runtimeRequire);
+  assert.deepEqual(context.result, [
+    'object',
+    'function',
+    true,
+    1,
+    'Derived constructors may only return object or undefined',
+  ]);
+});
+
+test('native classes structurally handle derived constructors that do not always call super', () => {
+  const result = transform(
+    `
+      class Base {}
+      class ObjectResult extends Base {
+        constructor() { return { valid: true }; }
+      }
+      class MissingSuper extends Base {
+        constructor(kind) {
+          if (kind === "super") super();
+          if (kind === "object") return { replacement: true };
+          return;
+        }
+      }
+      var objectOnly = new ObjectResult();
+      var conditional = new MissingSuper("super");
+      var replacement = new MissingSuper("object");
+      var errors = [];
+      for (var kind of ["missing", "undefined"]) {
+        try { new MissingSuper(kind); } catch (error) { errors.push(error.name); }
+      }
+      globalThis.result = [
+        objectOnly.valid,
+        conditional instanceof MissingSuper,
+        replacement.replacement,
+        errors,
+      ];
+    `,
+    'fixture.js',
+    pipeline({ classes: true }),
+  );
+  assert.equal(result.status, 'complete');
+  assert.doesNotMatch(result.code, /\bclass\s+(?:Base|ObjectResult|MissingSuper)\b/);
+  const context: { result?: unknown[] } = {};
+  new Function('globalThis', 'require', result.code)(context, runtimeRequire);
+  assert.deepEqual(context.result, [true, true, true, ['ReferenceError', 'ReferenceError']]);
+});
+
+test('native classes structurally lower literal public field keys', () => {
+  const result = transform(
+    `
+      class Value {
+        '' = 1;
+        2 = 3;
+      }
+      var value = new Value();
+      globalThis.result = [value[''], value[2]];
+    `,
+    'fixture.js',
+    pipeline({ classes: true, classProperties: { loose: true } }),
+  );
+  assert.equal(result.status, 'complete');
+  assert.doesNotMatch(result.code, /\bclass\s+Value\b/);
+  const context: { result?: unknown[] } = {};
+  new Function('globalThis', result.code)(context);
+  assert.deepEqual(context.result, [1, 3]);
+});
+
+test('native classes structurally lower anonymous expressions returned from generic arrows', () => {
+  const result = transform(
+    `
+      export default <T>(value: T) =>
+        class extends Array<T> {
+          field = value;
+        };
+    `,
+    'fixture.ts',
+    defineNativePipeline({
+      phases: [
+        {
+          name: 'syntax',
+          native: {
+            transforms: {
+              classes: true,
+              classProperties: { loose: true },
+            },
+            typescript: 'strip',
+            helpers: {
+              mode: 'runtime',
+              moduleName: '@babel/runtime',
+              version: '7.29.7',
+            },
+            compact: true,
+            comments: false,
+          },
+        },
+      ],
+    }),
+  );
+  assert.equal(result.status, 'complete', result.status === 'bailout' ? result.reason : undefined);
+  assert.doesNotMatch(result.code, /\bclass\s+extends\b/);
 });
 
 test('native for-of preserves iterable closing, control flow, nesting, and destructured heads', () => {
@@ -572,6 +969,18 @@ test('native destructuring helpers avoid source binding collisions', () => {
   assert.match(result.code, /_toArray\d+|_objectWithoutProperties\d+/);
 });
 
+test('destructuring preserves a binding renamed by block scoping', () => {
+  const result = transform(
+    'function read(input) { { let routes = 1; globalThis.inner = routes; } const { routes } = input; return routes; } globalThis.result = read({ routes: 2 });',
+    'fixture.js',
+    pipeline({ blockScoping: true, destructuring: { useBuiltIns: true } }),
+  );
+  assert.equal(result.status, 'complete');
+  const context: { inner?: unknown; result?: unknown } = {};
+  new Function('globalThis', 'require', result.code)(context, runtimeRequire);
+  assert.deepEqual([context.inner, context.result], [1, 2]);
+});
+
 test('native parameters preserve defaults, rest, destructuring, length, and mappings', () => {
   const source =
     'function read(first, { value } = { value: 2 }, ...rest) { return [first, value, rest, read.length]; }';
@@ -613,6 +1022,44 @@ test('native parameters preserve arrow lexical state and nested defaults', () =>
   assert.equal(result.status, 'complete');
   const outer = new Function(`${result.code}; return outer;`)() as Function;
   assert.deepEqual(outer.call({ value: 3 }, 4)()(), [1, 2, 3, 4]);
+});
+
+test('native parameters preserve a lowered arrow in a nullish-coalescing operand', () => {
+  const result = transform(
+    'const render = fallback ?? (({ color } = {}) => color);',
+    'fixture.js',
+    pipeline({ parameters: true }),
+  );
+  assert.equal(result.status, 'complete');
+  const evaluate = new Function('fallback', `${result.code}; return render;`);
+  const lowered = evaluate(null) as (input?: { color?: string }) => string | undefined;
+  assert.equal(lowered({ color: 'blue' }), 'blue');
+  const fallback = () => 'fallback';
+  assert.equal(evaluate(fallback), fallback);
+});
+
+test('native parameters lower destructured rest bindings without fallback', () => {
+  const result = transform(
+    'function read(prefix, ...[first, second = 4]) { return [prefix, first, second]; } globalThis.result = read(1, 2);',
+    'fixture.js',
+    pipeline({ parameters: true }),
+  );
+  assert.equal(result.status, 'complete');
+  assert.doesNotMatch(result.code, /\.\.\./);
+  const context: { result?: number[] } = {};
+  new Function('globalThis', result.code)(context);
+  assert.deepEqual(context.result, [1, 2, 4]);
+});
+
+test('native parameters structurally reparse JSX arrow bodies', () => {
+  const result = transform(
+    'const View = ({ value, ...props }) => <div {...props}>{value}</div>;',
+    'fixture.jsx',
+    pipeline({ parameters: true, destructuring: { useBuiltIns: true } }),
+  );
+  assert.equal(result.status, 'complete');
+  assert.match(result.code, /function\s*\(\)/);
+  assert.match(result.code, /<div/);
 });
 
 test('native parameters isolate defaults from body bindings', () => {
@@ -777,6 +1224,19 @@ test('class lowering preserves lexical this in field arrows with rest parameters
   new Function('globalThis', result.code)(context);
   assert.deepEqual(context.result, [3]);
   assert.doesNotMatch(result.code, /var _this\d*=this;[\s\S]*var Events/);
+});
+
+test('derived class field arrows retain their own return semantics', () => {
+  const result = transform(
+    'class Base {} class Derived extends Base { value = 4; primitive = () => this.value; object = () => ({ value: this.value }); } var value = new Derived(); globalThis.result = [value.primitive(), value.object().value];',
+    'fixture.js',
+    pipeline({ classes: true, classProperties: { loose: true } }),
+  );
+  assert.equal(result.status, 'complete');
+  const context: { result?: unknown } = {};
+  new Function('globalThis', 'require', result.code)(context, runtimeRequire);
+  assert.deepEqual(context.result, [4, 4]);
+  assert.doesNotMatch(result.code, /constructors may only return[\s\S]*value\.primitive/);
 });
 
 test('runtime helpers deduplicate and avoid source binding collisions', () => {
@@ -1009,6 +1469,7 @@ test('native regexp helpers avoid source binding collisions', () => {
   new Function('globalThis', 'require', result.code)(context, runtimeRequire);
   assert.deepEqual(context.result, [1, 2, 'a']);
   assert.match(result.code, /_wrapRegExp\d+/);
+  assert.deepEqual(result.metadata.nativeHelpers, ['wrapRegExp']);
 });
 
 test('regexp semantic boundaries only reject syntax owned by the selected toggle', () => {
@@ -1308,6 +1769,30 @@ test('native block scoping preserves captured loop bindings and relocated mappin
   );
 });
 
+test('captured-loop fragments normalize UTF-8 offsets before structural mutation', () => {
+  const result = transform(
+    'function read(items) { /* → */ var callbacks = []; for (const key in items) { if (!items[key]) continue; callbacks.push(() => key); } return callbacks.map(callback => callback()); } globalThis.result = read({ a: 1, b: 0, c: 1 });',
+    'fixture.js',
+    pipeline({ blockScoping: true }),
+  );
+  assert.equal(result.status, 'complete');
+  const context: { result?: string[] } = {};
+  new Function('globalThis', result.code)(context);
+  assert.deepEqual(context.result, ['a', 'c']);
+});
+
+test('captured loops inside private class methods retain their enclosing private names', () => {
+  const result = transform(
+    'class Values { #items = [1, 2]; read() { const callbacks = []; for (const value of this.#items) callbacks.push(() => value); return callbacks.map(callback => callback()); } } globalThis.result = new Values().read();',
+    'fixture.js',
+    pipeline({ blockScoping: true }),
+  );
+  assert.equal(result.status, 'complete');
+  const context: { result?: number[] } = {};
+  new Function('globalThis', result.code)(context);
+  assert.deepEqual(context.result, [1, 2]);
+});
+
 test('captured-loop helpers preserve colliding header bindings as parameters', () => {
   const result = transform(
     'var values = []; for (let ii = 0; ii < 1; ii++) values.push(ii); for (let ii = 0; ii < 2; ii++) { let value = ii; values.push(() => value); } globalThis.result = [values[0], values[1](), values[2]()];',
@@ -1342,6 +1827,32 @@ test('native captured-loop lowering preserves nested loops and abrupt control fl
     [1, 3],
     [2, 3],
   ]);
+});
+
+test('native captured-loop AST relocation preserves await and delegated yield', async () => {
+  const asyncResult = transform(
+    'async function read() { var callbacks = []; for (let value of [Promise.resolve(1), Promise.resolve(2)]) { value = await value; callbacks.push(() => value); } return callbacks.map(callback => callback()); }',
+    'fixture.js',
+    pipeline({ blockScoping: true }),
+  );
+  assert.equal(asyncResult.status, 'complete');
+  const readAsync = new Function(`${asyncResult.code}; return read;`)() as () => Promise<number[]>;
+  assert.deepEqual(await readAsync(), [1, 2]);
+
+  const generatorResult = transform(
+    'function* read() { var callbacks = []; for (let value of [1, 2]) { yield value; callbacks.push(() => value); } return callbacks.map(callback => callback()); }',
+    'fixture.js',
+    pipeline({ blockScoping: true }),
+  );
+  assert.equal(generatorResult.status, 'complete');
+  const readGenerator = new Function(`${generatorResult.code}; return read;`)() as () => Generator<
+    number,
+    number[]
+  >;
+  const iterator = readGenerator();
+  assert.deepEqual(iterator.next(), { value: 1, done: false });
+  assert.deepEqual(iterator.next(), { value: 2, done: false });
+  assert.deepEqual(iterator.next(), { value: [1, 2], done: true });
 });
 
 test('generated prologue statements do not fuse with an unterminated directive', () => {
@@ -1495,6 +2006,10 @@ test('derived constructors accept every shape of leading super call', () => {
     pipeline({ classes: true, classProperties: { loose: true } }),
   );
   assert.equal(result.status, 'complete');
+  assert.doesNotMatch(
+    result.code,
+    /\bclass\s+(?:Base|Sequence|Returned|ReturnedSequence|Escapes)\b/,
+  );
   const context: { answer?: unknown } = {};
   new Function('globalThis', 'require', result.code)(context, runtimeRequire);
   assert.deepEqual(context.answer, [['a', 'f', 'a!'], ['b', true], ['c', 'tail', true], 'd']);
@@ -1531,6 +2046,7 @@ test('derived constructors lower a super call the body reaches conditionally', (
     pipeline({ classes: true, classProperties: { loose: true } }),
   );
   assert.equal(result.status, 'complete');
+  assert.doesNotMatch(result.code, /\bclass\s+(?:Base|Derived|Sub)\b/);
   const context: { answer?: unknown } = {};
   new Function('globalThis', 'require', result.code)(context, runtimeRequire);
   assert.deepEqual(context.answer, [
@@ -1825,6 +2341,38 @@ test('React Refresh still registers a context used as a JSX element', () => {
   // The signature call belongs at the top of the body, ahead of the prologue
   // the parameter rewrite adds.
   assert.match(result.code, /function Provider\(\)\{_s\(\)/);
+});
+
+test('React Refresh signatures track hook structure after native mutation', () => {
+  const refreshPipeline = defineNativePipeline({
+    phases: [
+      {
+        name: 'refresh',
+        native: {
+          jsx: 'automatic',
+          reactRefresh: {},
+          transforms: { destructuring: { useBuiltIns: true } },
+          helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
+          compact: true,
+          comments: false,
+        },
+      },
+    ],
+  });
+  const signature = (source: string) => {
+    const result = transform(source, 'fixture.jsx', refreshPipeline);
+    assert.equal(result.status, 'complete');
+    const match = result.code.match(/_s\(C,`([^`]+)`\)/);
+    assert.ok(match);
+    return match[1];
+  };
+  const stateOnly = signature(
+    "import { useState } from 'react'; export function C() { const [value] = useState(1); return value; }",
+  );
+  const effectThenState = signature(
+    "import { useEffect, useState } from 'react'; export function C() { useEffect(() => {}); const [value] = useState(1); return value; }",
+  );
+  assert.notEqual(stateOnly, effectThenState);
 });
 
 test('Oxc keeps the class-feature transforms it owns and loses the ones it does not', () => {

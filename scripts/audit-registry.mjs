@@ -166,12 +166,42 @@ export const bailouts = {
     owner: 'blockScoping',
     triggerTest: 'syntax-transforms.test.ts',
   },
+  'captured-loop-ast-target-missing': {
+    ...invariant,
+    owner: 'blockScoping',
+    triggerTest: 'syntax-transforms.test.ts',
+  },
+  'captured-loop-post-rewrite-semantic-error': {
+    ...invariant,
+    owner: 'blockScoping',
+    triggerTest: 'syntax-transforms.test.ts',
+  },
   'parameters-edit-conflict': {
     ...invariant,
     owner: 'parameters',
     triggerTest: 'syntax-transforms.test.ts',
   },
+  'parameters-rest-names-missing': {
+    ...invariant,
+    owner: 'parameters',
+    triggerTest: 'syntax-transforms.test.ts',
+  },
+  'parameters-arrow-expression-body-shape-error': {
+    ...invariant,
+    owner: 'parameters',
+    triggerTest: 'syntax-transforms.test.ts',
+  },
+  'parameters-empty-capture-declaration': {
+    ...invariant,
+    owner: 'parameters',
+    triggerTest: 'syntax-transforms.test.ts',
+  },
   'destructuring-edit-conflict': {
+    ...invariant,
+    owner: 'destructuring',
+    triggerTest: 'syntax-transforms.test.ts',
+  },
+  'destructuring-temporary-declaration-empty': {
     ...invariant,
     owner: 'destructuring',
     triggerTest: 'syntax-transforms.test.ts',
@@ -182,6 +212,121 @@ export const bailouts = {
     triggerTest: 'syntax-transforms.test.ts',
   },
   'classes-edit-conflict': {
+    ...invariant,
+    owner: 'classes',
+    triggerTest: 'syntax-transforms.test.ts',
+  },
+  'classes-ast-target-missing': {
+    ...invariant,
+    owner: 'classes',
+    triggerTest: 'syntax-transforms.test.ts',
+  },
+  'classes-post-rewrite-semantic-error': {
+    ...invariant,
+    owner: 'classes',
+    triggerTest: 'syntax-transforms.test.ts',
+  },
+  'classes-postcondition-failed': {
+    ...invariant,
+    owner: 'classes',
+    triggerTest: 'syntax-transforms.test.ts',
+  },
+  'classes-decorators-not-implemented': {
+    ...invariant,
+    owner: 'classes',
+    triggerTest: 'syntax-transforms.test.ts',
+  },
+  'classes-direct-shape-not-implemented': {
+    ...temporary,
+    owner: 'classes',
+    triggerTest: 'syntax-transforms.test.ts',
+  },
+  'classes-direct-ast-target-missing': {
+    ...invariant,
+    owner: 'classes',
+    triggerTest: 'syntax-transforms.test.ts',
+  },
+  'classes-direct-derived-constructor-body-missing': {
+    ...invariant,
+    owner: 'classes',
+    triggerTest: 'syntax-transforms.test.ts',
+  },
+  'classes-direct-derived-result-name-missing': {
+    ...invariant,
+    owner: 'classes',
+    triggerTest: 'syntax-transforms.test.ts',
+  },
+  'classes-direct-derived-new-target-name-missing': {
+    ...invariant,
+    owner: 'classes',
+    triggerTest: 'syntax-transforms.test.ts',
+  },
+  'classes-direct-derived-super-call-name-missing': {
+    ...invariant,
+    owner: 'classes',
+    triggerTest: 'syntax-transforms.test.ts',
+  },
+  'classes-direct-leading-super-return-missing': {
+    ...invariant,
+    owner: 'classes',
+    triggerTest: 'syntax-transforms.test.ts',
+  },
+  'classes-direct-leading-super-sequence-empty': {
+    ...invariant,
+    owner: 'classes',
+    triggerTest: 'syntax-transforms.test.ts',
+  },
+  'classes-direct-leading-super-sequence-head-mismatch': {
+    ...invariant,
+    owner: 'classes',
+    triggerTest: 'syntax-transforms.test.ts',
+  },
+  'classes-direct-leading-super-expression-mismatch': {
+    ...invariant,
+    owner: 'classes',
+    triggerTest: 'syntax-transforms.test.ts',
+  },
+  'classes-direct-private-key-missing': {
+    ...invariant,
+    owner: 'classes',
+    triggerTest: 'syntax-transforms.test.ts',
+  },
+  'classes-direct-field-options-missing': {
+    ...invariant,
+    owner: 'classes',
+    triggerTest: 'syntax-transforms.test.ts',
+  },
+  'classes-direct-static-block-options-missing': {
+    ...invariant,
+    owner: 'classes',
+    triggerTest: 'syntax-transforms.test.ts',
+  },
+  'classes-direct-shape-mismatch': {
+    ...invariant,
+    owner: 'classes',
+    triggerTest: 'syntax-transforms.test.ts',
+  },
+  'classes-direct-derived-assert-name-missing': {
+    ...invariant,
+    owner: 'classes',
+    triggerTest: 'syntax-transforms.test.ts',
+  },
+  'classes-direct-constructor-body-missing': {
+    ...invariant,
+    owner: 'classes',
+    triggerTest: 'syntax-transforms.test.ts',
+  },
+  'classes-direct-method-key-mismatch': {
+    ...invariant,
+    owner: 'classes',
+    triggerTest: 'syntax-transforms.test.ts',
+  },
+  'classes-direct-method-body-missing': {
+    ...invariant,
+    owner: 'classes',
+    triggerTest: 'syntax-transforms.test.ts',
+  },
+  'classes-direct-field-key-mismatch': {
     ...invariant,
     owner: 'classes',
     triggerTest: 'syntax-transforms.test.ts',
@@ -289,6 +434,36 @@ export const bailouts = {
   'parameters-postcondition-failed': {
     ...invariant,
     owner: 'parameters',
+    triggerTest: 'syntax-transforms.test.ts',
+  },
+  'for-of-postcondition-failed': {
+    ...invariant,
+    owner: 'forOf',
+    triggerTest: 'syntax-transforms.test.ts',
+  },
+  'pre-for-of-semantic-error': {
+    ...invariant,
+    owner: 'forOf',
+    triggerTest: 'syntax-transforms.test.ts',
+  },
+  'for-of-ast-target-missing': {
+    ...invariant,
+    owner: 'forOf',
+    triggerTest: 'syntax-transforms.test.ts',
+  },
+  'pre-destructuring-semantic-error': {
+    ...invariant,
+    owner: 'destructuring',
+    triggerTest: 'syntax-transforms.test.ts',
+  },
+  'pre-block-scoping-semantic-error': {
+    ...invariant,
+    owner: 'blockScoping',
+    triggerTest: 'syntax-transforms.test.ts',
+  },
+  'post-rewrite-semantic-error': {
+    ...invariant,
+    owner: 'preflight',
     triggerTest: 'syntax-transforms.test.ts',
   },
   'regexp-class-shape-not-implemented': {

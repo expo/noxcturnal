@@ -21,7 +21,7 @@ exports[`every public native transform has an explicit ownership fixture 2`] = `
   "code": "var Value=(()=>{"use strict";function Value(){if(!(this instanceof Value))throw new TypeError(\`Cannot call a class as a function\`)}return Value})();",
   "helpers": [],
   "map": {
-    "mappings": "AAAA,IAAI,WAAW,CAAC,aAAa,SAAS,OAAO,CAAC,GAAG,EAAE,gBAAgB,OAAO,MAAM,IAAI,UAAU,mCAAmC,CAAE,CAAC,OAAO,KAAK,EAAC,AAAC,CAAC;;",
+    "mappings": "AAAA,iIAAa,EAAb,YAAa;",
     "names": [],
   },
   "name": "classes",
@@ -39,8 +39,10 @@ exports[`every public native transform has an explicit ownership fixture 3`] = `
     "objectDestructuringEmpty",
   ],
   "map": {
-    "mappings": "AAAA,IAAI,2BAA2B,CAAC,yBAAyB,QAAQ,iDAAiD,CAAC,EAAE,SAAS,0BAA0B,EAAE,CAAC,OAAO,2BAA2B,yBAAyB,CAAC,EAAE,CAAC,CAA1N,IAAI,KAAY,MAAM,KAAK,0BAA0B,IAAI,EAAE,MAAM,KAAK;;",
-    "names": [],
+    "mappings": "2NAAA,IAAIA,KAAY,MAAZA,mCAAgB,EAAd,MAAFA;",
+    "names": [
+      "{ value } = input",
+    ],
   },
   "name": "destructuring",
   "option": {
@@ -57,8 +59,10 @@ exports[`every public native transform has an explicit ownership fixture 4`] = `
   "code": "function read(){let value=arguments.length>0&&arguments[0]!==void 0?arguments[0]:1;return value}",
   "helpers": [],
   "map": {
-    "mappings": "AAAA,SAAS,MAAgB,CAAC,IAAI,MAAM,UAAU,OAAO,GAAG,UAAU,KAAK,IAAK,GAAE,UAAU,GAAG,EAAhE,OAAO,KAAO;;",
-    "names": [],
+    "mappings": "AAAA,SAAS,MAAgB,KAAX,MAAWA,uDAAH,EAAK,OAAO,KAAO;",
+    "names": [
+      "{ return value; }",
+    ],
   },
   "name": "parameters",
   "option": true,
@@ -73,8 +77,10 @@ exports[`every public native transform has an explicit ownership fixture 5`] = `
   "code": "{var _iteratorNormalCompletion=true,_didIteratorError=false,_iteratorError;try{for(var _iterator=values[Symbol.iterator](),_step;!(_iteratorNormalCompletion=(_step=_iterator.next()).done);_iteratorNormalCompletion=true){var value=_step.value;consume(value)}}catch(_iteratorError2){_didIteratorError=true;_iteratorError=_iteratorError2}finally{try{if(!_iteratorNormalCompletion&&_iterator.return!=null)_iterator.return()}finally{if(_didIteratorError)throw _iteratorError}}}",
   "helpers": [],
   "map": {
-    "mappings": "AAAA,CAAC,IAAI,0BAA0B,KAAK,kBAAkB,MAAM,eAAe,GAAG,CAAC,IAAI,IAAI,UAAW,OAAQ,OAAO,SAAS,CAAC,EAAE,MAAM,EAAE,2BAA2B,MAAM,UAAU,KAAK,EAAC,AAAC,CAAC,MAAM,0BAA0B,KAAK,CAAC,IAAI,MAAM,MAAM,MAAM,QAAQ,KAAK,CAAE,CAAC,OAAO,gBAAgB,CAAC,kBAAkB,KAAK,eAAe,eAAe,QAAQ,CAAC,GAAG,CAAC,GAAG,CAAC,2BAA2B,UAAU,QAAQ,KAAK,UAAU,OAAO,CAAC,QAAQ,CAAC,GAAG,kBAAkB,MAAM,cAAc,CAAC,CAAC;;",
-    "names": [],
+    "mappings": "AAAA,iGAAkB,OAAlBA,gBAAC,CAAD,4DAAC,CAADA,sCAAK,IAAI,MAATA,YAA0B,QAAQ,KAAK,CAAvC,uNAAwC;",
+    "names": [
+      "f",
+    ],
   },
   "name": "forOf",
   "option": true,
@@ -225,8 +231,10 @@ exports[`every public native transform has an explicit ownership fixture 14`] = 
   "code": "var value=Object.assign({},input);",
   "helpers": [],
   "map": {
-    "mappings": "AAAA,IAAI,MAAQ,OAAO,OAAO,CAAC,EAAE,KAAK;;",
-    "names": [],
+    "mappings": "AAAA,IAAI,MAAQA,eAAW,EAAN,KAAM;",
+    "names": [
+      "{ ...input }",
+    ],
   },
   "name": "objectRestSpread",
   "option": {
@@ -296,8 +304,10 @@ exports[`every public native transform has an explicit ownership fixture 18`] = 
   "code": "var Value=(()=>{"use strict";var _read=\`__private_Value_read\`;function Value(){if(!(this instanceof Value))throw new TypeError(\`Cannot call a class as a function\`);Object.defineProperty(this,_read,{value:function(){}})}return Value})();",
   "helpers": [],
   "map": {
-    "mappings": "AAAA,IAAI,WAAW,CAAC,aAAa,IAAI,MAAM,uBAAuB,SAAS,OAAO,CAAC,GAAG,EAAE,gBAAgB,OAAO,MAAM,IAAI,UAAU,mCAAmC,EAAE,OAAO,eAAe,KAAK,MAAM,CAAC,MAAM,UAAU,CAAC,CAAC,CAAC,CAAE,CAAC,OAAO,KAAK,EAAC,AAAC,CAAC;;",
-    "names": [],
+    "mappings": "AAAA,kKAAyB,EAAXA,wCAAK,UAAG,CAAC,GAAE,CAAzB,YAAyB;",
+    "names": [
+      "#read() {}",
+    ],
   },
   "name": "privateMethods",
   "option": {
@@ -314,8 +324,13 @@ exports[`every public native transform has an explicit ownership fixture 19`] = 
   "code": "var Value=(()=>{"use strict";var _field=\`__private_Value_field\`;function Value(){if(!(this instanceof Value))throw new TypeError(\`Cannot call a class as a function\`);Object.defineProperty(this,_field,{writable:true,value:void 0})}Object.defineProperty(Value.prototype,"has",{value:function(input){return Object.prototype.hasOwnProperty.call(input,_field)},writable:true,configurable:true});return Value})();",
   "helpers": [],
   "map": {
-    "mappings": "AAAA,IAAI,WAAW,CAAC,aAAa,IAAI,OAAO,wBAAwB,SAAS,OAAO,CAAC,GAAG,EAAE,gBAAgB,OAAO,MAAM,IAAI,UAAU,mCAAmC,EAAE,OAAO,eAAe,KAAK,OAAO,CAAC,SAAS,KAAK,MAAM,IAAK,EAAC,CAAC,CAAE,CAAC,OAAO,eAAe,MAAM,UAAU,MAAM,CAAC,MAAM,SAAS,MAAM,CAAE,OAAO,OAAO,UAAU,eAAe,KAAK,MAAO,MAAM,CAAG,EAAE,SAAS,KAAK,aAAa,IAAI,CAAC,EAAE,OAAO,KAAK,EAAC,AAAC,CAAC;;",
-    "names": [],
+    "mappings": "AAAA,oKAA6D,EAA/CA,6DAAM,EAAyC,CAA7DC,mDAAyB,SAAC,MAAO,CAAE,OAAOC,qCAAU,MAAVC,MAAc,CAAG,EAA3DF,+BAA6D,GAA7D,YAA6D;",
+    "names": [
+      "#field;",
+      "class Value { #field; has(input) { return #field in input; } }",
+      "#field in input",
+      "#field",
+    ],
   },
   "name": "privatePropertyInObject",
   "option": {
@@ -348,7 +363,7 @@ exports[`every public native transform has an explicit ownership fixture 21`] = 
   "code": "var value=/(?:\\uD83D\\uDE00)/;",
   "helpers": [],
   "map": {
-    "mappings": "AAAA,IAAI,MAAQ;;",
+    "mappings": "AAAA,IAAI,MAAQ;",
     "names": [],
   },
   "name": "regexpUnicode",
@@ -364,7 +379,7 @@ exports[`every public native transform has an explicit ownership fixture 22`] = 
   "code": "var value=/[\\u0000-\\u007F]/u;",
   "helpers": [],
   "map": {
-    "mappings": "AAAA,IAAI,MAAQ;;",
+    "mappings": "AAAA,IAAI,MAAQ;",
     "names": [],
   },
   "name": "regexpUnicodePropertyEscapes",
@@ -380,7 +395,7 @@ exports[`every public native transform has an explicit ownership fixture 23`] = 
   "code": "var value=/a[^]b/;",
   "helpers": [],
   "map": {
-    "mappings": "AAAA,IAAI,MAAQ;;",
+    "mappings": "AAAA,IAAI,MAAQ;",
     "names": [],
   },
   "name": "regexpDotAll",
@@ -398,8 +413,10 @@ exports[`every public native transform has an explicit ownership fixture 24`] = 
     "wrapRegExp",
   ],
   "map": {
-    "mappings": "AAAA,IAAI,aAAa,CAAC,WAAW,QAAQ,mCAAmC,CAAC,EAAE,YAAY,aAAa,WAApG,IAAI,MAAQ,YAAY,MAAM,CAAC,QAAQ,CAAC,CAAC;;",
-    "names": [],
+    "mappings": "+GAAA,IAAI,MAAQA,4BAAY;",
+    "names": [
+      "/(?<value>a)/",
+    ],
   },
   "name": "regexpNamedCaptureGroups",
   "option": true,
