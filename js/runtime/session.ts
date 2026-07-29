@@ -63,19 +63,6 @@ export class NativeTransformSession {
   #scopeParents: Uint32Array | null = null;
   #bindingIndex: { nameIds: Map<string, number>; keys: Set<number> } | null = null;
   #bindingsByScope = new Map<number, Map<string, QueryResult['bindings'][number]>>();
-  #nativeParseCount = 0;
-  #nativeAstTraversalCount = 0;
-  #nativeSemanticBuildCount = 0;
-  #reportedNativeParseCount: number | null = null;
-  #reportedNativeAstTraversalCount: number | null = null;
-  #reportedNativeSemanticBuildCount: number | null = null;
-  #performanceSnapshot: {
-    memoryBytes: number;
-    parseCount: number;
-    astTraversalCount: number;
-    semanticBuildCount: number;
-  } | null = null;
-  #nativeCrossings = 0;
   constructor(
     readonly source: string,
     readonly filename: string,
@@ -83,14 +70,12 @@ export class NativeTransformSession {
     retentionManifest?: Buffer,
     initialManifest?: Buffer,
     buildInitialRoute = true,
-    readonly recordNativeCrossing?: (operation: string, instrumentation?: boolean) => void,
     readonly uidAllocator = new TransformUidAllocator(),
   ) {
     this.#nativeFilename = parserFilename(filename, options.parser);
     // Without a retention plan or function map the native session holds no state, so its
     // construction (and the source copy it takes) is deferred until something needs it.
     if (options.functionMap === true || retentionManifest != null || initialManifest != null) {
-      this.#crossing('session.create');
       this.#native = new native.NativeIndexedSession(
         source,
         this.#nativeFilename,
@@ -100,46 +85,18 @@ export class NativeTransformSession {
         buildInitialRoute,
       );
       if (options.maxNativeMemoryBytes != null) {
-        this.#crossing('memory-budget');
         if (this.#native.memoryUsage() > options.maxNativeMemoryBytes) {
-          this.#crossing('session.close');
           this.#native.close();
           throw new Error('native-memory-budget-exceeded');
         }
       }
     }
   }
-  get nativeMemoryBytes(): number {
-    return this.#nativePerformanceSnapshot().memoryBytes;
-  }
-  get nativeParseCount(): number {
-    if (this.#native && this.#reportedNativeParseCount == null)
-      this.#reportedNativeParseCount = this.#nativePerformanceSnapshot().parseCount;
-    return this.#nativeParseCount + (this.#reportedNativeParseCount ?? 0);
-  }
-  get nativeAstTraversalCount(): number {
-    if (this.#native && this.#reportedNativeAstTraversalCount == null)
-      this.#reportedNativeAstTraversalCount = this.#nativePerformanceSnapshot().astTraversalCount;
-    return this.#nativeAstTraversalCount + (this.#reportedNativeAstTraversalCount ?? 0);
-  }
-  get nativeSemanticBuildCount(): number {
-    if (this.#native && this.#reportedNativeSemanticBuildCount == null)
-      this.#reportedNativeSemanticBuildCount = this.#nativePerformanceSnapshot().semanticBuildCount;
-    return this.#nativeSemanticBuildCount + (this.#reportedNativeSemanticBuildCount ?? 0);
-  }
-  get nativeCrossingCount(): number {
-    return this.#nativeCrossings;
-  }
   takeFunctionMap(): FunctionMap | null {
-    if (this.#native) this.#crossing('function-map.take');
     return this.#native?.takeFunctionMap() ?? null;
   }
-  recordStatelessParse(): void {
-    this.#nativeParseCount++;
-    // Stateless routing always walks the parsed AST once. Semantic construction,
-    // when requested by the manifest, is accounted separately only by retained
-    // sessions until the stateless envelope exposes that detail.
-    this.#nativeAstTraversalCount++;
+  get nativeMemoryBytes(): number {
+    return this.#native?.memoryUsage() ?? 0;
   }
   nextRoutedPacked(
     manifest: Buffer,
@@ -555,7 +512,6 @@ export class NativeTransformSession {
   }
   commit(edits: EditCommand[], mode?: string) {
     this.#assertOpen();
-    this.#crossing('edit.commit');
     // A live native session already holds this exact source; commit against it
     // rather than re-copying the whole source across the boundary. Only the
     // stateless path (no retained index) has no session to reach.
@@ -569,7 +525,6 @@ export class NativeTransformSession {
   /** Commit whose map stays a packed decoded layer for later chain composition. */
   commitDecoded(edits: EditCommand[], mode?: string) {
     this.#assertOpen();
-    this.#crossing('edit.commit-decoded');
     const session = this.#native;
     return commitWithDedupe(edits, data =>
       session != null
@@ -579,7 +534,6 @@ export class NativeTransformSession {
   }
   close(): void {
     if (!this.#closed && this.#native) {
-      this.#crossing('session.close');
       this.#native.close();
     }
     this.#closed = true;
@@ -587,24 +541,11 @@ export class NativeTransformSession {
   #assertOpen(): void {
     if (this.#closed) throw new Error('session-closed');
   }
-  #binding(operation: string, instrumentation = false): NativeIndexedSessionBinding {
-    this.#crossing(operation, instrumentation);
+  #binding(_operation: string, _instrumentation = false): NativeIndexedSessionBinding {
     this.#assertOpen();
     if (this.#native == null) {
-      this.#crossing('session.create');
       this.#native = new native.NativeIndexedSession(this.source, this.#nativeFilename);
     }
     return this.#native;
-  }
-  #nativePerformanceSnapshot() {
-    return (this.#performanceSnapshot ??= this.#binding(
-      'instrumentation.session-counters',
-      true,
-    ).performanceCounters());
-  }
-  #crossing(operation: string, instrumentation = false): void {
-    if (!this.options.debugPerformance) return;
-    this.#nativeCrossings++;
-    this.recordNativeCrossing?.(operation, instrumentation);
   }
 }

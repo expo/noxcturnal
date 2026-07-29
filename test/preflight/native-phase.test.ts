@@ -76,70 +76,22 @@ test('freezes native options and includes them in the pipeline cache key', () =>
   );
 });
 
-test('runs a fused native TypeScript phase and reports its own timing', () => {
+test('runs a fused native TypeScript phase', () => {
   const result = transform(
     'const value: number = 1;',
     'fixture.ts',
     defineNativePipeline({
       phases: [{ name: 'preflight', native: { typescript: 'strip' } }],
     }),
-    { debugPerformance: true },
+    {},
   );
 
   assert.equal(result.status, 'complete');
   assert.equal(result.code, 'const value = 1;\n');
   assert.notEqual(result.map.mappings, '');
-  const performance = result.metadata.performance as {
-    nativeTransformMs: number;
-    nativeParses: number;
-    nativeSemanticBuilds: number;
-    nativeAstTraversals: number;
-    nativeRenders: number;
-    nativeParseMs: number;
-    nativeSemanticBuildMs: number;
-    nativeCustomRewriteMs: number;
-    nativeOxcTransformMs: number;
-    nativeOptimizationMs: number;
-    nativeCodegenAndMapMs: number;
-    nativeHelperDiscoveryMs: number;
-    nativeHelperMaterializationMs: number;
-    nativeCrossings: number;
-    javascriptBatches: number;
-    processRssStartBytes: number;
-    processRssEndBytes: number;
-    processRssPeakObservedBytes: number;
-    processHeapUsedStartBytes: number;
-    processHeapUsedEndBytes: number;
-    processHeapUsedPeakObservedBytes: number;
-    phaseExecutions: { name: string; nativeTransformMs: number; boundaryReason: string }[];
-  };
-  assert.equal(performance.nativeParses, 1);
-  assert.equal(performance.nativeSemanticBuilds, 1);
-  assert.equal(performance.nativeAstTraversals, 1);
-  assert.equal(performance.nativeRenders, 1);
-  assert.ok(performance.nativeParseMs > 0);
-  assert.ok(performance.nativeSemanticBuildMs > 0);
-  assert.ok(performance.nativeCustomRewriteMs >= 0);
-  assert.ok(performance.nativeOxcTransformMs >= 0);
-  assert.ok(performance.nativeOptimizationMs >= 0);
-  assert.ok(performance.nativeCodegenAndMapMs >= 0);
-  assert.ok(performance.nativeHelperDiscoveryMs >= 0);
-  assert.ok(performance.nativeHelperMaterializationMs >= 0);
-  assert.equal(performance.nativeCrossings, 2);
-  assert.equal(performance.javascriptBatches, 0);
-  assert.ok(performance.processRssStartBytes > 0);
-  assert.ok(performance.processRssEndBytes > 0);
-  assert.ok(performance.processRssPeakObservedBytes >= performance.processRssStartBytes);
-  assert.ok(performance.processHeapUsedStartBytes > 0);
-  assert.ok(performance.processHeapUsedEndBytes > 0);
-  assert.ok(performance.processHeapUsedPeakObservedBytes >= performance.processHeapUsedStartBytes);
-  assert.ok(performance.nativeTransformMs > 0);
-  assert.equal(performance.phaseExecutions[0].name, 'preflight');
-  assert.equal(performance.phaseExecutions[0].boundaryReason, 'final-output');
-  assert.ok(performance.phaseExecutions[0].nativeTransformMs > 0);
 });
 
-test('reports only the required internal reparse and semantic rebuild for legacy lowering', () => {
+test('combines block scoping and destructuring lowering', () => {
   const result = transform(
     'let [value] = input;',
     'fixture.js',
@@ -157,22 +109,14 @@ test('reports only the required internal reparse and semantic rebuild for legacy
         },
       ],
     }),
-    { debugPerformance: true },
+    {},
   );
   assert.equal(result.status, 'complete');
-  const performance = result.metadata.performance as {
-    nativeParses: number;
-    nativeSemanticBuilds: number;
-    nativeRenders: number;
-  };
-  assert.equal(performance.nativeParses, 1);
-  // Initial planning, the binding-changing destructuring pass before block
-  // scoping, and final scoping for Oxc each require a semantic view.
-  assert.equal(performance.nativeSemanticBuilds, 3);
-  assert.equal(performance.nativeRenders, 1);
+  assert.doesNotMatch(result.code, /\blet\b/);
+  assert.doesNotMatch(result.code, /\[value\]\s*=/);
 });
 
-test('reports whether each selected internal rewrite acted', () => {
+test('combines object spread and regexp lowering', () => {
   const result = transform(
     'var value = { ...input }; var pattern = /./s;',
     'fixture.js',
@@ -189,17 +133,11 @@ test('reports whether each selected internal rewrite acted', () => {
         },
       ],
     }),
-    { debugPerformance: true },
+    {},
   );
   assert.equal(result.status, 'complete');
-  const performance = result.metadata.performance as {
-    phaseExecutions: { rewriteSteps: { name: string; acted: boolean }[] }[];
-  };
-  assert.deepEqual(performance.phaseExecutions[0].rewriteSteps, [
-    { name: 'ObjectSpread', acted: true },
-    { name: 'ObjectRest', acted: false },
-    { name: 'Regexp', acted: true },
-  ]);
+  assert.doesNotMatch(result.code, /\.\.\.input/);
+  assert.doesNotMatch(result.code, /\/\.\//);
 });
 
 test('lowers standalone for-of on one parsed program and one final render', () => {
@@ -214,17 +152,10 @@ test('lowers standalone for-of on one parsed program and one final render', () =
         },
       ],
     }),
-    { debugPerformance: true },
+    {},
   );
   assert.equal(result.status, 'complete');
-  const performance = result.metadata.performance as {
-    nativeParses: number;
-    nativeRenders: number;
-    phaseExecutions: { rewriteSteps: { name: string; acted: boolean }[] }[];
-  };
-  assert.equal(performance.nativeParses, 1);
-  assert.equal(performance.nativeRenders, 1);
-  assert.deepEqual(performance.phaseExecutions[0].rewriteSteps, [{ name: 'ForOf', acted: true }]);
+  assert.doesNotMatch(result.code, /\bof\b/);
 });
 
 test('lowers ordinary parameters on the shared parse', () => {
@@ -239,20 +170,10 @@ test('lowers ordinary parameters on the shared parse', () => {
         },
       ],
     }),
-    { debugPerformance: true },
+    {},
   );
   assert.equal(result.status, 'complete');
-  const performance = result.metadata.performance as {
-    nativeParses: number;
-    nativeSemanticBuilds: number;
-    nativeRenders: number;
-  };
-  // The parameter plan and mutation share the final parsed program. Its new
-  // bindings require one semantic refresh, with no compatibility render or
-  // reparse round trip.
-  assert.equal(performance.nativeParses, 1);
-  assert.equal(performance.nativeSemanticBuilds, 2);
-  assert.equal(performance.nativeRenders, 1);
+  assert.doesNotMatch(result.code, /value\s*=\s*1\)/);
 });
 
 test('runs React Fast Refresh instrumentation in the native JSX transform', () => {
@@ -352,21 +273,13 @@ test('computes chained dead functions to a fixed point while retaining reference
         },
       ],
     }),
-    { debugPerformance: true },
+    {},
   );
 
   assert.equal(result.status, 'complete');
   assert.doesNotMatch(result.code, /dead\d/);
   assert.match(result.code, /function cycleA\(\)/);
   assert.match(result.code, /function cycleB\(\)/);
-  const performance = result.metadata.performance as {
-    nativeParses: number;
-    nativeSemanticBuilds: number;
-    nativeAstTraversals: number;
-  };
-  assert.equal(performance.nativeParses, 1);
-  assert.equal(performance.nativeSemanticBuilds, 2);
-  assert.ok(performance.nativeAstTraversals <= 6);
 });
 
 test('retains dependencies reached from an exported function', () => {
@@ -486,20 +399,11 @@ test('lowers block scoping through the native preflight capability', () => {
     defineNativePipeline({
       phases: [{ name: 'preflight', native: { transforms: { blockScoping: true } } }],
     }),
-    { debugPerformance: true },
+    {},
   );
 
   assert.equal(result.status, 'complete');
   assert.match(result.code, /var pristine = true/);
-  const performance = result.metadata.performance as {
-    nativeParses: number;
-    nativeSemanticBuilds: number;
-    nativeAstTraversals: number;
-  };
-  assert.equal(performance.nativeParses, 1);
-  assert.equal(performance.nativeSemanticBuilds, 1);
-  assert.equal(performance.nativeAstTraversals, 2);
-
   const map = new TraceMap({
     version: 3,
     sources: ['fixture.js'],

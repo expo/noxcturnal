@@ -31,7 +31,6 @@ import type {
 } from '../contracts/visitor.js';
 import type {
   ControlFlowCapability,
-  Diagnostic,
   NativeFieldKey,
   NativeNodeType,
   QueryRequest,
@@ -201,70 +200,6 @@ function typedCapabilities(defined: DefinedVisitor<any>): RouteCapabilities {
     typedCapabilitiesCache.set(defined, capabilities);
   }
   return capabilities;
-}
-
-/**
- * Development-mode contract verification: reports undeclared field reads with a
- * paste-able contract fragment, and declared fields/capabilities that were never
- * used. Applies to typed visitor routes only; capability *violations* throw in
- * every mode.
- */
-export class ContractVerifier {
-  private readonly visitors = new Map<
-    RouteCapabilities,
-    { plugin: string; nodeType: string; usedFields: Set<string>; usedCapabilities: Set<string> }
-  >();
-  private readonly undeclared = new Map<string, Diagnostic>();
-  register(capabilities: RouteCapabilities, plugin: string, nodeType: string): void {
-    if (!this.visitors.has(capabilities))
-      this.visitors.set(capabilities, {
-        plugin,
-        nodeType,
-        usedFields: new Set(),
-        usedCapabilities: new Set(),
-      });
-  }
-  fieldRead(
-    capabilities: RouteCapabilities,
-    plugin: string,
-    nodeType: string,
-    field: string,
-  ): void {
-    const declared = capabilities.declaredFields;
-    if (declared.includes(field as NativeFieldKey)) {
-      this.visitors.get(capabilities)?.usedFields.add(field);
-      return;
-    }
-    const id = `${plugin}:${nodeType}.${field}`;
-    if (!this.undeclared.has(id))
-      this.undeclared.set(id, {
-        code: 'visitor-contract',
-        plugin,
-        message: `${nodeType} visitor read undeclared field ${field}; add it to the contract: fields: ['${field}']`,
-      });
-  }
-  capabilityUsed(capabilities: RouteCapabilities, name: string): void {
-    this.visitors.get(capabilities)?.usedCapabilities.add(name);
-  }
-  finish(diagnostics: Diagnostic[]): void {
-    for (const report of this.undeclared.values()) diagnostics.push(report);
-    for (const [capabilities, info] of this.visitors) {
-      const unused = (message: string) =>
-        diagnostics.push({ code: 'visitor-contract', plugin: info.plugin, message });
-      for (const field of capabilities.declaredFields)
-        if (!info.usedFields.has(field))
-          unused(`${info.nodeType} visitor declared field ${field} but never read it`);
-      if (capabilities.scope && !info.usedCapabilities.has('scope'))
-        unused(`${info.nodeType} visitor declared scope but never used it`);
-      if (capabilities.ancestry && !info.usedCapabilities.has('ancestry'))
-        unused(`${info.nodeType} visitor declared ancestry but never used it`);
-      if (capabilities.childRules != null && !info.usedCapabilities.has('children'))
-        unused(`${info.nodeType} visitor declared children but never accessed them`);
-      for (const capability of capabilities.controlFlow)
-        if (!info.usedCapabilities.has(capability))
-          unused(`${info.nodeType} visitor declared ${capability} but never used it`);
-    }
-  }
 }
 
 /** A plugin's plan is fixed by its definition, and a phase's preparation by the

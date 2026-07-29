@@ -1,6 +1,5 @@
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
-use std::time::Instant;
 
 use napi::{Error, Result, Status, bindgen_prelude::Buffer};
 use napi_derive::napi;
@@ -47,36 +46,8 @@ pub struct NativePreflightResult {
     pub reason: Option<String>,
     pub code: Option<String>,
     pub map: Option<Buffer>,
-    /// Segment count of `map`, reported when the map layer is retained natively
-    /// (the pipeline-session path) instead of crossed out as a buffer JS can
-    /// measure. `None` on the free-function path, where JS reads `map` directly.
-    pub mapping_segments: Option<u32>,
-    /// UTF-8 byte length of the rendered code, reported alongside `mapping_segments`
-    /// when the code stays resident so `debugPerformance` can size it without the
-    /// code crossing out.
-    pub rendered_bytes: Option<u32>,
     pub diagnostics: Vec<String>,
     pub helpers_used: Vec<String>,
-    pub parse_count: Option<u32>,
-    pub semantic_build_count: Option<u32>,
-    pub ast_traversal_count: Option<u32>,
-    pub render_count: Option<u32>,
-    pub parse_ms: Option<f64>,
-    pub semantic_build_ms: Option<f64>,
-    pub custom_rewrite_ms: Option<f64>,
-    pub oxc_transform_ms: Option<f64>,
-    pub optimization_ms: Option<f64>,
-    pub codegen_and_map_ms: Option<f64>,
-    pub helper_discovery_ms: Option<f64>,
-    pub helper_materialization_ms: Option<f64>,
-    pub rewrite_steps: Option<Vec<NativeRewriteStepPerformance>>,
-}
-
-#[napi(object)]
-#[derive(Clone)]
-pub struct NativeRewriteStepPerformance {
-    pub name: String,
-    pub acted: bool,
 }
 
 struct ParseOwner {
@@ -133,13 +104,8 @@ pub fn transform(
     // Precompute those booleans now instead of retaining a whole second copy of
     // the source across the entire transform.
     let before_helper_markers = helper_adapter_markers(&source);
-    let mut parse_count = 0;
     let mut semantic_build_count = 0;
     let mut ast_traversal_count = 0;
-    let mut render_count = 0;
-    let debug_performance = options.debug_performance.unwrap_or(false);
-    let mut parse_ms = 0.0;
-    let mut semantic_build_ms = 0.0;
     if options.react_compiler == Some(true) && !cfg!(feature = "react_compiler") {
         return Ok(unsupported("react-compiler-not-built", [] as [String; 0]));
     }
@@ -148,7 +114,6 @@ pub fn transform(
         options.jsx = Some("automatic".into());
     }
     let mut transform_options = compile_options(&options)?;
-    let custom_rewrite_started = debug_performance.then(Instant::now);
     let mut rewrite_layers = Vec::new();
     let loose_object_rest = options.object_rest_spread == Some(true)
         && options.object_rest_spread_loose == Some(true)
@@ -201,14 +166,9 @@ pub fn transform(
         // requires it to stand alone, so it selects nothing here either.
         && selects_source_rewrite;
     // Attributed to the phases they belong to, so a prepass does not look free.
-    let mut language_oxc_ms = 0.0;
-    let mut language_codegen_ms = 0.0;
     if language_prepass {
         let language_allocator = Allocator::default();
-        parse_count += 1;
-        let parsed = timed(debug_performance, &mut parse_ms, || {
-            Parser::new(&language_allocator, &source, active_source_type).parse()
-        });
+        let parsed = run(|| Parser::new(&language_allocator, &source, active_source_type).parse());
         // A file that does not parse is reported by the parse below, with its
         // original spans rather than the prepass's.
         if parsed.diagnostics.is_empty() {
@@ -230,7 +190,7 @@ pub fn transform(
             }
             semantic_build_count += 1;
             ast_traversal_count += 1;
-            let built = timed(debug_performance, &mut semantic_build_ms, || {
+            let built = run(|| {
                 SemanticBuilder::new()
                     .with_excess_capacity(2.0)
                     .with_enum_eval(true)
@@ -258,16 +218,11 @@ pub fn transform(
                     // one here would give it a span it could no longer match.
                     ..TransformOptions::default()
                 };
-                let language_started = debug_performance.then(Instant::now);
                 ast_traversal_count += 1;
                 let transformed =
                     Transformer::new(&language_allocator, Path::new(&filename), &language_options)
                         .build_with_scoping(built.semantic.into_scoping(), &mut program);
-                if let Some(started) = language_started {
-                    language_oxc_ms += started.elapsed().as_secs_f64() * 1_000.0;
-                }
                 if transformed.diagnostics.is_empty() {
-                    let render_started = debug_performance.then(Instant::now);
                     // The intermediate is never the output, so it is printed
                     // unminified whatever the caller asked for: the final codegen
                     // does the minifying, and readable input keeps the rewrites'
@@ -279,10 +234,6 @@ pub fn transform(
                         options.comments.unwrap_or(true),
                         0,
                     )?;
-                    render_count += 1;
-                    if let Some(started) = render_started {
-                        language_codegen_ms += started.elapsed().as_secs_f64() * 1_000.0;
-                    }
                     source = printed;
                     rewrite_layers.push(layer);
                     #[expect(deprecated)]
@@ -306,97 +257,7 @@ pub fn transform(
             }
         }
     }
-    let mut rewrite_steps = Vec::with_capacity(8);
-    if debug_performance {
-        if options.block_scoping == Some(true) {
-            rewrite_steps.push(NativeRewriteStepPerformance {
-                name: "CapturedLoop".into(),
-                acted: false,
-            });
-        }
-        if loose_object_rest {
-            // ObjectSpread is now an AST pass, but remains visible under the
-            // same per-rewrite instrumentation used to rank conversion work.
-            rewrite_steps.insert(
-                rewrite_steps
-                    .iter()
-                    .position(|step| step.name == "ObjectRest")
-                    .unwrap_or(rewrite_steps.len()),
-                NativeRewriteStepPerformance {
-                    name: "ObjectSpread".into(),
-                    acted: false,
-                },
-            );
-            if !rewrite_steps.iter().any(|step| step.name == "ObjectRest") {
-                let after_spread = rewrite_steps
-                    .iter()
-                    .position(|step| step.name == "ObjectSpread")
-                    .map_or(rewrite_steps.len(), |index| index + 1);
-                rewrite_steps.insert(
-                    after_spread,
-                    NativeRewriteStepPerformance {
-                        name: "ObjectRest".into(),
-                        acted: false,
-                    },
-                );
-            }
-        }
-        if regexp_rewrite_selected {
-            rewrite_steps.push(NativeRewriteStepPerformance {
-                name: "Regexp".into(),
-                acted: false,
-            });
-        }
-        if classes_ast_selected && !rewrite_steps.iter().any(|step| step.name == "Classes") {
-            rewrite_steps.insert(
-                0,
-                NativeRewriteStepPerformance {
-                    name: "Classes".into(),
-                    acted: false,
-                },
-            );
-        }
-        if options.destructuring == Some(true)
-            && !rewrite_steps
-                .iter()
-                .any(|step| step.name == "Destructuring")
-        {
-            let before_parameters = rewrite_steps
-                .iter()
-                .position(|step| step.name == "Parameters")
-                .unwrap_or(rewrite_steps.len());
-            rewrite_steps.insert(
-                before_parameters,
-                NativeRewriteStepPerformance {
-                    name: "Destructuring".into(),
-                    acted: false,
-                },
-            );
-        }
-        if options.parameters == Some(true) {
-            rewrite_steps.push(NativeRewriteStepPerformance {
-                name: "Parameters".into(),
-                acted: false,
-            });
-        }
-        if options.for_of == Some(true) && !rewrite_steps.iter().any(|step| step.name == "ForOf") {
-            let before = rewrite_steps
-                .iter()
-                .position(|step| matches!(step.name.as_str(), "Destructuring" | "ObjectRest"))
-                .unwrap_or(rewrite_steps.len());
-            rewrite_steps.insert(
-                before,
-                NativeRewriteStepPerformance {
-                    name: "ForOf".into(),
-                    acted: false,
-                },
-            );
-        }
-    }
-    parse_count += 1;
-    let mut final_program = timed(debug_performance, &mut parse_ms, || {
-        parse_owned(std::mem::take(&mut source), active_source_type)
-    });
+    let mut final_program = run(|| parse_owned(std::mem::take(&mut source), active_source_type));
     if final_program.has_diagnostics() {
         return Ok(unsupported(
             "parse-error",
@@ -406,13 +267,6 @@ pub fn transform(
     final_program.with_program_mut(|source, allocator, mut program| {
         let had_object_spread_syntax =
             loose_object_rest && object_spread::run(allocator, &mut program);
-        if had_object_spread_syntax
-            && let Some(counter) = rewrite_steps
-                .iter_mut()
-                .find(|counter| counter.name == "ObjectSpread")
-        {
-            counter.acted = true;
-        }
         if loose_object_rest {
             ast_traversal_count += 1;
         }
@@ -436,13 +290,6 @@ pub fn transform(
         } else {
             (false, super::helpers::CustomHelperRequests::default())
         };
-        if had_regexp_syntax
-            && let Some(counter) = rewrite_steps
-                .iter_mut()
-                .find(|counter| counter.name == "Regexp")
-        {
-            counter.acted = true;
-        }
         if conditional_jsx {
             let mut detector = JsxDetector(false);
             detector.visit_program(&program);
@@ -451,16 +298,7 @@ pub fn transform(
             // without printing. A fused source rewrite still has work even
             // when this particular file contains no JSX.
             if !detector.0 && !selects_source_rewrite {
-                return Ok(identity_result(
-                    source.to_owned(),
-                    parse_count,
-                    semantic_build_count,
-                    ast_traversal_count,
-                    render_count,
-                    debug_performance.then_some(parse_ms),
-                    debug_performance.then_some(semantic_build_ms),
-                    debug_performance.then_some(rewrite_steps.clone()),
-                ));
+                return Ok(identity_result(source.to_owned()));
             }
         }
         let check_decorators = source.contains('@') && source.contains("class");
@@ -499,7 +337,7 @@ pub fn transform(
         }
         semantic_build_count += 1;
         ast_traversal_count += 1;
-        let semantic = timed(debug_performance, &mut semantic_build_ms, || {
+        let semantic = run(|| {
             SemanticBuilder::new()
                 .with_build_nodes(
                     options.block_scoping == Some(true)
@@ -516,7 +354,6 @@ pub fn transform(
             return Ok(unsupported("semantic-error", semantic.diagnostics));
         }
         let mut semantic = semantic;
-        let mut captured_loop_changed = false;
         if options.block_scoping == Some(true) {
             loop {
                 let plan = match block_scoping::prepare_captured_loop_ast(
@@ -533,7 +370,7 @@ pub fn transform(
                 drop(semantic);
                 ast_traversal_count += 1;
                 match block_scoping::run_captured_loop_ast(allocator, &mut program, plan) {
-                    Ok(true) => captured_loop_changed = true,
+                    Ok(true) => {}
                     Ok(false) => {
                         return Ok(unsupported(
                             "captured-loop-ast-target-missing",
@@ -544,7 +381,7 @@ pub fn transform(
                 }
                 semantic_build_count += 1;
                 ast_traversal_count += 1;
-                semantic = timed(debug_performance, &mut semantic_build_ms, || {
+                semantic = run(|| {
                     SemanticBuilder::new()
                         .with_build_nodes(true)
                         .with_excess_capacity(2.0)
@@ -558,13 +395,6 @@ pub fn transform(
                     ));
                 }
             }
-        }
-        if captured_loop_changed
-            && let Some(counter) = rewrite_steps
-                .iter_mut()
-                .find(|counter| counter.name == "CapturedLoop")
-        {
-            counter.acted = true;
         }
         let classes_ast_plan = if classes_ast_selected {
             match super::classes::prepare_ast(
@@ -616,15 +446,9 @@ pub fn transform(
                 if !changed {
                     return Ok(unsupported("classes-ast-target-missing", [] as [String; 0]));
                 }
-                if let Some(counter) = rewrite_steps
-                    .iter_mut()
-                    .find(|counter| counter.name == "Classes")
-                {
-                    counter.acted = true;
-                }
                 semantic_build_count += 1;
                 ast_traversal_count += 1;
-                let rebuilt = timed(debug_performance, &mut semantic_build_ms, || {
+                let rebuilt = run(|| {
                     SemanticBuilder::new()
                         .with_build_nodes(true)
                         .with_excess_capacity(2.0)
@@ -726,20 +550,13 @@ pub fn transform(
         } else {
             false
         };
-        if had_parameters_ast_syntax
-            && let Some(counter) = rewrite_steps
-                .iter_mut()
-                .find(|counter| counter.name == "Parameters")
-        {
-            counter.acted = true;
-        }
         let for_of_plan = if options.for_of == Some(true) {
             // Parameters can introduce `_len`, `_key`, and capture aliases.
             // Rebuild before planning ForOf so its reservation set includes
             // every binding now present in the program.
             semantic_build_count += 1;
             ast_traversal_count += 1;
-            let mut semantic = timed(debug_performance, &mut semantic_build_ms, || {
+            let mut semantic = run(|| {
                 SemanticBuilder::new()
                     .with_build_nodes(true)
                     .with_excess_capacity(2.0)
@@ -769,13 +586,6 @@ pub fn transform(
         } else {
             false
         };
-        if had_for_of_syntax
-            && let Some(counter) = rewrite_steps
-                .iter_mut()
-                .find(|counter| counter.name == "ForOf")
-        {
-            counter.acted = true;
-        }
         if options.for_of == Some(true) {
             let mut for_of_postcondition = PostconditionDetector {
                 check_for_of: true,
@@ -795,7 +605,7 @@ pub fn transform(
         } else if options.destructuring == Some(true) || loose_object_rest {
             semantic_build_count += 1;
             ast_traversal_count += 1;
-            let mut semantic = timed(debug_performance, &mut semantic_build_ms, || {
+            let mut semantic = run(|| {
                 SemanticBuilder::new()
                     .with_build_nodes(true)
                     .with_excess_capacity(2.0)
@@ -858,7 +668,7 @@ pub fn transform(
             }
             semantic_build_count += 1;
             ast_traversal_count += 1;
-            let semantic = timed(debug_performance, &mut semantic_build_ms, || {
+            let semantic = run(|| {
                 SemanticBuilder::new()
                     .with_build_nodes(true)
                     .with_excess_capacity(2.0)
@@ -884,18 +694,6 @@ pub fn transform(
                 Err(reason) => return Ok(unsupported(reason, [] as [String; 0])),
             };
         }
-        if had_destructuring_ast_syntax
-            && let Some(counter) = rewrite_steps.iter_mut().find(|counter| {
-                counter.name
-                    == if options.destructuring == Some(true) {
-                        "Destructuring"
-                    } else {
-                        "ObjectRest"
-                    }
-            })
-        {
-            counter.acted = true;
-        }
         if options.parameters == Some(true) {
             let mut parameters_postcondition = PostconditionDetector {
                 check_parameters: true,
@@ -910,8 +708,6 @@ pub fn transform(
                 ));
             }
         }
-        let custom_rewrite_ms =
-            custom_rewrite_started.map(|started| started.elapsed().as_secs_f64() * 1_000.0);
         if had_block_scoping_syntax {
             // Plan block scoping from the AST after Parameters, ForOf, and
             // Destructuring have introduced bindings. The earlier semantic
@@ -921,7 +717,7 @@ pub fn transform(
             } else {
                 semantic_build_count += 1;
                 ast_traversal_count += 1;
-                let semantic = timed(debug_performance, &mut semantic_build_ms, || {
+                let semantic = run(|| {
                     SemanticBuilder::new()
                         .with_build_nodes(true)
                         .with_excess_capacity(2.0)
@@ -958,7 +754,7 @@ pub fn transform(
             // pre-transform mutations and before handing the program to Oxc.
             semantic_build_count += 1;
             ast_traversal_count += 1;
-            let rebuilt = timed(debug_performance, &mut semantic_build_ms, || {
+            let rebuilt = run(|| {
                 SemanticBuilder::new()
                     .with_excess_capacity(2.0)
                     .with_enum_eval(true)
@@ -1009,7 +805,6 @@ pub fn transform(
                     std::mem::take(&mut transform_options.env.es2018.async_generator_functions);
                 deferred
             });
-        let oxc_transform_started = debug_performance.then(Instant::now);
         let mut transformed = Transformer::new(allocator, Path::new(&filename), &transform_options)
             .build_with_scoping(scoping, &mut program);
         if let Some(deferred) = deferred_async
@@ -1023,8 +818,6 @@ pub fn transform(
             #[expect(deprecated)]
             transformed.helpers_used.extend(async_pass.helpers_used);
         }
-        let oxc_transform_ms = oxc_transform_started
-            .map(|started| started.elapsed().as_secs_f64() * 1_000.0 + language_oxc_ms);
         if !transformed.diagnostics.is_empty() {
             return Ok(unsupported("transform-error", transformed.diagnostics));
         }
@@ -1051,7 +844,7 @@ pub fn transform(
             // been rejected here pay for the extra semantic build.
             semantic_build_count += 1;
             ast_traversal_count += 1;
-            let semantic = timed(debug_performance, &mut semantic_build_ms, || {
+            let semantic = run(|| {
                 SemanticBuilder::new()
                     .with_build_nodes(true)
                     .with_excess_capacity(2.0)
@@ -1075,21 +868,12 @@ pub fn transform(
                 ));
             }
         }
-        let optimization_started = debug_performance.then(Instant::now);
-        let (optimization_traversals, optimization_semantic_builds, optimization_semantic_ms) =
-            optimize::run(
-                allocator,
-                &mut program,
-                options.constant_folding == Some(true),
-                options.dead_code_elimination == Some(true),
-                debug_performance,
-            );
-        let optimization_ms =
-            optimization_started.map(|started| started.elapsed().as_secs_f64() * 1_000.0);
-        ast_traversal_count += optimization_traversals;
-        semantic_build_count += optimization_semantic_builds;
-        semantic_build_ms += optimization_semantic_ms;
-        let helper_discovery_started = debug_performance.then(Instant::now);
+        optimize::run(
+            allocator,
+            &mut program,
+            options.constant_folding == Some(true),
+            options.dead_code_elimination == Some(true),
+        );
         #[expect(deprecated)]
         let helper_requests: Vec<_> = transformed.helpers_used.into_iter().collect();
         let oxc_codegen_only_transform_selected = options.explicit_resource_management
@@ -1128,16 +912,7 @@ pub fn transform(
             && !(options.comments == Some(false)
                 && (source.contains("//") || source.contains("/*")))
         {
-            return Ok(identity_result(
-                source.to_owned(),
-                parse_count,
-                semantic_build_count,
-                ast_traversal_count,
-                render_count,
-                debug_performance.then_some(parse_ms),
-                debug_performance.then_some(semantic_build_ms),
-                debug_performance.then_some(rewrite_steps.clone()),
-            ));
+            return Ok(identity_result(source.to_owned()));
         }
         let helper_mode = options.helpers_mode.as_deref().unwrap_or("runtime");
         let helper_module = options
@@ -1162,9 +937,6 @@ pub fn transform(
             &mut custom_helper_fragments,
             compact,
         );
-        let helper_discovery_ms =
-            helper_discovery_started.map(|started| started.elapsed().as_secs_f64() * 1_000.0);
-        let helper_materialization_started = debug_performance.then(Instant::now);
         let inline = if helper_mode == "inline" {
             match inline_helpers(helper_requests.iter().map(|(helper, _)| *helper), source) {
                 Ok(inline) => inline,
@@ -1215,10 +987,6 @@ pub fn transform(
             ast_traversal_count += 1;
             format!("var {binding}={};\n", inline.prefix)
         });
-        let helper_materialization_ms =
-            helper_materialization_started.map(|started| started.elapsed().as_secs_f64() * 1_000.0);
-
-        let codegen_and_map_started = debug_performance.then(Instant::now);
         let generated_line_offset = u32::from(inline_prefix.is_some());
         let (mut generated_code, codegen_layer) = render_program(
             &program,
@@ -1278,8 +1046,6 @@ pub fn transform(
                 )
             })?
         };
-        let codegen_and_map_ms = codegen_and_map_started
-            .map(|started| started.elapsed().as_secs_f64() * 1_000.0 + language_codegen_ms);
         Ok(NativePreflightResult {
             status: "complete".into(),
             reason: None,
@@ -1288,23 +1054,8 @@ pub fn transform(
                 None => generated_code,
             }),
             map: Some(layer.into()),
-            mapping_segments: None,
-            rendered_bytes: None,
             diagnostics: Vec::new(),
             helpers_used,
-            parse_count: Some(parse_count),
-            semantic_build_count: Some(semantic_build_count),
-            ast_traversal_count: Some(ast_traversal_count),
-            render_count: Some(render_count + 1),
-            parse_ms: debug_performance.then_some(parse_ms),
-            semantic_build_ms: debug_performance.then_some(semantic_build_ms),
-            custom_rewrite_ms,
-            oxc_transform_ms,
-            optimization_ms,
-            codegen_and_map_ms,
-            helper_discovery_ms,
-            helper_materialization_ms,
-            rewrite_steps: debug_performance.then_some(rewrite_steps),
         })
     })
 }
@@ -2035,14 +1786,8 @@ impl<'a> VisitMut<'a> for InlineHelperRenamer<'a> {
 }
 
 #[inline]
-fn timed<T>(enabled: bool, total_ms: &mut f64, operation: impl FnOnce() -> T) -> T {
-    if !enabled {
-        return operation();
-    }
-    let started = Instant::now();
-    let result = operation();
-    *total_ms += started.elapsed().as_secs_f64() * 1_000.0;
-    result
+fn run<T>(operation: impl FnOnce() -> T) -> T {
+    operation()
 }
 
 fn unsupported(
@@ -2054,43 +1799,15 @@ fn unsupported(
         reason: Some(reason.into()),
         code: None,
         map: None,
-        mapping_segments: None,
-        rendered_bytes: None,
         diagnostics: diagnostics
             .into_iter()
             .map(|diagnostic| format!("{diagnostic:?}"))
             .collect(),
         helpers_used: Vec::new(),
-        parse_count: None,
-        semantic_build_count: None,
-        ast_traversal_count: None,
-        render_count: None,
-        parse_ms: None,
-        semantic_build_ms: None,
-        custom_rewrite_ms: None,
-        oxc_transform_ms: None,
-        optimization_ms: None,
-        codegen_and_map_ms: None,
-        helper_discovery_ms: None,
-        helper_materialization_ms: None,
-        rewrite_steps: None,
     }
 }
 
-#[expect(
-    clippy::too_many_arguments,
-    reason = "the identity result carries the same native phase counters as a transformed result"
-)]
-fn identity_result(
-    source: String,
-    parse_count: u32,
-    semantic_build_count: u32,
-    ast_traversal_count: u32,
-    render_count: u32,
-    parse_ms: Option<f64>,
-    semantic_build_ms: Option<f64>,
-    rewrite_steps: Option<Vec<NativeRewriteStepPerformance>>,
-) -> NativePreflightResult {
+fn identity_result(source: String) -> NativePreflightResult {
     let line_count = source.bytes().filter(|byte| *byte == b'\n').count() as u32 + 1;
     let mut words = Vec::with_capacity(line_count as usize * 5);
     for line in 0..line_count {
@@ -2101,23 +1818,8 @@ fn identity_result(
         reason: None,
         code: Some(source),
         map: Some(pack_decoded_layer(&words, &[] as &[String], line_count).into()),
-        mapping_segments: None,
-        rendered_bytes: None,
         diagnostics: Vec::new(),
         helpers_used: Vec::new(),
-        parse_count: Some(parse_count),
-        semantic_build_count: Some(semantic_build_count),
-        ast_traversal_count: Some(ast_traversal_count),
-        render_count: Some(render_count),
-        parse_ms,
-        semantic_build_ms,
-        custom_rewrite_ms: None,
-        oxc_transform_ms: None,
-        optimization_ms: None,
-        codegen_and_map_ms: None,
-        helper_discovery_ms: None,
-        helper_materialization_ms: None,
-        rewrite_steps,
     }
 }
 

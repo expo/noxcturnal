@@ -1,5 +1,3 @@
-import { performance } from 'node:perf_hooks';
-
 import { alias, expandSubscriptions } from '../pipeline/route-utils.js';
 import { createEditor } from './editor.js';
 import {
@@ -11,13 +9,11 @@ import {
   type IntentRegistration,
   type RealizedContent,
 } from './fragments.js';
-import { optionsPerformance } from './metadata.js';
 import {
   childRoleIsDeclared,
   eventIsSkipped,
   makePath,
   NodePathImpl,
-  type ContractVerification,
   type PathRuntime,
   type PathState,
 } from './path.js';
@@ -34,7 +30,6 @@ import type {
   Code,
   DefinedVisitor,
   Handler,
-  NativeNodePath,
   NativePlugin,
   PipelinePhase,
   PluginContext,
@@ -43,11 +38,6 @@ import type { ControlFlowCapability, Diagnostic, EditCommand, NativeEvent } from
 import type { NativeTransformSession } from './session.js';
 
 export class Bailout extends Error {}
-
-export interface DispatchVerifier extends ContractVerification {
-  register(capabilities: RouteCapabilities, plugin: string, nodeType: string): void;
-  capabilityUsed(capabilities: RouteCapabilities, capability: string): void;
-}
 
 export interface DispatchServices {
   compileNestedVisitor(visitor: readonly DefinedVisitor<any>[]): CompiledNestedRoutes;
@@ -87,7 +77,6 @@ export function createDispatcher(
   dispatchRoutes: readonly DispatchRoute[],
   intents: Map<string, IntentRegistration>,
   provenance: { degradations: number },
-  verifier: DispatchVerifier | undefined,
   services: DispatchServices,
   pluginData: unknown,
 ): Dispatcher {
@@ -118,15 +107,6 @@ export function createDispatcher(
     const realizeIntentContent = (code: Code): RealizedContent =>
       realizeContent(session, code, (message, fragment) => {
         provenance.degradations++;
-        if (optionsPerformance(metadata))
-          diagnostics.push({
-            code: 'provenance-degraded',
-            message,
-            plugin: plugin.name,
-            phase: phase.name,
-            start: fragment.start,
-            end: fragment.end,
-          });
       });
     /** Register `(kind, key)` for this plugin, or return the existing registration
      * when the intent is already claimed with identical realized content. */
@@ -333,21 +313,17 @@ export function createDispatcher(
         // (and redoing alias matching) on each structural access.
         const roles = capabilities.childRules?.[type];
         if (roles == null || !childRoleIsDeclared(roles, role)) return false;
-        verifier?.capabilityUsed(capabilities, 'children');
         return true;
       },
       allowsAncestry() {
-        if (capabilities.ancestry) verifier?.capabilityUsed(capabilities, 'ancestry');
         return capabilities.ancestry;
       },
       allowsScope() {
-        if (capabilities.scope) verifier?.capabilityUsed(capabilities, 'scope');
         return capabilities.scope;
       },
       scopeCache: new Map(),
       assertControl(capability) {
         if (capabilities.controlFlow.includes(capability)) {
-          verifier?.capabilityUsed(capabilities, capability);
           return;
         }
         throw new Error(
@@ -356,8 +332,6 @@ export function createDispatcher(
         );
       },
       capabilities,
-      verify: verifier,
-      performance: optionsPerformance(metadata),
       provenance,
     };
     return runtime;
@@ -382,12 +356,12 @@ export function createDispatcher(
     const path = makePath(runtime, event);
     currentSequence = event.sequence;
     if (routedCallbacks.length === 1) {
-      invokeCallback(runtime, routedCallbacks[0], path, override ? overrideState : entry.state);
+      routedCallbacks[0](path, override ? overrideState : entry.state);
       delivered?.add(deliveryKey);
       return;
     }
     for (const callback of routedCallbacks) {
-      invokeCallback(runtime, callback, path, override ? overrideState : entry.state);
+      callback(path, override ? overrideState : entry.state);
       delivered?.add(deliveryKey);
     }
   };
@@ -478,10 +452,6 @@ export function createDispatcher(
       },
     );
   };
-  if (verifier)
-    for (const route of compiledRoutes)
-      verifier.register(route.capabilities, route.plugin.name, route.nodeType);
-  const counters = optionsPerformance(metadata);
   const routedThunks = dispatchRoutes.map(route => {
     if (!route.fast) {
       const { plugin, callbacks, capabilities } = route.members[0];
@@ -511,22 +481,16 @@ export function createDispatcher(
     if (members.length === 1 && members[0].callbacks.length === 1) {
       const { entry, runtime, callbacks } = members[0];
       const callback = callbacks[0];
-      if (counters == null)
-        return (event: NativeEvent) => {
-          currentSequence = event.sequence;
-          callback(new NodePathImpl(runtime, event), entry.state);
-        };
       return (event: NativeEvent) => {
         currentSequence = event.sequence;
-        invokeCallback(runtime, callback, makePath(runtime, event), entry.state);
+        callback(new NodePathImpl(runtime, event), entry.state);
       };
     }
     return (event: NativeEvent) => {
       currentSequence = event.sequence;
       for (const member of members) {
         const path = makePath(member.runtime, event);
-        for (const callback of member.callbacks)
-          invokeCallback(member.runtime, callback, path, member.entry.state);
+        for (const callback of member.callbacks) callback(path, member.entry.state);
       }
     };
   });
@@ -540,22 +504,6 @@ export function createDispatcher(
       );
     },
   };
-}
-
-function invokeCallback(
-  runtime: PathRuntime,
-  callback: Handler<any>,
-  path: NativeNodePath,
-  state: any,
-): void {
-  const counters = runtime.performance;
-  if (!counters) {
-    callback(path, state);
-    return;
-  }
-  const started = performance.now();
-  callback(path, state);
-  counters.callbackMs += performance.now() - started;
 }
 
 function assertDeclaredControl(

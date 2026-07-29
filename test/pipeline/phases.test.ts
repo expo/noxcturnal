@@ -155,26 +155,11 @@ test('plugins in one phase observe one immutable input and commit together', () 
     defineNativePipeline({
       phases: [{ name: 'shared-input', plugins: [edit, observe] }],
     }),
-    { debugPerformance: true },
+    {},
   );
   assert.equal(result.status, 'complete');
   assert.equal(observed, 'value');
   assert.equal(result.code, 'const renamed = 1');
-  const performance = result.metadata.performance as {
-    reparses: number;
-    nativeParses: number;
-    nativeCrossings: number;
-    javascriptBatches: number;
-    phaseExecutions: { editEffect: string; render: string; reusedParse: boolean }[];
-  };
-  assert.equal(performance.reparses, 0);
-  assert.equal(performance.nativeParses, 1);
-  assert.ok(performance.nativeCrossings >= 2);
-  assert.equal(performance.javascriptBatches, 1);
-  assert.deepEqual(
-    performance.phaseExecutions.map(phase => [phase.editEffect, phase.render, phase.reusedParse]),
-    [['whole-program', 'committed', false]],
-  );
 });
 
 test('reparses a changed version for the next current-source phase regardless of edit effect', () => {
@@ -206,11 +191,10 @@ test('reparses a changed version for the next current-source phase regardless of
         { name: 'observe', plugins: [observe] },
       ],
     }),
-    { debugPerformance: true },
+    {},
   );
   assert.equal(result.status, 'complete');
   assert.equal(observed, 'renamed');
-  assert.equal((result.metadata.performance as { reparses: number }).reparses, 1);
 });
 
 test('structural static-plan caching rebinds callbacks from recreated plugins', () => {
@@ -355,17 +339,11 @@ test('realizes an explicitly required map once and reuses it at final compositio
         },
       ],
     }),
-    { debugPerformance: true, sourceMapMode: 'boundary' },
+    { sourceMapMode: 'boundary' },
   );
   assert.equal(result.status, 'complete');
   assert.equal(result.code, 'const renamed = 1');
   assert.deepEqual(result.map.names, ['value']);
-  const performance = result.metadata.performance as {
-    mapEncodes: number;
-    mappingSegments: number;
-  };
-  assert.equal(performance.mapEncodes, 1);
-  assert.ok(performance.mappingSegments > 0);
 });
 
 test('coalesces structural mutators by composing them in one phase', () => {
@@ -393,20 +371,10 @@ test('coalesces structural mutators by composing them in one phase', () => {
         },
       ],
     }),
-    { debugPerformance: true },
+    {},
   );
   assert.equal(result.status, 'complete');
   assert.equal(result.code, 'const renamedFirst = renamedSecond;');
-  const performance = result.metadata.performance as {
-    reparses: number;
-    eliminatedBoundaryReasons: Record<string, number>;
-    phaseExecutions: { observedVersion: number; boundaryReason: string }[];
-  };
-  assert.equal(performance.reparses, 0);
-  assert.deepEqual(
-    performance.phaseExecutions.map(phase => phase.observedVersion),
-    [0],
-  );
 });
 
 test('keeps the source version for an identity-equivalent transaction', () => {
@@ -432,18 +400,10 @@ test('keeps the source version for an identity-equivalent transaction', () => {
     defineNativePipeline({
       phases: [{ name: 'identity', plugins: [identity, emptyInsertion] }],
     }),
-    { debugPerformance: true },
+    {},
   );
   assert.equal(result.status, 'complete');
   assert.equal(result.code, 'const value = 1;');
-  const performance = result.metadata.performance as {
-    effectiveNoopTransactions: number;
-    eliminatedBoundaryReasons: Record<string, number>;
-    sourceVersions: readonly unknown[];
-  };
-  assert.equal(performance.effectiveNoopTransactions, 1);
-  assert.equal(performance.eliminatedBoundaryReasons['no-effective-byte-change'], 1);
-  assert.equal(performance.sourceVersions.length, 1);
 });
 
 test('does not reuse a no-op phase session without the next phase fields', () => {
@@ -471,17 +431,10 @@ test('does not reuse a no-op phase session without the next phase fields', () =>
         { name: 'read-import', plugins: [readImport] },
       ],
     }),
-    { debugPerformance: true },
+    {},
   );
   assert.equal(result.status, 'complete');
   assert.equal(importedSource, './dependency');
-  const performance = result.metadata.performance as {
-    phaseExecutions: { reusedParse: boolean }[];
-  };
-  assert.deepEqual(
-    performance.phaseExecutions.map(phase => phase.reusedParse),
-    [false, false],
-  );
 });
 
 test('creates a map-only version without reparsing unchanged code', () => {
@@ -503,18 +456,10 @@ test('creates a map-only version without reparsing unchanged code', () => {
         { name: 'observe', plugins: [] },
       ],
     }),
-    { debugPerformance: true },
+    {},
   );
   assert.equal(result.status, 'complete');
   assert.equal(result.code, 'const value = 1;');
-  const performance = result.metadata.performance as {
-    reparses: number;
-    sourceVersions: readonly unknown[];
-    committedBoundaryReasons: Record<string, number>;
-  };
-  assert.equal(performance.reparses, 0);
-  assert.equal(performance.sourceVersions.length, 2);
-  assert.equal(performance.committedBoundaryReasons['realized-map'], 1);
 });
 
 test('keeps bytes and maps correct across structural render/reparse boundaries', () => {

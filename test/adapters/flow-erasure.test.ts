@@ -79,32 +79,6 @@ withErasure('native Flow erasure', () => {
     }
   });
 
-  test('reports the erase and bail split under debugPerformance', () => {
-    const erased = completed(
-      transform('// @flow\nconst x: number = 1;\n', 'fixture.js', pipeline, {
-        debugPerformance: true,
-      }),
-    );
-    assert.deepEqual(erased.metadata.flowErasure, {
-      status: 'erased',
-      reason: undefined,
-      detail: undefined,
-      erasedBytes: 8,
-      spanCount: 1,
-    });
-
-    // No adapter registered here, so a bail ends as a bailout — which is the
-    // case the coverage counter most needs to be able to see.
-    const bailed = transform('// @flow\nenum E { A, B }\n', 'fixture.js', pipeline, {
-      debugPerformance: true,
-    });
-    assert.equal(bailed.status, 'bailout');
-    assert.equal(
-      (bailed.metadata?.flowErasure as { reason?: string } | undefined)?.reason,
-      'proposal-syntax',
-    );
-  });
-
   test('maps an erased position back to the original source', () => {
     const result = completed(
       transform('// @flow\ntype T = number;\nconst value: T = 1;\n', 'fixture.js', pipeline),

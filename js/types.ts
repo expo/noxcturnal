@@ -191,12 +191,6 @@ export interface NativeBailoutResult {
   reason: string;
   source: string;
   diagnostics: Diagnostic[];
-  /**
-   * Present only under `debugPerformance`. A Flow file the native erasure
-   * declined and no adapter picked up ends here, and that is exactly the case
-   * the erase/bail coverage counter needs to see.
-   */
-  metadata?: Record<string, unknown>;
 }
 export type TransformResult = NativeTransformResult | NativeBailoutResult;
 
@@ -247,11 +241,6 @@ export interface TransformOptions {
   parserAdapter?: string;
   /** Generate a Metro-compatible function map for the final transformed code. */
   functionMap?: boolean;
-  /** Include phase decisions and counters in metadata. Intended for benchmarks/debugging only. */
-  debugPerformance?: boolean;
-  /** Development/test-only: report undeclared contract access with suggested
-   * fragments and declared-but-unused contract entries as diagnostics. */
-  verifyVisitorContracts?: boolean;
   /**
    * Consumer-owned, per-transform data exposed to plugin preparation,
    * lifecycle hooks, and visitor contexts. This is deliberately excluded from

@@ -137,19 +137,9 @@ test('conditionally lowers JSX from parsed syntax without reprinting false lexic
 
   const generated =
     '/* @generated SignedSource<<e7f6759bcc8955193867c6ab42bd07ad>> */\nmodule.exports=1;';
-  const noJsx = transform(generated, 'fixture.jsx', pipeline, { debugPerformance: true });
+  const noJsx = transform(generated, 'fixture.jsx', pipeline);
   assert.equal(noJsx.status, 'complete');
   assert.equal(noJsx.code, generated);
-  const performance = noJsx.metadata.performance as {
-    nativeParses: number;
-    nativeSemanticBuilds: number;
-    nativeAstTraversals: number;
-    nativeRenders: number;
-  };
-  assert.equal(performance.nativeParses, 1);
-  assert.equal(performance.nativeSemanticBuilds, 0);
-  assert.equal(performance.nativeAstTraversals, 1);
-  assert.equal(performance.nativeRenders, 0);
 });
 
 test('fuses conditional JSX and block scoping when either transform has work', () => {

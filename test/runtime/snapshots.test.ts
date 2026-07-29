@@ -52,28 +52,11 @@ test('provides direct path fields and retained snapshots', () => {
     'const value = 1',
     'fixture.js',
     defineNativePipeline({ phases: [{ name: 'transform', plugins: [plugin] }] }),
-    {
-      debugPerformance: true,
-    },
+    {},
   );
   assert.equal(result.status, 'complete');
   assert.equal(retained?.name, 'value');
   assert.ok(Object.isFrozen(retained));
-  assert.ok(result.metadata.performance);
-  const performance = result.metadata.performance as {
-    pathFacades: number;
-    nodeFacades: number;
-    snapshots: number;
-    scopeFacades: number;
-    recordWords: number;
-    utf8SlabBytes: number;
-  };
-  assert.equal(performance.pathFacades, 1);
-  assert.equal(performance.nodeFacades, 1);
-  assert.equal(performance.snapshots, 1);
-  assert.equal(performance.scopeFacades, 0);
-  assert.ok(performance.recordWords > 0);
-  assert.ok(performance.utf8SlabBytes > 0);
 });
 
 test('generates Metro-compatible function maps natively', () => {
@@ -83,7 +66,6 @@ test('generates Metro-compatible function maps natively', () => {
   const source = 'var x=1; function named(a){ return a } var inferred = function(){ return x };';
   const result = transform(source, 'fixture.js', pipeline, {
     functionMap: true,
-    debugPerformance: true,
   });
   assert.equal(result.status, 'complete');
   if (result.status !== 'complete') return;
@@ -91,18 +73,6 @@ test('generates Metro-compatible function maps natively', () => {
     names: ['<global>', 'named', 'inferred'],
     mappings: 'AAA,SC,6BD,gBE,sBF',
   });
-  const performance = result.metadata.performance as {
-    nativeParses: number;
-    nativeAstTraversals: number;
-    nativeSemanticBuilds: number;
-    nativeRetainedBytesPeak: number;
-    routeDeliveries: number;
-  };
-  assert.equal(performance.nativeParses, 1);
-  assert.equal(performance.nativeAstTraversals, 1);
-  assert.equal(performance.nativeSemanticBuilds, 0);
-  assert.ok(performance.nativeRetainedBytesPeak > source.length);
-  assert.equal(performance.routeDeliveries, 0);
 });
 
 test('matches Metro function naming and frame positions', () => {
@@ -194,7 +164,7 @@ test('generates a function map only from the final committed source version', ()
         { name: 'second', plugins: [rename('beta-gamma', 'beta', 'gamma')] },
       ],
     }),
-    { functionMap: true, debugPerformance: true },
+    { functionMap: true },
   );
   assert.equal(result.status, 'complete');
   if (result.status !== 'complete') return;
@@ -202,16 +172,6 @@ test('generates a function map only from the final committed source version', ()
   assert.deepEqual(result.functionMap?.names, ['gamma']);
   assert.ok(!result.functionMap?.names.includes('alpha'));
   assert.ok(!result.functionMap?.names.includes('beta'));
-  const performance = result.metadata.performance as {
-    finalFunctionMapCacheHit: boolean;
-    finalFunctionMapSyntaxParses: number;
-    nativeSemanticBuilds: number;
-    nativeCrossingOperations: Record<string, number>;
-  };
-  assert.equal(performance.finalFunctionMapCacheHit, false);
-  assert.equal(performance.finalFunctionMapSyntaxParses, 1);
-  assert.equal(performance.nativeSemanticBuilds, 0);
-  assert.equal(performance.nativeCrossingOperations['function-map.generate'] ?? 0, 0);
 });
 
 test('reuses a final-input function map across no-op and map-only commits', () => {
@@ -228,17 +188,11 @@ test('reuses a final-input function map across no-op and map-only commits', () =
     'const callback = () => 1;',
     'fixture.js',
     defineNativePipeline({ phases: [{ name: 'mark', plugins: [mark] }] }),
-    { functionMap: true, debugPerformance: true },
+    { functionMap: true },
   );
   assert.equal(result.status, 'complete');
   if (result.status !== 'complete') return;
   assert.deepEqual(result.functionMap?.names, ['<global>', 'callback']);
-  const performance = result.metadata.performance as {
-    finalFunctionMapCacheHit: boolean;
-    finalFunctionMapSyntaxParses: number;
-  };
-  assert.equal(performance.finalFunctionMapCacheHit, true);
-  assert.equal(performance.finalFunctionMapSyntaxParses, 0);
 });
 
 test('hydrates targeted snapshots once and retains exit ancestry and scope', () => {
@@ -264,9 +218,7 @@ test('hydrates targeted snapshots once and retains exit ancestry and scope', () 
     'const value = other',
     'fixture.js',
     defineNativePipeline({ phases: [{ name: 'transform', plugins: [plugin] }] }),
-    {
-      debugPerformance: true,
-    },
+    {},
   );
   assert.equal(result.status, 'complete');
   assert.deepEqual(
@@ -275,7 +227,6 @@ test('hydrates targeted snapshots once and retains exit ancestry and scope', () 
   );
   assert.ok(snapshots.every(snapshot => typeof snapshot.scopeId === 'number'));
   assert.ok(snapshots.every(Object.isFrozen));
-  assert.equal((result.metadata.performance as { nativeParses: number }).nativeParses, 1);
   assert.throws(
     () =>
       transform(

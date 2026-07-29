@@ -351,7 +351,6 @@ pub(crate) fn materialize_with_scope_parents(
             function_map,
             initial_routed_buffer,
             uid_prefix: Some(shortest_uid_prefix_from_names(&collector.uid_names)),
-            semantic_build_count: 0,
         });
     }
     let semantic_return = SemanticBuilder::new()
@@ -423,7 +422,6 @@ pub(crate) fn materialize_with_scope_parents(
         function_map,
         initial_routed_buffer,
         uid_prefix,
-        semantic_build_count: 1,
     })
 }
 

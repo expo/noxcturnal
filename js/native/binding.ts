@@ -4,7 +4,6 @@ import type { FunctionMap, NativeVlqMap, ParseClassification } from '../types.js
 import type { PreflightPlan } from '../preflight/types.js';
 
 interface NativePreflightOptionsInput {
-  debugPerformance?: boolean;
   reactCompiler?: boolean;
   reactCompilerCompilationMode?: string;
   reactCompilerPanicThreshold?: string;
@@ -71,25 +70,8 @@ export interface NativePreflightResultOutput {
   code?: string;
   /** Present only on the free-function path; the pipeline session keeps it resident. */
   map?: Buffer;
-  /** Layer segment count, reported by the pipeline session in place of `map`. */
-  mappingSegments?: number;
-  /** Rendered-code byte length, reported by the pipeline session in place of `code`. */
-  renderedBytes?: number;
   diagnostics: string[];
   helpersUsed: string[];
-  parseCount?: number;
-  semanticBuildCount?: number;
-  astTraversalCount?: number;
-  renderCount?: number;
-  parseMs?: number;
-  semanticBuildMs?: number;
-  customRewriteMs?: number;
-  oxcTransformMs?: number;
-  optimizationMs?: number;
-  codegenAndMapMs?: number;
-  helperDiscoveryMs?: number;
-  helperMaterializationMs?: number;
-  rewriteSteps?: { name: string; acted: boolean }[];
 }
 
 interface NativeBinding {
@@ -169,14 +151,6 @@ interface NativeBinding {
     scopeParentId(scopeId: number): number | null;
     close(): void;
     memoryUsage(): number;
-    parseCount(): number;
-    astTraversalCount(): number;
-    performanceCounters(): {
-      memoryBytes: number;
-      parseCount: number;
-      astTraversalCount: number;
-      semanticBuildCount: number;
-    };
     takeFunctionMap(): FunctionMap | null;
     commitPacked(data: Buffer, sourceMapMode?: string): { code: string; map: NativeVlqMap };
     commitDecoded(
@@ -198,8 +172,6 @@ interface NativeBinding {
       data: Buffer,
       sourceMapMode?: string,
     ): {
-      mappingSegments: number;
-      renderedBytes: number;
       codeChanged: boolean;
       mapChanged: boolean;
     };
@@ -212,7 +184,6 @@ interface NativeBinding {
       code: string;
       map: NativeVlqMap | null;
       functionMap: FunctionMap | null;
-      functionMapMs?: number;
     };
   };
   classify(filename: string, source: string): ParseClassification;
@@ -238,7 +209,6 @@ interface NativeBinding {
     code?: string;
     map?: NativeVlqMap | null;
     functionMap?: FunctionMap | null;
-    functionMapMs?: number;
   };
   commitPackedBuffer(
     source: string,
@@ -327,17 +297,11 @@ export function nativeFlowErasureBuilt(): boolean {
 }
 
 const nativePreflightOptionsCache = new WeakMap<PreflightPlan, NativePreflightOptionsInput>();
-const debugNativePreflightOptionsCache = new WeakMap<PreflightPlan, NativePreflightOptionsInput>();
 
-export function nativePreflightOptions(
-  plan: PreflightPlan,
-  debugPerformance = false,
-): NativePreflightOptionsInput {
-  const cache = debugPerformance ? debugNativePreflightOptionsCache : nativePreflightOptionsCache;
-  const cached = cache.get(plan);
+export function nativePreflightOptions(plan: PreflightPlan): NativePreflightOptionsInput {
+  const cached = nativePreflightOptionsCache.get(plan);
   if (cached != null) return cached;
   const options: NativePreflightOptionsInput = {
-    debugPerformance,
     reactCompiler: plan.reactCompiler != null,
     reactCompilerCompilationMode: plan.reactCompiler?.compilationMode,
     reactCompilerPanicThreshold: plan.reactCompiler?.panicThreshold,
@@ -400,6 +364,6 @@ export function nativePreflightOptions(
     regexpMatchIndices: plan.transforms?.regexpMatchIndices,
     regexpUnicodeSets: plan.transforms?.regexpUnicodeSets,
   };
-  cache.set(plan, options);
+  nativePreflightOptionsCache.set(plan, options);
   return options;
 }

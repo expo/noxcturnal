@@ -1,6 +1,5 @@
 use napi::{Error, Result, Status, bindgen_prelude::Buffer};
 use napi_derive::napi;
-use std::time::Instant;
 
 use crate::edit::commit::commit_decoded_buffer;
 use crate::event_types::NativeVlqMap;
@@ -31,13 +30,8 @@ pub struct NativePipelineSession {
     layers: Vec<Vec<u8>>,
 }
 
-/// A visitor-phase commit's result. The rendered code stays resident; only the
-/// map-layer segment count crosses out, and only so `debugPerformance` can keep
-/// counting segments it can no longer see in a buffer.
 #[napi(object)]
 pub struct NativePipelineCommit {
-    pub mapping_segments: u32,
-    pub rendered_bytes: u32,
     pub code_changed: bool,
     pub map_changed: bool,
 }
@@ -49,7 +43,6 @@ pub struct NativePipelineFinish {
     pub code: String,
     pub map: Option<NativeVlqMap>,
     pub function_map: Option<FunctionMap>,
-    pub function_map_ms: Option<f64>,
 }
 
 #[napi]
@@ -91,8 +84,6 @@ impl NativePipelineSession {
                     .take()
                     .ok_or_else(|| incomplete("native transform returned no map"))?
                     .to_vec();
-                result.mapping_segments = Some(decoded_segment_count(&layer));
-                result.rendered_bytes = Some(code.len() as u32);
                 self.current = Some(code);
                 self.layers.push(layer);
             }
@@ -126,16 +117,6 @@ impl NativePipelineSession {
         let map_changed = commit.map_changed;
         let layer = commit.map.to_vec();
         let has_effect = code_changed || map_changed;
-        let mapping_segments = if has_effect {
-            decoded_segment_count(&layer)
-        } else {
-            0
-        };
-        let rendered_bytes = if has_effect {
-            commit.code.len() as u32
-        } else {
-            0
-        };
         if code_changed {
             self.current = Some(commit.code);
         }
@@ -143,8 +124,6 @@ impl NativePipelineSession {
             self.layers.push(layer);
         }
         Ok(NativePipelineCommit {
-            mapping_segments,
-            rendered_bytes,
             code_changed,
             map_changed,
         })
@@ -180,19 +159,15 @@ impl NativePipelineSession {
             .current
             .clone()
             .ok_or_else(|| incomplete("pipeline source already consumed"))?;
-        let function_map_started = Instant::now();
         let collect_function_map = collect_function_map.unwrap_or(false);
         let function_map = collect_function_map
             .then(|| function_map::generate(&code, &self.filename))
             .transpose()?;
-        let function_map_ms =
-            collect_function_map.then(|| function_map_started.elapsed().as_secs_f64() * 1000.0);
         if self.layers.is_empty() {
             return Ok(NativePipelineFinish {
                 code,
                 map: None,
                 function_map,
-                function_map_ms,
             });
         }
         let slices: Vec<&[u8]> = self.layers.iter().map(Vec::as_slice).collect();
@@ -220,7 +195,6 @@ impl NativePipelineSession {
             code,
             map: Some(map),
             function_map,
-            function_map_ms,
         })
     }
 
@@ -254,7 +228,6 @@ pub fn run_native_pipeline(
             code: None,
             map: None,
             function_map: None,
-            function_map_ms: None,
         });
     }
     let finish = session.finish(input_mappings, input_names, collect_function_map)?;
@@ -263,7 +236,6 @@ pub fn run_native_pipeline(
         code: Some(finish.code),
         map: finish.map,
         function_map: finish.function_map,
-        function_map_ms: finish.function_map_ms,
     })
 }
 
@@ -275,7 +247,6 @@ pub struct NativeNativePipelineResult {
     pub code: Option<String>,
     pub map: Option<NativeVlqMap>,
     pub function_map: Option<FunctionMap>,
-    pub function_map_ms: Option<f64>,
 }
 
 fn incomplete(message: &str) -> Error {
@@ -285,14 +256,6 @@ fn incomplete(message: &str) -> Error {
 /// Segment count of a packed decoded layer buffer — the header stores the word
 /// offset of the segment table at bytes 4..8, and each segment is five u32 words
 /// (mirrors the reader in `js/runtime/transform.ts`).
-fn decoded_segment_count(layer: &[u8]) -> u32 {
-    if layer.len() < 12 {
-        return 0;
-    }
-    let segments_offset = u32::from_le_bytes([layer[4], layer[5], layer[6], layer[7]]);
-    ((layer.len() as u32 / 4) - segments_offset) / 5
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

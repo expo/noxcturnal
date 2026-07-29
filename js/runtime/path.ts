@@ -31,14 +31,9 @@ import {
   type SourceFragment,
 } from '../contracts/visitor.js';
 import type { NativeTransformSession } from './session.js';
-import type { PerformanceAllocationCounters } from './metadata.js';
 import type { RouteCapabilities } from '../pipeline/types.js';
 
 export type { RouteCapabilities } from '../pipeline/types.js';
-
-export interface ContractVerification {
-  fieldRead(capabilities: RouteCapabilities, plugin: string, nodeType: string, field: string): void;
-}
 
 export function childRoleIsDeclared(roles: readonly string[], requestedRole: string): boolean {
   for (const role of roles) {
@@ -76,18 +71,10 @@ export type PathRuntime = {
   scopeCache: Map<number, NativeScope>;
   assertControl: (capability: ControlFlowCapability) => void;
   capabilities: RouteCapabilities;
-  verify?: ContractVerification;
-  performance?: PerformanceAllocationCounters;
   provenance: { degradations: number };
 };
 export function makePath(runtime: PathRuntime, event: NativeEvent): NativeNodePath {
-  const counters = runtime.performance;
-  if (!counters) return new NodePathImpl(runtime, event);
-  const started = performance.now();
-  counters.pathFacades++;
-  const path = new NodePathImpl(runtime, event);
-  counters.pathConstructionMs += performance.now() - started;
-  return path;
+  return new NodePathImpl(runtime, event);
 }
 
 export class NodePathImpl implements NativeNodePath {
@@ -114,20 +101,7 @@ export class NodePathImpl implements NativeNodePath {
   }
   get node(): NodeView {
     if (!this.lazyNode) {
-      if (this.runtime.performance) this.runtime.performance.nodeFacades++;
       this.lazyNode = this.runtime.session.nodeView(this.event);
-      const verify = this.runtime.verify;
-      if (verify) {
-        const { capabilities, owner } = this.runtime;
-        const nodeType = this.event.type;
-        this.lazyNode = new Proxy(this.lazyNode, {
-          get(target, property, receiver) {
-            if (typeof property === 'string' && FIELD_KEY_IDS.has(property))
-              verify.fieldRead(capabilities, owner, nodeType, property);
-            return Reflect.get(target, property, receiver);
-          },
-        });
-      }
     }
     return this.lazyNode;
   }
@@ -163,7 +137,6 @@ export class NodePathImpl implements NativeNodePath {
     return this.runtime.session.source.slice(this.event.start, this.event.end);
   }
   snapshot(options: SnapshotOptions = {}): Readonly<NodeView> {
-    if (this.runtime.performance) this.runtime.performance.snapshots++;
     const fields = options.fields;
     let source = this.node as NodeView & Record<string, unknown>;
     if (fields) {
@@ -390,13 +363,6 @@ export class NodePathImpl implements NativeNodePath {
   }
   #degraded = (message: string, target: SourceFragment): void => {
     this.runtime.provenance.degradations++;
-    if (this.runtime.performance)
-      this.runtime.context.diagnostic({
-        code: 'provenance-degraded',
-        message,
-        start: target.start,
-        end: target.end,
-      });
   };
   insertBefore(content: Code): void {
     this.#insert('PrependRight', this.event.start, content);
@@ -484,7 +450,6 @@ function mappingPolicy(value?: CodeFragment['mapping']): EditCommand['mapping'] 
 function makeScope(runtime: PathRuntime, id: number, parentId: number | null): NativeScope {
   const cached = runtime.scopeCache.get(id);
   if (cached) return cached;
-  if (runtime.performance) runtime.performance.scopeFacades++;
   const session = runtime.session;
   const resolve = (name: string): QueryResult['bindings'][number] | undefined => {
     return session.resolveBinding(name, id);

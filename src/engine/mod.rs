@@ -23,7 +23,6 @@ struct MaterializedSessionParts {
     pub(crate) function_map: Option<FunctionMap>,
     pub(crate) initial_routed_buffer: Option<Vec<u8>>,
     pub(crate) uid_prefix: Option<String>,
-    pub(crate) semantic_build_count: u32,
 }
 
 const RETAIN_IDENTIFIERS: u32 = 1 << 0;

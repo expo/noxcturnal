@@ -12,7 +12,6 @@ use oxc_semantic::{Scoping, SemanticBuilder, SymbolId};
 use oxc_span::{GetSpan, SPAN};
 use oxc_syntax::scope::ScopeFlags;
 use rustc_hash::{FxHashMap, FxHashSet};
-use std::time::Instant;
 
 use crate::semantic::constant_eval::{EvaluatedConstant, evaluate_expression};
 
@@ -24,25 +23,16 @@ pub(super) fn run<'a>(
     program: &mut Program<'a>,
     constant_folding: bool,
     dead_code_elimination: bool,
-    debug_performance: bool,
-) -> (u32, u32, f64) {
-    let mut traversal_count = 0;
-    let mut semantic_build_count = 0;
-    let mut semantic_build_ms = 0.0;
+) {
     if constant_folding {
         ConstantFolder {
             ast: AstBuilder::new(allocator),
         }
         .visit_program(program);
-        traversal_count += 1;
     }
     if dead_code_elimination {
-        let (traversals, elapsed) = eliminate_dead_functions(program, debug_performance);
-        traversal_count += traversals;
-        semantic_build_ms += elapsed;
-        semantic_build_count += 1;
+        eliminate_dead_functions(program);
     }
-    (traversal_count, semantic_build_count, semantic_build_ms)
 }
 
 struct ConstantFolder<'a> {
@@ -142,7 +132,7 @@ impl<'a> VisitMut<'a> for ConstantFolder<'a> {
     }
 }
 
-fn eliminate_dead_functions(program: &mut Program<'_>, debug_performance: bool) -> (u32, f64) {
+fn eliminate_dead_functions(program: &mut Program<'_>) {
     // Metro's Babel pass repeatedly removes unreferenced function bindings and
     // recrawls scope until reaching a fixed point. Rebuilding the complete
     // semantic graph on every layer makes a dead chain quadratic. Compute the
@@ -150,12 +140,9 @@ fn eliminate_dead_functions(program: &mut Program<'_>, debug_performance: bool) 
     // unreferenced candidate subtracts all references originating in its body,
     // which may make the functions it called removable next. Cycles retain an
     // incoming reference exactly as they do in Metro's binding-based pass.
-    let semantic_started = debug_performance.then(Instant::now);
     let semantic = SemanticBuilder::new().build(program);
-    let semantic_ms =
-        semantic_started.map_or(0.0, |started| started.elapsed().as_secs_f64() * 1_000.0);
     if !semantic.diagnostics.is_empty() {
-        return (1, semantic_ms);
+        return;
     }
     let scoping = semantic.semantic.into_scoping();
     // SemanticBuilder refreshes the symbol cells after preceding transforms
@@ -164,14 +151,13 @@ fn eliminate_dead_functions(program: &mut Program<'_>, debug_performance: bool) 
     let mut collector = DeadFunctionCandidateCollector::default();
     collector.visit_program(program);
     if collector.candidates.is_empty() {
-        return (2, semantic_ms);
+        return;
     }
     let mut analysis =
         DeadFunctionDependencyAnalysis::new(&collector.candidates, &collector.roots, &scoping);
     analysis.visit_program(program);
     let unused = analysis.peel();
     DeadFunctionRemover { unused }.visit_program(program);
-    (4, semantic_ms)
 }
 
 #[derive(Default)]

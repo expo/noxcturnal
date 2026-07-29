@@ -22,23 +22,12 @@ pub struct NativeIndexedSession {
     filename: String,
     retained_index: RetainedIndex,
     scope_parents: Vec<u32>,
-    parse_count: u32,
-    ast_traversal_count: u32,
-    semantic_build_count: u32,
     function_map: Option<FunctionMap>,
     initial_route_manifest: Option<Vec<u8>>,
     initial_routed_buffer: Option<Vec<u8>>,
     uid_prefix: Option<String>,
     initial_routed_served: bool,
     closed: bool,
-}
-
-#[napi(object)]
-pub struct NativeSessionPerformanceCounters {
-    pub memory_bytes: u32,
-    pub parse_count: u32,
-    pub ast_traversal_count: u32,
-    pub semantic_build_count: u32,
 }
 
 #[napi]
@@ -55,7 +44,6 @@ impl NativeIndexedSession {
         let collect_function_map = function_map.unwrap_or(false);
         let has_retention = retention_manifest.is_some();
         let has_initial_route = initial_route_manifest.is_some();
-        let parse_count = u32::from(collect_function_map || has_retention || has_initial_route);
         let parts = if !collect_function_map && !has_retention && !has_initial_route {
             MaterializedSessionParts {
                 scope_parents: Vec::new(),
@@ -63,7 +51,6 @@ impl NativeIndexedSession {
                 function_map: None,
                 initial_routed_buffer: None,
                 uid_prefix: None,
-                semantic_build_count: 0,
             }
         } else {
             materialize_with_scope_parents(
@@ -81,18 +68,12 @@ impl NativeIndexedSession {
             function_map,
             initial_routed_buffer,
             uid_prefix,
-            semantic_build_count,
         } = parts;
-        let ast_traversal_count =
-            parse_count.saturating_mul(if semantic_build_count > 0 { 2 } else { 1 });
         Ok(Self {
             source,
             filename,
             retained_index,
             scope_parents,
-            parse_count,
-            ast_traversal_count,
-            semantic_build_count,
             function_map,
             initial_route_manifest: initial_route_manifest.map(|manifest| manifest.to_vec()),
             initial_routed_buffer,
@@ -365,26 +346,6 @@ impl NativeIndexedSession {
                 .map_or(0, Vec::capacity)
             + self.initial_routed_buffer.as_ref().map_or(0, Vec::capacity))
         .min(u32::MAX as usize) as u32
-    }
-
-    #[napi]
-    pub fn parse_count(&self) -> u32 {
-        self.parse_count
-    }
-
-    #[napi]
-    pub fn ast_traversal_count(&self) -> u32 {
-        self.ast_traversal_count
-    }
-
-    #[napi]
-    pub fn performance_counters(&self) -> NativeSessionPerformanceCounters {
-        NativeSessionPerformanceCounters {
-            memory_bytes: self.memory_usage(),
-            parse_count: self.parse_count,
-            ast_traversal_count: self.ast_traversal_count,
-            semantic_build_count: self.semantic_build_count,
-        }
     }
 
     #[napi]

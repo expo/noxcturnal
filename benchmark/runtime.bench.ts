@@ -864,7 +864,7 @@ for (const [label, generated] of [
   ['100 KiB', generatedSource(100 * 1024)],
 ] as const) {
   verifiedBench(`fixed-cost profile: ${label}`, () => {
-    benchmarkTransform(generated, 'generated.js', visitorPipeline, { debugPerformance: true });
+    benchmarkTransform(generated, 'generated.js', visitorPipeline);
   });
 }
 

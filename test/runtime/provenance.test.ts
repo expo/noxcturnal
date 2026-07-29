@@ -338,7 +338,7 @@ test('rejects copies whose range is partially overlapped by another edit', () =>
   );
 });
 
-test('degrades cross-phase fragments to text with a debug diagnostic', () => {
+test('degrades cross-phase fragments to text', () => {
   const source = 'const first = 1;\nconst second = target();\n';
   const capture = defineNativePlugin({
     name: 'capture-fragment',
@@ -374,55 +374,12 @@ test('degrades cross-phase fragments to text with a debug diagnostic', () => {
         { name: 'two', requiresPrintedInput: true, plugins: [reuse] },
       ],
     }),
-    { debugPerformance: true },
+    {},
   );
   assert.equal(result.status, 'complete');
   // The stale copy carries phase-one text; the live phase-one range was edited.
   assert.ok(result.code.includes('const target() = 1;'));
   assert.ok(result.code.includes('renamed()'));
-  assert.ok(result.diagnostics.some(diagnostic => diagnostic.code === 'provenance-degraded'));
-});
-
-test('counts provenance degradations in metadata without debug tracing', () => {
-  const source = 'const first = 1;\nconst second = target();\n';
-  const capture = defineNativePlugin({
-    name: 'capture-fragment',
-    contract: { metadata: { writes: ['captured'] } },
-    visitors: [
-      defineVisitor('CallExpression', { fields: ['calleeName'] }, path => {
-        if (path.node.calleeName === 'target') {
-          path.context.metadata.set('captured', path.getSource());
-          path.replaceWith('renamed()');
-        }
-      }),
-    ],
-  });
-  const reuse = defineNativePlugin({
-    name: 'reuse-fragment',
-    visitors: [
-      defineVisitor(
-        'Identifier',
-        { fields: ['name'], where: { name: { oneOf: ['first'] } } },
-        path => {
-          const captured = path.context.metadata.get('captured') as SourceFragment | undefined;
-          if (captured) path.replaceWith(captured);
-        },
-      ),
-    ],
-  });
-  const result = transform(
-    source,
-    'fixture.js',
-    defineNativePipeline({
-      phases: [
-        { name: 'one', plugins: [capture] },
-        { name: 'two', requiresPrintedInput: true, plugins: [reuse] },
-      ],
-    }),
-  );
-  assert.equal(result.status, 'complete');
-  assert.equal(result.metadata.provenanceDegradations, 1);
-  assert.ok(!result.diagnostics.some(diagnostic => diagnostic.code === 'provenance-degraded'));
 });
 
 test('ensureHelper inserts each key once at the end of the directive prologue', () => {
@@ -524,12 +481,10 @@ test('collapses byte-identical convergent edits to the first owner', () => {
         { name: 'transform', plugins: [upgrade('first-upgrade'), upgrade('second-upgrade')] },
       ],
     }),
-    { debugPerformance: true },
+    {},
   );
   assert.equal(result.status, 'complete');
   assert.equal(result.code, 'const value = compute2();\n');
-  const performance = result.metadata.performance as { convergentEditsDeduped: number };
-  assert.equal(performance.convergentEditsDeduped, 1);
 });
 
 test('still rejects convergent edits whose content differs', () => {

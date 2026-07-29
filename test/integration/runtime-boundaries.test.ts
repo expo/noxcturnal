@@ -65,11 +65,11 @@ test('keeps native sessions worker-thread isolated', async () => {
   );
   const value = await new Promise((resolve, reject) => {
     const worker = new Worker(
-      `import { parentPort } from 'node:worker_threads'; import(${JSON.stringify(moduleUrl)}).then(({ native }) => { const session = new native.NativeIndexedSession('const value = 1', 'worker.js', false, Buffer.from(${JSON.stringify(manifest)}, 'base64')); parentPort.postMessage(session.parseCount()); session.close(); }, error => { throw error; });`,
+      `import { parentPort } from 'node:worker_threads'; import(${JSON.stringify(moduleUrl)}).then(({ native }) => { const session = new native.NativeIndexedSession('const value = 1', 'worker.js', false, Buffer.from(${JSON.stringify(manifest)}, 'base64')); session.close(); parentPort.postMessage(true); }, error => { throw error; });`,
       { eval: true },
     );
     worker.once('message', resolve);
     worker.once('error', reject);
   });
-  assert.equal(value, 1);
+  assert.equal(value, true);
 });
