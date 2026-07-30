@@ -2,10 +2,12 @@ use oxc_allocator::{Allocator, Box as ArenaBox, TakeIn, Vec as ArenaVec};
 use oxc_ast::{
     AstBuilder, AstKind,
     ast::{
-        Argument, ArrayExpressionElement, BindingIdentifier, Expression, FormalParameterKind,
-        FormalParameterRest, IdentifierReference, Program, PropertyKind, Statement,
-        TSThisParameter, TSTypeAnnotation, TSTypeParameterDeclaration,
-        TSTypeParameterInstantiation, VariableDeclaration, VariableDeclarationKind,
+        Argument, ArrayExpressionElement, AssignmentTarget, AssignmentTargetMaybeDefault,
+        AssignmentTargetProperty, BindingIdentifier, ClassElement, Expression, FormalParameterKind,
+        FormalParameterRest, IdentifierReference, MethodDefinitionKind, Program, PropertyKey,
+        PropertyKind, SimpleAssignmentTarget, Statement, TSThisParameter, TSTypeAnnotation,
+        TSTypeParameterDeclaration, TSTypeParameterInstantiation, VariableDeclaration,
+        VariableDeclarationKind,
     },
 };
 use oxc_ast_visit::{Visit, VisitMut, walk, walk_mut};
@@ -911,12 +913,79 @@ pub(super) fn prepare_with_reserved<'a>(
     let mut groups: FxHashMap<(ScopeId, &str), Vec<SymbolId>> = FxHashMap::default();
     let mut used_names: FxHashSet<String> = scoping.symbol_names().map(str::to_owned).collect();
     used_names.extend(reserved_names.into_iter().map(str::to_owned));
+    let unresolved_names = scoping
+        .root_unresolved_references()
+        .keys()
+        .map(|name| name.to_string())
+        .collect::<FxHashSet<_>>();
+    let scope_preorder = scoping.scope_descendants_from_root().collect::<Vec<_>>();
+    let mut scope_index = FxHashMap::default();
+    let mut scope_end = FxHashMap::default();
+    let mut target_scopes = FxHashMap::default();
+    for (index, scope_id) in scope_preorder.iter().copied().enumerate() {
+        scope_index.insert(scope_id, index);
+        scope_end.insert(scope_id, index);
+        let target_scope = if scoping.scope_flags(scope_id).intersects(ScopeFlags::Var) {
+            scope_id
+        } else {
+            scoping
+                .scope_parent_id(scope_id)
+                .and_then(|parent| target_scopes.get(&parent).copied())
+                .unwrap_or(scope_id)
+        };
+        target_scopes.insert(scope_id, target_scope);
+    }
+    for scope_id in scope_preorder.iter().copied().rev() {
+        if let Some(parent) = scoping.scope_parent_id(scope_id) {
+            let child_end = scope_end[&scope_id];
+            scope_end
+                .entry(parent)
+                .and_modify(|parent_end| *parent_end = (*parent_end).max(child_end));
+        }
+    }
+    let mut ancestor_collisions = FxHashSet::default();
+    let mut symbols_by_name = FxHashMap::<&str, Vec<SymbolId>>::default();
+    for symbol_id in scoping.symbol_ids() {
+        symbols_by_name
+            .entry(scoping.symbol_name(symbol_id))
+            .or_default()
+            .push(symbol_id);
+    }
+    for symbols in symbols_by_name.values_mut() {
+        symbols.sort_unstable_by_key(|symbol_id| {
+            (
+                scope_index[&scoping.symbol_scope_id(*symbol_id)],
+                scoping.symbol_span(*symbol_id).start,
+            )
+        });
+        let mut active = Vec::<(usize, ScopeId)>::new();
+        let mut active_targets = FxHashMap::<ScopeId, usize>::default();
+        for symbol_id in symbols.iter().copied() {
+            let scope_id = scoping.symbol_scope_id(symbol_id);
+            let index = scope_index[&scope_id];
+            while active.last().is_some_and(|(end, _)| *end < index) {
+                let (_, target) = active.pop().unwrap();
+                let count = active_targets.get_mut(&target).unwrap();
+                *count -= 1;
+                if *count == 0 {
+                    active_targets.remove(&target);
+                }
+            }
+            let target_scope = target_scopes[&scope_id];
+            if scoping
+                .symbol_flags(symbol_id)
+                .contains(SymbolFlags::BlockScopedVariable)
+                && active.len() > active_targets.get(&target_scope).copied().unwrap_or(0)
+            {
+                ancestor_collisions.insert(symbol_id);
+            }
+            active.push((scope_end[&scope_id], target_scope));
+            *active_targets.entry(target_scope).or_default() += 1;
+        }
+    }
     for symbol_id in scoping.symbol_ids() {
         let scope_id = scoping.symbol_scope_id(symbol_id);
-        let target_scope = scoping
-            .scope_ancestors(scope_id)
-            .find(|scope_id| scoping.scope_flags(*scope_id).intersects(ScopeFlags::Var))
-            .unwrap_or(scope_id);
+        let target_scope = target_scopes[&scope_id];
         let name = scoping.symbol_name(symbol_id);
         groups
             .entry((target_scope, name))
@@ -925,8 +994,14 @@ pub(super) fn prepare_with_reserved<'a>(
     }
 
     let mut renames = FxHashMap::default();
+    let mut next_rename_suffix = FxHashMap::<String, u32>::default();
     for ((_scope_id, name), mut symbols) in groups {
-        if symbols.len() < 2 {
+        if symbols.len() < 2
+            && !symbols.iter().any(|symbol_id| {
+                ancestor_collisions.contains(symbol_id)
+                    || unresolved_names.contains(scoping.symbol_name(*symbol_id))
+            })
+        {
             continue;
         }
         // A function-scoped binding already occupies the name after lowering, so
@@ -951,20 +1026,22 @@ pub(super) fn prepare_with_reserved<'a>(
                 scoping
                     .symbol_flags(*symbol_id)
                     .contains(SymbolFlags::BlockScopedVariable)
-                    && *index > 0
+                    && (*index > 0
+                        || ancestor_collisions.contains(symbol_id)
+                        || unresolved_names.contains(scoping.symbol_name(*symbol_id)))
             })
         {
             let _ = index;
             let base = name.trim_end_matches(|character: char| character.is_ascii_digit());
             let base = if base.is_empty() { name } else { base };
-            let mut suffix = 0_u32;
+            let suffix = next_rename_suffix.entry(base.to_owned()).or_default();
             let replacement = loop {
-                let candidate = if suffix == 0 {
+                let candidate = if *suffix == 0 {
                     format!("_{base}")
                 } else {
-                    format!("_{base}{}", suffix + 1)
+                    format!("_{base}{}", *suffix + 1)
                 };
-                suffix += 1;
+                *suffix += 1;
                 if used_names.insert(candidate.clone()) {
                     break candidate;
                 }
@@ -1012,11 +1089,148 @@ pub(super) fn prepare_with_reserved<'a>(
         })
         .collect();
     let loop_reset_declarations = collect_loop_reset_declarations(semantic);
+    let mut const_write_expressions = FxHashMap::default();
+    for symbol_id in scoping.symbol_ids().filter(|symbol_id| {
+        scoping
+            .symbol_flags(*symbol_id)
+            .contains(SymbolFlags::ConstVariable)
+    }) {
+        for reference_id in scoping.get_resolved_reference_ids(symbol_id) {
+            let reference = scoping.get_reference(*reference_id);
+            if !reference.is_write() {
+                continue;
+            }
+            let parent_id = semantic.nodes().parent_id(reference.node_id());
+            match semantic.nodes().kind(parent_id) {
+                AstKind::AssignmentExpression(expression) => {
+                    let reference_span = semantic.nodes().kind(reference.node_id()).span();
+                    if expression.span != reference_span {
+                        const_write_expressions.insert(
+                            (expression.span.start, expression.span.end),
+                            scoping.symbol_name(symbol_id).to_owned(),
+                        );
+                    }
+                }
+                AstKind::UpdateExpression(expression) => {
+                    let reference_span = semantic.nodes().kind(reference.node_id()).span();
+                    if expression.span != reference_span {
+                        const_write_expressions.insert(
+                            (expression.span.start, expression.span.end),
+                            scoping.symbol_name(symbol_id).to_owned(),
+                        );
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+    const_write_expressions.extend(collect_read_only_private_writes(semantic));
     Ok(BlockScopingPlan {
         binding_renames,
         reference_renames,
         loop_reset_declarations,
+        const_write_expressions,
     })
+}
+
+/// Preserve the ECMAScript runtime error for stores to private methods and
+/// getter-only private accessors. Hermes V1 keeps private syntax, so this
+/// belongs in the active block-scoping pass rather than requiring the disabled
+/// private-method transform.
+fn collect_read_only_private_writes(semantic: &Semantic<'_>) -> FxHashMap<(u32, u32), String> {
+    struct PrivateClass {
+        end: u32,
+        read_only: FxHashSet<String>,
+    }
+
+    let nodes = semantic.nodes();
+    let mut writes = FxHashMap::default();
+    let mut classes = Vec::<PrivateClass>::new();
+    for (node_id, node) in nodes.iter_enumerated() {
+        let span = node.kind().span();
+        while classes.last().is_some_and(|class| span.start >= class.end) {
+            classes.pop();
+        }
+        if let AstKind::Class(class) = node.kind() {
+            let setters = class
+                .body
+                .body
+                .iter()
+                .filter_map(|element| match element {
+                    ClassElement::MethodDefinition(method)
+                        if method.kind == MethodDefinitionKind::Set =>
+                    {
+                        let PropertyKey::PrivateIdentifier(key) = &method.key else {
+                            return None;
+                        };
+                        Some(key.name.to_string())
+                    }
+                    _ => None,
+                })
+                .collect::<FxHashSet<_>>();
+            let read_only = class
+                .body
+                .body
+                .iter()
+                .filter_map(|element| match element {
+                    ClassElement::MethodDefinition(method)
+                        if method.kind != MethodDefinitionKind::Set =>
+                    {
+                        let PropertyKey::PrivateIdentifier(key) = &method.key else {
+                            return None;
+                        };
+                        (method.kind != MethodDefinitionKind::Get
+                            || !setters.contains(key.name.as_str()))
+                        .then(|| key.name.to_string())
+                    }
+                    _ => None,
+                })
+                .collect();
+            classes.push(PrivateClass {
+                end: class.span.end,
+                read_only,
+            });
+            continue;
+        }
+        let AstKind::PrivateFieldExpression(field) = node.kind() else {
+            continue;
+        };
+        if !classes
+            .last()
+            .is_some_and(|class| class.read_only.contains(field.field.name.as_str()))
+        {
+            continue;
+        }
+        let parent_id = nodes.parent_id(node_id);
+        match nodes.kind(parent_id) {
+            AstKind::AssignmentExpression(expression)
+                if matches!(
+                    &expression.left,
+                    AssignmentTarget::PrivateFieldExpression(target)
+                        if target.span == field.span
+                ) =>
+            {
+                writes.insert(
+                    (expression.span.start, expression.span.end),
+                    field.field.name.to_string(),
+                );
+            }
+            AstKind::UpdateExpression(expression)
+                if matches!(
+                    &expression.argument,
+                    SimpleAssignmentTarget::PrivateFieldExpression(target)
+                        if target.span == field.span
+                ) =>
+            {
+                writes.insert(
+                    (expression.span.start, expression.span.end),
+                    field.field.name.to_string(),
+                );
+            }
+            _ => {}
+        }
+    }
+    writes
 }
 
 /// Find uninitialized lexical declarations that execute repeatedly in loop
@@ -1117,6 +1331,7 @@ pub(super) struct BlockScopingPlan {
     binding_renames: FxHashMap<(u32, u32, String), String>,
     reference_renames: FxHashMap<(u32, u32, String), String>,
     loop_reset_declarations: FxHashSet<(u32, u32)>,
+    const_write_expressions: FxHashMap<(u32, u32), String>,
 }
 
 struct BlockScopingLowerer<'a> {
@@ -1139,6 +1354,68 @@ impl<'a> Visit<'a> for RemainingBlockScopingDetector {
 }
 
 impl<'a> VisitMut<'a> for BlockScopingLowerer<'a> {
+    #[expect(deprecated)]
+    fn visit_assignment_target_property(&mut self, property: &mut AssignmentTargetProperty<'a>) {
+        let AssignmentTargetProperty::AssignmentTargetPropertyIdentifier(shorthand) = property
+        else {
+            walk_mut::walk_assignment_target_property(self, property);
+            return;
+        };
+        let key = (
+            shorthand.binding.span.start,
+            shorthand.binding.span.end,
+            shorthand.binding.name.to_string(),
+        );
+        let Some(replacement) = self.plan.reference_renames.get(&key) else {
+            walk_mut::walk_assignment_target_property(self, property);
+            return;
+        };
+        let ast = AstBuilder::new(self.allocator);
+        let span = shorthand.span;
+        let original_name = shorthand.binding.name;
+        let target = ast.simple_assignment_target_assignment_target_identifier(
+            shorthand.binding.span,
+            self.allocator.alloc_str(replacement),
+        );
+        let binding = if let Some(mut init) = shorthand.init.take() {
+            self.visit_expression(&mut init);
+            ast.assignment_target_maybe_default_assignment_target_with_default(
+                span,
+                AssignmentTarget::from(target),
+                init,
+            )
+        } else {
+            AssignmentTargetMaybeDefault::from(target)
+        };
+        *property = ast.assignment_target_property_assignment_target_property_property(
+            span,
+            ast.property_key_static_identifier(span, original_name),
+            binding,
+            false,
+        );
+    }
+
+    #[expect(deprecated)]
+    fn visit_expression(&mut self, expression: &mut Expression<'a>) {
+        let span = expression.span();
+        if self
+            .plan
+            .const_write_expressions
+            .contains_key(&(span.start, span.end))
+        {
+            let ast = AstBuilder::new(self.allocator);
+            *expression = ast.expression_call(
+                span,
+                ast.expression_numeric_literal(span, 0.0, None, oxc_ast::ast::NumberBase::Decimal),
+                None::<ArenaBox<'a, TSTypeParameterInstantiation<'a>>>,
+                ArenaVec::new_in(&ast),
+                false,
+            );
+            return;
+        }
+        walk_mut::walk_expression(self, expression);
+    }
+
     #[expect(deprecated)]
     fn visit_variable_declaration(&mut self, declaration: &mut VariableDeclaration<'a>) {
         if matches!(
@@ -1249,5 +1526,23 @@ mod tests {
             collect_loop_reset_declarations(&semantic.semantic).len(),
             declarations
         );
+    }
+
+    #[test]
+    fn renames_bindings_that_would_capture_outer_or_unresolved_references() {
+        let source = "{ const leaked = 1; } typeof leaked; function outer(value) { return () => { if (true) { const value = 2; } return value; }; }";
+        let allocator = Allocator::default();
+        let parsed = Parser::new(&allocator, source, SourceType::default()).parse();
+        let semantic = SemanticBuilder::new()
+            .with_build_nodes(true)
+            .build(&parsed.program);
+        let plan = prepare(&semantic.semantic).unwrap();
+        let renames = plan
+            .binding_renames
+            .values()
+            .map(String::as_str)
+            .collect::<FxHashSet<_>>();
+        assert!(renames.contains("_leaked"));
+        assert!(renames.contains("_value"));
     }
 }

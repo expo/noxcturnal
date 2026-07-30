@@ -1742,6 +1742,64 @@ test('native block scoping renames a block binding that would shadow an outer bi
   assert.equal(target.output, '/2F');
 });
 
+test('native block scoping preserves keys when renaming shorthand assignment targets', () => {
+  const result = transform(
+    'var name = "outer"; function read() { let name; ({ user: { name } } = { user: { name: "test" } }); return name; } globalThis.result = read();',
+    'fixture.js',
+    pipeline({ blockScoping: true }),
+  );
+  assert.equal(result.status, 'complete');
+  assert.match(result.code, /user:\s*\{\s*name:\s*_name/);
+  const target: { result?: string } = {};
+  new Function('globalThis', result.code)(target);
+  assert.equal(target.result, 'test');
+});
+
+test('native block scoping preserves const write errors after lowering to var', () => {
+  for (const write of ['value = 2', 'value += 2', 'value++']) {
+    const result = transform(
+      `const value = 1; ${write};`,
+      'fixture.js',
+      pipeline({ blockScoping: true }),
+    );
+    assert.equal(result.status, 'complete');
+    assert.throws(() => new Function(result.code)(), TypeError);
+  }
+});
+
+test('Hermes V1 block scoping preserves read-only private stores without lowering classes', () => {
+  for (const source of [
+    'const marker = 1; class Foo { #bar() {} constructor() { this.#bar = 1; } } new Foo();',
+    'const marker = 1; class Foo { #bar() {} constructor() { this.#bar += 1; } } new Foo();',
+    'const marker = 1; class Foo { get #bar() { return 1; } constructor() { this.#bar = 2; } } new Foo();',
+  ]) {
+    const result = transform(source, 'fixture.js', pipeline({ blockScoping: true }));
+    assert.equal(result.status, 'complete');
+    assert.match(result.code, /class Foo/);
+    assert.throws(() => new Function(result.code)(), TypeError);
+  }
+});
+
+test('native loose private methods and getter-only accessors remain read-only', () => {
+  for (const source of [
+    'class Foo { #bar() {} constructor() { this.#bar = 1; } } new Foo();',
+    'class Foo { #bar() {} constructor() { this.#bar += 1; } } new Foo();',
+    'class Foo { get #bar() { return 1; } constructor() { this.#bar = 2; } } new Foo();',
+  ]) {
+    const result = transform(
+      source,
+      'fixture.js',
+      pipeline({
+        classes: true,
+        classProperties: { loose: true },
+        privateMethods: { loose: true },
+      }),
+    );
+    assert.equal(result.status, 'complete');
+    assert.throws(() => new Function('require', result.code)(runtimeRequire), TypeError);
+  }
+});
+
 test('native block scoping preserves captured loop bindings and relocated mappings', () => {
   const source = 'var callbacks = []; for (let value of [1, 2, 3]) callbacks.push(() => value);';
   const result = transform(source, 'fixture.js', pipeline({ blockScoping: true }));

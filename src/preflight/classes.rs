@@ -1519,6 +1519,7 @@ impl<'a> VisitMut<'a> for DerivedThisRewriter<'a> {
 struct PrivateLooseRewriter<'a, 'p> {
     allocator: &'a Allocator,
     keys: &'p FxHashMap<String, (String, String)>,
+    read_only: &'p FxHashSet<String>,
     base_name: &'a str,
     call_name: &'a str,
 }
@@ -1526,6 +1527,47 @@ struct PrivateLooseRewriter<'a, 'p> {
 impl<'a> PrivateLooseRewriter<'a, '_> {
     fn key(&self, name: &str) -> Option<&str> {
         self.keys.get(name).map(|key| key.0.as_str())
+    }
+
+    #[expect(deprecated)]
+    fn read_only_error(&self, span: Span) -> Expression<'a> {
+        let ast = AstBuilder::new(self.allocator);
+        let mut arguments = ArenaVec::new_in(&ast);
+        arguments.push(Argument::from(ast.expression_string_literal(
+            span,
+            "Attempted to set read only private field",
+            None,
+        )));
+        let mut statements = ArenaVec::new_in(&ast);
+        statements.push(ast.statement_throw(
+            span,
+            ast.expression_new(
+                span,
+                ast.expression_identifier(span, "TypeError"),
+                None::<ArenaBox<'a, TSTypeParameterInstantiation<'a>>>,
+                arguments,
+            ),
+        ));
+        ast.expression_call(
+            span,
+            ast.expression_arrow_function(
+                span,
+                false,
+                false,
+                None::<ArenaBox<'a, TSTypeParameterDeclaration<'a>>>,
+                ast.alloc_formal_parameters(
+                    span,
+                    FormalParameterKind::FormalParameter,
+                    ArenaVec::new_in(&ast),
+                    None::<ArenaBox<'a, FormalParameterRest<'a>>>,
+                ),
+                None::<ArenaBox<'a, TSTypeAnnotation<'a>>>,
+                ast.alloc_function_body(span, ArenaVec::new_in(&ast), statements),
+            ),
+            None::<ArenaBox<'a, TSTypeParameterInstantiation<'a>>>,
+            ArenaVec::new_in(&ast),
+            false,
+        )
     }
 
     #[expect(deprecated)]
@@ -1550,6 +1592,27 @@ impl<'a> VisitMut<'a> for PrivateLooseRewriter<'a, '_> {
     #[expect(deprecated)]
     fn visit_expression(&mut self, expression: &mut Expression<'a>) {
         let ast = AstBuilder::new(self.allocator);
+        let read_only_write = match expression {
+            Expression::AssignmentExpression(assignment) => {
+                if let AssignmentTarget::PrivateFieldExpression(field) = &assignment.left {
+                    self.read_only.contains(field.field.name.as_str())
+                } else {
+                    false
+                }
+            }
+            Expression::UpdateExpression(update) => {
+                if let SimpleAssignmentTarget::PrivateFieldExpression(field) = &update.argument {
+                    self.read_only.contains(field.field.name.as_str())
+                } else {
+                    false
+                }
+            }
+            _ => false,
+        };
+        if read_only_write {
+            *expression = self.read_only_error(expression.span());
+            return;
+        }
         if let Expression::CallExpression(call) = expression {
             let span = call.span;
             let optional = call.optional;
@@ -2371,10 +2434,47 @@ fn lower_simple_class<'a>(
     let name = &plan.name;
     let super_class = class.super_class.take();
     let super_name = plan.super_name.as_deref();
+    let private_setters = class
+        .body
+        .body
+        .iter()
+        .filter_map(|element| match element {
+            ClassElement::MethodDefinition(method)
+                if method.kind == MethodDefinitionKind::Set
+                    && matches!(method.key, PropertyKey::PrivateIdentifier(_)) =>
+            {
+                let PropertyKey::PrivateIdentifier(key) = &method.key else {
+                    unreachable!()
+                };
+                Some(key.name.to_string())
+            }
+            _ => None,
+        })
+        .collect::<FxHashSet<_>>();
+    let read_only_private = class
+        .body
+        .body
+        .iter()
+        .filter_map(|element| match element {
+            ClassElement::MethodDefinition(method)
+                if matches!(method.key, PropertyKey::PrivateIdentifier(_))
+                    && method.kind != MethodDefinitionKind::Set =>
+            {
+                let PropertyKey::PrivateIdentifier(key) = &method.key else {
+                    unreachable!()
+                };
+                (method.kind != MethodDefinitionKind::Get
+                    || !private_setters.contains(key.name.as_str()))
+                .then(|| key.name.to_string())
+            }
+            _ => None,
+        })
+        .collect::<FxHashSet<_>>();
     if !plan.private_keys.is_empty() {
         PrivateLooseRewriter {
             allocator,
             keys: &plan.private_keys,
+            read_only: &read_only_private,
             base_name: allocator.alloc_str(&plan.helper_names.private_base),
             call_name: allocator.alloc_str(&plan.helper_names.private_call),
         }
