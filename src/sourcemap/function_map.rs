@@ -7,6 +7,7 @@ use oxc_parser::Parser;
 use oxc_span::{GetSpan, Span};
 use rustc_hash::FxHashMap;
 use std::borrow::Cow;
+use std::rc::Rc;
 
 use super::vlq;
 use crate::syntax::classification::source_type;
@@ -46,7 +47,7 @@ pub fn generate(source: &str, filename: &str) -> napi::Result<FunctionMap> {
     Ok(collector.finish())
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct Position {
     line: u32,
     column: u32,
@@ -155,10 +156,12 @@ impl<'a> FunctionMapCollector<'a> {
         let line_start = self.line_starts[line_index];
         Position {
             line: line_index as u32 + 1,
-            column: self.utf16_offsets.as_ref().map_or(
-                (offset - line_start) as u32,
-                |offsets| offsets[offset] - offsets[line_start],
-            ),
+            column: self
+                .utf16_offsets
+                .as_ref()
+                .map_or((offset - line_start) as u32, |offsets| {
+                    offsets[offset] - offsets[line_start]
+                }),
         }
     }
 
@@ -437,4 +440,3 @@ mod tests {
         assert_eq!(unicode.position(12), Position { line: 2, column: 3 });
     }
 }
-use std::rc::Rc;

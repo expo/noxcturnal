@@ -47,6 +47,12 @@ pub(crate) struct CompiledManifest {
     /// Union of route payload/predicate and retained-plan fields per node type,
     /// precomputed so the retained collector performs no per-node selection work.
     pub(crate) merged_field_mask_by_type: Vec<FieldMask>,
+    /// Fields serialized once for matching nodes in the ancestor closure.
+    pub(crate) ancestor_field_mask_by_type: Vec<FieldMask>,
+    pub(crate) ancestor_types: NodeTypeSet,
+    pub(crate) ancestor_child_parent_types: NodeTypeSet,
+    pub(crate) has_ancestor_hydration: bool,
+    pub(crate) ancestry_depth: u32,
     /// Predicate fields without direct scalar accessors; only these fields need
     /// materialization before matching.
     pub(crate) fallback_predicate_mask_by_type: Vec<FieldMask>,
@@ -337,6 +343,92 @@ pub(crate) fn decode_route_manifest(
             fields.push(field_id);
         }
     }
+    let (
+        mut ancestor_field_mask_by_type,
+        ancestor_types,
+        ancestor_child_parent_types,
+        ancestry_depth,
+    ) = if cursor == word_limit {
+        (
+            Vec::new(),
+            NodeTypeSet::default(),
+            NodeTypeSet::default(),
+            u32::MAX,
+        )
+    } else {
+        let ancestor_type_count = word(cursor) as usize;
+        cursor += 1;
+        let mut field_masks = if ancestor_type_count == 0 {
+            Vec::new()
+        } else {
+            vec![FieldMask::none(); NODE_TYPE_COUNT + 1]
+        };
+        for _ in 0..ancestor_type_count {
+            if cursor + 2 > word_limit {
+                return Err(Error::new(
+                    Status::InvalidArg,
+                    "truncated ancestor field plan",
+                ));
+            }
+            let type_id = word(cursor);
+            let field_count = word(cursor + 1) as usize;
+            cursor += 2;
+            if type_id == 0
+                || type_id as usize > NODE_TYPE_COUNT
+                || !field_masks[type_id as usize].is_empty()
+                || cursor + field_count > word_limit
+            {
+                return Err(Error::new(
+                    Status::InvalidArg,
+                    "invalid ancestor field plan",
+                ));
+            }
+            let mut mask = FieldMask::none();
+            for _ in 0..field_count {
+                let field_id = word(cursor);
+                cursor += 1;
+                if field_key_name(field_id).is_none() || mask.wants(field_id) {
+                    return Err(Error::new(Status::InvalidArg, "invalid ancestor field id"));
+                }
+                mask = mask.with(field_id);
+            }
+            field_masks[type_id as usize] = mask;
+        }
+        let mut decode_type_set = |label: &str| -> Result<NodeTypeSet> {
+            if cursor >= word_limit {
+                return Err(Error::new(Status::InvalidArg, format!("missing {label}")));
+            }
+            let count = word(cursor) as usize;
+            cursor += 1;
+            if cursor + count > word_limit {
+                return Err(Error::new(Status::InvalidArg, format!("truncated {label}")));
+            }
+            let mut types = NodeTypeSet::default();
+            for _ in 0..count {
+                let type_id = word(cursor);
+                cursor += 1;
+                if type_id == 0 || type_id as usize > NODE_TYPE_COUNT || !types.insert(type_id) {
+                    return Err(Error::new(Status::InvalidArg, format!("invalid {label}")));
+                }
+            }
+            Ok(types)
+        };
+        let types = decode_type_set("ancestor node types")?;
+        let child_parent_types = decode_type_set("ancestor child parent types")?;
+        if cursor >= word_limit {
+            return Err(Error::new(Status::InvalidArg, "missing ancestry depth"));
+        }
+        let depth = word(cursor);
+        cursor += 1;
+        (field_masks, types, child_parent_types, depth)
+    };
+    if ancestor_field_mask_by_type.is_empty() && !ancestor_child_parent_types.is_empty() {
+        ancestor_field_mask_by_type.resize(NODE_TYPE_COUNT + 1, FieldMask::none());
+    }
+    let has_ancestor_hydration = !ancestor_child_parent_types.is_empty()
+        || ancestor_field_mask_by_type
+            .iter()
+            .any(|mask| !mask.is_empty());
     if cursor != word_limit {
         return Err(Error::new(
             Status::InvalidArg,
@@ -400,6 +492,11 @@ pub(crate) fn decode_route_manifest(
         retention_capabilities: flags >> 2,
         structural_parent_types,
         merged_field_mask_by_type,
+        ancestor_field_mask_by_type,
+        ancestor_types,
+        ancestor_child_parent_types,
+        has_ancestor_hydration,
+        ancestry_depth,
         fallback_predicate_mask_by_type,
         needs_semantics,
     })

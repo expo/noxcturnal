@@ -101,12 +101,16 @@ const v24 = defineVisitor('Identifier|StringLiteral', { fields: ['name', 'value'
 const v25 = defineVisitor('Expression', { fields: ['calleeName'], scope: true }, path => {
   path.scope.hasBinding('x');
 });
-const v26 = defineVisitor('VariableDeclaration', { scope: true, ancestry: 'findParent' }, path => {
-  path.findParent(parent => parent.type === 'Program');
-});
+const v26 = defineVisitor(
+  'VariableDeclaration',
+  { scope: true, ancestry: { mode: 'findParent' } },
+  path => {
+    path.findParent(parent => parent.type === 'Program');
+  },
+);
 const v27 = defineVisitor(
   'CallExpression',
-  { ancestry: 'functionParent', controlFlow: ['skip'] },
+  { ancestry: { mode: 'functionParent' }, controlFlow: ['skip'] },
   path => {
     path.getFunctionParent();
     path.skip();

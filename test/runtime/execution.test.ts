@@ -611,7 +611,7 @@ test('provides parent paths backed by native indexed records', () => {
   const plugin = defineNativePlugin({
     name: 'parent',
     visitors: [
-      defineVisitor('NumericLiteral', { ancestry: 'parent' }, path => {
+      defineVisitor('NumericLiteral', { ancestry: { mode: 'parent' } }, path => {
         parentType = path.parentPath?.node.type;
       }),
     ],
@@ -629,7 +629,7 @@ test('provides lazy ancestor helpers without recursive node materialization', ()
   const plugin = defineNativePlugin({
     name: 'ancestors',
     visitors: [
-      defineVisitor('NumericLiteral', { ancestry: 'programParent' }, path => {
+      defineVisitor('NumericLiteral', { ancestry: { mode: 'programParent' } }, path => {
         ancestors = [
           path.findParent(parent => parent.node.type === 'ReturnStatement')?.node.type,
           path.getFunctionParent()?.node.type,
@@ -644,6 +644,301 @@ test('provides lazy ancestor helpers without recursive node materialization', ()
     defineNativePipeline({ phases: [{ name: 'visit', plugins: [plugin] }] }),
   );
   assert.deepEqual(ancestors, ['ReturnStatement', 'Function', 'Program']);
+});
+
+test('enforces direct, bounded, and function-parent ancestry reach', () => {
+  const observed: unknown[] = [];
+  const plugin = defineNativePlugin({
+    name: 'ancestry-reach',
+    visitors: [
+      defineVisitor('NumericLiteral', { ancestry: { mode: 'parent' } }, path => {
+        // @ts-expect-error Direct-parent mode deliberately does not expose a second hop.
+        observed.push(['parent', path.parentPath?.node.type, path.parentPath?.parentPath]);
+      }),
+      defineVisitor('NumericLiteral', { ancestry: { mode: 2 } }, path => {
+        observed.push([
+          'bounded',
+          path.parentPath?.node.type,
+          path.parentPath?.parentPath?.node.type,
+          path.parentPath?.parentPath?.parentPath,
+        ]);
+      }),
+      defineVisitor('NumericLiteral', { ancestry: { mode: 'functionParent' } }, path => {
+        observed.push(['function', path.getFunctionParent()?.node.type]);
+      }),
+    ],
+  });
+  transform(
+    'function fixture() { return 1 }',
+    'fixture.js',
+    defineNativePipeline({ phases: [{ name: 'visit', plugins: [plugin] }] }),
+  );
+  assert.deepEqual(observed, [
+    ['parent', 'ReturnStatement', null],
+    ['bounded', 'ReturnStatement', 'FunctionBody', null],
+    ['function', 'Function'],
+  ]);
+});
+
+test('hydrates declared ancestor fields in the initial routed envelope', () => {
+  const names: unknown[] = [];
+  const plugin = defineNativePlugin({
+    name: 'ancestor-fields',
+    visitors: [
+      defineVisitor(
+        'CallExpression',
+        {
+          ancestry: {
+            mode: 'findParent',
+            routes: {
+              VariableDeclarator: { fields: ['bindingName'] },
+              AssignmentExpression: { fields: ['targetName'] },
+            },
+          },
+        },
+        path => {
+          const owner = path.findParent(
+            parent =>
+              parent.node.type === 'VariableDeclarator' ||
+              parent.node.type === 'AssignmentExpression',
+          );
+          if (owner?.node.type === 'VariableDeclarator') names.push(owner.node.bindingName);
+          if (owner?.node.type === 'AssignmentExpression') names.push(owner.node.targetName);
+        },
+      ),
+    ],
+  });
+  transform(
+    'const Foo = create(); exports.Bar = create(); obj["Baz"] = create(); obj[key] = create();',
+    'fixture.js',
+    defineNativePipeline({ phases: [{ name: 'visit', plugins: [plugin] }] }),
+    { maxFollowUpBatches: 0 },
+  );
+  assert.deepEqual(names, ['Foo', 'Bar', 'Baz', undefined]);
+});
+
+test('unions overlapping alias and concrete ancestor route fields', () => {
+  let observed: unknown;
+  const plugin = defineNativePlugin({
+    name: 'ancestor-alias-union',
+    visitors: [
+      defineVisitor(
+        'Identifier',
+        {
+          where: { name: { equals: 'object' } },
+          ancestry: {
+            mode: 'parent',
+            routes: {
+              MemberExpression: { fields: ['memberPath'] },
+              StaticMemberExpression: { fields: ['computed'] },
+            },
+          },
+        },
+        path => {
+          const parent = path.parentPath;
+          if (parent?.node.type === 'StaticMemberExpression')
+            observed = [parent.node.type, parent.node.memberPath, parent.node.computed];
+        },
+      ),
+    ],
+  });
+  transform(
+    'object.property;',
+    'fixture.js',
+    defineNativePipeline({ phases: [{ name: 'visit', plugins: [plugin] }] }),
+  );
+  assert.deepEqual(observed, ['StaticMemberExpression', 'object.property', false]);
+});
+
+test('projects simple binding names and unambiguous plain-assignment targets', () => {
+  const bindings: unknown[] = [];
+  const targets: unknown[] = [];
+  const plugin = defineNativePlugin({
+    name: 'assignment-fields',
+    visitors: [
+      defineVisitor('VariableDeclarator', { fields: ['bindingName'] }, path => {
+        bindings.push(path.node.bindingName);
+      }),
+      defineVisitor('AssignmentExpression', { fields: ['operator', 'targetName'] }, path =>
+        targets.push([path.node.operator, path.node.targetName]),
+      ),
+    ],
+  });
+  transform(
+    [
+      'const value = 1, { nested } = source;',
+      'Foo = value;',
+      'exports.Bar = value;',
+      'obj["Baz"] = value;',
+      'obj[key] = value;',
+      '({ nested } = value);',
+      'Foo += value;',
+    ].join('\n'),
+    'fixture.js',
+    defineNativePipeline({ phases: [{ name: 'visit', plugins: [plugin] }] }),
+  );
+  assert.deepEqual(bindings, ['value', undefined]);
+  assert.deepEqual(targets, [
+    ['=', 'Foo'],
+    ['=', 'Bar'],
+    ['=', 'Baz'],
+    ['=', undefined],
+    ['=', undefined],
+    ['+=', undefined],
+  ]);
+});
+
+test('hydrates ancestor child roles and provenance without follow-up native batches', () => {
+  let observed: unknown;
+  const plugin = defineNativePlugin({
+    name: 'ancestor-children',
+    visitors: [
+      defineVisitor(
+        'Identifier',
+        {
+          where: { name: { equals: 'value' } },
+          ancestry: {
+            mode: 'findParent',
+            routes: {
+              TryStatement: {
+                children: { block: { route: 'BlockStatement' } },
+              },
+            },
+          },
+        },
+        path => {
+          const statement = path.findParent(parent => parent.node.type === 'TryStatement');
+          const block = statement?.getChild('block');
+          observed = {
+            statement: statement?.node.id,
+            block: block?.node.id,
+            source: block?.getSource().text(),
+            parent: block?.parentPath?.node.id,
+          };
+        },
+      ),
+    ],
+  });
+  transform(
+    'try /* gap */ { use(value); } catch {}',
+    'fixture.js',
+    defineNativePipeline({ phases: [{ name: 'visit', plugins: [plugin] }] }),
+    { maxFollowUpBatches: 0 },
+  );
+  assert.deepEqual(observed, {
+    statement: 1,
+    block: 2,
+    source: '{ use(value); }',
+    parent: 1,
+  });
+});
+
+test('keeps hydrated ancestor capabilities identical on enter and exit', () => {
+  const observed: unknown[] = [];
+  const plugin = defineNativePlugin({
+    name: 'ancestor-enter-exit',
+    visitors: [
+      defineVisitor(
+        'CallExpression',
+        {
+          ancestry: {
+            mode: 'findParent',
+            routes: { VariableDeclarator: { fields: ['bindingName'] } },
+          },
+        },
+        {
+          enter(path) {
+            const owner = path.findParent(parent => parent.node.type === 'VariableDeclarator');
+            observed.push(owner?.node.type === 'VariableDeclarator' && owner.node.bindingName);
+          },
+          exit(path) {
+            const owner = path.findParent(parent => parent.node.type === 'VariableDeclarator');
+            observed.push(owner?.node.type === 'VariableDeclarator' && owner.node.bindingName);
+          },
+        },
+      ),
+    ],
+  });
+  transform(
+    'const owner = create();',
+    'fixture.js',
+    defineNativePipeline({ phases: [{ name: 'visit', plugins: [plugin] }] }),
+    { maxFollowUpBatches: 0 },
+  );
+  assert.deepEqual(observed, ['owner', 'owner']);
+});
+
+test('plans independent ancestry requirements for nested traversal visitors', () => {
+  const observed: unknown[] = [];
+  const nested = [
+    defineVisitor(
+      'CallExpression',
+      {
+        ancestry: {
+          mode: 'findParent',
+          routes: { VariableDeclarator: { fields: ['bindingName'] } },
+        },
+      },
+      path => {
+        const owner = path.findParent(parent => parent.node.type === 'VariableDeclarator');
+        observed.push(owner?.node.type === 'VariableDeclarator' && owner.node.bindingName);
+      },
+    ),
+  ];
+  const plugin = defineNativePlugin({
+    name: 'nested-ancestry',
+    visitors: [
+      defineVisitor('Function', { controlFlow: ['nested-traverse'], nested }, path =>
+        path.traverse(nested),
+      ),
+    ],
+  });
+  transform(
+    'function fixture() { const nestedOwner = create(); }',
+    'fixture.js',
+    defineNativePipeline({ phases: [{ name: 'visit', plugins: [plugin] }] }),
+  );
+  assert.deepEqual(observed, ['nestedOwner']);
+});
+
+test('rejects ancestor child roles omitted from a visitor despite phase-unioned hydration', () => {
+  let error: unknown;
+  const hydrated = defineNativePlugin({
+    name: 'child-reader',
+    visitors: [
+      defineVisitor(
+        'Identifier',
+        {
+          ancestry: {
+            mode: 'findParent',
+            routes: {
+              TryStatement: { children: { block: { route: 'BlockStatement' } } },
+            },
+          },
+        },
+        () => {},
+      ),
+    ],
+  });
+  const structural = defineNativePlugin({
+    name: 'child-structural',
+    visitors: [
+      defineVisitor('Identifier', { ancestry: { mode: 'findParent' } }, path => {
+        try {
+          // @ts-expect-error Deliberately exercise per-visitor child capability isolation.
+          path.findParent(parent => parent.node.type === 'TryStatement')?.getChild('block');
+        } catch (caught) {
+          error = caught;
+        }
+      }),
+    ],
+  });
+  transform(
+    'try { use(value); } catch {}',
+    'fixture.js',
+    defineNativePipeline({ phases: [{ name: 'visit', plugins: [hydrated, structural] }] }),
+  );
+  assert.match(String(error), /child-structural: undeclared child role TryStatement\.block/);
 });
 
 test('requires ancestry and scope payloads to be declared', () => {

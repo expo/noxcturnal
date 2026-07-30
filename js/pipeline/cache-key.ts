@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 
 import { classifyForTransform, parserFilename } from '../adapters/classification.js';
 import { parserAdapterCacheDescriptor } from '../adapters/registry.js';
-import type { NativePipeline } from '../contracts/visitor.js';
+import type { DefinedVisitor, NativePipeline } from '../contracts/visitor.js';
 import { nativeFlowErasureBuilt } from '../native/binding.js';
 import type { TransformOptions } from '../types.js';
 import { compilePhasePlan } from './compile.js';
@@ -29,10 +29,27 @@ export function pipelineCacheKey(
         name: plugin.name,
         editEffect: plugin.editEffect,
         options: plugin.options ?? null,
+        visitors: (plugin.visitors ?? []).map(visitorDescriptor),
       })),
     })),
   };
   return createHash('sha256').update(stableJson(descriptor)).digest('hex');
+}
+
+function visitorDescriptor(visitor: DefinedVisitor<any>): unknown {
+  const contract = visitor.contract;
+  return {
+    route: visitor.route,
+    fields: contract.fields,
+    where: contract.where ?? null,
+    scope: contract.scope,
+    ancestry: contract.ancestry ?? null,
+    children: contract.children ?? null,
+    controlFlow: contract.controlFlow,
+    nested: contract.nested.map(visitorDescriptor),
+    enter: visitor.enter != null,
+    exit: visitor.exit != null,
+  };
 }
 
 export function transformClassificationCacheKey(

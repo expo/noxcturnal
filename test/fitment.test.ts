@@ -19,7 +19,7 @@ const metroImports = defineNativePlugin<ImportState>({
       {
         fields: ['source'],
         scope: true,
-        ancestry: 'parent',
+        ancestry: { mode: 'parent' },
         children: {
           specifiers: { route: 'ImportSpecifier', fields: ['local', 'imported'] },
         },
@@ -202,7 +202,7 @@ const serverActions = defineNativePlugin<ActionState>({
       {
         fields: ['async', 'bodyEnd'],
         scope: true,
-        ancestry: 'programParent',
+        ancestry: { mode: 'programParent' },
         children: {
           body: {
             route: 'FunctionBody',

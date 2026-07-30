@@ -41,7 +41,10 @@ The lazy decorators wrapper intentionally delegates to the complete Babel decora
 - Complex construction uses escaped primitives, code templates, and natively validated expression or statement fragments. Generated syntax becomes observable only after a phase boundary.
 - Binding renames use Oxc semantic identities, not textual name matching, and preserve shorthand object/destructuring keys.
 - Scope ancestry comes from Oxc's complete semantic scope table through an on-demand packed integer buffer, so empty intermediate scopes are preserved without adding object transfer to ordinary event batches.
-- Ancestry and scope payloads are similarly opt-in through `PluginPlan.ancestry` and `semantics: ['scope']`; unused parent and scope words are omitted from the stateless packed hot path.
+- Ancestry and scope payloads are opt-in through each visitor contract. Summary-only
+  ancestry retains compact structural records; declared ancestry routes add sparse,
+  node-ID-keyed scalar and child records without duplicating them per routed event.
+  Unused parent, scope, and ancestor-field data remain absent from the packed hot path.
 - Transforms that legitimately share responsibility for the same tokens — dependency registration, ESM lowering, and polyfill rewrites converging on one import statement — should adopt `context.ensureReplace` intent keys instead of raw replacement, so the shared claim is an explicit contract (first owner wins, divergence is loud) rather than a byte-identical collision resolved by the convergent-edit fallback. `test/fitment.test.ts` expresses one such shared import-statement lowering.
 
 ## Remaining evidence gates

@@ -21,12 +21,12 @@ import type {
 } from './types.js';
 import { packRouteManifest, type NativeRouteManifestEntry } from '../protocol/manifest.js';
 import type {
-  AncestryCapability,
   ChildContract,
   DefinedVisitor,
   Handler,
   NativePlugin,
   PipelinePhase,
+  StoredVisitorContract,
   VisitorRouteSpec,
 } from '../contracts/visitor.js';
 import type {
@@ -84,6 +84,10 @@ function validateDefinedVisitor(pluginName: string, defined: DefinedVisitor<any>
     }
   };
   validateChildren(defined.route, defined.contract.children);
+  for (const [route, requirement] of Object.entries(defined.contract.ancestry?.routes ?? {})) {
+    validateRouteSpec(pluginName, 'ancestry route', route);
+    validateChildren(route, requirement.children);
+  }
   validatedVisitors.add(defined);
 }
 
@@ -117,7 +121,10 @@ function synthesizeVisitorPlan(
   const children: Record<string, string[]> = {};
   const controlFlow = new Set<ControlFlowCapability>();
   let scope = false;
-  let ancestry: AncestryCapability | undefined;
+  let ancestry: PreparedPluginPlan['ancestry'];
+  const ancestryFields: Record<string, NativeFieldKey[]> = {};
+  const ancestryChildren: Record<string, string[]> = {};
+  const ancestryTypes = new Set<NativeNodeType>();
   for (const { definition } of resolved) {
     const contract = definition.contract;
     subscriptions.push(definition.route);
@@ -144,7 +151,34 @@ function synthesizeVisitorPlan(
     attachChildren(concreteRouteTypes(definition.route), contract.children);
     for (const capability of contract.controlFlow) controlFlow.add(capability);
     scope ||= contract.scope;
-    if (contract.ancestry != null && ancestry == null) ancestry = contract.ancestry;
+    if (contract.ancestry != null) {
+      ancestry = mergeAncestry(ancestry, contract.ancestry);
+      for (const [route, requirement] of Object.entries(contract.ancestry.routes)) {
+        const ancestorTypes = concreteRouteTypes(route);
+        for (const type of ancestorTypes) ancestryTypes.add(type as NativeNodeType);
+        if ((requirement.fields?.length ?? 0) > 0)
+          for (const concrete of ancestorTypes)
+            mergeFieldRequests(ancestryFields, { [concrete]: requirement.fields! });
+        const attachAncestorChildren = (
+          parentTypes: readonly string[],
+          declared: Readonly<Record<string, ChildContract>> | undefined,
+        ) => {
+          if (declared == null) return;
+          for (const parentType of parentTypes) {
+            const roles = (ancestryChildren[parentType] ??= []);
+            for (const role of Object.keys(declared)) if (!roles.includes(role)) roles.push(role);
+          }
+          for (const child of Object.values(declared)) {
+            const childTypes = concreteRouteTypes(child.route);
+            if ((child.fields?.length ?? 0) > 0)
+              for (const concrete of childTypes)
+                mergeFieldRequests(ancestryFields, { [concrete]: child.fields! });
+            attachAncestorChildren(childTypes, child.children);
+          }
+        };
+        attachAncestorChildren(ancestorTypes, requirement.children);
+      }
+    }
     for (const nested of contract.nested) {
       validateDefinedVisitor(plugin.name, nested);
       for (const concrete of concreteRouteTypes(nested.route)) {
@@ -155,6 +189,40 @@ function synthesizeVisitorPlan(
         if (nestedFields.length > 0)
           mergeFieldRequests(fields, { [concrete]: nestedFields as NativeFieldKey[] });
       }
+      const collectNestedAncestry = (visitor: DefinedVisitor<any>) => {
+        const nestedContract = visitor.contract;
+        if (nestedContract.ancestry != null) {
+          ancestry = mergeAncestry(ancestry, nestedContract.ancestry);
+          const attach = (
+            route: string,
+            requestedFields: readonly NativeFieldKey[],
+            declaredChildren: Readonly<Record<string, ChildContract>> | undefined,
+          ) => {
+            const concreteTypes = concreteRouteTypes(route);
+            for (const type of concreteTypes) ancestryTypes.add(type as NativeNodeType);
+            if (requestedFields.length > 0)
+              for (const type of concreteTypes)
+                mergeFieldRequests(ancestryFields, { [type]: requestedFields });
+            if (declaredChildren != null) {
+              for (const type of concreteTypes) {
+                const roles = (ancestryChildren[type] ??= []);
+                for (const role of Object.keys(declaredChildren))
+                  if (!roles.includes(role)) roles.push(role);
+              }
+              for (const child of Object.values(declaredChildren))
+                attach(child.route, child.fields ?? [], child.children);
+            }
+          };
+          for (const [route, requirement] of Object.entries(nestedContract.ancestry.routes))
+            attach(route, requirement.fields, requirement.children);
+        }
+        scope ||= nestedContract.scope;
+        for (const deeper of nestedContract.nested) {
+          validateDefinedVisitor(plugin.name, deeper);
+          collectNestedAncestry(deeper);
+        }
+      };
+      collectNestedAncestry(nested);
     }
   }
   return {
@@ -164,8 +232,83 @@ function synthesizeVisitorPlan(
     controlFlow: controlFlow.size > 0 ? [...controlFlow] : undefined,
     scope: scope || undefined,
     ancestry,
+    ancestryFields:
+      Object.keys(ancestryFields).length > 0
+        ? (ancestryFields as PreparedPluginPlan['ancestryFields'])
+        : undefined,
+    ancestryChildren: Object.keys(ancestryChildren).length > 0 ? ancestryChildren : undefined,
+    ancestryTypes: ancestryTypes.size > 0 ? [...ancestryTypes] : undefined,
     resolvedVisitors: resolved,
   };
+}
+
+function ancestryReach(mode: NonNullable<PreparedPluginPlan['ancestry']>['mode']): number {
+  if (typeof mode === 'number') return mode;
+  return mode === 'parent' ? 1 : Number.POSITIVE_INFINITY;
+}
+
+function mergeAncestry(
+  left: PreparedPluginPlan['ancestry'],
+  right: NonNullable<PreparedPluginPlan['ancestry']>,
+): NonNullable<PreparedPluginPlan['ancestry']> {
+  if (left == null) return right;
+  const leftReach = ancestryReach(left.mode);
+  const rightReach = ancestryReach(right.mode);
+  const mode =
+    rightReach > leftReach
+      ? right.mode
+      : leftReach > rightReach
+        ? left.mode
+        : left.mode === 'programParent' || right.mode === 'programParent'
+          ? 'programParent'
+          : left.mode === 'functionParent' || right.mode === 'functionParent'
+            ? 'functionParent'
+            : left.mode;
+  const routes: Record<
+    string,
+    {
+      readonly fields: readonly NativeFieldKey[];
+      readonly children: Readonly<Record<string, ChildContract>> | undefined;
+    }
+  > = {};
+  for (const route of new Set([...Object.keys(left.routes), ...Object.keys(right.routes)])) {
+    const first = left.routes[route];
+    const second = right.routes[route];
+    const fields = [...new Set([...(first?.fields ?? []), ...(second?.fields ?? [])])];
+    routes[route] = Object.freeze({
+      fields,
+      children: mergeChildContracts(first?.children, second?.children),
+    });
+  }
+  return Object.freeze({
+    mode,
+    routes: Object.freeze(routes),
+  });
+}
+
+function mergeChildContracts(
+  left: Readonly<Record<string, ChildContract>> | undefined,
+  right: Readonly<Record<string, ChildContract>> | undefined,
+): Readonly<Record<string, ChildContract>> | undefined {
+  if (left == null) return right;
+  if (right == null) return left;
+  const result: Record<string, ChildContract> = {};
+  for (const role of new Set([...Object.keys(left), ...Object.keys(right)])) {
+    const first = left[role];
+    const second = right[role];
+    if (first == null || second == null) {
+      result[role] = (first ?? second)!;
+      continue;
+    }
+    result[role] = Object.freeze({
+      route: (first.route === second.route
+        ? first.route
+        : [first.route, second.route].join('|')) as VisitorRouteSpec,
+      fields: [...new Set([...(first.fields ?? []), ...(second.fields ?? [])])],
+      children: mergeChildContracts(first.children, second.children),
+    });
+  }
+  return Object.freeze(result);
 }
 
 const typedCapabilitiesCache = new WeakMap<DefinedVisitor<any>, RouteCapabilities>();
@@ -192,14 +335,44 @@ function typedCapabilities(defined: DefinedVisitor<any>): RouteCapabilities {
     }
     capabilities = {
       scope: contract.scope,
-      ancestry: contract.ancestry != null,
+      ancestry: contract.ancestry,
+      ancestorFields: ancestryRules(
+        contract.ancestry,
+        'fields',
+      ) as RouteCapabilities['ancestorFields'],
+      ancestorChildRules: ancestryRules(contract.ancestry, 'children'),
       childRules,
       controlFlow: contract.controlFlow,
       declaredFields: contract.fields,
     };
     typedCapabilitiesCache.set(defined, capabilities);
   }
-  return capabilities;
+  return capabilities!;
+}
+
+function ancestryRules(
+  ancestry: StoredVisitorContract['ancestry'],
+  kind: 'fields' | 'children',
+): Record<string, string[]> | null {
+  if (ancestry == null) return null;
+  const rules: Record<string, string[]> = {};
+  const attach = (
+    route: string,
+    fields: readonly NativeFieldKey[],
+    children: Readonly<Record<string, ChildContract>> | undefined,
+  ) => {
+    for (const type of concreteRouteTypes(route)) {
+      const values = kind === 'fields' ? fields : Object.keys(children ?? {});
+      const target = (rules[type] ??= []);
+      for (const value of values) if (!target.includes(value)) target.push(value);
+    }
+    for (const child of Object.values(children ?? {}))
+      attach(child.route, child.fields ?? [], child.children);
+  };
+  for (const [route, requirement] of Object.entries(ancestry.routes)) {
+    attach(route, requirement.fields, requirement.children);
+  }
+  return rules;
 }
 
 /** A plugin's plan is fixed by its definition, and a phase's preparation by the
@@ -276,6 +449,7 @@ export function preparePhase(phase: PipelinePhase): PreparedPhase {
     includeScope ||= plan.scope === true;
     includeParent ||= plan.ancestry != null;
     mergeFieldRequests(fieldRequests, plan.fields ?? {});
+    mergeFieldRequests(fieldRequests, plan.ancestryFields ?? {});
     for (const { definition, where } of plan.resolvedVisitors) {
       const matchFields = Object.keys(where ?? {});
       for (const part of definition.route.split('|')) {
@@ -310,6 +484,8 @@ export function preparePhase(phase: PipelinePhase): PreparedPhase {
       retentionCapabilities |= RETAIN_MODULE_FACTS;
     if (plan.children && Object.keys(plan.children).length > 0)
       retentionCapabilities |= RETAIN_CHILDREN;
+    if (plan.ancestryChildren && Object.keys(plan.ancestryChildren).length > 0)
+      retentionCapabilities |= RETAIN_CHILDREN;
     if (
       plan.controlFlow?.includes('nested-traverse') ||
       plan.controlFlow?.includes('dynamic-subscriptions')
@@ -330,6 +506,19 @@ export function preparePhase(phase: PipelinePhase): PreparedPhase {
   const structuralParentTypes = [
     ...new Set(activePlugins.flatMap(plugin => Object.keys(plans.get(plugin)?.children ?? {}))),
   ];
+  const ancestorChildParentTypes = [
+    ...new Set(
+      activePlugins.flatMap(plugin => Object.keys(plans.get(plugin)?.ancestryChildren ?? {})),
+    ),
+  ];
+  const ancestryDepth = activePlugins.reduce(
+    (depth, plugin) =>
+      Math.max(
+        depth,
+        plans.get(plugin)?.ancestry == null ? 0 : ancestryReach(plans.get(plugin)!.ancestry!.mode),
+      ),
+    0,
+  );
   const prepared: PreparedPhase = {
     activePlugins,
     plans,
@@ -340,8 +529,11 @@ export function preparePhase(phase: PipelinePhase): PreparedPhase {
     retentionCapabilities,
     requiresIndexBase:
       requiresNativeQueries ||
-      (retentionCapabilities & (RETAIN_CHILDREN | RETAIN_INSPECTION)) !== 0,
+      (retentionCapabilities & (RETAIN_CHILDREN | RETAIN_INSPECTION)) !== 0 ||
+      activePlugins.some(plugin => Object.keys(plans.get(plugin)?.ancestryFields ?? {}).length > 0),
     structuralParentTypes,
+    ancestorChildParentTypes,
+    ancestryDepth,
     runtimeEditEffect:
       phase.editEffect ??
       maxEditEffect(
@@ -436,10 +628,25 @@ function compilePhaseRoutes(
     dispatchRoutes.push(grouped);
   }
   const structuralParentTypes = [
-    ...new Set(plugins.flatMap(plugin => Object.keys(plans.get(plugin)?.children ?? {}))),
+    ...new Set(
+      plugins.flatMap(plugin => [
+        ...Object.keys(plans.get(plugin)?.children ?? {}),
+        ...Object.keys(plans.get(plugin)?.ancestryChildren ?? {}),
+      ]),
+    ),
   ];
   const retainedFields: Record<string, string[]> = {};
+  const ancestorRetainedFields: Record<string, string[]> = {};
+  const ancestorTypes = new Set<string>();
+  const ancestorChildParentTypes = new Set<string>();
   for (const plugin of plugins) mergeFieldRequests(retainedFields, plans.get(plugin)?.fields ?? {});
+  for (const plugin of plugins) {
+    mergeFieldRequests(retainedFields, plans.get(plugin)?.ancestryFields ?? {});
+    mergeFieldRequests(ancestorRetainedFields, plans.get(plugin)?.ancestryFields ?? {});
+    for (const type of plans.get(plugin)?.ancestryTypes ?? []) ancestorTypes.add(type);
+    for (const type of Object.keys(plans.get(plugin)?.ancestryChildren ?? {}))
+      ancestorChildParentTypes.add(type);
+  }
   const manifest = packRouteManifest(
     dispatchRoutes,
     includeParent,
@@ -447,6 +654,19 @@ function compilePhaseRoutes(
     retentionCapabilities,
     structuralParentTypes,
     retainedFields,
+    ancestorRetainedFields,
+    [...ancestorTypes],
+    [...ancestorChildParentTypes],
+    plugins.reduce(
+      (depth, plugin) =>
+        Math.max(
+          depth,
+          plans.get(plugin)?.ancestry == null
+            ? 0
+            : ancestryReach(plans.get(plugin)!.ancestry!.mode),
+        ),
+      0,
+    ),
   );
   return { routes, dispatchRoutes, manifest };
 }
@@ -512,9 +732,33 @@ export function compileNestedVisitor(visitor: NestedVisitor): CompiledNestedRout
   }[] = [];
   const capabilities: RouteCapabilities[] = [];
   const payloads: (readonly NativeFieldKey[])[] = [];
+  const ancestorFields: Record<string, string[]> = {};
+  const ancestorTypes = new Set<string>();
+  const ancestorChildParentTypes = new Set<string>();
+  let ancestryDepth = 0;
   for (const defined of visitor) {
     validateDefinedVisitor('nested', defined);
     const caps = typedCapabilities(defined);
+    if (defined.contract.ancestry != null) {
+      ancestryDepth = Math.max(ancestryDepth, ancestryReach(defined.contract.ancestry.mode));
+      const attach = (
+        route: string,
+        fields: readonly NativeFieldKey[],
+        children: Readonly<Record<string, ChildContract>> | undefined,
+      ) => {
+        const concreteTypes = concreteRouteTypes(route);
+        for (const type of concreteTypes) ancestorTypes.add(type);
+        if (fields.length > 0)
+          for (const type of concreteTypes) mergeFieldRequests(ancestorFields, { [type]: fields });
+        if (children != null) {
+          for (const type of concreteTypes) ancestorChildParentTypes.add(type);
+          for (const child of Object.values(children))
+            attach(child.route, child.fields ?? [], child.children);
+        }
+      };
+      for (const [route, requirement] of Object.entries(defined.contract.ancestry.routes))
+        attach(route, requirement.fields, requirement.children);
+    }
     for (const { nodeType, predicates } of typedRouteExpansion(defined, defined.contract.where)) {
       for (const side of ['enter', 'exit'] as const) {
         const callback = defined[side];
@@ -535,10 +779,22 @@ export function compileNestedVisitor(visitor: NestedVisitor): CompiledNestedRout
     payloadFields: payloads[id],
   }));
   const compiled: CompiledNestedRoutes = {
-    manifest: packRouteManifest(routes, true, true),
+    manifest: packRouteManifest(
+      routes,
+      true,
+      true,
+      0,
+      [...ancestorChildParentTypes],
+      ancestorFields,
+      ancestorFields,
+      [...ancestorTypes],
+      [...ancestorChildParentTypes],
+      ancestryDepth,
+    ),
     callbacks: variants.map(variant => variant.callbacks),
     routes,
     capabilities,
+    ancestorChildParentTypes: [...ancestorChildParentTypes],
   };
   nestedRouteCaches.set(visitor as object, compiled);
   return compiled;
@@ -565,12 +821,5 @@ export function nestedManifest(
   compiled: CompiledNestedRoutes,
 ): Buffer {
   assertNestedFieldsDeclared(plugin, plan, compiled.routes);
-  return packRouteManifest(
-    compiled.routes.map(route => ({
-      ...route,
-      payloadFields: route.payloadFields,
-    })),
-    true,
-    true,
-  );
+  return compiled.manifest;
 }

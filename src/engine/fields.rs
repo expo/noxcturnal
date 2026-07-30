@@ -2,8 +2,9 @@ use oxc_allocator::{Allocator, Vec as ArenaVec};
 use oxc_ast::{
     AstKind,
     ast::{
-        ClassType, ExportDefaultDeclarationKind, Expression, FunctionType, IdentifierReference,
-        ImportOrExportKind, PropertyKind, VariableDeclarationKind,
+        AssignmentTarget, BindingPattern, ClassType, ExportDefaultDeclarationKind, Expression,
+        FunctionType, IdentifierReference, ImportOrExportKind, PropertyKind,
+        VariableDeclarationKind,
     },
 };
 use oxc_semantic::Scoping;
@@ -187,6 +188,32 @@ fn static_member_root<'a, 'b>(
     }
 }
 
+fn assignment_target_name(target: &AssignmentTarget<'_>) -> Option<String> {
+    if let Some(name) = target.get_identifier_name() {
+        return Some(name.to_owned());
+    }
+    fn expression_name(expression: &Expression<'_>) -> Option<String> {
+        match expression {
+            Expression::Identifier(identifier) => Some(identifier.name.to_string()),
+            Expression::StaticMemberExpression(member) => Some(member.property.name.to_string()),
+            Expression::ComputedMemberExpression(member) => {
+                member.static_property_name().map(|name| name.to_string())
+            }
+            Expression::TSAsExpression(expression) => expression_name(&expression.expression),
+            Expression::TSSatisfiesExpression(expression) => {
+                expression_name(&expression.expression)
+            }
+            Expression::TSNonNullExpression(expression) => expression_name(&expression.expression),
+            Expression::TSTypeAssertion(expression) => expression_name(&expression.expression),
+            Expression::ParenthesizedExpression(expression) => {
+                expression_name(&expression.expression)
+            }
+            _ => None,
+        }
+    }
+    target.get_expression().and_then(expression_name)
+}
+
 pub(crate) struct DirectPackedFields {
     pub(crate) words: [u32; 32],
     pub(crate) len: usize,
@@ -318,6 +345,13 @@ pub(crate) fn packed_fields_direct(
             if wants(field_ids::OPERATOR) {
                 let operator = intern_packed(strings, expression.operator.as_str());
                 push(field_ids::OPERATOR, operator);
+            }
+            if wants(field_ids::TARGET_NAME)
+                && expression.operator.as_str() == "="
+                && let Some(name) = assignment_target_name(&expression.left)
+            {
+                let name = intern_packed(strings, &name);
+                push(field_ids::TARGET_NAME, name);
             }
         }
         AstKind::UpdateExpression(expression) => {
@@ -642,6 +676,12 @@ pub(crate) fn packed_fields_direct(
                 field_ids::HAS_INITIALIZER,
                 0x8000_0000 | u32::from(declarator.init.is_some()),
             );
+            if wants(field_ids::BINDING_NAME)
+                && let BindingPattern::BindingIdentifier(identifier) = &declarator.id
+            {
+                let name = intern_packed(strings, &identifier.name);
+                push(field_ids::BINDING_NAME, name);
+            }
         }
         AstKind::Directive(directive) => {
             if wants(field_ids::VALUE) {
@@ -799,6 +839,11 @@ pub(crate) fn fields(
                 "operator",
                 expression.operator.as_str().into()
             );
+            if expression.operator.as_str() == "="
+                && let Some(name) = assignment_target_name(&expression.left)
+            {
+                push!(field_ids::TARGET_NAME, "targetName", name);
+            }
         }
         AstKind::CallExpression(call) => {
             push!(field_ids::OPTIONAL, "optional", call.optional.to_string());
@@ -1095,6 +1140,13 @@ pub(crate) fn fields(
                 "hasInitializer",
                 declarator.init.is_some().to_string()
             );
+            if let BindingPattern::BindingIdentifier(identifier) = &declarator.id {
+                push!(
+                    field_ids::BINDING_NAME,
+                    "bindingName",
+                    identifier.name.to_string()
+                );
+            }
         }
         AstKind::Directive(directive) => {
             push!(field_ids::VALUE, "value", directive.directive.to_string());

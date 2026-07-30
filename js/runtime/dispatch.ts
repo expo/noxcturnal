@@ -278,6 +278,8 @@ export function createDispatcher(
         activeTraversals.add(key);
         try {
           const compiled = services.compileNestedVisitor(nested);
+          if (compiled.ancestorChildParentTypes.length > 0)
+            session.seedRetainedChildTypes(compiled.ancestorChildParentTypes);
           replayCustomRouted(
             session.nextRoutedPacked(services.nestedManifest(plugin, plans.get(plugin), compiled), {
               start: target.start,
@@ -300,12 +302,26 @@ export function createDispatcher(
           (!scopeOnly || candidate.scopeId === target.scopeId);
         replayRoutedFollowup(plugin, entry, context, expanded, root, filter);
       },
-      parent(_target, parentId) {
+      parent(_target, parentId, ancestryDepth) {
+        const cached = runtime.pathCache?.[parentId];
+        if (cached) return cached;
         const parent = session.event(parentId);
-        return parent ? makePath(runtime, parent) : null;
+        if (!parent) return null;
+        const path = makePath(runtime, parent, ancestryDepth);
+        if (runtime.pathCache) runtime.pathCache[parentId] = path;
+        return path;
       },
-      children(target) {
-        return session.children(target.id).map(child => makePath(runtime, child));
+      children(target, ancestryDepth) {
+        return session.children(target.id).map(child => {
+          if (ancestryDepth > 0) {
+            const cached = runtime.pathCache?.[child.id];
+            if (cached) return cached;
+            const path = makePath(runtime, child, ancestryDepth);
+            if (runtime.pathCache) runtime.pathCache[child.id] = path;
+            return path;
+          }
+          return makePath(runtime, child, 0);
+        });
       },
       allowsChild(type, role) {
         // childRules is normalized to concrete parent types when the visitor is
@@ -316,12 +332,27 @@ export function createDispatcher(
         return true;
       },
       allowsAncestry() {
-        return capabilities.ancestry;
+        return capabilities.ancestry != null;
       },
       allowsScope() {
         return capabilities.scope;
       },
       scopeCache: new Map(),
+      pathCache: undefined,
+      cacheAncestorPaths:
+        typeof capabilities.ancestry?.mode !== 'number' &&
+        (Object.values(capabilities.ancestorFields ?? {}).some(
+          fields => (fields?.length ?? 0) > 0,
+        ) ||
+          Object.values(capabilities.ancestorChildRules ?? {}).some(
+            roles => (roles?.length ?? 0) > 0,
+          )),
+      ancestryDepthLimit:
+        capabilities.ancestry?.mode === 'parent'
+          ? 1
+          : typeof capabilities.ancestry?.mode === 'number'
+            ? capabilities.ancestry.mode
+            : Number.POSITIVE_INFINITY,
       assertControl(capability) {
         if (capabilities.controlFlow.includes(capability)) {
           return;
@@ -334,6 +365,7 @@ export function createDispatcher(
       capabilities,
       provenance,
     };
+    if (runtime.cacheAncestorPaths) runtime.pathCache = new Array(session.nodeCapacity);
     return runtime;
   };
   const dispatchOne = (
@@ -372,6 +404,8 @@ export function createDispatcher(
     context: PluginContext,
   ) => {
     const compiled = services.compileNestedVisitor(visitor);
+    session.reserveEventCache(routedBatch.nodeCount);
+    if (routedBatch.includeParent) session.seedSummaries(routedBatch.parentSummaries);
     const synthetic = { name: 'nested' };
     const entry = {
       context,
@@ -395,6 +429,7 @@ export function createDispatcher(
             callbacks,
           ),
       ),
+      event => session.cacheEvent(event),
     );
   };
   const followupRouteCache = new Map<
@@ -483,7 +518,7 @@ export function createDispatcher(
       const callback = callbacks[0];
       return (event: NativeEvent) => {
         currentSequence = event.sequence;
-        callback(new NodePathImpl(runtime, event), entry.state);
+        callback(new NodePathImpl(runtime, event, 0), entry.state);
       };
     }
     return (event: NativeEvent) => {

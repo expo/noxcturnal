@@ -156,9 +156,51 @@ metadata, or diagnostics, the consumer must include the relevant values in
 its own transform-result cache key. Parser selection, preflight options, and
 other Noxcturnal-owned transform options remain part of the library key.
 
-Every visitor is a typed contract beside its callback: `defineVisitor(route, contract, handler)` declares the payload `fields`, native `where` predicates, `scope`, `ancestry`, `children`, `controlFlow`, and (when needed) `nested` visitor requirements — and the callback's path type is derived from exactly that contract, so undeclared fields and capability methods are TypeScript errors as well as runtime errors. The compiled native route manifest is generated from the same normalized contract object. The plugin `contract` declares context-level requirements (metadata ownership, semantic queries). Predicate values that vary per configuration are declared with `parameter(name)` and bound with `plugin.withParameters(values)`; there is no per-file hook that can change a contract.
+Every visitor is a typed contract beside its callback: `defineVisitor(route, contract, handler)` declares the payload `fields`, native `where` predicates, `scope`, `ancestry`, `children`, `controlFlow`, and (when needed) `nested` visitor requirements — and the callback's path type is derived from exactly that contract, so undeclared scalar fields are TypeScript errors while operational capabilities remain runtime-validated. The compiled native route manifest is generated from the same normalized contract object. The plugin `contract` declares context-level requirements (metadata ownership, semantic queries). Predicate values that vary per configuration are declared with `parameter(name)` and bound with `plugin.withParameters(values)`; there is no per-file hook that can change a contract.
 
 The TypeScript API derives its node and scalar-field names from the generated Oxc protocol schema: per-route declarable fields come from the same generated table the native predicate validator uses. Contracts narrow `path.node` to base identity plus declared fields (including `ReferencedIdentifier` and collapsed function/class routes), invalid route/field/capability literals are rejected, and the generic analysis value returned by `analyze` flows into `apply`. Composite routes such as `'Identifier|StringLiteral'` intentionally receive open field typing; use `path.is(...)` when a branch needs a specific view.
+
+Ancestry uses an object contract. Legacy strings and bare numeric values are not
+accepted: migrate `ancestry: 'findParent'` to
+`ancestry: { mode: 'findParent' }`, and `ancestry: 2` to
+`ancestry: { mode: 2 }`. Modes retain their existing method surface:
+`parent` retains the direct parent, `findParent` retains the chain,
+`functionParent` adds `getFunctionParent`, and `programParent` adds
+`getProgramParent`. Positive integers retain a bounded chain.
+
+Ancestor payload is independently declared with ordinary route, field, and child
+contracts:
+
+```ts
+defineVisitor(
+  'CallExpression',
+  {
+    ancestry: {
+      mode: 'findParent',
+      routes: {
+        VariableDeclarator: { fields: ['bindingName'] },
+        AssignmentExpression: { fields: ['targetName'] },
+        TryStatement: {
+          children: { block: { route: 'BlockStatement' } },
+        },
+      },
+    },
+  },
+  path => {
+    const owner = path.findParent(parent => parent.node.type === 'VariableDeclarator');
+    owner?.node.bindingName;
+  },
+);
+```
+
+Route aliases and composites are supported, but ancestry routes cannot declare
+`where`: hydration is fixed by node type rather than runtime values. A type guard
+on `ancestor.node.type` narrows its declared fields. Declared ancestor children
+use `get`, `getChild`, and `getChildList`, and their `getSource()` fragments retain
+source provenance. Summary-only ancestry transfers IDs, types, ranges, and parent
+relationships only. Hydrated ancestry adds one sparse record per unique matching
+ancestor or retained child, shared across routed descendants; phases without
+hydrated routes allocate no ancestor-field records.
 
 ## Implemented surface
 
@@ -166,7 +208,7 @@ The TypeScript API derives its node and scalar-field names from the generated Ox
 - Compiled binary route manifests and routed tapes with native scalar predicates, numeric JavaScript dispatch, explicit payload fields, and no runtime timing instrumentation.
 - Optional analyze/apply lifecycle: every plugin decision is collected before any apply hook runs, so unsupported files bail out from pristine input without speculative mutation.
 - Arbitrary compact Oxc node events with stable per-parse node IDs, parent summaries, scope IDs, typed scalar fields, semantic global-reference facts, and UTF-16 ranges. The integer node/field protocol is generated and checked against the pinned Oxc `AstKind` definition.
-- Lazy compact ancestor paths with `findParent`, function/program-parent helpers, declared field filtering, and explicit batched `inspect` for additional shallow facts.
+- Compact ancestor paths with bounded retention, `findParent`, function/program-parent helpers, TypeScript-declared scalar fields, runtime-validated child roles, and sparse shared hydration in the initial routed envelope.
 - Enter/exit visitors, per-plugin `skip` and `stop`, pipeline-wide stop, targeted `path.traverse`, subtree/scope widening, program revisits, and bounded follow-up batches.
 - One internally retained columnar index with deterministic close, cached native queries, targeted inspection, UID generation, memory limits, and transactional commit. The compiled retention manifest is authoritative; missing facilities fail instead of widening subscriptions or selecting an event-store fallback.
 - Binding queries include declaration, read/write references, and lexical captures as ready-to-use compact node views. Constant queries conservatively evaluate side-effect-free literal, unary, binary, logical, conditional, parenthesized, and sequence expressions; requested IDs return through a targeted packed buffer rather than transferring every expression. Module events expose import/export specifiers, declaration kinds, directives, and common call/construction summaries needed by source transformers.

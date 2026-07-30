@@ -260,6 +260,38 @@ test('stable plugin definitions receive current per-transform plugin data', () =
   );
 });
 
+test('pipeline cache keys include normalized ancestry requirements', () => {
+  const pipeline = (fields: readonly ('bindingName' | 'kind')[]) =>
+    defineNativePipeline({
+      phases: [
+        {
+          name: 'visit',
+          plugins: [
+            defineNativePlugin({
+              name: 'same-plugin-name',
+              visitors: [
+                defineVisitor(
+                  'CallExpression',
+                  {
+                    ancestry: {
+                      mode: 'findParent',
+                      routes: { VariableDeclarator: { fields } },
+                    },
+                  },
+                  () => {},
+                ),
+              ],
+            }),
+          ],
+        },
+      ],
+    });
+  assert.notEqual(
+    pipelineCacheKey(pipeline(['bindingName']), 'fixture.js'),
+    pipelineCacheKey(pipeline(['kind']), 'fixture.js'),
+  );
+});
+
 test('reusable phases preserve identity across dynamic pipeline composition', () => {
   const plugin = defineNativePlugin({
     name: 'stable-composed-plugin',
@@ -484,7 +516,7 @@ test('keeps bytes and maps correct across structural render/reparse boundaries',
           defineNativePlugin({
             name: 'parent-observer',
             editEffect: 'none',
-            visitors: [defineVisitor('Identifier', { ancestry: 'parent' }, () => {})],
+            visitors: [defineVisitor('Identifier', { ancestry: { mode: 'parent' } }, () => {})],
           }),
         ],
       },

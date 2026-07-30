@@ -473,7 +473,7 @@ const scopeAncestryPipeline = defineNativePipeline({
           visitors: [
             defineVisitor(
               'Identifier',
-              { fields: ['name'], scope: true, ancestry: 'parent' },
+              { fields: ['name'], scope: true, ancestry: { mode: 'parent' } },
               path => {
                 path.scope.hasBinding(String(path.node.name));
                 void path.parent;
@@ -709,7 +709,7 @@ function allocationVisitor(name: string) {
             path.snapshot({ fields: ['name'] }),
           )
         : name === 'parent'
-          ? defineVisitor('Identifier', { ancestry: 'parent' }, path => void path.parent)
+          ? defineVisitor('Identifier', { ancestry: { mode: 'parent' } }, path => void path.parent)
           : name === 'ranges'
             ? defineVisitor('Identifier', {}, path => void (path.type + path.start + path.end))
             : defineVisitor('Identifier', {}, () => {});
@@ -720,6 +720,61 @@ function allocationVisitor(name: string) {
 
 function generatedSource(minimumBytes: number): string {
   return generateLargeFileSource(minimumBytes, 'shallow');
+}
+
+function ancestorScalingSource(count: number): string {
+  return Array.from(
+    { length: count },
+    (_, index) => `const Component${index}=createReactClass({render(){return null}});`,
+  ).join('\n');
+}
+
+function ancestorScalingPipeline(hydrated: boolean) {
+  return defineNativePipeline({
+    phases: [
+      {
+        name: hydrated ? 'hydrated-ancestry' : 'summary-ancestry',
+        plugins: [
+          defineNativePlugin({
+            name: hydrated ? 'hydrated-display-name-owner' : 'summary-owner',
+            visitors: [
+              defineVisitor(
+                'CallExpression',
+                hydrated
+                  ? {
+                      ancestry: {
+                        mode: 'findParent',
+                        routes: {
+                          VariableDeclarator: { fields: ['bindingName'] },
+                        },
+                      },
+                    }
+                  : { ancestry: { mode: 'findParent' } },
+                path => {
+                  const owner = path.findParent(
+                    parent => parent.node.type === 'VariableDeclarator',
+                  );
+                  if (hydrated && owner?.node.type === 'VariableDeclarator')
+                    void owner.node.bindingName;
+                },
+              ),
+            ],
+          }),
+        ],
+      },
+    ],
+  });
+}
+
+for (const count of [250, 1_000, 4_000]) {
+  const generated = ancestorScalingSource(count);
+  for (const hydrated of [false, true]) {
+    const pipeline = ancestorScalingPipeline(hydrated);
+    verifiedBench(
+      `${count} createReactClass calls with ${hydrated ? 'hydrated' : 'summary-only'} ancestry`,
+      () => benchmarkTransform(generated, 'display-name-scaling.js', pipeline),
+    );
+  }
 }
 
 for (const shape of ['nested', 'functions', 'dependencies'] as const) {

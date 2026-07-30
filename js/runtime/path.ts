@@ -63,18 +63,25 @@ export type PathRuntime = {
   state: PathState;
   nested: (target: NativeEvent, visitor: readonly DefinedVisitor<any>[], value: any) => void;
   widen: (target: NativeEvent, types: string[], scopeOnly: boolean) => void;
-  parent: (target: NativeEvent, id: number) => NativeNodePath | null;
-  children: (target: NativeEvent) => NativeNodePath[];
+  parent: (target: NativeEvent, id: number, ancestryDepth: number) => NativeNodePath | null;
+  children: (target: NativeEvent, ancestryDepth: number) => NativeNodePath[];
   allowsChild: (type: string, role: string) => boolean;
   allowsAncestry: () => boolean;
   allowsScope: () => boolean;
   scopeCache: Map<number, NativeScope>;
+  pathCache: (NativeNodePath | undefined)[] | undefined;
+  cacheAncestorPaths: boolean;
+  ancestryDepthLimit: number;
   assertControl: (capability: ControlFlowCapability) => void;
   capabilities: RouteCapabilities;
   provenance: { degradations: number };
 };
-export function makePath(runtime: PathRuntime, event: NativeEvent): NativeNodePath {
-  return new NodePathImpl(runtime, event);
+export function makePath(
+  runtime: PathRuntime,
+  event: NativeEvent,
+  ancestryDepth = 0,
+): NativeNodePath {
+  return new NodePathImpl(runtime, event, ancestryDepth);
 }
 
 export class NodePathImpl implements NativeNodePath {
@@ -86,6 +93,7 @@ export class NodePathImpl implements NativeNodePath {
   constructor(
     readonly runtime: PathRuntime,
     readonly event: NativeEvent,
+    readonly ancestryDepth: number,
   ) {}
   get id(): number {
     return this.event.id;
@@ -101,6 +109,9 @@ export class NodePathImpl implements NativeNodePath {
   }
   get node(): NodeView {
     if (!this.lazyNode) {
+      // Scalar capability boundaries are enforced by DerivedNodePath's TypeScript
+      // view. The shared phase record may contain another visitor's field union;
+      // returning it directly keeps ancestor reads allocation-free at runtime.
       this.lazyNode = this.runtime.session.nodeView(this.event);
     }
     return this.lazyNode;
@@ -117,9 +128,10 @@ export class NodePathImpl implements NativeNodePath {
   }
   get parentPath(): NativeNodePath | null {
     this.#assertAncestry();
+    if (!this.#canReachParent()) return null;
     return this.event.parentId == null
       ? null
-      : this.runtime.parent(this.event, this.event.parentId);
+      : this.runtime.parent(this.event, this.event.parentId, this.ancestryDepth + 1);
   }
   get scope(): NativeScope {
     if (!this.runtime.allowsScope())
@@ -174,7 +186,7 @@ export class NodePathImpl implements NativeNodePath {
     return type === this.event.type;
   }
   childrenUnchecked(): readonly NativeNodePath[] {
-    return this.runtime.children(this.event);
+    return this.runtime.children(this.event, this.ancestryDepth);
   }
   getChildren(): readonly NativeNodePath[] {
     this.#assertChildRole('*');
@@ -202,14 +214,22 @@ export class NodePathImpl implements NativeNodePath {
     );
   }
   #assertChildRole(role: string): void {
-    if (!this.runtime.allowsChild(this.node.type, role))
+    const rules =
+      this.ancestryDepth === 0
+        ? this.runtime.capabilities.childRules
+        : this.runtime.capabilities.ancestorChildRules;
+    if (!childRoleIsDeclared(rules?.[this.event.type] ?? [], role))
       throw new Error(`${this.runtime.owner}: undeclared child role ${this.node.type}.${role}`);
   }
   #assertAncestry(): void {
     if (!this.runtime.allowsAncestry())
       throw new Error(`${this.runtime.owner}: undeclared ancestry access`);
   }
+  #canReachParent(): boolean {
+    return this.ancestryDepth < this.runtime.ancestryDepthLimit;
+  }
   findParent(predicate: (path: NativeNodePath) => boolean): NativeNodePath | null {
+    this.#assertAncestryMethod('findParent');
     let parent = this.parentPath;
     while (parent) {
       if (predicate(parent)) return parent;
@@ -218,6 +238,7 @@ export class NodePathImpl implements NativeNodePath {
     return null;
   }
   find(predicate: (path: NativeNodePath) => boolean): NativeNodePath | null {
+    this.#assertAncestryMethod('find');
     let current: NativeNodePath | null = this;
     while (current) {
       if (predicate(current)) return current;
@@ -226,10 +247,28 @@ export class NodePathImpl implements NativeNodePath {
     return null;
   }
   getFunctionParent(): NativeNodePath | null {
+    this.#assertAncestryMethod('getFunctionParent');
     return this.findParent(parent => alias('Function', parent.node.type));
   }
   getProgramParent(): NativeNodePath | null {
+    this.#assertAncestryMethod('getProgramParent');
     return this.findParent(parent => parent.node.type === 'Program');
+  }
+  #assertAncestryMethod(
+    method: 'findParent' | 'find' | 'getFunctionParent' | 'getProgramParent',
+  ): void {
+    const mode = this.runtime.capabilities.ancestry?.mode;
+    const allowed =
+      typeof mode === 'number' ||
+      (method === 'findParent' || method === 'find'
+        ? mode === 'findParent' || mode === 'functionParent' || mode === 'programParent'
+        : method === 'getFunctionParent'
+          ? mode === 'functionParent' || mode === 'programParent'
+          : mode === 'programParent');
+    if (!allowed)
+      throw new Error(
+        `${this.runtime.owner}: ancestry mode ${String(mode)} does not allow ${method}`,
+      );
   }
   #edit(kind: EditKind, content?: string | CodeFragment): void {
     this.runtime.edits.push({
@@ -384,11 +423,19 @@ export class NodePathImpl implements NativeNodePath {
   }
   unshiftContainer(key: 'body', code: Code | readonly Code[]): void {
     if (key !== 'body') throw new Error(`Unsupported container: ${key}`);
-    this.#insert('AppendRight', Number(this.node.bodyStart ?? this.event.start), code);
+    this.#insert(
+      'AppendRight',
+      Number((this.event as NativeEvent & Record<string, unknown>).bodyStart ?? this.event.start),
+      code,
+    );
   }
   pushContainer(key: 'body', code: Code | readonly Code[]): void {
     if (key !== 'body') throw new Error(`Unsupported container: ${key}`);
-    this.#insert('PrependLeft', Number(this.node.bodyEnd ?? this.event.end), code);
+    this.#insert(
+      'PrependLeft',
+      Number((this.event as NativeEvent & Record<string, unknown>).bodyEnd ?? this.event.end),
+      code,
+    );
   }
   addComment(position: 'leading' | 'trailing' | 'inner', content: string, line = false): void {
     const comment = line ? `//${content}\n` : `/*${content}*/`;
@@ -402,10 +449,18 @@ export class NodePathImpl implements NativeNodePath {
     ]);
   }
   prependToBody(content: Code): void {
-    this.#insert('AppendRight', Number(this.node.bodyStart ?? this.event.start), content);
+    this.#insert(
+      'AppendRight',
+      Number((this.event as NativeEvent & Record<string, unknown>).bodyStart ?? this.event.start),
+      content,
+    );
   }
   appendToBody(content: Code): void {
-    this.#insert('PrependLeft', Number(this.node.bodyEnd ?? this.event.end), content);
+    this.#insert(
+      'PrependLeft',
+      Number((this.event as NativeEvent & Record<string, unknown>).bodyEnd ?? this.event.end),
+      content,
+    );
   }
   skip(): void {
     this.runtime.assertControl('skip');
@@ -497,7 +552,11 @@ function makeScope(runtime: PathRuntime, id: number, parentId: number | null): N
         );
       const offset = directives.reduce(
         (end, directive) => Math.max(end, directive.end),
-        Number(owner.node.bodyStart ?? owner.node.start),
+        Number(
+          (owner instanceof NodePathImpl
+            ? (owner.event as NativeEvent & Record<string, unknown>).bodyStart
+            : undefined) ?? owner.start,
+        ),
       );
       runtime.edits.push({
         kind: 'AppendLeft',

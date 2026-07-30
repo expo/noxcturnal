@@ -95,9 +95,9 @@ impl CallRecord {
     }
 }
 
-struct RetainedField {
-    key_id: u32,
-    value: u32,
+pub(crate) struct RetainedField {
+    pub(crate) key_id: u32,
+    pub(crate) value: u32,
 }
 
 #[derive(Clone, Copy)]
@@ -716,6 +716,20 @@ impl RetainedIndex {
             return &[];
         };
         &self.scalar_fields[start as usize..(start + length) as usize]
+    }
+
+    pub(crate) fn scalar_fields(
+        &self,
+        node_id: u32,
+    ) -> impl Iterator<Item = (u32, RetainedFieldValue)> + '_ {
+        self.scalar_fields_for(node_id).iter().map(|field| {
+            let value = if field.value & 0xc000_0000 == 0 {
+                RetainedFieldValue::String(field.value)
+            } else {
+                RetainedFieldValue::Packed(field.value)
+            };
+            (field.key_id, value)
+        })
     }
 
     fn write_summary(&self, node_id: u32, scope_parents: &[u32], output: &mut Vec<u8>) {

@@ -24,6 +24,10 @@ export function packRouteManifest(
   retentionCapabilities = 0,
   structuralParentTypes: readonly string[] = [],
   retainedFields: Readonly<Record<string, readonly string[]>> = {},
+  ancestorFields: Readonly<Record<string, readonly string[]>> = {},
+  ancestorTypes: readonly string[] = [],
+  ancestorChildParentTypes: readonly string[] = [],
+  ancestryDepth = includeParent ? Number.POSITIVE_INFINITY : 0,
 ): Buffer {
   if (routes.length > 4096) throw new Error('compiled route limit exceeded');
   const concreteStructuralParentTypes = [
@@ -45,6 +49,27 @@ export function packRouteManifest(
       for (const field of fields) if (!target.includes(field)) target.push(field);
     }
   }
+  const concreteAncestorFields: Record<string, string[]> = {};
+  for (const [type, fields] of Object.entries(ancestorFields)) {
+    const concreteTypes = NODE_TYPE_IDS.has(type)
+      ? [type]
+      : NODE_TYPES.filter(concrete => concrete && aliasType(type, concrete));
+    for (const concrete of concreteTypes) {
+      const target = (concreteAncestorFields[concrete] ??= []);
+      for (const field of fields) if (!target.includes(field)) target.push(field);
+    }
+  }
+  const expandTypes = (types: readonly string[]) => [
+    ...new Set(
+      types.flatMap(type =>
+        NODE_TYPE_IDS.has(type)
+          ? [type]
+          : NODE_TYPES.filter(concrete => concrete && aliasType(type, concrete)),
+      ),
+    ),
+  ];
+  const concreteAncestorTypes = expandTypes(ancestorTypes);
+  const concreteAncestorChildParentTypes = expandTypes(ancestorChildParentTypes);
   const strings: string[] = [];
   const stringIds = new Map<string, number>();
   const intern = (value: string) => {
@@ -107,6 +132,26 @@ export function packRouteManifest(
   for (const [nodeType, fields] of retainedFieldEntries) {
     words.push(requiredId(NODE_TYPE_IDS, nodeType, 'retained field node type'), fields.length);
     for (const field of fields) words.push(requiredId(FIELD_KEY_IDS, field, 'retained field'));
+  }
+  const ancestorFieldEntries = Object.entries(concreteAncestorFields);
+  const hasAncestorPlan =
+    ancestorFieldEntries.length > 0 ||
+    concreteAncestorTypes.length > 0 ||
+    concreteAncestorChildParentTypes.length > 0 ||
+    (includeParent && ancestryDepth !== Number.POSITIVE_INFINITY);
+  if (hasAncestorPlan) {
+    words.push(ancestorFieldEntries.length);
+    for (const [nodeType, fields] of ancestorFieldEntries) {
+      words.push(requiredId(NODE_TYPE_IDS, nodeType, 'ancestor field node type'), fields.length);
+      for (const field of fields) words.push(requiredId(FIELD_KEY_IDS, field, 'ancestor field'));
+    }
+    words.push(concreteAncestorTypes.length);
+    for (const type of concreteAncestorTypes)
+      words.push(requiredId(NODE_TYPE_IDS, type, 'ancestor node type'));
+    words.push(concreteAncestorChildParentTypes.length);
+    for (const type of concreteAncestorChildParentTypes)
+      words.push(requiredId(NODE_TYPE_IDS, type, 'ancestor child parent type'));
+    words.push(ancestryDepth === Number.POSITIVE_INFINITY ? 0xffffffff : ancestryDepth);
   }
   words[3] = strings.length;
   words[4] = words.length * 4;

@@ -504,7 +504,7 @@
     "ConditionalExpression": ["constantKind", "constantValue"],
     "ParenthesizedExpression": ["constantKind", "constantValue"],
     "SequenceExpression": ["constantKind", "constantValue"],
-    "AssignmentExpression": ["operator"],
+    "AssignmentExpression": ["operator", "targetName"],
     "CallExpression": [
       "optional",
       "argumentCount",
@@ -536,7 +536,7 @@
     "ExportAllDeclaration": ["source", "exported", "exportKind"],
     "ExportSpecifier": ["local", "exported", "exportKind"],
     "VariableDeclaration": ["kind", "declarationCount"],
-    "VariableDeclarator": ["kind", "hasInitializer"],
+    "VariableDeclarator": ["kind", "hasInitializer", "bindingName"],
     "Directive": ["value"],
     "YieldExpression": ["delegate"],
     "ImportMeta": ["meta", "property"],
@@ -587,7 +587,9 @@
     "parameterCount",
     "delegate",
     "nodeKind",
-    "memberPath"
+    "memberPath",
+    "bindingName",
+    "targetName"
   ],
   "fieldTypes": {
     "Identifier": {
@@ -657,7 +659,8 @@
       "constantValue?": "string | number | boolean | null"
     },
     "AssignmentExpression": {
-      "operator": "AssignmentOperator"
+      "operator": "AssignmentOperator",
+      "targetName?": "string"
     },
     "CallExpression": {
       "optional": "boolean",
@@ -746,7 +749,8 @@
     },
     "VariableDeclarator": {
       "kind": "VariableDeclarationKind",
-      "hasInitializer": "boolean"
+      "hasInitializer": "boolean",
+      "bindingName?": "string"
     },
     "Directive": {
       "value": "string"
@@ -1135,7 +1139,7 @@
     },
     "StaticMemberExpression": {
       "object": {
-        "routes": ["Expression"],
+        "routes": ["Expression", "Super"],
         "list": false
       },
       "property": {
@@ -1145,7 +1149,7 @@
     },
     "ComputedMemberExpression": {
       "object": {
-        "routes": ["Expression"],
+        "routes": ["Expression", "Super"],
         "list": false
       },
       "property": {

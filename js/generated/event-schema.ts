@@ -254,6 +254,8 @@ export const FIELD_KEYS = [
   'delegate',
   'nodeKind',
   'memberPath',
+  'bindingName',
+  'targetName',
 ] as const;
 export type NativeFieldKey = Exclude<(typeof FIELD_KEYS)[number], ''>;
 export const FIELD_KEY_IDS = new Map<string, number>(
@@ -273,7 +275,7 @@ export const PREDICATE_FIELDS: Readonly<Record<string, readonly string[]>> = {
   ConditionalExpression: ['constantKind', 'constantValue'],
   ParenthesizedExpression: ['constantKind', 'constantValue'],
   SequenceExpression: ['constantKind', 'constantValue'],
-  AssignmentExpression: ['operator'],
+  AssignmentExpression: ['operator', 'targetName'],
   CallExpression: [
     'optional',
     'argumentCount',
@@ -297,7 +299,7 @@ export const PREDICATE_FIELDS: Readonly<Record<string, readonly string[]>> = {
   ExportAllDeclaration: ['source', 'exported', 'exportKind'],
   ExportSpecifier: ['local', 'exported', 'exportKind'],
   VariableDeclaration: ['kind', 'declarationCount'],
-  VariableDeclarator: ['kind', 'hasInitializer'],
+  VariableDeclarator: ['kind', 'hasInitializer', 'bindingName'],
   Directive: ['value'],
   YieldExpression: ['delegate'],
   ImportMeta: ['meta', 'property'],
@@ -433,6 +435,7 @@ export const PREDICATE_VALUE_DOMAINS: Readonly<
         '??=',
       ],
     },
+    targetName: { kinds: ['string'] },
   },
   CallExpression: {
     optional: { kinds: ['boolean'] },
@@ -528,6 +531,7 @@ export const PREDICATE_VALUE_DOMAINS: Readonly<
   VariableDeclarator: {
     kind: { kinds: ['string'], values: ['var', 'let', 'const', 'using', 'await using'] },
     hasInitializer: { kinds: ['boolean'] },
+    bindingName: { kinds: ['string'] },
   },
   Directive: { value: { kinds: ['string'] } },
   YieldExpression: { delegate: { kinds: ['boolean'] } },
@@ -2314,6 +2318,7 @@ export const CHILD_ROLES: Readonly<
         'TSSatisfiesExpression',
         'TSNonNullExpression',
         'TSInstantiationExpression',
+        'Super',
       ],
       list: false,
     },
@@ -2360,6 +2365,7 @@ export const CHILD_ROLES: Readonly<
         'TSSatisfiesExpression',
         'TSNonNullExpression',
         'TSInstantiationExpression',
+        'Super',
       ],
       list: false,
     },
@@ -3571,6 +3577,7 @@ export interface NativeNodeFields {
   };
   AssignmentExpression: {
     readonly operator: AssignmentOperator;
+    readonly targetName?: string;
   };
   CallExpression: {
     readonly optional: boolean;
@@ -3660,6 +3667,7 @@ export interface NativeNodeFields {
   VariableDeclarator: {
     readonly kind: VariableDeclarationKind;
     readonly hasInitializer: boolean;
+    readonly bindingName?: string;
   };
   Directive: {
     readonly value: string;
@@ -3752,6 +3760,7 @@ export interface NativeRouteFields {
     readonly prefix?: boolean | true;
     readonly constantKind?: 'null' | 'boolean' | 'number' | 'string';
     readonly constantValue?: string | number | boolean | null;
+    readonly targetName?: string;
     readonly async?: boolean;
     readonly expression?: boolean;
     readonly parameterCount?: number;
@@ -3845,9 +3854,11 @@ export interface NativeRouteFields {
     readonly prefix?: boolean | true;
     readonly constantKind?: 'null' | 'boolean' | 'number' | 'string';
     readonly constantValue?: string | number | boolean | null;
+    readonly targetName?: string;
     readonly value?: string | boolean | number;
     readonly declarationCount?: number;
     readonly hasInitializer?: boolean;
+    readonly bindingName?: string;
     readonly nodeKind?: FunctionType | ClassType;
     readonly async?: boolean;
     readonly generator?: boolean;
@@ -5577,7 +5588,8 @@ export interface NativeChildRoles {
         | 'TSAsExpression'
         | 'TSSatisfiesExpression'
         | 'TSNonNullExpression'
-        | 'TSInstantiationExpression';
+        | 'TSInstantiationExpression'
+        | 'Super';
       readonly list: false;
     };
     readonly property: { readonly child: 'Identifier'; readonly list: false };
@@ -5622,7 +5634,8 @@ export interface NativeChildRoles {
         | 'TSAsExpression'
         | 'TSSatisfiesExpression'
         | 'TSNonNullExpression'
-        | 'TSInstantiationExpression';
+        | 'TSInstantiationExpression'
+        | 'Super';
       readonly list: false;
     };
     readonly property: {
@@ -6674,7 +6687,8 @@ export interface NativeChildRoles {
         | 'TSAsExpression'
         | 'TSSatisfiesExpression'
         | 'TSNonNullExpression'
-        | 'TSInstantiationExpression';
+        | 'TSInstantiationExpression'
+        | 'Super';
       readonly list: false;
     };
     readonly property: {

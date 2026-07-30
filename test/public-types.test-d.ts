@@ -165,7 +165,7 @@ defineVisitor(
   {
     fields: ['kind'],
     scope: true,
-    ancestry: 'findParent',
+    ancestry: { mode: 'findParent' },
     children: { declarations: { route: 'VariableDeclarator', fields: ['kind'] } },
     controlFlow: ['skip', 'nested-traverse'],
   },
@@ -468,7 +468,7 @@ defineVisitor('Expression', { fields: ['calleeName'] }, path => {
 });
 
 // P7 — derived paths keep the owner's declared capabilities.
-defineVisitor('VariableDeclaration', { ancestry: 'findParent' }, path => {
+defineVisitor('VariableDeclaration', { ancestry: { mode: 'findParent' } }, path => {
   const parent = path.parentPath;
   parent?.getSource();
   // @ts-expect-error scope was not declared, so ancestors cannot expose it.
@@ -481,11 +481,45 @@ defineVisitor('VariableDeclaration', { ancestry: 'findParent' }, path => {
     return ancestor.type === 'Program';
   });
 });
-defineVisitor('VariableDeclaration', { scope: true, ancestry: 'programParent' }, path => {
+defineVisitor('VariableDeclaration', { scope: true, ancestry: { mode: 'programParent' } }, path => {
   // Declared capabilities propagate to derived paths.
   path.parentPath?.scope.getBinding('x');
   path.getProgramParent()?.scope.getBinding('x');
 });
+defineVisitor(
+  'CallExpression',
+  {
+    fields: ['argumentCount'],
+    ancestry: {
+      mode: 'findParent',
+      routes: {
+        VariableDeclarator: { fields: ['bindingName'] },
+        AssignmentExpression: { fields: ['targetName'] },
+        TryStatement: {
+          children: { block: { route: 'BlockStatement' } },
+        },
+      },
+    },
+  },
+  path => {
+    path.findParent(ancestor => {
+      if (ancestor.node.type === 'VariableDeclarator') ancestor.node.bindingName?.toUpperCase();
+      if (ancestor.node.type === 'AssignmentExpression') ancestor.node.targetName?.toUpperCase();
+      // @ts-expect-error Originating visitor fields do not leak onto ancestors.
+      ancestor.node.argumentCount;
+      if (ancestor.node.type === 'TryStatement') ancestor.getChild('block')?.getSource().text();
+      return false;
+    });
+  },
+);
+defineVisitor(
+  'Identifier',
+  {
+    // @ts-expect-error Ancestry routes cannot contain event-delivery predicates.
+    ancestry: { mode: 'findParent', routes: { VariableDeclarator: { where: {} } } },
+  },
+  () => {},
+);
 
 // P8 — traverse requires the state its visitors require.
 interface CounterState {

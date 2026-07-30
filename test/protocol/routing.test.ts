@@ -108,6 +108,71 @@ test('constructs the retained index and initial routed tape in one native parse'
   session.close();
 });
 
+test('serializes a shared hydrated ancestor once rather than once per routed descendant', () => {
+  const callCount = 256;
+  const source = `const owner = [${Array.from({ length: callCount }, () => 'create()').join(',')}];`;
+  const manifest = packRouteManifest(
+    [
+      {
+        id: 0,
+        pluginId: 0,
+        nodeType: 'CallExpression',
+        side: 'enter',
+        order: 0,
+        predicates: {},
+        payloadFields: [],
+      },
+    ],
+    true,
+    false,
+    0,
+    [],
+    { VariableDeclarator: ['bindingName'] },
+    { VariableDeclarator: ['bindingName'] },
+    ['VariableDeclarator'],
+    [],
+    Number.POSITIVE_INFINITY,
+  );
+  const session = new native.NativeIndexedSession(source, 'fixture.js', false, manifest, manifest);
+  const batch = decodeRoutedEnvelope(session.nextRoutedPacked(manifest));
+  session.close();
+  assert.equal(batch.routeDeliveryCount, callCount);
+  assert.equal(batch.nodeRecordCount, callCount + 1);
+
+  const summaryManifest = packRouteManifest(
+    [
+      {
+        id: 0,
+        pluginId: 0,
+        nodeType: 'CallExpression',
+        side: 'enter',
+        order: 0,
+        predicates: {},
+        payloadFields: [],
+      },
+    ],
+    true,
+    false,
+    0,
+    [],
+    {},
+    {},
+    [],
+    [],
+    Number.POSITIVE_INFINITY,
+  );
+  const summarySession = new native.NativeIndexedSession(
+    source,
+    'fixture.js',
+    false,
+    summaryManifest,
+    summaryManifest,
+  );
+  const summaryBatch = decodeRoutedEnvelope(summarySession.nextRoutedPacked(summaryManifest));
+  summarySession.close();
+  assert.equal(summaryBatch.nodeRecordCount, callCount);
+});
+
 test('uses syntax-only retained materialization for structural ancestry', () => {
   const source = 'function outer(value) { return value + 1; }';
   const route = {
@@ -165,7 +230,7 @@ test('retains structural records across syntax families and UTF-16 offsets', () 
       name: `structure-${filename}`,
       editEffect: 'none',
       visitors: [
-        defineVisitor('Identifier', { ancestry: 'parent' }, path => {
+        defineVisitor('Identifier', { ancestry: { mode: 'parent' } }, path => {
           records.push([
             path.node.id,
             path.node.type,
@@ -362,7 +427,7 @@ test('expands Function aliases to arrow functions in nested routed traversal', (
     visitors: [
       defineVisitor(
         'VariableDeclaration',
-        { ancestry: 'parent', controlFlow: ['nested-traverse'] },
+        { ancestry: { mode: 'parent' }, controlFlow: ['nested-traverse'] },
         path => {
           path.parentPath?.traverse([
             defineVisitor('Function', {}, fn => {

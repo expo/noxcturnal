@@ -40,7 +40,7 @@ test('provides direct path fields and retained snapshots', () => {
   const plugin = defineNativePlugin({
     name: 'snapshot',
     visitors: [
-      defineVisitor('Identifier', { fields: ['name'], ancestry: 'parent' }, path => {
+      defineVisitor('Identifier', { fields: ['name'], ancestry: { mode: 'parent' } }, path => {
         assert.equal(path.type, 'Identifier');
         assert.equal(path.id, path.node.id);
         assert.equal(path.start, path.node.start);
@@ -202,7 +202,7 @@ test('hydrates targeted snapshots once and retains exit ancestry and scope', () 
     visitors: [
       defineVisitor(
         'Identifier',
-        { fields: ['name'], scope: true, ancestry: 'parent' },
+        { fields: ['name'], scope: true, ancestry: { mode: 'parent' } },
         {
           enter(path) {
             snapshots.push(path.snapshot({ fields: ['name'], ancestry: 'parent' }));

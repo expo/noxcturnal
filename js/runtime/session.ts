@@ -1,5 +1,5 @@
 import { parserFilename } from '../adapters/classification.js';
-import { NODE_TYPE_IDS, NODE_TYPES } from '../generated/event-schema.js';
+import { FIELD_KEY_IDS, NODE_TYPE_IDS, NODE_TYPES } from '../generated/event-schema.js';
 import { native, type NativeIndexedSessionBinding } from '../native/binding.js';
 import {
   decodeEventBatch,
@@ -117,8 +117,37 @@ export class NativeTransformSession {
   }
   cacheEvent(event: NativeEvent): void {
     if (event.side === 'enter') {
+      const existing = this.#eventCache[event.id] as
+        | (NativeEvent & Record<string, unknown>)
+        | undefined;
+      if (existing != null) {
+        const target = event as NativeEvent & Record<string, unknown>;
+        for (const field of Object.keys(existing))
+          if (FIELD_KEY_IDS.has(field) && !(field in target)) target[field] = existing[field];
+      }
       this.#eventCache[event.id] = event;
+      if (event.parentId != null) {
+        const parent = this.#eventCache[event.parentId];
+        if (
+          parent &&
+          [...this.#prefetchedChildTypes].some(
+            type => type === parent.type || alias(type, parent.type),
+          )
+        ) {
+          let children = this.#childrenCache.get(event.parentId);
+          if (children == null) {
+            children = [];
+            this.#childrenCache.set(event.parentId, children);
+          }
+          if (!children.includes(event.id)) children.push(event.id);
+        }
+      }
     }
+  }
+  /** Mark child-complete ancestor types whose edges are carried by the routed
+   * envelope, avoiding a synchronous native prefetch on structural access. */
+  seedRetainedChildTypes(types: readonly string[]): void {
+    for (const type of types) this.#prefetchedChildTypes.add(type);
   }
   /** Pre-size the event cache to the parse's node count: scattered id stores into a
    * short array degrade to dictionary elements in V8; a packed array stays fast. */
@@ -129,6 +158,9 @@ export class NativeTransformSession {
       for (let id = 0; id < previous.length; id++)
         if (previous[id] !== undefined) this.#eventCache[id] = previous[id];
     }
+  }
+  get nodeCapacity(): number {
+    return this.#eventCache.length;
   }
   nodeView(event: NativeEvent): NodeView {
     return toNodeView(event);

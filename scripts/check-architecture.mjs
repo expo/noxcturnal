@@ -125,6 +125,52 @@ for (const obsolete of [
     failures.push(`${obsolete}: stale generated compatibility artifact must not be packaged`);
 }
 
+const declarationRoots = ['js', 'test', 'benchmark'];
+const legacyAncestry =
+  /\bancestry\s*:\s*(?:['"](?:parent|findParent|functionParent|programParent)['"]|[1-9]\d*)/g;
+function hasLegacyVisitorAncestry(source) {
+  for (const match of source.matchAll(legacyAncestry)) {
+    const prefix = source.slice(Math.max(0, match.index - 80), match.index);
+    if (!/\bsnapshot\s*\([^)]*$/.test(prefix)) return true;
+  }
+  return false;
+}
+for (const directory of declarationRoots) {
+  for (const filename of sourceFiles(path.join(root, directory), '.ts')) {
+    if (hasLegacyVisitorAncestry(fs.readFileSync(filename, 'utf8')))
+      failures.push(
+        `${path.relative(root, filename)}: legacy string/numeric ancestry declaration remains`,
+      );
+  }
+}
+
+const expoTransformer = path.resolve(
+  root,
+  '../expo/packages/@expo/metro-config/src/transform-worker/noxcturnal-transformer.ts',
+);
+if (fs.existsSync(expoTransformer)) {
+  const source = fs.readFileSync(expoTransformer, 'utf8');
+  if (hasLegacyVisitorAncestry(source))
+    failures.push('Expo noxcturnal transformer: legacy ancestry declaration remains');
+  const ancestorAliases = [];
+  for (const match of source.matchAll(
+    /\b(?:const|let)\s+([A-Za-z_$][\w$]*)\s*=\s*[^;\n]*(?:parentPath|findParent|getFunctionParent|getProgramParent)\b/g,
+  ))
+    ancestorAliases.push({ name: match[1], index: match.index });
+  if (
+    /\b(?:parentPath|findParent|getFunctionParent|getProgramParent)\b[^;\n]*\.sourceText\s*\(/.test(
+      source,
+    ) ||
+    ancestorAliases.some(({ name, index }) =>
+      new RegExp(`\\b${name}\\.sourceText\\s*\\(`).test(source.slice(index, index + 1200)),
+    ) ||
+    /findParent\s*\([^)]*sourceText\s*\(/s.test(source)
+  )
+    failures.push(
+      'Expo noxcturnal transformer: sourceText() must not be called on ancestry-derived paths',
+    );
+}
+
 if (failures.length > 0) {
   console.error(failures.join('\n'));
   process.exitCode = 1;

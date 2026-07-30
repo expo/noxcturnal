@@ -1,8 +1,8 @@
 import type {
-  AncestryCapability,
   DefinedVisitor,
   Handler,
   NativePlugin,
+  StoredVisitorContract,
 } from '../contracts/visitor.js';
 import type { NativeRouteManifestEntry } from '../protocol/manifest.js';
 import type {
@@ -16,7 +16,9 @@ import type {
 
 export interface RouteCapabilities {
   scope: boolean;
-  ancestry: boolean;
+  ancestry: StoredVisitorContract['ancestry'];
+  ancestorFields: Readonly<Partial<Record<string, readonly NativeFieldKey[]>>> | null;
+  ancestorChildRules: Readonly<Partial<Record<string, readonly string[]>>> | null;
   childRules: Readonly<Partial<Record<string, readonly string[]>>> | null;
   controlFlow: readonly ControlFlowCapability[];
   declaredFields: readonly NativeFieldKey[];
@@ -30,7 +32,10 @@ export type PreparedPluginPlan = {
   scope?: boolean;
   queries?: readonly QueryRequest[];
   metadataWrites?: readonly string[];
-  ancestry?: AncestryCapability;
+  ancestry?: StoredVisitorContract['ancestry'];
+  ancestryFields?: Readonly<Partial<Record<NativeNodeType, readonly NativeFieldKey[]>>>;
+  ancestryChildren?: Readonly<Partial<Record<string, readonly string[]>>>;
+  ancestryTypes?: readonly NativeNodeType[];
   children?: Readonly<Partial<Record<string, readonly string[]>>>;
   resolvedVisitors: readonly ResolvedVisitor[];
 };
@@ -68,6 +73,7 @@ export interface CompiledNestedRoutes {
   callbacks: readonly (readonly Handler<any>[])[];
   routes: readonly NativeRouteManifestEntry[];
   capabilities: readonly RouteCapabilities[];
+  ancestorChildParentTypes: readonly string[];
 }
 
 /** A phase prepared from its definitions.
@@ -84,6 +90,8 @@ export interface PreparedPhase {
   retentionCapabilities: number;
   requiresIndexBase: boolean;
   structuralParentTypes: readonly string[];
+  ancestorChildParentTypes: readonly string[];
+  ancestryDepth: number;
   runtimeEditEffect: EditEffect;
   compiledRoutes: readonly CompiledRouteTemplate[];
   dispatchRoutes: readonly DispatchRoute[];

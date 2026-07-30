@@ -17,6 +17,25 @@ import {
   transform,
   transformClassificationCacheKey,
 } from '../../dist/index.js';
+
+test('rejects malformed ancestry modes while defining a visitor', () => {
+  for (const mode of [0, -1, 1.5, Number.NaN]) {
+    assert.throws(
+      () => defineVisitor('Identifier', { ancestry: { mode } }, () => {}),
+      /positive integer/,
+    );
+  }
+  assert.throws(
+    () =>
+      defineVisitor(
+        'Identifier',
+        // @ts-expect-error Exercise runtime rejection of forbidden predicates.
+        { ancestry: { mode: 'findParent', routes: { Identifier: { where: {} } } } },
+        () => {},
+      ),
+    /cannot declare where predicates/,
+  );
+});
 import { NativeTransformSession } from '../../dist/runtime/session.js';
 import { native } from '../../dist/native/binding.js';
 import { packEdits } from '../../dist/protocol/edits.js';

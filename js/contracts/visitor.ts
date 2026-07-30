@@ -264,6 +264,8 @@ export type AncestryCapability =
   | 'programParent'
   | number;
 
+export type AncestryMode = AncestryCapability;
+
 /** A visitor route: one route name or a `|`-joined composite. */
 export type VisitorRouteSpec = NativeVisitorRoute | `${NativeVisitorRoute}|${string}`;
 
@@ -366,13 +368,32 @@ export interface ChildContract {
   children?: Readonly<Record<string, ChildContract>>;
 }
 
-export interface VisitorContract<Route extends VisitorRouteSpec = VisitorRouteSpec> {
+/** Ancestor routes reuse the ordinary field/child contract language. Runtime
+ * predicates are deliberately absent: hydration must be determined statically. */
+export type AncestorRouteContract<Route extends VisitorRouteSpec = VisitorRouteSpec> = {
+  fields?: readonly DeclaredFieldKey<Route>[];
+  children?: Readonly<Partial<Record<RouteChildRoleNames<Route> | '*', ChildContract>>>;
+};
+
+export type AncestorRouteMap = Readonly<
+  Partial<Record<VisitorRouteSpec, AncestorRouteContract<any>>>
+>;
+
+export interface AncestryContract<Routes extends AncestorRouteMap = {}> {
+  mode: AncestryMode;
+  routes?: Routes;
+}
+
+export interface VisitorContract<
+  Route extends VisitorRouteSpec = VisitorRouteSpec,
+  Routes extends AncestorRouteMap = {},
+> {
   /** Scalar payload fields transferred to the callback's `path.node`. */
   fields?: readonly DeclaredFieldKey<Route>[];
   /** Native match predicates. Match-only fields are not callback-visible. */
   where?: RouteWhere<Route>;
   scope?: boolean;
-  ancestry?: AncestryCapability;
+  ancestry?: AncestryContract<Routes>;
   children?: Readonly<Partial<Record<RouteChildRoleNames<Route> | '*', ChildContract>>>;
   controlFlow?: readonly ControlFlowCapability[];
   /** Typed visitors this handler may run via `path.traverse`; their payload and
@@ -387,8 +408,27 @@ export interface VisitorContract<Route extends VisitorRouteSpec = VisitorRouteSp
 type ValidateContract<Route extends string, Contract> = Contract extends {
   children: infer Children;
 }
-  ? { readonly children: ValidateChildren<Route, Children> }
+  ? { readonly children: ValidateChildren<Route, Children> } & ValidateAncestry<Contract>
+  : ValidateAncestry<Contract>;
+type ValidateAncestry<Contract> = Contract extends {
+  ancestry: { routes: infer Routes };
+}
+  ? { readonly ancestry: { readonly routes: ValidateAncestorRoutes<Routes> } }
   : unknown;
+type ValidateAncestorRoutes<Routes> = {
+  readonly [Route in keyof Routes]: Route extends string
+    ? ValidRouteSpec<Route> extends string
+      ? ValidRouteSpec<Route>
+      : Routes[Route] extends { where: unknown }
+        ? 'Ancestry routes cannot declare where predicates'
+        : ValidateAncestorRouteShape<Route, Routes[Route]>
+    : 'Ancestry route keys must be strings';
+};
+type ValidateAncestorRouteShape<Route extends string, Entry> = {
+  readonly fields?: readonly DeclaredFieldKey<Route>[];
+} & (Entry extends { children: infer Children }
+  ? { readonly children: ValidateChildren<Route, Children> }
+  : unknown);
 type ValidateChildren<Route extends string, Children> = {
   readonly [Role in keyof Children]: ValidateChildEntry<Route, Role & string, Children[Role]>;
 };
@@ -489,9 +529,46 @@ export interface ContractPathBase<Node> {
  * the owner's declared capabilities and a generic node view rather than the
  * contract's declared payload.
  */
-export type DerivedNodePath<Owner> = ContractPathBase<NodeView> &
+type AncestryRoutesOf<Owner> = Owner extends {
+  ancestry: { routes: infer Routes };
+}
+  ? Routes extends object
+    ? Routes
+    : {}
+  : {};
+type DeclaredAncestorNodeTypes<Owner> = {
+  [Route in keyof AncestryRoutesOf<Owner> & string]: RouteNodeTypes<Route>;
+}[keyof AncestryRoutesOf<Owner> & string];
+type DeclaredAncestorFields<Owner, Type extends NativeNodeType> = {
+  [Route in keyof AncestryRoutesOf<Owner> & string]: Type extends RouteNodeTypes<Route>
+    ? AncestryRoutesOf<Owner>[Route] extends {
+        fields: readonly (infer Field extends string)[];
+      }
+      ? Field
+      : never
+    : never;
+}[keyof AncestryRoutesOf<Owner> & string];
+/** Build one variant per concrete node type. This unions payloads from overlapping
+ * aliases and concrete routes before adding the discriminant, so narrowing an
+ * ancestor never leaves two incompatible variants with the same `type`. */
+type DeclaredAncestorNode<Owner> = {
+  [Type in DeclaredAncestorNodeTypes<Owner>]: ContractNode<
+    Type,
+    DeclaredAncestorFields<Owner, Type>
+  >;
+}[DeclaredAncestorNodeTypes<Owner>];
+type AncestorNode<Owner> = [DeclaredAncestorNode<Owner>] extends [never]
+  ? ContractNodeBase & { readonly type: NativeNodeType }
+  :
+      | DeclaredAncestorNode<Owner>
+      | (ContractNodeBase & {
+          readonly type: Exclude<NativeNodeType, PathNodeTypeOf<DeclaredAncestorNode<Owner>>>;
+        });
+
+export type DerivedNodePath<Owner> = ContractPathBase<AncestorNode<Owner>> &
   ScopePart<Owner> &
-  AncestryPart<Owner> &
+  DerivedAncestryPart<Owner> &
+  AncestorChildrenPart<Owner> &
   ControlPart<Owner>;
 
 interface ParentAccess<Owner> {
@@ -520,7 +597,7 @@ interface SubscribeAccess {
 }
 
 type ScopePart<Contract> = Contract extends { scope: true } ? { readonly scope: NativeScope } : {};
-type AncestryPart<Contract> = Contract extends { ancestry: infer Mode }
+type AncestryPart<Contract> = Contract extends { ancestry: { mode: infer Mode } }
   ? Mode extends 'parent'
     ? ParentAccess<Contract>
     : Mode extends 'findParent'
@@ -534,6 +611,50 @@ type AncestryPart<Contract> = Contract extends { ancestry: infer Mode }
               ProgramParentAccess<Contract>
           : {}
   : {};
+type DerivedAncestryPart<Contract> = Contract extends { ancestry: { mode: infer Mode } }
+  ? Mode extends 'parent'
+    ? { readonly parent: NodeSummary | null }
+    : AncestryPart<Contract>
+  : {};
+type DeclaredAncestorChildren<Owner> = {
+  [Route in keyof AncestryRoutesOf<Owner> & string]: AncestryRoutesOf<Owner>[Route] extends {
+    children: infer Children;
+  }
+    ? Children
+    : never;
+}[keyof AncestryRoutesOf<Owner> & string];
+type AncestorChildRoles<Owner> =
+  DeclaredAncestorChildren<Owner> extends infer Children
+    ? Children extends object
+      ? keyof Children & string
+      : never
+    : never;
+type AncestorChildEntry<Owner, Role extends string> =
+  DeclaredAncestorChildren<Owner> extends infer Children
+    ? Children extends object
+      ? Role extends keyof Children
+        ? NonNullable<Children[Role]> extends ChildContract
+          ? NonNullable<Children[Role]>
+          : never
+        : never
+      : never
+    : never;
+type AncestorChildrenPart<Owner> = [DeclaredAncestorChildren<Owner>] extends [never]
+  ? {}
+  : {
+      getChild<Role extends AncestorChildRoles<Owner>>(
+        role: Role,
+      ): ChildPathOf<AncestorChildEntry<Owner, Role>, Owner> | null;
+      getChildList<Role extends AncestorChildRoles<Owner>>(
+        role: Role,
+      ): readonly ChildPathOf<AncestorChildEntry<Owner, Role>, Owner>[];
+      get<Role extends AncestorChildRoles<Owner>>(
+        role: Role,
+      ):
+        | ChildPathOf<AncestorChildEntry<Owner, Role>, Owner>
+        | readonly ChildPathOf<AncestorChildEntry<Owner, Role>, Owner>[]
+        | null;
+    };
 type ControlPart<Contract> = Contract extends { controlFlow: readonly (infer C extends string)[] }
   ? ('skip' extends C ? { skip(): void } : {}) &
       ('stop' extends C ? { stop(): void } : {}) &
@@ -620,7 +741,20 @@ export interface StoredVisitorContract {
   readonly fields: readonly NativeFieldKey[];
   readonly where: Readonly<Partial<Record<string, ScalarPredicate>>> | undefined;
   readonly scope: boolean;
-  readonly ancestry: AncestryCapability | undefined;
+  readonly ancestry:
+    | Readonly<{
+        mode: AncestryMode;
+        routes: Readonly<
+          Record<
+            string,
+            {
+              readonly fields: readonly NativeFieldKey[];
+              readonly children: Readonly<Record<string, ChildContract>> | undefined;
+            }
+          >
+        >;
+      }>
+    | undefined;
   readonly children: Readonly<Record<string, ChildContract>> | undefined;
   readonly controlFlow: readonly ControlFlowCapability[];
   readonly nested: readonly DefinedVisitor<any>[];
@@ -655,6 +789,47 @@ function freezeChildContracts(
   );
 }
 
+function freezeAncestry(
+  ancestry: AncestryContract<AncestorRouteMap> | undefined,
+): StoredVisitorContract['ancestry'] {
+  if (ancestry == null) return undefined;
+  const mode = ancestry.mode;
+  if (typeof mode === 'number' && (!Number.isSafeInteger(mode) || mode <= 0))
+    throw new Error('ancestry mode must be a positive integer');
+  if (
+    typeof mode !== 'number' &&
+    mode !== 'parent' &&
+    mode !== 'findParent' &&
+    mode !== 'functionParent' &&
+    mode !== 'programParent'
+  )
+    throw new Error(`unknown ancestry mode ${String(mode)}`);
+  return Object.freeze({
+    mode,
+    routes: Object.freeze(
+      Object.fromEntries(
+        Object.entries(ancestry.routes ?? {}).flatMap(([route, contract]) =>
+          contract == null
+            ? []
+            : 'where' in contract
+              ? (() => {
+                  throw new Error('ancestry routes cannot declare where predicates');
+                })()
+              : [
+                  [
+                    route,
+                    Object.freeze({
+                      fields: Object.freeze([...(contract.fields ?? [])]),
+                      children: freezeChildContracts(contract.children),
+                    }),
+                  ],
+                ],
+        ),
+      ),
+    ),
+  });
+}
+
 /**
  * Define a typed visitor: the contract beside the callback that uses it.
  *
@@ -682,7 +857,7 @@ export function defineVisitor<
     fields: Object.freeze([...((contract.fields as readonly NativeFieldKey[] | undefined) ?? [])]),
     where: contract.where == null ? undefined : Object.freeze({ ...contract.where }),
     scope: contract.scope === true,
-    ancestry: contract.ancestry,
+    ancestry: freezeAncestry(contract.ancestry as AncestryContract<AncestorRouteMap> | undefined),
     children: freezeChildContracts(contract.children),
     controlFlow: Object.freeze([...(contract.controlFlow ?? [])]),
     nested: Object.freeze([...(contract.nested ?? [])]),
