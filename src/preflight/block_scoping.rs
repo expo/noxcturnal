@@ -911,7 +911,6 @@ pub(super) fn prepare_with_reserved<'a>(
     let mut groups: FxHashMap<(ScopeId, &str), Vec<SymbolId>> = FxHashMap::default();
     let mut used_names: FxHashSet<String> = scoping.symbol_names().map(str::to_owned).collect();
     used_names.extend(reserved_names.into_iter().map(str::to_owned));
-    let mut ancestor_collisions = FxHashSet::default();
     for symbol_id in scoping.symbol_ids() {
         let scope_id = scoping.symbol_scope_id(symbol_id);
         let target_scope = scoping
@@ -919,19 +918,6 @@ pub(super) fn prepare_with_reserved<'a>(
             .find(|scope_id| scoping.scope_flags(*scope_id).intersects(ScopeFlags::Var))
             .unwrap_or(scope_id);
         let name = scoping.symbol_name(symbol_id);
-        if scoping
-            .symbol_flags(symbol_id)
-            .contains(SymbolFlags::BlockScopedVariable)
-            && scope_id != target_scope
-            && scoping
-                .scope_parent_id(scope_id)
-                .and_then(|parent_scope| scoping.find_binding(parent_scope, name.into()))
-                .is_some_and(|visible_symbol| visible_symbol != symbol_id)
-        {
-            // Lowering a block binding to `var` makes it shadow bindings that
-            // were previously visible elsewhere in the containing function.
-            ancestor_collisions.insert(symbol_id);
-        }
         groups
             .entry((target_scope, name))
             .or_default()
@@ -940,17 +926,21 @@ pub(super) fn prepare_with_reserved<'a>(
 
     let mut renames = FxHashMap::default();
     for ((_scope_id, name), mut symbols) in groups {
-        if symbols.len() < 2 && !symbols.iter().any(|id| ancestor_collisions.contains(id)) {
+        if symbols.len() < 2 {
             continue;
         }
         // A function-scoped binding already occupies the name after lowering, so
         // preserve it even when its declaration appears after the lexical one.
-        // Otherwise preserve the earliest lexical binding and rename later ones.
+        // Otherwise preserve the shallowest lexical binding, matching Babel's
+        // choice of the binding that already belongs closest to the var scope.
         symbols.sort_unstable_by_key(|symbol_id| {
             (
                 !scoping
                     .symbol_flags(*symbol_id)
                     .contains(SymbolFlags::FunctionScopedVariable),
+                scoping
+                    .scope_ancestors(scoping.symbol_scope_id(*symbol_id))
+                    .count(),
                 scoping.symbol_span(*symbol_id).start,
             )
         });
@@ -961,16 +951,18 @@ pub(super) fn prepare_with_reserved<'a>(
                 scoping
                     .symbol_flags(*symbol_id)
                     .contains(SymbolFlags::BlockScopedVariable)
-                    && (*index > 0 || ancestor_collisions.contains(symbol_id))
+                    && *index > 0
             })
         {
             let _ = index;
+            let base = name.trim_end_matches(|character: char| character.is_ascii_digit());
+            let base = if base.is_empty() { name } else { base };
             let mut suffix = 0_u32;
             let replacement = loop {
                 let candidate = if suffix == 0 {
-                    format!("_{name}")
+                    format!("_{base}")
                 } else {
-                    format!("_{name}{suffix}")
+                    format!("_{base}{}", suffix + 1)
                 };
                 suffix += 1;
                 if used_names.insert(candidate.clone()) {
@@ -1019,10 +1011,88 @@ pub(super) fn prepare_with_reserved<'a>(
                 })
         })
         .collect();
+    let loop_reset_declarations = collect_loop_reset_declarations(semantic);
     Ok(BlockScopingPlan {
         binding_renames,
         reference_renames,
+        loop_reset_declarations,
     })
+}
+
+/// Find uninitialized lexical declarations that execute repeatedly in loop
+/// bodies. Semantic nodes are in source preorder, so each loop/function enters
+/// and leaves these stacks once instead of walking ancestors per declaration.
+fn collect_loop_reset_declarations(semantic: &Semantic<'_>) -> FxHashSet<(u32, u32)> {
+    #[derive(Clone, Copy)]
+    struct ActiveLoop {
+        end: u32,
+        boundary_depth: usize,
+    }
+
+    let nodes = semantic.nodes();
+    let mut resets = FxHashSet::default();
+    let mut pending_loops = Vec::<(u32, ActiveLoop)>::new();
+    let mut active_loops = Vec::<ActiveLoop>::new();
+    let mut active_boundaries = Vec::<u32>::new();
+
+    for (node_id, node) in nodes.iter_enumerated() {
+        let span = node.kind().span();
+        while active_loops
+            .last()
+            .is_some_and(|loop_| span.start >= loop_.end)
+        {
+            active_loops.pop();
+        }
+        while active_boundaries
+            .last()
+            .is_some_and(|end| span.start >= *end)
+        {
+            active_boundaries.pop();
+        }
+        while pending_loops
+            .last()
+            .is_some_and(|(start, _)| span.start >= *start)
+        {
+            let (_, loop_) = pending_loops.pop().unwrap();
+            active_loops.push(loop_);
+        }
+
+        if node.kind().is_function_like() {
+            active_boundaries.push(span.end);
+        }
+        if let Some((_, body_span)) = loop_spans(node.kind()) {
+            pending_loops.push((
+                body_span.start,
+                ActiveLoop {
+                    end: body_span.end,
+                    boundary_depth: active_boundaries.len(),
+                },
+            ));
+        }
+
+        let AstKind::VariableDeclarator(declarator) = node.kind() else {
+            continue;
+        };
+        if declarator.init.is_none()
+            && matches!(
+                nodes.parent_kind(node_id),
+                AstKind::VariableDeclaration(declaration)
+                    if matches!(
+                        declaration.kind,
+                        VariableDeclarationKind::Let | VariableDeclarationKind::Const
+                    )
+            )
+            && !pending_loops.last().is_some_and(|(body_start, loop_)| {
+                span.start < *body_start && loop_.boundary_depth == active_boundaries.len()
+            })
+            && active_loops
+                .last()
+                .is_some_and(|loop_| loop_.boundary_depth == active_boundaries.len())
+        {
+            resets.insert((declarator.span.start, declarator.span.end));
+        }
+    }
+    resets
 }
 
 pub(super) fn run<'a>(allocator: &'a Allocator, program: &mut Program<'a>, plan: BlockScopingPlan) {
@@ -1046,6 +1116,7 @@ fn has_captured_loop_binding(semantic: &Semantic<'_>) -> bool {
 pub(super) struct BlockScopingPlan {
     binding_renames: FxHashMap<(u32, u32, String), String>,
     reference_renames: FxHashMap<(u32, u32, String), String>,
+    loop_reset_declarations: FxHashSet<(u32, u32)>,
 }
 
 struct BlockScopingLowerer<'a> {
@@ -1068,11 +1139,33 @@ impl<'a> Visit<'a> for RemainingBlockScopingDetector {
 }
 
 impl<'a> VisitMut<'a> for BlockScopingLowerer<'a> {
+    #[expect(deprecated)]
     fn visit_variable_declaration(&mut self, declaration: &mut VariableDeclaration<'a>) {
         if matches!(
             declaration.kind,
             VariableDeclarationKind::Let | VariableDeclarationKind::Const
         ) {
+            for declarator in &mut declaration.declarations {
+                if declarator.init.is_none()
+                    && self
+                        .plan
+                        .loop_reset_declarations
+                        .contains(&(declarator.span.start, declarator.span.end))
+                {
+                    let span = declarator.span;
+                    let ast = AstBuilder::new(self.allocator);
+                    declarator.init = Some(ast.expression_unary(
+                        span,
+                        oxc_syntax::operator::UnaryOperator::Void,
+                        ast.expression_numeric_literal(
+                            span,
+                            0.0,
+                            None,
+                            oxc_ast::ast::NumberBase::Decimal,
+                        ),
+                    ));
+                }
+            }
             declaration.kind = VariableDeclarationKind::Var;
         }
         walk_mut::walk_variable_declaration(self, declaration);
@@ -1119,5 +1212,42 @@ mod tests {
             .build(&parsed.program);
         let loops = classify_captured_loops(&semantic.semantic);
         assert_eq!(loops.len(), 128);
+    }
+
+    #[test]
+    fn resets_uninitialized_lexical_declarations_in_loop_bodies_only() {
+        let source = "for (;;) { let bodyValue; for (let headerValue of values) use(headerValue); const nested = () => { let functionValue; }; }";
+        let allocator = Allocator::default();
+        let parsed = Parser::new(&allocator, source, SourceType::default()).parse();
+        let semantic = SemanticBuilder::new()
+            .with_build_nodes(true)
+            .build(&parsed.program);
+        let plan = prepare(&semantic.semantic).unwrap();
+        assert_eq!(plan.loop_reset_declarations.len(), 1);
+        let &(start, end) = plan.loop_reset_declarations.iter().next().unwrap();
+        assert_eq!(&source[start as usize..end as usize], "bodyValue");
+    }
+
+    #[test]
+    fn loop_reset_scan_handles_many_declarations_below_deep_blocks() {
+        let depth = 128;
+        let declarations = 1_024;
+        let source = format!(
+            "for (;;) {{{}{}{}}}",
+            "{".repeat(depth),
+            (0..declarations)
+                .map(|index| format!("let value{index};"))
+                .collect::<String>(),
+            "}".repeat(depth),
+        );
+        let allocator = Allocator::default();
+        let parsed = Parser::new(&allocator, &source, SourceType::default()).parse();
+        let semantic = SemanticBuilder::new()
+            .with_build_nodes(true)
+            .build(&parsed.program);
+        assert_eq!(
+            collect_loop_reset_declarations(&semantic.semantic).len(),
+            declarations
+        );
     }
 }
