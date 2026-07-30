@@ -8,7 +8,7 @@ use oxc_ast::{
     },
 };
 use oxc_ast_visit::{VisitMut, walk_mut};
-use oxc_semantic::{NodeId, Semantic};
+use oxc_semantic::Semantic;
 use oxc_span::{GetSpan, Span};
 use oxc_syntax::operator::{AssignmentOperator, BinaryOperator, LogicalOperator, UnaryOperator};
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -28,36 +28,40 @@ struct ForOfNames {
 
 pub(super) fn prepare(semantic: &Semantic<'_>) -> Plan {
     let nodes = semantic.nodes();
-    let loops = nodes
-        .iter_enumerated()
-        .filter_map(|(id, node)| {
-            matches!(node.kind(), AstKind::ForOfStatement(statement) if !statement.r#await)
-                .then_some(id)
-        })
-        .collect::<FxHashSet<_>>();
     let mut reserved = semantic
         .scoping()
         .symbol_names()
         .map(str::to_owned)
         .collect::<FxHashSet<_>>();
     let mut names = FxHashMap::<(u32, u32), Vec<ForOfNames>>::default();
-    let maximum_depth = loops
-        .iter()
-        .map(|id| for_of_depth(nodes, *id, &loops))
-        .max()
-        .unwrap_or(0);
+    let mut depth_buckets = Vec::<Vec<&ForOfStatement<'_>>>::new();
+    let mut active_loop_ends = Vec::<u32>::new();
+    for (_, node) in nodes.iter_enumerated() {
+        let AstKind::ForOfStatement(statement) = node.kind() else {
+            continue;
+        };
+        while active_loop_ends
+            .last()
+            .is_some_and(|end| statement.span.start >= *end)
+        {
+            active_loop_ends.pop();
+        }
+        if statement.r#await {
+            continue;
+        }
+        let depth = active_loop_ends.len();
+        if depth_buckets.len() == depth {
+            depth_buckets.push(Vec::new());
+        }
+        depth_buckets[depth].push(statement);
+        active_loop_ends.push(statement.span.end);
+    }
     // The text implementation transformed only outermost loops, reparsed, and
     // repeated. Within each round it allocated names in Semantic NodeId order.
     // Preserve that ABI while the mutator reaches every retained loop in one
     // walk by planning depth rounds up front.
-    for depth in 0..=maximum_depth {
-        for (id, node) in nodes.iter_enumerated() {
-            let AstKind::ForOfStatement(statement) = node.kind() else {
-                continue;
-            };
-            if statement.r#await || for_of_depth(nodes, id, &loops) != depth {
-                continue;
-            }
+    for bucket in depth_buckets {
+        for statement in bucket {
             names
                 .entry((statement.span.start, statement.span.end))
                 .or_default()
@@ -72,17 +76,6 @@ pub(super) fn prepare(semantic: &Semantic<'_>) -> Plan {
         }
     }
     Plan { names }
-}
-
-fn for_of_depth(
-    nodes: &oxc_semantic::AstNodes<'_>,
-    id: NodeId,
-    loops: &FxHashSet<NodeId>,
-) -> usize {
-    nodes
-        .ancestor_ids(id)
-        .filter(|ancestor| loops.contains(ancestor))
-        .count()
 }
 
 pub(super) fn run<'a>(
@@ -490,4 +483,28 @@ fn reserve(base: &str, reserved: &mut FxHashSet<String>) -> String {
         }
     }
     unreachable!()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use oxc_parser::Parser;
+    use oxc_semantic::SemanticBuilder;
+    use oxc_span::SourceType;
+
+    #[test]
+    fn nested_loop_depth_plans_all_loops() {
+        let source = format!(
+            "{}value;{}",
+            "for (const value of values) {".repeat(64),
+            "}".repeat(64)
+        );
+        let allocator = Allocator::default();
+        let parsed = Parser::new(&allocator, &source, SourceType::default()).parse();
+        let semantic = SemanticBuilder::new()
+            .with_build_nodes(true)
+            .build(&parsed.program);
+        let plan = prepare(&semantic.semantic);
+        assert_eq!(plan.names.len(), 64);
+    }
 }

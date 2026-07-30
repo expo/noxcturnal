@@ -114,17 +114,21 @@ interface NativeBinding {
     bindingIndexBuffer(): Buffer;
     uidPrefix(): string | null;
     scopeParentsBuffer(): Buffer;
-    queryCaptures(functionId: number): {
-      id: number;
-      start: number;
-      end: number;
-      scopeId: number;
-      bindingScopeId: number;
-      parentId?: number;
-      parentType?: string;
-      name: string;
-      read: boolean;
-      write: boolean;
+    scopeMetadataBuffer(): Buffer;
+    queryCapturesBatch(functionIds: number[]): {
+      functionId: number;
+      references: {
+        id: number;
+        start: number;
+        end: number;
+        scopeId: number;
+        bindingScopeId: number;
+        parentId?: number;
+        parentType?: string;
+        name: string;
+        read: boolean;
+        write: boolean;
+      }[];
     }[];
     inspectPackedBuffer(nodeIds: number[]): Buffer;
     nodeSummaryBuffer(nodeId: number): Buffer;

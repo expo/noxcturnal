@@ -46,25 +46,101 @@ pub(super) struct AstPlan {
     helper_names: HelperNames,
     emitted_helper_names: Vec<String>,
     nested_remaining: bool,
+    base_reserved: FxHashSet<String>,
+    planned_allocations: FxHashMap<String, usize>,
 }
 
 struct AstDeclaratorPlan {
     root: String,
     pattern: String,
     anchor: Span,
-    reserved: FxHashSet<String>,
+    reservation_checkpoint: usize,
 }
 
 struct AstCatchPlan {
     caught: String,
     anchor: Span,
-    reserved: FxHashSet<String>,
+    reservation_checkpoint: usize,
 }
 
 struct AstAssignmentPlan {
     root: String,
     anchor: Span,
-    reserved: FxHashSet<String>,
+    reservation_checkpoint: usize,
+}
+
+trait NameReservations {
+    fn contains(&self, name: &str) -> bool;
+    fn insert(&mut self, name: String) -> bool;
+    fn len(&self) -> usize;
+}
+
+struct PlanningReservations {
+    names: FxHashSet<String>,
+    base: FxHashSet<String>,
+    allocations: Vec<String>,
+}
+
+impl PlanningReservations {
+    fn new(base: FxHashSet<String>) -> Self {
+        Self {
+            names: base.clone(),
+            base,
+            allocations: Vec::new(),
+        }
+    }
+
+    fn checkpoint(&self) -> usize {
+        self.allocations.len()
+    }
+}
+
+impl NameReservations for PlanningReservations {
+    fn contains(&self, name: &str) -> bool {
+        self.names.contains(name)
+    }
+
+    fn insert(&mut self, name: String) -> bool {
+        if !self.names.insert(name.clone()) {
+            return false;
+        }
+        self.allocations.push(name);
+        true
+    }
+
+    fn len(&self) -> usize {
+        self.names.len()
+    }
+}
+
+struct SnapshotReservations<'a> {
+    base: &'a FxHashSet<String>,
+    planned: &'a FxHashMap<String, usize>,
+    checkpoint: usize,
+    local: FxHashSet<String>,
+}
+
+impl NameReservations for SnapshotReservations<'_> {
+    fn contains(&self, name: &str) -> bool {
+        self.base.contains(name)
+            || self
+                .planned
+                .get(name)
+                .is_some_and(|index| *index < self.checkpoint)
+            || self.local.contains(name)
+    }
+
+    fn insert(&mut self, name: String) -> bool {
+        if self.contains(&name) {
+            false
+        } else {
+            self.local.insert(name)
+        }
+    }
+
+    fn len(&self) -> usize {
+        self.base.len() + self.checkpoint + self.local.len()
+    }
 }
 
 pub(super) fn prepare_ast(
@@ -76,12 +152,13 @@ pub(super) fn prepare_ast(
     parameters_selected: bool,
     previous_helper_names: &[String],
 ) -> Result<AstPlan, &'static str> {
-    let mut reserved: FxHashSet<String> = semantic
+    let mut base_reserved: FxHashSet<String> = semantic
         .scoping()
         .symbol_names()
         .map(str::to_owned)
         .collect();
-    reserved.extend(previous_helper_names.iter().cloned());
+    base_reserved.extend(previous_helper_names.iter().cloned());
+    let mut reserved = PlanningReservations::new(base_reserved);
     let helper_names = HelperNames {
         iter: reserve("_toArray", &mut reserved),
         iter_runtime: reserve("_toArray2", &mut reserved),
@@ -96,12 +173,28 @@ pub(super) fn prepare_ast(
     let mut temporary_declarations: FxHashMap<u32, Vec<String>> = FxHashMap::default();
     let mut helper_usage = HelperUsage::default();
     let mut nested_remaining = false;
+    let mut active_pattern_ends = Vec::<u32>::new();
     // One semantic-node walk plans every destructuring shape against a shared
     // temporary-name set.
     for (node_id, node) in semantic.nodes().iter_enumerated() {
+        let node_span = node.kind().span();
+        while active_pattern_ends
+            .last()
+            .is_some_and(|end| node_span.start >= *end)
+        {
+            active_pattern_ends.pop();
+        }
+        let nested = active_pattern_ends
+            .last()
+            .is_some_and(|end| node_span.end <= *end);
         match node.kind() {
             AstKind::VariableDeclarator(declarator) => {
-                if has_planned_destructuring_ancestor(semantic.nodes(), node_id, only_object_rest) {
+                let selected_pattern = !declarator.id.is_binding_identifier()
+                    && (!only_object_rest || binding_has_object_rest(&declarator.id));
+                if selected_pattern {
+                    active_pattern_ends.push(declarator.id.span().end);
+                }
+                if nested {
                     nested_remaining = true;
                     continue;
                 }
@@ -127,7 +220,7 @@ pub(super) fn prepare_ast(
                 // it, in which case its source coordinates intentionally no longer
                 // describe text in the original input.
                 let root = reserve("_ref", &mut reserved);
-                let declarator_reserved = reserved.clone();
+                let reservation_checkpoint = reserved.checkpoint();
                 plan_binding_names(&declarator.id, &mut reserved, &mut helper_usage);
                 declarations
                     .entry(declarator.span.start)
@@ -136,14 +229,19 @@ pub(super) fn prepare_ast(
                         root,
                         pattern: binding_pattern_fingerprint(&declarator.id),
                         anchor: declarator.span,
-                        reserved: declarator_reserved,
+                        reservation_checkpoint,
                     });
             }
             AstKind::CatchClause(clause) => {
                 let Some(param) = &clause.param else {
                     continue;
                 };
-                if has_planned_destructuring_ancestor(semantic.nodes(), node_id, only_object_rest) {
+                let selected_pattern = !param.pattern.is_binding_identifier()
+                    && (!only_object_rest || binding_has_object_rest(&param.pattern));
+                if selected_pattern {
+                    active_pattern_ends.push(param.pattern.span().end);
+                }
+                if nested {
                     nested_remaining = true;
                     continue;
                 }
@@ -153,19 +251,24 @@ pub(super) fn prepare_ast(
                     continue;
                 }
                 let caught = reserve("_caught", &mut reserved);
-                let catch_reserved = reserved.clone();
+                let reservation_checkpoint = reserved.checkpoint();
                 plan_binding_names(&param.pattern, &mut reserved, &mut helper_usage);
                 catches.insert(
                     clause.span.start,
                     AstCatchPlan {
                         caught,
                         anchor: param.span,
-                        reserved: catch_reserved,
+                        reservation_checkpoint,
                     },
                 );
             }
             AstKind::AssignmentExpression(assignment) => {
-                if has_planned_destructuring_ancestor(semantic.nodes(), node_id, only_object_rest) {
+                let selected_pattern = assignment.left.is_assignment_target_pattern()
+                    && (!only_object_rest || assignment_has_object_rest(&assignment.left));
+                if selected_pattern {
+                    active_pattern_ends.push(assignment.left.span().end);
+                }
+                if nested {
                     nested_remaining = true;
                     continue;
                 }
@@ -174,16 +277,16 @@ pub(super) fn prepare_ast(
                 {
                     continue;
                 }
-                let before = reserved.clone();
+                let before = reserved.checkpoint();
                 let root = reserve("_ref", &mut reserved);
-                let assignment_reserved = reserved.clone();
+                let reservation_checkpoint = reserved.checkpoint();
                 plan_assignment_names(&assignment.left, &mut reserved, &mut helper_usage);
                 assignments.insert(
                     assignment.span.start,
                     AstAssignmentPlan {
                         root,
                         anchor: assignment.span,
-                        reserved: assignment_reserved,
+                        reservation_checkpoint,
                     },
                 );
                 let scope_start = semantic
@@ -198,12 +301,7 @@ pub(super) fn prepare_ast(
                 temporary_declarations
                     .entry(scope_start)
                     .or_default()
-                    .extend(
-                        reserved
-                            .iter()
-                            .filter(|name| !before.contains(*name))
-                            .cloned(),
-                    );
+                    .extend(reserved.allocations[before..].iter().cloned());
             }
             _ => {}
         }
@@ -323,6 +421,12 @@ pub(super) fn prepare_ast(
     emitted_helper_names.sort_unstable();
     emitted_helper_names.dedup();
     helper_requests.reserve_scope_names(emitted_helper_names.iter().cloned());
+    let planned_allocations = reserved
+        .allocations
+        .iter()
+        .enumerate()
+        .map(|(index, name)| (name.clone(), index))
+        .collect();
     Ok(AstPlan {
         declarations,
         catches,
@@ -332,6 +436,8 @@ pub(super) fn prepare_ast(
         helper_names,
         emitted_helper_names,
         nested_remaining,
+        base_reserved: reserved.base,
+        planned_allocations,
     })
 }
 
@@ -343,35 +449,6 @@ impl AstPlan {
     pub(super) fn emitted_helper_names(&self) -> &[String] {
         &self.emitted_helper_names
     }
-}
-
-fn has_planned_destructuring_ancestor(
-    nodes: &oxc_semantic::AstNodes<'_>,
-    node_id: oxc_semantic::NodeId,
-    only_object_rest: bool,
-) -> bool {
-    let span = nodes.kind(node_id).span();
-    let contains = |outer: Span| outer.start <= span.start && span.end <= outer.end;
-    nodes
-        .ancestor_ids(node_id)
-        .any(|ancestor_id| match nodes.kind(ancestor_id) {
-            AstKind::VariableDeclarator(declarator) => {
-                !declarator.id.is_binding_identifier()
-                    && (!only_object_rest || binding_has_object_rest(&declarator.id))
-                    && contains(declarator.id.span())
-            }
-            AstKind::CatchClause(clause) => clause.param.as_ref().is_some_and(|param| {
-                !param.pattern.is_binding_identifier()
-                    && (!only_object_rest || binding_has_object_rest(&param.pattern))
-                    && contains(param.pattern.span())
-            }),
-            AstKind::AssignmentExpression(assignment) => {
-                assignment.left.is_assignment_target_pattern()
-                    && (!only_object_rest || assignment_has_object_rest(&assignment.left))
-                    && contains(assignment.left.span())
-            }
-            _ => false,
-        })
 }
 
 pub(super) fn run_ast<'a>(
@@ -386,6 +463,8 @@ pub(super) fn run_ast<'a>(
         assignments: plan.assignments,
         temporary_declarations: plan.temporary_declarations,
         helper_names: plan.helper_names,
+        base_reserved: plan.base_reserved,
+        planned_allocations: plan.planned_allocations,
         changed: false,
         error: None,
     };
@@ -403,6 +482,8 @@ struct DestructuringDeclaratorLowerer<'a> {
     assignments: FxHashMap<u32, AstAssignmentPlan>,
     temporary_declarations: FxHashMap<u32, Vec<String>>,
     helper_names: HelperNames,
+    base_reserved: FxHashSet<String>,
+    planned_allocations: FxHashMap<String, usize>,
     changed: bool,
     error: Option<&'static str>,
 }
@@ -537,7 +618,7 @@ impl<'a> DestructuringDeclaratorLowerer<'a> {
         value: Expression<'a>,
         anchor: Span,
         output: &mut ArenaVec<'a, Expression<'a>>,
-        reserved: &mut FxHashSet<String>,
+        reserved: &mut impl NameReservations,
     ) -> Result<(), &'static str> {
         match target {
             AssignmentTargetMaybeDefault::AssignmentTargetWithDefault(default) => {
@@ -564,7 +645,7 @@ impl<'a> DestructuringDeclaratorLowerer<'a> {
         value: Expression<'a>,
         anchor: Span,
         output: &mut ArenaVec<'a, Expression<'a>>,
-        reserved: &mut FxHashSet<String>,
+        reserved: &mut impl NameReservations,
     ) -> Result<(), &'static str> {
         match target {
             AssignmentTarget::ArrayAssignmentTarget(pattern) => {
@@ -687,7 +768,7 @@ impl<'a> DestructuringDeclaratorLowerer<'a> {
         kind: VariableDeclarationKind,
         anchor: Span,
         output: &mut ArenaVec<'a, VariableDeclarator<'a>>,
-        reserved: &mut FxHashSet<String>,
+        reserved: &mut impl NameReservations,
     ) -> Result<(), &'static str> {
         match pattern {
             BindingPattern::BindingIdentifier(identifier) => {
@@ -870,7 +951,12 @@ impl<'a> VisitMut<'a> for DestructuringDeclaratorLowerer<'a> {
             clear_leading_pure_annotation(&mut init);
             let mut replacements = ArenaVec::new_in(&ast);
             replacements.push(self.declarator(plan.anchor, old.kind, &plan.root, Some(init)));
-            let mut reserved = plan.reserved;
+            let mut reserved = SnapshotReservations {
+                base: &self.base_reserved,
+                planned: &self.planned_allocations,
+                checkpoint: plan.reservation_checkpoint,
+                local: FxHashSet::default(),
+            };
             if let Err(error) = self.lower_binding(
                 old.id,
                 self.id(plan.anchor, &plan.root),
@@ -907,7 +993,12 @@ impl<'a> VisitMut<'a> for DestructuringDeclaratorLowerer<'a> {
                 None::<ArenaBox<'a, TSTypeAnnotation<'a>>>,
             );
             let mut declarators = ArenaVec::new_in(&ast);
-            let mut reserved = plan.reserved;
+            let mut reserved = SnapshotReservations {
+                base: &self.base_reserved,
+                planned: &self.planned_allocations,
+                checkpoint: plan.reservation_checkpoint,
+                local: FxHashSet::default(),
+            };
             if let Err(error) = self.lower_binding(
                 old_param.pattern,
                 self.id(plan.anchor, &plan.caught),
@@ -962,7 +1053,12 @@ impl<'a> VisitMut<'a> for DestructuringDeclaratorLowerer<'a> {
         let assignment = assignment.unbox();
         let mut expressions = ArenaVec::new_in(&ast);
         expressions.push(self.assign_name(plan.anchor, &plan.root, assignment.right));
-        let mut reserved = plan.reserved;
+        let mut reserved = SnapshotReservations {
+            base: &self.base_reserved,
+            planned: &self.planned_allocations,
+            checkpoint: plan.reservation_checkpoint,
+            local: FxHashSet::default(),
+        };
         if let Err(error) = self.lower_assignment(
             assignment.left,
             self.id(plan.anchor, &plan.root),
@@ -1114,7 +1210,7 @@ struct HelperUsage {
 
 fn plan_binding_names(
     pattern: &BindingPattern<'_>,
-    reserved: &mut FxHashSet<String>,
+    reserved: &mut impl NameReservations,
     helpers: &mut HelperUsage,
 ) {
     match pattern {
@@ -1152,7 +1248,7 @@ fn plan_binding_names(
 
 fn plan_assignment_names(
     target: &AssignmentTarget<'_>,
-    reserved: &mut FxHashSet<String>,
+    reserved: &mut impl NameReservations,
     helpers: &mut HelperUsage,
 ) {
     match target {
@@ -1195,7 +1291,7 @@ fn plan_assignment_names(
 
 fn plan_assignment_maybe_names(
     target: &AssignmentTargetMaybeDefault<'_>,
-    reserved: &mut FxHashSet<String>,
+    reserved: &mut impl NameReservations,
     helpers: &mut HelperUsage,
 ) {
     match target {
@@ -1271,7 +1367,7 @@ fn assignment_maybe_has_object_rest(
     }
 }
 
-fn reserve(base: &str, reserved: &mut FxHashSet<String>) -> String {
+fn reserve(base: &str, reserved: &mut impl NameReservations) -> String {
     if reserved.insert(base.to_owned()) {
         return base.to_owned();
     }
@@ -1399,5 +1495,20 @@ mod tests {
         assert!(code.contains("first = _arr[0]"));
         assert!(code.contains("rest = _arr.slice(1)"));
         assert!(!code.contains("[first, ...rest] ="));
+    }
+
+    #[test]
+    fn reservation_planning_allocates_only_generated_names() {
+        let source = (0..128)
+            .map(|index| format!("const [a{index}, b{index}] = values{index};"))
+            .collect::<String>();
+        let allocator = Allocator::default();
+        let parsed = Parser::new(&allocator, &source, SourceType::default()).parse();
+        let semantic = oxc_semantic::SemanticBuilder::new()
+            .with_build_nodes(true)
+            .build(&parsed.program);
+        let plan =
+            prepare_ast(&source, &semantic.semantic, true, false, false, false, &[]).unwrap();
+        assert_eq!(plan.declarations.len(), 128);
     }
 }

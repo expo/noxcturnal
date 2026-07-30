@@ -385,10 +385,15 @@ test('native classes structurally pair loose private accessors', () => {
         static #staticField = 2;
         static get #staticValue() { return this.#staticField; }
         static set #staticValue(value) { this.#staticField = value; }
+        #reverseField = 3;
+        set #reverseValue(value) { this.#reverseField = value; }
+        get #reverseValue() { return this.#reverseField; }
         read() { this.#value = 4; return this.#value; }
+        readReverse() { this.#reverseValue = 6; return this.#reverseValue; }
         static read() { this.#staticValue = 5; return this.#staticValue; }
       }
-      globalThis.result = [new Accessors().read(), Accessors.read()];
+      const instance = new Accessors();
+      globalThis.result = [instance.read(), Accessors.read(), instance.readReverse()];
     `,
     'fixture.js',
     pipeline({
@@ -402,7 +407,7 @@ test('native classes structurally pair loose private accessors', () => {
   assert.doesNotMatch(result.code, /\bclass\s+Accessors\b|#[A-Za-z_$]/);
   const context: { result?: unknown[] } = {};
   new Function('globalThis', 'require', result.code)(context, runtimeRequire);
-  assert.deepEqual(context.result, [4, 5]);
+  assert.deepEqual(context.result, [4, 5, 6]);
 });
 
 test('native class helpers avoid source binding collisions', () => {

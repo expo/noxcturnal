@@ -13,7 +13,7 @@ use oxc_ast::{
 use oxc_ast_visit::{Visit, VisitMut, walk, walk_mut};
 #[cfg(test)]
 use oxc_parser::Parser;
-use oxc_semantic::Semantic;
+use oxc_semantic::{NodeId, Semantic};
 use oxc_span::{GetSpan, SourceType, Span};
 use oxc_syntax::scope::ScopeFlags;
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -50,6 +50,40 @@ struct DirectClassPlan {
     helper_names: ClassHelperNames,
     uses_super_get: bool,
     uses_private_helper: bool,
+}
+
+#[derive(Default)]
+struct ClassFacts {
+    super_reference_ids: Vec<NodeId>,
+    has_private_in: bool,
+    uses_private_helper: bool,
+}
+
+fn collect_class_facts(semantic: &Semantic<'_>) -> FxHashMap<NodeId, ClassFacts> {
+    let mut facts = FxHashMap::default();
+    let mut active = Vec::<(NodeId, u32)>::new();
+    for (node_id, node) in semantic.nodes().iter_enumerated() {
+        let start = node.kind().span().start;
+        while active.last().is_some_and(|(_, end)| start >= *end) {
+            active.pop();
+        }
+        if let AstKind::Class(class) = node.kind() {
+            facts.insert(node_id, ClassFacts::default());
+            active.push((node_id, class.span.end));
+            continue;
+        }
+        let Some((class_id, _)) = active.last() else {
+            continue;
+        };
+        let class_facts = facts.get_mut(class_id).unwrap();
+        match node.kind() {
+            AstKind::Super(_) => class_facts.super_reference_ids.push(node_id),
+            AstKind::PrivateInExpression(_) => class_facts.has_private_in = true,
+            AstKind::PrivateFieldExpression(_) => class_facts.uses_private_helper = true,
+            _ => {}
+        }
+    }
+    facts
 }
 
 #[derive(Clone)]
@@ -162,6 +196,7 @@ fn class_helper_requests(
 #[expect(clippy::too_many_arguments)]
 fn direct_class_candidates(
     semantic: &Semantic<'_>,
+    facts: &FxHashMap<NodeId, ClassFacts>,
     lower_all_classes: bool,
     class_properties_loose: Option<bool>,
     class_static_blocks: bool,
@@ -177,17 +212,8 @@ fn direct_class_candidates(
             continue;
         };
         let derived = class.super_class.is_some();
-        let own_super_reference_ids = nodes
-            .iter_enumerated()
-            .filter(|(candidate_id, candidate)| {
-                matches!(candidate.kind(), AstKind::Super(_))
-                    && nodes
-                        .ancestor_ids(*candidate_id)
-                        .find(|ancestor| matches!(nodes.kind(*ancestor), AstKind::Class(_)))
-                        == Some(node_id)
-            })
-            .map(|(candidate_id, _)| candidate_id)
-            .collect::<Vec<_>>();
+        let class_facts = &facts[&node_id];
+        let own_super_reference_ids = &class_facts.super_reference_ids;
         let unsupported_super_reference = own_super_reference_ids.iter().any(|super_id| {
             let parent_id = nodes.parent_id(*super_id);
             match nodes.kind(parent_id) {
@@ -230,20 +256,8 @@ fn direct_class_candidates(
                     if matches!(property.key, PropertyKey::PrivateIdentifier(_))
             )
         });
-        let has_private_in = nodes.iter_enumerated().any(|(candidate_id, candidate)| {
-            matches!(candidate.kind(), AstKind::PrivateInExpression(_))
-                && nodes
-                    .ancestor_ids(candidate_id)
-                    .find(|ancestor| matches!(nodes.kind(*ancestor), AstKind::Class(_)))
-                    == Some(node_id)
-        });
-        let uses_private_helper = nodes.iter_enumerated().any(|(candidate_id, candidate)| {
-            matches!(candidate.kind(), AstKind::PrivateFieldExpression(_))
-                && nodes
-                    .ancestor_ids(candidate_id)
-                    .find(|ancestor| matches!(nodes.kind(*ancestor), AstKind::Class(_)))
-                    == Some(node_id)
-        });
+        let has_private_in = class_facts.has_private_in;
+        let uses_private_helper = class_facts.uses_private_helper;
         let uses_super_get = own_super_reference_ids.iter().any(|super_id| {
             matches!(
                 nodes.kind(nodes.parent_id(*super_id)),
@@ -396,8 +410,10 @@ pub(super) fn prepare_ast(
         private_call: reserve("_classPrivateMethodCall", &mut reserved),
         private_runtime: reserve("_classPrivateFieldLooseBase2", &mut reserved),
     };
+    let class_facts = collect_class_facts(semantic);
     let direct = direct_class_candidates(
         semantic,
+        &class_facts,
         lower_all_classes,
         class_properties_loose,
         class_static_blocks,
@@ -418,20 +434,7 @@ pub(super) fn prepare_ast(
                     if matches!(method.key, PropertyKey::PrivateIdentifier(_))
             )
         }) && private_methods_loose.is_some();
-        let owns_private_in = private_in_loose.is_some()
-            && semantic
-                .nodes()
-                .iter_enumerated()
-                .any(|(candidate_id, candidate)| {
-                    matches!(candidate.kind(), AstKind::PrivateInExpression(_))
-                        && semantic
-                            .nodes()
-                            .ancestor_ids(candidate_id)
-                            .find(|ancestor| {
-                                matches!(semantic.nodes().kind(*ancestor), AstKind::Class(_))
-                            })
-                            == Some(node_id)
-                });
+        let owns_private_in = private_in_loose.is_some() && class_facts[&node_id].has_private_in;
         if !(lower_all_classes || owns_private_method || owns_private_in)
             || direct_spans.contains(&(class.span.start, class.span.end))
         {
@@ -2384,6 +2387,10 @@ fn lower_simple_class<'a>(
     let mut private_instance_method_initializers = ArenaVec::new_in(&ast);
     let mut private_static_method_initializers = ArenaVec::new_in(&ast);
     let mut private_accessors: Vec<PrivateAccessorPlan<'a>> = Vec::new();
+    // Preserve first-occurrence emission order and promote only larger classes to
+    // keyed lookup. Staticness is part of the accessor identity: validation is a
+    // separate compiler phase and callers may supply a parser-built AST directly.
+    let mut private_accessor_indices: Option<FxHashMap<(String, bool), usize>> = None;
     let mut computed_key_initializers: Vec<(String, Expression<'a>, Span)> = Vec::new();
     for element in class.body.body.drain(..) {
         match element {
@@ -2431,21 +2438,43 @@ fn lower_simple_class<'a>(
                         method.kind,
                         MethodDefinitionKind::Get | MethodDefinitionKind::Set
                     ) {
-                        let index = private_accessors
-                            .iter()
-                            .position(|accessor| {
+                        const INDEX_THRESHOLD: usize = 8;
+                        if private_accessor_indices.is_none()
+                            && private_accessors.len() == INDEX_THRESHOLD
+                        {
+                            private_accessor_indices = Some(
+                                private_accessors
+                                    .iter()
+                                    .enumerate()
+                                    .map(|(index, accessor)| {
+                                        ((accessor.key.clone(), accessor.is_static), index)
+                                    })
+                                    .collect(),
+                            );
+                        }
+                        let existing = if let Some(indices) = &private_accessor_indices {
+                            indices
+                                .get(&(private_key.clone(), method.r#static))
+                                .copied()
+                        } else {
+                            private_accessors.iter().position(|accessor| {
                                 accessor.key == private_key && accessor.is_static == method.r#static
                             })
-                            .unwrap_or_else(|| {
-                                private_accessors.push(PrivateAccessorPlan {
-                                    key: private_key.clone(),
-                                    is_static: method.r#static,
-                                    get: None,
-                                    set: None,
-                                    span: method.span,
-                                });
-                                private_accessors.len() - 1
+                        };
+                        let index = existing.unwrap_or_else(|| {
+                            let index = private_accessors.len();
+                            private_accessors.push(PrivateAccessorPlan {
+                                key: private_key.clone(),
+                                is_static: method.r#static,
+                                get: None,
+                                set: None,
+                                span: method.span,
                             });
+                            if let Some(indices) = &mut private_accessor_indices {
+                                indices.insert((private_key.clone(), method.r#static), index);
+                            }
+                            index
+                        });
                         if method.kind == MethodDefinitionKind::Get {
                             private_accessors[index].get = Some(value);
                         } else {
@@ -3174,5 +3203,123 @@ mod tests {
         let code = Codegen::new().build(&program).code;
         assert!(!code.contains("class Value"));
         assert!(code.contains("var Value"));
+    }
+
+    #[test]
+    fn sibling_class_facts_preserve_all_classes() {
+        let source = (0..128)
+            .map(|index| format!("class C{index} {{ method() {{ return super.value; }} }}"))
+            .collect::<String>();
+        let allocator = Allocator::default();
+        let parsed = Parser::new(
+            &allocator,
+            &source,
+            SourceType::from_path(Path::new("x.js")).unwrap(),
+        )
+        .parse();
+        let semantic = SemanticBuilder::new()
+            .with_build_nodes(true)
+            .build(&parsed.program);
+        let facts = collect_class_facts(&semantic.semantic);
+        assert_eq!(facts.len(), 128);
+        assert!(
+            facts
+                .values()
+                .all(|facts| facts.super_reference_ids.len() == 1)
+        );
+    }
+
+    #[test]
+    fn nested_class_facts_belong_to_the_nearest_class() {
+        let source = "class Outer extends Base { method(){ super.x; return class Inner extends Base { method(){ super.y; return #value in this; } #value; }; } }";
+        let allocator = Allocator::default();
+        let parsed = Parser::new(
+            &allocator,
+            source,
+            SourceType::from_path(Path::new("x.js")).unwrap(),
+        )
+        .parse();
+        let semantic = SemanticBuilder::new()
+            .with_build_nodes(true)
+            .build(&parsed.program);
+        let mut facts = collect_class_facts(&semantic.semantic)
+            .into_values()
+            .map(|facts| {
+                (
+                    facts.super_reference_ids.len(),
+                    facts.has_private_in,
+                    facts.uses_private_helper,
+                )
+            })
+            .collect::<Vec<_>>();
+        facts.sort_unstable();
+        assert_eq!(facts, [(1, false, false), (1, true, false)]);
+    }
+
+    #[test]
+    fn private_accessor_pairing_handles_large_classes() {
+        let accessors = (0..128)
+            .map(|index| {
+                format!(
+                    "get #value{index}(){{return {index}}} set #value{index}(value){{sink(value)}}"
+                )
+            })
+            .collect::<String>();
+        let source = format!("class Values {{ {accessors} }}");
+        let allocator = Allocator::default();
+        let parsed = Parser::new(
+            &allocator,
+            &source,
+            SourceType::from_path(Path::new("x.js")).unwrap(),
+        )
+        .parse();
+        let mut program = parsed.program;
+        let semantic = SemanticBuilder::new()
+            .with_build_nodes(true)
+            .build(&program);
+        let plan = prepare_ast(
+            &source,
+            SourceType::default(),
+            &semantic.semantic,
+            true,
+            None,
+            false,
+            Some(true),
+            None,
+            false,
+            false,
+        )
+        .unwrap();
+        assert!(run_ast(&allocator, &mut program, plan).unwrap().0);
+    }
+
+    #[test]
+    fn static_and_instance_private_accessors_remain_distinct() {
+        let source = "class Values { static get #value(){ return 1 } get #value(){ return 2 } }";
+        let allocator = Allocator::default();
+        let parsed = Parser::new(
+            &allocator,
+            source,
+            SourceType::from_path(Path::new("x.js")).unwrap(),
+        )
+        .parse();
+        let mut program = parsed.program;
+        let semantic = SemanticBuilder::new()
+            .with_build_nodes(true)
+            .build(&program);
+        let plan = prepare_ast(
+            source,
+            SourceType::default(),
+            &semantic.semantic,
+            true,
+            None,
+            false,
+            Some(true),
+            None,
+            false,
+            false,
+        )
+        .unwrap();
+        assert!(run_ast(&allocator, &mut program, plan).unwrap().0);
     }
 }

@@ -107,10 +107,11 @@ pub(super) fn prepare_ast(source: &str, semantic: &Semantic<'_>) -> Result<AstPl
     let mut arrows: FxHashMap<u32, Vec<AstArrowPlan>> = FxHashMap::default();
     let mut hoists: FxHashMap<NodeId, Vec<CaptureAliases>> = FxHashMap::default();
     let mut reserved: FxHashSet<String> = scoping.symbol_names().map(str::to_owned).collect();
+    let (arrow_facts, planning_nodes) = collect_arrow_facts(semantic, &symbols);
     // Plan functions and arrows in one traversal, sharing one collision set for
     // every generated capture and rest binding.
-    for (node_id, node) in semantic.nodes().iter_enumerated() {
-        match node.kind() {
+    for node_id in planning_nodes {
+        match semantic.nodes().kind(node_id) {
             AstKind::Function(function) => {
                 let Some(body) = &function.body else {
                     continue;
@@ -153,11 +154,11 @@ pub(super) fn prepare_ast(source: &str, semantic: &Semantic<'_>) -> Result<AstPl
                 if non_simple(&arrow.params).is_none() {
                     continue;
                 }
-                if !ast_arrow_eligible(source, semantic, node_id, arrow, &symbols) {
+                let facts = &arrow_facts[&node_id];
+                if facts.has_super {
                     return Err("arrow-parameters-lexical-super-not-implemented");
                 }
-                let capture =
-                    plan_arrow_capture(source, semantic, node_id, arrow, &symbols, &mut reserved)?;
+                let capture = plan_arrow_capture(source, semantic, node_id, facts, &mut reserved);
                 let boundary = non_simple(&arrow.params).expect("non-simple arrow");
                 let wrapper = body_scope_requires_wrapper(
                     source,
@@ -908,32 +909,105 @@ fn ast_eligible(
     true
 }
 
-fn ast_arrow_eligible(
-    source: &str,
-    semantic: &Semantic<'_>,
-    node_id: NodeId,
-    arrow: &ArrowFunctionExpression<'_>,
-    _symbols: &[SymbolFact<'_>],
-) -> bool {
-    let nodes = semantic.nodes();
-    let _ = source;
-    for (candidate_id, node) in nodes
-        .iter_enumerated()
-        .skip(node_id.index() + 1)
-        .take_while(|(_, node)| node.kind().span().start < arrow.body.span.end)
-    {
-        let span = node.kind().span();
-        if span.start < arrow.body.span.start
-            || span.end > arrow.body.span.end
-            || !belongs_to_arrow(nodes, candidate_id, node_id)
-        {
-            continue;
-        }
-        if matches!(node.kind(), AstKind::Super(_)) {
-            return false;
+#[derive(Default)]
+struct ArrowFacts {
+    has_super: bool,
+    this_spans: Vec<(u32, u32)>,
+    arguments_spans: Vec<(u32, u32)>,
+    new_target_spans: Vec<(u32, u32)>,
+}
+
+enum ActiveOwner {
+    Function {
+        end: u32,
+    },
+    Arrow {
+        id: NodeId,
+        body_start: u32,
+        end: u32,
+    },
+}
+
+impl ActiveOwner {
+    fn end(&self) -> u32 {
+        match self {
+            Self::Function { end } | Self::Arrow { end, .. } => *end,
         }
     }
-    true
+}
+
+fn collect_arrow_facts(
+    semantic: &Semantic<'_>,
+    symbols: &[SymbolFact<'_>],
+) -> (FxHashMap<NodeId, ArrowFacts>, Vec<NodeId>) {
+    let mut facts = FxHashMap::default();
+    let mut planning_nodes = Vec::new();
+    let mut active = Vec::<ActiveOwner>::new();
+    let mut argument_shadow_ends = Vec::<u32>::new();
+    for (node_id, node) in semantic.nodes().iter_enumerated() {
+        let span = node.kind().span();
+        while active.last().is_some_and(|owner| span.start >= owner.end()) {
+            active.pop();
+        }
+        while argument_shadow_ends
+            .last()
+            .is_some_and(|end| span.start >= *end)
+        {
+            argument_shadow_ends.pop();
+        }
+        match node.kind() {
+            AstKind::Function(function) => {
+                planning_nodes.push(node_id);
+                active.push(ActiveOwner::Function {
+                    end: function.span.end,
+                });
+                continue;
+            }
+            AstKind::ArrowFunctionExpression(arrow) => {
+                let selected = non_simple(&arrow.params).is_some();
+                if parameter_binding_names(symbols, &arrow.params).contains("arguments") {
+                    argument_shadow_ends.push(arrow.span.end);
+                }
+                if selected {
+                    facts.insert(node_id, ArrowFacts::default());
+                    planning_nodes.push(node_id);
+                    active.push(ActiveOwner::Arrow {
+                        id: node_id,
+                        body_start: arrow.body.span.start,
+                        end: arrow.span.end,
+                    });
+                }
+                continue;
+            }
+            _ => {}
+        }
+        let lexical_kind = match node.kind() {
+            AstKind::Super(_) => 0,
+            AstKind::ThisExpression(_) => 1,
+            AstKind::IdentifierReference(identifier) if identifier.name == "arguments" => 2,
+            AstKind::NewTarget(_) => 3,
+            _ => continue,
+        };
+        if lexical_kind == 2 && !argument_shadow_ends.is_empty() {
+            continue;
+        }
+        for owner in active.iter().rev() {
+            let ActiveOwner::Arrow { id, body_start, .. } = owner else {
+                break;
+            };
+            if span.start < *body_start {
+                continue;
+            }
+            let arrow_facts = facts.get_mut(id).unwrap();
+            match lexical_kind {
+                0 => arrow_facts.has_super = true,
+                1 => arrow_facts.this_spans.push((span.start, span.end)),
+                2 => arrow_facts.arguments_spans.push((span.start, span.end)),
+                _ => arrow_facts.new_target_spans.push((span.start, span.end)),
+            }
+        }
+    }
+    (facts, planning_nodes)
 }
 
 struct ArrowCapturePlan {
@@ -946,58 +1020,35 @@ fn plan_arrow_capture(
     source: &str,
     semantic: &Semantic<'_>,
     node_id: NodeId,
-    arrow: &ArrowFunctionExpression<'_>,
-    symbols: &[SymbolFact<'_>],
+    facts: &ArrowFacts,
     reserved: &mut FxHashSet<String>,
-) -> Result<ArrowCapturePlan, &'static str> {
+) -> ArrowCapturePlan {
     let nodes = semantic.nodes();
-    let shadows_arguments = parameter_binding_names(symbols, &arrow.params).contains("arguments");
     let mut aliases = CaptureAliases::default();
-    for (candidate_id, node) in nodes
-        .iter_enumerated()
-        .skip(node_id.index() + 1)
-        .take_while(|(_, node)| node.kind().span().start < arrow.body.span.end)
-    {
-        let span = node.kind().span();
-        if span.start < arrow.body.span.start
-            || span.end > arrow.body.span.end
-            || !belongs_to_arrow(nodes, candidate_id, node_id)
-        {
-            continue;
-        }
-        match node.kind() {
-            AstKind::Super(_) => return Err("arrow-parameters-lexical-super-not-implemented"),
-            AstKind::ThisExpression(_) => {
-                aliases
-                    .this_name
-                    .get_or_insert_with(|| reserve_name("_this", reserved));
-                aliases.this_spans.insert((span.start, span.end));
-            }
-            AstKind::IdentifierReference(identifier)
-                if identifier.name == "arguments" && !shadows_arguments =>
-            {
-                aliases
-                    .arguments_name
-                    .get_or_insert_with(|| reserve_name("_arguments", reserved));
-                aliases.arguments_spans.insert((span.start, span.end));
-            }
-            AstKind::NewTarget(_) => {
-                aliases
-                    .new_target_name
-                    .get_or_insert_with(|| reserve_name("_newtarget", reserved));
-                aliases.new_target_spans.insert((span.start, span.end));
-            }
-            _ => {}
-        }
+    if !facts.this_spans.is_empty() {
+        aliases.this_name = Some(reserve_name("_this", reserved));
+        aliases.this_spans.extend(facts.this_spans.iter().copied());
+    }
+    if !facts.arguments_spans.is_empty() {
+        aliases.arguments_name = Some(reserve_name("_arguments", reserved));
+        aliases
+            .arguments_spans
+            .extend(facts.arguments_spans.iter().copied());
+    }
+    if !facts.new_target_spans.is_empty() {
+        aliases.new_target_name = Some(reserve_name("_newtarget", reserved));
+        aliases
+            .new_target_spans
+            .extend(facts.new_target_spans.iter().copied());
     }
     if aliases.is_empty() {
-        return Ok(ArrowCapturePlan {
+        return ArrowCapturePlan {
             aliases,
             hoist: None,
             in_place: false,
-        });
+        };
     }
-    Ok(match statement_insertion(source, nodes, node_id) {
+    match statement_insertion(source, nodes, node_id) {
         Some(insertion) => ArrowCapturePlan {
             aliases,
             hoist: Some(insertion),
@@ -1008,19 +1059,7 @@ fn plan_arrow_capture(
             hoist: None,
             in_place: true,
         },
-    })
-}
-
-fn belongs_to_arrow(nodes: &oxc_semantic::AstNodes<'_>, node_id: NodeId, arrow_id: NodeId) -> bool {
-    for ancestor in nodes.ancestor_ids(node_id) {
-        if ancestor == arrow_id {
-            return true;
-        }
-        if matches!(nodes.kind(ancestor), AstKind::Function(_)) {
-            return false;
-        }
     }
-    false
 }
 
 /// Offset of the statement enclosing `node_id`, when a `var` declaration hoisted
@@ -1123,11 +1162,17 @@ fn body_scope_requires_wrapper(
     params.items.iter().any(|parameter| {
         parameter.initializer.as_ref().is_some_and(|initializer| {
             let initializer = slice(source, initializer.span());
-            body_names.iter().any(|name| {
-                initializer
-                    .split(|character: char| !character.is_alphanumeric() && character != '_')
-                    .any(|token| token == *name)
-            })
+            let mut token_start = None;
+            for (offset, character) in initializer.char_indices() {
+                if character.is_alphanumeric() || character == '_' {
+                    token_start.get_or_insert(offset);
+                } else if let Some(start) = token_start.take()
+                    && body_names.contains(&initializer[start..offset])
+                {
+                    return true;
+                }
+            }
+            token_start.is_some_and(|start| body_names.contains(&initializer[start..]))
         })
     })
 }
@@ -1244,5 +1289,128 @@ mod tests {
         assert!(code.contains("_newtarget = new.target"));
         assert!(code.contains("function()"));
         assert!(code.contains("_this.x + value + _arguments.length + _newtarget"));
+    }
+
+    #[test]
+    fn sibling_arrow_facts_preserve_all_arrows() {
+        let source = (0..128)
+            .map(|index| format!("const a{index} = (value = 1) => this.x + value;"))
+            .collect::<String>();
+        let allocator = Allocator::default();
+        let parsed = Parser::new(&allocator, &source, SourceType::default()).parse();
+        let semantic = oxc_semantic::SemanticBuilder::new()
+            .with_build_nodes(true)
+            .build(&parsed.program);
+        let symbols = semantic
+            .semantic
+            .scoping()
+            .symbol_ids()
+            .map(|symbol_id| SymbolFact {
+                span: semantic.semantic.scoping().symbol_span(symbol_id),
+                name: semantic.semantic.scoping().symbol_name(symbol_id),
+                flags: semantic.semantic.scoping().symbol_flags(symbol_id),
+            })
+            .collect::<Vec<_>>();
+        let (facts, _) = collect_arrow_facts(&semantic.semantic, &symbols);
+        assert_eq!(facts.len(), 128);
+        assert!(facts.values().all(|facts| facts.this_spans.len() == 1));
+    }
+
+    #[test]
+    fn wrapper_scanner_preserves_textual_token_compatibility() {
+        let wrapper = |source: &str| {
+            let allocator = Allocator::default();
+            let parsed = Parser::new(&allocator, source, SourceType::default()).parse();
+            let semantic = oxc_semantic::SemanticBuilder::new()
+                .with_build_nodes(true)
+                .build(&parsed.program);
+            let plan = prepare_ast(source, &semantic.semantic).unwrap();
+            plan.functions.values().next().unwrap()[0].wrapper
+        };
+        assert!(wrapper(
+            "function read(value = object.body) { let body = 1; return value; }"
+        ));
+        assert!(wrapper(
+            "function read(value = 'body') { let body = 1; return value; }"
+        ));
+        assert!(!wrapper(
+            "function read(value = /* body */ 1) { let body = 1; return value; }"
+        ));
+        assert!(wrapper(
+            "function read(value = café) { let café = 1; return value; }"
+        ));
+        assert!(!wrapper(
+            "function read(value = somebody) { let body = 1; return value; }"
+        ));
+        assert!(!wrapper(
+            "function read(value = $body) { let $body = 1; return value; }"
+        ));
+    }
+
+    #[test]
+    fn nested_arrow_facts_propagate_without_crossing_functions() {
+        let collect = |source: &str| {
+            let allocator = Allocator::default();
+            let parsed = Parser::new(&allocator, source, SourceType::default()).parse();
+            let semantic = oxc_semantic::SemanticBuilder::new()
+                .with_build_nodes(true)
+                .build(&parsed.program);
+            let mut symbols = semantic
+                .semantic
+                .scoping()
+                .symbol_ids()
+                .map(|symbol_id| SymbolFact {
+                    span: semantic.semantic.scoping().symbol_span(symbol_id),
+                    name: semantic.semantic.scoping().symbol_name(symbol_id),
+                    flags: semantic.semantic.scoping().symbol_flags(symbol_id),
+                })
+                .collect::<Vec<_>>();
+            symbols.sort_unstable_by_key(|symbol| symbol.span.start);
+            let (facts, _) = collect_arrow_facts(&semantic.semantic, &symbols);
+            facts
+                .values()
+                .map(|facts| {
+                    (
+                        facts.this_spans.len(),
+                        facts.arguments_spans.len(),
+                        facts.new_target_spans.len(),
+                    )
+                })
+                .collect::<Vec<_>>()
+        };
+        let mut nested = collect("const read = (a = 1) => (b = 2) => this;");
+        nested.sort_unstable();
+        assert_eq!(nested, [(1, 0, 0), (1, 0, 0)]);
+        assert_eq!(
+            collect("const read = (a = 1) => function () { return this; };"),
+            [(0, 0, 0)]
+        );
+        assert_eq!(
+            collect("const read = (arguments = 1) => arguments;"),
+            [(0, 0, 0)]
+        );
+        assert_eq!(
+            collect("const read = (value = 1) => (arguments) => arguments;"),
+            [(0, 0, 0)]
+        );
+    }
+
+    #[test]
+    fn wrapper_collision_handles_many_bindings_and_initializer_names() {
+        let initializer = (0..1_024)
+            .map(|index| format!("outside{index}"))
+            .collect::<Vec<_>>()
+            .join("+");
+        let bindings = (0..1_024)
+            .map(|index| format!("let body{index}={index};"))
+            .collect::<String>();
+        let source = format!("function read(value={initializer}){{{bindings}return value;}}");
+        let allocator = Allocator::default();
+        let parsed = Parser::new(&allocator, &source, SourceType::default()).parse();
+        let semantic = oxc_semantic::SemanticBuilder::new()
+            .with_build_nodes(true)
+            .build(&parsed.program);
+        let plan = prepare_ast(&source, &semantic.semantic).unwrap();
+        assert_eq!(plan.functions.len(), 1);
     }
 }

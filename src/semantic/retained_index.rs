@@ -5,7 +5,7 @@ use oxc_semantic::Scoping;
 use rustc_hash::FxHashMap;
 
 use super::constant_eval::{EvaluatedConstant, constant_for_kind};
-use crate::generated::event_schema::node_type_name;
+use crate::generated::event_schema::{node_type_id, node_type_name};
 use crate::protocol::constants::NodeTypeSet;
 
 pub const ABSENT_ID: u32 = u32::MAX;
@@ -142,6 +142,12 @@ pub struct NativeCaptureReference {
     pub name: String,
     pub read: bool,
     pub write: bool,
+}
+
+#[napi(object)]
+pub struct NativeCaptureGroup {
+    pub function_id: u32,
+    pub references: Vec<NativeCaptureReference>,
 }
 
 #[napi(object)]
@@ -364,44 +370,96 @@ impl RetainedIndex {
             .collect()
     }
 
-    pub fn captures(&self, function_id: u32, scope_parents: &[u32]) -> Vec<NativeCaptureReference> {
-        let function = function_id as usize;
-        let Some((&function_start, &function_end, &function_scope_id)) = self
-            .starts
-            .get(function)
-            .zip(self.ends.get(function))
-            .zip(self.scope_ids.get(function))
-            .map(|((start, end), scope)| (start, end, scope))
-        else {
+    pub fn captures_batch(
+        &self,
+        function_ids: &[u32],
+        scope_parents: &[u32],
+    ) -> Vec<NativeCaptureGroup> {
+        if function_ids.is_empty() {
             return Vec::new();
-        };
-        self.bindings
+        }
+        struct RequestedFunction {
+            id: u32,
+            start: u32,
+            end: u32,
+            scope_id: u32,
+            parent: Option<usize>,
+            references: Vec<NativeCaptureReference>,
+        }
+
+        let mut functions = function_ids
             .iter()
-            .filter(|((binding_scope_id, _), _)| {
-                *binding_scope_id != function_scope_id
-                    && !scope_contains(scope_parents, function_scope_id, *binding_scope_id)
-            })
-            .flat_map(|(&(binding_scope_id, name_id), binding)| {
-                binding.references.iter().filter_map(move |reference| {
-                    let node_id = reference.node_id();
-                    let start = self.starts[node_id as usize];
-                    let end = self.ends[node_id as usize];
-                    (start >= function_start
-                        && end <= function_end
-                        && scope_contains(scope_parents, function_scope_id, reference.scope_id))
-                    .then(|| NativeCaptureReference {
-                        id: node_id,
-                        start,
-                        end,
-                        scope_id: reference.scope_id,
-                        binding_scope_id,
-                        parent_id: self.parent_id(node_id),
-                        parent_type: self.parent_type(node_id),
-                        name: self.names[name_id as usize].as_ref().to_owned(),
-                        read: reference.read(),
-                        write: reference.write(),
-                    })
+            .copied()
+            .filter_map(|id| {
+                let index = id as usize;
+                Some(RequestedFunction {
+                    id,
+                    start: *self.starts.get(index)?,
+                    end: *self.ends.get(index)?,
+                    scope_id: *self.scope_ids.get(index)?,
+                    parent: None,
+                    references: Vec::new(),
                 })
+            })
+            .collect::<Vec<_>>();
+        functions.sort_unstable_by_key(|function| (function.start, u32::MAX - function.end));
+        let mut stack = Vec::<usize>::new();
+        for index in 0..functions.len() {
+            while stack
+                .last()
+                .is_some_and(|parent| functions[*parent].end < functions[index].end)
+            {
+                stack.pop();
+            }
+            functions[index].parent = stack.last().copied();
+            stack.push(index);
+        }
+
+        let (scope_entries, scope_exits) = scope_intervals(scope_parents);
+        let contains_scope = |ancestor: u32, child: u32| {
+            let ancestor = ancestor as usize;
+            let child_entry = scope_entries[child as usize];
+            scope_entries[ancestor] <= child_entry && child_entry < scope_exits[ancestor]
+        };
+
+        for (&(binding_scope_id, name_id), binding) in &self.bindings {
+            for reference in &binding.references {
+                let node_id = reference.node_id();
+                let start = self.starts[node_id as usize];
+                let end = self.ends[node_id as usize];
+                let insertion = functions.partition_point(|function| function.start <= start);
+                let mut candidate = insertion.checked_sub(1);
+                while let Some(index) = candidate {
+                    let function_end = functions[index].end;
+                    let function_scope_id = functions[index].scope_id;
+                    candidate = functions[index].parent;
+                    if end <= function_end
+                        && function_scope_id != binding_scope_id
+                        && contains_scope(function_scope_id, reference.scope_id)
+                        && !contains_scope(function_scope_id, binding_scope_id)
+                    {
+                        functions[index].references.push(NativeCaptureReference {
+                            id: node_id,
+                            start,
+                            end,
+                            scope_id: reference.scope_id,
+                            binding_scope_id,
+                            parent_id: self.parent_id(node_id),
+                            parent_type: self.parent_type(node_id),
+                            name: self.names[name_id as usize].as_ref().to_owned(),
+                            read: reference.read(),
+                            write: reference.write(),
+                        });
+                    }
+                }
+            }
+        }
+
+        functions
+            .into_iter()
+            .map(|function| NativeCaptureGroup {
+                function_id: function.id,
+                references: function.references,
             })
             .collect()
     }
@@ -822,6 +880,33 @@ impl RetainedIndex {
             .map(|(node_id, _)| node_id as u32)
     }
 
+    pub fn scope_metadata_buffer(&self, scope_count: usize) -> Buffer {
+        let program = node_type_id("Program").unwrap();
+        let function = node_type_id("Function").unwrap();
+        let arrow = node_type_id("ArrowFunctionExpression").unwrap();
+        let directive = node_type_id("Directive").unwrap();
+        let mut words = vec![ABSENT_ID; scope_count * 3];
+        for node_id in 0..self.type_ids.len() {
+            let scope = self.scope_ids[node_id] as usize;
+            let offset = scope * 3;
+            let type_id = self.type_ids[node_id];
+            if type_id == program || type_id == function || type_id == arrow {
+                words[offset] = node_id as u32;
+            } else if type_id == directive {
+                let end = self.ends[node_id];
+                if words[offset + 2] == ABSENT_ID || end > words[offset + 1] {
+                    words[offset + 1] = end;
+                }
+                words[offset + 2] = 1;
+            }
+        }
+        let mut output = Vec::with_capacity(words.len() * 4);
+        for word in words {
+            output.extend_from_slice(&word.to_le_bytes());
+        }
+        output.into()
+    }
+
     pub fn memory_usage(&self) -> usize {
         self.type_ids.capacity() * size_of::<u32>()
             + self.starts.capacity() * size_of::<u32>()
@@ -893,20 +978,35 @@ impl RetainedIndex {
     }
 }
 
-fn scope_contains(scope_parents: &[u32], ancestor: u32, child: u32) -> bool {
-    let mut scope = child;
-    loop {
-        if scope == ancestor {
-            return true;
-        }
-        scope = scope_parents
-            .get(scope as usize)
-            .copied()
-            .unwrap_or(ABSENT_ID);
-        if scope == ABSENT_ID {
-            return false;
+fn scope_intervals(scope_parents: &[u32]) -> (Vec<u32>, Vec<u32>) {
+    let mut children = vec![Vec::new(); scope_parents.len()];
+    let mut roots = Vec::new();
+    for (scope, &parent) in scope_parents.iter().enumerate() {
+        if parent == ABSENT_ID {
+            roots.push(scope);
+        } else {
+            children[parent as usize].push(scope);
         }
     }
+    let mut entries = vec![0; scope_parents.len()];
+    let mut exits = vec![0; scope_parents.len()];
+    let mut clock = 0;
+    let mut stack = roots
+        .into_iter()
+        .rev()
+        .map(|scope| (scope, false))
+        .collect::<Vec<_>>();
+    while let Some((scope, exiting)) = stack.pop() {
+        if exiting {
+            exits[scope] = clock;
+            continue;
+        }
+        entries[scope] = clock;
+        clock += 1;
+        stack.push((scope, true));
+        stack.extend(children[scope].iter().rev().map(|&child| (child, false)));
+    }
+    (entries, exits)
 }
 
 pub struct Children<'a> {
@@ -931,3 +1031,73 @@ impl Iterator for Children<'_> {
     }
 }
 use std::rc::Rc;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn capture_batch_groups_many_functions() {
+        const COUNT: usize = 128;
+        let mut index = RetainedIndex {
+            type_ids: vec![0; COUNT * 2],
+            starts: vec![0; COUNT * 2],
+            ends: vec![0; COUNT * 2],
+            parent_ids: vec![ABSENT_ID; COUNT * 2],
+            scope_ids: vec![0; COUNT * 2],
+            names: vec![Rc::from("outer")],
+            ..RetainedIndex::default()
+        };
+        let mut references = Vec::with_capacity(COUNT);
+        let mut scope_parents = vec![ABSENT_ID];
+        for function in 0..COUNT {
+            let function_id = function as u32;
+            let reference_id = (COUNT + function) as u32;
+            let scope_id = function_id + 1;
+            let start = function_id * 10;
+            index.starts[function] = start;
+            index.ends[function] = start + 5;
+            index.scope_ids[function] = scope_id;
+            index.starts[reference_id as usize] = start + 1;
+            index.ends[reference_id as usize] = start + 2;
+            index.scope_ids[reference_id as usize] = scope_id;
+            scope_parents.push(0);
+            references.push(SemanticReference::new(reference_id, scope_id, true, false));
+        }
+        index.bindings.insert(
+            (0, 0),
+            BindingRecord {
+                declaration_id: None,
+                references,
+            },
+        );
+        let groups = index.captures_batch(&(0..COUNT as u32).collect::<Vec<_>>(), &scope_parents);
+        assert_eq!(groups.len(), COUNT);
+        assert!(groups.iter().all(|group| group.references.len() == 1));
+    }
+
+    #[test]
+    fn scope_metadata_encodes_all_scopes() {
+        const COUNT: usize = 128;
+        let program = node_type_id("Program").unwrap();
+        let function = node_type_id("Function").unwrap();
+        let directive = node_type_id("Directive").unwrap();
+        let mut index = RetainedIndex {
+            type_ids: vec![0; COUNT * 2],
+            starts: vec![0; COUNT * 2],
+            ends: vec![0; COUNT * 2],
+            scope_ids: vec![0; COUNT * 2],
+            ..RetainedIndex::default()
+        };
+        for scope in 0..COUNT {
+            index.type_ids[scope] = if scope == 0 { program } else { function };
+            index.scope_ids[scope] = scope as u32;
+            let directive_id = COUNT + scope;
+            index.type_ids[directive_id] = directive;
+            index.scope_ids[directive_id] = scope as u32;
+            index.ends[directive_id] = scope as u32 + 10;
+        }
+        let buffer = index.scope_metadata_buffer(COUNT);
+        assert_eq!(buffer.len(), COUNT * 3 * size_of::<u32>());
+    }
+}

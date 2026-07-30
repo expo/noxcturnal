@@ -636,18 +636,45 @@ fn expand_copies(source: &str, edits: &mut [Edit]) -> Result<Vec<Option<Vec<Piec
     // search skips everything left of a copied range, this is the only edit that can
     // still straddle the range's start boundary.
     let mut previous_ranged = vec![usize::MAX; edits.len()];
+    const TRANSPARENT_INDEX_THRESHOLD: usize = 8;
+    let transparent_count = edits
+        .iter()
+        .filter(|edit| edit.mark_only || edit.hole)
+        .count();
+    let index_transparent = transparent_count >= TRANSPARENT_INDEX_THRESHOLD;
+    let mut previous_end_conflict = index_transparent.then(|| vec![usize::MAX; edits.len()]);
     let mut last_ranged = usize::MAX;
+    let mut last_end_conflict = usize::MAX;
     for (index, edit) in edits.iter().enumerate() {
         if edit.end > edit.start {
             last_ranged = index;
+            if !edit.mark_only {
+                last_end_conflict = index;
+            }
         }
         previous_ranged[index] = last_ranged;
+        if let Some(previous) = &mut previous_end_conflict {
+            previous[index] = last_end_conflict;
+        }
     }
+    let next_effective = index_transparent.then(|| {
+        let mut table = vec![edits.len(); edits.len() + 1];
+        let mut next = edits.len();
+        for index in (0..edits.len()).rev() {
+            if !edits[index].mark_only && !edits[index].hole {
+                next = index;
+            }
+            table[index] = next;
+        }
+        table
+    });
     let mut expansions = vec![None; edits.len()];
     let mut expander = Expander {
         source,
         states: vec![State::Unresolved; edits.len()],
         previous_ranged,
+        previous_end_conflict,
+        next_effective,
         cache: FxHashMap::default(),
     };
     for index in 0..edits.len() {
@@ -667,6 +694,12 @@ struct Expander<'a> {
     source: &'a str,
     states: Vec<State>,
     previous_ranged: Vec<usize>,
+    /// Nearest ranged edit that participates in end-boundary conflicts. Mark-only
+    /// edits are transparent at this boundary in the legacy transaction rules.
+    previous_end_conflict: Option<Vec<usize>>,
+    /// Next edit that can emit a piece. Move holes and mapping-only marks are
+    /// transparent inside copied ranges and must not multiply candidate work.
+    next_effective: Option<Vec<usize>>,
     /// Expanded pieces per copied range, shared across identical copies.
     cache: FxHashMap<(usize, usize), Rc<[Piece]>>,
 }
@@ -773,17 +806,30 @@ impl Expander<'_> {
         {
             return Err(straddle_error(copier, &edits[index]));
         }
+        if let Some(previous_end_conflict) = &self.previous_end_conflict {
+            let before_end = edits.partition_point(|edit| edit.start < end);
+            if let Some(index) = before_end
+                .checked_sub(1)
+                .map(|index| previous_end_conflict[index])
+                .filter(|index| *index != usize::MAX)
+                && edits[index].end > end
+            {
+                return Err(straddle_error(copier, &edits[index]));
+            }
+        }
         let mut cursor = start;
-        for index in first..edits.len() {
+        let mut index = self
+            .next_effective
+            .as_ref()
+            .map_or(first, |next| next[first]);
+        while index < edits.len() {
             let (edit_start, edit_end, mark_only) =
                 (edits[index].start, edits[index].end, edits[index].mark_only);
             if edit_start >= end {
-                if edit_start > end || edit_end > edit_start {
-                    break;
-                }
-                continue;
+                break;
             }
             if mark_only {
+                index = self.next_candidate(index);
                 continue;
             }
             let contained = if edit_end > edit_start {
@@ -795,12 +841,14 @@ impl Expander<'_> {
                 if edit_end > edit_start {
                     return Err(straddle_error(copier, &edits[index]));
                 }
+                index = self.next_candidate(index);
                 continue;
             }
             if edits[index].hole {
                 // A moved-away range is transparent to expansion: the text still
                 // exists in original coordinates, and a move destination renders its
                 // own range through exactly this transparency.
+                index = self.next_candidate(index);
                 continue;
             }
             if edits[index].removed && edit_start == start && edit_end == end {
@@ -862,6 +910,7 @@ impl Expander<'_> {
                 },
             }
             cursor = edit_end.max(cursor);
+            index = self.next_candidate(index);
         }
         if end > cursor {
             out.push(Piece::Anchor {
@@ -871,6 +920,13 @@ impl Expander<'_> {
             out.push(Piece::Original { start: cursor, end });
         }
         Ok(())
+    }
+
+    #[inline]
+    fn next_candidate(&self, index: usize) -> usize {
+        self.next_effective
+            .as_ref()
+            .map_or(index + 1, |next| next[index + 1])
     }
 }
 
@@ -1016,5 +1072,93 @@ mod tests {
             "{}",
             error.reason
         );
+    }
+
+    #[test]
+    fn distinct_copy_ranges_expand_adversarial_fixture() {
+        const COUNT: usize = 128;
+        let source = "x".repeat(COUNT * 4 + 4);
+        let mut edits = Vec::with_capacity(COUNT * 2);
+        for end in 1..=COUNT {
+            edits.push(Edit {
+                start: 0,
+                end: 0,
+                content: String::new(),
+                parts: vec![ContentPart::Copy {
+                    start: COUNT * 2,
+                    end: COUNT * 2 + end * 2,
+                }],
+                mapping: MappingPolicy::Sourceless,
+                mark_only: false,
+                hole: false,
+                moved: false,
+                removed: false,
+                names: Vec::new(),
+                public_start: 0,
+                public_end: 0,
+            });
+        }
+        for index in 0..COUNT {
+            let offset = COUNT * 2 + index * 2 + 1;
+            edits.push(Edit {
+                start: offset,
+                end: offset,
+                content: "y".to_owned(),
+                parts: Vec::new(),
+                mapping: MappingPolicy::Sourceless,
+                mark_only: false,
+                hole: false,
+                moved: false,
+                removed: false,
+                names: Vec::new(),
+                public_start: offset as u32,
+                public_end: offset as u32,
+            });
+        }
+        let _ = expand_copies(&source, &mut edits).unwrap();
+    }
+
+    #[test]
+    fn transparent_move_holes_expand_adversarial_fixture() {
+        const COUNT: usize = 128;
+        let source = "x".repeat(COUNT * 4 + 4);
+        let mut edits = Vec::with_capacity(COUNT * 2);
+        for end in 1..=COUNT {
+            edits.push(Edit {
+                start: 0,
+                end: 0,
+                content: String::new(),
+                parts: vec![ContentPart::Copy {
+                    start: COUNT * 2,
+                    end: COUNT * 2 + end * 2,
+                }],
+                mapping: MappingPolicy::Sourceless,
+                mark_only: false,
+                hole: false,
+                moved: false,
+                removed: false,
+                names: Vec::new(),
+                public_start: 0,
+                public_end: 0,
+            });
+        }
+        for index in 0..COUNT {
+            let start = COUNT * 2 + index * 2;
+            edits.push(Edit {
+                start,
+                end: start + 1,
+                content: String::new(),
+                parts: Vec::new(),
+                mapping: MappingPolicy::Sourceless,
+                mark_only: false,
+                hole: true,
+                moved: false,
+                removed: true,
+                names: Vec::new(),
+                public_start: start as u32,
+                public_end: start as u32 + 1,
+            });
+        }
+        let _ = expand_copies(&source, &mut edits).unwrap();
     }
 }

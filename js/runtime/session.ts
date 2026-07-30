@@ -61,6 +61,7 @@ export class NativeTransformSession {
   #nativeFilename: string;
   #lineStarts: number[] | null = null;
   #scopeParents: Uint32Array | null = null;
+  #scopeMetadata: Uint32Array | null = null;
   #bindingIndex: { nameIds: Map<string, number>; keys: Set<number> } | null = null;
   #bindingsByScope = new Map<number, Map<string, QueryResult['bindings'][number]>>();
   constructor(
@@ -191,9 +192,11 @@ export class NativeTransformSession {
       }
     }
     const constants: QueryResult['constants'] = {};
-    const constantNodes = request.constants?.length ? this.constantNodes(request.constants) : [];
+    const constantNodesById = request.constants?.length
+      ? new Map(this.constantNodes(request.constants).map(node => [node.id, node]))
+      : undefined;
     for (const id of request.constants ?? []) {
-      const node = constantNodes.find(candidate => candidate.id === id);
+      const node = constantNodesById!.get(id);
       constants[id] =
         node?.constantKind === 'string'
           ? String(node.constantValue)
@@ -203,6 +206,28 @@ export class NativeTransformSession {
               ? node.constantValue === true || node.constantValue === 'true'
               : null;
     }
+    const captureIds = request.captures?.length
+      ? [...new Set(request.captures.map(capture => capture.functionId))]
+      : [];
+    const captures: QueryResult['captures'] = Object.fromEntries(
+      captureIds.map(functionId => [functionId, []]),
+    );
+    if (captureIds.length > 0)
+      for (const capture of this.#binding('query.captures').queryCapturesBatch(captureIds)) {
+        captures[capture.functionId] = capture.references.map(reference => ({
+          id: reference.id,
+          type: 'Identifier',
+          start: reference.start,
+          end: reference.end,
+          scopeId: reference.scopeId,
+          parentId: reference.parentId,
+          parentType: reference.parentType,
+          name: reference.name,
+          bindingScopeId: reference.bindingScopeId,
+          read: reference.read,
+          write: reference.write,
+        }));
+      }
     const result = {
       globals,
       imports: request.imports ? nodes.filter(node => node.type === 'ImportDeclaration') : [],
@@ -225,26 +250,7 @@ export class NativeTransformSession {
             })),
         ]),
       ),
-      captures: Object.fromEntries(
-        (request.captures ?? []).map(capture => [
-          capture.functionId,
-          this.#binding('query.captures')
-            .queryCaptures(capture.functionId)
-            .map(reference => ({
-              id: reference.id,
-              type: 'Identifier',
-              start: reference.start,
-              end: reference.end,
-              scopeId: reference.scopeId,
-              parentId: reference.parentId,
-              parentType: reference.parentType,
-              name: reference.name,
-              bindingScopeId: reference.bindingScopeId,
-              read: reference.read,
-              write: reference.write,
-            })),
-        ]),
-      ),
+      captures,
       bindings: (request.bindings ?? []).flatMap(binding =>
         this.#binding('query.bindings')
           .queryBindings(binding.name, binding.scopeId, binding.reads, binding.writes)
@@ -493,6 +499,24 @@ export class NativeTransformSession {
     this.#assertOpen();
     const parent = this.#scopeParentTable()[scopeId];
     return parent === undefined || parent === 0xffffffff ? null : parent;
+  }
+  scopeMetadata(scopeId: number): {
+    ownerId: number;
+    directivePrologueEnd: number;
+    hasDirectives: boolean;
+  } | null {
+    if (this.#scopeMetadata == null) {
+      const data = this.#binding('scope-metadata').scopeMetadataBuffer();
+      this.#scopeMetadata = new Uint32Array(data.buffer, data.byteOffset, data.byteLength / 4);
+    }
+    const offset = scopeId * 3;
+    const ownerId = this.#scopeMetadata[offset];
+    if (ownerId === 0xffffffff) return null;
+    return {
+      ownerId,
+      directivePrologueEnd: this.#scopeMetadata[offset + 1],
+      hasDirectives: this.#scopeMetadata[offset + 2] === 1,
+    };
   }
   #scopeParentTable(): Uint32Array {
     if (this.#scopeParents == null) {

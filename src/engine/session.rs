@@ -8,7 +8,7 @@ use crate::generated::event_schema::{
     NODE_TYPE_COUNT, alias_matches, node_type_id, node_type_name,
 };
 use crate::semantic::retained_index::{
-    NativeBindingFact, NativeCallFact, NativeCaptureReference, NativeConstantFact, RetainedIndex,
+    NativeBindingFact, NativeCallFact, NativeCaptureGroup, NativeConstantFact, RetainedIndex,
 };
 use crate::sourcemap::function_map::FunctionMap;
 
@@ -245,11 +245,14 @@ impl NativeIndexedSession {
     }
 
     #[napi]
-    pub fn query_captures(&mut self, function_id: u32) -> Result<Vec<NativeCaptureReference>> {
+    pub fn query_captures_batch(
+        &mut self,
+        function_ids: Vec<u32>,
+    ) -> Result<Vec<NativeCaptureGroup>> {
         self.ensure_open()?;
         Ok(self
             .retained_index
-            .captures(function_id, &self.scope_parents))
+            .captures_batch(&function_ids, &self.scope_parents))
     }
 
     #[napi]
@@ -272,6 +275,14 @@ impl NativeIndexedSession {
             output.extend_from_slice(&parent.to_le_bytes());
         }
         Ok(output.into())
+    }
+
+    #[napi]
+    pub fn scope_metadata_buffer(&self) -> Result<Buffer> {
+        self.ensure_open()?;
+        Ok(self
+            .retained_index
+            .scope_metadata_buffer(self.scope_parents.len()))
     }
 
     /// The binding-name table and key set for local JavaScript binding resolution.

@@ -21,6 +21,19 @@ struct CapturedLoop {
     header_bindings: Vec<String>,
 }
 
+struct PendingCapturedLoop {
+    captured: CapturedLoop,
+    statement_root: NodeId,
+    label: Option<String>,
+    content_start: u32,
+    content_end: u32,
+    returns: FxHashSet<(u32, u32)>,
+    breaks: FxHashSet<(u32, u32)>,
+    continues: FxHashSet<(u32, u32)>,
+    has_await: bool,
+    has_yield: bool,
+}
+
 pub(super) struct CapturedLoopAstPlan {
     roots: FxHashMap<(u32, u32), Vec<CapturedLoopMutation>>,
 }
@@ -549,137 +562,171 @@ fn captured_loop_mutations(
 ) -> Option<FxHashMap<(u32, u32), Vec<CapturedLoopMutation>>> {
     let nodes = semantic.nodes();
     let scoping = semantic.scoping();
-    let mut loops: FxHashMap<NodeId, CapturedLoop> = FxHashMap::default();
-    for symbol_id in scoping.symbol_ids() {
-        let Some(loop_id) = captured_loop_of(nodes, scoping, symbol_id) else {
-            continue;
-        };
-        let declaration_id = scoping.symbol_declaration(symbol_id);
-        let (span, body_span) = loop_spans(nodes.kind(loop_id))?;
-        let captured = loops.entry(loop_id).or_insert_with(|| CapturedLoop {
-            node_id: loop_id,
-            span,
-            body_span,
-            header_bindings: Vec::new(),
-        });
-        if nodes.kind(declaration_id).span().start < body_span.start {
-            captured
-                .header_bindings
-                .push(scoping.symbol_name(symbol_id).to_owned());
-        }
-    }
-    for captured in loops.values_mut() {
-        for symbol_id in scoping.symbol_ids() {
-            if !scoping
-                .symbol_flags(symbol_id)
-                .contains(SymbolFlags::BlockScopedVariable)
-            {
-                continue;
-            }
-            let declaration_id = scoping.symbol_declaration(symbol_id);
-            let belongs_to_loop = nodes
-                .ancestor_ids(declaration_id)
-                .find(|node_id| nodes.kind(*node_id).is_iteration_statement())
-                == Some(captured.node_id);
-            if belongs_to_loop && nodes.kind(declaration_id).span().start < captured.body_span.start
-            {
-                let name = scoping.symbol_name(symbol_id);
-                if !captured
-                    .header_bindings
-                    .iter()
-                    .any(|binding| binding == name)
-                {
-                    captured.header_bindings.push(name.to_owned());
-                }
-            }
-        }
-    }
+    let loops = classify_captured_loops(semantic);
     if loops.is_empty() {
         return None;
     }
     let loop_ids: FxHashSet<NodeId> = loops.keys().copied().collect();
-    let outermost = loops.into_values().filter(|candidate| {
-        !nodes
-            .ancestor_ids(candidate.node_id)
-            .any(|ancestor| loop_ids.contains(&ancestor))
-    });
+    let mut pending = loops
+        .into_values()
+        .filter(|candidate| {
+            !nodes
+                .ancestor_ids(candidate.node_id)
+                .any(|ancestor| loop_ids.contains(&ancestor))
+        })
+        .map(|captured| {
+            let mut statement_root = captured.node_id;
+            for ancestor in nodes.ancestor_ids(captured.node_id) {
+                if matches!(
+                    nodes.kind(ancestor),
+                    AstKind::Program(_)
+                        | AstKind::BlockStatement(_)
+                        | AstKind::FunctionBody(_)
+                        | AstKind::SwitchCase(_)
+                ) {
+                    break;
+                }
+                statement_root = ancestor;
+            }
+            let label =
+                nodes
+                    .ancestor_ids(captured.node_id)
+                    .next()
+                    .and_then(|parent_id| match nodes.kind(parent_id) {
+                        AstKind::LabeledStatement(statement) => {
+                            Some(statement.label.name.to_string())
+                        }
+                        _ => None,
+                    });
+            let body_is_block =
+                source.as_bytes().get(captured.body_span.start as usize) == Some(&b'{');
+            let content_start = captured.body_span.start + u32::from(body_is_block);
+            let content_end = captured.body_span.end - u32::from(body_is_block);
+            PendingCapturedLoop {
+                captured,
+                statement_root,
+                label,
+                content_start,
+                content_end,
+                returns: FxHashSet::default(),
+                breaks: FxHashSet::default(),
+                continues: FxHashSet::default(),
+                has_await: false,
+                has_yield: false,
+            }
+        })
+        .collect::<Vec<_>>();
+    pending.sort_unstable_by_key(|loop_plan| loop_plan.content_start);
+    let mut current = 0;
+    let mut active_functions = Vec::<u32>::new();
+    let mut active_iterations = Vec::<(NodeId, u32)>::new();
+    let mut active_breakables = Vec::<(NodeId, u32)>::new();
+    for (node_id, node) in nodes.iter_enumerated() {
+        let span = node.kind().span();
+        while current < pending.len() && span.start >= pending[current].content_end {
+            current += 1;
+            active_functions.clear();
+            active_iterations.clear();
+            active_breakables.clear();
+        }
+        let Some(loop_plan) = pending.get_mut(current) else {
+            break;
+        };
+        if span.start < loop_plan.content_start || span.end > loop_plan.content_end {
+            continue;
+        }
+        while active_functions
+            .last()
+            .is_some_and(|end| span.start >= *end)
+        {
+            active_functions.pop();
+        }
+        while active_iterations
+            .last()
+            .is_some_and(|(_, end)| span.start >= *end)
+        {
+            active_iterations.pop();
+        }
+        while active_breakables
+            .last()
+            .is_some_and(|(_, end)| span.start >= *end)
+        {
+            active_breakables.pop();
+        }
+        if node.kind().is_function_like() {
+            active_functions.push(span.end);
+            continue;
+        }
+        if node.kind().is_iteration_statement() {
+            active_iterations.push((node_id, span.end));
+            active_breakables.push((node_id, span.end));
+            continue;
+        }
+        if matches!(node.kind(), AstKind::SwitchStatement(_)) {
+            active_breakables.push((node_id, span.end));
+            continue;
+        }
+        let belongs_to_body = active_functions.is_empty();
+        match node.kind() {
+            AstKind::AwaitExpression(_) if belongs_to_body => {
+                loop_plan.has_await = true;
+            }
+            AstKind::YieldExpression(_) if belongs_to_body => {
+                loop_plan.has_yield = true;
+            }
+            AstKind::ReturnStatement(statement) if belongs_to_body => {
+                loop_plan
+                    .returns
+                    .insert((statement.span.start, statement.span.end));
+            }
+            AstKind::BreakStatement(statement)
+                if belongs_to_body
+                    && statement.label.as_ref().map_or_else(
+                        || {
+                            active_breakables
+                                .last()
+                                .is_none_or(|(target, _)| *target == loop_plan.captured.node_id)
+                        },
+                        |label| loop_plan.label.as_deref() == Some(label.name.as_str()),
+                    ) =>
+            {
+                loop_plan
+                    .breaks
+                    .insert((statement.span.start, statement.span.end));
+            }
+            AstKind::ContinueStatement(statement)
+                if belongs_to_body
+                    && statement.label.as_ref().map_or_else(
+                        || {
+                            active_iterations
+                                .last()
+                                .is_none_or(|(target, _)| *target == loop_plan.captured.node_id)
+                        },
+                        |label| loop_plan.label.as_deref() == Some(label.name.as_str()),
+                    ) =>
+            {
+                loop_plan
+                    .continues
+                    .insert((statement.span.start, statement.span.end));
+            }
+            _ => {}
+        }
+    }
     let mut reserved: FxHashSet<String> = scoping.symbol_names().map(str::to_owned).collect();
     let mut roots: FxHashMap<(u32, u32), Vec<CapturedLoopMutation>> = FxHashMap::default();
-    for captured in outermost {
-        let mut statement_root = captured.node_id;
-        for ancestor in nodes.ancestor_ids(captured.node_id) {
-            if matches!(
-                nodes.kind(ancestor),
-                AstKind::Program(_)
-                    | AstKind::BlockStatement(_)
-                    | AstKind::FunctionBody(_)
-                    | AstKind::SwitchCase(_)
-            ) {
-                break;
-            }
-            statement_root = ancestor;
-        }
-        let label = nodes
-            .ancestor_ids(captured.node_id)
-            .next()
-            .and_then(|parent_id| match nodes.kind(parent_id) {
-                AstKind::LabeledStatement(statement) => Some(statement.label.name.to_string()),
-                _ => None,
-            });
-        let body_is_block = source.as_bytes().get(captured.body_span.start as usize) == Some(&b'{');
-        let content_start = captured.body_span.start + u32::from(body_is_block);
-        let content_end = captured.body_span.end - u32::from(body_is_block);
-        let mut returns = FxHashSet::default();
-        let mut breaks = FxHashSet::default();
-        let mut continues = FxHashSet::default();
-        let mut has_await = false;
-        let mut has_yield = false;
-        for (node_id, node) in nodes.iter_enumerated() {
-            let span = node.kind().span();
-            if span.start < content_start || span.end > content_end {
-                continue;
-            }
-            match node.kind() {
-                AstKind::AwaitExpression(_)
-                    if belongs_to_body(nodes, node_id, captured.node_id) =>
-                {
-                    has_await = true;
-                }
-                AstKind::YieldExpression(_)
-                    if belongs_to_body(nodes, node_id, captured.node_id) =>
-                {
-                    has_yield = true;
-                }
-                AstKind::ReturnStatement(statement)
-                    if belongs_to_body(nodes, node_id, captured.node_id) =>
-                {
-                    returns.insert((statement.span.start, statement.span.end));
-                }
-                AstKind::BreakStatement(statement)
-                    if control_targets_loop(
-                        nodes,
-                        node_id,
-                        captured.node_id,
-                        true,
-                        label.as_deref(),
-                    ) =>
-                {
-                    breaks.insert((statement.span.start, statement.span.end));
-                }
-                AstKind::ContinueStatement(statement)
-                    if control_targets_loop(
-                        nodes,
-                        node_id,
-                        captured.node_id,
-                        false,
-                        label.as_deref(),
-                    ) =>
-                {
-                    continues.insert((statement.span.start, statement.span.end));
-                }
-                _ => {}
-            }
-        }
+    for loop_plan in pending {
+        let PendingCapturedLoop {
+            captured,
+            statement_root,
+            label,
+            content_start,
+            content_end,
+            returns,
+            breaks,
+            continues,
+            has_await,
+            has_yield,
+        } = loop_plan;
         let root_span = nodes.kind(statement_root).span();
         roots
             .entry((root_span.start, root_span.end))
@@ -703,72 +750,121 @@ fn captured_loop_mutations(
     (!roots.is_empty()).then_some(roots)
 }
 
-/// The iteration statement that has to give `symbol_id` a per-iteration
-/// environment, if any.
-///
-/// A lexical binding declared inside a loop needs one only when a closure built
-/// during the iteration outlives it. That means a reference reached through a
-/// function boundary — but only a boundary that sits *between* the binding and
-/// the loop. A binding declared inside a function that the loop body creates,
-/// such as the `let` the parameter and destructuring rewrites hoist into a
-/// lowered callback, gets a fresh environment from that call already, and its
-/// own function must not be mistaken for the closure that captures it.
-fn captured_loop_of(
-    nodes: &oxc_semantic::AstNodes<'_>,
-    scoping: &oxc_semantic::Scoping,
-    symbol_id: SymbolId,
-) -> Option<NodeId> {
-    if !scoping
-        .symbol_flags(symbol_id)
-        .contains(SymbolFlags::BlockScopedVariable)
-    {
-        return None;
+/// Classify loop declarations and references in semantic preorder. Active loop
+/// and closure-boundary stacks replace the former per-symbol ancestor walks.
+fn classify_captured_loops(semantic: &Semantic<'_>) -> FxHashMap<NodeId, CapturedLoop> {
+    #[derive(Clone, Copy)]
+    struct Declaration {
+        loop_id: NodeId,
+        boundary_depth: usize,
     }
-    let declaration_id = scoping.symbol_declaration(symbol_id);
-    let loop_id = nodes
-        .ancestor_ids(declaration_id)
-        .find(|node_id| nodes.kind(*node_id).is_iteration_statement())?;
-    let barrier = nodes
-        .ancestor_ids(declaration_id)
-        .find(|node_id| nodes.kind(*node_id).is_function_like());
-    scoping
-        .get_resolved_reference_ids(symbol_id)
-        .iter()
-        .any(|reference_id| {
-            crosses_function_before(
-                nodes,
-                scoping.get_reference(*reference_id).node_id(),
-                loop_id,
-                barrier,
-            )
-        })
-        .then_some(loop_id)
-}
 
-fn crosses_function_before(
-    nodes: &oxc_semantic::AstNodes<'_>,
-    node_id: NodeId,
-    loop_id: NodeId,
-    barrier: Option<NodeId>,
-) -> bool {
-    let mut crossed = false;
-    let reference_span = nodes.kind(node_id).span();
-    for ancestor in nodes.ancestor_ids(node_id) {
-        if ancestor == loop_id || Some(ancestor) == barrier {
-            return crossed;
+    let nodes = semantic.nodes();
+    let scoping = semantic.scoping();
+    let mut declarations = vec![None::<Declaration>; scoping.symbols_len()];
+    let mut loop_facts = FxHashMap::<NodeId, CapturedLoop>::default();
+    let mut captured = FxHashSet::<NodeId>::default();
+    let mut active_loops = Vec::<(NodeId, u32)>::new();
+    let mut active_loop_ids = FxHashSet::<NodeId>::default();
+    let mut active_boundaries = Vec::<u32>::new();
+    let mut pending_field_boundaries = Vec::<(u32, u32)>::new();
+
+    for (node_id, node) in nodes.iter_enumerated() {
+        let span = node.kind().span();
+        while active_loops
+            .last()
+            .is_some_and(|(_, end)| span.start >= *end)
+        {
+            let (loop_id, _) = active_loops.pop().unwrap();
+            active_loop_ids.remove(&loop_id);
         }
-        crossed |= nodes.kind(ancestor).is_function_like()
-            || matches!(
-                nodes.kind(ancestor),
-                AstKind::PropertyDefinition(property)
-                    if !property.r#static
-                        && property
-                            .value
-                            .as_ref()
-                            .is_some_and(|value| value.span().contains_inclusive(reference_span))
-            );
+        while active_boundaries
+            .last()
+            .is_some_and(|end| span.start >= *end)
+        {
+            active_boundaries.pop();
+        }
+        while pending_field_boundaries
+            .last()
+            .is_some_and(|(start, _)| span.start >= *start)
+        {
+            let (_, end) = pending_field_boundaries.pop().unwrap();
+            active_boundaries.push(end);
+        }
+
+        if node.kind().is_function_like() {
+            active_boundaries.push(span.end);
+        }
+        if let AstKind::PropertyDefinition(property) = node.kind()
+            && !property.r#static
+            && let Some(value) = &property.value
+        {
+            pending_field_boundaries.push((value.span().start, value.span().end));
+        }
+        if node.kind().is_iteration_statement() {
+            active_loops.push((node_id, span.end));
+            active_loop_ids.insert(node_id);
+            if let Some((loop_span, body_span)) = loop_spans(node.kind()) {
+                loop_facts.insert(
+                    node_id,
+                    CapturedLoop {
+                        node_id,
+                        span: loop_span,
+                        body_span,
+                        header_bindings: Vec::new(),
+                    },
+                );
+            }
+        }
+
+        match node.kind() {
+            AstKind::BindingIdentifier(identifier) => {
+                let Some(symbol_id) = identifier.symbol_id.get() else {
+                    continue;
+                };
+                if !scoping
+                    .symbol_flags(symbol_id)
+                    .contains(SymbolFlags::BlockScopedVariable)
+                {
+                    continue;
+                }
+                let Some(&(loop_id, _)) = active_loops.last() else {
+                    continue;
+                };
+                declarations[symbol_id.index()] = Some(Declaration {
+                    loop_id,
+                    boundary_depth: active_boundaries.len(),
+                });
+                let loop_fact = loop_facts.get_mut(&loop_id).unwrap();
+                if span.start < loop_fact.body_span.start
+                    && !loop_fact
+                        .header_bindings
+                        .iter()
+                        .any(|name| name == identifier.name.as_str())
+                {
+                    loop_fact.header_bindings.push(identifier.name.to_string());
+                }
+            }
+            AstKind::IdentifierReference(identifier) => {
+                let Some(reference_id) = identifier.reference_id.get() else {
+                    continue;
+                };
+                let reference = scoping.get_reference(reference_id);
+                let Some(symbol_id) = reference.symbol_id() else {
+                    continue;
+                };
+                if let Some(declaration) = declarations[symbol_id.index()]
+                    && active_boundaries.len() > declaration.boundary_depth
+                    && active_loop_ids.contains(&declaration.loop_id)
+                {
+                    captured.insert(declaration.loop_id);
+                }
+            }
+            _ => {}
+        }
     }
-    false
+    loop_facts.retain(|loop_id, _| captured.contains(loop_id));
+    loop_facts
 }
 
 fn loop_spans(kind: AstKind<'_>) -> Option<(Span, Span)> {
@@ -794,51 +890,6 @@ fn reserve_name(base: &str, used: &mut FxHashSet<String>) -> String {
         }
         suffix += 1;
     }
-}
-
-fn belongs_to_body(nodes: &oxc_semantic::AstNodes<'_>, node_id: NodeId, loop_id: NodeId) -> bool {
-    for ancestor in nodes.ancestor_ids(node_id) {
-        if ancestor == loop_id {
-            return true;
-        }
-        if nodes.kind(ancestor).is_function_like() {
-            return false;
-        }
-    }
-    false
-}
-
-fn control_targets_loop(
-    nodes: &oxc_semantic::AstNodes<'_>,
-    node_id: NodeId,
-    loop_id: NodeId,
-    break_allows_switch: bool,
-    label: Option<&str>,
-) -> bool {
-    let statement_label = match nodes.kind(node_id) {
-        AstKind::BreakStatement(statement) => {
-            statement.label.as_ref().map(|label| label.name.as_str())
-        }
-        AstKind::ContinueStatement(statement) => {
-            statement.label.as_ref().map(|label| label.name.as_str())
-        }
-        _ => None,
-    };
-    if let Some(statement_label) = statement_label {
-        return label == Some(statement_label);
-    }
-    for ancestor in nodes.ancestor_ids(node_id) {
-        let kind = nodes.kind(ancestor);
-        if kind.is_function_like() {
-            return false;
-        }
-        if kind.is_iteration_statement()
-            || (break_allows_switch && matches!(kind, AstKind::SwitchStatement(_)))
-        {
-            return ancestor == loop_id;
-        }
-    }
-    false
 }
 
 /// Lower lexical declarations whose bindings do not require per-iteration loop
@@ -985,15 +1036,11 @@ pub(super) fn has_remaining_syntax(program: &Program<'_>) -> bool {
 }
 
 /// Whether any lexical binding still needs the per-iteration environment the
-/// structural half of this pass builds. Shares [`captured_loop_of`] with that
-/// half so the two halves cannot disagree about what counts as captured; a
+/// structural half of this pass builds. Shares [`classify_captured_loops`] with
+/// that half so the two halves cannot disagree about what counts as captured; a
 /// disagreement would reject the file after the rewrite declined to touch it.
 fn has_captured_loop_binding(semantic: &Semantic<'_>) -> bool {
-    let scoping = semantic.scoping();
-    let nodes = semantic.nodes();
-    scoping
-        .symbol_ids()
-        .any(|symbol_id| captured_loop_of(nodes, scoping, symbol_id).is_some())
+    !classify_captured_loops(semantic).is_empty()
 }
 
 pub(super) struct BlockScopingPlan {
@@ -1049,5 +1096,28 @@ impl<'a> VisitMut<'a> for BlockScopingLowerer<'a> {
         )) {
             identifier.name = self.allocator.alloc_str(replacement).into();
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use oxc_parser::Parser;
+    use oxc_semantic::SemanticBuilder;
+
+    #[test]
+    fn captured_loop_classifies_all_siblings() {
+        let source = (0..128)
+            .map(|index| {
+                format!("for(let i{index}=0;i{index}<1;i{index}++){{queue(()=>i{index});}}")
+            })
+            .collect::<String>();
+        let allocator = Allocator::default();
+        let parsed = Parser::new(&allocator, &source, SourceType::default()).parse();
+        let semantic = SemanticBuilder::new()
+            .with_build_nodes(true)
+            .build(&parsed.program);
+        let loops = classify_captured_loops(&semantic.semantic);
+        assert_eq!(loops.len(), 128);
     }
 }

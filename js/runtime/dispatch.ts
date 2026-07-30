@@ -14,6 +14,7 @@ import {
   eventIsSkipped,
   makePath,
   NodePathImpl,
+  resetSkippedTraversal,
   type PathRuntime,
   type PathState,
 } from './path.js';
@@ -462,6 +463,7 @@ export function createDispatcher(
     }
     if (followup.routes.length === 0) return;
     const routed = session.nextRoutedPacked(followup.manifest, root);
+    resetSkippedTraversal(entry.skipped);
     const accepted = new WeakSet<NativeEvent>();
     dispatchRoutedEvents(
       routed,
@@ -532,6 +534,7 @@ export function createDispatcher(
   return {
     contexts,
     run() {
+      for (const entry of contexts.values()) resetSkippedTraversal(entry.skipped);
       dispatchRoutedEvents(
         batch,
         routedThunks!,

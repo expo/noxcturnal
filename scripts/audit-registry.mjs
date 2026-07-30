@@ -206,6 +206,11 @@ export const bailouts = {
     owner: 'destructuring',
     triggerTest: 'syntax-transforms.test.ts',
   },
+  'destructuring-fixpoint-limit': {
+    ...permanent,
+    owner: 'destructuring',
+    triggerTest: 'src/preflight/transform.rs',
+  },
   'for-of-edit-conflict': {
     ...invariant,
     owner: 'forOf',

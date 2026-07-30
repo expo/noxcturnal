@@ -694,6 +694,12 @@ pub fn transform(
                 Err(reason) => return Ok(unsupported(reason, [] as [String; 0])),
             };
         }
+        if destructuring_ast_plan.is_some() {
+            return Ok(unsupported(
+                "destructuring-fixpoint-limit",
+                [] as [String; 0],
+            ));
+        }
         if options.parameters == Some(true) {
             let mut parameters_postcondition = PostconditionDetector {
                 check_parameters: true,
@@ -1831,6 +1837,16 @@ mod tests {
         sourcemap::{compose, compose_layer_chain, render},
     };
 
+    fn nested_destructuring(depth: usize) -> String {
+        let mut statement = "sink(value);".to_owned();
+        for index in (0..depth).rev() {
+            statement = format!(
+                "const [value{index} = (() => {{ {statement} return value; }})()] = source;"
+            );
+        }
+        statement
+    }
+
     #[test]
     fn detects_jsx_from_the_parsed_ast() {
         let allocator = Allocator::default();
@@ -1893,5 +1909,39 @@ mod tests {
         let mut expected_names = visitor_names;
         expected_names.extend(native_names);
         assert_eq!(names, expected_names);
+    }
+
+    #[test]
+    fn nested_destructuring_completes_below_the_fixpoint_limit() {
+        let result = transform(
+            nested_destructuring(12),
+            "fixture.js".into(),
+            NativePreflightOptions {
+                destructuring: Some(true),
+                helpers_mode: Some("inline".into()),
+                ..NativePreflightOptions::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(result.status, "complete", "{:?}", result.reason);
+    }
+
+    #[test]
+    fn destructuring_fixpoint_limit_is_user_visible() {
+        let result = transform(
+            nested_destructuring(65),
+            "fixture.js".into(),
+            NativePreflightOptions {
+                destructuring: Some(true),
+                helpers_mode: Some("inline".into()),
+                ..NativePreflightOptions::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(result.status, "unsupported");
+        assert_eq!(
+            result.reason.as_deref(),
+            Some("destructuring-fixpoint-limit")
+        );
     }
 }

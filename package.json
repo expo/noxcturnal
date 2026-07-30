@@ -41,6 +41,7 @@
     "benchmark": "vitest bench --run",
     "benchmark:cold-start": "node benchmark/cold-start-comparison.mjs",
     "benchmark:class-scaling": "node benchmark/class-scaling-comparison.mjs",
+    "benchmark:super-linear": "node benchmark/super-linear-scaling.mjs",
     "benchmark:optimizer-comparison": "node benchmark/optimization-comparison.mjs",
     "package:check": "node scripts/check-package.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.tests.json && vitest --run --typecheck.only --typecheck.tsconfig tsconfig.type-tests.json",

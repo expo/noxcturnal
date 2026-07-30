@@ -339,11 +339,13 @@ test('conservatively evaluates side-effect-free constant expressions', () => {
   const ids = ['1 + 2 * 3', '!0 && "yes"', 'true ? "123" : "x"', 'sideEffect()'].map(expression =>
     bySource.get(expression)!,
   );
-  const constants = session.query({ constants: ids }).constants;
+  const missing = session.nodeCapacity + 1;
+  const constants = session.query({ constants: [ids[0], ...ids, ids[0], missing] }).constants;
   assert.equal(constants[ids[0]], 7);
   assert.equal(constants[ids[1]], 'yes');
   assert.equal(constants[ids[2]], '123');
   assert.equal(constants[ids[3]], null);
+  assert.equal(constants[missing], null);
   session.close();
 });
 

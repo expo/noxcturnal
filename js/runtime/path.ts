@@ -42,18 +42,74 @@ export function childRoleIsDeclared(roles: readonly string[], requestedRole: str
   return false;
 }
 
-export function eventIsSkipped(
-  event: NativeEvent,
-  ranges: readonly { start: number; end: number }[] | undefined,
-): boolean {
-  if (!ranges) return false;
-  for (const range of ranges) {
-    if (event.start > range.start && event.end <= range.end) return true;
+export function eventIsSkipped(event: NativeEvent, skipped: SkipState | undefined): boolean {
+  if (!skipped) return false;
+  const active = skipped.active;
+  if (active) {
+    if (event.start > active.start && event.end <= active.end) return true;
+    if (event.side === 'exit' && event.start === active.start && event.end === active.end) {
+      skipped.active = undefined;
+      return false;
+    }
   }
-  return false;
+  const ranges = skipped.ranges;
+  while (skipped.cursor < ranges.length && ranges[skipped.cursor].end <= event.start) {
+    skipped.cursor++;
+  }
+  const range = ranges[skipped.cursor];
+  if (!range || event.start < range.start || event.end > range.end) return false;
+  skipped.active = range;
+  if (event.start === range.start) return false;
+  return true;
 }
 
-export type PathState = { stopped: boolean; skipped?: { start: number; end: number }[] };
+export type SkipRange = { start: number; end: number };
+export type SkipState = {
+  ranges: SkipRange[];
+  cursor: number;
+  active?: SkipRange;
+};
+
+export function resetSkippedTraversal(skipped: SkipState | undefined): void {
+  if (!skipped) return;
+  skipped.cursor = 0;
+  skipped.active = undefined;
+}
+
+function addSkippedRange(state: PathState, start: number, end: number): void {
+  const skipped = (state.skipped ??= { ranges: [], cursor: 0 });
+  const ranges = skipped.ranges;
+  const last = ranges.at(-1);
+  if (!last || last.end <= start) {
+    const range = { start, end };
+    ranges.push(range);
+    skipped.active = range;
+    skipped.cursor = ranges.length;
+    return;
+  }
+  if (last.start <= start) {
+    if (end > last.end) last.end = end;
+    skipped.active = last;
+    skipped.cursor = ranges.length;
+    return;
+  }
+  let index = ranges.findIndex(range => range.end >= start);
+  if (index < 0) index = ranges.length;
+  let mergedStart = start;
+  let mergedEnd = end;
+  let removeEnd = index;
+  while (removeEnd < ranges.length && ranges[removeEnd].start < mergedEnd) {
+    mergedStart = Math.min(mergedStart, ranges[removeEnd].start);
+    mergedEnd = Math.max(mergedEnd, ranges[removeEnd].end);
+    removeEnd++;
+  }
+  const range = { start: mergedStart, end: mergedEnd };
+  ranges.splice(index, removeEnd - index, range);
+  skipped.active = range;
+  skipped.cursor = index + 1;
+}
+
+export type PathState = { stopped: boolean; skipped?: SkipState };
 export type PathRuntime = {
   session: NativeTransformSession;
   context: PluginContext;
@@ -464,7 +520,7 @@ export class NodePathImpl implements NativeNodePath {
   }
   skip(): void {
     this.runtime.assertControl('skip');
-    (this.runtime.state.skipped ??= []).push({ start: this.event.start, end: this.event.end });
+    addSkippedRange(this.runtime.state, this.event.start, this.event.end);
   }
   stop(): void {
     this.runtime.assertControl('stop');
@@ -544,31 +600,20 @@ function makeScope(runtime: PathRuntime, id: number, parentId: number | null): N
     push(content) {
       const owner = this.path;
       if (!owner) throw new Error(`Cannot find owner path for scope ${id}`);
-      const directives = session
-        .nodes(['Directive'])
-        .filter(
-          event =>
-            event.scopeId === id && event.start >= owner.node.start && event.end <= owner.node.end,
-        );
-      const offset = directives.reduce(
-        (end, directive) => Math.max(end, directive.end),
-        Number(
-          (owner instanceof NodePathImpl
-            ? (owner.event as NativeEvent & Record<string, unknown>).bodyStart
-            : undefined) ?? owner.start,
-        ),
-      );
+      const metadata = session.scopeMetadata(id);
+      const hasDirectives = metadata?.hasDirectives === true;
+      const offset = hasDirectives
+        ? metadata.directivePrologueEnd
+        : Number(
+            (owner instanceof NodePathImpl
+              ? (owner.event as NativeEvent & Record<string, unknown>).bodyStart
+              : undefined) ?? owner.start,
+          );
       runtime.edits.push({
         kind: 'AppendLeft',
         start: offset,
         end: offset,
-        ...realizeContent(
-          runtime.session,
-          content,
-          undefined,
-          directives.length === 0 ? '' : '\n',
-          '\n',
-        ),
+        ...realizeContent(runtime.session, content, undefined, hasDirectives ? '\n' : '', '\n'),
         owner: runtime.owner,
         order: runtime.nextOrder(),
       });
@@ -620,16 +665,8 @@ function makeScope(runtime: PathRuntime, id: number, parentId: number | null): N
 }
 
 function scopeOwnerPath(runtime: PathRuntime, scopeId: number): NativeNodePath | null {
-  const owner = runtime.session
-    .nodes(['Program', 'Function', 'ArrowFunctionExpression'])
-    .find(
-      event =>
-        event.scopeId === scopeId &&
-        (event.type === 'Program' ||
-          event.type === 'Function' ||
-          event.type === 'ArrowFunctionExpression'),
-    );
-  return owner ? pathForId(runtime, owner.id) : null;
+  const owner = runtime.session.scopeMetadata(scopeId);
+  return owner ? pathForId(runtime, owner.ownerId) : null;
 }
 
 function makeBinding(

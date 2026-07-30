@@ -300,6 +300,23 @@ test('exposes binding reads, writes, and lexical captures', () => {
   session.close();
 });
 
+test('batches and deduplicates captures for many functions', () => {
+  const source = `const outer = 1;${Array.from(
+    { length: 128 },
+    (_, index) => `function fn${index}(){return outer}`,
+  ).join('')}`;
+  const session = openRetained(source, 'fixture.js');
+  const functions = session.nodes(['Function']);
+  const requests = functions.flatMap(fn => [{ functionId: fn.id }, { functionId: fn.id }]);
+  const captures = session.query({ captures: requests }).captures;
+  assert.equal(Object.keys(captures).length, functions.length);
+  for (const fn of functions) {
+    assert.equal(captures[fn.id].length, 1);
+    assert.equal(captures[fn.id][0].name, 'outer');
+  }
+  session.close();
+});
+
 test('indexes repeated scope lookups without consuming follow-up batches', () => {
   const source = Array.from(
     { length: 100 },
