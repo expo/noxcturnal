@@ -60,6 +60,11 @@ pub(crate) struct FunctionMapCollector<'a> {
     tail: Position,
     tail_name: Option<Rc<str>>,
     line_starts: Vec<usize>,
+    /// Byte offset to UTF-16 offset for non-ASCII source. Function-map
+    /// collection asks for two positions per function/class. Recounting from
+    /// the start of the line at every boundary is quadratic for generated or
+    /// minified files that put many functions on one line.
+    utf16_offsets: Option<Vec<u32>>,
     filename_prefix: Option<String>,
 }
 
@@ -73,6 +78,16 @@ impl<'a> FunctionMapCollector<'a> {
             tail: Position { line: 1, column: 0 },
             tail_name: None,
             line_starts: line_starts(source),
+            utf16_offsets: (!source.is_ascii()).then(|| {
+                let mut offsets = Vec::with_capacity(source.len() + 1);
+                let mut utf16 = 0u32;
+                for character in source.chars() {
+                    offsets.extend(std::iter::repeat_n(utf16, character.len_utf8()));
+                    utf16 += character.len_utf16() as u32;
+                }
+                offsets.push(utf16);
+                offsets
+            }),
             filename_prefix: filename
                 .rsplit(['/', '\\'])
                 .next()
@@ -137,11 +152,13 @@ impl<'a> FunctionMapCollector<'a> {
     fn position(&self, offset: u32) -> Position {
         let offset = offset as usize;
         let line_index = self.line_starts.partition_point(|start| *start <= offset) - 1;
+        let line_start = self.line_starts[line_index];
         Position {
             line: line_index as u32 + 1,
-            column: self.source[self.line_starts[line_index]..offset]
-                .encode_utf16()
-                .count() as u32,
+            column: self.utf16_offsets.as_ref().map_or(
+                (offset - line_start) as u32,
+                |offsets| offsets[offset] - offsets[line_start],
+            ),
         }
     }
 
@@ -404,5 +421,20 @@ fn line_starts(source: &str) -> Vec<usize> {
 
 fn position_greater(left: Position, right: Position) -> bool {
     left.line > right.line || (left.line == right.line && left.column > right.column)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn positions_use_utf16_columns() {
+        let ascii = FunctionMapCollector::new("one\ntwo", "fixture.js");
+        assert_eq!(ascii.position(6), Position { line: 2, column: 2 });
+
+        let unicode = FunctionMapCollector::new("😀x\né😀z", "fixture.js");
+        assert_eq!(unicode.position(5), Position { line: 1, column: 3 });
+        assert_eq!(unicode.position(12), Position { line: 2, column: 3 });
+    }
 }
 use std::rc::Rc;
