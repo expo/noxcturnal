@@ -45,8 +45,8 @@ pub(super) fn run<'a>(
         requests.reserve_scope_names([helper_name.clone()]);
         if options.inline_helpers {
             requests.push_fragment(
-                format!("function {helper_name}(){{return {helper_name}=Object.assign?Object.assign.bind():function(target){{for(var i=1;i<arguments.length;i++){{var source=arguments[i];for(var key in source)if(Object.prototype.hasOwnProperty.call(source,key))target[key]=source[key]}}return target}},{helper_name}.apply(null,arguments)}}\n"),
-                format!("function {helper_name}() {{\n  return ({helper_name} = Object.assign\n    ? Object.assign.bind()\n    : function (target) {{\n        for (var i = 1; i < arguments.length; i++) {{\n          var source = arguments[i];\n          for (var key in source)\n            if (Object.prototype.hasOwnProperty.call(source, key)) target[key] = source[key];\n        }}\n        return target;\n      }}), {helper_name}.apply(null, arguments);\n}}\n"),
+                format!("function {helper_name}(){{return {helper_name}=Object.assign?Object.assign.bind():function(n){{for(var e=1;e<arguments.length;e++){{var t=arguments[e];for(var r in t)({{}}).hasOwnProperty.call(t,r)&&(n[r]=t[r])}}return n}},{helper_name}.apply(null,arguments)}}\n"),
+                format!("function {helper_name}() {{\n  return {helper_name} = Object.assign ? Object.assign.bind() : function (n) {{\n    for (var e = 1; e < arguments.length; e++) {{\n      var t = arguments[e];\n      for (var r in t) ({{}}).hasOwnProperty.call(t, r) && (n[r] = t[r]);\n    }}\n    return n;\n  }}, {helper_name}.apply(null, arguments);\n}}\n"),
             );
         } else {
             let fragment =
@@ -57,6 +57,46 @@ pub(super) fn run<'a>(
         }
     }
     (pass.changed, requests)
+}
+
+/// Lower only object-spread expressions generated as the props argument of a
+/// JSX `createElement` call. Oxc intentionally ignores Babel's deprecated
+/// `useSpread` option and otherwise leaves these object literals intact, while
+/// Babel 7's classic runtime still uses its assignment-based `extends` helper.
+pub(super) fn run_jsx_props<'a>(
+    allocator: &'a Allocator,
+    program: &mut Program<'a>,
+    inline_helpers: bool,
+) -> (bool, CustomHelperRequests) {
+    let helper_name = reserve_helper_name(program, "_extends");
+    let helper_binding = allocator.alloc_str(&helper_name);
+    let source = program.source_text;
+    let mut pass = JsxPropsSpreadLowerer {
+        source,
+        lowerer: ObjectSpreadLowerer {
+            ast: AstBuilder::new(allocator),
+            changed: false,
+            helper_name: Some(helper_binding),
+        },
+    };
+    pass.visit_program(program);
+    let mut requests = CustomHelperRequests::default();
+    if pass.lowerer.changed {
+        requests.reserve_scope_names([helper_name.clone()]);
+        if inline_helpers {
+            requests.push_fragment(
+                format!("function {helper_name}(){{return {helper_name}=Object.assign?Object.assign.bind():function(n){{for(var e=1;e<arguments.length;e++){{var t=arguments[e];for(var r in t)({{}}).hasOwnProperty.call(t,r)&&(n[r]=t[r])}}return n}},{helper_name}.apply(null,arguments)}}\n"),
+                format!("function {helper_name}() {{\n  return {helper_name} = Object.assign ? Object.assign.bind() : function (n) {{\n    for (var e = 1; e < arguments.length; e++) {{\n      var t = arguments[e];\n      for (var r in t) ({{}}).hasOwnProperty.call(t, r) && (n[r] = t[r]);\n    }}\n    return n;\n  }}, {helper_name}.apply(null, arguments);\n}}\n"),
+            );
+        } else {
+            requests.request("extends");
+            requests.push_fragment(
+                format!("var {helper_name}=require('@babel/runtime/helpers/extends');\n"),
+                format!("var {helper_name} = require('@babel/runtime/helpers/extends');\n"),
+            );
+        }
+    }
+    (pass.lowerer.changed, requests)
 }
 
 fn reserve_helper_name(program: &Program<'_>, base: &str) -> String {
@@ -99,14 +139,8 @@ impl<'a> ObjectSpreadLowerer<'a> {
             .expression_object(span, properties.take_in(&self.ast));
         arguments.push(group.into());
     }
-}
 
-impl<'a> VisitMut<'a> for ObjectSpreadLowerer<'a> {
-    fn visit_expression(&mut self, expression: &mut Expression<'a>) {
-        // Descendants first reaches the old outermost-only pass's fixpoint in
-        // one traversal, without intermediate renders or reparses.
-        walk_mut::walk_expression(self, expression);
-
+    fn lower_expression(&mut self, expression: &mut Expression<'a>) {
         let Expression::ObjectExpression(object) = expression else {
             return;
         };
@@ -173,5 +207,37 @@ impl<'a> VisitMut<'a> for ObjectSpreadLowerer<'a> {
             );
         }
         self.changed = true;
+    }
+}
+
+impl<'a> VisitMut<'a> for ObjectSpreadLowerer<'a> {
+    fn visit_expression(&mut self, expression: &mut Expression<'a>) {
+        // Descendants first reaches the old outermost-only pass's fixpoint in
+        // one traversal, without intermediate renders or reparses.
+        walk_mut::walk_expression(self, expression);
+
+        self.lower_expression(expression);
+    }
+}
+
+struct JsxPropsSpreadLowerer<'a> {
+    source: &'a str,
+    lowerer: ObjectSpreadLowerer<'a>,
+}
+
+impl<'a> VisitMut<'a> for JsxPropsSpreadLowerer<'a> {
+    fn visit_call_expression(&mut self, call: &mut oxc_ast::ast::CallExpression<'a>) {
+        walk_mut::walk_call_expression(self, call);
+        if self.source.as_bytes().get(call.span.start as usize) != Some(&b'<') {
+            return;
+        }
+        let Some(props) = call
+            .arguments
+            .get_mut(1)
+            .and_then(Argument::as_expression_mut)
+        else {
+            return;
+        };
+        self.lowerer.lower_expression(props);
     }
 }

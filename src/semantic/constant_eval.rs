@@ -1,4 +1,5 @@
 use oxc_ast::{AstKind, ast::Expression};
+use oxc_ecmascript::StringToNumber;
 use oxc_syntax::operator::{BinaryOperator, LogicalOperator, UnaryOperator};
 
 #[derive(Clone, Debug)]
@@ -42,10 +43,59 @@ impl EvaluatedConstant {
             Self::Null => Some(0.0),
             Self::Boolean(value) => Some(f64::from(*value)),
             Self::Number(value) => Some(*value),
-            Self::String(value) if value.trim().is_empty() => Some(0.0),
-            Self::String(value) => value.trim().parse().ok(),
+            Self::String(value) => string_to_number(value),
         }
     }
+}
+
+fn string_to_number(value: &str) -> Option<f64> {
+    let value = value.trim_matches(is_ecmascript_whitespace);
+    let unsigned = value
+        .strip_prefix("0b")
+        .or_else(|| value.strip_prefix("0B"))
+        .map(|digits| (digits, 53))
+        .or_else(|| {
+            value
+                .strip_prefix("0o")
+                .or_else(|| value.strip_prefix("0O"))
+                .map(|digits| (digits, 17))
+        })
+        .or_else(|| {
+            value
+                .strip_prefix("0x")
+                .or_else(|| value.strip_prefix("0X"))
+                .map(|digits| (digits, 13))
+        });
+    if unsigned
+        .is_some_and(|(digits, exact_digits)| digits.trim_start_matches('0').len() > exact_digits)
+    {
+        // Oxc's f64 accumulator can double-round wider radix integers. Leave
+        // those expressions intact unless conversion can be exact.
+        return None;
+    }
+    Some(value.string_to_number())
+}
+
+fn is_ecmascript_whitespace(character: char) -> bool {
+    matches!(
+        character,
+        '\u{0009}'
+            | '\u{000A}'
+            | '\u{000B}'
+            | '\u{000C}'
+            | '\u{000D}'
+            | '\u{0020}'
+            | '\u{00A0}'
+            | '\u{1680}'
+            | '\u{2000}'
+            ..='\u{200A}'
+                | '\u{2028}'
+                | '\u{2029}'
+                | '\u{202F}'
+                | '\u{205F}'
+                | '\u{3000}'
+                | '\u{FEFF}'
+    )
 }
 
 pub(crate) fn constant_for_kind(kind: AstKind<'_>) -> Option<EvaluatedConstant> {
@@ -126,7 +176,7 @@ fn evaluate_unary(operator: UnaryOperator, value: EvaluatedConstant) -> Option<E
         UnaryOperator::UnaryPlus => Some(EvaluatedConstant::Number(value.number()?)),
         UnaryOperator::UnaryNegation => Some(EvaluatedConstant::Number(-value.number()?)),
         UnaryOperator::BitwiseNot => Some(EvaluatedConstant::Number(
-            (!(value.number()? as i32)) as f64,
+            (!to_int32(value.number()?)) as f64,
         )),
         _ => None,
     }
@@ -187,11 +237,12 @@ fn evaluate_binary(
     ) && let (EvaluatedConstant::String(left), EvaluatedConstant::String(right)) =
         (&left, &right)
     {
+        let ordering = left.encode_utf16().cmp(right.encode_utf16());
         return Some(EvaluatedConstant::Boolean(match operator {
-            Op::LessThan => left < right,
-            Op::LessEqualThan => left <= right,
-            Op::GreaterThan => left > right,
-            Op::GreaterEqualThan => left >= right,
+            Op::LessThan => ordering.is_lt(),
+            Op::LessEqualThan => ordering.is_le(),
+            Op::GreaterThan => ordering.is_gt(),
+            Op::GreaterEqualThan => ordering.is_ge(),
             _ => unreachable!(),
         }));
     }
@@ -209,19 +260,32 @@ fn evaluate_binary(
         Op::LessEqualThan => EvaluatedConstant::Boolean(left <= right),
         Op::GreaterThan => EvaluatedConstant::Boolean(left > right),
         Op::GreaterEqualThan => EvaluatedConstant::Boolean(left >= right),
-        Op::ShiftLeft => EvaluatedConstant::Number(((left as i32) << ((right as u32) & 31)) as f64),
+        Op::ShiftLeft => {
+            EvaluatedConstant::Number((to_int32(left) << (to_uint32(right) & 31)) as f64)
+        }
         Op::ShiftRight => {
-            EvaluatedConstant::Number(((left as i32) >> ((right as u32) & 31)) as f64)
+            EvaluatedConstant::Number((to_int32(left) >> (to_uint32(right) & 31)) as f64)
         }
         Op::ShiftRightZeroFill => {
-            EvaluatedConstant::Number(((left as u32) >> ((right as u32) & 31)) as f64)
+            EvaluatedConstant::Number((to_uint32(left) >> (to_uint32(right) & 31)) as f64)
         }
-        Op::BitwiseOR => EvaluatedConstant::Number(((left as i32) | (right as i32)) as f64),
-        Op::BitwiseXOR => EvaluatedConstant::Number(((left as i32) ^ (right as i32)) as f64),
-        Op::BitwiseAnd => EvaluatedConstant::Number(((left as i32) & (right as i32)) as f64),
+        Op::BitwiseOR => EvaluatedConstant::Number((to_int32(left) | to_int32(right)) as f64),
+        Op::BitwiseXOR => EvaluatedConstant::Number((to_int32(left) ^ to_int32(right)) as f64),
+        Op::BitwiseAnd => EvaluatedConstant::Number((to_int32(left) & to_int32(right)) as f64),
         _ => return None,
     };
     Some(value)
+}
+
+fn to_uint32(value: f64) -> u32 {
+    if !value.is_finite() || value == 0.0 {
+        return 0;
+    }
+    value.trunc().rem_euclid(4_294_967_296.0) as u32
+}
+
+fn to_int32(value: f64) -> i32 {
+    to_uint32(value) as i32
 }
 
 fn constants_strictly_equal(left: &EvaluatedConstant, right: &EvaluatedConstant) -> bool {

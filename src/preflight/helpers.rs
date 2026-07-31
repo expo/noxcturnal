@@ -24,6 +24,10 @@ pub(super) struct CustomHelperRequests {
 }
 
 impl CustomHelperRequests {
+    pub(super) fn is_empty(&self) -> bool {
+        self.names.is_empty() && self.fragments.is_empty() && self.scope_names.is_empty()
+    }
+
     pub(super) fn request(&mut self, name: &'static str) {
         self.names.insert(name);
     }
@@ -230,6 +234,7 @@ pub fn validate_custom_runtime_helpers(
             | "objectDestructuringEmpty"
             | "objectWithoutProperties"
             | "objectWithoutPropertiesLoose"
+            | "readOnlyError"
             | "toPropertyKey"
             | "slicedToArray"
             | "toArray"

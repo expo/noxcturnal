@@ -2,14 +2,14 @@ use oxc_allocator::{Allocator, TakeIn};
 use oxc_ast::{
     AstBuilder,
     ast::{
-        Declaration, ExportNamedDeclaration, Expression, Function, FunctionType,
+        CallExpression, Declaration, ExportNamedDeclaration, Expression, Function, FunctionType,
         IdentifierReference, NumberBase, Program, Statement, VariableDeclaration,
         VariableDeclarator,
     },
 };
 use oxc_ast_visit::{Visit, VisitMut, walk, walk_mut};
 use oxc_semantic::{Scoping, SemanticBuilder, SymbolId};
-use oxc_span::{GetSpan, SPAN};
+use oxc_span::GetSpan;
 use oxc_syntax::scope::ScopeFlags;
 use rustc_hash::{FxHashMap, FxHashSet};
 
@@ -41,11 +41,14 @@ struct ConstantFolder<'a> {
 
 impl<'a> ConstantFolder<'a> {
     #[expect(deprecated)]
-    fn literal(&self, span: oxc_span::Span, value: EvaluatedConstant) -> Expression<'a> {
-        match value {
+    fn literal(&self, span: oxc_span::Span, value: EvaluatedConstant) -> Option<Expression<'a>> {
+        Some(match value {
             EvaluatedConstant::Null => self.ast.expression_null_literal(span),
             EvaluatedConstant::Boolean(value) => self.ast.expression_boolean_literal(span, value),
             EvaluatedConstant::Number(value) => {
+                if !value.is_finite() {
+                    return None;
+                }
                 self.ast
                     .expression_numeric_literal(span, value, None, NumberBase::Decimal)
             }
@@ -53,7 +56,7 @@ impl<'a> ConstantFolder<'a> {
                 let value = self.ast.allocator.alloc_str(&value);
                 self.ast.expression_string_literal(span, value, None)
             }
-        }
+        })
     }
 }
 
@@ -62,24 +65,11 @@ impl<'a> VisitMut<'a> for ConstantFolder<'a> {
         walk_mut::walk_expression(self, expression);
         let span = expression.span();
         match expression {
-            Expression::UnaryExpression(unary)
-                if unary.operator == oxc_syntax::operator::UnaryOperator::Void
-                    && matches!(
-                        unary.argument,
-                        Expression::NullLiteral(_)
-                            | Expression::BooleanLiteral(_)
-                            | Expression::NumericLiteral(_)
-                            | Expression::StringLiteral(_)
-                    ) =>
-            {
-                #[expect(deprecated)]
-                {
-                    *expression = self.ast.expression_identifier(SPAN, "undefined");
-                }
-            }
             Expression::UnaryExpression(_) | Expression::BinaryExpression(_) => {
-                if let Some(value) = evaluate_expression(expression) {
-                    *expression = self.literal(span, value);
+                if let Some(value) = evaluate_expression(expression)
+                    && let Some(literal) = self.literal(span, value)
+                {
+                    *expression = literal;
                 }
             }
             Expression::LogicalExpression(logical) => {
@@ -118,6 +108,17 @@ impl<'a> VisitMut<'a> for ConstantFolder<'a> {
         let Statement::IfStatement(if_statement) = statement else {
             return;
         };
+        if matches!(if_statement.consequent, Statement::FunctionDeclaration(_))
+            || matches!(
+                if_statement.alternate,
+                Some(Statement::FunctionDeclaration(_))
+            )
+        {
+            // Sloppy-mode Annex B creates an outer var binding even for an
+            // unreachable function declaration. Removing the branch would
+            // make reads of that binding throw instead of producing undefined.
+            return;
+        }
         let Some(test) = evaluate_expression(&if_statement.test) else {
             return;
         };
@@ -133,6 +134,14 @@ impl<'a> VisitMut<'a> for ConstantFolder<'a> {
 }
 
 fn eliminate_dead_functions(program: &mut Program<'_>) {
+    let mut direct_eval = DirectEvalDetector(false);
+    direct_eval.visit_program(program);
+    if direct_eval.0 {
+        // A direct eval can resolve any binding in its lexical environment.
+        // Without parsing and linking the runtime string, static reference
+        // counts cannot prove a function binding dead.
+        return;
+    }
     // Metro's Babel pass repeatedly removes unreferenced function bindings and
     // recrawls scope until reaching a fixed point. Rebuilding the complete
     // semantic graph on every layer makes a dead chain quadratic. Compute the
@@ -158,6 +167,18 @@ fn eliminate_dead_functions(program: &mut Program<'_>) {
     analysis.visit_program(program);
     let unused = analysis.peel();
     DeadFunctionRemover { unused }.visit_program(program);
+}
+
+struct DirectEvalDetector(bool);
+
+impl<'a> Visit<'a> for DirectEvalDetector {
+    fn visit_call_expression(&mut self, call: &CallExpression<'a>) {
+        if matches!(&call.callee, Expression::Identifier(identifier) if identifier.name == "eval") {
+            self.0 = true;
+            return;
+        }
+        walk::walk_call_expression(self, call);
+    }
 }
 
 #[derive(Default)]
@@ -359,13 +380,13 @@ impl DeadFunctionRemover {
 }
 
 impl<'a> VisitMut<'a> for DeadFunctionRemover {
-    fn visit_variable_declaration(&mut self, declaration: &mut VariableDeclaration<'a>) {
-        walk_mut::walk_variable_declaration(self, declaration);
-        self.remove_declarators(declaration);
-    }
-
     fn visit_statements(&mut self, statements: &mut oxc_allocator::Vec<'a, Statement<'a>>) {
         walk_mut::walk_statements(self, statements);
+        for statement in &mut *statements {
+            if let Statement::VariableDeclaration(declaration) = statement {
+                self.remove_declarators(declaration);
+            }
+        }
         statements.retain(|statement| match statement {
             Statement::FunctionDeclaration(function) => function
                 .id

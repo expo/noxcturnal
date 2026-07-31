@@ -2,12 +2,13 @@ use oxc_allocator::{Allocator, Box as ArenaBox, CloneIn, TakeIn, Vec as ArenaVec
 use oxc_ast::{
     AstBuilder, AstKind,
     ast::{
-        Argument, ArrayExpressionElement, AssignmentTarget, Class, ClassElement, Declaration,
-        ExportDefaultDeclaration, ExportDefaultDeclarationKind, ExportNamedDeclaration, Expression,
-        FormalParameterKind, FormalParameterRest, Function, FunctionType, MethodDefinitionKind,
-        Program, PropertyKey, PropertyKind, SimpleAssignmentTarget, Statement, TSThisParameter,
-        TSTypeAnnotation, TSTypeParameterDeclaration, TSTypeParameterInstantiation,
-        VariableDeclaration, VariableDeclarationKind,
+        Argument, ArrayExpressionElement, AssignmentTarget, BindingPattern, Class, ClassElement,
+        Declaration, ExportDefaultDeclaration, ExportDefaultDeclarationKind,
+        ExportNamedDeclaration, Expression, FormalParameterKind, FormalParameterRest, Function,
+        FunctionType, MethodDefinitionKind, Program, PropertyKey, PropertyKind,
+        SimpleAssignmentTarget, Statement, TSThisParameter, TSTypeAnnotation,
+        TSTypeParameterDeclaration, TSTypeParameterInstantiation, VariableDeclaration,
+        VariableDeclarationKind,
     },
 };
 use oxc_ast_visit::{Visit, VisitMut, walk, walk_mut};
@@ -38,6 +39,7 @@ pub(super) struct AstPlan {
 
 struct DirectClassPlan {
     name: String,
+    inferred_name: Option<String>,
     super_name: Option<String>,
     receiver_name: Option<String>,
     result_name: Option<String>,
@@ -293,6 +295,11 @@ fn direct_class_candidates(
         {
             continue;
         }
+        let inferred_name = class
+            .id
+            .is_none()
+            .then(|| inferred_class_name(nodes, node_id))
+            .flatten();
         let name = class.id.as_ref().map_or_else(
             || reserve("_Class", reserved),
             |identifier| identifier.name.to_string(),
@@ -357,6 +364,7 @@ fn direct_class_candidates(
             (class.span.start, class.span.end),
             DirectClassPlan {
                 name,
+                inferred_name,
                 super_name,
                 receiver_name,
                 result_name,
@@ -373,6 +381,27 @@ fn direct_class_candidates(
         );
     }
     direct
+}
+
+fn inferred_class_name(nodes: &oxc_semantic::AstNodes<'_>, node_id: NodeId) -> Option<String> {
+    match nodes.parent_kind(node_id) {
+        AstKind::VariableDeclarator(declarator) => match &declarator.id {
+            BindingPattern::BindingIdentifier(identifier) => Some(identifier.name.to_string()),
+            _ => None,
+        },
+        AstKind::AssignmentExpression(assignment) if assignment.operator.is_assign() => {
+            match &assignment.left {
+                AssignmentTarget::AssignmentTargetIdentifier(identifier) => {
+                    Some(identifier.name.to_string())
+                }
+                _ => None,
+            }
+        }
+        AstKind::ObjectProperty(property) if !property.computed => {
+            property.key.static_name().map(|name| name.into_owned())
+        }
+        _ => None,
+    }
 }
 
 #[expect(clippy::too_many_arguments)]
@@ -519,6 +548,7 @@ impl<'a> VisitMut<'a> for ClassAstLowerer<'a> {
                     unreachable!();
                 };
                 let mut class = class.unbox();
+                let binding = class.id.take();
                 self.visit_class(&mut class);
                 if self.error.is_some() {
                     return;
@@ -534,7 +564,12 @@ impl<'a> VisitMut<'a> for ClassAstLowerer<'a> {
                             // Preserve the export statement's start so comments
                             // attached to `export default class` stay with the
                             // lowered class rather than the trailing export.
-                            &ast, span, &plan.name, expression,
+                            &ast,
+                            span,
+                            &plan.name,
+                            VariableDeclarationKind::Let,
+                            binding,
+                            expression,
                         ));
                         statements.insert(
                             index + 1,
@@ -558,6 +593,7 @@ impl<'a> VisitMut<'a> for ClassAstLowerer<'a> {
                     unreachable!();
                 };
                 let mut class = class.unbox();
+                let binding = class.id.take();
                 self.visit_class(&mut class);
                 if self.error.is_some() {
                     return;
@@ -565,7 +601,12 @@ impl<'a> VisitMut<'a> for ClassAstLowerer<'a> {
                 match lower_simple_class(self.allocator, class, &plan) {
                     Ok(expression) => {
                         statements[index] = Statement::VariableDeclaration(direct_class_variable(
-                            &ast, span, &plan.name, expression,
+                            &ast,
+                            span,
+                            &plan.name,
+                            VariableDeclarationKind::Let,
+                            binding,
+                            expression,
                         ));
                         self.changed = true;
                         index += 1;
@@ -621,12 +662,14 @@ impl<'a> VisitMut<'a> for ClassAstLowerer<'a> {
         };
         let ast = AstBuilder::new(self.allocator);
         let mut class = class.take_in(&ast);
+        let binding = class.id.take();
         self.visit_class(&mut class);
         if self.error.is_some() {
             return;
         }
         match lower_simple_class(self.allocator, class, &plan) {
             Ok(expression) => {
+                let _ = binding;
                 declaration.declaration = ExportDefaultDeclarationKind::from(expression);
                 self.changed = true;
             }
@@ -646,15 +689,22 @@ impl<'a> VisitMut<'a> for ClassAstLowerer<'a> {
         };
         let ast = AstBuilder::new(self.allocator);
         let mut class = class.take_in(&ast);
+        let binding = class.id.take();
         self.visit_class(&mut class);
         if self.error.is_some() {
             return;
         }
         match lower_simple_class(self.allocator, class, &plan) {
             Ok(expression) => {
-                declaration.declaration = Some(Declaration::VariableDeclaration(
-                    direct_class_variable(&ast, span, &plan.name, expression),
-                ));
+                declaration.declaration =
+                    Some(Declaration::VariableDeclaration(direct_class_variable(
+                        &ast,
+                        span,
+                        &plan.name,
+                        VariableDeclarationKind::Let,
+                        binding,
+                        expression,
+                    )));
                 self.changed = true;
             }
             Err(error) => self.error = Some(error),
@@ -667,18 +717,23 @@ fn direct_class_variable<'a>(
     ast: &AstBuilder<'a>,
     span: Span,
     name: &str,
+    kind: VariableDeclarationKind,
+    binding: Option<oxc_ast::ast::BindingIdentifier<'a>>,
     expression: Expression<'a>,
 ) -> ArenaBox<'a, VariableDeclaration<'a>> {
     let mut declarations = ArenaVec::new_in(ast);
     declarations.push(ast.variable_declarator(
         span,
-        VariableDeclarationKind::Let,
-        ast.binding_pattern_binding_identifier(span, ast.allocator.alloc_str(name)),
+        kind,
+        binding.map_or_else(
+            || ast.binding_pattern_binding_identifier(span, ast.allocator.alloc_str(name)),
+            |binding| BindingPattern::BindingIdentifier(ast.alloc(binding)),
+        ),
         None::<ArenaBox<'a, TSTypeAnnotation<'a>>>,
         Some(expression),
         false,
     ));
-    ast.alloc_variable_declaration(span, VariableDeclarationKind::Let, declarations, false)
+    ast.alloc_variable_declaration(span, kind, declarations, false)
 }
 
 #[expect(deprecated)]
@@ -706,6 +761,7 @@ fn lower_derived_constructor_body<'a>(
         class_name: ast.allocator.alloc_str(class_name),
         get_name: ast.allocator.alloc_str(super_get_name),
         is_static: false,
+        receiver_name: None,
     };
     for statement in &mut body.statements {
         super_access_rewriter.visit_statement(statement);
@@ -917,6 +973,8 @@ fn lower_leading_super_constructor_body<'a>(
             ast,
             anchor,
             new_target_name,
+            VariableDeclarationKind::Var,
+            None,
             ast.expression_new_target(anchor),
         )));
     }
@@ -1192,6 +1250,8 @@ fn lower_general_derived_constructor_body<'a>(
             ast,
             anchor,
             result_name,
+            VariableDeclarationKind::Var,
+            None,
             result,
         )));
     body.statements.push(possible_constructor_return_statement(
@@ -1508,6 +1568,25 @@ impl<'a> VisitMut<'a> for DerivedThisRewriter<'a> {
     fn visit_function(&mut self, _function: &mut Function<'a>, _flags: ScopeFlags) {}
 }
 
+struct StaticInitializerThisRewriter<'a> {
+    allocator: &'a Allocator,
+    class_name: &'a str,
+}
+
+impl<'a> VisitMut<'a> for StaticInitializerThisRewriter<'a> {
+    #[expect(deprecated)]
+    fn visit_expression(&mut self, expression: &mut Expression<'a>) {
+        if matches!(expression, Expression::ThisExpression(_)) {
+            *expression = AstBuilder::new(self.allocator)
+                .expression_identifier(expression.span(), self.class_name);
+        } else {
+            walk_mut::walk_expression(self, expression);
+        }
+    }
+
+    fn visit_function(&mut self, _function: &mut Function<'a>, _flags: ScopeFlags) {}
+}
+
 struct PrivateLooseRewriter<'a, 'p> {
     allocator: &'a Allocator,
     keys: &'p FxHashMap<String, (String, String)>,
@@ -1742,9 +1821,18 @@ struct SuperAccessRewriter<'a> {
     class_name: &'a str,
     get_name: &'a str,
     is_static: bool,
+    receiver_name: Option<&'a str>,
 }
 
 impl<'a> SuperAccessRewriter<'a> {
+    #[expect(deprecated)]
+    fn receiver(&self, span: Span) -> Expression<'a> {
+        self.receiver_name.map_or_else(
+            || AstBuilder::new(self.allocator).expression_this(span),
+            |name| AstBuilder::new(self.allocator).expression_identifier(span, name),
+        )
+    }
+
     #[expect(deprecated)]
     fn take_key(&self, expression: &mut Expression<'a>) -> Option<(Span, Expression<'a>)> {
         let ast = AstBuilder::new(self.allocator);
@@ -1796,7 +1884,7 @@ impl<'a> SuperAccessRewriter<'a> {
         let mut get_arguments = ArenaVec::new_in(&ast);
         get_arguments.push(Argument::from(prototype));
         get_arguments.push(Argument::from(key));
-        get_arguments.push(Argument::from(ast.expression_this(span)));
+        get_arguments.push(Argument::from(self.receiver(span)));
         ast.expression_call(
             span,
             ast.expression_identifier(span, self.get_name),
@@ -1861,7 +1949,7 @@ impl<'a> SuperAccessRewriter<'a> {
         arguments.push(Argument::from(prototype));
         arguments.push(Argument::from(key));
         arguments.push(Argument::from(value));
-        arguments.push(Argument::from(ast.expression_this(span)));
+        arguments.push(Argument::from(self.receiver(span)));
         ast.expression_call(
             span,
             Expression::from(ast.member_expression_static(
@@ -2142,7 +2230,7 @@ impl<'a> VisitMut<'a> for SuperAccessRewriter<'a> {
             let ast = AstBuilder::new(self.allocator);
             let get = self.get(span, key);
             let mut arguments = std::mem::replace(&mut call.arguments, ArenaVec::new_in(&ast));
-            arguments.insert(0, Argument::from(ast.expression_this(span)));
+            arguments.insert(0, Argument::from(self.receiver(span)));
             *expression = ast.expression_call(
                 call.span,
                 Expression::from(ast.member_expression_static(
@@ -2162,6 +2250,123 @@ impl<'a> VisitMut<'a> for SuperAccessRewriter<'a> {
             *expression = self.get(span, key);
             walk_mut::walk_expression(self, expression);
             return;
+        }
+        walk_mut::walk_expression(self, expression);
+    }
+
+    fn visit_function(&mut self, _function: &mut Function<'a>, _flags: ScopeFlags) {}
+}
+
+struct LooseFieldSuperRewriter<'a> {
+    allocator: &'a Allocator,
+    class_name: &'a str,
+    super_name: &'a str,
+    is_static: bool,
+}
+
+impl<'a> LooseFieldSuperRewriter<'a> {
+    #[expect(deprecated)]
+    fn read_base(&self, span: Span) -> Expression<'a> {
+        let ast = AstBuilder::new(self.allocator);
+        let super_class = ast.expression_identifier(span, self.super_name);
+        if self.is_static {
+            super_class
+        } else {
+            Expression::from(ast.member_expression_static(
+                span,
+                super_class,
+                ast.identifier_name(span, "prototype"),
+                false,
+            ))
+        }
+    }
+
+    #[expect(deprecated)]
+    fn receiver(&self, span: Span) -> Expression<'a> {
+        if self.is_static {
+            AstBuilder::new(self.allocator).expression_identifier(span, self.class_name)
+        } else {
+            AstBuilder::new(self.allocator).expression_this(span)
+        }
+    }
+
+    fn replace_read_object(&self, expression: &mut Expression<'a>) -> bool {
+        match expression {
+            Expression::StaticMemberExpression(member)
+                if matches!(member.object, Expression::Super(_)) =>
+            {
+                member.object = self.read_base(member.object.span());
+                true
+            }
+            Expression::ComputedMemberExpression(member)
+                if matches!(member.object, Expression::Super(_)) =>
+            {
+                member.object = self.read_base(member.object.span());
+                true
+            }
+            _ => false,
+        }
+    }
+
+    fn replace_assignment_object(&self, target: &mut AssignmentTarget<'a>) {
+        match target {
+            AssignmentTarget::StaticMemberExpression(member)
+                if matches!(member.object, Expression::Super(_)) =>
+            {
+                member.object = self.receiver(member.object.span());
+            }
+            AssignmentTarget::ComputedMemberExpression(member)
+                if matches!(member.object, Expression::Super(_)) =>
+            {
+                member.object = self.receiver(member.object.span());
+            }
+            _ => {}
+        }
+    }
+
+    fn replace_update_object(&self, target: &mut SimpleAssignmentTarget<'a>) {
+        match target {
+            SimpleAssignmentTarget::StaticMemberExpression(member)
+                if matches!(member.object, Expression::Super(_)) =>
+            {
+                member.object = self.receiver(member.object.span());
+            }
+            SimpleAssignmentTarget::ComputedMemberExpression(member)
+                if matches!(member.object, Expression::Super(_)) =>
+            {
+                member.object = self.receiver(member.object.span());
+            }
+            _ => {}
+        }
+    }
+}
+
+impl<'a> VisitMut<'a> for LooseFieldSuperRewriter<'a> {
+    #[expect(deprecated)]
+    fn visit_expression(&mut self, expression: &mut Expression<'a>) {
+        let ast = AstBuilder::new(self.allocator);
+        if let Expression::CallExpression(call) = expression
+            && self.replace_read_object(&mut call.callee)
+        {
+            let span = call.span;
+            let callee = call.callee.take_in(&ast);
+            call.callee = Expression::from(ast.member_expression_static(
+                span,
+                callee,
+                ast.identifier_name(span, "call"),
+                false,
+            ));
+            call.arguments
+                .insert(0, Argument::from(self.receiver(span)));
+            walk_mut::walk_expression(self, expression);
+            return;
+        }
+        if let Expression::AssignmentExpression(assignment) = expression {
+            self.replace_assignment_object(&mut assignment.left);
+        } else if let Expression::UpdateExpression(update) = expression {
+            self.replace_update_object(&mut update.argument);
+        } else {
+            self.replace_read_object(expression);
         }
         walk_mut::walk_expression(self, expression);
     }
@@ -2335,8 +2540,6 @@ fn derived_inheritance_statements<'a>(
         ast.statement_throw(anchor, invalid_super_error),
         None,
     ));
-    statements.push(ast.statement_if(anchor, set_prototype_of(), set_statement, Some(fallback)));
-
     let super_prototype = Expression::from(ast.member_expression_static(
         anchor,
         super_reference(),
@@ -2407,6 +2610,7 @@ fn derived_inheritance_statements<'a>(
             ),
         ),
     );
+    statements.push(ast.statement_if(anchor, set_prototype_of(), set_statement, Some(fallback)));
     statements
 }
 
@@ -2531,6 +2735,7 @@ fn lower_simple_class<'a>(
                             class_name: allocator.alloc_str(name),
                             get_name: allocator.alloc_str(&plan.helper_names.super_get),
                             is_static: method.r#static,
+                            receiver_name: None,
                         };
                         for statement in &mut body.statements {
                             rewriter.visit_statement(statement);
@@ -2606,6 +2811,33 @@ fn lower_simple_class<'a>(
                 let mut property = property.unbox();
                 if let Some(value) = &mut property.value {
                     clear_leading_pure_annotation(value);
+                    if let Some(super_name) = super_name {
+                        if plan.class_properties_loose == Some(true) {
+                            LooseFieldSuperRewriter {
+                                allocator,
+                                class_name: allocator.alloc_str(name),
+                                super_name: allocator.alloc_str(super_name),
+                                is_static: property.r#static,
+                            }
+                            .visit_expression(value);
+                        } else {
+                            SuperAccessRewriter {
+                                allocator,
+                                class_name: allocator.alloc_str(name),
+                                get_name: allocator.alloc_str(&plan.helper_names.super_get),
+                                is_static: property.r#static,
+                                receiver_name: property.r#static.then(|| allocator.alloc_str(name)),
+                            }
+                            .visit_expression(value);
+                        }
+                    }
+                    if property.r#static {
+                        StaticInitializerThisRewriter {
+                            allocator,
+                            class_name: allocator.alloc_str(name),
+                        }
+                        .visit_expression(value);
+                    }
                 }
                 let computed_binding = plan
                     .computed_keys
@@ -2816,6 +3048,17 @@ fn lower_simple_class<'a>(
             false,
         ),
     ));
+    if let Some(inferred_name) = plan.inferred_name.as_deref() {
+        wrapper_statements.push(ast.statement_expression(
+            anchor,
+            set_function_name(
+                &ast,
+                ast.expression_identifier(anchor, allocator.alloc_str(name)),
+                ast.expression_string_literal(anchor, allocator.alloc_str(inferred_name), None),
+                anchor,
+            ),
+        ));
+    }
     let after_constructor = wrapper_statements.len();
     for method in methods {
         let method_name =
@@ -2869,6 +3112,7 @@ fn lower_simple_class<'a>(
                 class_name: allocator.alloc_str(name),
                 get_name: allocator.alloc_str(&plan.helper_names.super_get),
                 is_static: method.r#static,
+                receiver_name: None,
             };
             for statement in &mut body.statements {
                 rewriter.visit_statement(statement);
@@ -2950,6 +3194,7 @@ fn lower_simple_class<'a>(
         let mut inheritance = derived_inheritance_statements(&ast, name, super_name, anchor);
         wrapper_statements.splice(after_constructor..after_constructor, inheritance.drain(..));
     }
+    wrapper_statements.push(lock_class_prototype(&ast, name, anchor));
     wrapper_statements.append(&mut static_initializers);
     wrapper_statements.push(ast.statement_return(
         anchor,
@@ -3022,6 +3267,45 @@ fn static_block_initializer<'a>(
                 anchor,
                 function,
                 ast.identifier_name(anchor, "call"),
+                false,
+            )),
+            None::<ArenaBox<'a, TSTypeParameterInstantiation<'a>>>,
+            arguments,
+            false,
+        ),
+    )
+}
+
+#[expect(deprecated)]
+fn lock_class_prototype<'a>(ast: &AstBuilder<'a>, class_name: &str, anchor: Span) -> Statement<'a> {
+    let mut descriptor = ArenaVec::new_in(ast);
+    descriptor.push(ast.object_property_kind_object_property(
+        anchor,
+        PropertyKind::Init,
+        ast.property_key_static_identifier(anchor, "writable"),
+        ast.expression_boolean_literal(anchor, false),
+        false,
+        false,
+        false,
+    ));
+    let mut arguments = ArenaVec::new_in(ast);
+    arguments.push(Argument::from(
+        ast.expression_identifier(anchor, ast.allocator.alloc_str(class_name)),
+    ));
+    arguments.push(Argument::from(ast.expression_string_literal(
+        anchor,
+        "prototype",
+        None,
+    )));
+    arguments.push(Argument::from(ast.expression_object(anchor, descriptor)));
+    ast.statement_expression(
+        anchor,
+        ast.expression_call(
+            anchor,
+            Expression::from(ast.member_expression_static(
+                anchor,
+                ast.expression_identifier(anchor, "Object"),
+                ast.identifier_name(anchor, "defineProperty"),
                 false,
             )),
             None::<ArenaBox<'a, TSTypeParameterInstantiation<'a>>>,
@@ -3508,7 +3792,7 @@ mod tests {
         assert!(changed);
         let code = Codegen::new().build(&program).code;
         assert!(!code.contains("class Value"));
-        assert!(code.contains("var Value"));
+        assert!(code.contains("let Value"), "{code}");
     }
 
     #[test]

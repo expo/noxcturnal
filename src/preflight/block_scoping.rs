@@ -1,4 +1,4 @@
-use oxc_allocator::{Allocator, Box as ArenaBox, TakeIn, Vec as ArenaVec};
+use oxc_allocator::{Allocator, Box as ArenaBox, CloneIn, TakeIn, Vec as ArenaVec};
 use oxc_ast::{
     AstBuilder, AstKind,
     ast::{
@@ -13,8 +13,10 @@ use oxc_ast::{
 use oxc_ast_visit::{Visit, VisitMut, walk, walk_mut};
 use oxc_semantic::{NodeId, ScopeId, Semantic, SymbolId};
 use oxc_span::{GetSpan, SourceType, Span};
-use oxc_syntax::{scope::ScopeFlags, symbol::SymbolFlags};
+use oxc_syntax::{operator::AssignmentOperator, scope::ScopeFlags, symbol::SymbolFlags};
 use rustc_hash::{FxHashMap, FxHashSet};
+
+use crate::preflight::helpers::CustomHelperRequests;
 
 struct CapturedLoop {
     node_id: NodeId,
@@ -1100,22 +1102,30 @@ pub(super) fn prepare_with_reserved<'a>(
             if !reference.is_write() {
                 continue;
             }
-            let parent_id = semantic.nodes().parent_id(reference.node_id());
-            match semantic.nodes().kind(parent_id) {
-                AstKind::AssignmentExpression(expression) => {
+            let write_expression =
+                semantic
+                    .nodes()
+                    .ancestor_ids(reference.node_id())
+                    .find_map(|ancestor| match semantic.nodes().kind(ancestor) {
+                        AstKind::AssignmentExpression(expression) => Some((expression.span, false)),
+                        AstKind::UpdateExpression(expression) => Some((expression.span, true)),
+                        _ => None,
+                    });
+            match write_expression {
+                Some((expression_span, false)) => {
                     let reference_span = semantic.nodes().kind(reference.node_id()).span();
-                    if expression.span != reference_span {
+                    if expression_span != reference_span {
                         const_write_expressions.insert(
-                            (expression.span.start, expression.span.end),
+                            (expression_span.start, expression_span.end),
                             scoping.symbol_name(symbol_id).to_owned(),
                         );
                     }
                 }
-                AstKind::UpdateExpression(expression) => {
+                Some((expression_span, true)) => {
                     let reference_span = semantic.nodes().kind(reference.node_id()).span();
-                    if expression.span != reference_span {
+                    if expression_span != reference_span {
                         const_write_expressions.insert(
-                            (expression.span.start, expression.span.end),
+                            (expression_span.start, expression_span.end),
                             scoping.symbol_name(symbol_id).to_owned(),
                         );
                     }
@@ -1125,11 +1135,21 @@ pub(super) fn prepare_with_reserved<'a>(
         }
     }
     const_write_expressions.extend(collect_read_only_private_writes(semantic));
+    let (read_only_helper, read_only_temp) = if const_write_expressions.is_empty() {
+        (None, None)
+    } else {
+        (
+            Some(reserve_name("_readOnlyError", &mut used_names)),
+            Some(reserve_name("_readOnlyValue", &mut used_names)),
+        )
+    };
     Ok(BlockScopingPlan {
         binding_renames,
         reference_renames,
         loop_reset_declarations,
         const_write_expressions,
+        read_only_helper,
+        read_only_temp,
     })
 }
 
@@ -1309,8 +1329,33 @@ fn collect_loop_reset_declarations(semantic: &Semantic<'_>) -> FxHashSet<(u32, u
     resets
 }
 
-pub(super) fn run<'a>(allocator: &'a Allocator, program: &mut Program<'a>, plan: BlockScopingPlan) {
+pub(super) fn run<'a>(
+    allocator: &'a Allocator,
+    program: &mut Program<'a>,
+    plan: BlockScopingPlan,
+    inline_helpers: bool,
+) -> CustomHelperRequests {
+    let helper_name = plan.read_only_helper.clone();
+    let temp_name = plan.read_only_temp.clone();
     BlockScopingLowerer { allocator, plan }.visit_program(program);
+    let mut requests = CustomHelperRequests::default();
+    if let Some(helper_name) = helper_name {
+        let temp_name = temp_name.expect("const writes reserve a temporary");
+        requests.reserve_scope_names([helper_name.clone(), temp_name.clone()]);
+        if inline_helpers {
+            requests.push_fragment(
+                format!("var {temp_name};function {helper_name}(r){{throw new TypeError('\"'+r+'\" is read-only')}}\n"),
+                format!("var {temp_name};\nfunction {helper_name}(r) {{\n  throw new TypeError('\"' + r + '\" is read-only');\n}}\n"),
+            );
+        } else {
+            requests.request("readOnlyError");
+            requests.push_fragment(
+                format!("var {temp_name},{helper_name}=require('@babel/runtime/helpers/readOnlyError');\n"),
+                format!("var {temp_name},\n  {helper_name} = require('@babel/runtime/helpers/readOnlyError');\n"),
+            );
+        }
+    }
+    requests
 }
 
 pub(super) fn has_remaining_syntax(program: &Program<'_>) -> bool {
@@ -1332,11 +1377,98 @@ pub(super) struct BlockScopingPlan {
     reference_renames: FxHashMap<(u32, u32, String), String>,
     loop_reset_declarations: FxHashSet<(u32, u32)>,
     const_write_expressions: FxHashMap<(u32, u32), String>,
+    read_only_helper: Option<String>,
+    read_only_temp: Option<String>,
 }
 
 struct BlockScopingLowerer<'a> {
     allocator: &'a Allocator,
     plan: BlockScopingPlan,
+}
+
+impl<'a> BlockScopingLowerer<'a> {
+    #[expect(deprecated)]
+    fn read_only_error(&self, span: Span, name: &str) -> Expression<'a> {
+        let ast = AstBuilder::new(self.allocator);
+        let helper = self
+            .plan
+            .read_only_helper
+            .as_deref()
+            .expect("const writes reserve a read-only helper");
+        ast.expression_call(
+            span,
+            ast.expression_identifier(span, self.allocator.alloc_str(helper)),
+            None::<ArenaBox<'a, TSTypeParameterInstantiation<'a>>>,
+            ast.vec1(
+                ast.expression_string_literal(span, self.allocator.alloc_str(name), None)
+                    .into(),
+            ),
+            false,
+        )
+    }
+
+    #[expect(deprecated)]
+    fn temp_assignment(&self, span: Span, value: Expression<'a>) -> Expression<'a> {
+        let ast = AstBuilder::new(self.allocator);
+        let temp = self
+            .plan
+            .read_only_temp
+            .as_deref()
+            .expect("const writes reserve a temporary");
+        ast.expression_assignment(
+            span,
+            AssignmentOperator::Assign,
+            ast.simple_assignment_target_assignment_target_identifier(
+                span,
+                self.allocator.alloc_str(temp),
+            )
+            .into(),
+            value,
+        )
+    }
+
+    #[expect(deprecated)]
+    fn temp_target(&self, span: Span) -> AssignmentTarget<'a> {
+        AstBuilder::new(self.allocator)
+            .simple_assignment_target_assignment_target_identifier(
+                span,
+                self.allocator.alloc_str(
+                    self.plan
+                        .read_only_temp
+                        .as_deref()
+                        .expect("const writes reserve a temporary"),
+                ),
+            )
+            .into()
+    }
+
+    #[expect(deprecated)]
+    fn target_read(&self, target: &AssignmentTarget<'a>) -> Option<Expression<'a>> {
+        let ast = AstBuilder::new(self.allocator);
+        match target {
+            AssignmentTarget::AssignmentTargetIdentifier(identifier) => {
+                Some(ast.expression_identifier(identifier.span, identifier.name))
+            }
+            AssignmentTarget::PrivateFieldExpression(field) => Some(
+                Expression::PrivateFieldExpression(field.clone_in(self.allocator)),
+            ),
+            _ => None,
+        }
+    }
+
+    fn private_target_base(&self, target: &AssignmentTarget<'a>) -> Option<Expression<'a>> {
+        match target {
+            AssignmentTarget::PrivateFieldExpression(field) => {
+                Some(field.object.clone_in(self.allocator))
+            }
+            _ => None,
+        }
+    }
+
+    #[expect(deprecated)]
+    fn sequence(&self, span: Span, expressions: ArenaVec<'a, Expression<'a>>) -> Expression<'a> {
+        AstBuilder::new(self.allocator).expression_sequence(span, expressions)
+    }
 }
 
 struct RemainingBlockScopingDetector(bool);
@@ -1398,22 +1530,91 @@ impl<'a> VisitMut<'a> for BlockScopingLowerer<'a> {
     #[expect(deprecated)]
     fn visit_expression(&mut self, expression: &mut Expression<'a>) {
         let span = expression.span();
-        if self
+        let Some(name) = self
             .plan
             .const_write_expressions
-            .contains_key(&(span.start, span.end))
-        {
-            let ast = AstBuilder::new(self.allocator);
-            *expression = ast.expression_call(
-                span,
-                ast.expression_numeric_literal(span, 0.0, None, oxc_ast::ast::NumberBase::Decimal),
-                None::<ArenaBox<'a, TSTypeParameterInstantiation<'a>>>,
-                ArenaVec::new_in(&ast),
-                false,
-            );
+            .get(&(span.start, span.end))
+            .cloned()
+        else {
+            walk_mut::walk_expression(self, expression);
             return;
-        }
+        };
         walk_mut::walk_expression(self, expression);
+        let ast = AstBuilder::new(self.allocator);
+        let old = expression.take_in(&ast);
+        match old {
+            Expression::AssignmentExpression(assignment) => {
+                let mut assignment = assignment.unbox();
+                let read = self.target_read(&assignment.left);
+                let error = self.read_only_error(span, &name);
+                if assignment.operator == AssignmentOperator::Assign {
+                    let mut expressions = ArenaVec::new_in(&ast);
+                    if let Some(base) = self.private_target_base(&assignment.left) {
+                        expressions.push(base);
+                    }
+                    expressions.push(assignment.right);
+                    expressions.push(error);
+                    *expression = self.sequence(span, expressions);
+                    return;
+                }
+                let Some(read) = read else {
+                    *expression =
+                        Expression::AssignmentExpression(ArenaBox::new_in(assignment, &ast));
+                    return;
+                };
+                let init = self.temp_assignment(span, read);
+                assignment.left = self.temp_target(span);
+                if matches!(
+                    assignment.operator,
+                    AssignmentOperator::LogicalOr
+                        | AssignmentOperator::LogicalAnd
+                        | AssignmentOperator::LogicalNullish
+                ) {
+                    let mut right = ArenaVec::new_in(&ast);
+                    right.push(assignment.right);
+                    right.push(error);
+                    assignment.right = self.sequence(span, right);
+                    let mut expressions = ArenaVec::new_in(&ast);
+                    expressions.push(init);
+                    expressions.push(Expression::AssignmentExpression(ArenaBox::new_in(
+                        assignment, &ast,
+                    )));
+                    *expression = self.sequence(span, expressions);
+                } else {
+                    let mut expressions = ArenaVec::new_in(&ast);
+                    expressions.push(init);
+                    expressions.push(Expression::AssignmentExpression(ArenaBox::new_in(
+                        assignment, &ast,
+                    )));
+                    expressions.push(error);
+                    *expression = self.sequence(span, expressions);
+                }
+            }
+            Expression::UpdateExpression(update) => {
+                let mut update = update.unbox();
+                let read = match &update.argument {
+                    SimpleAssignmentTarget::AssignmentTargetIdentifier(identifier) => {
+                        ast.expression_identifier(identifier.span, identifier.name)
+                    }
+                    SimpleAssignmentTarget::PrivateFieldExpression(field) => {
+                        Expression::PrivateFieldExpression(field.clone_in(self.allocator))
+                    }
+                    _ => {
+                        *expression = Expression::UpdateExpression(ArenaBox::new_in(update, &ast));
+                        return;
+                    }
+                };
+                let init = self.temp_assignment(span, read);
+                update.argument = SimpleAssignmentTarget::try_from(self.temp_target(span))
+                    .expect("generated temporary is a simple assignment target");
+                let mut expressions = ArenaVec::new_in(&ast);
+                expressions.push(init);
+                expressions.push(Expression::UpdateExpression(ArenaBox::new_in(update, &ast)));
+                expressions.push(self.read_only_error(span, &name));
+                *expression = self.sequence(span, expressions);
+            }
+            other => *expression = other,
+        }
     }
 
     #[expect(deprecated)]

@@ -3,14 +3,15 @@ use std::rc::Rc;
 
 use napi::{Error, Result, Status, bindgen_prelude::Buffer};
 use napi_derive::napi;
-use oxc_allocator::{Allocator, TakeIn};
+use oxc_allocator::{Allocator, Box as ArenaBox, CloneIn, TakeIn};
 use oxc_ast::{
     AstKind,
     ast::{
-        AssignmentTargetPattern, CatchClause, Class, Decorator, Expression, ForOfStatement,
-        FormalParameters, IdentifierReference, MethodDefinition, PrivateInExpression, Program,
-        PropertyKey, RegExpFlags, RegExpLiteral, StaticMemberExpression, StringLiteral,
-        VariableDeclarator,
+        Argument, AssignmentTargetPattern, CatchClause, Class, Decorator, Expression,
+        ForOfStatement, ForStatement, ForStatementInit, FormalParameters, IdentifierReference,
+        ImportDeclarationSpecifier, MethodDefinition, PrivateInExpression, Program, PropertyKey,
+        RegExpFlags, RegExpLiteral, Statement, StaticMemberExpression, StringLiteral,
+        TSTypeParameterInstantiation, VariableDeclarator, WithClause,
     },
 };
 use oxc_ast_visit::{Visit, VisitMut, walk, walk_mut};
@@ -34,12 +35,200 @@ use crate::syntax::classification::source_type;
 
 use super::block_scoping;
 use super::helpers::{
-    custom_helpers_introduced, helper_adapter_markers, inline_helpers,
+    CustomHelperRequests, custom_helpers_introduced, helper_adapter_markers, inline_helpers,
     validate_custom_runtime_helpers, validate_runtime_helpers,
 };
 use super::object_spread;
 use super::optimize;
 use super::options::NativePreflightOptions;
+
+struct ExportNamespaceAttribute<'a> {
+    source: String,
+    exported: String,
+    with_clause: Option<ArenaBox<'a, WithClause<'a>>>,
+}
+
+fn capture_export_namespace_attributes<'a>(
+    allocator: &'a Allocator,
+    program: &Program<'a>,
+) -> Vec<ExportNamespaceAttribute<'a>> {
+    program
+        .body
+        .iter()
+        .filter_map(|statement| {
+            let Statement::ExportAllDeclaration(declaration) = statement else {
+                return None;
+            };
+            let exported = declaration.exported.as_ref()?;
+            let with_clause = declaration.with_clause.as_ref()?;
+            Some(ExportNamespaceAttribute {
+                source: declaration.source.value.to_string(),
+                exported: exported.name().to_string(),
+                with_clause: Some(with_clause.clone_in(allocator)),
+            })
+        })
+        .collect()
+}
+
+fn restore_export_namespace_attributes<'a>(
+    program: &mut Program<'a>,
+    attributes: &mut [ExportNamespaceAttribute<'a>],
+) {
+    for attribute in attributes {
+        for index in 0..program.body.len().saturating_sub(1) {
+            let (before, after) = program.body.split_at_mut(index + 1);
+            let Statement::ImportDeclaration(import) = &mut before[index] else {
+                continue;
+            };
+            if import.source.value != attribute.source || import.with_clause.is_some() {
+                continue;
+            }
+            let Some(import_specifiers) = import.specifiers.as_ref() else {
+                continue;
+            };
+            let [ImportDeclarationSpecifier::ImportNamespaceSpecifier(namespace)] =
+                import_specifiers.as_slice()
+            else {
+                continue;
+            };
+            let Statement::ExportNamedDeclaration(export) = &after[0] else {
+                continue;
+            };
+            let [specifier] = export.specifiers.as_slice() else {
+                continue;
+            };
+            if specifier.local.name() != namespace.local.name
+                || specifier.exported.name() != attribute.exported
+            {
+                continue;
+            }
+            import.with_clause = attribute.with_clause.take();
+            break;
+        }
+    }
+}
+
+#[derive(Default)]
+struct GeneratedAsyncIteratorCollector {
+    names: rustc_hash::FxHashSet<String>,
+}
+
+impl<'a> Visit<'a> for GeneratedAsyncIteratorCollector {
+    fn visit_for_statement(&mut self, statement: &ForStatement<'a>) {
+        if let Some(ForStatementInit::VariableDeclaration(declaration)) = &statement.init
+            && declaration.declarations.iter().any(|declarator| {
+                declarator
+                    .id
+                    .get_binding_identifier()
+                    .is_some_and(|identifier| identifier.name.starts_with("_step"))
+            })
+        {
+            for declarator in &declaration.declarations {
+                let Some(identifier) = declarator.id.get_binding_identifier() else {
+                    continue;
+                };
+                if declarator.init.is_some()
+                    && identifier.name.starts_with("_iterator")
+                    && !identifier.name.starts_with("_iteratorAbruptCompletion")
+                {
+                    self.names.insert(identifier.name.to_string());
+                    break;
+                }
+            }
+        }
+        walk::walk_for_statement(self, statement);
+    }
+}
+
+struct AsyncIteratorResultValidator<'a> {
+    ast: oxc_ast::AstBuilder<'a>,
+    iterators: rustc_hash::FxHashSet<String>,
+    helper: String,
+    changed: bool,
+}
+
+impl AsyncIteratorResultValidator<'_> {
+    fn is_iterator_call(&self, expression: &Expression<'_>) -> bool {
+        let Expression::CallExpression(call) = expression else {
+            return false;
+        };
+        let Expression::StaticMemberExpression(member) = &call.callee else {
+            return false;
+        };
+        matches!(member.property.name.as_str(), "next" | "return")
+            && matches!(&member.object, Expression::Identifier(identifier) if self.iterators.contains(identifier.name.as_str()))
+    }
+}
+
+impl<'a> VisitMut<'a> for AsyncIteratorResultValidator<'a> {
+    #[expect(deprecated)]
+    fn visit_expression(&mut self, expression: &mut Expression<'a>) {
+        walk_mut::walk_expression(self, expression);
+        let should_wrap = match expression {
+            Expression::AwaitExpression(await_expression) => {
+                self.is_iterator_call(&await_expression.argument)
+            }
+            Expression::YieldExpression(yield_expression) => yield_expression
+                .argument
+                .as_ref()
+                .is_some_and(|argument| self.is_iterator_call(argument)),
+            _ => false,
+        };
+        if !should_wrap {
+            return;
+        }
+        let span = expression.span();
+        let value = expression.take_in(&self.ast);
+        *expression = self.ast.expression_call(
+            span,
+            self.ast
+                .expression_identifier(span, self.ast.allocator.alloc_str(&self.helper)),
+            None::<ArenaBox<'a, TSTypeParameterInstantiation<'a>>>,
+            self.ast.vec1(Argument::from(value)),
+            false,
+        );
+        self.changed = true;
+    }
+}
+
+fn validate_generated_async_iterator_results<'a>(
+    allocator: &'a Allocator,
+    program: &mut Program<'a>,
+    scoping: &Scoping,
+) -> CustomHelperRequests {
+    let mut collector = GeneratedAsyncIteratorCollector::default();
+    collector.visit_program(program);
+    if collector.names.is_empty() {
+        return CustomHelperRequests::default();
+    }
+    let used = scoping
+        .symbol_names()
+        .map(str::to_owned)
+        .collect::<rustc_hash::FxHashSet<_>>();
+    let mut helper = "_iteratorResult".to_owned();
+    let mut suffix = 2;
+    while used.contains(&helper) {
+        helper = format!("_iteratorResult{suffix}");
+        suffix += 1;
+    }
+    let mut validator = AsyncIteratorResultValidator {
+        ast: oxc_ast::AstBuilder::new(allocator),
+        iterators: collector.names,
+        helper: helper.clone(),
+        changed: false,
+    };
+    validator.visit_program(program);
+    if !validator.changed {
+        return CustomHelperRequests::default();
+    }
+    let mut requests = CustomHelperRequests::default();
+    requests.reserve_scope_names([helper.clone()]);
+    requests.push_fragment(
+        format!("function {helper}(value){{if(Object(value)!==value)throw new TypeError('Iterator result is not an object');return value}}\n"),
+        format!("function {helper}(value) {{\n  if (Object(value) !== value) throw new TypeError('Iterator result is not an object');\n  return value;\n}}\n"),
+    );
+    requests
+}
 
 #[napi(object)]
 pub struct NativePreflightResult {
@@ -776,7 +965,13 @@ pub fn transform(
                     Err(reason) => return Ok(unsupported(reason, [] as [String; 0])),
                 }
             };
-            block_scoping::run(allocator, &mut program, plan);
+            let requests = block_scoping::run(
+                allocator,
+                &mut program,
+                plan,
+                options.helpers_mode.as_deref() != Some("runtime"),
+            );
+            structural_custom_helper_requests.prepend(requests);
             ast_traversal_count += 1;
         }
         if had_classes_ast_syntax
@@ -840,8 +1035,14 @@ pub fn transform(
                     std::mem::take(&mut transform_options.env.es2018.async_generator_functions);
                 deferred
             });
+        let mut export_namespace_attributes = if options.export_namespace_from == Some(true) {
+            capture_export_namespace_attributes(allocator, &program)
+        } else {
+            Vec::new()
+        };
         let mut transformed = Transformer::new(allocator, Path::new(&filename), &transform_options)
             .build_with_scoping(scoping, &mut program);
+        restore_export_namespace_attributes(&mut program, &mut export_namespace_attributes);
         if let Some(deferred) = deferred_async
             && transformed.diagnostics.is_empty()
         {
@@ -853,8 +1054,33 @@ pub fn transform(
             #[expect(deprecated)]
             transformed.helpers_used.extend(async_pass.helpers_used);
         }
+        if options.async_generator_functions == Some(true) && transformed.diagnostics.is_empty() {
+            let requests = validate_generated_async_iterator_results(
+                allocator,
+                &mut program,
+                &transformed.scoping,
+            );
+            if !requests.is_empty() {
+                ast_traversal_count += 2;
+                structural_custom_helper_requests.prepend(requests);
+            }
+        }
         if !transformed.diagnostics.is_empty() {
             return Ok(unsupported("transform-error", transformed.diagnostics));
+        }
+        if matches!(
+            options.jsx.as_deref(),
+            Some("classic" | "classic-development")
+        ) {
+            let (changed, jsx_helper_requests) = object_spread::run_jsx_props(
+                allocator,
+                &mut program,
+                options.helpers_mode.as_deref() != Some("runtime"),
+            );
+            if changed {
+                ast_traversal_count += 1;
+                structural_custom_helper_requests.prepend(jsx_helper_requests);
+            }
         }
         if object_rest_loose {
             ObjectRestLooseCompletionRewriter { allocator }.visit_program(&mut program);
@@ -864,20 +1090,9 @@ pub fn transform(
             let existing = transformed
                 .scoping
                 .symbol_names()
+                .map(str::to_owned)
                 .collect::<rustc_hash::FxHashSet<_>>();
-            let mut suffix = 0;
-            let logical_temp = loop {
-                let candidate = if suffix == 0 {
-                    "_private".to_owned()
-                } else {
-                    format!("_private{suffix}")
-                };
-                if !existing.contains(candidate.as_str()) {
-                    break candidate;
-                }
-                suffix += 1;
-            };
-            if super::logical_assignment::run(allocator, &mut program, &logical_temp) {
+            if super::logical_assignment::run(allocator, &mut program, existing) {
                 ast_traversal_count += 1;
             }
         }
@@ -921,7 +1136,15 @@ pub fn transform(
                 ));
             }
             match block_scoping::prepare(&semantic.semantic) {
-                Ok(plan) => block_scoping::run(allocator, &mut program, plan),
+                Ok(plan) => {
+                    let requests = block_scoping::run(
+                        allocator,
+                        &mut program,
+                        plan,
+                        options.helpers_mode.as_deref() != Some("runtime"),
+                    );
+                    structural_custom_helper_requests.prepend(requests);
+                }
                 Err(reason) => return Ok(unsupported(reason, [] as [String; 0])),
             }
             ast_traversal_count += 1;

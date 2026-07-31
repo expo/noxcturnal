@@ -168,11 +168,6 @@ impl<'a> ForOfLowerer<'a> {
                 self.ast.statement_expression(assignment.span(), assignment)
             }
         };
-        // The loop-head binding and the source body have distinct lexical
-        // environments. Keep an existing body block nested so declarations in
-        // it may legally shadow the per-iteration binding.
-        let body = self.vec([binding, statement.body]);
-
         let symbol_iterator = self.member(anchor, self.id(anchor, "Symbol"), "iterator");
         let iterator_method = {
             #[expect(deprecated)]
@@ -216,17 +211,36 @@ impl<'a> ForOfLowerer<'a> {
             false,
         );
         let assign_step = self.assign_name(anchor, &step, next);
-        let done = self.member(anchor, assign_step, "done");
-        let assign_normal = self.assign_name(anchor, &normal, done);
+        let done = self.member(anchor, self.id(anchor, &step), "done");
+        #[expect(deprecated)]
+        let not_done = self
+            .ast
+            .expression_unary(anchor, UnaryOperator::LogicalNot, done);
         #[expect(deprecated)]
         let test = self
             .ast
-            .expression_unary(anchor, UnaryOperator::LogicalNot, assign_normal);
+            .expression_sequence(anchor, self.vec([assign_step, not_done]));
         let update = self.assign_name(
             anchor,
             &normal,
             self.ast.expression_boolean_literal(anchor, true),
         );
+        // IteratorNext and IteratorComplete both happen before the loop is in
+        // an abruptly-closeable state. Validate the result before flipping
+        // `normal`; otherwise this TypeError would incorrectly call return().
+        let validate_step = self.validate_iterator_result(anchor, &step);
+        let mark_abrupt = self.expression_statement(
+            anchor,
+            self.assign_name(
+                anchor,
+                &normal,
+                self.ast.expression_boolean_literal(anchor, false),
+            ),
+        );
+        // The loop-head binding and the source body have distinct lexical
+        // environments. Keep an existing body block nested so declarations in
+        // it may legally shadow the per-iteration binding.
+        let body = self.vec([validate_step, mark_abrupt, binding, statement.body]);
         #[expect(deprecated)]
         let loop_body = self.ast.statement_block(anchor, body);
         #[expect(deprecated)]
@@ -309,42 +323,7 @@ impl<'a> ForOfLowerer<'a> {
             false,
         );
         let assign_return = self.assign_name(anchor, &return_result, call_return);
-        let mut object_arguments = ArenaVec::new_in(&self.ast);
-        object_arguments.push(Argument::from(self.id(anchor, &return_result)));
-        #[expect(deprecated)]
-        let object_result = self.ast.expression_call(
-            anchor,
-            self.id(anchor, "Object"),
-            None::<ArenaBox<'a, TSTypeParameterInstantiation<'a>>>,
-            object_arguments,
-            false,
-        );
-        #[expect(deprecated)]
-        let invalid_return = self.ast.expression_binary(
-            anchor,
-            object_result,
-            BinaryOperator::StrictInequality,
-            self.id(anchor, &return_result),
-        );
-        let mut error_arguments = ArenaVec::new_in(&self.ast);
-        error_arguments.push(Argument::from(self.ast.expression_string_literal(
-            anchor,
-            "Iterator result is not an object",
-            None,
-        )));
-        let invalid_return_error = self.ast.expression_new(
-            anchor,
-            self.id(anchor, "TypeError"),
-            None::<ArenaBox<'a, TSTypeParameterInstantiation<'a>>>,
-            error_arguments,
-        );
-        #[expect(deprecated)]
-        let validate_return = self.ast.statement_if(
-            anchor,
-            invalid_return,
-            self.ast.statement_throw(anchor, invalid_return_error),
-            None,
-        );
+        let validate_return = self.validate_iterator_result(anchor, &return_result);
         #[expect(deprecated)]
         let return_body = self.ast.statement_block(
             anchor,
@@ -463,6 +442,41 @@ impl<'a> ForOfLowerer<'a> {
         {
             self.ast.statement_expression(span, expression)
         }
+    }
+
+    fn validate_iterator_result(&self, span: Span, name: &str) -> Statement<'a> {
+        let mut object_arguments = ArenaVec::new_in(&self.ast);
+        object_arguments.push(Argument::from(self.id(span, name)));
+        #[expect(deprecated)]
+        let object_result = self.ast.expression_call(
+            span,
+            self.id(span, "Object"),
+            None::<ArenaBox<'a, TSTypeParameterInstantiation<'a>>>,
+            object_arguments,
+            false,
+        );
+        #[expect(deprecated)]
+        let invalid = self.ast.expression_binary(
+            span,
+            object_result,
+            BinaryOperator::StrictInequality,
+            self.id(span, name),
+        );
+        let mut error_arguments = ArenaVec::new_in(&self.ast);
+        error_arguments.push(Argument::from(self.ast.expression_string_literal(
+            span,
+            "Iterator result is not an object",
+            None,
+        )));
+        let error = self.ast.expression_new(
+            span,
+            self.id(span, "TypeError"),
+            None::<ArenaBox<'a, TSTypeParameterInstantiation<'a>>>,
+            error_arguments,
+        );
+        #[expect(deprecated)]
+        self.ast
+            .statement_if(span, invalid, self.ast.statement_throw(span, error), None)
     }
 
     fn declarator(

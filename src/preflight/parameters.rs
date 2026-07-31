@@ -40,7 +40,6 @@ struct AstFunctionPlan {
     wrapper: bool,
     wrapper_arguments: Vec<String>,
     captures: CaptureAliases,
-    setter: bool,
     rest_names: Option<RestNames>,
 }
 
@@ -125,6 +124,13 @@ pub(super) fn prepare_ast(source: &str, semantic: &Semantic<'_>) -> Result<AstPl
                 }
                 let boundary =
                     non_simple(&function.params).expect("eligible function is non-simple");
+                if function
+                    .scope_id
+                    .get()
+                    .is_some_and(|scope_id| scoping.scope_flags(scope_id).is_set_accessor())
+                {
+                    return Err("parameters-setter-semantics-not-implemented");
+                }
                 let param_bindings = parameter_binding_names(&symbols, &function.params);
                 let (wrapper, wrapper_arguments) = body_scope_wrapper_plan(
                     source,
@@ -161,9 +167,6 @@ pub(super) fn prepare_ast(source: &str, semantic: &Semantic<'_>) -> Result<AstPl
                         wrapper,
                         wrapper_arguments,
                         captures,
-                        setter: function.scope_id.get().is_some_and(|scope_id| {
-                            scoping.scope_flags(scope_id).is_set_accessor()
-                        }),
                         rest_names,
                     });
             }
@@ -336,37 +339,6 @@ impl<'a> OrdinaryParameterLowerer<'a> {
             declarations,
             false,
         ))
-    }
-
-    fn setter_default_statement(
-        &self,
-        name: &str,
-        initializer: Expression<'a>,
-        anchor: Span,
-    ) -> Statement<'a> {
-        let ast = self.ast();
-        let test = ast.expression_binary(
-            anchor,
-            self.id(anchor, name),
-            BinaryOperator::StrictEquality,
-            self.undefined(anchor),
-        );
-        let assignment = ast.expression_assignment(
-            anchor,
-            AssignmentOperator::Assign,
-            ast.simple_assignment_target_assignment_target_identifier(
-                anchor,
-                self.allocator.alloc_str(name),
-            )
-            .into(),
-            initializer,
-        );
-        ast.statement_if(
-            anchor,
-            test,
-            ast.statement_expression(anchor, assignment),
-            None,
-        )
     }
 
     fn rest_statement(
@@ -798,33 +770,6 @@ impl<'a> VisitMut<'a> for OrdinaryParameterLowerer<'a> {
                 self.error = Some("parameters-body-missing");
                 return;
             };
-            // Setters must retain exactly one formal parameter. Moving their
-            // default into an `arguments`-based body prologue, as for ordinary
-            // functions, leaves `set value()` which is invalid ECMAScript.
-            // A setter's sole BindingElement is allowed to carry a default, so
-            // preserve the identifier and lower only its initializer.
-            if plan.setter {
-                let Some(parameter) = function.params.items.first_mut() else {
-                    self.error = Some("parameters-setter-parameter-missing");
-                    return;
-                };
-                let BindingPattern::BindingIdentifier(identifier) = &parameter.pattern else {
-                    self.error = Some("parameters-setter-pattern-not-implemented");
-                    return;
-                };
-                let name = identifier.name.to_string();
-                let Some(initializer) = parameter.initializer.take().map(ArenaBox::unbox) else {
-                    self.error = Some("parameters-setter-default-missing");
-                    return;
-                };
-                body.statements.splice(
-                    0..0,
-                    [self.setter_default_statement(&name, initializer, plan.anchor)],
-                );
-                self.changed = true;
-                walk_mut::walk_function(self, function, flags);
-                return;
-            }
             let mut parameters = ArenaVec::new_in(&self.allocator);
             parameters.extend(function.params.items.drain(..));
             for placeholder in &plan.length_placeholders {
@@ -1391,9 +1336,10 @@ mod tests {
         assert_eq!(plan.functions.len(), 1);
         assert!(run_ast(&allocator, &mut program, plan).unwrap());
         let code = Codegen::new().build(&program).code;
-        assert!(code.starts_with("function collect(head)"));
-        assert!(code.contains("tail = new Array"));
-        assert!(code.contains("tail[_key - 1] = arguments[_key]"));
+        assert!(code.starts_with("function collect(_arg)"), "{code}");
+        assert!(code.contains("let head = arguments.length"), "{code}");
+        assert!(code.contains("tail = []"), "{code}");
+        assert!(code.contains("tail[_key - 1] = arguments[_key]"), "{code}");
     }
 
     #[test]
@@ -1429,7 +1375,7 @@ mod tests {
         let code = Codegen::new().build(&program).code;
         assert!(code.contains("const read = function()"));
         assert!(code.contains("let value = arguments.length"));
-        assert!(code.contains("rest = new Array"));
+        assert!(code.contains("rest = []"), "{code}");
         assert!(code.contains("return value + rest.length"));
     }
 

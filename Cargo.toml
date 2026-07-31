@@ -47,6 +47,7 @@ oxc_allocator = "=0.141.0"
 oxc_ast = "=0.141.0"
 oxc_ast_visit = "=0.141.0"
 oxc_codegen = "=0.141.0"
+oxc_ecmascript = "=0.141.0"
 oxc_parser = "=0.141.0"
 oxc_react_compiler = { version = "=0.141.0", optional = true }
 oxc_semantic = "=0.141.0"

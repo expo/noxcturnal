@@ -76,7 +76,7 @@ test('native block scoping preserves const write errors after lowering to var', 
       pipeline({ blockScoping: true }),
     );
     assert.equal(result.status, 'complete');
-    assert.throws(() => new Function(result.code)(), TypeError);
+    assert.throws(() => new Function('require', result.code)(runtimeRequire), TypeError);
   }
 });
 
@@ -89,7 +89,7 @@ test('Hermes V1 block scoping preserves read-only private stores without lowerin
     const result = transform(source, 'fixture.js', pipeline({ blockScoping: true }));
     assert.equal(result.status, 'complete');
     assert.match(result.code, /class Foo/);
-    assert.throws(() => new Function(result.code)(), TypeError);
+    assert.throws(() => new Function('require', result.code)(runtimeRequire), TypeError);
   }
 });
 

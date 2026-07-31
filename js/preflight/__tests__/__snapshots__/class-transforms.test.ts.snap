@@ -18,11 +18,13 @@ exports[`every public native transform has an explicit ownership fixture 1`] = `
 
 exports[`every public native transform has an explicit ownership fixture 2`] = `
 {
-  "code": "var Value=(()=>{"use strict";function Value(){if(!(this instanceof Value))throw new TypeError(\`Cannot call a class as a function\`)}return Value})();",
+  "code": "let Value=(()=>{"use strict";const Value=function Value(){if(!new.target)throw new TypeError(\`Cannot call a class as a function\`)};Object.defineProperty(Value,"prototype",{writable:false});return Value})();",
   "helpers": [],
   "map": {
-    "mappings": "AAAA,iIAAa,EAAb,YAAa;",
-    "names": [],
+    "mappings": "AAAA,IAAM,WAAN,iHAAa,GAAbA,uDAAa,GAAb,YAAa;",
+    "names": [
+      "class Value {}",
+    ],
   },
   "name": "classes",
   "option": true,
@@ -74,10 +76,10 @@ exports[`every public native transform has an explicit ownership fixture 4`] = `
 
 exports[`every public native transform has an explicit ownership fixture 5`] = `
 {
-  "code": "{var _iteratorNormalCompletion=true,_didIteratorError=false,_iteratorError,_iteratorReturnMethod,_iteratorReturn;try{for(var _iterator=values[Symbol.iterator](),_iteratorNext=_iterator.next,_step;!(_iteratorNormalCompletion=(_step=_iteratorNext.call(_iterator)).done);_iteratorNormalCompletion=true){var value=_step.value;consume(value)}}catch(_iteratorError2){_didIteratorError=true;_iteratorError=_iteratorError2}finally{try{if(!_iteratorNormalCompletion&&(_iteratorReturnMethod=_iterator.return)!=null){_iteratorReturn=_iteratorReturnMethod.call(_iterator);if(Object(_iteratorReturn)!==_iteratorReturn)throw new TypeError(\`Iterator result is not an object\`)}}finally{if(_didIteratorError)throw _iteratorError}}}",
+  "code": "{var _iteratorNormalCompletion=true,_didIteratorError=false,_iteratorError,_iteratorReturnMethod,_iteratorReturn;try{for(var _iterator=values[Symbol.iterator](),_iteratorNext=_iterator.next,_step;_step=_iteratorNext.call(_iterator),!_step.done;_iteratorNormalCompletion=true){if(Object(_step)!==_step)throw new TypeError(\`Iterator result is not an object\`);_iteratorNormalCompletion=false;var value=_step.value;consume(value)}}catch(_iteratorError2){_didIteratorError=true;_iteratorError=_iteratorError2}finally{try{if(!_iteratorNormalCompletion&&(_iteratorReturnMethod=_iterator.return)!=null){_iteratorReturn=_iteratorReturnMethod.call(_iterator);if(Object(_iteratorReturn)!==_iteratorReturn)throw new TypeError(\`Iterator result is not an object\`)}}finally{if(_didIteratorError)throw _iteratorError}}}",
   "helpers": [],
   "map": {
-    "mappings": "AAAA,uIAAkB,OAAlBA,gBAAC,CAAD,sGAAC,CAADA,sCAAK,IAAI,MAATA,YAA0B,QAAQ,KAAK,CAAvC,yXAAwC;",
+    "mappings": "AAAA,uIAAkB,OAAlBA,gBAAC,CAAD,sOAAK,IAAI,MAATA,YAA0B,QAAQ,KAAK,CAAvC,yXAAwC;",
     "names": [
       "f",
     ],
@@ -301,12 +303,13 @@ exports[`every public native transform has an explicit ownership fixture 17`] = 
 
 exports[`every public native transform has an explicit ownership fixture 18`] = `
 {
-  "code": "var Value=(()=>{"use strict";var _read=\`__private_Value_read\`;function Value(){if(!(this instanceof Value))throw new TypeError(\`Cannot call a class as a function\`);Object.defineProperty(this,_read,{value:function(){}})}return Value})();",
+  "code": "let Value=(()=>{"use strict";var _read=\`__private_Value_read\`;const Value=function Value(){if(!new.target)throw new TypeError(\`Cannot call a class as a function\`);Object.defineProperty(this,_read,{value:function(){if(new.target)throw new TypeError(\`Class methods cannot be invoked with 'new'\`)}})};Object.defineProperty(Value,"prototype",{writable:false});return Value})();",
   "helpers": [],
   "map": {
-    "mappings": "AAAA,kKAAyB,EAAXA,wCAAK,UAAG,CAAC,GAAE,CAAzB,YAAyB;",
+    "mappings": "AAAA,IAAM,WAAN,kJAAyB,EAAXA,wCAAK,UAAG,CAAR,8EAAS,IAAE,EAAzBC,uDAAyB,GAAzB,YAAyB;",
     "names": [
       "#read() {}",
+      "class Value { #read() {} }",
     ],
   },
   "name": "privateMethods",
@@ -321,10 +324,10 @@ exports[`every public native transform has an explicit ownership fixture 18`] = 
 
 exports[`every public native transform has an explicit ownership fixture 19`] = `
 {
-  "code": "var Value=(()=>{"use strict";var _field=\`__private_Value_field\`;function Value(){if(!(this instanceof Value))throw new TypeError(\`Cannot call a class as a function\`);Object.defineProperty(this,_field,{writable:true,value:void 0})}Object.defineProperty(Value.prototype,"has",{value:function(input){return Object.prototype.hasOwnProperty.call(input,_field)},writable:true,configurable:true});return Value})();",
+  "code": "let Value=(()=>{"use strict";var _field=\`__private_Value_field\`;const Value=function Value(){if(!new.target)throw new TypeError(\`Cannot call a class as a function\`);Object.defineProperty(this,_field,{writable:true,value:void 0})};Object.defineProperty(Value.prototype,"has",{value:Object.defineProperty(function(input){if(new.target)throw new TypeError(\`Class methods cannot be invoked with 'new'\`);return Object.prototype.hasOwnProperty.call(input,_field)},"name",{value:\`has\`,configurable:true}),writable:true,configurable:true});Object.defineProperty(Value,"prototype",{writable:false});return Value})();",
   "helpers": [],
   "map": {
-    "mappings": "AAAA,oKAA6D,EAA/CA,6DAAM,EAAyC,CAA7DC,mDAAyB,SAAC,MAAO,CAAE,OAAOC,qCAAU,MAAVC,MAAc,CAAG,EAA3DF,+BAA6D,GAA7D,YAA6D;",
+    "mappings": "AAAA,IAAM,WAAN,oJAA6D,EAA/CA,6DAAM,EAAyC,EAA7DC,yEAAyB,SAAC,MAAO,CAAX,8EAAqC,EAAxB,OAAOC,qCAAU,MAAVC,MAAc,CAAG,EAA3D,qCAA6D,GAA7DF,+BAA6D,GAA7DA,uDAA6D,GAA7D,YAA6D;",
     "names": [
       "#field;",
       "class Value { #field; has(input) { return #field in input; } }",
