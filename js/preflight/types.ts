@@ -83,6 +83,8 @@ export interface PreflightPlan {
   reactRefresh?: PreflightReactRefresh;
   typescript?: PreflightTypeScriptMode;
   jsx?: PreflightJsxMode;
+  /** Emit pure annotations for generated JSX calls. Defaults to false for development modes. */
+  jsxPure?: boolean;
   jsxImportSource?: string;
   jsxPragma?: string;
   jsxPragmaFrag?: string;

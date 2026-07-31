@@ -20,6 +20,7 @@ pub struct NativePreflightOptions {
     pub react_refresh_emit_full_signatures: Option<bool>,
     pub typescript: Option<String>,
     pub jsx: Option<String>,
+    pub jsx_pure: Option<bool>,
     pub jsx_import_source: Option<String>,
     pub jsx_pragma: Option<String>,
     pub jsx_pragma_frag: Option<String>,

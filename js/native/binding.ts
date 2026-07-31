@@ -16,6 +16,7 @@ interface NativePreflightOptionsInput {
   reactRefreshEmitFullSignatures?: boolean;
   typescript?: string;
   jsx?: string;
+  jsxPure?: boolean;
   jsxImportSource?: string;
   jsxPragma?: string;
   jsxPragmaFrag?: string;
@@ -323,6 +324,7 @@ export function nativePreflightOptions(plan: PreflightPlan): NativePreflightOpti
     reactRefreshEmitFullSignatures: plan.reactRefresh?.emitFullSignatures,
     typescript: plan.typescript,
     jsx: plan.jsx,
+    jsxPure: plan.jsxPure,
     jsxImportSource: plan.jsxImportSource,
     jsxPragma: plan.jsxPragma,
     jsxPragmaFrag: plan.jsxPragmaFrag,

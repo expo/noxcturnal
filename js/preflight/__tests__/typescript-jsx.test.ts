@@ -176,6 +176,17 @@ test('honors JSX import-source and classic pragma comments', () => {
   assert.match(classic.code, /h\(F, null/);
 });
 
+test('allows pure JSX annotations to be overridden independently of development output', () => {
+  const result = transform(
+    'const view = <Widget />;',
+    'fixture.jsx',
+    nativePipeline('fixture.jsx', { jsx: 'automatic', jsxPure: false }).pipeline,
+  );
+  assert.equal(result.status, 'complete');
+  assert.doesNotMatch(result.code, /[@#]__PURE__/);
+  assert.match(result.code, /react\/jsx-runtime/);
+});
+
 test('generated JSX runtime edges are visible to the normal dependency collector', () => {
   const dependencies: string[] = [];
   const collector = defineNativePlugin({

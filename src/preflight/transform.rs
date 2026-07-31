@@ -1542,7 +1542,10 @@ fn compile_options(options: &NativePreflightOptions) -> Result<TransformOptions>
             };
             compiled.jsx.development =
                 matches!(mode, "classic-development" | "automatic-development");
-            compiled.jsx.pure = !matches!(mode, "classic-development" | "automatic-development");
+            compiled.jsx.pure = options.jsx_pure.unwrap_or(!matches!(
+                mode,
+                "classic-development" | "automatic-development"
+            ));
             compiled.jsx.import_source = if compiled.jsx.runtime == JsxRuntime::Automatic {
                 Some(
                     options
