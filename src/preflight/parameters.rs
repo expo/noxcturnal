@@ -38,6 +38,7 @@ struct AstFunctionPlan {
     boundary: usize,
     anchor: Span,
     wrapper: bool,
+    setter: bool,
     rest_names: Option<RestNames>,
 }
 
@@ -147,6 +148,9 @@ pub(super) fn prepare_ast(source: &str, semantic: &Semantic<'_>) -> Result<AstPl
                         boundary,
                         anchor: body.span,
                         wrapper,
+                        setter: function.scope_id.get().is_some_and(|scope_id| {
+                            scoping.scope_flags(scope_id).is_set_accessor()
+                        }),
                         rest_names,
                     });
             }
@@ -318,6 +322,37 @@ impl<'a> OrdinaryParameterLowerer<'a> {
             declarations,
             false,
         ))
+    }
+
+    fn setter_default_statement(
+        &self,
+        name: &str,
+        initializer: Expression<'a>,
+        anchor: Span,
+    ) -> Statement<'a> {
+        let ast = self.ast();
+        let test = ast.expression_binary(
+            anchor,
+            self.id(anchor, name),
+            BinaryOperator::StrictEquality,
+            self.undefined(anchor),
+        );
+        let assignment = ast.expression_assignment(
+            anchor,
+            AssignmentOperator::Assign,
+            ast.simple_assignment_target_assignment_target_identifier(
+                anchor,
+                self.allocator.alloc_str(name),
+            )
+            .into(),
+            initializer,
+        );
+        ast.statement_if(
+            anchor,
+            test,
+            ast.statement_expression(anchor, assignment),
+            None,
+        )
     }
 
     fn rest_statement(
@@ -767,6 +802,33 @@ impl<'a> VisitMut<'a> for OrdinaryParameterLowerer<'a> {
                 self.error = Some("parameters-body-missing");
                 return;
             };
+            // Setters must retain exactly one formal parameter. Moving their
+            // default into an `arguments`-based body prologue, as for ordinary
+            // functions, leaves `set value()` which is invalid ECMAScript.
+            // A setter's sole BindingElement is allowed to carry a default, so
+            // preserve the identifier and lower only its initializer.
+            if plan.setter {
+                let Some(parameter) = function.params.items.first_mut() else {
+                    self.error = Some("parameters-setter-parameter-missing");
+                    return;
+                };
+                let BindingPattern::BindingIdentifier(identifier) = &parameter.pattern else {
+                    self.error = Some("parameters-setter-pattern-not-implemented");
+                    return;
+                };
+                let name = identifier.name.to_string();
+                let Some(initializer) = parameter.initializer.take().map(ArenaBox::unbox) else {
+                    self.error = Some("parameters-setter-default-missing");
+                    return;
+                };
+                body.statements.splice(
+                    0..0,
+                    [self.setter_default_statement(&name, initializer, plan.anchor)],
+                );
+                self.changed = true;
+                walk_mut::walk_function(self, function, flags);
+                return;
+            }
             let mut parameters = ArenaVec::new_in(&self.allocator);
             parameters.extend(function.params.items.drain(plan.boundary..));
             let rest = function.params.rest.take().map(ArenaBox::unbox);

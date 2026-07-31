@@ -344,15 +344,7 @@ fn direct_class_candidates(
                         reserve("_key", reserved),
                     );
                 }
-                ClassElement::MethodDefinition(method)
-                    if method.computed
-                        && class.body.body.iter().any(|element| {
-                            matches!(
-                                element,
-                                ClassElement::PropertyDefinition(property) if property.computed
-                            )
-                        }) =>
-                {
+                ClassElement::MethodDefinition(method) if method.computed => {
                     computed_keys.insert(
                         (method.span.start, method.span.end),
                         reserve("_key", reserved),
@@ -2762,19 +2754,24 @@ fn lower_simple_class<'a>(
             ),
         ));
     }
+    let mut wrapper_parameters = ArenaVec::new_in(&ast);
+    let mut wrapper_arguments = ArenaVec::new_in(&ast);
     for (binding, key, span) in computed_key_initializers {
-        let mut declarations = ArenaVec::new_in(&ast);
-        declarations.push(ast.variable_declarator(
+        wrapper_parameters.push(ast.formal_parameter(
             span,
-            VariableDeclarationKind::Var,
+            ArenaVec::new_in(&ast),
             ast.binding_pattern_binding_identifier(span, allocator.alloc_str(&binding)),
             None::<ArenaBox<'a, TSTypeAnnotation<'a>>>,
-            Some(key),
+            None::<ArenaBox<'a, Expression<'a>>>,
+            false,
+            None,
+            false,
             false,
         ));
-        wrapper_statements.push(Statement::VariableDeclaration(
-            ast.alloc_variable_declaration(span, VariableDeclarationKind::Var, declarations, false),
-        ));
+        // Computed keys are evaluated in the class's surrounding context. In
+        // particular, `yield` and `await` are valid here but become syntax
+        // errors if moved into the non-generator class wrapper body.
+        wrapper_arguments.push(Argument::from(key));
     }
     debug_assert!(!needs_assertion);
     wrapper_statements.push(Statement::FunctionDeclaration(constructor));
@@ -2907,7 +2904,7 @@ fn lower_simple_class<'a>(
         ast.alloc_formal_parameters(
             anchor,
             FormalParameterKind::FormalParameter,
-            ArenaVec::new_in(&ast),
+            wrapper_parameters,
             None::<ArenaBox<'a, FormalParameterRest<'a>>>,
         ),
         None::<ArenaBox<'a, TSTypeAnnotation<'a>>>,
@@ -2917,7 +2914,7 @@ fn lower_simple_class<'a>(
         anchor,
         wrapper,
         None::<ArenaBox<'a, TSTypeParameterInstantiation<'a>>>,
-        ArenaVec::new_in(&ast),
+        wrapper_arguments,
         false,
     ))
 }
