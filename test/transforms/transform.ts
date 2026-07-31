@@ -55,6 +55,22 @@ export async function transformOutcome(
   return formatted.code.trimEnd();
 }
 
+/** Assert a deliberately unsupported boundary without presenting it as transformed output. */
+export function expectBailout(
+  source: string,
+  filename: string,
+  preflight: PreflightPlan,
+  reason: string,
+): void {
+  const result = transform(
+    source,
+    filename,
+    defineNativePipeline({ phases: [{ name: 'preflight', native: preflight }] }),
+  );
+  expect(result.status, JSON.stringify(result)).toBe('bailout');
+  if (result.status === 'bailout') expect(result.reason).toBe(reason);
+}
+
 export const runtimeHelpers = {
   mode: 'runtime',
   moduleName: '@babel/runtime',

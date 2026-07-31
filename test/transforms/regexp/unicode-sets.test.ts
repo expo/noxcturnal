@@ -1,5 +1,5 @@
-import { expect, test } from 'vitest';
-import { transformOutcome } from '../transform';
+import { test } from 'vitest';
+import { expectBailout } from '../transform';
 
 const cases = [
   ['intersection', String.raw`/[\p{ASCII}&&\p{Letter}]/v`],
@@ -12,11 +12,14 @@ const cases = [
 
 for (const [name, regexp] of cases) {
   test(name, async () => {
-    expect(
-      await transformOutcome(`export const matcher = ${regexp};`, 'input.js', {
+    expectBailout(
+      `export const matcher = ${regexp};`,
+      'input.js',
+      {
         helpers: { mode: 'inline' },
         transforms: { regexpUnicodeSets: true },
-      }),
-    ).toMatchInlineSnapshot(`"[bailout] preflight:regexp-unicode-sets-semantic-mismatch"`);
+      },
+      'preflight:regexp-unicode-sets-semantic-mismatch',
+    );
   });
 }

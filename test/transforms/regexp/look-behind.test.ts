@@ -1,5 +1,5 @@
-import { expect, test } from 'vitest';
-import { transformOutcome } from '../transform';
+import { test } from 'vitest';
+import { expectBailout } from '../transform';
 
 const cases = [
   ['positive assertion', String.raw`/(?<=prefix)value/`],
@@ -12,10 +12,13 @@ const cases = [
 
 for (const [name, regexp] of cases) {
   test(name, async () => {
-    expect(
-      await transformOutcome(`export const matcher = ${regexp};`, 'input.js', {
+    expectBailout(
+      `export const matcher = ${regexp};`,
+      'input.js',
+      {
         transforms: { regexpLookBehind: true },
-      }),
-    ).toMatchInlineSnapshot(`"[bailout] preflight:regexp-look-behind-semantic-mismatch"`);
+      },
+      'preflight:regexp-look-behind-semantic-mismatch',
+    );
   });
 }

@@ -1,0 +1,410 @@
+import { expect, test } from 'vitest';
+import type { PreflightPlan } from '../../../js';
+import { runtimeHelpers, transformSource } from '../transform';
+
+const hermesV0: PreflightPlan = {
+  compact: true,
+  comments: false,
+  helpers: runtimeHelpers,
+  transforms: {
+    blockScoping: true,
+    classes: true,
+    classProperties: { loose: true },
+    classStaticBlock: true,
+    privateMethods: { loose: true },
+    privatePropertyInObject: { loose: true },
+    destructuring: { useBuiltIns: true },
+    parameters: true,
+    asyncFunctions: true,
+    asyncGeneratorFunctions: true,
+    regexpUnicode: true,
+    regexpNamedCaptureGroups: true,
+  },
+};
+
+const hermesV1: PreflightPlan = {
+  compact: true,
+  comments: false,
+  helpers: runtimeHelpers,
+  transforms: {
+    blockScoping: true,
+    classStaticBlock: true,
+    asyncGeneratorFunctions: true,
+  },
+};
+
+const web: PreflightPlan = {
+  helpers: runtimeHelpers,
+  transforms: { objectRestSpread: { loose: true, useBuiltIns: true } },
+};
+
+test('composes the native portion of the legacy Hermes language profile in one phase', async () => {
+  const source = `
+    export class Reader {
+      static { this.pattern = /(?<word>\\w+)/u; }
+      #value = 1;
+      has(input) { return #value in input; }
+      async read({ value = this.#value } = {}) { return await value; }
+      async *values(items) { for await (const item of items) yield item; }
+    }
+  `;
+  expect(await transformSource(source, 'input.js', hermesV0)).toMatchInlineSnapshot(`
+    "import _asyncToGenerator from '@babel/runtime/helpers/asyncToGenerator';
+    import _asyncIterator from '@babel/runtime/helpers/asyncIterator';
+    import _awaitAsyncGenerator from '@babel/runtime/helpers/awaitAsyncGenerator';
+    import _wrapAsyncGenerator from '@babel/runtime/helpers/wrapAsyncGenerator';
+    var _wrapRegExp2 = { wrapRegExp: require('@babel/runtime/helpers/wrapRegExp') },
+      _wrapRegExp = _wrapRegExp2.wrapRegExp;
+    var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _classPrivateFieldLooseBase2 = {
+      classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+    };
+    function _classPrivateFieldLooseBase(e, s) {
+      return _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+    }
+    function _classPrivateMethodCall(e, s, a) {
+      return _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s)[s].apply(e, a);
+    }
+    export var Reader = (() => {
+      'use strict';
+      var _value = \`__private_Reader_value\`;
+      function Reader() {
+        if (!(this instanceof Reader)) throw new TypeError(\`Cannot call a class as a function\`);
+        Object.defineProperty(this, _value, { writable: true, value: 1 });
+      }
+      Object.defineProperty(Reader.prototype, 'has', {
+        value: function (input) {
+          return Object.prototype.hasOwnProperty.call(input, _value);
+        },
+        writable: true,
+        configurable: true,
+      });
+      Object.defineProperty(Reader.prototype, 'read', {
+        value: _asyncToGenerator(function* () {
+          var _ref = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : {},
+            _obj = _objectDestructuringEmpty(_ref),
+            _value17 = _obj.value,
+            value = _value17 === void 0 ? _classPrivateFieldLooseBase(this, _value)[_value] : _value17;
+          return yield value;
+        }),
+        writable: true,
+        configurable: true,
+      });
+      Object.defineProperty(Reader.prototype, 'values', {
+        value: (function () {
+          var _ref2 = _wrapAsyncGenerator(function* (items) {
+            var _iteratorAbruptCompletion = false;
+            var _didIteratorError = false;
+            var _iteratorError;
+            try {
+              for (
+                var _iterator = _asyncIterator(items), _step;
+                (_iteratorAbruptCompletion = !(_step = yield _awaitAsyncGenerator(_iterator.next()))
+                  .done);
+                _iteratorAbruptCompletion = false
+              ) {
+                var item = _step.value;
+                yield item;
+              }
+            } catch (err) {
+              _didIteratorError = true;
+              _iteratorError = err;
+            } finally {
+              try {
+                if (_iteratorAbruptCompletion && _iterator.return != null) {
+                  yield _awaitAsyncGenerator(_iterator.return());
+                }
+              } finally {
+                if (_didIteratorError) {
+                  throw _iteratorError;
+                }
+              }
+            }
+          });
+          return function value(_x) {
+            return _ref2.apply(this, arguments);
+          };
+        })(),
+        writable: true,
+        configurable: true,
+      });
+      (function () {
+        this.pattern = _wrapRegExp(/(\\w+)/, { word: 1 });
+      }).call(Reader);
+      return Reader;
+    })();"
+  `);
+});
+
+test('composes the native portion of the modern Hermes language profile', async () => {
+  const source = `
+    export class Reader {
+      static { this.kind = 'reader'; }
+      async read(value) { return await value; }
+      async *values(items) { for await (const item of items) yield item; }
+    }
+    for (let index = 0; index < 2; index++) queue(() => index);
+  `;
+  expect(await transformSource(source, 'input.js', hermesV1)).toMatchInlineSnapshot(`
+    "import _asyncIterator from '@babel/runtime/helpers/asyncIterator';
+    import _awaitAsyncGenerator from '@babel/runtime/helpers/awaitAsyncGenerator';
+    import _wrapAsyncGenerator from '@babel/runtime/helpers/wrapAsyncGenerator';
+    export class Reader {
+      static #_ = (this.kind = \`reader\`);
+      async read(value) {
+        return await value;
+      }
+      values(items) {
+        return _wrapAsyncGenerator(function* () {
+          var _iteratorAbruptCompletion = false;
+          var _didIteratorError = false;
+          var _iteratorError;
+          try {
+            for (
+              var _iterator = _asyncIterator(items), _step;
+              (_iteratorAbruptCompletion = !(_step = yield _awaitAsyncGenerator(_iterator.next()))
+                .done);
+              _iteratorAbruptCompletion = false
+            ) {
+              var item = _step.value;
+              yield item;
+            }
+          } catch (err) {
+            _didIteratorError = true;
+            _iteratorError = err;
+          } finally {
+            try {
+              if (_iteratorAbruptCompletion && _iterator.return != null) {
+                yield _awaitAsyncGenerator(_iterator.return());
+              }
+            } finally {
+              if (_didIteratorError) {
+                throw _iteratorError;
+              }
+            }
+          }
+        })();
+      }
+    }
+    var _loopResult;
+    var _loop = index => {
+      queue(() => index);
+      return { type: \`normal\`, vars: [index] };
+    };
+    for (var index = 0; index < 2; index++) {
+      _loopResult = _loop(index);
+      index = _loopResult.vars[0];
+    }"
+  `);
+});
+
+test('composes the non-Hermes object rest and spread profile', async () => {
+  const source = `export const merge = ({ ignored, ...rest }, extra) => ({ ...rest, ...extra });`;
+  expect(await transformSource(source, 'input.js', web)).toMatchInlineSnapshot(`
+    "const _excluded = ['ignored'];
+    import _objectWithoutProperties from '@babel/runtime/helpers/objectWithoutProperties';
+    export const merge = (_ref, extra) => {
+      let { ignored } = _ref,
+        rest = _objectWithoutProperties(_ref, _excluded);
+      return Object.assign({}, rest, extra);
+    };"
+  `);
+});
+
+test('composes TypeScript with the automatic JSX runtime', async () => {
+  const source = `
+    type Props = { value: number };
+    export function App({ value }: Props) { return <View value={value} />; }
+  `;
+  expect(
+    await transformSource(source, 'App.tsx', {
+      typescript: 'strip',
+      jsx: 'automatic',
+      jsxImportSource: 'react',
+    }),
+  ).toMatchInlineSnapshot(`
+    "import { jsx as _jsx } from 'react/jsx-runtime';
+    export function App({ value }) {
+      return /* @__PURE__ */ _jsx(View, { value });
+    }"
+  `);
+});
+
+test('composes Flow erasure with the classic React runtime', async () => {
+  const source = `
+    // @flow
+    type Props = { value: number };
+    export function App({ value }: Props): React.Node { return <View value={value} />; }
+  `;
+  expect(await transformSource(source, 'App.js', { jsx: 'classic' })).toMatchInlineSnapshot(`
+    "// @flow
+    export function App({ value }) {
+      return /* @__PURE__ */ React.createElement(View, { value });
+    }"
+  `);
+});
+
+test('composes React Compiler with TypeScript and automatic JSX', async () => {
+  const source = `
+    type Props = { value: number };
+    export function App({ value }: Props) { return <View value={value} />; }
+  `;
+  expect(
+    await transformSource(source, 'App.tsx', {
+      typescript: 'strip',
+      jsx: 'automatic',
+      reactCompiler: {
+        compilationMode: 'infer',
+        panicThreshold: 'none',
+        target: '19',
+        enableResetCacheOnSourceFileChanges: true,
+      },
+    }),
+  ).toMatchInlineSnapshot(`
+    "import { c as _c } from 'react/compiler-runtime';
+    import { jsx as _jsx } from 'react/jsx-runtime';
+    export function App(t0) {
+      const $ = _c(2);
+      const { value } = t0;
+      let t1;
+      if ($[0] !== value) {
+        t1 = /* @__PURE__ */ _jsx(View, { value });
+        $[0] = value;
+        $[1] = t1;
+      } else {
+        t1 = $[1];
+      }
+      return t1;
+    }"
+  `);
+});
+
+test('composes React Refresh, automatic JSX, and async lowering', async () => {
+  const source = `
+    import { useState } from 'react';
+    export default async function App({ load }) {
+      const [value] = useState(0);
+      return <View value={await load(value)} />;
+    }
+  `;
+  expect(
+    await transformSource(source, 'App.jsx', {
+      helpers: runtimeHelpers,
+      jsx: 'automatic-development',
+      reactRefresh: {},
+      transforms: { asyncFunctions: true },
+    }),
+  ).toMatchInlineSnapshot(`
+    "import { useState } from 'react';
+    import _asyncToGenerator from '@babel/runtime/helpers/asyncToGenerator';
+    var _jsxFileName = 'App.jsx';
+    import { jsxDEV as _jsxDEV } from 'react/jsx-dev-runtime';
+    var _s = $RefreshSig$();
+    export default function App(_x) {
+      return _App.apply(this, arguments);
+    }
+    function _App() {
+      _App = _asyncToGenerator(function* ({ load }) {
+        _s();
+        const [value] = useState(0);
+        return _jsxDEV(
+          View,
+          { value: yield load(value) },
+          void 0,
+          false,
+          {
+            fileName: _jsxFileName,
+            lineNumber: 5,
+            columnNumber: 14,
+          },
+          this,
+        );
+      });
+      return _App.apply(this, arguments);
+    }
+    _s(App, 'hMeGOYDHwTuZt8ICyZR2ANpWEfs=');
+    _c = App;
+    var _c;
+    $RefreshReg$(_c, 'App');"
+  `);
+});
+
+test('supports inline and runtime helper profiles', async () => {
+  const source = 'export async function read(value) { return await value; }';
+  expect({
+    inline: await transformSource(source, 'input.js', {
+      helpers: { mode: 'inline' },
+      transforms: { asyncFunctions: true },
+    }),
+    runtime: await transformSource(source, 'input.js', {
+      helpers: runtimeHelpers,
+      transforms: { asyncFunctions: true },
+    }),
+  }).toMatchInlineSnapshot(`
+    {
+      "inline": "var babelHelpers = (() => {
+      var y = {
+          asyncToGenerator: function (r, u) {
+            function x(i, f, p, o, a, s, e) {
+              try {
+                var n = i[s](e),
+                  t = n.value;
+              } catch (d) {
+                return void p(d);
+              }
+              n.done ? f(t) : Promise.resolve(t).then(o, a);
+            }
+            function h(i) {
+              return function () {
+                var f = this,
+                  p = arguments;
+                return new Promise(function (o, a) {
+                  var s = i.apply(f, p);
+                  function e(t) {
+                    x(s, o, a, e, n, 'next', t);
+                  }
+                  function n(t) {
+                    x(s, o, a, e, n, 'throw', t);
+                  }
+                  e(void 0);
+                });
+              };
+            }
+            ((r.exports = h), (r.exports.__esModule = !0), (r.exports.default = r.exports));
+          },
+        },
+        c = {};
+      function v(r) {
+        if (c[r]) return c[r].exports;
+        var u = (c[r] = { exports: {} });
+        return (y[r](u, v), u.exports);
+      }
+      return { asyncToGenerator: v('asyncToGenerator') };
+    })();
+    export function read(_x) {
+      return _read.apply(this, arguments);
+    }
+    function _read() {
+      _read = babelHelpers.asyncToGenerator(function* (value) {
+        return yield value;
+      });
+      return _read.apply(this, arguments);
+    }",
+      "runtime": "import _asyncToGenerator from '@babel/runtime/helpers/asyncToGenerator';
+    export function read(_x) {
+      return _read.apply(this, arguments);
+    }
+    function _read() {
+      _read = _asyncToGenerator(function* (value) {
+        return yield value;
+      });
+      return _read.apply(this, arguments);
+    }",
+    }
+  `);
+});
