@@ -16,7 +16,7 @@ use oxc_ast::{
 };
 use oxc_ast_visit::{Visit, VisitMut, walk, walk_mut};
 use oxc_codegen::{Codegen, CodegenOptions, CommentOptions};
-use oxc_parser::Parser;
+use oxc_parser::{ParseOptions, Parser};
 #[cfg(feature = "react_compiler")]
 use oxc_react_compiler::{
     CompilationMode, CompilerTarget, PanicThreshold, PluginOptions as ReactCompilerOptions,
@@ -257,14 +257,25 @@ self_cell! {
     }
 }
 
-fn parse_owned(source: String, source_type: SourceType) -> OwnedProgram {
+fn parse_owned(
+    source: String,
+    source_type: SourceType,
+    parse_regular_expression: bool,
+) -> OwnedProgram {
     OwnedProgram::new(
         ParseOwner {
             allocator: Allocator::default(),
             source,
             source_type,
         },
-        |owner| Parser::new(&owner.allocator, &owner.source, owner.source_type).parse(),
+        move |owner| {
+            Parser::new(&owner.allocator, &owner.source, owner.source_type)
+                .with_options(ParseOptions {
+                    parse_regular_expression,
+                    ..ParseOptions::default()
+                })
+                .parse()
+        },
     )
 }
 
@@ -325,6 +336,9 @@ pub fn transform(
         || options.regexp_dot_all == Some(true)
         || options.regexp_named_capture_groups == Some(true)
         || options.regexp_unicode_sets == Some(true);
+    let regexp_ast_selected = options.regexp_unicode_sets != Some(true)
+        && (options.regexp_unicode_property_escapes == Some(true)
+            || options.regexp_named_capture_groups == Some(true));
     // Whether anything downstream of the language reads it.
     let selects_source_rewrite = options.block_scoping == Some(true)
         || options.classes == Some(true)
@@ -462,7 +476,13 @@ pub fn transform(
             }
         }
     }
-    let mut final_program = run(|| parse_owned(std::mem::take(&mut source), active_source_type));
+    let mut final_program = run(|| {
+        parse_owned(
+            std::mem::take(&mut source),
+            active_source_type,
+            regexp_ast_selected,
+        )
+    });
     if final_program.has_diagnostics() {
         return Ok(unsupported(
             "parse-error",
@@ -2000,7 +2020,12 @@ impl<'a> Visit<'a> for PostconditionDetector {
         let remainder = literal.regex.pattern.text.as_str();
         self.unicode_property |= remainder.contains("\\p{") || remainder.contains("\\P{");
         self.look_behind |= remainder.contains("(?<=") || remainder.contains("(?<!");
-        self.named_capture_groups |= super::regexp::contains_named_group(remainder);
+        self.named_capture_groups |= literal
+            .regex
+            .pattern
+            .pattern
+            .as_deref()
+            .is_some_and(super::regexp::pattern_has_named_group);
         walk::walk_reg_exp_literal(self, literal);
     }
 

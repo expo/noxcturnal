@@ -56,3 +56,16 @@ globalThis.__result = [found, expression.source];`,
     }),
   ).resolves.toEqual([null, String.raw`no-groups-\(?<looks-like-a-group>looks\)`]);
 });
+
+test('aligns Unicode escapes in group names with Babel', async () => {
+  await expect(
+    alignBabelBehavior({
+      source: String.raw`const match = /(?<\u0061>x)\k<\u0061>/.exec('xx');
+globalThis.__result = [match[0], match.groups.a, Object.keys(match.groups)];`,
+      filename: 'input.js',
+      plugins: [namedCaptureGroups],
+      noxcturnal: { helpers: { mode: 'inline' }, transforms: { regexpNamedCaptureGroups: true } },
+      output: { mustNotMatch: [/\(\?</, /\\k</] },
+    }),
+  ).resolves.toEqual(['xx', 'x', ['a']]);
+});

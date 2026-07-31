@@ -38,3 +38,22 @@ export const mixed = /[x\p{RGI_Emoji}]/v;`,
   expect(output).not.toContain('[bailout]');
   expect(output).not.toMatch(/\\p\{|\/v/u);
 });
+
+test('combines v, properties, Unicode, dot-all, and named-group transforms', async () => {
+  const output = await transformOutcome(
+    String.raw`export const matcher = /(?<word>[[\p{ASCII}&&\p{Letter}]--[A-Z]]+).\k<word>/sv;`,
+    'input.js',
+    {
+      helpers: { mode: 'inline' },
+      transforms: {
+        regexpDotAll: true,
+        regexpNamedCaptureGroups: true,
+        regexpUnicode: true,
+        regexpUnicodePropertyEscapes: true,
+        regexpUnicodeSets: true,
+      },
+    },
+  );
+  expect(output).not.toContain('[bailout]');
+  expect(output).not.toMatch(/\(\?<|\\k<|\\[pP]\{|\/[dgimsuvy]*[suv][dgimsuvy]*/u);
+});

@@ -9,6 +9,15 @@ use oxc_ast::{
     },
 };
 use oxc_ast_visit::{VisitMut, walk_mut};
+use oxc_regular_expression::{
+    LiteralParser, Options as RegExpParserOptions,
+    ast::{
+        CapturingGroup, CharacterClass, CharacterClassContents, CharacterClassContentsKind,
+        CharacterClassEscapeKind, Disjunction, Dot, NamedReference, Pattern, Term,
+        UnicodePropertyEscape,
+    },
+    visit::{Visit as RegExpVisit, walk},
+};
 use oxc_span::GetSpan;
 use regex_syntax::hir::{Class, HirKind};
 use rustc_hash::FxHashMap;
@@ -111,16 +120,69 @@ impl<'a> RegexpLowerer<'a> {
         };
         let mut pattern = literal.regex.pattern.text.as_str().to_owned();
         let mut flags = literal.regex.flags.to_string();
+        let is_unicode_sets = literal.regex.flags.contains(oxc_ast::ast::RegExpFlags::V);
+        let needs_pattern = self.named_groups || self.unicode_properties || self.unicode_sets;
+        if needs_pattern && literal.regex.pattern.pattern.is_none() {
+            let parsed = LiteralParser::new(
+                self.ast.allocator,
+                literal.regex.pattern.text.as_str(),
+                Some(&flags),
+                RegExpParserOptions {
+                    pattern_span_offset: literal.span.start + 1,
+                    flags_span_offset: literal.span.end.saturating_sub(flags.len() as u32),
+                },
+            )
+            .parse();
+            match parsed {
+                Ok(parsed) => {
+                    literal.regex.pattern.pattern =
+                        Some(ArenaBox::new_in(parsed, &self.ast.allocator));
+                }
+                // Babel/regexpu accepts range operands in set algebra even though
+                // ECMA-262 requires those ranges to be nested. Preserve that
+                // established output through the compatibility lowering.
+                Err(_) if is_unicode_sets && !self.named_groups => {}
+                Err(_) => return Err("regexp-pattern-shape-not-implemented"),
+            }
+        }
+        let regexp_pattern = literal.regex.pattern.pattern.as_deref();
         let mut changed = false;
-        if self.unicode_sets && flags.contains('v') {
-            pattern = lower_unicode_sets(&pattern)?;
-            flags.retain(|flag| flag != 'v');
-            flags.push('u');
+        let mut structural_edits = Vec::new();
+        let groups = if self.named_groups {
+            let (edits, names) = collect_named_group_edits(&pattern, regexp_pattern.unwrap())?;
+            if names.is_empty() {
+                None
+            } else {
+                structural_edits.extend(edits);
+                self.needs_named_helper = true;
+                changed = true;
+                Some(names)
+            }
+        } else {
+            None
+        };
+        if self.unicode_properties && !flags.contains('v') {
+            let drops_unicode_flag = self.unicode && flags.contains('u');
+            let edits =
+                collect_unicode_property_edits(regexp_pattern.unwrap(), drops_unicode_flag)?;
+            changed |= !edits.is_empty();
+            structural_edits.extend(edits);
+        }
+        let ast_lowered_unicode_sets =
+            self.unicode_sets && flags.contains('v') && regexp_pattern.is_some();
+        if ast_lowered_unicode_sets {
+            structural_edits.extend(collect_unicode_set_edits(regexp_pattern.unwrap())?);
             changed = true;
         }
-        if self.unicode_properties && (pattern.contains("\\p{") || pattern.contains("\\P{")) {
-            let drops_unicode_flag = self.unicode && flags.contains('u');
-            pattern = lower_unicode_properties(&pattern, drops_unicode_flag)?;
+        if !structural_edits.is_empty() {
+            apply_pattern_edits(&mut pattern, structural_edits)?;
+        }
+        if self.unicode_sets && flags.contains('v') {
+            if !ast_lowered_unicode_sets {
+                pattern = lower_babel_range_operand_unicode_sets(&pattern)?;
+            }
+            flags.retain(|flag| flag != 'v');
+            flags.push('u');
             changed = true;
         }
         if self.unicode && flags.contains('u') {
@@ -136,19 +198,6 @@ impl<'a> RegexpLowerer<'a> {
             flags.retain(|flag| flag != 's');
             changed = true;
         }
-        let groups = if self.named_groups && contains_named_group(&pattern) {
-            let (lowered, names) = lower_named_groups(&pattern)?;
-            if names.is_empty() {
-                None
-            } else {
-                pattern = lowered;
-                self.needs_named_helper = true;
-                changed = true;
-                Some(names)
-            }
-        } else {
-            None
-        };
         if !changed {
             return Ok(None);
         }
@@ -408,30 +457,56 @@ fn sort_class_additions(additions: &str) -> Result<String, &'static str> {
     Ok(atoms.into_iter().map(|(_, token)| token).collect())
 }
 
-pub(super) fn contains_named_group(pattern: &str) -> bool {
-    let bytes = pattern.as_bytes();
-    let mut index = 0;
-    let mut in_class = false;
-    while index < bytes.len() {
-        if bytes[index] == b'\\' {
-            index = (index + 2).min(bytes.len());
-            continue;
+#[derive(Default)]
+struct RegExpFacts {
+    has_dot: bool,
+    has_named_groups: bool,
+    has_named_references: bool,
+    has_unicode_properties: bool,
+    has_string_properties: bool,
+    has_unicode_set_operations: bool,
+}
+
+impl RegExpFacts {
+    fn analyze<'a>(pattern: &Pattern<'a>, selected: bool) -> Self {
+        let mut facts = Self::default();
+        if selected {
+            facts.visit_pattern(pattern);
         }
-        match bytes[index] {
-            b'[' => in_class = true,
-            b']' => in_class = false,
-            b'(' if !in_class
-                && bytes.get(index + 1) == Some(&b'?')
-                && bytes.get(index + 2) == Some(&b'<')
-                && !matches!(bytes.get(index + 3), Some(b'=') | Some(b'!')) =>
-            {
-                return true;
-            }
-            _ => {}
-        }
-        index += 1;
+        facts
     }
-    false
+}
+
+pub(super) fn pattern_has_named_group(pattern: &Pattern<'_>) -> bool {
+    RegExpFacts::analyze(pattern, true).has_named_groups
+}
+
+impl<'a> RegExpVisit<'a> for RegExpFacts {
+    fn visit_capturing_group(&mut self, group: &CapturingGroup<'a>) {
+        self.has_named_groups |= group.name.is_some();
+        walk::walk_capturing_group(self, group);
+    }
+
+    fn visit_named_reference(&mut self, reference: &NamedReference<'a>) {
+        self.has_named_references = true;
+        walk::walk_named_reference(self, reference);
+    }
+
+    fn visit_dot(&mut self, dot: &Dot) {
+        self.has_dot = true;
+        walk::walk_dot(self, dot);
+    }
+
+    fn visit_unicode_property_escape(&mut self, property: &UnicodePropertyEscape<'a>) {
+        self.has_unicode_properties = true;
+        self.has_string_properties |= property.strings;
+        walk::walk_unicode_property_escape(self, property);
+    }
+
+    fn visit_character_class(&mut self, class: &CharacterClass<'a>) {
+        self.has_unicode_set_operations |= class.kind != CharacterClassContentsKind::Union;
+        walk::walk_character_class(self, class);
+    }
 }
 
 impl<'a> VisitMut<'a> for RegexpLowerer<'a> {
@@ -459,104 +534,6 @@ fn reserve_source_name(base: &str, source: &str) -> String {
         }
     }
     unreachable!()
-}
-
-fn lower_unicode_properties(pattern: &str, surrogate_pairs: bool) -> Result<String, &'static str> {
-    let mut output = String::with_capacity(pattern.len());
-    let bytes = pattern.as_bytes();
-    let mut index = 0usize;
-    while index < bytes.len() {
-        // A property inside a character class cannot be substituted in place:
-        // its expansion is itself a class, and its astral half is a sequence of
-        // surrogate pairs, which no class can hold. The whole class is rewritten
-        // instead — see `lower_property_class`.
-        if bytes[index] == b'[' {
-            let end = class_end(pattern, index).ok_or("regexp-class-shape-not-implemented")?;
-            let body_start = index + 1;
-            let body = &pattern[body_start..end];
-            if body.contains("\\p{") || body.contains("\\P{") {
-                output.push_str(&lower_property_class(body, surrogate_pairs)?);
-            } else {
-                output.push_str(&pattern[index..=end]);
-            }
-            index = end + 1;
-            continue;
-        }
-        if bytes[index] == b'\\'
-            && matches!(bytes.get(index + 1), Some(b'p') | Some(b'P'))
-            && bytes.get(index + 2) == Some(&b'{')
-        {
-            let end = pattern[index + 3..]
-                .find('}')
-                .map(|offset| index + 3 + offset)
-                .ok_or("regexp-unicode-property-shape-not-implemented")?;
-            let negative = bytes[index + 1] == b'P';
-            let property = pattern[index + 3..end].replace('=', ":");
-            output.push_str(&render_ranges(
-                &unicode_property_ranges(&property, negative)?,
-                surrogate_pairs,
-            ));
-            index = end + 1;
-            continue;
-        }
-        // An escape consumes the character after it, so a `\[` never opens a
-        // class and a `\p` outside the shape above stays as written.
-        if bytes[index] == b'\\' && index + 1 < bytes.len() {
-            let escaped = pattern[index + 1..].chars().next().unwrap();
-            output.push('\\');
-            output.push(escaped);
-            index += 1 + escaped.len_utf8();
-            continue;
-        }
-        let character = pattern[index..].chars().next().unwrap();
-        output.push(character);
-        index += character.len_utf8();
-    }
-    Ok(output)
-}
-
-/// Index of the `]` closing the class that opens at `start`.
-///
-/// `[` is an ordinary character inside a class, and an empty class cannot be
-/// written in JavaScript, so only `\]` and the opening position need care.
-fn class_end(pattern: &str, start: usize) -> Option<usize> {
-    let bytes = pattern.as_bytes();
-    let mut index = start + 1;
-    if bytes.get(index) == Some(&b'^') {
-        index += 1;
-    }
-    if bytes.get(index) == Some(&b']') {
-        index += 1;
-    }
-    while index < bytes.len() {
-        match bytes[index] {
-            b'\\' => index += 1 + pattern[index + 1..].chars().next()?.len_utf8(),
-            b']' => return Some(index),
-            _ => index += pattern[index..].chars().next()?.len_utf8(),
-        }
-    }
-    None
-}
-
-/// Rewrites a character class containing at least one `\p{...}`.
-///
-/// Every item is resolved to code-point ranges and unioned, then split: the
-/// ranges up to U+FFFF stay a class, and anything above becomes surrogate-pair
-/// alternatives beside it. `[\p{Cn}\p{Co}]` therefore becomes
-/// `(?:[…bmp…]|…pairs…)`, which is the shape `regexpu-core` produces for Babel.
-///
-/// Only the items observed alongside property escapes are handled; anything
-/// else bails rather than guessing, because a mis-parsed class is a silently
-/// wrong regular expression.
-fn lower_property_class(body: &str, surrogate_pairs: bool) -> Result<String, &'static str> {
-    let (body, negative) = body
-        .strip_prefix('^')
-        .map_or((body, false), |body| (body, true));
-    let mut ranges = parse_class_ranges(body)?;
-    if negative {
-        ranges = complement_ranges(&ranges);
-    }
-    Ok(render_ranges(&ranges, surrogate_pairs))
 }
 
 fn parse_class_ranges(body: &str) -> Result<Vec<(u32, u32)>, &'static str> {
@@ -600,7 +577,201 @@ fn parse_class_ranges(body: &str) -> Result<Vec<(u32, u32)>, &'static str> {
     Ok(union(ranges))
 }
 
-fn lower_unicode_sets(pattern: &str) -> Result<String, &'static str> {
+fn collect_unicode_set_edits(pattern: &Pattern<'_>) -> Result<Vec<PatternEdit>, &'static str> {
+    let mut collector = UnicodeSetEditCollector {
+        span_offset: pattern.span.start,
+        edits: Vec::new(),
+        error: None,
+    };
+    collector.visit_pattern(pattern);
+    if let Some(error) = collector.error {
+        return Err(error);
+    }
+    Ok(collector.edits)
+}
+
+struct UnicodeSetEditCollector {
+    span_offset: u32,
+    edits: Vec<PatternEdit>,
+    error: Option<&'static str>,
+}
+
+impl UnicodeSetEditCollector {
+    fn push_edit(&mut self, span: oxc_span::Span, replacement: String) {
+        let Some(start) = span.start.checked_sub(self.span_offset) else {
+            self.error = Some("regexp-pattern-span-invalid");
+            return;
+        };
+        let Some(end) = span.end.checked_sub(self.span_offset) else {
+            self.error = Some("regexp-pattern-span-invalid");
+            return;
+        };
+        self.edits.push((start as usize, end as usize, replacement));
+    }
+}
+
+impl<'a> RegExpVisit<'a> for UnicodeSetEditCollector {
+    fn visit_character_class(&mut self, class: &CharacterClass<'a>) {
+        if self.error.is_some() {
+            return;
+        }
+        match unicode_set_class_value(class).and_then(render_unicode_set_value) {
+            Ok(replacement) => self.push_edit(class.span, replacement),
+            Err(error) => self.error = Some(error),
+        }
+    }
+
+    fn visit_unicode_property_escape(&mut self, property: &UnicodePropertyEscape<'a>) {
+        if self.error.is_some() {
+            return;
+        }
+        if property.strings {
+            if property.negative {
+                self.error = Some("regexp-unicode-sets-operation-not-implemented");
+                return;
+            }
+            match unicode_string_property_pattern(property.name.as_str()) {
+                Some(replacement) => self.push_edit(property.span, replacement.to_owned()),
+                None => self.error = Some("regexp-unicode-property-unsupported"),
+            }
+        } else {
+            match unicode_property_escape_ranges(property) {
+                Ok(ranges) => self.push_edit(property.span, render_ranges(&ranges, false)),
+                Err(error) => self.error = Some(error),
+            }
+        }
+    }
+}
+
+#[derive(Default)]
+struct UnicodeSetValue {
+    ranges: Vec<(u32, u32)>,
+    strings: Vec<(usize, usize, String)>,
+}
+
+fn unicode_set_class_value(class: &CharacterClass<'_>) -> Result<UnicodeSetValue, &'static str> {
+    let mut operands = Vec::with_capacity(class.body.len());
+    for content in &class.body {
+        operands.push(unicode_set_content_value(content)?);
+    }
+    let mut value = match class.kind {
+        CharacterClassContentsKind::Union => {
+            let mut value = UnicodeSetValue::default();
+            for mut operand in operands {
+                value.ranges.append(&mut operand.ranges);
+                value.strings.append(&mut operand.strings);
+            }
+            value.ranges = union(value.ranges);
+            value
+        }
+        CharacterClassContentsKind::Intersection | CharacterClassContentsKind::Subtraction => {
+            let mut operands = operands.into_iter();
+            let mut value = operands
+                .next()
+                .ok_or("regexp-unicode-sets-operation-not-implemented")?;
+            if !value.strings.is_empty() {
+                return Err("regexp-unicode-sets-operation-not-implemented");
+            }
+            for operand in operands {
+                if !operand.strings.is_empty() {
+                    return Err("regexp-unicode-sets-operation-not-implemented");
+                }
+                value.ranges = if class.kind == CharacterClassContentsKind::Intersection {
+                    intersect_ranges(&value.ranges, &operand.ranges)
+                } else {
+                    subtract_ranges(&value.ranges, &operand.ranges)
+                };
+            }
+            value
+        }
+    };
+    if class.negative {
+        if !value.strings.is_empty() {
+            return Err("regexp-unicode-sets-operation-not-implemented");
+        }
+        value.ranges = complement_ranges(&value.ranges);
+    }
+    Ok(value)
+}
+
+fn unicode_set_content_value(
+    content: &CharacterClassContents<'_>,
+) -> Result<UnicodeSetValue, &'static str> {
+    let mut value = UnicodeSetValue::default();
+    match content {
+        CharacterClassContents::CharacterClassRange(range) => {
+            value.ranges.push((range.min.value, range.max.value));
+        }
+        CharacterClassContents::CharacterClassEscape(escape) => {
+            value.ranges = character_class_escape_ranges(escape.kind);
+        }
+        CharacterClassContents::UnicodePropertyEscape(property) => {
+            if property.strings {
+                if property.negative {
+                    return Err("regexp-unicode-sets-operation-not-implemented");
+                }
+                let replacement = unicode_string_property_pattern(property.name.as_str())
+                    .ok_or("regexp-unicode-property-unsupported")?;
+                value.strings.push((usize::MAX, 0, replacement.to_owned()));
+            } else {
+                value.ranges = unicode_property_escape_ranges(property)?;
+            }
+        }
+        CharacterClassContents::Character(character) => {
+            value.ranges.push((character.value, character.value));
+        }
+        CharacterClassContents::NestedCharacterClass(class) => {
+            return unicode_set_class_value(class);
+        }
+        CharacterClassContents::ClassStringDisjunction(disjunction) => {
+            for (order, string) in disjunction.body.iter().enumerate() {
+                let mut rendered = String::new();
+                for character in &string.body {
+                    render_regexp_character(character.value, &mut rendered)?;
+                }
+                value.strings.push((string.body.len(), order, rendered));
+            }
+        }
+    }
+    value.ranges = union(value.ranges);
+    Ok(value)
+}
+
+fn render_unicode_set_value(mut value: UnicodeSetValue) -> Result<String, &'static str> {
+    value
+        .strings
+        .sort_by_key(|(length, order, _)| (std::cmp::Reverse(*length), *order));
+    let mut alternatives: Vec<String> = value
+        .strings
+        .into_iter()
+        .map(|(_, _, rendered)| rendered)
+        .collect();
+    if !value.ranges.is_empty() {
+        alternatives.push(render_ranges(&value.ranges, false));
+    }
+    match alternatives.as_slice() {
+        [] => Ok(render_ranges(&[], false)),
+        [only] => Ok(only.clone()),
+        _ => Ok(format!("(?:{})", alternatives.join("|"))),
+    }
+}
+
+fn render_regexp_character(value: u32, output: &mut String) -> Result<(), &'static str> {
+    let character = char::from_u32(value).ok_or("regexp-unicode-code-point-out-of-range")?;
+    if matches!(
+        character,
+        '.' | '*' | '+' | '?' | '(' | ')' | '[' | ']' | '{' | '}' | '^' | '$' | '/' | '|' | '\\'
+    ) {
+        output.push('\\');
+    }
+    output.push(character);
+    Ok(())
+}
+
+/// Compatibility lowering for Babel/regexpu's non-standard acceptance of a
+/// range as a direct set-algebra operand (for example `[a-z&&[^x]]`). Oxc's
+/// canonical parser rejects this ECMA-262 early error, so no AST exists to walk.
+fn lower_babel_range_operand_unicode_sets(pattern: &str) -> Result<String, &'static str> {
     let mut output = String::with_capacity(pattern.len());
     let bytes = pattern.as_bytes();
     let mut index = 0;
@@ -1520,110 +1691,340 @@ fn lower_dot_all(pattern: &str) -> String {
     output
 }
 
-fn lower_named_groups(
-    pattern: &str,
-) -> Result<(String, FxHashMap<String, Vec<usize>>), &'static str> {
-    let bytes = pattern.as_bytes();
-    let mut output = String::with_capacity(pattern.len());
-    // Named backreferences may precede their capturing group. Discover every
-    // capture number first, then perform the syntax rewrite in a second pass.
-    let groups = collect_named_groups(pattern)?;
-    let mut index = 0usize;
-    let mut in_class = false;
-    while index < bytes.len() {
-        if bytes[index] == b'\\' {
-            if bytes.get(index + 1) == Some(&b'k') && bytes.get(index + 2) == Some(&b'<') {
-                let end = pattern[index + 3..]
-                    .find('>')
-                    .map(|offset| index + 3 + offset)
-                    .ok_or("regexp-named-reference-shape-not-implemented")?;
-                let name = &pattern[index + 3..end];
-                let capture = groups
-                    .get(name)
-                    .ok_or("regexp-named-reference-shape-not-implemented")?;
-                for capture in capture {
-                    output.push('\\');
-                    output.push_str(&capture.to_string());
-                }
-                index = end + 1;
-                continue;
+type PatternEdit = (usize, usize, String);
+type NamedGroupMap = FxHashMap<String, Vec<usize>>;
+
+fn apply_pattern_edits(
+    source: &mut String,
+    mut edits: Vec<PatternEdit>,
+) -> Result<(), &'static str> {
+    edits.sort_unstable_by_key(|(start, end, _)| (*start, *end));
+    let mut next_start = source.len();
+    for (start, end, replacement) in edits.into_iter().rev() {
+        if start > end || end > next_start {
+            return Err("regexp-pattern-edits-overlap");
+        }
+        source.replace_range(start..end, &replacement);
+        next_start = start;
+    }
+    Ok(())
+}
+
+fn collect_named_group_edits(
+    source: &str,
+    pattern: &Pattern<'_>,
+) -> Result<(Vec<PatternEdit>, NamedGroupMap), &'static str> {
+    let mut collector = NamedGroupCollector::new(source, pattern.span.start);
+    collector.visit_disjunction(&pattern.body);
+    if let Some(error) = collector.error {
+        return Err(error);
+    }
+    let mut edits = collector.edits;
+    for reference in collector.references {
+        let indices = collector
+            .groups
+            .get(&reference.name)
+            .ok_or("regexp-named-reference-shape-not-implemented")?;
+        let replacement = indices.iter().map(|index| format!("\\{index}")).collect();
+        edits.push((reference.start, reference.end, replacement));
+    }
+    Ok((edits, collector.groups))
+}
+
+struct NamedReferenceEdit {
+    start: usize,
+    end: usize,
+    name: String,
+}
+
+struct NamedGroupCollector<'s> {
+    source: &'s str,
+    span_offset: u32,
+    capture_count: usize,
+    groups: FxHashMap<String, Vec<usize>>,
+    references: Vec<NamedReferenceEdit>,
+    edits: Vec<PatternEdit>,
+    error: Option<&'static str>,
+}
+
+impl<'s> NamedGroupCollector<'s> {
+    fn new(source: &'s str, span_offset: u32) -> Self {
+        Self {
+            source,
+            span_offset,
+            capture_count: 0,
+            groups: FxHashMap::default(),
+            references: Vec::new(),
+            edits: Vec::new(),
+            error: None,
+        }
+    }
+
+    fn relative_span(&self, span: oxc_span::Span) -> Result<(usize, usize), &'static str> {
+        let start = span
+            .start
+            .checked_sub(self.span_offset)
+            .ok_or("regexp-pattern-span-invalid")?;
+        let end = span
+            .end
+            .checked_sub(self.span_offset)
+            .ok_or("regexp-pattern-span-invalid")?;
+        Ok((start as usize, end as usize))
+    }
+
+    fn visit_disjunction(&mut self, disjunction: &Disjunction<'_>) {
+        for alternative in &disjunction.body {
+            for term in &alternative.body {
+                self.visit_term(term);
             }
-            let escaped_len = pattern[index + 1..]
-                .chars()
-                .next()
-                .map_or(0, char::len_utf8);
-            let end = (index + 1 + escaped_len).min(bytes.len());
-            output.push_str(&pattern[index..end]);
-            index = end;
-            continue;
         }
-        if bytes[index] == b'[' {
-            in_class = true;
-        } else if bytes[index] == b']' {
-            in_class = false;
-        } else if bytes[index] == b'('
-            && !in_class
-            && bytes.get(index + 1) == Some(&b'?')
-            && bytes.get(index + 2) == Some(&b'<')
-            && !matches!(bytes.get(index + 3), Some(b'=') | Some(b'!'))
+    }
+
+    fn visit_term(&mut self, term: &Term<'_>) {
+        match term {
+            Term::LookAroundAssertion(assertion) => self.visit_disjunction(&assertion.body),
+            Term::Quantifier(quantifier) => self.visit_term(&quantifier.body),
+            Term::CapturingGroup(group) => self.visit_capturing_group(group),
+            Term::IgnoreGroup(group) => self.visit_disjunction(&group.body),
+            Term::NamedReference(reference) => self.visit_named_reference(reference),
+            Term::BoundaryAssertion(_)
+            | Term::Character(_)
+            | Term::Dot(_)
+            | Term::CharacterClassEscape(_)
+            | Term::UnicodePropertyEscape(_)
+            | Term::CharacterClass(_)
+            | Term::IndexedReference(_) => {}
+        }
+    }
+
+    fn visit_capturing_group(&mut self, group: &CapturingGroup<'_>) {
+        self.capture_count += 1;
+        if let Some(name) = &group.name {
+            self.groups
+                .entry(normalize_regexp_group_name(name.as_str()))
+                .or_default()
+                .push(self.capture_count);
+            if self.error.is_none() {
+                match self.relative_span(group.span) {
+                    Ok((start, end)) => {
+                        if let Some(offset) = self.source[start + 3..end].find('>') {
+                            let prefix_end = start + 3 + offset + 1;
+                            self.edits.push((start, prefix_end, "(".to_owned()));
+                        } else {
+                            self.error = Some("regexp-named-group-shape-not-implemented");
+                        }
+                    }
+                    Err(error) => self.error = Some(error),
+                }
+            }
+        }
+        self.visit_disjunction(&group.body);
+    }
+
+    fn visit_named_reference(&mut self, reference: &NamedReference<'_>) {
+        if let Ok((start, end)) = self.relative_span(reference.span) {
+            self.references.push(NamedReferenceEdit {
+                start,
+                end,
+                name: normalize_regexp_group_name(reference.name.as_str()),
+            });
+        } else {
+            self.error = Some("regexp-pattern-span-invalid");
+        }
+    }
+}
+
+fn normalize_regexp_group_name(name: &str) -> String {
+    let mut output = String::with_capacity(name.len());
+    let mut index = 0;
+    while index < name.len() {
+        let remainder = &name[index..];
+        if let Some(hex) = remainder.strip_prefix("\\u{")
+            && let Some(end) = hex.find('}')
+            && let Ok(value) = u32::from_str_radix(&hex[..end], 16)
+            && let Some(character) = char::from_u32(value)
         {
-            let end = pattern[index + 3..]
-                .find('>')
-                .map(|offset| index + 3 + offset)
-                .ok_or("regexp-named-group-shape-not-implemented")?;
-            output.push('(');
-            index = end + 1;
+            output.push(character);
+            index += 3 + end + 1;
             continue;
         }
-        let character = pattern[index..].chars().next().unwrap();
+        if let Some(hex) = remainder.strip_prefix("\\u")
+            && hex.len() >= 4
+            && let Ok(value) = u32::from_str_radix(&hex[..4], 16)
+            && let Some(character) = char::from_u32(value)
+        {
+            output.push(character);
+            index += 6;
+            continue;
+        }
+        let character = remainder.chars().next().unwrap();
         output.push(character);
         index += character.len_utf8();
     }
-    Ok((output, groups))
+    output
 }
 
-fn collect_named_groups(pattern: &str) -> Result<FxHashMap<String, Vec<usize>>, &'static str> {
-    let bytes = pattern.as_bytes();
-    let mut groups: FxHashMap<String, Vec<usize>> = FxHashMap::default();
-    let mut capture_count = 0usize;
-    let mut index = 0usize;
-    let mut in_class = false;
-    while index < bytes.len() {
-        if bytes[index] == b'\\' {
-            let escaped_len = pattern[index + 1..]
-                .chars()
-                .next()
-                .map_or(0, char::len_utf8);
-            index = (index + 1 + escaped_len).min(bytes.len());
-            continue;
-        }
-        match bytes[index] {
-            b'[' => in_class = true,
-            b']' => in_class = false,
-            b'(' if !in_class => {
-                if bytes.get(index + 1) != Some(&b'?') {
-                    capture_count += 1;
-                } else if bytes.get(index + 2) == Some(&b'<')
-                    && !matches!(bytes.get(index + 3), Some(b'=') | Some(b'!'))
-                {
-                    let end = pattern[index + 3..]
-                        .find('>')
-                        .map(|offset| index + 3 + offset)
-                        .ok_or("regexp-named-group-shape-not-implemented")?;
-                    let name = &pattern[index + 3..end];
-                    capture_count += 1;
-                    groups
-                        .entry(name.to_owned())
-                        .or_default()
-                        .push(capture_count);
-                    index = end + 1;
-                    continue;
-                }
-            }
-            _ => {}
-        }
-        let character = pattern[index..].chars().next().unwrap();
-        index += character.len_utf8();
+fn collect_unicode_property_edits(
+    pattern: &Pattern<'_>,
+    surrogate_pairs: bool,
+) -> Result<Vec<PatternEdit>, &'static str> {
+    let mut collector = UnicodePropertyEditCollector {
+        span_offset: pattern.span.start,
+        surrogate_pairs,
+        edits: Vec::new(),
+        error: None,
+    };
+    collector.visit_pattern(pattern);
+    collector.error.map_or(Ok(collector.edits), Err)
+}
+
+struct UnicodePropertyEditCollector {
+    span_offset: u32,
+    surrogate_pairs: bool,
+    edits: Vec<PatternEdit>,
+    error: Option<&'static str>,
+}
+
+impl UnicodePropertyEditCollector {
+    fn relative_span(&self, span: oxc_span::Span) -> Result<(usize, usize), &'static str> {
+        let start = span
+            .start
+            .checked_sub(self.span_offset)
+            .ok_or("regexp-pattern-span-invalid")?;
+        let end = span
+            .end
+            .checked_sub(self.span_offset)
+            .ok_or("regexp-pattern-span-invalid")?;
+        Ok((start as usize, end as usize))
     }
-    Ok(groups)
+
+    fn push_edit(&mut self, span: oxc_span::Span, replacement: String) {
+        match self.relative_span(span) {
+            Ok((start, end)) => self.edits.push((start, end, replacement)),
+            Err(error) => self.error = Some(error),
+        }
+    }
+}
+
+impl<'a> RegExpVisit<'a> for UnicodePropertyEditCollector {
+    fn visit_character_class(&mut self, class: &CharacterClass<'a>) {
+        if self.error.is_some() {
+            return;
+        }
+        if character_class_has_unicode_property(class) {
+            match character_class_ranges(class) {
+                Ok(ranges) => {
+                    let ranges = if class.negative {
+                        complement_ranges(&ranges)
+                    } else {
+                        ranges
+                    };
+                    self.push_edit(class.span, render_ranges(&ranges, self.surrogate_pairs));
+                }
+                Err(error) => self.error = Some(error),
+            }
+        } else {
+            walk::walk_character_class(self, class);
+        }
+    }
+
+    fn visit_unicode_property_escape(&mut self, property: &UnicodePropertyEscape<'a>) {
+        if self.error.is_some() {
+            return;
+        }
+        match unicode_property_escape_ranges(property) {
+            Ok(ranges) => {
+                self.push_edit(property.span, render_ranges(&ranges, self.surrogate_pairs));
+            }
+            Err(error) => self.error = Some(error),
+        }
+    }
+}
+
+fn character_class_has_unicode_property(class: &CharacterClass<'_>) -> bool {
+    class.body.iter().any(|content| match content {
+        CharacterClassContents::UnicodePropertyEscape(_) => true,
+        CharacterClassContents::NestedCharacterClass(class) => {
+            character_class_has_unicode_property(class)
+        }
+        _ => false,
+    })
+}
+
+fn character_class_ranges(class: &CharacterClass<'_>) -> Result<Vec<(u32, u32)>, &'static str> {
+    if class.kind != CharacterClassContentsKind::Union || class.strings {
+        return Err("regexp-unicode-property-class-range-not-implemented");
+    }
+    let mut ranges = Vec::new();
+    for content in &class.body {
+        match content {
+            CharacterClassContents::CharacterClassRange(range) => {
+                ranges.push((range.min.value, range.max.value));
+            }
+            CharacterClassContents::CharacterClassEscape(escape) => {
+                ranges.extend(character_class_escape_ranges(escape.kind));
+            }
+            CharacterClassContents::UnicodePropertyEscape(property) => {
+                ranges.extend(unicode_property_escape_ranges(property)?);
+            }
+            CharacterClassContents::Character(character) => {
+                ranges.push((character.value, character.value));
+            }
+            CharacterClassContents::NestedCharacterClass(_)
+            | CharacterClassContents::ClassStringDisjunction(_) => {
+                return Err("regexp-unicode-property-class-range-not-implemented");
+            }
+        }
+    }
+    Ok(union(ranges))
+}
+
+fn unicode_property_escape_ranges(
+    property: &UnicodePropertyEscape<'_>,
+) -> Result<Vec<(u32, u32)>, &'static str> {
+    if property.strings {
+        return Err("regexp-unicode-property-class-range-not-implemented");
+    }
+    let normalized = property.value.as_ref().map_or_else(
+        || property.name.to_string(),
+        |value| format!("{}:{value}", property.name),
+    );
+    unicode_property_ranges(&normalized, property.negative)
+}
+
+fn character_class_escape_ranges(kind: CharacterClassEscapeKind) -> Vec<(u32, u32)> {
+    let (ranges, negative) = match kind {
+        CharacterClassEscapeKind::D => (vec![(0x30, 0x39)], false),
+        CharacterClassEscapeKind::NegativeD => (vec![(0x30, 0x39)], true),
+        CharacterClassEscapeKind::W => (
+            vec![(0x30, 0x39), (0x41, 0x5A), (0x5F, 0x5F), (0x61, 0x7A)],
+            false,
+        ),
+        CharacterClassEscapeKind::NegativeW => (
+            vec![(0x30, 0x39), (0x41, 0x5A), (0x5F, 0x5F), (0x61, 0x7A)],
+            true,
+        ),
+        CharacterClassEscapeKind::S => (whitespace_ranges(), false),
+        CharacterClassEscapeKind::NegativeS => (whitespace_ranges(), true),
+    };
+    if negative {
+        complement_ranges(&ranges)
+    } else {
+        ranges
+    }
+}
+
+fn whitespace_ranges() -> Vec<(u32, u32)> {
+    vec![
+        (0x09, 0x0D),
+        (0x20, 0x20),
+        (0xA0, 0xA0),
+        (0x1680, 0x1680),
+        (0x2000, 0x200A),
+        (0x2028, 0x2029),
+        (0x202F, 0x202F),
+        (0x205F, 0x205F),
+        (0x3000, 0x3000),
+        (0xFEFF, 0xFEFF),
+    ]
 }

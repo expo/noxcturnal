@@ -50,6 +50,7 @@ oxc_codegen = "=0.141.0"
 oxc_ecmascript = "=0.141.0"
 oxc_parser = "=0.141.0"
 oxc_react_compiler = { version = "=0.141.0", optional = true }
+oxc_regular_expression = "=0.141.0"
 oxc_semantic = "=0.141.0"
 # `oxc_sourcemap` has an independent release train; this is the version declared
 # by `oxc_codegen` 0.141.0.

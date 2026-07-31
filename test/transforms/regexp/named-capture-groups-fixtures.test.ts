@@ -1306,7 +1306,7 @@ test('syntax/escape-no-unicode-flag/input.js', async () => {
         return { wrapRegExp: _('wrapRegExp') };
       })(),
       _wrapRegExp = _wrapRegExp2.wrapRegExp;
-    _wrapRegExp(/()\\1/, { '\\\\u{41}': 1 });"
+    _wrapRegExp(/()\\1/, { A: 1 });"
   `);
 });
 
@@ -1461,7 +1461,7 @@ test('syntax/escape-unicode-flag/input.js', async () => {
         return { wrapRegExp: _('wrapRegExp') };
       })(),
       _wrapRegExp = _wrapRegExp2.wrapRegExp;
-    _wrapRegExp(/()\\1/u, { '\\\\u{41}': 1 });"
+    _wrapRegExp(/()\\1/u, { A: 1 });"
   `);
 });
 

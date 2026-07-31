@@ -43,3 +43,16 @@ test('lowers duplicate named groups in parser-approved alternatives', async () =
     export const matcher = _wrapRegExp(/(?:(a)|(b))\\1\\2/, { word: [1, 2] });"
   `);
 });
+
+test('uses structural spans for escaped syntax, lookbehind, nesting, and Unicode names', async () => {
+  const output = await transformSource(
+    String.raw`export const matcher = /(?<=\[)(?:(?<\u0061>a)|(?<deep>(?:b\.|c\\)+))\k<\u0061>\k<deep>\]/;`,
+    'input.js',
+    {
+      helpers: runtimeHelpers,
+      transforms: { regexpNamedCaptureGroups: true },
+    },
+  );
+  expect(output).toContain(String.raw`/(?<=\[)(?:(a)|((?:b\.|c\\)+))\1\2\]/`);
+  expect(output).toMatch(/\{\s+a: 1,\s+deep: 2,?\s+\}/u);
+});
