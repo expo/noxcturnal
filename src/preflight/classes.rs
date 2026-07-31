@@ -672,13 +672,13 @@ fn direct_class_variable<'a>(
     let mut declarations = ArenaVec::new_in(ast);
     declarations.push(ast.variable_declarator(
         span,
-        VariableDeclarationKind::Var,
+        VariableDeclarationKind::Let,
         ast.binding_pattern_binding_identifier(span, ast.allocator.alloc_str(name)),
         None::<ArenaBox<'a, TSTypeAnnotation<'a>>>,
         Some(expression),
         false,
     ));
-    ast.alloc_variable_declaration(span, VariableDeclarationKind::Var, declarations, false)
+    ast.alloc_variable_declaration(span, VariableDeclarationKind::Let, declarations, false)
 }
 
 #[expect(deprecated)]
@@ -2297,6 +2297,44 @@ fn derived_inheritance_statements<'a>(
         ),
     );
     let mut statements = ArenaVec::new_in(ast);
+    let invalid_super = ast.expression_logical(
+        anchor,
+        ast.expression_binary(
+            anchor,
+            super_reference(),
+            oxc_syntax::operator::BinaryOperator::StrictInequality,
+            ast.expression_null_literal(anchor),
+        ),
+        oxc_syntax::operator::LogicalOperator::And,
+        ast.expression_binary(
+            anchor,
+            ast.expression_unary(
+                anchor,
+                oxc_syntax::operator::UnaryOperator::Typeof,
+                super_reference(),
+            ),
+            oxc_syntax::operator::BinaryOperator::StrictInequality,
+            ast.expression_string_literal(anchor, "function", None),
+        ),
+    );
+    let mut error_arguments = ArenaVec::new_in(ast);
+    error_arguments.push(Argument::from(ast.expression_string_literal(
+        anchor,
+        "Super expression must either be null or a function",
+        None,
+    )));
+    let invalid_super_error = ast.expression_new(
+        anchor,
+        ast.expression_identifier(anchor, "TypeError"),
+        None::<ArenaBox<'a, TSTypeParameterInstantiation<'a>>>,
+        error_arguments,
+    );
+    statements.push(ast.statement_if(
+        anchor,
+        invalid_super,
+        ast.statement_throw(anchor, invalid_super_error),
+        None,
+    ));
     statements.push(ast.statement_if(anchor, set_prototype_of(), set_statement, Some(fallback)));
 
     let super_prototype = Expression::from(ast.member_expression_static(
@@ -2378,41 +2416,6 @@ struct PrivateAccessorPlan<'a> {
     get: Option<ArenaBox<'a, Function<'a>>>,
     set: Option<ArenaBox<'a, Function<'a>>>,
     span: Span,
-}
-
-struct ExpressionIdentifierInliner<'a, 'p> {
-    allocator: &'a Allocator,
-    name: &'p str,
-    replacement: &'p Expression<'a>,
-    preserved_call_name: Option<&'p str>,
-}
-
-impl<'a> VisitMut<'a> for ExpressionIdentifierInliner<'a, '_> {
-    fn visit_expression(&mut self, expression: &mut Expression<'a>) {
-        if matches!(
-            expression,
-            Expression::Identifier(identifier) if identifier.name == self.name
-        ) {
-            *expression = self.replacement.clone_in(self.allocator);
-        } else {
-            walk_mut::walk_expression(self, expression);
-        }
-    }
-
-    fn visit_call_expression(&mut self, call: &mut oxc_ast::ast::CallExpression<'a>) {
-        if self.preserved_call_name.is_some_and(|name| {
-            matches!(
-                &call.callee,
-                Expression::Identifier(identifier) if identifier.name == name
-            )
-        }) {
-            for argument in &mut call.arguments {
-                self.visit_argument(argument);
-            }
-        } else {
-            walk_mut::walk_call_expression(self, call);
-        }
-    }
 }
 
 #[expect(deprecated)]
@@ -2763,6 +2766,20 @@ fn lower_simple_class<'a>(
     }
     let mut wrapper_parameters = ArenaVec::new_in(&ast);
     let mut wrapper_arguments = ArenaVec::new_in(&ast);
+    if let (Some(super_name), Some(super_class)) = (super_name, super_class) {
+        wrapper_parameters.push(ast.formal_parameter(
+            anchor,
+            ArenaVec::new_in(&ast),
+            ast.binding_pattern_binding_identifier(anchor, allocator.alloc_str(super_name)),
+            None::<ArenaBox<'a, TSTypeAnnotation<'a>>>,
+            None::<ArenaBox<'a, Expression<'a>>>,
+            false,
+            None,
+            false,
+            false,
+        ));
+        wrapper_arguments.push(Argument::from(super_class));
+    }
     for (binding, key, span) in computed_key_initializers {
         wrapper_parameters.push(ast.formal_parameter(
             span,
@@ -2781,7 +2798,24 @@ fn lower_simple_class<'a>(
         wrapper_arguments.push(Argument::from(key));
     }
     debug_assert!(!needs_assertion);
-    wrapper_statements.push(Statement::FunctionDeclaration(constructor));
+    constructor.r#type = FunctionType::FunctionExpression;
+    let mut constructor_declarations = ArenaVec::new_in(&ast);
+    constructor_declarations.push(ast.variable_declarator(
+        anchor,
+        VariableDeclarationKind::Const,
+        ast.binding_pattern_binding_identifier(anchor, allocator.alloc_str(name)),
+        None::<ArenaBox<'a, TSTypeAnnotation<'a>>>,
+        Some(Expression::FunctionExpression(constructor)),
+        false,
+    ));
+    wrapper_statements.push(Statement::VariableDeclaration(
+        ast.alloc_variable_declaration(
+            anchor,
+            VariableDeclarationKind::Const,
+            constructor_declarations,
+            false,
+        ),
+    ));
     let after_constructor = wrapper_statements.len();
     for method in methods {
         let method_name =
@@ -2921,17 +2955,6 @@ fn lower_simple_class<'a>(
         anchor,
         Some(ast.expression_identifier(anchor, allocator.alloc_str(name))),
     ));
-    if let (Some(super_name), Some(super_class)) = (super_name, super_class.as_ref()) {
-        let mut inliner = ExpressionIdentifierInliner {
-            allocator,
-            name: super_name,
-            replacement: super_class,
-            preserved_call_name: plan.super_call_name.as_deref(),
-        };
-        for statement in &mut wrapper_statements {
-            inliner.visit_statement(statement);
-        }
-    }
     let mut wrapper_directives = ArenaVec::new_in(&ast);
     wrapper_directives.push(ast.directive(
         anchor,

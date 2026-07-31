@@ -35,7 +35,7 @@ pub(super) struct AstPlan {
 }
 
 struct AstFunctionPlan {
-    boundary: usize,
+    length_placeholders: Vec<String>,
     anchor: Span,
     wrapper: bool,
     wrapper_arguments: Vec<String>,
@@ -149,11 +149,14 @@ pub(super) fn prepare_ast(source: &str, semantic: &Semantic<'_>) -> Result<AstPl
                         array,
                     }
                 });
+                let length_placeholders = (0..boundary)
+                    .map(|_| reserve_name("_arg", &mut reserved))
+                    .collect();
                 functions
                     .entry(function.span.start)
                     .or_default()
                     .push(AstFunctionPlan {
-                        boundary,
+                        length_placeholders,
                         anchor: body.span,
                         wrapper,
                         wrapper_arguments,
@@ -391,31 +394,10 @@ impl<'a> OrdinaryParameterLowerer<'a> {
         };
         let length = self.id(anchor, &length_name);
         let key = self.id(anchor, &key_name);
-        let length_gt_index = ast.expression_binary(
-            anchor,
-            length.clone_in(self.allocator),
-            BinaryOperator::GreaterThan,
-            self.number(anchor, index),
-        );
-        let array_length = ast.expression_conditional(
-            anchor,
-            length_gt_index,
-            ast.expression_binary(
-                anchor,
-                length.clone_in(self.allocator),
-                BinaryOperator::Subtraction,
-                self.number(anchor, index),
-            ),
-            self.number(anchor, 0),
-        );
-        let mut new_arguments = ArenaVec::new_in(&ast);
-        new_arguments.push(Argument::from(array_length));
-        let array = ast.expression_new(
-            anchor,
-            self.id(anchor, "Array"),
-            None::<ArenaBox<'a, TSTypeParameterInstantiation<'a>>>,
-            new_arguments,
-        );
+        // Rest arrays are created from the current realm's intrinsic Array,
+        // independent of any lexical or global binding named `Array`. An array
+        // literal preserves that behavior; `new Array(...)` does not.
+        let array = ast.expression_array(anchor, ArenaVec::new_in(&ast));
         let mut declarations = ArenaVec::new_in(&ast);
         declarations.push(ast.variable_declarator(
             anchor,
@@ -799,6 +781,7 @@ impl<'a> VisitMut<'a> for OrdinaryParameterLowerer<'a> {
         walk_mut::walk_expression(self, expression);
     }
 
+    #[expect(deprecated)]
     fn visit_function(
         &mut self,
         function: &mut Function<'a>,
@@ -843,21 +826,32 @@ impl<'a> VisitMut<'a> for OrdinaryParameterLowerer<'a> {
                 return;
             }
             let mut parameters = ArenaVec::new_in(&self.allocator);
-            parameters.extend(function.params.items.drain(plan.boundary..));
+            parameters.extend(function.params.items.drain(..));
+            for placeholder in &plan.length_placeholders {
+                function.params.items.push(self.ast().formal_parameter(
+                    plan.anchor,
+                    ArenaVec::new_in(&self.allocator),
+                    self.ast().binding_pattern_binding_identifier(
+                        plan.anchor,
+                        self.allocator.alloc_str(placeholder),
+                    ),
+                    None::<ArenaBox<'a, TSTypeAnnotation<'a>>>,
+                    None::<ArenaBox<'a, Expression<'a>>>,
+                    false,
+                    None,
+                    false,
+                    false,
+                ));
+            }
             let rest = function.params.rest.take().map(ArenaBox::unbox);
-            let mut prologue = match self.parameter_prologue(
-                parameters,
-                rest,
-                plan.boundary,
-                plan.rest_names,
-                plan.anchor,
-            ) {
-                Ok(statements) => statements,
-                Err(error) => {
-                    self.error = Some(error);
-                    return;
-                }
-            };
+            let mut prologue =
+                match self.parameter_prologue(parameters, rest, 0, plan.rest_names, plan.anchor) {
+                    Ok(statements) => statements,
+                    Err(error) => {
+                        self.error = Some(error);
+                        return;
+                    }
+                };
             if plan.wrapper {
                 if !plan.captures.is_empty() {
                     let mut capture_rewriter = CaptureRewriter {
