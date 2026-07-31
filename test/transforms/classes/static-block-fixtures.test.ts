@@ -314,7 +314,15 @@ test('class-static-block/name-conflict/input.js', async () => {
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-spec-private-features-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
+    var _Foo;
+    class Foo {}
+    _Foo = Foo;
+    function _() {}
+    _Foo.foo = _assertClassBrand(_Foo, _Foo, _);
+    expect(Foo.foo).toBe(42);"
+  `);
 });
 
 test('class-static-block/new-target/exec.js', async () => {
@@ -870,7 +878,15 @@ test('integration-loose/private-in/exec.js', async () => {
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-spec-private-features-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _checkInRHS = require('@babel/runtime/helpers/checkInRHS');
+    var _Foo;
+    class Foo {}
+    _Foo = Foo;
+    var _bar = { _: 21 };
+    _Foo.foo = _checkInRHS(_Foo) === _Foo;
+    expect(Foo.foo).toBe(true);"
+  `);
 });
 
 test('integration-loose/private-methods-access/exec.js', async () => {
@@ -886,7 +902,18 @@ test('integration-loose/private-methods-access/exec.js', async () => {
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-spec-private-features-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
+    var _Foo;
+    let getFoo;
+    class Foo {}
+    _Foo = Foo;
+    function _foo() {
+      return 42;
+    }
+    getFoo = () => _assertClassBrand(_Foo, _Foo, _foo).call(_Foo);
+    expect(getFoo()).toBe(42);"
+  `);
 });
 
 test('integration-loose/super-property/exec.js', async () => {
@@ -1301,7 +1328,15 @@ test('integration/private-in/exec.js', async () => {
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-spec-private-features-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _checkInRHS = require('@babel/runtime/helpers/checkInRHS');
+    var _Foo;
+    class Foo {}
+    _Foo = Foo;
+    var _bar = { _: 21 };
+    _Foo.foo = _checkInRHS(_Foo) === _Foo;
+    expect(Foo.foo).toBe(true);"
+  `);
 });
 
 test('integration/private-methods-access/exec.js', async () => {
@@ -1317,7 +1352,18 @@ test('integration/private-methods-access/exec.js', async () => {
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-spec-private-features-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
+    var _Foo;
+    let getFoo;
+    class Foo {}
+    _Foo = Foo;
+    function _foo() {
+      return 42;
+    }
+    getFoo = () => _assertClassBrand(_Foo, _Foo, _foo).call(_Foo);
+    expect(getFoo()).toBe(42);"
+  `);
 });
 
 test('integration/super-property/exec.js', async () => {

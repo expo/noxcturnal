@@ -91,6 +91,21 @@ test('retains a default-exported function declaration', async () => {
   `);
 });
 
+test('retains function-valued bindings exported through specifiers', async () => {
+  const source = `
+const named = () => 1;
+const defaultValue = function () { return 2; };
+export { named, defaultValue as default };
+`;
+  expect(await transformSource(source, 'input.js', options)).toMatchInlineSnapshot(`
+    "const named = () => 1;
+    const defaultValue = function () {
+      return 2;
+    };
+    export { named, defaultValue as default };"
+  `);
+});
+
 test('retains functions referenced from top-level expressions', async () => {
   const source = `
 function invoked() { return 1; }
@@ -126,5 +141,29 @@ export const value = 1;
 `;
   expect(await transformSource(source, 'input.js', options)).toMatchInlineSnapshot(
     `"export const value = 1;"`,
+  );
+});
+
+test('retains function bindings when direct eval can observe them', async () => {
+  const source = `
+function inspect() {
+  const hidden = () => 42;
+  return eval('hidden()');
+}
+export { inspect };
+`;
+  expect(await transformSource(source, 'input.js', options)).toMatchInlineSnapshot(`
+    "function inspect() {
+      const hidden = () => 42;
+      return eval('hidden()');
+    }
+    export { inspect };"
+  `);
+});
+
+test('does not empty variable declarations used as for initializers', async () => {
+  const source = `for (let unused = () => 1; condition(); update()) work();`;
+  expect(await transformSource(source, 'input.js', options)).toMatchInlineSnapshot(
+    `"for (let unused = () => 1; condition(); update()) work();"`,
   );
 });

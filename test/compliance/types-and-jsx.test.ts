@@ -72,6 +72,44 @@ test('classic JSX preserves prop, spread, child, and fragment semantics', () => 
   });
 });
 
+test('classic JSX spread uses Babel assignment semantics for __proto__', () => {
+  const React = {
+    createElement(_type: unknown, props: object) {
+      return {
+        hasOwnProto: Object.hasOwn(props, '__proto__'),
+        polluted: (Object.getPrototypeOf(props) as { polluted?: boolean }).polluted,
+      };
+    },
+  };
+  const result = execute<{ result: unknown }>(
+    `const source = {};
+Object.defineProperty(source, '__proto__', {
+  value: { polluted: true },
+  enumerable: true,
+});
+globalThis.result = <Widget marker {...source} />;`,
+    { jsx: 'classic' },
+    { React, Widget: 'Widget' },
+    'input.jsx',
+  );
+  expect(result.result).toEqual({ hasOwnProto: false, polluted: true });
+});
+
+test('JSX namespaces become string tag and attribute names when explicitly allowed', () => {
+  const React = {
+    createElement(type: unknown, props: unknown) {
+      return { type, props };
+    },
+  };
+  const result = execute<{ result: unknown }>(
+    `globalThis.result = <f:image n:attr="value" />;`,
+    { jsx: 'classic', jsxThrowIfNamespace: false },
+    { React },
+    'input.jsx',
+  );
+  expect(result.result).toEqual({ type: 'f:image', props: { 'n:attr': 'value' } });
+});
+
 test('export-namespace-from preserves a live namespace object', async () => {
   const dependency = `data:text/javascript,export%20let%20value=1;export%20const%20set=next=>value=next`;
   const module = await executeModule(`export * as dependency from ${JSON.stringify(dependency)};`, {
@@ -178,6 +216,34 @@ test('automatic JSX preserves key, props, and child semantics', async () => {
         { type: 'Item', props: { value: 2 } },
       ],
     },
+  });
+});
+
+test('automatic JSX preserves Babel key/spread evaluation and createElement fallback', async () => {
+  const jsxRuntimeUrl =
+    'data:text/javascript,export%20function%20jsx(type,props,key)%7Breturn%20%7Btype,props,key%7D%7D';
+  const reactUrl =
+    'data:text/javascript,export%20function%20createElement(type,props)%7Bconst%20%7Bkey,...rest%7D=props;return%20%7Btype,props:rest,key%7D%7D';
+  const code = compile(
+    `
+      const calls = [];
+      const Item = 'Item';
+      const readKey = name => (calls.push('key:' + name), name);
+      const readProps = name => (calls.push('spread:' + name), { value: name });
+      export const before = <Item key={readKey('before')} {...readProps('before')} />;
+      export const after = <Item {...readProps('after')} key={readKey('after')} />;
+      export { calls };
+    `,
+    { jsx: 'automatic', jsxImportSource: 'react' },
+    'input.jsx',
+  )
+    .replace(/(['"])react\/jsx-runtime\1/, JSON.stringify(jsxRuntimeUrl))
+    .replace(/(['"])react\1/, JSON.stringify(reactUrl));
+  const module = await importCode(code);
+  expect(module).toMatchObject({
+    before: { type: 'Item', props: { value: 'before' }, key: 'before' },
+    after: { type: 'Item', props: { value: 'after' }, key: 'after' },
+    calls: ['spread:before', 'key:before', 'spread:after', 'key:after'],
   });
 });
 

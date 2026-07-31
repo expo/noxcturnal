@@ -9,23 +9,32 @@ test('lowers private property checks', async () => {
       transforms: { privatePropertyInObject: { loose: true } },
     }),
   ).toMatchInlineSnapshot(`
-    "export var Counter = (() => {
+    "export let Counter = (() => {
       'use strict';
       var _value = '__private_Counter_value';
-      function Counter() {
-        if (!(this instanceof Counter)) throw new TypeError('Cannot call a class as a function');
+      const Counter = function Counter() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
         Object.defineProperty(this, _value, {
           writable: true,
           value: void 0,
         });
-      }
+      };
       Object.defineProperty(Counter.prototype, 'has', {
-        value: function (input) {
-          return Object.prototype.hasOwnProperty.call(input, _value);
-        },
+        value: Object.defineProperty(
+          function (input) {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            return Object.prototype.hasOwnProperty.call(input, _value);
+          },
+          'name',
+          {
+            value: 'has',
+            configurable: true,
+          },
+        ),
         writable: true,
         configurable: true,
       });
+      Object.defineProperty(Counter, 'prototype', { writable: false });
       return Counter;
     })();"
   `);

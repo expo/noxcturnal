@@ -73,70 +73,85 @@ test('composes the native portion of the legacy Hermes language profile in one p
     export var Reader = (() => {
       'use strict';
       var _value = \`__private_Reader_value\`;
-      function Reader() {
-        if (!(this instanceof Reader)) throw new TypeError(\`Cannot call a class as a function\`);
+      var _Reader = function _Reader() {
+        if (!new.target) throw new TypeError(\`Cannot call a class as a function\`);
         Object.defineProperty(this, _value, { writable: true, value: 1 });
-      }
-      Object.defineProperty(Reader.prototype, 'has', {
-        value: function (input) {
-          return Object.prototype.hasOwnProperty.call(input, _value);
-        },
+      };
+      Object.defineProperty(_Reader.prototype, 'has', {
+        value: Object.defineProperty(
+          function (input) {
+            if (new.target) throw new TypeError(\`Class methods cannot be invoked with 'new'\`);
+            return Object.prototype.hasOwnProperty.call(input, _value);
+          },
+          'name',
+          { value: \`has\`, configurable: true },
+        ),
         writable: true,
         configurable: true,
       });
-      Object.defineProperty(Reader.prototype, 'read', {
-        value: _asyncToGenerator(function* () {
-          var _ref = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : {},
-            _obj = _objectDestructuringEmpty(_ref),
-            _value17 = _obj.value,
-            value = _value17 === void 0 ? _classPrivateFieldLooseBase(this, _value)[_value] : _value17;
-          return yield value;
-        }),
+      Object.defineProperty(_Reader.prototype, 'read', {
+        value: Object.defineProperty(
+          _asyncToGenerator(function* () {
+            var _ref = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : {},
+              _obj = _objectDestructuringEmpty(_ref),
+              _value17 = _obj.value,
+              value =
+                _value17 === void 0 ? _classPrivateFieldLooseBase(this, _value)[_value] : _value17;
+            return yield value;
+          }),
+          'name',
+          { value: \`read\`, configurable: true },
+        ),
         writable: true,
         configurable: true,
       });
-      Object.defineProperty(Reader.prototype, 'values', {
-        value: (function () {
-          var _ref2 = _wrapAsyncGenerator(function* (items) {
-            var _iteratorAbruptCompletion = false;
-            var _didIteratorError = false;
-            var _iteratorError;
-            try {
-              for (
-                var _iterator = _asyncIterator(items), _step;
-                (_iteratorAbruptCompletion = !(_step = yield _awaitAsyncGenerator(_iterator.next()))
-                  .done);
-                _iteratorAbruptCompletion = false
-              ) {
-                var item = _step.value;
-                yield item;
-              }
-            } catch (err) {
-              _didIteratorError = true;
-              _iteratorError = err;
-            } finally {
+      Object.defineProperty(_Reader.prototype, 'values', {
+        value: Object.defineProperty(
+          (function () {
+            var _ref2 = _wrapAsyncGenerator(function* (items) {
+              var _iteratorAbruptCompletion = false;
+              var _didIteratorError = false;
+              var _iteratorError;
               try {
-                if (_iteratorAbruptCompletion && _iterator.return != null) {
-                  yield _awaitAsyncGenerator(_iterator.return());
+                for (
+                  var _iterator = _asyncIterator(items), _step;
+                  (_iteratorAbruptCompletion = !(_step = yield _awaitAsyncGenerator(_iterator.next()))
+                    .done);
+                  _iteratorAbruptCompletion = false
+                ) {
+                  var item = _step.value;
+                  yield item;
                 }
+              } catch (err) {
+                _didIteratorError = true;
+                _iteratorError = err;
               } finally {
-                if (_didIteratorError) {
-                  throw _iteratorError;
+                try {
+                  if (_iteratorAbruptCompletion && _iterator.return != null) {
+                    yield _awaitAsyncGenerator(_iterator.return());
+                  }
+                } finally {
+                  if (_didIteratorError) {
+                    throw _iteratorError;
+                  }
                 }
               }
-            }
-          });
-          return function value(_x) {
-            return _ref2.apply(this, arguments);
-          };
-        })(),
+            });
+            return function (_x) {
+              return _ref2.apply(this, arguments);
+            };
+          })(),
+          'name',
+          { value: \`values\`, configurable: true },
+        ),
         writable: true,
         configurable: true,
       });
+      Object.defineProperty(_Reader, 'prototype', { writable: false });
       (function () {
         this.pattern = _wrapRegExp(/(\\w+)/, { word: 1 });
-      }).call(Reader);
-      return Reader;
+      }).call(_Reader);
+      return _Reader;
     })();"
   `);
 });
@@ -207,7 +222,7 @@ test('composes the non-Hermes object rest and spread profile', async () => {
   const source = `export const merge = ({ ignored, ...rest }, extra) => ({ ...rest, ...extra });`;
   expect(await transformSource(source, 'input.js', web)).toMatchInlineSnapshot(`
     "const _excluded = ['ignored'];
-    import _objectWithoutProperties from '@babel/runtime/helpers/objectWithoutProperties';
+    import _objectWithoutProperties from '@babel/runtime/helpers/objectWithoutPropertiesLoose';
     export const merge = (_ref, extra) => {
       let { ignored } = _ref,
         rest = _objectWithoutProperties(_ref, _excluded);

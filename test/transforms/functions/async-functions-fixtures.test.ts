@@ -340,13 +340,129 @@ test('async-to-generator/async-arrow-in-method/input.js', async () => {
 
 test('async-to-generator/async-complex-params-destructuring/exec.js', async () => {
   const source =
-    'let r1 = false;\nconst p1 = (new class {\n  async foo(a, { b }) { }\n})\n  .foo()\n  .catch(e => {\n    r1 = true;\n  });\n\nconst r2 = [];\nconst p2 = (new class {\n  async foo(a, { b }) {\n    r2.push(a, b);\n  }\n})\n  .foo(1, { b: 2 });\n\nconst r3 = [];\nconst p3 = (new class {\n  async foo(a, b = (() => { throw new Error("required") })()) {\n    r3.push(a, b);\n  }\n})\n  .foo(1, 2);\n\nconst r4 = [];\nconst p4 = (new class {\n  async foo(a, ...b) {\n    r4.push(a, b);\n  }\n})\n  .foo(1, 2);\n\nconst r5 = [];\nconst p5 = (new class {\n  async foo(a, { b }) {\n    noop(this, arguments);\n    r5.push(a, b);\n  }\n})\n  .foo(1, { b: 2 });\n\nconst r6 = [];\nconst p6 = (new class extends class { get c() { return "c"; } } {\n  async foo(a, { b }) {\n    r6.push(a, b, super.c);\n  }\n})\n  .foo(1, { b: 2 });\n\n\nreturn Promise.all([p1, p2, p3, p4, p5, p6]).then(() => {\n  expect(r1).toBe(true);\n  expect(r2).toEqual([1, 2]);\n  expect(r3).toEqual([1, 2]);\n  expect(r4).toEqual([1, [2]]);\n  expect(r5).toEqual([1, 2]);\n  expect(r6).toEqual([1, 2, "c"]);\n});\n\nfunction noop() { }\n';
+    '(function () {\nlet r1 = false;\nconst p1 = (new class {\n  async foo(a, { b }) { }\n})\n  .foo()\n  .catch(e => {\n    r1 = true;\n  });\n\nconst r2 = [];\nconst p2 = (new class {\n  async foo(a, { b }) {\n    r2.push(a, b);\n  }\n})\n  .foo(1, { b: 2 });\n\nconst r3 = [];\nconst p3 = (new class {\n  async foo(a, b = (() => { throw new Error("required") })()) {\n    r3.push(a, b);\n  }\n})\n  .foo(1, 2);\n\nconst r4 = [];\nconst p4 = (new class {\n  async foo(a, ...b) {\n    r4.push(a, b);\n  }\n})\n  .foo(1, 2);\n\nconst r5 = [];\nconst p5 = (new class {\n  async foo(a, { b }) {\n    noop(this, arguments);\n    r5.push(a, b);\n  }\n})\n  .foo(1, { b: 2 });\n\nconst r6 = [];\nconst p6 = (new class extends class { get c() { return "c"; } } {\n  async foo(a, { b }) {\n    r6.push(a, b, super.c);\n  }\n})\n  .foo(1, { b: 2 });\n\n\nreturn Promise.all([p1, p2, p3, p4, p5, p6]).then(() => {\n  expect(r1).toBe(true);\n  expect(r2).toEqual([1, 2]);\n  expect(r3).toEqual([1, 2]);\n  expect(r4).toEqual([1, [2]]);\n  expect(r5).toEqual([1, 2]);\n  expect(r6).toEqual([1, 2, "c"]);\n});\n\nfunction noop() { }\n\n});\n';
   expect(
     await transformOutcome(source, 'exec.js', {
       transforms: { asyncFunctions: true },
       helpers: { mode: 'inline' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:parse-error"`);
+  ).toMatchInlineSnapshot(`
+    "var babelHelpers = (() => {
+      var y = {
+          asyncToGenerator: function (r, u) {
+            function x(i, f, p, o, a, s, e) {
+              try {
+                var n = i[s](e),
+                  t = n.value;
+              } catch (d) {
+                return void p(d);
+              }
+              n.done ? f(t) : Promise.resolve(t).then(o, a);
+            }
+            function h(i) {
+              return function () {
+                var f = this,
+                  p = arguments;
+                return new Promise(function (o, a) {
+                  var s = i.apply(f, p);
+                  function e(t) {
+                    x(s, o, a, e, n, 'next', t);
+                  }
+                  function n(t) {
+                    x(s, o, a, e, n, 'throw', t);
+                  }
+                  e(void 0);
+                });
+              };
+            }
+            ((r.exports = h), (r.exports.__esModule = !0), (r.exports.default = r.exports));
+          },
+        },
+        c = {};
+      function v(r) {
+        if (c[r]) return c[r].exports;
+        var u = (c[r] = { exports: {} });
+        return (y[r](u, v), u.exports);
+      }
+      return { asyncToGenerator: v('asyncToGenerator') };
+    })();
+    (function () {
+      let r1 = false;
+      const p1 = new (class {
+        foo(a, { b }) {
+          return babelHelpers.asyncToGenerator(function* () {})();
+        }
+      })()
+        .foo()
+        .catch(e => {
+          r1 = true;
+        });
+      const r2 = [];
+      const p2 = new (class {
+        foo(a, { b }) {
+          return babelHelpers.asyncToGenerator(function* () {
+            r2.push(a, b);
+          })();
+        }
+      })().foo(1, { b: 2 });
+      const r3 = [];
+      const p3 = new (class {
+        foo(_x) {
+          return babelHelpers
+            .asyncToGenerator(function* (
+              a,
+              b = (() => {
+                throw new Error('required');
+              })(),
+            ) {
+              r3.push(a, b);
+            })
+            .apply(this, arguments);
+        }
+      })().foo(1, 2);
+      const r4 = [];
+      const p4 = new (class {
+        foo(a, ...b) {
+          return babelHelpers.asyncToGenerator(function* () {
+            r4.push(a, b);
+          })();
+        }
+      })().foo(1, 2);
+      const r5 = [];
+      const p5 = new (class {
+        foo(a, { b }) {
+          var _arguments = arguments,
+            _this = this;
+          return babelHelpers.asyncToGenerator(function* () {
+            noop(_this, _arguments);
+            r5.push(a, b);
+          })();
+        }
+      })().foo(1, { b: 2 });
+      const r6 = [];
+      const p6 = new (class extends class {
+        get c() {
+          return 'c';
+        }
+      } {
+        foo(a, { b }) {
+          var _superprop_getC = () => super.c;
+          return babelHelpers.asyncToGenerator(function* () {
+            r6.push(a, b, _superprop_getC());
+          })();
+        }
+      })().foo(1, { b: 2 });
+      return Promise.all([p1, p2, p3, p4, p5, p6]).then(() => {
+        expect(r1).toBe(true);
+        expect(r2).toEqual([1, 2]);
+        expect(r3).toEqual([1, 2]);
+        expect(r4).toEqual([1, [2]]);
+        expect(r5).toEqual([1, 2]);
+        expect(r6).toEqual([1, 2, 'c']);
+      });
+      function noop() {}
+    });"
+  `);
 });
 
 test('async-to-generator/async-complex-params-destructuring/input.js', async () => {
@@ -460,13 +576,129 @@ test('async-to-generator/async-complex-params-destructuring/input.js', async () 
 
 test('async-to-generator/async-complex-params/exec.js', async () => {
   const source =
-    'let r1 = false;\nconst p1 = (new class {\n  async foo(a, { b }) { }\n})\n  .foo()\n  .catch(e => {\n    r1 = true;\n  });\n\nconst r2 = [];\nconst p2 = (new class {\n  async foo(a, { b }) {\n    r2.push(a, b);\n  }\n})\n  .foo(1, { b: 2 });\n\nconst r3 = [];\nconst p3 = (new class {\n  async foo(a, b = (() => { throw new Error("required") })()) {\n    r3.push(a, b);\n  }\n})\n  .foo(1, 2);\n\nconst r4 = [];\nconst p4 = (new class {\n  async foo(a, ...b) {\n    r4.push(a, b);\n  }\n})\n  .foo(1, 2);\n\nconst r5 = [];\nconst p5 = (new class {\n  async foo(a, { b }) {\n    noop(this, arguments);\n    r5.push(a, b);\n  }\n})\n  .foo(1, { b: 2 });\n\nconst r6 = [];\nconst p6 = (new class extends class { get c() { return "c"; } } {\n  async foo(a, { b }) {\n    r6.push(a, b, super.c);\n  }\n})\n  .foo(1, { b: 2 });\n\n\nreturn Promise.all([p1, p2, p3, p4, p5, p6]).then(() => {\n  expect(r1).toBe(true);\n  expect(r2).toEqual([1, 2]);\n  expect(r3).toEqual([1, 2]);\n  expect(r4).toEqual([1, [2]]);\n  expect(r5).toEqual([1, 2]);\n  expect(r6).toEqual([1, 2, "c"]);\n});\n\nfunction noop() { }\n';
+    '(function () {\nlet r1 = false;\nconst p1 = (new class {\n  async foo(a, { b }) { }\n})\n  .foo()\n  .catch(e => {\n    r1 = true;\n  });\n\nconst r2 = [];\nconst p2 = (new class {\n  async foo(a, { b }) {\n    r2.push(a, b);\n  }\n})\n  .foo(1, { b: 2 });\n\nconst r3 = [];\nconst p3 = (new class {\n  async foo(a, b = (() => { throw new Error("required") })()) {\n    r3.push(a, b);\n  }\n})\n  .foo(1, 2);\n\nconst r4 = [];\nconst p4 = (new class {\n  async foo(a, ...b) {\n    r4.push(a, b);\n  }\n})\n  .foo(1, 2);\n\nconst r5 = [];\nconst p5 = (new class {\n  async foo(a, { b }) {\n    noop(this, arguments);\n    r5.push(a, b);\n  }\n})\n  .foo(1, { b: 2 });\n\nconst r6 = [];\nconst p6 = (new class extends class { get c() { return "c"; } } {\n  async foo(a, { b }) {\n    r6.push(a, b, super.c);\n  }\n})\n  .foo(1, { b: 2 });\n\n\nreturn Promise.all([p1, p2, p3, p4, p5, p6]).then(() => {\n  expect(r1).toBe(true);\n  expect(r2).toEqual([1, 2]);\n  expect(r3).toEqual([1, 2]);\n  expect(r4).toEqual([1, [2]]);\n  expect(r5).toEqual([1, 2]);\n  expect(r6).toEqual([1, 2, "c"]);\n});\n\nfunction noop() { }\n\n});\n';
   expect(
     await transformOutcome(source, 'exec.js', {
       transforms: { asyncFunctions: true },
       helpers: { mode: 'inline' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:parse-error"`);
+  ).toMatchInlineSnapshot(`
+    "var babelHelpers = (() => {
+      var y = {
+          asyncToGenerator: function (r, u) {
+            function x(i, f, p, o, a, s, e) {
+              try {
+                var n = i[s](e),
+                  t = n.value;
+              } catch (d) {
+                return void p(d);
+              }
+              n.done ? f(t) : Promise.resolve(t).then(o, a);
+            }
+            function h(i) {
+              return function () {
+                var f = this,
+                  p = arguments;
+                return new Promise(function (o, a) {
+                  var s = i.apply(f, p);
+                  function e(t) {
+                    x(s, o, a, e, n, 'next', t);
+                  }
+                  function n(t) {
+                    x(s, o, a, e, n, 'throw', t);
+                  }
+                  e(void 0);
+                });
+              };
+            }
+            ((r.exports = h), (r.exports.__esModule = !0), (r.exports.default = r.exports));
+          },
+        },
+        c = {};
+      function v(r) {
+        if (c[r]) return c[r].exports;
+        var u = (c[r] = { exports: {} });
+        return (y[r](u, v), u.exports);
+      }
+      return { asyncToGenerator: v('asyncToGenerator') };
+    })();
+    (function () {
+      let r1 = false;
+      const p1 = new (class {
+        foo(a, { b }) {
+          return babelHelpers.asyncToGenerator(function* () {})();
+        }
+      })()
+        .foo()
+        .catch(e => {
+          r1 = true;
+        });
+      const r2 = [];
+      const p2 = new (class {
+        foo(a, { b }) {
+          return babelHelpers.asyncToGenerator(function* () {
+            r2.push(a, b);
+          })();
+        }
+      })().foo(1, { b: 2 });
+      const r3 = [];
+      const p3 = new (class {
+        foo(_x) {
+          return babelHelpers
+            .asyncToGenerator(function* (
+              a,
+              b = (() => {
+                throw new Error('required');
+              })(),
+            ) {
+              r3.push(a, b);
+            })
+            .apply(this, arguments);
+        }
+      })().foo(1, 2);
+      const r4 = [];
+      const p4 = new (class {
+        foo(a, ...b) {
+          return babelHelpers.asyncToGenerator(function* () {
+            r4.push(a, b);
+          })();
+        }
+      })().foo(1, 2);
+      const r5 = [];
+      const p5 = new (class {
+        foo(a, { b }) {
+          var _arguments = arguments,
+            _this = this;
+          return babelHelpers.asyncToGenerator(function* () {
+            noop(_this, _arguments);
+            r5.push(a, b);
+          })();
+        }
+      })().foo(1, { b: 2 });
+      const r6 = [];
+      const p6 = new (class extends class {
+        get c() {
+          return 'c';
+        }
+      } {
+        foo(a, { b }) {
+          var _superprop_getC = () => super.c;
+          return babelHelpers.asyncToGenerator(function* () {
+            r6.push(a, b, _superprop_getC());
+          })();
+        }
+      })().foo(1, { b: 2 });
+      return Promise.all([p1, p2, p3, p4, p5, p6]).then(() => {
+        expect(r1).toBe(true);
+        expect(r2).toEqual([1, 2]);
+        expect(r3).toEqual([1, 2]);
+        expect(r4).toEqual([1, [2]]);
+        expect(r5).toEqual([1, 2]);
+        expect(r6).toEqual([1, 2, 'c']);
+      });
+      function noop() {}
+    });"
+  `);
 });
 
 test('async-to-generator/async-complex-params/input.js', async () => {
@@ -1188,13 +1420,73 @@ test('async-to-generator/deeply-nested-asyncs/input.js', async () => {
 
 test('async-to-generator/double-await/exec.js', async () => {
   const source =
-    'const log = [];\n\nconst p1 = (async function () {\n  log.push(1);\n  await await null;\n  log.push(2);\n})();\n\nconst p2 = (async function () {\n  log.push(3);\n  await null;\n  log.push(4);\n})();\n\nlog.push(5);\nconst p3 = Promise.resolve().then(() => log.push(6)).then(() => log.push(7));\n\nreturn Promise.all([p1, p2, p3]).then(() => {\n  expect(log).toEqual([1, 3, 5, 4, 6, 2, 7]);\n});\n';
+    '(function () {\nconst log = [];\n\nconst p1 = (async function () {\n  log.push(1);\n  await await null;\n  log.push(2);\n})();\n\nconst p2 = (async function () {\n  log.push(3);\n  await null;\n  log.push(4);\n})();\n\nlog.push(5);\nconst p3 = Promise.resolve().then(() => log.push(6)).then(() => log.push(7));\n\nreturn Promise.all([p1, p2, p3]).then(() => {\n  expect(log).toEqual([1, 3, 5, 4, 6, 2, 7]);\n});\n\n});\n';
   expect(
     await transformOutcome(source, 'exec.js', {
       transforms: { asyncFunctions: true },
       helpers: { mode: 'inline' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:parse-error"`);
+  ).toMatchInlineSnapshot(`
+    "var babelHelpers = (() => {
+      var y = {
+          asyncToGenerator: function (r, u) {
+            function x(i, f, p, o, a, s, e) {
+              try {
+                var n = i[s](e),
+                  t = n.value;
+              } catch (d) {
+                return void p(d);
+              }
+              n.done ? f(t) : Promise.resolve(t).then(o, a);
+            }
+            function h(i) {
+              return function () {
+                var f = this,
+                  p = arguments;
+                return new Promise(function (o, a) {
+                  var s = i.apply(f, p);
+                  function e(t) {
+                    x(s, o, a, e, n, 'next', t);
+                  }
+                  function n(t) {
+                    x(s, o, a, e, n, 'throw', t);
+                  }
+                  e(void 0);
+                });
+              };
+            }
+            ((r.exports = h), (r.exports.__esModule = !0), (r.exports.default = r.exports));
+          },
+        },
+        c = {};
+      function v(r) {
+        if (c[r]) return c[r].exports;
+        var u = (c[r] = { exports: {} });
+        return (y[r](u, v), u.exports);
+      }
+      return { asyncToGenerator: v('asyncToGenerator') };
+    })();
+    (function () {
+      const log = [];
+      const p1 = babelHelpers.asyncToGenerator(function* () {
+        log.push(1);
+        yield yield null;
+        log.push(2);
+      })();
+      const p2 = babelHelpers.asyncToGenerator(function* () {
+        log.push(3);
+        yield null;
+        log.push(4);
+      })();
+      log.push(5);
+      const p3 = Promise.resolve()
+        .then(() => log.push(6))
+        .then(() => log.push(7));
+      return Promise.all([p1, p2, p3]).then(() => {
+        expect(log).toEqual([1, 3, 5, 4, 6, 2, 7]);
+      });
+    });"
+  `);
 });
 
 test('async-to-generator/double-await/input.js', async () => {
@@ -2544,13 +2836,81 @@ test('export-async/lone-export/input.mjs', async () => {
 
 test('regression/15978/exec.js', async () => {
   const source =
-    'return (async function () {\n  let items = [1, 2, 3, 4];\n  let output = [];\n  for (const item of items) {\n    await f(async (x) => {\n      output.push(item);\n    });\n  }\n  expect(output).toStrictEqual([1, 2, 3, 4]);\n})();\n\nasync function f(lambda) {\n  await lambda();\n}\n';
+    '(function () {\nreturn (async function () {\n  let items = [1, 2, 3, 4];\n  let output = [];\n  for (const item of items) {\n    await f(async (x) => {\n      output.push(item);\n    });\n  }\n  expect(output).toStrictEqual([1, 2, 3, 4]);\n})();\n\nasync function f(lambda) {\n  await lambda();\n}\n\n});\n';
   expect(
     await transformOutcome(source, 'exec.js', {
       transforms: { asyncFunctions: true },
       helpers: { mode: 'inline' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:parse-error"`);
+  ).toMatchInlineSnapshot(`
+    "var babelHelpers = (() => {
+      var y = {
+          asyncToGenerator: function (r, u) {
+            function x(i, f, p, o, a, s, e) {
+              try {
+                var n = i[s](e),
+                  t = n.value;
+              } catch (d) {
+                return void p(d);
+              }
+              n.done ? f(t) : Promise.resolve(t).then(o, a);
+            }
+            function h(i) {
+              return function () {
+                var f = this,
+                  p = arguments;
+                return new Promise(function (o, a) {
+                  var s = i.apply(f, p);
+                  function e(t) {
+                    x(s, o, a, e, n, 'next', t);
+                  }
+                  function n(t) {
+                    x(s, o, a, e, n, 'throw', t);
+                  }
+                  e(void 0);
+                });
+              };
+            }
+            ((r.exports = h), (r.exports.__esModule = !0), (r.exports.default = r.exports));
+          },
+        },
+        c = {};
+      function v(r) {
+        if (c[r]) return c[r].exports;
+        var u = (c[r] = { exports: {} });
+        return (y[r](u, v), u.exports);
+      }
+      return { asyncToGenerator: v('asyncToGenerator') };
+    })();
+    (function () {
+      return babelHelpers.asyncToGenerator(function* () {
+        let items = [1, 2, 3, 4];
+        let output = [];
+        for (const item of items) {
+          yield f(
+            (function () {
+              var _ref = babelHelpers.asyncToGenerator(function* (x) {
+                output.push(item);
+              });
+              return function (_x) {
+                return _ref.apply(this, arguments);
+              };
+            })(),
+          );
+        }
+        expect(output).toStrictEqual([1, 2, 3, 4]);
+      })();
+      function f(_x2) {
+        return _f.apply(this, arguments);
+      }
+      function _f() {
+        _f = babelHelpers.asyncToGenerator(function* (lambda) {
+          yield lambda();
+        });
+        return _f.apply(this, arguments);
+      }
+    });"
+  `);
 });
 
 test('regression/15978/input.js', async () => {
@@ -2686,13 +3046,74 @@ test('regression/4599/input.js', async () => {
 
 test('regression/4943/exec.js', async () => {
   const source =
-    '"use strict";\n\nfunction mandatory(paramName) {\n  throw new Error(`Missing parameter: ${paramName}`);\n}\n\nasync function foo({ a, b = mandatory("b") } = {}) {\n  return Promise.resolve(b);\n}\n\nreturn foo().then(() => {\n  throw new Error(\'should not occur\');\n}, () => true);\n';
+    '(function () {\n"use strict";\n\nfunction mandatory(paramName) {\n  throw new Error(`Missing parameter: ${paramName}`);\n}\n\nasync function foo({ a, b = mandatory("b") } = {}) {\n  return Promise.resolve(b);\n}\n\nreturn foo().then(() => {\n  throw new Error(\'should not occur\');\n}, () => true);\n\n});\n';
   expect(
     await transformOutcome(source, 'exec.js', {
       transforms: { asyncFunctions: true },
       helpers: { mode: 'inline' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:parse-error"`);
+  ).toMatchInlineSnapshot(`
+    "var babelHelpers = (() => {
+      var y = {
+          asyncToGenerator: function (r, u) {
+            function x(i, f, p, o, a, s, e) {
+              try {
+                var n = i[s](e),
+                  t = n.value;
+              } catch (d) {
+                return void p(d);
+              }
+              n.done ? f(t) : Promise.resolve(t).then(o, a);
+            }
+            function h(i) {
+              return function () {
+                var f = this,
+                  p = arguments;
+                return new Promise(function (o, a) {
+                  var s = i.apply(f, p);
+                  function e(t) {
+                    x(s, o, a, e, n, 'next', t);
+                  }
+                  function n(t) {
+                    x(s, o, a, e, n, 'throw', t);
+                  }
+                  e(void 0);
+                });
+              };
+            }
+            ((r.exports = h), (r.exports.__esModule = !0), (r.exports.default = r.exports));
+          },
+        },
+        c = {};
+      function v(r) {
+        if (c[r]) return c[r].exports;
+        var u = (c[r] = { exports: {} });
+        return (y[r](u, v), u.exports);
+      }
+      return { asyncToGenerator: v('asyncToGenerator') };
+    })();
+    (function () {
+      'use strict';
+      function mandatory(paramName) {
+        throw new Error(\`Missing parameter: \${paramName}\`);
+      }
+      function foo() {
+        return _foo.apply(this, arguments);
+      }
+      function _foo() {
+        _foo = babelHelpers.asyncToGenerator(function* ({ a, b = mandatory('b') } = {}) {
+          return Promise.resolve(b);
+        });
+        return _foo.apply(this, arguments);
+      }
+      return foo().then(
+        () => {
+          throw new Error('should not occur');
+        },
+        () => true,
+      );
+    });"
+  `);
 });
 
 test('regression/4943/input.js', async () => {
@@ -2766,19 +3187,131 @@ test('regression/7178/input.js', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: { asyncFunctions: true },
       helpers: { mode: 'inline' },
+      jsx: 'preserve',
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:parse-error"`);
+  ).toMatchInlineSnapshot(`
+    "var babelHelpers = (() => {
+      var y = {
+          asyncToGenerator: function (r, u) {
+            function x(i, f, p, o, a, s, e) {
+              try {
+                var n = i[s](e),
+                  t = n.value;
+              } catch (d) {
+                return void p(d);
+              }
+              n.done ? f(t) : Promise.resolve(t).then(o, a);
+            }
+            function h(i) {
+              return function () {
+                var f = this,
+                  p = arguments;
+                return new Promise(function (o, a) {
+                  var s = i.apply(f, p);
+                  function e(t) {
+                    x(s, o, a, e, n, 'next', t);
+                  }
+                  function n(t) {
+                    x(s, o, a, e, n, 'throw', t);
+                  }
+                  e(void 0);
+                });
+              };
+            }
+            ((r.exports = h), (r.exports.__esModule = !0), (r.exports.default = r.exports));
+          },
+        },
+        c = {};
+      function v(r) {
+        if (c[r]) return c[r].exports;
+        var u = (c[r] = { exports: {} });
+        return (y[r](u, v), u.exports);
+      }
+      return { asyncToGenerator: v('asyncToGenerator') };
+    })();
+    const title = 'Neem contact op';
+    function action() {
+      return _action.apply(this, arguments);
+    }
+    function _action() {
+      _action = babelHelpers.asyncToGenerator(function* () {
+        return <Contact title={title} />;
+      });
+      return _action.apply(this, arguments);
+    }"
+  `);
 });
 
 test('regression/8783/exec.js', async () => {
   const source =
-    'let log = [];\n\nlet resolve;\nconst main = new Promise(r => { resolve = r });\n\n(async function poll(count) {\n  log.push(await Promise.resolve(count))\n  if (count < 3) setTimeout(poll, 10, count + 1);\n  else resolve();\n})(0)\n\nreturn main.then(() => {\n  expect(log).toEqual([0, 1, 2, 3]);\n});\n';
+    '(function () {\nlet log = [];\n\nlet resolve;\nconst main = new Promise(r => { resolve = r });\n\n(async function poll(count) {\n  log.push(await Promise.resolve(count))\n  if (count < 3) setTimeout(poll, 10, count + 1);\n  else resolve();\n})(0)\n\nreturn main.then(() => {\n  expect(log).toEqual([0, 1, 2, 3]);\n});\n\n});\n';
   expect(
     await transformOutcome(source, 'exec.js', {
       transforms: { asyncFunctions: true },
       helpers: { mode: 'inline' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:parse-error"`);
+  ).toMatchInlineSnapshot(`
+    "var babelHelpers = (() => {
+      var y = {
+          asyncToGenerator: function (r, u) {
+            function x(i, f, p, o, a, s, e) {
+              try {
+                var n = i[s](e),
+                  t = n.value;
+              } catch (d) {
+                return void p(d);
+              }
+              n.done ? f(t) : Promise.resolve(t).then(o, a);
+            }
+            function h(i) {
+              return function () {
+                var f = this,
+                  p = arguments;
+                return new Promise(function (o, a) {
+                  var s = i.apply(f, p);
+                  function e(t) {
+                    x(s, o, a, e, n, 'next', t);
+                  }
+                  function n(t) {
+                    x(s, o, a, e, n, 'throw', t);
+                  }
+                  e(void 0);
+                });
+              };
+            }
+            ((r.exports = h), (r.exports.__esModule = !0), (r.exports.default = r.exports));
+          },
+        },
+        c = {};
+      function v(r) {
+        if (c[r]) return c[r].exports;
+        var u = (c[r] = { exports: {} });
+        return (y[r](u, v), u.exports);
+      }
+      return { asyncToGenerator: v('asyncToGenerator') };
+    })();
+    (function () {
+      let log = [];
+      let resolve;
+      const main = new Promise(r => {
+        resolve = r;
+      });
+      /* @__PURE__ */ (function () {
+        var _poll = babelHelpers.asyncToGenerator(function* (count) {
+          log.push(yield Promise.resolve(count));
+          if (count < 3) setTimeout(poll, 10, count + 1);
+          else resolve();
+        });
+        function poll(_x) {
+          return _poll.apply(this, arguments);
+        }
+        return poll;
+      })()(0);
+      return main.then(() => {
+        expect(log).toEqual([0, 1, 2, 3]);
+      });
+    });"
+  `);
 });
 
 test('regression/8783/input.js', async () => {

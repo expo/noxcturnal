@@ -629,9 +629,13 @@ test('assumption-objectRestNoSymbols/rest-computed/input.js [helpers]', async ()
         _objectWithoutProperties2.objectWithoutProperties(t, e)
       );
     }
+    var _toPropertyKey2 = require('@babel/runtime/helpers/toPropertyKey');
+    function _toPropertyKey(value) {
+      return _toPropertyKey2(value);
+    }
     let _ref = obj,
       _obj = _objectDestructuringEmpty(_ref),
-      _key = a,
+      _key = _toPropertyKey(a),
       b = _obj[_key],
       c = _objectWithoutProperties(_obj, [_key]);"
   `);
@@ -661,9 +665,13 @@ test('assumption-objectRestNoSymbols/rest-computed/input.js [built-ins]', async 
         _objectWithoutProperties2.objectWithoutProperties(t, e)
       );
     }
+    var _toPropertyKey2 = require('@babel/runtime/helpers/toPropertyKey');
+    function _toPropertyKey(value) {
+      return _toPropertyKey2(value);
+    }
     let _ref = obj,
       _obj = _objectDestructuringEmpty(_ref),
-      _key = a,
+      _key = _toPropertyKey(a),
       b = _obj[_key],
       c = _objectWithoutProperties(_obj, [_key]);"
   `);
@@ -1876,11 +1884,15 @@ test('destructuring/check-no-hoisting-when-using-template-strings/input.js [help
         _objectWithoutProperties2.objectWithoutProperties(t, e)
       );
     }
+    var _toPropertyKey2 = require('@babel/runtime/helpers/toPropertyKey');
+    function _toPropertyKey(value) {
+      return _toPropertyKey2(value);
+    }
     const example = obj => {
       const foo = 'foo';
       const _ref = obj,
         _obj = _objectDestructuringEmpty(_ref),
-        _key = \`prefix_\${foo}\`,
+        _key = _toPropertyKey(\`prefix_\${foo}\`),
         _ = _obj[_key],
         rest = _objectWithoutProperties(_obj, [_key]);
     };"
@@ -1912,11 +1924,15 @@ test('destructuring/check-no-hoisting-when-using-template-strings/input.js [buil
         _objectWithoutProperties2.objectWithoutProperties(t, e)
       );
     }
+    var _toPropertyKey2 = require('@babel/runtime/helpers/toPropertyKey');
+    function _toPropertyKey(value) {
+      return _toPropertyKey2(value);
+    }
     const example = obj => {
       const foo = 'foo';
       const _ref = obj,
         _obj = _objectDestructuringEmpty(_ref),
-        _key = \`prefix_\${foo}\`,
+        _key = _toPropertyKey(\`prefix_\${foo}\`),
         _ = _obj[_key],
         rest = _objectWithoutProperties(_obj, [_key]);
     };"
@@ -2716,6 +2732,10 @@ test('destructuring/es7-object-rest-builtins/input.js [helpers]', async () => {
         _objectWithoutProperties2.objectWithoutProperties(t, e)
       );
     }
+    var _toPropertyKey2 = require('@babel/runtime/helpers/toPropertyKey');
+    function _toPropertyKey(value) {
+      return _toPropertyKey2(value);
+    }
     var _ref16, _obj17;
     var z = {};
     var _ref = z,
@@ -2727,7 +2747,7 @@ test('destructuring/es7-object-rest-builtins/input.js [helpers]', async () => {
       y = _objectWithoutProperties(_obj12, ['x']);
     var _ref13 = z,
       _obj14 = _objectDestructuringEmpty(_ref13),
-      _key = x,
+      _key = _toPropertyKey(x),
       x = _obj14[_key],
       y = _objectWithoutProperties(_obj14, [_key]);
     (function ({ x, ...y }) {});
@@ -2765,6 +2785,10 @@ test('destructuring/es7-object-rest-builtins/input.js [built-ins]', async () => 
         _objectWithoutProperties2.objectWithoutProperties(t, e)
       );
     }
+    var _toPropertyKey2 = require('@babel/runtime/helpers/toPropertyKey');
+    function _toPropertyKey(value) {
+      return _toPropertyKey2(value);
+    }
     var _ref16, _obj17;
     var z = {};
     var _ref = z,
@@ -2776,7 +2800,7 @@ test('destructuring/es7-object-rest-builtins/input.js [built-ins]', async () => 
       y = _objectWithoutProperties(_obj12, ['x']);
     var _ref13 = z,
       _obj14 = _objectDestructuringEmpty(_ref13),
-      _key = x,
+      _key = _toPropertyKey(x),
       x = _obj14[_key],
       y = _objectWithoutProperties(_obj14, [_key]);
     (function ({ x, ...y }) {});
@@ -2814,6 +2838,10 @@ test('destructuring/es7-object-rest-loose/input.js [helpers]', async () => {
         _objectWithoutProperties2.objectWithoutProperties(t, e)
       );
     }
+    var _toPropertyKey2 = require('@babel/runtime/helpers/toPropertyKey');
+    function _toPropertyKey(value) {
+      return _toPropertyKey2(value);
+    }
     var _ref16, _obj17;
     var z = {};
     var _ref = z,
@@ -2825,7 +2853,7 @@ test('destructuring/es7-object-rest-loose/input.js [helpers]', async () => {
       y = _objectWithoutProperties(_obj12, ['x']);
     var _ref13 = z,
       _obj14 = _objectDestructuringEmpty(_ref13),
-      _key = x,
+      _key = _toPropertyKey(x),
       x = _obj14[_key],
       y = _objectWithoutProperties(_obj14, [_key]);
     (function ({ x, ...y }) {});
@@ -2863,6 +2891,10 @@ test('destructuring/es7-object-rest-loose/input.js [built-ins]', async () => {
         _objectWithoutProperties2.objectWithoutProperties(t, e)
       );
     }
+    var _toPropertyKey2 = require('@babel/runtime/helpers/toPropertyKey');
+    function _toPropertyKey(value) {
+      return _toPropertyKey2(value);
+    }
     var _ref16, _obj17;
     var z = {};
     var _ref = z,
@@ -2874,7 +2906,7 @@ test('destructuring/es7-object-rest-loose/input.js [built-ins]', async () => {
       y = _objectWithoutProperties(_obj12, ['x']);
     var _ref13 = z,
       _obj14 = _objectDestructuringEmpty(_ref13),
-      _key = x,
+      _key = _toPropertyKey(x),
       x = _obj14[_key],
       y = _objectWithoutProperties(_obj14, [_key]);
     (function ({ x, ...y }) {});
@@ -2912,6 +2944,10 @@ test('destructuring/es7-object-rest/input.js [helpers]', async () => {
         _objectWithoutProperties2.objectWithoutProperties(t, e)
       );
     }
+    var _toPropertyKey2 = require('@babel/runtime/helpers/toPropertyKey');
+    function _toPropertyKey(value) {
+      return _toPropertyKey2(value);
+    }
     var _ref16, _obj17;
     var z = {};
     var _ref = z,
@@ -2923,7 +2959,7 @@ test('destructuring/es7-object-rest/input.js [helpers]', async () => {
       y = _objectWithoutProperties(_obj12, ['x']);
     var _ref13 = z,
       _obj14 = _objectDestructuringEmpty(_ref13),
-      _key = x,
+      _key = _toPropertyKey(x),
       x = _obj14[_key],
       y = _objectWithoutProperties(_obj14, [_key]);
     (function ({ x, ...y }) {});
@@ -2961,6 +2997,10 @@ test('destructuring/es7-object-rest/input.js [built-ins]', async () => {
         _objectWithoutProperties2.objectWithoutProperties(t, e)
       );
     }
+    var _toPropertyKey2 = require('@babel/runtime/helpers/toPropertyKey');
+    function _toPropertyKey(value) {
+      return _toPropertyKey2(value);
+    }
     var _ref16, _obj17;
     var z = {};
     var _ref = z,
@@ -2972,7 +3012,7 @@ test('destructuring/es7-object-rest/input.js [built-ins]', async () => {
       y = _objectWithoutProperties(_obj12, ['x']);
     var _ref13 = z,
       _obj14 = _objectDestructuringEmpty(_ref13),
-      _key = x,
+      _key = _toPropertyKey(x),
       x = _obj14[_key],
       y = _objectWithoutProperties(_obj14, [_key]);
     (function ({ x, ...y }) {});
@@ -3173,7 +3213,32 @@ test('destructuring/for-of-shadowed-block-scoped/exec.js [helpers]', async () =>
       transforms: { destructuring: { useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:destructuring-generated-initializer-missing"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _ref12, _obj13, _key14;
+    var O = { a: 'a' };
+    const a = 'a';
+    for (const _ref of [O]) {
+      const _obj = _objectDestructuringEmpty(_ref),
+        _key = a,
+        _ = _obj[_key];
+      {
+        const a = 'A';
+      }
+    }
+    var _;
+    for (_ref12 of [O]) {
+      ((_obj13 = _objectDestructuringEmpty(_ref12)), (_key14 = a), (_ = _obj13[_key14]));
+      {
+        const a = 'A';
+      }
+    }"
+  `);
 });
 
 test('destructuring/for-of-shadowed-block-scoped/exec.js [built-ins]', async () => {
@@ -3184,7 +3249,32 @@ test('destructuring/for-of-shadowed-block-scoped/exec.js [built-ins]', async () 
       transforms: { destructuring: { useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:destructuring-generated-initializer-missing"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _ref12, _obj13, _key14;
+    var O = { a: 'a' };
+    const a = 'a';
+    for (const _ref of [O]) {
+      const _obj = _objectDestructuringEmpty(_ref),
+        _key = a,
+        _ = _obj[_key];
+      {
+        const a = 'A';
+      }
+    }
+    var _;
+    for (_ref12 of [O]) {
+      ((_obj13 = _objectDestructuringEmpty(_ref12)), (_key14 = a), (_ = _obj13[_key14]));
+      {
+        const a = 'A';
+      }
+    }"
+  `);
 });
 
 test('destructuring/for-of-shadowed-block-scoped/input.js [helpers]', async () => {
@@ -3195,7 +3285,32 @@ test('destructuring/for-of-shadowed-block-scoped/input.js [helpers]', async () =
       transforms: { destructuring: { useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:destructuring-generated-initializer-missing"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _ref12, _obj13, _key14;
+    var O = { a: 'a' };
+    const a = 'a';
+    for (const _ref of [O]) {
+      const _obj = _objectDestructuringEmpty(_ref),
+        _key = a,
+        _ = _obj[_key];
+      {
+        const a = 'A';
+      }
+    }
+    var _;
+    for (_ref12 of [O]) {
+      ((_obj13 = _objectDestructuringEmpty(_ref12)), (_key14 = a), (_ = _obj13[_key14]));
+      {
+        const a = 'A';
+      }
+    }"
+  `);
 });
 
 test('destructuring/for-of-shadowed-block-scoped/input.js [built-ins]', async () => {
@@ -3206,7 +3321,32 @@ test('destructuring/for-of-shadowed-block-scoped/input.js [built-ins]', async ()
       transforms: { destructuring: { useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:destructuring-generated-initializer-missing"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _ref12, _obj13, _key14;
+    var O = { a: 'a' };
+    const a = 'a';
+    for (const _ref of [O]) {
+      const _obj = _objectDestructuringEmpty(_ref),
+        _key = a,
+        _ = _obj[_key];
+      {
+        const a = 'A';
+      }
+    }
+    var _;
+    for (_ref12 of [O]) {
+      ((_obj13 = _objectDestructuringEmpty(_ref12)), (_key14 = a), (_ = _obj13[_key14]));
+      {
+        const a = 'A';
+      }
+    }"
+  `);
 });
 
 test('destructuring/for-of/input.js [helpers]', async () => {
@@ -3217,7 +3357,32 @@ test('destructuring/for-of/input.js [helpers]', async () => {
       transforms: { destructuring: { useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:destructuring-generated-initializer-missing"`);
+  ).toMatchInlineSnapshot(`
+    "var _toArray2 = {
+      slicedToArray: require('@babel/runtime/helpers/slicedToArray'),
+      toArray: require('@babel/runtime/helpers/toArray'),
+    };
+    function _toArray(r, e, a) {
+      return a ? _toArray2.toArray(r) : _toArray2.slicedToArray(r, e);
+    }
+    var _ref11, _arr12;
+    for (var _ref of test.expectation.registers) {
+      var _arr = _toArray(_ref, 3, false),
+        name = _arr[0],
+        before = _arr[1],
+        after = _arr[2];
+      {
+      }
+    }
+    for (_ref11 of test.expectation.registers) {
+      ((_arr12 = _toArray(_ref11, 3, false)),
+        (name = _arr12[0]),
+        (before = _arr12[1]),
+        (after = _arr12[2]));
+      {
+      }
+    }"
+  `);
 });
 
 test('destructuring/for-of/input.js [built-ins]', async () => {
@@ -3228,7 +3393,32 @@ test('destructuring/for-of/input.js [built-ins]', async () => {
       transforms: { destructuring: { useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:destructuring-generated-initializer-missing"`);
+  ).toMatchInlineSnapshot(`
+    "var _toArray2 = {
+      slicedToArray: require('@babel/runtime/helpers/slicedToArray'),
+      toArray: require('@babel/runtime/helpers/toArray'),
+    };
+    function _toArray(r, e, a) {
+      return a ? _toArray2.toArray(r) : _toArray2.slicedToArray(r, e);
+    }
+    var _ref11, _arr12;
+    for (var _ref of test.expectation.registers) {
+      var _arr = _toArray(_ref, 3, false),
+        name = _arr[0],
+        before = _arr[1],
+        after = _arr[2];
+      {
+      }
+    }
+    for (_ref11 of test.expectation.registers) {
+      ((_arr12 = _toArray(_ref11, 3, false)),
+        (name = _arr12[0]),
+        (before = _arr12[1]),
+        (after = _arr12[2]));
+      {
+      }
+    }"
+  `);
 });
 
 test('destructuring/function-key-with-object-rest-spread/exec.js [helpers]', async () => {
@@ -3256,9 +3446,13 @@ test('destructuring/function-key-with-object-rest-spread/exec.js [helpers]', asy
         _objectWithoutProperties2.objectWithoutProperties(t, e)
       );
     }
+    var _toPropertyKey2 = require('@babel/runtime/helpers/toPropertyKey');
+    function _toPropertyKey(value) {
+      return _toPropertyKey2(value);
+    }
     const _ref = { 1: 'a' },
       _obj = _objectDestructuringEmpty(_ref),
-      _key = (() => 1)(),
+      _key = _toPropertyKey((() => 1)()),
       a = _obj[_key],
       rest = _objectWithoutProperties(_obj, [_key]);
     expect(a).toBe('a');
@@ -3291,9 +3485,13 @@ test('destructuring/function-key-with-object-rest-spread/exec.js [built-ins]', a
         _objectWithoutProperties2.objectWithoutProperties(t, e)
       );
     }
+    var _toPropertyKey2 = require('@babel/runtime/helpers/toPropertyKey');
+    function _toPropertyKey(value) {
+      return _toPropertyKey2(value);
+    }
     const _ref = { 1: 'a' },
       _obj = _objectDestructuringEmpty(_ref),
-      _key = (() => 1)(),
+      _key = _toPropertyKey((() => 1)()),
       a = _obj[_key],
       rest = _objectWithoutProperties(_obj, [_key]);
     expect(a).toBe('a');
@@ -4068,16 +4266,20 @@ test('destructuring/issue-9834/input.js [helpers]', async () => {
         _objectWithoutProperties2.objectWithoutProperties(t, e)
       );
     }
+    var _toPropertyKey2 = require('@babel/runtime/helpers/toPropertyKey');
+    function _toPropertyKey(value) {
+      return _toPropertyKey2(value);
+    }
     const input = {};
     const _ref = input,
       _obj = _objectDestructuringEmpty(_ref),
       givenName = _obj.given_name,
       lastName = _obj['last_name'],
-      _key = \`country\`,
+      _key = _toPropertyKey(\`country\`),
       country = _obj[_key],
-      _key16 = prefix + 'state',
+      _key16 = _toPropertyKey(prefix + 'state'),
       state = _obj[_key16],
-      _key17 = \`\${prefix}consents\`,
+      _key17 = _toPropertyKey(\`\${prefix}consents\`),
       consents = _obj[_key17],
       rest = _objectWithoutProperties(_obj, ['given_name', 'last_name', _key, _key16, _key17]);"
   `);
@@ -4108,16 +4310,20 @@ test('destructuring/issue-9834/input.js [built-ins]', async () => {
         _objectWithoutProperties2.objectWithoutProperties(t, e)
       );
     }
+    var _toPropertyKey2 = require('@babel/runtime/helpers/toPropertyKey');
+    function _toPropertyKey(value) {
+      return _toPropertyKey2(value);
+    }
     const input = {};
     const _ref = input,
       _obj = _objectDestructuringEmpty(_ref),
       givenName = _obj.given_name,
       lastName = _obj['last_name'],
-      _key = \`country\`,
+      _key = _toPropertyKey(\`country\`),
       country = _obj[_key],
-      _key16 = prefix + 'state',
+      _key16 = _toPropertyKey(prefix + 'state'),
       state = _obj[_key16],
-      _key17 = \`\${prefix}consents\`,
+      _key17 = _toPropertyKey(\`\${prefix}consents\`),
       consents = _obj[_key17],
       rest = _objectWithoutProperties(_obj, ['given_name', 'last_name', _key, _key16, _key17]);"
   `);
@@ -4542,6 +4748,10 @@ test('destructuring/number-key-with-object-rest-spread/exec.js [helpers]', async
         _objectWithoutProperties2.objectWithoutProperties(t, e)
       );
     }
+    var _toPropertyKey2 = require('@babel/runtime/helpers/toPropertyKey');
+    function _toPropertyKey(value) {
+      return _toPropertyKey2(value);
+    }
     const foo = {
       1: 'a',
       2: 'b',
@@ -4549,7 +4759,7 @@ test('destructuring/number-key-with-object-rest-spread/exec.js [helpers]', async
     };
     const _ref = foo,
       _obj = _objectDestructuringEmpty(_ref),
-      _key = 1,
+      _key = _toPropertyKey(1),
       bar = _obj[_key],
       rest = _objectWithoutProperties(_obj, [_key]);
     expect(bar).toBe('a');
@@ -4585,6 +4795,10 @@ test('destructuring/number-key-with-object-rest-spread/exec.js [built-ins]', asy
         _objectWithoutProperties2.objectWithoutProperties(t, e)
       );
     }
+    var _toPropertyKey2 = require('@babel/runtime/helpers/toPropertyKey');
+    function _toPropertyKey(value) {
+      return _toPropertyKey2(value);
+    }
     const foo = {
       1: 'a',
       2: 'b',
@@ -4592,7 +4806,7 @@ test('destructuring/number-key-with-object-rest-spread/exec.js [built-ins]', asy
     };
     const _ref = foo,
       _obj = _objectDestructuringEmpty(_ref),
-      _key = 1,
+      _key = _toPropertyKey(1),
       bar = _obj[_key],
       rest = _objectWithoutProperties(_obj, [_key]);
     expect(bar).toBe('a');
@@ -4734,6 +4948,10 @@ test('destructuring/object-rest-impure-computed-keys/exec.js [helpers]', async (
         _objectWithoutProperties2.objectWithoutProperties(t, e)
       );
     }
+    var _toPropertyKey2 = require('@babel/runtime/helpers/toPropertyKey');
+    function _toPropertyKey(value) {
+      return _toPropertyKey2(value);
+    }
     var _ref21, _obj22, _key23;
     var key, x, y, z;
     // impure
@@ -4743,7 +4961,7 @@ test('destructuring/object-rest-impure-computed-keys/exec.js [helpers]', async (
         a: 1,
       },
       _obj = _objectDestructuringEmpty(_ref),
-      _key = key++,
+      _key = _toPropertyKey(key++),
       y = _obj[_key],
       x = _objectWithoutProperties(_obj, [_key]);
     expect(x).toEqual({ a: 1 });
@@ -4756,9 +4974,9 @@ test('destructuring/object-rest-impure-computed-keys/exec.js [helpers]', async (
         3: 3,
       },
       _obj18 = _objectDestructuringEmpty(_ref17),
-      _key19 = ++key,
+      _key19 = _toPropertyKey(++key),
       y = _obj18[_key19],
-      _key20 = ++key,
+      _key20 = _toPropertyKey(++key),
       z = _obj18[_key20],
       rest = _objectWithoutProperties(_obj18, [_key19, _key20]);
     expect(y).toBe(2);
@@ -4770,7 +4988,7 @@ test('destructuring/object-rest-impure-computed-keys/exec.js [helpers]', async (
       z: 'zee',
     }),
       (_obj22 = _objectDestructuringEmpty(_ref21)),
-      (_key23 = key),
+      (_key23 = _toPropertyKey(key)),
       (y = _obj22[_key23]),
       (z = _obj22.z),
       (x = _objectWithoutProperties(_obj22, [_key23, 'z'])),
@@ -4790,7 +5008,7 @@ test('destructuring/object-rest-impure-computed-keys/exec.js [helpers]', async (
     }
     var _ref24 = right(),
       _obj25 = _objectDestructuringEmpty(_ref24),
-      _key26 = left(),
+      _key26 = _toPropertyKey(left()),
       y = _obj25[_key26],
       x = _objectWithoutProperties(_obj25, [_key26]);
     expect(order).toEqual(['right', 'left']);"
@@ -4822,6 +5040,10 @@ test('destructuring/object-rest-impure-computed-keys/exec.js [built-ins]', async
         _objectWithoutProperties2.objectWithoutProperties(t, e)
       );
     }
+    var _toPropertyKey2 = require('@babel/runtime/helpers/toPropertyKey');
+    function _toPropertyKey(value) {
+      return _toPropertyKey2(value);
+    }
     var _ref21, _obj22, _key23;
     var key, x, y, z;
     // impure
@@ -4831,7 +5053,7 @@ test('destructuring/object-rest-impure-computed-keys/exec.js [built-ins]', async
         a: 1,
       },
       _obj = _objectDestructuringEmpty(_ref),
-      _key = key++,
+      _key = _toPropertyKey(key++),
       y = _obj[_key],
       x = _objectWithoutProperties(_obj, [_key]);
     expect(x).toEqual({ a: 1 });
@@ -4844,9 +5066,9 @@ test('destructuring/object-rest-impure-computed-keys/exec.js [built-ins]', async
         3: 3,
       },
       _obj18 = _objectDestructuringEmpty(_ref17),
-      _key19 = ++key,
+      _key19 = _toPropertyKey(++key),
       y = _obj18[_key19],
-      _key20 = ++key,
+      _key20 = _toPropertyKey(++key),
       z = _obj18[_key20],
       rest = _objectWithoutProperties(_obj18, [_key19, _key20]);
     expect(y).toBe(2);
@@ -4858,7 +5080,7 @@ test('destructuring/object-rest-impure-computed-keys/exec.js [built-ins]', async
       z: 'zee',
     }),
       (_obj22 = _objectDestructuringEmpty(_ref21)),
-      (_key23 = key),
+      (_key23 = _toPropertyKey(key)),
       (y = _obj22[_key23]),
       (z = _obj22.z),
       (x = _objectWithoutProperties(_obj22, [_key23, 'z'])),
@@ -4878,7 +5100,7 @@ test('destructuring/object-rest-impure-computed-keys/exec.js [built-ins]', async
     }
     var _ref24 = right(),
       _obj25 = _objectDestructuringEmpty(_ref24),
-      _key26 = left(),
+      _key26 = _toPropertyKey(left()),
       y = _obj25[_key26],
       x = _objectWithoutProperties(_obj25, [_key26]);
     expect(order).toEqual(['right', 'left']);"
@@ -4909,9 +5131,13 @@ test('destructuring/object-rest-impure-computed-keys/input.js [helpers]', async 
         _objectWithoutProperties2.objectWithoutProperties(t, e)
       );
     }
+    var _toPropertyKey2 = require('@babel/runtime/helpers/toPropertyKey');
+    function _toPropertyKey(value) {
+      return _toPropertyKey2(value);
+    }
     var _ref = z,
       _obj = _objectDestructuringEmpty(_ref),
-      _key = fn(),
+      _key = _toPropertyKey(fn()),
       x = _obj[_key],
       y = _objectWithoutProperties(_obj, [_key]);"
   `);
@@ -4941,9 +5167,13 @@ test('destructuring/object-rest-impure-computed-keys/input.js [built-ins]', asyn
         _objectWithoutProperties2.objectWithoutProperties(t, e)
       );
     }
+    var _toPropertyKey2 = require('@babel/runtime/helpers/toPropertyKey');
+    function _toPropertyKey(value) {
+      return _toPropertyKey2(value);
+    }
     var _ref = z,
       _obj = _objectDestructuringEmpty(_ref),
-      _key = fn(),
+      _key = _toPropertyKey(fn()),
       x = _obj[_key],
       y = _objectWithoutProperties(_obj, [_key]);"
   `);

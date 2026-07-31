@@ -336,7 +336,7 @@ test('declarations/nested-namespace/input.mjs', async () => {
     '; // Otherwise-empty file\nexport declare namespace P {\n  export namespace C {}\n}\n';
   expect(
     await transformOutcome(source, 'input.mjs', { typescript: 'strip' }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:parse-error"`);
+  ).toMatchInlineSnapshot(`"export {};"`);
 });
 
 test('enum/boolean-value/input.ts', async () => {
@@ -923,9 +923,11 @@ test('exports/type-only-export-specifier-3/input.ts', async () => {
 
 test('function/overloads-exports/input.mjs', async () => {
   const source = 'function f(): void;\nfunction f(): void {\n}\nexport { f }';
-  expect(
-    await transformOutcome(source, 'input.mjs', { typescript: 'strip' }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:parse-error"`);
+  expect(await transformOutcome(source, 'input.mjs', { typescript: 'strip' }))
+    .toMatchInlineSnapshot(`
+    "function f() {}
+    export { f };"
+  `);
 });
 
 test('function/overloads/input.ts', async () => {
@@ -976,33 +978,49 @@ test('imports/elide-injected/input.ts', async () => {
 test('imports/elide-jsx-pragma-namespace-no/input.ts', async () => {
   const source =
     '/* @jsx jsx.htm */\n// Don\'t elide htm if a JSX element appears somewhere.\nimport * as jsx from "fake-jsx-package";\n<div></div>;\n';
-  expect(await transformOutcome(source, 'input.ts', { typescript: 'strip' })).toMatchInlineSnapshot(
-    `"[bailout] preflight:parse-error"`,
-  );
+  expect(await transformOutcome(source, 'input.ts', { typescript: 'strip', jsx: 'preserve' }))
+    .toMatchInlineSnapshot(`
+    "/* @jsx jsx.htm */
+    // Don't elide htm if a JSX element appears somewhere.
+    import * as jsx from 'fake-jsx-package';
+    <div></div>;"
+  `);
 });
 
 test('imports/elide-jsx-pragma-no/input.ts', async () => {
   const source =
     '/* @jsx htm */\n// Don\'t elide htm if a JSX element appears somewhere.\nimport { htm } from "fake-jsx-package";\n<div></div>;\n';
-  expect(await transformOutcome(source, 'input.ts', { typescript: 'strip' })).toMatchInlineSnapshot(
-    `"[bailout] preflight:parse-error"`,
-  );
+  expect(await transformOutcome(source, 'input.ts', { typescript: 'strip', jsx: 'preserve' }))
+    .toMatchInlineSnapshot(`
+    "/* @jsx htm */
+    // Don't elide htm if a JSX element appears somewhere.
+    import { htm } from 'fake-jsx-package';
+    <div></div>;"
+  `);
 });
 
 test('imports/elide-jsx-pragmaFrag-namespace-no/input.ts', async () => {
   const source =
     '/* @jsxFrag jsx.htm */\n// Don\'t elide htm if a JSX fragment appears somewhere.\nimport * as jsx from "fake-jsx-package";\n<></>;\n';
-  expect(await transformOutcome(source, 'input.ts', { typescript: 'strip' })).toMatchInlineSnapshot(
-    `"[bailout] preflight:parse-error"`,
-  );
+  expect(await transformOutcome(source, 'input.ts', { typescript: 'strip', jsx: 'preserve' }))
+    .toMatchInlineSnapshot(`
+    "/* @jsxFrag jsx.htm */
+    // Don't elide htm if a JSX fragment appears somewhere.
+    import * as jsx from 'fake-jsx-package';
+    <></>;"
+  `);
 });
 
 test('imports/elide-jsx-pragmaFrag-no/input.ts', async () => {
   const source =
     '/* @jsxFrag htm */\n// Don\'t elide htm if a JSX fragment appears somewhere.\nimport { htm } from "fake-jsx-package";\n<></>;\n';
-  expect(await transformOutcome(source, 'input.ts', { typescript: 'strip' })).toMatchInlineSnapshot(
-    `"[bailout] preflight:parse-error"`,
-  );
+  expect(await transformOutcome(source, 'input.ts', { typescript: 'strip', jsx: 'preserve' }))
+    .toMatchInlineSnapshot(`
+    "/* @jsxFrag htm */
+    // Don't elide htm if a JSX fragment appears somewhere.
+    import { htm } from 'fake-jsx-package';
+    <></>;"
+  `);
 });
 
 test('imports/elide-no-import-specifiers/input.ts', async () => {
@@ -1017,17 +1035,22 @@ test('imports/elide-no-import-specifiers/input.ts', async () => {
 test('imports/elide-preact-no-1/input.ts', async () => {
   const source =
     '// Don\'t elide Preact if a JSX element appears somewhere.\nimport { h, Fragment, render } from "preact";\n<div></div>;\n<></>;\n';
-  expect(await transformOutcome(source, 'input.ts', { typescript: 'strip' })).toMatchInlineSnapshot(
-    `"[bailout] preflight:parse-error"`,
-  );
+  expect(await transformOutcome(source, 'input.ts', { typescript: 'strip', jsx: 'preserve' }))
+    .toMatchInlineSnapshot(`
+    "<div></div>;
+    <></>;
+    export {};"
+  `);
 });
 
 test('imports/elide-preact-no-2/input.ts', async () => {
   const source =
     '// Don\'t elide Preact if a JSX fragment appears somewhere.\nimport { Fragment, render } from "preact";\n<></>;\n';
-  expect(await transformOutcome(source, 'input.ts', { typescript: 'strip' })).toMatchInlineSnapshot(
-    `"[bailout] preflight:parse-error"`,
-  );
+  expect(await transformOutcome(source, 'input.ts', { typescript: 'strip', jsx: 'preserve' }))
+    .toMatchInlineSnapshot(`
+    "<></>;
+    export {};"
+  `);
 });
 
 test('imports/elide-preact/input.ts', async () => {
@@ -1042,25 +1065,34 @@ test('imports/elide-preact/input.ts', async () => {
 test('imports/elide-react-no-1/input.ts', async () => {
   const source =
     '// Don\'t elide React if a JSX element appears somewhere.\nimport * as React from "react";\n<div></div>;\n';
-  expect(await transformOutcome(source, 'input.ts', { typescript: 'strip' })).toMatchInlineSnapshot(
-    `"[bailout] preflight:parse-error"`,
-  );
+  expect(await transformOutcome(source, 'input.ts', { typescript: 'strip', jsx: 'preserve' }))
+    .toMatchInlineSnapshot(`
+    "// Don't elide React if a JSX element appears somewhere.
+    import * as React from 'react';
+    <div></div>;"
+  `);
 });
 
 test('imports/elide-react-no-2/input.ts', async () => {
   const source =
     '// Don\'t elide React if a JSX element appears somewhere.\nimport * as React from "react";\n<div/>;\n';
-  expect(await transformOutcome(source, 'input.ts', { typescript: 'strip' })).toMatchInlineSnapshot(
-    `"[bailout] preflight:parse-error"`,
-  );
+  expect(await transformOutcome(source, 'input.ts', { typescript: 'strip', jsx: 'preserve' }))
+    .toMatchInlineSnapshot(`
+    "// Don't elide React if a JSX element appears somewhere.
+    import * as React from 'react';
+    <div />;"
+  `);
 });
 
 test('imports/elide-react-no-3/input.ts', async () => {
   const source =
     '// Don\'t elide React if a JSX fragment appears somewhere.\nimport * as React from "react";\n<></>;\n';
-  expect(await transformOutcome(source, 'input.ts', { typescript: 'strip' })).toMatchInlineSnapshot(
-    `"[bailout] preflight:parse-error"`,
-  );
+  expect(await transformOutcome(source, 'input.ts', { typescript: 'strip', jsx: 'preserve' }))
+    .toMatchInlineSnapshot(`
+    "// Don't elide React if a JSX fragment appears somewhere.
+    import * as React from 'react';
+    <></>;"
+  `);
 });
 
 test('imports/elide-react/input.ts', async () => {
@@ -2107,9 +2139,15 @@ test('regression/10338/input.ts', async () => {
 test('regression/11061/input.mjs', async () => {
   const source =
     "import { messaging } from 'firebase-admin'\n\nexport class Something {\n  constructor(\n  \tpublic messaging: messaging.Messaging\n  ) {\n  }\n}\n";
-  expect(
-    await transformOutcome(source, 'input.mjs', { typescript: 'strip' }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:parse-error"`);
+  expect(await transformOutcome(source, 'input.mjs', { typescript: 'strip' }))
+    .toMatchInlineSnapshot(`
+    "export class Something {
+      messaging;
+      constructor(messaging) {
+        this.messaging = messaging;
+      }
+    }"
+  `);
 });
 
 test('regression/15768/input.ts', async () => {
@@ -2180,9 +2218,11 @@ test('type-arguments/tagged-template/input.ts', async () => {
 
 test('type-arguments/tsx/input.ts', async () => {
   const source = '<C<number>></C>;\n<C<number>/>;\n';
-  expect(await transformOutcome(source, 'input.ts', { typescript: 'strip' })).toMatchInlineSnapshot(
-    `"[bailout] preflight:parse-error"`,
-  );
+  expect(await transformOutcome(source, 'input.ts', { typescript: 'strip', jsx: 'preserve' }))
+    .toMatchInlineSnapshot(`
+    "<C></C>;
+    <C />;"
+  `);
 });
 
 test('variable-declaration/exclamation/input.ts', async () => {

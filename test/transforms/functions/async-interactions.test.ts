@@ -87,6 +87,10 @@ test('preserves captured per-iteration bindings in for-await loops', async () =>
   ).toMatchInlineSnapshot(`
     "import _asyncIterator from '@babel/runtime/helpers/asyncIterator';
     import _asyncToGenerator from '@babel/runtime/helpers/asyncToGenerator';
+    function _iteratorResult(value) {
+      if (Object(value) !== value) throw new TypeError('Iterator result is not an object');
+      return value;
+    }
     export function collect(_x) {
       return _collect.apply(this, arguments);
     }
@@ -107,7 +111,7 @@ test('preserves captured per-iteration bindings in for-await loops', async () =>
         try {
           for (
             var _iterator = _asyncIterator(items), _step;
-            (_iteratorAbruptCompletion = !(_step = yield _iterator.next()).done);
+            (_iteratorAbruptCompletion = !(_step = _iteratorResult(yield _iterator.next())).done);
             _iteratorAbruptCompletion = false
           ) {
             var item = _step.value;
@@ -122,7 +126,7 @@ test('preserves captured per-iteration bindings in for-await loops', async () =>
         } finally {
           try {
             if (_iteratorAbruptCompletion && _iterator.return != null) {
-              yield _iterator.return();
+              _iteratorResult(yield _iterator.return());
             }
           } finally {
             if (_didIteratorError) {

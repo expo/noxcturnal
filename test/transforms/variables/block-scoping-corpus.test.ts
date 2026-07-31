@@ -821,13 +821,17 @@ test('030 JS Block Scoping > temporal dead zone > const reassignment throws Type
     '() => {\n        expect(() => {\n          const x = 0;\n          x = 1;\n        }).toThrow();\n      }';
   expect(await transformOutcome(source, 'input.js', { transforms: { blockScoping: true } }))
     .toMatchInlineSnapshot(`
-    "() => {
-      expect(() => {
-        var x = 0;
-        0();
-      }).toThrow();
-    };"
-  `);
+      "var _readOnlyValue;
+      function _readOnlyError(r) {
+        throw new TypeError('"' + r + '" is read-only');
+      }
+      () => {
+        expect(() => {
+          var x = 0;
+          (1, _readOnlyError('x'));
+        }).toThrow();
+      };"
+    `);
 });
 
 test('031 JS Block Scoping > temporal dead zone > assignment before const declaration throws', async () => {
@@ -835,13 +839,17 @@ test('031 JS Block Scoping > temporal dead zone > assignment before const declar
     '() => {\n        expect(() => {\n          x = 1;\n          const x = 0;\n        }).toThrow();\n      }';
   expect(await transformOutcome(source, 'input.js', { transforms: { blockScoping: true } }))
     .toMatchInlineSnapshot(`
-    "() => {
-      expect(() => {
-        0();
-        var x = 0;
-      }).toThrow();
-    };"
-  `);
+      "var _readOnlyValue;
+      function _readOnlyError(r) {
+        throw new TypeError('"' + r + '" is read-only');
+      }
+      () => {
+        expect(() => {
+          (1, _readOnlyError('x'));
+          var x = 0;
+        }).toThrow();
+      };"
+    `);
 });
 
 test('032 JS Block Scoping > temporal dead zone > closure called before const declaration throws', async () => {
@@ -849,15 +857,19 @@ test('032 JS Block Scoping > temporal dead zone > closure called before const de
     '() => {\n        expect(() => {\n          (() => {\n            x = 1;\n          })();\n          const x = 0;\n        }).toThrow();\n      }';
   expect(await transformOutcome(source, 'input.js', { transforms: { blockScoping: true } }))
     .toMatchInlineSnapshot(`
-    "() => {
-      expect(() => {
-        (() => {
-          0();
-        })();
-        var x = 0;
-      }).toThrow();
-    };"
-  `);
+      "var _readOnlyValue;
+      function _readOnlyError(r) {
+        throw new TypeError('"' + r + '" is read-only');
+      }
+      () => {
+        expect(() => {
+          (() => {
+            (1, _readOnlyError('x'));
+          })();
+          var x = 0;
+        }).toThrow();
+      };"
+    `);
 });
 
 test('033 JS Block Scoping > temporal dead zone > deferred closure called after const declaration throws TypeError', async () => {
@@ -865,18 +877,22 @@ test('033 JS Block Scoping > temporal dead zone > deferred closure called after 
     '() => {\n        expect(() => {\n          const call = (() => {\n            return () => {\n              x = 1;\n            };\n          })();\n          const x = 0;\n          call();\n        }).toThrow();\n      }';
   expect(await transformOutcome(source, 'input.js', { transforms: { blockScoping: true } }))
     .toMatchInlineSnapshot(`
-    "() => {
-      expect(() => {
-        var call = (() => {
-          return () => {
-            0();
-          };
-        })();
-        var x = 0;
-        call();
-      }).toThrow();
-    };"
-  `);
+      "var _readOnlyValue;
+      function _readOnlyError(r) {
+        throw new TypeError('"' + r + '" is read-only');
+      }
+      () => {
+        expect(() => {
+          var call = (() => {
+            return () => {
+              (1, _readOnlyError('x'));
+            };
+          })();
+          var x = 0;
+          call();
+        }).toThrow();
+      };"
+    `);
 });
 
 test('034 [upstream xit] JS Block Scoping > temporal dead zone > let is undefined before initialization in same scope', async () => {
@@ -1261,13 +1277,17 @@ test('050 JS Block Scoping > assignment and mutation > const does not allow reas
     '() => {\n        expect(() => {\n          const x = 1;\n          x = 2;\n        }).toThrow();\n      }';
   expect(await transformOutcome(source, 'input.js', { transforms: { blockScoping: true } }))
     .toMatchInlineSnapshot(`
-    "() => {
-      expect(() => {
-        var x = 1;
-        0();
-      }).toThrow();
-    };"
-  `);
+      "var _readOnlyValue;
+      function _readOnlyError(r) {
+        throw new TypeError('"' + r + '" is read-only');
+      }
+      () => {
+        expect(() => {
+          var x = 1;
+          (2, _readOnlyError('x'));
+        }).toThrow();
+      };"
+    `);
 });
 
 test('051 JS Block Scoping > assignment and mutation > const object properties can be mutated', async () => {
@@ -1301,13 +1321,17 @@ test('053 JS Block Scoping > assignment and mutation > const += throws TypeError
     '() => {\n        expect(() => {\n          const a = 1;\n          a += 2;\n        }).toThrow();\n      }';
   expect(await transformOutcome(source, 'input.js', { transforms: { blockScoping: true } }))
     .toMatchInlineSnapshot(`
-    "() => {
-      expect(() => {
-        var a = 1;
-        0();
-      }).toThrow();
-    };"
-  `);
+      "var _readOnlyValue;
+      function _readOnlyError(r) {
+        throw new TypeError('"' + r + '" is read-only');
+      }
+      () => {
+        expect(() => {
+          var a = 1;
+          ((_readOnlyValue = a), (_readOnlyValue += 2), _readOnlyError('a'));
+        }).toThrow();
+      };"
+    `);
 });
 
 test('054 JS Block Scoping > assignment and mutation > const++ throws TypeError', async () => {
@@ -1315,13 +1339,17 @@ test('054 JS Block Scoping > assignment and mutation > const++ throws TypeError'
     '() => {\n        expect(() => {\n          const a = 1;\n          a++;\n        }).toThrow();\n      }';
   expect(await transformOutcome(source, 'input.js', { transforms: { blockScoping: true } }))
     .toMatchInlineSnapshot(`
-    "() => {
-      expect(() => {
-        var a = 1;
-        0();
-      }).toThrow();
-    };"
-  `);
+      "var _readOnlyValue;
+      function _readOnlyError(r) {
+        throw new TypeError('"' + r + '" is read-only');
+      }
+      () => {
+        expect(() => {
+          var a = 1;
+          ((_readOnlyValue = a), _readOnlyValue++, _readOnlyError('a'));
+        }).toThrow();
+      };"
+    `);
 });
 
 test('055 JS Block Scoping > edge cases > let in try-catch blocks', async () => {

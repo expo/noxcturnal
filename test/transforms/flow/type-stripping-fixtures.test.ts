@@ -378,7 +378,7 @@ test('strip-types/strip-type-annotations-2/input.mjs', async () => {
 
 test('strip-types/strip-type-annotations-syntax-jsx/input.mjs', async () => {
   const source = '// @flow\n// @flow\n<Foo<T>></Foo>\n';
-  expect(await transformOutcome(source, 'input.mjs', {})).toMatchInlineSnapshot(`
+  expect(await transformOutcome(source, 'input.mjs', { jsx: 'preserve' })).toMatchInlineSnapshot(`
     "// @flow
     // @flow
     <Foo></Foo>;"
@@ -504,7 +504,7 @@ test('strip-types/strip-type-annotations/input.mjs', async () => {
 test('strip-types/strip-typeapp-call/input.js', async () => {
   const source =
     '// @flow\n// @flow\nf<T>();\nf<T><U></U>;\nnew C<T>;\nf<T>(e);\no[e]<T>();\nf<T>(x)<U>(y);\nasync <T>() => {};\nasync <T>(): T => {}\nnew C<T>(e);\nf<T>[e];\nnew C<T>();\no.m<T>();\nf<T>.0;\no?.m<T>(e);\no.m?.<T>(e);\nasync<T>();\nf?.<T>(e);\n';
-  expect(await transformOutcome(source, 'input.js', {})).toMatchInlineSnapshot(`
+  expect(await transformOutcome(source, 'input.js', { jsx: 'preserve' })).toMatchInlineSnapshot(`
     "// @flow
     // @flow
     f();
@@ -519,7 +519,7 @@ test('strip-types/strip-typeapp-call/input.js', async () => {
     f < T > [e];
     new C();
     o.m();
-    f < T > 0.0;
+    f < T > 0;
     o?.m(e);
     o.m?.(e);
     async();

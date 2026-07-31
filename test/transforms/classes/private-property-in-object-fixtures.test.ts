@@ -15,7 +15,20 @@ test('assumption-privateFieldsAsProperties/accessor/input.js [spec]', async () =
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-spec-private-features-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
+    var _checkInRHS = require('@babel/runtime/helpers/checkInRHS');
+    var _Foo_brand = /* @__PURE__ */ new WeakSet();
+    class Foo {
+      constructor() {
+        _classPrivateMethodInitSpec(this, _Foo_brand);
+      }
+      test(other) {
+        return _Foo_brand.has(_checkInRHS(other));
+      }
+    }
+    function _get_foo() {}"
+  `);
 });
 
 test('assumption-privateFieldsAsProperties/accessor/input.js [loose]', async () => {
@@ -31,20 +44,33 @@ test('assumption-privateFieldsAsProperties/accessor/input.js [loose]', async () 
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "var Foo = (() => {
+    "let Foo = (() => {
       'use strict';
       var _foo = '__private_Foo_foo';
-      function Foo() {
-        if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
-        Object.defineProperty(this, _foo, { get: function () {} });
-      }
+      const Foo = function Foo() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+        Object.defineProperty(this, _foo, {
+          get: function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          },
+        });
+      };
       Object.defineProperty(Foo.prototype, 'test', {
-        value: function (other) {
-          return Object.prototype.hasOwnProperty.call(other, _foo);
-        },
+        value: Object.defineProperty(
+          function (other) {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            return Object.prototype.hasOwnProperty.call(other, _foo);
+          },
+          'name',
+          {
+            value: 'test',
+            configurable: true,
+          },
+        ),
         writable: true,
         configurable: true,
       });
+      Object.defineProperty(Foo, 'prototype', { writable: false });
       return Foo;
     })();"
   `);
@@ -62,7 +88,23 @@ test('assumption-privateFieldsAsProperties/compiled-classes/input.js [spec]', as
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-spec-private-features-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
+    var _checkInRHS = require('@babel/runtime/helpers/checkInRHS');
+    var _bar = /* @__PURE__ */ new WeakMap();
+    class Foo {
+      constructor() {
+        _classPrivateFieldInitSpec(this, _bar, 'bar');
+      }
+      static test() {
+        return _checkInRHS(Foo) === Foo;
+      }
+      test() {
+        return _bar.has(_checkInRHS(this));
+      }
+    }
+    var _foo = { _: 'foo' };"
+  `);
 });
 
 test('assumption-privateFieldsAsProperties/compiled-classes/input.js [loose]', async () => {
@@ -78,31 +120,48 @@ test('assumption-privateFieldsAsProperties/compiled-classes/input.js [loose]', a
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "var Foo = (() => {
+    "let Foo = (() => {
       'use strict';
       var _foo = '__private_Foo_foo';
       var _bar = '__private_Foo_bar';
-      function Foo() {
-        if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
+      const Foo = function Foo() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
         Object.defineProperty(this, _bar, {
           writable: true,
           value: 'bar',
         });
-      }
+      };
       Object.defineProperty(Foo, 'test', {
-        value: function () {
-          return Object.prototype.hasOwnProperty.call(Foo, _foo);
-        },
+        value: Object.defineProperty(
+          function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            return Object.prototype.hasOwnProperty.call(Foo, _foo);
+          },
+          'name',
+          {
+            value: 'test',
+            configurable: true,
+          },
+        ),
         writable: true,
         configurable: true,
       });
       Object.defineProperty(Foo.prototype, 'test', {
-        value: function () {
-          return Object.prototype.hasOwnProperty.call(this, _bar);
-        },
+        value: Object.defineProperty(
+          function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            return Object.prototype.hasOwnProperty.call(this, _bar);
+          },
+          'name',
+          {
+            value: 'test',
+            configurable: true,
+          },
+        ),
         writable: true,
         configurable: true,
       });
+      Object.defineProperty(Foo, 'prototype', { writable: false });
       Object.defineProperty(Foo, _foo, {
         writable: true,
         value: 'foo',
@@ -123,7 +182,19 @@ test('assumption-privateFieldsAsProperties/field/input.js [spec]', async () => {
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-spec-private-features-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
+    var _checkInRHS = require('@babel/runtime/helpers/checkInRHS');
+    var _foo = /* @__PURE__ */ new WeakMap();
+    class Foo {
+      constructor() {
+        _classPrivateFieldInitSpec(this, _foo, 1);
+      }
+      test(other) {
+        return _foo.has(_checkInRHS(other));
+      }
+    }"
+  `);
 });
 
 test('assumption-privateFieldsAsProperties/field/input.js [loose]', async () => {
@@ -138,23 +209,32 @@ test('assumption-privateFieldsAsProperties/field/input.js [loose]', async () => 
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "var Foo = (() => {
+    "let Foo = (() => {
       'use strict';
       var _foo = '__private_Foo_foo';
-      function Foo() {
-        if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
+      const Foo = function Foo() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
         Object.defineProperty(this, _foo, {
           writable: true,
           value: 1,
         });
-      }
+      };
       Object.defineProperty(Foo.prototype, 'test', {
-        value: function (other) {
-          return Object.prototype.hasOwnProperty.call(other, _foo);
-        },
+        value: Object.defineProperty(
+          function (other) {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            return Object.prototype.hasOwnProperty.call(other, _foo);
+          },
+          'name',
+          {
+            value: 'test',
+            configurable: true,
+          },
+        ),
         writable: true,
         configurable: true,
       });
+      Object.defineProperty(Foo, 'prototype', { writable: false });
       return Foo;
     })();"
   `);
@@ -172,7 +252,29 @@ test('assumption-privateFieldsAsProperties/method/exec.js [spec]', async () => {
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-spec-private-features-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
+    var _checkInRHS = require('@babel/runtime/helpers/checkInRHS');
+    var _Foo_brand = /* @__PURE__ */ new WeakSet();
+    class Foo {
+      constructor() {
+        _classPrivateMethodInitSpec(this, _Foo_brand);
+      }
+      test(other) {
+        return _Foo_brand.has(_checkInRHS(other));
+      }
+      test2(other) {
+        return _Foo_brand.has(_checkInRHS(other));
+      }
+    }
+    function _foo() {}
+    function _foo2() {}
+    const cl = new Foo();
+    expect(cl.test({})).toBe(false);
+    expect(cl.test(cl)).toBe(true);
+    expect(cl.test2({})).toBe(false);
+    expect(cl.test2(cl)).toBe(true);"
+  `);
 });
 
 test('assumption-privateFieldsAsProperties/method/exec.js [loose]', async () => {
@@ -188,29 +290,54 @@ test('assumption-privateFieldsAsProperties/method/exec.js [loose]', async () => 
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "var Foo = (() => {
+    "let Foo = (() => {
       'use strict';
       var _foo = '__private_Foo_foo';
       var _foo2 = '__private_Foo_foo2';
-      function Foo() {
-        if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
-        Object.defineProperty(this, _foo, { value: function () {} });
-        Object.defineProperty(this, _foo2, { value: function () {} });
-      }
+      const Foo = function Foo() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+        Object.defineProperty(this, _foo, {
+          value: function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          },
+        });
+        Object.defineProperty(this, _foo2, {
+          value: function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          },
+        });
+      };
       Object.defineProperty(Foo.prototype, 'test', {
-        value: function (other) {
-          return Object.prototype.hasOwnProperty.call(other, _foo);
-        },
+        value: Object.defineProperty(
+          function (other) {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            return Object.prototype.hasOwnProperty.call(other, _foo);
+          },
+          'name',
+          {
+            value: 'test',
+            configurable: true,
+          },
+        ),
         writable: true,
         configurable: true,
       });
       Object.defineProperty(Foo.prototype, 'test2', {
-        value: function (other) {
-          return Object.prototype.hasOwnProperty.call(other, _foo2);
-        },
+        value: Object.defineProperty(
+          function (other) {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            return Object.prototype.hasOwnProperty.call(other, _foo2);
+          },
+          'name',
+          {
+            value: 'test2',
+            configurable: true,
+          },
+        ),
         writable: true,
         configurable: true,
       });
+      Object.defineProperty(Foo, 'prototype', { writable: false });
       return Foo;
     })();
     const cl = new Foo();
@@ -233,7 +360,24 @@ test('assumption-privateFieldsAsProperties/method/input.js [spec]', async () => 
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-spec-private-features-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
+    var _checkInRHS = require('@babel/runtime/helpers/checkInRHS');
+    var _Foo_brand = /* @__PURE__ */ new WeakSet();
+    class Foo {
+      constructor() {
+        _classPrivateMethodInitSpec(this, _Foo_brand);
+      }
+      test(other) {
+        return _Foo_brand.has(_checkInRHS(other));
+      }
+      test2(other) {
+        return _Foo_brand.has(_checkInRHS(other));
+      }
+    }
+    function _foo() {}
+    function _foo2() {}"
+  `);
 });
 
 test('assumption-privateFieldsAsProperties/method/input.js [loose]', async () => {
@@ -249,29 +393,54 @@ test('assumption-privateFieldsAsProperties/method/input.js [loose]', async () =>
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "var Foo = (() => {
+    "let Foo = (() => {
       'use strict';
       var _foo = '__private_Foo_foo';
       var _foo2 = '__private_Foo_foo2';
-      function Foo() {
-        if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
-        Object.defineProperty(this, _foo, { value: function () {} });
-        Object.defineProperty(this, _foo2, { value: function () {} });
-      }
+      const Foo = function Foo() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+        Object.defineProperty(this, _foo, {
+          value: function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          },
+        });
+        Object.defineProperty(this, _foo2, {
+          value: function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          },
+        });
+      };
       Object.defineProperty(Foo.prototype, 'test', {
-        value: function (other) {
-          return Object.prototype.hasOwnProperty.call(other, _foo);
-        },
+        value: Object.defineProperty(
+          function (other) {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            return Object.prototype.hasOwnProperty.call(other, _foo);
+          },
+          'name',
+          {
+            value: 'test',
+            configurable: true,
+          },
+        ),
         writable: true,
         configurable: true,
       });
       Object.defineProperty(Foo.prototype, 'test2', {
-        value: function (other) {
-          return Object.prototype.hasOwnProperty.call(other, _foo2);
-        },
+        value: Object.defineProperty(
+          function (other) {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            return Object.prototype.hasOwnProperty.call(other, _foo2);
+          },
+          'name',
+          {
+            value: 'test2',
+            configurable: true,
+          },
+        ),
         writable: true,
         configurable: true,
       });
+      Object.defineProperty(Foo, 'prototype', { writable: false });
       return Foo;
     })();"
   `);
@@ -289,7 +458,32 @@ test('assumption-privateFieldsAsProperties/nested-class-other-redeclared/input.j
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-spec-private-features-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
+    var _checkInRHS = require('@babel/runtime/helpers/checkInRHS');
+    var _foo = /* @__PURE__ */ new WeakMap();
+    var _bar = /* @__PURE__ */ new WeakMap();
+    class Foo {
+      constructor() {
+        _classPrivateFieldInitSpec(this, _foo, 1);
+        _classPrivateFieldInitSpec(this, _bar, 1);
+      }
+      test() {
+        var _bar2 = /* @__PURE__ */ new WeakMap();
+        class Nested {
+          constructor() {
+            _classPrivateFieldInitSpec(this, _bar2, 2);
+          }
+          test() {
+            _foo.has(_checkInRHS(this));
+            _bar2.has(_checkInRHS(this));
+          }
+        }
+        _foo.has(_checkInRHS(this));
+        _bar.has(_checkInRHS(this));
+      }
+    }"
+  `);
 });
 
 test('assumption-privateFieldsAsProperties/nested-class-other-redeclared/input.js [loose]', async () => {
@@ -305,12 +499,12 @@ test('assumption-privateFieldsAsProperties/nested-class-other-redeclared/input.j
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "var Foo = (() => {
+    "let Foo = (() => {
       'use strict';
       var _foo = '__private_Foo_foo';
       var _bar = '__private_Foo_bar';
-      function Foo() {
-        if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
+      const Foo = function Foo() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
         Object.defineProperty(this, _foo, {
           writable: true,
           value: 1,
@@ -319,35 +513,53 @@ test('assumption-privateFieldsAsProperties/nested-class-other-redeclared/input.j
           writable: true,
           value: 1,
         });
-      }
+      };
       Object.defineProperty(Foo.prototype, 'test', {
-        value: function () {
-          var Nested = (() => {
-            'use strict';
-            var _bar11 = '__private_Nested_bar';
-            function Nested() {
-              if (!(this instanceof Nested)) throw new TypeError('Cannot call a class as a function');
-              Object.defineProperty(this, _bar11, {
+        value: Object.defineProperty(
+          function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            let Nested = (() => {
+              'use strict';
+              var _bar11 = '__private_Nested_bar';
+              const Nested = function Nested() {
+                if (!new.target) throw new TypeError('Cannot call a class as a function');
+                Object.defineProperty(this, _bar11, {
+                  writable: true,
+                  value: 2,
+                });
+              };
+              Object.defineProperty(Nested.prototype, 'test', {
+                value: Object.defineProperty(
+                  function () {
+                    if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+                    Object.prototype.hasOwnProperty.call(this, _foo);
+                    Object.prototype.hasOwnProperty.call(this, _bar11);
+                  },
+                  'name',
+                  {
+                    value: 'test',
+                    configurable: true,
+                  },
+                ),
                 writable: true,
-                value: 2,
+                configurable: true,
               });
-            }
-            Object.defineProperty(Nested.prototype, 'test', {
-              value: function () {
-                Object.prototype.hasOwnProperty.call(this, _foo);
-                Object.prototype.hasOwnProperty.call(this, _bar11);
-              },
-              writable: true,
-              configurable: true,
-            });
-            return Nested;
-          })();
-          Object.prototype.hasOwnProperty.call(this, _foo);
-          Object.prototype.hasOwnProperty.call(this, _bar);
-        },
+              Object.defineProperty(Nested, 'prototype', { writable: false });
+              return Nested;
+            })();
+            Object.prototype.hasOwnProperty.call(this, _foo);
+            Object.prototype.hasOwnProperty.call(this, _bar);
+          },
+          'name',
+          {
+            value: 'test',
+            configurable: true,
+          },
+        ),
         writable: true,
         configurable: true,
       });
+      Object.defineProperty(Foo, 'prototype', { writable: false });
       return Foo;
     })();"
   `);
@@ -365,7 +577,28 @@ test('assumption-privateFieldsAsProperties/nested-class-redeclared/input.js [spe
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-spec-private-features-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
+    var _checkInRHS = require('@babel/runtime/helpers/checkInRHS');
+    var _foo = /* @__PURE__ */ new WeakMap();
+    class Foo {
+      constructor() {
+        _classPrivateFieldInitSpec(this, _foo, 1);
+      }
+      test() {
+        var _foo2 = /* @__PURE__ */ new WeakMap();
+        class Nested {
+          constructor() {
+            _classPrivateFieldInitSpec(this, _foo2, 2);
+          }
+          test() {
+            _foo2.has(_checkInRHS(this));
+          }
+        }
+        _foo.has(_checkInRHS(this));
+      }
+    }"
+  `);
 });
 
 test('assumption-privateFieldsAsProperties/nested-class-redeclared/input.js [loose]', async () => {
@@ -381,42 +614,60 @@ test('assumption-privateFieldsAsProperties/nested-class-redeclared/input.js [loo
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "var Foo = (() => {
+    "let Foo = (() => {
       'use strict';
       var _foo = '__private_Foo_foo';
-      function Foo() {
-        if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
+      const Foo = function Foo() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
         Object.defineProperty(this, _foo, {
           writable: true,
           value: 1,
         });
-      }
+      };
       Object.defineProperty(Foo.prototype, 'test', {
-        value: function () {
-          var Nested = (() => {
-            'use strict';
-            var _foo10 = '__private_Nested_foo';
-            function Nested() {
-              if (!(this instanceof Nested)) throw new TypeError('Cannot call a class as a function');
-              Object.defineProperty(this, _foo10, {
+        value: Object.defineProperty(
+          function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            let Nested = (() => {
+              'use strict';
+              var _foo10 = '__private_Nested_foo';
+              const Nested = function Nested() {
+                if (!new.target) throw new TypeError('Cannot call a class as a function');
+                Object.defineProperty(this, _foo10, {
+                  writable: true,
+                  value: 2,
+                });
+              };
+              Object.defineProperty(Nested.prototype, 'test', {
+                value: Object.defineProperty(
+                  function () {
+                    if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+                    Object.prototype.hasOwnProperty.call(this, _foo10);
+                  },
+                  'name',
+                  {
+                    value: 'test',
+                    configurable: true,
+                  },
+                ),
                 writable: true,
-                value: 2,
+                configurable: true,
               });
-            }
-            Object.defineProperty(Nested.prototype, 'test', {
-              value: function () {
-                Object.prototype.hasOwnProperty.call(this, _foo10);
-              },
-              writable: true,
-              configurable: true,
-            });
-            return Nested;
-          })();
-          Object.prototype.hasOwnProperty.call(this, _foo);
-        },
+              Object.defineProperty(Nested, 'prototype', { writable: false });
+              return Nested;
+            })();
+            Object.prototype.hasOwnProperty.call(this, _foo);
+          },
+          'name',
+          {
+            value: 'test',
+            configurable: true,
+          },
+        ),
         writable: true,
         configurable: true,
       });
+      Object.defineProperty(Foo, 'prototype', { writable: false });
       return Foo;
     })();"
   `);
@@ -434,7 +685,24 @@ test('assumption-privateFieldsAsProperties/nested-class/input.js [spec]', async 
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-spec-private-features-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
+    var _checkInRHS = require('@babel/runtime/helpers/checkInRHS');
+    var _foo = /* @__PURE__ */ new WeakMap();
+    class Foo {
+      constructor() {
+        _classPrivateFieldInitSpec(this, _foo, 1);
+      }
+      test() {
+        class Nested {
+          test() {
+            _foo.has(_checkInRHS(this));
+          }
+        }
+        _foo.has(_checkInRHS(this));
+      }
+    }"
+  `);
 });
 
 test('assumption-privateFieldsAsProperties/nested-class/input.js [loose]', async () => {
@@ -450,37 +718,55 @@ test('assumption-privateFieldsAsProperties/nested-class/input.js [loose]', async
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "var Foo = (() => {
+    "let Foo = (() => {
       'use strict';
       var _foo = '__private_Foo_foo';
-      function Foo() {
-        if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
+      const Foo = function Foo() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
         Object.defineProperty(this, _foo, {
           writable: true,
           value: 1,
         });
-      }
+      };
       Object.defineProperty(Foo.prototype, 'test', {
-        value: function () {
-          var Nested = (() => {
-            'use strict';
-            function Nested() {
-              if (!(this instanceof Nested)) throw new TypeError('Cannot call a class as a function');
-            }
-            Object.defineProperty(Nested.prototype, 'test', {
-              value: function () {
-                Object.prototype.hasOwnProperty.call(this, _foo);
-              },
-              writable: true,
-              configurable: true,
-            });
-            return Nested;
-          })();
-          Object.prototype.hasOwnProperty.call(this, _foo);
-        },
+        value: Object.defineProperty(
+          function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            let Nested = (() => {
+              'use strict';
+              const Nested = function Nested() {
+                if (!new.target) throw new TypeError('Cannot call a class as a function');
+              };
+              Object.defineProperty(Nested.prototype, 'test', {
+                value: Object.defineProperty(
+                  function () {
+                    if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+                    Object.prototype.hasOwnProperty.call(this, _foo);
+                  },
+                  'name',
+                  {
+                    value: 'test',
+                    configurable: true,
+                  },
+                ),
+                writable: true,
+                configurable: true,
+              });
+              Object.defineProperty(Nested, 'prototype', { writable: false });
+              return Nested;
+            })();
+            Object.prototype.hasOwnProperty.call(this, _foo);
+          },
+          'name',
+          {
+            value: 'test',
+            configurable: true,
+          },
+        ),
         writable: true,
         configurable: true,
       });
+      Object.defineProperty(Foo, 'prototype', { writable: false });
       return Foo;
     })();"
   `);
@@ -498,7 +784,231 @@ test('assumption-privateFieldsAsProperties/rhs-not-object/exec.js [spec]', async
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-spec-private-features-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _checkInRHS = require('@babel/runtime/helpers/checkInRHS');
+    var _defineProperty = require('@babel/runtime/helpers/defineProperty');
+    var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
+    var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
+    expect(() => {
+      var _Class, _p;
+      return ((_Class = class {}), (_p = { _: _checkInRHS(0) === _Class }), _Class);
+    }).toThrow(\`right-hand side of 'in' should be an object, got number\`);
+    expect(() => {
+      var _Class2, _p2;
+      return ((_Class2 = class {}), (_p2 = { _: _checkInRHS('') === _Class2 }), _Class2);
+    }).toThrow(\`right-hand side of 'in' should be an object, got string\`);
+    expect(() => {
+      var _Class3, _p3;
+      return ((_Class3 = class {}), (_p3 = { _: _checkInRHS(true) === _Class3 }), _Class3);
+    }).toThrow(\`right-hand side of 'in' should be an object, got boolean\`);
+    expect(() => {
+      var _Class4, _p4;
+      return ((_Class4 = class {}), (_p4 = { _: _checkInRHS(void 0) === _Class4 }), _Class4);
+    }).toThrow(\`right-hand side of 'in' should be an object, got undefined\`);
+    expect(() => {
+      var _Class5, _p5;
+      return ((_Class5 = class {}), (_p5 = { _: _checkInRHS(null) === _Class5 }), _Class5);
+    }).toThrow(\`right-hand side of 'in' should be an object, got null\`);
+    expect(() => {
+      var _Class6, _p6;
+      return ((_Class6 = class {}), (_p6 = { _: _checkInRHS(Symbol.iterator) === _Class6 }), _Class6);
+    }).toThrow(\`right-hand side of 'in' should be an object, got symbol\`);
+    expect(() => {
+      var _Class7, _p7;
+      return ((_Class7 = class {}), (_p7 = { _: _checkInRHS(0n) === _Class7 }), _Class7);
+    }).toThrow(\`right-hand side of 'in' should be an object, got bigint\`);
+    expect(() => {
+      var _Class8;
+      return ((_Class8 = class {}), _defineProperty(_Class8, 'q', _checkInRHS(0) === _Class8), _Class8);
+      function _p8() {}
+    }).toThrow(\`right-hand side of 'in' should be an object, got number\`);
+    expect(() => {
+      var _Class9;
+      return (
+        (_Class9 = class {}), _defineProperty(_Class9, 'q', _checkInRHS('') === _Class9), _Class9
+      );
+      function _p9() {}
+    }).toThrow(\`right-hand side of 'in' should be an object, got string\`);
+    expect(() => {
+      var _Class10;
+      return (
+        (_Class10 = class {}), _defineProperty(_Class10, 'q', _checkInRHS(true) === _Class10), _Class10
+      );
+      function _p10() {}
+    }).toThrow(\`right-hand side of 'in' should be an object, got boolean\`);
+    expect(() => {
+      var _Class11;
+      return (
+        (_Class11 = class {}),
+        _defineProperty(_Class11, 'q', _checkInRHS(void 0) === _Class11),
+        _Class11
+      );
+      function _p11() {}
+    }).toThrow(\`right-hand side of 'in' should be an object, got undefined\`);
+    expect(() => {
+      var _Class12;
+      return (
+        (_Class12 = class {}), _defineProperty(_Class12, 'q', _checkInRHS(null) === _Class12), _Class12
+      );
+      function _p12() {}
+    }).toThrow(\`right-hand side of 'in' should be an object, got null\`);
+    expect(() => {
+      var _Class13;
+      return (
+        (_Class13 = class {}),
+        _defineProperty(_Class13, 'q', _checkInRHS(Symbol.iterator) === _Class13),
+        _Class13
+      );
+      function _p13() {}
+    }).toThrow(\`right-hand side of 'in' should be an object, got symbol\`);
+    expect(() => {
+      var _Class14;
+      return (
+        (_Class14 = class {}), _defineProperty(_Class14, 'q', _checkInRHS(0n) === _Class14), _Class14
+      );
+      function _p14() {}
+    }).toThrow(\`right-hand side of 'in' should be an object, got bigint\`);
+    expect(() => {
+      var _p15;
+      return new ((_p15 = /* @__PURE__ */ new WeakMap()),
+      class {
+        constructor() {
+          _classPrivateFieldInitSpec(this, _p15, _p15.has(_checkInRHS(0)));
+        }
+      })();
+    }).toThrow(\`right-hand side of 'in' should be an object, got number\`);
+    expect(() => {
+      var _p16;
+      return new ((_p16 = /* @__PURE__ */ new WeakMap()),
+      class {
+        constructor() {
+          _classPrivateFieldInitSpec(this, _p16, _p16.has(_checkInRHS('')));
+        }
+      })();
+    }).toThrow(\`right-hand side of 'in' should be an object, got string\`);
+    expect(() => {
+      var _p17;
+      return new ((_p17 = /* @__PURE__ */ new WeakMap()),
+      class {
+        constructor() {
+          _classPrivateFieldInitSpec(this, _p17, _p17.has(_checkInRHS(true)));
+        }
+      })();
+    }).toThrow(\`right-hand side of 'in' should be an object, got boolean\`);
+    expect(() => {
+      var _p18;
+      return new ((_p18 = /* @__PURE__ */ new WeakMap()),
+      class {
+        constructor() {
+          _classPrivateFieldInitSpec(this, _p18, _p18.has(_checkInRHS(void 0)));
+        }
+      })();
+    }).toThrow(\`right-hand side of 'in' should be an object, got undefined\`);
+    expect(() => {
+      var _p19;
+      return new ((_p19 = /* @__PURE__ */ new WeakMap()),
+      class {
+        constructor() {
+          _classPrivateFieldInitSpec(this, _p19, _p19.has(_checkInRHS(null)));
+        }
+      })();
+    }).toThrow(\`right-hand side of 'in' should be an object, got null\`);
+    expect(() => {
+      var _p20;
+      return new ((_p20 = /* @__PURE__ */ new WeakMap()),
+      class {
+        constructor() {
+          _classPrivateFieldInitSpec(this, _p20, _p20.has(_checkInRHS(Symbol.iterator)));
+        }
+      })();
+    }).toThrow(\`right-hand side of 'in' should be an object, got symbol\`);
+    expect(() => {
+      var _p21;
+      return new ((_p21 = /* @__PURE__ */ new WeakMap()),
+      class {
+        constructor() {
+          _classPrivateFieldInitSpec(this, _p21, _p21.has(_checkInRHS(0n)));
+        }
+      })();
+    }).toThrow(\`right-hand side of 'in' should be an object, got bigint\`);
+    expect(() => {
+      var _Class_brand;
+      return new ((_Class_brand = /* @__PURE__ */ new WeakSet()),
+      class {
+        constructor() {
+          _classPrivateMethodInitSpec(this, _Class_brand);
+          _defineProperty(this, 'q', _Class_brand.has(_checkInRHS(0)));
+        }
+      })();
+      function _p22() {}
+    }).toThrow(\`right-hand side of 'in' should be an object, got number\`);
+    expect(() => {
+      var _Class_brand2;
+      return new ((_Class_brand2 = /* @__PURE__ */ new WeakSet()),
+      class {
+        constructor() {
+          _classPrivateMethodInitSpec(this, _Class_brand2);
+          _defineProperty(this, 'q', _Class_brand2.has(_checkInRHS('')));
+        }
+      })();
+      function _p23() {}
+    }).toThrow(\`right-hand side of 'in' should be an object, got string\`);
+    expect(() => {
+      var _Class_brand3;
+      return new ((_Class_brand3 = /* @__PURE__ */ new WeakSet()),
+      class {
+        constructor() {
+          _classPrivateMethodInitSpec(this, _Class_brand3);
+          _defineProperty(this, 'q', _Class_brand3.has(_checkInRHS(true)));
+        }
+      })();
+      function _p24() {}
+    }).toThrow(\`right-hand side of 'in' should be an object, got boolean\`);
+    expect(() => {
+      var _Class_brand4;
+      return new ((_Class_brand4 = /* @__PURE__ */ new WeakSet()),
+      class {
+        constructor() {
+          _classPrivateMethodInitSpec(this, _Class_brand4);
+          _defineProperty(this, 'q', _Class_brand4.has(_checkInRHS(void 0)));
+        }
+      })();
+      function _p25() {}
+    }).toThrow(\`right-hand side of 'in' should be an object, got undefined\`);
+    expect(() => {
+      var _Class_brand5;
+      return new ((_Class_brand5 = /* @__PURE__ */ new WeakSet()),
+      class {
+        constructor() {
+          _classPrivateMethodInitSpec(this, _Class_brand5);
+          _defineProperty(this, 'q', _Class_brand5.has(_checkInRHS(null)));
+        }
+      })();
+      function _p26() {}
+    }).toThrow(\`right-hand side of 'in' should be an object, got null\`);
+    expect(() => {
+      var _Class_brand6;
+      return new ((_Class_brand6 = /* @__PURE__ */ new WeakSet()),
+      class {
+        constructor() {
+          _classPrivateMethodInitSpec(this, _Class_brand6);
+          _defineProperty(this, 'q', _Class_brand6.has(_checkInRHS(Symbol.iterator)));
+        }
+      })();
+      function _p27() {}
+    }).toThrow(\`right-hand side of 'in' should be an object, got symbol\`);
+    expect(() => {
+      var _Class_brand7;
+      return new ((_Class_brand7 = /* @__PURE__ */ new WeakSet()),
+      class {
+        constructor() {
+          _classPrivateMethodInitSpec(this, _Class_brand7);
+          _defineProperty(this, 'q', _Class_brand7.has(_checkInRHS(0n)));
+        }
+      })();
+      function _p28() {}
+    }).toThrow(\`right-hand side of 'in' should be an object, got bigint\`);"
+  `);
 });
 
 test('assumption-privateFieldsAsProperties/rhs-not-object/exec.js [loose]', async () => {
@@ -518,9 +1028,10 @@ test('assumption-privateFieldsAsProperties/rhs-not-object/exec.js [loose]', asyn
       (() => {
         'use strict';
         var _p = '__private__Class_p';
-        function _Class() {
-          if (!(this instanceof _Class)) throw new TypeError('Cannot call a class as a function');
-        }
+        const _Class = function _Class() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
+        Object.defineProperty(_Class, 'prototype', { writable: false });
         Object.defineProperty(_Class, _p, {
           writable: true,
           value: Object.prototype.hasOwnProperty.call(0, _p),
@@ -532,9 +1043,10 @@ test('assumption-privateFieldsAsProperties/rhs-not-object/exec.js [loose]', asyn
       (() => {
         'use strict';
         var _p10 = '__private__Class9_p';
-        function _Class9() {
-          if (!(this instanceof _Class9)) throw new TypeError('Cannot call a class as a function');
-        }
+        const _Class9 = function _Class9() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
+        Object.defineProperty(_Class9, 'prototype', { writable: false });
         Object.defineProperty(_Class9, _p10, {
           writable: true,
           value: Object.prototype.hasOwnProperty.call('', _p10),
@@ -546,9 +1058,10 @@ test('assumption-privateFieldsAsProperties/rhs-not-object/exec.js [loose]', asyn
       (() => {
         'use strict';
         var _p12 = '__private__Class11_p';
-        function _Class11() {
-          if (!(this instanceof _Class11)) throw new TypeError('Cannot call a class as a function');
-        }
+        const _Class11 = function _Class11() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
+        Object.defineProperty(_Class11, 'prototype', { writable: false });
         Object.defineProperty(_Class11, _p12, {
           writable: true,
           value: Object.prototype.hasOwnProperty.call(true, _p12),
@@ -560,9 +1073,10 @@ test('assumption-privateFieldsAsProperties/rhs-not-object/exec.js [loose]', asyn
       (() => {
         'use strict';
         var _p14 = '__private__Class13_p';
-        function _Class13() {
-          if (!(this instanceof _Class13)) throw new TypeError('Cannot call a class as a function');
-        }
+        const _Class13 = function _Class13() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
+        Object.defineProperty(_Class13, 'prototype', { writable: false });
         Object.defineProperty(_Class13, _p14, {
           writable: true,
           value: Object.prototype.hasOwnProperty.call(void 0, _p14),
@@ -574,9 +1088,10 @@ test('assumption-privateFieldsAsProperties/rhs-not-object/exec.js [loose]', asyn
       (() => {
         'use strict';
         var _p16 = '__private__Class15_p';
-        function _Class15() {
-          if (!(this instanceof _Class15)) throw new TypeError('Cannot call a class as a function');
-        }
+        const _Class15 = function _Class15() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
+        Object.defineProperty(_Class15, 'prototype', { writable: false });
         Object.defineProperty(_Class15, _p16, {
           writable: true,
           value: Object.prototype.hasOwnProperty.call(null, _p16),
@@ -588,9 +1103,10 @@ test('assumption-privateFieldsAsProperties/rhs-not-object/exec.js [loose]', asyn
       (() => {
         'use strict';
         var _p18 = '__private__Class17_p';
-        function _Class17() {
-          if (!(this instanceof _Class17)) throw new TypeError('Cannot call a class as a function');
-        }
+        const _Class17 = function _Class17() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
+        Object.defineProperty(_Class17, 'prototype', { writable: false });
         Object.defineProperty(_Class17, _p18, {
           writable: true,
           value: Object.prototype.hasOwnProperty.call(Symbol.iterator, _p18),
@@ -602,9 +1118,10 @@ test('assumption-privateFieldsAsProperties/rhs-not-object/exec.js [loose]', asyn
       (() => {
         'use strict';
         var _p20 = '__private__Class19_p';
-        function _Class19() {
-          if (!(this instanceof _Class19)) throw new TypeError('Cannot call a class as a function');
-        }
+        const _Class19 = function _Class19() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
+        Object.defineProperty(_Class19, 'prototype', { writable: false });
         Object.defineProperty(_Class19, _p20, {
           writable: true,
           value: Object.prototype.hasOwnProperty.call(0n, _p20),
@@ -616,11 +1133,16 @@ test('assumption-privateFieldsAsProperties/rhs-not-object/exec.js [loose]', asyn
       (() => {
         'use strict';
         var _p22 = '__private__Class21_p';
-        function _Class21() {
-          if (!(this instanceof _Class21)) throw new TypeError('Cannot call a class as a function');
-        }
+        const _Class21 = function _Class21() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
+        Object.defineProperty(_Class21, 'prototype', { writable: false });
         _Class21.q = Object.prototype.hasOwnProperty.call(0, _p22);
-        Object.defineProperty(_Class21, _p22, { value: function () {} });
+        Object.defineProperty(_Class21, _p22, {
+          value: function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          },
+        });
         return _Class21;
       })(),
     ).toThrow(\`right-hand side of 'in' should be an object, got number\`);
@@ -628,11 +1150,16 @@ test('assumption-privateFieldsAsProperties/rhs-not-object/exec.js [loose]', asyn
       (() => {
         'use strict';
         var _p24 = '__private__Class23_p';
-        function _Class23() {
-          if (!(this instanceof _Class23)) throw new TypeError('Cannot call a class as a function');
-        }
+        const _Class23 = function _Class23() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
+        Object.defineProperty(_Class23, 'prototype', { writable: false });
         _Class23.q = Object.prototype.hasOwnProperty.call('', _p24);
-        Object.defineProperty(_Class23, _p24, { value: function () {} });
+        Object.defineProperty(_Class23, _p24, {
+          value: function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          },
+        });
         return _Class23;
       })(),
     ).toThrow(\`right-hand side of 'in' should be an object, got string\`);
@@ -640,11 +1167,16 @@ test('assumption-privateFieldsAsProperties/rhs-not-object/exec.js [loose]', asyn
       (() => {
         'use strict';
         var _p26 = '__private__Class25_p';
-        function _Class25() {
-          if (!(this instanceof _Class25)) throw new TypeError('Cannot call a class as a function');
-        }
+        const _Class25 = function _Class25() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
+        Object.defineProperty(_Class25, 'prototype', { writable: false });
         _Class25.q = Object.prototype.hasOwnProperty.call(true, _p26);
-        Object.defineProperty(_Class25, _p26, { value: function () {} });
+        Object.defineProperty(_Class25, _p26, {
+          value: function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          },
+        });
         return _Class25;
       })(),
     ).toThrow(\`right-hand side of 'in' should be an object, got boolean\`);
@@ -652,11 +1184,16 @@ test('assumption-privateFieldsAsProperties/rhs-not-object/exec.js [loose]', asyn
       (() => {
         'use strict';
         var _p28 = '__private__Class27_p';
-        function _Class27() {
-          if (!(this instanceof _Class27)) throw new TypeError('Cannot call a class as a function');
-        }
+        const _Class27 = function _Class27() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
+        Object.defineProperty(_Class27, 'prototype', { writable: false });
         _Class27.q = Object.prototype.hasOwnProperty.call(void 0, _p28);
-        Object.defineProperty(_Class27, _p28, { value: function () {} });
+        Object.defineProperty(_Class27, _p28, {
+          value: function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          },
+        });
         return _Class27;
       })(),
     ).toThrow(\`right-hand side of 'in' should be an object, got undefined\`);
@@ -664,11 +1201,16 @@ test('assumption-privateFieldsAsProperties/rhs-not-object/exec.js [loose]', asyn
       (() => {
         'use strict';
         var _p30 = '__private__Class29_p';
-        function _Class29() {
-          if (!(this instanceof _Class29)) throw new TypeError('Cannot call a class as a function');
-        }
+        const _Class29 = function _Class29() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
+        Object.defineProperty(_Class29, 'prototype', { writable: false });
         _Class29.q = Object.prototype.hasOwnProperty.call(null, _p30);
-        Object.defineProperty(_Class29, _p30, { value: function () {} });
+        Object.defineProperty(_Class29, _p30, {
+          value: function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          },
+        });
         return _Class29;
       })(),
     ).toThrow(\`right-hand side of 'in' should be an object, got null\`);
@@ -676,11 +1218,16 @@ test('assumption-privateFieldsAsProperties/rhs-not-object/exec.js [loose]', asyn
       (() => {
         'use strict';
         var _p32 = '__private__Class31_p';
-        function _Class31() {
-          if (!(this instanceof _Class31)) throw new TypeError('Cannot call a class as a function');
-        }
+        const _Class31 = function _Class31() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
+        Object.defineProperty(_Class31, 'prototype', { writable: false });
         _Class31.q = Object.prototype.hasOwnProperty.call(Symbol.iterator, _p32);
-        Object.defineProperty(_Class31, _p32, { value: function () {} });
+        Object.defineProperty(_Class31, _p32, {
+          value: function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          },
+        });
         return _Class31;
       })(),
     ).toThrow(\`right-hand side of 'in' should be an object, got symbol\`);
@@ -688,11 +1235,16 @@ test('assumption-privateFieldsAsProperties/rhs-not-object/exec.js [loose]', asyn
       (() => {
         'use strict';
         var _p34 = '__private__Class33_p';
-        function _Class33() {
-          if (!(this instanceof _Class33)) throw new TypeError('Cannot call a class as a function');
-        }
+        const _Class33 = function _Class33() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
+        Object.defineProperty(_Class33, 'prototype', { writable: false });
         _Class33.q = Object.prototype.hasOwnProperty.call(0n, _p34);
-        Object.defineProperty(_Class33, _p34, { value: function () {} });
+        Object.defineProperty(_Class33, _p34, {
+          value: function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          },
+        });
         return _Class33;
       })(),
     ).toThrow(\`right-hand side of 'in' should be an object, got bigint\`);
@@ -701,13 +1253,14 @@ test('assumption-privateFieldsAsProperties/rhs-not-object/exec.js [loose]', asyn
         new ((() => {
           'use strict';
           var _p36 = '__private__Class35_p';
-          function _Class35() {
-            if (!(this instanceof _Class35)) throw new TypeError('Cannot call a class as a function');
+          const _Class35 = function _Class35() {
+            if (!new.target) throw new TypeError('Cannot call a class as a function');
             Object.defineProperty(this, _p36, {
               writable: true,
               value: Object.prototype.hasOwnProperty.call(0, _p36),
             });
-          }
+          };
+          Object.defineProperty(_Class35, 'prototype', { writable: false });
           return _Class35;
         })())(),
     ).toThrow(\`right-hand side of 'in' should be an object, got number\`);
@@ -716,13 +1269,14 @@ test('assumption-privateFieldsAsProperties/rhs-not-object/exec.js [loose]', asyn
         new ((() => {
           'use strict';
           var _p38 = '__private__Class37_p';
-          function _Class37() {
-            if (!(this instanceof _Class37)) throw new TypeError('Cannot call a class as a function');
+          const _Class37 = function _Class37() {
+            if (!new.target) throw new TypeError('Cannot call a class as a function');
             Object.defineProperty(this, _p38, {
               writable: true,
               value: Object.prototype.hasOwnProperty.call('', _p38),
             });
-          }
+          };
+          Object.defineProperty(_Class37, 'prototype', { writable: false });
           return _Class37;
         })())(),
     ).toThrow(\`right-hand side of 'in' should be an object, got string\`);
@@ -731,13 +1285,14 @@ test('assumption-privateFieldsAsProperties/rhs-not-object/exec.js [loose]', asyn
         new ((() => {
           'use strict';
           var _p40 = '__private__Class39_p';
-          function _Class39() {
-            if (!(this instanceof _Class39)) throw new TypeError('Cannot call a class as a function');
+          const _Class39 = function _Class39() {
+            if (!new.target) throw new TypeError('Cannot call a class as a function');
             Object.defineProperty(this, _p40, {
               writable: true,
               value: Object.prototype.hasOwnProperty.call(true, _p40),
             });
-          }
+          };
+          Object.defineProperty(_Class39, 'prototype', { writable: false });
           return _Class39;
         })())(),
     ).toThrow(\`right-hand side of 'in' should be an object, got boolean\`);
@@ -746,13 +1301,14 @@ test('assumption-privateFieldsAsProperties/rhs-not-object/exec.js [loose]', asyn
         new ((() => {
           'use strict';
           var _p42 = '__private__Class41_p';
-          function _Class41() {
-            if (!(this instanceof _Class41)) throw new TypeError('Cannot call a class as a function');
+          const _Class41 = function _Class41() {
+            if (!new.target) throw new TypeError('Cannot call a class as a function');
             Object.defineProperty(this, _p42, {
               writable: true,
               value: Object.prototype.hasOwnProperty.call(void 0, _p42),
             });
-          }
+          };
+          Object.defineProperty(_Class41, 'prototype', { writable: false });
           return _Class41;
         })())(),
     ).toThrow(\`right-hand side of 'in' should be an object, got undefined\`);
@@ -761,13 +1317,14 @@ test('assumption-privateFieldsAsProperties/rhs-not-object/exec.js [loose]', asyn
         new ((() => {
           'use strict';
           var _p44 = '__private__Class43_p';
-          function _Class43() {
-            if (!(this instanceof _Class43)) throw new TypeError('Cannot call a class as a function');
+          const _Class43 = function _Class43() {
+            if (!new.target) throw new TypeError('Cannot call a class as a function');
             Object.defineProperty(this, _p44, {
               writable: true,
               value: Object.prototype.hasOwnProperty.call(null, _p44),
             });
-          }
+          };
+          Object.defineProperty(_Class43, 'prototype', { writable: false });
           return _Class43;
         })())(),
     ).toThrow(\`right-hand side of 'in' should be an object, got null\`);
@@ -776,13 +1333,14 @@ test('assumption-privateFieldsAsProperties/rhs-not-object/exec.js [loose]', asyn
         new ((() => {
           'use strict';
           var _p46 = '__private__Class45_p';
-          function _Class45() {
-            if (!(this instanceof _Class45)) throw new TypeError('Cannot call a class as a function');
+          const _Class45 = function _Class45() {
+            if (!new.target) throw new TypeError('Cannot call a class as a function');
             Object.defineProperty(this, _p46, {
               writable: true,
               value: Object.prototype.hasOwnProperty.call(Symbol.iterator, _p46),
             });
-          }
+          };
+          Object.defineProperty(_Class45, 'prototype', { writable: false });
           return _Class45;
         })())(),
     ).toThrow(\`right-hand side of 'in' should be an object, got symbol\`);
@@ -791,13 +1349,14 @@ test('assumption-privateFieldsAsProperties/rhs-not-object/exec.js [loose]', asyn
         new ((() => {
           'use strict';
           var _p48 = '__private__Class47_p';
-          function _Class47() {
-            if (!(this instanceof _Class47)) throw new TypeError('Cannot call a class as a function');
+          const _Class47 = function _Class47() {
+            if (!new.target) throw new TypeError('Cannot call a class as a function');
             Object.defineProperty(this, _p48, {
               writable: true,
               value: Object.prototype.hasOwnProperty.call(0n, _p48),
             });
-          }
+          };
+          Object.defineProperty(_Class47, 'prototype', { writable: false });
           return _Class47;
         })())(),
     ).toThrow(\`right-hand side of 'in' should be an object, got bigint\`);
@@ -806,11 +1365,16 @@ test('assumption-privateFieldsAsProperties/rhs-not-object/exec.js [loose]', asyn
         new ((() => {
           'use strict';
           var _p50 = '__private__Class49_p';
-          function _Class49() {
-            if (!(this instanceof _Class49)) throw new TypeError('Cannot call a class as a function');
+          const _Class49 = function _Class49() {
+            if (!new.target) throw new TypeError('Cannot call a class as a function');
             this.q = Object.prototype.hasOwnProperty.call(0, _p50);
-            Object.defineProperty(this, _p50, { value: function () {} });
-          }
+            Object.defineProperty(this, _p50, {
+              value: function () {
+                if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              },
+            });
+          };
+          Object.defineProperty(_Class49, 'prototype', { writable: false });
           return _Class49;
         })())(),
     ).toThrow(\`right-hand side of 'in' should be an object, got number\`);
@@ -819,11 +1383,16 @@ test('assumption-privateFieldsAsProperties/rhs-not-object/exec.js [loose]', asyn
         new ((() => {
           'use strict';
           var _p52 = '__private__Class51_p';
-          function _Class51() {
-            if (!(this instanceof _Class51)) throw new TypeError('Cannot call a class as a function');
+          const _Class51 = function _Class51() {
+            if (!new.target) throw new TypeError('Cannot call a class as a function');
             this.q = Object.prototype.hasOwnProperty.call('', _p52);
-            Object.defineProperty(this, _p52, { value: function () {} });
-          }
+            Object.defineProperty(this, _p52, {
+              value: function () {
+                if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              },
+            });
+          };
+          Object.defineProperty(_Class51, 'prototype', { writable: false });
           return _Class51;
         })())(),
     ).toThrow(\`right-hand side of 'in' should be an object, got string\`);
@@ -832,11 +1401,16 @@ test('assumption-privateFieldsAsProperties/rhs-not-object/exec.js [loose]', asyn
         new ((() => {
           'use strict';
           var _p54 = '__private__Class53_p';
-          function _Class53() {
-            if (!(this instanceof _Class53)) throw new TypeError('Cannot call a class as a function');
+          const _Class53 = function _Class53() {
+            if (!new.target) throw new TypeError('Cannot call a class as a function');
             this.q = Object.prototype.hasOwnProperty.call(true, _p54);
-            Object.defineProperty(this, _p54, { value: function () {} });
-          }
+            Object.defineProperty(this, _p54, {
+              value: function () {
+                if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              },
+            });
+          };
+          Object.defineProperty(_Class53, 'prototype', { writable: false });
           return _Class53;
         })())(),
     ).toThrow(\`right-hand side of 'in' should be an object, got boolean\`);
@@ -845,11 +1419,16 @@ test('assumption-privateFieldsAsProperties/rhs-not-object/exec.js [loose]', asyn
         new ((() => {
           'use strict';
           var _p56 = '__private__Class55_p';
-          function _Class55() {
-            if (!(this instanceof _Class55)) throw new TypeError('Cannot call a class as a function');
+          const _Class55 = function _Class55() {
+            if (!new.target) throw new TypeError('Cannot call a class as a function');
             this.q = Object.prototype.hasOwnProperty.call(void 0, _p56);
-            Object.defineProperty(this, _p56, { value: function () {} });
-          }
+            Object.defineProperty(this, _p56, {
+              value: function () {
+                if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              },
+            });
+          };
+          Object.defineProperty(_Class55, 'prototype', { writable: false });
           return _Class55;
         })())(),
     ).toThrow(\`right-hand side of 'in' should be an object, got undefined\`);
@@ -858,11 +1437,16 @@ test('assumption-privateFieldsAsProperties/rhs-not-object/exec.js [loose]', asyn
         new ((() => {
           'use strict';
           var _p58 = '__private__Class57_p';
-          function _Class57() {
-            if (!(this instanceof _Class57)) throw new TypeError('Cannot call a class as a function');
+          const _Class57 = function _Class57() {
+            if (!new.target) throw new TypeError('Cannot call a class as a function');
             this.q = Object.prototype.hasOwnProperty.call(null, _p58);
-            Object.defineProperty(this, _p58, { value: function () {} });
-          }
+            Object.defineProperty(this, _p58, {
+              value: function () {
+                if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              },
+            });
+          };
+          Object.defineProperty(_Class57, 'prototype', { writable: false });
           return _Class57;
         })())(),
     ).toThrow(\`right-hand side of 'in' should be an object, got null\`);
@@ -871,11 +1455,16 @@ test('assumption-privateFieldsAsProperties/rhs-not-object/exec.js [loose]', asyn
         new ((() => {
           'use strict';
           var _p60 = '__private__Class59_p';
-          function _Class59() {
-            if (!(this instanceof _Class59)) throw new TypeError('Cannot call a class as a function');
+          const _Class59 = function _Class59() {
+            if (!new.target) throw new TypeError('Cannot call a class as a function');
             this.q = Object.prototype.hasOwnProperty.call(Symbol.iterator, _p60);
-            Object.defineProperty(this, _p60, { value: function () {} });
-          }
+            Object.defineProperty(this, _p60, {
+              value: function () {
+                if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              },
+            });
+          };
+          Object.defineProperty(_Class59, 'prototype', { writable: false });
           return _Class59;
         })())(),
     ).toThrow(\`right-hand side of 'in' should be an object, got symbol\`);
@@ -884,11 +1473,16 @@ test('assumption-privateFieldsAsProperties/rhs-not-object/exec.js [loose]', asyn
         new ((() => {
           'use strict';
           var _p62 = '__private__Class61_p';
-          function _Class61() {
-            if (!(this instanceof _Class61)) throw new TypeError('Cannot call a class as a function');
+          const _Class61 = function _Class61() {
+            if (!new.target) throw new TypeError('Cannot call a class as a function');
             this.q = Object.prototype.hasOwnProperty.call(0n, _p62);
-            Object.defineProperty(this, _p62, { value: function () {} });
-          }
+            Object.defineProperty(this, _p62, {
+              value: function () {
+                if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              },
+            });
+          };
+          Object.defineProperty(_Class61, 'prototype', { writable: false });
           return _Class61;
         })())(),
     ).toThrow(\`right-hand side of 'in' should be an object, got bigint\`);"
@@ -907,7 +1501,15 @@ test('assumption-privateFieldsAsProperties/static-accessor/input.js [spec]', asy
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-spec-private-features-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _checkInRHS = require('@babel/runtime/helpers/checkInRHS');
+    class Foo {
+      test(other) {
+        return _checkInRHS(other) === Foo;
+      }
+    }
+    function _get_foo() {}"
+  `);
 });
 
 test('assumption-privateFieldsAsProperties/static-accessor/input.js [loose]', async () => {
@@ -923,20 +1525,33 @@ test('assumption-privateFieldsAsProperties/static-accessor/input.js [loose]', as
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "var Foo = (() => {
+    "let Foo = (() => {
       'use strict';
       var _foo = '__private_Foo_foo';
-      function Foo() {
-        if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
-      }
+      const Foo = function Foo() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+      };
       Object.defineProperty(Foo.prototype, 'test', {
-        value: function (other) {
-          return Object.prototype.hasOwnProperty.call(other, _foo);
-        },
+        value: Object.defineProperty(
+          function (other) {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            return Object.prototype.hasOwnProperty.call(other, _foo);
+          },
+          'name',
+          {
+            value: 'test',
+            configurable: true,
+          },
+        ),
         writable: true,
         configurable: true,
       });
-      Object.defineProperty(Foo, _foo, { get: function () {} });
+      Object.defineProperty(Foo, 'prototype', { writable: false });
+      Object.defineProperty(Foo, _foo, {
+        get: function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        },
+      });
       return Foo;
     })();"
   `);
@@ -954,7 +1569,15 @@ test('assumption-privateFieldsAsProperties/static-field/input.js [spec]', async 
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-spec-private-features-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _checkInRHS = require('@babel/runtime/helpers/checkInRHS');
+    class Foo {
+      test(other) {
+        return _checkInRHS(other) === Foo;
+      }
+    }
+    var _foo = { _: 1 };"
+  `);
 });
 
 test('assumption-privateFieldsAsProperties/static-field/input.js [loose]', async () => {
@@ -970,19 +1593,28 @@ test('assumption-privateFieldsAsProperties/static-field/input.js [loose]', async
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "var Foo = (() => {
+    "let Foo = (() => {
       'use strict';
       var _foo = '__private_Foo_foo';
-      function Foo() {
-        if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
-      }
+      const Foo = function Foo() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+      };
       Object.defineProperty(Foo.prototype, 'test', {
-        value: function (other) {
-          return Object.prototype.hasOwnProperty.call(other, _foo);
-        },
+        value: Object.defineProperty(
+          function (other) {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            return Object.prototype.hasOwnProperty.call(other, _foo);
+          },
+          'name',
+          {
+            value: 'test',
+            configurable: true,
+          },
+        ),
         writable: true,
         configurable: true,
       });
+      Object.defineProperty(Foo, 'prototype', { writable: false });
       Object.defineProperty(Foo, _foo, {
         writable: true,
         value: 1,
@@ -1004,7 +1636,15 @@ test('assumption-privateFieldsAsProperties/static-method/input.js [spec]', async
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-spec-private-features-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _checkInRHS = require('@babel/runtime/helpers/checkInRHS');
+    class Foo {
+      test(other) {
+        return _checkInRHS(other) === Foo;
+      }
+    }
+    function _foo() {}"
+  `);
 });
 
 test('assumption-privateFieldsAsProperties/static-method/input.js [loose]', async () => {
@@ -1020,20 +1660,33 @@ test('assumption-privateFieldsAsProperties/static-method/input.js [loose]', asyn
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "var Foo = (() => {
+    "let Foo = (() => {
       'use strict';
       var _foo = '__private_Foo_foo';
-      function Foo() {
-        if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
-      }
+      const Foo = function Foo() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+      };
       Object.defineProperty(Foo.prototype, 'test', {
-        value: function (other) {
-          return Object.prototype.hasOwnProperty.call(other, _foo);
-        },
+        value: Object.defineProperty(
+          function (other) {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            return Object.prototype.hasOwnProperty.call(other, _foo);
+          },
+          'name',
+          {
+            value: 'test',
+            configurable: true,
+          },
+        ),
         writable: true,
         configurable: true,
       });
-      Object.defineProperty(Foo, _foo, { value: function () {} });
+      Object.defineProperty(Foo, 'prototype', { writable: false });
+      Object.defineProperty(Foo, _foo, {
+        value: function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        },
+      });
       return Foo;
     })();"
   `);
@@ -1051,7 +1704,20 @@ test('assumption-privateFieldsAsSymbols/accessor/input.js [spec]', async () => {
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-spec-private-features-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
+    var _checkInRHS = require('@babel/runtime/helpers/checkInRHS');
+    var _Foo_brand = /* @__PURE__ */ new WeakSet();
+    class Foo {
+      constructor() {
+        _classPrivateMethodInitSpec(this, _Foo_brand);
+      }
+      test(other) {
+        return _Foo_brand.has(_checkInRHS(other));
+      }
+    }
+    function _get_foo() {}"
+  `);
 });
 
 test('assumption-privateFieldsAsSymbols/accessor/input.js [loose]', async () => {
@@ -1067,20 +1733,33 @@ test('assumption-privateFieldsAsSymbols/accessor/input.js [loose]', async () => 
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "var Foo = (() => {
+    "let Foo = (() => {
       'use strict';
       var _foo = '__private_Foo_foo';
-      function Foo() {
-        if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
-        Object.defineProperty(this, _foo, { get: function () {} });
-      }
+      const Foo = function Foo() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+        Object.defineProperty(this, _foo, {
+          get: function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          },
+        });
+      };
       Object.defineProperty(Foo.prototype, 'test', {
-        value: function (other) {
-          return Object.prototype.hasOwnProperty.call(other, _foo);
-        },
+        value: Object.defineProperty(
+          function (other) {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            return Object.prototype.hasOwnProperty.call(other, _foo);
+          },
+          'name',
+          {
+            value: 'test',
+            configurable: true,
+          },
+        ),
         writable: true,
         configurable: true,
       });
+      Object.defineProperty(Foo, 'prototype', { writable: false });
       return Foo;
     })();"
   `);
@@ -1098,7 +1777,23 @@ test('assumption-privateFieldsAsSymbols/compiled-classes/input.js [spec]', async
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-spec-private-features-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
+    var _checkInRHS = require('@babel/runtime/helpers/checkInRHS');
+    var _bar = /* @__PURE__ */ new WeakMap();
+    class Foo {
+      constructor() {
+        _classPrivateFieldInitSpec(this, _bar, 'bar');
+      }
+      static test() {
+        return _checkInRHS(Foo) === Foo;
+      }
+      test() {
+        return _bar.has(_checkInRHS(this));
+      }
+    }
+    var _foo = { _: 'foo' };"
+  `);
 });
 
 test('assumption-privateFieldsAsSymbols/compiled-classes/input.js [loose]', async () => {
@@ -1114,31 +1809,48 @@ test('assumption-privateFieldsAsSymbols/compiled-classes/input.js [loose]', asyn
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "var Foo = (() => {
+    "let Foo = (() => {
       'use strict';
       var _foo = '__private_Foo_foo';
       var _bar = '__private_Foo_bar';
-      function Foo() {
-        if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
+      const Foo = function Foo() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
         Object.defineProperty(this, _bar, {
           writable: true,
           value: 'bar',
         });
-      }
+      };
       Object.defineProperty(Foo, 'test', {
-        value: function () {
-          return Object.prototype.hasOwnProperty.call(Foo, _foo);
-        },
+        value: Object.defineProperty(
+          function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            return Object.prototype.hasOwnProperty.call(Foo, _foo);
+          },
+          'name',
+          {
+            value: 'test',
+            configurable: true,
+          },
+        ),
         writable: true,
         configurable: true,
       });
       Object.defineProperty(Foo.prototype, 'test', {
-        value: function () {
-          return Object.prototype.hasOwnProperty.call(this, _bar);
-        },
+        value: Object.defineProperty(
+          function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            return Object.prototype.hasOwnProperty.call(this, _bar);
+          },
+          'name',
+          {
+            value: 'test',
+            configurable: true,
+          },
+        ),
         writable: true,
         configurable: true,
       });
+      Object.defineProperty(Foo, 'prototype', { writable: false });
       Object.defineProperty(Foo, _foo, {
         writable: true,
         value: 'foo',
@@ -1159,7 +1871,19 @@ test('assumption-privateFieldsAsSymbols/field/input.js [spec]', async () => {
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-spec-private-features-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
+    var _checkInRHS = require('@babel/runtime/helpers/checkInRHS');
+    var _foo = /* @__PURE__ */ new WeakMap();
+    class Foo {
+      constructor() {
+        _classPrivateFieldInitSpec(this, _foo, 1);
+      }
+      test(other) {
+        return _foo.has(_checkInRHS(other));
+      }
+    }"
+  `);
 });
 
 test('assumption-privateFieldsAsSymbols/field/input.js [loose]', async () => {
@@ -1174,23 +1898,32 @@ test('assumption-privateFieldsAsSymbols/field/input.js [loose]', async () => {
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "var Foo = (() => {
+    "let Foo = (() => {
       'use strict';
       var _foo = '__private_Foo_foo';
-      function Foo() {
-        if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
+      const Foo = function Foo() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
         Object.defineProperty(this, _foo, {
           writable: true,
           value: 1,
         });
-      }
+      };
       Object.defineProperty(Foo.prototype, 'test', {
-        value: function (other) {
-          return Object.prototype.hasOwnProperty.call(other, _foo);
-        },
+        value: Object.defineProperty(
+          function (other) {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            return Object.prototype.hasOwnProperty.call(other, _foo);
+          },
+          'name',
+          {
+            value: 'test',
+            configurable: true,
+          },
+        ),
         writable: true,
         configurable: true,
       });
+      Object.defineProperty(Foo, 'prototype', { writable: false });
       return Foo;
     })();"
   `);
@@ -1208,7 +1941,29 @@ test('assumption-privateFieldsAsSymbols/method/exec.js [spec]', async () => {
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-spec-private-features-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
+    var _checkInRHS = require('@babel/runtime/helpers/checkInRHS');
+    var _Foo_brand = /* @__PURE__ */ new WeakSet();
+    class Foo {
+      constructor() {
+        _classPrivateMethodInitSpec(this, _Foo_brand);
+      }
+      test(other) {
+        return _Foo_brand.has(_checkInRHS(other));
+      }
+      test2(other) {
+        return _Foo_brand.has(_checkInRHS(other));
+      }
+    }
+    function _foo() {}
+    function _foo2() {}
+    const cl = new Foo();
+    expect(cl.test({})).toBe(false);
+    expect(cl.test(cl)).toBe(true);
+    expect(cl.test2({})).toBe(false);
+    expect(cl.test2(cl)).toBe(true);"
+  `);
 });
 
 test('assumption-privateFieldsAsSymbols/method/exec.js [loose]', async () => {
@@ -1224,29 +1979,54 @@ test('assumption-privateFieldsAsSymbols/method/exec.js [loose]', async () => {
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "var Foo = (() => {
+    "let Foo = (() => {
       'use strict';
       var _foo = '__private_Foo_foo';
       var _foo2 = '__private_Foo_foo2';
-      function Foo() {
-        if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
-        Object.defineProperty(this, _foo, { value: function () {} });
-        Object.defineProperty(this, _foo2, { value: function () {} });
-      }
+      const Foo = function Foo() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+        Object.defineProperty(this, _foo, {
+          value: function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          },
+        });
+        Object.defineProperty(this, _foo2, {
+          value: function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          },
+        });
+      };
       Object.defineProperty(Foo.prototype, 'test', {
-        value: function (other) {
-          return Object.prototype.hasOwnProperty.call(other, _foo);
-        },
+        value: Object.defineProperty(
+          function (other) {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            return Object.prototype.hasOwnProperty.call(other, _foo);
+          },
+          'name',
+          {
+            value: 'test',
+            configurable: true,
+          },
+        ),
         writable: true,
         configurable: true,
       });
       Object.defineProperty(Foo.prototype, 'test2', {
-        value: function (other) {
-          return Object.prototype.hasOwnProperty.call(other, _foo2);
-        },
+        value: Object.defineProperty(
+          function (other) {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            return Object.prototype.hasOwnProperty.call(other, _foo2);
+          },
+          'name',
+          {
+            value: 'test2',
+            configurable: true,
+          },
+        ),
         writable: true,
         configurable: true,
       });
+      Object.defineProperty(Foo, 'prototype', { writable: false });
       return Foo;
     })();
     const cl = new Foo();
@@ -1269,7 +2049,24 @@ test('assumption-privateFieldsAsSymbols/method/input.js [spec]', async () => {
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-spec-private-features-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
+    var _checkInRHS = require('@babel/runtime/helpers/checkInRHS');
+    var _Foo_brand = /* @__PURE__ */ new WeakSet();
+    class Foo {
+      constructor() {
+        _classPrivateMethodInitSpec(this, _Foo_brand);
+      }
+      test(other) {
+        return _Foo_brand.has(_checkInRHS(other));
+      }
+      test2(other) {
+        return _Foo_brand.has(_checkInRHS(other));
+      }
+    }
+    function _foo() {}
+    function _foo2() {}"
+  `);
 });
 
 test('assumption-privateFieldsAsSymbols/method/input.js [loose]', async () => {
@@ -1285,29 +2082,54 @@ test('assumption-privateFieldsAsSymbols/method/input.js [loose]', async () => {
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "var Foo = (() => {
+    "let Foo = (() => {
       'use strict';
       var _foo = '__private_Foo_foo';
       var _foo2 = '__private_Foo_foo2';
-      function Foo() {
-        if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
-        Object.defineProperty(this, _foo, { value: function () {} });
-        Object.defineProperty(this, _foo2, { value: function () {} });
-      }
+      const Foo = function Foo() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+        Object.defineProperty(this, _foo, {
+          value: function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          },
+        });
+        Object.defineProperty(this, _foo2, {
+          value: function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          },
+        });
+      };
       Object.defineProperty(Foo.prototype, 'test', {
-        value: function (other) {
-          return Object.prototype.hasOwnProperty.call(other, _foo);
-        },
+        value: Object.defineProperty(
+          function (other) {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            return Object.prototype.hasOwnProperty.call(other, _foo);
+          },
+          'name',
+          {
+            value: 'test',
+            configurable: true,
+          },
+        ),
         writable: true,
         configurable: true,
       });
       Object.defineProperty(Foo.prototype, 'test2', {
-        value: function (other) {
-          return Object.prototype.hasOwnProperty.call(other, _foo);
-        },
+        value: Object.defineProperty(
+          function (other) {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            return Object.prototype.hasOwnProperty.call(other, _foo);
+          },
+          'name',
+          {
+            value: 'test2',
+            configurable: true,
+          },
+        ),
         writable: true,
         configurable: true,
       });
+      Object.defineProperty(Foo, 'prototype', { writable: false });
       return Foo;
     })();"
   `);
@@ -1325,7 +2147,32 @@ test('assumption-privateFieldsAsSymbols/nested-class-other-redeclared/input.js [
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-spec-private-features-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
+    var _checkInRHS = require('@babel/runtime/helpers/checkInRHS');
+    var _foo = /* @__PURE__ */ new WeakMap();
+    var _bar = /* @__PURE__ */ new WeakMap();
+    class Foo {
+      constructor() {
+        _classPrivateFieldInitSpec(this, _foo, 1);
+        _classPrivateFieldInitSpec(this, _bar, 1);
+      }
+      test() {
+        var _bar2 = /* @__PURE__ */ new WeakMap();
+        class Nested {
+          constructor() {
+            _classPrivateFieldInitSpec(this, _bar2, 2);
+          }
+          test() {
+            _foo.has(_checkInRHS(this));
+            _bar2.has(_checkInRHS(this));
+          }
+        }
+        _foo.has(_checkInRHS(this));
+        _bar.has(_checkInRHS(this));
+      }
+    }"
+  `);
 });
 
 test('assumption-privateFieldsAsSymbols/nested-class-other-redeclared/input.js [loose]', async () => {
@@ -1341,12 +2188,12 @@ test('assumption-privateFieldsAsSymbols/nested-class-other-redeclared/input.js [
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "var Foo = (() => {
+    "let Foo = (() => {
       'use strict';
       var _foo = '__private_Foo_foo';
       var _bar = '__private_Foo_bar';
-      function Foo() {
-        if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
+      const Foo = function Foo() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
         Object.defineProperty(this, _foo, {
           writable: true,
           value: 1,
@@ -1355,35 +2202,53 @@ test('assumption-privateFieldsAsSymbols/nested-class-other-redeclared/input.js [
           writable: true,
           value: 1,
         });
-      }
+      };
       Object.defineProperty(Foo.prototype, 'test', {
-        value: function () {
-          var Nested = (() => {
-            'use strict';
-            var _bar11 = '__private_Nested_bar';
-            function Nested() {
-              if (!(this instanceof Nested)) throw new TypeError('Cannot call a class as a function');
-              Object.defineProperty(this, _bar11, {
+        value: Object.defineProperty(
+          function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            let Nested = (() => {
+              'use strict';
+              var _bar11 = '__private_Nested_bar';
+              const Nested = function Nested() {
+                if (!new.target) throw new TypeError('Cannot call a class as a function');
+                Object.defineProperty(this, _bar11, {
+                  writable: true,
+                  value: 2,
+                });
+              };
+              Object.defineProperty(Nested.prototype, 'test', {
+                value: Object.defineProperty(
+                  function () {
+                    if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+                    Object.prototype.hasOwnProperty.call(this, _foo);
+                    Object.prototype.hasOwnProperty.call(this, _bar11);
+                  },
+                  'name',
+                  {
+                    value: 'test',
+                    configurable: true,
+                  },
+                ),
                 writable: true,
-                value: 2,
+                configurable: true,
               });
-            }
-            Object.defineProperty(Nested.prototype, 'test', {
-              value: function () {
-                Object.prototype.hasOwnProperty.call(this, _foo);
-                Object.prototype.hasOwnProperty.call(this, _bar11);
-              },
-              writable: true,
-              configurable: true,
-            });
-            return Nested;
-          })();
-          Object.prototype.hasOwnProperty.call(this, _foo);
-          Object.prototype.hasOwnProperty.call(this, _bar);
-        },
+              Object.defineProperty(Nested, 'prototype', { writable: false });
+              return Nested;
+            })();
+            Object.prototype.hasOwnProperty.call(this, _foo);
+            Object.prototype.hasOwnProperty.call(this, _bar);
+          },
+          'name',
+          {
+            value: 'test',
+            configurable: true,
+          },
+        ),
         writable: true,
         configurable: true,
       });
+      Object.defineProperty(Foo, 'prototype', { writable: false });
       return Foo;
     })();"
   `);
@@ -1401,7 +2266,28 @@ test('assumption-privateFieldsAsSymbols/nested-class-redeclared/input.js [spec]'
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-spec-private-features-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
+    var _checkInRHS = require('@babel/runtime/helpers/checkInRHS');
+    var _foo = /* @__PURE__ */ new WeakMap();
+    class Foo {
+      constructor() {
+        _classPrivateFieldInitSpec(this, _foo, 1);
+      }
+      test() {
+        var _foo2 = /* @__PURE__ */ new WeakMap();
+        class Nested {
+          constructor() {
+            _classPrivateFieldInitSpec(this, _foo2, 2);
+          }
+          test() {
+            _foo2.has(_checkInRHS(this));
+          }
+        }
+        _foo.has(_checkInRHS(this));
+      }
+    }"
+  `);
 });
 
 test('assumption-privateFieldsAsSymbols/nested-class-redeclared/input.js [loose]', async () => {
@@ -1417,42 +2303,60 @@ test('assumption-privateFieldsAsSymbols/nested-class-redeclared/input.js [loose]
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "var Foo = (() => {
+    "let Foo = (() => {
       'use strict';
       var _foo = '__private_Foo_foo';
-      function Foo() {
-        if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
+      const Foo = function Foo() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
         Object.defineProperty(this, _foo, {
           writable: true,
           value: 1,
         });
-      }
+      };
       Object.defineProperty(Foo.prototype, 'test', {
-        value: function () {
-          var Nested = (() => {
-            'use strict';
-            var _foo10 = '__private_Nested_foo';
-            function Nested() {
-              if (!(this instanceof Nested)) throw new TypeError('Cannot call a class as a function');
-              Object.defineProperty(this, _foo10, {
+        value: Object.defineProperty(
+          function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            let Nested = (() => {
+              'use strict';
+              var _foo10 = '__private_Nested_foo';
+              const Nested = function Nested() {
+                if (!new.target) throw new TypeError('Cannot call a class as a function');
+                Object.defineProperty(this, _foo10, {
+                  writable: true,
+                  value: 2,
+                });
+              };
+              Object.defineProperty(Nested.prototype, 'test', {
+                value: Object.defineProperty(
+                  function () {
+                    if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+                    Object.prototype.hasOwnProperty.call(this, _foo10);
+                  },
+                  'name',
+                  {
+                    value: 'test',
+                    configurable: true,
+                  },
+                ),
                 writable: true,
-                value: 2,
+                configurable: true,
               });
-            }
-            Object.defineProperty(Nested.prototype, 'test', {
-              value: function () {
-                Object.prototype.hasOwnProperty.call(this, _foo10);
-              },
-              writable: true,
-              configurable: true,
-            });
-            return Nested;
-          })();
-          Object.prototype.hasOwnProperty.call(this, _foo);
-        },
+              Object.defineProperty(Nested, 'prototype', { writable: false });
+              return Nested;
+            })();
+            Object.prototype.hasOwnProperty.call(this, _foo);
+          },
+          'name',
+          {
+            value: 'test',
+            configurable: true,
+          },
+        ),
         writable: true,
         configurable: true,
       });
+      Object.defineProperty(Foo, 'prototype', { writable: false });
       return Foo;
     })();"
   `);
@@ -1470,7 +2374,24 @@ test('assumption-privateFieldsAsSymbols/nested-class/input.js [spec]', async () 
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-spec-private-features-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
+    var _checkInRHS = require('@babel/runtime/helpers/checkInRHS');
+    var _foo = /* @__PURE__ */ new WeakMap();
+    class Foo {
+      constructor() {
+        _classPrivateFieldInitSpec(this, _foo, 1);
+      }
+      test() {
+        class Nested {
+          test() {
+            _foo.has(_checkInRHS(this));
+          }
+        }
+        _foo.has(_checkInRHS(this));
+      }
+    }"
+  `);
 });
 
 test('assumption-privateFieldsAsSymbols/nested-class/input.js [loose]', async () => {
@@ -1486,37 +2407,55 @@ test('assumption-privateFieldsAsSymbols/nested-class/input.js [loose]', async ()
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "var Foo = (() => {
+    "let Foo = (() => {
       'use strict';
       var _foo = '__private_Foo_foo';
-      function Foo() {
-        if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
+      const Foo = function Foo() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
         Object.defineProperty(this, _foo, {
           writable: true,
           value: 1,
         });
-      }
+      };
       Object.defineProperty(Foo.prototype, 'test', {
-        value: function () {
-          var Nested = (() => {
-            'use strict';
-            function Nested() {
-              if (!(this instanceof Nested)) throw new TypeError('Cannot call a class as a function');
-            }
-            Object.defineProperty(Nested.prototype, 'test', {
-              value: function () {
-                Object.prototype.hasOwnProperty.call(this, _foo);
-              },
-              writable: true,
-              configurable: true,
-            });
-            return Nested;
-          })();
-          Object.prototype.hasOwnProperty.call(this, _foo);
-        },
+        value: Object.defineProperty(
+          function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            let Nested = (() => {
+              'use strict';
+              const Nested = function Nested() {
+                if (!new.target) throw new TypeError('Cannot call a class as a function');
+              };
+              Object.defineProperty(Nested.prototype, 'test', {
+                value: Object.defineProperty(
+                  function () {
+                    if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+                    Object.prototype.hasOwnProperty.call(this, _foo);
+                  },
+                  'name',
+                  {
+                    value: 'test',
+                    configurable: true,
+                  },
+                ),
+                writable: true,
+                configurable: true,
+              });
+              Object.defineProperty(Nested, 'prototype', { writable: false });
+              return Nested;
+            })();
+            Object.prototype.hasOwnProperty.call(this, _foo);
+          },
+          'name',
+          {
+            value: 'test',
+            configurable: true,
+          },
+        ),
         writable: true,
         configurable: true,
       });
+      Object.defineProperty(Foo, 'prototype', { writable: false });
       return Foo;
     })();"
   `);
@@ -1534,7 +2473,231 @@ test('assumption-privateFieldsAsSymbols/rhs-not-object/exec.js [spec]', async ()
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-spec-private-features-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _checkInRHS = require('@babel/runtime/helpers/checkInRHS');
+    var _defineProperty = require('@babel/runtime/helpers/defineProperty');
+    var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
+    var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
+    expect(() => {
+      var _Class, _p;
+      return ((_Class = class {}), (_p = { _: _checkInRHS(0) === _Class }), _Class);
+    }).toThrow(\`right-hand side of 'in' should be an object, got number\`);
+    expect(() => {
+      var _Class2, _p2;
+      return ((_Class2 = class {}), (_p2 = { _: _checkInRHS('') === _Class2 }), _Class2);
+    }).toThrow(\`right-hand side of 'in' should be an object, got string\`);
+    expect(() => {
+      var _Class3, _p3;
+      return ((_Class3 = class {}), (_p3 = { _: _checkInRHS(true) === _Class3 }), _Class3);
+    }).toThrow(\`right-hand side of 'in' should be an object, got boolean\`);
+    expect(() => {
+      var _Class4, _p4;
+      return ((_Class4 = class {}), (_p4 = { _: _checkInRHS(void 0) === _Class4 }), _Class4);
+    }).toThrow(\`right-hand side of 'in' should be an object, got undefined\`);
+    expect(() => {
+      var _Class5, _p5;
+      return ((_Class5 = class {}), (_p5 = { _: _checkInRHS(null) === _Class5 }), _Class5);
+    }).toThrow(\`right-hand side of 'in' should be an object, got null\`);
+    expect(() => {
+      var _Class6, _p6;
+      return ((_Class6 = class {}), (_p6 = { _: _checkInRHS(Symbol.iterator) === _Class6 }), _Class6);
+    }).toThrow(\`right-hand side of 'in' should be an object, got symbol\`);
+    expect(() => {
+      var _Class7, _p7;
+      return ((_Class7 = class {}), (_p7 = { _: _checkInRHS(0n) === _Class7 }), _Class7);
+    }).toThrow(\`right-hand side of 'in' should be an object, got bigint\`);
+    expect(() => {
+      var _Class8;
+      return ((_Class8 = class {}), _defineProperty(_Class8, 'q', _checkInRHS(0) === _Class8), _Class8);
+      function _p8() {}
+    }).toThrow(\`right-hand side of 'in' should be an object, got number\`);
+    expect(() => {
+      var _Class9;
+      return (
+        (_Class9 = class {}), _defineProperty(_Class9, 'q', _checkInRHS('') === _Class9), _Class9
+      );
+      function _p9() {}
+    }).toThrow(\`right-hand side of 'in' should be an object, got string\`);
+    expect(() => {
+      var _Class10;
+      return (
+        (_Class10 = class {}), _defineProperty(_Class10, 'q', _checkInRHS(true) === _Class10), _Class10
+      );
+      function _p10() {}
+    }).toThrow(\`right-hand side of 'in' should be an object, got boolean\`);
+    expect(() => {
+      var _Class11;
+      return (
+        (_Class11 = class {}),
+        _defineProperty(_Class11, 'q', _checkInRHS(void 0) === _Class11),
+        _Class11
+      );
+      function _p11() {}
+    }).toThrow(\`right-hand side of 'in' should be an object, got undefined\`);
+    expect(() => {
+      var _Class12;
+      return (
+        (_Class12 = class {}), _defineProperty(_Class12, 'q', _checkInRHS(null) === _Class12), _Class12
+      );
+      function _p12() {}
+    }).toThrow(\`right-hand side of 'in' should be an object, got null\`);
+    expect(() => {
+      var _Class13;
+      return (
+        (_Class13 = class {}),
+        _defineProperty(_Class13, 'q', _checkInRHS(Symbol.iterator) === _Class13),
+        _Class13
+      );
+      function _p13() {}
+    }).toThrow(\`right-hand side of 'in' should be an object, got symbol\`);
+    expect(() => {
+      var _Class14;
+      return (
+        (_Class14 = class {}), _defineProperty(_Class14, 'q', _checkInRHS(0n) === _Class14), _Class14
+      );
+      function _p14() {}
+    }).toThrow(\`right-hand side of 'in' should be an object, got bigint\`);
+    expect(() => {
+      var _p15;
+      return new ((_p15 = /* @__PURE__ */ new WeakMap()),
+      class {
+        constructor() {
+          _classPrivateFieldInitSpec(this, _p15, _p15.has(_checkInRHS(0)));
+        }
+      })();
+    }).toThrow(\`right-hand side of 'in' should be an object, got number\`);
+    expect(() => {
+      var _p16;
+      return new ((_p16 = /* @__PURE__ */ new WeakMap()),
+      class {
+        constructor() {
+          _classPrivateFieldInitSpec(this, _p16, _p16.has(_checkInRHS('')));
+        }
+      })();
+    }).toThrow(\`right-hand side of 'in' should be an object, got string\`);
+    expect(() => {
+      var _p17;
+      return new ((_p17 = /* @__PURE__ */ new WeakMap()),
+      class {
+        constructor() {
+          _classPrivateFieldInitSpec(this, _p17, _p17.has(_checkInRHS(true)));
+        }
+      })();
+    }).toThrow(\`right-hand side of 'in' should be an object, got boolean\`);
+    expect(() => {
+      var _p18;
+      return new ((_p18 = /* @__PURE__ */ new WeakMap()),
+      class {
+        constructor() {
+          _classPrivateFieldInitSpec(this, _p18, _p18.has(_checkInRHS(void 0)));
+        }
+      })();
+    }).toThrow(\`right-hand side of 'in' should be an object, got undefined\`);
+    expect(() => {
+      var _p19;
+      return new ((_p19 = /* @__PURE__ */ new WeakMap()),
+      class {
+        constructor() {
+          _classPrivateFieldInitSpec(this, _p19, _p19.has(_checkInRHS(null)));
+        }
+      })();
+    }).toThrow(\`right-hand side of 'in' should be an object, got null\`);
+    expect(() => {
+      var _p20;
+      return new ((_p20 = /* @__PURE__ */ new WeakMap()),
+      class {
+        constructor() {
+          _classPrivateFieldInitSpec(this, _p20, _p20.has(_checkInRHS(Symbol.iterator)));
+        }
+      })();
+    }).toThrow(\`right-hand side of 'in' should be an object, got symbol\`);
+    expect(() => {
+      var _p21;
+      return new ((_p21 = /* @__PURE__ */ new WeakMap()),
+      class {
+        constructor() {
+          _classPrivateFieldInitSpec(this, _p21, _p21.has(_checkInRHS(0n)));
+        }
+      })();
+    }).toThrow(\`right-hand side of 'in' should be an object, got bigint\`);
+    expect(() => {
+      var _Class_brand;
+      return new ((_Class_brand = /* @__PURE__ */ new WeakSet()),
+      class {
+        constructor() {
+          _classPrivateMethodInitSpec(this, _Class_brand);
+          _defineProperty(this, 'q', _Class_brand.has(_checkInRHS(0)));
+        }
+      })();
+      function _p22() {}
+    }).toThrow(\`right-hand side of 'in' should be an object, got number\`);
+    expect(() => {
+      var _Class_brand2;
+      return new ((_Class_brand2 = /* @__PURE__ */ new WeakSet()),
+      class {
+        constructor() {
+          _classPrivateMethodInitSpec(this, _Class_brand2);
+          _defineProperty(this, 'q', _Class_brand2.has(_checkInRHS('')));
+        }
+      })();
+      function _p23() {}
+    }).toThrow(\`right-hand side of 'in' should be an object, got string\`);
+    expect(() => {
+      var _Class_brand3;
+      return new ((_Class_brand3 = /* @__PURE__ */ new WeakSet()),
+      class {
+        constructor() {
+          _classPrivateMethodInitSpec(this, _Class_brand3);
+          _defineProperty(this, 'q', _Class_brand3.has(_checkInRHS(true)));
+        }
+      })();
+      function _p24() {}
+    }).toThrow(\`right-hand side of 'in' should be an object, got boolean\`);
+    expect(() => {
+      var _Class_brand4;
+      return new ((_Class_brand4 = /* @__PURE__ */ new WeakSet()),
+      class {
+        constructor() {
+          _classPrivateMethodInitSpec(this, _Class_brand4);
+          _defineProperty(this, 'q', _Class_brand4.has(_checkInRHS(void 0)));
+        }
+      })();
+      function _p25() {}
+    }).toThrow(\`right-hand side of 'in' should be an object, got undefined\`);
+    expect(() => {
+      var _Class_brand5;
+      return new ((_Class_brand5 = /* @__PURE__ */ new WeakSet()),
+      class {
+        constructor() {
+          _classPrivateMethodInitSpec(this, _Class_brand5);
+          _defineProperty(this, 'q', _Class_brand5.has(_checkInRHS(null)));
+        }
+      })();
+      function _p26() {}
+    }).toThrow(\`right-hand side of 'in' should be an object, got null\`);
+    expect(() => {
+      var _Class_brand6;
+      return new ((_Class_brand6 = /* @__PURE__ */ new WeakSet()),
+      class {
+        constructor() {
+          _classPrivateMethodInitSpec(this, _Class_brand6);
+          _defineProperty(this, 'q', _Class_brand6.has(_checkInRHS(Symbol.iterator)));
+        }
+      })();
+      function _p27() {}
+    }).toThrow(\`right-hand side of 'in' should be an object, got symbol\`);
+    expect(() => {
+      var _Class_brand7;
+      return new ((_Class_brand7 = /* @__PURE__ */ new WeakSet()),
+      class {
+        constructor() {
+          _classPrivateMethodInitSpec(this, _Class_brand7);
+          _defineProperty(this, 'q', _Class_brand7.has(_checkInRHS(0n)));
+        }
+      })();
+      function _p28() {}
+    }).toThrow(\`right-hand side of 'in' should be an object, got bigint\`);"
+  `);
 });
 
 test('assumption-privateFieldsAsSymbols/rhs-not-object/exec.js [loose]', async () => {
@@ -1554,9 +2717,10 @@ test('assumption-privateFieldsAsSymbols/rhs-not-object/exec.js [loose]', async (
       (() => {
         'use strict';
         var _p = '__private__Class_p';
-        function _Class() {
-          if (!(this instanceof _Class)) throw new TypeError('Cannot call a class as a function');
-        }
+        const _Class = function _Class() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
+        Object.defineProperty(_Class, 'prototype', { writable: false });
         Object.defineProperty(_Class, _p, {
           writable: true,
           value: Object.prototype.hasOwnProperty.call(0, _p),
@@ -1568,9 +2732,10 @@ test('assumption-privateFieldsAsSymbols/rhs-not-object/exec.js [loose]', async (
       (() => {
         'use strict';
         var _p10 = '__private__Class9_p';
-        function _Class9() {
-          if (!(this instanceof _Class9)) throw new TypeError('Cannot call a class as a function');
-        }
+        const _Class9 = function _Class9() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
+        Object.defineProperty(_Class9, 'prototype', { writable: false });
         Object.defineProperty(_Class9, _p10, {
           writable: true,
           value: Object.prototype.hasOwnProperty.call('', _p10),
@@ -1582,9 +2747,10 @@ test('assumption-privateFieldsAsSymbols/rhs-not-object/exec.js [loose]', async (
       (() => {
         'use strict';
         var _p12 = '__private__Class11_p';
-        function _Class11() {
-          if (!(this instanceof _Class11)) throw new TypeError('Cannot call a class as a function');
-        }
+        const _Class11 = function _Class11() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
+        Object.defineProperty(_Class11, 'prototype', { writable: false });
         Object.defineProperty(_Class11, _p12, {
           writable: true,
           value: Object.prototype.hasOwnProperty.call(true, _p12),
@@ -1596,9 +2762,10 @@ test('assumption-privateFieldsAsSymbols/rhs-not-object/exec.js [loose]', async (
       (() => {
         'use strict';
         var _p14 = '__private__Class13_p';
-        function _Class13() {
-          if (!(this instanceof _Class13)) throw new TypeError('Cannot call a class as a function');
-        }
+        const _Class13 = function _Class13() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
+        Object.defineProperty(_Class13, 'prototype', { writable: false });
         Object.defineProperty(_Class13, _p14, {
           writable: true,
           value: Object.prototype.hasOwnProperty.call(void 0, _p14),
@@ -1610,9 +2777,10 @@ test('assumption-privateFieldsAsSymbols/rhs-not-object/exec.js [loose]', async (
       (() => {
         'use strict';
         var _p16 = '__private__Class15_p';
-        function _Class15() {
-          if (!(this instanceof _Class15)) throw new TypeError('Cannot call a class as a function');
-        }
+        const _Class15 = function _Class15() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
+        Object.defineProperty(_Class15, 'prototype', { writable: false });
         Object.defineProperty(_Class15, _p16, {
           writable: true,
           value: Object.prototype.hasOwnProperty.call(null, _p16),
@@ -1624,9 +2792,10 @@ test('assumption-privateFieldsAsSymbols/rhs-not-object/exec.js [loose]', async (
       (() => {
         'use strict';
         var _p18 = '__private__Class17_p';
-        function _Class17() {
-          if (!(this instanceof _Class17)) throw new TypeError('Cannot call a class as a function');
-        }
+        const _Class17 = function _Class17() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
+        Object.defineProperty(_Class17, 'prototype', { writable: false });
         Object.defineProperty(_Class17, _p18, {
           writable: true,
           value: Object.prototype.hasOwnProperty.call(Symbol.iterator, _p18),
@@ -1638,9 +2807,10 @@ test('assumption-privateFieldsAsSymbols/rhs-not-object/exec.js [loose]', async (
       (() => {
         'use strict';
         var _p20 = '__private__Class19_p';
-        function _Class19() {
-          if (!(this instanceof _Class19)) throw new TypeError('Cannot call a class as a function');
-        }
+        const _Class19 = function _Class19() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
+        Object.defineProperty(_Class19, 'prototype', { writable: false });
         Object.defineProperty(_Class19, _p20, {
           writable: true,
           value: Object.prototype.hasOwnProperty.call(0n, _p20),
@@ -1652,11 +2822,16 @@ test('assumption-privateFieldsAsSymbols/rhs-not-object/exec.js [loose]', async (
       (() => {
         'use strict';
         var _p22 = '__private__Class21_p';
-        function _Class21() {
-          if (!(this instanceof _Class21)) throw new TypeError('Cannot call a class as a function');
-        }
+        const _Class21 = function _Class21() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
+        Object.defineProperty(_Class21, 'prototype', { writable: false });
         _Class21.q = Object.prototype.hasOwnProperty.call(0, _p22);
-        Object.defineProperty(_Class21, _p22, { value: function () {} });
+        Object.defineProperty(_Class21, _p22, {
+          value: function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          },
+        });
         return _Class21;
       })(),
     ).toThrow(\`right-hand side of 'in' should be an object, got number\`);
@@ -1664,11 +2839,16 @@ test('assumption-privateFieldsAsSymbols/rhs-not-object/exec.js [loose]', async (
       (() => {
         'use strict';
         var _p24 = '__private__Class23_p';
-        function _Class23() {
-          if (!(this instanceof _Class23)) throw new TypeError('Cannot call a class as a function');
-        }
+        const _Class23 = function _Class23() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
+        Object.defineProperty(_Class23, 'prototype', { writable: false });
         _Class23.q = Object.prototype.hasOwnProperty.call('', _p24);
-        Object.defineProperty(_Class23, _p24, { value: function () {} });
+        Object.defineProperty(_Class23, _p24, {
+          value: function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          },
+        });
         return _Class23;
       })(),
     ).toThrow(\`right-hand side of 'in' should be an object, got string\`);
@@ -1676,11 +2856,16 @@ test('assumption-privateFieldsAsSymbols/rhs-not-object/exec.js [loose]', async (
       (() => {
         'use strict';
         var _p26 = '__private__Class25_p';
-        function _Class25() {
-          if (!(this instanceof _Class25)) throw new TypeError('Cannot call a class as a function');
-        }
+        const _Class25 = function _Class25() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
+        Object.defineProperty(_Class25, 'prototype', { writable: false });
         _Class25.q = Object.prototype.hasOwnProperty.call(true, _p26);
-        Object.defineProperty(_Class25, _p26, { value: function () {} });
+        Object.defineProperty(_Class25, _p26, {
+          value: function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          },
+        });
         return _Class25;
       })(),
     ).toThrow(\`right-hand side of 'in' should be an object, got boolean\`);
@@ -1688,11 +2873,16 @@ test('assumption-privateFieldsAsSymbols/rhs-not-object/exec.js [loose]', async (
       (() => {
         'use strict';
         var _p28 = '__private__Class27_p';
-        function _Class27() {
-          if (!(this instanceof _Class27)) throw new TypeError('Cannot call a class as a function');
-        }
+        const _Class27 = function _Class27() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
+        Object.defineProperty(_Class27, 'prototype', { writable: false });
         _Class27.q = Object.prototype.hasOwnProperty.call(void 0, _p28);
-        Object.defineProperty(_Class27, _p28, { value: function () {} });
+        Object.defineProperty(_Class27, _p28, {
+          value: function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          },
+        });
         return _Class27;
       })(),
     ).toThrow(\`right-hand side of 'in' should be an object, got undefined\`);
@@ -1700,11 +2890,16 @@ test('assumption-privateFieldsAsSymbols/rhs-not-object/exec.js [loose]', async (
       (() => {
         'use strict';
         var _p30 = '__private__Class29_p';
-        function _Class29() {
-          if (!(this instanceof _Class29)) throw new TypeError('Cannot call a class as a function');
-        }
+        const _Class29 = function _Class29() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
+        Object.defineProperty(_Class29, 'prototype', { writable: false });
         _Class29.q = Object.prototype.hasOwnProperty.call(null, _p30);
-        Object.defineProperty(_Class29, _p30, { value: function () {} });
+        Object.defineProperty(_Class29, _p30, {
+          value: function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          },
+        });
         return _Class29;
       })(),
     ).toThrow(\`right-hand side of 'in' should be an object, got null\`);
@@ -1712,11 +2907,16 @@ test('assumption-privateFieldsAsSymbols/rhs-not-object/exec.js [loose]', async (
       (() => {
         'use strict';
         var _p32 = '__private__Class31_p';
-        function _Class31() {
-          if (!(this instanceof _Class31)) throw new TypeError('Cannot call a class as a function');
-        }
+        const _Class31 = function _Class31() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
+        Object.defineProperty(_Class31, 'prototype', { writable: false });
         _Class31.q = Object.prototype.hasOwnProperty.call(Symbol.iterator, _p32);
-        Object.defineProperty(_Class31, _p32, { value: function () {} });
+        Object.defineProperty(_Class31, _p32, {
+          value: function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          },
+        });
         return _Class31;
       })(),
     ).toThrow(\`right-hand side of 'in' should be an object, got symbol\`);
@@ -1724,11 +2924,16 @@ test('assumption-privateFieldsAsSymbols/rhs-not-object/exec.js [loose]', async (
       (() => {
         'use strict';
         var _p34 = '__private__Class33_p';
-        function _Class33() {
-          if (!(this instanceof _Class33)) throw new TypeError('Cannot call a class as a function');
-        }
+        const _Class33 = function _Class33() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
+        Object.defineProperty(_Class33, 'prototype', { writable: false });
         _Class33.q = Object.prototype.hasOwnProperty.call(0n, _p34);
-        Object.defineProperty(_Class33, _p34, { value: function () {} });
+        Object.defineProperty(_Class33, _p34, {
+          value: function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          },
+        });
         return _Class33;
       })(),
     ).toThrow(\`right-hand side of 'in' should be an object, got bigint\`);
@@ -1737,13 +2942,14 @@ test('assumption-privateFieldsAsSymbols/rhs-not-object/exec.js [loose]', async (
         new ((() => {
           'use strict';
           var _p36 = '__private__Class35_p';
-          function _Class35() {
-            if (!(this instanceof _Class35)) throw new TypeError('Cannot call a class as a function');
+          const _Class35 = function _Class35() {
+            if (!new.target) throw new TypeError('Cannot call a class as a function');
             Object.defineProperty(this, _p36, {
               writable: true,
               value: Object.prototype.hasOwnProperty.call(0, _p36),
             });
-          }
+          };
+          Object.defineProperty(_Class35, 'prototype', { writable: false });
           return _Class35;
         })())(),
     ).toThrow(\`right-hand side of 'in' should be an object, got number\`);
@@ -1752,13 +2958,14 @@ test('assumption-privateFieldsAsSymbols/rhs-not-object/exec.js [loose]', async (
         new ((() => {
           'use strict';
           var _p38 = '__private__Class37_p';
-          function _Class37() {
-            if (!(this instanceof _Class37)) throw new TypeError('Cannot call a class as a function');
+          const _Class37 = function _Class37() {
+            if (!new.target) throw new TypeError('Cannot call a class as a function');
             Object.defineProperty(this, _p38, {
               writable: true,
               value: Object.prototype.hasOwnProperty.call('', _p38),
             });
-          }
+          };
+          Object.defineProperty(_Class37, 'prototype', { writable: false });
           return _Class37;
         })())(),
     ).toThrow(\`right-hand side of 'in' should be an object, got string\`);
@@ -1767,13 +2974,14 @@ test('assumption-privateFieldsAsSymbols/rhs-not-object/exec.js [loose]', async (
         new ((() => {
           'use strict';
           var _p40 = '__private__Class39_p';
-          function _Class39() {
-            if (!(this instanceof _Class39)) throw new TypeError('Cannot call a class as a function');
+          const _Class39 = function _Class39() {
+            if (!new.target) throw new TypeError('Cannot call a class as a function');
             Object.defineProperty(this, _p40, {
               writable: true,
               value: Object.prototype.hasOwnProperty.call(true, _p40),
             });
-          }
+          };
+          Object.defineProperty(_Class39, 'prototype', { writable: false });
           return _Class39;
         })())(),
     ).toThrow(\`right-hand side of 'in' should be an object, got boolean\`);
@@ -1782,13 +2990,14 @@ test('assumption-privateFieldsAsSymbols/rhs-not-object/exec.js [loose]', async (
         new ((() => {
           'use strict';
           var _p42 = '__private__Class41_p';
-          function _Class41() {
-            if (!(this instanceof _Class41)) throw new TypeError('Cannot call a class as a function');
+          const _Class41 = function _Class41() {
+            if (!new.target) throw new TypeError('Cannot call a class as a function');
             Object.defineProperty(this, _p42, {
               writable: true,
               value: Object.prototype.hasOwnProperty.call(void 0, _p42),
             });
-          }
+          };
+          Object.defineProperty(_Class41, 'prototype', { writable: false });
           return _Class41;
         })())(),
     ).toThrow(\`right-hand side of 'in' should be an object, got undefined\`);
@@ -1797,13 +3006,14 @@ test('assumption-privateFieldsAsSymbols/rhs-not-object/exec.js [loose]', async (
         new ((() => {
           'use strict';
           var _p44 = '__private__Class43_p';
-          function _Class43() {
-            if (!(this instanceof _Class43)) throw new TypeError('Cannot call a class as a function');
+          const _Class43 = function _Class43() {
+            if (!new.target) throw new TypeError('Cannot call a class as a function');
             Object.defineProperty(this, _p44, {
               writable: true,
               value: Object.prototype.hasOwnProperty.call(null, _p44),
             });
-          }
+          };
+          Object.defineProperty(_Class43, 'prototype', { writable: false });
           return _Class43;
         })())(),
     ).toThrow(\`right-hand side of 'in' should be an object, got null\`);
@@ -1812,13 +3022,14 @@ test('assumption-privateFieldsAsSymbols/rhs-not-object/exec.js [loose]', async (
         new ((() => {
           'use strict';
           var _p46 = '__private__Class45_p';
-          function _Class45() {
-            if (!(this instanceof _Class45)) throw new TypeError('Cannot call a class as a function');
+          const _Class45 = function _Class45() {
+            if (!new.target) throw new TypeError('Cannot call a class as a function');
             Object.defineProperty(this, _p46, {
               writable: true,
               value: Object.prototype.hasOwnProperty.call(Symbol.iterator, _p46),
             });
-          }
+          };
+          Object.defineProperty(_Class45, 'prototype', { writable: false });
           return _Class45;
         })())(),
     ).toThrow(\`right-hand side of 'in' should be an object, got symbol\`);
@@ -1827,13 +3038,14 @@ test('assumption-privateFieldsAsSymbols/rhs-not-object/exec.js [loose]', async (
         new ((() => {
           'use strict';
           var _p48 = '__private__Class47_p';
-          function _Class47() {
-            if (!(this instanceof _Class47)) throw new TypeError('Cannot call a class as a function');
+          const _Class47 = function _Class47() {
+            if (!new.target) throw new TypeError('Cannot call a class as a function');
             Object.defineProperty(this, _p48, {
               writable: true,
               value: Object.prototype.hasOwnProperty.call(0n, _p48),
             });
-          }
+          };
+          Object.defineProperty(_Class47, 'prototype', { writable: false });
           return _Class47;
         })())(),
     ).toThrow(\`right-hand side of 'in' should be an object, got bigint\`);
@@ -1842,11 +3054,16 @@ test('assumption-privateFieldsAsSymbols/rhs-not-object/exec.js [loose]', async (
         new ((() => {
           'use strict';
           var _p50 = '__private__Class49_p';
-          function _Class49() {
-            if (!(this instanceof _Class49)) throw new TypeError('Cannot call a class as a function');
+          const _Class49 = function _Class49() {
+            if (!new.target) throw new TypeError('Cannot call a class as a function');
             this.q = Object.prototype.hasOwnProperty.call(0, _p50);
-            Object.defineProperty(this, _p50, { value: function () {} });
-          }
+            Object.defineProperty(this, _p50, {
+              value: function () {
+                if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              },
+            });
+          };
+          Object.defineProperty(_Class49, 'prototype', { writable: false });
           return _Class49;
         })())(),
     ).toThrow(\`right-hand side of 'in' should be an object, got number\`);
@@ -1855,11 +3072,16 @@ test('assumption-privateFieldsAsSymbols/rhs-not-object/exec.js [loose]', async (
         new ((() => {
           'use strict';
           var _p52 = '__private__Class51_p';
-          function _Class51() {
-            if (!(this instanceof _Class51)) throw new TypeError('Cannot call a class as a function');
+          const _Class51 = function _Class51() {
+            if (!new.target) throw new TypeError('Cannot call a class as a function');
             this.q = Object.prototype.hasOwnProperty.call('', _p52);
-            Object.defineProperty(this, _p52, { value: function () {} });
-          }
+            Object.defineProperty(this, _p52, {
+              value: function () {
+                if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              },
+            });
+          };
+          Object.defineProperty(_Class51, 'prototype', { writable: false });
           return _Class51;
         })())(),
     ).toThrow(\`right-hand side of 'in' should be an object, got string\`);
@@ -1868,11 +3090,16 @@ test('assumption-privateFieldsAsSymbols/rhs-not-object/exec.js [loose]', async (
         new ((() => {
           'use strict';
           var _p54 = '__private__Class53_p';
-          function _Class53() {
-            if (!(this instanceof _Class53)) throw new TypeError('Cannot call a class as a function');
+          const _Class53 = function _Class53() {
+            if (!new.target) throw new TypeError('Cannot call a class as a function');
             this.q = Object.prototype.hasOwnProperty.call(true, _p54);
-            Object.defineProperty(this, _p54, { value: function () {} });
-          }
+            Object.defineProperty(this, _p54, {
+              value: function () {
+                if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              },
+            });
+          };
+          Object.defineProperty(_Class53, 'prototype', { writable: false });
           return _Class53;
         })())(),
     ).toThrow(\`right-hand side of 'in' should be an object, got boolean\`);
@@ -1881,11 +3108,16 @@ test('assumption-privateFieldsAsSymbols/rhs-not-object/exec.js [loose]', async (
         new ((() => {
           'use strict';
           var _p56 = '__private__Class55_p';
-          function _Class55() {
-            if (!(this instanceof _Class55)) throw new TypeError('Cannot call a class as a function');
+          const _Class55 = function _Class55() {
+            if (!new.target) throw new TypeError('Cannot call a class as a function');
             this.q = Object.prototype.hasOwnProperty.call(void 0, _p56);
-            Object.defineProperty(this, _p56, { value: function () {} });
-          }
+            Object.defineProperty(this, _p56, {
+              value: function () {
+                if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              },
+            });
+          };
+          Object.defineProperty(_Class55, 'prototype', { writable: false });
           return _Class55;
         })())(),
     ).toThrow(\`right-hand side of 'in' should be an object, got undefined\`);
@@ -1894,11 +3126,16 @@ test('assumption-privateFieldsAsSymbols/rhs-not-object/exec.js [loose]', async (
         new ((() => {
           'use strict';
           var _p58 = '__private__Class57_p';
-          function _Class57() {
-            if (!(this instanceof _Class57)) throw new TypeError('Cannot call a class as a function');
+          const _Class57 = function _Class57() {
+            if (!new.target) throw new TypeError('Cannot call a class as a function');
             this.q = Object.prototype.hasOwnProperty.call(null, _p58);
-            Object.defineProperty(this, _p58, { value: function () {} });
-          }
+            Object.defineProperty(this, _p58, {
+              value: function () {
+                if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              },
+            });
+          };
+          Object.defineProperty(_Class57, 'prototype', { writable: false });
           return _Class57;
         })())(),
     ).toThrow(\`right-hand side of 'in' should be an object, got null\`);
@@ -1907,11 +3144,16 @@ test('assumption-privateFieldsAsSymbols/rhs-not-object/exec.js [loose]', async (
         new ((() => {
           'use strict';
           var _p60 = '__private__Class59_p';
-          function _Class59() {
-            if (!(this instanceof _Class59)) throw new TypeError('Cannot call a class as a function');
+          const _Class59 = function _Class59() {
+            if (!new.target) throw new TypeError('Cannot call a class as a function');
             this.q = Object.prototype.hasOwnProperty.call(Symbol.iterator, _p60);
-            Object.defineProperty(this, _p60, { value: function () {} });
-          }
+            Object.defineProperty(this, _p60, {
+              value: function () {
+                if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              },
+            });
+          };
+          Object.defineProperty(_Class59, 'prototype', { writable: false });
           return _Class59;
         })())(),
     ).toThrow(\`right-hand side of 'in' should be an object, got symbol\`);
@@ -1920,11 +3162,16 @@ test('assumption-privateFieldsAsSymbols/rhs-not-object/exec.js [loose]', async (
         new ((() => {
           'use strict';
           var _p62 = '__private__Class61_p';
-          function _Class61() {
-            if (!(this instanceof _Class61)) throw new TypeError('Cannot call a class as a function');
+          const _Class61 = function _Class61() {
+            if (!new.target) throw new TypeError('Cannot call a class as a function');
             this.q = Object.prototype.hasOwnProperty.call(0n, _p62);
-            Object.defineProperty(this, _p62, { value: function () {} });
-          }
+            Object.defineProperty(this, _p62, {
+              value: function () {
+                if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              },
+            });
+          };
+          Object.defineProperty(_Class61, 'prototype', { writable: false });
           return _Class61;
         })())(),
     ).toThrow(\`right-hand side of 'in' should be an object, got bigint\`);"
@@ -1943,7 +3190,15 @@ test('assumption-privateFieldsAsSymbols/static-accessor/input.js [spec]', async 
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-spec-private-features-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _checkInRHS = require('@babel/runtime/helpers/checkInRHS');
+    class Foo {
+      test(other) {
+        return _checkInRHS(other) === Foo;
+      }
+    }
+    function _get_foo() {}"
+  `);
 });
 
 test('assumption-privateFieldsAsSymbols/static-accessor/input.js [loose]', async () => {
@@ -1959,20 +3214,33 @@ test('assumption-privateFieldsAsSymbols/static-accessor/input.js [loose]', async
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "var Foo = (() => {
+    "let Foo = (() => {
       'use strict';
       var _foo = '__private_Foo_foo';
-      function Foo() {
-        if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
-      }
+      const Foo = function Foo() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+      };
       Object.defineProperty(Foo.prototype, 'test', {
-        value: function (other) {
-          return Object.prototype.hasOwnProperty.call(other, _foo);
-        },
+        value: Object.defineProperty(
+          function (other) {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            return Object.prototype.hasOwnProperty.call(other, _foo);
+          },
+          'name',
+          {
+            value: 'test',
+            configurable: true,
+          },
+        ),
         writable: true,
         configurable: true,
       });
-      Object.defineProperty(Foo, _foo, { get: function () {} });
+      Object.defineProperty(Foo, 'prototype', { writable: false });
+      Object.defineProperty(Foo, _foo, {
+        get: function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        },
+      });
       return Foo;
     })();"
   `);
@@ -1990,7 +3258,15 @@ test('assumption-privateFieldsAsSymbols/static-field/input.js [spec]', async () 
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-spec-private-features-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _checkInRHS = require('@babel/runtime/helpers/checkInRHS');
+    class Foo {
+      test(other) {
+        return _checkInRHS(other) === Foo;
+      }
+    }
+    var _foo = { _: 1 };"
+  `);
 });
 
 test('assumption-privateFieldsAsSymbols/static-field/input.js [loose]', async () => {
@@ -2006,19 +3282,28 @@ test('assumption-privateFieldsAsSymbols/static-field/input.js [loose]', async ()
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "var Foo = (() => {
+    "let Foo = (() => {
       'use strict';
       var _foo = '__private_Foo_foo';
-      function Foo() {
-        if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
-      }
+      const Foo = function Foo() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+      };
       Object.defineProperty(Foo.prototype, 'test', {
-        value: function (other) {
-          return Object.prototype.hasOwnProperty.call(other, _foo);
-        },
+        value: Object.defineProperty(
+          function (other) {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            return Object.prototype.hasOwnProperty.call(other, _foo);
+          },
+          'name',
+          {
+            value: 'test',
+            configurable: true,
+          },
+        ),
         writable: true,
         configurable: true,
       });
+      Object.defineProperty(Foo, 'prototype', { writable: false });
       Object.defineProperty(Foo, _foo, {
         writable: true,
         value: 1,
@@ -2040,7 +3325,15 @@ test('assumption-privateFieldsAsSymbols/static-method/input.js [spec]', async ()
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-spec-private-features-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _checkInRHS = require('@babel/runtime/helpers/checkInRHS');
+    class Foo {
+      test(other) {
+        return _checkInRHS(other) === Foo;
+      }
+    }
+    function _foo() {}"
+  `);
 });
 
 test('assumption-privateFieldsAsSymbols/static-method/input.js [loose]', async () => {
@@ -2056,20 +3349,33 @@ test('assumption-privateFieldsAsSymbols/static-method/input.js [loose]', async (
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "var Foo = (() => {
+    "let Foo = (() => {
       'use strict';
       var _foo = '__private_Foo_foo';
-      function Foo() {
-        if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
-      }
+      const Foo = function Foo() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+      };
       Object.defineProperty(Foo.prototype, 'test', {
-        value: function (other) {
-          return Object.prototype.hasOwnProperty.call(other, _foo);
-        },
+        value: Object.defineProperty(
+          function (other) {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            return Object.prototype.hasOwnProperty.call(other, _foo);
+          },
+          'name',
+          {
+            value: 'test',
+            configurable: true,
+          },
+        ),
         writable: true,
         configurable: true,
       });
-      Object.defineProperty(Foo, _foo, { value: function () {} });
+      Object.defineProperty(Foo, 'prototype', { writable: false });
+      Object.defineProperty(Foo, _foo, {
+        value: function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        },
+      });
       return Foo;
     })();"
   `);
@@ -2087,7 +3393,20 @@ test('private-loose/accessor/input.js [spec]', async () => {
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-spec-private-features-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
+    var _checkInRHS = require('@babel/runtime/helpers/checkInRHS');
+    var _Foo_brand = /* @__PURE__ */ new WeakSet();
+    class Foo {
+      constructor() {
+        _classPrivateMethodInitSpec(this, _Foo_brand);
+      }
+      test(other) {
+        return _Foo_brand.has(_checkInRHS(other));
+      }
+    }
+    function _get_foo() {}"
+  `);
 });
 
 test('private-loose/accessor/input.js [loose]', async () => {
@@ -2103,20 +3422,33 @@ test('private-loose/accessor/input.js [loose]', async () => {
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "var Foo = (() => {
+    "let Foo = (() => {
       'use strict';
       var _foo = '__private_Foo_foo';
-      function Foo() {
-        if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
-        Object.defineProperty(this, _foo, { get: function () {} });
-      }
+      const Foo = function Foo() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+        Object.defineProperty(this, _foo, {
+          get: function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          },
+        });
+      };
       Object.defineProperty(Foo.prototype, 'test', {
-        value: function (other) {
-          return Object.prototype.hasOwnProperty.call(other, _foo);
-        },
+        value: Object.defineProperty(
+          function (other) {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            return Object.prototype.hasOwnProperty.call(other, _foo);
+          },
+          'name',
+          {
+            value: 'test',
+            configurable: true,
+          },
+        ),
         writable: true,
         configurable: true,
       });
+      Object.defineProperty(Foo, 'prototype', { writable: false });
       return Foo;
     })();"
   `);
@@ -2133,7 +3465,19 @@ test('private-loose/field/input.js [spec]', async () => {
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-spec-private-features-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
+    var _checkInRHS = require('@babel/runtime/helpers/checkInRHS');
+    var _foo = /* @__PURE__ */ new WeakMap();
+    class Foo {
+      constructor() {
+        _classPrivateFieldInitSpec(this, _foo, 1);
+      }
+      test(other) {
+        return _foo.has(_checkInRHS(other));
+      }
+    }"
+  `);
 });
 
 test('private-loose/field/input.js [loose]', async () => {
@@ -2148,23 +3492,32 @@ test('private-loose/field/input.js [loose]', async () => {
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "var Foo = (() => {
+    "let Foo = (() => {
       'use strict';
       var _foo = '__private_Foo_foo';
-      function Foo() {
-        if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
+      const Foo = function Foo() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
         Object.defineProperty(this, _foo, {
           writable: true,
           value: 1,
         });
-      }
+      };
       Object.defineProperty(Foo.prototype, 'test', {
-        value: function (other) {
-          return Object.prototype.hasOwnProperty.call(other, _foo);
-        },
+        value: Object.defineProperty(
+          function (other) {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            return Object.prototype.hasOwnProperty.call(other, _foo);
+          },
+          'name',
+          {
+            value: 'test',
+            configurable: true,
+          },
+        ),
         writable: true,
         configurable: true,
       });
+      Object.defineProperty(Foo, 'prototype', { writable: false });
       return Foo;
     })();"
   `);
@@ -2181,7 +3534,20 @@ test('private-loose/method/input.js [spec]', async () => {
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-spec-private-features-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
+    var _checkInRHS = require('@babel/runtime/helpers/checkInRHS');
+    var _Foo_brand = /* @__PURE__ */ new WeakSet();
+    class Foo {
+      constructor() {
+        _classPrivateMethodInitSpec(this, _Foo_brand);
+      }
+      test(other) {
+        return _Foo_brand.has(_checkInRHS(other));
+      }
+    }
+    function _foo() {}"
+  `);
 });
 
 test('private-loose/method/input.js [loose]', async () => {
@@ -2196,20 +3562,33 @@ test('private-loose/method/input.js [loose]', async () => {
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "var Foo = (() => {
+    "let Foo = (() => {
       'use strict';
       var _foo = '__private_Foo_foo';
-      function Foo() {
-        if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
-        Object.defineProperty(this, _foo, { value: function () {} });
-      }
+      const Foo = function Foo() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+        Object.defineProperty(this, _foo, {
+          value: function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          },
+        });
+      };
       Object.defineProperty(Foo.prototype, 'test', {
-        value: function (other) {
-          return Object.prototype.hasOwnProperty.call(other, _foo);
-        },
+        value: Object.defineProperty(
+          function (other) {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            return Object.prototype.hasOwnProperty.call(other, _foo);
+          },
+          'name',
+          {
+            value: 'test',
+            configurable: true,
+          },
+        ),
         writable: true,
         configurable: true,
       });
+      Object.defineProperty(Foo, 'prototype', { writable: false });
       return Foo;
     })();"
   `);
@@ -2227,7 +3606,23 @@ test('private-loose/native-classes/input.js [spec]', async () => {
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-spec-private-features-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
+    var _checkInRHS = require('@babel/runtime/helpers/checkInRHS');
+    var _bar = /* @__PURE__ */ new WeakMap();
+    class Foo {
+      constructor() {
+        _classPrivateFieldInitSpec(this, _bar, 'bar');
+      }
+      static test() {
+        return _checkInRHS(Foo) === Foo;
+      }
+      test() {
+        return _bar.has(_checkInRHS(this));
+      }
+    }
+    var _foo = { _: 'foo' };"
+  `);
 });
 
 test('private-loose/native-classes/input.js [loose]', async () => {
@@ -2243,31 +3638,48 @@ test('private-loose/native-classes/input.js [loose]', async () => {
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "var Foo = (() => {
+    "let Foo = (() => {
       'use strict';
       var _foo = '__private_Foo_foo';
       var _bar = '__private_Foo_bar';
-      function Foo() {
-        if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
+      const Foo = function Foo() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
         Object.defineProperty(this, _bar, {
           writable: true,
           value: 'bar',
         });
-      }
+      };
       Object.defineProperty(Foo, 'test', {
-        value: function () {
-          return Object.prototype.hasOwnProperty.call(Foo, _foo);
-        },
+        value: Object.defineProperty(
+          function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            return Object.prototype.hasOwnProperty.call(Foo, _foo);
+          },
+          'name',
+          {
+            value: 'test',
+            configurable: true,
+          },
+        ),
         writable: true,
         configurable: true,
       });
       Object.defineProperty(Foo.prototype, 'test', {
-        value: function () {
-          return Object.prototype.hasOwnProperty.call(this, _bar);
-        },
+        value: Object.defineProperty(
+          function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            return Object.prototype.hasOwnProperty.call(this, _bar);
+          },
+          'name',
+          {
+            value: 'test',
+            configurable: true,
+          },
+        ),
         writable: true,
         configurable: true,
       });
+      Object.defineProperty(Foo, 'prototype', { writable: false });
       Object.defineProperty(Foo, _foo, {
         writable: true,
         value: 'foo',
@@ -2289,7 +3701,32 @@ test('private-loose/nested-class-other-redeclared/input.js [spec]', async () => 
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-spec-private-features-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
+    var _checkInRHS = require('@babel/runtime/helpers/checkInRHS');
+    var _foo = /* @__PURE__ */ new WeakMap();
+    var _bar = /* @__PURE__ */ new WeakMap();
+    class Foo {
+      constructor() {
+        _classPrivateFieldInitSpec(this, _foo, 1);
+        _classPrivateFieldInitSpec(this, _bar, 1);
+      }
+      test() {
+        var _bar2 = /* @__PURE__ */ new WeakMap();
+        class Nested {
+          constructor() {
+            _classPrivateFieldInitSpec(this, _bar2, 2);
+          }
+          test() {
+            _foo.has(_checkInRHS(this));
+            _bar2.has(_checkInRHS(this));
+          }
+        }
+        _foo.has(_checkInRHS(this));
+        _bar.has(_checkInRHS(this));
+      }
+    }"
+  `);
 });
 
 test('private-loose/nested-class-other-redeclared/input.js [loose]', async () => {
@@ -2305,12 +3742,12 @@ test('private-loose/nested-class-other-redeclared/input.js [loose]', async () =>
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "var Foo = (() => {
+    "let Foo = (() => {
       'use strict';
       var _foo = '__private_Foo_foo';
       var _bar = '__private_Foo_bar';
-      function Foo() {
-        if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
+      const Foo = function Foo() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
         Object.defineProperty(this, _foo, {
           writable: true,
           value: 1,
@@ -2319,35 +3756,53 @@ test('private-loose/nested-class-other-redeclared/input.js [loose]', async () =>
           writable: true,
           value: 1,
         });
-      }
+      };
       Object.defineProperty(Foo.prototype, 'test', {
-        value: function () {
-          var Nested = (() => {
-            'use strict';
-            var _bar11 = '__private_Nested_bar';
-            function Nested() {
-              if (!(this instanceof Nested)) throw new TypeError('Cannot call a class as a function');
-              Object.defineProperty(this, _bar11, {
+        value: Object.defineProperty(
+          function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            let Nested = (() => {
+              'use strict';
+              var _bar11 = '__private_Nested_bar';
+              const Nested = function Nested() {
+                if (!new.target) throw new TypeError('Cannot call a class as a function');
+                Object.defineProperty(this, _bar11, {
+                  writable: true,
+                  value: 2,
+                });
+              };
+              Object.defineProperty(Nested.prototype, 'test', {
+                value: Object.defineProperty(
+                  function () {
+                    if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+                    Object.prototype.hasOwnProperty.call(this, _foo);
+                    Object.prototype.hasOwnProperty.call(this, _bar11);
+                  },
+                  'name',
+                  {
+                    value: 'test',
+                    configurable: true,
+                  },
+                ),
                 writable: true,
-                value: 2,
+                configurable: true,
               });
-            }
-            Object.defineProperty(Nested.prototype, 'test', {
-              value: function () {
-                Object.prototype.hasOwnProperty.call(this, _foo);
-                Object.prototype.hasOwnProperty.call(this, _bar11);
-              },
-              writable: true,
-              configurable: true,
-            });
-            return Nested;
-          })();
-          Object.prototype.hasOwnProperty.call(this, _foo);
-          Object.prototype.hasOwnProperty.call(this, _bar);
-        },
+              Object.defineProperty(Nested, 'prototype', { writable: false });
+              return Nested;
+            })();
+            Object.prototype.hasOwnProperty.call(this, _foo);
+            Object.prototype.hasOwnProperty.call(this, _bar);
+          },
+          'name',
+          {
+            value: 'test',
+            configurable: true,
+          },
+        ),
         writable: true,
         configurable: true,
       });
+      Object.defineProperty(Foo, 'prototype', { writable: false });
       return Foo;
     })();"
   `);
@@ -2365,7 +3820,28 @@ test('private-loose/nested-class-redeclared/input.js [spec]', async () => {
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-spec-private-features-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
+    var _checkInRHS = require('@babel/runtime/helpers/checkInRHS');
+    var _foo = /* @__PURE__ */ new WeakMap();
+    class Foo {
+      constructor() {
+        _classPrivateFieldInitSpec(this, _foo, 1);
+      }
+      test() {
+        var _foo2 = /* @__PURE__ */ new WeakMap();
+        class Nested {
+          constructor() {
+            _classPrivateFieldInitSpec(this, _foo2, 2);
+          }
+          test() {
+            _foo2.has(_checkInRHS(this));
+          }
+        }
+        _foo.has(_checkInRHS(this));
+      }
+    }"
+  `);
 });
 
 test('private-loose/nested-class-redeclared/input.js [loose]', async () => {
@@ -2381,42 +3857,60 @@ test('private-loose/nested-class-redeclared/input.js [loose]', async () => {
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "var Foo = (() => {
+    "let Foo = (() => {
       'use strict';
       var _foo = '__private_Foo_foo';
-      function Foo() {
-        if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
+      const Foo = function Foo() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
         Object.defineProperty(this, _foo, {
           writable: true,
           value: 1,
         });
-      }
+      };
       Object.defineProperty(Foo.prototype, 'test', {
-        value: function () {
-          var Nested = (() => {
-            'use strict';
-            var _foo10 = '__private_Nested_foo';
-            function Nested() {
-              if (!(this instanceof Nested)) throw new TypeError('Cannot call a class as a function');
-              Object.defineProperty(this, _foo10, {
+        value: Object.defineProperty(
+          function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            let Nested = (() => {
+              'use strict';
+              var _foo10 = '__private_Nested_foo';
+              const Nested = function Nested() {
+                if (!new.target) throw new TypeError('Cannot call a class as a function');
+                Object.defineProperty(this, _foo10, {
+                  writable: true,
+                  value: 2,
+                });
+              };
+              Object.defineProperty(Nested.prototype, 'test', {
+                value: Object.defineProperty(
+                  function () {
+                    if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+                    Object.prototype.hasOwnProperty.call(this, _foo10);
+                  },
+                  'name',
+                  {
+                    value: 'test',
+                    configurable: true,
+                  },
+                ),
                 writable: true,
-                value: 2,
+                configurable: true,
               });
-            }
-            Object.defineProperty(Nested.prototype, 'test', {
-              value: function () {
-                Object.prototype.hasOwnProperty.call(this, _foo10);
-              },
-              writable: true,
-              configurable: true,
-            });
-            return Nested;
-          })();
-          Object.prototype.hasOwnProperty.call(this, _foo);
-        },
+              Object.defineProperty(Nested, 'prototype', { writable: false });
+              return Nested;
+            })();
+            Object.prototype.hasOwnProperty.call(this, _foo);
+          },
+          'name',
+          {
+            value: 'test',
+            configurable: true,
+          },
+        ),
         writable: true,
         configurable: true,
       });
+      Object.defineProperty(Foo, 'prototype', { writable: false });
       return Foo;
     })();"
   `);
@@ -2434,7 +3928,24 @@ test('private-loose/nested-class/input.js [spec]', async () => {
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-spec-private-features-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
+    var _checkInRHS = require('@babel/runtime/helpers/checkInRHS');
+    var _foo = /* @__PURE__ */ new WeakMap();
+    class Foo {
+      constructor() {
+        _classPrivateFieldInitSpec(this, _foo, 1);
+      }
+      test() {
+        class Nested {
+          test() {
+            _foo.has(_checkInRHS(this));
+          }
+        }
+        _foo.has(_checkInRHS(this));
+      }
+    }"
+  `);
 });
 
 test('private-loose/nested-class/input.js [loose]', async () => {
@@ -2450,37 +3961,55 @@ test('private-loose/nested-class/input.js [loose]', async () => {
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "var Foo = (() => {
+    "let Foo = (() => {
       'use strict';
       var _foo = '__private_Foo_foo';
-      function Foo() {
-        if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
+      const Foo = function Foo() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
         Object.defineProperty(this, _foo, {
           writable: true,
           value: 1,
         });
-      }
+      };
       Object.defineProperty(Foo.prototype, 'test', {
-        value: function () {
-          var Nested = (() => {
-            'use strict';
-            function Nested() {
-              if (!(this instanceof Nested)) throw new TypeError('Cannot call a class as a function');
-            }
-            Object.defineProperty(Nested.prototype, 'test', {
-              value: function () {
-                Object.prototype.hasOwnProperty.call(this, _foo);
-              },
-              writable: true,
-              configurable: true,
-            });
-            return Nested;
-          })();
-          Object.prototype.hasOwnProperty.call(this, _foo);
-        },
+        value: Object.defineProperty(
+          function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            let Nested = (() => {
+              'use strict';
+              const Nested = function Nested() {
+                if (!new.target) throw new TypeError('Cannot call a class as a function');
+              };
+              Object.defineProperty(Nested.prototype, 'test', {
+                value: Object.defineProperty(
+                  function () {
+                    if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+                    Object.prototype.hasOwnProperty.call(this, _foo);
+                  },
+                  'name',
+                  {
+                    value: 'test',
+                    configurable: true,
+                  },
+                ),
+                writable: true,
+                configurable: true,
+              });
+              Object.defineProperty(Nested, 'prototype', { writable: false });
+              return Nested;
+            })();
+            Object.prototype.hasOwnProperty.call(this, _foo);
+          },
+          'name',
+          {
+            value: 'test',
+            configurable: true,
+          },
+        ),
         writable: true,
         configurable: true,
       });
+      Object.defineProperty(Foo, 'prototype', { writable: false });
       return Foo;
     })();"
   `);
@@ -2498,7 +4027,231 @@ test('private-loose/rhs-not-object/exec.js [spec]', async () => {
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-spec-private-features-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _checkInRHS = require('@babel/runtime/helpers/checkInRHS');
+    var _defineProperty = require('@babel/runtime/helpers/defineProperty');
+    var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
+    var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
+    expect(() => {
+      var _Class, _p;
+      return ((_Class = class {}), (_p = { _: _checkInRHS(0) === _Class }), _Class);
+    }).toThrow(\`right-hand side of 'in' should be an object, got number\`);
+    expect(() => {
+      var _Class2, _p2;
+      return ((_Class2 = class {}), (_p2 = { _: _checkInRHS('') === _Class2 }), _Class2);
+    }).toThrow(\`right-hand side of 'in' should be an object, got string\`);
+    expect(() => {
+      var _Class3, _p3;
+      return ((_Class3 = class {}), (_p3 = { _: _checkInRHS(true) === _Class3 }), _Class3);
+    }).toThrow(\`right-hand side of 'in' should be an object, got boolean\`);
+    expect(() => {
+      var _Class4, _p4;
+      return ((_Class4 = class {}), (_p4 = { _: _checkInRHS(void 0) === _Class4 }), _Class4);
+    }).toThrow(\`right-hand side of 'in' should be an object, got undefined\`);
+    expect(() => {
+      var _Class5, _p5;
+      return ((_Class5 = class {}), (_p5 = { _: _checkInRHS(null) === _Class5 }), _Class5);
+    }).toThrow(\`right-hand side of 'in' should be an object, got null\`);
+    expect(() => {
+      var _Class6, _p6;
+      return ((_Class6 = class {}), (_p6 = { _: _checkInRHS(Symbol.iterator) === _Class6 }), _Class6);
+    }).toThrow(\`right-hand side of 'in' should be an object, got symbol\`);
+    expect(() => {
+      var _Class7, _p7;
+      return ((_Class7 = class {}), (_p7 = { _: _checkInRHS(0n) === _Class7 }), _Class7);
+    }).toThrow(\`right-hand side of 'in' should be an object, got bigint\`);
+    expect(() => {
+      var _Class8;
+      return ((_Class8 = class {}), _defineProperty(_Class8, 'q', _checkInRHS(0) === _Class8), _Class8);
+      function _p8() {}
+    }).toThrow(\`right-hand side of 'in' should be an object, got number\`);
+    expect(() => {
+      var _Class9;
+      return (
+        (_Class9 = class {}), _defineProperty(_Class9, 'q', _checkInRHS('') === _Class9), _Class9
+      );
+      function _p9() {}
+    }).toThrow(\`right-hand side of 'in' should be an object, got string\`);
+    expect(() => {
+      var _Class10;
+      return (
+        (_Class10 = class {}), _defineProperty(_Class10, 'q', _checkInRHS(true) === _Class10), _Class10
+      );
+      function _p10() {}
+    }).toThrow(\`right-hand side of 'in' should be an object, got boolean\`);
+    expect(() => {
+      var _Class11;
+      return (
+        (_Class11 = class {}),
+        _defineProperty(_Class11, 'q', _checkInRHS(void 0) === _Class11),
+        _Class11
+      );
+      function _p11() {}
+    }).toThrow(\`right-hand side of 'in' should be an object, got undefined\`);
+    expect(() => {
+      var _Class12;
+      return (
+        (_Class12 = class {}), _defineProperty(_Class12, 'q', _checkInRHS(null) === _Class12), _Class12
+      );
+      function _p12() {}
+    }).toThrow(\`right-hand side of 'in' should be an object, got null\`);
+    expect(() => {
+      var _Class13;
+      return (
+        (_Class13 = class {}),
+        _defineProperty(_Class13, 'q', _checkInRHS(Symbol.iterator) === _Class13),
+        _Class13
+      );
+      function _p13() {}
+    }).toThrow(\`right-hand side of 'in' should be an object, got symbol\`);
+    expect(() => {
+      var _Class14;
+      return (
+        (_Class14 = class {}), _defineProperty(_Class14, 'q', _checkInRHS(0n) === _Class14), _Class14
+      );
+      function _p14() {}
+    }).toThrow(\`right-hand side of 'in' should be an object, got bigint\`);
+    expect(() => {
+      var _p15;
+      return new ((_p15 = /* @__PURE__ */ new WeakMap()),
+      class {
+        constructor() {
+          _classPrivateFieldInitSpec(this, _p15, _p15.has(_checkInRHS(0)));
+        }
+      })();
+    }).toThrow(\`right-hand side of 'in' should be an object, got number\`);
+    expect(() => {
+      var _p16;
+      return new ((_p16 = /* @__PURE__ */ new WeakMap()),
+      class {
+        constructor() {
+          _classPrivateFieldInitSpec(this, _p16, _p16.has(_checkInRHS('')));
+        }
+      })();
+    }).toThrow(\`right-hand side of 'in' should be an object, got string\`);
+    expect(() => {
+      var _p17;
+      return new ((_p17 = /* @__PURE__ */ new WeakMap()),
+      class {
+        constructor() {
+          _classPrivateFieldInitSpec(this, _p17, _p17.has(_checkInRHS(true)));
+        }
+      })();
+    }).toThrow(\`right-hand side of 'in' should be an object, got boolean\`);
+    expect(() => {
+      var _p18;
+      return new ((_p18 = /* @__PURE__ */ new WeakMap()),
+      class {
+        constructor() {
+          _classPrivateFieldInitSpec(this, _p18, _p18.has(_checkInRHS(void 0)));
+        }
+      })();
+    }).toThrow(\`right-hand side of 'in' should be an object, got undefined\`);
+    expect(() => {
+      var _p19;
+      return new ((_p19 = /* @__PURE__ */ new WeakMap()),
+      class {
+        constructor() {
+          _classPrivateFieldInitSpec(this, _p19, _p19.has(_checkInRHS(null)));
+        }
+      })();
+    }).toThrow(\`right-hand side of 'in' should be an object, got null\`);
+    expect(() => {
+      var _p20;
+      return new ((_p20 = /* @__PURE__ */ new WeakMap()),
+      class {
+        constructor() {
+          _classPrivateFieldInitSpec(this, _p20, _p20.has(_checkInRHS(Symbol.iterator)));
+        }
+      })();
+    }).toThrow(\`right-hand side of 'in' should be an object, got symbol\`);
+    expect(() => {
+      var _p21;
+      return new ((_p21 = /* @__PURE__ */ new WeakMap()),
+      class {
+        constructor() {
+          _classPrivateFieldInitSpec(this, _p21, _p21.has(_checkInRHS(0n)));
+        }
+      })();
+    }).toThrow(\`right-hand side of 'in' should be an object, got bigint\`);
+    expect(() => {
+      var _Class_brand;
+      return new ((_Class_brand = /* @__PURE__ */ new WeakSet()),
+      class {
+        constructor() {
+          _classPrivateMethodInitSpec(this, _Class_brand);
+          _defineProperty(this, 'q', _Class_brand.has(_checkInRHS(0)));
+        }
+      })();
+      function _p22() {}
+    }).toThrow(\`right-hand side of 'in' should be an object, got number\`);
+    expect(() => {
+      var _Class_brand2;
+      return new ((_Class_brand2 = /* @__PURE__ */ new WeakSet()),
+      class {
+        constructor() {
+          _classPrivateMethodInitSpec(this, _Class_brand2);
+          _defineProperty(this, 'q', _Class_brand2.has(_checkInRHS('')));
+        }
+      })();
+      function _p23() {}
+    }).toThrow(\`right-hand side of 'in' should be an object, got string\`);
+    expect(() => {
+      var _Class_brand3;
+      return new ((_Class_brand3 = /* @__PURE__ */ new WeakSet()),
+      class {
+        constructor() {
+          _classPrivateMethodInitSpec(this, _Class_brand3);
+          _defineProperty(this, 'q', _Class_brand3.has(_checkInRHS(true)));
+        }
+      })();
+      function _p24() {}
+    }).toThrow(\`right-hand side of 'in' should be an object, got boolean\`);
+    expect(() => {
+      var _Class_brand4;
+      return new ((_Class_brand4 = /* @__PURE__ */ new WeakSet()),
+      class {
+        constructor() {
+          _classPrivateMethodInitSpec(this, _Class_brand4);
+          _defineProperty(this, 'q', _Class_brand4.has(_checkInRHS(void 0)));
+        }
+      })();
+      function _p25() {}
+    }).toThrow(\`right-hand side of 'in' should be an object, got undefined\`);
+    expect(() => {
+      var _Class_brand5;
+      return new ((_Class_brand5 = /* @__PURE__ */ new WeakSet()),
+      class {
+        constructor() {
+          _classPrivateMethodInitSpec(this, _Class_brand5);
+          _defineProperty(this, 'q', _Class_brand5.has(_checkInRHS(null)));
+        }
+      })();
+      function _p26() {}
+    }).toThrow(\`right-hand side of 'in' should be an object, got null\`);
+    expect(() => {
+      var _Class_brand6;
+      return new ((_Class_brand6 = /* @__PURE__ */ new WeakSet()),
+      class {
+        constructor() {
+          _classPrivateMethodInitSpec(this, _Class_brand6);
+          _defineProperty(this, 'q', _Class_brand6.has(_checkInRHS(Symbol.iterator)));
+        }
+      })();
+      function _p27() {}
+    }).toThrow(\`right-hand side of 'in' should be an object, got symbol\`);
+    expect(() => {
+      var _Class_brand7;
+      return new ((_Class_brand7 = /* @__PURE__ */ new WeakSet()),
+      class {
+        constructor() {
+          _classPrivateMethodInitSpec(this, _Class_brand7);
+          _defineProperty(this, 'q', _Class_brand7.has(_checkInRHS(0n)));
+        }
+      })();
+      function _p28() {}
+    }).toThrow(\`right-hand side of 'in' should be an object, got bigint\`);"
+  `);
 });
 
 test('private-loose/rhs-not-object/exec.js [loose]', async () => {
@@ -2518,9 +4271,10 @@ test('private-loose/rhs-not-object/exec.js [loose]', async () => {
       (() => {
         'use strict';
         var _p = '__private__Class_p';
-        function _Class() {
-          if (!(this instanceof _Class)) throw new TypeError('Cannot call a class as a function');
-        }
+        const _Class = function _Class() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
+        Object.defineProperty(_Class, 'prototype', { writable: false });
         Object.defineProperty(_Class, _p, {
           writable: true,
           value: Object.prototype.hasOwnProperty.call(0, _p),
@@ -2532,9 +4286,10 @@ test('private-loose/rhs-not-object/exec.js [loose]', async () => {
       (() => {
         'use strict';
         var _p10 = '__private__Class9_p';
-        function _Class9() {
-          if (!(this instanceof _Class9)) throw new TypeError('Cannot call a class as a function');
-        }
+        const _Class9 = function _Class9() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
+        Object.defineProperty(_Class9, 'prototype', { writable: false });
         Object.defineProperty(_Class9, _p10, {
           writable: true,
           value: Object.prototype.hasOwnProperty.call('', _p10),
@@ -2546,9 +4301,10 @@ test('private-loose/rhs-not-object/exec.js [loose]', async () => {
       (() => {
         'use strict';
         var _p12 = '__private__Class11_p';
-        function _Class11() {
-          if (!(this instanceof _Class11)) throw new TypeError('Cannot call a class as a function');
-        }
+        const _Class11 = function _Class11() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
+        Object.defineProperty(_Class11, 'prototype', { writable: false });
         Object.defineProperty(_Class11, _p12, {
           writable: true,
           value: Object.prototype.hasOwnProperty.call(true, _p12),
@@ -2560,9 +4316,10 @@ test('private-loose/rhs-not-object/exec.js [loose]', async () => {
       (() => {
         'use strict';
         var _p14 = '__private__Class13_p';
-        function _Class13() {
-          if (!(this instanceof _Class13)) throw new TypeError('Cannot call a class as a function');
-        }
+        const _Class13 = function _Class13() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
+        Object.defineProperty(_Class13, 'prototype', { writable: false });
         Object.defineProperty(_Class13, _p14, {
           writable: true,
           value: Object.prototype.hasOwnProperty.call(void 0, _p14),
@@ -2574,9 +4331,10 @@ test('private-loose/rhs-not-object/exec.js [loose]', async () => {
       (() => {
         'use strict';
         var _p16 = '__private__Class15_p';
-        function _Class15() {
-          if (!(this instanceof _Class15)) throw new TypeError('Cannot call a class as a function');
-        }
+        const _Class15 = function _Class15() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
+        Object.defineProperty(_Class15, 'prototype', { writable: false });
         Object.defineProperty(_Class15, _p16, {
           writable: true,
           value: Object.prototype.hasOwnProperty.call(null, _p16),
@@ -2588,9 +4346,10 @@ test('private-loose/rhs-not-object/exec.js [loose]', async () => {
       (() => {
         'use strict';
         var _p18 = '__private__Class17_p';
-        function _Class17() {
-          if (!(this instanceof _Class17)) throw new TypeError('Cannot call a class as a function');
-        }
+        const _Class17 = function _Class17() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
+        Object.defineProperty(_Class17, 'prototype', { writable: false });
         Object.defineProperty(_Class17, _p18, {
           writable: true,
           value: Object.prototype.hasOwnProperty.call(Symbol.iterator, _p18),
@@ -2602,9 +4361,10 @@ test('private-loose/rhs-not-object/exec.js [loose]', async () => {
       (() => {
         'use strict';
         var _p20 = '__private__Class19_p';
-        function _Class19() {
-          if (!(this instanceof _Class19)) throw new TypeError('Cannot call a class as a function');
-        }
+        const _Class19 = function _Class19() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
+        Object.defineProperty(_Class19, 'prototype', { writable: false });
         Object.defineProperty(_Class19, _p20, {
           writable: true,
           value: Object.prototype.hasOwnProperty.call(0n, _p20),
@@ -2616,11 +4376,16 @@ test('private-loose/rhs-not-object/exec.js [loose]', async () => {
       (() => {
         'use strict';
         var _p22 = '__private__Class21_p';
-        function _Class21() {
-          if (!(this instanceof _Class21)) throw new TypeError('Cannot call a class as a function');
-        }
+        const _Class21 = function _Class21() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
+        Object.defineProperty(_Class21, 'prototype', { writable: false });
         _Class21.q = Object.prototype.hasOwnProperty.call(0, _p22);
-        Object.defineProperty(_Class21, _p22, { value: function () {} });
+        Object.defineProperty(_Class21, _p22, {
+          value: function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          },
+        });
         return _Class21;
       })(),
     ).toThrow(\`right-hand side of 'in' should be an object, got number\`);
@@ -2628,11 +4393,16 @@ test('private-loose/rhs-not-object/exec.js [loose]', async () => {
       (() => {
         'use strict';
         var _p24 = '__private__Class23_p';
-        function _Class23() {
-          if (!(this instanceof _Class23)) throw new TypeError('Cannot call a class as a function');
-        }
+        const _Class23 = function _Class23() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
+        Object.defineProperty(_Class23, 'prototype', { writable: false });
         _Class23.q = Object.prototype.hasOwnProperty.call('', _p24);
-        Object.defineProperty(_Class23, _p24, { value: function () {} });
+        Object.defineProperty(_Class23, _p24, {
+          value: function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          },
+        });
         return _Class23;
       })(),
     ).toThrow(\`right-hand side of 'in' should be an object, got string\`);
@@ -2640,11 +4410,16 @@ test('private-loose/rhs-not-object/exec.js [loose]', async () => {
       (() => {
         'use strict';
         var _p26 = '__private__Class25_p';
-        function _Class25() {
-          if (!(this instanceof _Class25)) throw new TypeError('Cannot call a class as a function');
-        }
+        const _Class25 = function _Class25() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
+        Object.defineProperty(_Class25, 'prototype', { writable: false });
         _Class25.q = Object.prototype.hasOwnProperty.call(true, _p26);
-        Object.defineProperty(_Class25, _p26, { value: function () {} });
+        Object.defineProperty(_Class25, _p26, {
+          value: function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          },
+        });
         return _Class25;
       })(),
     ).toThrow(\`right-hand side of 'in' should be an object, got boolean\`);
@@ -2652,11 +4427,16 @@ test('private-loose/rhs-not-object/exec.js [loose]', async () => {
       (() => {
         'use strict';
         var _p28 = '__private__Class27_p';
-        function _Class27() {
-          if (!(this instanceof _Class27)) throw new TypeError('Cannot call a class as a function');
-        }
+        const _Class27 = function _Class27() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
+        Object.defineProperty(_Class27, 'prototype', { writable: false });
         _Class27.q = Object.prototype.hasOwnProperty.call(void 0, _p28);
-        Object.defineProperty(_Class27, _p28, { value: function () {} });
+        Object.defineProperty(_Class27, _p28, {
+          value: function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          },
+        });
         return _Class27;
       })(),
     ).toThrow(\`right-hand side of 'in' should be an object, got undefined\`);
@@ -2664,11 +4444,16 @@ test('private-loose/rhs-not-object/exec.js [loose]', async () => {
       (() => {
         'use strict';
         var _p30 = '__private__Class29_p';
-        function _Class29() {
-          if (!(this instanceof _Class29)) throw new TypeError('Cannot call a class as a function');
-        }
+        const _Class29 = function _Class29() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
+        Object.defineProperty(_Class29, 'prototype', { writable: false });
         _Class29.q = Object.prototype.hasOwnProperty.call(null, _p30);
-        Object.defineProperty(_Class29, _p30, { value: function () {} });
+        Object.defineProperty(_Class29, _p30, {
+          value: function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          },
+        });
         return _Class29;
       })(),
     ).toThrow(\`right-hand side of 'in' should be an object, got null\`);
@@ -2676,11 +4461,16 @@ test('private-loose/rhs-not-object/exec.js [loose]', async () => {
       (() => {
         'use strict';
         var _p32 = '__private__Class31_p';
-        function _Class31() {
-          if (!(this instanceof _Class31)) throw new TypeError('Cannot call a class as a function');
-        }
+        const _Class31 = function _Class31() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
+        Object.defineProperty(_Class31, 'prototype', { writable: false });
         _Class31.q = Object.prototype.hasOwnProperty.call(Symbol.iterator, _p32);
-        Object.defineProperty(_Class31, _p32, { value: function () {} });
+        Object.defineProperty(_Class31, _p32, {
+          value: function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          },
+        });
         return _Class31;
       })(),
     ).toThrow(\`right-hand side of 'in' should be an object, got symbol\`);
@@ -2688,11 +4478,16 @@ test('private-loose/rhs-not-object/exec.js [loose]', async () => {
       (() => {
         'use strict';
         var _p34 = '__private__Class33_p';
-        function _Class33() {
-          if (!(this instanceof _Class33)) throw new TypeError('Cannot call a class as a function');
-        }
+        const _Class33 = function _Class33() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
+        Object.defineProperty(_Class33, 'prototype', { writable: false });
         _Class33.q = Object.prototype.hasOwnProperty.call(0n, _p34);
-        Object.defineProperty(_Class33, _p34, { value: function () {} });
+        Object.defineProperty(_Class33, _p34, {
+          value: function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          },
+        });
         return _Class33;
       })(),
     ).toThrow(\`right-hand side of 'in' should be an object, got bigint\`);
@@ -2701,13 +4496,14 @@ test('private-loose/rhs-not-object/exec.js [loose]', async () => {
         new ((() => {
           'use strict';
           var _p36 = '__private__Class35_p';
-          function _Class35() {
-            if (!(this instanceof _Class35)) throw new TypeError('Cannot call a class as a function');
+          const _Class35 = function _Class35() {
+            if (!new.target) throw new TypeError('Cannot call a class as a function');
             Object.defineProperty(this, _p36, {
               writable: true,
               value: Object.prototype.hasOwnProperty.call(0, _p36),
             });
-          }
+          };
+          Object.defineProperty(_Class35, 'prototype', { writable: false });
           return _Class35;
         })())(),
     ).toThrow(\`right-hand side of 'in' should be an object, got number\`);
@@ -2716,13 +4512,14 @@ test('private-loose/rhs-not-object/exec.js [loose]', async () => {
         new ((() => {
           'use strict';
           var _p38 = '__private__Class37_p';
-          function _Class37() {
-            if (!(this instanceof _Class37)) throw new TypeError('Cannot call a class as a function');
+          const _Class37 = function _Class37() {
+            if (!new.target) throw new TypeError('Cannot call a class as a function');
             Object.defineProperty(this, _p38, {
               writable: true,
               value: Object.prototype.hasOwnProperty.call('', _p38),
             });
-          }
+          };
+          Object.defineProperty(_Class37, 'prototype', { writable: false });
           return _Class37;
         })())(),
     ).toThrow(\`right-hand side of 'in' should be an object, got string\`);
@@ -2731,13 +4528,14 @@ test('private-loose/rhs-not-object/exec.js [loose]', async () => {
         new ((() => {
           'use strict';
           var _p40 = '__private__Class39_p';
-          function _Class39() {
-            if (!(this instanceof _Class39)) throw new TypeError('Cannot call a class as a function');
+          const _Class39 = function _Class39() {
+            if (!new.target) throw new TypeError('Cannot call a class as a function');
             Object.defineProperty(this, _p40, {
               writable: true,
               value: Object.prototype.hasOwnProperty.call(true, _p40),
             });
-          }
+          };
+          Object.defineProperty(_Class39, 'prototype', { writable: false });
           return _Class39;
         })())(),
     ).toThrow(\`right-hand side of 'in' should be an object, got boolean\`);
@@ -2746,13 +4544,14 @@ test('private-loose/rhs-not-object/exec.js [loose]', async () => {
         new ((() => {
           'use strict';
           var _p42 = '__private__Class41_p';
-          function _Class41() {
-            if (!(this instanceof _Class41)) throw new TypeError('Cannot call a class as a function');
+          const _Class41 = function _Class41() {
+            if (!new.target) throw new TypeError('Cannot call a class as a function');
             Object.defineProperty(this, _p42, {
               writable: true,
               value: Object.prototype.hasOwnProperty.call(void 0, _p42),
             });
-          }
+          };
+          Object.defineProperty(_Class41, 'prototype', { writable: false });
           return _Class41;
         })())(),
     ).toThrow(\`right-hand side of 'in' should be an object, got undefined\`);
@@ -2761,13 +4560,14 @@ test('private-loose/rhs-not-object/exec.js [loose]', async () => {
         new ((() => {
           'use strict';
           var _p44 = '__private__Class43_p';
-          function _Class43() {
-            if (!(this instanceof _Class43)) throw new TypeError('Cannot call a class as a function');
+          const _Class43 = function _Class43() {
+            if (!new.target) throw new TypeError('Cannot call a class as a function');
             Object.defineProperty(this, _p44, {
               writable: true,
               value: Object.prototype.hasOwnProperty.call(null, _p44),
             });
-          }
+          };
+          Object.defineProperty(_Class43, 'prototype', { writable: false });
           return _Class43;
         })())(),
     ).toThrow(\`right-hand side of 'in' should be an object, got null\`);
@@ -2776,13 +4576,14 @@ test('private-loose/rhs-not-object/exec.js [loose]', async () => {
         new ((() => {
           'use strict';
           var _p46 = '__private__Class45_p';
-          function _Class45() {
-            if (!(this instanceof _Class45)) throw new TypeError('Cannot call a class as a function');
+          const _Class45 = function _Class45() {
+            if (!new.target) throw new TypeError('Cannot call a class as a function');
             Object.defineProperty(this, _p46, {
               writable: true,
               value: Object.prototype.hasOwnProperty.call(Symbol.iterator, _p46),
             });
-          }
+          };
+          Object.defineProperty(_Class45, 'prototype', { writable: false });
           return _Class45;
         })())(),
     ).toThrow(\`right-hand side of 'in' should be an object, got symbol\`);
@@ -2791,13 +4592,14 @@ test('private-loose/rhs-not-object/exec.js [loose]', async () => {
         new ((() => {
           'use strict';
           var _p48 = '__private__Class47_p';
-          function _Class47() {
-            if (!(this instanceof _Class47)) throw new TypeError('Cannot call a class as a function');
+          const _Class47 = function _Class47() {
+            if (!new.target) throw new TypeError('Cannot call a class as a function');
             Object.defineProperty(this, _p48, {
               writable: true,
               value: Object.prototype.hasOwnProperty.call(0n, _p48),
             });
-          }
+          };
+          Object.defineProperty(_Class47, 'prototype', { writable: false });
           return _Class47;
         })())(),
     ).toThrow(\`right-hand side of 'in' should be an object, got bigint\`);
@@ -2806,11 +4608,16 @@ test('private-loose/rhs-not-object/exec.js [loose]', async () => {
         new ((() => {
           'use strict';
           var _p50 = '__private__Class49_p';
-          function _Class49() {
-            if (!(this instanceof _Class49)) throw new TypeError('Cannot call a class as a function');
+          const _Class49 = function _Class49() {
+            if (!new.target) throw new TypeError('Cannot call a class as a function');
             this.q = Object.prototype.hasOwnProperty.call(0, _p50);
-            Object.defineProperty(this, _p50, { value: function () {} });
-          }
+            Object.defineProperty(this, _p50, {
+              value: function () {
+                if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              },
+            });
+          };
+          Object.defineProperty(_Class49, 'prototype', { writable: false });
           return _Class49;
         })())(),
     ).toThrow(\`right-hand side of 'in' should be an object, got number\`);
@@ -2819,11 +4626,16 @@ test('private-loose/rhs-not-object/exec.js [loose]', async () => {
         new ((() => {
           'use strict';
           var _p52 = '__private__Class51_p';
-          function _Class51() {
-            if (!(this instanceof _Class51)) throw new TypeError('Cannot call a class as a function');
+          const _Class51 = function _Class51() {
+            if (!new.target) throw new TypeError('Cannot call a class as a function');
             this.q = Object.prototype.hasOwnProperty.call('', _p52);
-            Object.defineProperty(this, _p52, { value: function () {} });
-          }
+            Object.defineProperty(this, _p52, {
+              value: function () {
+                if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              },
+            });
+          };
+          Object.defineProperty(_Class51, 'prototype', { writable: false });
           return _Class51;
         })())(),
     ).toThrow(\`right-hand side of 'in' should be an object, got string\`);
@@ -2832,11 +4644,16 @@ test('private-loose/rhs-not-object/exec.js [loose]', async () => {
         new ((() => {
           'use strict';
           var _p54 = '__private__Class53_p';
-          function _Class53() {
-            if (!(this instanceof _Class53)) throw new TypeError('Cannot call a class as a function');
+          const _Class53 = function _Class53() {
+            if (!new.target) throw new TypeError('Cannot call a class as a function');
             this.q = Object.prototype.hasOwnProperty.call(true, _p54);
-            Object.defineProperty(this, _p54, { value: function () {} });
-          }
+            Object.defineProperty(this, _p54, {
+              value: function () {
+                if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              },
+            });
+          };
+          Object.defineProperty(_Class53, 'prototype', { writable: false });
           return _Class53;
         })())(),
     ).toThrow(\`right-hand side of 'in' should be an object, got boolean\`);
@@ -2845,11 +4662,16 @@ test('private-loose/rhs-not-object/exec.js [loose]', async () => {
         new ((() => {
           'use strict';
           var _p56 = '__private__Class55_p';
-          function _Class55() {
-            if (!(this instanceof _Class55)) throw new TypeError('Cannot call a class as a function');
+          const _Class55 = function _Class55() {
+            if (!new.target) throw new TypeError('Cannot call a class as a function');
             this.q = Object.prototype.hasOwnProperty.call(void 0, _p56);
-            Object.defineProperty(this, _p56, { value: function () {} });
-          }
+            Object.defineProperty(this, _p56, {
+              value: function () {
+                if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              },
+            });
+          };
+          Object.defineProperty(_Class55, 'prototype', { writable: false });
           return _Class55;
         })())(),
     ).toThrow(\`right-hand side of 'in' should be an object, got undefined\`);
@@ -2858,11 +4680,16 @@ test('private-loose/rhs-not-object/exec.js [loose]', async () => {
         new ((() => {
           'use strict';
           var _p58 = '__private__Class57_p';
-          function _Class57() {
-            if (!(this instanceof _Class57)) throw new TypeError('Cannot call a class as a function');
+          const _Class57 = function _Class57() {
+            if (!new.target) throw new TypeError('Cannot call a class as a function');
             this.q = Object.prototype.hasOwnProperty.call(null, _p58);
-            Object.defineProperty(this, _p58, { value: function () {} });
-          }
+            Object.defineProperty(this, _p58, {
+              value: function () {
+                if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              },
+            });
+          };
+          Object.defineProperty(_Class57, 'prototype', { writable: false });
           return _Class57;
         })())(),
     ).toThrow(\`right-hand side of 'in' should be an object, got null\`);
@@ -2871,11 +4698,16 @@ test('private-loose/rhs-not-object/exec.js [loose]', async () => {
         new ((() => {
           'use strict';
           var _p60 = '__private__Class59_p';
-          function _Class59() {
-            if (!(this instanceof _Class59)) throw new TypeError('Cannot call a class as a function');
+          const _Class59 = function _Class59() {
+            if (!new.target) throw new TypeError('Cannot call a class as a function');
             this.q = Object.prototype.hasOwnProperty.call(Symbol.iterator, _p60);
-            Object.defineProperty(this, _p60, { value: function () {} });
-          }
+            Object.defineProperty(this, _p60, {
+              value: function () {
+                if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              },
+            });
+          };
+          Object.defineProperty(_Class59, 'prototype', { writable: false });
           return _Class59;
         })())(),
     ).toThrow(\`right-hand side of 'in' should be an object, got symbol\`);
@@ -2884,11 +4716,16 @@ test('private-loose/rhs-not-object/exec.js [loose]', async () => {
         new ((() => {
           'use strict';
           var _p62 = '__private__Class61_p';
-          function _Class61() {
-            if (!(this instanceof _Class61)) throw new TypeError('Cannot call a class as a function');
+          const _Class61 = function _Class61() {
+            if (!new.target) throw new TypeError('Cannot call a class as a function');
             this.q = Object.prototype.hasOwnProperty.call(0n, _p62);
-            Object.defineProperty(this, _p62, { value: function () {} });
-          }
+            Object.defineProperty(this, _p62, {
+              value: function () {
+                if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              },
+            });
+          };
+          Object.defineProperty(_Class61, 'prototype', { writable: false });
           return _Class61;
         })())(),
     ).toThrow(\`right-hand side of 'in' should be an object, got bigint\`);"
@@ -2907,7 +4744,15 @@ test('private-loose/static-accessor/input.js [spec]', async () => {
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-spec-private-features-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _checkInRHS = require('@babel/runtime/helpers/checkInRHS');
+    class Foo {
+      test(other) {
+        return _checkInRHS(other) === Foo;
+      }
+    }
+    function _get_foo() {}"
+  `);
 });
 
 test('private-loose/static-accessor/input.js [loose]', async () => {
@@ -2923,20 +4768,33 @@ test('private-loose/static-accessor/input.js [loose]', async () => {
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "var Foo = (() => {
+    "let Foo = (() => {
       'use strict';
       var _foo = '__private_Foo_foo';
-      function Foo() {
-        if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
-      }
+      const Foo = function Foo() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+      };
       Object.defineProperty(Foo.prototype, 'test', {
-        value: function (other) {
-          return Object.prototype.hasOwnProperty.call(other, _foo);
-        },
+        value: Object.defineProperty(
+          function (other) {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            return Object.prototype.hasOwnProperty.call(other, _foo);
+          },
+          'name',
+          {
+            value: 'test',
+            configurable: true,
+          },
+        ),
         writable: true,
         configurable: true,
       });
-      Object.defineProperty(Foo, _foo, { get: function () {} });
+      Object.defineProperty(Foo, 'prototype', { writable: false });
+      Object.defineProperty(Foo, _foo, {
+        get: function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        },
+      });
       return Foo;
     })();"
   `);
@@ -2954,7 +4812,15 @@ test('private-loose/static-field/input.js [spec]', async () => {
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-spec-private-features-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _checkInRHS = require('@babel/runtime/helpers/checkInRHS');
+    class Foo {
+      test(other) {
+        return _checkInRHS(other) === Foo;
+      }
+    }
+    var _foo = { _: 1 };"
+  `);
 });
 
 test('private-loose/static-field/input.js [loose]', async () => {
@@ -2970,19 +4836,28 @@ test('private-loose/static-field/input.js [loose]', async () => {
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "var Foo = (() => {
+    "let Foo = (() => {
       'use strict';
       var _foo = '__private_Foo_foo';
-      function Foo() {
-        if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
-      }
+      const Foo = function Foo() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+      };
       Object.defineProperty(Foo.prototype, 'test', {
-        value: function (other) {
-          return Object.prototype.hasOwnProperty.call(other, _foo);
-        },
+        value: Object.defineProperty(
+          function (other) {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            return Object.prototype.hasOwnProperty.call(other, _foo);
+          },
+          'name',
+          {
+            value: 'test',
+            configurable: true,
+          },
+        ),
         writable: true,
         configurable: true,
       });
+      Object.defineProperty(Foo, 'prototype', { writable: false });
       Object.defineProperty(Foo, _foo, {
         writable: true,
         value: 1,
@@ -3004,7 +4879,15 @@ test('private-loose/static-method/input.js [spec]', async () => {
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-spec-private-features-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _checkInRHS = require('@babel/runtime/helpers/checkInRHS');
+    class Foo {
+      test(other) {
+        return _checkInRHS(other) === Foo;
+      }
+    }
+    function _foo() {}"
+  `);
 });
 
 test('private-loose/static-method/input.js [loose]', async () => {
@@ -3020,20 +4903,33 @@ test('private-loose/static-method/input.js [loose]', async () => {
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "var Foo = (() => {
+    "let Foo = (() => {
       'use strict';
       var _foo = '__private_Foo_foo';
-      function Foo() {
-        if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
-      }
+      const Foo = function Foo() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+      };
       Object.defineProperty(Foo.prototype, 'test', {
-        value: function (other) {
-          return Object.prototype.hasOwnProperty.call(other, _foo);
-        },
+        value: Object.defineProperty(
+          function (other) {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            return Object.prototype.hasOwnProperty.call(other, _foo);
+          },
+          'name',
+          {
+            value: 'test',
+            configurable: true,
+          },
+        ),
         writable: true,
         configurable: true,
       });
-      Object.defineProperty(Foo, _foo, { value: function () {} });
+      Object.defineProperty(Foo, 'prototype', { writable: false });
+      Object.defineProperty(Foo, _foo, {
+        value: function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        },
+      });
       return Foo;
     })();"
   `);
@@ -3051,7 +4947,23 @@ test('private-loose/static-shadow/exec.js [spec]', async () => {
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-spec-private-features-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _checkInRHS = require('@babel/runtime/helpers/checkInRHS');
+    class Test {
+      method(other) {
+        const Test = 2;
+        const func = () => {
+          const Test = 3;
+          return _checkInRHS(other) === Test && Test;
+        };
+        return func() + Test;
+      }
+    }
+    var _x = { _: 1 };
+    const t = new Test();
+    const t2 = new Test();
+    expect(t.method(Test)).toBe(5);"
+  `);
 });
 
 test('private-loose/static-shadow/exec.js [loose]', async () => {
@@ -3067,24 +4979,33 @@ test('private-loose/static-shadow/exec.js [loose]', async () => {
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "var Test = (() => {
+    "let Test = (() => {
       'use strict';
       var _x = '__private_Test_x';
-      function Test() {
-        if (!(this instanceof Test)) throw new TypeError('Cannot call a class as a function');
-      }
+      const Test = function Test() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+      };
       Object.defineProperty(Test.prototype, 'method', {
-        value: function (other) {
-          const Test = 2;
-          const func = () => {
-            const Test = 3;
-            return Object.prototype.hasOwnProperty.call(other, _x) && Test;
-          };
-          return func() + Test;
-        },
+        value: Object.defineProperty(
+          function (other) {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            const Test = 2;
+            const func = () => {
+              const Test = 3;
+              return Object.prototype.hasOwnProperty.call(other, _x) && Test;
+            };
+            return func() + Test;
+          },
+          'name',
+          {
+            value: 'method',
+            configurable: true,
+          },
+        ),
         writable: true,
         configurable: true,
       });
+      Object.defineProperty(Test, 'prototype', { writable: false });
       Object.defineProperty(Test, _x, {
         writable: true,
         value: 1,
@@ -3109,7 +5030,20 @@ test('private-loose/static-shadow/input.js [spec]', async () => {
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-spec-private-features-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _checkInRHS = require('@babel/runtime/helpers/checkInRHS');
+    class Test {
+      method(other) {
+        const Test = 2;
+        const func = () => {
+          const Test = 3;
+          return _checkInRHS(other) === Test && Test;
+        };
+        return func() + Test;
+      }
+    }
+    var _x = { _: 1 };"
+  `);
 });
 
 test('private-loose/static-shadow/input.js [loose]', async () => {
@@ -3125,24 +5059,33 @@ test('private-loose/static-shadow/input.js [loose]', async () => {
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "var Test = (() => {
+    "let Test = (() => {
       'use strict';
       var _x = '__private_Test_x';
-      function Test() {
-        if (!(this instanceof Test)) throw new TypeError('Cannot call a class as a function');
-      }
+      const Test = function Test() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+      };
       Object.defineProperty(Test.prototype, 'method', {
-        value: function (other) {
-          const Test = 2;
-          const func = () => {
-            const Test = 3;
-            return Object.prototype.hasOwnProperty.call(other, _x) && Test;
-          };
-          return func() + Test;
-        },
+        value: Object.defineProperty(
+          function (other) {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            const Test = 2;
+            const func = () => {
+              const Test = 3;
+              return Object.prototype.hasOwnProperty.call(other, _x) && Test;
+            };
+            return func() + Test;
+          },
+          'name',
+          {
+            value: 'method',
+            configurable: true,
+          },
+        ),
         writable: true,
         configurable: true,
       });
+      Object.defineProperty(Test, 'prototype', { writable: false });
       Object.defineProperty(Test, _x, {
         writable: true,
         value: 1,
@@ -3164,7 +5107,20 @@ test('private/accessor/input.js [spec]', async () => {
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-spec-private-features-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
+    var _checkInRHS = require('@babel/runtime/helpers/checkInRHS');
+    var _Foo_brand = /* @__PURE__ */ new WeakSet();
+    class Foo {
+      constructor() {
+        _classPrivateMethodInitSpec(this, _Foo_brand);
+      }
+      test(other) {
+        return _Foo_brand.has(_checkInRHS(other));
+      }
+    }
+    function _get_foo() {}"
+  `);
 });
 
 test('private/accessor/input.js [loose]', async () => {
@@ -3180,20 +5136,33 @@ test('private/accessor/input.js [loose]', async () => {
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "var Foo = (() => {
+    "let Foo = (() => {
       'use strict';
       var _foo = '__private_Foo_foo';
-      function Foo() {
-        if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
-        Object.defineProperty(this, _foo, { get: function () {} });
-      }
+      const Foo = function Foo() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+        Object.defineProperty(this, _foo, {
+          get: function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          },
+        });
+      };
       Object.defineProperty(Foo.prototype, 'test', {
-        value: function (other) {
-          return Object.prototype.hasOwnProperty.call(other, _foo);
-        },
+        value: Object.defineProperty(
+          function (other) {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            return Object.prototype.hasOwnProperty.call(other, _foo);
+          },
+          'name',
+          {
+            value: 'test',
+            configurable: true,
+          },
+        ),
         writable: true,
         configurable: true,
       });
+      Object.defineProperty(Foo, 'prototype', { writable: false });
       return Foo;
     })();"
   `);
@@ -3210,7 +5179,19 @@ test('private/field/input.js [spec]', async () => {
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-spec-private-features-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
+    var _checkInRHS = require('@babel/runtime/helpers/checkInRHS');
+    var _foo = /* @__PURE__ */ new WeakMap();
+    class Foo {
+      constructor() {
+        _classPrivateFieldInitSpec(this, _foo, 1);
+      }
+      test(other) {
+        return _foo.has(_checkInRHS(other));
+      }
+    }"
+  `);
 });
 
 test('private/field/input.js [loose]', async () => {
@@ -3225,23 +5206,32 @@ test('private/field/input.js [loose]', async () => {
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "var Foo = (() => {
+    "let Foo = (() => {
       'use strict';
       var _foo = '__private_Foo_foo';
-      function Foo() {
-        if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
+      const Foo = function Foo() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
         Object.defineProperty(this, _foo, {
           writable: true,
           value: 1,
         });
-      }
+      };
       Object.defineProperty(Foo.prototype, 'test', {
-        value: function (other) {
-          return Object.prototype.hasOwnProperty.call(other, _foo);
-        },
+        value: Object.defineProperty(
+          function (other) {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            return Object.prototype.hasOwnProperty.call(other, _foo);
+          },
+          'name',
+          {
+            value: 'test',
+            configurable: true,
+          },
+        ),
         writable: true,
         configurable: true,
       });
+      Object.defineProperty(Foo, 'prototype', { writable: false });
       return Foo;
     })();"
   `);
@@ -3258,7 +5248,20 @@ test('private/method/input.js [spec]', async () => {
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-spec-private-features-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
+    var _checkInRHS = require('@babel/runtime/helpers/checkInRHS');
+    var _Foo_brand = /* @__PURE__ */ new WeakSet();
+    class Foo {
+      constructor() {
+        _classPrivateMethodInitSpec(this, _Foo_brand);
+      }
+      test(other) {
+        return _Foo_brand.has(_checkInRHS(other));
+      }
+    }
+    function _foo() {}"
+  `);
 });
 
 test('private/method/input.js [loose]', async () => {
@@ -3273,20 +5276,33 @@ test('private/method/input.js [loose]', async () => {
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "var Foo = (() => {
+    "let Foo = (() => {
       'use strict';
       var _foo = '__private_Foo_foo';
-      function Foo() {
-        if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
-        Object.defineProperty(this, _foo, { value: function () {} });
-      }
+      const Foo = function Foo() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+        Object.defineProperty(this, _foo, {
+          value: function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          },
+        });
+      };
       Object.defineProperty(Foo.prototype, 'test', {
-        value: function (other) {
-          return Object.prototype.hasOwnProperty.call(other, _foo);
-        },
+        value: Object.defineProperty(
+          function (other) {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            return Object.prototype.hasOwnProperty.call(other, _foo);
+          },
+          'name',
+          {
+            value: 'test',
+            configurable: true,
+          },
+        ),
         writable: true,
         configurable: true,
       });
+      Object.defineProperty(Foo, 'prototype', { writable: false });
       return Foo;
     })();"
   `);
@@ -3304,7 +5320,23 @@ test('private/native-classes/input.js [spec]', async () => {
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-spec-private-features-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
+    var _checkInRHS = require('@babel/runtime/helpers/checkInRHS');
+    var _bar = /* @__PURE__ */ new WeakMap();
+    class Foo {
+      constructor() {
+        _classPrivateFieldInitSpec(this, _bar, 'bar');
+      }
+      static test() {
+        return _checkInRHS(Foo) === Foo;
+      }
+      test() {
+        return _bar.has(_checkInRHS(this));
+      }
+    }
+    var _foo = { _: 'foo' };"
+  `);
 });
 
 test('private/native-classes/input.js [loose]', async () => {
@@ -3320,31 +5352,48 @@ test('private/native-classes/input.js [loose]', async () => {
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "var Foo = (() => {
+    "let Foo = (() => {
       'use strict';
       var _foo = '__private_Foo_foo';
       var _bar = '__private_Foo_bar';
-      function Foo() {
-        if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
+      const Foo = function Foo() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
         Object.defineProperty(this, _bar, {
           writable: true,
           value: 'bar',
         });
-      }
+      };
       Object.defineProperty(Foo, 'test', {
-        value: function () {
-          return Object.prototype.hasOwnProperty.call(Foo, _foo);
-        },
+        value: Object.defineProperty(
+          function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            return Object.prototype.hasOwnProperty.call(Foo, _foo);
+          },
+          'name',
+          {
+            value: 'test',
+            configurable: true,
+          },
+        ),
         writable: true,
         configurable: true,
       });
       Object.defineProperty(Foo.prototype, 'test', {
-        value: function () {
-          return Object.prototype.hasOwnProperty.call(this, _bar);
-        },
+        value: Object.defineProperty(
+          function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            return Object.prototype.hasOwnProperty.call(this, _bar);
+          },
+          'name',
+          {
+            value: 'test',
+            configurable: true,
+          },
+        ),
         writable: true,
         configurable: true,
       });
+      Object.defineProperty(Foo, 'prototype', { writable: false });
       Object.defineProperty(Foo, _foo, {
         writable: true,
         value: 'foo',
@@ -3366,7 +5415,32 @@ test('private/nested-class-other-redeclared/input.js [spec]', async () => {
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-spec-private-features-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
+    var _checkInRHS = require('@babel/runtime/helpers/checkInRHS');
+    var _foo = /* @__PURE__ */ new WeakMap();
+    var _bar = /* @__PURE__ */ new WeakMap();
+    class Foo {
+      constructor() {
+        _classPrivateFieldInitSpec(this, _foo, 1);
+        _classPrivateFieldInitSpec(this, _bar, 1);
+      }
+      test() {
+        var _bar2 = /* @__PURE__ */ new WeakMap();
+        class Nested {
+          constructor() {
+            _classPrivateFieldInitSpec(this, _bar2, 2);
+          }
+          test() {
+            _foo.has(_checkInRHS(this));
+            _bar2.has(_checkInRHS(this));
+          }
+        }
+        _foo.has(_checkInRHS(this));
+        _bar.has(_checkInRHS(this));
+      }
+    }"
+  `);
 });
 
 test('private/nested-class-other-redeclared/input.js [loose]', async () => {
@@ -3382,12 +5456,12 @@ test('private/nested-class-other-redeclared/input.js [loose]', async () => {
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "var Foo = (() => {
+    "let Foo = (() => {
       'use strict';
       var _foo = '__private_Foo_foo';
       var _bar = '__private_Foo_bar';
-      function Foo() {
-        if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
+      const Foo = function Foo() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
         Object.defineProperty(this, _foo, {
           writable: true,
           value: 1,
@@ -3396,35 +5470,53 @@ test('private/nested-class-other-redeclared/input.js [loose]', async () => {
           writable: true,
           value: 1,
         });
-      }
+      };
       Object.defineProperty(Foo.prototype, 'test', {
-        value: function () {
-          var Nested = (() => {
-            'use strict';
-            var _bar11 = '__private_Nested_bar';
-            function Nested() {
-              if (!(this instanceof Nested)) throw new TypeError('Cannot call a class as a function');
-              Object.defineProperty(this, _bar11, {
+        value: Object.defineProperty(
+          function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            let Nested = (() => {
+              'use strict';
+              var _bar11 = '__private_Nested_bar';
+              const Nested = function Nested() {
+                if (!new.target) throw new TypeError('Cannot call a class as a function');
+                Object.defineProperty(this, _bar11, {
+                  writable: true,
+                  value: 2,
+                });
+              };
+              Object.defineProperty(Nested.prototype, 'test', {
+                value: Object.defineProperty(
+                  function () {
+                    if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+                    Object.prototype.hasOwnProperty.call(this, _foo);
+                    Object.prototype.hasOwnProperty.call(this, _bar11);
+                  },
+                  'name',
+                  {
+                    value: 'test',
+                    configurable: true,
+                  },
+                ),
                 writable: true,
-                value: 2,
+                configurable: true,
               });
-            }
-            Object.defineProperty(Nested.prototype, 'test', {
-              value: function () {
-                Object.prototype.hasOwnProperty.call(this, _foo);
-                Object.prototype.hasOwnProperty.call(this, _bar11);
-              },
-              writable: true,
-              configurable: true,
-            });
-            return Nested;
-          })();
-          Object.prototype.hasOwnProperty.call(this, _foo);
-          Object.prototype.hasOwnProperty.call(this, _bar);
-        },
+              Object.defineProperty(Nested, 'prototype', { writable: false });
+              return Nested;
+            })();
+            Object.prototype.hasOwnProperty.call(this, _foo);
+            Object.prototype.hasOwnProperty.call(this, _bar);
+          },
+          'name',
+          {
+            value: 'test',
+            configurable: true,
+          },
+        ),
         writable: true,
         configurable: true,
       });
+      Object.defineProperty(Foo, 'prototype', { writable: false });
       return Foo;
     })();"
   `);
@@ -3442,7 +5534,28 @@ test('private/nested-class-redeclared/input.js [spec]', async () => {
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-spec-private-features-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
+    var _checkInRHS = require('@babel/runtime/helpers/checkInRHS');
+    var _foo = /* @__PURE__ */ new WeakMap();
+    class Foo {
+      constructor() {
+        _classPrivateFieldInitSpec(this, _foo, 1);
+      }
+      test() {
+        var _foo2 = /* @__PURE__ */ new WeakMap();
+        class Nested {
+          constructor() {
+            _classPrivateFieldInitSpec(this, _foo2, 2);
+          }
+          test() {
+            _foo2.has(_checkInRHS(this));
+          }
+        }
+        _foo.has(_checkInRHS(this));
+      }
+    }"
+  `);
 });
 
 test('private/nested-class-redeclared/input.js [loose]', async () => {
@@ -3458,42 +5571,60 @@ test('private/nested-class-redeclared/input.js [loose]', async () => {
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "var Foo = (() => {
+    "let Foo = (() => {
       'use strict';
       var _foo = '__private_Foo_foo';
-      function Foo() {
-        if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
+      const Foo = function Foo() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
         Object.defineProperty(this, _foo, {
           writable: true,
           value: 1,
         });
-      }
+      };
       Object.defineProperty(Foo.prototype, 'test', {
-        value: function () {
-          var Nested = (() => {
-            'use strict';
-            var _foo10 = '__private_Nested_foo';
-            function Nested() {
-              if (!(this instanceof Nested)) throw new TypeError('Cannot call a class as a function');
-              Object.defineProperty(this, _foo10, {
+        value: Object.defineProperty(
+          function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            let Nested = (() => {
+              'use strict';
+              var _foo10 = '__private_Nested_foo';
+              const Nested = function Nested() {
+                if (!new.target) throw new TypeError('Cannot call a class as a function');
+                Object.defineProperty(this, _foo10, {
+                  writable: true,
+                  value: 2,
+                });
+              };
+              Object.defineProperty(Nested.prototype, 'test', {
+                value: Object.defineProperty(
+                  function () {
+                    if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+                    Object.prototype.hasOwnProperty.call(this, _foo10);
+                  },
+                  'name',
+                  {
+                    value: 'test',
+                    configurable: true,
+                  },
+                ),
                 writable: true,
-                value: 2,
+                configurable: true,
               });
-            }
-            Object.defineProperty(Nested.prototype, 'test', {
-              value: function () {
-                Object.prototype.hasOwnProperty.call(this, _foo10);
-              },
-              writable: true,
-              configurable: true,
-            });
-            return Nested;
-          })();
-          Object.prototype.hasOwnProperty.call(this, _foo);
-        },
+              Object.defineProperty(Nested, 'prototype', { writable: false });
+              return Nested;
+            })();
+            Object.prototype.hasOwnProperty.call(this, _foo);
+          },
+          'name',
+          {
+            value: 'test',
+            configurable: true,
+          },
+        ),
         writable: true,
         configurable: true,
       });
+      Object.defineProperty(Foo, 'prototype', { writable: false });
       return Foo;
     })();"
   `);
@@ -3511,7 +5642,24 @@ test('private/nested-class/input.js [spec]', async () => {
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-spec-private-features-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
+    var _checkInRHS = require('@babel/runtime/helpers/checkInRHS');
+    var _foo = /* @__PURE__ */ new WeakMap();
+    class Foo {
+      constructor() {
+        _classPrivateFieldInitSpec(this, _foo, 1);
+      }
+      test() {
+        class Nested {
+          test() {
+            _foo.has(_checkInRHS(this));
+          }
+        }
+        _foo.has(_checkInRHS(this));
+      }
+    }"
+  `);
 });
 
 test('private/nested-class/input.js [loose]', async () => {
@@ -3527,37 +5675,55 @@ test('private/nested-class/input.js [loose]', async () => {
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "var Foo = (() => {
+    "let Foo = (() => {
       'use strict';
       var _foo = '__private_Foo_foo';
-      function Foo() {
-        if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
+      const Foo = function Foo() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
         Object.defineProperty(this, _foo, {
           writable: true,
           value: 1,
         });
-      }
+      };
       Object.defineProperty(Foo.prototype, 'test', {
-        value: function () {
-          var Nested = (() => {
-            'use strict';
-            function Nested() {
-              if (!(this instanceof Nested)) throw new TypeError('Cannot call a class as a function');
-            }
-            Object.defineProperty(Nested.prototype, 'test', {
-              value: function () {
-                Object.prototype.hasOwnProperty.call(this, _foo);
-              },
-              writable: true,
-              configurable: true,
-            });
-            return Nested;
-          })();
-          Object.prototype.hasOwnProperty.call(this, _foo);
-        },
+        value: Object.defineProperty(
+          function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            let Nested = (() => {
+              'use strict';
+              const Nested = function Nested() {
+                if (!new.target) throw new TypeError('Cannot call a class as a function');
+              };
+              Object.defineProperty(Nested.prototype, 'test', {
+                value: Object.defineProperty(
+                  function () {
+                    if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+                    Object.prototype.hasOwnProperty.call(this, _foo);
+                  },
+                  'name',
+                  {
+                    value: 'test',
+                    configurable: true,
+                  },
+                ),
+                writable: true,
+                configurable: true,
+              });
+              Object.defineProperty(Nested, 'prototype', { writable: false });
+              return Nested;
+            })();
+            Object.prototype.hasOwnProperty.call(this, _foo);
+          },
+          'name',
+          {
+            value: 'test',
+            configurable: true,
+          },
+        ),
         writable: true,
         configurable: true,
       });
+      Object.defineProperty(Foo, 'prototype', { writable: false });
       return Foo;
     })();"
   `);
@@ -3575,7 +5741,231 @@ test('private/rhs-not-object/exec.js [spec]', async () => {
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-spec-private-features-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _checkInRHS = require('@babel/runtime/helpers/checkInRHS');
+    var _defineProperty = require('@babel/runtime/helpers/defineProperty');
+    var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
+    var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
+    expect(() => {
+      var _Class, _p;
+      return ((_Class = class {}), (_p = { _: _checkInRHS(0) === _Class }), _Class);
+    }).toThrow(\`right-hand side of 'in' should be an object, got number\`);
+    expect(() => {
+      var _Class2, _p2;
+      return ((_Class2 = class {}), (_p2 = { _: _checkInRHS('') === _Class2 }), _Class2);
+    }).toThrow(\`right-hand side of 'in' should be an object, got string\`);
+    expect(() => {
+      var _Class3, _p3;
+      return ((_Class3 = class {}), (_p3 = { _: _checkInRHS(true) === _Class3 }), _Class3);
+    }).toThrow(\`right-hand side of 'in' should be an object, got boolean\`);
+    expect(() => {
+      var _Class4, _p4;
+      return ((_Class4 = class {}), (_p4 = { _: _checkInRHS(void 0) === _Class4 }), _Class4);
+    }).toThrow(\`right-hand side of 'in' should be an object, got undefined\`);
+    expect(() => {
+      var _Class5, _p5;
+      return ((_Class5 = class {}), (_p5 = { _: _checkInRHS(null) === _Class5 }), _Class5);
+    }).toThrow(\`right-hand side of 'in' should be an object, got null\`);
+    expect(() => {
+      var _Class6, _p6;
+      return ((_Class6 = class {}), (_p6 = { _: _checkInRHS(Symbol.iterator) === _Class6 }), _Class6);
+    }).toThrow(\`right-hand side of 'in' should be an object, got symbol\`);
+    expect(() => {
+      var _Class7, _p7;
+      return ((_Class7 = class {}), (_p7 = { _: _checkInRHS(0n) === _Class7 }), _Class7);
+    }).toThrow(\`right-hand side of 'in' should be an object, got bigint\`);
+    expect(() => {
+      var _Class8;
+      return ((_Class8 = class {}), _defineProperty(_Class8, 'q', _checkInRHS(0) === _Class8), _Class8);
+      function _p8() {}
+    }).toThrow(\`right-hand side of 'in' should be an object, got number\`);
+    expect(() => {
+      var _Class9;
+      return (
+        (_Class9 = class {}), _defineProperty(_Class9, 'q', _checkInRHS('') === _Class9), _Class9
+      );
+      function _p9() {}
+    }).toThrow(\`right-hand side of 'in' should be an object, got string\`);
+    expect(() => {
+      var _Class10;
+      return (
+        (_Class10 = class {}), _defineProperty(_Class10, 'q', _checkInRHS(true) === _Class10), _Class10
+      );
+      function _p10() {}
+    }).toThrow(\`right-hand side of 'in' should be an object, got boolean\`);
+    expect(() => {
+      var _Class11;
+      return (
+        (_Class11 = class {}),
+        _defineProperty(_Class11, 'q', _checkInRHS(void 0) === _Class11),
+        _Class11
+      );
+      function _p11() {}
+    }).toThrow(\`right-hand side of 'in' should be an object, got undefined\`);
+    expect(() => {
+      var _Class12;
+      return (
+        (_Class12 = class {}), _defineProperty(_Class12, 'q', _checkInRHS(null) === _Class12), _Class12
+      );
+      function _p12() {}
+    }).toThrow(\`right-hand side of 'in' should be an object, got null\`);
+    expect(() => {
+      var _Class13;
+      return (
+        (_Class13 = class {}),
+        _defineProperty(_Class13, 'q', _checkInRHS(Symbol.iterator) === _Class13),
+        _Class13
+      );
+      function _p13() {}
+    }).toThrow(\`right-hand side of 'in' should be an object, got symbol\`);
+    expect(() => {
+      var _Class14;
+      return (
+        (_Class14 = class {}), _defineProperty(_Class14, 'q', _checkInRHS(0n) === _Class14), _Class14
+      );
+      function _p14() {}
+    }).toThrow(\`right-hand side of 'in' should be an object, got bigint\`);
+    expect(() => {
+      var _p15;
+      return new ((_p15 = /* @__PURE__ */ new WeakMap()),
+      class {
+        constructor() {
+          _classPrivateFieldInitSpec(this, _p15, _p15.has(_checkInRHS(0)));
+        }
+      })();
+    }).toThrow(\`right-hand side of 'in' should be an object, got number\`);
+    expect(() => {
+      var _p16;
+      return new ((_p16 = /* @__PURE__ */ new WeakMap()),
+      class {
+        constructor() {
+          _classPrivateFieldInitSpec(this, _p16, _p16.has(_checkInRHS('')));
+        }
+      })();
+    }).toThrow(\`right-hand side of 'in' should be an object, got string\`);
+    expect(() => {
+      var _p17;
+      return new ((_p17 = /* @__PURE__ */ new WeakMap()),
+      class {
+        constructor() {
+          _classPrivateFieldInitSpec(this, _p17, _p17.has(_checkInRHS(true)));
+        }
+      })();
+    }).toThrow(\`right-hand side of 'in' should be an object, got boolean\`);
+    expect(() => {
+      var _p18;
+      return new ((_p18 = /* @__PURE__ */ new WeakMap()),
+      class {
+        constructor() {
+          _classPrivateFieldInitSpec(this, _p18, _p18.has(_checkInRHS(void 0)));
+        }
+      })();
+    }).toThrow(\`right-hand side of 'in' should be an object, got undefined\`);
+    expect(() => {
+      var _p19;
+      return new ((_p19 = /* @__PURE__ */ new WeakMap()),
+      class {
+        constructor() {
+          _classPrivateFieldInitSpec(this, _p19, _p19.has(_checkInRHS(null)));
+        }
+      })();
+    }).toThrow(\`right-hand side of 'in' should be an object, got null\`);
+    expect(() => {
+      var _p20;
+      return new ((_p20 = /* @__PURE__ */ new WeakMap()),
+      class {
+        constructor() {
+          _classPrivateFieldInitSpec(this, _p20, _p20.has(_checkInRHS(Symbol.iterator)));
+        }
+      })();
+    }).toThrow(\`right-hand side of 'in' should be an object, got symbol\`);
+    expect(() => {
+      var _p21;
+      return new ((_p21 = /* @__PURE__ */ new WeakMap()),
+      class {
+        constructor() {
+          _classPrivateFieldInitSpec(this, _p21, _p21.has(_checkInRHS(0n)));
+        }
+      })();
+    }).toThrow(\`right-hand side of 'in' should be an object, got bigint\`);
+    expect(() => {
+      var _Class_brand;
+      return new ((_Class_brand = /* @__PURE__ */ new WeakSet()),
+      class {
+        constructor() {
+          _classPrivateMethodInitSpec(this, _Class_brand);
+          _defineProperty(this, 'q', _Class_brand.has(_checkInRHS(0)));
+        }
+      })();
+      function _p22() {}
+    }).toThrow(\`right-hand side of 'in' should be an object, got number\`);
+    expect(() => {
+      var _Class_brand2;
+      return new ((_Class_brand2 = /* @__PURE__ */ new WeakSet()),
+      class {
+        constructor() {
+          _classPrivateMethodInitSpec(this, _Class_brand2);
+          _defineProperty(this, 'q', _Class_brand2.has(_checkInRHS('')));
+        }
+      })();
+      function _p23() {}
+    }).toThrow(\`right-hand side of 'in' should be an object, got string\`);
+    expect(() => {
+      var _Class_brand3;
+      return new ((_Class_brand3 = /* @__PURE__ */ new WeakSet()),
+      class {
+        constructor() {
+          _classPrivateMethodInitSpec(this, _Class_brand3);
+          _defineProperty(this, 'q', _Class_brand3.has(_checkInRHS(true)));
+        }
+      })();
+      function _p24() {}
+    }).toThrow(\`right-hand side of 'in' should be an object, got boolean\`);
+    expect(() => {
+      var _Class_brand4;
+      return new ((_Class_brand4 = /* @__PURE__ */ new WeakSet()),
+      class {
+        constructor() {
+          _classPrivateMethodInitSpec(this, _Class_brand4);
+          _defineProperty(this, 'q', _Class_brand4.has(_checkInRHS(void 0)));
+        }
+      })();
+      function _p25() {}
+    }).toThrow(\`right-hand side of 'in' should be an object, got undefined\`);
+    expect(() => {
+      var _Class_brand5;
+      return new ((_Class_brand5 = /* @__PURE__ */ new WeakSet()),
+      class {
+        constructor() {
+          _classPrivateMethodInitSpec(this, _Class_brand5);
+          _defineProperty(this, 'q', _Class_brand5.has(_checkInRHS(null)));
+        }
+      })();
+      function _p26() {}
+    }).toThrow(\`right-hand side of 'in' should be an object, got null\`);
+    expect(() => {
+      var _Class_brand6;
+      return new ((_Class_brand6 = /* @__PURE__ */ new WeakSet()),
+      class {
+        constructor() {
+          _classPrivateMethodInitSpec(this, _Class_brand6);
+          _defineProperty(this, 'q', _Class_brand6.has(_checkInRHS(Symbol.iterator)));
+        }
+      })();
+      function _p27() {}
+    }).toThrow(\`right-hand side of 'in' should be an object, got symbol\`);
+    expect(() => {
+      var _Class_brand7;
+      return new ((_Class_brand7 = /* @__PURE__ */ new WeakSet()),
+      class {
+        constructor() {
+          _classPrivateMethodInitSpec(this, _Class_brand7);
+          _defineProperty(this, 'q', _Class_brand7.has(_checkInRHS(0n)));
+        }
+      })();
+      function _p28() {}
+    }).toThrow(\`right-hand side of 'in' should be an object, got bigint\`);"
+  `);
 });
 
 test('private/rhs-not-object/exec.js [loose]', async () => {
@@ -3595,9 +5985,10 @@ test('private/rhs-not-object/exec.js [loose]', async () => {
       (() => {
         'use strict';
         var _p = '__private__Class_p';
-        function _Class() {
-          if (!(this instanceof _Class)) throw new TypeError('Cannot call a class as a function');
-        }
+        const _Class = function _Class() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
+        Object.defineProperty(_Class, 'prototype', { writable: false });
         Object.defineProperty(_Class, _p, {
           writable: true,
           value: Object.prototype.hasOwnProperty.call(0, _p),
@@ -3609,9 +6000,10 @@ test('private/rhs-not-object/exec.js [loose]', async () => {
       (() => {
         'use strict';
         var _p10 = '__private__Class9_p';
-        function _Class9() {
-          if (!(this instanceof _Class9)) throw new TypeError('Cannot call a class as a function');
-        }
+        const _Class9 = function _Class9() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
+        Object.defineProperty(_Class9, 'prototype', { writable: false });
         Object.defineProperty(_Class9, _p10, {
           writable: true,
           value: Object.prototype.hasOwnProperty.call('', _p10),
@@ -3623,9 +6015,10 @@ test('private/rhs-not-object/exec.js [loose]', async () => {
       (() => {
         'use strict';
         var _p12 = '__private__Class11_p';
-        function _Class11() {
-          if (!(this instanceof _Class11)) throw new TypeError('Cannot call a class as a function');
-        }
+        const _Class11 = function _Class11() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
+        Object.defineProperty(_Class11, 'prototype', { writable: false });
         Object.defineProperty(_Class11, _p12, {
           writable: true,
           value: Object.prototype.hasOwnProperty.call(true, _p12),
@@ -3637,9 +6030,10 @@ test('private/rhs-not-object/exec.js [loose]', async () => {
       (() => {
         'use strict';
         var _p14 = '__private__Class13_p';
-        function _Class13() {
-          if (!(this instanceof _Class13)) throw new TypeError('Cannot call a class as a function');
-        }
+        const _Class13 = function _Class13() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
+        Object.defineProperty(_Class13, 'prototype', { writable: false });
         Object.defineProperty(_Class13, _p14, {
           writable: true,
           value: Object.prototype.hasOwnProperty.call(void 0, _p14),
@@ -3651,9 +6045,10 @@ test('private/rhs-not-object/exec.js [loose]', async () => {
       (() => {
         'use strict';
         var _p16 = '__private__Class15_p';
-        function _Class15() {
-          if (!(this instanceof _Class15)) throw new TypeError('Cannot call a class as a function');
-        }
+        const _Class15 = function _Class15() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
+        Object.defineProperty(_Class15, 'prototype', { writable: false });
         Object.defineProperty(_Class15, _p16, {
           writable: true,
           value: Object.prototype.hasOwnProperty.call(null, _p16),
@@ -3665,9 +6060,10 @@ test('private/rhs-not-object/exec.js [loose]', async () => {
       (() => {
         'use strict';
         var _p18 = '__private__Class17_p';
-        function _Class17() {
-          if (!(this instanceof _Class17)) throw new TypeError('Cannot call a class as a function');
-        }
+        const _Class17 = function _Class17() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
+        Object.defineProperty(_Class17, 'prototype', { writable: false });
         Object.defineProperty(_Class17, _p18, {
           writable: true,
           value: Object.prototype.hasOwnProperty.call(Symbol.iterator, _p18),
@@ -3679,9 +6075,10 @@ test('private/rhs-not-object/exec.js [loose]', async () => {
       (() => {
         'use strict';
         var _p20 = '__private__Class19_p';
-        function _Class19() {
-          if (!(this instanceof _Class19)) throw new TypeError('Cannot call a class as a function');
-        }
+        const _Class19 = function _Class19() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
+        Object.defineProperty(_Class19, 'prototype', { writable: false });
         Object.defineProperty(_Class19, _p20, {
           writable: true,
           value: Object.prototype.hasOwnProperty.call(0n, _p20),
@@ -3693,11 +6090,16 @@ test('private/rhs-not-object/exec.js [loose]', async () => {
       (() => {
         'use strict';
         var _p22 = '__private__Class21_p';
-        function _Class21() {
-          if (!(this instanceof _Class21)) throw new TypeError('Cannot call a class as a function');
-        }
+        const _Class21 = function _Class21() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
+        Object.defineProperty(_Class21, 'prototype', { writable: false });
         _Class21.q = Object.prototype.hasOwnProperty.call(0, _p22);
-        Object.defineProperty(_Class21, _p22, { value: function () {} });
+        Object.defineProperty(_Class21, _p22, {
+          value: function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          },
+        });
         return _Class21;
       })(),
     ).toThrow(\`right-hand side of 'in' should be an object, got number\`);
@@ -3705,11 +6107,16 @@ test('private/rhs-not-object/exec.js [loose]', async () => {
       (() => {
         'use strict';
         var _p24 = '__private__Class23_p';
-        function _Class23() {
-          if (!(this instanceof _Class23)) throw new TypeError('Cannot call a class as a function');
-        }
+        const _Class23 = function _Class23() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
+        Object.defineProperty(_Class23, 'prototype', { writable: false });
         _Class23.q = Object.prototype.hasOwnProperty.call('', _p24);
-        Object.defineProperty(_Class23, _p24, { value: function () {} });
+        Object.defineProperty(_Class23, _p24, {
+          value: function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          },
+        });
         return _Class23;
       })(),
     ).toThrow(\`right-hand side of 'in' should be an object, got string\`);
@@ -3717,11 +6124,16 @@ test('private/rhs-not-object/exec.js [loose]', async () => {
       (() => {
         'use strict';
         var _p26 = '__private__Class25_p';
-        function _Class25() {
-          if (!(this instanceof _Class25)) throw new TypeError('Cannot call a class as a function');
-        }
+        const _Class25 = function _Class25() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
+        Object.defineProperty(_Class25, 'prototype', { writable: false });
         _Class25.q = Object.prototype.hasOwnProperty.call(true, _p26);
-        Object.defineProperty(_Class25, _p26, { value: function () {} });
+        Object.defineProperty(_Class25, _p26, {
+          value: function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          },
+        });
         return _Class25;
       })(),
     ).toThrow(\`right-hand side of 'in' should be an object, got boolean\`);
@@ -3729,11 +6141,16 @@ test('private/rhs-not-object/exec.js [loose]', async () => {
       (() => {
         'use strict';
         var _p28 = '__private__Class27_p';
-        function _Class27() {
-          if (!(this instanceof _Class27)) throw new TypeError('Cannot call a class as a function');
-        }
+        const _Class27 = function _Class27() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
+        Object.defineProperty(_Class27, 'prototype', { writable: false });
         _Class27.q = Object.prototype.hasOwnProperty.call(void 0, _p28);
-        Object.defineProperty(_Class27, _p28, { value: function () {} });
+        Object.defineProperty(_Class27, _p28, {
+          value: function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          },
+        });
         return _Class27;
       })(),
     ).toThrow(\`right-hand side of 'in' should be an object, got undefined\`);
@@ -3741,11 +6158,16 @@ test('private/rhs-not-object/exec.js [loose]', async () => {
       (() => {
         'use strict';
         var _p30 = '__private__Class29_p';
-        function _Class29() {
-          if (!(this instanceof _Class29)) throw new TypeError('Cannot call a class as a function');
-        }
+        const _Class29 = function _Class29() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
+        Object.defineProperty(_Class29, 'prototype', { writable: false });
         _Class29.q = Object.prototype.hasOwnProperty.call(null, _p30);
-        Object.defineProperty(_Class29, _p30, { value: function () {} });
+        Object.defineProperty(_Class29, _p30, {
+          value: function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          },
+        });
         return _Class29;
       })(),
     ).toThrow(\`right-hand side of 'in' should be an object, got null\`);
@@ -3753,11 +6175,16 @@ test('private/rhs-not-object/exec.js [loose]', async () => {
       (() => {
         'use strict';
         var _p32 = '__private__Class31_p';
-        function _Class31() {
-          if (!(this instanceof _Class31)) throw new TypeError('Cannot call a class as a function');
-        }
+        const _Class31 = function _Class31() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
+        Object.defineProperty(_Class31, 'prototype', { writable: false });
         _Class31.q = Object.prototype.hasOwnProperty.call(Symbol.iterator, _p32);
-        Object.defineProperty(_Class31, _p32, { value: function () {} });
+        Object.defineProperty(_Class31, _p32, {
+          value: function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          },
+        });
         return _Class31;
       })(),
     ).toThrow(\`right-hand side of 'in' should be an object, got symbol\`);
@@ -3765,11 +6192,16 @@ test('private/rhs-not-object/exec.js [loose]', async () => {
       (() => {
         'use strict';
         var _p34 = '__private__Class33_p';
-        function _Class33() {
-          if (!(this instanceof _Class33)) throw new TypeError('Cannot call a class as a function');
-        }
+        const _Class33 = function _Class33() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
+        Object.defineProperty(_Class33, 'prototype', { writable: false });
         _Class33.q = Object.prototype.hasOwnProperty.call(0n, _p34);
-        Object.defineProperty(_Class33, _p34, { value: function () {} });
+        Object.defineProperty(_Class33, _p34, {
+          value: function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          },
+        });
         return _Class33;
       })(),
     ).toThrow(\`right-hand side of 'in' should be an object, got bigint\`);
@@ -3778,13 +6210,14 @@ test('private/rhs-not-object/exec.js [loose]', async () => {
         new ((() => {
           'use strict';
           var _p36 = '__private__Class35_p';
-          function _Class35() {
-            if (!(this instanceof _Class35)) throw new TypeError('Cannot call a class as a function');
+          const _Class35 = function _Class35() {
+            if (!new.target) throw new TypeError('Cannot call a class as a function');
             Object.defineProperty(this, _p36, {
               writable: true,
               value: Object.prototype.hasOwnProperty.call(0, _p36),
             });
-          }
+          };
+          Object.defineProperty(_Class35, 'prototype', { writable: false });
           return _Class35;
         })())(),
     ).toThrow(\`right-hand side of 'in' should be an object, got number\`);
@@ -3793,13 +6226,14 @@ test('private/rhs-not-object/exec.js [loose]', async () => {
         new ((() => {
           'use strict';
           var _p38 = '__private__Class37_p';
-          function _Class37() {
-            if (!(this instanceof _Class37)) throw new TypeError('Cannot call a class as a function');
+          const _Class37 = function _Class37() {
+            if (!new.target) throw new TypeError('Cannot call a class as a function');
             Object.defineProperty(this, _p38, {
               writable: true,
               value: Object.prototype.hasOwnProperty.call('', _p38),
             });
-          }
+          };
+          Object.defineProperty(_Class37, 'prototype', { writable: false });
           return _Class37;
         })())(),
     ).toThrow(\`right-hand side of 'in' should be an object, got string\`);
@@ -3808,13 +6242,14 @@ test('private/rhs-not-object/exec.js [loose]', async () => {
         new ((() => {
           'use strict';
           var _p40 = '__private__Class39_p';
-          function _Class39() {
-            if (!(this instanceof _Class39)) throw new TypeError('Cannot call a class as a function');
+          const _Class39 = function _Class39() {
+            if (!new.target) throw new TypeError('Cannot call a class as a function');
             Object.defineProperty(this, _p40, {
               writable: true,
               value: Object.prototype.hasOwnProperty.call(true, _p40),
             });
-          }
+          };
+          Object.defineProperty(_Class39, 'prototype', { writable: false });
           return _Class39;
         })())(),
     ).toThrow(\`right-hand side of 'in' should be an object, got boolean\`);
@@ -3823,13 +6258,14 @@ test('private/rhs-not-object/exec.js [loose]', async () => {
         new ((() => {
           'use strict';
           var _p42 = '__private__Class41_p';
-          function _Class41() {
-            if (!(this instanceof _Class41)) throw new TypeError('Cannot call a class as a function');
+          const _Class41 = function _Class41() {
+            if (!new.target) throw new TypeError('Cannot call a class as a function');
             Object.defineProperty(this, _p42, {
               writable: true,
               value: Object.prototype.hasOwnProperty.call(void 0, _p42),
             });
-          }
+          };
+          Object.defineProperty(_Class41, 'prototype', { writable: false });
           return _Class41;
         })())(),
     ).toThrow(\`right-hand side of 'in' should be an object, got undefined\`);
@@ -3838,13 +6274,14 @@ test('private/rhs-not-object/exec.js [loose]', async () => {
         new ((() => {
           'use strict';
           var _p44 = '__private__Class43_p';
-          function _Class43() {
-            if (!(this instanceof _Class43)) throw new TypeError('Cannot call a class as a function');
+          const _Class43 = function _Class43() {
+            if (!new.target) throw new TypeError('Cannot call a class as a function');
             Object.defineProperty(this, _p44, {
               writable: true,
               value: Object.prototype.hasOwnProperty.call(null, _p44),
             });
-          }
+          };
+          Object.defineProperty(_Class43, 'prototype', { writable: false });
           return _Class43;
         })())(),
     ).toThrow(\`right-hand side of 'in' should be an object, got null\`);
@@ -3853,13 +6290,14 @@ test('private/rhs-not-object/exec.js [loose]', async () => {
         new ((() => {
           'use strict';
           var _p46 = '__private__Class45_p';
-          function _Class45() {
-            if (!(this instanceof _Class45)) throw new TypeError('Cannot call a class as a function');
+          const _Class45 = function _Class45() {
+            if (!new.target) throw new TypeError('Cannot call a class as a function');
             Object.defineProperty(this, _p46, {
               writable: true,
               value: Object.prototype.hasOwnProperty.call(Symbol.iterator, _p46),
             });
-          }
+          };
+          Object.defineProperty(_Class45, 'prototype', { writable: false });
           return _Class45;
         })())(),
     ).toThrow(\`right-hand side of 'in' should be an object, got symbol\`);
@@ -3868,13 +6306,14 @@ test('private/rhs-not-object/exec.js [loose]', async () => {
         new ((() => {
           'use strict';
           var _p48 = '__private__Class47_p';
-          function _Class47() {
-            if (!(this instanceof _Class47)) throw new TypeError('Cannot call a class as a function');
+          const _Class47 = function _Class47() {
+            if (!new.target) throw new TypeError('Cannot call a class as a function');
             Object.defineProperty(this, _p48, {
               writable: true,
               value: Object.prototype.hasOwnProperty.call(0n, _p48),
             });
-          }
+          };
+          Object.defineProperty(_Class47, 'prototype', { writable: false });
           return _Class47;
         })())(),
     ).toThrow(\`right-hand side of 'in' should be an object, got bigint\`);
@@ -3883,11 +6322,16 @@ test('private/rhs-not-object/exec.js [loose]', async () => {
         new ((() => {
           'use strict';
           var _p50 = '__private__Class49_p';
-          function _Class49() {
-            if (!(this instanceof _Class49)) throw new TypeError('Cannot call a class as a function');
+          const _Class49 = function _Class49() {
+            if (!new.target) throw new TypeError('Cannot call a class as a function');
             this.q = Object.prototype.hasOwnProperty.call(0, _p50);
-            Object.defineProperty(this, _p50, { value: function () {} });
-          }
+            Object.defineProperty(this, _p50, {
+              value: function () {
+                if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              },
+            });
+          };
+          Object.defineProperty(_Class49, 'prototype', { writable: false });
           return _Class49;
         })())(),
     ).toThrow(\`right-hand side of 'in' should be an object, got number\`);
@@ -3896,11 +6340,16 @@ test('private/rhs-not-object/exec.js [loose]', async () => {
         new ((() => {
           'use strict';
           var _p52 = '__private__Class51_p';
-          function _Class51() {
-            if (!(this instanceof _Class51)) throw new TypeError('Cannot call a class as a function');
+          const _Class51 = function _Class51() {
+            if (!new.target) throw new TypeError('Cannot call a class as a function');
             this.q = Object.prototype.hasOwnProperty.call('', _p52);
-            Object.defineProperty(this, _p52, { value: function () {} });
-          }
+            Object.defineProperty(this, _p52, {
+              value: function () {
+                if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              },
+            });
+          };
+          Object.defineProperty(_Class51, 'prototype', { writable: false });
           return _Class51;
         })())(),
     ).toThrow(\`right-hand side of 'in' should be an object, got string\`);
@@ -3909,11 +6358,16 @@ test('private/rhs-not-object/exec.js [loose]', async () => {
         new ((() => {
           'use strict';
           var _p54 = '__private__Class53_p';
-          function _Class53() {
-            if (!(this instanceof _Class53)) throw new TypeError('Cannot call a class as a function');
+          const _Class53 = function _Class53() {
+            if (!new.target) throw new TypeError('Cannot call a class as a function');
             this.q = Object.prototype.hasOwnProperty.call(true, _p54);
-            Object.defineProperty(this, _p54, { value: function () {} });
-          }
+            Object.defineProperty(this, _p54, {
+              value: function () {
+                if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              },
+            });
+          };
+          Object.defineProperty(_Class53, 'prototype', { writable: false });
           return _Class53;
         })())(),
     ).toThrow(\`right-hand side of 'in' should be an object, got boolean\`);
@@ -3922,11 +6376,16 @@ test('private/rhs-not-object/exec.js [loose]', async () => {
         new ((() => {
           'use strict';
           var _p56 = '__private__Class55_p';
-          function _Class55() {
-            if (!(this instanceof _Class55)) throw new TypeError('Cannot call a class as a function');
+          const _Class55 = function _Class55() {
+            if (!new.target) throw new TypeError('Cannot call a class as a function');
             this.q = Object.prototype.hasOwnProperty.call(void 0, _p56);
-            Object.defineProperty(this, _p56, { value: function () {} });
-          }
+            Object.defineProperty(this, _p56, {
+              value: function () {
+                if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              },
+            });
+          };
+          Object.defineProperty(_Class55, 'prototype', { writable: false });
           return _Class55;
         })())(),
     ).toThrow(\`right-hand side of 'in' should be an object, got undefined\`);
@@ -3935,11 +6394,16 @@ test('private/rhs-not-object/exec.js [loose]', async () => {
         new ((() => {
           'use strict';
           var _p58 = '__private__Class57_p';
-          function _Class57() {
-            if (!(this instanceof _Class57)) throw new TypeError('Cannot call a class as a function');
+          const _Class57 = function _Class57() {
+            if (!new.target) throw new TypeError('Cannot call a class as a function');
             this.q = Object.prototype.hasOwnProperty.call(null, _p58);
-            Object.defineProperty(this, _p58, { value: function () {} });
-          }
+            Object.defineProperty(this, _p58, {
+              value: function () {
+                if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              },
+            });
+          };
+          Object.defineProperty(_Class57, 'prototype', { writable: false });
           return _Class57;
         })())(),
     ).toThrow(\`right-hand side of 'in' should be an object, got null\`);
@@ -3948,11 +6412,16 @@ test('private/rhs-not-object/exec.js [loose]', async () => {
         new ((() => {
           'use strict';
           var _p60 = '__private__Class59_p';
-          function _Class59() {
-            if (!(this instanceof _Class59)) throw new TypeError('Cannot call a class as a function');
+          const _Class59 = function _Class59() {
+            if (!new.target) throw new TypeError('Cannot call a class as a function');
             this.q = Object.prototype.hasOwnProperty.call(Symbol.iterator, _p60);
-            Object.defineProperty(this, _p60, { value: function () {} });
-          }
+            Object.defineProperty(this, _p60, {
+              value: function () {
+                if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              },
+            });
+          };
+          Object.defineProperty(_Class59, 'prototype', { writable: false });
           return _Class59;
         })())(),
     ).toThrow(\`right-hand side of 'in' should be an object, got symbol\`);
@@ -3961,11 +6430,16 @@ test('private/rhs-not-object/exec.js [loose]', async () => {
         new ((() => {
           'use strict';
           var _p62 = '__private__Class61_p';
-          function _Class61() {
-            if (!(this instanceof _Class61)) throw new TypeError('Cannot call a class as a function');
+          const _Class61 = function _Class61() {
+            if (!new.target) throw new TypeError('Cannot call a class as a function');
             this.q = Object.prototype.hasOwnProperty.call(0n, _p62);
-            Object.defineProperty(this, _p62, { value: function () {} });
-          }
+            Object.defineProperty(this, _p62, {
+              value: function () {
+                if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              },
+            });
+          };
+          Object.defineProperty(_Class61, 'prototype', { writable: false });
           return _Class61;
         })())(),
     ).toThrow(\`right-hand side of 'in' should be an object, got bigint\`);"
@@ -3984,7 +6458,15 @@ test('private/static-accessor/input.js [spec]', async () => {
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-spec-private-features-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _checkInRHS = require('@babel/runtime/helpers/checkInRHS');
+    class Foo {
+      test(other) {
+        return _checkInRHS(other) === Foo;
+      }
+    }
+    function _get_foo() {}"
+  `);
 });
 
 test('private/static-accessor/input.js [loose]', async () => {
@@ -4000,20 +6482,33 @@ test('private/static-accessor/input.js [loose]', async () => {
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "var Foo = (() => {
+    "let Foo = (() => {
       'use strict';
       var _foo = '__private_Foo_foo';
-      function Foo() {
-        if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
-      }
+      const Foo = function Foo() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+      };
       Object.defineProperty(Foo.prototype, 'test', {
-        value: function (other) {
-          return Object.prototype.hasOwnProperty.call(other, _foo);
-        },
+        value: Object.defineProperty(
+          function (other) {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            return Object.prototype.hasOwnProperty.call(other, _foo);
+          },
+          'name',
+          {
+            value: 'test',
+            configurable: true,
+          },
+        ),
         writable: true,
         configurable: true,
       });
-      Object.defineProperty(Foo, _foo, { get: function () {} });
+      Object.defineProperty(Foo, 'prototype', { writable: false });
+      Object.defineProperty(Foo, _foo, {
+        get: function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        },
+      });
       return Foo;
     })();"
   `);
@@ -4031,7 +6526,15 @@ test('private/static-field/input.js [spec]', async () => {
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-spec-private-features-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _checkInRHS = require('@babel/runtime/helpers/checkInRHS');
+    class Foo {
+      test(other) {
+        return _checkInRHS(other) === Foo;
+      }
+    }
+    var _foo = { _: 1 };"
+  `);
 });
 
 test('private/static-field/input.js [loose]', async () => {
@@ -4047,19 +6550,28 @@ test('private/static-field/input.js [loose]', async () => {
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "var Foo = (() => {
+    "let Foo = (() => {
       'use strict';
       var _foo = '__private_Foo_foo';
-      function Foo() {
-        if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
-      }
+      const Foo = function Foo() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+      };
       Object.defineProperty(Foo.prototype, 'test', {
-        value: function (other) {
-          return Object.prototype.hasOwnProperty.call(other, _foo);
-        },
+        value: Object.defineProperty(
+          function (other) {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            return Object.prototype.hasOwnProperty.call(other, _foo);
+          },
+          'name',
+          {
+            value: 'test',
+            configurable: true,
+          },
+        ),
         writable: true,
         configurable: true,
       });
+      Object.defineProperty(Foo, 'prototype', { writable: false });
       Object.defineProperty(Foo, _foo, {
         writable: true,
         value: 1,
@@ -4081,7 +6593,15 @@ test('private/static-method/input.js [spec]', async () => {
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-spec-private-features-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _checkInRHS = require('@babel/runtime/helpers/checkInRHS');
+    class Foo {
+      test(other) {
+        return _checkInRHS(other) === Foo;
+      }
+    }
+    function _foo() {}"
+  `);
 });
 
 test('private/static-method/input.js [loose]', async () => {
@@ -4097,20 +6617,33 @@ test('private/static-method/input.js [loose]', async () => {
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "var Foo = (() => {
+    "let Foo = (() => {
       'use strict';
       var _foo = '__private_Foo_foo';
-      function Foo() {
-        if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
-      }
+      const Foo = function Foo() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+      };
       Object.defineProperty(Foo.prototype, 'test', {
-        value: function (other) {
-          return Object.prototype.hasOwnProperty.call(other, _foo);
-        },
+        value: Object.defineProperty(
+          function (other) {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            return Object.prototype.hasOwnProperty.call(other, _foo);
+          },
+          'name',
+          {
+            value: 'test',
+            configurable: true,
+          },
+        ),
         writable: true,
         configurable: true,
       });
-      Object.defineProperty(Foo, _foo, { value: function () {} });
+      Object.defineProperty(Foo, 'prototype', { writable: false });
+      Object.defineProperty(Foo, _foo, {
+        value: function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        },
+      });
       return Foo;
     })();"
   `);
@@ -4128,7 +6661,23 @@ test('private/static-shadow/exec.js [spec]', async () => {
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-spec-private-features-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _checkInRHS = require('@babel/runtime/helpers/checkInRHS');
+    class Test {
+      method(other) {
+        const Test = 2;
+        const func = () => {
+          const Test = 3;
+          return _checkInRHS(other) === Test && Test;
+        };
+        return func() + Test;
+      }
+    }
+    var _x = { _: 1 };
+    const t = new Test();
+    const t2 = new Test();
+    expect(t.method(Test)).toBe(5);"
+  `);
 });
 
 test('private/static-shadow/exec.js [loose]', async () => {
@@ -4144,24 +6693,33 @@ test('private/static-shadow/exec.js [loose]', async () => {
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "var Test = (() => {
+    "let Test = (() => {
       'use strict';
       var _x = '__private_Test_x';
-      function Test() {
-        if (!(this instanceof Test)) throw new TypeError('Cannot call a class as a function');
-      }
+      const Test = function Test() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+      };
       Object.defineProperty(Test.prototype, 'method', {
-        value: function (other) {
-          const Test = 2;
-          const func = () => {
-            const Test = 3;
-            return Object.prototype.hasOwnProperty.call(other, _x) && Test;
-          };
-          return func() + Test;
-        },
+        value: Object.defineProperty(
+          function (other) {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            const Test = 2;
+            const func = () => {
+              const Test = 3;
+              return Object.prototype.hasOwnProperty.call(other, _x) && Test;
+            };
+            return func() + Test;
+          },
+          'name',
+          {
+            value: 'method',
+            configurable: true,
+          },
+        ),
         writable: true,
         configurable: true,
       });
+      Object.defineProperty(Test, 'prototype', { writable: false });
       Object.defineProperty(Test, _x, {
         writable: true,
         value: 1,
@@ -4186,7 +6744,20 @@ test('private/static-shadow/input.js [spec]', async () => {
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-spec-private-features-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _checkInRHS = require('@babel/runtime/helpers/checkInRHS');
+    class Test {
+      method(other) {
+        const Test = 2;
+        const func = () => {
+          const Test = 3;
+          return _checkInRHS(other) === Test && Test;
+        };
+        return func() + Test;
+      }
+    }
+    var _x = { _: 1 };"
+  `);
 });
 
 test('private/static-shadow/input.js [loose]', async () => {
@@ -4202,24 +6773,33 @@ test('private/static-shadow/input.js [loose]', async () => {
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "var Test = (() => {
+    "let Test = (() => {
       'use strict';
       var _x = '__private_Test_x';
-      function Test() {
-        if (!(this instanceof Test)) throw new TypeError('Cannot call a class as a function');
-      }
+      const Test = function Test() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+      };
       Object.defineProperty(Test.prototype, 'method', {
-        value: function (other) {
-          const Test = 2;
-          const func = () => {
-            const Test = 3;
-            return Object.prototype.hasOwnProperty.call(other, _x) && Test;
-          };
-          return func() + Test;
-        },
+        value: Object.defineProperty(
+          function (other) {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            const Test = 2;
+            const func = () => {
+              const Test = 3;
+              return Object.prototype.hasOwnProperty.call(other, _x) && Test;
+            };
+            return func() + Test;
+          },
+          'name',
+          {
+            value: 'method',
+            configurable: true,
+          },
+        ),
         writable: true,
         configurable: true,
       });
+      Object.defineProperty(Test, 'prototype', { writable: false });
       Object.defineProperty(Test, _x, {
         writable: true,
         value: 1,
@@ -4241,7 +6821,20 @@ test('to-native-fields/accessor/input.js [spec]', async () => {
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-spec-private-features-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
+    var _checkInRHS = require('@babel/runtime/helpers/checkInRHS');
+    var _Foo_brand = /* @__PURE__ */ new WeakSet();
+    class Foo {
+      constructor() {
+        _classPrivateMethodInitSpec(this, _Foo_brand);
+      }
+      test(other) {
+        return _Foo_brand.has(_checkInRHS(other));
+      }
+    }
+    function _get_foo() {}"
+  `);
 });
 
 test('to-native-fields/accessor/input.js [loose]', async () => {
@@ -4257,20 +6850,33 @@ test('to-native-fields/accessor/input.js [loose]', async () => {
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "var Foo = (() => {
+    "let Foo = (() => {
       'use strict';
       var _foo = '__private_Foo_foo';
-      function Foo() {
-        if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
-        Object.defineProperty(this, _foo, { get: function () {} });
-      }
+      const Foo = function Foo() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+        Object.defineProperty(this, _foo, {
+          get: function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          },
+        });
+      };
       Object.defineProperty(Foo.prototype, 'test', {
-        value: function (other) {
-          return Object.prototype.hasOwnProperty.call(other, _foo);
-        },
+        value: Object.defineProperty(
+          function (other) {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            return Object.prototype.hasOwnProperty.call(other, _foo);
+          },
+          'name',
+          {
+            value: 'test',
+            configurable: true,
+          },
+        ),
         writable: true,
         configurable: true,
       });
+      Object.defineProperty(Foo, 'prototype', { writable: false });
       return Foo;
     })();"
   `);
@@ -4287,7 +6893,22 @@ test('to-native-fields/class-expression-in-default-param/input.js [spec]', async
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-spec-private-features-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
+    var _checkInRHS = require('@babel/runtime/helpers/checkInRHS');
+    var _foo;
+    (
+      x = ((_foo = /* @__PURE__ */ new WeakMap()),
+      class {
+        constructor() {
+          _classPrivateFieldInitSpec(this, _foo, void 0);
+        }
+        test(other) {
+          return _foo.has(_checkInRHS(other));
+        }
+      }),
+    ) => {};"
+  `);
 });
 
 test('to-native-fields/class-expression-in-default-param/input.js [loose]', async () => {
@@ -4306,20 +6927,29 @@ test('to-native-fields/class-expression-in-default-param/input.js [loose]', asyn
       x = (() => {
         'use strict';
         var _foo = '__private__Class_foo';
-        function _Class() {
-          if (!(this instanceof _Class)) throw new TypeError('Cannot call a class as a function');
+        const _Class = function _Class() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
           Object.defineProperty(this, _foo, {
             writable: true,
             value: void 0,
           });
-        }
+        };
         Object.defineProperty(_Class.prototype, 'test', {
-          value: function (other) {
-            return Object.prototype.hasOwnProperty.call(other, _foo);
-          },
+          value: Object.defineProperty(
+            function (other) {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              return Object.prototype.hasOwnProperty.call(other, _foo);
+            },
+            'name',
+            {
+              value: 'test',
+              configurable: true,
+            },
+          ),
           writable: true,
           configurable: true,
         });
+        Object.defineProperty(_Class, 'prototype', { writable: false });
         return _Class;
       })(),
     ) => {};"
@@ -4338,7 +6968,22 @@ test('to-native-fields/class-expression-instance/input.js [spec]', async () => {
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-spec-private-features-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
+    var _checkInRHS = require('@babel/runtime/helpers/checkInRHS');
+    function fn() {
+      var _priv;
+      return new ((_priv = /* @__PURE__ */ new WeakMap()),
+      class {
+        constructor() {
+          _classPrivateFieldInitSpec(this, _priv, void 0);
+        }
+        method(obj) {
+          return _priv.has(_checkInRHS(obj));
+        }
+      })();
+    }"
+  `);
 });
 
 test('to-native-fields/class-expression-instance/input.js [loose]', async () => {
@@ -4358,20 +7003,29 @@ test('to-native-fields/class-expression-instance/input.js [loose]', async () => 
       return new ((() => {
         'use strict';
         var _priv = '__private__Class_priv';
-        function _Class() {
-          if (!(this instanceof _Class)) throw new TypeError('Cannot call a class as a function');
+        const _Class = function _Class() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
           Object.defineProperty(this, _priv, {
             writable: true,
             value: void 0,
           });
-        }
+        };
         Object.defineProperty(_Class.prototype, 'method', {
-          value: function (obj) {
-            return Object.prototype.hasOwnProperty.call(obj, _priv);
-          },
+          value: Object.defineProperty(
+            function (obj) {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              return Object.prototype.hasOwnProperty.call(obj, _priv);
+            },
+            'name',
+            {
+              value: 'method',
+              configurable: true,
+            },
+          ),
           writable: true,
           configurable: true,
         });
+        Object.defineProperty(_Class, 'prototype', { writable: false });
         return _Class;
       })())();
     }"
@@ -4390,7 +7044,19 @@ test('to-native-fields/class-expression-static/input.js [spec]', async () => {
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-spec-private-features-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _checkInRHS = require('@babel/runtime/helpers/checkInRHS');
+    function fn() {
+      var _Class, _priv;
+      return new ((_Class = class {
+        method(obj) {
+          return _checkInRHS(obj) === _Class;
+        }
+      }),
+      (_priv = { _: void 0 }),
+      _Class)();
+    }"
+  `);
 });
 
 test('to-native-fields/class-expression-static/input.js [loose]', async () => {
@@ -4410,16 +7076,25 @@ test('to-native-fields/class-expression-static/input.js [loose]', async () => {
       return new ((() => {
         'use strict';
         var _priv = '__private__Class_priv';
-        function _Class() {
-          if (!(this instanceof _Class)) throw new TypeError('Cannot call a class as a function');
-        }
+        const _Class = function _Class() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
         Object.defineProperty(_Class.prototype, 'method', {
-          value: function (obj) {
-            return Object.prototype.hasOwnProperty.call(obj, _priv);
-          },
+          value: Object.defineProperty(
+            function (obj) {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              return Object.prototype.hasOwnProperty.call(obj, _priv);
+            },
+            'name',
+            {
+              value: 'method',
+              configurable: true,
+            },
+          ),
           writable: true,
           configurable: true,
         });
+        Object.defineProperty(_Class, 'prototype', { writable: false });
         Object.defineProperty(_Class, _priv, {
           writable: true,
           value: void 0,
@@ -4441,7 +7116,19 @@ test('to-native-fields/field/input.js [spec]', async () => {
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-spec-private-features-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
+    var _checkInRHS = require('@babel/runtime/helpers/checkInRHS');
+    var _foo = /* @__PURE__ */ new WeakMap();
+    class Foo {
+      constructor() {
+        _classPrivateFieldInitSpec(this, _foo, 1);
+      }
+      test(other) {
+        return _foo.has(_checkInRHS(other));
+      }
+    }"
+  `);
 });
 
 test('to-native-fields/field/input.js [loose]', async () => {
@@ -4456,23 +7143,32 @@ test('to-native-fields/field/input.js [loose]', async () => {
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "var Foo = (() => {
+    "let Foo = (() => {
       'use strict';
       var _foo = '__private_Foo_foo';
-      function Foo() {
-        if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
+      const Foo = function Foo() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
         Object.defineProperty(this, _foo, {
           writable: true,
           value: 1,
         });
-      }
+      };
       Object.defineProperty(Foo.prototype, 'test', {
-        value: function (other) {
-          return Object.prototype.hasOwnProperty.call(other, _foo);
-        },
+        value: Object.defineProperty(
+          function (other) {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            return Object.prototype.hasOwnProperty.call(other, _foo);
+          },
+          'name',
+          {
+            value: 'test',
+            configurable: true,
+          },
+        ),
         writable: true,
         configurable: true,
       });
+      Object.defineProperty(Foo, 'prototype', { writable: false });
       return Foo;
     })();"
   `);
@@ -4490,7 +7186,46 @@ test('to-native-fields/half-constructed-instance/exec.js [spec]', async () => {
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-spec-private-features-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
+    var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
+    var _checkInRHS = require('@babel/runtime/helpers/checkInRHS');
+    let hasW, hasX, hasY, hasZ;
+    let halfConstructed;
+    var _F_brand = /* @__PURE__ */ new WeakSet();
+    var _x = /* @__PURE__ */ new WeakMap();
+    var _y = /* @__PURE__ */ new WeakMap();
+    class F {
+      constructor() {
+        _classPrivateMethodInitSpec(this, _F_brand);
+        _classPrivateFieldInitSpec(this, _x, 0);
+        _classPrivateFieldInitSpec(
+          this,
+          _y,
+          (() => {
+            halfConstructed = this;
+            throw 'error';
+          })(),
+        );
+      }
+      m() {
+        hasW = _F_brand.has(_checkInRHS(this));
+        hasX = _x.has(_checkInRHS(this));
+        hasY = _y.has(_checkInRHS(this));
+        hasZ = _F_brand.has(_checkInRHS(this));
+      }
+    }
+    function _get_w() {}
+    function _z() {}
+    try {
+      new F();
+    } catch {}
+    halfConstructed.m();
+    expect(hasW).toBe(true);
+    expect(hasX).toBe(true);
+    expect(hasY).toBe(false);
+    expect(hasZ).toBe(true);"
+  `);
 });
 
 test('to-native-fields/half-constructed-instance/exec.js [loose]', async () => {
@@ -4508,14 +7243,14 @@ test('to-native-fields/half-constructed-instance/exec.js [loose]', async () => {
   ).toMatchInlineSnapshot(`
     "let hasW, hasX, hasY, hasZ;
     let halfConstructed;
-    var F = (() => {
+    let F = (() => {
       'use strict';
       var _z = '__private_F_z';
       var _y = '__private_F_y';
       var _w = '__private_F_w';
       var _x = '__private_F_x';
-      function F() {
-        if (!(this instanceof F)) throw new TypeError('Cannot call a class as a function');
+      const F = function F() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
         Object.defineProperty(this, _x, {
           writable: true,
           value: 0,
@@ -4527,19 +7262,36 @@ test('to-native-fields/half-constructed-instance/exec.js [loose]', async () => {
             throw 'error';
           })(),
         });
-        Object.defineProperty(this, _z, { value: function () {} });
-        Object.defineProperty(this, _w, { get: function () {} });
-      }
+        Object.defineProperty(this, _z, {
+          value: function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          },
+        });
+        Object.defineProperty(this, _w, {
+          get: function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          },
+        });
+      };
       Object.defineProperty(F.prototype, 'm', {
-        value: function () {
-          hasW = Object.prototype.hasOwnProperty.call(this, _w);
-          hasX = Object.prototype.hasOwnProperty.call(this, _x);
-          hasY = Object.prototype.hasOwnProperty.call(this, _y);
-          hasZ = Object.prototype.hasOwnProperty.call(this, _z);
-        },
+        value: Object.defineProperty(
+          function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            hasW = Object.prototype.hasOwnProperty.call(this, _w);
+            hasX = Object.prototype.hasOwnProperty.call(this, _x);
+            hasY = Object.prototype.hasOwnProperty.call(this, _y);
+            hasZ = Object.prototype.hasOwnProperty.call(this, _z);
+          },
+          'name',
+          {
+            value: 'm',
+            configurable: true,
+          },
+        ),
         writable: true,
         configurable: true,
       });
+      Object.defineProperty(F, 'prototype', { writable: false });
       return F;
     })();
     try {
@@ -4565,7 +7317,35 @@ test('to-native-fields/half-constructed-instance/input.js [spec]', async () => {
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-spec-private-features-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
+    var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
+    var _checkInRHS = require('@babel/runtime/helpers/checkInRHS');
+    var _F_brand = /* @__PURE__ */ new WeakSet();
+    var _x = /* @__PURE__ */ new WeakMap();
+    var _y = /* @__PURE__ */ new WeakMap();
+    class F {
+      constructor() {
+        _classPrivateMethodInitSpec(this, _F_brand);
+        _classPrivateFieldInitSpec(this, _x, 0);
+        _classPrivateFieldInitSpec(
+          this,
+          _y,
+          (() => {
+            throw 'error';
+          })(),
+        );
+      }
+      m() {
+        _F_brand.has(_checkInRHS(this));
+        _x.has(_checkInRHS(this));
+        _y.has(_checkInRHS(this));
+        _F_brand.has(_checkInRHS(this));
+      }
+    }
+    function _get_w() {}
+    function _z() {}"
+  `);
 });
 
 test('to-native-fields/half-constructed-instance/input.js [loose]', async () => {
@@ -4581,14 +7361,14 @@ test('to-native-fields/half-constructed-instance/input.js [loose]', async () => 
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "var F = (() => {
+    "let F = (() => {
       'use strict';
       var _z = '__private_F_z';
       var _y = '__private_F_y';
       var _w = '__private_F_w';
       var _x = '__private_F_x';
-      function F() {
-        if (!(this instanceof F)) throw new TypeError('Cannot call a class as a function');
+      const F = function F() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
         Object.defineProperty(this, _x, {
           writable: true,
           value: 0,
@@ -4599,19 +7379,36 @@ test('to-native-fields/half-constructed-instance/input.js [loose]', async () => 
             throw 'error';
           })(),
         });
-        Object.defineProperty(this, _z, { value: function () {} });
-        Object.defineProperty(this, _w, { get: function () {} });
-      }
+        Object.defineProperty(this, _z, {
+          value: function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          },
+        });
+        Object.defineProperty(this, _w, {
+          get: function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          },
+        });
+      };
       Object.defineProperty(F.prototype, 'm', {
-        value: function () {
-          Object.prototype.hasOwnProperty.call(this, _w);
-          Object.prototype.hasOwnProperty.call(this, _x);
-          Object.prototype.hasOwnProperty.call(this, _y);
-          Object.prototype.hasOwnProperty.call(this, _z);
-        },
+        value: Object.defineProperty(
+          function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            Object.prototype.hasOwnProperty.call(this, _w);
+            Object.prototype.hasOwnProperty.call(this, _x);
+            Object.prototype.hasOwnProperty.call(this, _y);
+            Object.prototype.hasOwnProperty.call(this, _z);
+          },
+          'name',
+          {
+            value: 'm',
+            configurable: true,
+          },
+        ),
         writable: true,
         configurable: true,
       });
+      Object.defineProperty(F, 'prototype', { writable: false });
       return F;
     })();"
   `);
@@ -4629,7 +7426,37 @@ test('to-native-fields/half-constructed-static/exec.js [spec]', async () => {
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-spec-private-features-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _checkInRHS = require('@babel/runtime/helpers/checkInRHS');
+    let hasW, hasX, hasY, hasZ;
+    let halfConstructed;
+    try {
+      var _F;
+      class F {
+        static m() {
+          hasW = _checkInRHS(this) === F;
+          hasX = _checkInRHS(this) === F;
+          hasY = _checkInRHS(this) === F;
+          hasZ = _checkInRHS(this) === F;
+        }
+      }
+      _F = F;
+      function _get_w() {}
+      function _z() {}
+      var _x = { _: 0 };
+      var _y = {
+        _: (() => {
+          halfConstructed = _F;
+          throw 'error';
+        })(),
+      };
+    } catch {}
+    halfConstructed.m();
+    expect(hasW).toBe(true);
+    expect(hasX).toBe(true);
+    expect(hasY).toBe(false);
+    expect(hasZ).toBe(true);"
+  `);
 });
 
 test('to-native-fields/half-constructed-static/exec.js [loose]', async () => {
@@ -4648,25 +7475,34 @@ test('to-native-fields/half-constructed-static/exec.js [loose]', async () => {
     "let hasW, hasX, hasY, hasZ;
     let halfConstructed;
     try {
-      var F = (() => {
+      let F = (() => {
         'use strict';
         var _z = '__private_F_z';
         var _y = '__private_F_y';
         var _w = '__private_F_w';
         var _x = '__private_F_x';
-        function F() {
-          if (!(this instanceof F)) throw new TypeError('Cannot call a class as a function');
-        }
+        const F = function F() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
         Object.defineProperty(F, 'm', {
-          value: function () {
-            hasW = Object.prototype.hasOwnProperty.call(this, _w);
-            hasX = Object.prototype.hasOwnProperty.call(this, _x);
-            hasY = Object.prototype.hasOwnProperty.call(this, _y);
-            hasZ = Object.prototype.hasOwnProperty.call(this, _z);
-          },
+          value: Object.defineProperty(
+            function () {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              hasW = Object.prototype.hasOwnProperty.call(this, _w);
+              hasX = Object.prototype.hasOwnProperty.call(this, _x);
+              hasY = Object.prototype.hasOwnProperty.call(this, _y);
+              hasZ = Object.prototype.hasOwnProperty.call(this, _z);
+            },
+            'name',
+            {
+              value: 'm',
+              configurable: true,
+            },
+          ),
           writable: true,
           configurable: true,
         });
+        Object.defineProperty(F, 'prototype', { writable: false });
         Object.defineProperty(F, _x, {
           writable: true,
           value: 0,
@@ -4674,12 +7510,20 @@ test('to-native-fields/half-constructed-static/exec.js [loose]', async () => {
         Object.defineProperty(F, _y, {
           writable: true,
           value: (() => {
-            halfConstructed = this;
+            halfConstructed = F;
             throw 'error';
           })(),
         });
-        Object.defineProperty(F, _z, { value: function () {} });
-        Object.defineProperty(F, _w, { get: function () {} });
+        Object.defineProperty(F, _z, {
+          value: function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          },
+        });
+        Object.defineProperty(F, _w, {
+          get: function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          },
+        });
         return F;
       })();
     } catch {}
@@ -4703,7 +7547,23 @@ test('to-native-fields/half-constructed-static/input.js [spec]', async () => {
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-spec-private-features-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _checkInRHS = require('@babel/runtime/helpers/checkInRHS');
+    class F {
+      static m() {
+        _checkInRHS(this) === F;
+        _checkInRHS(this) === F;
+        _checkInRHS(this) === F;
+      }
+    }
+    function _z() {}
+    var _x = { _: 0 };
+    var _y = {
+      _: (() => {
+        throw 'error';
+      })(),
+    };"
+  `);
 });
 
 test('to-native-fields/half-constructed-static/input.js [loose]', async () => {
@@ -4719,23 +7579,32 @@ test('to-native-fields/half-constructed-static/input.js [loose]', async () => {
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "var F = (() => {
+    "let F = (() => {
       'use strict';
       var _z = '__private_F_z';
       var _x = '__private_F_x';
       var _y = '__private_F_y';
-      function F() {
-        if (!(this instanceof F)) throw new TypeError('Cannot call a class as a function');
-      }
+      const F = function F() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+      };
       Object.defineProperty(F, 'm', {
-        value: function () {
-          Object.prototype.hasOwnProperty.call(this, _x);
-          Object.prototype.hasOwnProperty.call(this, _y);
-          Object.prototype.hasOwnProperty.call(this, _z);
-        },
+        value: Object.defineProperty(
+          function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            Object.prototype.hasOwnProperty.call(this, _x);
+            Object.prototype.hasOwnProperty.call(this, _y);
+            Object.prototype.hasOwnProperty.call(this, _z);
+          },
+          'name',
+          {
+            value: 'm',
+            configurable: true,
+          },
+        ),
         writable: true,
         configurable: true,
       });
+      Object.defineProperty(F, 'prototype', { writable: false });
       Object.defineProperty(F, _x, {
         writable: true,
         value: 0,
@@ -4746,7 +7615,11 @@ test('to-native-fields/half-constructed-static/input.js [loose]', async () => {
           throw 'error';
         })(),
       });
-      Object.defineProperty(F, _z, { value: function () {} });
+      Object.defineProperty(F, _z, {
+        value: function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        },
+      });
       return F;
     })();"
   `);
@@ -4763,7 +7636,20 @@ test('to-native-fields/method/input.js [spec]', async () => {
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-spec-private-features-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
+    var _checkInRHS = require('@babel/runtime/helpers/checkInRHS');
+    var _Foo_brand = /* @__PURE__ */ new WeakSet();
+    class Foo {
+      constructor() {
+        _classPrivateMethodInitSpec(this, _Foo_brand);
+      }
+      test(other) {
+        return _Foo_brand.has(_checkInRHS(other));
+      }
+    }
+    function _foo() {}"
+  `);
 });
 
 test('to-native-fields/method/input.js [loose]', async () => {
@@ -4778,20 +7664,33 @@ test('to-native-fields/method/input.js [loose]', async () => {
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "var Foo = (() => {
+    "let Foo = (() => {
       'use strict';
       var _foo = '__private_Foo_foo';
-      function Foo() {
-        if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
-        Object.defineProperty(this, _foo, { value: function () {} });
-      }
+      const Foo = function Foo() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+        Object.defineProperty(this, _foo, {
+          value: function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          },
+        });
+      };
       Object.defineProperty(Foo.prototype, 'test', {
-        value: function (other) {
-          return Object.prototype.hasOwnProperty.call(other, _foo);
-        },
+        value: Object.defineProperty(
+          function (other) {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            return Object.prototype.hasOwnProperty.call(other, _foo);
+          },
+          'name',
+          {
+            value: 'test',
+            configurable: true,
+          },
+        ),
         writable: true,
         configurable: true,
       });
+      Object.defineProperty(Foo, 'prototype', { writable: false });
       return Foo;
     })();"
   `);
@@ -4809,7 +7708,26 @@ test('to-native-fields/multiple-checks/input.js [spec]', async () => {
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-spec-private-features-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
+    var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
+    var _checkInRHS = require('@babel/runtime/helpers/checkInRHS');
+    var _x = /* @__PURE__ */ new WeakMap();
+    var _A_brand = /* @__PURE__ */ new WeakSet();
+    class A {
+      constructor() {
+        _classPrivateMethodInitSpec(this, _A_brand);
+        _classPrivateFieldInitSpec(this, _x, void 0);
+      }
+      test() {
+        _x.has(_checkInRHS(this));
+        _A_brand.has(_checkInRHS(this));
+        _x.has(_checkInRHS(this));
+        _A_brand.has(_checkInRHS(this));
+      }
+    }
+    function _m() {}"
+  `);
 });
 
 test('to-native-fields/multiple-checks/input.js [loose]', async () => {
@@ -4825,28 +7743,41 @@ test('to-native-fields/multiple-checks/input.js [loose]', async () => {
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "var A = (() => {
+    "let A = (() => {
       'use strict';
       var _m = '__private_A_m';
       var _x = '__private_A_x';
-      function A() {
-        if (!(this instanceof A)) throw new TypeError('Cannot call a class as a function');
+      const A = function A() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
         Object.defineProperty(this, _x, {
           writable: true,
           value: void 0,
         });
-        Object.defineProperty(this, _m, { value: function () {} });
-      }
+        Object.defineProperty(this, _m, {
+          value: function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          },
+        });
+      };
       Object.defineProperty(A.prototype, 'test', {
-        value: function () {
-          Object.prototype.hasOwnProperty.call(this, _x);
-          Object.prototype.hasOwnProperty.call(this, _m);
-          Object.prototype.hasOwnProperty.call(this, _x);
-          Object.prototype.hasOwnProperty.call(this, _m);
-        },
+        value: Object.defineProperty(
+          function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            Object.prototype.hasOwnProperty.call(this, _x);
+            Object.prototype.hasOwnProperty.call(this, _m);
+            Object.prototype.hasOwnProperty.call(this, _x);
+            Object.prototype.hasOwnProperty.call(this, _m);
+          },
+          'name',
+          {
+            value: 'test',
+            configurable: true,
+          },
+        ),
         writable: true,
         configurable: true,
       });
+      Object.defineProperty(A, 'prototype', { writable: false });
       return A;
     })();"
   `);
@@ -4864,7 +7795,32 @@ test('to-native-fields/nested-class-other-redeclared/input.js [spec]', async () 
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-spec-private-features-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
+    var _checkInRHS = require('@babel/runtime/helpers/checkInRHS');
+    var _foo = /* @__PURE__ */ new WeakMap();
+    var _bar = /* @__PURE__ */ new WeakMap();
+    class Foo {
+      constructor() {
+        _classPrivateFieldInitSpec(this, _foo, 1);
+        _classPrivateFieldInitSpec(this, _bar, 1);
+      }
+      test() {
+        var _bar2 = /* @__PURE__ */ new WeakMap();
+        class Nested {
+          constructor() {
+            _classPrivateFieldInitSpec(this, _bar2, 2);
+          }
+          test() {
+            _foo.has(_checkInRHS(this));
+            _bar2.has(_checkInRHS(this));
+          }
+        }
+        _foo.has(_checkInRHS(this));
+        _bar.has(_checkInRHS(this));
+      }
+    }"
+  `);
 });
 
 test('to-native-fields/nested-class-other-redeclared/input.js [loose]', async () => {
@@ -4880,12 +7836,12 @@ test('to-native-fields/nested-class-other-redeclared/input.js [loose]', async ()
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "var Foo = (() => {
+    "let Foo = (() => {
       'use strict';
       var _foo = '__private_Foo_foo';
       var _bar = '__private_Foo_bar';
-      function Foo() {
-        if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
+      const Foo = function Foo() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
         Object.defineProperty(this, _foo, {
           writable: true,
           value: 1,
@@ -4894,35 +7850,53 @@ test('to-native-fields/nested-class-other-redeclared/input.js [loose]', async ()
           writable: true,
           value: 1,
         });
-      }
+      };
       Object.defineProperty(Foo.prototype, 'test', {
-        value: function () {
-          var Nested = (() => {
-            'use strict';
-            var _bar11 = '__private_Nested_bar';
-            function Nested() {
-              if (!(this instanceof Nested)) throw new TypeError('Cannot call a class as a function');
-              Object.defineProperty(this, _bar11, {
+        value: Object.defineProperty(
+          function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            let Nested = (() => {
+              'use strict';
+              var _bar11 = '__private_Nested_bar';
+              const Nested = function Nested() {
+                if (!new.target) throw new TypeError('Cannot call a class as a function');
+                Object.defineProperty(this, _bar11, {
+                  writable: true,
+                  value: 2,
+                });
+              };
+              Object.defineProperty(Nested.prototype, 'test', {
+                value: Object.defineProperty(
+                  function () {
+                    if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+                    Object.prototype.hasOwnProperty.call(this, _foo);
+                    Object.prototype.hasOwnProperty.call(this, _bar11);
+                  },
+                  'name',
+                  {
+                    value: 'test',
+                    configurable: true,
+                  },
+                ),
                 writable: true,
-                value: 2,
+                configurable: true,
               });
-            }
-            Object.defineProperty(Nested.prototype, 'test', {
-              value: function () {
-                Object.prototype.hasOwnProperty.call(this, _foo);
-                Object.prototype.hasOwnProperty.call(this, _bar11);
-              },
-              writable: true,
-              configurable: true,
-            });
-            return Nested;
-          })();
-          Object.prototype.hasOwnProperty.call(this, _foo);
-          Object.prototype.hasOwnProperty.call(this, _bar);
-        },
+              Object.defineProperty(Nested, 'prototype', { writable: false });
+              return Nested;
+            })();
+            Object.prototype.hasOwnProperty.call(this, _foo);
+            Object.prototype.hasOwnProperty.call(this, _bar);
+          },
+          'name',
+          {
+            value: 'test',
+            configurable: true,
+          },
+        ),
         writable: true,
         configurable: true,
       });
+      Object.defineProperty(Foo, 'prototype', { writable: false });
       return Foo;
     })();"
   `);
@@ -4940,7 +7914,28 @@ test('to-native-fields/nested-class-redeclared/input.js [spec]', async () => {
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-spec-private-features-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
+    var _checkInRHS = require('@babel/runtime/helpers/checkInRHS');
+    var _foo = /* @__PURE__ */ new WeakMap();
+    class Foo {
+      constructor() {
+        _classPrivateFieldInitSpec(this, _foo, 1);
+      }
+      test() {
+        var _foo2 = /* @__PURE__ */ new WeakMap();
+        class Nested {
+          constructor() {
+            _classPrivateFieldInitSpec(this, _foo2, 2);
+          }
+          test() {
+            _foo2.has(_checkInRHS(this));
+          }
+        }
+        _foo.has(_checkInRHS(this));
+      }
+    }"
+  `);
 });
 
 test('to-native-fields/nested-class-redeclared/input.js [loose]', async () => {
@@ -4956,42 +7951,60 @@ test('to-native-fields/nested-class-redeclared/input.js [loose]', async () => {
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "var Foo = (() => {
+    "let Foo = (() => {
       'use strict';
       var _foo = '__private_Foo_foo';
-      function Foo() {
-        if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
+      const Foo = function Foo() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
         Object.defineProperty(this, _foo, {
           writable: true,
           value: 1,
         });
-      }
+      };
       Object.defineProperty(Foo.prototype, 'test', {
-        value: function () {
-          var Nested = (() => {
-            'use strict';
-            var _foo10 = '__private_Nested_foo';
-            function Nested() {
-              if (!(this instanceof Nested)) throw new TypeError('Cannot call a class as a function');
-              Object.defineProperty(this, _foo10, {
+        value: Object.defineProperty(
+          function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            let Nested = (() => {
+              'use strict';
+              var _foo10 = '__private_Nested_foo';
+              const Nested = function Nested() {
+                if (!new.target) throw new TypeError('Cannot call a class as a function');
+                Object.defineProperty(this, _foo10, {
+                  writable: true,
+                  value: 2,
+                });
+              };
+              Object.defineProperty(Nested.prototype, 'test', {
+                value: Object.defineProperty(
+                  function () {
+                    if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+                    Object.prototype.hasOwnProperty.call(this, _foo10);
+                  },
+                  'name',
+                  {
+                    value: 'test',
+                    configurable: true,
+                  },
+                ),
                 writable: true,
-                value: 2,
+                configurable: true,
               });
-            }
-            Object.defineProperty(Nested.prototype, 'test', {
-              value: function () {
-                Object.prototype.hasOwnProperty.call(this, _foo10);
-              },
-              writable: true,
-              configurable: true,
-            });
-            return Nested;
-          })();
-          Object.prototype.hasOwnProperty.call(this, _foo);
-        },
+              Object.defineProperty(Nested, 'prototype', { writable: false });
+              return Nested;
+            })();
+            Object.prototype.hasOwnProperty.call(this, _foo);
+          },
+          'name',
+          {
+            value: 'test',
+            configurable: true,
+          },
+        ),
         writable: true,
         configurable: true,
       });
+      Object.defineProperty(Foo, 'prototype', { writable: false });
       return Foo;
     })();"
   `);
@@ -5009,7 +8022,24 @@ test('to-native-fields/nested-class/input.js [spec]', async () => {
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-spec-private-features-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
+    var _checkInRHS = require('@babel/runtime/helpers/checkInRHS');
+    var _foo = /* @__PURE__ */ new WeakMap();
+    class Foo {
+      constructor() {
+        _classPrivateFieldInitSpec(this, _foo, 1);
+      }
+      test() {
+        class Nested {
+          test() {
+            _foo.has(_checkInRHS(this));
+          }
+        }
+        _foo.has(_checkInRHS(this));
+      }
+    }"
+  `);
 });
 
 test('to-native-fields/nested-class/input.js [loose]', async () => {
@@ -5025,37 +8055,55 @@ test('to-native-fields/nested-class/input.js [loose]', async () => {
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "var Foo = (() => {
+    "let Foo = (() => {
       'use strict';
       var _foo = '__private_Foo_foo';
-      function Foo() {
-        if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
+      const Foo = function Foo() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
         Object.defineProperty(this, _foo, {
           writable: true,
           value: 1,
         });
-      }
+      };
       Object.defineProperty(Foo.prototype, 'test', {
-        value: function () {
-          var Nested = (() => {
-            'use strict';
-            function Nested() {
-              if (!(this instanceof Nested)) throw new TypeError('Cannot call a class as a function');
-            }
-            Object.defineProperty(Nested.prototype, 'test', {
-              value: function () {
-                Object.prototype.hasOwnProperty.call(this, _foo);
-              },
-              writable: true,
-              configurable: true,
-            });
-            return Nested;
-          })();
-          Object.prototype.hasOwnProperty.call(this, _foo);
-        },
+        value: Object.defineProperty(
+          function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            let Nested = (() => {
+              'use strict';
+              const Nested = function Nested() {
+                if (!new.target) throw new TypeError('Cannot call a class as a function');
+              };
+              Object.defineProperty(Nested.prototype, 'test', {
+                value: Object.defineProperty(
+                  function () {
+                    if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+                    Object.prototype.hasOwnProperty.call(this, _foo);
+                  },
+                  'name',
+                  {
+                    value: 'test',
+                    configurable: true,
+                  },
+                ),
+                writable: true,
+                configurable: true,
+              });
+              Object.defineProperty(Nested, 'prototype', { writable: false });
+              return Nested;
+            })();
+            Object.prototype.hasOwnProperty.call(this, _foo);
+          },
+          'name',
+          {
+            value: 'test',
+            configurable: true,
+          },
+        ),
         writable: true,
         configurable: true,
       });
+      Object.defineProperty(Foo, 'prototype', { writable: false });
       return Foo;
     })();"
   `);
@@ -5073,7 +8121,231 @@ test('to-native-fields/rhs-not-object/exec.js [spec]', async () => {
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-spec-private-features-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _checkInRHS = require('@babel/runtime/helpers/checkInRHS');
+    var _defineProperty = require('@babel/runtime/helpers/defineProperty');
+    var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
+    var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
+    expect(() => {
+      var _Class, _p;
+      return ((_Class = class {}), (_p = { _: _checkInRHS(0) === _Class }), _Class);
+    }).toThrow(\`right-hand side of 'in' should be an object, got number\`);
+    expect(() => {
+      var _Class2, _p2;
+      return ((_Class2 = class {}), (_p2 = { _: _checkInRHS('') === _Class2 }), _Class2);
+    }).toThrow(\`right-hand side of 'in' should be an object, got string\`);
+    expect(() => {
+      var _Class3, _p3;
+      return ((_Class3 = class {}), (_p3 = { _: _checkInRHS(true) === _Class3 }), _Class3);
+    }).toThrow(\`right-hand side of 'in' should be an object, got boolean\`);
+    expect(() => {
+      var _Class4, _p4;
+      return ((_Class4 = class {}), (_p4 = { _: _checkInRHS(void 0) === _Class4 }), _Class4);
+    }).toThrow(\`right-hand side of 'in' should be an object, got undefined\`);
+    expect(() => {
+      var _Class5, _p5;
+      return ((_Class5 = class {}), (_p5 = { _: _checkInRHS(null) === _Class5 }), _Class5);
+    }).toThrow(\`right-hand side of 'in' should be an object, got null\`);
+    expect(() => {
+      var _Class6, _p6;
+      return ((_Class6 = class {}), (_p6 = { _: _checkInRHS(Symbol.iterator) === _Class6 }), _Class6);
+    }).toThrow(\`right-hand side of 'in' should be an object, got symbol\`);
+    expect(() => {
+      var _Class7, _p7;
+      return ((_Class7 = class {}), (_p7 = { _: _checkInRHS(0n) === _Class7 }), _Class7);
+    }).toThrow(\`right-hand side of 'in' should be an object, got bigint\`);
+    expect(() => {
+      var _Class8;
+      return ((_Class8 = class {}), _defineProperty(_Class8, 'q', _checkInRHS(0) === _Class8), _Class8);
+      function _p8() {}
+    }).toThrow(\`right-hand side of 'in' should be an object, got number\`);
+    expect(() => {
+      var _Class9;
+      return (
+        (_Class9 = class {}), _defineProperty(_Class9, 'q', _checkInRHS('') === _Class9), _Class9
+      );
+      function _p9() {}
+    }).toThrow(\`right-hand side of 'in' should be an object, got string\`);
+    expect(() => {
+      var _Class10;
+      return (
+        (_Class10 = class {}), _defineProperty(_Class10, 'q', _checkInRHS(true) === _Class10), _Class10
+      );
+      function _p10() {}
+    }).toThrow(\`right-hand side of 'in' should be an object, got boolean\`);
+    expect(() => {
+      var _Class11;
+      return (
+        (_Class11 = class {}),
+        _defineProperty(_Class11, 'q', _checkInRHS(void 0) === _Class11),
+        _Class11
+      );
+      function _p11() {}
+    }).toThrow(\`right-hand side of 'in' should be an object, got undefined\`);
+    expect(() => {
+      var _Class12;
+      return (
+        (_Class12 = class {}), _defineProperty(_Class12, 'q', _checkInRHS(null) === _Class12), _Class12
+      );
+      function _p12() {}
+    }).toThrow(\`right-hand side of 'in' should be an object, got null\`);
+    expect(() => {
+      var _Class13;
+      return (
+        (_Class13 = class {}),
+        _defineProperty(_Class13, 'q', _checkInRHS(Symbol.iterator) === _Class13),
+        _Class13
+      );
+      function _p13() {}
+    }).toThrow(\`right-hand side of 'in' should be an object, got symbol\`);
+    expect(() => {
+      var _Class14;
+      return (
+        (_Class14 = class {}), _defineProperty(_Class14, 'q', _checkInRHS(0n) === _Class14), _Class14
+      );
+      function _p14() {}
+    }).toThrow(\`right-hand side of 'in' should be an object, got bigint\`);
+    expect(() => {
+      var _p15;
+      return new ((_p15 = /* @__PURE__ */ new WeakMap()),
+      class {
+        constructor() {
+          _classPrivateFieldInitSpec(this, _p15, _p15.has(_checkInRHS(0)));
+        }
+      })();
+    }).toThrow(\`right-hand side of 'in' should be an object, got number\`);
+    expect(() => {
+      var _p16;
+      return new ((_p16 = /* @__PURE__ */ new WeakMap()),
+      class {
+        constructor() {
+          _classPrivateFieldInitSpec(this, _p16, _p16.has(_checkInRHS('')));
+        }
+      })();
+    }).toThrow(\`right-hand side of 'in' should be an object, got string\`);
+    expect(() => {
+      var _p17;
+      return new ((_p17 = /* @__PURE__ */ new WeakMap()),
+      class {
+        constructor() {
+          _classPrivateFieldInitSpec(this, _p17, _p17.has(_checkInRHS(true)));
+        }
+      })();
+    }).toThrow(\`right-hand side of 'in' should be an object, got boolean\`);
+    expect(() => {
+      var _p18;
+      return new ((_p18 = /* @__PURE__ */ new WeakMap()),
+      class {
+        constructor() {
+          _classPrivateFieldInitSpec(this, _p18, _p18.has(_checkInRHS(void 0)));
+        }
+      })();
+    }).toThrow(\`right-hand side of 'in' should be an object, got undefined\`);
+    expect(() => {
+      var _p19;
+      return new ((_p19 = /* @__PURE__ */ new WeakMap()),
+      class {
+        constructor() {
+          _classPrivateFieldInitSpec(this, _p19, _p19.has(_checkInRHS(null)));
+        }
+      })();
+    }).toThrow(\`right-hand side of 'in' should be an object, got null\`);
+    expect(() => {
+      var _p20;
+      return new ((_p20 = /* @__PURE__ */ new WeakMap()),
+      class {
+        constructor() {
+          _classPrivateFieldInitSpec(this, _p20, _p20.has(_checkInRHS(Symbol.iterator)));
+        }
+      })();
+    }).toThrow(\`right-hand side of 'in' should be an object, got symbol\`);
+    expect(() => {
+      var _p21;
+      return new ((_p21 = /* @__PURE__ */ new WeakMap()),
+      class {
+        constructor() {
+          _classPrivateFieldInitSpec(this, _p21, _p21.has(_checkInRHS(0n)));
+        }
+      })();
+    }).toThrow(\`right-hand side of 'in' should be an object, got bigint\`);
+    expect(() => {
+      var _Class_brand;
+      return new ((_Class_brand = /* @__PURE__ */ new WeakSet()),
+      class {
+        constructor() {
+          _classPrivateMethodInitSpec(this, _Class_brand);
+          _defineProperty(this, 'q', _Class_brand.has(_checkInRHS(0)));
+        }
+      })();
+      function _p22() {}
+    }).toThrow(\`right-hand side of 'in' should be an object, got number\`);
+    expect(() => {
+      var _Class_brand2;
+      return new ((_Class_brand2 = /* @__PURE__ */ new WeakSet()),
+      class {
+        constructor() {
+          _classPrivateMethodInitSpec(this, _Class_brand2);
+          _defineProperty(this, 'q', _Class_brand2.has(_checkInRHS('')));
+        }
+      })();
+      function _p23() {}
+    }).toThrow(\`right-hand side of 'in' should be an object, got string\`);
+    expect(() => {
+      var _Class_brand3;
+      return new ((_Class_brand3 = /* @__PURE__ */ new WeakSet()),
+      class {
+        constructor() {
+          _classPrivateMethodInitSpec(this, _Class_brand3);
+          _defineProperty(this, 'q', _Class_brand3.has(_checkInRHS(true)));
+        }
+      })();
+      function _p24() {}
+    }).toThrow(\`right-hand side of 'in' should be an object, got boolean\`);
+    expect(() => {
+      var _Class_brand4;
+      return new ((_Class_brand4 = /* @__PURE__ */ new WeakSet()),
+      class {
+        constructor() {
+          _classPrivateMethodInitSpec(this, _Class_brand4);
+          _defineProperty(this, 'q', _Class_brand4.has(_checkInRHS(void 0)));
+        }
+      })();
+      function _p25() {}
+    }).toThrow(\`right-hand side of 'in' should be an object, got undefined\`);
+    expect(() => {
+      var _Class_brand5;
+      return new ((_Class_brand5 = /* @__PURE__ */ new WeakSet()),
+      class {
+        constructor() {
+          _classPrivateMethodInitSpec(this, _Class_brand5);
+          _defineProperty(this, 'q', _Class_brand5.has(_checkInRHS(null)));
+        }
+      })();
+      function _p26() {}
+    }).toThrow(\`right-hand side of 'in' should be an object, got null\`);
+    expect(() => {
+      var _Class_brand6;
+      return new ((_Class_brand6 = /* @__PURE__ */ new WeakSet()),
+      class {
+        constructor() {
+          _classPrivateMethodInitSpec(this, _Class_brand6);
+          _defineProperty(this, 'q', _Class_brand6.has(_checkInRHS(Symbol.iterator)));
+        }
+      })();
+      function _p27() {}
+    }).toThrow(\`right-hand side of 'in' should be an object, got symbol\`);
+    expect(() => {
+      var _Class_brand7;
+      return new ((_Class_brand7 = /* @__PURE__ */ new WeakSet()),
+      class {
+        constructor() {
+          _classPrivateMethodInitSpec(this, _Class_brand7);
+          _defineProperty(this, 'q', _Class_brand7.has(_checkInRHS(0n)));
+        }
+      })();
+      function _p28() {}
+    }).toThrow(\`right-hand side of 'in' should be an object, got bigint\`);"
+  `);
 });
 
 test('to-native-fields/rhs-not-object/exec.js [loose]', async () => {
@@ -5093,9 +8365,10 @@ test('to-native-fields/rhs-not-object/exec.js [loose]', async () => {
       (() => {
         'use strict';
         var _p = '__private__Class_p';
-        function _Class() {
-          if (!(this instanceof _Class)) throw new TypeError('Cannot call a class as a function');
-        }
+        const _Class = function _Class() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
+        Object.defineProperty(_Class, 'prototype', { writable: false });
         Object.defineProperty(_Class, _p, {
           writable: true,
           value: Object.prototype.hasOwnProperty.call(0, _p),
@@ -5107,9 +8380,10 @@ test('to-native-fields/rhs-not-object/exec.js [loose]', async () => {
       (() => {
         'use strict';
         var _p10 = '__private__Class9_p';
-        function _Class9() {
-          if (!(this instanceof _Class9)) throw new TypeError('Cannot call a class as a function');
-        }
+        const _Class9 = function _Class9() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
+        Object.defineProperty(_Class9, 'prototype', { writable: false });
         Object.defineProperty(_Class9, _p10, {
           writable: true,
           value: Object.prototype.hasOwnProperty.call('', _p10),
@@ -5121,9 +8395,10 @@ test('to-native-fields/rhs-not-object/exec.js [loose]', async () => {
       (() => {
         'use strict';
         var _p12 = '__private__Class11_p';
-        function _Class11() {
-          if (!(this instanceof _Class11)) throw new TypeError('Cannot call a class as a function');
-        }
+        const _Class11 = function _Class11() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
+        Object.defineProperty(_Class11, 'prototype', { writable: false });
         Object.defineProperty(_Class11, _p12, {
           writable: true,
           value: Object.prototype.hasOwnProperty.call(true, _p12),
@@ -5135,9 +8410,10 @@ test('to-native-fields/rhs-not-object/exec.js [loose]', async () => {
       (() => {
         'use strict';
         var _p14 = '__private__Class13_p';
-        function _Class13() {
-          if (!(this instanceof _Class13)) throw new TypeError('Cannot call a class as a function');
-        }
+        const _Class13 = function _Class13() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
+        Object.defineProperty(_Class13, 'prototype', { writable: false });
         Object.defineProperty(_Class13, _p14, {
           writable: true,
           value: Object.prototype.hasOwnProperty.call(void 0, _p14),
@@ -5149,9 +8425,10 @@ test('to-native-fields/rhs-not-object/exec.js [loose]', async () => {
       (() => {
         'use strict';
         var _p16 = '__private__Class15_p';
-        function _Class15() {
-          if (!(this instanceof _Class15)) throw new TypeError('Cannot call a class as a function');
-        }
+        const _Class15 = function _Class15() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
+        Object.defineProperty(_Class15, 'prototype', { writable: false });
         Object.defineProperty(_Class15, _p16, {
           writable: true,
           value: Object.prototype.hasOwnProperty.call(null, _p16),
@@ -5163,9 +8440,10 @@ test('to-native-fields/rhs-not-object/exec.js [loose]', async () => {
       (() => {
         'use strict';
         var _p18 = '__private__Class17_p';
-        function _Class17() {
-          if (!(this instanceof _Class17)) throw new TypeError('Cannot call a class as a function');
-        }
+        const _Class17 = function _Class17() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
+        Object.defineProperty(_Class17, 'prototype', { writable: false });
         Object.defineProperty(_Class17, _p18, {
           writable: true,
           value: Object.prototype.hasOwnProperty.call(Symbol.iterator, _p18),
@@ -5177,9 +8455,10 @@ test('to-native-fields/rhs-not-object/exec.js [loose]', async () => {
       (() => {
         'use strict';
         var _p20 = '__private__Class19_p';
-        function _Class19() {
-          if (!(this instanceof _Class19)) throw new TypeError('Cannot call a class as a function');
-        }
+        const _Class19 = function _Class19() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
+        Object.defineProperty(_Class19, 'prototype', { writable: false });
         Object.defineProperty(_Class19, _p20, {
           writable: true,
           value: Object.prototype.hasOwnProperty.call(0n, _p20),
@@ -5191,11 +8470,16 @@ test('to-native-fields/rhs-not-object/exec.js [loose]', async () => {
       (() => {
         'use strict';
         var _p22 = '__private__Class21_p';
-        function _Class21() {
-          if (!(this instanceof _Class21)) throw new TypeError('Cannot call a class as a function');
-        }
+        const _Class21 = function _Class21() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
+        Object.defineProperty(_Class21, 'prototype', { writable: false });
         _Class21.q = Object.prototype.hasOwnProperty.call(0, _p22);
-        Object.defineProperty(_Class21, _p22, { value: function () {} });
+        Object.defineProperty(_Class21, _p22, {
+          value: function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          },
+        });
         return _Class21;
       })(),
     ).toThrow(\`right-hand side of 'in' should be an object, got number\`);
@@ -5203,11 +8487,16 @@ test('to-native-fields/rhs-not-object/exec.js [loose]', async () => {
       (() => {
         'use strict';
         var _p24 = '__private__Class23_p';
-        function _Class23() {
-          if (!(this instanceof _Class23)) throw new TypeError('Cannot call a class as a function');
-        }
+        const _Class23 = function _Class23() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
+        Object.defineProperty(_Class23, 'prototype', { writable: false });
         _Class23.q = Object.prototype.hasOwnProperty.call('', _p24);
-        Object.defineProperty(_Class23, _p24, { value: function () {} });
+        Object.defineProperty(_Class23, _p24, {
+          value: function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          },
+        });
         return _Class23;
       })(),
     ).toThrow(\`right-hand side of 'in' should be an object, got string\`);
@@ -5215,11 +8504,16 @@ test('to-native-fields/rhs-not-object/exec.js [loose]', async () => {
       (() => {
         'use strict';
         var _p26 = '__private__Class25_p';
-        function _Class25() {
-          if (!(this instanceof _Class25)) throw new TypeError('Cannot call a class as a function');
-        }
+        const _Class25 = function _Class25() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
+        Object.defineProperty(_Class25, 'prototype', { writable: false });
         _Class25.q = Object.prototype.hasOwnProperty.call(true, _p26);
-        Object.defineProperty(_Class25, _p26, { value: function () {} });
+        Object.defineProperty(_Class25, _p26, {
+          value: function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          },
+        });
         return _Class25;
       })(),
     ).toThrow(\`right-hand side of 'in' should be an object, got boolean\`);
@@ -5227,11 +8521,16 @@ test('to-native-fields/rhs-not-object/exec.js [loose]', async () => {
       (() => {
         'use strict';
         var _p28 = '__private__Class27_p';
-        function _Class27() {
-          if (!(this instanceof _Class27)) throw new TypeError('Cannot call a class as a function');
-        }
+        const _Class27 = function _Class27() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
+        Object.defineProperty(_Class27, 'prototype', { writable: false });
         _Class27.q = Object.prototype.hasOwnProperty.call(void 0, _p28);
-        Object.defineProperty(_Class27, _p28, { value: function () {} });
+        Object.defineProperty(_Class27, _p28, {
+          value: function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          },
+        });
         return _Class27;
       })(),
     ).toThrow(\`right-hand side of 'in' should be an object, got undefined\`);
@@ -5239,11 +8538,16 @@ test('to-native-fields/rhs-not-object/exec.js [loose]', async () => {
       (() => {
         'use strict';
         var _p30 = '__private__Class29_p';
-        function _Class29() {
-          if (!(this instanceof _Class29)) throw new TypeError('Cannot call a class as a function');
-        }
+        const _Class29 = function _Class29() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
+        Object.defineProperty(_Class29, 'prototype', { writable: false });
         _Class29.q = Object.prototype.hasOwnProperty.call(null, _p30);
-        Object.defineProperty(_Class29, _p30, { value: function () {} });
+        Object.defineProperty(_Class29, _p30, {
+          value: function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          },
+        });
         return _Class29;
       })(),
     ).toThrow(\`right-hand side of 'in' should be an object, got null\`);
@@ -5251,11 +8555,16 @@ test('to-native-fields/rhs-not-object/exec.js [loose]', async () => {
       (() => {
         'use strict';
         var _p32 = '__private__Class31_p';
-        function _Class31() {
-          if (!(this instanceof _Class31)) throw new TypeError('Cannot call a class as a function');
-        }
+        const _Class31 = function _Class31() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
+        Object.defineProperty(_Class31, 'prototype', { writable: false });
         _Class31.q = Object.prototype.hasOwnProperty.call(Symbol.iterator, _p32);
-        Object.defineProperty(_Class31, _p32, { value: function () {} });
+        Object.defineProperty(_Class31, _p32, {
+          value: function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          },
+        });
         return _Class31;
       })(),
     ).toThrow(\`right-hand side of 'in' should be an object, got symbol\`);
@@ -5263,11 +8572,16 @@ test('to-native-fields/rhs-not-object/exec.js [loose]', async () => {
       (() => {
         'use strict';
         var _p34 = '__private__Class33_p';
-        function _Class33() {
-          if (!(this instanceof _Class33)) throw new TypeError('Cannot call a class as a function');
-        }
+        const _Class33 = function _Class33() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
+        Object.defineProperty(_Class33, 'prototype', { writable: false });
         _Class33.q = Object.prototype.hasOwnProperty.call(0n, _p34);
-        Object.defineProperty(_Class33, _p34, { value: function () {} });
+        Object.defineProperty(_Class33, _p34, {
+          value: function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          },
+        });
         return _Class33;
       })(),
     ).toThrow(\`right-hand side of 'in' should be an object, got bigint\`);
@@ -5276,13 +8590,14 @@ test('to-native-fields/rhs-not-object/exec.js [loose]', async () => {
         new ((() => {
           'use strict';
           var _p36 = '__private__Class35_p';
-          function _Class35() {
-            if (!(this instanceof _Class35)) throw new TypeError('Cannot call a class as a function');
+          const _Class35 = function _Class35() {
+            if (!new.target) throw new TypeError('Cannot call a class as a function');
             Object.defineProperty(this, _p36, {
               writable: true,
               value: Object.prototype.hasOwnProperty.call(0, _p36),
             });
-          }
+          };
+          Object.defineProperty(_Class35, 'prototype', { writable: false });
           return _Class35;
         })())(),
     ).toThrow(\`right-hand side of 'in' should be an object, got number\`);
@@ -5291,13 +8606,14 @@ test('to-native-fields/rhs-not-object/exec.js [loose]', async () => {
         new ((() => {
           'use strict';
           var _p38 = '__private__Class37_p';
-          function _Class37() {
-            if (!(this instanceof _Class37)) throw new TypeError('Cannot call a class as a function');
+          const _Class37 = function _Class37() {
+            if (!new.target) throw new TypeError('Cannot call a class as a function');
             Object.defineProperty(this, _p38, {
               writable: true,
               value: Object.prototype.hasOwnProperty.call('', _p38),
             });
-          }
+          };
+          Object.defineProperty(_Class37, 'prototype', { writable: false });
           return _Class37;
         })())(),
     ).toThrow(\`right-hand side of 'in' should be an object, got string\`);
@@ -5306,13 +8622,14 @@ test('to-native-fields/rhs-not-object/exec.js [loose]', async () => {
         new ((() => {
           'use strict';
           var _p40 = '__private__Class39_p';
-          function _Class39() {
-            if (!(this instanceof _Class39)) throw new TypeError('Cannot call a class as a function');
+          const _Class39 = function _Class39() {
+            if (!new.target) throw new TypeError('Cannot call a class as a function');
             Object.defineProperty(this, _p40, {
               writable: true,
               value: Object.prototype.hasOwnProperty.call(true, _p40),
             });
-          }
+          };
+          Object.defineProperty(_Class39, 'prototype', { writable: false });
           return _Class39;
         })())(),
     ).toThrow(\`right-hand side of 'in' should be an object, got boolean\`);
@@ -5321,13 +8638,14 @@ test('to-native-fields/rhs-not-object/exec.js [loose]', async () => {
         new ((() => {
           'use strict';
           var _p42 = '__private__Class41_p';
-          function _Class41() {
-            if (!(this instanceof _Class41)) throw new TypeError('Cannot call a class as a function');
+          const _Class41 = function _Class41() {
+            if (!new.target) throw new TypeError('Cannot call a class as a function');
             Object.defineProperty(this, _p42, {
               writable: true,
               value: Object.prototype.hasOwnProperty.call(void 0, _p42),
             });
-          }
+          };
+          Object.defineProperty(_Class41, 'prototype', { writable: false });
           return _Class41;
         })())(),
     ).toThrow(\`right-hand side of 'in' should be an object, got undefined\`);
@@ -5336,13 +8654,14 @@ test('to-native-fields/rhs-not-object/exec.js [loose]', async () => {
         new ((() => {
           'use strict';
           var _p44 = '__private__Class43_p';
-          function _Class43() {
-            if (!(this instanceof _Class43)) throw new TypeError('Cannot call a class as a function');
+          const _Class43 = function _Class43() {
+            if (!new.target) throw new TypeError('Cannot call a class as a function');
             Object.defineProperty(this, _p44, {
               writable: true,
               value: Object.prototype.hasOwnProperty.call(null, _p44),
             });
-          }
+          };
+          Object.defineProperty(_Class43, 'prototype', { writable: false });
           return _Class43;
         })())(),
     ).toThrow(\`right-hand side of 'in' should be an object, got null\`);
@@ -5351,13 +8670,14 @@ test('to-native-fields/rhs-not-object/exec.js [loose]', async () => {
         new ((() => {
           'use strict';
           var _p46 = '__private__Class45_p';
-          function _Class45() {
-            if (!(this instanceof _Class45)) throw new TypeError('Cannot call a class as a function');
+          const _Class45 = function _Class45() {
+            if (!new.target) throw new TypeError('Cannot call a class as a function');
             Object.defineProperty(this, _p46, {
               writable: true,
               value: Object.prototype.hasOwnProperty.call(Symbol.iterator, _p46),
             });
-          }
+          };
+          Object.defineProperty(_Class45, 'prototype', { writable: false });
           return _Class45;
         })())(),
     ).toThrow(\`right-hand side of 'in' should be an object, got symbol\`);
@@ -5366,13 +8686,14 @@ test('to-native-fields/rhs-not-object/exec.js [loose]', async () => {
         new ((() => {
           'use strict';
           var _p48 = '__private__Class47_p';
-          function _Class47() {
-            if (!(this instanceof _Class47)) throw new TypeError('Cannot call a class as a function');
+          const _Class47 = function _Class47() {
+            if (!new.target) throw new TypeError('Cannot call a class as a function');
             Object.defineProperty(this, _p48, {
               writable: true,
               value: Object.prototype.hasOwnProperty.call(0n, _p48),
             });
-          }
+          };
+          Object.defineProperty(_Class47, 'prototype', { writable: false });
           return _Class47;
         })())(),
     ).toThrow(\`right-hand side of 'in' should be an object, got bigint\`);
@@ -5381,11 +8702,16 @@ test('to-native-fields/rhs-not-object/exec.js [loose]', async () => {
         new ((() => {
           'use strict';
           var _p50 = '__private__Class49_p';
-          function _Class49() {
-            if (!(this instanceof _Class49)) throw new TypeError('Cannot call a class as a function');
+          const _Class49 = function _Class49() {
+            if (!new.target) throw new TypeError('Cannot call a class as a function');
             this.q = Object.prototype.hasOwnProperty.call(0, _p50);
-            Object.defineProperty(this, _p50, { value: function () {} });
-          }
+            Object.defineProperty(this, _p50, {
+              value: function () {
+                if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              },
+            });
+          };
+          Object.defineProperty(_Class49, 'prototype', { writable: false });
           return _Class49;
         })())(),
     ).toThrow(\`right-hand side of 'in' should be an object, got number\`);
@@ -5394,11 +8720,16 @@ test('to-native-fields/rhs-not-object/exec.js [loose]', async () => {
         new ((() => {
           'use strict';
           var _p52 = '__private__Class51_p';
-          function _Class51() {
-            if (!(this instanceof _Class51)) throw new TypeError('Cannot call a class as a function');
+          const _Class51 = function _Class51() {
+            if (!new.target) throw new TypeError('Cannot call a class as a function');
             this.q = Object.prototype.hasOwnProperty.call('', _p52);
-            Object.defineProperty(this, _p52, { value: function () {} });
-          }
+            Object.defineProperty(this, _p52, {
+              value: function () {
+                if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              },
+            });
+          };
+          Object.defineProperty(_Class51, 'prototype', { writable: false });
           return _Class51;
         })())(),
     ).toThrow(\`right-hand side of 'in' should be an object, got string\`);
@@ -5407,11 +8738,16 @@ test('to-native-fields/rhs-not-object/exec.js [loose]', async () => {
         new ((() => {
           'use strict';
           var _p54 = '__private__Class53_p';
-          function _Class53() {
-            if (!(this instanceof _Class53)) throw new TypeError('Cannot call a class as a function');
+          const _Class53 = function _Class53() {
+            if (!new.target) throw new TypeError('Cannot call a class as a function');
             this.q = Object.prototype.hasOwnProperty.call(true, _p54);
-            Object.defineProperty(this, _p54, { value: function () {} });
-          }
+            Object.defineProperty(this, _p54, {
+              value: function () {
+                if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              },
+            });
+          };
+          Object.defineProperty(_Class53, 'prototype', { writable: false });
           return _Class53;
         })())(),
     ).toThrow(\`right-hand side of 'in' should be an object, got boolean\`);
@@ -5420,11 +8756,16 @@ test('to-native-fields/rhs-not-object/exec.js [loose]', async () => {
         new ((() => {
           'use strict';
           var _p56 = '__private__Class55_p';
-          function _Class55() {
-            if (!(this instanceof _Class55)) throw new TypeError('Cannot call a class as a function');
+          const _Class55 = function _Class55() {
+            if (!new.target) throw new TypeError('Cannot call a class as a function');
             this.q = Object.prototype.hasOwnProperty.call(void 0, _p56);
-            Object.defineProperty(this, _p56, { value: function () {} });
-          }
+            Object.defineProperty(this, _p56, {
+              value: function () {
+                if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              },
+            });
+          };
+          Object.defineProperty(_Class55, 'prototype', { writable: false });
           return _Class55;
         })())(),
     ).toThrow(\`right-hand side of 'in' should be an object, got undefined\`);
@@ -5433,11 +8774,16 @@ test('to-native-fields/rhs-not-object/exec.js [loose]', async () => {
         new ((() => {
           'use strict';
           var _p58 = '__private__Class57_p';
-          function _Class57() {
-            if (!(this instanceof _Class57)) throw new TypeError('Cannot call a class as a function');
+          const _Class57 = function _Class57() {
+            if (!new.target) throw new TypeError('Cannot call a class as a function');
             this.q = Object.prototype.hasOwnProperty.call(null, _p58);
-            Object.defineProperty(this, _p58, { value: function () {} });
-          }
+            Object.defineProperty(this, _p58, {
+              value: function () {
+                if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              },
+            });
+          };
+          Object.defineProperty(_Class57, 'prototype', { writable: false });
           return _Class57;
         })())(),
     ).toThrow(\`right-hand side of 'in' should be an object, got null\`);
@@ -5446,11 +8792,16 @@ test('to-native-fields/rhs-not-object/exec.js [loose]', async () => {
         new ((() => {
           'use strict';
           var _p60 = '__private__Class59_p';
-          function _Class59() {
-            if (!(this instanceof _Class59)) throw new TypeError('Cannot call a class as a function');
+          const _Class59 = function _Class59() {
+            if (!new.target) throw new TypeError('Cannot call a class as a function');
             this.q = Object.prototype.hasOwnProperty.call(Symbol.iterator, _p60);
-            Object.defineProperty(this, _p60, { value: function () {} });
-          }
+            Object.defineProperty(this, _p60, {
+              value: function () {
+                if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              },
+            });
+          };
+          Object.defineProperty(_Class59, 'prototype', { writable: false });
           return _Class59;
         })())(),
     ).toThrow(\`right-hand side of 'in' should be an object, got symbol\`);
@@ -5459,11 +8810,16 @@ test('to-native-fields/rhs-not-object/exec.js [loose]', async () => {
         new ((() => {
           'use strict';
           var _p62 = '__private__Class61_p';
-          function _Class61() {
-            if (!(this instanceof _Class61)) throw new TypeError('Cannot call a class as a function');
+          const _Class61 = function _Class61() {
+            if (!new.target) throw new TypeError('Cannot call a class as a function');
             this.q = Object.prototype.hasOwnProperty.call(0n, _p62);
-            Object.defineProperty(this, _p62, { value: function () {} });
-          }
+            Object.defineProperty(this, _p62, {
+              value: function () {
+                if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              },
+            });
+          };
+          Object.defineProperty(_Class61, 'prototype', { writable: false });
           return _Class61;
         })())(),
     ).toThrow(\`right-hand side of 'in' should be an object, got bigint\`);"
@@ -5482,7 +8838,15 @@ test('to-native-fields/static-accessor/input.js [spec]', async () => {
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-spec-private-features-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _checkInRHS = require('@babel/runtime/helpers/checkInRHS');
+    class Foo {
+      test(other) {
+        return _checkInRHS(other) === Foo;
+      }
+    }
+    function _get_foo() {}"
+  `);
 });
 
 test('to-native-fields/static-accessor/input.js [loose]', async () => {
@@ -5498,20 +8862,33 @@ test('to-native-fields/static-accessor/input.js [loose]', async () => {
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "var Foo = (() => {
+    "let Foo = (() => {
       'use strict';
       var _foo = '__private_Foo_foo';
-      function Foo() {
-        if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
-      }
+      const Foo = function Foo() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+      };
       Object.defineProperty(Foo.prototype, 'test', {
-        value: function (other) {
-          return Object.prototype.hasOwnProperty.call(other, _foo);
-        },
+        value: Object.defineProperty(
+          function (other) {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            return Object.prototype.hasOwnProperty.call(other, _foo);
+          },
+          'name',
+          {
+            value: 'test',
+            configurable: true,
+          },
+        ),
         writable: true,
         configurable: true,
       });
-      Object.defineProperty(Foo, _foo, { get: function () {} });
+      Object.defineProperty(Foo, 'prototype', { writable: false });
+      Object.defineProperty(Foo, _foo, {
+        get: function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        },
+      });
       return Foo;
     })();"
   `);
@@ -5529,7 +8906,15 @@ test('to-native-fields/static-field/input.js [spec]', async () => {
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-spec-private-features-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _checkInRHS = require('@babel/runtime/helpers/checkInRHS');
+    class Foo {
+      test(other) {
+        return _checkInRHS(other) === Foo;
+      }
+    }
+    var _foo = { _: 1 };"
+  `);
 });
 
 test('to-native-fields/static-field/input.js [loose]', async () => {
@@ -5545,19 +8930,28 @@ test('to-native-fields/static-field/input.js [loose]', async () => {
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "var Foo = (() => {
+    "let Foo = (() => {
       'use strict';
       var _foo = '__private_Foo_foo';
-      function Foo() {
-        if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
-      }
+      const Foo = function Foo() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+      };
       Object.defineProperty(Foo.prototype, 'test', {
-        value: function (other) {
-          return Object.prototype.hasOwnProperty.call(other, _foo);
-        },
+        value: Object.defineProperty(
+          function (other) {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            return Object.prototype.hasOwnProperty.call(other, _foo);
+          },
+          'name',
+          {
+            value: 'test',
+            configurable: true,
+          },
+        ),
         writable: true,
         configurable: true,
       });
+      Object.defineProperty(Foo, 'prototype', { writable: false });
       Object.defineProperty(Foo, _foo, {
         writable: true,
         value: 1,
@@ -5579,7 +8973,15 @@ test('to-native-fields/static-method/input.js [spec]', async () => {
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-spec-private-features-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _checkInRHS = require('@babel/runtime/helpers/checkInRHS');
+    class Foo {
+      test(other) {
+        return _checkInRHS(other) === Foo;
+      }
+    }
+    function _foo() {}"
+  `);
 });
 
 test('to-native-fields/static-method/input.js [loose]', async () => {
@@ -5595,20 +8997,33 @@ test('to-native-fields/static-method/input.js [loose]', async () => {
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "var Foo = (() => {
+    "let Foo = (() => {
       'use strict';
       var _foo = '__private_Foo_foo';
-      function Foo() {
-        if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
-      }
+      const Foo = function Foo() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+      };
       Object.defineProperty(Foo.prototype, 'test', {
-        value: function (other) {
-          return Object.prototype.hasOwnProperty.call(other, _foo);
-        },
+        value: Object.defineProperty(
+          function (other) {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            return Object.prototype.hasOwnProperty.call(other, _foo);
+          },
+          'name',
+          {
+            value: 'test',
+            configurable: true,
+          },
+        ),
         writable: true,
         configurable: true,
       });
-      Object.defineProperty(Foo, _foo, { value: function () {} });
+      Object.defineProperty(Foo, 'prototype', { writable: false });
+      Object.defineProperty(Foo, _foo, {
+        value: function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        },
+      });
       return Foo;
     })();"
   `);
@@ -5626,7 +9041,23 @@ test('to-native-fields/static-shadow/exec.js [spec]', async () => {
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-spec-private-features-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _checkInRHS = require('@babel/runtime/helpers/checkInRHS');
+    class Test {
+      method(other) {
+        const Test = 2;
+        const func = () => {
+          const Test = 3;
+          return _checkInRHS(other) === Test && Test;
+        };
+        return func() + Test;
+      }
+    }
+    var _x = { _: 1 };
+    const t = new Test();
+    const t2 = new Test();
+    expect(t.method(Test)).toBe(5);"
+  `);
 });
 
 test('to-native-fields/static-shadow/exec.js [loose]', async () => {
@@ -5642,24 +9073,33 @@ test('to-native-fields/static-shadow/exec.js [loose]', async () => {
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "var Test = (() => {
+    "let Test = (() => {
       'use strict';
       var _x = '__private_Test_x';
-      function Test() {
-        if (!(this instanceof Test)) throw new TypeError('Cannot call a class as a function');
-      }
+      const Test = function Test() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+      };
       Object.defineProperty(Test.prototype, 'method', {
-        value: function (other) {
-          const Test = 2;
-          const func = () => {
-            const Test = 3;
-            return Object.prototype.hasOwnProperty.call(other, _x) && Test;
-          };
-          return func() + Test;
-        },
+        value: Object.defineProperty(
+          function (other) {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            const Test = 2;
+            const func = () => {
+              const Test = 3;
+              return Object.prototype.hasOwnProperty.call(other, _x) && Test;
+            };
+            return func() + Test;
+          },
+          'name',
+          {
+            value: 'method',
+            configurable: true,
+          },
+        ),
         writable: true,
         configurable: true,
       });
+      Object.defineProperty(Test, 'prototype', { writable: false });
       Object.defineProperty(Test, _x, {
         writable: true,
         value: 1,
@@ -5684,7 +9124,20 @@ test('to-native-fields/static-shadow/input.js [spec]', async () => {
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-spec-private-features-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _checkInRHS = require('@babel/runtime/helpers/checkInRHS');
+    class Test {
+      method(other) {
+        const Test = 2;
+        const func = () => {
+          const Test = 3;
+          return _checkInRHS(other) === Test && Test;
+        };
+        return func() + Test;
+      }
+    }
+    var _x = { _: 1 };"
+  `);
 });
 
 test('to-native-fields/static-shadow/input.js [loose]', async () => {
@@ -5700,24 +9153,33 @@ test('to-native-fields/static-shadow/input.js [loose]', async () => {
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "var Test = (() => {
+    "let Test = (() => {
       'use strict';
       var _x = '__private_Test_x';
-      function Test() {
-        if (!(this instanceof Test)) throw new TypeError('Cannot call a class as a function');
-      }
+      const Test = function Test() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+      };
       Object.defineProperty(Test.prototype, 'method', {
-        value: function (other) {
-          const Test = 2;
-          const func = () => {
-            const Test = 3;
-            return Object.prototype.hasOwnProperty.call(other, _x) && Test;
-          };
-          return func() + Test;
-        },
+        value: Object.defineProperty(
+          function (other) {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            const Test = 2;
+            const func = () => {
+              const Test = 3;
+              return Object.prototype.hasOwnProperty.call(other, _x) && Test;
+            };
+            return func() + Test;
+          },
+          'name',
+          {
+            value: 'method',
+            configurable: true,
+          },
+        ),
         writable: true,
         configurable: true,
       });
+      Object.defineProperty(Test, 'prototype', { writable: false });
       Object.defineProperty(Test, _x, {
         writable: true,
         value: 1,
@@ -5739,7 +9201,17 @@ test('to-native-fields/static-shadowed-binding/input.js [spec]', async () => {
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-spec-private-features-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _checkInRHS = require('@babel/runtime/helpers/checkInRHS');
+    class A {
+      test() {
+        let A = function fn(A) {
+          return _checkInRHS(A) === A;
+        };
+      }
+    }
+    var _foo = { _: void 0 };"
+  `);
 });
 
 test('to-native-fields/static-shadowed-binding/input.js [loose]', async () => {
@@ -5755,21 +9227,30 @@ test('to-native-fields/static-shadowed-binding/input.js [loose]', async () => {
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "var A = (() => {
+    "let A = (() => {
       'use strict';
       var _foo = '__private_A_foo';
-      function A() {
-        if (!(this instanceof A)) throw new TypeError('Cannot call a class as a function');
-      }
+      const A = function A() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+      };
       Object.defineProperty(A.prototype, 'test', {
-        value: function () {
-          let A = function fn(A) {
-            return Object.prototype.hasOwnProperty.call(A, _foo);
-          };
-        },
+        value: Object.defineProperty(
+          function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            let A = function fn(A) {
+              return Object.prototype.hasOwnProperty.call(A, _foo);
+            };
+          },
+          'name',
+          {
+            value: 'test',
+            configurable: true,
+          },
+        ),
         writable: true,
         configurable: true,
       });
+      Object.defineProperty(A, 'prototype', { writable: false });
       Object.defineProperty(A, _foo, {
         writable: true,
         value: void 0,

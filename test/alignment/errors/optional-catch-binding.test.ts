@@ -15,3 +15,18 @@ globalThis.__result = caught;`,
     }),
   ).resolves.toBe(true);
 });
+
+test('aligns generated catch binding collisions with Babel', async () => {
+  await expect(
+    alignBabelBehavior({
+      source: `const _unused = 'outer';
+let result;
+try { throw 'thrown'; } catch { result = _unused; }
+globalThis.__result = result;`,
+      filename: 'input.js',
+      plugins: [optionalCatchBinding],
+      noxcturnal: { transforms: { optionalCatchBinding: true } },
+      output: { mustNotMatch: [/catch\s*\{/] },
+    }),
+  ).resolves.toBe('outer');
+});

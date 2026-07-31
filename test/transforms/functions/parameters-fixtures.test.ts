@@ -40,17 +40,23 @@ test('assumption-ignoreFunctionLength/default-array-destructuring/input.js', asy
 
 test('assumption-ignoreFunctionLength/default-assignment-with-types/input.mjs', async () => {
   const source =
-    'export function transformFileSync(\n  filename: string,\n  opts?: Object = {},\n): string {}\n';
-  expect(
-    await transformOutcome(source, 'input.mjs', { transforms: { parameters: true } }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:parse-error"`);
+    '// @flow\nexport function transformFileSync(\n  filename: string,\n  opts?: Object = {},\n): string {}\n';
+  expect(await transformOutcome(source, 'input.mjs', { transforms: { parameters: true } }))
+    .toMatchInlineSnapshot(`
+    "// @flow
+    export function transformFileSync(_arg) {
+      let filename = arguments.length > 0 ? arguments[0] : void 0;
+      let opts = arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : {};
+    }"
+  `);
 });
 
 test('assumption-ignoreFunctionLength/default-earlier-params/exec.js', async () => {
   const source = 'function f(a, b = a, c = b) { return c; }\n\nexpect(f(3)).toBe(3);\n';
   expect(await transformOutcome(source, 'exec.js', { transforms: { parameters: true } }))
     .toMatchInlineSnapshot(`
-    "function f(a) {
+    "function f(_arg) {
+      let a = arguments.length > 0 ? arguments[0] : void 0;
       let b = arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : a;
       let c = arguments.length > 2 && arguments[2] !== void 0 ? arguments[2] : b;
       return c;
@@ -67,18 +73,14 @@ test('assumption-ignoreFunctionLength/default-iife-1128/exec.js', async () => {
     "const bar = true;
     function foo() {
       let a = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : bar;
-      for (
-        var _len = arguments.length, b = new Array(_len > 1 ? _len - 1 : 0), _key = 1;
-        _key < _len;
-        _key++
-      ) {
+      for (var _len = arguments.length, b = [], _key = 1; _key < _len; _key++) {
         b[_key - 1] = arguments[_key];
       }
       return function () {
         const bar = false;
         expect(b[0]).toBe(2);
         expect(b[1]).toBe(3);
-      }.apply(this, arguments);
+      }.call(this);
     }
     foo(1, 2, 3);"
   `);
@@ -127,7 +129,8 @@ test('assumption-ignoreFunctionLength/default-multiple/input.js', async () => {
       let f = arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : 5;
       return e + ' bar ' + f;
     };
-    var a = function (e) {
+    var a = function (_arg) {
+      let e = arguments.length > 0 ? arguments[0] : void 0;
       let f = arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : 5;
       return e + ' bar ' + f;
     };"
@@ -163,7 +166,8 @@ test('assumption-ignoreFunctionLength/default-rest-mix/input.js', async () => {
   const source = 'function fn(\n  a1,\n  a2 = 4,\n  {a3, a4},\n  a5,\n  {a6, a7} = {}) {\n\n}\n';
   expect(await transformOutcome(source, 'input.js', { transforms: { parameters: true } }))
     .toMatchInlineSnapshot(`
-    "function fn(a1) {
+    "function fn(_arg) {
+      let a1 = arguments.length > 0 ? arguments[0] : void 0;
       let a2 = arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : 4;
       let { a3, a4 } = arguments.length > 2 ? arguments[2] : void 0;
       let a5 = arguments.length > 3 ? arguments[3] : void 0;
@@ -180,11 +184,7 @@ test('assumption-ignoreFunctionLength/default-rest/exec.js', async () => {
     "const a = 1;
     function rest() {
       let b = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : a;
-      for (
-        var _len = arguments.length, a = new Array(_len > 1 ? _len - 1 : 0), _key = 1;
-        _key < _len;
-        _key++
-      ) {
+      for (var _len = arguments.length, a = [], _key = 1; _key < _len; _key++) {
         a[_key - 1] = arguments[_key];
       }
       expect(b).toBe(1);
@@ -192,11 +192,7 @@ test('assumption-ignoreFunctionLength/default-rest/exec.js', async () => {
     rest(undefined, 2);
     function rest2() {
       let b = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : a;
-      for (
-        var _len7 = arguments.length, a = new Array(_len7 > 1 ? _len7 - 1 : 0), _key8 = 1;
-        _key8 < _len7;
-        _key8++
-      ) {
+      for (var _len7 = arguments.length, a = [], _key8 = 1; _key8 < _len7; _key8++) {
         a[_key8 - 1] = arguments[_key8];
       }
       expect(a[0]).toBe(2);
@@ -204,11 +200,7 @@ test('assumption-ignoreFunctionLength/default-rest/exec.js', async () => {
     rest2(undefined, 2);
     function rest3() {
       let b = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : a;
-      for (
-        var _len9 = arguments.length, a = new Array(_len9 > 1 ? _len9 - 1 : 0), _key10 = 1;
-        _key10 < _len9;
-        _key10++
-      ) {
+      for (var _len9 = arguments.length, a = [], _key10 = 1; _key10 < _len9; _key10++) {
         a[_key10 - 1] = arguments[_key10];
       }
       expect(a).toHaveLength(1);
@@ -237,11 +229,7 @@ test('assumption-ignoreFunctionLength/destructuring-rest/input.js', async () => 
     function t() {
       let x = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : 'default';
       let { a, b } = arguments.length > 1 ? arguments[1] : void 0;
-      for (
-        var _len = arguments.length, args = new Array(_len > 2 ? _len - 2 : 0), _key = 2;
-        _key < _len;
-        _key++
-      ) {
+      for (var _len = arguments.length, args = [], _key = 2; _key < _len; _key++) {
         args[_key - 2] = arguments[_key];
       }
       console.log(x, a, b, args);
@@ -277,7 +265,8 @@ test('loose/ignoreFunctionLength/input.js', async () => {
   const source = 'function fn(a, b = c()) {\n  return b;\n}\n';
   expect(await transformOutcome(source, 'input.js', { transforms: { parameters: true } }))
     .toMatchInlineSnapshot(`
-    "function fn(a) {
+    "function fn(_arg) {
+      let a = arguments.length > 0 ? arguments[0] : void 0;
       let b = arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : c();
       return b;
     }"
@@ -332,11 +321,7 @@ test('parameters/default-arguments/exec.js', async () => {
   expect(await transformOutcome(source, 'exec.js', { transforms: { parameters: true } }))
     .toMatchInlineSnapshot(`
     "function func() {
-      for (
-        var _len = arguments.length, arguments = new Array(_len > 0 ? _len - 0 : 0), _key = 0;
-        _key < _len;
-        _key++
-      ) {
+      for (var _len = arguments.length, arguments = [], _key = 0; _key < _len; _key++) {
         arguments[_key - 0] = arguments[_key];
       }
       return arguments;
@@ -351,11 +336,7 @@ test('parameters/default-arguments/input.js', async () => {
   expect(await transformOutcome(source, 'input.js', { transforms: { parameters: true } }))
     .toMatchInlineSnapshot(`
     "function func() {
-      for (
-        var _len = arguments.length, arguments = new Array(_len > 0 ? _len - 0 : 0), _key = 0;
-        _key < _len;
-        _key++
-      ) {
+      for (var _len = arguments.length, arguments = [], _key = 0; _key < _len; _key++) {
         arguments[_key - 0] = arguments[_key];
       }
       console.log(arguments);
@@ -404,7 +385,8 @@ test('parameters/default-earlier-params/exec.js', async () => {
   const source = 'function f(a, b = a, c = b) { return c; }\n\nexpect(3).toBe(f(3));\n';
   expect(await transformOutcome(source, 'exec.js', { transforms: { parameters: true } }))
     .toMatchInlineSnapshot(`
-    "function f(a) {
+    "function f(_arg) {
+      let a = arguments.length > 0 ? arguments[0] : void 0;
       let b = arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : a;
       let c = arguments.length > 2 && arguments[2] !== void 0 ? arguments[2] : b;
       return c;
@@ -424,7 +406,7 @@ test('parameters/default-eval/input.js', async () => {
       return function () {
         let x = 'inside';
         return a();
-      }.apply(this, arguments);
+      }.call(this);
     }
     outer();"
   `);
@@ -438,18 +420,14 @@ test('parameters/default-iife-1128/exec.js', async () => {
     "const bar = true;
     function foo() {
       let a = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : bar;
-      for (
-        var _len = arguments.length, b = new Array(_len > 1 ? _len - 1 : 0), _key = 1;
-        _key < _len;
-        _key++
-      ) {
+      for (var _len = arguments.length, b = [], _key = 1; _key < _len; _key++) {
         b[_key - 1] = arguments[_key];
       }
       return function () {
         const bar = false;
         expect(b[0]).toBe(2);
         expect(b[1]).toBe(3);
-      }.apply(this, arguments);
+      }.call(this);
     }
     foo(1, 2, 3);"
   `);
@@ -499,7 +477,7 @@ test('parameters/default-iife-9947/input.js', async () => {
       return function () {
         let x = 'inside';
         return a();
-      }.apply(this, arguments);
+      }.call(this);
     }
     outer();"
   `);
@@ -550,7 +528,8 @@ test('parameters/default-multiple/input.js', async () => {
       let f = arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : 5;
       return e + ' bar ' + f;
     };
-    var a = function (e) {
+    var a = function (_arg) {
+      let e = arguments.length > 0 ? arguments[0] : void 0;
       let f = arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : 5;
       return e + ' bar ' + f;
     };"
@@ -561,7 +540,8 @@ test('parameters/default-rest-mix/input.js', async () => {
   const source = 'function fn(\n  a1,\n  a2 = 4,\n  {a3, a4},\n  a5,\n  {a6, a7} = {}) {\n\n}\n';
   expect(await transformOutcome(source, 'input.js', { transforms: { parameters: true } }))
     .toMatchInlineSnapshot(`
-    "function fn(a1) {
+    "function fn(_arg) {
+      let a1 = arguments.length > 0 ? arguments[0] : void 0;
       let a2 = arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : 4;
       let { a3, a4 } = arguments.length > 2 ? arguments[2] : void 0;
       let a5 = arguments.length > 3 ? arguments[3] : void 0;
@@ -578,11 +558,7 @@ test('parameters/default-rest/exec.js', async () => {
     "const a = 1;
     function rest() {
       let b = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : a;
-      for (
-        var _len = arguments.length, a = new Array(_len > 1 ? _len - 1 : 0), _key = 1;
-        _key < _len;
-        _key++
-      ) {
+      for (var _len = arguments.length, a = [], _key = 1; _key < _len; _key++) {
         a[_key - 1] = arguments[_key];
       }
       expect(b).toBe(1);
@@ -590,11 +566,7 @@ test('parameters/default-rest/exec.js', async () => {
     rest(undefined, 2);
     function rest2() {
       let b = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : a;
-      for (
-        var _len7 = arguments.length, a = new Array(_len7 > 1 ? _len7 - 1 : 0), _key8 = 1;
-        _key8 < _len7;
-        _key8++
-      ) {
+      for (var _len7 = arguments.length, a = [], _key8 = 1; _key8 < _len7; _key8++) {
         a[_key8 - 1] = arguments[_key8];
       }
       expect(a[0]).toBe(2);
@@ -602,11 +574,7 @@ test('parameters/default-rest/exec.js', async () => {
     rest2(undefined, 2);
     function rest3() {
       let b = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : a;
-      for (
-        var _len9 = arguments.length, a = new Array(_len9 > 1 ? _len9 - 1 : 0), _key10 = 1;
-        _key10 < _len9;
-        _key10++
-      ) {
+      for (var _len9 = arguments.length, a = [], _key10 = 1; _key10 < _len9; _key10++) {
         a[_key10 - 1] = arguments[_key10];
       }
       expect(a).toHaveLength(1);
@@ -623,11 +591,7 @@ test('parameters/default-rest/input.js', async () => {
     "const a = 1;
     function rest() {
       let b = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : a;
-      for (
-        var _len = arguments.length, a = new Array(_len > 1 ? _len - 1 : 0), _key = 1;
-        _key < _len;
-        _key++
-      ) {
+      for (var _len = arguments.length, a = [], _key = 1; _key < _len; _key++) {
         a[_key - 1] = arguments[_key];
       }
       expect(b).toBe(1);
@@ -635,11 +599,7 @@ test('parameters/default-rest/input.js', async () => {
     rest(undefined, 2);
     function rest2() {
       let b = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : a;
-      for (
-        var _len7 = arguments.length, a = new Array(_len7 > 1 ? _len7 - 1 : 0), _key8 = 1;
-        _key8 < _len7;
-        _key8++
-      ) {
+      for (var _len7 = arguments.length, a = [], _key8 = 1; _key8 < _len7; _key8++) {
         a[_key8 - 1] = arguments[_key8];
       }
       expect(a[0]).toBe(2);
@@ -647,11 +607,7 @@ test('parameters/default-rest/input.js', async () => {
     rest2(undefined, 2);
     function rest3() {
       let b = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : a;
-      for (
-        var _len9 = arguments.length, a = new Array(_len9 > 1 ? _len9 - 1 : 0), _key10 = 1;
-        _key10 < _len9;
-        _key10++
-      ) {
+      for (var _len9 = arguments.length, a = [], _key10 = 1; _key10 < _len9; _key10++) {
         a[_key10 - 1] = arguments[_key10];
       }
       expect(a).toHaveLength(1);
@@ -663,31 +619,16 @@ test('parameters/default-rest/input.js', async () => {
 test('parameters/default-setter/exec.js', async () => {
   const source =
     'const defaultValue = 1;\nconst obj = {\n  set field(num = defaultValue) {\n    this.num = num;\n  }\n};\nobj.field = void 0;\n\nexpect(obj.num).toBe(defaultValue);\n';
-  expect(await transformOutcome(source, 'exec.js', { transforms: { parameters: true } }))
-    .toMatchInlineSnapshot(`
-    "const defaultValue = 1;
-    const obj = {
-      set field(num) {
-        if (num === void 0) num = defaultValue;
-        this.num = num;
-      },
-    };
-    obj.field = void 0;
-    expect(obj.num).toBe(defaultValue);"
-  `);
+  expect(
+    await transformOutcome(source, 'exec.js', { transforms: { parameters: true } }),
+  ).toMatchInlineSnapshot(`"[bailout] preflight:parameters-setter-semantics-not-implemented"`);
 });
 
 test('parameters/default-setter/input.js', async () => {
   const source = 'const obj = {\n  set field(num = 1) {\n    this.num = num;\n  }\n};\n';
-  expect(await transformOutcome(source, 'input.js', { transforms: { parameters: true } }))
-    .toMatchInlineSnapshot(`
-    "const obj = {
-      set field(num) {
-        if (num === void 0) num = 1;
-        this.num = num;
-      },
-    };"
-  `);
+  expect(
+    await transformOutcome(source, 'input.js', { transforms: { parameters: true } }),
+  ).toMatchInlineSnapshot(`"[bailout] preflight:parameters-setter-semantics-not-implemented"`);
 });
 
 test('parameters/default-single/input.js', async () => {
@@ -710,11 +651,7 @@ test('parameters/destructuring-rest/input.js', async () => {
     function t() {
       let x = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : 'default';
       let { a, b } = arguments.length > 1 ? arguments[1] : void 0;
-      for (
-        var _len = arguments.length, args = new Array(_len > 2 ? _len - 2 : 0), _key = 2;
-        _key < _len;
-        _key++
-      ) {
+      for (var _len = arguments.length, args = [], _key = 2; _key < _len; _key++) {
         args[_key - 2] = arguments[_key];
       }
       console.log(x, a, b, args);
@@ -724,17 +661,32 @@ test('parameters/destructuring-rest/input.js', async () => {
 
 test('parameters/flow-this-param/input.js', async () => {
   const source =
-    'function foo (this : number, x : number, y : string, ...z : any) {\n    x + y + z[0];\n}\n';
-  expect(
-    await transformOutcome(source, 'input.js', { transforms: { parameters: true } }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:parse-error"`);
+    '// @flow\nfunction foo (this : number, x : number, y : string, ...z : any) {\n    x + y + z[0];\n}\n';
+  expect(await transformOutcome(source, 'input.js', { transforms: { parameters: true } }))
+    .toMatchInlineSnapshot(`
+    "// @flow
+    function foo(_arg, _arg7) {
+      let x = arguments.length > 0 ? arguments[0] : void 0;
+      let y = arguments.length > 1 ? arguments[1] : void 0;
+      for (var _len = arguments.length, z = [], _key = 2; _key < _len; _key++) {
+        z[_key - 2] = arguments[_key];
+      }
+      x + y + z[0];
+    }"
+  `);
 });
 
 test('parameters/fn-decl-same-as-param/input.js', async () => {
   const source = 'function foo(a = 2) {\n  function a() {\n\n  }\n}\n';
-  expect(
-    await transformOutcome(source, 'input.js', { transforms: { parameters: true } }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:post-rewrite-semantic-error"`);
+  expect(await transformOutcome(source, 'input.js', { transforms: { parameters: true } }))
+    .toMatchInlineSnapshot(`
+    "function foo() {
+      let a = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : 2;
+      return function (a) {
+        function a() {}
+      }.call(this, a);
+    }"
+  `);
 });
 
 test('parameters/generator/input.ts', async () => {
@@ -742,7 +694,8 @@ test('parameters/generator/input.ts', async () => {
     'function* fn(a, [], b = 2) {\n  yield a;\n  yield arguments;\n  yield this;\n  return b;\n}\n';
   expect(await transformOutcome(source, 'input.ts', { transforms: { parameters: true } }))
     .toMatchInlineSnapshot(`
-    "function* fn(a) {
+    "function* fn(_arg) {
+      let a = arguments.length > 0 ? arguments[0] : void 0;
       let [] = arguments.length > 1 ? arguments[1] : void 0;
       let b = arguments.length > 2 && arguments[2] !== void 0 ? arguments[2] : 2;
       yield a;
@@ -757,8 +710,19 @@ test('parameters/iife-this-9385/input.mjs', async () => {
   const source =
     'export class Test {\n  invite(options: { privacy: string } = {}) {\n    const privacy = options.privacy || "Private"\n    console.log(this)\n  }\n}';
   expect(
-    await transformOutcome(source, 'input.mjs', { transforms: { parameters: true } }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:parse-error"`);
+    await transformOutcome(source, 'input.mjs', {
+      transforms: { parameters: true },
+      typescript: 'strip',
+    }),
+  ).toMatchInlineSnapshot(`
+    "export class Test {
+      invite() {
+        let options = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : {};
+        const privacy = options.privacy || 'Private';
+        console.log(this);
+      }
+    }"
+  `);
 });
 
 test('parameters/iife-this/input.js', async () => {
@@ -772,7 +736,7 @@ test('parameters/iife-this/input.js', async () => {
         return function () {
           let a;
           this;
-        }.apply(this, arguments);
+        }.call(this);
       }
     }"
   `);
@@ -785,10 +749,10 @@ test('parameters/let-for-init-same-as-param/exec.js', async () => {
     .toMatchInlineSnapshot(`
     "function foo() {
       let a = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : 2;
-      return function () {
+      return function (a) {
         for (let a = 1; a > 0; a--);
         expect(a).toBe(2);
-      }.apply(this, arguments);
+      }.call(this, a);
     }
     foo();"
   `);
@@ -801,10 +765,10 @@ test('parameters/let-no-init-for-init-same-as-param/exec.js', async () => {
     .toMatchInlineSnapshot(`
     "function foo() {
       let a = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : 2;
-      return function () {
+      return function (a) {
         for (let a, i = 0; i < 1; i++) a = 1;
         expect(a).toBe(2);
-      }.apply(this, arguments);
+      }.call(this, a);
     }
     foo();"
   `);
@@ -813,8 +777,12 @@ test('parameters/let-no-init-for-init-same-as-param/exec.js', async () => {
 test('parameters/preserve-types/input.ts', async () => {
   const source =
     'type Point = {\n  x: number;\n  y: number;\n};\n\nfunction value({ x, y }: Point) {\n  return x * y;\n}\n\nfunction valueWithDefault({ x, y }: Point = {}) {\n  return x * y;\n}\n\n';
-  expect(await transformOutcome(source, 'input.ts', { transforms: { parameters: true } }))
-    .toMatchInlineSnapshot(`
+  expect(
+    await transformOutcome(source, 'input.ts', {
+      transforms: { parameters: true },
+      typescript: 'strip',
+    }),
+  ).toMatchInlineSnapshot(`
     "function value() {
       let { x, y } = arguments.length > 0 ? arguments[0] : void 0;
       return x * y;
@@ -832,11 +800,7 @@ test('parameters/regression-4333/input.js', async () => {
     .toMatchInlineSnapshot(`
     "const args = 'bar';
     function foo() {
-      for (
-        var _len = arguments.length, args = new Array(_len > 0 ? _len - 0 : 0), _key = 0;
-        _key < _len;
-        _key++
-      ) {
+      for (var _len = arguments.length, args = [], _key = 0; _key < _len; _key++) {
         args[_key - 0] = arguments[_key];
       }
       return args;
@@ -849,11 +813,7 @@ test('parameters/regression-4348/input.js', async () => {
   expect(await transformOutcome(source, 'input.js', { transforms: { parameters: true } }))
     .toMatchInlineSnapshot(`
     "function first() {
-      for (
-        var _len = arguments.length, values = new Array(_len > 0 ? _len - 0 : 0), _key = 0;
-        _key < _len;
-        _key++
-      ) {
+      for (var _len = arguments.length, values = [], _key = 0; _key < _len; _key++) {
         values[_key - 0] = arguments[_key];
       }
       var index = 0;
@@ -864,10 +824,20 @@ test('parameters/regression-4348/input.js', async () => {
 
 test('parameters/regression-4634/input.js', async () => {
   const source =
-    'let oneOf = (...nodes) => {\n  if (nodes.length === 1) {\n    return nodes[0];\n  }\n  return ((new OneOfNode(nodes)): any)\n}\n';
-  expect(
-    await transformOutcome(source, 'input.js', { transforms: { parameters: true } }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:parse-error"`);
+    '// @flow\nlet oneOf = (...nodes) => {\n  if (nodes.length === 1) {\n    return nodes[0];\n  }\n  return ((new OneOfNode(nodes)): any)\n}\n';
+  expect(await transformOutcome(source, 'input.js', { transforms: { parameters: true } }))
+    .toMatchInlineSnapshot(`
+    "// @flow
+    let oneOf = function () {
+      for (var _len = arguments.length, nodes = [], _key = 0; _key < _len; _key++) {
+        nodes[_key - 0] = arguments[_key];
+      }
+      if (nodes.length === 1) {
+        return nodes[0];
+      }
+      return new OneOfNode(nodes);
+    };"
+  `);
 });
 
 test('parameters/regression-5787/exec.js', async () => {
@@ -875,12 +845,9 @@ test('parameters/regression-5787/exec.js', async () => {
     'function f1(a, ...rest) {\n  let b = rest[rest.length - 3];\n  let c = rest[rest.length - 2];\n  let d = rest[rest.length - 1];\n  return [a, b, c, d];\n}\nexpect(f1(1, 2)).toEqual([1, undefined, undefined, 2]);\n\nfunction f2(a, ...rest) {\n  return rest[-1];\n}\nexpect(f2(1, 2)).toBeUndefined();\n';
   expect(await transformOutcome(source, 'exec.js', { transforms: { parameters: true } }))
     .toMatchInlineSnapshot(`
-    "function f1(a) {
-      for (
-        var _len = arguments.length, rest = new Array(_len > 1 ? _len - 1 : 0), _key = 1;
-        _key < _len;
-        _key++
-      ) {
+    "function f1(_arg) {
+      let a = arguments.length > 0 ? arguments[0] : void 0;
+      for (var _len = arguments.length, rest = [], _key = 1; _key < _len; _key++) {
         rest[_key - 1] = arguments[_key];
       }
       let b = rest[rest.length - 3];
@@ -889,13 +856,10 @@ test('parameters/regression-5787/exec.js', async () => {
       return [a, b, c, d];
     }
     expect(f1(1, 2)).toEqual([1, undefined, undefined, 2]);
-    function f2(a) {
-      for (
-        var _len9 = arguments.length, rest = new Array(_len9 > 1 ? _len9 - 1 : 0), _key10 = 1;
-        _key10 < _len9;
-        _key10++
-      ) {
-        rest[_key10 - 1] = arguments[_key10];
+    function f2(_arg12) {
+      let a = arguments.length > 0 ? arguments[0] : void 0;
+      for (var _len10 = arguments.length, rest = [], _key11 = 1; _key11 < _len10; _key11++) {
+        rest[_key11 - 1] = arguments[_key11];
       }
       return rest[-1];
     }
@@ -908,12 +872,9 @@ test('parameters/regression-5787/input.js', async () => {
     'function f(a, ...rest) {\n  let b = rest[rest.length - 3];\n  let c = rest[rest.length - 2];\n  let d = rest[rest.length - 1];\n  return [a, b, c, d];\n}\n\nfunction f(a, ...rest) {\n  return rest[-1];\n}\n';
   expect(await transformOutcome(source, 'input.js', { transforms: { parameters: true } }))
     .toMatchInlineSnapshot(`
-    "function f(a) {
-      for (
-        var _len = arguments.length, rest = new Array(_len > 1 ? _len - 1 : 0), _key = 1;
-        _key < _len;
-        _key++
-      ) {
+    "function f(_arg) {
+      let a = arguments.length > 0 ? arguments[0] : void 0;
+      for (var _len = arguments.length, rest = [], _key = 1; _key < _len; _key++) {
         rest[_key - 1] = arguments[_key];
       }
       let b = rest[rest.length - 3];
@@ -921,13 +882,10 @@ test('parameters/regression-5787/input.js', async () => {
       let d = rest[rest.length - 1];
       return [a, b, c, d];
     }
-    function f(a) {
-      for (
-        var _len8 = arguments.length, rest = new Array(_len8 > 1 ? _len8 - 1 : 0), _key9 = 1;
-        _key9 < _len8;
-        _key9++
-      ) {
-        rest[_key9 - 1] = arguments[_key9];
+    function f(_arg11) {
+      let a = arguments.length > 0 ? arguments[0] : void 0;
+      for (var _len9 = arguments.length, rest = [], _key10 = 1; _key10 < _len9; _key10++) {
+        rest[_key10 - 1] = arguments[_key10];
       }
       return rest[-1];
     }"
@@ -939,12 +897,10 @@ test('parameters/rest-argument-with-other-arguments/exec.js', async () => {
     "function func(a, b, ...arguments) {\n    return [a, b, arguments];\n}\n\nexpect(func('a', 'b', 1, 2, 3)).toStrictEqual(['a', 'b', [1, 2, 3]])";
   expect(await transformOutcome(source, 'exec.js', { transforms: { parameters: true } }))
     .toMatchInlineSnapshot(`
-    "function func(a, b) {
-      for (
-        var _len = arguments.length, arguments = new Array(_len > 2 ? _len - 2 : 0), _key = 2;
-        _key < _len;
-        _key++
-      ) {
+    "function func(_arg, _arg7) {
+      let a = arguments.length > 0 ? arguments[0] : void 0;
+      let b = arguments.length > 1 ? arguments[1] : void 0;
+      for (var _len = arguments.length, arguments = [], _key = 2; _key < _len; _key++) {
         arguments[_key - 2] = arguments[_key];
       }
       return [a, b, arguments];
@@ -958,12 +914,10 @@ test('parameters/rest-argument-with-other-arguments/input.js', async () => {
     "function func(a, b, ...arguments) {\n    return [a, b, arguments];\n}\n\nfunc('a', 'b', 1, 2, 3)";
   expect(await transformOutcome(source, 'input.js', { transforms: { parameters: true } }))
     .toMatchInlineSnapshot(`
-    "function func(a, b) {
-      for (
-        var _len = arguments.length, arguments = new Array(_len > 2 ? _len - 2 : 0), _key = 2;
-        _key < _len;
-        _key++
-      ) {
+    "function func(_arg, _arg7) {
+      let a = arguments.length > 0 ? arguments[0] : void 0;
+      let b = arguments.length > 1 ? arguments[1] : void 0;
+      for (var _len = arguments.length, arguments = [], _key = 2; _key < _len; _key++) {
         arguments[_key - 2] = arguments[_key];
       }
       return [a, b, arguments];
@@ -977,11 +931,7 @@ test('parameters/rest-arguments-deoptimisation/input.js', async () => {
   expect(await transformOutcome(source, 'input.js', { transforms: { parameters: true } }))
     .toMatchInlineSnapshot(`
     "function x() {
-      for (
-        var _len = arguments.length, rest = new Array(_len > 0 ? _len - 0 : 0), _key = 0;
-        _key < _len;
-        _key++
-      ) {
+      for (var _len = arguments.length, rest = [], _key = 0; _key < _len; _key++) {
         rest[_key - 0] = arguments[_key];
       }
       arguments;
@@ -991,15 +941,12 @@ test('parameters/rest-arguments-deoptimisation/input.js', async () => {
 
 test('parameters/rest-arrow-functions/input.js', async () => {
   const source =
-    'var concat = (...args) => {\n  var x = args[0];\n  var y = args[1];\n};\n\nvar somefun = function () {\n  let get2ndArg = (a, b, ...args1) => {\n    var _b = args1[0];\n    let somef = (x, y, z, ...args2) => {\n      var _a = args2[0];\n    };\n    let somefg = (c, d, e, f, ...args3) => {\n      var _a = args3[0];\n    };\n    var _d = args1[1];\n  };\n  let get3rdArg = (...args) => args[2];\n}\n\nfunction demo1(...args) {\n  return (i) => {\n    return args[i+0];\n  };\n}\n\nvar x = (...rest) => {\n  if (noNeedToWork) return 0;\n  return rest;\n};\n\nvar innerclassproperties = (...args) => (\n  class {\n    static args = args;\n    args = args;\n  }\n);\n';
+    '// @flow\nvar concat = (...args) => {\n  var x = args[0];\n  var y = args[1];\n};\n\nvar somefun = function () {\n  let get2ndArg = (a, b, ...args1) => {\n    var _b = args1[0];\n    let somef = (x, y, z, ...args2) => {\n      var _a = args2[0];\n    };\n    let somefg = (c, d, e, f, ...args3) => {\n      var _a = args3[0];\n    };\n    var _d = args1[1];\n  };\n  let get3rdArg = (...args) => args[2];\n}\n\nfunction demo1(...args) {\n  return (i) => {\n    return args[i+0];\n  };\n}\n\nvar x = (...rest) => {\n  if (noNeedToWork) return 0;\n  return rest;\n};\n\nvar innerclassproperties = (...args) => (\n  class {\n    static args = args;\n    args = args;\n  }\n);\n';
   expect(await transformOutcome(source, 'input.js', { transforms: { parameters: true } }))
     .toMatchInlineSnapshot(`
-    "var concat = function () {
-      for (
-        var _len = arguments.length, args = new Array(_len > 0 ? _len - 0 : 0), _key = 0;
-        _key < _len;
-        _key++
-      ) {
+    "// @flow
+    var concat = function () {
+      for (var _len = arguments.length, args = [], _key = 0; _key < _len; _key++) {
         args[_key - 0] = arguments[_key];
       }
       var x = args[0];
@@ -1007,30 +954,18 @@ test('parameters/rest-arrow-functions/input.js', async () => {
     };
     var somefun = function () {
       let get2ndArg = function (a, b) {
-        for (
-          var _len28 = arguments.length, args1 = new Array(_len28 > 2 ? _len28 - 2 : 0), _key29 = 2;
-          _key29 < _len28;
-          _key29++
-        ) {
+        for (var _len28 = arguments.length, args1 = [], _key29 = 2; _key29 < _len28; _key29++) {
           args1[_key29 - 2] = arguments[_key29];
         }
         var _b = args1[0];
         let somef = function (x, y, z) {
-          for (
-            var _len30 = arguments.length, args2 = new Array(_len30 > 3 ? _len30 - 3 : 0), _key31 = 3;
-            _key31 < _len30;
-            _key31++
-          ) {
+          for (var _len30 = arguments.length, args2 = [], _key31 = 3; _key31 < _len30; _key31++) {
             args2[_key31 - 3] = arguments[_key31];
           }
           var _a = args2[0];
         };
         let somefg = function (c, d, e, f) {
-          for (
-            var _len32 = arguments.length, args3 = new Array(_len32 > 4 ? _len32 - 4 : 0), _key33 = 4;
-            _key33 < _len32;
-            _key33++
-          ) {
+          for (var _len32 = arguments.length, args3 = [], _key33 = 4; _key33 < _len32; _key33++) {
             args3[_key33 - 4] = arguments[_key33];
           }
           var _a = args3[0];
@@ -1038,22 +973,14 @@ test('parameters/rest-arrow-functions/input.js', async () => {
         var _d = args1[1];
       };
       let get3rdArg = function () {
-        for (
-          var _len34 = arguments.length, args = new Array(_len34 > 0 ? _len34 - 0 : 0), _key35 = 0;
-          _key35 < _len34;
-          _key35++
-        ) {
+        for (var _len34 = arguments.length, args = [], _key35 = 0; _key35 < _len34; _key35++) {
           args[_key35 - 0] = arguments[_key35];
         }
         return args[2];
       };
     };
     function demo1() {
-      for (
-        var _len36 = arguments.length, args = new Array(_len36 > 0 ? _len36 - 0 : 0), _key37 = 0;
-        _key37 < _len36;
-        _key37++
-      ) {
+      for (var _len36 = arguments.length, args = [], _key37 = 0; _key37 < _len36; _key37++) {
         args[_key37 - 0] = arguments[_key37];
       }
       return i => {
@@ -1061,22 +988,14 @@ test('parameters/rest-arrow-functions/input.js', async () => {
       };
     }
     var x = function () {
-      for (
-        var _len38 = arguments.length, rest = new Array(_len38 > 0 ? _len38 - 0 : 0), _key39 = 0;
-        _key39 < _len38;
-        _key39++
-      ) {
+      for (var _len38 = arguments.length, rest = [], _key39 = 0; _key39 < _len38; _key39++) {
         rest[_key39 - 0] = arguments[_key39];
       }
       if (noNeedToWork) return 0;
       return rest;
     };
     var innerclassproperties = function () {
-      for (
-        var _len40 = arguments.length, args = new Array(_len40 > 0 ? _len40 - 0 : 0), _key41 = 0;
-        _key41 < _len40;
-        _key41++
-      ) {
+      for (var _len40 = arguments.length, args = [], _key41 = 0; _key41 < _len40; _key41++) {
         args[_key41 - 0] = arguments[_key41];
       }
       return class {
@@ -1093,22 +1012,14 @@ test('parameters/rest-async-arrow-functions/input.js', async () => {
   expect(await transformOutcome(source, 'input.js', { transforms: { parameters: true } }))
     .toMatchInlineSnapshot(`
     "var concat = async function () {
-      for (
-        var _len = arguments.length, args = new Array(_len > 0 ? _len - 0 : 0), _key = 0;
-        _key < _len;
-        _key++
-      ) {
+      for (var _len = arguments.length, args = [], _key = 0; _key < _len; _key++) {
         args[_key - 0] = arguments[_key];
       }
       var x = args[0];
       var y = args[1];
     };
     var x = async function () {
-      for (
-        var _len7 = arguments.length, rest = new Array(_len7 > 0 ? _len7 - 0 : 0), _key8 = 0;
-        _key8 < _len7;
-        _key8++
-      ) {
+      for (var _len7 = arguments.length, rest = [], _key8 = 0; _key8 < _len7; _key8++) {
         rest[_key8 - 0] = arguments[_key8];
       }
       if (noNeedToWork) return 0;
@@ -1122,11 +1033,7 @@ test('parameters/rest-binding-deoptimisation/input.js', async () => {
   expect(await transformOutcome(source, 'input.js', { transforms: { parameters: true } }))
     .toMatchInlineSnapshot(`
     "const deepAssign = function () {
-      for (
-        var _len = arguments.length, args = new Array(_len > 0 ? _len - 0 : 0), _key = 0;
-        _key < _len;
-        _key++
-      ) {
+      for (var _len = arguments.length, args = [], _key = 0; _key < _len; _key++) {
         args[_key - 0] = arguments[_key];
       }
       return (args = []);
@@ -1141,11 +1048,7 @@ test('parameters/rest-deepest-common-ancestor-earliest-child/input.js', async ()
     .toMatchInlineSnapshot(`
     "// single reference
     function r() {
-      for (
-        var _len = arguments.length, rest = new Array(_len > 0 ? _len - 0 : 0), _key = 0;
-        _key < _len;
-        _key++
-      ) {
+      for (var _len = arguments.length, rest = [], _key = 0; _key < _len; _key++) {
         rest[_key - 0] = arguments[_key];
       }
       if (noNeedToWork) return 0;
@@ -1153,11 +1056,7 @@ test('parameters/rest-deepest-common-ancestor-earliest-child/input.js', async ()
     }
     // multiple references
     function r() {
-      for (
-        var _len10 = arguments.length, rest = new Array(_len10 > 0 ? _len10 - 0 : 0), _key11 = 0;
-        _key11 < _len10;
-        _key11++
-      ) {
+      for (var _len10 = arguments.length, rest = [], _key11 = 0; _key11 < _len10; _key11++) {
         rest[_key11 - 0] = arguments[_key11];
       }
       if (noNeedToWork) return 0;
@@ -1166,11 +1065,7 @@ test('parameters/rest-deepest-common-ancestor-earliest-child/input.js', async ()
     }
     // multiple nested references
     function r() {
-      for (
-        var _len12 = arguments.length, rest = new Array(_len12 > 0 ? _len12 - 0 : 0), _key13 = 0;
-        _key13 < _len12;
-        _key13++
-      ) {
+      for (var _len12 = arguments.length, rest = [], _key13 = 0; _key13 < _len12; _key13++) {
         rest[_key13 - 0] = arguments[_key13];
       }
       if (noNeedToWork) return 0;
@@ -1182,11 +1077,7 @@ test('parameters/rest-deepest-common-ancestor-earliest-child/input.js', async ()
     }
     // deeply nested
     function r() {
-      for (
-        var _len14 = arguments.length, rest = new Array(_len14 > 0 ? _len14 - 0 : 0), _key15 = 0;
-        _key15 < _len14;
-        _key15++
-      ) {
+      for (var _len14 = arguments.length, rest = [], _key15 = 0; _key15 < _len14; _key15++) {
         rest[_key15 - 0] = arguments[_key15];
       }
       if (true) {
@@ -1199,11 +1090,7 @@ test('parameters/rest-deepest-common-ancestor-earliest-child/input.js', async ()
     }
     // nested reference with root reference
     function r() {
-      for (
-        var _len16 = arguments.length, rest = new Array(_len16 > 0 ? _len16 - 0 : 0), _key17 = 0;
-        _key17 < _len16;
-        _key17++
-      ) {
+      for (var _len16 = arguments.length, rest = [], _key17 = 0; _key17 < _len16; _key17++) {
         rest[_key17 - 0] = arguments[_key17];
       }
       if (noNeedToWork) return 0;
@@ -1212,11 +1099,7 @@ test('parameters/rest-deepest-common-ancestor-earliest-child/input.js', async ()
     }
     // nested functions
     function a() {
-      for (
-        var _len18 = arguments.length, args = new Array(_len18 > 0 ? _len18 - 0 : 0), _key19 = 0;
-        _key19 < _len18;
-        _key19++
-      ) {
+      for (var _len18 = arguments.length, args = [], _key19 = 0; _key19 < _len18; _key19++) {
         args[_key19 - 0] = arguments[_key19];
       }
       return function () {
@@ -1225,12 +1108,9 @@ test('parameters/rest-deepest-common-ancestor-earliest-child/input.js', async ()
       };
     }
     // loop
-    function runQueue(queue) {
-      for (
-        var _len20 = arguments.length, args = new Array(_len20 > 1 ? _len20 - 1 : 0), _key21 = 1;
-        _key21 < _len20;
-        _key21++
-      ) {
+    function runQueue(_arg) {
+      let queue = arguments.length > 0 ? arguments[0] : void 0;
+      for (var _len20 = arguments.length, args = [], _key21 = 1; _key21 < _len20; _key21++) {
         args[_key21 - 1] = arguments[_key21];
       }
       for (let i = 0; i < queue.length; i++) {
@@ -1238,13 +1118,10 @@ test('parameters/rest-deepest-common-ancestor-earliest-child/input.js', async ()
       }
     }
     // nested loop
-    function runQueue(queue) {
-      for (
-        var _len22 = arguments.length, args = new Array(_len22 > 1 ? _len22 - 1 : 0), _key23 = 1;
-        _key23 < _len22;
-        _key23++
-      ) {
-        args[_key23 - 1] = arguments[_key23];
+    function runQueue(_arg25) {
+      let queue = arguments.length > 0 ? arguments[0] : void 0;
+      for (var _len23 = arguments.length, args = [], _key24 = 1; _key24 < _len23; _key24++) {
+        args[_key24 - 1] = arguments[_key24];
       }
       if (foo) {
         for (let i = 0; i < queue.length; i++) {
@@ -1253,12 +1130,8 @@ test('parameters/rest-deepest-common-ancestor-earliest-child/input.js', async ()
       }
     }
     function r() {
-      for (
-        var _len24 = arguments.length, rest = new Array(_len24 > 0 ? _len24 - 0 : 0), _key25 = 0;
-        _key25 < _len24;
-        _key25++
-      ) {
-        rest[_key25 - 0] = arguments[_key25];
+      for (var _len26 = arguments.length, rest = [], _key27 = 0; _key27 < _len26; _key27++) {
+        rest[_key27 - 0] = arguments[_key27];
       }
       if (noNeedToWork) return 0;
       [rest[0]] = x;
@@ -1272,12 +1145,10 @@ test('parameters/rest-length/exec.js', async () => {
     'var length = function (a, b, ...items) {\n  return items.length;\n};\n\nexpect(length()).toBe(0);\nexpect(length(1)).toBe(0);\nexpect(length(1, 2)).toBe(0);\nexpect(length(1, 2, 3)).toBe(1);\n';
   expect(await transformOutcome(source, 'exec.js', { transforms: { parameters: true } }))
     .toMatchInlineSnapshot(`
-    "var length = function (a, b) {
-      for (
-        var _len = arguments.length, items = new Array(_len > 2 ? _len - 2 : 0), _key = 2;
-        _key < _len;
-        _key++
-      ) {
+    "var length = function (_arg, _arg7) {
+      let a = arguments.length > 0 ? arguments[0] : void 0;
+      let b = arguments.length > 1 ? arguments[1] : void 0;
+      for (var _len = arguments.length, items = [], _key = 2; _key < _len; _key++) {
         items[_key - 2] = arguments[_key];
       }
       return items.length;
@@ -1294,24 +1165,18 @@ test('parameters/rest-length/input.js', async () => {
     'var t = function (f, ...items) {\n  items[0];\n  items[items.length - 1];\n};\n\nfunction t(f, ...items) {\n  items;\n  items[0];\n  items[items.length - 1];\n}\n';
   expect(await transformOutcome(source, 'input.js', { transforms: { parameters: true } }))
     .toMatchInlineSnapshot(`
-    "var t = function (f) {
-      for (
-        var _len = arguments.length, items = new Array(_len > 1 ? _len - 1 : 0), _key = 1;
-        _key < _len;
-        _key++
-      ) {
+    "var t = function (_arg) {
+      let f = arguments.length > 0 ? arguments[0] : void 0;
+      for (var _len = arguments.length, items = [], _key = 1; _key < _len; _key++) {
         items[_key - 1] = arguments[_key];
       }
       items[0];
       items[items.length - 1];
     };
-    function t(f) {
-      for (
-        var _len5 = arguments.length, items = new Array(_len5 > 1 ? _len5 - 1 : 0), _key6 = 1;
-        _key6 < _len5;
-        _key6++
-      ) {
-        items[_key6 - 1] = arguments[_key6];
+    function t(_arg8) {
+      let f = arguments.length > 0 ? arguments[0] : void 0;
+      for (var _len6 = arguments.length, items = [], _key7 = 1; _key7 < _len6; _key7++) {
+        items[_key7 - 1] = arguments[_key7];
       }
       items;
       items[0];
@@ -1325,226 +1190,152 @@ test('parameters/rest-member-expression-deoptimisation/input.js', async () => {
     'var x = function (foo, ...bar) {\n  console.log(bar);\n};\n\nvar y = function (foo, ...bar) {\n  var x = function z(bar) {\n    bar[1] = 5;\n  };\n};\n\nvar b = function (x, y, ...args) {\n  console.log(args[0]);\n  args.pop();\n  console.log(args[1]);\n};\n\nvar z = function (foo, ...bar) {\n  var x = function () {\n    bar[1] = 5;\n  };\n};\n\nvar a = function (foo, ...bar) {\n  return bar.join(",");\n};\n\nvar b = function (foo, ...bar) {\n  var join = "join";\n  return bar[join];\n};\n\nvar b = function (...bar) {\n  return bar.len;\n};\n\nvar b = function (foo, ...bar) {\n  return bar.length * 2;\n};\n\nvar b = function (foo, baz, ...bar) {\n  return bar.length;\n};\n\nfunction x (...rest) {\n  rest[0] = 0;\n}\n\nfunction swap (...rest) {\n  [rest[0], rest[1]] = [rest[1], rest[0]];\n}\n\nfunction forIn (...rest) {\n  for (rest[0] in this) {\n    foo(rest[0]);\n  }\n}\n\nfunction inc (...rest) {\n  ++rest[0];\n}\n\nfunction dec (...rest) {\n  --rest[0];\n}\n\nfunction del (...rest) {\n  delete rest[0];\n}\n\nfunction method (...rest) {\n  rest[0]();\n}\n\nfunction newExp (...rest) {\n  new rest[0]();\n}\n\n// In addition to swap() above because at some point someone tried checking\n// grandparent path for isArrayExpression() to deopt.\nfunction arrayDestructure (...rest) {\n  [rest[0]] = x;\n}\n\nfunction forOf (...rest) {\n  for (rest[0] of this);\n}\n\nfunction postfixIncrement (...rest) {\n  rest[0]++;\n}\n\nfunction postfixDecrement (...rest) {\n  rest[0]--;\n}\n';
   expect(await transformOutcome(source, 'input.js', { transforms: { parameters: true } }))
     .toMatchInlineSnapshot(`
-    "var x = function (foo) {
-      for (
-        var _len = arguments.length, bar = new Array(_len > 1 ? _len - 1 : 0), _key = 1;
-        _key < _len;
-        _key++
-      ) {
+    "var x = function (_arg) {
+      let foo = arguments.length > 0 ? arguments[0] : void 0;
+      for (var _len = arguments.length, bar = [], _key = 1; _key < _len; _key++) {
         bar[_key - 1] = arguments[_key];
       }
       console.log(bar);
     };
-    var y = function (foo) {
-      for (
-        var _len24 = arguments.length, bar = new Array(_len24 > 1 ? _len24 - 1 : 0), _key25 = 1;
-        _key25 < _len24;
-        _key25++
-      ) {
-        bar[_key25 - 1] = arguments[_key25];
+    var y = function (_arg27) {
+      let foo = arguments.length > 0 ? arguments[0] : void 0;
+      for (var _len25 = arguments.length, bar = [], _key26 = 1; _key26 < _len25; _key26++) {
+        bar[_key26 - 1] = arguments[_key26];
       }
-      return function () {
+      return function (bar) {
         var x = function z(bar) {
           bar[1] = 5;
         };
-      }.apply(this, arguments);
+      }.call(this, bar);
     };
-    var b = function (x, y) {
-      for (
-        var _len26 = arguments.length, args = new Array(_len26 > 2 ? _len26 - 2 : 0), _key27 = 2;
-        _key27 < _len26;
-        _key27++
-      ) {
-        args[_key27 - 2] = arguments[_key27];
+    var b = function (_arg30, _arg31) {
+      let x = arguments.length > 0 ? arguments[0] : void 0;
+      let y = arguments.length > 1 ? arguments[1] : void 0;
+      for (var _len28 = arguments.length, args = [], _key29 = 2; _key29 < _len28; _key29++) {
+        args[_key29 - 2] = arguments[_key29];
       }
       console.log(args[0]);
       args.pop();
       console.log(args[1]);
     };
-    var z = function (foo) {
-      for (
-        var _len28 = arguments.length, bar = new Array(_len28 > 1 ? _len28 - 1 : 0), _key29 = 1;
-        _key29 < _len28;
-        _key29++
-      ) {
-        bar[_key29 - 1] = arguments[_key29];
+    var z = function (_arg34) {
+      let foo = arguments.length > 0 ? arguments[0] : void 0;
+      for (var _len32 = arguments.length, bar = [], _key33 = 1; _key33 < _len32; _key33++) {
+        bar[_key33 - 1] = arguments[_key33];
       }
       var x = function () {
         bar[1] = 5;
       };
     };
-    var a = function (foo) {
-      for (
-        var _len30 = arguments.length, bar = new Array(_len30 > 1 ? _len30 - 1 : 0), _key31 = 1;
-        _key31 < _len30;
-        _key31++
-      ) {
-        bar[_key31 - 1] = arguments[_key31];
+    var a = function (_arg37) {
+      let foo = arguments.length > 0 ? arguments[0] : void 0;
+      for (var _len35 = arguments.length, bar = [], _key36 = 1; _key36 < _len35; _key36++) {
+        bar[_key36 - 1] = arguments[_key36];
       }
       return bar.join(',');
     };
-    var b = function (foo) {
-      for (
-        var _len32 = arguments.length, bar = new Array(_len32 > 1 ? _len32 - 1 : 0), _key33 = 1;
-        _key33 < _len32;
-        _key33++
-      ) {
-        bar[_key33 - 1] = arguments[_key33];
+    var b = function (_arg40) {
+      let foo = arguments.length > 0 ? arguments[0] : void 0;
+      for (var _len38 = arguments.length, bar = [], _key39 = 1; _key39 < _len38; _key39++) {
+        bar[_key39 - 1] = arguments[_key39];
       }
       var join = 'join';
       return bar[join];
     };
     var b = function () {
-      for (
-        var _len34 = arguments.length, bar = new Array(_len34 > 0 ? _len34 - 0 : 0), _key35 = 0;
-        _key35 < _len34;
-        _key35++
-      ) {
-        bar[_key35 - 0] = arguments[_key35];
+      for (var _len41 = arguments.length, bar = [], _key42 = 0; _key42 < _len41; _key42++) {
+        bar[_key42 - 0] = arguments[_key42];
       }
       return bar.len;
     };
-    var b = function (foo) {
-      for (
-        var _len36 = arguments.length, bar = new Array(_len36 > 1 ? _len36 - 1 : 0), _key37 = 1;
-        _key37 < _len36;
-        _key37++
-      ) {
-        bar[_key37 - 1] = arguments[_key37];
+    var b = function (_arg45) {
+      let foo = arguments.length > 0 ? arguments[0] : void 0;
+      for (var _len43 = arguments.length, bar = [], _key44 = 1; _key44 < _len43; _key44++) {
+        bar[_key44 - 1] = arguments[_key44];
       }
       return bar.length * 2;
     };
-    var b = function (foo, baz) {
-      for (
-        var _len38 = arguments.length, bar = new Array(_len38 > 2 ? _len38 - 2 : 0), _key39 = 2;
-        _key39 < _len38;
-        _key39++
-      ) {
-        bar[_key39 - 2] = arguments[_key39];
+    var b = function (_arg48, _arg49) {
+      let foo = arguments.length > 0 ? arguments[0] : void 0;
+      let baz = arguments.length > 1 ? arguments[1] : void 0;
+      for (var _len46 = arguments.length, bar = [], _key47 = 2; _key47 < _len46; _key47++) {
+        bar[_key47 - 2] = arguments[_key47];
       }
       return bar.length;
     };
     function x() {
-      for (
-        var _len40 = arguments.length, rest = new Array(_len40 > 0 ? _len40 - 0 : 0), _key41 = 0;
-        _key41 < _len40;
-        _key41++
-      ) {
-        rest[_key41 - 0] = arguments[_key41];
+      for (var _len50 = arguments.length, rest = [], _key51 = 0; _key51 < _len50; _key51++) {
+        rest[_key51 - 0] = arguments[_key51];
       }
       rest[0] = 0;
     }
     function swap() {
-      for (
-        var _len42 = arguments.length, rest = new Array(_len42 > 0 ? _len42 - 0 : 0), _key43 = 0;
-        _key43 < _len42;
-        _key43++
-      ) {
-        rest[_key43 - 0] = arguments[_key43];
+      for (var _len52 = arguments.length, rest = [], _key53 = 0; _key53 < _len52; _key53++) {
+        rest[_key53 - 0] = arguments[_key53];
       }
       [rest[0], rest[1]] = [rest[1], rest[0]];
     }
     function forIn() {
-      for (
-        var _len44 = arguments.length, rest = new Array(_len44 > 0 ? _len44 - 0 : 0), _key45 = 0;
-        _key45 < _len44;
-        _key45++
-      ) {
-        rest[_key45 - 0] = arguments[_key45];
+      for (var _len54 = arguments.length, rest = [], _key55 = 0; _key55 < _len54; _key55++) {
+        rest[_key55 - 0] = arguments[_key55];
       }
       for (rest[0] in this) {
         foo(rest[0]);
       }
     }
     function inc() {
-      for (
-        var _len46 = arguments.length, rest = new Array(_len46 > 0 ? _len46 - 0 : 0), _key47 = 0;
-        _key47 < _len46;
-        _key47++
-      ) {
-        rest[_key47 - 0] = arguments[_key47];
+      for (var _len56 = arguments.length, rest = [], _key57 = 0; _key57 < _len56; _key57++) {
+        rest[_key57 - 0] = arguments[_key57];
       }
       ++rest[0];
     }
     function dec() {
-      for (
-        var _len48 = arguments.length, rest = new Array(_len48 > 0 ? _len48 - 0 : 0), _key49 = 0;
-        _key49 < _len48;
-        _key49++
-      ) {
-        rest[_key49 - 0] = arguments[_key49];
+      for (var _len58 = arguments.length, rest = [], _key59 = 0; _key59 < _len58; _key59++) {
+        rest[_key59 - 0] = arguments[_key59];
       }
       --rest[0];
     }
     function del() {
-      for (
-        var _len50 = arguments.length, rest = new Array(_len50 > 0 ? _len50 - 0 : 0), _key51 = 0;
-        _key51 < _len50;
-        _key51++
-      ) {
-        rest[_key51 - 0] = arguments[_key51];
+      for (var _len60 = arguments.length, rest = [], _key61 = 0; _key61 < _len60; _key61++) {
+        rest[_key61 - 0] = arguments[_key61];
       }
       delete rest[0];
     }
     function method() {
-      for (
-        var _len52 = arguments.length, rest = new Array(_len52 > 0 ? _len52 - 0 : 0), _key53 = 0;
-        _key53 < _len52;
-        _key53++
-      ) {
-        rest[_key53 - 0] = arguments[_key53];
+      for (var _len62 = arguments.length, rest = [], _key63 = 0; _key63 < _len62; _key63++) {
+        rest[_key63 - 0] = arguments[_key63];
       }
       rest[0]();
     }
     function newExp() {
-      for (
-        var _len54 = arguments.length, rest = new Array(_len54 > 0 ? _len54 - 0 : 0), _key55 = 0;
-        _key55 < _len54;
-        _key55++
-      ) {
-        rest[_key55 - 0] = arguments[_key55];
+      for (var _len64 = arguments.length, rest = [], _key65 = 0; _key65 < _len64; _key65++) {
+        rest[_key65 - 0] = arguments[_key65];
       }
       new rest[0]();
     }
     // In addition to swap() above because at some point someone tried checking
     // grandparent path for isArrayExpression() to deopt.
     function arrayDestructure() {
-      for (
-        var _len56 = arguments.length, rest = new Array(_len56 > 0 ? _len56 - 0 : 0), _key57 = 0;
-        _key57 < _len56;
-        _key57++
-      ) {
-        rest[_key57 - 0] = arguments[_key57];
+      for (var _len66 = arguments.length, rest = [], _key67 = 0; _key67 < _len66; _key67++) {
+        rest[_key67 - 0] = arguments[_key67];
       }
       [rest[0]] = x;
     }
     function forOf() {
-      for (
-        var _len58 = arguments.length, rest = new Array(_len58 > 0 ? _len58 - 0 : 0), _key59 = 0;
-        _key59 < _len58;
-        _key59++
-      ) {
-        rest[_key59 - 0] = arguments[_key59];
+      for (var _len68 = arguments.length, rest = [], _key69 = 0; _key69 < _len68; _key69++) {
+        rest[_key69 - 0] = arguments[_key69];
       }
       for (rest[0] of this);
     }
     function postfixIncrement() {
-      for (
-        var _len60 = arguments.length, rest = new Array(_len60 > 0 ? _len60 - 0 : 0), _key61 = 0;
-        _key61 < _len60;
-        _key61++
-      ) {
-        rest[_key61 - 0] = arguments[_key61];
+      for (var _len70 = arguments.length, rest = [], _key71 = 0; _key71 < _len70; _key71++) {
+        rest[_key71 - 0] = arguments[_key71];
       }
       rest[0]++;
     }
     function postfixDecrement() {
-      for (
-        var _len62 = arguments.length, rest = new Array(_len62 > 0 ? _len62 - 0 : 0), _key63 = 0;
-        _key63 < _len62;
-        _key63++
-      ) {
-        rest[_key63 - 0] = arguments[_key63];
+      for (var _len72 = arguments.length, rest = [], _key73 = 0; _key73 < _len72; _key73++) {
+        rest[_key73 - 0] = arguments[_key73];
       }
       rest[0]--;
     }"
@@ -1557,33 +1348,21 @@ test('parameters/rest-member-expression-optimisation/input.js', async () => {
   expect(await transformOutcome(source, 'input.js', { transforms: { parameters: true } }))
     .toMatchInlineSnapshot(`
     "var t = function () {
-      for (
-        var _len = arguments.length, items = new Array(_len > 0 ? _len - 0 : 0), _key = 0;
-        _key < _len;
-        _key++
-      ) {
+      for (var _len = arguments.length, items = [], _key = 0; _key < _len; _key++) {
         items[_key - 0] = arguments[_key];
       }
       var x = items[0];
       var y = items[1];
     };
     function t() {
-      for (
-        var _len8 = arguments.length, items = new Array(_len8 > 0 ? _len8 - 0 : 0), _key9 = 0;
-        _key9 < _len8;
-        _key9++
-      ) {
+      for (var _len8 = arguments.length, items = [], _key9 = 0; _key9 < _len8; _key9++) {
         items[_key9 - 0] = arguments[_key9];
       }
       var x = items[0];
       var y = items[1];
     }
     function t() {
-      for (
-        var _len10 = arguments.length, items = new Array(_len10 > 0 ? _len10 - 0 : 0), _key11 = 0;
-        _key11 < _len10;
-        _key11++
-      ) {
+      for (var _len10 = arguments.length, items = [], _key11 = 0; _key11 < _len10; _key11++) {
         items[_key11 - 0] = arguments[_key11];
       }
       var a = [];
@@ -1594,11 +1373,7 @@ test('parameters/rest-member-expression-optimisation/input.js', async () => {
     }
     // https://github.com/babel/babel/pull/2833#issuecomment-166039291
     function t() {
-      for (
-        var _len12 = arguments.length, items = new Array(_len12 > 0 ? _len12 - 0 : 0), _key13 = 0;
-        _key13 < _len12;
-        _key13++
-      ) {
+      for (var _len12 = arguments.length, items = [], _key13 = 0; _key13 < _len12; _key13++) {
         items[_key13 - 0] = arguments[_key13];
       }
       for (let i = 0; i < items.length; i++) {
@@ -1613,37 +1388,29 @@ test('parameters/rest-multiple/input.js', async () => {
     'var t = function (f, ...items) {\n    var x = f;\n    x = items[0];\n    x = items[1];\n};\n\nfunction t(f, ...items) {\n    var x = f;\n    x = items[0];\n    x = items[1];\n}\n\nfunction u(f, g, ...items) {\n    var x = f;\n    var y = g;\n    x[12] = items[0];\n    y.prop = items[1];\n    var z = items[2] | 0 || 12;\n}\n';
   expect(await transformOutcome(source, 'input.js', { transforms: { parameters: true } }))
     .toMatchInlineSnapshot(`
-    "var t = function (f) {
-      for (
-        var _len = arguments.length, items = new Array(_len > 1 ? _len - 1 : 0), _key = 1;
-        _key < _len;
-        _key++
-      ) {
+    "var t = function (_arg) {
+      let f = arguments.length > 0 ? arguments[0] : void 0;
+      for (var _len = arguments.length, items = [], _key = 1; _key < _len; _key++) {
         items[_key - 1] = arguments[_key];
       }
       var x = f;
       x = items[0];
       x = items[1];
     };
-    function t(f) {
-      for (
-        var _len10 = arguments.length, items = new Array(_len10 > 1 ? _len10 - 1 : 0), _key11 = 1;
-        _key11 < _len10;
-        _key11++
-      ) {
-        items[_key11 - 1] = arguments[_key11];
+    function t(_arg13) {
+      let f = arguments.length > 0 ? arguments[0] : void 0;
+      for (var _len11 = arguments.length, items = [], _key12 = 1; _key12 < _len11; _key12++) {
+        items[_key12 - 1] = arguments[_key12];
       }
       var x = f;
       x = items[0];
       x = items[1];
     }
-    function u(f, g) {
-      for (
-        var _len12 = arguments.length, items = new Array(_len12 > 2 ? _len12 - 2 : 0), _key13 = 2;
-        _key13 < _len12;
-        _key13++
-      ) {
-        items[_key13 - 2] = arguments[_key13];
+    function u(_arg16, _arg17) {
+      let f = arguments.length > 0 ? arguments[0] : void 0;
+      let g = arguments.length > 1 ? arguments[1] : void 0;
+      for (var _len14 = arguments.length, items = [], _key15 = 2; _key15 < _len14; _key15++) {
+        items[_key15 - 2] = arguments[_key15];
       }
       var x = f;
       var y = g;
@@ -1660,19 +1427,11 @@ test('parameters/rest-nested-5656/input.js', async () => {
   expect(await transformOutcome(source, 'input.js', { transforms: { parameters: true } }))
     .toMatchInlineSnapshot(`
     "function a() {
-      for (
-        var _len = arguments.length, args = new Array(_len > 0 ? _len - 0 : 0), _key = 0;
-        _key < _len;
-        _key++
-      ) {
+      for (var _len = arguments.length, args = [], _key = 0; _key < _len; _key++) {
         args[_key - 0] = arguments[_key];
       }
       const foo = function () {
-        for (
-          var _len10 = arguments.length, list = new Array(_len10 > 0 ? _len10 - 0 : 0), _key11 = 0;
-          _key11 < _len10;
-          _key11++
-        ) {
+        for (var _len10 = arguments.length, list = [], _key11 = 0; _key11 < _len10; _key11++) {
           list[_key11 - 0] = arguments[_key11];
         }
         return bar(...list);
@@ -1680,65 +1439,42 @@ test('parameters/rest-nested-5656/input.js', async () => {
       foo(...args);
     }
     function b() {
-      for (
-        var _len12 = arguments.length, args = new Array(_len12 > 0 ? _len12 - 0 : 0), _key13 = 0;
-        _key13 < _len12;
-        _key13++
-      ) {
+      for (var _len12 = arguments.length, args = [], _key13 = 0; _key13 < _len12; _key13++) {
         args[_key13 - 0] = arguments[_key13];
       }
-      return function () {
+      return function (args) {
         const foo = function () {
-          for (
-            var _len14 = arguments.length, args = new Array(_len14 > 0 ? _len14 - 0 : 0), _key15 = 0;
-            _key15 < _len14;
-            _key15++
-          ) {
+          for (var _len14 = arguments.length, args = [], _key15 = 0; _key15 < _len14; _key15++) {
             args[_key15 - 0] = arguments[_key15];
           }
           return bar(...args);
         };
         foo(...args);
-      }.apply(this, arguments);
+      }.call(this, args);
     }
     function c() {
-      for (
-        var _len16 = arguments.length, args = new Array(_len16 > 0 ? _len16 - 0 : 0), _key17 = 0;
-        _key17 < _len16;
-        _key17++
-      ) {
+      for (var _len16 = arguments.length, args = [], _key17 = 0; _key17 < _len16; _key17++) {
         args[_key17 - 0] = arguments[_key17];
       }
-      return function () {
+      return function (args) {
         const foo = function () {
-          for (
-            var _len18 = arguments.length, args = new Array(_len18 > 0 ? _len18 - 0 : 0), _key19 = 0;
-            _key19 < _len18;
-            _key19++
-          ) {
+          for (var _len18 = arguments.length, args = [], _key19 = 0; _key19 < _len18; _key19++) {
             args[_key19 - 0] = arguments[_key19];
           }
           return bar(...args);
         };
         foo([]);
-      }.apply(this, arguments);
+      }.call(this, args);
     }
-    function d(thing) {
-      for (
-        var _len20 = arguments.length, args = new Array(_len20 > 1 ? _len20 - 1 : 0), _key21 = 1;
-        _key21 < _len20;
-        _key21++
-      ) {
+    function d(_arg) {
+      let thing = arguments.length > 0 ? arguments[0] : void 0;
+      for (var _len20 = arguments.length, args = [], _key21 = 1; _key21 < _len20; _key21++) {
         args[_key21 - 1] = arguments[_key21];
       }
-      return function () {
+      return function (args) {
         const foo = function () {
-          for (
-            var _len22 = arguments.length, args = new Array(_len22 > 0 ? _len22 - 0 : 0), _key23 = 0;
-            _key23 < _len22;
-            _key23++
-          ) {
-            args[_key23 - 0] = arguments[_key23];
+          for (var _len23 = arguments.length, args = [], _key24 = 0; _key24 < _len23; _key24++) {
+            args[_key24 - 0] = arguments[_key24];
           }
           return bar(...args);
         };
@@ -1746,7 +1482,7 @@ test('parameters/rest-nested-5656/input.js', async () => {
           let args = thing;
           foo(thing);
         }
-      }.apply(this, arguments);
+      }.call(this, args);
     }"
   `);
 });
@@ -1756,12 +1492,9 @@ test('parameters/rest-nested-iife/input.js', async () => {
     'function broken(x, ...foo) {\n  if (true) {\n    class Foo extends Bar { }\n    return hello(...foo)\n  }\n}\n';
   expect(await transformOutcome(source, 'input.js', { transforms: { parameters: true } }))
     .toMatchInlineSnapshot(`
-    "function broken(x) {
-      for (
-        var _len = arguments.length, foo = new Array(_len > 1 ? _len - 1 : 0), _key = 1;
-        _key < _len;
-        _key++
-      ) {
+    "function broken(_arg) {
+      let x = arguments.length > 0 ? arguments[0] : void 0;
+      for (var _len = arguments.length, foo = [], _key = 1; _key < _len; _key++) {
         foo[_key - 1] = arguments[_key];
       }
       if (true) {
@@ -1778,11 +1511,7 @@ test('parameters/rest-patterns/exec.js', async () => {
   expect(await transformOutcome(source, 'exec.js', { transforms: { parameters: true } }))
     .toMatchInlineSnapshot(`
     "function foo() {
-      for (
-        var _len = arguments.length, _args = new Array(_len > 0 ? _len - 0 : 0), _key = 0;
-        _key < _len;
-        _key++
-      ) {
+      for (var _len = arguments.length, _args = [], _key = 0; _key < _len; _key++) {
         _args[_key - 0] = arguments[_key];
       }
       let { length } = _args;
@@ -1797,11 +1526,7 @@ test('parameters/rest-patterns/input.js', async () => {
   expect(await transformOutcome(source, 'input.js', { transforms: { parameters: true } }))
     .toMatchInlineSnapshot(`
     "function foo() {
-      for (
-        var _len = arguments.length, [a] = new Array(_len > 0 ? _len - 0 : 0), _key = 0;
-        _key < _len;
-        _key++
-      ) {
+      for (var _len = arguments.length, [a] = [], _key = 0; _key < _len; _key++) {
         [a][_key - 0] = arguments[_key];
       }
     }"
@@ -1815,43 +1540,28 @@ test('parameters/rest-spread-optimisation/input.js', async () => {
     .toMatchInlineSnapshot(`
     "// optimisation
     function foo() {
-      for (
-        var _len = arguments.length, bar = new Array(_len > 0 ? _len - 0 : 0), _key = 0;
-        _key < _len;
-        _key++
-      ) {
+      for (var _len = arguments.length, bar = [], _key = 0; _key < _len; _key++) {
         bar[_key - 0] = arguments[_key];
       }
       foo(...bar);
     }
     // deoptimisation
-    function foo(a) {
-      for (
-        var _len7 = arguments.length, b = new Array(_len7 > 1 ? _len7 - 1 : 0), _key8 = 1;
-        _key8 < _len7;
-        _key8++
-      ) {
+    function foo(_arg) {
+      let a = arguments.length > 0 ? arguments[0] : void 0;
+      for (var _len7 = arguments.length, b = [], _key8 = 1; _key8 < _len7; _key8++) {
         b[_key8 - 1] = arguments[_key8];
       }
       foo(...b);
     }
     function foo() {
-      for (
-        var _len9 = arguments.length, b = new Array(_len9 > 0 ? _len9 - 0 : 0), _key10 = 0;
-        _key10 < _len9;
-        _key10++
-      ) {
-        b[_key10 - 0] = arguments[_key10];
+      for (var _len10 = arguments.length, b = [], _key11 = 0; _key11 < _len10; _key11++) {
+        b[_key11 - 0] = arguments[_key11];
       }
       foo(1, ...b);
     }
     function foo() {
-      for (
-        var _len11 = arguments.length, args = new Array(_len11 > 0 ? _len11 - 0 : 0), _key12 = 0;
-        _key12 < _len11;
-        _key12++
-      ) {
-        args[_key12 - 0] = arguments[_key12];
+      for (var _len12 = arguments.length, args = [], _key13 = 0; _key13 < _len12; _key13++) {
+        args[_key13 - 0] = arguments[_key13];
       }
       args.pop();
       foo(...args);
@@ -1862,24 +1572,21 @@ test('parameters/rest-spread-optimisation/input.js', async () => {
 test('parameters/rest-ts-this-parameter/input.ts', async () => {
   const source =
     'function u(this: Foo, ...items) {\n  items[0];\n}\n\nfunction v(this: Foo, event: string, ...args: any[]) {\n  args;\n}\n';
-  expect(await transformOutcome(source, 'input.ts', { transforms: { parameters: true } }))
-    .toMatchInlineSnapshot(`
+  expect(
+    await transformOutcome(source, 'input.ts', {
+      transforms: { parameters: true },
+      typescript: 'strip',
+    }),
+  ).toMatchInlineSnapshot(`
     "function u() {
-      for (
-        var _len = arguments.length, items = new Array(_len > 0 ? _len - 0 : 0), _key = 0;
-        _key < _len;
-        _key++
-      ) {
+      for (var _len = arguments.length, items = [], _key = 0; _key < _len; _key++) {
         items[_key - 0] = arguments[_key];
       }
       items[0];
     }
-    function v(event) {
-      for (
-        var _len7 = arguments.length, args = new Array(_len7 > 1 ? _len7 - 1 : 0), _key8 = 1;
-        _key8 < _len7;
-        _key8++
-      ) {
+    function v(_arg) {
+      let event = arguments.length > 0 ? arguments[0] : void 0;
+      for (var _len7 = arguments.length, args = [], _key8 = 1; _key8 < _len7; _key8++) {
         args[_key8 - 1] = arguments[_key8];
       }
       args;
@@ -1890,63 +1597,131 @@ test('parameters/rest-ts-this-parameter/input.ts', async () => {
 test('parameters/var-for-body-same-as-param/exec.js', async () => {
   const source =
     'function foo(a = 2) {\n  for (var i of [0]) var a = 1;\n  expect(a).toBe(1);\n}\nfoo();\n';
-  expect(
-    await transformOutcome(source, 'exec.js', { transforms: { parameters: true } }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:post-rewrite-semantic-error"`);
+  expect(await transformOutcome(source, 'exec.js', { transforms: { parameters: true } }))
+    .toMatchInlineSnapshot(`
+    "function foo() {
+      let a = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : 2;
+      return function (a) {
+        for (var i of [0]) var a = 1;
+        expect(a).toBe(1);
+      }.call(this, a);
+    }
+    foo();"
+  `);
 });
 
 test('parameters/var-for-init-same-as-param/exec.js', async () => {
   const source =
     'function foo(a = 2) {\n  for (var [a] of [[1]]);\n  expect(a).toBe(1);\n}\nfoo();\n';
-  expect(
-    await transformOutcome(source, 'exec.js', { transforms: { parameters: true } }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:post-rewrite-semantic-error"`);
+  expect(await transformOutcome(source, 'exec.js', { transforms: { parameters: true } }))
+    .toMatchInlineSnapshot(`
+    "function foo() {
+      let a = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : 2;
+      return function (a) {
+        for (var [a] of [[1]]);
+        expect(a).toBe(1);
+      }.call(this, a);
+    }
+    foo();"
+  `);
 });
 
 test('parameters/var-no-init-for-body-same-as-param/exec.js', async () => {
   const source =
     'function foo(a = 2) {\n  for (var i of [0]) var a;\n  expect(a).toBe(2);\n}\nfoo();\n';
-  expect(
-    await transformOutcome(source, 'exec.js', { transforms: { parameters: true } }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:post-rewrite-semantic-error"`);
+  expect(await transformOutcome(source, 'exec.js', { transforms: { parameters: true } }))
+    .toMatchInlineSnapshot(`
+    "function foo() {
+      let a = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : 2;
+      return function (a) {
+        for (var i of [0]) var a;
+        expect(a).toBe(2);
+      }.call(this, a);
+    }
+    foo();"
+  `);
 });
 
 test('parameters/var-no-init-for-init-same-as-param/exec.js', async () => {
   const source =
     'function foo(a = 2) {\n  for (var a, i = 0; i < 1; i++);\n  expect(a).toBe(2);\n}\nfoo();\n';
-  expect(
-    await transformOutcome(source, 'exec.js', { transforms: { parameters: true } }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:post-rewrite-semantic-error"`);
+  expect(await transformOutcome(source, 'exec.js', { transforms: { parameters: true } }))
+    .toMatchInlineSnapshot(`
+    "function foo() {
+      let a = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : 2;
+      return function (a) {
+        for (var a, i = 0; i < 1; i++);
+        expect(a).toBe(2);
+      }.call(this, a);
+    }
+    foo();"
+  `);
 });
 
 test('parameters/var-no-init-same-as-param/input.js', async () => {
   const source =
     'function f(a = 2, b = 3) {\n  var a, b = 4;\n  var a;\n  var b;\n  return a + b;\n}\n';
-  expect(
-    await transformOutcome(source, 'input.js', { transforms: { parameters: true } }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:post-rewrite-semantic-error"`);
+  expect(await transformOutcome(source, 'input.js', { transforms: { parameters: true } }))
+    .toMatchInlineSnapshot(`
+    "function f() {
+      let a = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : 2;
+      let b = arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : 3;
+      return function (a, b) {
+        var a,
+          b = 4;
+        var a;
+        var b;
+        return a + b;
+      }.call(this, a, b);
+    }"
+  `);
 });
 
 test('parameters/var-no-init-then-var-with-init-same-as-param/input.js', async () => {
   const source =
     'function f(a = 2, b = 3) {\n  var a;\n  var { a } = { a: 4 };\n  return a + b;\n}\n';
-  expect(
-    await transformOutcome(source, 'input.js', { transforms: { parameters: true } }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:post-rewrite-semantic-error"`);
+  expect(await transformOutcome(source, 'input.js', { transforms: { parameters: true } }))
+    .toMatchInlineSnapshot(`
+    "function f() {
+      let a = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : 2;
+      let b = arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : 3;
+      return function (a) {
+        var a;
+        var { a } = { a: 4 };
+        return a + b;
+      }.call(this, a);
+    }"
+  `);
 });
 
 test('parameters/var-same-as-array-pattern-param/input.js', async () => {
   const source = 'function foo({a, b}) {\n  var a = 3;\n  var c = 2;\n  var d = a + b + c;\n}\n';
-  expect(
-    await transformOutcome(source, 'input.js', { transforms: { parameters: true } }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:post-rewrite-semantic-error"`);
+  expect(await transformOutcome(source, 'input.js', { transforms: { parameters: true } }))
+    .toMatchInlineSnapshot(`
+    "function foo() {
+      let { a, b } = arguments.length > 0 ? arguments[0] : void 0;
+      return function (a) {
+        var a = 3;
+        var c = 2;
+        var d = a + b + c;
+      }.call(this, a);
+    }"
+  `);
 });
 
 test('parameters/var-same-as-object-pattern-param/input.js', async () => {
   const source = 'function foo([a, b]) {\n  var a = 3;\n  var c = 2;\n  var d = a + b + c;\n}\n';
-  expect(
-    await transformOutcome(source, 'input.js', { transforms: { parameters: true } }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:post-rewrite-semantic-error"`);
+  expect(await transformOutcome(source, 'input.js', { transforms: { parameters: true } }))
+    .toMatchInlineSnapshot(`
+    "function foo() {
+      let [a, b] = arguments.length > 0 ? arguments[0] : void 0;
+      return function (a) {
+        var a = 3;
+        var c = 2;
+        var d = a + b + c;
+      }.call(this, a);
+    }"
+  `);
 });
 
 test('parameters/var-same-as-param-closure/exec.js', async () => {
@@ -1955,16 +1730,19 @@ test('parameters/var-same-as-param-closure/exec.js', async () => {
   expect(await transformOutcome(source, 'exec.js', { transforms: { parameters: true } }))
     .toMatchInlineSnapshot(`
     "var x = 1;
-    function foo(x) {
+    function foo(_arg) {
+      let x = arguments.length > 0 ? arguments[0] : void 0;
       let y =
         arguments.length > 1 && arguments[1] !== void 0
           ? arguments[1]
           : function () {
               x = 2;
             };
-      var x = 3;
-      y();
-      expect(x).toBe(3);
+      return function (x) {
+        var x = 3;
+        y();
+        expect(x).toBe(3);
+      }.call(this, x);
     }
     foo();
     expect(x).toBe(1);"
@@ -1973,25 +1751,71 @@ test('parameters/var-same-as-param-closure/exec.js', async () => {
 
 test('parameters/var-same-as-param/input.js', async () => {
   const source = 'function foo(a = 2) {\n  var a = 1;\n}\n';
-  expect(
-    await transformOutcome(source, 'input.js', { transforms: { parameters: true } }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:post-rewrite-semantic-error"`);
+  expect(await transformOutcome(source, 'input.js', { transforms: { parameters: true } }))
+    .toMatchInlineSnapshot(`
+    "function foo() {
+      let a = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : 2;
+      return function (a) {
+        var a = 1;
+      }.call(this, a);
+    }"
+  `);
 });
 
 test('parameters/var-same-name-as-nested-in-rest-param-2/input.js', async () => {
   const source =
     'function f(...{ length: x = 0, y = x }) {\n  var x;\n  return x;\n}\n\nfunction g(...{ length: x = 0, y = x }) {\n  var x = 1;\n  return x;\n}\n';
-  expect(
-    await transformOutcome(source, 'input.js', { transforms: { parameters: true } }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:post-rewrite-semantic-error"`);
+  expect(await transformOutcome(source, 'input.js', { transforms: { parameters: true } }))
+    .toMatchInlineSnapshot(`
+    "function f() {
+      for (var _len = arguments.length, _args = [], _key = 0; _key < _len; _key++) {
+        _args[_key - 0] = arguments[_key];
+      }
+      let { length: x = 0, y = x } = _args;
+      return function (x) {
+        var x;
+        return x;
+      }.call(this, x);
+    }
+    function g() {
+      for (var _len8 = arguments.length, _args7 = [], _key9 = 0; _key9 < _len8; _key9++) {
+        _args7[_key9 - 0] = arguments[_key9];
+      }
+      let { length: x = 0, y = x } = _args7;
+      return function (x) {
+        var x = 1;
+        return x;
+      }.call(this, x);
+    }"
+  `);
 });
 
 test('parameters/var-same-name-as-nested-in-rest-param/input.js', async () => {
   const source =
     'function f(...[x, y = x]) {\n  var x;\n  return x;\n}\n\nfunction g(...[x, y = x]) {\n  var x = 1;\n  return x;\n}\n';
-  expect(
-    await transformOutcome(source, 'input.js', { transforms: { parameters: true } }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:post-rewrite-semantic-error"`);
+  expect(await transformOutcome(source, 'input.js', { transforms: { parameters: true } }))
+    .toMatchInlineSnapshot(`
+    "function f() {
+      for (var _len = arguments.length, _args = [], _key = 0; _key < _len; _key++) {
+        _args[_key - 0] = arguments[_key];
+      }
+      let [x, y = x] = _args;
+      return function (x) {
+        var x;
+        return x;
+      }.call(this, x);
+    }
+    function g() {
+      for (var _len8 = arguments.length, _args7 = [], _key9 = 0; _key9 < _len8; _key9++) {
+        _args7[_key9 - 0] = arguments[_key9];
+      }
+      let [x, y = x] = _args7;
+      return function (x) {
+        var x = 1;
+        return x;
+      }.call(this, x);
+    }"
+  `);
 });
 
 test('parameters/var-same-name-as-rest-param/input.js', async () => {
@@ -2000,26 +1824,22 @@ test('parameters/var-same-name-as-rest-param/input.js', async () => {
   expect(await transformOutcome(source, 'input.js', { transforms: { parameters: true } }))
     .toMatchInlineSnapshot(`
     "function f() {
-      for (
-        var _len = arguments.length, x = new Array(_len > 0 ? _len - 0 : 0), _key = 0;
-        _key < _len;
-        _key++
-      ) {
+      for (var _len = arguments.length, x = [], _key = 0; _key < _len; _key++) {
         x[_key - 0] = arguments[_key];
       }
-      var x;
-      return x;
+      return function (x) {
+        var x;
+        return x;
+      }.call(this, x);
     }
     function g() {
-      for (
-        var _len5 = arguments.length, x = new Array(_len5 > 0 ? _len5 - 0 : 0), _key6 = 0;
-        _key6 < _len5;
-        _key6++
-      ) {
+      for (var _len5 = arguments.length, x = [], _key6 = 0; _key6 < _len5; _key6++) {
         x[_key6 - 0] = arguments[_key6];
       }
-      var x = 1;
-      return x;
+      return function (x) {
+        var x = 1;
+        return x;
+      }.call(this, x);
     }"
   `);
 });
@@ -2027,16 +1847,32 @@ test('parameters/var-same-name-as-rest-param/input.js', async () => {
 test('parameters/var-with-init-then-var-no-init-same-as-param/input.js', async () => {
   const source =
     'function f(a = 2, b = 3) {\n  var { a } = { a: 4 };\n  var a;\n  var b;\n  return a + b;\n}\n';
-  expect(
-    await transformOutcome(source, 'input.js', { transforms: { parameters: true } }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:post-rewrite-semantic-error"`);
+  expect(await transformOutcome(source, 'input.js', { transforms: { parameters: true } }))
+    .toMatchInlineSnapshot(`
+    "function f() {
+      let a = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : 2;
+      let b = arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : 3;
+      return function (a, b) {
+        var { a } = { a: 4 };
+        var a;
+        var b;
+        return a + b;
+      }.call(this, a, b);
+    }"
+  `);
 });
 
 test('regression/11231/input.mjs', async () => {
   const source = '(i = "__proto__") => {\n  for (var i in {});\n};\n';
-  expect(
-    await transformOutcome(source, 'input.mjs', { transforms: { parameters: true } }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:post-rewrite-semantic-error"`);
+  expect(await transformOutcome(source, 'input.mjs', { transforms: { parameters: true } }))
+    .toMatchInlineSnapshot(`
+    "(function () {
+      let i = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : '__proto__';
+      return function (i) {
+        for (var i in {});
+      }.call(this, i);
+    });"
+  `);
 });
 
 test('regression/11256/input.js', async () => {
@@ -2058,10 +1894,13 @@ test('regression/11303/exec.js', async () => {
     'function test(a, b = 1) {\n  var a = a + b;\n  return a;\n}\n\nexpect(test(2)).toBe(3);\n';
   expect(await transformOutcome(source, 'exec.js', { transforms: { parameters: true } }))
     .toMatchInlineSnapshot(`
-    "function test(a) {
+    "function test(_arg) {
+      let a = arguments.length > 0 ? arguments[0] : void 0;
       let b = arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : 1;
-      var a = a + b;
-      return a;
+      return function (a) {
+        var a = a + b;
+        return a;
+      }.call(this, a);
     }
     expect(test(2)).toBe(3);"
   `);
@@ -2071,28 +1910,52 @@ test('regression/11303/input.js', async () => {
   const source = 'function test(a, b = 1) {\n  var a = a + b;\n  return a;\n}\n';
   expect(await transformOutcome(source, 'input.js', { transforms: { parameters: true } }))
     .toMatchInlineSnapshot(`
-    "function test(a) {
+    "function test(_arg) {
+      let a = arguments.length > 0 ? arguments[0] : void 0;
       let b = arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : 1;
-      var a = a + b;
-      return a;
+      return function (a) {
+        var a = a + b;
+        return a;
+      }.call(this, a);
     }"
   `);
 });
 
 test('regression/11344-flow/input.js', async () => {
   const source =
-    'function a(b: (c) => void = {}) {\n  let c;\n}\n\nfunction d(e = <T>() => {}) {\n  let T;\n}\n';
-  expect(
-    await transformOutcome(source, 'input.js', { transforms: { parameters: true } }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:parse-error"`);
+    '// @flow\nfunction a(b: (c) => void = {}) {\n  let c;\n}\n\nfunction d(e = <T>() => {}) {\n  let T;\n}\n';
+  expect(await transformOutcome(source, 'input.js', { transforms: { parameters: true } }))
+    .toMatchInlineSnapshot(`
+    "// @flow
+    function a() {
+      let b = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : {};
+      let c;
+    }
+    function d() {
+      let e = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : () => {};
+      let T;
+    }"
+  `);
 });
 
 test('regression/11344-typescript/input.js', async () => {
   const source =
     'function a(b: (c) => void = {}) {\n  let c;\n}\n\nfunction d(e = <T>() => {}) {\n  let T;\n}\n';
   expect(
-    await transformOutcome(source, 'input.js', { transforms: { parameters: true } }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:parse-error"`);
+    await transformOutcome(source, 'input.js', {
+      transforms: { parameters: true },
+      typescript: 'strip',
+    }),
+  ).toMatchInlineSnapshot(`
+    "function a() {
+      let b = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : {};
+      let c;
+    }
+    function d() {
+      let e = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : () => {};
+      let T;
+    }"
+  `);
 });
 
 test('regression/13939-complex/input.js', async () => {
@@ -2139,10 +2002,22 @@ test('regression/13939/input.js', async () => {
 
 test('regression/15145/exec.js', async () => {
   const source =
-    'async function * foo (p = 1) {\n  yield "hello";\n  yield p;\n}\n\nreturn (async () => {\n  const res = [];\n  for await (const x of foo()) res.push(x);\n  expect(res).toEqual(["hello", 1]);\n})();\n';
-  expect(
-    await transformOutcome(source, 'exec.js', { transforms: { parameters: true } }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:parse-error"`);
+    '(function () {\nasync function * foo (p = 1) {\n  yield "hello";\n  yield p;\n}\n\nreturn (async () => {\n  const res = [];\n  for await (const x of foo()) res.push(x);\n  expect(res).toEqual(["hello", 1]);\n})();\n\n});\n';
+  expect(await transformOutcome(source, 'exec.js', { transforms: { parameters: true } }))
+    .toMatchInlineSnapshot(`
+    "(function () {
+      async function* foo() {
+        let p = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : 1;
+        yield 'hello';
+        yield p;
+      }
+      return (async () => {
+        const res = [];
+        for await (const x of foo()) res.push(x);
+        expect(res).toEqual(['hello', 1]);
+      })();
+    });"
+  `);
 });
 
 test('regression/4209/input.mjs', async () => {
@@ -2185,11 +2060,7 @@ test('regression/6057-simple/input.js', async () => {
     .toMatchInlineSnapshot(`
     "const a = 'bar';
     function foo() {
-      for (
-        var _len = arguments.length, a = new Array(_len > 0 ? _len - 0 : 0), _key = 0;
-        _key < _len;
-        _key++
-      ) {
+      for (var _len = arguments.length, a = [], _key = 0; _key < _len; _key++) {
         a[_key - 0] = arguments[_key];
       }
       return a;
@@ -2204,11 +2075,7 @@ test('regression/regression-2364/input.js', async () => {
     .toMatchInlineSnapshot(`
     "function wrapper(fn) {
       return function () {
-        for (
-          var _len = arguments.length, args = new Array(_len > 0 ? _len - 0 : 0), _key = 0;
-          _key < _len;
-          _key++
-        ) {
+        for (var _len = arguments.length, args = [], _key = 0; _key < _len; _key++) {
           args[_key - 0] = arguments[_key];
         }
         while (someCondition) {
@@ -2224,16 +2091,60 @@ test('regression/regression-2364/input.js', async () => {
 
 test('regression/scope-async-param-error-async/exec.js', async () => {
   const source =
-    'const err = new Error();\n\nasync function f(a = (() => { throw err })()) {\n  throw 1;\n  var a = await a;\n  return a;\n}\n\nreturn (async () => {\n  let p;\n  expect(() => { p = f() }).not.toThrow();\n  await expect(p).rejects.toThrow(err);\n})();\n';
-  expect(
-    await transformOutcome(source, 'exec.js', { transforms: { parameters: true } }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:parse-error"`);
+    '(function () {\nconst err = new Error();\n\nasync function f(a = (() => { throw err })()) {\n  throw 1;\n  var a = await a;\n  return a;\n}\n\nreturn (async () => {\n  let p;\n  expect(() => { p = f() }).not.toThrow();\n  await expect(p).rejects.toThrow(err);\n})();\n\n});\n';
+  expect(await transformOutcome(source, 'exec.js', { transforms: { parameters: true } }))
+    .toMatchInlineSnapshot(`
+    "(function () {
+      const err = new Error();
+      async function f() {
+        let a =
+          arguments.length > 0 && arguments[0] !== void 0
+            ? arguments[0]
+            : (() => {
+                throw err;
+              })();
+        return async function (a) {
+          throw 1;
+          var a = await a;
+          return a;
+        }.call(this, a);
+      }
+      return (async () => {
+        let p;
+        expect(() => {
+          p = f();
+        }).not.toThrow();
+        await expect(p).rejects.toThrow(err);
+      })();
+    });"
+  `);
 });
 
 test('regression/scope-gen-async/input.js', async () => {
   const source =
     'function* f(a = 1) {\n  var a = yield a;\n  return a;\n}\n\nasync function g(a = 1) {\n  var a = await a;\n  return a;\n}\n\nasync function* h(a = 1) {\n  var a = await (yield a);\n  return a;\n}\n';
-  expect(
-    await transformOutcome(source, 'input.js', { transforms: { parameters: true } }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:post-rewrite-semantic-error"`);
+  expect(await transformOutcome(source, 'input.js', { transforms: { parameters: true } }))
+    .toMatchInlineSnapshot(`
+    "function* f() {
+      let a = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : 1;
+      return yield* function* (a) {
+        var a = yield a;
+        return a;
+      }.call(this, a);
+    }
+    async function g() {
+      let a = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : 1;
+      return async function (a) {
+        var a = await a;
+        return a;
+      }.call(this, a);
+    }
+    async function* h() {
+      let a = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : 1;
+      return yield* async function* (a) {
+        var a = await (yield a);
+        return a;
+      }.call(this, a);
+    }"
+  `);
 });

@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { transformSource } from '../transform';
+import { runtimeHelpers, transformSource } from '../transform';
 
 test('lowers block-scoped declarations', async () => {
   const source = `export function read(flag) { if (flag) { let value = 1; return value; } }`;
@@ -12,4 +12,13 @@ test('lowers block-scoped declarations', async () => {
       }
     }"
   `);
+});
+
+test('uses the Babel runtime readOnlyError helper when runtime helpers are selected', async () => {
+  const output = await transformSource(`const value = 1; value = sideEffect();`, 'input.js', {
+    helpers: runtimeHelpers,
+    transforms: { blockScoping: true },
+  });
+  expect(output).toContain("require('@babel/runtime/helpers/readOnlyError')");
+  expect(output).toContain("sideEffect(), _readOnlyError('value')");
 });

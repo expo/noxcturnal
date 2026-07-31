@@ -19,16 +19,17 @@ test('lowers inherited private brands referenced from a static block', async () 
       },
     }),
   ).toMatchInlineSnapshot(`
-    "export var Base = (() => {
+    "export let Base = (() => {
       'use strict';
       var _value = '__private_Base_value';
-      function Base() {
-        if (!(this instanceof Base)) throw new TypeError('Cannot call a class as a function');
+      const Base = function Base() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
         Object.defineProperty(this, _value, {
           writable: true,
           value: 1,
         });
-      }
+      };
+      Object.defineProperty(Base, 'prototype', { writable: false });
       (function () {
         this.accepts = input => Object.prototype.hasOwnProperty.call(input, _value);
       }).call(Base);

@@ -13,7 +13,7 @@ test('lowers object rest and spread', async () => {
     }),
   ).toMatchInlineSnapshot(`
     "const _excluded = ['id'];
-    import _objectWithoutProperties from '@babel/runtime/helpers/objectWithoutProperties';
+    import _objectWithoutProperties from '@babel/runtime/helpers/objectWithoutPropertiesLoose';
     export function rename(_ref, extra) {
       let { id } = _ref,
         attributes = _objectWithoutProperties(_ref, _excluded);

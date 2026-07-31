@@ -22,3 +22,17 @@ test('lowers async generator functions', async () => {
     }"
   `);
 });
+
+test('validates native async iterator next and return results', async () => {
+  const output = await transformSource(
+    `export async function inspect(iterable) { for await (const value of iterable) { void value; break; } }`,
+    'input.js',
+    {
+      helpers: runtimeHelpers,
+      transforms: { asyncGeneratorFunctions: true },
+    },
+  );
+  expect(output).toContain('function _iteratorResult(value)');
+  expect(output).toContain('_iteratorResult(await _iterator.next())');
+  expect(output).toContain('_iteratorResult(await _iterator.return())');
+});

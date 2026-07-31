@@ -45,22 +45,26 @@ test('spec and loose nullish coalescing preserve falsy and nullish values', () =
   }
 });
 
-test('supported object spread modes preserve values and property precedence', () => {
+test('all object rest/spread option combinations preserve their specified semantics', () => {
   const source = `
     const symbol = Symbol('value');
     const first = { value: 1, [symbol]: 2 };
     const output = { ...first, value: 3 };
-    globalThis.result = [output.value, output[symbol]];
+    const { value, ...rest } = output;
+    function pick({ value, ...parameterRest }) { return parameterRest[symbol]; }
+    globalThis.result = [value, output[symbol], rest[symbol], pick(output)];
   `;
   for (const options of [
     { loose: false, useBuiltIns: false },
+    { loose: false, useBuiltIns: true },
+    { loose: true, useBuiltIns: false },
     { loose: true, useBuiltIns: true },
   ]) {
     expect(
       execute<{ result: unknown[] }>(source, {
         transforms: { objectRestSpread: options },
       }).result,
-    ).toEqual([3, 2]);
+    ).toEqual([3, 2, options.loose ? undefined : 2, options.loose ? undefined : 2]);
   }
 });
 

@@ -18,24 +18,34 @@ test('lowers private methods', async () => {
     function _classPrivateMethodCall(e, s, a) {
       return _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s)[s].apply(e, a);
     }
-    export var Counter = (() => {
+    export let Counter = (() => {
       'use strict';
       var _increment = '__private_Counter_increment';
-      function Counter() {
-        if (!(this instanceof Counter)) throw new TypeError('Cannot call a class as a function');
+      const Counter = function Counter() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
         Object.defineProperty(this, _increment, {
           value: function (value) {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
             return value + 1;
           },
         });
-      }
+      };
       Object.defineProperty(Counter.prototype, 'add', {
-        value: function (value) {
-          return _classPrivateMethodCall(this, _increment, [value]);
-        },
+        value: Object.defineProperty(
+          function (value) {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            return _classPrivateMethodCall(this, _increment, [value]);
+          },
+          'name',
+          {
+            value: 'add',
+            configurable: true,
+          },
+        ),
         writable: true,
         configurable: true,
       });
+      Object.defineProperty(Counter, 'prototype', { writable: false });
       return Counter;
     })();"
   `);

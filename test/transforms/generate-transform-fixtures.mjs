@@ -9,6 +9,7 @@ const runtimeHelpers = {
   moduleName: '@babel/runtime',
   version: '7.29.7',
 };
+const requestedOutputs = new Set(process.argv.slice(2));
 
 /**
  * Babel's transform fixtures are an unusually thorough catalogue of syntax
@@ -185,6 +186,7 @@ function modeName(plan) {
 }
 
 for (const [category, outputName, babelName, plans] of transforms) {
+  if (requestedOutputs.size > 0 && !requestedOutputs.has(outputName)) continue;
   const fixtureRoot = path.join(
     babelRoot,
     `babel-plugin-transform-${babelName}`,
@@ -202,12 +204,54 @@ for (const [category, outputName, babelName, plans] of transforms) {
   const tests = [];
   for (const filename of fixtures) {
     let source = await readFile(filename, 'utf8');
-    if (category === 'flow' && !/^\s*\/\*?\s*@flow\b/m.test(source)) {
+    const relative = path.relative(fixtureRoot, filename);
+    let fixtureOptions = '';
+    try {
+      fixtureOptions = await readFile(path.join(path.dirname(filename), 'options.json'), 'utf8');
+    } catch (error) {
+      if (error?.code !== 'ENOENT') throw error;
+    }
+    const isFlowFixture =
+      category === 'flow' ||
+      /(?:^|[\/_-])flow(?:[\/_.-]|$)/i.test(relative) ||
+      /(?:syntax|transform)-flow(?:-strip-types)?/.test(fixtureOptions);
+    if (isFlowFixture && !/^\s*\/\*?\s*@flow\b/m.test(source)) {
       source = `// @flow\n${source}`;
     }
-    const relative = path.relative(fixtureRoot, filename);
+    // Babel's exec fixture runner evaluates these bodies inside a function and
+    // therefore permits a top-level `return`. Feed the transform valid source
+    // with the same syntactic function boundary instead of snapshotting a parser
+    // rejection that production code should retain.
+    if (
+      /^return\b/m.test(source) &&
+      (path.basename(filename).startsWith('exec.') ||
+        /"allowReturnOutsideFunction"\s*:\s*true/.test(fixtureOptions))
+    ) {
+      source = `(function () {\n${source}\n});\n`;
+    }
     for (const plan of plans) {
       const effectivePlan = structuredClone(plan);
+      const containsJsx =
+        path.extname(filename) === '.tsx' ||
+        /<>|<\/[A-Za-z][\w:.-]*\s*>|<[A-Za-z][\w:.-]*(?:\s[^<>]*|\s*)\/>/.test(source) ||
+        /(?:syntax|transform)-jsx/.test(fixtureOptions);
+      if (category !== 'jsx' && containsJsx && effectivePlan.jsx === undefined) {
+        // JSX is incidental to several transform fixtures. Preserve it so the
+        // selected transform is tested without turning this into a JSX test.
+        effectivePlan.jsx = 'preserve';
+      }
+      if (
+        category !== 'typescript' &&
+        /(?:syntax|transform)-typescript/.test(fixtureOptions) &&
+        effectivePlan.typescript === undefined
+      ) {
+        // Some transform fixtures use TypeScript solely as incidental input
+        // syntax. Strip it before exercising the selected transform.
+        effectivePlan.typescript = 'strip';
+      }
+      if (category === 'jsx' && relative.includes('should-support-xml-namespaces-if-flag')) {
+        effectivePlan.jsxThrowIfNamespace = false;
+      }
       if (category === 'classes' && source.includes('#')) {
         const loose =
           effectivePlan.transforms?.classProperties?.loose ??

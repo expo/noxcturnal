@@ -35,7 +35,20 @@ test('assumption-ignoreFunctionLength/parameters-object-rest-used-in-default/inp
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty = require('@babel/runtime/helpers/objectDestructuringEmpty');
+    var _extends = require('@babel/runtime/helpers/extends');
+    (_ref, a = R) => {
+      let R = _extends({}, (_objectDestructuringEmpty(_ref), _ref));
+    };
+    (_ref2, e, c = 2, a = R, f = q) => {
+      let R = _extends({}, (_objectDestructuringEmpty(_ref2), _ref2));
+      let q;
+    };
+    (_ref3, a = f(R)) => {
+      let R = _extends({}, (_objectDestructuringEmpty(_ref3), _ref3));
+    };"
+  `);
 });
 
 test('assumption-ignoreFunctionLength/parameters-object-rest-used-in-default/input.js [loose, helpers]', async () => {
@@ -46,7 +59,20 @@ test('assumption-ignoreFunctionLength/parameters-object-rest-used-in-default/inp
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty = require('@babel/runtime/helpers/objectDestructuringEmpty');
+    var _extends = require('@babel/runtime/helpers/extends');
+    (_ref, a = R) => {
+      let R = _extends({}, (_objectDestructuringEmpty(_ref), _ref));
+    };
+    (_ref2, e, c = 2, a = R, f = q) => {
+      let R = _extends({}, (_objectDestructuringEmpty(_ref2), _ref2));
+      let q;
+    };
+    (_ref3, a = f(R)) => {
+      let R = _extends({}, (_objectDestructuringEmpty(_ref3), _ref3));
+    };"
+  `);
 });
 
 test('assumption-ignoreFunctionLength/parameters-object-rest-used-in-default/input.js [loose, built-ins]', async () => {
@@ -94,7 +120,31 @@ test('assumption-objectRestNoSymbols/rest-assignment-expression/input.js [spec, 
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutProperties: require('@babel/runtime/helpers/objectWithoutProperties'),
+    };
+    function _objectWithoutProperties(t, e) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(t),
+        _objectWithoutProperties2.objectWithoutProperties(t, e)
+      );
+    }
+    var _ref, _obj;
+    ((_ref = obj),
+      (_obj = _objectDestructuringEmpty(_ref)),
+      (a = _obj.a),
+      (b = _obj.b),
+      (c = _objectWithoutProperties(_obj, ['a', 'b'])),
+      _ref);"
+  `);
 });
 
 test('assumption-objectRestNoSymbols/rest-assignment-expression/input.js [loose, helpers]', async () => {
@@ -104,7 +154,31 @@ test('assumption-objectRestNoSymbols/rest-assignment-expression/input.js [loose,
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutPropertiesLoose: require('@babel/runtime/helpers/objectWithoutPropertiesLoose'),
+    };
+    function _objectWithoutProperties(e, t) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(e),
+        _objectWithoutProperties2.objectWithoutPropertiesLoose(e, t)
+      );
+    }
+    var _ref, _obj;
+    ((_ref = obj),
+      (_obj = _objectDestructuringEmpty(_ref)),
+      (a = _obj.a),
+      (b = _obj.b),
+      (c = _objectWithoutProperties(_obj, ['a', 'b'])),
+      _ref);"
+  `);
 });
 
 test('assumption-objectRestNoSymbols/rest-assignment-expression/input.js [loose, built-ins]', async () => {
@@ -164,7 +238,33 @@ test('assumption-objectRestNoSymbols/rest-computed/input.js [spec, built-ins]', 
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutProperties: require('@babel/runtime/helpers/objectWithoutProperties'),
+    };
+    function _objectWithoutProperties(t, e) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(t),
+        _objectWithoutProperties2.objectWithoutProperties(t, e)
+      );
+    }
+    var _toPropertyKey2 = require('@babel/runtime/helpers/toPropertyKey');
+    function _toPropertyKey(value) {
+      return _toPropertyKey2(value);
+    }
+    let _ref = obj,
+      _obj = _objectDestructuringEmpty(_ref),
+      _key = _toPropertyKey(a),
+      b = _obj[_key],
+      c = _objectWithoutProperties(_obj, [_key]);"
+  `);
 });
 
 test('assumption-objectRestNoSymbols/rest-computed/input.js [loose, helpers]', async () => {
@@ -174,7 +274,33 @@ test('assumption-objectRestNoSymbols/rest-computed/input.js [loose, helpers]', a
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutPropertiesLoose: require('@babel/runtime/helpers/objectWithoutPropertiesLoose'),
+    };
+    function _objectWithoutProperties(e, t) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(e),
+        _objectWithoutProperties2.objectWithoutPropertiesLoose(e, t)
+      );
+    }
+    var _toPropertyKey2 = require('@babel/runtime/helpers/toPropertyKey');
+    function _toPropertyKey(value) {
+      return _toPropertyKey2(value);
+    }
+    let _ref = obj,
+      _obj = _objectDestructuringEmpty(_ref),
+      _key = _toPropertyKey(a),
+      b = _obj[_key],
+      c = _objectWithoutProperties(_obj, [_key]);"
+  `);
 });
 
 test('assumption-objectRestNoSymbols/rest-computed/input.js [loose, built-ins]', async () => {
@@ -201,9 +327,13 @@ test('assumption-objectRestNoSymbols/rest-computed/input.js [loose, built-ins]',
         _objectWithoutProperties2.objectWithoutPropertiesLoose(e, t)
       );
     }
+    var _toPropertyKey2 = require('@babel/runtime/helpers/toPropertyKey');
+    function _toPropertyKey(value) {
+      return _toPropertyKey2(value);
+    }
     let _ref = obj,
       _obj = _objectDestructuringEmpty(_ref),
-      _key = a,
+      _key = _toPropertyKey(a),
       b = _obj[_key],
       c = _objectWithoutProperties(_obj, [_key]);"
   `);
@@ -241,7 +371,36 @@ test('assumption-objectRestNoSymbols/rest-ignore-symbols/exec.js [spec, built-in
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutProperties: require('@babel/runtime/helpers/objectWithoutProperties'),
+    };
+    function _objectWithoutProperties(t, e) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(t),
+        _objectWithoutProperties2.objectWithoutProperties(t, e)
+      );
+    }
+    let sym = Symbol();
+    let _ref = {
+        a: 1,
+        b: 2,
+        [sym]: 3,
+      },
+      _obj = _objectDestructuringEmpty(_ref),
+      a = _obj.a,
+      r = _objectWithoutProperties(_obj, ['a']);
+    expect(a).toBe(1);
+    expect(r.b).toBe(2);
+    expect(sym in r).toBe(false);"
+  `);
 });
 
 test('assumption-objectRestNoSymbols/rest-ignore-symbols/exec.js [loose, helpers]', async () => {
@@ -252,7 +411,36 @@ test('assumption-objectRestNoSymbols/rest-ignore-symbols/exec.js [loose, helpers
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutPropertiesLoose: require('@babel/runtime/helpers/objectWithoutPropertiesLoose'),
+    };
+    function _objectWithoutProperties(e, t) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(e),
+        _objectWithoutProperties2.objectWithoutPropertiesLoose(e, t)
+      );
+    }
+    let sym = Symbol();
+    let _ref = {
+        a: 1,
+        b: 2,
+        [sym]: 3,
+      },
+      _obj = _objectDestructuringEmpty(_ref),
+      a = _obj.a,
+      r = _objectWithoutProperties(_obj, ['a']);
+    expect(a).toBe(1);
+    expect(r.b).toBe(2);
+    expect(sym in r).toBe(false);"
+  `);
 });
 
 test('assumption-objectRestNoSymbols/rest-ignore-symbols/exec.js [loose, built-ins]', async () => {
@@ -317,7 +505,32 @@ test('assumption-objectRestNoSymbols/rest-nested/input.js [spec, built-ins]', as
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutProperties: require('@babel/runtime/helpers/objectWithoutProperties'),
+    };
+    function _objectWithoutProperties(t, e) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(t),
+        _objectWithoutProperties2.objectWithoutProperties(t, e)
+      );
+    }
+    let _ref = obj,
+      _obj = _objectDestructuringEmpty(_ref),
+      a = _obj.a,
+      _obj13 = _objectDestructuringEmpty(_obj.nested),
+      b = _obj13.b,
+      c = _obj13.c,
+      d = _objectWithoutProperties(_obj13, ['b', 'c']),
+      e = _obj.e;"
+  `);
 });
 
 test('assumption-objectRestNoSymbols/rest-nested/input.js [loose, helpers]', async () => {
@@ -327,7 +540,32 @@ test('assumption-objectRestNoSymbols/rest-nested/input.js [loose, helpers]', asy
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutPropertiesLoose: require('@babel/runtime/helpers/objectWithoutPropertiesLoose'),
+    };
+    function _objectWithoutProperties(e, t) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(e),
+        _objectWithoutProperties2.objectWithoutPropertiesLoose(e, t)
+      );
+    }
+    let _ref = obj,
+      _obj = _objectDestructuringEmpty(_ref),
+      a = _obj.a,
+      _obj13 = _objectDestructuringEmpty(_obj.nested),
+      b = _obj13.b,
+      c = _obj13.c,
+      d = _objectWithoutProperties(_obj13, ['b', 'c']),
+      e = _obj.e;"
+  `);
 });
 
 test('assumption-objectRestNoSymbols/rest-nested/input.js [loose, built-ins]', async () => {
@@ -386,7 +624,29 @@ test('assumption-objectRestNoSymbols/rest-var-declaration/input.js [spec, built-
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutProperties: require('@babel/runtime/helpers/objectWithoutProperties'),
+    };
+    function _objectWithoutProperties(t, e) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(t),
+        _objectWithoutProperties2.objectWithoutProperties(t, e)
+      );
+    }
+    var _ref = obj,
+      _obj = _objectDestructuringEmpty(_ref),
+      a = _obj.a,
+      b = _obj.b,
+      c = _objectWithoutProperties(_obj, ['a', 'b']);"
+  `);
 });
 
 test('assumption-objectRestNoSymbols/rest-var-declaration/input.js [loose, helpers]', async () => {
@@ -396,7 +656,29 @@ test('assumption-objectRestNoSymbols/rest-var-declaration/input.js [loose, helpe
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutPropertiesLoose: require('@babel/runtime/helpers/objectWithoutPropertiesLoose'),
+    };
+    function _objectWithoutProperties(e, t) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(e),
+        _objectWithoutProperties2.objectWithoutPropertiesLoose(e, t)
+      );
+    }
+    var _ref = obj,
+      _obj = _objectDestructuringEmpty(_ref),
+      a = _obj.a,
+      b = _obj.b,
+      c = _objectWithoutProperties(_obj, ['a', 'b']);"
+  `);
 });
 
 test('assumption-objectRestNoSymbols/rest-var-declaration/input.js [loose, built-ins]', async () => {
@@ -463,7 +745,37 @@ test('assumption-pureGetters/rest-remove-unused-excluded-keys/exec.js [spec, bui
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutProperties: require('@babel/runtime/helpers/objectWithoutProperties'),
+    };
+    function _objectWithoutProperties(t, e) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(t),
+        _objectWithoutProperties2.objectWithoutProperties(t, e)
+      );
+    }
+    let called = false;
+    let obj = {
+      get foo() {
+        called = true;
+      },
+    };
+    let _ref = obj,
+      _obj = _objectDestructuringEmpty(_ref),
+      foo = _obj.foo,
+      rest = _objectWithoutProperties(_obj, ['foo']);
+    expect('foo' in rest).toBe(false);
+    // Without assuming that getters are pure (in this case it isn't), this should be true
+    expect(called).toBe(false);"
+  `);
 });
 
 test('assumption-pureGetters/rest-remove-unused-excluded-keys/exec.js [loose, helpers]', async () => {
@@ -474,7 +786,37 @@ test('assumption-pureGetters/rest-remove-unused-excluded-keys/exec.js [loose, he
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutPropertiesLoose: require('@babel/runtime/helpers/objectWithoutPropertiesLoose'),
+    };
+    function _objectWithoutProperties(e, t) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(e),
+        _objectWithoutProperties2.objectWithoutPropertiesLoose(e, t)
+      );
+    }
+    let called = false;
+    let obj = {
+      get foo() {
+        called = true;
+      },
+    };
+    let _ref = obj,
+      _obj = _objectDestructuringEmpty(_ref),
+      foo = _obj.foo,
+      rest = _objectWithoutProperties(_obj, ['foo']);
+    expect('foo' in rest).toBe(false);
+    // Without assuming that getters are pure (in this case it isn't), this should be true
+    expect(called).toBe(false);"
+  `);
 });
 
 test('assumption-pureGetters/rest-remove-unused-excluded-keys/exec.js [loose, built-ins]', async () => {
@@ -556,7 +898,49 @@ test('assumption-pureGetters/rest-remove-unused-excluded-keys/input.js [spec, bu
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "const _excluded = ['unused'];
+    var _objectWithoutProperties3 = require('@babel/runtime/helpers/objectWithoutProperties');
+    var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutProperties: require('@babel/runtime/helpers/objectWithoutProperties'),
+    };
+    function _objectWithoutProperties(t, e) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(t),
+        _objectWithoutProperties2.objectWithoutProperties(t, e)
+      );
+    }
+    var _ref, _obj;
+    // should not remove when destructuring into existing bindings
+    ((_ref = c2),
+      (_obj = _objectDestructuringEmpty(_ref)),
+      (a2 = _obj.a2),
+      (b2 = _objectWithoutProperties(_obj, ['a2'])),
+      _ref);
+    function render() {
+      const _ref17 = this.props,
+        _obj18 = _objectDestructuringEmpty(_ref17),
+        excluded = _obj18.excluded,
+        excludedRenamed = _obj18.excluded2,
+        used = _obj18.used,
+        usedRenamed = _obj18.used2,
+        props = _objectWithoutProperties(_obj18, ['excluded', 'excluded2', 'used', 'used2']);
+      console.log(used, usedRenamed);
+      return React.createElement('input', props);
+    }
+    function smth(_ref18) {
+      let { unused } = _ref18,
+        rest = _objectWithoutProperties3(_ref18, _excluded);
+      call(rest);
+    }"
+  `);
 });
 
 test('assumption-pureGetters/rest-remove-unused-excluded-keys/input.js [loose, helpers]', async () => {
@@ -567,7 +951,49 @@ test('assumption-pureGetters/rest-remove-unused-excluded-keys/input.js [loose, h
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "const _excluded = ['unused'];
+    var _objectWithoutProperties3 = require('@babel/runtime/helpers/objectWithoutPropertiesLoose');
+    var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutPropertiesLoose: require('@babel/runtime/helpers/objectWithoutPropertiesLoose'),
+    };
+    function _objectWithoutProperties(e, t) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(e),
+        _objectWithoutProperties2.objectWithoutPropertiesLoose(e, t)
+      );
+    }
+    var _ref, _obj;
+    // should not remove when destructuring into existing bindings
+    ((_ref = c2),
+      (_obj = _objectDestructuringEmpty(_ref)),
+      (a2 = _obj.a2),
+      (b2 = _objectWithoutProperties(_obj, ['a2'])),
+      _ref);
+    function render() {
+      const _ref17 = this.props,
+        _obj18 = _objectDestructuringEmpty(_ref17),
+        excluded = _obj18.excluded,
+        excludedRenamed = _obj18.excluded2,
+        used = _obj18.used,
+        usedRenamed = _obj18.used2,
+        props = _objectWithoutProperties(_obj18, ['excluded', 'excluded2', 'used', 'used2']);
+      console.log(used, usedRenamed);
+      return React.createElement('input', props);
+    }
+    function smth(_ref18) {
+      let { unused } = _ref18,
+        rest = _objectWithoutProperties3(_ref18, _excluded);
+      call(rest);
+    }"
+  `);
 });
 
 test('assumption-pureGetters/rest-remove-unused-excluded-keys/input.js [loose, built-ins]', async () => {
@@ -580,7 +1006,7 @@ test('assumption-pureGetters/rest-remove-unused-excluded-keys/input.js [loose, b
     }),
   ).toMatchInlineSnapshot(`
     "const _excluded = ['unused'];
-    var _objectWithoutProperties3 = require('@babel/runtime/helpers/objectWithoutProperties');
+    var _objectWithoutProperties3 = require('@babel/runtime/helpers/objectWithoutPropertiesLoose');
     var _objectDestructuringEmpty2 = {
       objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
     };
@@ -663,7 +1089,27 @@ test('assumption-pureGetters/spread-single-call/exec.js [spec, built-ins]', asyn
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "let count = 0;
+    let withFoo = {
+      get foo() {
+        return count++;
+      },
+    };
+    let withBar = {
+      get bar() {
+        return count++;
+      },
+    };
+    let res = Object.assign({}, withFoo, { middle: count }, withBar);
+    // Without assuming that getters are pure (in this case it isn't),
+    // the result should be { foo: 0, middle: 1, bar: 1 }
+    expect(res).toEqual({
+      foo: 0,
+      middle: 0,
+      bar: 1,
+    });"
+  `);
 });
 
 test('assumption-pureGetters/spread-single-call/exec.js [loose, helpers]', async () => {
@@ -674,7 +1120,28 @@ test('assumption-pureGetters/spread-single-call/exec.js [loose, helpers]', async
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _extends = require('@babel/runtime/helpers/extends');
+    let count = 0;
+    let withFoo = {
+      get foo() {
+        return count++;
+      },
+    };
+    let withBar = {
+      get bar() {
+        return count++;
+      },
+    };
+    let res = _extends({}, withFoo, { middle: count }, withBar);
+    // Without assuming that getters are pure (in this case it isn't),
+    // the result should be { foo: 0, middle: 1, bar: 1 }
+    expect(res).toEqual({
+      foo: 0,
+      middle: 0,
+      bar: 1,
+    });"
+  `);
 });
 
 test('assumption-pureGetters/spread-single-call/exec.js [loose, built-ins]', async () => {
@@ -728,7 +1195,7 @@ test('assumption-pureGetters/spread-single-call/input.js [spec, built-ins]', asy
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`"let obj = Object.assign({ a }, b, { c }, d, { e });"`);
 });
 
 test('assumption-pureGetters/spread-single-call/input.js [loose, helpers]', async () => {
@@ -738,7 +1205,10 @@ test('assumption-pureGetters/spread-single-call/input.js [loose, helpers]', asyn
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _extends = require('@babel/runtime/helpers/extends');
+    let obj = _extends({ a }, b, { c }, d, { e });"
+  `);
 });
 
 test('assumption-pureGetters/spread-single-call/input.js [loose, built-ins]', async () => {
@@ -778,7 +1248,16 @@ test('assumption-setSpreadProperties-with-useBuiltIns/assignment/input.js [spec,
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var x;
+    var y;
+    var z;
+    z = Object.assign({ x }, y);
+    z = {
+      x,
+      w: Object.assign({}, y),
+    };"
+  `);
 });
 
 test('assumption-setSpreadProperties-with-useBuiltIns/assignment/input.js [loose, helpers]', async () => {
@@ -788,7 +1267,17 @@ test('assumption-setSpreadProperties-with-useBuiltIns/assignment/input.js [loose
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _extends = require('@babel/runtime/helpers/extends');
+    var x;
+    var y;
+    var z;
+    z = _extends({ x }, y);
+    z = {
+      x,
+      w: _extends({}, y),
+    };"
+  `);
 });
 
 test('assumption-setSpreadProperties-with-useBuiltIns/assignment/input.js [loose, built-ins]', async () => {
@@ -850,7 +1339,24 @@ test('assumption-setSpreadProperties-with-useBuiltIns/expression/exec.js [spec, 
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var log = [];
+    var a = Object.assign(
+      {},
+      {
+        get foo() {
+          log.push(1);
+        },
+      },
+      {
+        get bar() {
+          log.push(2);
+        },
+      },
+    );
+    // Loose mode uses regular Get, not GetOwnProperty.
+    expect(log).toEqual([1, 2]);"
+  `);
 });
 
 test('assumption-setSpreadProperties-with-useBuiltIns/expression/exec.js [loose, helpers]', async () => {
@@ -861,7 +1367,25 @@ test('assumption-setSpreadProperties-with-useBuiltIns/expression/exec.js [loose,
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _extends = require('@babel/runtime/helpers/extends');
+    var log = [];
+    var a = _extends(
+      {},
+      {
+        get foo() {
+          log.push(1);
+        },
+      },
+      {
+        get bar() {
+          log.push(2);
+        },
+      },
+    );
+    // Loose mode uses regular Get, not GetOwnProperty.
+    expect(log).toEqual([1, 2]);"
+  `);
 });
 
 test('assumption-setSpreadProperties-with-useBuiltIns/expression/exec.js [loose, built-ins]', async () => {
@@ -931,7 +1455,26 @@ test('assumption-setSpreadProperties-with-useBuiltIns/expression/input.js [spec,
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var a;
+    var b;
+    var c;
+    var d;
+    var x;
+    var y;
+    Object.assign({ x }, y, { a }, b, { c });
+    Object.assign({}, Object.prototype);
+    Object.assign({}, { foo: 'bar' });
+    Object.assign({}, { foo: 'bar' }, { bar: 'baz' });
+    Object.assign(
+      {},
+      {
+        get foo() {
+          return 'foo';
+        },
+      },
+    );"
+  `);
 });
 
 test('assumption-setSpreadProperties-with-useBuiltIns/expression/input.js [loose, helpers]', async () => {
@@ -942,7 +1485,27 @@ test('assumption-setSpreadProperties-with-useBuiltIns/expression/input.js [loose
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _extends = require('@babel/runtime/helpers/extends');
+    var a;
+    var b;
+    var c;
+    var d;
+    var x;
+    var y;
+    _extends({ x }, y, { a }, b, { c });
+    _extends({}, Object.prototype);
+    _extends({}, { foo: 'bar' });
+    _extends({}, { foo: 'bar' }, { bar: 'baz' });
+    _extends(
+      {},
+      {
+        get foo() {
+          return 'foo';
+        },
+      },
+    );"
+  `);
 });
 
 test('assumption-setSpreadProperties-with-useBuiltIns/expression/input.js [loose, built-ins]', async () => {
@@ -1003,7 +1566,15 @@ test('assumption-setSpreadProperties-with-useBuiltIns/no-getOwnPropertyDescripto
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "const oldGOPDs = Object.getOwnPropertyDescriptors;
+    Object.getOwnPropertyDescriptors = null;
+    try {
+      Object.assign({}, { a: 1 }, { b: 1 }, {});
+    } finally {
+      Object.getOwnPropertyDescriptors = oldGOPDs;
+    }"
+  `);
 });
 
 test('assumption-setSpreadProperties-with-useBuiltIns/no-getOwnPropertyDescriptors/exec.js [loose, helpers]', async () => {
@@ -1014,7 +1585,16 @@ test('assumption-setSpreadProperties-with-useBuiltIns/no-getOwnPropertyDescripto
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _extends = require('@babel/runtime/helpers/extends');
+    const oldGOPDs = Object.getOwnPropertyDescriptors;
+    Object.getOwnPropertyDescriptors = null;
+    try {
+      _extends({}, { a: 1 }, { b: 1 }, {});
+    } finally {
+      Object.getOwnPropertyDescriptors = oldGOPDs;
+    }"
+  `);
 });
 
 test('assumption-setSpreadProperties-with-useBuiltIns/no-getOwnPropertyDescriptors/exec.js [loose, built-ins]', async () => {
@@ -1104,7 +1684,52 @@ test('assumption-setSpreadProperties-with-useBuiltIns/no-object-assign-exec/exec
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "'use strict';
+    Object.defineProperty(Object.prototype, 'NOSET', {
+      get(value) {
+        // noop
+      },
+    });
+    Object.defineProperty(Object.prototype, 'NOWRITE', {
+      writable: false,
+      value: 'abc',
+    });
+    const obj = { NOSET: 123 };
+    // this won't work as expected if transformed as Object.assign (or equivalent)
+    // because those trigger object setters (spread don't)
+    expect(() => {
+      const objSpread = Object.assign({}, obj);
+    }).toThrow();
+    const obj2 = { NOWRITE: 456 };
+    // this throws \`TypeError: Cannot assign to read only property 'NOWRITE'\`
+    // if transformed as Object.assign (or equivalent) because those use *assignment* for creating properties
+    // (spread defines them)
+    expect(() => {
+      const obj2Spread = Object.assign({}, obj2);
+    }).toThrow();
+    const KEY = Symbol('key');
+    const obj3Spread = Object.assign(
+      {},
+      {
+        get foo() {
+          return 'bar';
+        },
+      },
+      { [KEY]: 'symbol' },
+    );
+    expect(Object.getOwnPropertyDescriptor(obj3Spread, 'foo').value).toBe('bar');
+    expect(Object.getOwnPropertyDescriptor(obj3Spread, KEY).value).toBe('symbol');
+    const obj4Spread = Object.assign({}, Object.prototype);
+    expect(Object.getOwnPropertyDescriptor(obj4Spread, 'hasOwnProperty')).toBeUndefined();
+    expect(() => Object.assign({}, null, undefined)).not.toThrow();
+    const o = Object.create(null);
+    o.a = 'foo';
+    o.__proto__ = [];
+    const o2 = Object.assign({}, o);
+    // Loose will do o2.__proto__ = []
+    expect(Array.isArray(Object.getPrototypeOf(o2))).toBe(true);"
+  `);
 });
 
 test('assumption-setSpreadProperties-with-useBuiltIns/no-object-assign-exec/exec.js [loose, helpers]', async () => {
@@ -1115,7 +1740,53 @@ test('assumption-setSpreadProperties-with-useBuiltIns/no-object-assign-exec/exec
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "'use strict';
+    var _extends = require('@babel/runtime/helpers/extends');
+    Object.defineProperty(Object.prototype, 'NOSET', {
+      get(value) {
+        // noop
+      },
+    });
+    Object.defineProperty(Object.prototype, 'NOWRITE', {
+      writable: false,
+      value: 'abc',
+    });
+    const obj = { NOSET: 123 };
+    // this won't work as expected if transformed as Object.assign (or equivalent)
+    // because those trigger object setters (spread don't)
+    expect(() => {
+      const objSpread = _extends({}, obj);
+    }).toThrow();
+    const obj2 = { NOWRITE: 456 };
+    // this throws \`TypeError: Cannot assign to read only property 'NOWRITE'\`
+    // if transformed as Object.assign (or equivalent) because those use *assignment* for creating properties
+    // (spread defines them)
+    expect(() => {
+      const obj2Spread = _extends({}, obj2);
+    }).toThrow();
+    const KEY = Symbol('key');
+    const obj3Spread = _extends(
+      {},
+      {
+        get foo() {
+          return 'bar';
+        },
+      },
+      { [KEY]: 'symbol' },
+    );
+    expect(Object.getOwnPropertyDescriptor(obj3Spread, 'foo').value).toBe('bar');
+    expect(Object.getOwnPropertyDescriptor(obj3Spread, KEY).value).toBe('symbol');
+    const obj4Spread = _extends({}, Object.prototype);
+    expect(Object.getOwnPropertyDescriptor(obj4Spread, 'hasOwnProperty')).toBeUndefined();
+    expect(() => _extends({}, null, undefined)).not.toThrow();
+    const o = Object.create(null);
+    o.a = 'foo';
+    o.__proto__ = [];
+    const o2 = _extends({}, o);
+    // Loose will do o2.__proto__ = []
+    expect(Array.isArray(Object.getPrototypeOf(o2))).toBe(true);"
+  `);
 });
 
 test('assumption-setSpreadProperties-with-useBuiltIns/no-object-assign-exec/exec.js [loose, built-ins]', async () => {
@@ -1201,7 +1872,16 @@ test('assumption-setSpreadProperties/assignment/input.js [spec, built-ins]', asy
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var x;
+    var y;
+    var z;
+    z = Object.assign({ x }, y);
+    z = {
+      x,
+      w: Object.assign({}, y),
+    };"
+  `);
 });
 
 test('assumption-setSpreadProperties/assignment/input.js [loose, helpers]', async () => {
@@ -1211,7 +1891,17 @@ test('assumption-setSpreadProperties/assignment/input.js [loose, helpers]', asyn
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _extends = require('@babel/runtime/helpers/extends');
+    var x;
+    var y;
+    var z;
+    z = _extends({ x }, y);
+    z = {
+      x,
+      w: _extends({}, y),
+    };"
+  `);
 });
 
 test('assumption-setSpreadProperties/assignment/input.js [loose, built-ins]', async () => {
@@ -1273,7 +1963,24 @@ test('assumption-setSpreadProperties/expression/exec.js [spec, built-ins]', asyn
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var log = [];
+    var a = Object.assign(
+      {},
+      {
+        get foo() {
+          log.push(1);
+        },
+      },
+      {
+        get bar() {
+          log.push(2);
+        },
+      },
+    );
+    // Loose mode uses regular Get, not GetOwnProperty.
+    expect(log).toEqual([1, 2]);"
+  `);
 });
 
 test('assumption-setSpreadProperties/expression/exec.js [loose, helpers]', async () => {
@@ -1284,7 +1991,25 @@ test('assumption-setSpreadProperties/expression/exec.js [loose, helpers]', async
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _extends = require('@babel/runtime/helpers/extends');
+    var log = [];
+    var a = _extends(
+      {},
+      {
+        get foo() {
+          log.push(1);
+        },
+      },
+      {
+        get bar() {
+          log.push(2);
+        },
+      },
+    );
+    // Loose mode uses regular Get, not GetOwnProperty.
+    expect(log).toEqual([1, 2]);"
+  `);
 });
 
 test('assumption-setSpreadProperties/expression/exec.js [loose, built-ins]', async () => {
@@ -1354,7 +2079,26 @@ test('assumption-setSpreadProperties/expression/input.js [spec, built-ins]', asy
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var a;
+    var b;
+    var c;
+    var d;
+    var x;
+    var y;
+    Object.assign({ x }, y, { a }, b, { c });
+    Object.assign({}, Object.prototype);
+    Object.assign({}, { foo: 'bar' });
+    Object.assign({}, { foo: 'bar' }, { bar: 'baz' });
+    Object.assign(
+      {},
+      {
+        get foo() {
+          return 'foo';
+        },
+      },
+    );"
+  `);
 });
 
 test('assumption-setSpreadProperties/expression/input.js [loose, helpers]', async () => {
@@ -1365,7 +2109,27 @@ test('assumption-setSpreadProperties/expression/input.js [loose, helpers]', asyn
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _extends = require('@babel/runtime/helpers/extends');
+    var a;
+    var b;
+    var c;
+    var d;
+    var x;
+    var y;
+    _extends({ x }, y, { a }, b, { c });
+    _extends({}, Object.prototype);
+    _extends({}, { foo: 'bar' });
+    _extends({}, { foo: 'bar' }, { bar: 'baz' });
+    _extends(
+      {},
+      {
+        get foo() {
+          return 'foo';
+        },
+      },
+    );"
+  `);
 });
 
 test('assumption-setSpreadProperties/expression/input.js [loose, built-ins]', async () => {
@@ -1426,7 +2190,15 @@ test('assumption-setSpreadProperties/no-getOwnPropertyDescriptors/exec.js [spec,
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "const oldGOPDs = Object.getOwnPropertyDescriptors;
+    Object.getOwnPropertyDescriptors = null;
+    try {
+      Object.assign({}, { a: 1 }, { b: 1 }, {});
+    } finally {
+      Object.getOwnPropertyDescriptors = oldGOPDs;
+    }"
+  `);
 });
 
 test('assumption-setSpreadProperties/no-getOwnPropertyDescriptors/exec.js [loose, helpers]', async () => {
@@ -1437,7 +2209,16 @@ test('assumption-setSpreadProperties/no-getOwnPropertyDescriptors/exec.js [loose
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _extends = require('@babel/runtime/helpers/extends');
+    const oldGOPDs = Object.getOwnPropertyDescriptors;
+    Object.getOwnPropertyDescriptors = null;
+    try {
+      _extends({}, { a: 1 }, { b: 1 }, {});
+    } finally {
+      Object.getOwnPropertyDescriptors = oldGOPDs;
+    }"
+  `);
 });
 
 test('assumption-setSpreadProperties/no-getOwnPropertyDescriptors/exec.js [loose, built-ins]', async () => {
@@ -1527,7 +2308,52 @@ test('assumption-setSpreadProperties/no-object-assign-exec/exec.js [spec, built-
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "'use strict';
+    Object.defineProperty(Object.prototype, 'NOSET', {
+      get(value) {
+        // noop
+      },
+    });
+    Object.defineProperty(Object.prototype, 'NOWRITE', {
+      writable: false,
+      value: 'abc',
+    });
+    const obj = { NOSET: 123 };
+    // this won't work as expected if transformed as Object.assign (or equivalent)
+    // because those trigger object setters (spread don't)
+    expect(() => {
+      const objSpread = Object.assign({}, obj);
+    }).toThrow();
+    const obj2 = { NOWRITE: 456 };
+    // this throws \`TypeError: Cannot assign to read only property 'NOWRITE'\`
+    // if transformed as Object.assign (or equivalent) because those use *assignment* for creating properties
+    // (spread defines them)
+    expect(() => {
+      const obj2Spread = Object.assign({}, obj2);
+    }).toThrow();
+    const KEY = Symbol('key');
+    const obj3Spread = Object.assign(
+      {},
+      {
+        get foo() {
+          return 'bar';
+        },
+      },
+      { [KEY]: 'symbol' },
+    );
+    expect(Object.getOwnPropertyDescriptor(obj3Spread, 'foo').value).toBe('bar');
+    expect(Object.getOwnPropertyDescriptor(obj3Spread, KEY).value).toBe('symbol');
+    const obj4Spread = Object.assign({}, Object.prototype);
+    expect(Object.getOwnPropertyDescriptor(obj4Spread, 'hasOwnProperty')).toBeUndefined();
+    expect(() => Object.assign({}, null, undefined)).not.toThrow();
+    const o = Object.create(null);
+    o.a = 'foo';
+    o.__proto__ = [];
+    const o2 = Object.assign({}, o);
+    // Loose will do o2.__proto__ = []
+    expect(Array.isArray(Object.getPrototypeOf(o2))).toBe(true);"
+  `);
 });
 
 test('assumption-setSpreadProperties/no-object-assign-exec/exec.js [loose, helpers]', async () => {
@@ -1538,7 +2364,53 @@ test('assumption-setSpreadProperties/no-object-assign-exec/exec.js [loose, helpe
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "'use strict';
+    var _extends = require('@babel/runtime/helpers/extends');
+    Object.defineProperty(Object.prototype, 'NOSET', {
+      get(value) {
+        // noop
+      },
+    });
+    Object.defineProperty(Object.prototype, 'NOWRITE', {
+      writable: false,
+      value: 'abc',
+    });
+    const obj = { NOSET: 123 };
+    // this won't work as expected if transformed as Object.assign (or equivalent)
+    // because those trigger object setters (spread don't)
+    expect(() => {
+      const objSpread = _extends({}, obj);
+    }).toThrow();
+    const obj2 = { NOWRITE: 456 };
+    // this throws \`TypeError: Cannot assign to read only property 'NOWRITE'\`
+    // if transformed as Object.assign (or equivalent) because those use *assignment* for creating properties
+    // (spread defines them)
+    expect(() => {
+      const obj2Spread = _extends({}, obj2);
+    }).toThrow();
+    const KEY = Symbol('key');
+    const obj3Spread = _extends(
+      {},
+      {
+        get foo() {
+          return 'bar';
+        },
+      },
+      { [KEY]: 'symbol' },
+    );
+    expect(Object.getOwnPropertyDescriptor(obj3Spread, 'foo').value).toBe('bar');
+    expect(Object.getOwnPropertyDescriptor(obj3Spread, KEY).value).toBe('symbol');
+    const obj4Spread = _extends({}, Object.prototype);
+    expect(Object.getOwnPropertyDescriptor(obj4Spread, 'hasOwnProperty')).toBeUndefined();
+    expect(() => _extends({}, null, undefined)).not.toThrow();
+    const o = Object.create(null);
+    o.a = 'foo';
+    o.__proto__ = [];
+    const o2 = _extends({}, o);
+    // Loose will do o2.__proto__ = []
+    expect(Array.isArray(Object.getPrototypeOf(o2))).toBe(true);"
+  `);
 });
 
 test('assumption-setSpreadProperties/no-object-assign-exec/exec.js [loose, built-ins]', async () => {
@@ -1617,7 +2489,7 @@ test('assumption-setSpreadProperties/targets-support-object-assign/input.js [spe
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`"let a = Object.assign({ x: 1 }, b);"`);
 });
 
 test('assumption-setSpreadProperties/targets-support-object-assign/input.js [loose, helpers]', async () => {
@@ -1627,7 +2499,10 @@ test('assumption-setSpreadProperties/targets-support-object-assign/input.js [loo
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _extends = require('@babel/runtime/helpers/extends');
+    let a = _extends({ x: 1 }, b);"
+  `);
 });
 
 test('assumption-setSpreadProperties/targets-support-object-assign/input.js [loose, built-ins]', async () => {
@@ -1664,7 +2539,38 @@ test('object-rest/assignment-expression/input.js [spec, built-ins]', async () =>
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutProperties: require('@babel/runtime/helpers/objectWithoutProperties'),
+    };
+    function _objectWithoutProperties(t, e) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(t),
+        _objectWithoutProperties2.objectWithoutProperties(t, e)
+      );
+    }
+    var _ref, _obj, _ref8, _obj9;
+    ({ a1 } = c1);
+    ((_ref = c2),
+      (_obj = _objectDestructuringEmpty(_ref)),
+      (a2 = _obj.a2),
+      (b2 = _objectWithoutProperties(_obj, ['a2'])),
+      _ref);
+    console.log(
+      ((_ref8 = c3),
+      (_obj9 = _objectDestructuringEmpty(_ref8)),
+      (a3 = _obj9.a3),
+      (b3 = _objectWithoutProperties(_obj9, ['a3'])),
+      _ref8),
+    );"
+  `);
 });
 
 test('object-rest/assignment-expression/input.js [loose, helpers]', async () => {
@@ -1674,7 +2580,38 @@ test('object-rest/assignment-expression/input.js [loose, helpers]', async () => 
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutPropertiesLoose: require('@babel/runtime/helpers/objectWithoutPropertiesLoose'),
+    };
+    function _objectWithoutProperties(e, t) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(e),
+        _objectWithoutProperties2.objectWithoutPropertiesLoose(e, t)
+      );
+    }
+    var _ref, _obj, _ref8, _obj9;
+    ({ a1 } = c1);
+    ((_ref = c2),
+      (_obj = _objectDestructuringEmpty(_ref)),
+      (a2 = _obj.a2),
+      (b2 = _objectWithoutProperties(_obj, ['a2'])),
+      _ref);
+    console.log(
+      ((_ref8 = c3),
+      (_obj9 = _objectDestructuringEmpty(_ref8)),
+      (a3 = _obj9.a3),
+      (b3 = _objectWithoutProperties(_obj9, ['a3'])),
+      _ref8),
+    );"
+  `);
 });
 
 test('object-rest/assignment-expression/input.js [loose, built-ins]', async () => {
@@ -1769,7 +2706,56 @@ test('object-rest/catch-clause/input.js [spec, built-ins]', async () => {
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutProperties: require('@babel/runtime/helpers/objectWithoutProperties'),
+    };
+    function _objectWithoutProperties(t, e) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(t),
+        _objectWithoutProperties2.objectWithoutProperties(t, e)
+      );
+    }
+    try {
+    } catch (_caught) {
+      let _obj = _objectDestructuringEmpty(_caught),
+        a34 = _objectWithoutProperties(_obj, []);
+    }
+    try {
+    } catch (_caught18) {
+      let _obj19 = _objectDestructuringEmpty(_caught18),
+        a1 = _obj19.a1,
+        b1 = _objectWithoutProperties(_obj19, ['a1']);
+    }
+    try {
+    } catch (_caught20) {
+      let _obj21 = _objectDestructuringEmpty(_caught20),
+        a2 = _obj21.a2,
+        b2 = _obj21.b2,
+        c2 = _objectWithoutProperties(_obj21, ['a2', 'b2']);
+    }
+    try {
+    } catch (_caught22) {
+      let _obj23 = _objectDestructuringEmpty(_caught22),
+        a2 = _obj23.a2,
+        b2 = _obj23.b2,
+        _obj24 = _objectDestructuringEmpty(_obj23.c2),
+        c3 = _obj24.c3,
+        c4 = _objectWithoutProperties(_obj24, ['c3']);
+    }
+    // Unchanged
+    try {
+    } catch (a) {}
+    try {
+    } catch ({ b }) {}"
+  `);
 });
 
 test('object-rest/catch-clause/input.js [loose, helpers]', async () => {
@@ -1780,7 +2766,56 @@ test('object-rest/catch-clause/input.js [loose, helpers]', async () => {
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutPropertiesLoose: require('@babel/runtime/helpers/objectWithoutPropertiesLoose'),
+    };
+    function _objectWithoutProperties(e, t) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(e),
+        _objectWithoutProperties2.objectWithoutPropertiesLoose(e, t)
+      );
+    }
+    try {
+    } catch (_caught) {
+      let _obj = _objectDestructuringEmpty(_caught),
+        a34 = _objectWithoutProperties(_obj, []);
+    }
+    try {
+    } catch (_caught18) {
+      let _obj19 = _objectDestructuringEmpty(_caught18),
+        a1 = _obj19.a1,
+        b1 = _objectWithoutProperties(_obj19, ['a1']);
+    }
+    try {
+    } catch (_caught20) {
+      let _obj21 = _objectDestructuringEmpty(_caught20),
+        a2 = _obj21.a2,
+        b2 = _obj21.b2,
+        c2 = _objectWithoutProperties(_obj21, ['a2', 'b2']);
+    }
+    try {
+    } catch (_caught22) {
+      let _obj23 = _objectDestructuringEmpty(_caught22),
+        a2 = _obj23.a2,
+        b2 = _obj23.b2,
+        _obj24 = _objectDestructuringEmpty(_obj23.c2),
+        c3 = _obj24.c3,
+        c4 = _objectWithoutProperties(_obj24, ['c3']);
+    }
+    // Unchanged
+    try {
+    } catch (a) {}
+    try {
+    } catch ({ b }) {}"
+  `);
 });
 
 test('object-rest/catch-clause/input.js [loose, built-ins]', async () => {
@@ -1872,7 +2907,33 @@ test('object-rest/duplicate-decl-bug/input.js [spec, built-ins]', async () => {
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutProperties: require('@babel/runtime/helpers/objectWithoutProperties'),
+    };
+    function _objectWithoutProperties(t, e) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(t),
+        _objectWithoutProperties2.objectWithoutProperties(t, e)
+      );
+    }
+    it('es7.objectRestSpread', () => {
+      let original = {
+        a: 1,
+        b: 2,
+      };
+      let _ref = original,
+        _obj = _objectDestructuringEmpty(_ref),
+        copy = _objectWithoutProperties(_obj, []);
+    });"
+  `);
 });
 
 test('object-rest/duplicate-decl-bug/input.js [loose, helpers]', async () => {
@@ -1883,7 +2944,33 @@ test('object-rest/duplicate-decl-bug/input.js [loose, helpers]', async () => {
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutPropertiesLoose: require('@babel/runtime/helpers/objectWithoutPropertiesLoose'),
+    };
+    function _objectWithoutProperties(e, t) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(e),
+        _objectWithoutProperties2.objectWithoutPropertiesLoose(e, t)
+      );
+    }
+    it('es7.objectRestSpread', () => {
+      let original = {
+        a: 1,
+        b: 2,
+      };
+      let _ref = original,
+        _obj = _objectDestructuringEmpty(_ref),
+        copy = _objectWithoutProperties(_obj, []);
+    });"
+  `);
 });
 
 test('object-rest/duplicate-decl-bug/input.js [loose, built-ins]', async () => {
@@ -1950,7 +3037,32 @@ test('object-rest/export/input.mjs [spec, built-ins]', async () => {
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutProperties: require('@babel/runtime/helpers/objectWithoutProperties'),
+    };
+    function _objectWithoutProperties(t, e) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(t),
+        _objectWithoutProperties2.objectWithoutProperties(t, e)
+      );
+    }
+    // ExportNamedDeclaration
+    export var _ref = asdf2,
+      _obj = _objectDestructuringEmpty(_ref),
+      b = _obj.b,
+      c = _objectWithoutProperties(_obj, ['b']);
+    // Skip
+    export var { bb, cc } = ads;
+    export var [dd, ee, ...ff] = ads;"
+  `);
 });
 
 test('object-rest/export/input.mjs [loose, helpers]', async () => {
@@ -1961,7 +3073,32 @@ test('object-rest/export/input.mjs [loose, helpers]', async () => {
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutPropertiesLoose: require('@babel/runtime/helpers/objectWithoutPropertiesLoose'),
+    };
+    function _objectWithoutProperties(e, t) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(e),
+        _objectWithoutProperties2.objectWithoutPropertiesLoose(e, t)
+      );
+    }
+    // ExportNamedDeclaration
+    export var _ref = asdf2,
+      _obj = _objectDestructuringEmpty(_ref),
+      b = _obj.b,
+      c = _objectWithoutProperties(_obj, ['b']);
+    // Skip
+    export var { bb, cc } = ads;
+    export var [dd, ee, ...ff] = ads;"
+  `);
 });
 
 test('object-rest/export/input.mjs [loose, built-ins]', async () => {
@@ -2028,7 +3165,41 @@ test('object-rest/for-x-array-pattern-rest-only/exec.js [spec, built-ins]', asyn
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _toArray2 = {
+      slicedToArray: require('@babel/runtime/helpers/slicedToArray'),
+      toArray: require('@babel/runtime/helpers/toArray'),
+    };
+    function _toArray(r, e, a) {
+      return a ? _toArray2.toArray(r) : _toArray2.slicedToArray(r, e);
+    }
+    var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutProperties: require('@babel/runtime/helpers/objectWithoutProperties'),
+    };
+    function _objectWithoutProperties(t, e) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(t),
+        _objectWithoutProperties2.objectWithoutProperties(t, e)
+      );
+    }
+    let a, result;
+    for (const _ref of [[{ a: 0 }]]) {
+      const _arr = _toArray(_ref, 1, false),
+        _obj = _objectDestructuringEmpty(_arr[0]),
+        a = _objectWithoutProperties(_obj, []);
+      {
+        result = a;
+      }
+    }
+    expect(result).toEqual({ a: 0 });"
+  `);
 });
 
 test('object-rest/for-x-array-pattern-rest-only/exec.js [loose, helpers]', async () => {
@@ -2039,7 +3210,41 @@ test('object-rest/for-x-array-pattern-rest-only/exec.js [loose, helpers]', async
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _toArray2 = {
+      slicedToArray: require('@babel/runtime/helpers/slicedToArray'),
+      toArray: require('@babel/runtime/helpers/toArray'),
+    };
+    function _toArray(r, e, a) {
+      return a ? _toArray2.toArray(r) : _toArray2.slicedToArray(r, e);
+    }
+    var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutPropertiesLoose: require('@babel/runtime/helpers/objectWithoutPropertiesLoose'),
+    };
+    function _objectWithoutProperties(e, t) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(e),
+        _objectWithoutProperties2.objectWithoutPropertiesLoose(e, t)
+      );
+    }
+    let a, result;
+    for (const _ref of [[{ a: 0 }]]) {
+      const _arr = _toArray(_ref, 1, false),
+        _obj = _objectDestructuringEmpty(_arr[0]),
+        a = _objectWithoutProperties(_obj, []);
+      {
+        result = a;
+      }
+    }
+    expect(result).toEqual({ a: 0 });"
+  `);
 });
 
 test('object-rest/for-x-array-pattern-rest-only/exec.js [loose, built-ins]', async () => {
@@ -2050,7 +3255,41 @@ test('object-rest/for-x-array-pattern-rest-only/exec.js [loose, built-ins]', asy
       transforms: { objectRestSpread: { loose: true, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:destructuring-generated-initializer-missing"`);
+  ).toMatchInlineSnapshot(`
+    "var _toArray2 = {
+      slicedToArray: require('@babel/runtime/helpers/slicedToArray'),
+      toArray: require('@babel/runtime/helpers/toArray'),
+    };
+    function _toArray(r, e, a) {
+      return a ? _toArray2.toArray(r) : _toArray2.slicedToArray(r, e);
+    }
+    var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutPropertiesLoose: require('@babel/runtime/helpers/objectWithoutPropertiesLoose'),
+    };
+    function _objectWithoutProperties(e, t) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(e),
+        _objectWithoutProperties2.objectWithoutPropertiesLoose(e, t)
+      );
+    }
+    let a, result;
+    for (const _ref of [[{ a: 0 }]]) {
+      const _arr = _toArray(_ref, 1, false),
+        _obj = _objectDestructuringEmpty(_arr[0]),
+        a = _objectWithoutProperties(_obj, []);
+      {
+        result = a;
+      }
+    }
+    expect(result).toEqual({ a: 0 });"
+  `);
 });
 
 test('object-rest/for-x-array-pattern-rest-only/input.js [spec, helpers]', async () => {
@@ -2113,7 +3352,71 @@ test('object-rest/for-x-array-pattern-rest-only/input.js [spec, built-ins]', asy
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _toArray2 = {
+      slicedToArray: require('@babel/runtime/helpers/slicedToArray'),
+      toArray: require('@babel/runtime/helpers/toArray'),
+    };
+    function _toArray(r, e, a) {
+      return a ? _toArray2.toArray(r) : _toArray2.slicedToArray(r, e);
+    }
+    var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutProperties: require('@babel/runtime/helpers/objectWithoutProperties'),
+    };
+    function _objectWithoutProperties(t, e) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(t),
+        _objectWithoutProperties2.objectWithoutProperties(t, e)
+      );
+    }
+    var _ref11, _arr12, _obj13;
+    // ForXStatement
+    {
+      let a;
+      for (const _ref of []) {
+        const _arr = _toArray(_ref, 1, false),
+          _obj = _objectDestructuringEmpty(_arr[0]),
+          a = _objectWithoutProperties(_obj, []);
+        {
+        }
+      }
+      for (_ref11 of []) {
+        ((_arr12 = _toArray(_ref11, 1, false)),
+          (_obj13 = _objectDestructuringEmpty(_arr12[0])),
+          (a = _objectWithoutProperties(_obj13, [])));
+        {
+        }
+      }
+      async function f() {
+        var _ref14, _arr15, _obj16;
+        for await (_ref14 of []) {
+          ((_arr15 = _toArray(_ref14, 1, false)),
+            (_obj16 = _objectDestructuringEmpty(_arr15[0])),
+            (a = _objectWithoutProperties(_obj16, [])));
+          {
+          }
+        }
+      }
+    }
+    // skip
+    {
+      for ([...a] in {}) {
+      }
+      for ([...a] of []) {
+      }
+      async function a() {
+        for await ([...a] of []) {
+        }
+      }
+    }"
+  `);
 });
 
 test('object-rest/for-x-array-pattern-rest-only/input.js [loose, helpers]', async () => {
@@ -2124,7 +3427,71 @@ test('object-rest/for-x-array-pattern-rest-only/input.js [loose, helpers]', asyn
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _toArray2 = {
+      slicedToArray: require('@babel/runtime/helpers/slicedToArray'),
+      toArray: require('@babel/runtime/helpers/toArray'),
+    };
+    function _toArray(r, e, a) {
+      return a ? _toArray2.toArray(r) : _toArray2.slicedToArray(r, e);
+    }
+    var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutPropertiesLoose: require('@babel/runtime/helpers/objectWithoutPropertiesLoose'),
+    };
+    function _objectWithoutProperties(e, t) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(e),
+        _objectWithoutProperties2.objectWithoutPropertiesLoose(e, t)
+      );
+    }
+    var _ref11, _arr12, _obj13;
+    // ForXStatement
+    {
+      let a;
+      for (const _ref of []) {
+        const _arr = _toArray(_ref, 1, false),
+          _obj = _objectDestructuringEmpty(_arr[0]),
+          a = _objectWithoutProperties(_obj, []);
+        {
+        }
+      }
+      for (_ref11 of []) {
+        ((_arr12 = _toArray(_ref11, 1, false)),
+          (_obj13 = _objectDestructuringEmpty(_arr12[0])),
+          (a = _objectWithoutProperties(_obj13, [])));
+        {
+        }
+      }
+      async function f() {
+        var _ref14, _arr15, _obj16;
+        for await (_ref14 of []) {
+          ((_arr15 = _toArray(_ref14, 1, false)),
+            (_obj16 = _objectDestructuringEmpty(_arr15[0])),
+            (a = _objectWithoutProperties(_obj16, [])));
+          {
+          }
+        }
+      }
+    }
+    // skip
+    {
+      for ([...a] in {}) {
+      }
+      for ([...a] of []) {
+      }
+      async function a() {
+        for await ([...a] of []) {
+        }
+      }
+    }"
+  `);
 });
 
 test('object-rest/for-x-array-pattern-rest-only/input.js [loose, built-ins]', async () => {
@@ -2135,7 +3502,71 @@ test('object-rest/for-x-array-pattern-rest-only/input.js [loose, built-ins]', as
       transforms: { objectRestSpread: { loose: true, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:destructuring-generated-initializer-missing"`);
+  ).toMatchInlineSnapshot(`
+    "var _toArray2 = {
+      slicedToArray: require('@babel/runtime/helpers/slicedToArray'),
+      toArray: require('@babel/runtime/helpers/toArray'),
+    };
+    function _toArray(r, e, a) {
+      return a ? _toArray2.toArray(r) : _toArray2.slicedToArray(r, e);
+    }
+    var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutPropertiesLoose: require('@babel/runtime/helpers/objectWithoutPropertiesLoose'),
+    };
+    function _objectWithoutProperties(e, t) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(e),
+        _objectWithoutProperties2.objectWithoutPropertiesLoose(e, t)
+      );
+    }
+    var _ref11, _arr12, _obj13;
+    // ForXStatement
+    {
+      let a;
+      for (const _ref of []) {
+        const _arr = _toArray(_ref, 1, false),
+          _obj = _objectDestructuringEmpty(_arr[0]),
+          a = _objectWithoutProperties(_obj, []);
+        {
+        }
+      }
+      for (_ref11 of []) {
+        ((_arr12 = _toArray(_ref11, 1, false)),
+          (_obj13 = _objectDestructuringEmpty(_arr12[0])),
+          (a = _objectWithoutProperties(_obj13, [])));
+        {
+        }
+      }
+      async function f() {
+        var _ref14, _arr15, _obj16;
+        for await (_ref14 of []) {
+          ((_arr15 = _toArray(_ref14, 1, false)),
+            (_obj16 = _objectDestructuringEmpty(_arr15[0])),
+            (a = _objectWithoutProperties(_obj16, [])));
+          {
+          }
+        }
+      }
+    }
+    // skip
+    {
+      for ([...a] in {}) {
+      }
+      for ([...a] of []) {
+      }
+      async function a() {
+        for await ([...a] of []) {
+        }
+      }
+    }"
+  `);
 });
 
 test('object-rest/for-x-array-pattern/input.js [spec, helpers]', async () => {
@@ -2219,7 +3650,93 @@ test('object-rest/for-x-array-pattern/input.js [spec, built-ins]', async () => {
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _toArray2 = {
+      slicedToArray: require('@babel/runtime/helpers/slicedToArray'),
+      toArray: require('@babel/runtime/helpers/toArray'),
+    };
+    function _toArray(r, e, a) {
+      return a ? _toArray2.toArray(r) : _toArray2.slicedToArray(r, e);
+    }
+    var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutProperties: require('@babel/runtime/helpers/objectWithoutProperties'),
+    };
+    function _objectWithoutProperties(t, e) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(t),
+        _objectWithoutProperties2.objectWithoutProperties(t, e)
+      );
+    }
+    var _ref12, _arr13, _obj14;
+    // ForXStatement
+    {
+      let a, b;
+      for (const _ref of []) {
+        const _arr = _toArray(_ref, 1, false),
+          _obj = _objectDestructuringEmpty(_arr[0]),
+          a = _obj.a,
+          b = _objectWithoutProperties(_obj, ['a']);
+        {
+        }
+      }
+      for (_ref12 of []) {
+        ((_arr13 = _toArray(_ref12, 1, false)),
+          (_obj14 = _objectDestructuringEmpty(_arr13[0])),
+          (a = _obj14.a),
+          (b = _objectWithoutProperties(_obj14, ['a'])));
+        {
+        }
+      }
+      async function f() {
+        var _ref15, _arr16, _obj17;
+        for await (_ref15 of []) {
+          ((_arr16 = _toArray(_ref15, 1, false)),
+            (_obj17 = _objectDestructuringEmpty(_arr16[0])),
+            (a = _obj17.a),
+            (b = _objectWithoutProperties(_obj17, ['a'])));
+          {
+          }
+        }
+      }
+      for (const _ref18 of []) {
+        const _obj19 = _objectDestructuringEmpty(_ref18),
+          _arr20 = _toArray(_obj19.a, 1, false),
+          _obj21 = _objectDestructuringEmpty(_arr20[0]),
+          a = _obj21.a,
+          b = _objectWithoutProperties(_obj21, ['a']);
+        {
+        }
+      }
+    }
+    // skip
+    {
+      for ([{ a }] in {}) {
+      }
+      for ([{ a }] of []) {
+      }
+      async function a() {
+        for await ([{ a }] of []) {
+        }
+      }
+    }
+    {
+      for ([a, ...b] in {}) {
+      }
+      for ([a, ...b] of []) {
+      }
+      async function a() {
+        for await ([a, ...b] of []) {
+        }
+      }
+    }"
+  `);
 });
 
 test('object-rest/for-x-array-pattern/input.js [loose, helpers]', async () => {
@@ -2230,7 +3747,93 @@ test('object-rest/for-x-array-pattern/input.js [loose, helpers]', async () => {
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _toArray2 = {
+      slicedToArray: require('@babel/runtime/helpers/slicedToArray'),
+      toArray: require('@babel/runtime/helpers/toArray'),
+    };
+    function _toArray(r, e, a) {
+      return a ? _toArray2.toArray(r) : _toArray2.slicedToArray(r, e);
+    }
+    var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutPropertiesLoose: require('@babel/runtime/helpers/objectWithoutPropertiesLoose'),
+    };
+    function _objectWithoutProperties(e, t) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(e),
+        _objectWithoutProperties2.objectWithoutPropertiesLoose(e, t)
+      );
+    }
+    var _ref12, _arr13, _obj14;
+    // ForXStatement
+    {
+      let a, b;
+      for (const _ref of []) {
+        const _arr = _toArray(_ref, 1, false),
+          _obj = _objectDestructuringEmpty(_arr[0]),
+          a = _obj.a,
+          b = _objectWithoutProperties(_obj, ['a']);
+        {
+        }
+      }
+      for (_ref12 of []) {
+        ((_arr13 = _toArray(_ref12, 1, false)),
+          (_obj14 = _objectDestructuringEmpty(_arr13[0])),
+          (a = _obj14.a),
+          (b = _objectWithoutProperties(_obj14, ['a'])));
+        {
+        }
+      }
+      async function f() {
+        var _ref15, _arr16, _obj17;
+        for await (_ref15 of []) {
+          ((_arr16 = _toArray(_ref15, 1, false)),
+            (_obj17 = _objectDestructuringEmpty(_arr16[0])),
+            (a = _obj17.a),
+            (b = _objectWithoutProperties(_obj17, ['a'])));
+          {
+          }
+        }
+      }
+      for (const _ref18 of []) {
+        const _obj19 = _objectDestructuringEmpty(_ref18),
+          _arr20 = _toArray(_obj19.a, 1, false),
+          _obj21 = _objectDestructuringEmpty(_arr20[0]),
+          a = _obj21.a,
+          b = _objectWithoutProperties(_obj21, ['a']);
+        {
+        }
+      }
+    }
+    // skip
+    {
+      for ([{ a }] in {}) {
+      }
+      for ([{ a }] of []) {
+      }
+      async function a() {
+        for await ([{ a }] of []) {
+        }
+      }
+    }
+    {
+      for ([a, ...b] in {}) {
+      }
+      for ([a, ...b] of []) {
+      }
+      async function a() {
+        for await ([a, ...b] of []) {
+        }
+      }
+    }"
+  `);
 });
 
 test('object-rest/for-x-array-pattern/input.js [loose, built-ins]', async () => {
@@ -2241,7 +3844,93 @@ test('object-rest/for-x-array-pattern/input.js [loose, built-ins]', async () => 
       transforms: { objectRestSpread: { loose: true, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:destructuring-generated-initializer-missing"`);
+  ).toMatchInlineSnapshot(`
+    "var _toArray2 = {
+      slicedToArray: require('@babel/runtime/helpers/slicedToArray'),
+      toArray: require('@babel/runtime/helpers/toArray'),
+    };
+    function _toArray(r, e, a) {
+      return a ? _toArray2.toArray(r) : _toArray2.slicedToArray(r, e);
+    }
+    var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutPropertiesLoose: require('@babel/runtime/helpers/objectWithoutPropertiesLoose'),
+    };
+    function _objectWithoutProperties(e, t) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(e),
+        _objectWithoutProperties2.objectWithoutPropertiesLoose(e, t)
+      );
+    }
+    var _ref12, _arr13, _obj14;
+    // ForXStatement
+    {
+      let a, b;
+      for (const _ref of []) {
+        const _arr = _toArray(_ref, 1, false),
+          _obj = _objectDestructuringEmpty(_arr[0]),
+          a = _obj.a,
+          b = _objectWithoutProperties(_obj, ['a']);
+        {
+        }
+      }
+      for (_ref12 of []) {
+        ((_arr13 = _toArray(_ref12, 1, false)),
+          (_obj14 = _objectDestructuringEmpty(_arr13[0])),
+          (a = _obj14.a),
+          (b = _objectWithoutProperties(_obj14, ['a'])));
+        {
+        }
+      }
+      async function f() {
+        var _ref15, _arr16, _obj17;
+        for await (_ref15 of []) {
+          ((_arr16 = _toArray(_ref15, 1, false)),
+            (_obj17 = _objectDestructuringEmpty(_arr16[0])),
+            (a = _obj17.a),
+            (b = _objectWithoutProperties(_obj17, ['a'])));
+          {
+          }
+        }
+      }
+      for (const _ref18 of []) {
+        const _obj19 = _objectDestructuringEmpty(_ref18),
+          _arr20 = _toArray(_obj19.a, 1, false),
+          _obj21 = _objectDestructuringEmpty(_arr20[0]),
+          a = _obj21.a,
+          b = _objectWithoutProperties(_obj21, ['a']);
+        {
+        }
+      }
+    }
+    // skip
+    {
+      for ([{ a }] in {}) {
+      }
+      for ([{ a }] of []) {
+      }
+      async function a() {
+        for await ([{ a }] of []) {
+        }
+      }
+    }
+    {
+      for ([a, ...b] in {}) {
+      }
+      for ([a, ...b] of []) {
+      }
+      async function a() {
+        for await ([a, ...b] of []) {
+        }
+      }
+    }"
+  `);
 });
 
 test('object-rest/for-x-assignment-shadowed-block-scoped-bindings/exec.js [spec, helpers]', async () => {
@@ -2278,7 +3967,42 @@ test('object-rest/for-x-assignment-shadowed-block-scoped-bindings/exec.js [spec,
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutProperties: require('@babel/runtime/helpers/objectWithoutProperties'),
+    };
+    function _objectWithoutProperties(t, e) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(t),
+        _objectWithoutProperties2.objectWithoutProperties(t, e)
+      );
+    }
+    var _toPropertyKey2 = require('@babel/runtime/helpers/toPropertyKey');
+    function _toPropertyKey(value) {
+      return _toPropertyKey2(value);
+    }
+    var _ref, _obj, _key;
+    let a = 0,
+      result,
+      y;
+    for (_ref of [['0', '1']]) {
+      ((_obj = _objectDestructuringEmpty(_ref)),
+        (_key = _toPropertyKey(a++)),
+        (result = _obj[_key]),
+        (y = _objectWithoutProperties(_obj, [_key])));
+      {
+        const a = 1;
+      }
+    }
+    expect(result).toBe('0');"
+  `);
 });
 
 test('object-rest/for-x-assignment-shadowed-block-scoped-bindings/exec.js [loose, helpers]', async () => {
@@ -2289,7 +4013,42 @@ test('object-rest/for-x-assignment-shadowed-block-scoped-bindings/exec.js [loose
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutPropertiesLoose: require('@babel/runtime/helpers/objectWithoutPropertiesLoose'),
+    };
+    function _objectWithoutProperties(e, t) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(e),
+        _objectWithoutProperties2.objectWithoutPropertiesLoose(e, t)
+      );
+    }
+    var _toPropertyKey2 = require('@babel/runtime/helpers/toPropertyKey');
+    function _toPropertyKey(value) {
+      return _toPropertyKey2(value);
+    }
+    var _ref, _obj, _key;
+    let a = 0,
+      result,
+      y;
+    for (_ref of [['0', '1']]) {
+      ((_obj = _objectDestructuringEmpty(_ref)),
+        (_key = _toPropertyKey(a++)),
+        (result = _obj[_key]),
+        (y = _objectWithoutProperties(_obj, [_key])));
+      {
+        const a = 1;
+      }
+    }
+    expect(result).toBe('0');"
+  `);
 });
 
 test('object-rest/for-x-assignment-shadowed-block-scoped-bindings/exec.js [loose, built-ins]', async () => {
@@ -2301,18 +4060,38 @@ test('object-rest/for-x-assignment-shadowed-block-scoped-bindings/exec.js [loose
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "var _toPropertyKey = require('@babel/runtime/helpers/toPropertyKey');
-    var _objectWithoutProperties = require('@babel/runtime/helpers/objectWithoutProperties');
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutPropertiesLoose: require('@babel/runtime/helpers/objectWithoutPropertiesLoose'),
+    };
+    function _objectWithoutProperties(e, t) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(e),
+        _objectWithoutProperties2.objectWithoutPropertiesLoose(e, t)
+      );
+    }
+    var _toPropertyKey2 = require('@babel/runtime/helpers/toPropertyKey');
+    function _toPropertyKey(value) {
+      return _toPropertyKey2(value);
+    }
+    var _ref, _obj, _key;
     let a = 0,
       result,
       y;
-    for (var _ref of [['0', '1']]) {
-      var _ref2,
-        _a = a++;
-      ((_ref2 = _ref),
-        ({ [_a]: result } = _ref2),
-        (y = _objectWithoutProperties(_ref2, [_a].map(_toPropertyKey))));
-      const a = 1;
+    for (_ref of [['0', '1']]) {
+      ((_obj = _objectDestructuringEmpty(_ref)),
+        (_key = _toPropertyKey(a++)),
+        (result = _obj[_key]),
+        (y = _objectWithoutProperties(_obj, [_key])));
+      {
+        const a = 1;
+      }
     }
     expect(result).toBe('0');"
   `);
@@ -2351,7 +4130,41 @@ test('object-rest/for-x-assignment-shadowed-block-scoped-bindings/input.js [spec
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutProperties: require('@babel/runtime/helpers/objectWithoutProperties'),
+    };
+    function _objectWithoutProperties(t, e) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(t),
+        _objectWithoutProperties2.objectWithoutProperties(t, e)
+      );
+    }
+    var _toPropertyKey2 = require('@babel/runtime/helpers/toPropertyKey');
+    function _toPropertyKey(value) {
+      return _toPropertyKey2(value);
+    }
+    var _ref, _obj, _key;
+    let a = 0,
+      result,
+      y;
+    for (_ref of [['0', '1']]) {
+      ((_obj = _objectDestructuringEmpty(_ref)),
+        (_key = _toPropertyKey(a++)),
+        (result = _obj[_key]),
+        (y = _objectWithoutProperties(_obj, [_key])));
+      {
+        const a = 1;
+      }
+    }"
+  `);
 });
 
 test('object-rest/for-x-assignment-shadowed-block-scoped-bindings/input.js [loose, helpers]', async () => {
@@ -2362,7 +4175,41 @@ test('object-rest/for-x-assignment-shadowed-block-scoped-bindings/input.js [loos
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutPropertiesLoose: require('@babel/runtime/helpers/objectWithoutPropertiesLoose'),
+    };
+    function _objectWithoutProperties(e, t) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(e),
+        _objectWithoutProperties2.objectWithoutPropertiesLoose(e, t)
+      );
+    }
+    var _toPropertyKey2 = require('@babel/runtime/helpers/toPropertyKey');
+    function _toPropertyKey(value) {
+      return _toPropertyKey2(value);
+    }
+    var _ref, _obj, _key;
+    let a = 0,
+      result,
+      y;
+    for (_ref of [['0', '1']]) {
+      ((_obj = _objectDestructuringEmpty(_ref)),
+        (_key = _toPropertyKey(a++)),
+        (result = _obj[_key]),
+        (y = _objectWithoutProperties(_obj, [_key])));
+      {
+        const a = 1;
+      }
+    }"
+  `);
 });
 
 test('object-rest/for-x-assignment-shadowed-block-scoped-bindings/input.js [loose, built-ins]', async () => {
@@ -2374,18 +4221,38 @@ test('object-rest/for-x-assignment-shadowed-block-scoped-bindings/input.js [loos
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "var _toPropertyKey = require('@babel/runtime/helpers/toPropertyKey');
-    var _objectWithoutProperties = require('@babel/runtime/helpers/objectWithoutProperties');
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutPropertiesLoose: require('@babel/runtime/helpers/objectWithoutPropertiesLoose'),
+    };
+    function _objectWithoutProperties(e, t) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(e),
+        _objectWithoutProperties2.objectWithoutPropertiesLoose(e, t)
+      );
+    }
+    var _toPropertyKey2 = require('@babel/runtime/helpers/toPropertyKey');
+    function _toPropertyKey(value) {
+      return _toPropertyKey2(value);
+    }
+    var _ref, _obj, _key;
     let a = 0,
       result,
       y;
-    for (var _ref of [['0', '1']]) {
-      var _ref2,
-        _a = a++;
-      ((_ref2 = _ref),
-        ({ [_a]: result } = _ref2),
-        (y = _objectWithoutProperties(_ref2, [_a].map(_toPropertyKey))));
-      const a = 1;
+    for (_ref of [['0', '1']]) {
+      ((_obj = _objectDestructuringEmpty(_ref)),
+        (_key = _toPropertyKey(a++)),
+        (result = _obj[_key]),
+        (y = _objectWithoutProperties(_obj, [_key])));
+      {
+        const a = 1;
+      }
     }"
   `);
 });
@@ -2414,7 +4281,32 @@ test('object-rest/for-x-completion-record/input.js [spec, built-ins]', async () 
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutProperties: require('@babel/runtime/helpers/objectWithoutProperties'),
+    };
+    function _objectWithoutProperties(t, e) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(t),
+        _objectWithoutProperties2.objectWithoutProperties(t, e)
+      );
+    }
+    var _ref, _obj;
+    for (_ref of []) {
+      ((_obj = _objectDestructuringEmpty(_ref)),
+        (a = _obj.a),
+        (b = _objectWithoutProperties(_obj, ['a'])));
+      {
+      }
+    }"
+  `);
 });
 
 test('object-rest/for-x-completion-record/input.js [loose, helpers]', async () => {
@@ -2424,7 +4316,32 @@ test('object-rest/for-x-completion-record/input.js [loose, helpers]', async () =
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutPropertiesLoose: require('@babel/runtime/helpers/objectWithoutPropertiesLoose'),
+    };
+    function _objectWithoutProperties(e, t) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(e),
+        _objectWithoutProperties2.objectWithoutPropertiesLoose(e, t)
+      );
+    }
+    var _ref, _obj;
+    for (_ref of []) {
+      ((_obj = _objectDestructuringEmpty(_ref)),
+        (a = _obj.a),
+        (b = _objectWithoutProperties(_obj, ['a'])));
+      {
+      }
+    }"
+  `);
 });
 
 test('object-rest/for-x-completion-record/input.js [loose, built-ins]', async () => {
@@ -2435,11 +4352,29 @@ test('object-rest/for-x-completion-record/input.js [loose, built-ins]', async ()
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "const _excluded = ['a'];
-    var _objectWithoutProperties = require('@babel/runtime/helpers/objectWithoutProperties');
-    for (var _ref of []) {
-      var _ref2;
-      ((_ref2 = _ref), ({ a } = _ref2), (b = _objectWithoutProperties(_ref2, _excluded)));
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutPropertiesLoose: require('@babel/runtime/helpers/objectWithoutPropertiesLoose'),
+    };
+    function _objectWithoutProperties(e, t) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(e),
+        _objectWithoutProperties2.objectWithoutPropertiesLoose(e, t)
+      );
+    }
+    var _ref, _obj;
+    for (_ref of []) {
+      ((_obj = _objectDestructuringEmpty(_ref)),
+        (a = _obj.a),
+        (b = _objectWithoutProperties(_obj, ['a'])));
+      {
+      }
     }"
   `);
 });
@@ -2476,7 +4411,41 @@ test('object-rest/for-x-declaration-shadowed-block-scoped-bindings/exec.js [spec
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutProperties: require('@babel/runtime/helpers/objectWithoutProperties'),
+    };
+    function _objectWithoutProperties(t, e) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(t),
+        _objectWithoutProperties2.objectWithoutProperties(t, e)
+      );
+    }
+    var _toPropertyKey2 = require('@babel/runtime/helpers/toPropertyKey');
+    function _toPropertyKey(value) {
+      return _toPropertyKey2(value);
+    }
+    let a = 0,
+      result;
+    for (const _ref of [['0', '1']]) {
+      const _obj = _objectDestructuringEmpty(_ref),
+        _key = _toPropertyKey(a++),
+        x = _obj[_key],
+        y = _objectWithoutProperties(_obj, [_key]);
+      {
+        const a = 1;
+        result = x;
+      }
+    }
+    expect(result).toBe('0');"
+  `);
 });
 
 test('object-rest/for-x-declaration-shadowed-block-scoped-bindings/exec.js [loose, helpers]', async () => {
@@ -2487,7 +4456,41 @@ test('object-rest/for-x-declaration-shadowed-block-scoped-bindings/exec.js [loos
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutPropertiesLoose: require('@babel/runtime/helpers/objectWithoutPropertiesLoose'),
+    };
+    function _objectWithoutProperties(e, t) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(e),
+        _objectWithoutProperties2.objectWithoutPropertiesLoose(e, t)
+      );
+    }
+    var _toPropertyKey2 = require('@babel/runtime/helpers/toPropertyKey');
+    function _toPropertyKey(value) {
+      return _toPropertyKey2(value);
+    }
+    let a = 0,
+      result;
+    for (const _ref of [['0', '1']]) {
+      const _obj = _objectDestructuringEmpty(_ref),
+        _key = _toPropertyKey(a++),
+        x = _obj[_key],
+        y = _objectWithoutProperties(_obj, [_key]);
+      {
+        const a = 1;
+        result = x;
+      }
+    }
+    expect(result).toBe('0');"
+  `);
 });
 
 test('object-rest/for-x-declaration-shadowed-block-scoped-bindings/exec.js [loose, built-ins]', async () => {
@@ -2498,7 +4501,41 @@ test('object-rest/for-x-declaration-shadowed-block-scoped-bindings/exec.js [loos
       transforms: { objectRestSpread: { loose: true, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:destructuring-generated-initializer-missing"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutPropertiesLoose: require('@babel/runtime/helpers/objectWithoutPropertiesLoose'),
+    };
+    function _objectWithoutProperties(e, t) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(e),
+        _objectWithoutProperties2.objectWithoutPropertiesLoose(e, t)
+      );
+    }
+    var _toPropertyKey2 = require('@babel/runtime/helpers/toPropertyKey');
+    function _toPropertyKey(value) {
+      return _toPropertyKey2(value);
+    }
+    let a = 0,
+      result;
+    for (const _ref of [['0', '1']]) {
+      const _obj = _objectDestructuringEmpty(_ref),
+        _key = _toPropertyKey(a++),
+        x = _obj[_key],
+        y = _objectWithoutProperties(_obj, [_key]);
+      {
+        const a = 1;
+        result = x;
+      }
+    }
+    expect(result).toBe('0');"
+  `);
 });
 
 test('object-rest/for-x-declaration-shadowed-block-scoped-bindings/input.js [spec, helpers]', async () => {
@@ -2532,7 +4569,40 @@ test('object-rest/for-x-declaration-shadowed-block-scoped-bindings/input.js [spe
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutProperties: require('@babel/runtime/helpers/objectWithoutProperties'),
+    };
+    function _objectWithoutProperties(t, e) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(t),
+        _objectWithoutProperties2.objectWithoutProperties(t, e)
+      );
+    }
+    var _toPropertyKey2 = require('@babel/runtime/helpers/toPropertyKey');
+    function _toPropertyKey(value) {
+      return _toPropertyKey2(value);
+    }
+    let a = 0,
+      result;
+    for (const _ref of [['0', '1']]) {
+      const _obj = _objectDestructuringEmpty(_ref),
+        _key = _toPropertyKey(a++),
+        x = _obj[_key],
+        y = _objectWithoutProperties(_obj, [_key]);
+      {
+        const a = 1;
+        result = x;
+      }
+    }"
+  `);
 });
 
 test('object-rest/for-x-declaration-shadowed-block-scoped-bindings/input.js [loose, helpers]', async () => {
@@ -2543,7 +4613,40 @@ test('object-rest/for-x-declaration-shadowed-block-scoped-bindings/input.js [loo
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutPropertiesLoose: require('@babel/runtime/helpers/objectWithoutPropertiesLoose'),
+    };
+    function _objectWithoutProperties(e, t) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(e),
+        _objectWithoutProperties2.objectWithoutPropertiesLoose(e, t)
+      );
+    }
+    var _toPropertyKey2 = require('@babel/runtime/helpers/toPropertyKey');
+    function _toPropertyKey(value) {
+      return _toPropertyKey2(value);
+    }
+    let a = 0,
+      result;
+    for (const _ref of [['0', '1']]) {
+      const _obj = _objectDestructuringEmpty(_ref),
+        _key = _toPropertyKey(a++),
+        x = _obj[_key],
+        y = _objectWithoutProperties(_obj, [_key]);
+      {
+        const a = 1;
+        result = x;
+      }
+    }"
+  `);
 });
 
 test('object-rest/for-x-declaration-shadowed-block-scoped-bindings/input.js [loose, built-ins]', async () => {
@@ -2554,7 +4657,40 @@ test('object-rest/for-x-declaration-shadowed-block-scoped-bindings/input.js [loo
       transforms: { objectRestSpread: { loose: true, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:destructuring-generated-initializer-missing"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutPropertiesLoose: require('@babel/runtime/helpers/objectWithoutPropertiesLoose'),
+    };
+    function _objectWithoutProperties(e, t) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(e),
+        _objectWithoutProperties2.objectWithoutPropertiesLoose(e, t)
+      );
+    }
+    var _toPropertyKey2 = require('@babel/runtime/helpers/toPropertyKey');
+    function _toPropertyKey(value) {
+      return _toPropertyKey2(value);
+    }
+    let a = 0,
+      result;
+    for (const _ref of [['0', '1']]) {
+      const _obj = _objectDestructuringEmpty(_ref),
+        _key = _toPropertyKey(a++),
+        x = _obj[_key],
+        y = _objectWithoutProperties(_obj, [_key]);
+      {
+        const a = 1;
+        result = x;
+      }
+    }"
+  `);
 });
 
 test('object-rest/for-x/input.js [spec, helpers]', async () => {
@@ -2613,7 +4749,67 @@ test('object-rest/for-x/input.js [spec, built-ins]', async () => {
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutProperties: require('@babel/runtime/helpers/objectWithoutProperties'),
+    };
+    function _objectWithoutProperties(t, e) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(t),
+        _objectWithoutProperties2.objectWithoutProperties(t, e)
+      );
+    }
+    var _ref10, _obj11;
+    // ForXStatement
+    for (var _ref of []) {
+      var _obj = _objectDestructuringEmpty(_ref),
+        a = _obj.a,
+        b = _objectWithoutProperties(_obj, ['a']);
+      {
+      }
+    }
+    for (_ref10 of []) {
+      ((_obj11 = _objectDestructuringEmpty(_ref10)),
+        (a = _obj11.a),
+        (b = _objectWithoutProperties(_obj11, ['a'])));
+      {
+      }
+    }
+    async function a() {
+      var _ref12, _obj13;
+      for await (_ref12 of []) {
+        ((_obj13 = _objectDestructuringEmpty(_ref12)),
+          (a = _obj13.a),
+          (b = _objectWithoutProperties(_obj13, ['a'])));
+        {
+        }
+      }
+    }
+    // skip
+    for ({ a } in {}) {
+    }
+    for ({ a } of []) {
+    }
+    async function a() {
+      for await ({ a } of []) {
+      }
+    }
+    for (a in {}) {
+    }
+    for (a of []) {
+    }
+    async function a() {
+      for await (a of []) {
+      }
+    }"
+  `);
 });
 
 test('object-rest/for-x/input.js [loose, helpers]', async () => {
@@ -2624,7 +4820,67 @@ test('object-rest/for-x/input.js [loose, helpers]', async () => {
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutPropertiesLoose: require('@babel/runtime/helpers/objectWithoutPropertiesLoose'),
+    };
+    function _objectWithoutProperties(e, t) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(e),
+        _objectWithoutProperties2.objectWithoutPropertiesLoose(e, t)
+      );
+    }
+    var _ref10, _obj11;
+    // ForXStatement
+    for (var _ref of []) {
+      var _obj = _objectDestructuringEmpty(_ref),
+        a = _obj.a,
+        b = _objectWithoutProperties(_obj, ['a']);
+      {
+      }
+    }
+    for (_ref10 of []) {
+      ((_obj11 = _objectDestructuringEmpty(_ref10)),
+        (a = _obj11.a),
+        (b = _objectWithoutProperties(_obj11, ['a'])));
+      {
+      }
+    }
+    async function a() {
+      var _ref12, _obj13;
+      for await (_ref12 of []) {
+        ((_obj13 = _objectDestructuringEmpty(_ref12)),
+          (a = _obj13.a),
+          (b = _objectWithoutProperties(_obj13, ['a'])));
+        {
+        }
+      }
+    }
+    // skip
+    for ({ a } in {}) {
+    }
+    for ({ a } of []) {
+    }
+    async function a() {
+      for await ({ a } of []) {
+      }
+    }
+    for (a in {}) {
+    }
+    for (a of []) {
+    }
+    async function a() {
+      for await (a of []) {
+      }
+    }"
+  `);
 });
 
 test('object-rest/for-x/input.js [loose, built-ins]', async () => {
@@ -2635,7 +4891,67 @@ test('object-rest/for-x/input.js [loose, built-ins]', async () => {
       transforms: { objectRestSpread: { loose: true, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:destructuring-generated-initializer-missing"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutPropertiesLoose: require('@babel/runtime/helpers/objectWithoutPropertiesLoose'),
+    };
+    function _objectWithoutProperties(e, t) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(e),
+        _objectWithoutProperties2.objectWithoutPropertiesLoose(e, t)
+      );
+    }
+    var _ref10, _obj11;
+    // ForXStatement
+    for (var _ref of []) {
+      var _obj = _objectDestructuringEmpty(_ref),
+        a = _obj.a,
+        b = _objectWithoutProperties(_obj, ['a']);
+      {
+      }
+    }
+    for (_ref10 of []) {
+      ((_obj11 = _objectDestructuringEmpty(_ref10)),
+        (a = _obj11.a),
+        (b = _objectWithoutProperties(_obj11, ['a'])));
+      {
+      }
+    }
+    async function a() {
+      var _ref12, _obj13;
+      for await (_ref12 of []) {
+        ((_obj13 = _objectDestructuringEmpty(_ref12)),
+          (a = _obj13.a),
+          (b = _objectWithoutProperties(_obj13, ['a'])));
+        {
+        }
+      }
+    }
+    // skip
+    for ({ a } in {}) {
+    }
+    for ({ a } of []) {
+    }
+    async function a() {
+      for await ({ a } of []) {
+      }
+    }
+    for (a in {}) {
+    }
+    for (a of []) {
+    }
+    async function a() {
+      for await (a of []) {
+      }
+    }"
+  `);
 });
 
 test('object-rest/impure-computed-exec/exec.js [spec, helpers]', async () => {
@@ -2712,7 +5028,88 @@ test('object-rest/impure-computed-exec/exec.js [spec, built-ins]', async () => {
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutProperties: require('@babel/runtime/helpers/objectWithoutProperties'),
+    };
+    function _objectWithoutProperties(t, e) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(t),
+        _objectWithoutProperties2.objectWithoutProperties(t, e)
+      );
+    }
+    var _toPropertyKey2 = require('@babel/runtime/helpers/toPropertyKey');
+    function _toPropertyKey(value) {
+      return _toPropertyKey2(value);
+    }
+    var _ref21, _obj22, _key23;
+    var key, x, y, z;
+    // impure
+    key = 1;
+    var _ref = {
+        1: 1,
+        a: 1,
+      },
+      _obj = _objectDestructuringEmpty(_ref),
+      _key = _toPropertyKey(key++),
+      y = _obj[_key],
+      x = _objectWithoutProperties(_obj, [_key]);
+    expect(x).toEqual({ a: 1 });
+    expect(key).toBe(2);
+    expect(1).toBe(y);
+    // takes care of the order
+    key = 1;
+    var _ref17 = {
+        2: 2,
+        3: 3,
+      },
+      _obj18 = _objectDestructuringEmpty(_ref17),
+      _key19 = _toPropertyKey(++key),
+      y = _obj18[_key19],
+      _key20 = _toPropertyKey(++key),
+      z = _obj18[_key20],
+      rest = _objectWithoutProperties(_obj18, [_key19, _key20]);
+    expect(y).toBe(2);
+    expect(z).toBe(3);
+    // pure, computed property should remain as-is
+    key = 2;
+    ((_ref21 = {
+      2: 'two',
+      z: 'zee',
+    }),
+      (_obj22 = _objectDestructuringEmpty(_ref21)),
+      (_key23 = _toPropertyKey(key)),
+      (y = _obj22[_key23]),
+      (z = _obj22.z),
+      (x = _objectWithoutProperties(_obj22, [_key23, 'z'])),
+      _ref21);
+    expect(y).toBe('two');
+    expect(x).toEqual({});
+    expect(z).toBe('zee');
+    // rhs evaluated before lhs
+    var order = [];
+    function left() {
+      order.push('left');
+      return 0;
+    }
+    function right() {
+      order.push('right');
+      return {};
+    }
+    var _ref24 = right(),
+      _obj25 = _objectDestructuringEmpty(_ref24),
+      _key26 = _toPropertyKey(left()),
+      y = _obj25[_key26],
+      x = _objectWithoutProperties(_obj25, [_key26]);
+    expect(order).toEqual(['right', 'left']);"
+  `);
 });
 
 test('object-rest/impure-computed-exec/exec.js [loose, helpers]', async () => {
@@ -2723,7 +5120,88 @@ test('object-rest/impure-computed-exec/exec.js [loose, helpers]', async () => {
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutPropertiesLoose: require('@babel/runtime/helpers/objectWithoutPropertiesLoose'),
+    };
+    function _objectWithoutProperties(e, t) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(e),
+        _objectWithoutProperties2.objectWithoutPropertiesLoose(e, t)
+      );
+    }
+    var _toPropertyKey2 = require('@babel/runtime/helpers/toPropertyKey');
+    function _toPropertyKey(value) {
+      return _toPropertyKey2(value);
+    }
+    var _ref21, _obj22, _key23;
+    var key, x, y, z;
+    // impure
+    key = 1;
+    var _ref = {
+        1: 1,
+        a: 1,
+      },
+      _obj = _objectDestructuringEmpty(_ref),
+      _key = _toPropertyKey(key++),
+      y = _obj[_key],
+      x = _objectWithoutProperties(_obj, [_key]);
+    expect(x).toEqual({ a: 1 });
+    expect(key).toBe(2);
+    expect(1).toBe(y);
+    // takes care of the order
+    key = 1;
+    var _ref17 = {
+        2: 2,
+        3: 3,
+      },
+      _obj18 = _objectDestructuringEmpty(_ref17),
+      _key19 = _toPropertyKey(++key),
+      y = _obj18[_key19],
+      _key20 = _toPropertyKey(++key),
+      z = _obj18[_key20],
+      rest = _objectWithoutProperties(_obj18, [_key19, _key20]);
+    expect(y).toBe(2);
+    expect(z).toBe(3);
+    // pure, computed property should remain as-is
+    key = 2;
+    ((_ref21 = {
+      2: 'two',
+      z: 'zee',
+    }),
+      (_obj22 = _objectDestructuringEmpty(_ref21)),
+      (_key23 = _toPropertyKey(key)),
+      (y = _obj22[_key23]),
+      (z = _obj22.z),
+      (x = _objectWithoutProperties(_obj22, [_key23, 'z'])),
+      _ref21);
+    expect(y).toBe('two');
+    expect(x).toEqual({});
+    expect(z).toBe('zee');
+    // rhs evaluated before lhs
+    var order = [];
+    function left() {
+      order.push('left');
+      return 0;
+    }
+    function right() {
+      order.push('right');
+      return {};
+    }
+    var _ref24 = right(),
+      _obj25 = _objectDestructuringEmpty(_ref24),
+      _key26 = _toPropertyKey(left()),
+      y = _obj25[_key26],
+      x = _objectWithoutProperties(_obj25, [_key26]);
+    expect(order).toEqual(['right', 'left']);"
+  `);
 });
 
 test('object-rest/impure-computed-exec/exec.js [loose, built-ins]', async () => {
@@ -2751,6 +5229,10 @@ test('object-rest/impure-computed-exec/exec.js [loose, built-ins]', async () => 
         _objectWithoutProperties2.objectWithoutPropertiesLoose(e, t)
       );
     }
+    var _toPropertyKey2 = require('@babel/runtime/helpers/toPropertyKey');
+    function _toPropertyKey(value) {
+      return _toPropertyKey2(value);
+    }
     var _ref21, _obj22, _key23;
     var key, x, y, z;
     // impure
@@ -2760,7 +5242,7 @@ test('object-rest/impure-computed-exec/exec.js [loose, built-ins]', async () => 
         a: 1,
       },
       _obj = _objectDestructuringEmpty(_ref),
-      _key = key++,
+      _key = _toPropertyKey(key++),
       y = _obj[_key],
       x = _objectWithoutProperties(_obj, [_key]);
     expect(x).toEqual({ a: 1 });
@@ -2773,9 +5255,9 @@ test('object-rest/impure-computed-exec/exec.js [loose, built-ins]', async () => 
         3: 3,
       },
       _obj18 = _objectDestructuringEmpty(_ref17),
-      _key19 = ++key,
+      _key19 = _toPropertyKey(++key),
       y = _obj18[_key19],
-      _key20 = ++key,
+      _key20 = _toPropertyKey(++key),
       z = _obj18[_key20],
       rest = _objectWithoutProperties(_obj18, [_key19, _key20]);
     expect(y).toBe(2);
@@ -2787,7 +5269,7 @@ test('object-rest/impure-computed-exec/exec.js [loose, built-ins]', async () => 
       z: 'zee',
     }),
       (_obj22 = _objectDestructuringEmpty(_ref21)),
-      (_key23 = key),
+      (_key23 = _toPropertyKey(key)),
       (y = _obj22[_key23]),
       (z = _obj22.z),
       (x = _objectWithoutProperties(_obj22, [_key23, 'z'])),
@@ -2807,7 +5289,7 @@ test('object-rest/impure-computed-exec/exec.js [loose, built-ins]', async () => 
     }
     var _ref24 = right(),
       _obj25 = _objectDestructuringEmpty(_ref24),
-      _key26 = left(),
+      _key26 = _toPropertyKey(left()),
       y = _obj25[_key26],
       x = _objectWithoutProperties(_obj25, [_key26]);
     expect(order).toEqual(['right', 'left']);"
@@ -2873,7 +5355,72 @@ test('object-rest/impure-computed/input.js [spec, built-ins]', async () => {
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutProperties: require('@babel/runtime/helpers/objectWithoutProperties'),
+    };
+    function _objectWithoutProperties(t, e) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(t),
+        _objectWithoutProperties2.objectWithoutProperties(t, e)
+      );
+    }
+    var _toPropertyKey2 = require('@babel/runtime/helpers/toPropertyKey');
+    function _toPropertyKey(value) {
+      return _toPropertyKey2(value);
+    }
+    var _ref18, _obj19, _key20;
+    var key, x, y, z;
+    // impure
+    key = 1;
+    var _ref = {
+        1: 1,
+        a: 1,
+      },
+      _obj = _objectDestructuringEmpty(_ref),
+      _key = _toPropertyKey(key++),
+      y = _obj[_key],
+      x = _objectWithoutProperties(_obj, [_key]);
+    expect(x).toEqual({ a: 1 });
+    expect(key).toBe(2);
+    expect(y).toBe(1);
+    // takes care of the order
+    key = 1;
+    var _ref14 = {
+        2: 2,
+        3: 3,
+      },
+      _obj15 = _objectDestructuringEmpty(_ref14),
+      _key16 = _toPropertyKey(++key),
+      y = _obj15[_key16],
+      _key17 = _toPropertyKey(++key),
+      z = _obj15[_key17],
+      rest = _objectWithoutProperties(_obj15, [_key16, _key17]);
+    expect(y).toBe(2);
+    expect(z).toBe(3);
+    // pure, computed property should remain as-is
+    key = 2;
+    ((_ref18 = {
+      2: 'two',
+      z: 'zee',
+    }),
+      (_obj19 = _objectDestructuringEmpty(_ref18)),
+      (_key20 = _toPropertyKey(key)),
+      (y = _obj19[_key20]),
+      (z = _obj19.z),
+      (x = _objectWithoutProperties(_obj19, [_key20, 'z'])),
+      _ref18);
+    expect(y).toBe('two');
+    expect(x).toEqual({});
+    expect(z).toBe('zee');"
+  `);
 });
 
 test('object-rest/impure-computed/input.js [loose, helpers]', async () => {
@@ -2884,7 +5431,72 @@ test('object-rest/impure-computed/input.js [loose, helpers]', async () => {
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutPropertiesLoose: require('@babel/runtime/helpers/objectWithoutPropertiesLoose'),
+    };
+    function _objectWithoutProperties(e, t) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(e),
+        _objectWithoutProperties2.objectWithoutPropertiesLoose(e, t)
+      );
+    }
+    var _toPropertyKey2 = require('@babel/runtime/helpers/toPropertyKey');
+    function _toPropertyKey(value) {
+      return _toPropertyKey2(value);
+    }
+    var _ref18, _obj19, _key20;
+    var key, x, y, z;
+    // impure
+    key = 1;
+    var _ref = {
+        1: 1,
+        a: 1,
+      },
+      _obj = _objectDestructuringEmpty(_ref),
+      _key = _toPropertyKey(key++),
+      y = _obj[_key],
+      x = _objectWithoutProperties(_obj, [_key]);
+    expect(x).toEqual({ a: 1 });
+    expect(key).toBe(2);
+    expect(y).toBe(1);
+    // takes care of the order
+    key = 1;
+    var _ref14 = {
+        2: 2,
+        3: 3,
+      },
+      _obj15 = _objectDestructuringEmpty(_ref14),
+      _key16 = _toPropertyKey(++key),
+      y = _obj15[_key16],
+      _key17 = _toPropertyKey(++key),
+      z = _obj15[_key17],
+      rest = _objectWithoutProperties(_obj15, [_key16, _key17]);
+    expect(y).toBe(2);
+    expect(z).toBe(3);
+    // pure, computed property should remain as-is
+    key = 2;
+    ((_ref18 = {
+      2: 'two',
+      z: 'zee',
+    }),
+      (_obj19 = _objectDestructuringEmpty(_ref18)),
+      (_key20 = _toPropertyKey(key)),
+      (y = _obj19[_key20]),
+      (z = _obj19.z),
+      (x = _objectWithoutProperties(_obj19, [_key20, 'z'])),
+      _ref18);
+    expect(y).toBe('two');
+    expect(x).toEqual({});
+    expect(z).toBe('zee');"
+  `);
 });
 
 test('object-rest/impure-computed/input.js [loose, built-ins]', async () => {
@@ -2912,6 +5524,10 @@ test('object-rest/impure-computed/input.js [loose, built-ins]', async () => {
         _objectWithoutProperties2.objectWithoutPropertiesLoose(e, t)
       );
     }
+    var _toPropertyKey2 = require('@babel/runtime/helpers/toPropertyKey');
+    function _toPropertyKey(value) {
+      return _toPropertyKey2(value);
+    }
     var _ref18, _obj19, _key20;
     var key, x, y, z;
     // impure
@@ -2921,7 +5537,7 @@ test('object-rest/impure-computed/input.js [loose, built-ins]', async () => {
         a: 1,
       },
       _obj = _objectDestructuringEmpty(_ref),
-      _key = key++,
+      _key = _toPropertyKey(key++),
       y = _obj[_key],
       x = _objectWithoutProperties(_obj, [_key]);
     expect(x).toEqual({ a: 1 });
@@ -2934,9 +5550,9 @@ test('object-rest/impure-computed/input.js [loose, built-ins]', async () => {
         3: 3,
       },
       _obj15 = _objectDestructuringEmpty(_ref14),
-      _key16 = ++key,
+      _key16 = _toPropertyKey(++key),
       y = _obj15[_key16],
-      _key17 = ++key,
+      _key17 = _toPropertyKey(++key),
       z = _obj15[_key17],
       rest = _objectWithoutProperties(_obj15, [_key16, _key17]);
     expect(y).toBe(2);
@@ -2948,7 +5564,7 @@ test('object-rest/impure-computed/input.js [loose, built-ins]', async () => {
       z: 'zee',
     }),
       (_obj19 = _objectDestructuringEmpty(_ref18)),
-      (_key20 = key),
+      (_key20 = _toPropertyKey(key)),
       (y = _obj19[_key20]),
       (z = _obj19.z),
       (x = _objectWithoutProperties(_obj19, [_key20, 'z'])),
@@ -3002,7 +5618,45 @@ test('object-rest/nested-2/input.js [spec, built-ins]', async () => {
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutProperties: require('@babel/runtime/helpers/objectWithoutProperties'),
+    };
+    function _objectWithoutProperties(t, e) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(t),
+        _objectWithoutProperties2.objectWithoutProperties(t, e)
+      );
+    }
+    const test = {
+      foo: {
+        bar: {
+          baz: {
+            a: {
+              x: 1,
+              y: 2,
+              z: 3,
+            },
+          },
+        },
+      },
+    };
+    const _ref = test,
+      _obj = _objectDestructuringEmpty(_ref),
+      _obj11 = _objectDestructuringEmpty(_obj.foo),
+      _obj12 = _objectDestructuringEmpty(_obj11.bar),
+      _obj13 = _objectDestructuringEmpty(_obj12.baz),
+      _obj14 = _objectDestructuringEmpty(_obj13.a),
+      x = _obj14.x,
+      other = _objectWithoutProperties(_obj14, ['x']);"
+  `);
 });
 
 test('object-rest/nested-2/input.js [loose, helpers]', async () => {
@@ -3013,7 +5667,45 @@ test('object-rest/nested-2/input.js [loose, helpers]', async () => {
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutPropertiesLoose: require('@babel/runtime/helpers/objectWithoutPropertiesLoose'),
+    };
+    function _objectWithoutProperties(e, t) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(e),
+        _objectWithoutProperties2.objectWithoutPropertiesLoose(e, t)
+      );
+    }
+    const test = {
+      foo: {
+        bar: {
+          baz: {
+            a: {
+              x: 1,
+              y: 2,
+              z: 3,
+            },
+          },
+        },
+      },
+    };
+    const _ref = test,
+      _obj = _objectDestructuringEmpty(_ref),
+      _obj11 = _objectDestructuringEmpty(_obj.foo),
+      _obj12 = _objectDestructuringEmpty(_obj11.bar),
+      _obj13 = _objectDestructuringEmpty(_obj12.baz),
+      _obj14 = _objectDestructuringEmpty(_obj13.a),
+      x = _obj14.x,
+      other = _objectWithoutProperties(_obj14, ['x']);"
+  `);
 });
 
 test('object-rest/nested-2/input.js [loose, built-ins]', async () => {
@@ -3103,7 +5795,51 @@ test('object-rest/nested-array-2/input.js [spec, built-ins]', async () => {
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _toArray2 = {
+      slicedToArray: require('@babel/runtime/helpers/slicedToArray'),
+      toArray: require('@babel/runtime/helpers/toArray'),
+    };
+    function _toArray(r, e, a) {
+      return a ? _toArray2.toArray(r) : _toArray2.slicedToArray(r, e);
+    }
+    var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutProperties: require('@babel/runtime/helpers/objectWithoutProperties'),
+    };
+    function _objectWithoutProperties(t, e) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(t),
+        _objectWithoutProperties2.objectWithoutProperties(t, e)
+      );
+    }
+    const _ref = x,
+      _arr = _toArray(_ref, 4, false),
+      a = _arr[0],
+      _arr18 = _toArray(_arr[1], 1, false),
+      _obj = _objectDestructuringEmpty(_arr18[0]),
+      b = _obj.b,
+      c = _objectWithoutProperties(_obj, ['b']),
+      _obj20 = _objectDestructuringEmpty(_arr[2]),
+      d = _obj20.d,
+      e = _objectWithoutProperties(_obj20, ['d']),
+      _arr21 = _toArray(_arr[3], 2, false),
+      _obj22 = _objectDestructuringEmpty(_arr21[0]),
+      f = _obj22.f,
+      g = _objectWithoutProperties(_obj22, ['f']),
+      _obj23 = _objectDestructuringEmpty(_arr21[1]),
+      _arr24 = _toArray(_obj23.h, 2, false),
+      i = _arr24[0],
+      _obj25 = _objectDestructuringEmpty(_arr24[1]),
+      j = _obj25.j,
+      k = _objectWithoutProperties(_obj25, ['j']);"
+  `);
 });
 
 test('object-rest/nested-array-2/input.js [loose, helpers]', async () => {
@@ -3113,7 +5849,51 @@ test('object-rest/nested-array-2/input.js [loose, helpers]', async () => {
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _toArray2 = {
+      slicedToArray: require('@babel/runtime/helpers/slicedToArray'),
+      toArray: require('@babel/runtime/helpers/toArray'),
+    };
+    function _toArray(r, e, a) {
+      return a ? _toArray2.toArray(r) : _toArray2.slicedToArray(r, e);
+    }
+    var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutPropertiesLoose: require('@babel/runtime/helpers/objectWithoutPropertiesLoose'),
+    };
+    function _objectWithoutProperties(e, t) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(e),
+        _objectWithoutProperties2.objectWithoutPropertiesLoose(e, t)
+      );
+    }
+    const _ref = x,
+      _arr = _toArray(_ref, 4, false),
+      a = _arr[0],
+      _arr18 = _toArray(_arr[1], 1, false),
+      _obj = _objectDestructuringEmpty(_arr18[0]),
+      b = _obj.b,
+      c = _objectWithoutProperties(_obj, ['b']),
+      _obj20 = _objectDestructuringEmpty(_arr[2]),
+      d = _obj20.d,
+      e = _objectWithoutProperties(_obj20, ['d']),
+      _arr21 = _toArray(_arr[3], 2, false),
+      _obj22 = _objectDestructuringEmpty(_arr21[0]),
+      f = _obj22.f,
+      g = _objectWithoutProperties(_obj22, ['f']),
+      _obj23 = _objectDestructuringEmpty(_arr21[1]),
+      _arr24 = _toArray(_obj23.h, 2, false),
+      i = _arr24[0],
+      _obj25 = _objectDestructuringEmpty(_arr24[1]),
+      j = _obj25.j,
+      k = _objectWithoutProperties(_obj25, ['j']);"
+  `);
 });
 
 test('object-rest/nested-array-2/input.js [loose, built-ins]', async () => {
@@ -3234,7 +6014,79 @@ test('object-rest/nested-array/exec.js [spec, built-ins]', async () => {
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _toArray2 = {
+      slicedToArray: require('@babel/runtime/helpers/slicedToArray'),
+      toArray: require('@babel/runtime/helpers/toArray'),
+    };
+    function _toArray(r, e, a) {
+      return a ? _toArray2.toArray(r) : _toArray2.slicedToArray(r, e);
+    }
+    var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutProperties: require('@babel/runtime/helpers/objectWithoutProperties'),
+    };
+    function _objectWithoutProperties(t, e) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(t),
+        _objectWithoutProperties2.objectWithoutProperties(t, e)
+      );
+    }
+    var _ref21, _arr22, _obj23;
+    const _ref = [
+        1,
+        {
+          b: 2,
+          other: 3,
+        },
+      ],
+      _arr = _toArray(_ref, 2, false),
+      a = _arr[0],
+      _obj = _objectDestructuringEmpty(_arr[1]),
+      b = _obj.b,
+      c = _objectWithoutProperties(_obj, ['b']);
+    expect(a).toBe(1);
+    expect(b).toBe(2);
+    expect(c).toStrictEqual({ other: 3 });
+    let _ref18 = [
+        4,
+        {
+          e: 5,
+          other: 6,
+        },
+      ],
+      _arr19 = _toArray(_ref18, 2, false),
+      d = _arr19[0],
+      _obj20 = _objectDestructuringEmpty(_arr19[1]),
+      e = _obj20.e,
+      f = _objectWithoutProperties(_obj20, ['e']);
+    expect(d).toBe(4);
+    expect(e).toBe(5);
+    expect(f).toStrictEqual({ other: 6 });
+    let g, h, i;
+    ((_ref21 = [
+      7,
+      {
+        h: 8,
+        other: 9,
+      },
+    ]),
+      (_arr22 = _toArray(_ref21, 2, false)),
+      (g = _arr22[0]),
+      (_obj23 = _objectDestructuringEmpty(_arr22[1])),
+      (h = _obj23.h),
+      (i = _objectWithoutProperties(_obj23, ['h'])),
+      _ref21);
+    expect(g).toBe(7);
+    expect(h).toBe(8);
+    expect(i).toStrictEqual({ other: 9 });"
+  `);
 });
 
 test('object-rest/nested-array/exec.js [loose, helpers]', async () => {
@@ -3245,7 +6097,79 @@ test('object-rest/nested-array/exec.js [loose, helpers]', async () => {
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _toArray2 = {
+      slicedToArray: require('@babel/runtime/helpers/slicedToArray'),
+      toArray: require('@babel/runtime/helpers/toArray'),
+    };
+    function _toArray(r, e, a) {
+      return a ? _toArray2.toArray(r) : _toArray2.slicedToArray(r, e);
+    }
+    var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutPropertiesLoose: require('@babel/runtime/helpers/objectWithoutPropertiesLoose'),
+    };
+    function _objectWithoutProperties(e, t) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(e),
+        _objectWithoutProperties2.objectWithoutPropertiesLoose(e, t)
+      );
+    }
+    var _ref21, _arr22, _obj23;
+    const _ref = [
+        1,
+        {
+          b: 2,
+          other: 3,
+        },
+      ],
+      _arr = _toArray(_ref, 2, false),
+      a = _arr[0],
+      _obj = _objectDestructuringEmpty(_arr[1]),
+      b = _obj.b,
+      c = _objectWithoutProperties(_obj, ['b']);
+    expect(a).toBe(1);
+    expect(b).toBe(2);
+    expect(c).toStrictEqual({ other: 3 });
+    let _ref18 = [
+        4,
+        {
+          e: 5,
+          other: 6,
+        },
+      ],
+      _arr19 = _toArray(_ref18, 2, false),
+      d = _arr19[0],
+      _obj20 = _objectDestructuringEmpty(_arr19[1]),
+      e = _obj20.e,
+      f = _objectWithoutProperties(_obj20, ['e']);
+    expect(d).toBe(4);
+    expect(e).toBe(5);
+    expect(f).toStrictEqual({ other: 6 });
+    let g, h, i;
+    ((_ref21 = [
+      7,
+      {
+        h: 8,
+        other: 9,
+      },
+    ]),
+      (_arr22 = _toArray(_ref21, 2, false)),
+      (g = _arr22[0]),
+      (_obj23 = _objectDestructuringEmpty(_arr22[1])),
+      (h = _obj23.h),
+      (i = _objectWithoutProperties(_obj23, ['h'])),
+      _ref21);
+    expect(g).toBe(7);
+    expect(h).toBe(8);
+    expect(i).toStrictEqual({ other: 9 });"
+  `);
 });
 
 test('object-rest/nested-array/exec.js [loose, built-ins]', async () => {
@@ -3363,7 +6287,51 @@ test('object-rest/nested-array/input.js [spec, built-ins]', async () => {
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _toArray2 = {
+      slicedToArray: require('@babel/runtime/helpers/slicedToArray'),
+      toArray: require('@babel/runtime/helpers/toArray'),
+    };
+    function _toArray(r, e, a) {
+      return a ? _toArray2.toArray(r) : _toArray2.slicedToArray(r, e);
+    }
+    var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutProperties: require('@babel/runtime/helpers/objectWithoutProperties'),
+    };
+    function _objectWithoutProperties(t, e) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(t),
+        _objectWithoutProperties2.objectWithoutProperties(t, e)
+      );
+    }
+    var _ref18, _arr19, _obj20;
+    const _ref = x,
+      _arr = _toArray(_ref, 2, false),
+      a = _arr[0],
+      _obj = _objectDestructuringEmpty(_arr[1]),
+      b = _obj.b,
+      c = _objectWithoutProperties(_obj, ['b']);
+    let _ref15 = x,
+      _arr16 = _toArray(_ref15, 2, false),
+      d = _arr16[0],
+      _obj17 = _objectDestructuringEmpty(_arr16[1]),
+      e = _obj17.e,
+      f = _objectWithoutProperties(_obj17, ['e']);
+    ((_ref18 = x),
+      (_arr19 = _toArray(_ref18, 2, false)),
+      (g = _arr19[0]),
+      (_obj20 = _objectDestructuringEmpty(_arr19[1])),
+      (h = _obj20.h),
+      (i = _objectWithoutProperties(_obj20, ['h'])),
+      _ref18);"
+  `);
 });
 
 test('object-rest/nested-array/input.js [loose, helpers]', async () => {
@@ -3373,7 +6341,51 @@ test('object-rest/nested-array/input.js [loose, helpers]', async () => {
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _toArray2 = {
+      slicedToArray: require('@babel/runtime/helpers/slicedToArray'),
+      toArray: require('@babel/runtime/helpers/toArray'),
+    };
+    function _toArray(r, e, a) {
+      return a ? _toArray2.toArray(r) : _toArray2.slicedToArray(r, e);
+    }
+    var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutPropertiesLoose: require('@babel/runtime/helpers/objectWithoutPropertiesLoose'),
+    };
+    function _objectWithoutProperties(e, t) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(e),
+        _objectWithoutProperties2.objectWithoutPropertiesLoose(e, t)
+      );
+    }
+    var _ref18, _arr19, _obj20;
+    const _ref = x,
+      _arr = _toArray(_ref, 2, false),
+      a = _arr[0],
+      _obj = _objectDestructuringEmpty(_arr[1]),
+      b = _obj.b,
+      c = _objectWithoutProperties(_obj, ['b']);
+    let _ref15 = x,
+      _arr16 = _toArray(_ref15, 2, false),
+      d = _arr16[0],
+      _obj17 = _objectDestructuringEmpty(_arr16[1]),
+      e = _obj17.e,
+      f = _objectWithoutProperties(_obj17, ['e']);
+    ((_ref18 = x),
+      (_arr19 = _toArray(_ref18, 2, false)),
+      (g = _arr19[0]),
+      (_obj20 = _objectDestructuringEmpty(_arr19[1])),
+      (h = _obj20.h),
+      (i = _objectWithoutProperties(_obj20, ['h'])),
+      _ref18);"
+  `);
 });
 
 test('object-rest/nested-array/input.js [loose, built-ins]', async () => {
@@ -3464,7 +6476,39 @@ test('object-rest/nested-computed-key/input.js [spec, built-ins]', async () => {
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty3 = require('@babel/runtime/helpers/objectDestructuringEmpty');
+    var _extends = require('@babel/runtime/helpers/extends');
+    var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutProperties: require('@babel/runtime/helpers/objectWithoutProperties'),
+    };
+    function _objectWithoutProperties(t, e) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(t),
+        _objectWithoutProperties2.objectWithoutProperties(t, e)
+      );
+    }
+    var _ref12, _obj13;
+    const {
+      [_ref13 => {
+        let rest = _extends({}, (_objectDestructuringEmpty3(_ref13), _ref13));
+        let _ref = {},
+          _obj = _objectDestructuringEmpty(_ref),
+          b = _objectWithoutProperties(_obj, []);
+      }]: a,
+      [((_ref12 = {}),
+      (_obj13 = _objectDestructuringEmpty(_ref12)),
+      (d = _objectWithoutProperties(_obj13, [])),
+      _ref12)]: c,
+    } = {};"
+  `);
 });
 
 test('object-rest/nested-computed-key/input.js [loose, helpers]', async () => {
@@ -3475,7 +6519,39 @@ test('object-rest/nested-computed-key/input.js [loose, helpers]', async () => {
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty3 = require('@babel/runtime/helpers/objectDestructuringEmpty');
+    var _extends = require('@babel/runtime/helpers/extends');
+    var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutPropertiesLoose: require('@babel/runtime/helpers/objectWithoutPropertiesLoose'),
+    };
+    function _objectWithoutProperties(e, t) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(e),
+        _objectWithoutProperties2.objectWithoutPropertiesLoose(e, t)
+      );
+    }
+    var _ref12, _obj13;
+    const {
+      [_ref13 => {
+        let rest = _extends({}, (_objectDestructuringEmpty3(_ref13), _ref13));
+        let _ref = {},
+          _obj = _objectDestructuringEmpty(_ref),
+          b = _objectWithoutProperties(_obj, []);
+      }]: a,
+      [((_ref12 = {}),
+      (_obj13 = _objectDestructuringEmpty(_ref12)),
+      (d = _objectWithoutProperties(_obj13, [])),
+      _ref12)]: c,
+    } = {};"
+  `);
 });
 
 test('object-rest/nested-computed-key/input.js [loose, built-ins]', async () => {
@@ -3555,7 +6631,39 @@ test('object-rest/nested-default-value/input.js [spec, built-ins]', async () => 
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty3 = require('@babel/runtime/helpers/objectDestructuringEmpty');
+    var _extends = require('@babel/runtime/helpers/extends');
+    var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutProperties: require('@babel/runtime/helpers/objectWithoutProperties'),
+    };
+    function _objectWithoutProperties(t, e) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(t),
+        _objectWithoutProperties2.objectWithoutProperties(t, e)
+      );
+    }
+    var _ref12, _obj13;
+    const {
+      a = _ref13 => {
+        let rest = _extends({}, (_objectDestructuringEmpty3(_ref13), _ref13));
+        let _ref = {},
+          _obj = _objectDestructuringEmpty(_ref),
+          b = _objectWithoutProperties(_obj, []);
+      },
+      c = ((_ref12 = {}),
+      (_obj13 = _objectDestructuringEmpty(_ref12)),
+      (d = _objectWithoutProperties(_obj13, [])),
+      _ref12),
+    } = {};"
+  `);
 });
 
 test('object-rest/nested-default-value/input.js [loose, helpers]', async () => {
@@ -3566,7 +6674,39 @@ test('object-rest/nested-default-value/input.js [loose, helpers]', async () => {
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty3 = require('@babel/runtime/helpers/objectDestructuringEmpty');
+    var _extends = require('@babel/runtime/helpers/extends');
+    var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutPropertiesLoose: require('@babel/runtime/helpers/objectWithoutPropertiesLoose'),
+    };
+    function _objectWithoutProperties(e, t) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(e),
+        _objectWithoutProperties2.objectWithoutPropertiesLoose(e, t)
+      );
+    }
+    var _ref12, _obj13;
+    const {
+      a = _ref13 => {
+        let rest = _extends({}, (_objectDestructuringEmpty3(_ref13), _ref13));
+        let _ref = {},
+          _obj = _objectDestructuringEmpty(_ref),
+          b = _objectWithoutProperties(_obj, []);
+      },
+      c = ((_ref12 = {}),
+      (_obj13 = _objectDestructuringEmpty(_ref12)),
+      (d = _objectWithoutProperties(_obj13, [])),
+      _ref12),
+    } = {};"
+  `);
 });
 
 test('object-rest/nested-default-value/input.js [loose, built-ins]', async () => {
@@ -3639,7 +6779,34 @@ test('object-rest/nested-literal-property/input.js [spec, built-ins]', async () 
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutProperties: require('@babel/runtime/helpers/objectWithoutProperties'),
+    };
+    function _objectWithoutProperties(t, e) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(t),
+        _objectWithoutProperties2.objectWithoutProperties(t, e)
+      );
+    }
+    let useState = [{ some: 42 }, () => null];
+    let _ref = useState,
+      _obj = _objectDestructuringEmpty(_ref),
+      _obj14 = _objectDestructuringEmpty(_obj[0]),
+      numeric = _obj14.numeric,
+      rest1 = _objectWithoutProperties(_obj14, ['numeric']),
+      _obj15 = _objectDestructuringEmpty(_obj['2']),
+      str = _obj15.str,
+      rest2 = _objectWithoutProperties(_obj15, ['str']),
+      setState = _obj[1];"
+  `);
 });
 
 test('object-rest/nested-literal-property/input.js [loose, helpers]', async () => {
@@ -3650,7 +6817,34 @@ test('object-rest/nested-literal-property/input.js [loose, helpers]', async () =
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutPropertiesLoose: require('@babel/runtime/helpers/objectWithoutPropertiesLoose'),
+    };
+    function _objectWithoutProperties(e, t) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(e),
+        _objectWithoutProperties2.objectWithoutPropertiesLoose(e, t)
+      );
+    }
+    let useState = [{ some: 42 }, () => null];
+    let _ref = useState,
+      _obj = _objectDestructuringEmpty(_ref),
+      _obj14 = _objectDestructuringEmpty(_obj[0]),
+      numeric = _obj14.numeric,
+      rest1 = _objectWithoutProperties(_obj14, ['numeric']),
+      _obj15 = _objectDestructuringEmpty(_obj['2']),
+      str = _obj15.str,
+      rest2 = _objectWithoutProperties(_obj15, ['str']),
+      setState = _obj[1];"
+  `);
 });
 
 test('object-rest/nested-literal-property/input.js [loose, built-ins]', async () => {
@@ -3735,7 +6929,48 @@ test('object-rest/nested-order/exec.js [spec, built-ins]', async () => {
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutProperties: require('@babel/runtime/helpers/objectWithoutProperties'),
+    };
+    function _objectWithoutProperties(t, e) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(t),
+        _objectWithoutProperties2.objectWithoutProperties(t, e)
+      );
+    }
+    var result = '';
+    var obj = {
+      get foo() {
+        result += 'foo';
+      },
+      a: {
+        get bar() {
+          result += 'bar';
+        },
+      },
+      b: {
+        get baz() {
+          result += 'baz';
+        },
+      },
+    };
+    var _ref = obj,
+      _obj = _objectDestructuringEmpty(_ref),
+      _obj13 = _objectDestructuringEmpty(_obj.a),
+      bar = _objectWithoutProperties(_obj13, []),
+      _obj14 = _objectDestructuringEmpty(_obj.b),
+      baz = _objectWithoutProperties(_obj14, []),
+      foo = _objectWithoutProperties(_obj, ['a', 'b']);
+    expect(result).toBe('barbazfoo');"
+  `);
 });
 
 test('object-rest/nested-order/exec.js [loose, helpers]', async () => {
@@ -3746,7 +6981,48 @@ test('object-rest/nested-order/exec.js [loose, helpers]', async () => {
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutPropertiesLoose: require('@babel/runtime/helpers/objectWithoutPropertiesLoose'),
+    };
+    function _objectWithoutProperties(e, t) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(e),
+        _objectWithoutProperties2.objectWithoutPropertiesLoose(e, t)
+      );
+    }
+    var result = '';
+    var obj = {
+      get foo() {
+        result += 'foo';
+      },
+      a: {
+        get bar() {
+          result += 'bar';
+        },
+      },
+      b: {
+        get baz() {
+          result += 'baz';
+        },
+      },
+    };
+    var _ref = obj,
+      _obj = _objectDestructuringEmpty(_ref),
+      _obj13 = _objectDestructuringEmpty(_obj.a),
+      bar = _objectWithoutProperties(_obj13, []),
+      _obj14 = _objectDestructuringEmpty(_obj.b),
+      baz = _objectWithoutProperties(_obj14, []),
+      foo = _objectWithoutProperties(_obj, ['a', 'b']);
+    expect(result).toBe('barbazfoo');"
+  `);
 });
 
 test('object-rest/nested-order/exec.js [loose, built-ins]', async () => {
@@ -3826,7 +7102,31 @@ test('object-rest/nested-order/input.js [spec, built-ins]', async () => {
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutProperties: require('@babel/runtime/helpers/objectWithoutProperties'),
+    };
+    function _objectWithoutProperties(t, e) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(t),
+        _objectWithoutProperties2.objectWithoutProperties(t, e)
+      );
+    }
+    const _ref = obj,
+      _obj = _objectDestructuringEmpty(_ref),
+      _obj11 = _objectDestructuringEmpty(_obj.a),
+      bar = _objectWithoutProperties(_obj11, []),
+      _obj12 = _objectDestructuringEmpty(_obj.b),
+      baz = _objectWithoutProperties(_obj12, []),
+      foo = _objectWithoutProperties(_obj, ['a', 'b']);"
+  `);
 });
 
 test('object-rest/nested-order/input.js [loose, helpers]', async () => {
@@ -3836,7 +7136,31 @@ test('object-rest/nested-order/input.js [loose, helpers]', async () => {
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutPropertiesLoose: require('@babel/runtime/helpers/objectWithoutPropertiesLoose'),
+    };
+    function _objectWithoutProperties(e, t) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(e),
+        _objectWithoutProperties2.objectWithoutPropertiesLoose(e, t)
+      );
+    }
+    const _ref = obj,
+      _obj = _objectDestructuringEmpty(_ref),
+      _obj11 = _objectDestructuringEmpty(_obj.a),
+      bar = _objectWithoutProperties(_obj11, []),
+      _obj12 = _objectDestructuringEmpty(_obj.b),
+      baz = _objectWithoutProperties(_obj12, []),
+      foo = _objectWithoutProperties(_obj, ['a', 'b']);"
+  `);
 });
 
 test('object-rest/nested-order/input.js [loose, built-ins]', async () => {
@@ -3907,7 +7231,38 @@ test('object-rest/nested/input.js [spec, built-ins]', async () => {
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutProperties: require('@babel/runtime/helpers/objectWithoutProperties'),
+    };
+    function _objectWithoutProperties(t, e) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(t),
+        _objectWithoutProperties2.objectWithoutProperties(t, e)
+      );
+    }
+    const defunct = {
+      outer: {
+        inner: {
+          three: 'three',
+          four: 'four',
+        },
+      },
+    };
+    const _ref = defunct,
+      _obj = _objectDestructuringEmpty(_ref),
+      _obj11 = _objectDestructuringEmpty(_obj.outer),
+      _obj12 = _objectDestructuringEmpty(_obj11.inner),
+      three = _obj12.three,
+      other = _objectWithoutProperties(_obj12, ['three']);"
+  `);
 });
 
 test('object-rest/nested/input.js [loose, helpers]', async () => {
@@ -3918,7 +7273,38 @@ test('object-rest/nested/input.js [loose, helpers]', async () => {
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutPropertiesLoose: require('@babel/runtime/helpers/objectWithoutPropertiesLoose'),
+    };
+    function _objectWithoutProperties(e, t) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(e),
+        _objectWithoutProperties2.objectWithoutPropertiesLoose(e, t)
+      );
+    }
+    const defunct = {
+      outer: {
+        inner: {
+          three: 'three',
+          four: 'four',
+        },
+      },
+    };
+    const _ref = defunct,
+      _obj = _objectDestructuringEmpty(_ref),
+      _obj11 = _objectDestructuringEmpty(_obj.outer),
+      _obj12 = _objectDestructuringEmpty(_obj11.inner),
+      three = _obj12.three,
+      other = _objectWithoutProperties(_obj12, ['three']);"
+  `);
 });
 
 test('object-rest/nested/input.js [loose, built-ins]', async () => {
@@ -4029,7 +7415,86 @@ test('object-rest/non-string-computed-exec/exec.js [spec, built-ins]', async () 
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutProperties: require('@babel/runtime/helpers/objectWithoutProperties'),
+    };
+    function _objectWithoutProperties(t, e) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(t),
+        _objectWithoutProperties2.objectWithoutProperties(t, e)
+      );
+    }
+    var _toPropertyKey2 = require('@babel/runtime/helpers/toPropertyKey');
+    function _toPropertyKey(value) {
+      return _toPropertyKey2(value);
+    }
+    const a = {
+      3: 'three',
+      foo: 'bar',
+    };
+    const _ref = a,
+      _obj = _objectDestructuringEmpty(_ref),
+      _key = _toPropertyKey(3),
+      omit = _obj[_key],
+      rest = _objectWithoutProperties(_obj, [_key]);
+    expect(rest).toEqual({ foo: 'bar' });
+    expect(omit).toBe('three');
+    const [k1, k2, k3, k4, k5] = [
+      null,
+      undefined,
+      true,
+      false,
+      {
+        toString() {
+          return 'warrior';
+        },
+      },
+    ];
+    const c = {
+      [k1]: '1',
+      [k2]: '2',
+      [k3]: '3',
+      [k4]: '4',
+      [k5]: '5',
+    };
+    const _ref29 = c,
+      _obj30 = _objectDestructuringEmpty(_ref29),
+      _key31 = _toPropertyKey(k1),
+      v1 = _obj30[_key31],
+      _key32 = _toPropertyKey(k2),
+      v2 = _obj30[_key32],
+      _key33 = _toPropertyKey(k3),
+      v3 = _obj30[_key33],
+      _key34 = _toPropertyKey(k4),
+      v4 = _obj30[_key34],
+      _key35 = _toPropertyKey(k5),
+      v5 = _obj30[_key35],
+      vrest = _objectWithoutProperties(_obj30, [_key31, _key32, _key33, _key34, _key35]);
+    expect(v1).toBe('1');
+    expect(v2).toBe('2');
+    expect(v3).toBe('3');
+    expect(v4).toBe('4');
+    expect(v5).toBe('5');
+    expect(vrest).toEqual({});
+    // shouldn't convert symbols to strings
+    const sx = Symbol();
+    const sy = Symbol();
+    const d = {
+      [sx]: 'sx',
+      [sy]: 'sy',
+    };
+    const { [sx]: dx, [sy]: dy } = d;
+    expect(dx).toBe('sx');
+    expect(dy).toBe('sy');"
+  `);
 });
 
 test('object-rest/non-string-computed-exec/exec.js [loose, helpers]', async () => {
@@ -4040,7 +7505,86 @@ test('object-rest/non-string-computed-exec/exec.js [loose, helpers]', async () =
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutPropertiesLoose: require('@babel/runtime/helpers/objectWithoutPropertiesLoose'),
+    };
+    function _objectWithoutProperties(e, t) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(e),
+        _objectWithoutProperties2.objectWithoutPropertiesLoose(e, t)
+      );
+    }
+    var _toPropertyKey2 = require('@babel/runtime/helpers/toPropertyKey');
+    function _toPropertyKey(value) {
+      return _toPropertyKey2(value);
+    }
+    const a = {
+      3: 'three',
+      foo: 'bar',
+    };
+    const _ref = a,
+      _obj = _objectDestructuringEmpty(_ref),
+      _key = _toPropertyKey(3),
+      omit = _obj[_key],
+      rest = _objectWithoutProperties(_obj, [_key]);
+    expect(rest).toEqual({ foo: 'bar' });
+    expect(omit).toBe('three');
+    const [k1, k2, k3, k4, k5] = [
+      null,
+      undefined,
+      true,
+      false,
+      {
+        toString() {
+          return 'warrior';
+        },
+      },
+    ];
+    const c = {
+      [k1]: '1',
+      [k2]: '2',
+      [k3]: '3',
+      [k4]: '4',
+      [k5]: '5',
+    };
+    const _ref29 = c,
+      _obj30 = _objectDestructuringEmpty(_ref29),
+      _key31 = _toPropertyKey(k1),
+      v1 = _obj30[_key31],
+      _key32 = _toPropertyKey(k2),
+      v2 = _obj30[_key32],
+      _key33 = _toPropertyKey(k3),
+      v3 = _obj30[_key33],
+      _key34 = _toPropertyKey(k4),
+      v4 = _obj30[_key34],
+      _key35 = _toPropertyKey(k5),
+      v5 = _obj30[_key35],
+      vrest = _objectWithoutProperties(_obj30, [_key31, _key32, _key33, _key34, _key35]);
+    expect(v1).toBe('1');
+    expect(v2).toBe('2');
+    expect(v3).toBe('3');
+    expect(v4).toBe('4');
+    expect(v5).toBe('5');
+    expect(vrest).toEqual({});
+    // shouldn't convert symbols to strings
+    const sx = Symbol();
+    const sy = Symbol();
+    const d = {
+      [sx]: 'sx',
+      [sy]: 'sy',
+    };
+    const { [sx]: dx, [sy]: dy } = d;
+    expect(dx).toBe('sx');
+    expect(dy).toBe('sy');"
+  `);
 });
 
 test('object-rest/non-string-computed-exec/exec.js [loose, built-ins]', async () => {
@@ -4068,13 +7612,17 @@ test('object-rest/non-string-computed-exec/exec.js [loose, built-ins]', async ()
         _objectWithoutProperties2.objectWithoutPropertiesLoose(e, t)
       );
     }
+    var _toPropertyKey2 = require('@babel/runtime/helpers/toPropertyKey');
+    function _toPropertyKey(value) {
+      return _toPropertyKey2(value);
+    }
     const a = {
       3: 'three',
       foo: 'bar',
     };
     const _ref = a,
       _obj = _objectDestructuringEmpty(_ref),
-      _key = 3,
+      _key = _toPropertyKey(3),
       omit = _obj[_key],
       rest = _objectWithoutProperties(_obj, [_key]);
     expect(rest).toEqual({ foo: 'bar' });
@@ -4099,15 +7647,15 @@ test('object-rest/non-string-computed-exec/exec.js [loose, built-ins]', async ()
     };
     const _ref29 = c,
       _obj30 = _objectDestructuringEmpty(_ref29),
-      _key31 = k1,
+      _key31 = _toPropertyKey(k1),
       v1 = _obj30[_key31],
-      _key32 = k2,
+      _key32 = _toPropertyKey(k2),
       v2 = _obj30[_key32],
-      _key33 = k3,
+      _key33 = _toPropertyKey(k3),
       v3 = _obj30[_key33],
-      _key34 = k4,
+      _key34 = _toPropertyKey(k4),
       v4 = _obj30[_key34],
-      _key35 = k5,
+      _key35 = _toPropertyKey(k5),
       v5 = _obj30[_key35],
       vrest = _objectWithoutProperties(_obj30, [_key31, _key32, _key33, _key34, _key35]);
     expect(v1).toBe('1');
@@ -4195,7 +7743,86 @@ test('object-rest/non-string-computed/input.js [spec, built-ins]', async () => {
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutProperties: require('@babel/runtime/helpers/objectWithoutProperties'),
+    };
+    function _objectWithoutProperties(t, e) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(t),
+        _objectWithoutProperties2.objectWithoutProperties(t, e)
+      );
+    }
+    var _toPropertyKey2 = require('@babel/runtime/helpers/toPropertyKey');
+    function _toPropertyKey(value) {
+      return _toPropertyKey2(value);
+    }
+    const a = {
+      3: 'three',
+      foo: 'bar',
+    };
+    const _ref = a,
+      _obj = _objectDestructuringEmpty(_ref),
+      _key = _toPropertyKey(3),
+      omit = _obj[_key],
+      rest = _objectWithoutProperties(_obj, [_key]);
+    expect(rest).toEqual({ foo: 'bar' });
+    expect(omit).toBe('three');
+    const [k1, k2, k3, k4, k5] = [
+      null,
+      undefined,
+      true,
+      false,
+      {
+        toString() {
+          return 'warrior';
+        },
+      },
+    ];
+    const c = {
+      [k1]: '1',
+      [k2]: '2',
+      [k3]: '3',
+      [k4]: '4',
+      [k5]: '5',
+    };
+    const _ref29 = c,
+      _obj30 = _objectDestructuringEmpty(_ref29),
+      _key31 = _toPropertyKey(k1),
+      v1 = _obj30[_key31],
+      _key32 = _toPropertyKey(k2),
+      v2 = _obj30[_key32],
+      _key33 = _toPropertyKey(k3),
+      v3 = _obj30[_key33],
+      _key34 = _toPropertyKey(k4),
+      v4 = _obj30[_key34],
+      _key35 = _toPropertyKey(k5),
+      v5 = _obj30[_key35],
+      vrest = _objectWithoutProperties(_obj30, [_key31, _key32, _key33, _key34, _key35]);
+    expect(v1).toBe('1');
+    expect(v2).toBe('2');
+    expect(v3).toBe('3');
+    expect(v4).toBe('4');
+    expect(v5).toBe('5');
+    expect(vrest).toEqual({});
+    // shouldn't convert symbols to strings
+    const sx = Symbol();
+    const sy = Symbol();
+    const d = {
+      [sx]: 'sx',
+      [sy]: 'sy',
+    };
+    const { [sx]: dx, [sy]: dy } = d;
+    expect(dx).toBe('sx');
+    expect(dy).toBe('sy');"
+  `);
 });
 
 test('object-rest/non-string-computed/input.js [loose, helpers]', async () => {
@@ -4206,7 +7833,86 @@ test('object-rest/non-string-computed/input.js [loose, helpers]', async () => {
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutPropertiesLoose: require('@babel/runtime/helpers/objectWithoutPropertiesLoose'),
+    };
+    function _objectWithoutProperties(e, t) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(e),
+        _objectWithoutProperties2.objectWithoutPropertiesLoose(e, t)
+      );
+    }
+    var _toPropertyKey2 = require('@babel/runtime/helpers/toPropertyKey');
+    function _toPropertyKey(value) {
+      return _toPropertyKey2(value);
+    }
+    const a = {
+      3: 'three',
+      foo: 'bar',
+    };
+    const _ref = a,
+      _obj = _objectDestructuringEmpty(_ref),
+      _key = _toPropertyKey(3),
+      omit = _obj[_key],
+      rest = _objectWithoutProperties(_obj, [_key]);
+    expect(rest).toEqual({ foo: 'bar' });
+    expect(omit).toBe('three');
+    const [k1, k2, k3, k4, k5] = [
+      null,
+      undefined,
+      true,
+      false,
+      {
+        toString() {
+          return 'warrior';
+        },
+      },
+    ];
+    const c = {
+      [k1]: '1',
+      [k2]: '2',
+      [k3]: '3',
+      [k4]: '4',
+      [k5]: '5',
+    };
+    const _ref29 = c,
+      _obj30 = _objectDestructuringEmpty(_ref29),
+      _key31 = _toPropertyKey(k1),
+      v1 = _obj30[_key31],
+      _key32 = _toPropertyKey(k2),
+      v2 = _obj30[_key32],
+      _key33 = _toPropertyKey(k3),
+      v3 = _obj30[_key33],
+      _key34 = _toPropertyKey(k4),
+      v4 = _obj30[_key34],
+      _key35 = _toPropertyKey(k5),
+      v5 = _obj30[_key35],
+      vrest = _objectWithoutProperties(_obj30, [_key31, _key32, _key33, _key34, _key35]);
+    expect(v1).toBe('1');
+    expect(v2).toBe('2');
+    expect(v3).toBe('3');
+    expect(v4).toBe('4');
+    expect(v5).toBe('5');
+    expect(vrest).toEqual({});
+    // shouldn't convert symbols to strings
+    const sx = Symbol();
+    const sy = Symbol();
+    const d = {
+      [sx]: 'sx',
+      [sy]: 'sy',
+    };
+    const { [sx]: dx, [sy]: dy } = d;
+    expect(dx).toBe('sx');
+    expect(dy).toBe('sy');"
+  `);
 });
 
 test('object-rest/non-string-computed/input.js [loose, built-ins]', async () => {
@@ -4234,13 +7940,17 @@ test('object-rest/non-string-computed/input.js [loose, built-ins]', async () => 
         _objectWithoutProperties2.objectWithoutPropertiesLoose(e, t)
       );
     }
+    var _toPropertyKey2 = require('@babel/runtime/helpers/toPropertyKey');
+    function _toPropertyKey(value) {
+      return _toPropertyKey2(value);
+    }
     const a = {
       3: 'three',
       foo: 'bar',
     };
     const _ref = a,
       _obj = _objectDestructuringEmpty(_ref),
-      _key = 3,
+      _key = _toPropertyKey(3),
       omit = _obj[_key],
       rest = _objectWithoutProperties(_obj, [_key]);
     expect(rest).toEqual({ foo: 'bar' });
@@ -4265,15 +7975,15 @@ test('object-rest/non-string-computed/input.js [loose, built-ins]', async () => 
     };
     const _ref29 = c,
       _obj30 = _objectDestructuringEmpty(_ref29),
-      _key31 = k1,
+      _key31 = _toPropertyKey(k1),
       v1 = _obj30[_key31],
-      _key32 = k2,
+      _key32 = _toPropertyKey(k2),
       v2 = _obj30[_key32],
-      _key33 = k3,
+      _key33 = _toPropertyKey(k3),
       v3 = _obj30[_key33],
-      _key34 = k4,
+      _key34 = _toPropertyKey(k4),
       v4 = _obj30[_key34],
-      _key35 = k5,
+      _key35 = _toPropertyKey(k5),
       v5 = _obj30[_key35],
       vrest = _objectWithoutProperties(_obj30, [_key31, _key32, _key33, _key34, _key35]);
     expect(v1).toBe('1');
@@ -4328,7 +8038,35 @@ test('object-rest/null-destructuring-transform-destructuring/exec.js [spec, buil
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutProperties: require('@babel/runtime/helpers/objectWithoutProperties'),
+    };
+    function _objectWithoutProperties(t, e) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(t),
+        _objectWithoutProperties2.objectWithoutProperties(t, e)
+      );
+    }
+    expect(() => {
+      var _ref = null,
+        _obj = _objectDestructuringEmpty(_ref),
+        x = _objectWithoutProperties(_obj, []);
+    }).toThrow(/null/);
+    expect(() => {
+      var _ref10 = null,
+        _obj11 = _objectDestructuringEmpty(_ref10),
+        x = _obj11.x,
+        y = _objectWithoutProperties(_obj11, ['x']);
+    }).toThrow(/null/);"
+  `);
 });
 
 test('object-rest/null-destructuring-transform-destructuring/exec.js [loose, helpers]', async () => {
@@ -4339,7 +8077,35 @@ test('object-rest/null-destructuring-transform-destructuring/exec.js [loose, hel
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutPropertiesLoose: require('@babel/runtime/helpers/objectWithoutPropertiesLoose'),
+    };
+    function _objectWithoutProperties(e, t) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(e),
+        _objectWithoutProperties2.objectWithoutPropertiesLoose(e, t)
+      );
+    }
+    expect(() => {
+      var _ref = null,
+        _obj = _objectDestructuringEmpty(_ref),
+        x = _objectWithoutProperties(_obj, []);
+    }).toThrow(/null/);
+    expect(() => {
+      var _ref10 = null,
+        _obj11 = _objectDestructuringEmpty(_ref10),
+        x = _obj11.x,
+        y = _objectWithoutProperties(_obj11, ['x']);
+    }).toThrow(/null/);"
+  `);
 });
 
 test('object-rest/null-destructuring-transform-destructuring/exec.js [loose, built-ins]', async () => {
@@ -4414,7 +8180,35 @@ test('object-rest/null-destructuring-transform-destructuring/input.js [spec, bui
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutProperties: require('@babel/runtime/helpers/objectWithoutProperties'),
+    };
+    function _objectWithoutProperties(t, e) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(t),
+        _objectWithoutProperties2.objectWithoutProperties(t, e)
+      );
+    }
+    expect(() => {
+      var _ref = null,
+        _obj = _objectDestructuringEmpty(_ref),
+        x = _objectWithoutProperties(_obj, []);
+    }).toThrow(/null/);
+    expect(() => {
+      var _ref10 = null,
+        _obj11 = _objectDestructuringEmpty(_ref10),
+        x = _obj11.x,
+        y = _objectWithoutProperties(_obj11, ['x']);
+    }).toThrow(/null/);"
+  `);
 });
 
 test('object-rest/null-destructuring-transform-destructuring/input.js [loose, helpers]', async () => {
@@ -4425,7 +8219,35 @@ test('object-rest/null-destructuring-transform-destructuring/input.js [loose, he
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutPropertiesLoose: require('@babel/runtime/helpers/objectWithoutPropertiesLoose'),
+    };
+    function _objectWithoutProperties(e, t) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(e),
+        _objectWithoutProperties2.objectWithoutPropertiesLoose(e, t)
+      );
+    }
+    expect(() => {
+      var _ref = null,
+        _obj = _objectDestructuringEmpty(_ref),
+        x = _objectWithoutProperties(_obj, []);
+    }).toThrow(/null/);
+    expect(() => {
+      var _ref10 = null,
+        _obj11 = _objectDestructuringEmpty(_ref10),
+        x = _obj11.x,
+        y = _objectWithoutProperties(_obj11, ['x']);
+    }).toThrow(/null/);"
+  `);
 });
 
 test('object-rest/null-destructuring-transform-destructuring/input.js [loose, built-ins]', async () => {
@@ -4500,7 +8322,35 @@ test('object-rest/null-destructuring/exec.js [spec, built-ins]', async () => {
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutProperties: require('@babel/runtime/helpers/objectWithoutProperties'),
+    };
+    function _objectWithoutProperties(t, e) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(t),
+        _objectWithoutProperties2.objectWithoutProperties(t, e)
+      );
+    }
+    expect(() => {
+      var _ref = null,
+        _obj = _objectDestructuringEmpty(_ref),
+        x = _objectWithoutProperties(_obj, []);
+    }).toThrow(/null/);
+    expect(() => {
+      var _ref10 = null,
+        _obj11 = _objectDestructuringEmpty(_ref10),
+        x = _obj11.x,
+        y = _objectWithoutProperties(_obj11, ['x']);
+    }).toThrow(/null/);"
+  `);
 });
 
 test('object-rest/null-destructuring/exec.js [loose, helpers]', async () => {
@@ -4511,7 +8361,35 @@ test('object-rest/null-destructuring/exec.js [loose, helpers]', async () => {
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutPropertiesLoose: require('@babel/runtime/helpers/objectWithoutPropertiesLoose'),
+    };
+    function _objectWithoutProperties(e, t) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(e),
+        _objectWithoutProperties2.objectWithoutPropertiesLoose(e, t)
+      );
+    }
+    expect(() => {
+      var _ref = null,
+        _obj = _objectDestructuringEmpty(_ref),
+        x = _objectWithoutProperties(_obj, []);
+    }).toThrow(/null/);
+    expect(() => {
+      var _ref10 = null,
+        _obj11 = _objectDestructuringEmpty(_ref10),
+        x = _obj11.x,
+        y = _objectWithoutProperties(_obj11, ['x']);
+    }).toThrow(/null/);"
+  `);
 });
 
 test('object-rest/null-destructuring/exec.js [loose, built-ins]', async () => {
@@ -4586,7 +8464,35 @@ test('object-rest/null-destructuring/input.js [spec, built-ins]', async () => {
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutProperties: require('@babel/runtime/helpers/objectWithoutProperties'),
+    };
+    function _objectWithoutProperties(t, e) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(t),
+        _objectWithoutProperties2.objectWithoutProperties(t, e)
+      );
+    }
+    expect(() => {
+      var _ref = null,
+        _obj = _objectDestructuringEmpty(_ref),
+        x = _objectWithoutProperties(_obj, []);
+    }).toThrow(/null/);
+    expect(() => {
+      var _ref10 = null,
+        _obj11 = _objectDestructuringEmpty(_ref10),
+        x = _obj11.x,
+        y = _objectWithoutProperties(_obj11, ['x']);
+    }).toThrow(/null/);"
+  `);
 });
 
 test('object-rest/null-destructuring/input.js [loose, helpers]', async () => {
@@ -4597,7 +8503,35 @@ test('object-rest/null-destructuring/input.js [loose, helpers]', async () => {
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutPropertiesLoose: require('@babel/runtime/helpers/objectWithoutPropertiesLoose'),
+    };
+    function _objectWithoutProperties(e, t) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(e),
+        _objectWithoutProperties2.objectWithoutPropertiesLoose(e, t)
+      );
+    }
+    expect(() => {
+      var _ref = null,
+        _obj = _objectDestructuringEmpty(_ref),
+        x = _objectWithoutProperties(_obj, []);
+    }).toThrow(/null/);
+    expect(() => {
+      var _ref10 = null,
+        _obj11 = _objectDestructuringEmpty(_ref10),
+        x = _obj11.x,
+        y = _objectWithoutProperties(_obj11, ['x']);
+    }).toThrow(/null/);"
+  `);
 });
 
 test('object-rest/null-destructuring/input.js [loose, built-ins]', async () => {
@@ -4697,7 +8631,67 @@ test('object-rest/object-ref-computed/exec.js [spec, built-ins]', async () => {
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutProperties: require('@babel/runtime/helpers/objectWithoutProperties'),
+    };
+    function _objectWithoutProperties(t, e) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(t),
+        _objectWithoutProperties2.objectWithoutProperties(t, e)
+      );
+    }
+    var key, x, y, z;
+    // impure
+    key = 1;
+    var _ref = {
+        1: {
+          a: 1,
+          y: 1,
+        },
+      },
+      _obj = _objectDestructuringEmpty(_ref),
+      _key = key++,
+      _obj15 = _objectDestructuringEmpty(_obj[_key]),
+      y = _obj15.y,
+      x = _objectWithoutProperties(_obj15, ['y']);
+    expect(x).toEqual({ a: 1 });
+    expect(key).toBe(2);
+    expect(y).toBe(1);
+    // takes care of the order
+    key = 1;
+    var _ref16 = {
+        2: {
+          y: 2,
+          z: 3,
+        },
+        3: {
+          y: 4,
+          z: 6,
+        },
+      },
+      _obj17 = _objectDestructuringEmpty(_ref16),
+      _key18 = ++key,
+      _obj19 = _objectDestructuringEmpty(_obj17[_key18]),
+      y = _obj19.y,
+      rest_y = _objectWithoutProperties(_obj19, ['y']),
+      _key20 = ++key,
+      _obj21 = _objectDestructuringEmpty(_obj17[_key20]),
+      z = _obj21.z,
+      rest_z = _objectWithoutProperties(_obj21, ['z']);
+    expect(y).toBe(2);
+    expect(rest_y).toEqual({ z: 3 });
+    expect(z).toBe(6);
+    expect(rest_z).toEqual({ y: 4 });
+    expect(key).toBe(3);"
+  `);
 });
 
 test('object-rest/object-ref-computed/exec.js [loose, helpers]', async () => {
@@ -4708,7 +8702,67 @@ test('object-rest/object-ref-computed/exec.js [loose, helpers]', async () => {
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutPropertiesLoose: require('@babel/runtime/helpers/objectWithoutPropertiesLoose'),
+    };
+    function _objectWithoutProperties(e, t) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(e),
+        _objectWithoutProperties2.objectWithoutPropertiesLoose(e, t)
+      );
+    }
+    var key, x, y, z;
+    // impure
+    key = 1;
+    var _ref = {
+        1: {
+          a: 1,
+          y: 1,
+        },
+      },
+      _obj = _objectDestructuringEmpty(_ref),
+      _key = key++,
+      _obj15 = _objectDestructuringEmpty(_obj[_key]),
+      y = _obj15.y,
+      x = _objectWithoutProperties(_obj15, ['y']);
+    expect(x).toEqual({ a: 1 });
+    expect(key).toBe(2);
+    expect(y).toBe(1);
+    // takes care of the order
+    key = 1;
+    var _ref16 = {
+        2: {
+          y: 2,
+          z: 3,
+        },
+        3: {
+          y: 4,
+          z: 6,
+        },
+      },
+      _obj17 = _objectDestructuringEmpty(_ref16),
+      _key18 = ++key,
+      _obj19 = _objectDestructuringEmpty(_obj17[_key18]),
+      y = _obj19.y,
+      rest_y = _objectWithoutProperties(_obj19, ['y']),
+      _key20 = ++key,
+      _obj21 = _objectDestructuringEmpty(_obj17[_key20]),
+      z = _obj21.z,
+      rest_z = _objectWithoutProperties(_obj21, ['z']);
+    expect(y).toBe(2);
+    expect(rest_y).toEqual({ z: 3 });
+    expect(z).toBe(6);
+    expect(rest_z).toEqual({ y: 4 });
+    expect(key).toBe(3);"
+  `);
 });
 
 test('object-rest/object-ref-computed/exec.js [loose, built-ins]', async () => {
@@ -4840,7 +8894,67 @@ test('object-rest/object-ref-computed/input.js [spec, built-ins]', async () => {
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutProperties: require('@babel/runtime/helpers/objectWithoutProperties'),
+    };
+    function _objectWithoutProperties(t, e) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(t),
+        _objectWithoutProperties2.objectWithoutProperties(t, e)
+      );
+    }
+    var key, x, y, z;
+    // impure
+    key = 1;
+    var _ref = {
+        1: {
+          a: 1,
+          y: 1,
+        },
+      },
+      _obj = _objectDestructuringEmpty(_ref),
+      _key = key++,
+      _obj15 = _objectDestructuringEmpty(_obj[_key]),
+      y = _obj15.y,
+      x = _objectWithoutProperties(_obj15, ['y']);
+    expect(x).toEqual({ a: 1 });
+    expect(key).toBe(2);
+    expect(y).toBe(1);
+    // takes care of the order
+    key = 1;
+    var _ref16 = {
+        2: {
+          y: 2,
+          z: 3,
+        },
+        3: {
+          y: 4,
+          z: 6,
+        },
+      },
+      _obj17 = _objectDestructuringEmpty(_ref16),
+      _key18 = ++key,
+      _obj19 = _objectDestructuringEmpty(_obj17[_key18]),
+      y = _obj19.y,
+      rest_y = _objectWithoutProperties(_obj19, ['y']),
+      _key20 = ++key,
+      _obj21 = _objectDestructuringEmpty(_obj17[_key20]),
+      z = _obj21.z,
+      rest_z = _objectWithoutProperties(_obj21, ['z']);
+    expect(y).toBe(2);
+    expect(rest_y).toEqual({ z: 3 });
+    expect(z).toBe(6);
+    expect(rest_z).toEqual({ y: 4 });
+    expect(key).toBe(3);"
+  `);
 });
 
 test('object-rest/object-ref-computed/input.js [loose, helpers]', async () => {
@@ -4851,7 +8965,67 @@ test('object-rest/object-ref-computed/input.js [loose, helpers]', async () => {
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutPropertiesLoose: require('@babel/runtime/helpers/objectWithoutPropertiesLoose'),
+    };
+    function _objectWithoutProperties(e, t) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(e),
+        _objectWithoutProperties2.objectWithoutPropertiesLoose(e, t)
+      );
+    }
+    var key, x, y, z;
+    // impure
+    key = 1;
+    var _ref = {
+        1: {
+          a: 1,
+          y: 1,
+        },
+      },
+      _obj = _objectDestructuringEmpty(_ref),
+      _key = key++,
+      _obj15 = _objectDestructuringEmpty(_obj[_key]),
+      y = _obj15.y,
+      x = _objectWithoutProperties(_obj15, ['y']);
+    expect(x).toEqual({ a: 1 });
+    expect(key).toBe(2);
+    expect(y).toBe(1);
+    // takes care of the order
+    key = 1;
+    var _ref16 = {
+        2: {
+          y: 2,
+          z: 3,
+        },
+        3: {
+          y: 4,
+          z: 6,
+        },
+      },
+      _obj17 = _objectDestructuringEmpty(_ref16),
+      _key18 = ++key,
+      _obj19 = _objectDestructuringEmpty(_obj17[_key18]),
+      y = _obj19.y,
+      rest_y = _objectWithoutProperties(_obj19, ['y']),
+      _key20 = ++key,
+      _obj21 = _objectDestructuringEmpty(_obj17[_key20]),
+      z = _obj21.z,
+      rest_z = _objectWithoutProperties(_obj21, ['z']);
+    expect(y).toBe(2);
+    expect(rest_y).toEqual({ z: 3 });
+    expect(z).toBe(6);
+    expect(rest_z).toEqual({ y: 4 });
+    expect(key).toBe(3);"
+  `);
 });
 
 test('object-rest/object-ref-computed/input.js [loose, built-ins]', async () => {
@@ -4953,7 +9127,16 @@ test('object-rest/parameters-exec/exec.js [spec, built-ins]', async () => {
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "function sum(x, y, z) {
+      return x + y + z;
+    }
+    function test() {
+      var args = arguments;
+      return sum(...args);
+    }
+    expect(test(1, 2, 3)).toBe(6);"
+  `);
 });
 
 test('object-rest/parameters-exec/exec.js [loose, helpers]', async () => {
@@ -4964,7 +9147,16 @@ test('object-rest/parameters-exec/exec.js [loose, helpers]', async () => {
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "function sum(x, y, z) {
+      return x + y + z;
+    }
+    function test() {
+      var args = arguments;
+      return sum(...args);
+    }
+    expect(test(1, 2, 3)).toBe(6);"
+  `);
 });
 
 test('object-rest/parameters-exec/exec.js [loose, built-ins]', async () => {
@@ -4983,7 +9175,6 @@ test('object-rest/parameters-exec/exec.js [loose, built-ins]', async () => {
       var args = arguments;
       return sum(...args);
     }
-
     expect(test(1, 2, 3)).toBe(6);"
   `);
 });
@@ -5038,7 +9229,38 @@ test('object-rest/parameters-object-rest-used-in-default/input.js [spec, built-i
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "const _excluded = ['X'];
+    var _objectDestructuringEmpty = require('@babel/runtime/helpers/objectDestructuringEmpty');
+    var _extends = require('@babel/runtime/helpers/extends');
+    var _objectWithoutProperties = require('@babel/runtime/helpers/objectWithoutProperties');
+    (_ref, a = R) => {
+      let R = _extends({}, (_objectDestructuringEmpty(_ref), _ref));
+    };
+    (_ref2, { a = { Y } }) => {
+      let { X: Y } = _ref2,
+        R = _objectWithoutProperties(_ref2, _excluded);
+    };
+    (a = R, _ref3) => {
+      let R = _extends({}, (_objectDestructuringEmpty(_ref3), _ref3));
+    };
+    (_ref4, e, c = 2, a = R, f = q) => {
+      let R = _extends({}, (_objectDestructuringEmpty(_ref4), _ref4));
+      let q;
+    };
+    (_ref5, a = f(R)) => {
+      let R = _extends({}, (_objectDestructuringEmpty(_ref5), _ref5));
+    };
+    (_ref6, { [R.key]: a = 42 }) => {
+      let R = _extends({}, (_objectDestructuringEmpty(_ref6), _ref6));
+    };
+    (_ref7, { a = { R: b } }) => {
+      let R = _extends({}, (_objectDestructuringEmpty(_ref7), _ref7));
+    };
+    (_ref8, { a = R => R } = { b: R => R }) => {
+      let R = _extends({}, (_objectDestructuringEmpty(_ref8), _ref8));
+    };"
+  `);
 });
 
 test('object-rest/parameters-object-rest-used-in-default/input.js [loose, helpers]', async () => {
@@ -5049,7 +9271,38 @@ test('object-rest/parameters-object-rest-used-in-default/input.js [loose, helper
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "const _excluded = ['X'];
+    var _objectDestructuringEmpty = require('@babel/runtime/helpers/objectDestructuringEmpty');
+    var _extends = require('@babel/runtime/helpers/extends');
+    var _objectWithoutProperties = require('@babel/runtime/helpers/objectWithoutPropertiesLoose');
+    (_ref, a = R) => {
+      let R = _extends({}, (_objectDestructuringEmpty(_ref), _ref));
+    };
+    (_ref2, { a = { Y } }) => {
+      let { X: Y } = _ref2,
+        R = _objectWithoutProperties(_ref2, _excluded);
+    };
+    (a = R, _ref3) => {
+      let R = _extends({}, (_objectDestructuringEmpty(_ref3), _ref3));
+    };
+    (_ref4, e, c = 2, a = R, f = q) => {
+      let R = _extends({}, (_objectDestructuringEmpty(_ref4), _ref4));
+      let q;
+    };
+    (_ref5, a = f(R)) => {
+      let R = _extends({}, (_objectDestructuringEmpty(_ref5), _ref5));
+    };
+    (_ref6, { [R.key]: a = 42 }) => {
+      let R = _extends({}, (_objectDestructuringEmpty(_ref6), _ref6));
+    };
+    (_ref7, { a = { R: b } }) => {
+      let R = _extends({}, (_objectDestructuringEmpty(_ref7), _ref7));
+    };
+    (_ref8, { a = R => R } = { b: R => R }) => {
+      let R = _extends({}, (_objectDestructuringEmpty(_ref8), _ref8));
+    };"
+  `);
 });
 
 test('object-rest/parameters-object-rest-used-in-default/input.js [loose, built-ins]', async () => {
@@ -5064,7 +9317,7 @@ test('object-rest/parameters-object-rest-used-in-default/input.js [loose, built-
     "const _excluded = ['X'];
     var _objectDestructuringEmpty = require('@babel/runtime/helpers/objectDestructuringEmpty');
     var _extends = require('@babel/runtime/helpers/extends');
-    var _objectWithoutProperties = require('@babel/runtime/helpers/objectWithoutProperties');
+    var _objectWithoutProperties = require('@babel/runtime/helpers/objectWithoutPropertiesLoose');
     (_ref, a = R) => {
       let R = _extends({}, (_objectDestructuringEmpty(_ref), _ref));
     };
@@ -5172,7 +9425,66 @@ test('object-rest/parameters/input.js [spec, built-ins]', async () => {
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "const _excluded = ['a1'],
+      _excluded2 = ['a2', 'b2'],
+      _excluded3 = ['a5'],
+      _excluded4 = ['a3'],
+      _excluded5 = ['ba1'],
+      _excluded6 = ['a3', 'b2'],
+      _excluded7 = ['ba1'],
+      _excluded8 = ['a1'],
+      _excluded9 = ['a1'];
+    var _objectDestructuringEmpty = require('@babel/runtime/helpers/objectDestructuringEmpty');
+    var _extends = require('@babel/runtime/helpers/extends');
+    var _objectWithoutProperties = require('@babel/runtime/helpers/objectWithoutProperties');
+    function a(_ref) {
+      let a34 = _extends({}, (_objectDestructuringEmpty(_ref), _ref));
+    }
+    function a2(_ref2) {
+      let { a1 } = _ref2,
+        b1 = _objectWithoutProperties(_ref2, _excluded);
+    }
+    function a3(_ref3) {
+      let { a2, b2 } = _ref3,
+        c2 = _objectWithoutProperties(_ref3, _excluded2);
+    }
+    function a4(_ref4, _ref5) {
+      let { a5 } = _ref5,
+        c5 = _objectWithoutProperties(_ref5, _excluded3);
+      let { a3 } = _ref4,
+        c3 = _objectWithoutProperties(_ref4, _excluded4);
+    }
+    function a5(_ref6) {
+      let { a3, b2: _ref7 } = _ref6,
+        { ba1 } = _ref7,
+        ba2 = _objectWithoutProperties(_ref7, _excluded5),
+        c3 = _objectWithoutProperties(_ref6, _excluded6);
+    }
+    function a6(_ref8) {
+      let { a3, b2: _ref9 } = _ref8,
+        { ba1 } = _ref9,
+        ba2 = _objectWithoutProperties(_ref9, _excluded7);
+    }
+    function a7(_ref10 = {}) {
+      let { a1 = 1 } = _ref10,
+        b1 = _objectWithoutProperties(_ref10, _excluded8);
+    }
+    function a8([_ref11]) {
+      let a1 = _extends({}, (_objectDestructuringEmpty(_ref11), _ref11));
+    }
+    function a9([_ref12]) {
+      let { a1 } = _ref12,
+        a2 = _objectWithoutProperties(_ref12, _excluded9);
+    }
+    function a10([a1, _ref13]) {
+      let a2 = _extends({}, (_objectDestructuringEmpty(_ref13), _ref13));
+    }
+    // Unchanged
+    function b(a) {}
+    function b2(a, ...b) {}
+    function b3({ b }) {}"
+  `);
 });
 
 test('object-rest/parameters/input.js [loose, helpers]', async () => {
@@ -5183,7 +9495,66 @@ test('object-rest/parameters/input.js [loose, helpers]', async () => {
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "const _excluded = ['a1'],
+      _excluded2 = ['a2', 'b2'],
+      _excluded3 = ['a5'],
+      _excluded4 = ['a3'],
+      _excluded5 = ['ba1'],
+      _excluded6 = ['a3', 'b2'],
+      _excluded7 = ['ba1'],
+      _excluded8 = ['a1'],
+      _excluded9 = ['a1'];
+    var _objectDestructuringEmpty = require('@babel/runtime/helpers/objectDestructuringEmpty');
+    var _extends = require('@babel/runtime/helpers/extends');
+    var _objectWithoutProperties = require('@babel/runtime/helpers/objectWithoutPropertiesLoose');
+    function a(_ref) {
+      let a34 = _extends({}, (_objectDestructuringEmpty(_ref), _ref));
+    }
+    function a2(_ref2) {
+      let { a1 } = _ref2,
+        b1 = _objectWithoutProperties(_ref2, _excluded);
+    }
+    function a3(_ref3) {
+      let { a2, b2 } = _ref3,
+        c2 = _objectWithoutProperties(_ref3, _excluded2);
+    }
+    function a4(_ref4, _ref5) {
+      let { a5 } = _ref5,
+        c5 = _objectWithoutProperties(_ref5, _excluded3);
+      let { a3 } = _ref4,
+        c3 = _objectWithoutProperties(_ref4, _excluded4);
+    }
+    function a5(_ref6) {
+      let { a3, b2: _ref7 } = _ref6,
+        { ba1 } = _ref7,
+        ba2 = _objectWithoutProperties(_ref7, _excluded5),
+        c3 = _objectWithoutProperties(_ref6, _excluded6);
+    }
+    function a6(_ref8) {
+      let { a3, b2: _ref9 } = _ref8,
+        { ba1 } = _ref9,
+        ba2 = _objectWithoutProperties(_ref9, _excluded7);
+    }
+    function a7(_ref10 = {}) {
+      let { a1 = 1 } = _ref10,
+        b1 = _objectWithoutProperties(_ref10, _excluded8);
+    }
+    function a8([_ref11]) {
+      let a1 = _extends({}, (_objectDestructuringEmpty(_ref11), _ref11));
+    }
+    function a9([_ref12]) {
+      let { a1 } = _ref12,
+        a2 = _objectWithoutProperties(_ref12, _excluded9);
+    }
+    function a10([a1, _ref13]) {
+      let a2 = _extends({}, (_objectDestructuringEmpty(_ref13), _ref13));
+    }
+    // Unchanged
+    function b(a) {}
+    function b2(a, ...b) {}
+    function b3({ b }) {}"
+  `);
 });
 
 test('object-rest/parameters/input.js [loose, built-ins]', async () => {
@@ -5206,7 +9577,7 @@ test('object-rest/parameters/input.js [loose, built-ins]', async () => {
       _excluded9 = ['a1'];
     var _objectDestructuringEmpty = require('@babel/runtime/helpers/objectDestructuringEmpty');
     var _extends = require('@babel/runtime/helpers/extends');
-    var _objectWithoutProperties = require('@babel/runtime/helpers/objectWithoutProperties');
+    var _objectWithoutProperties = require('@babel/runtime/helpers/objectWithoutPropertiesLoose');
     function a(_ref) {
       let a34 = _extends({}, (_objectDestructuringEmpty(_ref), _ref));
     }
@@ -5296,7 +9667,51 @@ test('object-rest/remove-unused-excluded-keys-loose/input.js [spec, built-ins]',
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "const _excluded = ['unused'];
+    var _objectWithoutProperties3 = require('@babel/runtime/helpers/objectWithoutProperties');
+    var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutProperties: require('@babel/runtime/helpers/objectWithoutProperties'),
+    };
+    function _objectWithoutProperties(t, e) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(t),
+        _objectWithoutProperties2.objectWithoutProperties(t, e)
+      );
+    }
+    var _ref, _obj;
+    // should not remove when destructuring into existing bindings
+    ((_ref = c2),
+      (_obj = _objectDestructuringEmpty(_ref)),
+      (a2 = _obj.a2),
+      (b2 = _objectWithoutProperties(_obj, ['a2'])),
+      _ref);
+    class Comp extends React.Component {
+      render() {
+        const _ref17 = this.props,
+          _obj18 = _objectDestructuringEmpty(_ref17),
+          excluded = _obj18.excluded,
+          excludedRenamed = _obj18.excluded2,
+          used = _obj18.used,
+          usedRenamed = _obj18.used2,
+          props = _objectWithoutProperties(_obj18, ['excluded', 'excluded2', 'used', 'used2']);
+        console.log(used, usedRenamed);
+        return React.createElement('input', props);
+      }
+    }
+    function smth(_ref18) {
+      let { unused } = _ref18,
+        rest = _objectWithoutProperties3(_ref18, _excluded);
+      call(rest);
+    }"
+  `);
 });
 
 test('object-rest/remove-unused-excluded-keys-loose/input.js [loose, helpers]', async () => {
@@ -5307,7 +9722,51 @@ test('object-rest/remove-unused-excluded-keys-loose/input.js [loose, helpers]', 
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "const _excluded = ['unused'];
+    var _objectWithoutProperties3 = require('@babel/runtime/helpers/objectWithoutPropertiesLoose');
+    var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutPropertiesLoose: require('@babel/runtime/helpers/objectWithoutPropertiesLoose'),
+    };
+    function _objectWithoutProperties(e, t) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(e),
+        _objectWithoutProperties2.objectWithoutPropertiesLoose(e, t)
+      );
+    }
+    var _ref, _obj;
+    // should not remove when destructuring into existing bindings
+    ((_ref = c2),
+      (_obj = _objectDestructuringEmpty(_ref)),
+      (a2 = _obj.a2),
+      (b2 = _objectWithoutProperties(_obj, ['a2'])),
+      _ref);
+    class Comp extends React.Component {
+      render() {
+        const _ref17 = this.props,
+          _obj18 = _objectDestructuringEmpty(_ref17),
+          excluded = _obj18.excluded,
+          excludedRenamed = _obj18.excluded2,
+          used = _obj18.used,
+          usedRenamed = _obj18.used2,
+          props = _objectWithoutProperties(_obj18, ['excluded', 'excluded2', 'used', 'used2']);
+        console.log(used, usedRenamed);
+        return React.createElement('input', props);
+      }
+    }
+    function smth(_ref18) {
+      let { unused } = _ref18,
+        rest = _objectWithoutProperties3(_ref18, _excluded);
+      call(rest);
+    }"
+  `);
 });
 
 test('object-rest/remove-unused-excluded-keys-loose/input.js [loose, built-ins]', async () => {
@@ -5320,7 +9779,7 @@ test('object-rest/remove-unused-excluded-keys-loose/input.js [loose, built-ins]'
     }),
   ).toMatchInlineSnapshot(`
     "const _excluded = ['unused'];
-    var _objectWithoutProperties3 = require('@babel/runtime/helpers/objectWithoutProperties');
+    var _objectWithoutProperties3 = require('@babel/runtime/helpers/objectWithoutPropertiesLoose');
     var _objectDestructuringEmpty2 = {
       objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
     };
@@ -5408,7 +9867,52 @@ test('object-rest/symbol-exec/exec.js [spec, built-ins]', async () => {
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutProperties: require('@babel/runtime/helpers/objectWithoutProperties'),
+    };
+    function _objectWithoutProperties(t, e) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(t),
+        _objectWithoutProperties2.objectWithoutProperties(t, e)
+      );
+    }
+    var _toPropertyKey2 = require('@babel/runtime/helpers/toPropertyKey');
+    function _toPropertyKey(value) {
+      return _toPropertyKey2(value);
+    }
+    const sym = Symbol('test');
+    const sym2 = Symbol('not enumerable');
+    const src = { a: 'string' };
+    Object.defineProperty(src, 'b', { value: 'not enumerable' });
+    Object.defineProperty(src, sym, {
+      enumerable: true,
+      value: 'symbol',
+    });
+    Object.defineProperty(src, sym2, { value: 'not enumerable' });
+    const _ref = src,
+      _obj = _objectDestructuringEmpty(_ref),
+      rest = _objectWithoutProperties(_obj, []);
+    expect(rest[sym]).toBe('symbol');
+    expect(rest.a).toBe('string');
+    expect(Object.getOwnPropertyNames(rest)).toEqual(['a']);
+    expect(Object.getOwnPropertySymbols(rest)).toEqual([sym]);
+    const _ref14 = src,
+      _obj15 = _objectDestructuringEmpty(_ref14),
+      _key = _toPropertyKey(sym),
+      dst = _obj15[_key],
+      noSym = _objectWithoutProperties(_obj15, [_key]);
+    expect(dst).toBe('symbol');
+    expect(noSym.a).toBe('string');
+    expect(Object.getOwnPropertySymbols(noSym)).toEqual([]);"
+  `);
 });
 
 test('object-rest/symbol-exec/exec.js [loose, helpers]', async () => {
@@ -5419,7 +9923,52 @@ test('object-rest/symbol-exec/exec.js [loose, helpers]', async () => {
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutPropertiesLoose: require('@babel/runtime/helpers/objectWithoutPropertiesLoose'),
+    };
+    function _objectWithoutProperties(e, t) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(e),
+        _objectWithoutProperties2.objectWithoutPropertiesLoose(e, t)
+      );
+    }
+    var _toPropertyKey2 = require('@babel/runtime/helpers/toPropertyKey');
+    function _toPropertyKey(value) {
+      return _toPropertyKey2(value);
+    }
+    const sym = Symbol('test');
+    const sym2 = Symbol('not enumerable');
+    const src = { a: 'string' };
+    Object.defineProperty(src, 'b', { value: 'not enumerable' });
+    Object.defineProperty(src, sym, {
+      enumerable: true,
+      value: 'symbol',
+    });
+    Object.defineProperty(src, sym2, { value: 'not enumerable' });
+    const _ref = src,
+      _obj = _objectDestructuringEmpty(_ref),
+      rest = _objectWithoutProperties(_obj, []);
+    expect(rest[sym]).toBe('symbol');
+    expect(rest.a).toBe('string');
+    expect(Object.getOwnPropertyNames(rest)).toEqual(['a']);
+    expect(Object.getOwnPropertySymbols(rest)).toEqual([sym]);
+    const _ref14 = src,
+      _obj15 = _objectDestructuringEmpty(_ref14),
+      _key = _toPropertyKey(sym),
+      dst = _obj15[_key],
+      noSym = _objectWithoutProperties(_obj15, [_key]);
+    expect(dst).toBe('symbol');
+    expect(noSym.a).toBe('string');
+    expect(Object.getOwnPropertySymbols(noSym)).toEqual([]);"
+  `);
 });
 
 test('object-rest/symbol-exec/exec.js [loose, built-ins]', async () => {
@@ -5447,6 +9996,10 @@ test('object-rest/symbol-exec/exec.js [loose, built-ins]', async () => {
         _objectWithoutProperties2.objectWithoutPropertiesLoose(e, t)
       );
     }
+    var _toPropertyKey2 = require('@babel/runtime/helpers/toPropertyKey');
+    function _toPropertyKey(value) {
+      return _toPropertyKey2(value);
+    }
     const sym = Symbol('test');
     const sym2 = Symbol('not enumerable');
     const src = { a: 'string' };
@@ -5465,7 +10018,7 @@ test('object-rest/symbol-exec/exec.js [loose, built-ins]', async () => {
     expect(Object.getOwnPropertySymbols(rest)).toEqual([sym]);
     const _ref14 = src,
       _obj15 = _objectDestructuringEmpty(_ref14),
-      _key = sym,
+      _key = _toPropertyKey(sym),
       dst = _obj15[_key],
       noSym = _objectWithoutProperties(_obj15, [_key]);
     expect(dst).toBe('symbol');
@@ -5514,7 +10067,49 @@ test('object-rest/symbol/input.js [spec, built-ins]', async () => {
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutProperties: require('@babel/runtime/helpers/objectWithoutProperties'),
+    };
+    function _objectWithoutProperties(t, e) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(t),
+        _objectWithoutProperties2.objectWithoutProperties(t, e)
+      );
+    }
+    var _toPropertyKey2 = require('@babel/runtime/helpers/toPropertyKey');
+    function _toPropertyKey(value) {
+      return _toPropertyKey2(value);
+    }
+    var _ref11, _obj12, _key13, _ref14, _obj15, _key16;
+    let _ref = {},
+      _obj = _objectDestructuringEmpty(_ref),
+      _key = _toPropertyKey(Symbol.for('foo')),
+      foo = _obj[_key],
+      rest = _objectWithoutProperties(_obj, [_key]);
+    ((_ref11 = {}),
+      (_obj12 = _objectDestructuringEmpty(_ref11)),
+      (_key13 = _toPropertyKey(Symbol.for('foo'))),
+      (foo = _obj12[_key13]),
+      (rest = _objectWithoutProperties(_obj12, [_key13])),
+      _ref11);
+    if (
+      ((_ref14 = {}),
+      (_obj15 = _objectDestructuringEmpty(_ref14)),
+      (_key16 = _toPropertyKey(Symbol.for('foo'))),
+      (foo = _obj15[_key16]),
+      (rest = _objectWithoutProperties(_obj15, [_key16])),
+      _ref14)
+    ) {
+    }"
+  `);
 });
 
 test('object-rest/symbol/input.js [loose, helpers]', async () => {
@@ -5525,7 +10120,49 @@ test('object-rest/symbol/input.js [loose, helpers]', async () => {
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutPropertiesLoose: require('@babel/runtime/helpers/objectWithoutPropertiesLoose'),
+    };
+    function _objectWithoutProperties(e, t) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(e),
+        _objectWithoutProperties2.objectWithoutPropertiesLoose(e, t)
+      );
+    }
+    var _toPropertyKey2 = require('@babel/runtime/helpers/toPropertyKey');
+    function _toPropertyKey(value) {
+      return _toPropertyKey2(value);
+    }
+    var _ref11, _obj12, _key13, _ref14, _obj15, _key16;
+    let _ref = {},
+      _obj = _objectDestructuringEmpty(_ref),
+      _key = _toPropertyKey(Symbol.for('foo')),
+      foo = _obj[_key],
+      rest = _objectWithoutProperties(_obj, [_key]);
+    ((_ref11 = {}),
+      (_obj12 = _objectDestructuringEmpty(_ref11)),
+      (_key13 = _toPropertyKey(Symbol.for('foo'))),
+      (foo = _obj12[_key13]),
+      (rest = _objectWithoutProperties(_obj12, [_key13])),
+      _ref11);
+    if (
+      ((_ref14 = {}),
+      (_obj15 = _objectDestructuringEmpty(_ref14)),
+      (_key16 = _toPropertyKey(Symbol.for('foo'))),
+      (foo = _obj15[_key16]),
+      (rest = _objectWithoutProperties(_obj15, [_key16])),
+      _ref14)
+    ) {
+    }"
+  `);
 });
 
 test('object-rest/symbol/input.js [loose, built-ins]', async () => {
@@ -5553,22 +10190,26 @@ test('object-rest/symbol/input.js [loose, built-ins]', async () => {
         _objectWithoutProperties2.objectWithoutPropertiesLoose(e, t)
       );
     }
+    var _toPropertyKey2 = require('@babel/runtime/helpers/toPropertyKey');
+    function _toPropertyKey(value) {
+      return _toPropertyKey2(value);
+    }
     var _ref11, _obj12, _key13, _ref14, _obj15, _key16;
     let _ref = {},
       _obj = _objectDestructuringEmpty(_ref),
-      _key = Symbol.for('foo'),
+      _key = _toPropertyKey(Symbol.for('foo')),
       foo = _obj[_key],
       rest = _objectWithoutProperties(_obj, [_key]);
     ((_ref11 = {}),
       (_obj12 = _objectDestructuringEmpty(_ref11)),
-      (_key13 = Symbol.for('foo')),
+      (_key13 = _toPropertyKey(Symbol.for('foo'))),
       (foo = _obj12[_key13]),
       (rest = _objectWithoutProperties(_obj12, [_key13])),
       _ref11);
     if (
       ((_ref14 = {}),
       (_obj15 = _objectDestructuringEmpty(_ref14)),
-      (_key16 = Symbol.for('foo')),
+      (_key16 = _toPropertyKey(Symbol.for('foo'))),
       (foo = _obj15[_key16]),
       (rest = _objectWithoutProperties(_obj15, [_key16])),
       _ref14)
@@ -5608,7 +10249,39 @@ test('object-rest/template-literal-allLiterals-true-no-hoisting/input.js [spec, 
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutProperties: require('@babel/runtime/helpers/objectWithoutProperties'),
+    };
+    function _objectWithoutProperties(t, e) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(t),
+        _objectWithoutProperties2.objectWithoutProperties(t, e)
+      );
+    }
+    var _toPropertyKey2 = require('@babel/runtime/helpers/toPropertyKey');
+    function _toPropertyKey(value) {
+      return _toPropertyKey2(value);
+    }
+    const example = () => {
+      var _ref, _obj, _key;
+      const input = {};
+      const foo = 'foo';
+      ((_ref = input),
+        (_obj = _objectDestructuringEmpty(_ref)),
+        (_key = _toPropertyKey(\`\${foo}_bar\`)),
+        (country = _obj[_key]),
+        (rest = _objectWithoutProperties(_obj, [_key])),
+        _ref);
+    };"
+  `);
 });
 
 test('object-rest/template-literal-allLiterals-true-no-hoisting/input.js [loose, helpers]', async () => {
@@ -5619,7 +10292,39 @@ test('object-rest/template-literal-allLiterals-true-no-hoisting/input.js [loose,
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutPropertiesLoose: require('@babel/runtime/helpers/objectWithoutPropertiesLoose'),
+    };
+    function _objectWithoutProperties(e, t) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(e),
+        _objectWithoutProperties2.objectWithoutPropertiesLoose(e, t)
+      );
+    }
+    var _toPropertyKey2 = require('@babel/runtime/helpers/toPropertyKey');
+    function _toPropertyKey(value) {
+      return _toPropertyKey2(value);
+    }
+    const example = () => {
+      var _ref, _obj, _key;
+      const input = {};
+      const foo = 'foo';
+      ((_ref = input),
+        (_obj = _objectDestructuringEmpty(_ref)),
+        (_key = _toPropertyKey(\`\${foo}_bar\`)),
+        (country = _obj[_key]),
+        (rest = _objectWithoutProperties(_obj, [_key])),
+        _ref);
+    };"
+  `);
 });
 
 test('object-rest/template-literal-allLiterals-true-no-hoisting/input.js [loose, built-ins]', async () => {
@@ -5647,13 +10352,17 @@ test('object-rest/template-literal-allLiterals-true-no-hoisting/input.js [loose,
         _objectWithoutProperties2.objectWithoutPropertiesLoose(e, t)
       );
     }
+    var _toPropertyKey2 = require('@babel/runtime/helpers/toPropertyKey');
+    function _toPropertyKey(value) {
+      return _toPropertyKey2(value);
+    }
     const example = () => {
       var _ref, _obj, _key;
       const input = {};
       const foo = 'foo';
       ((_ref = input),
         (_obj = _objectDestructuringEmpty(_ref)),
-        (_key = \`\${foo}_bar\`),
+        (_key = _toPropertyKey(\`\${foo}_bar\`)),
         (country = _obj[_key]),
         (rest = _objectWithoutProperties(_obj, [_key])),
         _ref);
@@ -5697,7 +10406,40 @@ test('object-rest/template-literal-property-allLiterals-false/input.js [spec, bu
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutProperties: require('@babel/runtime/helpers/objectWithoutProperties'),
+    };
+    function _objectWithoutProperties(t, e) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(t),
+        _objectWithoutProperties2.objectWithoutProperties(t, e)
+      );
+    }
+    var _toPropertyKey2 = require('@babel/runtime/helpers/toPropertyKey');
+    function _toPropertyKey(value) {
+      return _toPropertyKey2(value);
+    }
+    const input = {};
+    const _ref = input,
+      _obj = _objectDestructuringEmpty(_ref),
+      givenName = _obj.given_name,
+      lastName = _obj['last_name'],
+      _key = _toPropertyKey(\`country\`),
+      country = _obj[_key],
+      _key16 = _toPropertyKey(prefix + 'state'),
+      state = _obj[_key16],
+      _key17 = _toPropertyKey(\`\${prefix}consents\`),
+      consents = _obj[_key17],
+      rest = _objectWithoutProperties(_obj, ['given_name', 'last_name', _key, _key16, _key17]);"
+  `);
 });
 
 test('object-rest/template-literal-property-allLiterals-false/input.js [loose, helpers]', async () => {
@@ -5708,7 +10450,40 @@ test('object-rest/template-literal-property-allLiterals-false/input.js [loose, h
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutPropertiesLoose: require('@babel/runtime/helpers/objectWithoutPropertiesLoose'),
+    };
+    function _objectWithoutProperties(e, t) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(e),
+        _objectWithoutProperties2.objectWithoutPropertiesLoose(e, t)
+      );
+    }
+    var _toPropertyKey2 = require('@babel/runtime/helpers/toPropertyKey');
+    function _toPropertyKey(value) {
+      return _toPropertyKey2(value);
+    }
+    const input = {};
+    const _ref = input,
+      _obj = _objectDestructuringEmpty(_ref),
+      givenName = _obj.given_name,
+      lastName = _obj['last_name'],
+      _key = _toPropertyKey(\`country\`),
+      country = _obj[_key],
+      _key16 = _toPropertyKey(prefix + 'state'),
+      state = _obj[_key16],
+      _key17 = _toPropertyKey(\`\${prefix}consents\`),
+      consents = _obj[_key17],
+      rest = _objectWithoutProperties(_obj, ['given_name', 'last_name', _key, _key16, _key17]);"
+  `);
 });
 
 test('object-rest/template-literal-property-allLiterals-false/input.js [loose, built-ins]', async () => {
@@ -5736,16 +10511,20 @@ test('object-rest/template-literal-property-allLiterals-false/input.js [loose, b
         _objectWithoutProperties2.objectWithoutPropertiesLoose(e, t)
       );
     }
+    var _toPropertyKey2 = require('@babel/runtime/helpers/toPropertyKey');
+    function _toPropertyKey(value) {
+      return _toPropertyKey2(value);
+    }
     const input = {};
     const _ref = input,
       _obj = _objectDestructuringEmpty(_ref),
       givenName = _obj.given_name,
       lastName = _obj['last_name'],
-      _key = \`country\`,
+      _key = _toPropertyKey(\`country\`),
       country = _obj[_key],
-      _key16 = prefix + 'state',
+      _key16 = _toPropertyKey(prefix + 'state'),
       state = _obj[_key16],
-      _key17 = \`\${prefix}consents\`,
+      _key17 = _toPropertyKey(\`\${prefix}consents\`),
       consents = _obj[_key17],
       rest = _objectWithoutProperties(_obj, ['given_name', 'last_name', _key, _key16, _key17]);"
   `);
@@ -5775,7 +10554,36 @@ test('object-rest/template-literal-property-allLiterals-true/input.js [spec, bui
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutProperties: require('@babel/runtime/helpers/objectWithoutProperties'),
+    };
+    function _objectWithoutProperties(t, e) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(t),
+        _objectWithoutProperties2.objectWithoutProperties(t, e)
+      );
+    }
+    var _toPropertyKey2 = require('@babel/runtime/helpers/toPropertyKey');
+    function _toPropertyKey(value) {
+      return _toPropertyKey2(value);
+    }
+    const input = {};
+    const _ref = input,
+      _obj = _objectDestructuringEmpty(_ref),
+      givenName = _obj.given_name,
+      lastName = _obj['last_name'],
+      _key = _toPropertyKey(\`country\`),
+      country = _obj[_key],
+      rest = _objectWithoutProperties(_obj, ['given_name', 'last_name', _key]);"
+  `);
 });
 
 test('object-rest/template-literal-property-allLiterals-true/input.js [loose, helpers]', async () => {
@@ -5786,7 +10594,36 @@ test('object-rest/template-literal-property-allLiterals-true/input.js [loose, he
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutPropertiesLoose: require('@babel/runtime/helpers/objectWithoutPropertiesLoose'),
+    };
+    function _objectWithoutProperties(e, t) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(e),
+        _objectWithoutProperties2.objectWithoutPropertiesLoose(e, t)
+      );
+    }
+    var _toPropertyKey2 = require('@babel/runtime/helpers/toPropertyKey');
+    function _toPropertyKey(value) {
+      return _toPropertyKey2(value);
+    }
+    const input = {};
+    const _ref = input,
+      _obj = _objectDestructuringEmpty(_ref),
+      givenName = _obj.given_name,
+      lastName = _obj['last_name'],
+      _key = _toPropertyKey(\`country\`),
+      country = _obj[_key],
+      rest = _objectWithoutProperties(_obj, ['given_name', 'last_name', _key]);"
+  `);
 });
 
 test('object-rest/template-literal-property-allLiterals-true/input.js [loose, built-ins]', async () => {
@@ -5814,12 +10651,16 @@ test('object-rest/template-literal-property-allLiterals-true/input.js [loose, bu
         _objectWithoutProperties2.objectWithoutPropertiesLoose(e, t)
       );
     }
+    var _toPropertyKey2 = require('@babel/runtime/helpers/toPropertyKey');
+    function _toPropertyKey(value) {
+      return _toPropertyKey2(value);
+    }
     const input = {};
     const _ref = input,
       _obj = _objectDestructuringEmpty(_ref),
       givenName = _obj.given_name,
       lastName = _obj['last_name'],
-      _key = \`country\`,
+      _key = _toPropertyKey(\`country\`),
       country = _obj[_key],
       rest = _objectWithoutProperties(_obj, ['given_name', 'last_name', _key]);"
   `);
@@ -5968,7 +10809,186 @@ test('object-rest/variable-destructuring/input.js [spec, built-ins]', async () =
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _toArray2 = {
+      slicedToArray: require('@babel/runtime/helpers/slicedToArray'),
+      toArray: require('@babel/runtime/helpers/toArray'),
+    };
+    function _toArray(r, e, a) {
+      return a ? _toArray2.toArray(r) : _toArray2.slicedToArray(r, e);
+    }
+    var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutProperties: require('@babel/runtime/helpers/objectWithoutProperties'),
+    };
+    function _objectWithoutProperties(t, e) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(t),
+        _objectWithoutProperties2.objectWithoutProperties(t, e)
+      );
+    }
+    var _toPropertyKey2 = require('@babel/runtime/helpers/toPropertyKey');
+    function _toPropertyKey(value) {
+      return _toPropertyKey2(value);
+    }
+    const _ref = z(),
+      _obj = _objectDestructuringEmpty(_ref),
+      _arr = _toArray(_obj.x15, 0, true),
+      _obj63 = _objectDestructuringEmpty(_arr.slice(0)),
+      y15 = _objectWithoutProperties(_obj63, []);
+    let _ref64 = complex,
+      _obj65 = _objectDestructuringEmpty(_ref64),
+      _obj66 = _objectDestructuringEmpty(_obj65.x),
+      xa = _obj66.a,
+      _key = _toPropertyKey(d),
+      f = _obj66[_key],
+      asdf = _objectWithoutProperties(_obj66, ['a', _key]),
+      _obj68 = _objectDestructuringEmpty(_obj65.y),
+      d = _objectWithoutProperties(_obj68, []),
+      g = _objectWithoutProperties(_obj65, ['x', 'y']);
+    let _ref69 = z(),
+      _obj70 = _objectDestructuringEmpty(_ref69),
+      _obj71 = _objectDestructuringEmpty(_obj70.x4),
+      y4 = _objectWithoutProperties(_obj71, []);
+    let _ref72 = z(),
+      _obj73 = _objectDestructuringEmpty(_ref72),
+      _obj74 = _objectDestructuringEmpty(_obj73.x5),
+      w5 = _obj74.w5,
+      y5 = _objectWithoutProperties(_obj74, ['w5']);
+    let _ref75 = z(),
+      _obj76 = _objectDestructuringEmpty(_ref75),
+      _obj77 = _objectDestructuringEmpty(_obj76.x6),
+      _obj78 = _objectDestructuringEmpty(_obj77.w6),
+      a6 = _obj78.a6,
+      y6 = _objectWithoutProperties(_obj78, ['a6']);
+    let _ref79 = z(),
+      _obj80 = _objectDestructuringEmpty(_ref79),
+      _obj81 = _objectDestructuringEmpty(_obj80.x7),
+      e7 = _obj81.e7,
+      r7 = _obj81.r7,
+      _obj82 = _objectDestructuringEmpty(_obj80.q7),
+      _obj83 = _objectDestructuringEmpty(_obj82.w7),
+      a7 = _obj83.a7,
+      y7 = _objectWithoutProperties(_obj83, ['a7']);
+    let _ref84 = z(),
+      _obj85 = _objectDestructuringEmpty(_ref84),
+      x8 = _obj85.x8,
+      y8 = _objectWithoutProperties(_obj85, ['x8']);
+    let _ref86 = z(),
+      _obj87 = _objectDestructuringEmpty(_ref86),
+      _obj88 = _objectDestructuringEmpty(_obj87.x9),
+      _obj89 = _objectDestructuringEmpty(_obj88.w9),
+      a9 = _obj89.a9,
+      y9 = _objectWithoutProperties(_obj89, ['a9']),
+      _obj90 = _objectDestructuringEmpty(_obj87.x10),
+      a10 = _obj90.a10,
+      y10 = _objectWithoutProperties(_obj90, ['a10']);
+    let _ref91 = z(),
+      _obj92 = _objectDestructuringEmpty(_ref91),
+      _arr93 = _toArray(_obj92.x11, 1, false),
+      _obj94 = _objectDestructuringEmpty(_arr93[0]),
+      w11 = _obj94.w11,
+      z11 = _objectWithoutProperties(_obj94, ['w11']);
+    let _ref95 = z(),
+      _obj96 = _objectDestructuringEmpty(_ref95),
+      _arr97 = _toArray(_obj96.x12, 2, false),
+      _obj98 = _objectDestructuringEmpty(_arr97[0]),
+      a12 = _obj98.a12,
+      b12 = _obj98.b12,
+      _obj99 = _objectDestructuringEmpty(_arr97[1]),
+      c12 = _obj99.c12,
+      d12 = _objectWithoutProperties(_obj99, ['c12']);
+    let _ref100 = z(),
+      _obj101 = _objectDestructuringEmpty(_ref100),
+      _arr102 = _toArray(_obj101.x13, 2, false),
+      _obj103 = _objectDestructuringEmpty(_arr102[1]),
+      c13 = _obj103.c13,
+      d13 = _objectWithoutProperties(_obj103, ['c13']);
+    const _ref104 = z(),
+      _obj105 = _objectDestructuringEmpty(_ref104),
+      _arr106 = _toArray(_obj105.x14, 0, true),
+      _obj107 = _objectDestructuringEmpty(_arr106.slice(0)),
+      q14 = _obj107.q14,
+      y14 = _objectWithoutProperties(_obj107, ['q14']);
+    const _ref108 = z(),
+      _obj109 = _objectDestructuringEmpty(_ref108),
+      _arr110 = _toArray(_obj109.x15, 0, true),
+      _obj111 = _objectDestructuringEmpty(_arr110.slice(0)),
+      y16 = _objectWithoutProperties(_obj111, []);
+    const {
+      x16: [],
+    } = z();
+    const [...[...y17]] = z();
+    const _ref112 = z(),
+      _arr113 = _toArray(_ref112, 0, true),
+      _obj114 = _objectDestructuringEmpty(_arr113.slice(0)),
+      y18 = _objectWithoutProperties(_obj114, []);
+    const _ref115 = z(),
+      _arr116 = _toArray(_ref115, 0, true),
+      _obj117 = _objectDestructuringEmpty(_arr116.slice(0)),
+      a19 = _obj117.a19,
+      y19 = _objectWithoutProperties(_obj117, ['a19']);
+    const _ref118 = z(),
+      _obj119 = _objectDestructuringEmpty(_ref118),
+      _value = _obj119.x20,
+      _obj121 = _objectDestructuringEmpty(_value === void 0 ? {} : _value),
+      y20 = _objectWithoutProperties(_obj121, []);
+    const _ref122 = z(),
+      _obj123 = _objectDestructuringEmpty(_ref122),
+      _value124 = _obj123.x22,
+      _obj125 = _objectDestructuringEmpty(_value124 === void 0 ? {} : _value124),
+      q22 = _obj125.q22,
+      y22 = _objectWithoutProperties(_obj125, ['q22']);
+    const [[...y23] = []] = z();
+    const _ref126 = z(),
+      _arr127 = _toArray(_ref126, 1, false),
+      _value128 = _arr127[0],
+      _obj129 = _objectDestructuringEmpty(_value128 === void 0 ? [] : _value128),
+      y24 = _objectWithoutProperties(_obj129, []);
+    const { x25: [...y25] = [] } = z();
+    const { x26: [q26, ...y26] = [] } = z();
+    const {} = {};
+    const [, , x27] = z();
+    const _ref130 = z(),
+      _obj131 = _objectDestructuringEmpty(_ref130),
+      _arr132 = _toArray(_obj131.x28, 3, false),
+      _obj133 = _objectDestructuringEmpty(_arr132[2]),
+      y28 = _objectWithoutProperties(_obj133, []);
+    const _ref134 = z(),
+      _obj135 = _objectDestructuringEmpty(_ref134),
+      _arr136 = _toArray(_obj135.x29, 3, false),
+      _obj137 = _objectDestructuringEmpty(_arr136[2]),
+      q29 = _obj137.q29,
+      y29 = _objectWithoutProperties(_obj137, ['q29']);
+    const _ref138 = z(),
+      _arr139 = _toArray(_ref138, 3, false),
+      _obj140 = _objectDestructuringEmpty(_arr139[2]),
+      y30 = _obj140.y30,
+      x30 = _objectWithoutProperties(_obj140, ['y30']);
+    const _ref141 = z(),
+      _arr142 = _toArray(_ref141, 3, false),
+      _obj143 = _objectDestructuringEmpty(_arr142[2]),
+      x31 = _objectWithoutProperties(_obj143, []);
+    const _ref144 = z(),
+      _obj145 = _objectDestructuringEmpty(_ref144),
+      _obj146 = _objectDestructuringEmpty(_obj145.x32),
+      _obj147 = _objectDestructuringEmpty(_obj145.w32),
+      y32 = _objectWithoutProperties(_obj147, []);
+    const _ref148 = z(),
+      _arr149 = _toArray(_ref148, 4, false),
+      _obj150 = _objectDestructuringEmpty(_arr149[2]),
+      _obj151 = _objectDestructuringEmpty(_arr149[3]),
+      q32 = _objectWithoutProperties(_obj151, []);
+    const _ref152 = z(),
+      _obj153 = _objectDestructuringEmpty(_ref152),
+      y33 = _objectWithoutProperties(_obj153, []);"
+  `);
 });
 
 test('object-rest/variable-destructuring/input.js [loose, helpers]', async () => {
@@ -5979,7 +10999,186 @@ test('object-rest/variable-destructuring/input.js [loose, helpers]', async () =>
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _toArray2 = {
+      slicedToArray: require('@babel/runtime/helpers/slicedToArray'),
+      toArray: require('@babel/runtime/helpers/toArray'),
+    };
+    function _toArray(r, e, a) {
+      return a ? _toArray2.toArray(r) : _toArray2.slicedToArray(r, e);
+    }
+    var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutPropertiesLoose: require('@babel/runtime/helpers/objectWithoutPropertiesLoose'),
+    };
+    function _objectWithoutProperties(e, t) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(e),
+        _objectWithoutProperties2.objectWithoutPropertiesLoose(e, t)
+      );
+    }
+    var _toPropertyKey2 = require('@babel/runtime/helpers/toPropertyKey');
+    function _toPropertyKey(value) {
+      return _toPropertyKey2(value);
+    }
+    const _ref = z(),
+      _obj = _objectDestructuringEmpty(_ref),
+      _arr = _toArray(_obj.x15, 0, true),
+      _obj63 = _objectDestructuringEmpty(_arr.slice(0)),
+      y15 = _objectWithoutProperties(_obj63, []);
+    let _ref64 = complex,
+      _obj65 = _objectDestructuringEmpty(_ref64),
+      _obj66 = _objectDestructuringEmpty(_obj65.x),
+      xa = _obj66.a,
+      _key = _toPropertyKey(d),
+      f = _obj66[_key],
+      asdf = _objectWithoutProperties(_obj66, ['a', _key]),
+      _obj68 = _objectDestructuringEmpty(_obj65.y),
+      d = _objectWithoutProperties(_obj68, []),
+      g = _objectWithoutProperties(_obj65, ['x', 'y']);
+    let _ref69 = z(),
+      _obj70 = _objectDestructuringEmpty(_ref69),
+      _obj71 = _objectDestructuringEmpty(_obj70.x4),
+      y4 = _objectWithoutProperties(_obj71, []);
+    let _ref72 = z(),
+      _obj73 = _objectDestructuringEmpty(_ref72),
+      _obj74 = _objectDestructuringEmpty(_obj73.x5),
+      w5 = _obj74.w5,
+      y5 = _objectWithoutProperties(_obj74, ['w5']);
+    let _ref75 = z(),
+      _obj76 = _objectDestructuringEmpty(_ref75),
+      _obj77 = _objectDestructuringEmpty(_obj76.x6),
+      _obj78 = _objectDestructuringEmpty(_obj77.w6),
+      a6 = _obj78.a6,
+      y6 = _objectWithoutProperties(_obj78, ['a6']);
+    let _ref79 = z(),
+      _obj80 = _objectDestructuringEmpty(_ref79),
+      _obj81 = _objectDestructuringEmpty(_obj80.x7),
+      e7 = _obj81.e7,
+      r7 = _obj81.r7,
+      _obj82 = _objectDestructuringEmpty(_obj80.q7),
+      _obj83 = _objectDestructuringEmpty(_obj82.w7),
+      a7 = _obj83.a7,
+      y7 = _objectWithoutProperties(_obj83, ['a7']);
+    let _ref84 = z(),
+      _obj85 = _objectDestructuringEmpty(_ref84),
+      x8 = _obj85.x8,
+      y8 = _objectWithoutProperties(_obj85, ['x8']);
+    let _ref86 = z(),
+      _obj87 = _objectDestructuringEmpty(_ref86),
+      _obj88 = _objectDestructuringEmpty(_obj87.x9),
+      _obj89 = _objectDestructuringEmpty(_obj88.w9),
+      a9 = _obj89.a9,
+      y9 = _objectWithoutProperties(_obj89, ['a9']),
+      _obj90 = _objectDestructuringEmpty(_obj87.x10),
+      a10 = _obj90.a10,
+      y10 = _objectWithoutProperties(_obj90, ['a10']);
+    let _ref91 = z(),
+      _obj92 = _objectDestructuringEmpty(_ref91),
+      _arr93 = _toArray(_obj92.x11, 1, false),
+      _obj94 = _objectDestructuringEmpty(_arr93[0]),
+      w11 = _obj94.w11,
+      z11 = _objectWithoutProperties(_obj94, ['w11']);
+    let _ref95 = z(),
+      _obj96 = _objectDestructuringEmpty(_ref95),
+      _arr97 = _toArray(_obj96.x12, 2, false),
+      _obj98 = _objectDestructuringEmpty(_arr97[0]),
+      a12 = _obj98.a12,
+      b12 = _obj98.b12,
+      _obj99 = _objectDestructuringEmpty(_arr97[1]),
+      c12 = _obj99.c12,
+      d12 = _objectWithoutProperties(_obj99, ['c12']);
+    let _ref100 = z(),
+      _obj101 = _objectDestructuringEmpty(_ref100),
+      _arr102 = _toArray(_obj101.x13, 2, false),
+      _obj103 = _objectDestructuringEmpty(_arr102[1]),
+      c13 = _obj103.c13,
+      d13 = _objectWithoutProperties(_obj103, ['c13']);
+    const _ref104 = z(),
+      _obj105 = _objectDestructuringEmpty(_ref104),
+      _arr106 = _toArray(_obj105.x14, 0, true),
+      _obj107 = _objectDestructuringEmpty(_arr106.slice(0)),
+      q14 = _obj107.q14,
+      y14 = _objectWithoutProperties(_obj107, ['q14']);
+    const _ref108 = z(),
+      _obj109 = _objectDestructuringEmpty(_ref108),
+      _arr110 = _toArray(_obj109.x15, 0, true),
+      _obj111 = _objectDestructuringEmpty(_arr110.slice(0)),
+      y16 = _objectWithoutProperties(_obj111, []);
+    const {
+      x16: [],
+    } = z();
+    const [...[...y17]] = z();
+    const _ref112 = z(),
+      _arr113 = _toArray(_ref112, 0, true),
+      _obj114 = _objectDestructuringEmpty(_arr113.slice(0)),
+      y18 = _objectWithoutProperties(_obj114, []);
+    const _ref115 = z(),
+      _arr116 = _toArray(_ref115, 0, true),
+      _obj117 = _objectDestructuringEmpty(_arr116.slice(0)),
+      a19 = _obj117.a19,
+      y19 = _objectWithoutProperties(_obj117, ['a19']);
+    const _ref118 = z(),
+      _obj119 = _objectDestructuringEmpty(_ref118),
+      _value = _obj119.x20,
+      _obj121 = _objectDestructuringEmpty(_value === void 0 ? {} : _value),
+      y20 = _objectWithoutProperties(_obj121, []);
+    const _ref122 = z(),
+      _obj123 = _objectDestructuringEmpty(_ref122),
+      _value124 = _obj123.x22,
+      _obj125 = _objectDestructuringEmpty(_value124 === void 0 ? {} : _value124),
+      q22 = _obj125.q22,
+      y22 = _objectWithoutProperties(_obj125, ['q22']);
+    const [[...y23] = []] = z();
+    const _ref126 = z(),
+      _arr127 = _toArray(_ref126, 1, false),
+      _value128 = _arr127[0],
+      _obj129 = _objectDestructuringEmpty(_value128 === void 0 ? [] : _value128),
+      y24 = _objectWithoutProperties(_obj129, []);
+    const { x25: [...y25] = [] } = z();
+    const { x26: [q26, ...y26] = [] } = z();
+    const {} = {};
+    const [, , x27] = z();
+    const _ref130 = z(),
+      _obj131 = _objectDestructuringEmpty(_ref130),
+      _arr132 = _toArray(_obj131.x28, 3, false),
+      _obj133 = _objectDestructuringEmpty(_arr132[2]),
+      y28 = _objectWithoutProperties(_obj133, []);
+    const _ref134 = z(),
+      _obj135 = _objectDestructuringEmpty(_ref134),
+      _arr136 = _toArray(_obj135.x29, 3, false),
+      _obj137 = _objectDestructuringEmpty(_arr136[2]),
+      q29 = _obj137.q29,
+      y29 = _objectWithoutProperties(_obj137, ['q29']);
+    const _ref138 = z(),
+      _arr139 = _toArray(_ref138, 3, false),
+      _obj140 = _objectDestructuringEmpty(_arr139[2]),
+      y30 = _obj140.y30,
+      x30 = _objectWithoutProperties(_obj140, ['y30']);
+    const _ref141 = z(),
+      _arr142 = _toArray(_ref141, 3, false),
+      _obj143 = _objectDestructuringEmpty(_arr142[2]),
+      x31 = _objectWithoutProperties(_obj143, []);
+    const _ref144 = z(),
+      _obj145 = _objectDestructuringEmpty(_ref144),
+      _obj146 = _objectDestructuringEmpty(_obj145.x32),
+      _obj147 = _objectDestructuringEmpty(_obj145.w32),
+      y32 = _objectWithoutProperties(_obj147, []);
+    const _ref148 = z(),
+      _arr149 = _toArray(_ref148, 4, false),
+      _obj150 = _objectDestructuringEmpty(_arr149[2]),
+      _obj151 = _objectDestructuringEmpty(_arr149[3]),
+      q32 = _objectWithoutProperties(_obj151, []);
+    const _ref152 = z(),
+      _obj153 = _objectDestructuringEmpty(_ref152),
+      y33 = _objectWithoutProperties(_obj153, []);"
+  `);
 });
 
 test('object-rest/variable-destructuring/input.js [loose, built-ins]', async () => {
@@ -6014,6 +11213,10 @@ test('object-rest/variable-destructuring/input.js [loose, built-ins]', async () 
         _objectWithoutProperties2.objectWithoutPropertiesLoose(e, t)
       );
     }
+    var _toPropertyKey2 = require('@babel/runtime/helpers/toPropertyKey');
+    function _toPropertyKey(value) {
+      return _toPropertyKey2(value);
+    }
     const _ref = z(),
       _obj = _objectDestructuringEmpty(_ref),
       _arr = _toArray(_obj.x15, 0, true),
@@ -6023,7 +11226,7 @@ test('object-rest/variable-destructuring/input.js [loose, built-ins]', async () 
       _obj65 = _objectDestructuringEmpty(_ref64),
       _obj66 = _objectDestructuringEmpty(_obj65.x),
       xa = _obj66.a,
-      _key = d,
+      _key = _toPropertyKey(d),
       f = _obj66[_key],
       asdf = _objectWithoutProperties(_obj66, ['a', _key]),
       _obj68 = _objectDestructuringEmpty(_obj65.y),
@@ -6205,7 +11408,25 @@ test('object-rest/variable-exec/exec.js [spec, built-ins]', async () => {
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "// var { x, y, ...z } = { x: 1, y: 2, a: 3, b: 4 };
+    // expect(x).toBe(1);
+    // expect(y).toBe(2);
+    // expect(z).toEqual({ a: 3, b: 4 });
+    // var complex = {
+    //   x: { a: 1, b: 2, c: 3 },
+    // };
+    // var {
+    //   x: { a: xa, ...xbc }
+    // } = complex;
+    // expect(xa).toBe(1);
+    // expect(xbc).toEqual({ b: 2, c: 3});
+    // // own properties
+    // function ownX({ ...properties }) {
+    //   return properties.x;
+    // }
+    // expect(ownX(Object.create({ x: 1 }))).toBeUndefined();"
+  `);
 });
 
 test('object-rest/variable-exec/exec.js [loose, helpers]', async () => {
@@ -6216,7 +11437,25 @@ test('object-rest/variable-exec/exec.js [loose, helpers]', async () => {
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "// var { x, y, ...z } = { x: 1, y: 2, a: 3, b: 4 };
+    // expect(x).toBe(1);
+    // expect(y).toBe(2);
+    // expect(z).toEqual({ a: 3, b: 4 });
+    // var complex = {
+    //   x: { a: 1, b: 2, c: 3 },
+    // };
+    // var {
+    //   x: { a: xa, ...xbc }
+    // } = complex;
+    // expect(xa).toBe(1);
+    // expect(xbc).toEqual({ b: 2, c: 3});
+    // // own properties
+    // function ownX({ ...properties }) {
+    //   return properties.x;
+    // }
+    // expect(ownX(Object.create({ x: 1 }))).toBeUndefined();"
+  `);
 });
 
 test('object-rest/variable-exec/exec.js [loose, built-ins]', async () => {
@@ -6229,22 +11468,17 @@ test('object-rest/variable-exec/exec.js [loose, built-ins]', async () => {
     }),
   ).toMatchInlineSnapshot(`
     "// var { x, y, ...z } = { x: 1, y: 2, a: 3, b: 4 };
-
     // expect(x).toBe(1);
     // expect(y).toBe(2);
     // expect(z).toEqual({ a: 3, b: 4 });
-
     // var complex = {
     //   x: { a: 1, b: 2, c: 3 },
     // };
-
     // var {
     //   x: { a: xa, ...xbc }
     // } = complex;
-
     // expect(xa).toBe(1);
     // expect(xbc).toEqual({ b: 2, c: 3});
-
     // // own properties
     // function ownX({ ...properties }) {
     //   return properties.x;
@@ -6283,7 +11517,42 @@ test('object-rest/with-array-rest/input.js [spec, built-ins]', async () => {
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _toArray2 = {
+      slicedToArray: require('@babel/runtime/helpers/slicedToArray'),
+      toArray: require('@babel/runtime/helpers/toArray'),
+    };
+    function _toArray(r, e, a) {
+      return a ? _toArray2.toArray(r) : _toArray2.slicedToArray(r, e);
+    }
+    var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutProperties: require('@babel/runtime/helpers/objectWithoutProperties'),
+    };
+    function _objectWithoutProperties(t, e) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(t),
+        _objectWithoutProperties2.objectWithoutProperties(t, e)
+      );
+    }
+    let _ref = {
+        a: [1, 2, 3, 4],
+        d: 'oyez',
+      },
+      _obj = _objectDestructuringEmpty(_ref),
+      _arr = _toArray(_obj.a, 1, true),
+      b = _arr[0],
+      arrayRest = _arr.slice(1),
+      _value = _obj.c,
+      c = _value === void 0 ? function (...functionRest) {} : _value,
+      objectRest = _objectWithoutProperties(_obj, ['a', 'c']);"
+  `);
 });
 
 test('object-rest/with-array-rest/input.js [loose, helpers]', async () => {
@@ -6294,7 +11563,42 @@ test('object-rest/with-array-rest/input.js [loose, helpers]', async () => {
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _toArray2 = {
+      slicedToArray: require('@babel/runtime/helpers/slicedToArray'),
+      toArray: require('@babel/runtime/helpers/toArray'),
+    };
+    function _toArray(r, e, a) {
+      return a ? _toArray2.toArray(r) : _toArray2.slicedToArray(r, e);
+    }
+    var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutPropertiesLoose: require('@babel/runtime/helpers/objectWithoutPropertiesLoose'),
+    };
+    function _objectWithoutProperties(e, t) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(e),
+        _objectWithoutProperties2.objectWithoutPropertiesLoose(e, t)
+      );
+    }
+    let _ref = {
+        a: [1, 2, 3, 4],
+        d: 'oyez',
+      },
+      _obj = _objectDestructuringEmpty(_ref),
+      _arr = _toArray(_obj.a, 1, true),
+      b = _arr[0],
+      arrayRest = _arr.slice(1),
+      _value = _obj.c,
+      c = _value === void 0 ? function (...functionRest) {} : _value,
+      objectRest = _objectWithoutProperties(_obj, ['a', 'c']);"
+  `);
 });
 
 test('object-rest/with-array-rest/input.js [loose, built-ins]', async () => {
@@ -6370,7 +11674,16 @@ test('object-spread-loose-builtins/assignment/input.js [spec, built-ins]', async
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var x;
+    var y;
+    var z;
+    z = Object.assign({ x }, y);
+    z = {
+      x,
+      w: Object.assign({}, y),
+    };"
+  `);
 });
 
 test('object-spread-loose-builtins/assignment/input.js [loose, helpers]', async () => {
@@ -6380,7 +11693,17 @@ test('object-spread-loose-builtins/assignment/input.js [loose, helpers]', async 
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _extends = require('@babel/runtime/helpers/extends');
+    var x;
+    var y;
+    var z;
+    z = _extends({ x }, y);
+    z = {
+      x,
+      w: _extends({}, y),
+    };"
+  `);
 });
 
 test('object-spread-loose-builtins/assignment/input.js [loose, built-ins]', async () => {
@@ -6442,7 +11765,24 @@ test('object-spread-loose-builtins/expression/exec.js [spec, built-ins]', async 
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var log = [];
+    var a = Object.assign(
+      {},
+      {
+        get foo() {
+          log.push(1);
+        },
+      },
+      {
+        get bar() {
+          log.push(2);
+        },
+      },
+    );
+    // Loose mode uses regular Get, not GetOwnProperty.
+    expect(log).toEqual([1, 2]);"
+  `);
 });
 
 test('object-spread-loose-builtins/expression/exec.js [loose, helpers]', async () => {
@@ -6453,7 +11793,25 @@ test('object-spread-loose-builtins/expression/exec.js [loose, helpers]', async (
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _extends = require('@babel/runtime/helpers/extends');
+    var log = [];
+    var a = _extends(
+      {},
+      {
+        get foo() {
+          log.push(1);
+        },
+      },
+      {
+        get bar() {
+          log.push(2);
+        },
+      },
+    );
+    // Loose mode uses regular Get, not GetOwnProperty.
+    expect(log).toEqual([1, 2]);"
+  `);
 });
 
 test('object-spread-loose-builtins/expression/exec.js [loose, built-ins]', async () => {
@@ -6523,7 +11881,26 @@ test('object-spread-loose-builtins/expression/input.js [spec, built-ins]', async
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var a;
+    var b;
+    var c;
+    var d;
+    var x;
+    var y;
+    Object.assign({ x }, y, { a }, b, { c });
+    Object.assign({}, Object.prototype);
+    Object.assign({}, { foo: 'bar' });
+    Object.assign({}, { foo: 'bar' }, { bar: 'baz' });
+    Object.assign(
+      {},
+      {
+        get foo() {
+          return 'foo';
+        },
+      },
+    );"
+  `);
 });
 
 test('object-spread-loose-builtins/expression/input.js [loose, helpers]', async () => {
@@ -6534,7 +11911,27 @@ test('object-spread-loose-builtins/expression/input.js [loose, helpers]', async 
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _extends = require('@babel/runtime/helpers/extends');
+    var a;
+    var b;
+    var c;
+    var d;
+    var x;
+    var y;
+    _extends({ x }, y, { a }, b, { c });
+    _extends({}, Object.prototype);
+    _extends({}, { foo: 'bar' });
+    _extends({}, { foo: 'bar' }, { bar: 'baz' });
+    _extends(
+      {},
+      {
+        get foo() {
+          return 'foo';
+        },
+      },
+    );"
+  `);
 });
 
 test('object-spread-loose-builtins/expression/input.js [loose, built-ins]', async () => {
@@ -6595,7 +11992,15 @@ test('object-spread-loose-builtins/no-getOwnPropertyDescriptors/exec.js [spec, b
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "const oldGOPDs = Object.getOwnPropertyDescriptors;
+    Object.getOwnPropertyDescriptors = null;
+    try {
+      Object.assign({}, { a: 1 }, { b: 1 }, {});
+    } finally {
+      Object.getOwnPropertyDescriptors = oldGOPDs;
+    }"
+  `);
 });
 
 test('object-spread-loose-builtins/no-getOwnPropertyDescriptors/exec.js [loose, helpers]', async () => {
@@ -6606,7 +12011,16 @@ test('object-spread-loose-builtins/no-getOwnPropertyDescriptors/exec.js [loose, 
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _extends = require('@babel/runtime/helpers/extends');
+    const oldGOPDs = Object.getOwnPropertyDescriptors;
+    Object.getOwnPropertyDescriptors = null;
+    try {
+      _extends({}, { a: 1 }, { b: 1 }, {});
+    } finally {
+      Object.getOwnPropertyDescriptors = oldGOPDs;
+    }"
+  `);
 });
 
 test('object-spread-loose-builtins/no-getOwnPropertyDescriptors/exec.js [loose, built-ins]', async () => {
@@ -6696,7 +12110,52 @@ test('object-spread-loose-builtins/no-object-assign-exec/exec.js [spec, built-in
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "'use strict';
+    Object.defineProperty(Object.prototype, 'NOSET', {
+      get(value) {
+        // noop
+      },
+    });
+    Object.defineProperty(Object.prototype, 'NOWRITE', {
+      writable: false,
+      value: 'abc',
+    });
+    const obj = { NOSET: 123 };
+    // this won't work as expected if transformed as Object.assign (or equivalent)
+    // because those trigger object setters (spread don't)
+    expect(() => {
+      const objSpread = Object.assign({}, obj);
+    }).toThrow();
+    const obj2 = { NOWRITE: 456 };
+    // this throws \`TypeError: Cannot assign to read only property 'NOWRITE'\`
+    // if transformed as Object.assign (or equivalent) because those use *assignment* for creating properties
+    // (spread defines them)
+    expect(() => {
+      const obj2Spread = Object.assign({}, obj2);
+    }).toThrow();
+    const KEY = Symbol('key');
+    const obj3Spread = Object.assign(
+      {},
+      {
+        get foo() {
+          return 'bar';
+        },
+      },
+      { [KEY]: 'symbol' },
+    );
+    expect(Object.getOwnPropertyDescriptor(obj3Spread, 'foo').value).toBe('bar');
+    expect(Object.getOwnPropertyDescriptor(obj3Spread, KEY).value).toBe('symbol');
+    const obj4Spread = Object.assign({}, Object.prototype);
+    expect(Object.getOwnPropertyDescriptor(obj4Spread, 'hasOwnProperty')).toBeUndefined();
+    expect(() => Object.assign({}, null, undefined)).not.toThrow();
+    const o = Object.create(null);
+    o.a = 'foo';
+    o.__proto__ = [];
+    const o2 = Object.assign({}, o);
+    // Loose will do o2.__proto__ = []
+    expect(Array.isArray(Object.getPrototypeOf(o2))).toBe(true);"
+  `);
 });
 
 test('object-spread-loose-builtins/no-object-assign-exec/exec.js [loose, helpers]', async () => {
@@ -6707,7 +12166,53 @@ test('object-spread-loose-builtins/no-object-assign-exec/exec.js [loose, helpers
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "'use strict';
+    var _extends = require('@babel/runtime/helpers/extends');
+    Object.defineProperty(Object.prototype, 'NOSET', {
+      get(value) {
+        // noop
+      },
+    });
+    Object.defineProperty(Object.prototype, 'NOWRITE', {
+      writable: false,
+      value: 'abc',
+    });
+    const obj = { NOSET: 123 };
+    // this won't work as expected if transformed as Object.assign (or equivalent)
+    // because those trigger object setters (spread don't)
+    expect(() => {
+      const objSpread = _extends({}, obj);
+    }).toThrow();
+    const obj2 = { NOWRITE: 456 };
+    // this throws \`TypeError: Cannot assign to read only property 'NOWRITE'\`
+    // if transformed as Object.assign (or equivalent) because those use *assignment* for creating properties
+    // (spread defines them)
+    expect(() => {
+      const obj2Spread = _extends({}, obj2);
+    }).toThrow();
+    const KEY = Symbol('key');
+    const obj3Spread = _extends(
+      {},
+      {
+        get foo() {
+          return 'bar';
+        },
+      },
+      { [KEY]: 'symbol' },
+    );
+    expect(Object.getOwnPropertyDescriptor(obj3Spread, 'foo').value).toBe('bar');
+    expect(Object.getOwnPropertyDescriptor(obj3Spread, KEY).value).toBe('symbol');
+    const obj4Spread = _extends({}, Object.prototype);
+    expect(Object.getOwnPropertyDescriptor(obj4Spread, 'hasOwnProperty')).toBeUndefined();
+    expect(() => _extends({}, null, undefined)).not.toThrow();
+    const o = Object.create(null);
+    o.a = 'foo';
+    o.__proto__ = [];
+    const o2 = _extends({}, o);
+    // Loose will do o2.__proto__ = []
+    expect(Array.isArray(Object.getPrototypeOf(o2))).toBe(true);"
+  `);
 });
 
 test('object-spread-loose-builtins/no-object-assign-exec/exec.js [loose, built-ins]', async () => {
@@ -6814,7 +12319,35 @@ test('object-spread-loose-builtins/side-effect/exec.js [spec, built-ins]', async
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var k = {
+      a: 1,
+      b: 2,
+    };
+    var o = Object.assign({ a: 3 }, k, { b: k.a++ });
+    // Loose will evaluate the static \`b: k.a++\` before spreading \`...k\`.
+    // It should be {a: 1, b: 1}
+    expect(o).toEqual({
+      a: 2,
+      b: 1,
+    });
+    var k = {
+      a: 1,
+      get b() {
+        l = { z: 9 };
+        return 2;
+      },
+    };
+    var l = { c: 3 };
+    var o = Object.assign({}, k, l);
+    // Loose will evaluate the \`l\` before spreading \`...k\`.
+    // It should be {a: 1, b: 2, z: 9}
+    expect(o).toEqual({
+      a: 1,
+      b: 2,
+      c: 3,
+    });"
+  `);
 });
 
 test('object-spread-loose-builtins/side-effect/exec.js [loose, helpers]', async () => {
@@ -6825,7 +12358,36 @@ test('object-spread-loose-builtins/side-effect/exec.js [loose, helpers]', async 
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _extends = require('@babel/runtime/helpers/extends');
+    var k = {
+      a: 1,
+      b: 2,
+    };
+    var o = _extends({ a: 3 }, k, { b: k.a++ });
+    // Loose will evaluate the static \`b: k.a++\` before spreading \`...k\`.
+    // It should be {a: 1, b: 1}
+    expect(o).toEqual({
+      a: 2,
+      b: 1,
+    });
+    var k = {
+      a: 1,
+      get b() {
+        l = { z: 9 };
+        return 2;
+      },
+    };
+    var l = { c: 3 };
+    var o = _extends({}, k, l);
+    // Loose will evaluate the \`l\` before spreading \`...k\`.
+    // It should be {a: 1, b: 2, z: 9}
+    expect(o).toEqual({
+      a: 1,
+      b: 2,
+      c: 3,
+    });"
+  `);
 });
 
 test('object-spread-loose-builtins/side-effect/exec.js [loose, built-ins]', async () => {
@@ -6924,7 +12486,35 @@ test('object-spread-loose-builtins/side-effect/input.js [spec, built-ins]', asyn
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var k = {
+      a: 1,
+      b: 2,
+    };
+    var o = Object.assign({ a: 3 }, k, { b: k.a++ });
+    var pureA = {};
+    var pureB = {};
+    var pureC = {};
+    var pureD = {};
+    var pureE = {};
+    function impureFunc() {
+      console.log('hello');
+    }
+    var output = Object.assign(
+      {},
+      pureA,
+      {
+        get foo() {},
+        get bar() {},
+      },
+      pureB,
+      pureC,
+      impureFunc(),
+      pureD,
+      { pureD },
+    );
+    var simpleOutput = Object.assign({}, pureA, { test: '1' }, pureB);"
+  `);
 });
 
 test('object-spread-loose-builtins/side-effect/input.js [loose, helpers]', async () => {
@@ -6935,7 +12525,36 @@ test('object-spread-loose-builtins/side-effect/input.js [loose, helpers]', async
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _extends = require('@babel/runtime/helpers/extends');
+    var k = {
+      a: 1,
+      b: 2,
+    };
+    var o = _extends({ a: 3 }, k, { b: k.a++ });
+    var pureA = {};
+    var pureB = {};
+    var pureC = {};
+    var pureD = {};
+    var pureE = {};
+    function impureFunc() {
+      console.log('hello');
+    }
+    var output = _extends(
+      {},
+      pureA,
+      {
+        get foo() {},
+        get bar() {},
+      },
+      pureB,
+      pureC,
+      impureFunc(),
+      pureD,
+      { pureD },
+    );
+    var simpleOutput = _extends({}, pureA, { test: '1' }, pureB);"
+  `);
 });
 
 test('object-spread-loose-builtins/side-effect/input.js [loose, built-ins]', async () => {
@@ -7000,7 +12619,11 @@ test('object-spread-loose-builtins/string-exec/exec.js [spec, built-ins]', async
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "expect([...'']).toHaveLength(0);
+    expect([...'abc']).toHaveLength(3);
+    expect([...'def']).toMatchObject(['d', 'e', 'f']);"
+  `);
 });
 
 test('object-spread-loose-builtins/string-exec/exec.js [loose, helpers]', async () => {
@@ -7011,7 +12634,11 @@ test('object-spread-loose-builtins/string-exec/exec.js [loose, helpers]', async 
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "expect([...'']).toHaveLength(0);
+    expect([...'abc']).toHaveLength(3);
+    expect([...'def']).toMatchObject(['d', 'e', 'f']);"
+  `);
 });
 
 test('object-spread-loose-builtins/string-exec/exec.js [loose, built-ins]', async () => {
@@ -7049,7 +12676,7 @@ test('object-spread-loose-builtins/variable-declaration/input.js [spec, built-in
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`"var z = Object.assign({}, x);"`);
 });
 
 test('object-spread-loose-builtins/variable-declaration/input.js [loose, helpers]', async () => {
@@ -7059,7 +12686,10 @@ test('object-spread-loose-builtins/variable-declaration/input.js [loose, helpers
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _extends = require('@babel/runtime/helpers/extends');
+    var z = _extends({}, x);"
+  `);
 });
 
 test('object-spread-loose-builtins/variable-declaration/input.js [loose, built-ins]', async () => {
@@ -7099,7 +12729,16 @@ test('object-spread-loose/assignment/input.js [spec, built-ins]', async () => {
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var x;
+    var y;
+    var z;
+    z = Object.assign({ x }, y);
+    z = {
+      x,
+      w: Object.assign({}, y),
+    };"
+  `);
 });
 
 test('object-spread-loose/assignment/input.js [loose, helpers]', async () => {
@@ -7109,7 +12748,17 @@ test('object-spread-loose/assignment/input.js [loose, helpers]', async () => {
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _extends = require('@babel/runtime/helpers/extends');
+    var x;
+    var y;
+    var z;
+    z = _extends({ x }, y);
+    z = {
+      x,
+      w: _extends({}, y),
+    };"
+  `);
 });
 
 test('object-spread-loose/assignment/input.js [loose, built-ins]', async () => {
@@ -7171,7 +12820,24 @@ test('object-spread-loose/expression/exec.js [spec, built-ins]', async () => {
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var log = [];
+    var a = Object.assign(
+      {},
+      {
+        get foo() {
+          log.push(1);
+        },
+      },
+      {
+        get bar() {
+          log.push(2);
+        },
+      },
+    );
+    // Loose mode uses regular Get, not GetOwnProperty.
+    expect(log).toEqual([1, 2]);"
+  `);
 });
 
 test('object-spread-loose/expression/exec.js [loose, helpers]', async () => {
@@ -7182,7 +12848,25 @@ test('object-spread-loose/expression/exec.js [loose, helpers]', async () => {
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _extends = require('@babel/runtime/helpers/extends');
+    var log = [];
+    var a = _extends(
+      {},
+      {
+        get foo() {
+          log.push(1);
+        },
+      },
+      {
+        get bar() {
+          log.push(2);
+        },
+      },
+    );
+    // Loose mode uses regular Get, not GetOwnProperty.
+    expect(log).toEqual([1, 2]);"
+  `);
 });
 
 test('object-spread-loose/expression/exec.js [loose, built-ins]', async () => {
@@ -7252,7 +12936,26 @@ test('object-spread-loose/expression/input.js [spec, built-ins]', async () => {
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var a;
+    var b;
+    var c;
+    var d;
+    var x;
+    var y;
+    Object.assign({ x }, y, { a }, b, { c });
+    Object.assign({}, Object.prototype);
+    Object.assign({}, { foo: 'bar' });
+    Object.assign({}, { foo: 'bar' }, { bar: 'baz' });
+    Object.assign(
+      {},
+      {
+        get foo() {
+          return 'foo';
+        },
+      },
+    );"
+  `);
 });
 
 test('object-spread-loose/expression/input.js [loose, helpers]', async () => {
@@ -7263,7 +12966,27 @@ test('object-spread-loose/expression/input.js [loose, helpers]', async () => {
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _extends = require('@babel/runtime/helpers/extends');
+    var a;
+    var b;
+    var c;
+    var d;
+    var x;
+    var y;
+    _extends({ x }, y, { a }, b, { c });
+    _extends({}, Object.prototype);
+    _extends({}, { foo: 'bar' });
+    _extends({}, { foo: 'bar' }, { bar: 'baz' });
+    _extends(
+      {},
+      {
+        get foo() {
+          return 'foo';
+        },
+      },
+    );"
+  `);
 });
 
 test('object-spread-loose/expression/input.js [loose, built-ins]', async () => {
@@ -7324,7 +13047,15 @@ test('object-spread-loose/no-getOwnPropertyDescriptors/exec.js [spec, built-ins]
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "const oldGOPDs = Object.getOwnPropertyDescriptors;
+    Object.getOwnPropertyDescriptors = null;
+    try {
+      Object.assign({}, { a: 1 }, { b: 1 }, {});
+    } finally {
+      Object.getOwnPropertyDescriptors = oldGOPDs;
+    }"
+  `);
 });
 
 test('object-spread-loose/no-getOwnPropertyDescriptors/exec.js [loose, helpers]', async () => {
@@ -7335,7 +13066,16 @@ test('object-spread-loose/no-getOwnPropertyDescriptors/exec.js [loose, helpers]'
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _extends = require('@babel/runtime/helpers/extends');
+    const oldGOPDs = Object.getOwnPropertyDescriptors;
+    Object.getOwnPropertyDescriptors = null;
+    try {
+      _extends({}, { a: 1 }, { b: 1 }, {});
+    } finally {
+      Object.getOwnPropertyDescriptors = oldGOPDs;
+    }"
+  `);
 });
 
 test('object-spread-loose/no-getOwnPropertyDescriptors/exec.js [loose, built-ins]', async () => {
@@ -7425,7 +13165,52 @@ test('object-spread-loose/no-object-assign-exec/exec.js [spec, built-ins]', asyn
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "'use strict';
+    Object.defineProperty(Object.prototype, 'NOSET', {
+      get(value) {
+        // noop
+      },
+    });
+    Object.defineProperty(Object.prototype, 'NOWRITE', {
+      writable: false,
+      value: 'abc',
+    });
+    const obj = { NOSET: 123 };
+    // this won't work as expected if transformed as Object.assign (or equivalent)
+    // because those trigger object setters (spread don't)
+    expect(() => {
+      const objSpread = Object.assign({}, obj);
+    }).toThrow();
+    const obj2 = { NOWRITE: 456 };
+    // this throws \`TypeError: Cannot assign to read only property 'NOWRITE'\`
+    // if transformed as Object.assign (or equivalent) because those use *assignment* for creating properties
+    // (spread defines them)
+    expect(() => {
+      const obj2Spread = Object.assign({}, obj2);
+    }).toThrow();
+    const KEY = Symbol('key');
+    const obj3Spread = Object.assign(
+      {},
+      {
+        get foo() {
+          return 'bar';
+        },
+      },
+      { [KEY]: 'symbol' },
+    );
+    expect(Object.getOwnPropertyDescriptor(obj3Spread, 'foo').value).toBe('bar');
+    expect(Object.getOwnPropertyDescriptor(obj3Spread, KEY).value).toBe('symbol');
+    const obj4Spread = Object.assign({}, Object.prototype);
+    expect(Object.getOwnPropertyDescriptor(obj4Spread, 'hasOwnProperty')).toBeUndefined();
+    expect(() => Object.assign({}, null, undefined)).not.toThrow();
+    const o = Object.create(null);
+    o.a = 'foo';
+    o.__proto__ = [];
+    const o2 = Object.assign({}, o);
+    // Loose will do o2.__proto__ = []
+    expect(Array.isArray(Object.getPrototypeOf(o2))).toBe(true);"
+  `);
 });
 
 test('object-spread-loose/no-object-assign-exec/exec.js [loose, helpers]', async () => {
@@ -7436,7 +13221,53 @@ test('object-spread-loose/no-object-assign-exec/exec.js [loose, helpers]', async
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "'use strict';
+    var _extends = require('@babel/runtime/helpers/extends');
+    Object.defineProperty(Object.prototype, 'NOSET', {
+      get(value) {
+        // noop
+      },
+    });
+    Object.defineProperty(Object.prototype, 'NOWRITE', {
+      writable: false,
+      value: 'abc',
+    });
+    const obj = { NOSET: 123 };
+    // this won't work as expected if transformed as Object.assign (or equivalent)
+    // because those trigger object setters (spread don't)
+    expect(() => {
+      const objSpread = _extends({}, obj);
+    }).toThrow();
+    const obj2 = { NOWRITE: 456 };
+    // this throws \`TypeError: Cannot assign to read only property 'NOWRITE'\`
+    // if transformed as Object.assign (or equivalent) because those use *assignment* for creating properties
+    // (spread defines them)
+    expect(() => {
+      const obj2Spread = _extends({}, obj2);
+    }).toThrow();
+    const KEY = Symbol('key');
+    const obj3Spread = _extends(
+      {},
+      {
+        get foo() {
+          return 'bar';
+        },
+      },
+      { [KEY]: 'symbol' },
+    );
+    expect(Object.getOwnPropertyDescriptor(obj3Spread, 'foo').value).toBe('bar');
+    expect(Object.getOwnPropertyDescriptor(obj3Spread, KEY).value).toBe('symbol');
+    const obj4Spread = _extends({}, Object.prototype);
+    expect(Object.getOwnPropertyDescriptor(obj4Spread, 'hasOwnProperty')).toBeUndefined();
+    expect(() => _extends({}, null, undefined)).not.toThrow();
+    const o = Object.create(null);
+    o.a = 'foo';
+    o.__proto__ = [];
+    const o2 = _extends({}, o);
+    // Loose will do o2.__proto__ = []
+    expect(Array.isArray(Object.getPrototypeOf(o2))).toBe(true);"
+  `);
 });
 
 test('object-spread-loose/no-object-assign-exec/exec.js [loose, built-ins]', async () => {
@@ -7527,7 +13358,20 @@ test('object-spread-loose/parameters-object-rest-used-in-default/input.js [spec,
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty = require('@babel/runtime/helpers/objectDestructuringEmpty');
+    var _extends = require('@babel/runtime/helpers/extends');
+    (_ref, a = R) => {
+      let R = _extends({}, (_objectDestructuringEmpty(_ref), _ref));
+    };
+    (_ref2, e, c = 2, a = R, f = q) => {
+      let R = _extends({}, (_objectDestructuringEmpty(_ref2), _ref2));
+      let q;
+    };
+    (_ref3, a = f(R)) => {
+      let R = _extends({}, (_objectDestructuringEmpty(_ref3), _ref3));
+    };"
+  `);
 });
 
 test('object-spread-loose/parameters-object-rest-used-in-default/input.js [loose, helpers]', async () => {
@@ -7538,7 +13382,20 @@ test('object-spread-loose/parameters-object-rest-used-in-default/input.js [loose
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty = require('@babel/runtime/helpers/objectDestructuringEmpty');
+    var _extends = require('@babel/runtime/helpers/extends');
+    (_ref, a = R) => {
+      let R = _extends({}, (_objectDestructuringEmpty(_ref), _ref));
+    };
+    (_ref2, e, c = 2, a = R, f = q) => {
+      let R = _extends({}, (_objectDestructuringEmpty(_ref2), _ref2));
+      let q;
+    };
+    (_ref3, a = f(R)) => {
+      let R = _extends({}, (_objectDestructuringEmpty(_ref3), _ref3));
+    };"
+  `);
 });
 
 test('object-spread-loose/parameters-object-rest-used-in-default/input.js [loose, built-ins]', async () => {
@@ -7613,7 +13470,35 @@ test('object-spread-loose/side-effect/exec.js [spec, built-ins]', async () => {
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var k = {
+      a: 1,
+      b: 2,
+    };
+    var o = Object.assign({ a: 3 }, k, { b: k.a++ });
+    // Loose will evaluate the static \`b: k.a++\` before spreading \`...k\`.
+    // It should be {a: 1, b: 1}
+    expect(o).toEqual({
+      a: 2,
+      b: 1,
+    });
+    var k = {
+      a: 1,
+      get b() {
+        l = { z: 9 };
+        return 2;
+      },
+    };
+    var l = { c: 3 };
+    var o = Object.assign({}, k, l);
+    // Loose will evaluate the \`l\` before spreading \`...k\`.
+    // It should be {a: 1, b: 2, z: 9}
+    expect(o).toEqual({
+      a: 1,
+      b: 2,
+      c: 3,
+    });"
+  `);
 });
 
 test('object-spread-loose/side-effect/exec.js [loose, helpers]', async () => {
@@ -7624,7 +13509,36 @@ test('object-spread-loose/side-effect/exec.js [loose, helpers]', async () => {
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _extends = require('@babel/runtime/helpers/extends');
+    var k = {
+      a: 1,
+      b: 2,
+    };
+    var o = _extends({ a: 3 }, k, { b: k.a++ });
+    // Loose will evaluate the static \`b: k.a++\` before spreading \`...k\`.
+    // It should be {a: 1, b: 1}
+    expect(o).toEqual({
+      a: 2,
+      b: 1,
+    });
+    var k = {
+      a: 1,
+      get b() {
+        l = { z: 9 };
+        return 2;
+      },
+    };
+    var l = { c: 3 };
+    var o = _extends({}, k, l);
+    // Loose will evaluate the \`l\` before spreading \`...k\`.
+    // It should be {a: 1, b: 2, z: 9}
+    expect(o).toEqual({
+      a: 1,
+      b: 2,
+      c: 3,
+    });"
+  `);
 });
 
 test('object-spread-loose/side-effect/exec.js [loose, built-ins]', async () => {
@@ -7723,7 +13637,35 @@ test('object-spread-loose/side-effect/input.js [spec, built-ins]', async () => {
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var k = {
+      a: 1,
+      b: 2,
+    };
+    var o = Object.assign({ a: 3 }, k, { b: k.a++ });
+    var pureA = {};
+    var pureB = {};
+    var pureC = {};
+    var pureD = {};
+    var pureE = {};
+    function impureFunc() {
+      console.log('hello');
+    }
+    var output = Object.assign(
+      {},
+      pureA,
+      {
+        get foo() {},
+        get bar() {},
+      },
+      pureB,
+      pureC,
+      impureFunc(),
+      pureD,
+      { pureD },
+    );
+    var simpleOutput = Object.assign({}, pureA, { test: '1' }, pureB);"
+  `);
 });
 
 test('object-spread-loose/side-effect/input.js [loose, helpers]', async () => {
@@ -7734,7 +13676,36 @@ test('object-spread-loose/side-effect/input.js [loose, helpers]', async () => {
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _extends = require('@babel/runtime/helpers/extends');
+    var k = {
+      a: 1,
+      b: 2,
+    };
+    var o = _extends({ a: 3 }, k, { b: k.a++ });
+    var pureA = {};
+    var pureB = {};
+    var pureC = {};
+    var pureD = {};
+    var pureE = {};
+    function impureFunc() {
+      console.log('hello');
+    }
+    var output = _extends(
+      {},
+      pureA,
+      {
+        get foo() {},
+        get bar() {},
+      },
+      pureB,
+      pureC,
+      impureFunc(),
+      pureD,
+      { pureD },
+    );
+    var simpleOutput = _extends({}, pureA, { test: '1' }, pureB);"
+  `);
 });
 
 test('object-spread-loose/side-effect/input.js [loose, built-ins]', async () => {
@@ -7799,7 +13770,11 @@ test('object-spread-loose/string-exec/exec.js [spec, built-ins]', async () => {
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "expect([...'']).toHaveLength(0);
+    expect([...'abc']).toHaveLength(3);
+    expect([...'def']).toMatchObject(['d', 'e', 'f']);"
+  `);
 });
 
 test('object-spread-loose/string-exec/exec.js [loose, helpers]', async () => {
@@ -7810,7 +13785,11 @@ test('object-spread-loose/string-exec/exec.js [loose, helpers]', async () => {
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "expect([...'']).toHaveLength(0);
+    expect([...'abc']).toHaveLength(3);
+    expect([...'def']).toMatchObject(['d', 'e', 'f']);"
+  `);
 });
 
 test('object-spread-loose/string-exec/exec.js [loose, built-ins]', async () => {
@@ -7848,7 +13827,7 @@ test('object-spread-loose/targets-support-object-assign/input.js [spec, built-in
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`"let a = Object.assign({ x: 1 }, b);"`);
 });
 
 test('object-spread-loose/targets-support-object-assign/input.js [loose, helpers]', async () => {
@@ -7858,7 +13837,10 @@ test('object-spread-loose/targets-support-object-assign/input.js [loose, helpers
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _extends = require('@babel/runtime/helpers/extends');
+    let a = _extends({ x: 1 }, b);"
+  `);
 });
 
 test('object-spread-loose/targets-support-object-assign/input.js [loose, built-ins]', async () => {
@@ -7891,7 +13873,7 @@ test('object-spread-loose/variable-declaration/input.js [spec, built-ins]', asyn
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`"var z = Object.assign({}, x);"`);
 });
 
 test('object-spread-loose/variable-declaration/input.js [loose, helpers]', async () => {
@@ -7901,7 +13883,10 @@ test('object-spread-loose/variable-declaration/input.js [loose, helpers]', async
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _extends = require('@babel/runtime/helpers/extends');
+    var z = _extends({}, x);"
+  `);
 });
 
 test('object-spread-loose/variable-declaration/input.js [loose, built-ins]', async () => {
@@ -7941,7 +13926,16 @@ test('object-spread/assignment/input.js [spec, built-ins]', async () => {
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var x;
+    var y;
+    var z;
+    z = Object.assign({ x }, y);
+    z = {
+      x,
+      w: Object.assign({}, y),
+    };"
+  `);
 });
 
 test('object-spread/assignment/input.js [loose, helpers]', async () => {
@@ -7951,7 +13945,17 @@ test('object-spread/assignment/input.js [loose, helpers]', async () => {
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _extends = require('@babel/runtime/helpers/extends');
+    var x;
+    var y;
+    var z;
+    z = _extends({ x }, y);
+    z = {
+      x,
+      w: _extends({}, y),
+    };"
+  `);
 });
 
 test('object-spread/assignment/input.js [loose, built-ins]', async () => {
@@ -8012,7 +14016,23 @@ test('object-spread/expression/exec.js [spec, built-ins]', async () => {
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var log = [];
+    var a = Object.assign(
+      {},
+      {
+        get foo() {
+          log.push(1);
+        },
+      },
+      {
+        get bar() {
+          log.push(2);
+        },
+      },
+    );
+    expect(log).toEqual([1]);"
+  `);
 });
 
 test('object-spread/expression/exec.js [loose, helpers]', async () => {
@@ -8023,7 +14043,24 @@ test('object-spread/expression/exec.js [loose, helpers]', async () => {
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _extends = require('@babel/runtime/helpers/extends');
+    var log = [];
+    var a = _extends(
+      {},
+      {
+        get foo() {
+          log.push(1);
+        },
+      },
+      {
+        get bar() {
+          log.push(2);
+        },
+      },
+    );
+    expect(log).toEqual([1]);"
+  `);
 });
 
 test('object-spread/expression/exec.js [loose, built-ins]', async () => {
@@ -8092,7 +14129,26 @@ test('object-spread/expression/input.js [spec, built-ins]', async () => {
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var a;
+    var b;
+    var c;
+    var d;
+    var x;
+    var y;
+    Object.assign({ x }, y, { a }, b, { c });
+    Object.assign({}, Object.prototype);
+    Object.assign({}, { foo: 'bar' });
+    Object.assign({}, { foo: 'bar' }, { bar: 'baz' });
+    Object.assign(
+      {},
+      {
+        get foo() {
+          return 'foo';
+        },
+      },
+    );"
+  `);
 });
 
 test('object-spread/expression/input.js [loose, helpers]', async () => {
@@ -8103,7 +14159,27 @@ test('object-spread/expression/input.js [loose, helpers]', async () => {
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _extends = require('@babel/runtime/helpers/extends');
+    var a;
+    var b;
+    var c;
+    var d;
+    var x;
+    var y;
+    _extends({ x }, y, { a }, b, { c });
+    _extends({}, Object.prototype);
+    _extends({}, { foo: 'bar' });
+    _extends({}, { foo: 'bar' }, { bar: 'baz' });
+    _extends(
+      {},
+      {
+        get foo() {
+          return 'foo';
+        },
+      },
+    );"
+  `);
 });
 
 test('object-spread/expression/input.js [loose, built-ins]', async () => {
@@ -8164,7 +14240,15 @@ test('object-spread/no-getOwnPropertyDescriptors/exec.js [spec, built-ins]', asy
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "const oldGOPDs = Object.getOwnPropertyDescriptors;
+    Object.getOwnPropertyDescriptors = null;
+    try {
+      Object.assign({}, { a: 1 }, { b: 1 }, {});
+    } finally {
+      Object.getOwnPropertyDescriptors = oldGOPDs;
+    }"
+  `);
 });
 
 test('object-spread/no-getOwnPropertyDescriptors/exec.js [loose, helpers]', async () => {
@@ -8175,7 +14259,16 @@ test('object-spread/no-getOwnPropertyDescriptors/exec.js [loose, helpers]', asyn
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _extends = require('@babel/runtime/helpers/extends');
+    const oldGOPDs = Object.getOwnPropertyDescriptors;
+    Object.getOwnPropertyDescriptors = null;
+    try {
+      _extends({}, { a: 1 }, { b: 1 }, {});
+    } finally {
+      Object.getOwnPropertyDescriptors = oldGOPDs;
+    }"
+  `);
 });
 
 test('object-spread/no-getOwnPropertyDescriptors/exec.js [loose, built-ins]', async () => {
@@ -8262,7 +14355,49 @@ test('object-spread/no-object-assign-exec/exec.js [spec, built-ins]', async () =
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "'use strict';
+    Object.defineProperty(Object.prototype, 'NOSET', {
+      get(value) {
+        // noop
+      },
+    });
+    Object.defineProperty(Object.prototype, 'NOWRITE', {
+      writable: false,
+      value: 'abc',
+    });
+    const obj = { NOSET: 123 };
+    // this wouldn't work as expected if transformed as Object.assign (or equivalent)
+    // because those trigger object setters (spread don't)
+    const objSpread = Object.assign({}, obj);
+    expect(objSpread).toHaveProperty('NOSET', 123);
+    const obj2 = { NOWRITE: 456 };
+    // this line would throw \`TypeError: Cannot assign to read only property 'NOWRITE'\`
+    // if transformed as Object.assign (or equivalent) because those use *assignment* for creating properties
+    // (spread defines them)
+    const obj2Spread = Object.assign({}, obj2);
+    expect(obj2Spread).toHaveProperty('NOWRITE', 456);
+    const KEY = Symbol('key');
+    const obj3Spread = Object.assign(
+      {},
+      {
+        get foo() {
+          return 'bar';
+        },
+      },
+      { [KEY]: 'symbol' },
+    );
+    expect(Object.getOwnPropertyDescriptor(obj3Spread, 'foo').value).toBe('bar');
+    expect(Object.getOwnPropertyDescriptor(obj3Spread, KEY).value).toBe('symbol');
+    const obj4Spread = Object.assign({}, Object.prototype);
+    expect(Object.getOwnPropertyDescriptor(obj4Spread, 'hasOwnProperty')).toBeUndefined();
+    expect(() => Object.assign({}, null, undefined)).not.toThrow();
+    const o = Object.create(null);
+    o.a = 'foo';
+    o.__proto__ = [];
+    const o2 = Object.assign({}, o);
+    expect(Array.isArray(Object.getPrototypeOf(o2))).toBe(false);"
+  `);
 });
 
 test('object-spread/no-object-assign-exec/exec.js [loose, helpers]', async () => {
@@ -8273,7 +14408,50 @@ test('object-spread/no-object-assign-exec/exec.js [loose, helpers]', async () =>
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "'use strict';
+    var _extends = require('@babel/runtime/helpers/extends');
+    Object.defineProperty(Object.prototype, 'NOSET', {
+      get(value) {
+        // noop
+      },
+    });
+    Object.defineProperty(Object.prototype, 'NOWRITE', {
+      writable: false,
+      value: 'abc',
+    });
+    const obj = { NOSET: 123 };
+    // this wouldn't work as expected if transformed as Object.assign (or equivalent)
+    // because those trigger object setters (spread don't)
+    const objSpread = _extends({}, obj);
+    expect(objSpread).toHaveProperty('NOSET', 123);
+    const obj2 = { NOWRITE: 456 };
+    // this line would throw \`TypeError: Cannot assign to read only property 'NOWRITE'\`
+    // if transformed as Object.assign (or equivalent) because those use *assignment* for creating properties
+    // (spread defines them)
+    const obj2Spread = _extends({}, obj2);
+    expect(obj2Spread).toHaveProperty('NOWRITE', 456);
+    const KEY = Symbol('key');
+    const obj3Spread = _extends(
+      {},
+      {
+        get foo() {
+          return 'bar';
+        },
+      },
+      { [KEY]: 'symbol' },
+    );
+    expect(Object.getOwnPropertyDescriptor(obj3Spread, 'foo').value).toBe('bar');
+    expect(Object.getOwnPropertyDescriptor(obj3Spread, KEY).value).toBe('symbol');
+    const obj4Spread = _extends({}, Object.prototype);
+    expect(Object.getOwnPropertyDescriptor(obj4Spread, 'hasOwnProperty')).toBeUndefined();
+    expect(() => _extends({}, null, undefined)).not.toThrow();
+    const o = Object.create(null);
+    o.a = 'foo';
+    o.__proto__ = [];
+    const o2 = _extends({}, o);
+    expect(Array.isArray(Object.getPrototypeOf(o2))).toBe(false);"
+  `);
 });
 
 test('object-spread/no-object-assign-exec/exec.js [loose, built-ins]', async () => {
@@ -8373,7 +14551,31 @@ test('object-spread/side-effect/exec.js [spec, built-ins]', async () => {
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var k = {
+      a: 1,
+      b: 2,
+    };
+    var o = Object.assign({ a: 3 }, k, { b: k.a++ });
+    expect(o).toEqual({
+      a: 1,
+      b: 1,
+    });
+    var k = {
+      a: 1,
+      get b() {
+        l = { z: 9 };
+        return 2;
+      },
+    };
+    var l = { c: 3 };
+    var o = Object.assign({}, k, l);
+    expect(o).toEqual({
+      a: 1,
+      b: 2,
+      z: 9,
+    });"
+  `);
 });
 
 test('object-spread/side-effect/exec.js [loose, helpers]', async () => {
@@ -8384,7 +14586,32 @@ test('object-spread/side-effect/exec.js [loose, helpers]', async () => {
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _extends = require('@babel/runtime/helpers/extends');
+    var k = {
+      a: 1,
+      b: 2,
+    };
+    var o = _extends({ a: 3 }, k, { b: k.a++ });
+    expect(o).toEqual({
+      a: 1,
+      b: 1,
+    });
+    var k = {
+      a: 1,
+      get b() {
+        l = { z: 9 };
+        return 2;
+      },
+    };
+    var l = { c: 3 };
+    var o = _extends({}, k, l);
+    expect(o).toEqual({
+      a: 1,
+      b: 2,
+      z: 9,
+    });"
+  `);
 });
 
 test('object-spread/side-effect/exec.js [loose, built-ins]', async () => {
@@ -8479,7 +14706,35 @@ test('object-spread/side-effect/input.js [spec, built-ins]', async () => {
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var k = {
+      a: 1,
+      b: 2,
+    };
+    var o = Object.assign({ a: 3 }, k, { b: k.a++ });
+    var pureA = {};
+    var pureB = {};
+    var pureC = {};
+    var pureD = {};
+    var pureE = {};
+    function impureFunc() {
+      console.log('hello');
+    }
+    var output = Object.assign(
+      {},
+      pureA,
+      {
+        get foo() {},
+        get bar() {},
+      },
+      pureB,
+      pureC,
+      impureFunc(),
+      pureD,
+      { pureD },
+    );
+    var simpleOutput = Object.assign({}, pureA, { test: '1' }, pureB);"
+  `);
 });
 
 test('object-spread/side-effect/input.js [loose, helpers]', async () => {
@@ -8490,7 +14745,36 @@ test('object-spread/side-effect/input.js [loose, helpers]', async () => {
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _extends = require('@babel/runtime/helpers/extends');
+    var k = {
+      a: 1,
+      b: 2,
+    };
+    var o = _extends({ a: 3 }, k, { b: k.a++ });
+    var pureA = {};
+    var pureB = {};
+    var pureC = {};
+    var pureD = {};
+    var pureE = {};
+    function impureFunc() {
+      console.log('hello');
+    }
+    var output = _extends(
+      {},
+      pureA,
+      {
+        get foo() {},
+        get bar() {},
+      },
+      pureB,
+      pureC,
+      impureFunc(),
+      pureD,
+      { pureD },
+    );
+    var simpleOutput = _extends({}, pureA, { test: '1' }, pureB);"
+  `);
 });
 
 test('object-spread/side-effect/input.js [loose, built-ins]', async () => {
@@ -8555,7 +14839,11 @@ test('object-spread/string-exec/exec.js [spec, built-ins]', async () => {
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "expect([...'']).toHaveLength(0);
+    expect([...'abc']).toHaveLength(3);
+    expect([...'def']).toMatchObject(['d', 'e', 'f']);"
+  `);
 });
 
 test('object-spread/string-exec/exec.js [loose, helpers]', async () => {
@@ -8566,7 +14854,11 @@ test('object-spread/string-exec/exec.js [loose, helpers]', async () => {
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "expect([...'']).toHaveLength(0);
+    expect([...'abc']).toHaveLength(3);
+    expect([...'def']).toMatchObject(['d', 'e', 'f']);"
+  `);
 });
 
 test('object-spread/string-exec/exec.js [loose, built-ins]', async () => {
@@ -8604,7 +14896,7 @@ test('object-spread/variable-declaration/input.js [spec, built-ins]', async () =
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`"var z = Object.assign({}, x);"`);
 });
 
 test('object-spread/variable-declaration/input.js [loose, helpers]', async () => {
@@ -8614,7 +14906,10 @@ test('object-spread/variable-declaration/input.js [loose, helpers]', async () =>
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _extends = require('@babel/runtime/helpers/extends');
+    var z = _extends({}, x);"
+  `);
 });
 
 test('object-spread/variable-declaration/input.js [loose, built-ins]', async () => {
@@ -8656,7 +14951,32 @@ test('regression/T7178/input.mjs [spec, built-ins]', async () => {
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutProperties: require('@babel/runtime/helpers/objectWithoutProperties'),
+    };
+    function _objectWithoutProperties(t, e) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(t),
+        _objectWithoutProperties2.objectWithoutProperties(t, e)
+      );
+    }
+    import props from 'props';
+    console.log(props);
+    (function () {
+      const _ref = this.props,
+        _obj = _objectDestructuringEmpty(_ref),
+        props = _objectWithoutProperties(_obj, []);
+      console.log(props);
+    })();"
+  `);
 });
 
 test('regression/T7178/input.mjs [loose, helpers]', async () => {
@@ -8667,7 +14987,32 @@ test('regression/T7178/input.mjs [loose, helpers]', async () => {
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutPropertiesLoose: require('@babel/runtime/helpers/objectWithoutPropertiesLoose'),
+    };
+    function _objectWithoutProperties(e, t) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(e),
+        _objectWithoutProperties2.objectWithoutPropertiesLoose(e, t)
+      );
+    }
+    import props from 'props';
+    console.log(props);
+    (function () {
+      const _ref = this.props,
+        _obj = _objectDestructuringEmpty(_ref),
+        props = _objectWithoutProperties(_obj, []);
+      console.log(props);
+    })();"
+  `);
 });
 
 test('regression/T7178/input.mjs [loose, built-ins]', async () => {
@@ -8741,7 +15086,46 @@ test('regression/gh-17274/input.js [spec, built-ins]', async () => {
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutProperties: require('@babel/runtime/helpers/objectWithoutProperties'),
+    };
+    function _objectWithoutProperties(t, e) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(t),
+        _objectWithoutProperties2.objectWithoutProperties(t, e)
+      );
+    }
+    var _toPropertyKey2 = require('@babel/runtime/helpers/toPropertyKey');
+    function _toPropertyKey(value) {
+      return _toPropertyKey2(value);
+    }
+    // Computed keys must be evaluated in source order (left-to-right)
+    // even when nested object rest is involved. This test verifies
+    // that log(0), log(1), log(2), log(3) execute in that order.
+    function log(n) {
+      console.log(n);
+      return 'x';
+    }
+    const _ref = { x: { x: {} } },
+      _obj = _objectDestructuringEmpty(_ref),
+      _key = log(0),
+      _obj15 = _objectDestructuringEmpty(_obj[_key]),
+      _key16 = _toPropertyKey(log(1)),
+      x = _obj15[_key16],
+      _key17 = _toPropertyKey(log(2)),
+      y = _obj15[_key17],
+      rest = _objectWithoutProperties(_obj15, [_key16, _key17]),
+      _key18 = log(3),
+      z = _obj[_key18];"
+  `);
 });
 
 test('regression/gh-17274/input.js [loose, helpers]', async () => {
@@ -8752,7 +15136,46 @@ test('regression/gh-17274/input.js [loose, helpers]', async () => {
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutPropertiesLoose: require('@babel/runtime/helpers/objectWithoutPropertiesLoose'),
+    };
+    function _objectWithoutProperties(e, t) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(e),
+        _objectWithoutProperties2.objectWithoutPropertiesLoose(e, t)
+      );
+    }
+    var _toPropertyKey2 = require('@babel/runtime/helpers/toPropertyKey');
+    function _toPropertyKey(value) {
+      return _toPropertyKey2(value);
+    }
+    // Computed keys must be evaluated in source order (left-to-right)
+    // even when nested object rest is involved. This test verifies
+    // that log(0), log(1), log(2), log(3) execute in that order.
+    function log(n) {
+      console.log(n);
+      return 'x';
+    }
+    const _ref = { x: { x: {} } },
+      _obj = _objectDestructuringEmpty(_ref),
+      _key = log(0),
+      _obj15 = _objectDestructuringEmpty(_obj[_key]),
+      _key16 = _toPropertyKey(log(1)),
+      x = _obj15[_key16],
+      _key17 = _toPropertyKey(log(2)),
+      y = _obj15[_key17],
+      rest = _objectWithoutProperties(_obj15, [_key16, _key17]),
+      _key18 = log(3),
+      z = _obj[_key18];"
+  `);
 });
 
 test('regression/gh-17274/input.js [loose, built-ins]', async () => {
@@ -8780,6 +15203,10 @@ test('regression/gh-17274/input.js [loose, built-ins]', async () => {
         _objectWithoutProperties2.objectWithoutPropertiesLoose(e, t)
       );
     }
+    var _toPropertyKey2 = require('@babel/runtime/helpers/toPropertyKey');
+    function _toPropertyKey(value) {
+      return _toPropertyKey2(value);
+    }
     // Computed keys must be evaluated in source order (left-to-right)
     // even when nested object rest is involved. This test verifies
     // that log(0), log(1), log(2), log(3) execute in that order.
@@ -8791,9 +15218,9 @@ test('regression/gh-17274/input.js [loose, built-ins]', async () => {
       _obj = _objectDestructuringEmpty(_ref),
       _key = log(0),
       _obj15 = _objectDestructuringEmpty(_obj[_key]),
-      _key16 = log(1),
+      _key16 = _toPropertyKey(log(1)),
       x = _obj15[_key16],
-      _key17 = log(2),
+      _key17 = _toPropertyKey(log(2)),
       y = _obj15[_key17],
       rest = _objectWithoutProperties(_obj15, [_key16, _key17]),
       _key18 = log(3),
@@ -8836,7 +15263,41 @@ test('regression/gh-4904/input.js [spec, built-ins]', async () => {
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "const _excluded = ['b'];
+    var _objectWithoutProperties3 = require('@babel/runtime/helpers/objectWithoutProperties');
+    var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutProperties: require('@babel/runtime/helpers/objectWithoutProperties'),
+    };
+    function _objectWithoutProperties(t, e) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(t),
+        _objectWithoutProperties2.objectWithoutProperties(t, e)
+      );
+    }
+    const _ref = foo(),
+      _obj = _objectDestructuringEmpty(_ref),
+      s = _obj.s,
+      t = _objectWithoutProperties(_obj, ['s']);
+    const _ref16 = bar(),
+      _obj17 = _objectDestructuringEmpty(_ref16),
+      _obj18 = _objectDestructuringEmpty(_obj17.s),
+      q1 = _obj18.q1,
+      q2 = _objectWithoutProperties(_obj18, ['q1']),
+      q3 = _objectWithoutProperties(_obj17, ['s']);
+    const { a } = foo(_ref17 => {
+      let { b } = _ref17,
+        c = _objectWithoutProperties3(_ref17, _excluded);
+      console.log(b, c);
+    });"
+  `);
 });
 
 test('regression/gh-4904/input.js [loose, helpers]', async () => {
@@ -8847,7 +15308,41 @@ test('regression/gh-4904/input.js [loose, helpers]', async () => {
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "const _excluded = ['b'];
+    var _objectWithoutProperties3 = require('@babel/runtime/helpers/objectWithoutPropertiesLoose');
+    var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutPropertiesLoose: require('@babel/runtime/helpers/objectWithoutPropertiesLoose'),
+    };
+    function _objectWithoutProperties(e, t) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(e),
+        _objectWithoutProperties2.objectWithoutPropertiesLoose(e, t)
+      );
+    }
+    const _ref = foo(),
+      _obj = _objectDestructuringEmpty(_ref),
+      s = _obj.s,
+      t = _objectWithoutProperties(_obj, ['s']);
+    const _ref16 = bar(),
+      _obj17 = _objectDestructuringEmpty(_ref16),
+      _obj18 = _objectDestructuringEmpty(_obj17.s),
+      q1 = _obj18.q1,
+      q2 = _objectWithoutProperties(_obj18, ['q1']),
+      q3 = _objectWithoutProperties(_obj17, ['s']);
+    const { a } = foo(_ref17 => {
+      let { b } = _ref17,
+        c = _objectWithoutProperties3(_ref17, _excluded);
+      console.log(b, c);
+    });"
+  `);
 });
 
 test('regression/gh-4904/input.js [loose, built-ins]', async () => {
@@ -8860,7 +15355,7 @@ test('regression/gh-4904/input.js [loose, built-ins]', async () => {
     }),
   ).toMatchInlineSnapshot(`
     "const _excluded = ['b'];
-    var _objectWithoutProperties3 = require('@babel/runtime/helpers/objectWithoutProperties');
+    var _objectWithoutProperties3 = require('@babel/runtime/helpers/objectWithoutPropertiesLoose');
     var _objectDestructuringEmpty2 = {
       objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
     };
@@ -8931,7 +15426,42 @@ test('regression/gh-5151/input.js [spec, built-ins]', async () => {
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutProperties: require('@babel/runtime/helpers/objectWithoutProperties'),
+    };
+    function _objectWithoutProperties(t, e) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(t),
+        _objectWithoutProperties2.objectWithoutProperties(t, e)
+      );
+    }
+    const _ref = a,
+      _obj = _objectDestructuringEmpty(_ref),
+      x = _obj.x,
+      y = _objectWithoutProperties(_obj, ['x']),
+      z = foo(y);
+    const _ref18 = r,
+      _obj19 = _objectDestructuringEmpty(_ref18),
+      s = _objectWithoutProperties(_obj19, []),
+      t = foo(s);
+    // ordering is preserved
+    var l = foo(),
+      _ref20 = bar(),
+      _obj21 = _objectDestructuringEmpty(_ref20),
+      _obj22 = _objectDestructuringEmpty(_obj21.m),
+      n = _obj22.n,
+      o = _objectWithoutProperties(_obj22, ['n']),
+      p = _objectWithoutProperties(_obj21, ['m']),
+      q = baz();"
+  `);
 });
 
 test('regression/gh-5151/input.js [loose, helpers]', async () => {
@@ -8942,7 +15472,42 @@ test('regression/gh-5151/input.js [loose, helpers]', async () => {
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutPropertiesLoose: require('@babel/runtime/helpers/objectWithoutPropertiesLoose'),
+    };
+    function _objectWithoutProperties(e, t) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(e),
+        _objectWithoutProperties2.objectWithoutPropertiesLoose(e, t)
+      );
+    }
+    const _ref = a,
+      _obj = _objectDestructuringEmpty(_ref),
+      x = _obj.x,
+      y = _objectWithoutProperties(_obj, ['x']),
+      z = foo(y);
+    const _ref18 = r,
+      _obj19 = _objectDestructuringEmpty(_ref18),
+      s = _objectWithoutProperties(_obj19, []),
+      t = foo(s);
+    // ordering is preserved
+    var l = foo(),
+      _ref20 = bar(),
+      _obj21 = _objectDestructuringEmpty(_ref20),
+      _obj22 = _objectDestructuringEmpty(_obj21.m),
+      n = _obj22.n,
+      o = _objectWithoutProperties(_obj22, ['n']),
+      p = _objectWithoutProperties(_obj21, ['m']),
+      q = baz();"
+  `);
 });
 
 test('regression/gh-5151/input.js [loose, built-ins]', async () => {
@@ -9026,7 +15591,39 @@ test('regression/gh-7388/input.js [spec, built-ins]', async () => {
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutProperties: require('@babel/runtime/helpers/objectWithoutProperties'),
+    };
+    function _objectWithoutProperties(t, e) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(t),
+        _objectWithoutProperties2.objectWithoutProperties(t, e)
+      );
+    }
+    function fn0(obj0) {
+      const {
+        fn1 = (obj1 = {}) => {
+          const {
+            fn2 = (obj2 = {}) => {
+              const _ref = obj2,
+                _obj = _objectDestructuringEmpty(_ref),
+                a = _obj.a,
+                rest = _objectWithoutProperties(_obj, ['a']);
+              console.log(rest);
+            },
+          } = obj1;
+        },
+      } = obj0;
+    }"
+  `);
 });
 
 test('regression/gh-7388/input.js [loose, helpers]', async () => {
@@ -9037,7 +15634,39 @@ test('regression/gh-7388/input.js [loose, helpers]', async () => {
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutPropertiesLoose: require('@babel/runtime/helpers/objectWithoutPropertiesLoose'),
+    };
+    function _objectWithoutProperties(e, t) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(e),
+        _objectWithoutProperties2.objectWithoutPropertiesLoose(e, t)
+      );
+    }
+    function fn0(obj0) {
+      const {
+        fn1 = (obj1 = {}) => {
+          const {
+            fn2 = (obj2 = {}) => {
+              const _ref = obj2,
+                _obj = _objectDestructuringEmpty(_ref),
+                a = _obj.a,
+                rest = _objectWithoutProperties(_obj, ['a']);
+              console.log(rest);
+            },
+          } = obj1;
+        },
+      } = obj0;
+    }"
+  `);
 });
 
 test('regression/gh-7388/input.js [loose, built-ins]', async () => {
@@ -9114,7 +15743,19 @@ test('regression/gh-8323/input.js [spec, built-ins]', async () => {
       transforms: { objectRestSpread: { loose: false, useBuiltIns: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "const _excluded = ['a', 'b', 'c'];
+    var _objectWithoutProperties = require('@babel/runtime/helpers/objectWithoutProperties');
+    const get = () => {
+      fireTheMissiles();
+      return 3;
+    };
+    const f = _ref => {
+      let { a = get(), b, c } = _ref,
+        z = _objectWithoutProperties(_ref, _excluded);
+      const v = b + 3;
+    };"
+  `);
 });
 
 test('regression/gh-8323/input.js [loose, helpers]', async () => {
@@ -9125,7 +15766,19 @@ test('regression/gh-8323/input.js [loose, helpers]', async () => {
       transforms: { objectRestSpread: { loose: true, useBuiltIns: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:transform-error"`);
+  ).toMatchInlineSnapshot(`
+    "const _excluded = ['a', 'b', 'c'];
+    var _objectWithoutProperties = require('@babel/runtime/helpers/objectWithoutPropertiesLoose');
+    const get = () => {
+      fireTheMissiles();
+      return 3;
+    };
+    const f = _ref => {
+      let { a = get(), b, c } = _ref,
+        z = _objectWithoutProperties(_ref, _excluded);
+      const v = b + 3;
+    };"
+  `);
 });
 
 test('regression/gh-8323/input.js [loose, built-ins]', async () => {
@@ -9138,7 +15791,7 @@ test('regression/gh-8323/input.js [loose, built-ins]', async () => {
     }),
   ).toMatchInlineSnapshot(`
     "const _excluded = ['a', 'b', 'c'];
-    var _objectWithoutProperties = require('@babel/runtime/helpers/objectWithoutProperties');
+    var _objectWithoutProperties = require('@babel/runtime/helpers/objectWithoutPropertiesLoose');
     const get = () => {
       fireTheMissiles();
       return 3;

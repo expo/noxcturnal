@@ -1627,7 +1627,7 @@ test('wrapper/looks-like-a-group-unicode/input.js', async () => {
       transforms: { regexpNamedCaptureGroups: true },
       helpers: { mode: 'inline' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:regexp-named-capture-groups-semantic-mismatch"`);
+  ).toMatchInlineSnapshot(`"/no-groups-\\(?<looks-like-a-group>looks\\)\\u{10000}/u;"`);
 });
 
 test('wrapper/looks-like-a-group/input.js', async () => {
@@ -1637,7 +1637,7 @@ test('wrapper/looks-like-a-group/input.js', async () => {
       transforms: { regexpNamedCaptureGroups: true },
       helpers: { mode: 'inline' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:regexp-named-capture-groups-semantic-mismatch"`);
+  ).toMatchInlineSnapshot(`"/no-groups-\\(?<looks-like-a-group>looks\\)/;"`);
 });
 
 test('wrapper/name-hasOwnProperty/exec.js', async () => {

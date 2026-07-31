@@ -1135,6 +1135,10 @@ test('044 JS Async Generator > async generators > async generator as class metho
   ).toMatchInlineSnapshot(`
     "var _wrapAsyncGenerator = require('@babel/runtime/helpers/wrapAsyncGenerator');
     var _asyncIterator = require('@babel/runtime/helpers/asyncIterator');
+    function _iteratorResult(value) {
+      if (Object(value) !== value) throw new TypeError('Iterator result is not an object');
+      return value;
+    }
     async () => {
       class Foo {
         items() {
@@ -1151,7 +1155,7 @@ test('044 JS Async Generator > async generators > async generator as class metho
       try {
         for (
           var _iterator = _asyncIterator(new Foo().items()), _step;
-          (_iteratorAbruptCompletion = !(_step = await _iterator.next()).done);
+          (_iteratorAbruptCompletion = !(_step = _iteratorResult(await _iterator.next())).done);
           _iteratorAbruptCompletion = false
         ) {
           const val = _step.value;
@@ -1165,7 +1169,7 @@ test('044 JS Async Generator > async generators > async generator as class metho
       } finally {
         try {
           if (_iteratorAbruptCompletion && _iterator.return != null) {
-            await _iterator.return();
+            _iteratorResult(await _iterator.return());
           }
         } finally {
           if (_didIteratorError) {
@@ -1190,6 +1194,10 @@ test('045 JS Async Generator > for-await-of > for-await-of with async generator 
     "var _asyncIterator = require('@babel/runtime/helpers/asyncIterator');
     var _awaitAsyncGenerator = require('@babel/runtime/helpers/awaitAsyncGenerator');
     var _wrapAsyncGenerator = require('@babel/runtime/helpers/wrapAsyncGenerator');
+    function _iteratorResult(value) {
+      if (Object(value) !== value) throw new TypeError('Iterator result is not an object');
+      return value;
+    }
     async () => {
       function genAnswers() {
         return _genAnswers.apply(this, arguments);
@@ -1238,7 +1246,7 @@ test('045 JS Async Generator > for-await-of > for-await-of with async generator 
       try {
         for (
           var _iterator2 = _asyncIterator(genAnswers()), _step2;
-          (_iteratorAbruptCompletion2 = !(_step2 = await _iterator2.next()).done);
+          (_iteratorAbruptCompletion2 = !(_step2 = _iteratorResult(await _iterator2.next())).done);
           _iteratorAbruptCompletion2 = false
         ) {
           const val = _step2.value;
@@ -1252,7 +1260,7 @@ test('045 JS Async Generator > for-await-of > for-await-of with async generator 
       } finally {
         try {
           if (_iteratorAbruptCompletion2 && _iterator2.return != null) {
-            await _iterator2.return();
+            _iteratorResult(await _iterator2.return());
           }
         } finally {
           if (_didIteratorError2) {
@@ -1275,6 +1283,10 @@ test('046 JS Async Generator > for-await-of > for-await-of with array of promise
     }),
   ).toMatchInlineSnapshot(`
     "var _asyncIterator = require('@babel/runtime/helpers/asyncIterator');
+    function _iteratorResult(value) {
+      if (Object(value) !== value) throw new TypeError('Iterator result is not an object');
+      return value;
+    }
     async () => {
       const promises = [Promise.resolve(1), Promise.resolve(2), Promise.resolve(3)];
       const results = [];
@@ -1284,7 +1296,7 @@ test('046 JS Async Generator > for-await-of > for-await-of with array of promise
       try {
         for (
           var _iterator = _asyncIterator(promises), _step;
-          (_iteratorAbruptCompletion = !(_step = await _iterator.next()).done);
+          (_iteratorAbruptCompletion = !(_step = _iteratorResult(await _iterator.next())).done);
           _iteratorAbruptCompletion = false
         ) {
           const val = _step.value;
@@ -1298,7 +1310,7 @@ test('046 JS Async Generator > for-await-of > for-await-of with array of promise
       } finally {
         try {
           if (_iteratorAbruptCompletion && _iterator.return != null) {
-            await _iterator.return();
+            _iteratorResult(await _iterator.return());
           }
         } finally {
           if (_didIteratorError) {
@@ -1321,6 +1333,10 @@ test('047 JS Async Generator > for-await-of > for-await-of with custom async ite
     }),
   ).toMatchInlineSnapshot(`
     "var _asyncIterator = require('@babel/runtime/helpers/asyncIterator');
+    function _iteratorResult(value) {
+      if (Object(value) !== value) throw new TypeError('Iterator result is not an object');
+      return value;
+    }
     async () => {
       const iterable = {
         [Symbol.asyncIterator]() {
@@ -1347,7 +1363,7 @@ test('047 JS Async Generator > for-await-of > for-await-of with custom async ite
       try {
         for (
           var _iterator = _asyncIterator(iterable), _step;
-          (_iteratorAbruptCompletion = !(_step = await _iterator.next()).done);
+          (_iteratorAbruptCompletion = !(_step = _iteratorResult(await _iterator.next())).done);
           _iteratorAbruptCompletion = false
         ) {
           const val = _step.value;
@@ -1361,7 +1377,7 @@ test('047 JS Async Generator > for-await-of > for-await-of with custom async ite
       } finally {
         try {
           if (_iteratorAbruptCompletion && _iterator.return != null) {
-            await _iterator.return();
+            _iteratorResult(await _iterator.return());
           }
         } finally {
           if (_didIteratorError) {
@@ -1385,6 +1401,10 @@ test('048 JS Async Generator > for-await-of > for-await-of with break', async ()
   ).toMatchInlineSnapshot(`
     "var _wrapAsyncGenerator = require('@babel/runtime/helpers/wrapAsyncGenerator');
     var _asyncIterator = require('@babel/runtime/helpers/asyncIterator');
+    function _iteratorResult(value) {
+      if (Object(value) !== value) throw new TypeError('Iterator result is not an object');
+      return value;
+    }
     async () => {
       function gen() {
         return _gen.apply(this, arguments);
@@ -1406,7 +1426,7 @@ test('048 JS Async Generator > for-await-of > for-await-of with break', async ()
       try {
         for (
           var _iterator = _asyncIterator(gen()), _step;
-          (_iteratorAbruptCompletion = !(_step = await _iterator.next()).done);
+          (_iteratorAbruptCompletion = !(_step = _iteratorResult(await _iterator.next())).done);
           _iteratorAbruptCompletion = false
         ) {
           const val = _step.value;
@@ -1421,7 +1441,7 @@ test('048 JS Async Generator > for-await-of > for-await-of with break', async ()
       } finally {
         try {
           if (_iteratorAbruptCompletion && _iterator.return != null) {
-            await _iterator.return();
+            _iteratorResult(await _iterator.return());
           }
         } finally {
           if (_didIteratorError) {
@@ -1445,6 +1465,10 @@ test('049 JS Async Generator > for-await-of > for-await-of with error in iterabl
   ).toMatchInlineSnapshot(`
     "var _wrapAsyncGenerator = require('@babel/runtime/helpers/wrapAsyncGenerator');
     var _asyncIterator = require('@babel/runtime/helpers/asyncIterator');
+    function _iteratorResult(value) {
+      if (Object(value) !== value) throw new TypeError('Iterator result is not an object');
+      return value;
+    }
     async () => {
       function gen() {
         return _gen.apply(this, arguments);
@@ -1464,7 +1488,7 @@ test('049 JS Async Generator > for-await-of > for-await-of with error in iterabl
         try {
           for (
             var _iterator = _asyncIterator(gen()), _step;
-            (_iteratorAbruptCompletion = !(_step = await _iterator.next()).done);
+            (_iteratorAbruptCompletion = !(_step = _iteratorResult(await _iterator.next())).done);
             _iteratorAbruptCompletion = false
           ) {
             const val = _step.value;
@@ -1478,7 +1502,7 @@ test('049 JS Async Generator > for-await-of > for-await-of with error in iterabl
         } finally {
           try {
             if (_iteratorAbruptCompletion && _iterator.return != null) {
-              await _iterator.return();
+              _iteratorResult(await _iterator.return());
             }
           } finally {
             if (_didIteratorError) {
@@ -1504,6 +1528,10 @@ test('050 JS Async Generator > for-await-of > for-await-of does not access value
     }),
   ).toMatchInlineSnapshot(`
     "var _asyncIterator = require('@babel/runtime/helpers/asyncIterator');
+    function _iteratorResult(value) {
+      if (Object(value) !== value) throw new TypeError('Iterator result is not an object');
+      return value;
+    }
     async () => {
       let gotValue = false;
       const iterable = {
@@ -1525,7 +1553,7 @@ test('050 JS Async Generator > for-await-of > for-await-of does not access value
       try {
         for (
           var _iterator = _asyncIterator(iterable), _step;
-          (_iteratorAbruptCompletion = !(_step = await _iterator.next()).done);
+          (_iteratorAbruptCompletion = !(_step = _iteratorResult(await _iterator.next())).done);
           _iteratorAbruptCompletion = false
         ) {
           let value = _step.value;
@@ -1536,7 +1564,7 @@ test('050 JS Async Generator > for-await-of > for-await-of does not access value
       } finally {
         try {
           if (_iteratorAbruptCompletion && _iterator.return != null) {
-            await _iterator.return();
+            _iteratorResult(await _iterator.return());
           }
         } finally {
           if (_didIteratorError) {
@@ -1559,6 +1587,10 @@ test('051 JS Async Generator > for-await-of > for-await-of with member expressio
     }),
   ).toMatchInlineSnapshot(`
     "var _asyncIterator = require('@babel/runtime/helpers/asyncIterator');
+    function _iteratorResult(value) {
+      if (Object(value) !== value) throw new TypeError('Iterator result is not an object');
+      return value;
+    }
     async () => {
       let obj = {};
       var _iteratorAbruptCompletion = false;
@@ -1567,7 +1599,7 @@ test('051 JS Async Generator > for-await-of > for-await-of with member expressio
       try {
         for (
           var _iterator = _asyncIterator([1, 2]), _step;
-          (_iteratorAbruptCompletion = !(_step = await _iterator.next()).done);
+          (_iteratorAbruptCompletion = !(_step = _iteratorResult(await _iterator.next())).done);
           _iteratorAbruptCompletion = false
         ) {
           obj.x = _step.value;
@@ -1578,7 +1610,7 @@ test('051 JS Async Generator > for-await-of > for-await-of with member expressio
       } finally {
         try {
           if (_iteratorAbruptCompletion && _iterator.return != null) {
-            await _iterator.return();
+            _iteratorResult(await _iterator.return());
           }
         } finally {
           if (_didIteratorError) {
@@ -1601,6 +1633,10 @@ test('052 JS Async Generator > for-await-of > for-await-of allows re-declaration
     }),
   ).toMatchInlineSnapshot(`
     "var _asyncIterator = require('@babel/runtime/helpers/asyncIterator');
+    function _iteratorResult(value) {
+      if (Object(value) !== value) throw new TypeError('Iterator result is not an object');
+      return value;
+    }
     async () => {
       var _iteratorAbruptCompletion = false;
       var _didIteratorError = false;
@@ -1609,7 +1645,7 @@ test('052 JS Async Generator > for-await-of > for-await-of allows re-declaration
       try {
         for (
           var _iterator = _asyncIterator([]), _step;
-          (_iteratorAbruptCompletion = !(_step = await _iterator.next()).done);
+          (_iteratorAbruptCompletion = !(_step = _iteratorResult(await _iterator.next())).done);
           _iteratorAbruptCompletion = false
         ) {
           let x = _step.value;
@@ -1623,7 +1659,7 @@ test('052 JS Async Generator > for-await-of > for-await-of allows re-declaration
       } finally {
         try {
           if (_iteratorAbruptCompletion && _iterator.return != null) {
-            await _iterator.return();
+            _iteratorResult(await _iterator.return());
           }
         } finally {
           if (_didIteratorError) {
@@ -1647,6 +1683,10 @@ test('053 JS Async Generator > for-await-of > for-await-of with destructuring', 
   ).toMatchInlineSnapshot(`
     "var _wrapAsyncGenerator = require('@babel/runtime/helpers/wrapAsyncGenerator');
     var _asyncIterator = require('@babel/runtime/helpers/asyncIterator');
+    function _iteratorResult(value) {
+      if (Object(value) !== value) throw new TypeError('Iterator result is not an object');
+      return value;
+    }
     async () => {
       function gen() {
         return _gen.apply(this, arguments);
@@ -1671,7 +1711,7 @@ test('053 JS Async Generator > for-await-of > for-await-of with destructuring', 
       try {
         for (
           var _iterator = _asyncIterator(gen()), _step;
-          (_iteratorAbruptCompletion = !(_step = await _iterator.next()).done);
+          (_iteratorAbruptCompletion = !(_step = _iteratorResult(await _iterator.next())).done);
           _iteratorAbruptCompletion = false
         ) {
           const { a, b } = _step.value;
@@ -1685,7 +1725,7 @@ test('053 JS Async Generator > for-await-of > for-await-of with destructuring', 
       } finally {
         try {
           if (_iteratorAbruptCompletion && _iterator.return != null) {
-            await _iterator.return();
+            _iteratorResult(await _iterator.return());
           }
         } finally {
           if (_didIteratorError) {
@@ -1708,6 +1748,10 @@ test('054 JS Async Generator > for-await-of > for-await-of with sync iterable (f
     }),
   ).toMatchInlineSnapshot(`
     "var _asyncIterator = require('@babel/runtime/helpers/asyncIterator');
+    function _iteratorResult(value) {
+      if (Object(value) !== value) throw new TypeError('Iterator result is not an object');
+      return value;
+    }
     async () => {
       // for-await-of should work with sync iterables too
       const results = [];
@@ -1717,7 +1761,7 @@ test('054 JS Async Generator > for-await-of > for-await-of with sync iterable (f
       try {
         for (
           var _iterator = _asyncIterator([10, 20, 30]), _step;
-          (_iteratorAbruptCompletion = !(_step = await _iterator.next()).done);
+          (_iteratorAbruptCompletion = !(_step = _iteratorResult(await _iterator.next())).done);
           _iteratorAbruptCompletion = false
         ) {
           const val = _step.value;
@@ -1731,7 +1775,7 @@ test('054 JS Async Generator > for-await-of > for-await-of with sync iterable (f
       } finally {
         try {
           if (_iteratorAbruptCompletion && _iterator.return != null) {
-            await _iterator.return();
+            _iteratorResult(await _iterator.return());
           }
         } finally {
           if (_didIteratorError) {
@@ -1939,6 +1983,10 @@ test('059 JS Async Generator > async generator yield* delegation > yield* delega
     var _wrapAsyncGenerator = require('@babel/runtime/helpers/wrapAsyncGenerator');
     var _asyncIterator = require('@babel/runtime/helpers/asyncIterator');
     var _asyncGeneratorDelegate = require('@babel/runtime/helpers/asyncGeneratorDelegate');
+    function _iteratorResult(value) {
+      if (Object(value) !== value) throw new TypeError('Iterator result is not an object');
+      return value;
+    }
     async () => {
       function inner() {
         return _inner.apply(this, arguments);
@@ -1968,7 +2016,7 @@ test('059 JS Async Generator > async generator yield* delegation > yield* delega
       try {
         for (
           var _iterator = _asyncIterator(outer()), _step;
-          (_iteratorAbruptCompletion = !(_step = await _iterator.next()).done);
+          (_iteratorAbruptCompletion = !(_step = _iteratorResult(await _iterator.next())).done);
           _iteratorAbruptCompletion = false
         ) {
           const val = _step.value;
@@ -1982,7 +2030,7 @@ test('059 JS Async Generator > async generator yield* delegation > yield* delega
       } finally {
         try {
           if (_iteratorAbruptCompletion && _iterator.return != null) {
-            await _iterator.return();
+            _iteratorResult(await _iterator.return());
           }
         } finally {
           if (_didIteratorError) {
@@ -2007,6 +2055,10 @@ test('060 JS Async Generator > async generator yield* delegation > yield* nested
     "var _wrapAsyncGenerator = require('@babel/runtime/helpers/wrapAsyncGenerator');
     var _asyncIterator = require('@babel/runtime/helpers/asyncIterator');
     var _asyncGeneratorDelegate = require('@babel/runtime/helpers/asyncGeneratorDelegate');
+    function _iteratorResult(value) {
+      if (Object(value) !== value) throw new TypeError('Iterator result is not an object');
+      return value;
+    }
     async () => {
       function a() {
         return _a.apply(this, arguments);
@@ -2044,7 +2096,7 @@ test('060 JS Async Generator > async generator yield* delegation > yield* nested
       try {
         for (
           var _iterator = _asyncIterator(c()), _step;
-          (_iteratorAbruptCompletion = !(_step = await _iterator.next()).done);
+          (_iteratorAbruptCompletion = !(_step = _iteratorResult(await _iterator.next())).done);
           _iteratorAbruptCompletion = false
         ) {
           const val = _step.value;
@@ -2058,7 +2110,7 @@ test('060 JS Async Generator > async generator yield* delegation > yield* nested
       } finally {
         try {
           if (_iteratorAbruptCompletion && _iterator.return != null) {
-            await _iterator.return();
+            _iteratorResult(await _iterator.return());
           }
         } finally {
           if (_didIteratorError) {
@@ -2110,6 +2162,10 @@ test('062 JS Async Generator > edge cases > async generator with for-of inside',
     "var _awaitAsyncGenerator = require('@babel/runtime/helpers/awaitAsyncGenerator');
     var _wrapAsyncGenerator = require('@babel/runtime/helpers/wrapAsyncGenerator');
     var _asyncIterator = require('@babel/runtime/helpers/asyncIterator');
+    function _iteratorResult(value) {
+      if (Object(value) !== value) throw new TypeError('Iterator result is not an object');
+      return value;
+    }
     async () => {
       function gen() {
         return _gen.apply(this, arguments);
@@ -2129,7 +2185,7 @@ test('062 JS Async Generator > edge cases > async generator with for-of inside',
       try {
         for (
           var _iterator = _asyncIterator(gen()), _step;
-          (_iteratorAbruptCompletion = !(_step = await _iterator.next()).done);
+          (_iteratorAbruptCompletion = !(_step = _iteratorResult(await _iterator.next())).done);
           _iteratorAbruptCompletion = false
         ) {
           const val = _step.value;
@@ -2143,7 +2199,7 @@ test('062 JS Async Generator > edge cases > async generator with for-of inside',
       } finally {
         try {
           if (_iteratorAbruptCompletion && _iterator.return != null) {
-            await _iterator.return();
+            _iteratorResult(await _iterator.return());
           }
         } finally {
           if (_didIteratorError) {
@@ -2168,6 +2224,10 @@ test('063 JS Async Generator > edge cases > async generator with for-await-of in
     "var _asyncIterator = require('@babel/runtime/helpers/asyncIterator');
     var _awaitAsyncGenerator = require('@babel/runtime/helpers/awaitAsyncGenerator');
     var _wrapAsyncGenerator = require('@babel/runtime/helpers/wrapAsyncGenerator');
+    function _iteratorResult(value) {
+      if (Object(value) !== value) throw new TypeError('Iterator result is not an object');
+      return value;
+    }
     async () => {
       function gen() {
         return _gen.apply(this, arguments);
@@ -2213,7 +2273,7 @@ test('063 JS Async Generator > edge cases > async generator with for-await-of in
       try {
         for (
           var _iterator2 = _asyncIterator(gen()), _step2;
-          (_iteratorAbruptCompletion2 = !(_step2 = await _iterator2.next()).done);
+          (_iteratorAbruptCompletion2 = !(_step2 = _iteratorResult(await _iterator2.next())).done);
           _iteratorAbruptCompletion2 = false
         ) {
           const val = _step2.value;
@@ -2227,7 +2287,7 @@ test('063 JS Async Generator > edge cases > async generator with for-await-of in
       } finally {
         try {
           if (_iteratorAbruptCompletion2 && _iterator2.return != null) {
-            await _iterator2.return();
+            _iteratorResult(await _iterator2.return());
           }
         } finally {
           if (_didIteratorError2) {
@@ -2270,6 +2330,10 @@ test('065 JS Async Generator > edge cases > for-await-of with empty async iterab
   ).toMatchInlineSnapshot(`
     "var _wrapAsyncGenerator = require('@babel/runtime/helpers/wrapAsyncGenerator');
     var _asyncIterator = require('@babel/runtime/helpers/asyncIterator');
+    function _iteratorResult(value) {
+      if (Object(value) !== value) throw new TypeError('Iterator result is not an object');
+      return value;
+    }
     async () => {
       function empty() {
         return _empty.apply(this, arguments);
@@ -2285,7 +2349,7 @@ test('065 JS Async Generator > edge cases > for-await-of with empty async iterab
       try {
         for (
           var _iterator = _asyncIterator(empty()), _step;
-          (_iteratorAbruptCompletion = !(_step = await _iterator.next()).done);
+          (_iteratorAbruptCompletion = !(_step = _iteratorResult(await _iterator.next())).done);
           _iteratorAbruptCompletion = false
         ) {
           const x = _step.value;
@@ -2299,7 +2363,7 @@ test('065 JS Async Generator > edge cases > for-await-of with empty async iterab
       } finally {
         try {
           if (_iteratorAbruptCompletion && _iterator.return != null) {
-            await _iterator.return();
+            _iteratorResult(await _iterator.return());
           }
         } finally {
           if (_didIteratorError) {
@@ -2404,6 +2468,10 @@ test('070 JS Async Generator > edge cases > async generator with Promise.all ins
     "var _awaitAsyncGenerator = require('@babel/runtime/helpers/awaitAsyncGenerator');
     var _wrapAsyncGenerator = require('@babel/runtime/helpers/wrapAsyncGenerator');
     var _asyncIterator = require('@babel/runtime/helpers/asyncIterator');
+    function _iteratorResult(value) {
+      if (Object(value) !== value) throw new TypeError('Iterator result is not an object');
+      return value;
+    }
     async () => {
       function gen() {
         return _gen.apply(this, arguments);
@@ -2426,7 +2494,7 @@ test('070 JS Async Generator > edge cases > async generator with Promise.all ins
       try {
         for (
           var _iterator = _asyncIterator(gen()), _step;
-          (_iteratorAbruptCompletion = !(_step = await _iterator.next()).done);
+          (_iteratorAbruptCompletion = !(_step = _iteratorResult(await _iterator.next())).done);
           _iteratorAbruptCompletion = false
         ) {
           const val = _step.value;
@@ -2440,7 +2508,7 @@ test('070 JS Async Generator > edge cases > async generator with Promise.all ins
       } finally {
         try {
           if (_iteratorAbruptCompletion && _iterator.return != null) {
-            await _iterator.return();
+            _iteratorResult(await _iterator.return());
           }
         } finally {
           if (_didIteratorError) {
@@ -2582,6 +2650,10 @@ test('075 [upstream xit] JS Async Generator > stack traces > error propagates th
   ).toMatchInlineSnapshot(`
     "var _wrapAsyncGenerator = require('@babel/runtime/helpers/wrapAsyncGenerator');
     var _asyncIterator = require('@babel/runtime/helpers/asyncIterator');
+    function _iteratorResult(value) {
+      if (Object(value) !== value) throw new TypeError('Iterator result is not an object');
+      return value;
+    }
     async () => {
       function explodingGen() {
         return _explodingGen.apply(this, arguments);
@@ -2600,7 +2672,7 @@ test('075 [upstream xit] JS Async Generator > stack traces > error propagates th
         try {
           for (
             var _iterator = _asyncIterator(explodingGen()), _step;
-            (_iteratorAbruptCompletion = !(_step = await _iterator.next()).done);
+            (_iteratorAbruptCompletion = !(_step = _iteratorResult(await _iterator.next())).done);
             _iteratorAbruptCompletion = false
           ) {
             const _val = _step.value;
@@ -2611,7 +2683,7 @@ test('075 [upstream xit] JS Async Generator > stack traces > error propagates th
         } finally {
           try {
             if (_iteratorAbruptCompletion && _iterator.return != null) {
-              await _iterator.return();
+              _iteratorResult(await _iterator.return());
             }
           } finally {
             if (_didIteratorError) {
@@ -2699,6 +2771,10 @@ test('078 [upstream xit] JS Async Generator > stack traces > nested async genera
     "var _awaitAsyncGenerator = require('@babel/runtime/helpers/awaitAsyncGenerator');
     var _wrapAsyncGenerator = require('@babel/runtime/helpers/wrapAsyncGenerator');
     var _asyncIterator = require('@babel/runtime/helpers/asyncIterator');
+    function _iteratorResult(value) {
+      if (Object(value) !== value) throw new TypeError('Iterator result is not an object');
+      return value;
+    }
     async () => {
       function innerGen() {
         return _innerGen.apply(this, arguments);
@@ -2754,7 +2830,7 @@ test('078 [upstream xit] JS Async Generator > stack traces > nested async genera
         try {
           for (
             var _iterator2 = _asyncIterator(outerGen()), _step2;
-            (_iteratorAbruptCompletion2 = !(_step2 = await _iterator2.next()).done);
+            (_iteratorAbruptCompletion2 = !(_step2 = _iteratorResult(await _iterator2.next())).done);
             _iteratorAbruptCompletion2 = false
           ) {
             const _val = _step2.value;
@@ -2765,7 +2841,7 @@ test('078 [upstream xit] JS Async Generator > stack traces > nested async genera
         } finally {
           try {
             if (_iteratorAbruptCompletion2 && _iterator2.return != null) {
-              await _iterator2.return();
+              _iteratorResult(await _iterator2.return());
             }
           } finally {
             if (_didIteratorError2) {
@@ -2817,6 +2893,10 @@ test('080 [upstream xit] JS Async Generator > stack traces > re-thrown error fro
   ).toMatchInlineSnapshot(`
     "var _wrapAsyncGenerator = require('@babel/runtime/helpers/wrapAsyncGenerator');
     var _asyncIterator = require('@babel/runtime/helpers/asyncIterator');
+    function _iteratorResult(value) {
+      if (Object(value) !== value) throw new TypeError('Iterator result is not an object');
+      return value;
+    }
     async () => {
       function originalGen() {
         return _originalGen.apply(this, arguments);
@@ -2835,7 +2915,7 @@ test('080 [upstream xit] JS Async Generator > stack traces > re-thrown error fro
           try {
             for (
               var _iterator = _asyncIterator(originalGen()), _step;
-              (_iteratorAbruptCompletion = !(_step = await _iterator.next()).done);
+              (_iteratorAbruptCompletion = !(_step = _iteratorResult(await _iterator.next())).done);
               _iteratorAbruptCompletion = false
             ) {
               const _val = _step.value;
@@ -2846,7 +2926,7 @@ test('080 [upstream xit] JS Async Generator > stack traces > re-thrown error fro
           } finally {
             try {
               if (_iteratorAbruptCompletion && _iterator.return != null) {
-                await _iterator.return();
+                _iteratorResult(await _iterator.return());
               }
             } finally {
               if (_didIteratorError) {
@@ -2984,6 +3064,10 @@ test('084 JS Async Generator > destructuring + state lifting (generators) > asyn
   ).toMatchInlineSnapshot(`
     "var _wrapAsyncGenerator = require('@babel/runtime/helpers/wrapAsyncGenerator');
     var _asyncIterator = require('@babel/runtime/helpers/asyncIterator');
+    function _iteratorResult(value) {
+      if (Object(value) !== value) throw new TypeError('Iterator result is not an object');
+      return value;
+    }
     async () => {
       function gen(_x) {
         return _gen.apply(this, arguments);
@@ -3002,7 +3086,7 @@ test('084 JS Async Generator > destructuring + state lifting (generators) > asyn
       try {
         for (
           var _iterator = _asyncIterator(gen({ b: 10 })), _step;
-          (_iteratorAbruptCompletion = !(_step = await _iterator.next()).done);
+          (_iteratorAbruptCompletion = !(_step = _iteratorResult(await _iterator.next())).done);
           _iteratorAbruptCompletion = false
         ) {
           const v = _step.value;
@@ -3016,7 +3100,7 @@ test('084 JS Async Generator > destructuring + state lifting (generators) > asyn
       } finally {
         try {
           if (_iteratorAbruptCompletion && _iterator.return != null) {
-            await _iterator.return();
+            _iteratorResult(await _iterator.return());
           }
         } finally {
           if (_didIteratorError) {

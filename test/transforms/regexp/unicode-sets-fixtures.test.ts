@@ -10,7 +10,7 @@ test('basic/basic/input.js', async () => {
       transforms: { regexpUnicodeSets: true },
       helpers: { mode: 'inline' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:regexp-unicode-sets-semantic-mismatch"`);
+  ).toMatchInlineSnapshot(`"/[\\u0035-\\u0037]\\u{10FFFF}/u;"`);
 });
 
 test('basic/string-properties/input.js', async () => {
@@ -20,7 +20,7 @@ test('basic/string-properties/input.js', async () => {
       transforms: { regexpUnicodeSets: true },
       helpers: { mode: 'inline' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:regexp-unicode-sets-semantic-mismatch"`);
+  ).toMatchInlineSnapshot(`"/(?:\\*️⃣|#️⃣|0️⃣|1️⃣|2️⃣|3️⃣|4️⃣|5️⃣|6️⃣|7️⃣|8️⃣|9️⃣)/u;"`);
 });
 
 test('transform-u/basic/input.js', async () => {
@@ -30,7 +30,7 @@ test('transform-u/basic/input.js', async () => {
       transforms: { regexpUnicodeSets: true },
       helpers: { mode: 'inline' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:regexp-unicode-sets-semantic-mismatch"`);
+  ).toMatchInlineSnapshot(`"/[\\u0035-\\u0037]\\u{10FFFF}/u;"`);
 });
 
 test('transform-u/string-properties/input.js', async () => {
@@ -40,5 +40,5 @@ test('transform-u/string-properties/input.js', async () => {
       transforms: { regexpUnicodeSets: true },
       helpers: { mode: 'inline' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:regexp-unicode-sets-semantic-mismatch"`);
+  ).toMatchInlineSnapshot(`"/(?:\\*️⃣|#️⃣|0️⃣|1️⃣|2️⃣|3️⃣|4️⃣|5️⃣|6️⃣|7️⃣|8️⃣|9️⃣)/u;"`);
 });

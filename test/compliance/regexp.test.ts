@@ -24,6 +24,24 @@ test('dot-all matches line terminators but not unrelated prefixes', () => {
   ]);
 });
 
+test('dot-all covers every line terminator without rewriting literal dots', () => {
+  const result = execute<{ result: unknown[] }>(
+    `
+      const wildcard = /^.$/s;
+      const literalDots = /^[.]\\.$/s;
+      const unicode = /^.$/su;
+      globalThis.result = [
+        ['\\n', '\\r', '\\u2028', '\\u2029'].map(value => wildcard.test(value)),
+        literalDots.test('..'),
+        literalDots.test('a.'),
+        unicode.test('😀'),
+      ];
+    `,
+    { transforms: { regexpDotAll: true } },
+  );
+  expect(result.result).toEqual([[true, true, true, true], true, false, true]);
+});
+
 test('sticky expressions only match at lastIndex', () => {
   const result = execute<{ result: unknown[] }>(
     `
@@ -39,10 +57,136 @@ test('sticky expressions only match at lastIndex', () => {
   expect(result.result).toEqual(['a', 1, null]);
 });
 
+test('sticky expressions preserve combined flags and empty-match lastIndex behavior', () => {
+  const result = execute<{ result: unknown[] }>(
+    `
+      const combined = /a/gy;
+      combined.lastIndex = 1;
+      const empty = /(?:)/y;
+      empty.lastIndex = 1;
+      const found = combined.exec('ba');
+      const emptyMatch = empty.exec('x');
+      globalThis.result = [found[0], combined.lastIndex, emptyMatch.index, empty.lastIndex];
+    `,
+    { transforms: { regexpSticky: true } },
+  );
+  expect(result.result).toEqual(['a', 2, 1, 1]);
+});
+
 test('Unicode code-point escapes match astral characters as one value', () => {
   expect(match(String.raw`/^\u{1F600}$/u`, { regexpUnicode: true }, ['😀', 'x'])).toEqual([
     ['😀', 0],
     null,
+  ]);
+});
+
+test('Unicode astral character classes preserve ranges, negation, and quantifiers', () => {
+  const result = execute<{ result: unknown[] }>(
+    String.raw`
+      const included = /^[a-z\u{1F600}-\u{1F602}]+$/u;
+      const excluded = /^[^\u{1F600}]+$/u;
+      globalThis.result = [
+        included.test('a😀😂z'),
+        included.test('😃'),
+        excluded.test('😁😂'),
+        excluded.test('😀'),
+        excluded.test('\ud83d'),
+      ];
+    `,
+    { transforms: { regexpUnicode: true } },
+  );
+  expect(result.result).toEqual([true, false, true, false, true]);
+});
+
+test('Unicode ignore-case lowering preserves non-ASCII BMP case pairs', () => {
+  expect(match('/^[éαб]+$/iu', { regexpUnicode: true }, ['ÉΑБ', 'éαб', 'EAB'])).toEqual([
+    ['ÉΑБ', 0],
+    ['éαб', 0],
+    null,
+  ]);
+});
+
+test('Unicode ignore-case lowering preserves Unicode-only BMP simple folds', () => {
+  const result = execute<{ result: boolean[] }>(
+    String.raw`
+      const kelvin = /^k$/iu;
+      const longS = /^[s]$/iu;
+      const ohm = /^Ω$/iu;
+      const sharpS = /^ß$/iu;
+      const angstrom = /^å$/iu;
+      const asciiRange = /^[a-z]$/iu;
+      const negatedRange = /^[^a-z]$/iu;
+      const mixedEndingInFold = /^[0k]$/iu;
+      globalThis.result = [
+        kelvin.test('K'), longS.test('ſ'), ohm.test('Ω'),
+        sharpS.test('ẞ'), angstrom.test('Å'), kelvin.test('x'),
+        asciiRange.test('K'), asciiRange.test('ſ'),
+        negatedRange.test('K'), negatedRange.test('ſ'), negatedRange.test('1'),
+        mixedEndingInFold.test('0'), mixedEndingInFold.test('K'), mixedEndingInFold.test('x'),
+      ];
+    `,
+    { transforms: { regexpUnicode: true } },
+  );
+  expect(result.result).toEqual([
+    true,
+    true,
+    true,
+    true,
+    true,
+    false,
+    true,
+    true,
+    false,
+    false,
+    true,
+    true,
+    true,
+    false,
+  ]);
+});
+
+test('Unicode ignore-case lowering preserves astral atoms and their case folds', () => {
+  const result = execute<{ result: boolean[] }>(
+    String.raw`
+      const emoji = /^\u{1F600}$/iu;
+      const deseretUpper = /^\u{10400}$/iu;
+      const deseretLower = /^\u{10428}$/iu;
+      const deseretClass = /^[\u{10400}]$/iu;
+      const mixedClass = /^[A\u{10400}]$/iu;
+      const rangedClass = /^[\u{10400}-\u{10401}]$/iu;
+      const negatedDeseret = /^[^\u{10400}]$/iu;
+      globalThis.result = [
+        emoji.test('😀'), emoji.test('x'),
+        deseretUpper.test('\u{10400}'), deseretUpper.test('\u{10428}'),
+        deseretLower.test('\u{10400}'), deseretLower.test('\u{10428}'),
+        deseretClass.test('\u{10400}'), deseretClass.test('\u{10428}'),
+        mixedClass.test('a'), mixedClass.test('\u{10428}'), mixedClass.test('B'),
+        rangedClass.test('\u{10400}'), rangedClass.test('\u{10429}'), rangedClass.test('\u{1042A}'),
+        negatedDeseret.test('\u{10400}'), negatedDeseret.test('\u{10428}'),
+        negatedDeseret.test('A'), negatedDeseret.test('\ud801'),
+      ];
+    `,
+    { transforms: { regexpUnicode: true } },
+  );
+  expect(result.result).toEqual([
+    true,
+    false,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    false,
+    true,
+    true,
+    false,
+    false,
+    false,
+    true,
+    true,
   ]);
 });
 
@@ -54,6 +198,188 @@ test('Unicode property escapes recognize letters across scripts', () => {
       '1',
     ]),
   ).toEqual([['hello', 0], ['λ', 0], null]);
+});
+
+test('Unicode property escapes recognize Unknown and Unicode 17 scripts', () => {
+  const result = execute<{ result: boolean[] }>(
+    String.raw`
+      const unknown = /^\p{Script=Zzzz}$/u;
+      const beriaErfe = /^\p{Script_Extensions=Berf}$/u;
+      globalThis.result = [
+        unknown.test('\uD800'),
+        unknown.test('\uE800'),
+        unknown.test('A'),
+        beriaErfe.test('\u{16EA0}'),
+        beriaErfe.test('\u{16EBA}'),
+        beriaErfe.test('\u{16EBB}'),
+      ];
+    `,
+    { transforms: { regexpUnicodePropertyEscapes: true } },
+  );
+  expect(result.result).toEqual([true, true, false, true, false, true]);
+});
+
+test('Unicode property classes support outer negation and ECMAScript set escapes', () => {
+  const result = execute<{ result: boolean[] }>(
+    String.raw`
+      const outerNegation = /^[^\p{ASCII}]$/u;
+      const nestedComplement = /^[\P{ASCII}]$/u;
+      const mixed = /^[\p{Lowercase_Letter}\d\s]$/u;
+      const universalUnion = /^[\p{ASCII}\D]$/u;
+      globalThis.result = [
+        outerNegation.test('é'), outerNegation.test('😀'), outerNegation.test('A'),
+        nestedComplement.test('é'), nestedComplement.test('😀'), nestedComplement.test('A'),
+        mixed.test('a'), mixed.test('5'), mixed.test('\u2028'), mixed.test('\uFEFF'),
+        mixed.test('A'), mixed.test('\u0661'), mixed.test('😀'),
+        universalUnion.test('A'), universalUnion.test('\u0661'), universalUnion.test('😀'),
+      ];
+    `,
+    { transforms: { regexpUnicodePropertyEscapes: true } },
+  );
+  expect(result.result).toEqual([
+    true,
+    true,
+    false,
+    true,
+    true,
+    false,
+    true,
+    true,
+    true,
+    true,
+    false,
+    false,
+    false,
+    true,
+    true,
+    true,
+  ]);
+});
+
+test('Unicode property complements remain code-point atomic after Unicode-flag removal', () => {
+  const result = execute<{ result: boolean[] }>(
+    String.raw`
+      const excludedDeseret = /^[^\p{Script=Deseret}]+$/u;
+      const oneNonAscii = /^[^\p{ASCII}]{1}$/u;
+      const surrogate = /^\p{Surrogate}$/u;
+      globalThis.result = [
+        excludedDeseret.test('\u{10400}'), excludedDeseret.test('\u{10428}'),
+        excludedDeseret.test('A'), excludedDeseret.test('😀'),
+        oneNonAscii.test('é'), oneNonAscii.test('😀'), oneNonAscii.test('ab'),
+        surrogate.test('\ud800'), surrogate.test('😀'),
+      ];
+    `,
+    { transforms: { regexpUnicode: true, regexpUnicodePropertyEscapes: true } },
+  );
+  expect(result.result).toEqual([false, false, true, true, true, true, false, true, false]);
+});
+
+test('Unicode sets preserve intersection, subtraction, negation, empty sets, and strings', () => {
+  const result = execute<{ result: boolean[] }>(
+    String.raw`
+      const letters = /^[\p{ASCII}&&\p{Letter}]+$/v;
+      const consonants = /^[a-z&&[^aeiou]]+$/v;
+      const greekUpper = /^[\p{Script=Greek}--\p{Lowercase_Letter}]+$/v;
+      const empty = /[a&&b]/v;
+      const keycap = /^\p{Emoji_Keycap_Sequence}$/v;
+      const strings = /^[x\q{a|long|mid}]$/v;
+      const chainedIntersection = /^[a-z&&[^aeiou]&&[^x-z]]+$/v;
+      const chainedSubtraction = /^[a-z--[aeiou]--[x-z]]+$/v;
+      globalThis.result = [
+        letters.test('Az'), letters.test('é'), letters.test('7'),
+        consonants.test('bcdf'), consonants.test('face'),
+        greekUpper.test('Α'), greekUpper.test('α'),
+        empty.test('a'), keycap.test('#️⃣'), keycap.test('#'),
+        strings.test('long'), strings.test('mid'), strings.test('x'), strings.test('lo'),
+        chainedIntersection.test('bcdf'), chainedIntersection.test('xyz'),
+        chainedSubtraction.test('bcdf'), chainedSubtraction.test('z'),
+      ];
+    `,
+    { transforms: { regexpUnicodeSets: true } },
+  );
+  expect(result.result).toEqual([
+    true,
+    false,
+    false,
+    true,
+    false,
+    true,
+    false,
+    false,
+    true,
+    false,
+    true,
+    true,
+    true,
+    false,
+    true,
+    false,
+    true,
+    false,
+  ]);
+});
+
+test('Unicode-set string alternatives prefer the longest string and preserve escaped literals', () => {
+  const result = execute<{ result: unknown[] }>(
+    String.raw`
+      const longest = /[\q{a|long|mid}]/v.exec('long');
+      const escaped = /^[\q{\+|a\.}]$/v;
+      const unicode = /^[\q{\u{1F600}|\u0061\x62}]$/v;
+      globalThis.result = [
+        longest[0], escaped.test('+'), escaped.test('a.'), escaped.test('aX'),
+        unicode.test('😀'), unicode.test('ab'), unicode.test('a'),
+      ];
+    `,
+    { transforms: { regexpUnicodeSets: true } },
+  );
+  expect(result.result).toEqual(['long', true, true, false, true, true, false]);
+});
+
+test('Unicode properties of strings match complete canonical emoji sequences', () => {
+  const result = execute<{ result: boolean[] }>(
+    String.raw`
+      const basic = /^\p{Basic_Emoji}$/v;
+      const modifier = /^\p{RGI_Emoji_Modifier_Sequence}$/v;
+      const flag = /^\p{RGI_Emoji_Flag_Sequence}$/v;
+      const tag = /^\p{RGI_Emoji_Tag_Sequence}$/v;
+      const zwj = /^\p{RGI_Emoji_ZWJ_Sequence}$/v;
+      const rgi = /^\p{RGI_Emoji}$/v;
+      const bracketed = /^[\p{RGI_Emoji}]$/v;
+      const mixed = /^[x\p{RGI_Emoji}]$/v;
+      const england = '\u{1F3F4}\u{E0067}\u{E0062}\u{E0065}\u{E006E}\u{E0067}\u{E007F}';
+      globalThis.result = [
+        basic.test('😀'), basic.test('A'),
+        modifier.test('👍🏽'), modifier.test('👍'),
+        flag.test('🇬🇧'), flag.test('🇬'),
+        tag.test(england), tag.test('🏴'),
+        zwj.test('👨‍👩‍👧'), zwj.test('👨'),
+        rgi.test('👨‍👩‍👧'), rgi.test('🇬🇧'), rgi.test('A'),
+        bracketed.test('👨‍👩‍👧'), bracketed.test('A'),
+        mixed.test('x'), mixed.test('🇬🇧'), mixed.test('A'),
+      ];
+    `,
+    { transforms: { regexpUnicodeSets: true } },
+  );
+  expect(result.result).toEqual([
+    true,
+    false,
+    true,
+    false,
+    true,
+    false,
+    true,
+    false,
+    true,
+    false,
+    true,
+    true,
+    false,
+    true,
+    false,
+    true,
+    true,
+    false,
+  ]);
 });
 
 test('named capture groups expose groups and preserve backreferences', () => {
@@ -68,12 +394,81 @@ test('named capture groups expose groups and preserve backreferences', () => {
   expect(result.result).toEqual(['test-test', 'test', false]);
 });
 
+test('forward named backreferences resolve against later capture groups', () => {
+  const result = execute<{ result: unknown[] }>(
+    String.raw`
+      const match = /\k<word>(?<word>a)/.exec('a');
+      globalThis.result = [match[0], match.groups.word];
+    `,
+    { transforms: { regexpNamedCaptureGroups: true } },
+  );
+  expect(result.result).toEqual(['a', 'a']);
+});
+
+test('duplicate named groups in disjoint alternatives expose the participating capture', () => {
+  const result = execute<{ result: unknown[] }>(
+    String.raw`
+      const expression = /(?:(?<word>a)|(?<word>b))\k<word>/;
+      const first = expression.exec('aa');
+      const second = expression.exec('bb');
+      globalThis.result = [first[0], first.groups.word, second[0], second.groups.word];
+    `,
+    { transforms: { regexpNamedCaptureGroups: true } },
+  );
+  expect(result.result).toEqual(['aa', 'a', 'bb', 'b']);
+});
+
 test('named captures work with replacement strings', () => {
   const result = execute<{ result: string }>(
     `globalThis.result = 'first-last'.replace(/(?<first>\\w+)-(?<last>\\w+)/, '$<last>, $<first>');`,
     { transforms: { regexpNamedCaptureGroups: true } },
   );
   expect(result.result).toBe('last, first');
+});
+
+test('named captures reach functional replacers and indices groups', () => {
+  const result = execute<{ result: unknown[] }>(
+    String.raw`
+      const argumentsSeen = [];
+      const replaced = 'ab'.replace(/(?<first>a)(?<optional>z)?/d, function () {
+        const args = Array.from(arguments);
+        const groups = args.at(-1);
+        argumentsSeen.push([
+          args[0], args[1], args[2], args[args.length - 3], args[args.length - 2],
+          Object.getPrototypeOf(groups) === null, groups.first, groups.optional,
+        ]);
+        return groups.first.toUpperCase();
+      });
+      const match = /(?<first>a)(?<optional>z)?/d.exec('ab');
+      globalThis.result = [
+        replaced,
+        argumentsSeen,
+        match.indices.groups.first,
+        match.indices.groups.optional,
+        Object.getPrototypeOf(match.indices.groups) === null,
+      ];
+    `,
+    { transforms: { regexpNamedCaptureGroups: true } },
+  );
+  expect(result.result).toEqual([
+    'Ab',
+    [['a', 'a', undefined, 0, 'ab', true, 'a', undefined]],
+    [0, 1],
+    undefined,
+    true,
+  ]);
+});
+
+test('escaped named-group lookalikes remain ordinary regexp text', () => {
+  const result = execute<{ result: unknown[] }>(
+    String.raw`
+      const expression = /no-groups-\(?<looks-like-a-group>looks\)/;
+      const found = expression.exec('unrelated');
+      globalThis.result = [found, expression.source];
+    `,
+    { transforms: { regexpNamedCaptureGroups: true } },
+  );
+  expect(result.result).toEqual([null, String.raw`no-groups-\(?<looks-like-a-group>looks\)`]);
 });
 
 test('global transformed expressions update and reset lastIndex', () => {
@@ -97,11 +492,16 @@ test('Unicode matching keeps lone surrogates distinct from astral code points', 
         /^.$/u.test('😀'),
         /^.$/u.test('\\ud83d'),
         /^..$/u.test('😀'),
+        /^[^\\uD800]$/u.test('😀'),
+        /^[^\\uD800]$/u.test('\\ud800'),
+        /^[^\\uD800]$/u.test('\\ud801'),
+        /^[^\\uD800-\\uDBFF]$/u.test('😀'),
+        /^[^\\uD800-\\uDBFF]$/u.test('\\ud83d'),
       ];
     `,
     { transforms: { regexpUnicode: true } },
   );
-  expect(result.result).toEqual([true, true, false]);
+  expect(result.result).toEqual([true, true, false, true, false, true, true, false]);
 });
 
 test('Unicode property escapes support negation and case-insensitive matching', () => {

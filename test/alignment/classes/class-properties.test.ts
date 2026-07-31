@@ -18,3 +18,35 @@ globalThis.__result = new Counter().read();`,
     }),
   ).resolves.toBe(6);
 });
+
+async function alignStaticFieldSuper(loose: boolean): Promise<unknown> {
+  return alignBabelBehavior({
+    source: `class Base {
+  static get value() { return this.seed; }
+}
+class Child extends Base {
+  static seed = 21;
+  static direct = super.value;
+  static arrow = () => [this, super.value];
+}
+const original = Child;
+Child = null;
+const [receiver, value] = original.arrow();
+globalThis.__result = [original.direct, receiver === original, value];`,
+    filename: 'input.js',
+    plugins: [[classProperties, { loose }]],
+    noxcturnal: {
+      helpers: { mode: 'inline' },
+      transforms: { classProperties: { loose } },
+    },
+    output: { mustNotMatch: [/^\s*static\s+(?:seed|direct|arrow)\s*=/m] },
+  });
+}
+
+test('aligns static field this and super evaluation with Babel in spec mode', async () => {
+  await expect(alignStaticFieldSuper(false)).resolves.toEqual([21, true, 21]);
+});
+
+test.fails('documents Oxc loose static-super getter receiver divergence from Babel', async () => {
+  await alignStaticFieldSuper(true);
+});

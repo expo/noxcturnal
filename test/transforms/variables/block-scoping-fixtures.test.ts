@@ -8,60 +8,64 @@ test('const-violations/assignment-expression/exec.js', async () => {
     'const state1 = {};\nexpect(function() {\n  const a = 3;\n  let b = 1;\n  state1.getA = () => a;\n  state1.getB = () => b;\n\n  a += b++;\n}).toThrow(\'"a" is read-only\');\nexpect(state1.getA()).toBe(3); // Assignment did not succeed\nexpect(state1.getB()).toBe(2); // `b++` was evaluated before error thrown\n\nconst state2 = {};\nexpect(function() {\n  const a = {\n    valueOf() {\n      state2.valueOfIsCalled = true;\n    }\n  };\n  state2.a = a;\n  state2.getA = () => a;\n  state2.getB = () => b;\n\n  let b = 1;\n  a += b++;\n}).toThrow(\'"a" is read-only\');\nexpect(state2.getA()).toBe(state2.a); // Assignment did not succeed\nexpect(state2.getB()).toBe(2); // `b++` was evaluated before error thrown\nexpect(state2.valueOfIsCalled).toBe(true); // `a` was read before error thrown\n\nconst state3 = {};\nexpect(function() {\n  const a = 32;\n  let b = 1;\n  state3.getA = () => a;\n  state3.getB = () => b;\n\n  a >>>= ++b;\n}).toThrow(\'"a" is read-only\');\nexpect(state3.getA()).toBe(32); // Assignment did not succeed\nexpect(state3.getB()).toBe(2); // `++b` was evaluated before error thrown\n\nconst state4 = {};\nexpect(function() {\n  const a = 1;\n  let b = 1;\n  state4.getA = () => a;\n  state4.getB = () => b;\n\n  a &&= ++b;\n}).toThrow(\'"a" is read-only\');\nexpect(state4.getA()).toBe(1); // Assignment did not succeed\nexpect(state4.getB()).toBe(2); // `++b` was evaluated before error thrown\n\n{\n  const a = 1;\n  let b = 1;\n  a ||= ++b;\n\n  expect(a).toBe(1); // Assignment not made\n  expect(b).toBe(1); // `++b` was not evaluated\n}\n';
   expect(await transformOutcome(source, 'exec.js', { transforms: { blockScoping: true } }))
     .toMatchInlineSnapshot(`
-    "var state1 = {};
-    expect(function () {
-      var a = 3;
-      var b = 1;
-      state1.getA = () => a;
-      state1.getB = () => b;
-      0();
-    }).toThrow('"a" is read-only');
-    expect(state1.getA()).toBe(3);
-    expect(state1.getB()).toBe(2);
-    var state2 = {};
-    expect(function () {
-      var a = {
-        valueOf() {
-          state2.valueOfIsCalled = true;
-        },
-      };
-      state2.a = a;
-      state2.getA = () => a;
-      state2.getB = () => b;
-      var b = 1;
-      0();
-    }).toThrow('"a" is read-only');
-    expect(state2.getA()).toBe(state2.a);
-    expect(state2.getB()).toBe(2);
-    expect(state2.valueOfIsCalled).toBe(true);
-    var state3 = {};
-    expect(function () {
-      var a = 32;
-      var b = 1;
-      state3.getA = () => a;
-      state3.getB = () => b;
-      0();
-    }).toThrow('"a" is read-only');
-    expect(state3.getA()).toBe(32);
-    expect(state3.getB()).toBe(2);
-    var state4 = {};
-    expect(function () {
-      var a = 1;
-      var b = 1;
-      state4.getA = () => a;
-      state4.getB = () => b;
-      0();
-    }).toThrow('"a" is read-only');
-    expect(state4.getA()).toBe(1);
-    expect(state4.getB()).toBe(2);
-    {
-      var a = 1;
-      var b = 1;
-      0();
-      expect(a).toBe(1);
-      expect(b).toBe(1);
-    }"
-  `);
+      "var _readOnlyValue;
+      function _readOnlyError(r) {
+        throw new TypeError('"' + r + '" is read-only');
+      }
+      var state1 = {};
+      expect(function () {
+        var a = 3;
+        var b = 1;
+        state1.getA = () => a;
+        state1.getB = () => b;
+        ((_readOnlyValue = a), (_readOnlyValue += b++), _readOnlyError('a'));
+      }).toThrow('"a" is read-only');
+      expect(state1.getA()).toBe(3);
+      expect(state1.getB()).toBe(2);
+      var state2 = {};
+      expect(function () {
+        var a = {
+          valueOf() {
+            state2.valueOfIsCalled = true;
+          },
+        };
+        state2.a = a;
+        state2.getA = () => a;
+        state2.getB = () => b;
+        var b = 1;
+        ((_readOnlyValue = a), (_readOnlyValue += b++), _readOnlyError('a'));
+      }).toThrow('"a" is read-only');
+      expect(state2.getA()).toBe(state2.a);
+      expect(state2.getB()).toBe(2);
+      expect(state2.valueOfIsCalled).toBe(true);
+      var state3 = {};
+      expect(function () {
+        var a = 32;
+        var b = 1;
+        state3.getA = () => a;
+        state3.getB = () => b;
+        ((_readOnlyValue = a), (_readOnlyValue >>>= ++b), _readOnlyError('a'));
+      }).toThrow('"a" is read-only');
+      expect(state3.getA()).toBe(32);
+      expect(state3.getB()).toBe(2);
+      var state4 = {};
+      expect(function () {
+        var a = 1;
+        var b = 1;
+        state4.getA = () => a;
+        state4.getB = () => b;
+        ((_readOnlyValue = a), (_readOnlyValue &&= (++b, _readOnlyError('a'))));
+      }).toThrow('"a" is read-only');
+      expect(state4.getA()).toBe(1);
+      expect(state4.getB()).toBe(2);
+      {
+        var a = 1;
+        var b = 1;
+        ((_readOnlyValue = a), (_readOnlyValue ||= (++b, _readOnlyError('a'))));
+        expect(a).toBe(1);
+        expect(b).toBe(1);
+      }"
+    `);
 });
 
 test('const-violations/assignment-expression/input.js', async () => {
@@ -69,14 +73,18 @@ test('const-violations/assignment-expression/input.js', async () => {
     'const a = 5;\nlet b = 0;\na += b++;\na >>>= b++;\na ||= b++;\na &&= b++;\na ??= b++;\n';
   expect(await transformOutcome(source, 'input.js', { transforms: { blockScoping: true } }))
     .toMatchInlineSnapshot(`
-    "var a = 5;
-    var b = 0;
-    0();
-    0();
-    0();
-    0();
-    0();"
-  `);
+      "var _readOnlyValue;
+      function _readOnlyError(r) {
+        throw new TypeError('"' + r + '" is read-only');
+      }
+      var a = 5;
+      var b = 0;
+      ((_readOnlyValue = a), (_readOnlyValue += b++), _readOnlyError('a'));
+      ((_readOnlyValue = a), (_readOnlyValue >>>= b++), _readOnlyError('a'));
+      ((_readOnlyValue = a), (_readOnlyValue ||= (b++, _readOnlyError('a'))));
+      ((_readOnlyValue = a), (_readOnlyValue &&= (b++, _readOnlyError('a'))));
+      ((_readOnlyValue = a), (_readOnlyValue ??= (b++, _readOnlyError('a'))));"
+    `);
 });
 
 test('const-violations/assignment-in-for-loop/exec.js', async () => {
@@ -84,28 +92,37 @@ test('const-violations/assignment-in-for-loop/exec.js', async () => {
     'expect(function () {\n    for (const element = 1; element++;) break;\n}).toThrow(\'"element" is read-only\');\n\nexpect(function () {\n    for (;;) {\n        const from = 50;\n        from--;\n        break;\n    }\n}).toThrow(\'"from" is read-only\');\n';
   expect(await transformOutcome(source, 'exec.js', { transforms: { blockScoping: true } }))
     .toMatchInlineSnapshot(`
-    "expect(function () {
-      for (var element = 1; 0();) break;
-    }).toThrow('"element" is read-only');
-    expect(function () {
-      for (;;) {
-        var from = 50;
-        0();
-        break;
+      "var _readOnlyValue;
+      function _readOnlyError(r) {
+        throw new TypeError('"' + r + '" is read-only');
       }
-    }).toThrow('"from" is read-only');"
-  `);
+      expect(function () {
+        for (var element = 1; (_readOnlyValue = element), _readOnlyValue++, _readOnlyError('element');)
+          break;
+      }).toThrow('"element" is read-only');
+      expect(function () {
+        for (;;) {
+          var from = 50;
+          ((_readOnlyValue = from), _readOnlyValue--, _readOnlyError('from'));
+          break;
+        }
+      }).toThrow('"from" is read-only');"
+    `);
 });
 
 test('const-violations/assignment-in-for-loop/input.js', async () => {
   const source = 'for (const element = 1; element++;) {\n  const from = 50;\n  from--;\n}\n';
   expect(await transformOutcome(source, 'input.js', { transforms: { blockScoping: true } }))
     .toMatchInlineSnapshot(`
-    "for (var element = 1; 0();) {
-      var from = 50;
-      0();
-    }"
-  `);
+      "var _readOnlyValue;
+      function _readOnlyError(r) {
+        throw new TypeError('"' + r + '" is read-only');
+      }
+      for (var element = 1; (_readOnlyValue = element), _readOnlyValue++, _readOnlyError('element');) {
+        var from = 50;
+        ((_readOnlyValue = from), _readOnlyValue--, _readOnlyError('from'));
+      }"
+    `);
 });
 
 test('const-violations/assignment-in-for-of-loop/exec.js', async () => {
@@ -113,25 +130,33 @@ test('const-violations/assignment-in-for-of-loop/exec.js', async () => {
     'expect(function () {\n    const array = [1, 2, 3];\n    for (const element of array) {\n        const from = 50;\n        from--;\n    }\n}).toThrow(\'"from" is read-only\');';
   expect(await transformOutcome(source, 'exec.js', { transforms: { blockScoping: true } }))
     .toMatchInlineSnapshot(`
-    "expect(function () {
-      var array = [1, 2, 3];
-      for (var element of array) {
-        var from = 50;
-        0();
+      "var _readOnlyValue;
+      function _readOnlyError(r) {
+        throw new TypeError('"' + r + '" is read-only');
       }
-    }).toThrow('"from" is read-only');"
-  `);
+      expect(function () {
+        var array = [1, 2, 3];
+        for (var element of array) {
+          var from = 50;
+          ((_readOnlyValue = from), _readOnlyValue--, _readOnlyError('from'));
+        }
+      }).toThrow('"from" is read-only');"
+    `);
 });
 
 test('const-violations/assignment-in-for-of-loop/input.js', async () => {
   const source = 'for (const element of []) {\n  const from = 50;\n  from--;\n}\n';
   expect(await transformOutcome(source, 'input.js', { transforms: { blockScoping: true } }))
     .toMatchInlineSnapshot(`
-    "for (var element of []) {
-      var from = 50;
-      0();
-    }"
-  `);
+      "var _readOnlyValue;
+      function _readOnlyError(r) {
+        throw new TypeError('"' + r + '" is read-only');
+      }
+      for (var element of []) {
+        var from = 50;
+        ((_readOnlyValue = from), _readOnlyValue--, _readOnlyError('from'));
+      }"
+    `);
 });
 
 test('const-violations/block-scoped/exec.js', async () => {
@@ -163,13 +188,17 @@ test('const-violations/deadcode-violation/exec.js', async () => {
     'function f() {\n  const a = "foo";\n\n  if (false) a = "false";\n\n  return a;\n}\n\nexpect(f()).toBe("foo");\n';
   expect(await transformOutcome(source, 'exec.js', { transforms: { blockScoping: true } }))
     .toMatchInlineSnapshot(`
-    "function f() {
-      var a = 'foo';
-      if (false) 0();
-      return a;
-    }
-    expect(f()).toBe('foo');"
-  `);
+      "var _readOnlyValue;
+      function _readOnlyError(r) {
+        throw new TypeError('"' + r + '" is read-only');
+      }
+      function f() {
+        var a = 'foo';
+        if (false) ('false', _readOnlyError('a'));
+        return a;
+      }
+      expect(f()).toBe('foo');"
+    `);
 });
 
 test('const-violations/deadcode-violation/input.js', async () => {
@@ -177,12 +206,16 @@ test('const-violations/deadcode-violation/input.js', async () => {
     '(function(){\n  const a = "foo";\n\n  if (false) a = "false";\n\n  return a;\n})();\n';
   expect(await transformOutcome(source, 'input.js', { transforms: { blockScoping: true } }))
     .toMatchInlineSnapshot(`
-    "(function () {
-      var a = 'foo';
-      if (false) 0();
-      return a;
-    })();"
-  `);
+      "var _readOnlyValue;
+      function _readOnlyError(r) {
+        throw new TypeError('"' + r + '" is read-only');
+      }
+      (function () {
+        var a = 'foo';
+        if (false) ('false', _readOnlyError('a'));
+        return a;
+      })();"
+    `);
 });
 
 test('const-violations/destructuring-assignment/exec.js', async () => {
@@ -190,28 +223,36 @@ test('const-violations/destructuring-assignment/exec.js', async () => {
     'expect(function() {\n  const [a, b] = [1, 2];\n  a = 3;\n}).toThrow(\'"a" is read-only\');\n\nexpect(function() {\n  const a = 1;\n  [a] = [2];\n}).toThrow(\'"a" is read-only\');\n\nexpect(function() {\n  const b = 1;\n  ({b} = {b: 2});\n}).toThrow(\'"b" is read-only\');\n';
   expect(await transformOutcome(source, 'exec.js', { transforms: { blockScoping: true } }))
     .toMatchInlineSnapshot(`
-    "expect(function () {
-      var [a, b] = [1, 2];
-      0();
-    }).toThrow('"a" is read-only');
-    expect(function () {
-      var a = 1;
-      [a] = [2];
-    }).toThrow('"a" is read-only');
-    expect(function () {
-      var b = 1;
-      ({ b } = { b: 2 });
-    }).toThrow('"b" is read-only');"
-  `);
+      "var _readOnlyValue;
+      function _readOnlyError(r) {
+        throw new TypeError('"' + r + '" is read-only');
+      }
+      expect(function () {
+        var [a, b] = [1, 2];
+        (3, _readOnlyError('a'));
+      }).toThrow('"a" is read-only');
+      expect(function () {
+        var a = 1;
+        ([2], _readOnlyError('a'));
+      }).toThrow('"a" is read-only');
+      expect(function () {
+        var b = 1;
+        (({ b: 2 }), _readOnlyError('b'));
+      }).toThrow('"b" is read-only');"
+    `);
 });
 
 test('const-violations/destructuring-assignment/input.js', async () => {
   const source = 'const [a, b] = [1, 2];\na = 3;\n';
   expect(await transformOutcome(source, 'input.js', { transforms: { blockScoping: true } }))
     .toMatchInlineSnapshot(`
-    "var [a, b] = [1, 2];
-    0();"
-  `);
+      "var _readOnlyValue;
+      function _readOnlyError(r) {
+        throw new TypeError('"' + r + '" is read-only');
+      }
+      var [a, b] = [1, 2];
+      (3, _readOnlyError('a'));"
+    `);
 });
 
 test('const-violations/destructuring/input.js', async () => {
@@ -233,10 +274,12 @@ test('const-violations/destructuring/input.js', async () => {
 });
 
 test('const-violations/flow-declar/input.js', async () => {
-  const source = 'declare class foo {}\nconst foo1 = 1;\n';
-  expect(
-    await transformOutcome(source, 'input.js', { transforms: { blockScoping: true } }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:parse-error"`);
+  const source = '// @flow\ndeclare class foo {}\nconst foo1 = 1;\n';
+  expect(await transformOutcome(source, 'input.js', { transforms: { blockScoping: true } }))
+    .toMatchInlineSnapshot(`
+    "// @flow
+    var foo1 = 1;"
+  `);
 });
 
 test('const-violations/ignore-member-expressions/input.js', async () => {
@@ -253,10 +296,14 @@ test('const-violations/loop/exec.js', async () => {
     'expect(function() {\n  for (const i = 0; i < 3; i = i + 1) {\n    // whatever\n  }\n}).toThrow(\'"i" is read-only\');\n';
   expect(await transformOutcome(source, 'exec.js', { transforms: { blockScoping: true } }))
     .toMatchInlineSnapshot(`
-    "expect(function () {
-      for (var i = 0; i < 3; 0()) {}
-    }).toThrow('"i" is read-only');"
-  `);
+      "var _readOnlyValue;
+      function _readOnlyError(r) {
+        throw new TypeError('"' + r + '" is read-only');
+      }
+      expect(function () {
+        for (var i = 0; i < 3; i + 1, _readOnlyError('i')) {}
+      }).toThrow('"i" is read-only');"
+    `);
 });
 
 test('const-violations/loop/input.js', async () => {
@@ -264,13 +311,17 @@ test('const-violations/loop/input.js', async () => {
     'for (const i = 0; i < 3; i = i + 1) {\n  console.log(i);\n}\n\nfor (const j = 0; j < 3; j++) {\n  console.log(j);\n}\n';
   expect(await transformOutcome(source, 'input.js', { transforms: { blockScoping: true } }))
     .toMatchInlineSnapshot(`
-    "for (var i = 0; i < 3; 0()) {
-      console.log(i);
-    }
-    for (var j = 0; j < 3; 0()) {
-      console.log(j);
-    }"
-  `);
+      "var _readOnlyValue;
+      function _readOnlyError(r) {
+        throw new TypeError('"' + r + '" is read-only');
+      }
+      for (var i = 0; i < 3; i + 1, _readOnlyError('i')) {
+        console.log(i);
+      }
+      for (var j = 0; j < 3; _readOnlyValue = j, _readOnlyValue++, _readOnlyError('j')) {
+        console.log(j);
+      }"
+    `);
 });
 
 test('const-violations/nested-update-expressions/exec.js', async () => {
@@ -278,27 +329,35 @@ test('const-violations/nested-update-expressions/exec.js', async () => {
     'expect(function() {\n  const c = 17;\n  let a = 0;\n\n  function f() {\n    return ++c+--a;\n  }\n\n  f();\n\n}).toThrow(\'"c" is read-only\');\n';
   expect(await transformOutcome(source, 'exec.js', { transforms: { blockScoping: true } }))
     .toMatchInlineSnapshot(`
-    "expect(function () {
-      var c = 17;
-      var a = 0;
-      function f() {
-        return 0() + --a;
+      "var _readOnlyValue;
+      function _readOnlyError(r) {
+        throw new TypeError('"' + r + '" is read-only');
       }
-      f();
-    }).toThrow('"c" is read-only');"
-  `);
+      expect(function () {
+        var c = 17;
+        var a = 0;
+        function f() {
+          return ((_readOnlyValue = c), ++_readOnlyValue, _readOnlyError('c')) + --a;
+        }
+        f();
+      }).toThrow('"c" is read-only');"
+    `);
 });
 
 test('const-violations/nested-update-expressions/input.js', async () => {
   const source = 'const c = 17;\nlet a = 0;\n\nfunction f() {\n  return ++c+--a;\n}\n';
   expect(await transformOutcome(source, 'input.js', { transforms: { blockScoping: true } }))
     .toMatchInlineSnapshot(`
-    "var c = 17;
-    var a = 0;
-    function f() {
-      return 0() + --a;
-    }"
-  `);
+      "var _readOnlyValue;
+      function _readOnlyError(r) {
+        throw new TypeError('"' + r + '" is read-only');
+      }
+      var c = 17;
+      var a = 0;
+      function f() {
+        return ((_readOnlyValue = c), ++_readOnlyValue, _readOnlyError('c')) + --a;
+      }"
+    `);
 });
 
 test('const-violations/no-assignment/exec.js', async () => {
@@ -306,24 +365,28 @@ test('const-violations/no-assignment/exec.js', async () => {
     'const state1 = {};\nexpect(function() {\n  const a = 3;\n  state1.getA = () => a;\n\n  a = 7;\n}).toThrow(\'"a" is read-only\');\nexpect(state1.getA()).toBe(3); // Assignment did not succeed\n\nconst state2 = {};\nexpect(function() {\n  const a = 3;\n  let b = 0;\n  state2.getA = () => a;\n  state2.getB = () => b;\n\n  a = b++;\n}).toThrow(\'"a" is read-only\');\nexpect(state2.getA()).toBe(3); // Assignment did not succeed\nexpect(state2.getB()).toBe(1); // `b++` was evaluated before error thrown\n';
   expect(await transformOutcome(source, 'exec.js', { transforms: { blockScoping: true } }))
     .toMatchInlineSnapshot(`
-    "var state1 = {};
-    expect(function () {
-      var a = 3;
-      state1.getA = () => a;
-      0();
-    }).toThrow('"a" is read-only');
-    expect(state1.getA()).toBe(3);
-    var state2 = {};
-    expect(function () {
-      var a = 3;
-      var b = 0;
-      state2.getA = () => a;
-      state2.getB = () => b;
-      0();
-    }).toThrow('"a" is read-only');
-    expect(state2.getA()).toBe(3);
-    expect(state2.getB()).toBe(1);"
-  `);
+      "var _readOnlyValue;
+      function _readOnlyError(r) {
+        throw new TypeError('"' + r + '" is read-only');
+      }
+      var state1 = {};
+      expect(function () {
+        var a = 3;
+        state1.getA = () => a;
+        (7, _readOnlyError('a'));
+      }).toThrow('"a" is read-only');
+      expect(state1.getA()).toBe(3);
+      var state2 = {};
+      expect(function () {
+        var a = 3;
+        var b = 0;
+        state2.getA = () => a;
+        state2.getB = () => b;
+        (b++, _readOnlyError('a'));
+      }).toThrow('"a" is read-only');
+      expect(state2.getA()).toBe(3);
+      expect(state2.getB()).toBe(1);"
+    `);
 });
 
 test('const-violations/no-assignment/input.js', async () => {
@@ -331,12 +394,16 @@ test('const-violations/no-assignment/input.js', async () => {
     'const MULTIPLIER = 5;\nMULTIPLIER = "overwrite";\n\nconst a = 5;\nlet b = 0;\na = b++;\n';
   expect(await transformOutcome(source, 'input.js', { transforms: { blockScoping: true } }))
     .toMatchInlineSnapshot(`
-    "var MULTIPLIER = 5;
-    0();
-    var a = 5;
-    var b = 0;
-    0();"
-  `);
+      "var _readOnlyValue;
+      function _readOnlyError(r) {
+        throw new TypeError('"' + r + '" is read-only');
+      }
+      var MULTIPLIER = 5;
+      ('overwrite', _readOnlyError('MULTIPLIER'));
+      var a = 5;
+      var b = 0;
+      (b++, _readOnlyError('a'));"
+    `);
 });
 
 test('const-violations/no-for-in/exec.js', async () => {
@@ -405,36 +472,44 @@ test('const-violations/update-expression-prefix/exec.js', async () => {
     'const state1 = {};\nexpect(function() {\n  const a = "str";\n  state1.getA = () => a;\n\n  --a;\n}).toThrow(\'"a" is read-only\');\nexpect(state1.getA()).toBe("str"); // Assignment did not succeed\n\nconst state2 = {};\nexpect(function() {\n  const b = {\n    valueOf() {\n      state2.valueOfIsCalled = true;\n    }\n  };\n  state2.b = b;\n  state2.getB = () => b;\n\n  --b;\n}).toThrow(\'"b" is read-only\');\nexpect(state2.getB()).toBe(state2.b); // Assignment did not succeed\nexpect(state2.valueOfIsCalled).toBe(true); // `bar` was read before error thrown\n';
   expect(await transformOutcome(source, 'exec.js', { transforms: { blockScoping: true } }))
     .toMatchInlineSnapshot(`
-    "var state1 = {};
-    expect(function () {
-      var a = 'str';
-      state1.getA = () => a;
-      0();
-    }).toThrow('"a" is read-only');
-    expect(state1.getA()).toBe('str');
-    var state2 = {};
-    expect(function () {
-      var b = {
-        valueOf() {
-          state2.valueOfIsCalled = true;
-        },
-      };
-      state2.b = b;
-      state2.getB = () => b;
-      0();
-    }).toThrow('"b" is read-only');
-    expect(state2.getB()).toBe(state2.b);
-    expect(state2.valueOfIsCalled).toBe(true);"
-  `);
+      "var _readOnlyValue;
+      function _readOnlyError(r) {
+        throw new TypeError('"' + r + '" is read-only');
+      }
+      var state1 = {};
+      expect(function () {
+        var a = 'str';
+        state1.getA = () => a;
+        ((_readOnlyValue = a), --_readOnlyValue, _readOnlyError('a'));
+      }).toThrow('"a" is read-only');
+      expect(state1.getA()).toBe('str');
+      var state2 = {};
+      expect(function () {
+        var b = {
+          valueOf() {
+            state2.valueOfIsCalled = true;
+          },
+        };
+        state2.b = b;
+        state2.getB = () => b;
+        ((_readOnlyValue = b), --_readOnlyValue, _readOnlyError('b'));
+      }).toThrow('"b" is read-only');
+      expect(state2.getB()).toBe(state2.b);
+      expect(state2.valueOfIsCalled).toBe(true);"
+    `);
 });
 
 test('const-violations/update-expression-prefix/input.js', async () => {
   const source = 'const a = "str";\n--a;\n';
   expect(await transformOutcome(source, 'input.js', { transforms: { blockScoping: true } }))
     .toMatchInlineSnapshot(`
-    "var a = 'str';
-    0();"
-  `);
+      "var _readOnlyValue;
+      function _readOnlyError(r) {
+        throw new TypeError('"' + r + '" is read-only');
+      }
+      var a = 'str';
+      ((_readOnlyValue = a), --_readOnlyValue, _readOnlyError('a'));"
+    `);
 });
 
 test('const-violations/update-expression/exec.js', async () => {
@@ -442,36 +517,44 @@ test('const-violations/update-expression/exec.js', async () => {
     'const state1 = {};\nexpect(function() {\n  const foo = 1;\n  state1.getFoo = () => foo;\n\n  foo++;\n}).toThrow(\'"foo" is read-only\');\nexpect(state1.getFoo()).toBe(1); // Assignment did not succeed\n\nconst state2 = {};\nexpect(function() {\n  const bar = {\n    valueOf() {\n      state2.valueOfIsCalled = true;\n    }\n  };\n  state2.bar = bar;\n  state2.getBar = () => bar;\n\n  bar++;\n}).toThrow(\'"bar" is read-only\');\nexpect(state2.getBar()).toBe(state2.bar); // Assignment did not succeed\nexpect(state2.valueOfIsCalled).toBe(true); // `bar` was read before error thrown\n';
   expect(await transformOutcome(source, 'exec.js', { transforms: { blockScoping: true } }))
     .toMatchInlineSnapshot(`
-    "var state1 = {};
-    expect(function () {
-      var foo = 1;
-      state1.getFoo = () => foo;
-      0();
-    }).toThrow('"foo" is read-only');
-    expect(state1.getFoo()).toBe(1);
-    var state2 = {};
-    expect(function () {
-      var bar = {
-        valueOf() {
-          state2.valueOfIsCalled = true;
-        },
-      };
-      state2.bar = bar;
-      state2.getBar = () => bar;
-      0();
-    }).toThrow('"bar" is read-only');
-    expect(state2.getBar()).toBe(state2.bar);
-    expect(state2.valueOfIsCalled).toBe(true);"
-  `);
+      "var _readOnlyValue;
+      function _readOnlyError(r) {
+        throw new TypeError('"' + r + '" is read-only');
+      }
+      var state1 = {};
+      expect(function () {
+        var foo = 1;
+        state1.getFoo = () => foo;
+        ((_readOnlyValue = foo), _readOnlyValue++, _readOnlyError('foo'));
+      }).toThrow('"foo" is read-only');
+      expect(state1.getFoo()).toBe(1);
+      var state2 = {};
+      expect(function () {
+        var bar = {
+          valueOf() {
+            state2.valueOfIsCalled = true;
+          },
+        };
+        state2.bar = bar;
+        state2.getBar = () => bar;
+        ((_readOnlyValue = bar), _readOnlyValue++, _readOnlyError('bar'));
+      }).toThrow('"bar" is read-only');
+      expect(state2.getBar()).toBe(state2.bar);
+      expect(state2.valueOfIsCalled).toBe(true);"
+    `);
 });
 
 test('const-violations/update-expression/input.js', async () => {
   const source = 'const foo = 1;\nfoo++;\n';
   expect(await transformOutcome(source, 'input.js', { transforms: { blockScoping: true } }))
     .toMatchInlineSnapshot(`
-    "var foo = 1;
-    0();"
-  `);
+      "var _readOnlyValue;
+      function _readOnlyError(r) {
+        throw new TypeError('"' + r + '" is read-only');
+      }
+      var foo = 1;
+      ((_readOnlyValue = foo), _readOnlyValue++, _readOnlyError('foo'));"
+    `);
 });
 
 test('general/annex-B_3_3-async-generator/input.js', async () => {
@@ -951,10 +1034,66 @@ test('general/block-not-shadow-outer-variable/input.js', async () => {
 
 test('general/closure-in-generator-or-async/exec.js', async () => {
   const source =
-    'function* a() {\n  do {\n    let x = yield "iteration";\n    var fn = () => x;\n  } while (false);\n  return fn;\n}\n\nasync function b() {\n  do {\n    let x = await "iteration";\n    var fn = () => x;\n  } while (false);\n  return fn;\n}\n\nasync function* c() {\n  do {\n    let x = yield "iteration";\n    var fn = () => x;\n  } while (false);\n  return fn;\n}\n\nreturn (async () => {\n  let it = a();\n  expect(it.next().value).toBe("iteration");\n  expect(it.next("foo").value()).toBe("foo");\n\n  expect((await b())()).toBe("iteration");\n\n  it = c();\n  expect((await it.next()).value).toBe("iteration");\n  expect((await it.next("foo")).value()).toBe("foo");\n})();\n\n';
-  expect(
-    await transformOutcome(source, 'exec.js', { transforms: { blockScoping: true } }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:parse-error"`);
+    '(function () {\nfunction* a() {\n  do {\n    let x = yield "iteration";\n    var fn = () => x;\n  } while (false);\n  return fn;\n}\n\nasync function b() {\n  do {\n    let x = await "iteration";\n    var fn = () => x;\n  } while (false);\n  return fn;\n}\n\nasync function* c() {\n  do {\n    let x = yield "iteration";\n    var fn = () => x;\n  } while (false);\n  return fn;\n}\n\nreturn (async () => {\n  let it = a();\n  expect(it.next().value).toBe("iteration");\n  expect(it.next("foo").value()).toBe("foo");\n\n  expect((await b())()).toBe("iteration");\n\n  it = c();\n  expect((await it.next()).value).toBe("iteration");\n  expect((await it.next("foo")).value()).toBe("foo");\n})();\n\n\n});\n';
+  expect(await transformOutcome(source, 'exec.js', { transforms: { blockScoping: true } }))
+    .toMatchInlineSnapshot(`
+    "(function () {
+      function* a() {
+        var _loopResult;
+        var _loop = function* () {
+          var x = yield 'iteration';
+          var fn = () => x;
+          return {
+            type: 'normal',
+            vars: [],
+          };
+        };
+        do {
+          _loopResult = yield* _loop.call(this);
+        } while (false);
+        return fn;
+      }
+      async function b() {
+        var _loopResult9;
+        var _loop8 = async () => {
+          var x = await 'iteration';
+          var fn = () => x;
+          return {
+            type: 'normal',
+            vars: [],
+          };
+        };
+        do {
+          _loopResult9 = await _loop8();
+        } while (false);
+        return fn;
+      }
+      async function* c() {
+        var _loopResult11;
+        var _loop10 = function* () {
+          var x = yield 'iteration';
+          var fn = () => x;
+          return {
+            type: 'normal',
+            vars: [],
+          };
+        };
+        do {
+          _loopResult11 = yield* _loop10.call(this);
+        } while (false);
+        return fn;
+      }
+      return (async () => {
+        var it = a();
+        expect(it.next().value).toBe('iteration');
+        expect(it.next('foo').value()).toBe('foo');
+        expect((await b())()).toBe('iteration');
+        it = c();
+        expect((await it.next()).value).toBe('iteration');
+        expect((await it.next('foo')).value()).toBe('foo');
+      })();
+    });"
+  `);
 });
 
 test('general/closure-in-generator-or-async/input.js', async () => {
@@ -1533,10 +1672,50 @@ test('general/hoisting/input.js', async () => {
 
 test('general/issue-10339/exec.js', async () => {
   const source =
-    'const code = `\n  for (const {foo, ...bar} of { bar: [] }) {\n    () => foo;\n    const [qux] = bar;\n    try {} catch (e) {\n      let quux = qux;\n    }\n  }\n`;\n\nlet programPath;\nlet forOfPath;\nlet functionPath;\n\nreturn transformAsync(code, {\n  configFile: false,\n  plugins: [\n    __dirname + "/../../../../lib/index.js",\n    {\n      post({ path }) {\n        programPath = path;\n        path.traverse({\n          ForOfStatement(path) { forOfPath = path },\n          FunctionExpression(path) { functionPath = path }\n        });\n      }\n    }\n  ]\n}).then(() => {\n  expect(Object.keys(programPath.scope.bindings)).toEqual(["foo", "bar"]);\n\n  // for declarations should be transformed to for bindings\n  expect(forOfPath.scope.bindings).toEqual({});\n  // The body should be wrapped into closure\n  expect(forOfPath.get("body").scope.bindings).toEqual({});\n\n  expect(Object.keys(functionPath.scope.bindings)).toEqual(["foo", "qux", "quux"]);\n});\n';
-  expect(
-    await transformOutcome(source, 'exec.js', { transforms: { blockScoping: true } }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:parse-error"`);
+    '(function () {\nconst code = `\n  for (const {foo, ...bar} of { bar: [] }) {\n    () => foo;\n    const [qux] = bar;\n    try {} catch (e) {\n      let quux = qux;\n    }\n  }\n`;\n\nlet programPath;\nlet forOfPath;\nlet functionPath;\n\nreturn transformAsync(code, {\n  configFile: false,\n  plugins: [\n    __dirname + "/../../../../lib/index.js",\n    {\n      post({ path }) {\n        programPath = path;\n        path.traverse({\n          ForOfStatement(path) { forOfPath = path },\n          FunctionExpression(path) { functionPath = path }\n        });\n      }\n    }\n  ]\n}).then(() => {\n  expect(Object.keys(programPath.scope.bindings)).toEqual(["foo", "bar"]);\n\n  // for declarations should be transformed to for bindings\n  expect(forOfPath.scope.bindings).toEqual({});\n  // The body should be wrapped into closure\n  expect(forOfPath.get("body").scope.bindings).toEqual({});\n\n  expect(Object.keys(functionPath.scope.bindings)).toEqual(["foo", "qux", "quux"]);\n});\n\n});\n';
+  expect(await transformOutcome(source, 'exec.js', { transforms: { blockScoping: true } }))
+    .toMatchInlineSnapshot(`
+    "(function () {
+      var code = \`
+      for (const {foo, ...bar} of { bar: [] }) {
+        () => foo;
+        const [qux] = bar;
+        try {} catch (e) {
+          let quux = qux;
+        }
+      }
+    \`;
+      var programPath;
+      var forOfPath;
+      var functionPath;
+      return transformAsync(code, {
+        configFile: false,
+        plugins: [
+          __dirname + '/../../../../lib/index.js',
+          {
+            post({ path }) {
+              programPath = path;
+              path.traverse({
+                ForOfStatement(path) {
+                  forOfPath = path;
+                },
+                FunctionExpression(path) {
+                  functionPath = path;
+                },
+              });
+            },
+          },
+        ],
+      }).then(() => {
+        expect(Object.keys(programPath.scope.bindings)).toEqual(['foo', 'bar']);
+        // for declarations should be transformed to for bindings
+        expect(forOfPath.scope.bindings).toEqual({});
+        // The body should be wrapped into closure
+        expect(forOfPath.get('body').scope.bindings).toEqual({});
+        expect(Object.keys(functionPath.scope.bindings)).toEqual(['foo', 'qux', 'quux']);
+      });
+    });"
+  `);
 });
 
 test('general/issue-10339/input.js', async () => {
@@ -2214,8 +2393,17 @@ test('general/jsx-identifier/input.js', async () => {
   const source =
     '// #1683\n\nvar arr = [];\nfor(let i = 0; i < 4; ++i) {\n  arr.push(\n    <i></i>\n  );\n}\n';
   expect(
-    await transformOutcome(source, 'input.js', { transforms: { blockScoping: true } }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:parse-error"`);
+    await transformOutcome(source, 'input.js', {
+      transforms: { blockScoping: true },
+      jsx: 'preserve',
+    }),
+  ).toMatchInlineSnapshot(`
+    "// #1683
+    var arr = [];
+    for (var i = 0; i < 4; ++i) {
+      arr.push(<i></i>);
+    }"
+  `);
 });
 
 test('general/label-complex/input.js', async () => {
@@ -3134,46 +3322,54 @@ test('tdz/const-readonly/exec.js', async () => {
     'function callNow(f) {\n  f();\n}\n\nfunction callLater(f) {\n  return () => f();\n}\n\nexpect(() => {\n  const x = 0;\n  x = 1;\n}).toThrow(TypeError);\n\nexpect(() => {\n  x = 1;\n  const x = 0;\n}).toThrow(ReferenceError);\n\nexpect(() => {\n  callNow(() => {\n    x = 1;\n  });\n  const x = 0;\n}).toThrow(ReferenceError);\n\n\nexpect(() => {\n  const call = callLater(() => {\n    x = 1;\n  });\n  const x = 0;\n  call();\n}).toThrow(TypeError);\n';
   expect(await transformOutcome(source, 'exec.js', { transforms: { blockScoping: true } }))
     .toMatchInlineSnapshot(`
-    "function callNow(f) {
-      f();
-    }
-    function callLater(f) {
-      return () => f();
-    }
-    expect(() => {
-      var x = 0;
-      0();
-    }).toThrow(TypeError);
-    expect(() => {
-      0();
-      var x = 0;
-    }).toThrow(ReferenceError);
-    expect(() => {
-      callNow(() => {
-        0();
-      });
-      var x = 0;
-    }).toThrow(ReferenceError);
-    expect(() => {
-      var call = callLater(() => {
-        0();
-      });
-      var x = 0;
-      call();
-    }).toThrow(TypeError);"
-  `);
+      "var _readOnlyValue;
+      function _readOnlyError(r) {
+        throw new TypeError('"' + r + '" is read-only');
+      }
+      function callNow(f) {
+        f();
+      }
+      function callLater(f) {
+        return () => f();
+      }
+      expect(() => {
+        var x = 0;
+        (1, _readOnlyError('x'));
+      }).toThrow(TypeError);
+      expect(() => {
+        (1, _readOnlyError('x'));
+        var x = 0;
+      }).toThrow(ReferenceError);
+      expect(() => {
+        callNow(() => {
+          (1, _readOnlyError('x'));
+        });
+        var x = 0;
+      }).toThrow(ReferenceError);
+      expect(() => {
+        var call = callLater(() => {
+          (1, _readOnlyError('x'));
+        });
+        var x = 0;
+        call();
+      }).toThrow(TypeError);"
+    `);
 });
 
 test('tdz/const-readonly/input.js', async () => {
   const source = 'maybeCallLater(function () {\n  x = 2;\n});\n\nconst x = 0;\nx = 1;\n';
   expect(await transformOutcome(source, 'input.js', { transforms: { blockScoping: true } }))
     .toMatchInlineSnapshot(`
-    "maybeCallLater(function () {
-      0();
-    });
-    var x = 0;
-    0();"
-  `);
+      "var _readOnlyValue;
+      function _readOnlyError(r) {
+        throw new TypeError('"' + r + '" is read-only');
+      }
+      maybeCallLater(function () {
+        (2, _readOnlyError('x'));
+      });
+      var x = 0;
+      (1, _readOnlyError('x'));"
+    `);
 });
 
 test('tdz/destructured-self-reference/exec.js', async () => {

@@ -7,11 +7,11 @@ test('unicode-regex/basic/input.js', async () => {
   const source = 'var string = "foo💩bar";\nvar match = string.match(/foo(.)bar/u);\n';
   expect(await transformOutcome(source, 'input.js', { transforms: { regexpUnicode: true } }))
     .toMatchInlineSnapshot(`
-    "var string = 'foo💩bar';
-    var match = string.match(
-      /foo((?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[^\\uD800-\\uDBFF]|^)[\\uDC00-\\uDFFF]))bar/,
-    );"
-  `);
+      "var string = 'foo💩bar';
+      var match = string.match(
+        /foo((?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF]))bar/,
+      );"
+    `);
 });
 
 test('unicode-regex/ignore-non-unicode/input.js', async () => {
@@ -28,13 +28,25 @@ test('unicode-regex/negated-set/input.js', async () => {
     '/[^K]/u.test(string);\n/[^k]/u.test(string);\n/[^\\u212a]/u.test(string);\n\n/[^K]/iu.test(string);\n/[^k]/iu.test(string);\n/[^\\u212a]/iu.test(string);\n';
   expect(await transformOutcome(source, 'input.js', { transforms: { regexpUnicode: true } }))
     .toMatchInlineSnapshot(`
-    "/[^K]/.test(string);
-    /[^k]/.test(string);
-    /[^\\u212a]/.test(string);
-    /[^K]/i.test(string);
-    /[^k]/i.test(string);
-    /[^\\u212a]/i.test(string);"
-  `);
+      "/(?:[\\u0000-\\u004A\\u004C-\\uD7FF\\uE000-\\uFFFF]|\\uD800[\\uDC00-\\uDFFF]|[\\uD801-\\uDBFE][\\uDC00-\\uDFFF]|\\uDBFF[\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF])/.test(
+        string,
+      );
+      /(?:[\\u0000-\\u006A\\u006C-\\uD7FF\\uE000-\\uFFFF]|\\uD800[\\uDC00-\\uDFFF]|[\\uD801-\\uDBFE][\\uDC00-\\uDFFF]|\\uDBFF[\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF])/.test(
+        string,
+      );
+      /(?:[\\u0000-\\u2129\\u212B-\\uD7FF\\uE000-\\uFFFF]|\\uD800[\\uDC00-\\uDFFF]|[\\uD801-\\uDBFE][\\uDC00-\\uDFFF]|\\uDBFF[\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF])/.test(
+        string,
+      );
+      /(?:[\\u0000-\\u004A\\u004C-\\u2129\\u212B-\\uD7FF\\uE000-\\uFFFF]|\\uD800[\\uDC00-\\uDFFF]|[\\uD801-\\uDBFE][\\uDC00-\\uDFFF]|\\uDBFF[\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF])/i.test(
+        string,
+      );
+      /(?:[\\u0000-\\u006A\\u006C-\\u2129\\u212B-\\uD7FF\\uE000-\\uFFFF]|\\uD800[\\uDC00-\\uDFFF]|[\\uD801-\\uDBFE][\\uDC00-\\uDFFF]|\\uDBFF[\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF])/i.test(
+        string,
+      );
+      /(?:[\\u0000-\\u004A\\u004C-\\u2129\\u212B-\\uD7FF\\uE000-\\uFFFF]|\\uD800[\\uDC00-\\uDFFF]|[\\uD801-\\uDBFE][\\uDC00-\\uDFFF]|\\uDBFF[\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF])/i.test(
+        string,
+      );"
+    `);
 });
 
 test('unicode-regex/slash/input.js', async () => {

@@ -4608,6 +4608,7 @@ test('class-name-tdz/typescript-type/input.ts [spec]', async () => {
     await transformOutcome(source, 'input.ts', {
       transforms: { classProperties: { loose: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
+      typescript: 'strip',
     }),
   ).toMatchInlineSnapshot(`"[bailout] preflight:decorators-not-supported"`);
 });
@@ -4618,6 +4619,7 @@ test('class-name-tdz/typescript-type/input.ts [loose]', async () => {
     await transformOutcome(source, 'input.ts', {
       transforms: { classProperties: { loose: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
+      typescript: 'strip',
     }),
   ).toMatchInlineSnapshot(`"[bailout] preflight:decorators-not-supported"`);
 });
@@ -4629,8 +4631,22 @@ test('compile-to-class/constructor-collision-ignores-types-loose/input.js [spec]
     await transformOutcome(source, 'input.js', {
       transforms: { classProperties: { loose: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
+      typescript: 'strip',
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:parse-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _defineProperty = require('@babel/runtime/helpers/defineProperty');
+    class C {
+      constructor(T) {
+        _defineProperty(
+          this,
+          // Output should not use \`_initialiseProps\`
+          'x',
+          void 0,
+        );
+        _defineProperty(this, 'y', 0);
+      }
+    }"
+  `);
 });
 
 test('compile-to-class/constructor-collision-ignores-types-loose/input.js [loose]', async () => {
@@ -4640,8 +4656,16 @@ test('compile-to-class/constructor-collision-ignores-types-loose/input.js [loose
     await transformOutcome(source, 'input.js', {
       transforms: { classProperties: { loose: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
+      typescript: 'strip',
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:parse-error"`);
+  ).toMatchInlineSnapshot(`
+    "class C {
+      constructor(T) {
+        this.x = void 0;
+        this.y = 0;
+      }
+    }"
+  `);
 });
 
 test('compile-to-class/constructor-collision-ignores-types/input.js [spec]', async () => {
@@ -4651,8 +4675,22 @@ test('compile-to-class/constructor-collision-ignores-types/input.js [spec]', asy
     await transformOutcome(source, 'input.js', {
       transforms: { classProperties: { loose: false } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
+      typescript: 'strip',
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:parse-error"`);
+  ).toMatchInlineSnapshot(`
+    "var _defineProperty = require('@babel/runtime/helpers/defineProperty');
+    class C {
+      constructor(T) {
+        _defineProperty(
+          this,
+          // Output should not use \`_initialiseProps\`
+          'x',
+          void 0,
+        );
+        _defineProperty(this, 'y', 0);
+      }
+    }"
+  `);
 });
 
 test('compile-to-class/constructor-collision-ignores-types/input.js [loose]', async () => {
@@ -4662,8 +4700,16 @@ test('compile-to-class/constructor-collision-ignores-types/input.js [loose]', as
     await transformOutcome(source, 'input.js', {
       transforms: { classProperties: { loose: true } },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
+      typescript: 'strip',
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:parse-error"`);
+  ).toMatchInlineSnapshot(`
+    "class C {
+      constructor(T) {
+        this.x = void 0;
+        this.y = 0;
+      }
+    }"
+  `);
 });
 
 test('compile-to-class/preserve-comments/input.js [spec]', async () => {
@@ -62854,7 +62900,38 @@ test('private/static-self-method/exec.js [spec]', async () => {
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-spec-private-features-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
+    var _Foo;
+    const f = (_Foo = class Foo {
+      static extract() {
+        return {
+          bar: _assertClassBrand(_Foo, Foo, _bar),
+          method: _assertClassBrand(_Foo, Foo, _method),
+          method_shadowed: _assertClassBrand(_Foo, Foo, _method_shadowed),
+        };
+      }
+    });
+    function _bar() {
+      return _Foo;
+    }
+    function _method() {
+      return function inner() {
+        return _Foo;
+      };
+    }
+    function _method_shadowed() {
+      new _Foo();
+      return function inner() {
+        let Foo = 3;
+        return Foo;
+      };
+    }
+    const { bar, method, method_shadowed } = f.extract();
+    expect(bar()).toBe(f);
+    expect(method()()).toBe(f);
+    expect(method_shadowed()()).toBe(3);"
+  `);
 });
 
 test('private/static-self-method/exec.js [loose]', async () => {
@@ -62884,27 +62961,38 @@ test('private/static-self-method/exec.js [loose]', async () => {
       var _method_shadowed = '__private_Foo_method_shadowed';
       var _method = '__private_Foo_method';
       var _bar = '__private_Foo_bar';
-      function Foo() {
-        if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
-      }
+      const Foo = function Foo() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+      };
       Object.defineProperty(Foo, 'extract', {
-        value: function () {
-          return {
-            bar: _classPrivateFieldLooseBase(Foo, _bar)[_bar],
-            method: _classPrivateFieldLooseBase(Foo, _method)[_method],
-            method_shadowed: _classPrivateFieldLooseBase(Foo, _method_shadowed)[_method_shadowed],
-          };
-        },
+        value: Object.defineProperty(
+          function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            return {
+              bar: _classPrivateFieldLooseBase(Foo, _bar)[_bar],
+              method: _classPrivateFieldLooseBase(Foo, _method)[_method],
+              method_shadowed: _classPrivateFieldLooseBase(Foo, _method_shadowed)[_method_shadowed],
+            };
+          },
+          'name',
+          {
+            value: 'extract',
+            configurable: true,
+          },
+        ),
         writable: true,
         configurable: true,
       });
+      Object.defineProperty(Foo, 'prototype', { writable: false });
       Object.defineProperty(Foo, _bar, {
         value: function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
           return Foo;
         },
       });
       Object.defineProperty(Foo, _method, {
         value: function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
           return function inner() {
             return Foo;
           };
@@ -62912,6 +63000,7 @@ test('private/static-self-method/exec.js [loose]', async () => {
       });
       Object.defineProperty(Foo, _method_shadowed, {
         value: function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
           new Foo();
           return function inner() {
             let Foo = 3;
@@ -62940,7 +63029,25 @@ test('private/static-self-method/input.js [spec]', async () => {
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-spec-private-features-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _Foo;
+    const f = (_Foo = class Foo {});
+    function _bar() {
+      return _Foo;
+    }
+    function _method() {
+      return function inner() {
+        return _Foo;
+      };
+    }
+    function _method_shadowed() {
+      new _Foo();
+      return function inner() {
+        let Foo = 3;
+        return Foo;
+      };
+    }"
+  `);
 });
 
 test('private/static-self-method/input.js [loose]', async () => {
@@ -62961,16 +63068,19 @@ test('private/static-self-method/input.js [loose]', async () => {
       var _method_shadowed = '__private_Foo_method_shadowed';
       var _method = '__private_Foo_method';
       var _bar = '__private_Foo_bar';
-      function Foo() {
-        if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
-      }
+      const Foo = function Foo() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+      };
+      Object.defineProperty(Foo, 'prototype', { writable: false });
       Object.defineProperty(Foo, _bar, {
         value: function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
           return Foo;
         },
       });
       Object.defineProperty(Foo, _method, {
         value: function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
           return function inner() {
             return Foo;
           };
@@ -62978,6 +63088,7 @@ test('private/static-self-method/input.js [loose]', async () => {
       });
       Object.defineProperty(Foo, _method_shadowed, {
         value: function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
           new Foo();
           return function inner() {
             let Foo = 3;
@@ -63722,7 +63833,30 @@ test('private/tagged-template/exec.js [spec]', async () => {
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-spec-private-features-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
+    var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
+    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
+    var _classPrivateFieldGet = require('@babel/runtime/helpers/classPrivateFieldGet2');
+    var _Foo_brand = /* @__PURE__ */ new WeakSet();
+    var _tag2 = /* @__PURE__ */ new WeakMap();
+    class Foo {
+      constructor() {
+        _classPrivateMethodInitSpec(this, _Foo_brand);
+        _classPrivateFieldInitSpec(this, _tag2, function () {
+          return this;
+        });
+        const receiver = _assertClassBrand(_Foo_brand, this, _tag).bind(this)\`tagged template\`;
+        expect(receiver).toBe(this);
+        const receiver2 = _classPrivateFieldGet(_tag2, this).bind(this)\`tagged template\`;
+        expect(receiver2).toBe(this);
+      }
+    }
+    function _tag() {
+      return this;
+    }
+    new Foo();"
+  `);
 });
 
 test('private/tagged-template/exec.js [loose]', async () => {
@@ -63747,12 +63881,12 @@ test('private/tagged-template/exec.js [loose]', async () => {
     function _classPrivateMethodCall(e, s, a) {
       return _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s)[s].apply(e, a);
     }
-    var Foo = (() => {
+    let Foo = (() => {
       'use strict';
       var _tag = '__private_Foo_tag';
       var _tag2 = '__private_Foo_tag2';
-      function Foo() {
-        if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
+      const Foo = function Foo() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
         Object.defineProperty(this, _tag2, {
           writable: true,
           value: function () {
@@ -63761,6 +63895,7 @@ test('private/tagged-template/exec.js [loose]', async () => {
         });
         Object.defineProperty(this, _tag, {
           value: function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
             return this;
           },
         });
@@ -63768,7 +63903,8 @@ test('private/tagged-template/exec.js [loose]', async () => {
         expect(receiver).toBe(this);
         const receiver2 = _classPrivateFieldLooseBase(this, _tag2)[_tag2]\`tagged template\`;
         expect(receiver2).toBe(this);
-      }
+      };
+      Object.defineProperty(Foo, 'prototype', { writable: false });
       return Foo;
     })();
     new Foo();"
@@ -69481,7 +69617,28 @@ test('source-maps/private-get/input.js [spec]', async () => {
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-spec-private-features-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
+    var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
+    var _classPrivateFieldGet = require('@babel/runtime/helpers/classPrivateFieldGet2');
+    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
+    var _field = /* @__PURE__ */ new WeakMap();
+    var _A_brand = /* @__PURE__ */ new WeakSet();
+    class A {
+      constructor() {
+        _classPrivateMethodInitSpec(this, _A_brand);
+        _classPrivateFieldInitSpec(this, _field, void 0);
+      }
+      method() {
+        _classPrivateFieldGet(_field, this);
+        _get_getter.call(_assertClassBrand(_A_brand, this));
+        _assertClassBrand(_A_brand, this, _method);
+        inExpr(_classPrivateFieldGet(_field, this));
+      }
+    }
+    function _get_getter() {}
+    function _method() {}"
+  `);
 });
 
 test('source-maps/private-get/input.js [loose]', async () => {
@@ -69506,30 +69663,47 @@ test('source-maps/private-get/input.js [loose]', async () => {
     function _classPrivateMethodCall(e, s, a) {
       return _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s)[s].apply(e, a);
     }
-    var A = (() => {
+    let A = (() => {
       'use strict';
       var _field = '__private_A_field';
       var _getter = '__private_A_getter';
       var _method = '__private_A_method';
-      function A() {
-        if (!(this instanceof A)) throw new TypeError('Cannot call a class as a function');
+      const A = function A() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
         Object.defineProperty(this, _field, {
           writable: true,
           value: void 0,
         });
-        Object.defineProperty(this, _method, { value: function () {} });
-        Object.defineProperty(this, _getter, { get: function () {} });
-      }
+        Object.defineProperty(this, _method, {
+          value: function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          },
+        });
+        Object.defineProperty(this, _getter, {
+          get: function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          },
+        });
+      };
       Object.defineProperty(A.prototype, 'method', {
-        value: function () {
-          _classPrivateFieldLooseBase(this, _field)[_field];
-          _classPrivateFieldLooseBase(this, _getter)[_getter];
-          _classPrivateFieldLooseBase(this, _method)[_method];
-          inExpr(_classPrivateFieldLooseBase(this, _field)[_field]);
-        },
+        value: Object.defineProperty(
+          function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            _classPrivateFieldLooseBase(this, _field)[_field];
+            _classPrivateFieldLooseBase(this, _getter)[_getter];
+            _classPrivateFieldLooseBase(this, _method)[_method];
+            inExpr(_classPrivateFieldLooseBase(this, _field)[_field]);
+          },
+          'name',
+          {
+            value: 'method',
+            configurable: true,
+          },
+        ),
         writable: true,
         configurable: true,
       });
+      Object.defineProperty(A, 'prototype', { writable: false });
       return A;
     })();"
   `);
@@ -69547,7 +69721,27 @@ test('source-maps/private-set/input.js [spec]', async () => {
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-spec-private-features-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
+    var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
+    var _classPrivateFieldSet = require('@babel/runtime/helpers/classPrivateFieldSet2');
+    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
+    var _toSetter = require('@babel/runtime/helpers/toSetter');
+    var _field = /* @__PURE__ */ new WeakMap();
+    var _A_brand = /* @__PURE__ */ new WeakSet();
+    class A {
+      constructor() {
+        _classPrivateMethodInitSpec(this, _A_brand);
+        _classPrivateFieldInitSpec(this, _field, void 0);
+      }
+      method() {
+        _classPrivateFieldSet(_field, this, 42);
+        _toSetter(_set_setter.bind(_assertClassBrand(_A_brand, this)))._ = 43;
+        inExpr(_classPrivateFieldSet(_field, this, 5));
+      }
+    }
+    function _set_setter(value) {}"
+  `);
 });
 
 test('source-maps/private-set/input.js [loose]', async () => {
@@ -69572,27 +69766,40 @@ test('source-maps/private-set/input.js [loose]', async () => {
     function _classPrivateMethodCall(e, s, a) {
       return _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s)[s].apply(e, a);
     }
-    var A = (() => {
+    let A = (() => {
       'use strict';
       var _field = '__private_A_field';
       var _setter = '__private_A_setter';
-      function A() {
-        if (!(this instanceof A)) throw new TypeError('Cannot call a class as a function');
+      const A = function A() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
         Object.defineProperty(this, _field, {
           writable: true,
           value: void 0,
         });
-        Object.defineProperty(this, _setter, { set: function (value) {} });
-      }
+        Object.defineProperty(this, _setter, {
+          set: function (value) {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          },
+        });
+      };
       Object.defineProperty(A.prototype, 'method', {
-        value: function () {
-          _classPrivateFieldLooseBase(this, _field)[_field] = 42;
-          _classPrivateFieldLooseBase(this, _setter)[_setter] = 43;
-          inExpr((_classPrivateFieldLooseBase(this, _field)[_field] = 5));
-        },
+        value: Object.defineProperty(
+          function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            _classPrivateFieldLooseBase(this, _field)[_field] = 42;
+            _classPrivateFieldLooseBase(this, _setter)[_setter] = 43;
+            inExpr((_classPrivateFieldLooseBase(this, _field)[_field] = 5));
+          },
+          'name',
+          {
+            value: 'method',
+            configurable: true,
+          },
+        ),
         writable: true,
         configurable: true,
       });
+      Object.defineProperty(A, 'prototype', { writable: false });
       return A;
     })();"
   `);

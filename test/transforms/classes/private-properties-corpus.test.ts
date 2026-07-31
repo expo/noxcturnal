@@ -1213,23 +1213,32 @@ test('034 JS Private Properties > private instance field brand checks > basic #f
     }),
   ).toMatchInlineSnapshot(`
     "() => {
-      var Foo = (() => {
+      let Foo = (() => {
         'use strict';
         var _x = '__private_Foo_x';
-        function Foo() {
-          if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
+        const Foo = function Foo() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
           Object.defineProperty(this, _x, {
             writable: true,
             value: 1,
           });
-        }
+        };
         Object.defineProperty(Foo, 'check', {
-          value: function (obj) {
-            return Object.prototype.hasOwnProperty.call(obj, _x);
-          },
+          value: Object.defineProperty(
+            function (obj) {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              return Object.prototype.hasOwnProperty.call(obj, _x);
+            },
+            'name',
+            {
+              value: 'check',
+              configurable: true,
+            },
+          ),
           writable: true,
           configurable: true,
         });
+        Object.defineProperty(Foo, 'prototype', { writable: false });
         return Foo;
       })();
       expect(Foo.check(new Foo())).toBe(true);
@@ -1247,23 +1256,32 @@ test('035 JS Private Properties > private instance field brand checks > #field i
     }),
   ).toMatchInlineSnapshot(`
     "() => {
-      var Foo = (() => {
+      let Foo = (() => {
         'use strict';
         var _x = '__private_Foo_x';
-        function Foo() {
-          if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
+        const Foo = function Foo() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
           Object.defineProperty(this, _x, {
             writable: true,
             value: 1,
           });
-        }
+        };
         Object.defineProperty(Foo, 'check', {
-          value: function (obj) {
-            return Object.prototype.hasOwnProperty.call(obj, _x);
-          },
+          value: Object.defineProperty(
+            function (obj) {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              return Object.prototype.hasOwnProperty.call(obj, _x);
+            },
+            'name',
+            {
+              value: 'check',
+              configurable: true,
+            },
+          ),
           writable: true,
           configurable: true,
         });
+        Object.defineProperty(Foo, 'prototype', { writable: false });
         return Foo;
       })();
       expect(Foo.check({})).toBe(false);
@@ -1282,23 +1300,32 @@ test('036 JS Private Properties > private instance field brand checks > #field i
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseKey = require('@babel/runtime/helpers/classPrivateFieldLooseKey');
     () => {
-      var A = (() => {
+      let A = (() => {
         'use strict';
         var _x = '__private_A_x';
-        function A() {
-          if (!(this instanceof A)) throw new TypeError('Cannot call a class as a function');
+        const A = function A() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
           Object.defineProperty(this, _x, {
             writable: true,
             value: 1,
           });
-        }
+        };
         Object.defineProperty(A, 'check', {
-          value: function (obj) {
-            return Object.prototype.hasOwnProperty.call(obj, _x);
-          },
+          value: Object.defineProperty(
+            function (obj) {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              return Object.prototype.hasOwnProperty.call(obj, _x);
+            },
+            'name',
+            {
+              value: 'check',
+              configurable: true,
+            },
+          ),
           writable: true,
           configurable: true,
         });
+        Object.defineProperty(A, 'prototype', { writable: false });
         return A;
       })();
       var _x2 = /* @__PURE__ */ _classPrivateFieldLooseKey('x');
@@ -1325,12 +1352,12 @@ test('037 JS Private Properties > private instance field brand checks > multiple
     }),
   ).toMatchInlineSnapshot(`
     "() => {
-      var Foo = (() => {
+      let Foo = (() => {
         'use strict';
         var _a = '__private_Foo_a';
         var _b = '__private_Foo_b';
-        function Foo() {
-          if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
+        const Foo = function Foo() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
           Object.defineProperty(this, _a, {
             writable: true,
             value: 1,
@@ -1339,21 +1366,38 @@ test('037 JS Private Properties > private instance field brand checks > multiple
             writable: true,
             value: 2,
           });
-        }
+        };
         Object.defineProperty(Foo, 'checkA', {
-          value: function (obj) {
-            return Object.prototype.hasOwnProperty.call(obj, _a);
-          },
+          value: Object.defineProperty(
+            function (obj) {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              return Object.prototype.hasOwnProperty.call(obj, _a);
+            },
+            'name',
+            {
+              value: 'checkA',
+              configurable: true,
+            },
+          ),
           writable: true,
           configurable: true,
         });
         Object.defineProperty(Foo, 'checkB', {
-          value: function (obj) {
-            return Object.prototype.hasOwnProperty.call(obj, _b);
-          },
+          value: Object.defineProperty(
+            function (obj) {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              return Object.prototype.hasOwnProperty.call(obj, _b);
+            },
+            'name',
+            {
+              value: 'checkB',
+              configurable: true,
+            },
+          ),
           writable: true,
           configurable: true,
         });
+        Object.defineProperty(Foo, 'prototype', { writable: false });
         return Foo;
       })();
       const foo = new Foo();
@@ -1375,23 +1419,32 @@ test('038 JS Private Properties > private instance field brand checks > #field i
     }),
   ).toMatchInlineSnapshot(`
     "() => {
-      var Foo = (() => {
+      let Foo = (() => {
         'use strict';
         var _x = '__private_Foo_x';
-        function Foo() {
-          if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
+        const Foo = function Foo() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
           Object.defineProperty(this, _x, {
             writable: true,
             value: void 0,
           });
-        }
+        };
         Object.defineProperty(Foo, 'check', {
-          value: function (obj) {
-            return Object.prototype.hasOwnProperty.call(obj, _x);
-          },
+          value: Object.defineProperty(
+            function (obj) {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              return Object.prototype.hasOwnProperty.call(obj, _x);
+            },
+            'name',
+            {
+              value: 'check',
+              configurable: true,
+            },
+          ),
           writable: true,
           configurable: true,
         });
+        Object.defineProperty(Foo, 'prototype', { writable: false });
         return Foo;
       })();
       expect(Foo.check(new Foo())).toBe(true);
@@ -1409,23 +1462,32 @@ test('039 JS Private Properties > private instance field brand checks > instance
     }),
   ).toMatchInlineSnapshot(`
     "() => {
-      var Foo = (() => {
+      let Foo = (() => {
         'use strict';
         var _x = '__private_Foo_x';
-        function Foo() {
-          if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
+        const Foo = function Foo() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
           Object.defineProperty(this, _x, {
             writable: true,
             value: 1,
           });
-        }
+        };
         Object.defineProperty(Foo.prototype, 'isFoo', {
-          value: function (obj) {
-            return Object.prototype.hasOwnProperty.call(obj, _x);
-          },
+          value: Object.defineProperty(
+            function (obj) {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              return Object.prototype.hasOwnProperty.call(obj, _x);
+            },
+            'name',
+            {
+              value: 'isFoo',
+              configurable: true,
+            },
+          ),
           writable: true,
           configurable: true,
         });
+        Object.defineProperty(Foo, 'prototype', { writable: false });
         return Foo;
       })();
       const foo = new Foo();
@@ -1511,19 +1573,28 @@ test('046 JS Private Properties > private static field brand checks > #staticFie
     }),
   ).toMatchInlineSnapshot(`
     "() => {
-      var Foo = (() => {
+      let Foo = (() => {
         'use strict';
         var _x = '__private_Foo_x';
-        function Foo() {
-          if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
-        }
+        const Foo = function Foo() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
         Object.defineProperty(Foo, 'check', {
-          value: function (obj) {
-            return Object.prototype.hasOwnProperty.call(obj, _x);
-          },
+          value: Object.defineProperty(
+            function (obj) {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              return Object.prototype.hasOwnProperty.call(obj, _x);
+            },
+            'name',
+            {
+              value: 'check',
+              configurable: true,
+            },
+          ),
           writable: true,
           configurable: true,
         });
+        Object.defineProperty(Foo, 'prototype', { writable: false });
         Object.defineProperty(Foo, _x, {
           writable: true,
           value: 1,
@@ -1545,19 +1616,28 @@ test('047 JS Private Properties > private static field brand checks > #staticFie
     }),
   ).toMatchInlineSnapshot(`
     "() => {
-      var Foo = (() => {
+      let Foo = (() => {
         'use strict';
         var _x = '__private_Foo_x';
-        function Foo() {
-          if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
-        }
+        const Foo = function Foo() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
         Object.defineProperty(Foo, 'check', {
-          value: function (obj) {
-            return Object.prototype.hasOwnProperty.call(obj, _x);
-          },
+          value: Object.defineProperty(
+            function (obj) {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              return Object.prototype.hasOwnProperty.call(obj, _x);
+            },
+            'name',
+            {
+              value: 'check',
+              configurable: true,
+            },
+          ),
           writable: true,
           configurable: true,
         });
+        Object.defineProperty(Foo, 'prototype', { writable: false });
         Object.defineProperty(Foo, _x, {
           writable: true,
           value: 1,
@@ -1579,19 +1659,28 @@ test('048 JS Private Properties > private static field brand checks > #staticFie
     }),
   ).toMatchInlineSnapshot(`
     "() => {
-      var Foo = (() => {
+      let Foo = (() => {
         'use strict';
         var _x = '__private_Foo_x';
-        function Foo() {
-          if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
-        }
+        const Foo = function Foo() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
         Object.defineProperty(Foo, 'check', {
-          value: function (obj) {
-            return Object.prototype.hasOwnProperty.call(obj, _x);
-          },
+          value: Object.defineProperty(
+            function (obj) {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              return Object.prototype.hasOwnProperty.call(obj, _x);
+            },
+            'name',
+            {
+              value: 'check',
+              configurable: true,
+            },
+          ),
           writable: true,
           configurable: true,
         });
+        Object.defineProperty(Foo, 'prototype', { writable: false });
         Object.defineProperty(Foo, _x, {
           writable: true,
           value: 1,
@@ -1646,23 +1735,32 @@ test('052 JS Private Properties > RHS not an object > throws TypeError for numbe
     }),
   ).toMatchInlineSnapshot(`
     "() => {
-      var Foo = (() => {
+      let Foo = (() => {
         'use strict';
         var _x = '__private_Foo_x';
-        function Foo() {
-          if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
+        const Foo = function Foo() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
           Object.defineProperty(this, _x, {
             writable: true,
             value: 1,
           });
-        }
+        };
         Object.defineProperty(Foo, 'check', {
-          value: function (obj) {
-            return Object.prototype.hasOwnProperty.call(obj, _x);
-          },
+          value: Object.defineProperty(
+            function (obj) {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              return Object.prototype.hasOwnProperty.call(obj, _x);
+            },
+            'name',
+            {
+              value: 'check',
+              configurable: true,
+            },
+          ),
           writable: true,
           configurable: true,
         });
+        Object.defineProperty(Foo, 'prototype', { writable: false });
         return Foo;
       })();
       expect(() => Foo.check(42)).toThrow();
@@ -1680,23 +1778,32 @@ test('053 JS Private Properties > RHS not an object > throws TypeError for strin
     }),
   ).toMatchInlineSnapshot(`
     "() => {
-      var Foo = (() => {
+      let Foo = (() => {
         'use strict';
         var _x = '__private_Foo_x';
-        function Foo() {
-          if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
+        const Foo = function Foo() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
           Object.defineProperty(this, _x, {
             writable: true,
             value: 1,
           });
-        }
+        };
         Object.defineProperty(Foo, 'check', {
-          value: function (obj) {
-            return Object.prototype.hasOwnProperty.call(obj, _x);
-          },
+          value: Object.defineProperty(
+            function (obj) {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              return Object.prototype.hasOwnProperty.call(obj, _x);
+            },
+            'name',
+            {
+              value: 'check',
+              configurable: true,
+            },
+          ),
           writable: true,
           configurable: true,
         });
+        Object.defineProperty(Foo, 'prototype', { writable: false });
         return Foo;
       })();
       expect(() => Foo.check('hello')).toThrow();
@@ -1714,23 +1821,32 @@ test('054 JS Private Properties > RHS not an object > throws TypeError for boole
     }),
   ).toMatchInlineSnapshot(`
     "() => {
-      var Foo = (() => {
+      let Foo = (() => {
         'use strict';
         var _x = '__private_Foo_x';
-        function Foo() {
-          if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
+        const Foo = function Foo() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
           Object.defineProperty(this, _x, {
             writable: true,
             value: 1,
           });
-        }
+        };
         Object.defineProperty(Foo, 'check', {
-          value: function (obj) {
-            return Object.prototype.hasOwnProperty.call(obj, _x);
-          },
+          value: Object.defineProperty(
+            function (obj) {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              return Object.prototype.hasOwnProperty.call(obj, _x);
+            },
+            'name',
+            {
+              value: 'check',
+              configurable: true,
+            },
+          ),
           writable: true,
           configurable: true,
         });
+        Object.defineProperty(Foo, 'prototype', { writable: false });
         return Foo;
       })();
       expect(() => Foo.check(true)).toThrow();
@@ -1748,23 +1864,32 @@ test('055 JS Private Properties > RHS not an object > throws TypeError for undef
     }),
   ).toMatchInlineSnapshot(`
     "() => {
-      var Foo = (() => {
+      let Foo = (() => {
         'use strict';
         var _x = '__private_Foo_x';
-        function Foo() {
-          if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
+        const Foo = function Foo() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
           Object.defineProperty(this, _x, {
             writable: true,
             value: 1,
           });
-        }
+        };
         Object.defineProperty(Foo, 'check', {
-          value: function (obj) {
-            return Object.prototype.hasOwnProperty.call(obj, _x);
-          },
+          value: Object.defineProperty(
+            function (obj) {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              return Object.prototype.hasOwnProperty.call(obj, _x);
+            },
+            'name',
+            {
+              value: 'check',
+              configurable: true,
+            },
+          ),
           writable: true,
           configurable: true,
         });
+        Object.defineProperty(Foo, 'prototype', { writable: false });
         return Foo;
       })();
       expect(() => Foo.check(undefined)).toThrow();
@@ -1782,23 +1907,32 @@ test('056 JS Private Properties > RHS not an object > throws TypeError for null'
     }),
   ).toMatchInlineSnapshot(`
     "() => {
-      var Foo = (() => {
+      let Foo = (() => {
         'use strict';
         var _x = '__private_Foo_x';
-        function Foo() {
-          if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
+        const Foo = function Foo() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
           Object.defineProperty(this, _x, {
             writable: true,
             value: 1,
           });
-        }
+        };
         Object.defineProperty(Foo, 'check', {
-          value: function (obj) {
-            return Object.prototype.hasOwnProperty.call(obj, _x);
-          },
+          value: Object.defineProperty(
+            function (obj) {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              return Object.prototype.hasOwnProperty.call(obj, _x);
+            },
+            'name',
+            {
+              value: 'check',
+              configurable: true,
+            },
+          ),
           writable: true,
           configurable: true,
         });
+        Object.defineProperty(Foo, 'prototype', { writable: false });
         return Foo;
       })();
       expect(() => Foo.check(null)).toThrow();
@@ -1816,23 +1950,32 @@ test('057 JS Private Properties > RHS not an object > throws TypeError for symbo
     }),
   ).toMatchInlineSnapshot(`
     "() => {
-      var Foo = (() => {
+      let Foo = (() => {
         'use strict';
         var _x = '__private_Foo_x';
-        function Foo() {
-          if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
+        const Foo = function Foo() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
           Object.defineProperty(this, _x, {
             writable: true,
             value: 1,
           });
-        }
+        };
         Object.defineProperty(Foo, 'check', {
-          value: function (obj) {
-            return Object.prototype.hasOwnProperty.call(obj, _x);
-          },
+          value: Object.defineProperty(
+            function (obj) {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              return Object.prototype.hasOwnProperty.call(obj, _x);
+            },
+            'name',
+            {
+              value: 'check',
+              configurable: true,
+            },
+          ),
           writable: true,
           configurable: true,
         });
+        Object.defineProperty(Foo, 'prototype', { writable: false });
         return Foo;
       })();
       expect(() => Foo.check(Symbol('test'))).toThrow();
@@ -1850,19 +1993,28 @@ test('058 JS Private Properties > RHS not an object > throws for static private 
     }),
   ).toMatchInlineSnapshot(`
     "() => {
-      var Foo = (() => {
+      let Foo = (() => {
         'use strict';
         var _x = '__private_Foo_x';
-        function Foo() {
-          if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
-        }
+        const Foo = function Foo() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
         Object.defineProperty(Foo, 'check', {
-          value: function (obj) {
-            return Object.prototype.hasOwnProperty.call(obj, _x);
-          },
+          value: Object.defineProperty(
+            function (obj) {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              return Object.prototype.hasOwnProperty.call(obj, _x);
+            },
+            'name',
+            {
+              value: 'check',
+              configurable: true,
+            },
+          ),
           writable: true,
           configurable: true,
         });
+        Object.defineProperty(Foo, 'prototype', { writable: false });
         Object.defineProperty(Foo, _x, {
           writable: true,
           value: 1,
@@ -1897,24 +2049,33 @@ test('060 JS Private Properties > class name shadowing > static private field ch
     }),
   ).toMatchInlineSnapshot(`
     "() => {
-      var Test = (() => {
+      let Test = (() => {
         'use strict';
         var _x = '__private_Test_x';
-        function Test() {
-          if (!(this instanceof Test)) throw new TypeError('Cannot call a class as a function');
-        }
+        const Test = function Test() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
         Object.defineProperty(Test.prototype, 'method', {
-          value: function (other) {
-            const Test = 2;
-            const func = () => {
-              const Test = 3;
-              return Object.prototype.hasOwnProperty.call(other, _x) && Test;
-            };
-            return func() + Test;
-          },
+          value: Object.defineProperty(
+            function (other) {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              const Test = 2;
+              const func = () => {
+                const Test = 3;
+                return Object.prototype.hasOwnProperty.call(other, _x) && Test;
+              };
+              return func() + Test;
+            },
+            'name',
+            {
+              value: 'method',
+              configurable: true,
+            },
+          ),
           writable: true,
           configurable: true,
         });
+        Object.defineProperty(Test, 'prototype', { writable: false });
         Object.defineProperty(Test, _x, {
           writable: true,
           value: 1,
@@ -1937,24 +2098,33 @@ test('061 JS Private Properties > class name shadowing > instance private field 
     }),
   ).toMatchInlineSnapshot(`
     "() => {
-      var Foo = (() => {
+      let Foo = (() => {
         'use strict';
         var _x = '__private_Foo_x';
-        function Foo() {
-          if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
+        const Foo = function Foo() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
           Object.defineProperty(this, _x, {
             writable: true,
             value: 1,
           });
-        }
+        };
         Object.defineProperty(Foo.prototype, 'check', {
-          value: function (obj) {
-            const Foo = 'shadowed';
-            return Object.prototype.hasOwnProperty.call(obj, _x);
-          },
+          value: Object.defineProperty(
+            function (obj) {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              const Foo = 'shadowed';
+              return Object.prototype.hasOwnProperty.call(obj, _x);
+            },
+            'name',
+            {
+              value: 'check',
+              configurable: true,
+            },
+          ),
           writable: true,
           configurable: true,
         });
+        Object.defineProperty(Foo, 'prototype', { writable: false });
         return Foo;
       })();
       const foo = new Foo();
@@ -1974,23 +2144,32 @@ test('062 JS Private Properties > inheritance > #field in subclass instance retu
     }),
   ).toMatchInlineSnapshot(`
     "() => {
-      var Base = (() => {
+      let Base = (() => {
         'use strict';
         var _x = '__private_Base_x';
-        function Base() {
-          if (!(this instanceof Base)) throw new TypeError('Cannot call a class as a function');
+        const Base = function Base() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
           Object.defineProperty(this, _x, {
             writable: true,
             value: 1,
           });
-        }
+        };
         Object.defineProperty(Base, 'check', {
-          value: function (obj) {
-            return Object.prototype.hasOwnProperty.call(obj, _x);
-          },
+          value: Object.defineProperty(
+            function (obj) {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              return Object.prototype.hasOwnProperty.call(obj, _x);
+            },
+            'name',
+            {
+              value: 'check',
+              configurable: true,
+            },
+          ),
           writable: true,
           configurable: true,
         });
+        Object.defineProperty(Base, 'prototype', { writable: false });
         return Base;
       })();
       class Child extends Base {}
@@ -2014,31 +2193,40 @@ test('063 JS Private Properties > inheritance > subclass private field is indepe
       return _construct2.construct(t, r, c);
     }
     () => {
-      var Base = (() => {
+      let Base = (() => {
         'use strict';
         var _x = '__private_Base_x';
-        function Base() {
-          if (!(this instanceof Base)) throw new TypeError('Cannot call a class as a function');
+        const Base = function Base() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
           Object.defineProperty(this, _x, {
             writable: true,
             value: 1,
           });
-        }
+        };
         Object.defineProperty(Base, 'checkBase', {
-          value: function (obj) {
-            return Object.prototype.hasOwnProperty.call(obj, _x);
-          },
+          value: Object.defineProperty(
+            function (obj) {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              return Object.prototype.hasOwnProperty.call(obj, _x);
+            },
+            'name',
+            {
+              value: 'checkBase',
+              configurable: true,
+            },
+          ),
           writable: true,
           configurable: true,
         });
+        Object.defineProperty(Base, 'prototype', { writable: false });
         return Base;
       })();
-      var Child = (() => {
+      let Child = (__nox_super_141_272 => {
         'use strict';
         var _y = '__private_Child_y';
-        function Child() {
-          if (!(this instanceof Child)) throw new TypeError('Cannot call a class as a function');
-          var _this = _construct(Base, arguments, new.target || Child);
+        const Child = function Child() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+          var _this = _construct(__nox_super_141_272, arguments, new.target || Child);
           (function () {
             Object.defineProperty(this, _y, {
               writable: true,
@@ -2046,25 +2234,36 @@ test('063 JS Private Properties > inheritance > subclass private field is indepe
             });
           }).call(_this);
           return _this;
-        }
-        if (Object.setPrototypeOf) Object.setPrototypeOf(Child, Base);
-        else Child.__proto__ = Base;
-        Child.prototype = Object.create(Base && Base.prototype, {
+        };
+        if (__nox_super_141_272 !== null && typeof __nox_super_141_272 !== 'function')
+          throw new TypeError('Super expression must either be null or a function');
+        Child.prototype = Object.create(__nox_super_141_272 && __nox_super_141_272.prototype, {
           constructor: {
             value: Child,
             writable: true,
             configurable: true,
           },
         });
+        if (Object.setPrototypeOf) Object.setPrototypeOf(Child, __nox_super_141_272);
+        else Child.__proto__ = __nox_super_141_272;
         Object.defineProperty(Child, 'checkChild', {
-          value: function (obj) {
-            return Object.prototype.hasOwnProperty.call(obj, _y);
-          },
+          value: Object.defineProperty(
+            function (obj) {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              return Object.prototype.hasOwnProperty.call(obj, _y);
+            },
+            'name',
+            {
+              value: 'checkChild',
+              configurable: true,
+            },
+          ),
           writable: true,
           configurable: true,
         });
+        Object.defineProperty(Child, 'prototype', { writable: false });
         return Child;
-      })();
+      })(Base);
       const child = new Child();
       expect(Base.checkBase(child)).toBe(true);
       expect(Child.checkChild(child)).toBe(true);
@@ -2083,19 +2282,28 @@ test('064 JS Private Properties > inheritance > #staticField in subclass returns
     }),
   ).toMatchInlineSnapshot(`
     "() => {
-      var Base = (() => {
+      let Base = (() => {
         'use strict';
         var _x = '__private_Base_x';
-        function Base() {
-          if (!(this instanceof Base)) throw new TypeError('Cannot call a class as a function');
-        }
+        const Base = function Base() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
         Object.defineProperty(Base, 'check', {
-          value: function (obj) {
-            return Object.prototype.hasOwnProperty.call(obj, _x);
-          },
+          value: Object.defineProperty(
+            function (obj) {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              return Object.prototype.hasOwnProperty.call(obj, _x);
+            },
+            'name',
+            {
+              value: 'check',
+              configurable: true,
+            },
+          ),
           writable: true,
           configurable: true,
         });
+        Object.defineProperty(Base, 'prototype', { writable: false });
         Object.defineProperty(Base, _x, {
           writable: true,
           value: 1,
@@ -2131,23 +2339,32 @@ test('066 JS Private Properties > usage in expressions > negation: !(#field in o
     }),
   ).toMatchInlineSnapshot(`
     "() => {
-      var Foo = (() => {
+      let Foo = (() => {
         'use strict';
         var _x = '__private_Foo_x';
-        function Foo() {
-          if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
+        const Foo = function Foo() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
           Object.defineProperty(this, _x, {
             writable: true,
             value: 1,
           });
-        }
+        };
         Object.defineProperty(Foo, 'notFoo', {
-          value: function (obj) {
-            return !Object.prototype.hasOwnProperty.call(obj, _x);
-          },
+          value: Object.defineProperty(
+            function (obj) {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              return !Object.prototype.hasOwnProperty.call(obj, _x);
+            },
+            'name',
+            {
+              value: 'notFoo',
+              configurable: true,
+            },
+          ),
           writable: true,
           configurable: true,
         });
+        Object.defineProperty(Foo, 'prototype', { writable: false });
         return Foo;
       })();
       expect(Foo.notFoo(new Foo())).toBe(false);
@@ -2166,23 +2383,32 @@ test('067 JS Private Properties > usage in expressions > ternary: #field in obj 
     }),
   ).toMatchInlineSnapshot(`
     "() => {
-      var Foo = (() => {
+      let Foo = (() => {
         'use strict';
         var _x = '__private_Foo_x';
-        function Foo() {
-          if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
+        const Foo = function Foo() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
           Object.defineProperty(this, _x, {
             writable: true,
             value: 1,
           });
-        }
+        };
         Object.defineProperty(Foo, 'label', {
-          value: function (obj) {
-            return Object.prototype.hasOwnProperty.call(obj, _x) ? 'foo' : 'not foo';
-          },
+          value: Object.defineProperty(
+            function (obj) {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              return Object.prototype.hasOwnProperty.call(obj, _x) ? 'foo' : 'not foo';
+            },
+            'name',
+            {
+              value: 'label',
+              configurable: true,
+            },
+          ),
           writable: true,
           configurable: true,
         });
+        Object.defineProperty(Foo, 'prototype', { writable: false });
         return Foo;
       })();
       expect(Foo.label(new Foo())).toBe('foo');
@@ -2201,23 +2427,32 @@ test('068 JS Private Properties > usage in expressions > logical AND: #field in 
     }),
   ).toMatchInlineSnapshot(`
     "() => {
-      var Foo = (() => {
+      let Foo = (() => {
         'use strict';
         var _x = '__private_Foo_x';
-        function Foo() {
-          if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
+        const Foo = function Foo() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
           Object.defineProperty(this, _x, {
             writable: true,
             value: 1,
           });
-        }
+        };
         Object.defineProperty(Foo, 'check', {
-          value: function (obj) {
-            return Object.prototype.hasOwnProperty.call(obj, _x) && 'yes';
-          },
+          value: Object.defineProperty(
+            function (obj) {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              return Object.prototype.hasOwnProperty.call(obj, _x) && 'yes';
+            },
+            'name',
+            {
+              value: 'check',
+              configurable: true,
+            },
+          ),
           writable: true,
           configurable: true,
         });
+        Object.defineProperty(Foo, 'prototype', { writable: false });
         return Foo;
       })();
       expect(Foo.check(new Foo())).toBe('yes');
@@ -2236,23 +2471,32 @@ test('069 JS Private Properties > usage in expressions > logical OR: #field in o
     }),
   ).toMatchInlineSnapshot(`
     "() => {
-      var Foo = (() => {
+      let Foo = (() => {
         'use strict';
         var _x = '__private_Foo_x';
-        function Foo() {
-          if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
+        const Foo = function Foo() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
           Object.defineProperty(this, _x, {
             writable: true,
             value: 1,
           });
-        }
+        };
         Object.defineProperty(Foo, 'check', {
-          value: function (obj) {
-            return Object.prototype.hasOwnProperty.call(obj, _x) || 'fallback';
-          },
+          value: Object.defineProperty(
+            function (obj) {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              return Object.prototype.hasOwnProperty.call(obj, _x) || 'fallback';
+            },
+            'name',
+            {
+              value: 'check',
+              configurable: true,
+            },
+          ),
           writable: true,
           configurable: true,
         });
+        Object.defineProperty(Foo, 'prototype', { writable: false });
         return Foo;
       })();
       expect(Foo.check(new Foo())).toBe(true);
@@ -2271,27 +2515,36 @@ test('070 JS Private Properties > usage in expressions > if/else with brand chec
     }),
   ).toMatchInlineSnapshot(`
     "() => {
-      var Foo = (() => {
+      let Foo = (() => {
         'use strict';
         var _x = '__private_Foo_x';
-        function Foo() {
-          if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
+        const Foo = function Foo() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
           Object.defineProperty(this, _x, {
             writable: true,
             value: 1,
           });
-        }
+        };
         Object.defineProperty(Foo, 'describe', {
-          value: function (obj) {
-            if (Object.prototype.hasOwnProperty.call(obj, _x)) {
-              return 'is Foo';
-            } else {
-              return 'not Foo';
-            }
-          },
+          value: Object.defineProperty(
+            function (obj) {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              if (Object.prototype.hasOwnProperty.call(obj, _x)) {
+                return 'is Foo';
+              } else {
+                return 'not Foo';
+              }
+            },
+            'name',
+            {
+              value: 'describe',
+              configurable: true,
+            },
+          ),
           writable: true,
           configurable: true,
         });
+        Object.defineProperty(Foo, 'prototype', { writable: false });
         return Foo;
       })();
       expect(Foo.describe(new Foo())).toBe('is Foo');
@@ -2310,23 +2563,32 @@ test('071 JS Private Properties > usage in expressions > brand check in while lo
     }),
   ).toMatchInlineSnapshot(`
     "() => {
-      var Foo = (() => {
+      let Foo = (() => {
         'use strict';
         var _x = '__private_Foo_x';
-        function Foo() {
-          if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
+        const Foo = function Foo() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
           Object.defineProperty(this, _x, {
             writable: true,
             value: 1,
           });
-        }
+        };
         Object.defineProperty(Foo, 'check', {
-          value: function (obj) {
-            return Object.prototype.hasOwnProperty.call(obj, _x);
-          },
+          value: Object.defineProperty(
+            function (obj) {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              return Object.prototype.hasOwnProperty.call(obj, _x);
+            },
+            'name',
+            {
+              value: 'check',
+              configurable: true,
+            },
+          ),
           writable: true,
           configurable: true,
         });
+        Object.defineProperty(Foo, 'prototype', { writable: false });
         return Foo;
       })();
       const items = [{}, new Foo(), {}, new Foo(), {}];
@@ -2349,23 +2611,32 @@ test('072 JS Private Properties > usage in expressions > brand check with nullis
     }),
   ).toMatchInlineSnapshot(`
     "() => {
-      var Foo = (() => {
+      let Foo = (() => {
         'use strict';
         var _x = '__private_Foo_x';
-        function Foo() {
-          if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
+        const Foo = function Foo() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
           Object.defineProperty(this, _x, {
             writable: true,
             value: 1,
           });
-        }
+        };
         Object.defineProperty(Foo, 'check', {
-          value: function (obj) {
-            return Object.prototype.hasOwnProperty.call(obj, _x) ?? 'never';
-          },
+          value: Object.defineProperty(
+            function (obj) {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              return Object.prototype.hasOwnProperty.call(obj, _x) ?? 'never';
+            },
+            'name',
+            {
+              value: 'check',
+              configurable: true,
+            },
+          ),
           writable: true,
           configurable: true,
         });
+        Object.defineProperty(Foo, 'prototype', { writable: false });
         return Foo;
       })();
       // #x in obj always returns boolean, never nullish
@@ -2394,28 +2665,37 @@ test('073 JS Private Properties > practical patterns > static factory with brand
       return _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s)[s].apply(e, a);
     }
     () => {
-      var MyClass = (() => {
+      let MyClass = (() => {
         'use strict';
         var _brand = '__private_MyClass_brand';
-        function MyClass() {
-          if (!(this instanceof MyClass)) throw new TypeError('Cannot call a class as a function');
+        const MyClass = function MyClass() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
           Object.defineProperty(this, _brand, {
             writable: true,
             value: void 0,
           });
           _classPrivateFieldLooseBase(this, _brand)[_brand] = undefined;
-        }
+        };
         Object.defineProperty(MyClass, 'isMyClass', {
-          value: function (obj) {
-            try {
-              return Object.prototype.hasOwnProperty.call(obj, _brand);
-            } catch {
-              return false;
-            }
-          },
+          value: Object.defineProperty(
+            function (obj) {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              try {
+                return Object.prototype.hasOwnProperty.call(obj, _brand);
+              } catch {
+                return false;
+              }
+            },
+            'name',
+            {
+              value: 'isMyClass',
+              configurable: true,
+            },
+          ),
           writable: true,
           configurable: true,
         });
+        Object.defineProperty(MyClass, 'prototype', { writable: false });
         return MyClass;
       })();
       expect(MyClass.isMyClass(new MyClass())).toBe(true);
@@ -2445,38 +2725,55 @@ test('074 JS Private Properties > practical patterns > safe unwrap pattern', asy
       return _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s)[s].apply(e, a);
     }
     () => {
-      var Wrapper = (() => {
+      let Wrapper = (() => {
         'use strict';
         var _value = '__private_Wrapper_value';
-        function Wrapper(value) {
-          if (!(this instanceof Wrapper)) throw new TypeError('Cannot call a class as a function');
+        const Wrapper = function Wrapper(value) {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
           Object.defineProperty(this, _value, {
             writable: true,
             value: void 0,
           });
           _classPrivateFieldLooseBase(this, _value)[_value] = value;
-        }
+        };
         Object.defineProperty(Wrapper, 'unwrap', {
-          value: function (obj) {
-            if (
-              typeof obj === 'object' &&
-              obj !== null &&
-              Object.prototype.hasOwnProperty.call(obj, _value)
-            ) {
-              return obj.getValue();
-            }
-            return obj;
-          },
+          value: Object.defineProperty(
+            function (obj) {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              if (
+                typeof obj === 'object' &&
+                obj !== null &&
+                Object.prototype.hasOwnProperty.call(obj, _value)
+              ) {
+                return obj.getValue();
+              }
+              return obj;
+            },
+            'name',
+            {
+              value: 'unwrap',
+              configurable: true,
+            },
+          ),
           writable: true,
           configurable: true,
         });
         Object.defineProperty(Wrapper.prototype, 'getValue', {
-          value: function () {
-            return _classPrivateFieldLooseBase(this, _value)[_value];
-          },
+          value: Object.defineProperty(
+            function () {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              return _classPrivateFieldLooseBase(this, _value)[_value];
+            },
+            'name',
+            {
+              value: 'getValue',
+              configurable: true,
+            },
+          ),
           writable: true,
           configurable: true,
         });
+        Object.defineProperty(Wrapper, 'prototype', { writable: false });
         return Wrapper;
       })();
       expect(Wrapper.unwrap(new Wrapper(42))).toBe(42);
@@ -2496,42 +2793,60 @@ test('075 JS Private Properties > practical patterns > type narrowing with multi
     }),
   ).toMatchInlineSnapshot(`
     "() => {
-      var Dog = (() => {
+      let Dog = (() => {
         'use strict';
         var _bark = '__private_Dog_bark';
-        function Dog() {
-          if (!(this instanceof Dog)) throw new TypeError('Cannot call a class as a function');
+        const Dog = function Dog() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
           Object.defineProperty(this, _bark, {
             writable: true,
             value: true,
           });
-        }
+        };
         Object.defineProperty(Dog, 'isDog', {
-          value: function (obj) {
-            return Object.prototype.hasOwnProperty.call(obj, _bark);
-          },
+          value: Object.defineProperty(
+            function (obj) {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              return Object.prototype.hasOwnProperty.call(obj, _bark);
+            },
+            'name',
+            {
+              value: 'isDog',
+              configurable: true,
+            },
+          ),
           writable: true,
           configurable: true,
         });
+        Object.defineProperty(Dog, 'prototype', { writable: false });
         return Dog;
       })();
-      var Cat = (() => {
+      let Cat = (() => {
         'use strict';
         var _meow = '__private_Cat_meow';
-        function Cat() {
-          if (!(this instanceof Cat)) throw new TypeError('Cannot call a class as a function');
+        const Cat = function Cat() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
           Object.defineProperty(this, _meow, {
             writable: true,
             value: true,
           });
-        }
+        };
         Object.defineProperty(Cat, 'isCat', {
-          value: function (obj) {
-            return Object.prototype.hasOwnProperty.call(obj, _meow);
-          },
+          value: Object.defineProperty(
+            function (obj) {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              return Object.prototype.hasOwnProperty.call(obj, _meow);
+            },
+            'name',
+            {
+              value: 'isCat',
+              configurable: true,
+            },
+          ),
           writable: true,
           configurable: true,
         });
+        Object.defineProperty(Cat, 'prototype', { writable: false });
         return Cat;
       })();
       const dog = new Dog();
@@ -2554,27 +2869,36 @@ test('076 JS Private Properties > practical patterns > filtering an array by bra
     }),
   ).toMatchInlineSnapshot(`
     "() => {
-      var Special = (() => {
+      let Special = (() => {
         'use strict';
         var _mark = '__private_Special_mark';
-        function Special() {
-          if (!(this instanceof Special)) throw new TypeError('Cannot call a class as a function');
+        const Special = function Special() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
           Object.defineProperty(this, _mark, {
             writable: true,
             value: true,
           });
-        }
+        };
         Object.defineProperty(Special, 'is', {
-          value: function (obj) {
-            return (
-              typeof obj === 'object' &&
-              obj !== null &&
-              Object.prototype.hasOwnProperty.call(obj, _mark)
-            );
-          },
+          value: Object.defineProperty(
+            function (obj) {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              return (
+                typeof obj === 'object' &&
+                obj !== null &&
+                Object.prototype.hasOwnProperty.call(obj, _mark)
+              );
+            },
+            'name',
+            {
+              value: 'is',
+              configurable: true,
+            },
+          ),
           writable: true,
           configurable: true,
         });
+        Object.defineProperty(Special, 'prototype', { writable: false });
         return Special;
       })();
       const items = [new Special(), {}, new Special(), 42, null, new Special()];
@@ -2597,42 +2921,60 @@ test('077 JS Private Properties > cross-class isolation > same field name in dif
     }),
   ).toMatchInlineSnapshot(`
     "() => {
-      var A = (() => {
+      let A = (() => {
         'use strict';
         var _x = '__private_A_x';
-        function A() {
-          if (!(this instanceof A)) throw new TypeError('Cannot call a class as a function');
+        const A = function A() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
           Object.defineProperty(this, _x, {
             writable: true,
             value: 1,
           });
-        }
+        };
         Object.defineProperty(A, 'check', {
-          value: function (obj) {
-            return Object.prototype.hasOwnProperty.call(obj, _x);
-          },
+          value: Object.defineProperty(
+            function (obj) {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              return Object.prototype.hasOwnProperty.call(obj, _x);
+            },
+            'name',
+            {
+              value: 'check',
+              configurable: true,
+            },
+          ),
           writable: true,
           configurable: true,
         });
+        Object.defineProperty(A, 'prototype', { writable: false });
         return A;
       })();
-      var B = (() => {
+      let B = (() => {
         'use strict';
         var _x13 = '__private_B_x';
-        function B() {
-          if (!(this instanceof B)) throw new TypeError('Cannot call a class as a function');
+        const B = function B() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
           Object.defineProperty(this, _x13, {
             writable: true,
             value: 2,
           });
-        }
+        };
         Object.defineProperty(B, 'check', {
-          value: function (obj) {
-            return Object.prototype.hasOwnProperty.call(obj, _x13);
-          },
+          value: Object.defineProperty(
+            function (obj) {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              return Object.prototype.hasOwnProperty.call(obj, _x13);
+            },
+            'name',
+            {
+              value: 'check',
+              configurable: true,
+            },
+          ),
           writable: true,
           configurable: true,
         });
+        Object.defineProperty(B, 'prototype', { writable: false });
         return B;
       })();
       const a = new A();
@@ -2655,48 +2997,74 @@ test('078 JS Private Properties > cross-class isolation > nested class brand che
     }),
   ).toMatchInlineSnapshot(`
     "() => {
-      var Outer = (() => {
+      let Outer = (() => {
         'use strict';
         var _x = '__private_Outer_x';
-        function Outer() {
-          if (!(this instanceof Outer)) throw new TypeError('Cannot call a class as a function');
+        const Outer = function Outer() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
           Object.defineProperty(this, _x, {
             writable: true,
             value: 1,
           });
-        }
+        };
         Object.defineProperty(Outer, 'check', {
-          value: function (obj) {
-            return Object.prototype.hasOwnProperty.call(obj, _x);
-          },
+          value: Object.defineProperty(
+            function (obj) {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              return Object.prototype.hasOwnProperty.call(obj, _x);
+            },
+            'name',
+            {
+              value: 'check',
+              configurable: true,
+            },
+          ),
           writable: true,
           configurable: true,
         });
         Object.defineProperty(Outer.prototype, 'makeInner', {
-          value: function () {
-            return new ((() => {
-              'use strict';
-              var _x12 = '__private_Inner_x';
-              function Inner() {
-                if (!(this instanceof Inner)) throw new TypeError('Cannot call a class as a function');
-                Object.defineProperty(this, _x12, {
+          value: Object.defineProperty(
+            function () {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              return new ((() => {
+                'use strict';
+                var _x12 = '__private_Inner_x';
+                const Inner = function Inner() {
+                  if (!new.target) throw new TypeError('Cannot call a class as a function');
+                  Object.defineProperty(this, _x12, {
+                    writable: true,
+                    value: 2,
+                  });
+                };
+                Object.defineProperty(Inner, 'check', {
+                  value: Object.defineProperty(
+                    function (obj) {
+                      if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+                      return Object.prototype.hasOwnProperty.call(obj, _x12);
+                    },
+                    'name',
+                    {
+                      value: 'check',
+                      configurable: true,
+                    },
+                  ),
                   writable: true,
-                  value: 2,
+                  configurable: true,
                 });
-              }
-              Object.defineProperty(Inner, 'check', {
-                value: function (obj) {
-                  return Object.prototype.hasOwnProperty.call(obj, _x12);
-                },
-                writable: true,
-                configurable: true,
-              });
-              return Inner;
-            })())();
-          },
+                Object.defineProperty(Inner, 'prototype', { writable: false });
+                return Inner;
+              })())();
+            },
+            'name',
+            {
+              value: 'makeInner',
+              configurable: true,
+            },
+          ),
           writable: true,
           configurable: true,
         });
+        Object.defineProperty(Outer, 'prototype', { writable: false });
         return Outer;
       })();
       const outer = new Outer();
@@ -2715,23 +3083,32 @@ test('079 JS Private Properties > various object types as RHS > works with array
     }),
   ).toMatchInlineSnapshot(`
     "() => {
-      var Foo = (() => {
+      let Foo = (() => {
         'use strict';
         var _x = '__private_Foo_x';
-        function Foo() {
-          if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
+        const Foo = function Foo() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
           Object.defineProperty(this, _x, {
             writable: true,
             value: 1,
           });
-        }
+        };
         Object.defineProperty(Foo, 'check', {
-          value: function (obj) {
-            return Object.prototype.hasOwnProperty.call(obj, _x);
-          },
+          value: Object.defineProperty(
+            function (obj) {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              return Object.prototype.hasOwnProperty.call(obj, _x);
+            },
+            'name',
+            {
+              value: 'check',
+              configurable: true,
+            },
+          ),
           writable: true,
           configurable: true,
         });
+        Object.defineProperty(Foo, 'prototype', { writable: false });
         return Foo;
       })();
       expect(Foo.check([])).toBe(false);
@@ -2749,23 +3126,32 @@ test('080 JS Private Properties > various object types as RHS > works with funct
     }),
   ).toMatchInlineSnapshot(`
     "() => {
-      var Foo = (() => {
+      let Foo = (() => {
         'use strict';
         var _x = '__private_Foo_x';
-        function Foo() {
-          if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
+        const Foo = function Foo() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
           Object.defineProperty(this, _x, {
             writable: true,
             value: 1,
           });
-        }
+        };
         Object.defineProperty(Foo, 'check', {
-          value: function (obj) {
-            return Object.prototype.hasOwnProperty.call(obj, _x);
-          },
+          value: Object.defineProperty(
+            function (obj) {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              return Object.prototype.hasOwnProperty.call(obj, _x);
+            },
+            'name',
+            {
+              value: 'check',
+              configurable: true,
+            },
+          ),
           writable: true,
           configurable: true,
         });
+        Object.defineProperty(Foo, 'prototype', { writable: false });
         return Foo;
       })();
       expect(Foo.check(function () {})).toBe(false);
@@ -2783,23 +3169,32 @@ test('081 JS Private Properties > various object types as RHS > works with class
     }),
   ).toMatchInlineSnapshot(`
     "() => {
-      var Foo = (() => {
+      let Foo = (() => {
         'use strict';
         var _x = '__private_Foo_x';
-        function Foo() {
-          if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
+        const Foo = function Foo() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
           Object.defineProperty(this, _x, {
             writable: true,
             value: 1,
           });
-        }
+        };
         Object.defineProperty(Foo, 'check', {
-          value: function (obj) {
-            return Object.prototype.hasOwnProperty.call(obj, _x);
-          },
+          value: Object.defineProperty(
+            function (obj) {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              return Object.prototype.hasOwnProperty.call(obj, _x);
+            },
+            'name',
+            {
+              value: 'check',
+              configurable: true,
+            },
+          ),
           writable: true,
           configurable: true,
         });
+        Object.defineProperty(Foo, 'prototype', { writable: false });
         return Foo;
       })();
       // Instance brand is not on the class constructor
@@ -2818,23 +3213,32 @@ test('082 JS Private Properties > various object types as RHS > works with Objec
     }),
   ).toMatchInlineSnapshot(`
     "() => {
-      var Foo = (() => {
+      let Foo = (() => {
         'use strict';
         var _x = '__private_Foo_x';
-        function Foo() {
-          if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
+        const Foo = function Foo() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
           Object.defineProperty(this, _x, {
             writable: true,
             value: 1,
           });
-        }
+        };
         Object.defineProperty(Foo, 'check', {
-          value: function (obj) {
-            return Object.prototype.hasOwnProperty.call(obj, _x);
-          },
+          value: Object.defineProperty(
+            function (obj) {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              return Object.prototype.hasOwnProperty.call(obj, _x);
+            },
+            'name',
+            {
+              value: 'check',
+              configurable: true,
+            },
+          ),
           writable: true,
           configurable: true,
         });
+        Object.defineProperty(Foo, 'prototype', { writable: false });
         return Foo;
       })();
       expect(Foo.check(Object.create(null))).toBe(false);
@@ -2852,23 +3256,32 @@ test('083 JS Private Properties > various object types as RHS > works with Date,
     }),
   ).toMatchInlineSnapshot(`
     "() => {
-      var Foo = (() => {
+      let Foo = (() => {
         'use strict';
         var _x = '__private_Foo_x';
-        function Foo() {
-          if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
+        const Foo = function Foo() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
           Object.defineProperty(this, _x, {
             writable: true,
             value: 1,
           });
-        }
+        };
         Object.defineProperty(Foo, 'check', {
-          value: function (obj) {
-            return Object.prototype.hasOwnProperty.call(obj, _x);
-          },
+          value: Object.defineProperty(
+            function (obj) {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              return Object.prototype.hasOwnProperty.call(obj, _x);
+            },
+            'name',
+            {
+              value: 'check',
+              configurable: true,
+            },
+          ),
           writable: true,
           configurable: true,
         });
+        Object.defineProperty(Foo, 'prototype', { writable: false });
         return Foo;
       })();
       expect(Foo.check(new Date())).toBe(false);
@@ -2888,18 +3301,19 @@ test('084 JS Private Properties > edge cases > brand check in constructor', asyn
     }),
   ).toMatchInlineSnapshot(`
     "() => {
-      var Foo = (() => {
+      let Foo = (() => {
         'use strict';
         var _x = '__private_Foo_x';
-        function Foo() {
-          if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
+        const Foo = function Foo() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
           Object.defineProperty(this, _x, {
             writable: true,
             value: 1,
           });
           this.hasBrand = void 0;
           this.hasBrand = Object.prototype.hasOwnProperty.call(this, _x);
-        }
+        };
+        Object.defineProperty(Foo, 'prototype', { writable: false });
         return Foo;
       })();
       expect(new Foo().hasBrand).toBe(true);
@@ -2917,17 +3331,18 @@ test('085 JS Private Properties > edge cases > brand check during field initiali
     }),
   ).toMatchInlineSnapshot(`
     "() => {
-      var Foo = (() => {
+      let Foo = (() => {
         'use strict';
         var _x = '__private_Foo_x';
-        function Foo() {
-          if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
+        const Foo = function Foo() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
           Object.defineProperty(this, _x, {
             writable: true,
             value: 1,
           });
           this.hasBrand = Object.prototype.hasOwnProperty.call(this, _x);
-        }
+        };
+        Object.defineProperty(Foo, 'prototype', { writable: false });
         return Foo;
       })();
       expect(new Foo().hasBrand).toBe(true);
@@ -2956,23 +3371,32 @@ test('087 JS Private Properties > edge cases > brand check result is always a bo
     }),
   ).toMatchInlineSnapshot(`
     "() => {
-      var Foo = (() => {
+      let Foo = (() => {
         'use strict';
         var _x = '__private_Foo_x';
-        function Foo() {
-          if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
+        const Foo = function Foo() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
           Object.defineProperty(this, _x, {
             writable: true,
             value: 1,
           });
-        }
+        };
         Object.defineProperty(Foo, 'check', {
-          value: function (obj) {
-            return Object.prototype.hasOwnProperty.call(obj, _x);
-          },
+          value: Object.defineProperty(
+            function (obj) {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              return Object.prototype.hasOwnProperty.call(obj, _x);
+            },
+            'name',
+            {
+              value: 'check',
+              configurable: true,
+            },
+          ),
           writable: true,
           configurable: true,
         });
+        Object.defineProperty(Foo, 'prototype', { writable: false });
         return Foo;
       })();
       expect(typeof Foo.check(new Foo())).toBe('boolean');
@@ -2993,23 +3417,32 @@ test('088 JS Private Properties > edge cases > brand check on Proxy-wrapped obje
     }),
   ).toMatchInlineSnapshot(`
     "() => {
-      var Foo = (() => {
+      let Foo = (() => {
         'use strict';
         var _x = '__private_Foo_x';
-        function Foo() {
-          if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
+        const Foo = function Foo() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
           Object.defineProperty(this, _x, {
             writable: true,
             value: 1,
           });
-        }
+        };
         Object.defineProperty(Foo, 'check', {
-          value: function (obj) {
-            return Object.prototype.hasOwnProperty.call(obj, _x);
-          },
+          value: Object.defineProperty(
+            function (obj) {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              return Object.prototype.hasOwnProperty.call(obj, _x);
+            },
+            'name',
+            {
+              value: 'check',
+              configurable: true,
+            },
+          ),
           writable: true,
           configurable: true,
         });
+        Object.defineProperty(Foo, 'prototype', { writable: false });
         return Foo;
       })();
       const foo = new Foo();
@@ -3033,42 +3466,60 @@ test('089 JS Private Properties > edge cases > multiple brand checks in single e
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseKey = require('@babel/runtime/helpers/classPrivateFieldLooseKey');
     () => {
-      var A = (() => {
+      let A = (() => {
         'use strict';
         var _a = '__private_A_a';
-        function A() {
-          if (!(this instanceof A)) throw new TypeError('Cannot call a class as a function');
+        const A = function A() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
           Object.defineProperty(this, _a, {
             writable: true,
             value: 1,
           });
-        }
+        };
         Object.defineProperty(A, 'check', {
-          value: function (obj) {
-            return Object.prototype.hasOwnProperty.call(obj, _a);
-          },
+          value: Object.defineProperty(
+            function (obj) {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              return Object.prototype.hasOwnProperty.call(obj, _a);
+            },
+            'name',
+            {
+              value: 'check',
+              configurable: true,
+            },
+          ),
           writable: true,
           configurable: true,
         });
+        Object.defineProperty(A, 'prototype', { writable: false });
         return A;
       })();
-      var B = (() => {
+      let B = (() => {
         'use strict';
         var _b = '__private_B_b';
-        function B() {
-          if (!(this instanceof B)) throw new TypeError('Cannot call a class as a function');
+        const B = function B() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
           Object.defineProperty(this, _b, {
             writable: true,
             value: 2,
           });
-        }
+        };
         Object.defineProperty(B, 'check', {
-          value: function (obj) {
-            return Object.prototype.hasOwnProperty.call(obj, _b);
-          },
+          value: Object.defineProperty(
+            function (obj) {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              return Object.prototype.hasOwnProperty.call(obj, _b);
+            },
+            'name',
+            {
+              value: 'check',
+              configurable: true,
+            },
+          ),
           writable: true,
           configurable: true,
         });
+        Object.defineProperty(B, 'prototype', { writable: false });
         return B;
       })();
       var _b_too = /* @__PURE__ */ _classPrivateFieldLooseKey('b_too');
@@ -3098,23 +3549,32 @@ test('090 JS Private Properties > edge cases > brand check after Object.freeze',
     }),
   ).toMatchInlineSnapshot(`
     "() => {
-      var Foo = (() => {
+      let Foo = (() => {
         'use strict';
         var _x = '__private_Foo_x';
-        function Foo() {
-          if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
+        const Foo = function Foo() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
           Object.defineProperty(this, _x, {
             writable: true,
             value: 1,
           });
-        }
+        };
         Object.defineProperty(Foo, 'check', {
-          value: function (obj) {
-            return Object.prototype.hasOwnProperty.call(obj, _x);
-          },
+          value: Object.defineProperty(
+            function (obj) {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              return Object.prototype.hasOwnProperty.call(obj, _x);
+            },
+            'name',
+            {
+              value: 'check',
+              configurable: true,
+            },
+          ),
           writable: true,
           configurable: true,
         });
+        Object.defineProperty(Foo, 'prototype', { writable: false });
         return Foo;
       })();
       const foo = Object.freeze(new Foo());
@@ -3133,23 +3593,32 @@ test('091 JS Private Properties > edge cases > brand check after Object.seal', a
     }),
   ).toMatchInlineSnapshot(`
     "() => {
-      var Foo = (() => {
+      let Foo = (() => {
         'use strict';
         var _x = '__private_Foo_x';
-        function Foo() {
-          if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
+        const Foo = function Foo() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
           Object.defineProperty(this, _x, {
             writable: true,
             value: 1,
           });
-        }
+        };
         Object.defineProperty(Foo, 'check', {
-          value: function (obj) {
-            return Object.prototype.hasOwnProperty.call(obj, _x);
-          },
+          value: Object.defineProperty(
+            function (obj) {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              return Object.prototype.hasOwnProperty.call(obj, _x);
+            },
+            'name',
+            {
+              value: 'check',
+              configurable: true,
+            },
+          ),
           writable: true,
           configurable: true,
         });
+        Object.defineProperty(Foo, 'prototype', { writable: false });
         return Foo;
       })();
       const foo = Object.seal(new Foo());
@@ -3168,23 +3637,32 @@ test('092 JS Private Properties > edge cases > brand check with Object.preventEx
     }),
   ).toMatchInlineSnapshot(`
     "() => {
-      var Foo = (() => {
+      let Foo = (() => {
         'use strict';
         var _x = '__private_Foo_x';
-        function Foo() {
-          if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
+        const Foo = function Foo() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
           Object.defineProperty(this, _x, {
             writable: true,
             value: 1,
           });
-        }
+        };
         Object.defineProperty(Foo, 'check', {
-          value: function (obj) {
-            return Object.prototype.hasOwnProperty.call(obj, _x);
-          },
+          value: Object.defineProperty(
+            function (obj) {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              return Object.prototype.hasOwnProperty.call(obj, _x);
+            },
+            'name',
+            {
+              value: 'check',
+              configurable: true,
+            },
+          ),
           writable: true,
           configurable: true,
         });
+        Object.defineProperty(Foo, 'prototype', { writable: false });
         return Foo;
       })();
       const foo = new Foo();
@@ -3207,20 +3685,33 @@ test('093 JS Private Properties > edge cases > expression class with brand check
       const Foo = (() => {
         'use strict';
         var _x = '__private__Class_x';
-        function _Class() {
-          if (!(this instanceof _Class)) throw new TypeError('Cannot call a class as a function');
+        const _Class = function _Class() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
           Object.defineProperty(this, _x, {
             writable: true,
             value: 1,
           });
-        }
+        };
+        Object.defineProperty(_Class, 'name', {
+          value: 'Foo',
+          configurable: true,
+        });
         Object.defineProperty(_Class, 'check', {
-          value: function (obj) {
-            return Object.prototype.hasOwnProperty.call(obj, _x);
-          },
+          value: Object.defineProperty(
+            function (obj) {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              return Object.prototype.hasOwnProperty.call(obj, _x);
+            },
+            'name',
+            {
+              value: 'check',
+              configurable: true,
+            },
+          ),
           writable: true,
           configurable: true,
         });
+        Object.defineProperty(_Class, 'prototype', { writable: false });
         return _Class;
       })();
       expect(Foo.check(new Foo())).toBe(true);

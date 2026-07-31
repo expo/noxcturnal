@@ -8,61 +8,77 @@ test('cross-platform/auto-import-dev/input.js [classic-development]', async () =
     'var x = (\n  <>\n    <div>\n      <div key="1" />\n      <div key="2" meow="wolf" />\n      <div key="3" />\n      <div {...props} key="4" />\n    </div>\n  </>\n);\n';
   expect(await transformOutcome(source, 'input.jsx', { jsx: 'classic-development' }))
     .toMatchInlineSnapshot(`
-    "var _jsxFileName = 'input.jsx';
-    var x = /* @__PURE__ */ React.createElement(
-      React.Fragment,
-      null,
-      /* @__PURE__ */ React.createElement(
-        'div',
-        {
-          __self: this,
-          __source: {
-            fileName: _jsxFileName,
-            lineNumber: 3,
-            columnNumber: 5,
+      "var _jsxFileName = 'input.jsx';
+      function _extends() {
+        return (
+          (_extends = Object.assign
+            ? Object.assign.bind()
+            : function (n) {
+                for (var e = 1; e < arguments.length; e++) {
+                  var t = arguments[e];
+                  for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]);
+                }
+                return n;
+              }),
+          _extends.apply(null, arguments)
+        );
+      }
+      var x = /* @__PURE__ */ React.createElement(
+        React.Fragment,
+        null,
+        /* @__PURE__ */ React.createElement(
+          'div',
+          {
+            __self: this,
+            __source: {
+              fileName: _jsxFileName,
+              lineNumber: 3,
+              columnNumber: 5,
+            },
           },
-        },
-        /* @__PURE__ */ React.createElement('div', {
-          key: '1',
-          __self: this,
-          __source: {
-            fileName: _jsxFileName,
-            lineNumber: 4,
-            columnNumber: 7,
-          },
-        }),
-        /* @__PURE__ */ React.createElement('div', {
-          key: '2',
-          meow: 'wolf',
-          __self: this,
-          __source: {
-            fileName: _jsxFileName,
-            lineNumber: 5,
-            columnNumber: 7,
-          },
-        }),
-        /* @__PURE__ */ React.createElement('div', {
-          key: '3',
-          __self: this,
-          __source: {
-            fileName: _jsxFileName,
-            lineNumber: 6,
-            columnNumber: 7,
-          },
-        }),
-        /* @__PURE__ */ React.createElement('div', {
-          ...props,
-          key: '4',
-          __self: this,
-          __source: {
-            fileName: _jsxFileName,
-            lineNumber: 7,
-            columnNumber: 7,
-          },
-        }),
-      ),
-    );"
-  `);
+          /* @__PURE__ */ React.createElement('div', {
+            key: '1',
+            __self: this,
+            __source: {
+              fileName: _jsxFileName,
+              lineNumber: 4,
+              columnNumber: 7,
+            },
+          }),
+          /* @__PURE__ */ React.createElement('div', {
+            key: '2',
+            meow: 'wolf',
+            __self: this,
+            __source: {
+              fileName: _jsxFileName,
+              lineNumber: 5,
+              columnNumber: 7,
+            },
+          }),
+          /* @__PURE__ */ React.createElement('div', {
+            key: '3',
+            __self: this,
+            __source: {
+              fileName: _jsxFileName,
+              lineNumber: 6,
+              columnNumber: 7,
+            },
+          }),
+          /* @__PURE__ */ React.createElement(
+            'div',
+            _extends({}, props, {
+              key: '4',
+              __self: this,
+              __source: {
+                fileName: _jsxFileName,
+                lineNumber: 7,
+                columnNumber: 7,
+              },
+            }),
+          ),
+        ),
+      );"
+    `);
 });
 
 test('cross-platform/auto-import-dev/input.js [automatic-development]', async () => {
@@ -155,61 +171,77 @@ test('cross-platform/classic-runtime/input.js [classic-development]', async () =
     'var x = (\n    <>\n    <div>\n        <div key="1" />\n        <div key="2" meow="wolf" />\n        <div key="3" />\n        <div {...props} key="4" />\n    </div>\n    </>\n  );';
   expect(await transformOutcome(source, 'input.jsx', { jsx: 'classic-development' }))
     .toMatchInlineSnapshot(`
-    "var _jsxFileName = 'input.jsx';
-    var x = /* @__PURE__ */ React.createElement(
-      React.Fragment,
-      null,
-      /* @__PURE__ */ React.createElement(
-        'div',
-        {
-          __self: this,
-          __source: {
-            fileName: _jsxFileName,
-            lineNumber: 3,
-            columnNumber: 5,
+      "var _jsxFileName = 'input.jsx';
+      function _extends() {
+        return (
+          (_extends = Object.assign
+            ? Object.assign.bind()
+            : function (n) {
+                for (var e = 1; e < arguments.length; e++) {
+                  var t = arguments[e];
+                  for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]);
+                }
+                return n;
+              }),
+          _extends.apply(null, arguments)
+        );
+      }
+      var x = /* @__PURE__ */ React.createElement(
+        React.Fragment,
+        null,
+        /* @__PURE__ */ React.createElement(
+          'div',
+          {
+            __self: this,
+            __source: {
+              fileName: _jsxFileName,
+              lineNumber: 3,
+              columnNumber: 5,
+            },
           },
-        },
-        /* @__PURE__ */ React.createElement('div', {
-          key: '1',
-          __self: this,
-          __source: {
-            fileName: _jsxFileName,
-            lineNumber: 4,
-            columnNumber: 9,
-          },
-        }),
-        /* @__PURE__ */ React.createElement('div', {
-          key: '2',
-          meow: 'wolf',
-          __self: this,
-          __source: {
-            fileName: _jsxFileName,
-            lineNumber: 5,
-            columnNumber: 9,
-          },
-        }),
-        /* @__PURE__ */ React.createElement('div', {
-          key: '3',
-          __self: this,
-          __source: {
-            fileName: _jsxFileName,
-            lineNumber: 6,
-            columnNumber: 9,
-          },
-        }),
-        /* @__PURE__ */ React.createElement('div', {
-          ...props,
-          key: '4',
-          __self: this,
-          __source: {
-            fileName: _jsxFileName,
-            lineNumber: 7,
-            columnNumber: 9,
-          },
-        }),
-      ),
-    );"
-  `);
+          /* @__PURE__ */ React.createElement('div', {
+            key: '1',
+            __self: this,
+            __source: {
+              fileName: _jsxFileName,
+              lineNumber: 4,
+              columnNumber: 9,
+            },
+          }),
+          /* @__PURE__ */ React.createElement('div', {
+            key: '2',
+            meow: 'wolf',
+            __self: this,
+            __source: {
+              fileName: _jsxFileName,
+              lineNumber: 5,
+              columnNumber: 9,
+            },
+          }),
+          /* @__PURE__ */ React.createElement('div', {
+            key: '3',
+            __self: this,
+            __source: {
+              fileName: _jsxFileName,
+              lineNumber: 6,
+              columnNumber: 9,
+            },
+          }),
+          /* @__PURE__ */ React.createElement(
+            'div',
+            _extends({}, props, {
+              key: '4',
+              __self: this,
+              __source: {
+                fileName: _jsxFileName,
+                lineNumber: 7,
+                columnNumber: 9,
+              },
+            }),
+          ),
+        ),
+      );"
+    `);
 });
 
 test('cross-platform/classic-runtime/input.js [automatic-development]', async () => {

@@ -77,11 +77,7 @@ test('lowers every non-simple async-arrow parameter shape', async () => {
         "name": "rest parameter",
         "output": "var _asyncToGenerator = require('@babel/runtime/helpers/asyncToGenerator');
     const read = _asyncToGenerator(function* () {
-      for (
-        var _len = arguments.length, values = new Array(_len > 0 ? _len - 0 : 0), _key = 0;
-        _key < _len;
-        _key++
-      ) {
+      for (var _len = arguments.length, values = [], _key = 0; _key < _len; _key++) {
         values[_key - 0] = arguments[_key];
       }
       return values.length;
@@ -94,11 +90,7 @@ test('lowers every non-simple async-arrow parameter shape', async () => {
       var _ref = _asyncToGenerator(function* (first) {
         let { second } = arguments.length > 1 ? arguments[1] : void 0;
         let third = arguments.length > 2 && arguments[2] !== void 0 ? arguments[2] : 3;
-        for (
-          var _len = arguments.length, rest = new Array(_len > 3 ? _len - 3 : 0), _key = 3;
-          _key < _len;
-          _key++
-        ) {
+        for (var _len = arguments.length, rest = [], _key = 3; _key < _len; _key++) {
           rest[_key - 3] = arguments[_key];
         }
         return [first, second, third, rest];
@@ -173,11 +165,7 @@ test('preserves async-arrow call semantics and function length', async () => {
     globalThis.read = /* @__PURE__ */ (function () {
       var _ref = babelHelpers.asyncToGenerator(function* (first) {
         let second = arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : sideEffect();
-        for (
-          var _len = arguments.length, rest = new Array(_len > 2 ? _len - 2 : 0), _key = 2;
-          _key < _len;
-          _key++
-        ) {
+        for (var _len = arguments.length, rest = [], _key = 2; _key < _len; _key++) {
           rest[_key - 2] = arguments[_key];
         }
         return [first, second, rest];

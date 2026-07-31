@@ -133,7 +133,21 @@ test('autoImport/auto-import-react-source-type-module/input.js [classic]', async
   const source =
     'var x = (\n    <>\n    <div>\n        <div key="1" />\n        <div key="2" meow="wolf" />\n        <div key="3" />\n        <div {...props} key="4" />\n    </div>\n    </>\n);';
   expect(await transformOutcome(source, 'input.jsx', { jsx: 'classic' })).toMatchInlineSnapshot(`
-    "var x = /* @__PURE__ */ React.createElement(
+    "function _extends() {
+      return (
+        (_extends = Object.assign
+          ? Object.assign.bind()
+          : function (n) {
+              for (var e = 1; e < arguments.length; e++) {
+                var t = arguments[e];
+                for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]);
+              }
+              return n;
+            }),
+        _extends.apply(null, arguments)
+      );
+    }
+    var x = /* @__PURE__ */ React.createElement(
       React.Fragment,
       null,
       /* @__PURE__ */ React.createElement(
@@ -145,10 +159,7 @@ test('autoImport/auto-import-react-source-type-module/input.js [classic]', async
           meow: 'wolf',
         }),
         /* @__PURE__ */ React.createElement('div', { key: '3' }),
-        /* @__PURE__ */ React.createElement('div', {
-          ...props,
-          key: '4',
-        }),
+        /* @__PURE__ */ React.createElement('div', _extends({}, props, { key: '4' })),
       ),
     );"
   `);
@@ -180,7 +191,21 @@ test('autoImport/auto-import-react-source-type-script/input.js [classic]', async
   const source =
     'var x = (\n    <>\n    <div>\n        <div key="1" />\n        <div key="2" meow="wolf" />\n        <div key="3" />\n        <div {...props} key="4" />\n    </div>\n    </>\n);';
   expect(await transformOutcome(source, 'input.jsx', { jsx: 'classic' })).toMatchInlineSnapshot(`
-    "var x = /* @__PURE__ */ React.createElement(
+    "function _extends() {
+      return (
+        (_extends = Object.assign
+          ? Object.assign.bind()
+          : function (n) {
+              for (var e = 1; e < arguments.length; e++) {
+                var t = arguments[e];
+                for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]);
+              }
+              return n;
+            }),
+        _extends.apply(null, arguments)
+      );
+    }
+    var x = /* @__PURE__ */ React.createElement(
       React.Fragment,
       null,
       /* @__PURE__ */ React.createElement(
@@ -192,10 +217,7 @@ test('autoImport/auto-import-react-source-type-script/input.js [classic]', async
           meow: 'wolf',
         }),
         /* @__PURE__ */ React.createElement('div', { key: '3' }),
-        /* @__PURE__ */ React.createElement('div', {
-          ...props,
-          key: '4',
-        }),
+        /* @__PURE__ */ React.createElement('div', _extends({}, props, { key: '4' })),
       ),
     );"
   `);
@@ -375,7 +397,21 @@ test('autoImport/react-defined/input.js [classic]', async () => {
   const source =
     'import * as react from "react";\nvar y = react.createElement("div", {foo: 1});\nvar x = (\n    <div>\n        <div key="1" />\n        <div key="2" meow="wolf" />\n        <div key="3" />\n        <div {...props} key="4" />\n    </div>\n);';
   expect(await transformOutcome(source, 'input.jsx', { jsx: 'classic' })).toMatchInlineSnapshot(`
-    "import * as react from 'react';
+    "function _extends() {
+      return (
+        (_extends = Object.assign
+          ? Object.assign.bind()
+          : function (n) {
+              for (var e = 1; e < arguments.length; e++) {
+                var t = arguments[e];
+                for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]);
+              }
+              return n;
+            }),
+        _extends.apply(null, arguments)
+      );
+    }
+    import * as react from 'react';
     var y = react.createElement('div', { foo: 1 });
     var x = /* @__PURE__ */ React.createElement(
       'div',
@@ -386,10 +422,7 @@ test('autoImport/react-defined/input.js [classic]', async () => {
         meow: 'wolf',
       }),
       /* @__PURE__ */ React.createElement('div', { key: '3' }),
-      /* @__PURE__ */ React.createElement('div', {
-        ...props,
-        key: '4',
-      }),
+      /* @__PURE__ */ React.createElement('div', _extends({}, props, { key: '4' })),
     );"
   `);
 });
@@ -728,10 +761,21 @@ test('react-automatic/.should-properly-handle-comments-adjacent-to-children/inpu
 test('react-automatic/adds-appropriate-newlines-when-using-spread-attribute/input.js [classic]', async () => {
   const source = '<Component\n  {...props}\n  sound="moo" />\n';
   expect(await transformOutcome(source, 'input.jsx', { jsx: 'classic' })).toMatchInlineSnapshot(`
-    "/* @__PURE__ */ React.createElement(Component, {
-      ...props,
-      sound: 'moo',
-    });"
+    "function _extends() {
+      return (
+        (_extends = Object.assign
+          ? Object.assign.bind()
+          : function (n) {
+              for (var e = 1; e < arguments.length; e++) {
+                var t = arguments[e];
+                for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]);
+              }
+              return n;
+            }),
+        _extends.apply(null, arguments)
+      );
+    }
+    /* @__PURE__ */ React.createElement(Component, _extends({}, props, { sound: 'moo' }));"
   `);
 });
 
@@ -776,10 +820,21 @@ test('react-automatic/arrow-functions/input.js [automatic]', async () => {
 test('react-automatic/assignment/input.js [classic]', async () => {
   const source = 'var div = <Component {...props} foo="bar" />\n';
   expect(await transformOutcome(source, 'input.jsx', { jsx: 'classic' })).toMatchInlineSnapshot(`
-    "var div = /* @__PURE__ */ React.createElement(Component, {
-      ...props,
-      foo: 'bar',
-    });"
+    "function _extends() {
+      return (
+        (_extends = Object.assign
+          ? Object.assign.bind()
+          : function (n) {
+              for (var e = 1; e < arguments.length; e++) {
+                var t = arguments[e];
+                for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]);
+              }
+              return n;
+            }),
+        _extends.apply(null, arguments)
+      );
+    }
+    var div = /* @__PURE__ */ React.createElement(Component, _extends({}, props, { foo: 'bar' }));"
   `);
 });
 
@@ -930,7 +985,21 @@ test('react-automatic/does-not-add-source-self-automatic/input.mjs [classic]', a
   const source =
     'var x = (\n  <>\n  <div>\n      <div key="1" />\n      <div key="2" meow="wolf" />\n      <div key="3" />\n      <div {...props} key="4" />\n  </div>\n  </>\n);\n';
   expect(await transformOutcome(source, 'input.jsx', { jsx: 'classic' })).toMatchInlineSnapshot(`
-    "var x = /* @__PURE__ */ React.createElement(
+    "function _extends() {
+      return (
+        (_extends = Object.assign
+          ? Object.assign.bind()
+          : function (n) {
+              for (var e = 1; e < arguments.length; e++) {
+                var t = arguments[e];
+                for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]);
+              }
+              return n;
+            }),
+        _extends.apply(null, arguments)
+      );
+    }
+    var x = /* @__PURE__ */ React.createElement(
       React.Fragment,
       null,
       /* @__PURE__ */ React.createElement(
@@ -942,10 +1011,7 @@ test('react-automatic/does-not-add-source-self-automatic/input.mjs [classic]', a
           meow: 'wolf',
         }),
         /* @__PURE__ */ React.createElement('div', { key: '3' }),
-        /* @__PURE__ */ React.createElement('div', {
-          ...props,
-          key: '4',
-        }),
+        /* @__PURE__ */ React.createElement('div', _extends({}, props, { key: '4' })),
       ),
     );"
   `);
@@ -1195,8 +1261,22 @@ test('react-automatic/handle-spread-with-proto/input.js [classic]', async () => 
   const source =
     '<p {...{__proto__: null}}>text</p>;\n\n<div {...{"__proto__": null}}>{contents}</div>;\n';
   expect(await transformOutcome(source, 'input.jsx', { jsx: 'classic' })).toMatchInlineSnapshot(`
-    "/* @__PURE__ */ React.createElement('p', { ...{ __proto__: null } }, 'text');
-    /* @__PURE__ */ React.createElement('div', { ...{ __proto__: null } }, contents);"
+    "function _extends() {
+      return (
+        (_extends = Object.assign
+          ? Object.assign.bind()
+          : function (n) {
+              for (var e = 1; e < arguments.length; e++) {
+                var t = arguments[e];
+                for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]);
+              }
+              return n;
+            }),
+        _extends.apply(null, arguments)
+      );
+    }
+    /* @__PURE__ */ React.createElement('p', _extends({}, { __proto__: null }), 'text');
+    /* @__PURE__ */ React.createElement('div', _extends({}, { __proto__: null }), contents);"
   `);
 });
 
@@ -1282,11 +1362,22 @@ test('react-automatic/jsx-without-retainlines-option/input.js [automatic]', asyn
 test('react-automatic/key-undefined-works/input.js [classic]', async () => {
   const source = 'const props = {foo: true};\nvar x = (<div {...props} key={undefined}></div>)\n';
   expect(await transformOutcome(source, 'input.jsx', { jsx: 'classic' })).toMatchInlineSnapshot(`
-    "const props = { foo: true };
-    var x = /* @__PURE__ */ React.createElement('div', {
-      ...props,
-      key: undefined,
-    });"
+    "function _extends() {
+      return (
+        (_extends = Object.assign
+          ? Object.assign.bind()
+          : function (n) {
+              for (var e = 1; e < arguments.length; e++) {
+                var t = arguments[e];
+                for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]);
+              }
+              return n;
+            }),
+        _extends.apply(null, arguments)
+      );
+    }
+    const props = { foo: true };
+    var x = /* @__PURE__ */ React.createElement('div', _extends({}, props, { key: undefined }));"
   `);
 });
 
@@ -1992,16 +2083,25 @@ test('react-automatic/should-quote-jsx-attributes/input.js [automatic]', async (
 
 test('react-automatic/should-support-xml-namespaces-if-flag/input.js [classic]', async () => {
   const source = '<f:image n:attr />;\n';
-  expect(await transformOutcome(source, 'input.jsx', { jsx: 'classic' })).toMatchInlineSnapshot(
-    `"[bailout] preflight:transform-error"`,
-  );
+  expect(
+    await transformOutcome(source, 'input.jsx', {
+      jsx: 'classic',
+      jsxThrowIfNamespace: false,
+    }),
+  ).toMatchInlineSnapshot(`"/* @__PURE__ */ React.createElement('f:image', { 'n:attr': true });"`);
 });
 
 test('react-automatic/should-support-xml-namespaces-if-flag/input.js [automatic]', async () => {
   const source = '<f:image n:attr />;\n';
-  expect(await transformOutcome(source, 'input.jsx', { jsx: 'automatic' })).toMatchInlineSnapshot(
-    `"[bailout] preflight:transform-error"`,
-  );
+  expect(
+    await transformOutcome(source, 'input.jsx', {
+      jsx: 'automatic',
+      jsxThrowIfNamespace: false,
+    }),
+  ).toMatchInlineSnapshot(`
+    "var _reactJsxRuntime = require('react/jsx-runtime');
+    /* @__PURE__ */ _reactJsxRuntime.jsx('f:image', { 'n:attr': true });"
+  `);
 });
 
 test('react-automatic/should-throw-error-namespaces-if-not-flag/input.js [classic]', async () => {
@@ -2051,11 +2151,27 @@ test('react-automatic/should-transform-known-hyphenated-tags/input.js [automatic
 test('react-automatic/should-use-createElement-when-key-comes-after-spread/input.js [classic]', async () => {
   const source = 'var x = (\n    <div {...props} key="1" foo="bar" />\n);';
   expect(await transformOutcome(source, 'input.jsx', { jsx: 'classic' })).toMatchInlineSnapshot(`
-    "var x = /* @__PURE__ */ React.createElement('div', {
-      ...props,
-      key: '1',
-      foo: 'bar',
-    });"
+    "function _extends() {
+      return (
+        (_extends = Object.assign
+          ? Object.assign.bind()
+          : function (n) {
+              for (var e = 1; e < arguments.length; e++) {
+                var t = arguments[e];
+                for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]);
+              }
+              return n;
+            }),
+        _extends.apply(null, arguments)
+      );
+    }
+    var x = /* @__PURE__ */ React.createElement(
+      'div',
+      _extends({}, props, {
+        key: '1',
+        foo: 'bar',
+      }),
+    );"
   `);
 });
 
@@ -2074,11 +2190,21 @@ test('react-automatic/should-use-createElement-when-key-comes-after-spread/input
 test('react-automatic/should-use-jsx-when-key-comes-before-spread/input.js [classic]', async () => {
   const source = 'var x = (\n    <div key="1" {...props} foo="bar" />\n);';
   expect(await transformOutcome(source, 'input.jsx', { jsx: 'classic' })).toMatchInlineSnapshot(`
-    "var x = /* @__PURE__ */ React.createElement('div', {
-      key: '1',
-      ...props,
-      foo: 'bar',
-    });"
+    "function _extends() {
+      return (
+        (_extends = Object.assign
+          ? Object.assign.bind()
+          : function (n) {
+              for (var e = 1; e < arguments.length; e++) {
+                var t = arguments[e];
+                for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]);
+              }
+              return n;
+            }),
+        _extends.apply(null, arguments)
+      );
+    }
+    var x = /* @__PURE__ */ React.createElement('div', _extends({ key: '1' }, props, { foo: 'bar' }));"
   `);
 });
 
@@ -2157,11 +2283,30 @@ test('react-automatic/weird-symbols/input.js [automatic]', async () => {
 test('react-automatic/wraps-props-in-react-spread-for-last-spread-attributes/input.js [classic]', async () => {
   const source = '<Component y={2} z { ... x } />\n';
   expect(await transformOutcome(source, 'input.jsx', { jsx: 'classic' })).toMatchInlineSnapshot(`
-    "/* @__PURE__ */ React.createElement(Component, {
-      y: 2,
-      z: true,
-      ...x,
-    });"
+    "function _extends() {
+      return (
+        (_extends = Object.assign
+          ? Object.assign.bind()
+          : function (n) {
+              for (var e = 1; e < arguments.length; e++) {
+                var t = arguments[e];
+                for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]);
+              }
+              return n;
+            }),
+        _extends.apply(null, arguments)
+      );
+    }
+    /* @__PURE__ */ React.createElement(
+      Component,
+      _extends(
+        {
+          y: 2,
+          z: true,
+        },
+        x,
+      ),
+    );"
   `);
 });
 
@@ -2180,11 +2325,21 @@ test('react-automatic/wraps-props-in-react-spread-for-last-spread-attributes/inp
 test('react-automatic/wraps-props-in-react-spread-for-middle-spread-attributes/input.js [classic]', async () => {
   const source = '<Component y={2} { ... x } z />\n';
   expect(await transformOutcome(source, 'input.jsx', { jsx: 'classic' })).toMatchInlineSnapshot(`
-    "/* @__PURE__ */ React.createElement(Component, {
-      y: 2,
-      ...x,
-      z: true,
-    });"
+    "function _extends() {
+      return (
+        (_extends = Object.assign
+          ? Object.assign.bind()
+          : function (n) {
+              for (var e = 1; e < arguments.length; e++) {
+                var t = arguments[e];
+                for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]);
+              }
+              return n;
+            }),
+        _extends.apply(null, arguments)
+      );
+    }
+    /* @__PURE__ */ React.createElement(Component, _extends({ y: 2 }, x, { z: true }));"
   `);
 });
 
@@ -2230,10 +2385,21 @@ test('react/.should-properly-handle-comments-adjacent-to-children/input.js [auto
 test('react/adds-appropriate-newlines-when-using-spread-attribute/input.js [classic]', async () => {
   const source = '<Component\n  {...props}\n  sound="moo" />\n';
   expect(await transformOutcome(source, 'input.jsx', { jsx: 'classic' })).toMatchInlineSnapshot(`
-    "/* @__PURE__ */ React.createElement(Component, {
-      ...props,
-      sound: 'moo',
-    });"
+    "function _extends() {
+      return (
+        (_extends = Object.assign
+          ? Object.assign.bind()
+          : function (n) {
+              for (var e = 1; e < arguments.length; e++) {
+                var t = arguments[e];
+                for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]);
+              }
+              return n;
+            }),
+        _extends.apply(null, arguments)
+      );
+    }
+    /* @__PURE__ */ React.createElement(Component, _extends({}, props, { sound: 'moo' }));"
   `);
 });
 
@@ -2278,10 +2444,21 @@ test('react/arrow-functions/input.js [automatic]', async () => {
 test('react/assignment/input.js [classic]', async () => {
   const source = 'var div = <Component {...props} foo="bar" />\n';
   expect(await transformOutcome(source, 'input.jsx', { jsx: 'classic' })).toMatchInlineSnapshot(`
-    "var div = /* @__PURE__ */ React.createElement(Component, {
-      ...props,
-      foo: 'bar',
-    });"
+    "function _extends() {
+      return (
+        (_extends = Object.assign
+          ? Object.assign.bind()
+          : function (n) {
+              for (var e = 1; e < arguments.length; e++) {
+                var t = arguments[e];
+                for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]);
+              }
+              return n;
+            }),
+        _extends.apply(null, arguments)
+      );
+    }
+    var div = /* @__PURE__ */ React.createElement(Component, _extends({}, props, { foo: 'bar' }));"
   `);
 });
 
@@ -2432,7 +2609,21 @@ test('react/does-not-add-source-self/input.mjs [classic]', async () => {
   const source =
     'var x = (\n  <>\n  <div>\n      <div key="1" />\n      <div key="2" meow="wolf" />\n      <div key="3" />\n      <div {...props} key="4" />\n  </div>\n  </>\n);\n';
   expect(await transformOutcome(source, 'input.jsx', { jsx: 'classic' })).toMatchInlineSnapshot(`
-    "var x = /* @__PURE__ */ React.createElement(
+    "function _extends() {
+      return (
+        (_extends = Object.assign
+          ? Object.assign.bind()
+          : function (n) {
+              for (var e = 1; e < arguments.length; e++) {
+                var t = arguments[e];
+                for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]);
+              }
+              return n;
+            }),
+        _extends.apply(null, arguments)
+      );
+    }
+    var x = /* @__PURE__ */ React.createElement(
       React.Fragment,
       null,
       /* @__PURE__ */ React.createElement(
@@ -2444,10 +2635,7 @@ test('react/does-not-add-source-self/input.mjs [classic]', async () => {
           meow: 'wolf',
         }),
         /* @__PURE__ */ React.createElement('div', { key: '3' }),
-        /* @__PURE__ */ React.createElement('div', {
-          ...props,
-          key: '4',
-        }),
+        /* @__PURE__ */ React.createElement('div', _extends({}, props, { key: '4' })),
       ),
     );"
   `);
@@ -2617,8 +2805,22 @@ test('react/handle-spread-with-proto/input.js [classic]', async () => {
   const source =
     '<p {...{__proto__: null}}>text</p>;\n\n<div {...{"__proto__": null}}>{contents}</div>;\n';
   expect(await transformOutcome(source, 'input.jsx', { jsx: 'classic' })).toMatchInlineSnapshot(`
-    "/* @__PURE__ */ React.createElement('p', { ...{ __proto__: null } }, 'text');
-    /* @__PURE__ */ React.createElement('div', { ...{ __proto__: null } }, contents);"
+    "function _extends() {
+      return (
+        (_extends = Object.assign
+          ? Object.assign.bind()
+          : function (n) {
+              for (var e = 1; e < arguments.length; e++) {
+                var t = arguments[e];
+                for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]);
+              }
+              return n;
+            }),
+        _extends.apply(null, arguments)
+      );
+    }
+    /* @__PURE__ */ React.createElement('p', _extends({}, { __proto__: null }), 'text');
+    /* @__PURE__ */ React.createElement('div', _extends({}, { __proto__: null }), contents);"
   `);
 });
 
@@ -3526,16 +3728,25 @@ test('react/should-quote-jsx-attributes/input.js [automatic]', async () => {
 
 test('react/should-support-xml-namespaces-if-flag/input.js [classic]', async () => {
   const source = '<f:image n:attr />;\n';
-  expect(await transformOutcome(source, 'input.jsx', { jsx: 'classic' })).toMatchInlineSnapshot(
-    `"[bailout] preflight:transform-error"`,
-  );
+  expect(
+    await transformOutcome(source, 'input.jsx', {
+      jsx: 'classic',
+      jsxThrowIfNamespace: false,
+    }),
+  ).toMatchInlineSnapshot(`"/* @__PURE__ */ React.createElement('f:image', { 'n:attr': true });"`);
 });
 
 test('react/should-support-xml-namespaces-if-flag/input.js [automatic]', async () => {
   const source = '<f:image n:attr />;\n';
-  expect(await transformOutcome(source, 'input.jsx', { jsx: 'automatic' })).toMatchInlineSnapshot(
-    `"[bailout] preflight:transform-error"`,
-  );
+  expect(
+    await transformOutcome(source, 'input.jsx', {
+      jsx: 'automatic',
+      jsxThrowIfNamespace: false,
+    }),
+  ).toMatchInlineSnapshot(`
+    "var _reactJsxRuntime = require('react/jsx-runtime');
+    /* @__PURE__ */ _reactJsxRuntime.jsx('f:image', { 'n:attr': true });"
+  `);
 });
 
 test('react/should-throw-error-namespaces-if-not-flag/input.js [classic]', async () => {
@@ -3647,11 +3858,27 @@ test('react/weird-symbols/input.js [automatic]', async () => {
 test('react/wraps-props-in-react-spread-for-first-spread-attributes/input.js [classic]', async () => {
   const source = '<Component { ... x } y\n={2 } z />\n';
   expect(await transformOutcome(source, 'input.jsx', { jsx: 'classic' })).toMatchInlineSnapshot(`
-    "/* @__PURE__ */ React.createElement(Component, {
-      ...x,
-      y: 2,
-      z: true,
-    });"
+    "function _extends() {
+      return (
+        (_extends = Object.assign
+          ? Object.assign.bind()
+          : function (n) {
+              for (var e = 1; e < arguments.length; e++) {
+                var t = arguments[e];
+                for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]);
+              }
+              return n;
+            }),
+        _extends.apply(null, arguments)
+      );
+    }
+    /* @__PURE__ */ React.createElement(
+      Component,
+      _extends({}, x, {
+        y: 2,
+        z: true,
+      }),
+    );"
   `);
 });
 
@@ -3670,11 +3897,30 @@ test('react/wraps-props-in-react-spread-for-first-spread-attributes/input.js [au
 test('react/wraps-props-in-react-spread-for-last-spread-attributes/input.js [classic]', async () => {
   const source = '<Component y={2} z { ... x } />\n';
   expect(await transformOutcome(source, 'input.jsx', { jsx: 'classic' })).toMatchInlineSnapshot(`
-    "/* @__PURE__ */ React.createElement(Component, {
-      y: 2,
-      z: true,
-      ...x,
-    });"
+    "function _extends() {
+      return (
+        (_extends = Object.assign
+          ? Object.assign.bind()
+          : function (n) {
+              for (var e = 1; e < arguments.length; e++) {
+                var t = arguments[e];
+                for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]);
+              }
+              return n;
+            }),
+        _extends.apply(null, arguments)
+      );
+    }
+    /* @__PURE__ */ React.createElement(
+      Component,
+      _extends(
+        {
+          y: 2,
+          z: true,
+        },
+        x,
+      ),
+    );"
   `);
 });
 
@@ -3693,11 +3939,21 @@ test('react/wraps-props-in-react-spread-for-last-spread-attributes/input.js [aut
 test('react/wraps-props-in-react-spread-for-middle-spread-attributes/input.js [classic]', async () => {
   const source = '<Component y={2} { ... x } z />\n';
   expect(await transformOutcome(source, 'input.jsx', { jsx: 'classic' })).toMatchInlineSnapshot(`
-    "/* @__PURE__ */ React.createElement(Component, {
-      y: 2,
-      ...x,
-      z: true,
-    });"
+    "function _extends() {
+      return (
+        (_extends = Object.assign
+          ? Object.assign.bind()
+          : function (n) {
+              for (var e = 1; e < arguments.length; e++) {
+                var t = arguments[e];
+                for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]);
+              }
+              return n;
+            }),
+        _extends.apply(null, arguments)
+      );
+    }
+    /* @__PURE__ */ React.createElement(Component, _extends({ y: 2 }, x, { z: true }));"
   `);
 });
 
@@ -3763,10 +4019,21 @@ test('regression/pragma-frag-set-default-classic-runtime/input.js [automatic]', 
 test('removed-options/invalid-use-builtins-false/input.js [classic]', async () => {
   const source = 'var div = <Component {...props} foo="bar" />\n';
   expect(await transformOutcome(source, 'input.jsx', { jsx: 'classic' })).toMatchInlineSnapshot(`
-    "var div = /* @__PURE__ */ React.createElement(Component, {
-      ...props,
-      foo: 'bar',
-    });"
+    "function _extends() {
+      return (
+        (_extends = Object.assign
+          ? Object.assign.bind()
+          : function (n) {
+              for (var e = 1; e < arguments.length; e++) {
+                var t = arguments[e];
+                for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]);
+              }
+              return n;
+            }),
+        _extends.apply(null, arguments)
+      );
+    }
+    var div = /* @__PURE__ */ React.createElement(Component, _extends({}, props, { foo: 'bar' }));"
   `);
 });
 
@@ -3784,10 +4051,21 @@ test('removed-options/invalid-use-builtins-false/input.js [automatic]', async ()
 test('removed-options/invalid-use-builtins-true/input.js [classic]', async () => {
   const source = 'var div = <Component {...props} foo="bar" />\n';
   expect(await transformOutcome(source, 'input.jsx', { jsx: 'classic' })).toMatchInlineSnapshot(`
-    "var div = /* @__PURE__ */ React.createElement(Component, {
-      ...props,
-      foo: 'bar',
-    });"
+    "function _extends() {
+      return (
+        (_extends = Object.assign
+          ? Object.assign.bind()
+          : function (n) {
+              for (var e = 1; e < arguments.length; e++) {
+                var t = arguments[e];
+                for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]);
+              }
+              return n;
+            }),
+        _extends.apply(null, arguments)
+      );
+    }
+    var div = /* @__PURE__ */ React.createElement(Component, _extends({}, props, { foo: 'bar' }));"
   `);
 });
 
@@ -3805,10 +4083,21 @@ test('removed-options/invalid-use-builtins-true/input.js [automatic]', async () 
 test('removed-options/invalid-use-spread-false/input.js [classic]', async () => {
   const source = 'var div = <Component {...props} foo="bar" />\n';
   expect(await transformOutcome(source, 'input.jsx', { jsx: 'classic' })).toMatchInlineSnapshot(`
-    "var div = /* @__PURE__ */ React.createElement(Component, {
-      ...props,
-      foo: 'bar',
-    });"
+    "function _extends() {
+      return (
+        (_extends = Object.assign
+          ? Object.assign.bind()
+          : function (n) {
+              for (var e = 1; e < arguments.length; e++) {
+                var t = arguments[e];
+                for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]);
+              }
+              return n;
+            }),
+        _extends.apply(null, arguments)
+      );
+    }
+    var div = /* @__PURE__ */ React.createElement(Component, _extends({}, props, { foo: 'bar' }));"
   `);
 });
 
@@ -3826,10 +4115,21 @@ test('removed-options/invalid-use-spread-false/input.js [automatic]', async () =
 test('removed-options/invalid-use-spread-true/input.js [classic]', async () => {
   const source = 'var div = <Component {...props} foo="bar" />\n';
   expect(await transformOutcome(source, 'input.jsx', { jsx: 'classic' })).toMatchInlineSnapshot(`
-    "var div = /* @__PURE__ */ React.createElement(Component, {
-      ...props,
-      foo: 'bar',
-    });"
+    "function _extends() {
+      return (
+        (_extends = Object.assign
+          ? Object.assign.bind()
+          : function (n) {
+              for (var e = 1; e < arguments.length; e++) {
+                var t = arguments[e];
+                for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]);
+              }
+              return n;
+            }),
+        _extends.apply(null, arguments)
+      );
+    }
+    var div = /* @__PURE__ */ React.createElement(Component, _extends({}, props, { foo: 'bar' }));"
   `);
 });
 
@@ -3991,10 +4291,21 @@ test('sourcemaps/JSXText/input.js [automatic]', async () => {
 test('spread-transform/transform-to-babel-extend/input.js [classic]', async () => {
   const source = 'var div = <Component {...props} foo="bar" />\n';
   expect(await transformOutcome(source, 'input.jsx', { jsx: 'classic' })).toMatchInlineSnapshot(`
-    "var div = /* @__PURE__ */ React.createElement(Component, {
-      ...props,
-      foo: 'bar',
-    });"
+    "function _extends() {
+      return (
+        (_extends = Object.assign
+          ? Object.assign.bind()
+          : function (n) {
+              for (var e = 1; e < arguments.length; e++) {
+                var t = arguments[e];
+                for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]);
+              }
+              return n;
+            }),
+        _extends.apply(null, arguments)
+      );
+    }
+    var div = /* @__PURE__ */ React.createElement(Component, _extends({}, props, { foo: 'bar' }));"
   `);
 });
 
@@ -4012,10 +4323,21 @@ test('spread-transform/transform-to-babel-extend/input.js [automatic]', async ()
 test('spread-transform/transform-to-object-assign/input.js [classic]', async () => {
   const source = 'var div = <Component {...props} foo="bar" />\n';
   expect(await transformOutcome(source, 'input.jsx', { jsx: 'classic' })).toMatchInlineSnapshot(`
-    "var div = /* @__PURE__ */ React.createElement(Component, {
-      ...props,
-      foo: 'bar',
-    });"
+    "function _extends() {
+      return (
+        (_extends = Object.assign
+          ? Object.assign.bind()
+          : function (n) {
+              for (var e = 1; e < arguments.length; e++) {
+                var t = arguments[e];
+                for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]);
+              }
+              return n;
+            }),
+        _extends.apply(null, arguments)
+      );
+    }
+    var div = /* @__PURE__ */ React.createElement(Component, _extends({}, props, { foo: 'bar' }));"
   `);
 });
 

@@ -32,6 +32,30 @@ test('aligns a custom automatic JSX import source', () => {
   });
 });
 
+test('aligns JSX namespaces when the Babel option permits them', () => {
+  alignBabelTransform({
+    source: `export const view = <f:image n:attr />;`,
+    filename: 'input.jsx',
+    plugins: [
+      [
+        reactJsx,
+        { importSource: 'react', pure: true, runtime: 'automatic', throwIfNamespace: false },
+      ],
+    ],
+    noxcturnal: { jsx: 'automatic', jsxThrowIfNamespace: false },
+  });
+});
+
+test('aligns automatic-runtime key and spread fallback shapes', () => {
+  alignBabelTransform({
+    source: `export const before = <Widget key={readKey()} {...readProps()} />;
+export const after = <Widget {...readProps()} key={readKey()} />;`,
+    filename: 'input.jsx',
+    plugins: [[reactJsx, { importSource: 'react', pure: true, runtime: 'automatic' }]],
+    noxcturnal: { jsx: 'automatic' },
+  });
+});
+
 function expectNoPureAnnotation(code: string) {
   if (/[@#]__PURE__/.test(code)) throw new Error(`unexpected pure annotation:\n${code}`);
 }

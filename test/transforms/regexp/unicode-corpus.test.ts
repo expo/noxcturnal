@@ -187,7 +187,15 @@ test('011 JS Unicode Regexes > Unicode code point escapes (\\u{XXXXX}) > \\u{} i
       helpers: runtimeHelpers,
       transforms: { regexpUnicode: true },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:regexp-unicode-astral-class-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "() => {
+      const re = /\\uD83D[\\uDE00-\\uDE02]/;
+      expect(re.test('😀')).toBe(true);
+      expect(re.test('😁')).toBe(true);
+      expect(re.test('😂')).toBe(true);
+      expect(re.test('😃')).toBe(false);
+    };"
+  `);
 });
 
 test('012 JS Unicode Regexes > Unicode code point escapes (\\u{XXXXX}) > \\u{} range in character class', async () => {
@@ -198,7 +206,16 @@ test('012 JS Unicode Regexes > Unicode code point escapes (\\u{XXXXX}) > \\u{} r
       helpers: runtimeHelpers,
       transforms: { regexpUnicode: true },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:regexp-unicode-astral-class-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "() => {
+      const re = /\\uD83D[\\uDE00-\\uDE02]/;
+      expect(re.test('😀')).toBe(true);
+      expect(re.test('😁')).toBe(true);
+      expect(re.test('😂')).toBe(true);
+      expect(re.test('😃')).toBe(false);
+      expect(re.test('🗿')).toBe(false);
+    };"
+  `);
 });
 
 test('013 JS Unicode Regexes > Unicode code point escapes (\\u{XXXXX}) > \\u{} with zero-padded code point', async () => {
@@ -280,7 +297,7 @@ test('017 JS Unicode Regexes > astral plane character matching > astral characte
       // Without /u, emoji is two code units (surrogate pair) and . matches one unit
       // With /u, emoji is one code point and . matches the full character
       const re =
-        /^(?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[^\\uD800-\\uDBFF]|^)[\\uDC00-\\uDFFF])$/;
+        /^(?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF])$/;
       expect(re.test('😀')).toBe(true);
       expect(re.test('A')).toBe(true);
     };"
@@ -317,7 +334,7 @@ test('019 JS Unicode Regexes > astral plane character matching > string of astra
   ).toMatchInlineSnapshot(`
     "() => {
       const re =
-        /^(?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[^\\uD800-\\uDBFF]|^)[\\uDC00-\\uDFFF]){3}$/;
+        /^(?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF]){3}$/;
       expect(re.test('😀😁😂')).toBe(true);
     };"
   `);
@@ -331,7 +348,17 @@ test('020 JS Unicode Regexes > astral plane character matching > astral characte
       helpers: runtimeHelpers,
       transforms: { regexpUnicode: true },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:regexp-unicode-astral-class-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "() => {
+      // U+1D306 to U+1D308
+      const re = /\\uD834[\\uDF06-\\uDF08]/;
+      expect(re.test('𝌆')).toBe(true);
+      expect(re.test('𝌇')).toBe(true);
+      expect(re.test('𝌈')).toBe(true);
+      expect(re.test('𝌅')).toBe(false);
+      expect(re.test('𝌉')).toBe(false);
+    };"
+  `);
 });
 
 test('021 JS Unicode Regexes > astral plane character matching > mixed BMP and astral in character class', async () => {
@@ -342,7 +369,16 @@ test('021 JS Unicode Regexes > astral plane character matching > mixed BMP and a
       helpers: runtimeHelpers,
       transforms: { regexpUnicode: true },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:regexp-unicode-astral-class-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "() => {
+      const re = /(?:[\\u0061-\\u007A]|\\uD83D[\\uDE00-\\uDE02])/;
+      expect(re.test('a')).toBe(true);
+      expect(re.test('z')).toBe(true);
+      expect(re.test('😀')).toBe(true);
+      expect(re.test('😂')).toBe(true);
+      expect(re.test('1')).toBe(false);
+    };"
+  `);
 });
 
 test('022 JS Unicode Regexes > astral plane character matching > exec returns full code point, not surrogate halves', async () => {
@@ -356,7 +392,7 @@ test('022 JS Unicode Regexes > astral plane character matching > exec returns fu
   ).toMatchInlineSnapshot(`
     "() => {
       const re =
-        /((?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[^\\uD800-\\uDBFF]|^)[\\uDC00-\\uDFFF]))/;
+        /((?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF]))/;
       const match = re.exec('😀');
       expect(match[0]).toBe('😀');
       expect(match[1]).toBe('😀');
@@ -376,7 +412,7 @@ test('023 JS Unicode Regexes > astral plane character matching > quantifier appl
   ).toMatchInlineSnapshot(`
     "() => {
       const re =
-        /^((?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[^\\uD800-\\uDBFF]|^)[\\uDC00-\\uDFFF]))\\1$/;
+        /^((?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF]))\\1$/;
       expect(re.test('😀😀')).toBe(true);
       expect(re.test('😀😁')).toBe(false);
     };"
@@ -394,7 +430,7 @@ test('024 JS Unicode Regexes > dot matching with /u > dot matches BMP character 
   ).toMatchInlineSnapshot(`
     "() => {
       const re =
-        /^(?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[^\\uD800-\\uDBFF]|^)[\\uDC00-\\uDFFF])$/;
+        /^(?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF])$/;
       expect(re.test('A')).toBe(true);
       expect(re.test('é')).toBe(true);
       expect(re.test('世')).toBe(true);
@@ -413,7 +449,7 @@ test('025 JS Unicode Regexes > dot matching with /u > dot matches astral plane c
   ).toMatchInlineSnapshot(`
     "() => {
       const re =
-        /^(?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[^\\uD800-\\uDBFF]|^)[\\uDC00-\\uDFFF])$/;
+        /^(?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF])$/;
       expect(re.test('😀')).toBe(true);
       expect(re.test('𝌆')).toBe(true);
       expect(re.test('💩')).toBe(true);
@@ -432,7 +468,7 @@ test('026 JS Unicode Regexes > dot matching with /u > dot does not match newline
   ).toMatchInlineSnapshot(`
     "() => {
       const re =
-        /^(?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[^\\uD800-\\uDBFF]|^)[\\uDC00-\\uDFFF])$/;
+        /^(?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF])$/;
       expect(re.test('\\n')).toBe(false);
       expect(re.test('\\r')).toBe(false);
       expect(re.test('\\u2028')).toBe(false);
@@ -488,7 +524,7 @@ test('029 JS Unicode Regexes > dot matching with /u > multiple dots match multip
   ).toMatchInlineSnapshot(`
     "() => {
       const re =
-        /^(?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[^\\uD800-\\uDBFF]|^)[\\uDC00-\\uDFFF])(?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[^\\uD800-\\uDBFF]|^)[\\uDC00-\\uDFFF])$/;
+        /^(?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF])(?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF])$/;
       expect(re.test('AB')).toBe(true);
       expect(re.test('😀😁')).toBe(true);
       expect(re.test('A😀')).toBe(true);
@@ -508,7 +544,7 @@ test('030 JS Unicode Regexes > dot matching with /u > dot with quantifier counts
   ).toMatchInlineSnapshot(`
     "() => {
       const re =
-        /^(?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[^\\uD800-\\uDBFF]|^)[\\uDC00-\\uDFFF]){2}$/;
+        /^(?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF]){2}$/;
       expect(re.test('AB')).toBe(true);
       expect(re.test('😀😁')).toBe(true);
       expect(re.test('😀')).toBe(false);
@@ -649,7 +685,8 @@ test('038 JS Unicode Regexes > negated character classes with /u > negated class
     }),
   ).toMatchInlineSnapshot(`
     "() => {
-      const re = /^[^abc]$/;
+      const re =
+        /^(?:[\\u0000-\\u0060\\u0064-\\uD7FF\\uE000-\\uFFFF]|\\uD800[\\uDC00-\\uDFFF]|[\\uD801-\\uDBFE][\\uDC00-\\uDFFF]|\\uDBFF[\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF])$/;
       expect(re.test('d')).toBe(true);
       expect(re.test('a')).toBe(false);
     };"
@@ -666,7 +703,8 @@ test('039 JS Unicode Regexes > negated character classes with /u > negated class
     }),
   ).toMatchInlineSnapshot(`
     "() => {
-      const re = /^[^abc]$/;
+      const re =
+        /^(?:[\\u0000-\\u0060\\u0064-\\uD7FF\\uE000-\\uFFFF]|\\uD800[\\uDC00-\\uDFFF]|[\\uD801-\\uDBFE][\\uDC00-\\uDFFF]|\\uDBFF[\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF])$/;
       expect(re.test('😀')).toBe(true);
     };"
   `);
@@ -680,7 +718,15 @@ test('040 JS Unicode Regexes > negated character classes with /u > negated class
       helpers: runtimeHelpers,
       transforms: { regexpUnicode: true },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:regexp-unicode-astral-class-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "() => {
+      const re =
+        /^(?:[\\u0000-\\uD7FF\\uE000-\\uFFFF]|\\uD800[\\uDC00-\\uDFFF]|[\\uD801-\\uD83C][\\uDC00-\\uDFFF]|\\uD83D[\\uDC00-\\uDDFF]|\\uD83D[\\uDE01-\\uDFFF]|[\\uD83E-\\uDBFE][\\uDC00-\\uDFFF]|\\uDBFF[\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF])$/;
+      expect(re.test('A')).toBe(true);
+      expect(re.test('😁')).toBe(true);
+      expect(re.test('😀')).toBe(false);
+    };"
+  `);
 });
 
 test('041 JS Unicode Regexes > negated character classes with /u > negated class excludes full code point', async () => {
@@ -691,7 +737,17 @@ test('041 JS Unicode Regexes > negated character classes with /u > negated class
       helpers: runtimeHelpers,
       transforms: { regexpUnicode: true },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:regexp-unicode-astral-class-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "() => {
+      // Without /u, [^\\u{1F600}] would exclude the individual surrogate halves
+      // With /u, it excludes the whole code point
+      const re =
+        /^(?:[\\u0000-\\uD7FF\\uE000-\\uFFFF]|\\uD800[\\uDC00-\\uDFFF]|[\\uD801-\\uD83C][\\uDC00-\\uDFFF]|\\uD83D[\\uDC00-\\uDDFF]|\\uD83D[\\uDE01-\\uDFFF]|[\\uD83E-\\uDBFE][\\uDC00-\\uDFFF]|\\uDBFF[\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF])+$/;
+      expect(re.test('hello')).toBe(true);
+      expect(re.test('😁😂')).toBe(true);
+      expect(re.test('😀')).toBe(false);
+    };"
+  `);
 });
 
 test('042 JS Unicode Regexes > case-insensitive with /u (ui flags) > basic ASCII case insensitive', async () => {
@@ -704,7 +760,7 @@ test('042 JS Unicode Regexes > case-insensitive with /u (ui flags) > basic ASCII
     }),
   ).toMatchInlineSnapshot(`
     "() => {
-      const re = /^[a-z]+$/i;
+      const re = /^[a-z\\u017F\\u212A]+$/i;
       expect(re.test('hello')).toBe(true);
       expect(re.test('HELLO')).toBe(true);
       expect(re.test('Hello')).toBe(true);
@@ -723,7 +779,7 @@ test('043 JS Unicode Regexes > case-insensitive with /u (ui flags) > Unicode cas
   ).toMatchInlineSnapshot(`
     "() => {
       // U+212A is KELVIN SIGN, which case-folds to 'k'
-      const re = /k/i;
+      const re = /[k\\u212A]/i;
       expect(re.test('k')).toBe(true);
       expect(re.test('K')).toBe(true);
       expect(re.test('K')).toBe(true);
@@ -742,7 +798,7 @@ test('044 JS Unicode Regexes > case-insensitive with /u (ui flags) > Unicode cas
   ).toMatchInlineSnapshot(`
     "() => {
       // U+017F is LATIN SMALL LETTER LONG S, which case-folds to 's'
-      const re = /s/i;
+      const re = /[s\\u017F]/i;
       expect(re.test('s')).toBe(true);
       expect(re.test('S')).toBe(true);
       expect(re.test('ſ')).toBe(true);
@@ -759,7 +815,13 @@ test('045 JS Unicode Regexes > case-insensitive with /u (ui flags) > case insens
       transforms: { regexpUnicode: true },
     }),
   ).toMatchInlineSnapshot(
-    `"[bailout] preflight:regexp-unicode-ignore-case-complex-not-implemented"`,
+    `
+    "() => {
+      const re = /é/i;
+      expect(re.test('é')).toBe(true);
+      expect(re.test('É')).toBe(true);
+    };"
+  `,
   );
 });
 
@@ -773,7 +835,7 @@ test('046 JS Unicode Regexes > case-insensitive with /u (ui flags) > case insens
     }),
   ).toMatchInlineSnapshot(`
     "() => {
-      const re = /^[a-z]$/i;
+      const re = /^[a-z\\u017F\\u212A]$/i;
       expect(re.test('A')).toBe(true);
       expect(re.test('z')).toBe(true);
       expect(re.test('Z')).toBe(true);
@@ -811,7 +873,13 @@ test('048 JS Unicode Regexes > case-insensitive with /u (ui flags) > Greek case 
       transforms: { regexpUnicode: true },
     }),
   ).toMatchInlineSnapshot(
-    `"[bailout] preflight:regexp-unicode-ignore-case-complex-not-implemented"`,
+    `
+    "() => {
+      const re = /α/i;
+      expect(re.test('α')).toBe(true);
+      expect(re.test('Α')).toBe(true);
+    };"
+  `,
   );
 });
 
@@ -824,7 +892,13 @@ test('049 JS Unicode Regexes > case-insensitive with /u (ui flags) > Cyrillic ca
       transforms: { regexpUnicode: true },
     }),
   ).toMatchInlineSnapshot(
-    `"[bailout] preflight:regexp-unicode-ignore-case-complex-not-implemented"`,
+    `
+    "() => {
+      const re = /б/i;
+      expect(re.test('б')).toBe(true);
+      expect(re.test('Б')).toBe(true);
+    };"
+  `,
   );
 });
 
@@ -841,7 +915,7 @@ test('050 JS Unicode Regexes > surrogate pair handling > /u treats surrogate pai
       // 😀 is U+1F600, stored as surrogate pair \\uD83D\\uDE00
       const str = '😀';
       const re =
-        /^(?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[^\\uD800-\\uDBFF]|^)[\\uDC00-\\uDFFF])$/;
+        /^(?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF])$/;
       expect(re.test(str)).toBe(true);
     };"
   `);
@@ -876,7 +950,7 @@ test('052 JS Unicode Regexes > surrogate pair handling > lone high surrogate doe
     "() => {
       // A lone high surrogate is not a valid code point sequence
       const re =
-        /^(?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[^\\uD800-\\uDBFF]|^)[\\uDC00-\\uDFFF])$/;
+        /^(?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF])$/;
       expect(re.test('\\ud83d')).toBe(true);
     };"
   `);
@@ -911,7 +985,7 @@ test('054 JS Unicode Regexes > surrogate pair handling > consecutive astral char
   ).toMatchInlineSnapshot(`
     "() => {
       const re =
-        /^((?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[^\\uD800-\\uDBFF]|^)[\\uDC00-\\uDFFF]))((?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[^\\uD800-\\uDBFF]|^)[\\uDC00-\\uDFFF]))$/;
+        /^((?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF]))((?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF]))$/;
       const match = re.exec('😀😁');
       expect(match[1]).toBe('😀');
       expect(match[2]).toBe('😁');
@@ -966,7 +1040,7 @@ test('057 JS Unicode Regexes > quantifiers with /u > {n} quantifier counts code 
   ).toMatchInlineSnapshot(`
     "() => {
       const re =
-        /^(?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[^\\uD800-\\uDBFF]|^)[\\uDC00-\\uDFFF]){3}$/;
+        /^(?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF]){3}$/;
       expect(re.test('abc')).toBe(true);
       expect(re.test('😀😁😂')).toBe(true);
       expect(re.test('a😀b')).toBe(true);
@@ -986,7 +1060,7 @@ test('058 JS Unicode Regexes > quantifiers with /u > {n,m} range quantifier with
   ).toMatchInlineSnapshot(`
     "() => {
       const re =
-        /^(?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[^\\uD800-\\uDBFF]|^)[\\uDC00-\\uDFFF]){2,4}$/;
+        /^(?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF]){2,4}$/;
       expect(re.test('ab')).toBe(true);
       expect(re.test('😀😁')).toBe(true);
       expect(re.test('😀😁😂😃')).toBe(true);
@@ -1025,7 +1099,7 @@ test('060 JS Unicode Regexes > capturing groups with /u > capturing group captur
   ).toMatchInlineSnapshot(`
     "() => {
       const re =
-        /^((?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[^\\uD800-\\uDBFF]|^)[\\uDC00-\\uDFFF]))$/;
+        /^((?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF]))$/;
       const match = re.exec('😀');
       expect(match[1]).toBe('😀');
     };"
@@ -1043,7 +1117,7 @@ test('061 JS Unicode Regexes > capturing groups with /u > multiple groups with a
   ).toMatchInlineSnapshot(`
     "() => {
       const re =
-        /^((?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[^\\uD800-\\uDBFF]|^)[\\uDC00-\\uDFFF]))((?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[^\\uD800-\\uDBFF]|^)[\\uDC00-\\uDFFF]))((?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[^\\uD800-\\uDBFF]|^)[\\uDC00-\\uDFFF]))$/;
+        /^((?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF]))((?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF]))((?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF]))$/;
       const match = re.exec('a😀b');
       expect(match[1]).toBe('a');
       expect(match[2]).toBe('😀');
@@ -1063,7 +1137,7 @@ test('062 JS Unicode Regexes > capturing groups with /u > backreference matches 
   ).toMatchInlineSnapshot(`
     "() => {
       const re =
-        /^((?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[^\\uD800-\\uDBFF]|^)[\\uDC00-\\uDFFF]))\\1$/;
+        /^((?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF]))\\1$/;
       expect(re.test('aa')).toBe(true);
       expect(re.test('😀😀')).toBe(true);
       expect(re.test('😀😁')).toBe(false);
@@ -1082,7 +1156,7 @@ test('063 JS Unicode Regexes > capturing groups with /u > named group with /u', 
   ).toMatchInlineSnapshot(`
     "() => {
       const re =
-        /(?<emoji>(?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[^\\uD800-\\uDBFF]|^)[\\uDC00-\\uDFFF]))/;
+        /(?<emoji>(?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF]))/;
       const match = re.exec('😀');
       expect(match.groups.emoji).toBe('😀');
     };"
@@ -1100,7 +1174,7 @@ test('064 JS Unicode Regexes > capturing groups with /u > non-capturing group wi
   ).toMatchInlineSnapshot(`
     "() => {
       const re =
-        /^(?:(?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[^\\uD800-\\uDBFF]|^)[\\uDC00-\\uDFFF]))$/;
+        /^(?:(?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF]))$/;
       expect(re.test('😀')).toBe(true);
       expect(re.test('A')).toBe(true);
     };"
@@ -1135,7 +1209,7 @@ test('066 JS Unicode Regexes > anchors and boundaries with /u > multiline anchor
   ).toMatchInlineSnapshot(`
     "() => {
       const re =
-        /^(?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[^\\uD800-\\uDBFF]|^)[\\uDC00-\\uDFFF])$/gm;
+        /^(?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF])$/gm;
       const matches = 'a\\n😀\\nb'.match(re);
       expect(matches.length).toBe(3);
       expect(matches[0]).toBe('a');
@@ -1342,7 +1416,7 @@ test('078 JS Unicode Regexes > replace and split with /u > replace dot-matched a
   ).toMatchInlineSnapshot(`
     "() => {
       const result = 'a😀b'.replace(
-        /((?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[^\\uD800-\\uDBFF]|^)[\\uDC00-\\uDFFF]))/g,
+        /((?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF]))/g,
         '[$1]',
       );
       expect(result).toBe('[a][😀][b]');
@@ -1377,7 +1451,7 @@ test('080 JS Unicode Regexes > combined flags > /gu global unicode', async () =>
   ).toMatchInlineSnapshot(`
     "() => {
       const re =
-        /(?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[^\\uD800-\\uDBFF]|^)[\\uDC00-\\uDFFF])/g;
+        /(?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF])/g;
       const matches = '😀😁😂'.match(re);
       expect(matches.length).toBe(3);
       expect(matches[0]).toBe('😀');
@@ -1397,7 +1471,7 @@ test('081 JS Unicode Regexes > combined flags > /giu global case-insensitive uni
     }),
   ).toMatchInlineSnapshot(`
     "() => {
-      const re = /[a-z]/gi;
+      const re = /[a-z\\u017F\\u212A]/gi;
       const matches = 'Hello'.match(re);
       expect(matches.length).toBe(5);
     };"
@@ -1415,7 +1489,7 @@ test('082 JS Unicode Regexes > combined flags > /mu multiline unicode', async ()
   ).toMatchInlineSnapshot(`
     "() => {
       const re =
-        /^(?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[^\\uD800-\\uDBFF]|^)[\\uDC00-\\uDFFF])$/m;
+        /^(?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF])$/m;
       expect(re.test('😀')).toBe(true);
     };"
   `);
@@ -1449,7 +1523,7 @@ test('084 JS Unicode Regexes > combined flags > /yu sticky unicode', async () =>
   ).toMatchInlineSnapshot(`
     "() => {
       const re =
-        /(?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[^\\uD800-\\uDBFF]|^)[\\uDC00-\\uDFFF])/y;
+        /(?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF])/y;
       re.lastIndex = 0;
       const match = re.exec('😀A');
       expect(match[0]).toBe('😀');
@@ -1585,7 +1659,13 @@ test('092 JS Unicode Regexes > edge cases > consecutive astral characters in cla
       helpers: runtimeHelpers,
       transforms: { regexpUnicode: true },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:regexp-unicode-astral-class-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "() => {
+      const re = /^\\uD83D[\\uDE00-\\uDE02]+$/;
+      expect(re.test('😀😁😂😀')).toBe(true);
+      expect(re.test('😃')).toBe(false);
+    };"
+  `);
 });
 
 test('093 JS Unicode Regexes > edge cases > astral character at string boundaries', async () => {
@@ -1631,7 +1711,13 @@ test('095 JS Unicode Regexes > edge cases > mixed BMP and astral string', async 
       helpers: runtimeHelpers,
       transforms: { regexpUnicode: true },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:regexp-unicode-astral-class-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "() => {
+      const re = /^(?:[\\u0061-\\u007A]|\\uD83D[\\uDE00-\\uDE00])+$/;
+      expect(re.test('hello😀world')).toBe(true);
+      expect(re.test('hello😀world!')).toBe(false);
+    };"
+  `);
 });
 
 test('096 JS Unicode Regexes > edge cases > new RegExp with /u flag', async () => {
@@ -1678,7 +1764,7 @@ test('098 JS Unicode Regexes > edge cases > lastIndex advances by code units, no
   ).toMatchInlineSnapshot(`
     "() => {
       const re =
-        /(?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[^\\uD800-\\uDBFF]|^)[\\uDC00-\\uDFFF])/g;
+        /(?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF])/g;
       const str = '😀a';
       const m1 = re.exec(str);
       expect(m1[0]).toBe('😀');
@@ -1698,7 +1784,14 @@ test('099 JS Unicode Regexes > practical patterns > match any emoji in range', a
       helpers: runtimeHelpers,
       transforms: { regexpUnicode: true },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:regexp-unicode-astral-class-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "() => {
+      const re = /\\uD83D[\\uDE00-\\uDE4F]/;
+      expect(re.test('😀')).toBe(true);
+      expect(re.test('🙏')).toBe(true);
+      expect(re.test('A')).toBe(false);
+    };"
+  `);
 });
 
 test('100 JS Unicode Regexes > practical patterns > extract emoji from text', async () => {
@@ -1709,7 +1802,15 @@ test('100 JS Unicode Regexes > practical patterns > extract emoji from text', as
       helpers: runtimeHelpers,
       transforms: { regexpUnicode: true },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:regexp-unicode-astral-class-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "() => {
+      const re = /\\uD83D[\\uDE00-\\uDE4F]/g;
+      const matches = 'Hello 😀 World 😂!'.match(re);
+      expect(matches.length).toBe(2);
+      expect(matches[0]).toBe('😀');
+      expect(matches[1]).toBe('😂');
+    };"
+  `);
 });
 
 test('101 JS Unicode Regexes > practical patterns > count code points in string', async () => {
@@ -1774,7 +1875,15 @@ test('104 JS Unicode Regexes > practical patterns > match mathematical symbols (
       helpers: runtimeHelpers,
       transforms: { regexpUnicode: true },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:regexp-unicode-astral-class-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "() => {
+      // U+1D400-U+1D7FF: Mathematical Alphanumeric Symbols
+      const re = /\\uD835[\\uDC00-\\uDFFF]/;
+      expect(re.test('𝐀')).toBe(true);
+      expect(re.test('𝟿')).toBe(true);
+      expect(re.test('A')).toBe(false);
+    };"
+  `);
 });
 
 test('105 JS Unicode Regexes > practical patterns > split text preserving emoji', async () => {
@@ -1805,7 +1914,7 @@ test('106 JS Unicode Regexes > practical patterns > replace each code point indi
   ).toMatchInlineSnapshot(`
     "() => {
       const result = 'a😀b'.replace(
-        /(?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[^\\uD800-\\uDBFF]|^)[\\uDC00-\\uDFFF])/g,
+        /(?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF])/g,
         ch => \`[\${ch}]\`,
       );
       expect(result).toBe('[a][😀][b]');

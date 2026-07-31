@@ -21,13 +21,17 @@ test('allowArrayLike/holes/exec.js', async () => {
     {
       var _iteratorNormalCompletion = true,
         _didIteratorError = false,
-        _iteratorError;
+        _iteratorError,
+        _iteratorReturnMethod,
+        _iteratorReturn;
       try {
         for (
-          var _iterator = p2[Symbol.iterator](), _step;
-          !(_iteratorNormalCompletion = (_step = _iterator.next()).done);
+          var _iterator = p2[Symbol.iterator](), _iteratorNext = _iterator.next, _step;
+          (_step = _iteratorNext.call(_iterator)), !_step.done;
           _iteratorNormalCompletion = true
         ) {
+          if (Object(_step) !== _step) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion = false;
           var x = _step.value;
           arr.push(x);
         }
@@ -36,7 +40,11 @@ test('allowArrayLike/holes/exec.js', async () => {
         _iteratorError = _iteratorError2;
       } finally {
         try {
-          if (!_iteratorNormalCompletion && _iterator.return != null) _iterator.return();
+          if (!_iteratorNormalCompletion && (_iteratorReturnMethod = _iterator.return) != null) {
+            _iteratorReturn = _iteratorReturnMethod.call(_iterator);
+            if (Object(_iteratorReturn) !== _iteratorReturn)
+              throw new TypeError('Iterator result is not an object');
+          }
         } finally {
           if (_didIteratorError) throw _iteratorError;
         }
@@ -66,13 +74,17 @@ test('allowArrayLike/length-cropped/exec.js', async () => {
     {
       var _iteratorNormalCompletion = true,
         _didIteratorError = false,
-        _iteratorError;
+        _iteratorError,
+        _iteratorReturnMethod,
+        _iteratorReturn;
       try {
         for (
-          var _iterator = p2[Symbol.iterator](), _step;
-          !(_iteratorNormalCompletion = (_step = _iterator.next()).done);
+          var _iterator = p2[Symbol.iterator](), _iteratorNext = _iterator.next, _step;
+          (_step = _iteratorNext.call(_iterator)), !_step.done;
           _iteratorNormalCompletion = true
         ) {
+          if (Object(_step) !== _step) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion = false;
           var x = _step.value;
           arr.push(x);
         }
@@ -81,7 +93,11 @@ test('allowArrayLike/length-cropped/exec.js', async () => {
         _iteratorError = _iteratorError2;
       } finally {
         try {
-          if (!_iteratorNormalCompletion && _iterator.return != null) _iterator.return();
+          if (!_iteratorNormalCompletion && (_iteratorReturnMethod = _iterator.return) != null) {
+            _iteratorReturn = _iteratorReturnMethod.call(_iterator);
+            if (Object(_iteratorReturn) !== _iteratorReturn)
+              throw new TypeError('Iterator result is not an object');
+          }
         } finally {
           if (_didIteratorError) throw _iteratorError;
         }
@@ -110,13 +126,17 @@ test('allowArrayLike/simple/exec.js', async () => {
     {
       var _iteratorNormalCompletion = true,
         _didIteratorError = false,
-        _iteratorError;
+        _iteratorError,
+        _iteratorReturnMethod,
+        _iteratorReturn;
       try {
         for (
-          var _iterator = p2[Symbol.iterator](), _step;
-          !(_iteratorNormalCompletion = (_step = _iterator.next()).done);
+          var _iterator = p2[Symbol.iterator](), _iteratorNext = _iterator.next, _step;
+          (_step = _iteratorNext.call(_iterator)), !_step.done;
           _iteratorNormalCompletion = true
         ) {
+          if (Object(_step) !== _step) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion = false;
           var x = _step.value;
           arr.push(x);
         }
@@ -125,7 +145,11 @@ test('allowArrayLike/simple/exec.js', async () => {
         _iteratorError = _iteratorError2;
       } finally {
         try {
-          if (!_iteratorNormalCompletion && _iterator.return != null) _iterator.return();
+          if (!_iteratorNormalCompletion && (_iteratorReturnMethod = _iterator.return) != null) {
+            _iteratorReturn = _iteratorReturnMethod.call(_iterator);
+            if (Object(_iteratorReturn) !== _iteratorReturn)
+              throw new TypeError('Iterator result is not an object');
+          }
         } finally {
           if (_didIteratorError) throw _iteratorError;
         }
@@ -146,13 +170,17 @@ test('allowArrayLike/simple/input.js', async () => {
     "{
       var _iteratorNormalCompletion = true,
         _didIteratorError = false,
-        _iteratorError;
+        _iteratorError,
+        _iteratorReturnMethod,
+        _iteratorReturn;
       try {
         for (
-          var _iterator = p2[Symbol.iterator](), _step;
-          !(_iteratorNormalCompletion = (_step = _iterator.next()).done);
+          var _iterator = p2[Symbol.iterator](), _iteratorNext = _iterator.next, _step;
+          (_step = _iteratorNext.call(_iterator)), !_step.done;
           _iteratorNormalCompletion = true
         ) {
+          if (Object(_step) !== _step) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion = false;
           var x = _step.value;
           arr.push(x);
         }
@@ -161,7 +189,11 @@ test('allowArrayLike/simple/input.js', async () => {
         _iteratorError = _iteratorError2;
       } finally {
         try {
-          if (!_iteratorNormalCompletion && _iterator.return != null) _iterator.return();
+          if (!_iteratorNormalCompletion && (_iteratorReturnMethod = _iterator.return) != null) {
+            _iteratorReturn = _iteratorReturnMethod.call(_iterator);
+            if (Object(_iteratorReturn) !== _iteratorReturn)
+              throw new TypeError('Iterator result is not an object');
+          }
         } finally {
           if (_didIteratorError) throw _iteratorError;
         }
@@ -188,13 +220,17 @@ test('assumption-arrayLikeIsIterable/holes/exec.js', async () => {
     {
       var _iteratorNormalCompletion = true,
         _didIteratorError = false,
-        _iteratorError;
+        _iteratorError,
+        _iteratorReturnMethod,
+        _iteratorReturn;
       try {
         for (
-          var _iterator = p2[Symbol.iterator](), _step;
-          !(_iteratorNormalCompletion = (_step = _iterator.next()).done);
+          var _iterator = p2[Symbol.iterator](), _iteratorNext = _iterator.next, _step;
+          (_step = _iteratorNext.call(_iterator)), !_step.done;
           _iteratorNormalCompletion = true
         ) {
+          if (Object(_step) !== _step) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion = false;
           var x = _step.value;
           arr.push(x);
         }
@@ -203,7 +239,11 @@ test('assumption-arrayLikeIsIterable/holes/exec.js', async () => {
         _iteratorError = _iteratorError2;
       } finally {
         try {
-          if (!_iteratorNormalCompletion && _iterator.return != null) _iterator.return();
+          if (!_iteratorNormalCompletion && (_iteratorReturnMethod = _iterator.return) != null) {
+            _iteratorReturn = _iteratorReturnMethod.call(_iterator);
+            if (Object(_iteratorReturn) !== _iteratorReturn)
+              throw new TypeError('Iterator result is not an object');
+          }
         } finally {
           if (_didIteratorError) throw _iteratorError;
         }
@@ -233,13 +273,17 @@ test('assumption-arrayLikeIsIterable/length-cropped/exec.js', async () => {
     {
       var _iteratorNormalCompletion = true,
         _didIteratorError = false,
-        _iteratorError;
+        _iteratorError,
+        _iteratorReturnMethod,
+        _iteratorReturn;
       try {
         for (
-          var _iterator = p2[Symbol.iterator](), _step;
-          !(_iteratorNormalCompletion = (_step = _iterator.next()).done);
+          var _iterator = p2[Symbol.iterator](), _iteratorNext = _iterator.next, _step;
+          (_step = _iteratorNext.call(_iterator)), !_step.done;
           _iteratorNormalCompletion = true
         ) {
+          if (Object(_step) !== _step) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion = false;
           var x = _step.value;
           arr.push(x);
         }
@@ -248,7 +292,11 @@ test('assumption-arrayLikeIsIterable/length-cropped/exec.js', async () => {
         _iteratorError = _iteratorError2;
       } finally {
         try {
-          if (!_iteratorNormalCompletion && _iterator.return != null) _iterator.return();
+          if (!_iteratorNormalCompletion && (_iteratorReturnMethod = _iterator.return) != null) {
+            _iteratorReturn = _iteratorReturnMethod.call(_iterator);
+            if (Object(_iteratorReturn) !== _iteratorReturn)
+              throw new TypeError('Iterator result is not an object');
+          }
         } finally {
           if (_didIteratorError) throw _iteratorError;
         }
@@ -277,13 +325,17 @@ test('assumption-arrayLikeIsIterable/simple/exec.js', async () => {
     {
       var _iteratorNormalCompletion = true,
         _didIteratorError = false,
-        _iteratorError;
+        _iteratorError,
+        _iteratorReturnMethod,
+        _iteratorReturn;
       try {
         for (
-          var _iterator = p2[Symbol.iterator](), _step;
-          !(_iteratorNormalCompletion = (_step = _iterator.next()).done);
+          var _iterator = p2[Symbol.iterator](), _iteratorNext = _iterator.next, _step;
+          (_step = _iteratorNext.call(_iterator)), !_step.done;
           _iteratorNormalCompletion = true
         ) {
+          if (Object(_step) !== _step) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion = false;
           var x = _step.value;
           arr.push(x);
         }
@@ -292,7 +344,11 @@ test('assumption-arrayLikeIsIterable/simple/exec.js', async () => {
         _iteratorError = _iteratorError2;
       } finally {
         try {
-          if (!_iteratorNormalCompletion && _iterator.return != null) _iterator.return();
+          if (!_iteratorNormalCompletion && (_iteratorReturnMethod = _iterator.return) != null) {
+            _iteratorReturn = _iteratorReturnMethod.call(_iterator);
+            if (Object(_iteratorReturn) !== _iteratorReturn)
+              throw new TypeError('Iterator result is not an object');
+          }
         } finally {
           if (_didIteratorError) throw _iteratorError;
         }
@@ -313,13 +369,17 @@ test('assumption-arrayLikeIsIterable/simple/input.js', async () => {
     "{
       var _iteratorNormalCompletion = true,
         _didIteratorError = false,
-        _iteratorError;
+        _iteratorError,
+        _iteratorReturnMethod,
+        _iteratorReturn;
       try {
         for (
-          var _iterator = p2[Symbol.iterator](), _step;
-          !(_iteratorNormalCompletion = (_step = _iterator.next()).done);
+          var _iterator = p2[Symbol.iterator](), _iteratorNext = _iterator.next, _step;
+          (_step = _iteratorNext.call(_iterator)), !_step.done;
           _iteratorNormalCompletion = true
         ) {
+          if (Object(_step) !== _step) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion = false;
           var x = _step.value;
           arr.push(x);
         }
@@ -328,7 +388,11 @@ test('assumption-arrayLikeIsIterable/simple/input.js', async () => {
         _iteratorError = _iteratorError2;
       } finally {
         try {
-          if (!_iteratorNormalCompletion && _iterator.return != null) _iterator.return();
+          if (!_iteratorNormalCompletion && (_iteratorReturnMethod = _iterator.return) != null) {
+            _iteratorReturn = _iteratorReturnMethod.call(_iterator);
+            if (Object(_iteratorReturn) !== _iteratorReturn)
+              throw new TypeError('Iterator result is not an object');
+          }
         } finally {
           if (_didIteratorError) throw _iteratorError;
         }
@@ -363,22 +427,32 @@ test('assumption-iterableIsArray/for-of-array-pattern/input.js', async () => {
     {
       var _iteratorNormalCompletion = true,
         _didIteratorError = false,
-        _iteratorError;
+        _iteratorError,
+        _iteratorReturnMethod,
+        _iteratorReturn;
       try {
         for (
-          var _iterator = array[Symbol.iterator](), _step;
-          !(_iteratorNormalCompletion = (_step = _iterator.next()).done);
+          var _iterator = array[Symbol.iterator](), _iteratorNext = _iterator.next, _step;
+          (_step = _iteratorNext.call(_iterator)), !_step.done;
           _iteratorNormalCompletion = true
         ) {
+          if (Object(_step) !== _step) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion = false;
           [elm] = _step.value;
-          console.log(elm);
+          {
+            console.log(elm);
+          }
         }
       } catch (_iteratorError2) {
         _didIteratorError = true;
         _iteratorError = _iteratorError2;
       } finally {
         try {
-          if (!_iteratorNormalCompletion && _iterator.return != null) _iterator.return();
+          if (!_iteratorNormalCompletion && (_iteratorReturnMethod = _iterator.return) != null) {
+            _iteratorReturn = _iteratorReturnMethod.call(_iterator);
+            if (Object(_iteratorReturn) !== _iteratorReturn)
+              throw new TypeError('Iterator result is not an object');
+          }
         } finally {
           if (_didIteratorError) throw _iteratorError;
         }
@@ -398,22 +472,32 @@ test('assumption-iterableIsArray/for-of-declaration-array-pattern/input.js', asy
     "{
       var _iteratorNormalCompletion = true,
         _didIteratorError = false,
-        _iteratorError;
+        _iteratorError,
+        _iteratorReturnMethod,
+        _iteratorReturn;
       try {
         for (
-          var _iterator = array[Symbol.iterator](), _step;
-          !(_iteratorNormalCompletion = (_step = _iterator.next()).done);
+          var _iterator = array[Symbol.iterator](), _iteratorNext = _iterator.next, _step;
+          (_step = _iteratorNext.call(_iterator)), !_step.done;
           _iteratorNormalCompletion = true
         ) {
+          if (Object(_step) !== _step) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion = false;
           const [elm] = _step.value;
-          console.log(elm);
+          {
+            console.log(elm);
+          }
         }
       } catch (_iteratorError2) {
         _didIteratorError = true;
         _iteratorError = _iteratorError2;
       } finally {
         try {
-          if (!_iteratorNormalCompletion && _iterator.return != null) _iterator.return();
+          if (!_iteratorNormalCompletion && (_iteratorReturnMethod = _iterator.return) != null) {
+            _iteratorReturn = _iteratorReturnMethod.call(_iterator);
+            if (Object(_iteratorReturn) !== _iteratorReturn)
+              throw new TypeError('Iterator result is not an object');
+          }
         } finally {
           if (_didIteratorError) throw _iteratorError;
         }
@@ -433,22 +517,32 @@ test('assumption-iterableIsArray/for-of-declaration/input.js', async () => {
     "{
       var _iteratorNormalCompletion = true,
         _didIteratorError = false,
-        _iteratorError;
+        _iteratorError,
+        _iteratorReturnMethod,
+        _iteratorReturn;
       try {
         for (
-          var _iterator = array[Symbol.iterator](), _step;
-          !(_iteratorNormalCompletion = (_step = _iterator.next()).done);
+          var _iterator = array[Symbol.iterator](), _iteratorNext = _iterator.next, _step;
+          (_step = _iteratorNext.call(_iterator)), !_step.done;
           _iteratorNormalCompletion = true
         ) {
+          if (Object(_step) !== _step) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion = false;
           const elm = _step.value;
-          console.log(elm);
+          {
+            console.log(elm);
+          }
         }
       } catch (_iteratorError2) {
         _didIteratorError = true;
         _iteratorError = _iteratorError2;
       } finally {
         try {
-          if (!_iteratorNormalCompletion && _iterator.return != null) _iterator.return();
+          if (!_iteratorNormalCompletion && (_iteratorReturnMethod = _iterator.return) != null) {
+            _iteratorReturn = _iteratorReturnMethod.call(_iterator);
+            if (Object(_iteratorReturn) !== _iteratorReturn)
+              throw new TypeError('Iterator result is not an object');
+          }
         } finally {
           if (_didIteratorError) throw _iteratorError;
         }
@@ -468,13 +562,17 @@ test('assumption-iterableIsArray/for-of-expression-declaration/input.js', async 
     "{
       var _iteratorNormalCompletion = true,
         _didIteratorError = false,
-        _iteratorError;
+        _iteratorError,
+        _iteratorReturnMethod,
+        _iteratorReturn;
       try {
         for (
-          var _iterator = items[Symbol.iterator](), _step;
-          !(_iteratorNormalCompletion = (_step = _iterator.next()).done);
+          var _iterator = items[Symbol.iterator](), _iteratorNext = _iterator.next, _step;
+          (_step = _iteratorNext.call(_iterator)), !_step.done;
           _iteratorNormalCompletion = true
         ) {
+          if (Object(_step) !== _step) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion = false;
           const i = _step.value;
           i;
         }
@@ -483,7 +581,11 @@ test('assumption-iterableIsArray/for-of-expression-declaration/input.js', async 
         _iteratorError = _iteratorError2;
       } finally {
         try {
-          if (!_iteratorNormalCompletion && _iterator.return != null) _iterator.return();
+          if (!_iteratorNormalCompletion && (_iteratorReturnMethod = _iterator.return) != null) {
+            _iteratorReturn = _iteratorReturnMethod.call(_iterator);
+            if (Object(_iteratorReturn) !== _iteratorReturn)
+              throw new TypeError('Iterator result is not an object');
+          }
         } finally {
           if (_didIteratorError) throw _iteratorError;
         }
@@ -504,13 +606,17 @@ test('assumption-iterableIsArray/for-of-expression/input.js', async () => {
     {
       var _iteratorNormalCompletion = true,
         _didIteratorError = false,
-        _iteratorError;
+        _iteratorError,
+        _iteratorReturnMethod,
+        _iteratorReturn;
       try {
         for (
-          var _iterator = items[Symbol.iterator](), _step;
-          !(_iteratorNormalCompletion = (_step = _iterator.next()).done);
+          var _iterator = items[Symbol.iterator](), _iteratorNext = _iterator.next, _step;
+          (_step = _iteratorNext.call(_iterator)), !_step.done;
           _iteratorNormalCompletion = true
         ) {
+          if (Object(_step) !== _step) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion = false;
           i = _step.value;
           i;
         }
@@ -519,7 +625,11 @@ test('assumption-iterableIsArray/for-of-expression/input.js', async () => {
         _iteratorError = _iteratorError2;
       } finally {
         try {
-          if (!_iteratorNormalCompletion && _iterator.return != null) _iterator.return();
+          if (!_iteratorNormalCompletion && (_iteratorReturnMethod = _iterator.return) != null) {
+            _iteratorReturn = _iteratorReturnMethod.call(_iterator);
+            if (Object(_iteratorReturn) !== _iteratorReturn)
+              throw new TypeError('Iterator result is not an object');
+          }
         } finally {
           if (_didIteratorError) throw _iteratorError;
         }
@@ -541,22 +651,32 @@ test('assumption-iterableIsArray/for-of-import-amd/input.mjs', async () => {
     {
       var _iteratorNormalCompletion = true,
         _didIteratorError = false,
-        _iteratorError;
+        _iteratorError,
+        _iteratorReturnMethod,
+        _iteratorReturn;
       try {
         for (
-          var _iterator = array[Symbol.iterator](), _step;
-          !(_iteratorNormalCompletion = (_step = _iterator.next()).done);
+          var _iterator = array[Symbol.iterator](), _iteratorNext = _iterator.next, _step;
+          (_step = _iteratorNext.call(_iterator)), !_step.done;
           _iteratorNormalCompletion = true
         ) {
+          if (Object(_step) !== _step) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion = false;
           const elm = _step.value;
-          console.log(elm);
+          {
+            console.log(elm);
+          }
         }
       } catch (_iteratorError2) {
         _didIteratorError = true;
         _iteratorError = _iteratorError2;
       } finally {
         try {
-          if (!_iteratorNormalCompletion && _iterator.return != null) _iterator.return();
+          if (!_iteratorNormalCompletion && (_iteratorReturnMethod = _iterator.return) != null) {
+            _iteratorReturn = _iteratorReturnMethod.call(_iterator);
+            if (Object(_iteratorReturn) !== _iteratorReturn)
+              throw new TypeError('Iterator result is not an object');
+          }
         } finally {
           if (_didIteratorError) throw _iteratorError;
         }
@@ -578,22 +698,32 @@ test('assumption-iterableIsArray/for-of-import-commonjs/input.mjs', async () => 
     {
       var _iteratorNormalCompletion = true,
         _didIteratorError = false,
-        _iteratorError;
+        _iteratorError,
+        _iteratorReturnMethod,
+        _iteratorReturn;
       try {
         for (
-          var _iterator = array[Symbol.iterator](), _step;
-          !(_iteratorNormalCompletion = (_step = _iterator.next()).done);
+          var _iterator = array[Symbol.iterator](), _iteratorNext = _iterator.next, _step;
+          (_step = _iteratorNext.call(_iterator)), !_step.done;
           _iteratorNormalCompletion = true
         ) {
+          if (Object(_step) !== _step) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion = false;
           const elm = _step.value;
-          console.log(elm);
+          {
+            console.log(elm);
+          }
         }
       } catch (_iteratorError2) {
         _didIteratorError = true;
         _iteratorError = _iteratorError2;
       } finally {
         try {
-          if (!_iteratorNormalCompletion && _iterator.return != null) _iterator.return();
+          if (!_iteratorNormalCompletion && (_iteratorReturnMethod = _iterator.return) != null) {
+            _iteratorReturn = _iteratorReturnMethod.call(_iterator);
+            if (Object(_iteratorReturn) !== _iteratorReturn)
+              throw new TypeError('Iterator result is not an object');
+          }
         } finally {
           if (_didIteratorError) throw _iteratorError;
         }
@@ -615,22 +745,32 @@ test('assumption-iterableIsArray/for-of-import-es2015/input.mjs', async () => {
     {
       var _iteratorNormalCompletion = true,
         _didIteratorError = false,
-        _iteratorError;
+        _iteratorError,
+        _iteratorReturnMethod,
+        _iteratorReturn;
       try {
         for (
-          var _iterator = array[Symbol.iterator](), _step;
-          !(_iteratorNormalCompletion = (_step = _iterator.next()).done);
+          var _iterator = array[Symbol.iterator](), _iteratorNext = _iterator.next, _step;
+          (_step = _iteratorNext.call(_iterator)), !_step.done;
           _iteratorNormalCompletion = true
         ) {
+          if (Object(_step) !== _step) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion = false;
           const elm = _step.value;
-          console.log(elm);
+          {
+            console.log(elm);
+          }
         }
       } catch (_iteratorError2) {
         _didIteratorError = true;
         _iteratorError = _iteratorError2;
       } finally {
         try {
-          if (!_iteratorNormalCompletion && _iterator.return != null) _iterator.return();
+          if (!_iteratorNormalCompletion && (_iteratorReturnMethod = _iterator.return) != null) {
+            _iteratorReturn = _iteratorReturnMethod.call(_iterator);
+            if (Object(_iteratorReturn) !== _iteratorReturn)
+              throw new TypeError('Iterator result is not an object');
+          }
         } finally {
           if (_didIteratorError) throw _iteratorError;
         }
@@ -650,22 +790,32 @@ test('assumption-iterableIsArray/for-of-modify-iterable/input.js', async () => {
     "{
       var _iteratorNormalCompletion = true,
         _didIteratorError = false,
-        _iteratorError;
+        _iteratorError,
+        _iteratorReturnMethod,
+        _iteratorReturn;
       try {
         for (
-          var _iterator = arr[Symbol.iterator](), _step;
-          !(_iteratorNormalCompletion = (_step = _iterator.next()).done);
+          var _iterator = arr[Symbol.iterator](), _iteratorNext = _iterator.next, _step;
+          (_step = _iteratorNext.call(_iterator)), !_step.done;
           _iteratorNormalCompletion = true
         ) {
+          if (Object(_step) !== _step) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion = false;
           let o = _step.value;
-          arr = null;
+          {
+            arr = null;
+          }
         }
       } catch (_iteratorError2) {
         _didIteratorError = true;
         _iteratorError = _iteratorError2;
       } finally {
         try {
-          if (!_iteratorNormalCompletion && _iterator.return != null) _iterator.return();
+          if (!_iteratorNormalCompletion && (_iteratorReturnMethod = _iterator.return) != null) {
+            _iteratorReturn = _iteratorReturnMethod.call(_iterator);
+            if (Object(_iteratorReturn) !== _iteratorReturn)
+              throw new TypeError('Iterator result is not an object');
+          }
         } finally {
           if (_didIteratorError) throw _iteratorError;
         }
@@ -682,7 +832,44 @@ test('assumption-iterableIsArray/for-of-partial-redeclaration-in-body-array-patt
       transforms: { forOf: true },
       helpers: { mode: 'inline' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:post-rewrite-semantic-error"`);
+  ).toMatchInlineSnapshot(`
+    "{
+      var _iteratorNormalCompletion = true,
+        _didIteratorError = false,
+        _iteratorError,
+        _iteratorReturnMethod,
+        _iteratorReturn;
+      try {
+        for (
+          var _iterator = array[Symbol.iterator](), _iteratorNext = _iterator.next, _step;
+          (_step = _iteratorNext.call(_iterator)), !_step.done;
+          _iteratorNormalCompletion = true
+        ) {
+          if (Object(_step) !== _step) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion = false;
+          const [head, ...tail] = _step.value;
+          {
+            const head = 1;
+            console.log(tail);
+            console.log(head);
+          }
+        }
+      } catch (_iteratorError2) {
+        _didIteratorError = true;
+        _iteratorError = _iteratorError2;
+      } finally {
+        try {
+          if (!_iteratorNormalCompletion && (_iteratorReturnMethod = _iterator.return) != null) {
+            _iteratorReturn = _iteratorReturnMethod.call(_iterator);
+            if (Object(_iteratorReturn) !== _iteratorReturn)
+              throw new TypeError('Iterator result is not an object');
+          }
+        } finally {
+          if (_didIteratorError) throw _iteratorError;
+        }
+      }
+    }"
+  `);
 });
 
 test('assumption-iterableIsArray/for-of-partial-redeclaration-in-body-object-pattern/input.js', async () => {
@@ -693,7 +880,44 @@ test('assumption-iterableIsArray/for-of-partial-redeclaration-in-body-object-pat
       transforms: { forOf: true },
       helpers: { mode: 'inline' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:post-rewrite-semantic-error"`);
+  ).toMatchInlineSnapshot(`
+    "{
+      var _iteratorNormalCompletion = true,
+        _didIteratorError = false,
+        _iteratorError,
+        _iteratorReturnMethod,
+        _iteratorReturn;
+      try {
+        for (
+          var _iterator = array[Symbol.iterator](), _iteratorNext = _iterator.next, _step;
+          (_step = _iteratorNext.call(_iterator)), !_step.done;
+          _iteratorNormalCompletion = true
+        ) {
+          if (Object(_step) !== _step) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion = false;
+          const [type, ...rest] = _step.value;
+          {
+            const type = 1;
+            console.log(rest);
+            console.log(type);
+          }
+        }
+      } catch (_iteratorError2) {
+        _didIteratorError = true;
+        _iteratorError = _iteratorError2;
+      } finally {
+        try {
+          if (!_iteratorNormalCompletion && (_iteratorReturnMethod = _iterator.return) != null) {
+            _iteratorReturn = _iteratorReturnMethod.call(_iterator);
+            if (Object(_iteratorReturn) !== _iteratorReturn)
+              throw new TypeError('Iterator result is not an object');
+          }
+        } finally {
+          if (_didIteratorError) throw _iteratorError;
+        }
+      }
+    }"
+  `);
 });
 
 test('assumption-iterableIsArray/for-of-redeclaration-in-body-array-pattern/input.js', async () => {
@@ -704,7 +928,45 @@ test('assumption-iterableIsArray/for-of-redeclaration-in-body-array-pattern/inpu
       transforms: { forOf: true },
       helpers: { mode: 'inline' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:post-rewrite-semantic-error"`);
+  ).toMatchInlineSnapshot(`
+    "{
+      var _iteratorNormalCompletion = true,
+        _didIteratorError = false,
+        _iteratorError,
+        _iteratorReturnMethod,
+        _iteratorReturn;
+      try {
+        for (
+          var _iterator = array[Symbol.iterator](), _iteratorNext = _iterator.next, _step;
+          (_step = _iteratorNext.call(_iterator)), !_step.done;
+          _iteratorNormalCompletion = true
+        ) {
+          if (Object(_step) !== _step) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion = false;
+          const [head, ...tail] = _step.value;
+          {
+            const head = 1;
+            let tail;
+            console.log(tail);
+            console.log(head);
+          }
+        }
+      } catch (_iteratorError2) {
+        _didIteratorError = true;
+        _iteratorError = _iteratorError2;
+      } finally {
+        try {
+          if (!_iteratorNormalCompletion && (_iteratorReturnMethod = _iterator.return) != null) {
+            _iteratorReturn = _iteratorReturnMethod.call(_iterator);
+            if (Object(_iteratorReturn) !== _iteratorReturn)
+              throw new TypeError('Iterator result is not an object');
+          }
+        } finally {
+          if (_didIteratorError) throw _iteratorError;
+        }
+      }
+    }"
+  `);
 });
 
 test('assumption-iterableIsArray/for-of-redeclaration-in-body-object-pattern/input.js', async () => {
@@ -715,7 +977,45 @@ test('assumption-iterableIsArray/for-of-redeclaration-in-body-object-pattern/inp
       transforms: { forOf: true },
       helpers: { mode: 'inline' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:post-rewrite-semantic-error"`);
+  ).toMatchInlineSnapshot(`
+    "{
+      var _iteratorNormalCompletion = true,
+        _didIteratorError = false,
+        _iteratorError,
+        _iteratorReturnMethod,
+        _iteratorReturn;
+      try {
+        for (
+          var _iterator = array[Symbol.iterator](), _iteratorNext = _iterator.next, _step;
+          (_step = _iteratorNext.call(_iterator)), !_step.done;
+          _iteratorNormalCompletion = true
+        ) {
+          if (Object(_step) !== _step) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion = false;
+          const { type, ...rest } = _step.value;
+          {
+            const type = 1;
+            let rest;
+            console.log(rest);
+            console.log(type);
+          }
+        }
+      } catch (_iteratorError2) {
+        _didIteratorError = true;
+        _iteratorError = _iteratorError2;
+      } finally {
+        try {
+          if (!_iteratorNormalCompletion && (_iteratorReturnMethod = _iterator.return) != null) {
+            _iteratorReturn = _iteratorReturnMethod.call(_iterator);
+            if (Object(_iteratorReturn) !== _iteratorReturn)
+              throw new TypeError('Iterator result is not an object');
+          }
+        } finally {
+          if (_didIteratorError) throw _iteratorError;
+        }
+      }
+    }"
+  `);
 });
 
 test('assumption-iterableIsArray/for-of-redeclaration-in-body/input.js', async () => {
@@ -725,7 +1025,42 @@ test('assumption-iterableIsArray/for-of-redeclaration-in-body/input.js', async (
       transforms: { forOf: true },
       helpers: { mode: 'inline' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:post-rewrite-semantic-error"`);
+  ).toMatchInlineSnapshot(`
+    "{
+      var _iteratorNormalCompletion = true,
+        _didIteratorError = false,
+        _iteratorError,
+        _iteratorReturnMethod,
+        _iteratorReturn;
+      try {
+        for (
+          var _iterator = array[Symbol.iterator](), _iteratorNext = _iterator.next, _step;
+          (_step = _iteratorNext.call(_iterator)), !_step.done;
+          _iteratorNormalCompletion = true
+        ) {
+          if (Object(_step) !== _step) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion = false;
+          const elm = _step.value;
+          {
+            const elm = 2;
+          }
+        }
+      } catch (_iteratorError2) {
+        _didIteratorError = true;
+        _iteratorError = _iteratorError2;
+      } finally {
+        try {
+          if (!_iteratorNormalCompletion && (_iteratorReturnMethod = _iterator.return) != null) {
+            _iteratorReturn = _iteratorReturnMethod.call(_iterator);
+            if (Object(_iteratorReturn) !== _iteratorReturn)
+              throw new TypeError('Iterator result is not an object');
+          }
+        } finally {
+          if (_didIteratorError) throw _iteratorError;
+        }
+      }
+    }"
+  `);
 });
 
 test('assumption-iterableIsArray/for-of-redeclare-iterable/input.js', async () => {
@@ -739,22 +1074,32 @@ test('assumption-iterableIsArray/for-of-redeclare-iterable/input.js', async () =
     "{
       var _iteratorNormalCompletion = true,
         _didIteratorError = false,
-        _iteratorError;
+        _iteratorError,
+        _iteratorReturnMethod,
+        _iteratorReturn;
       try {
         for (
-          var _iterator = arr[Symbol.iterator](), _step;
-          !(_iteratorNormalCompletion = (_step = _iterator.next()).done);
+          var _iterator = arr[Symbol.iterator](), _iteratorNext = _iterator.next, _step;
+          (_step = _iteratorNext.call(_iterator)), !_step.done;
           _iteratorNormalCompletion = true
         ) {
+          if (Object(_step) !== _step) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion = false;
           let o = _step.value;
-          const arr = o;
+          {
+            const arr = o;
+          }
         }
       } catch (_iteratorError2) {
         _didIteratorError = true;
         _iteratorError = _iteratorError2;
       } finally {
         try {
-          if (!_iteratorNormalCompletion && _iterator.return != null) _iterator.return();
+          if (!_iteratorNormalCompletion && (_iteratorReturnMethod = _iterator.return) != null) {
+            _iteratorReturn = _iteratorReturnMethod.call(_iterator);
+            if (Object(_iteratorReturn) !== _iteratorReturn)
+              throw new TypeError('Iterator result is not an object');
+          }
         } finally {
           if (_didIteratorError) throw _iteratorError;
         }
@@ -775,22 +1120,32 @@ test('assumption-iterableIsArray/for-of-static-declaration/input.js', async () =
     {
       var _iteratorNormalCompletion = true,
         _didIteratorError = false,
-        _iteratorError;
+        _iteratorError,
+        _iteratorReturnMethod,
+        _iteratorReturn;
       try {
         for (
-          var _iterator = array[Symbol.iterator](), _step;
-          !(_iteratorNormalCompletion = (_step = _iterator.next()).done);
+          var _iterator = array[Symbol.iterator](), _iteratorNext = _iterator.next, _step;
+          (_step = _iteratorNext.call(_iterator)), !_step.done;
           _iteratorNormalCompletion = true
         ) {
+          if (Object(_step) !== _step) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion = false;
           const elm = _step.value;
-          console.log(elm);
+          {
+            console.log(elm);
+          }
         }
       } catch (_iteratorError2) {
         _didIteratorError = true;
         _iteratorError = _iteratorError2;
       } finally {
         try {
-          if (!_iteratorNormalCompletion && _iterator.return != null) _iterator.return();
+          if (!_iteratorNormalCompletion && (_iteratorReturnMethod = _iterator.return) != null) {
+            _iteratorReturn = _iteratorReturnMethod.call(_iterator);
+            if (Object(_iteratorReturn) !== _iteratorReturn)
+              throw new TypeError('Iterator result is not an object');
+          }
         } finally {
           if (_didIteratorError) throw _iteratorError;
         }
@@ -812,22 +1167,32 @@ test('assumption-iterableIsArray/for-of-static/input.js', async () => {
     {
       var _iteratorNormalCompletion = true,
         _didIteratorError = false,
-        _iteratorError;
+        _iteratorError,
+        _iteratorReturnMethod,
+        _iteratorReturn;
       try {
         for (
-          var _iterator = array[Symbol.iterator](), _step;
-          !(_iteratorNormalCompletion = (_step = _iterator.next()).done);
+          var _iterator = array[Symbol.iterator](), _iteratorNext = _iterator.next, _step;
+          (_step = _iteratorNext.call(_iterator)), !_step.done;
           _iteratorNormalCompletion = true
         ) {
+          if (Object(_step) !== _step) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion = false;
           elm = _step.value;
-          console.log(elm);
+          {
+            console.log(elm);
+          }
         }
       } catch (_iteratorError2) {
         _didIteratorError = true;
         _iteratorError = _iteratorError2;
       } finally {
         try {
-          if (!_iteratorNormalCompletion && _iterator.return != null) _iterator.return();
+          if (!_iteratorNormalCompletion && (_iteratorReturnMethod = _iterator.return) != null) {
+            _iteratorReturn = _iteratorReturnMethod.call(_iterator);
+            if (Object(_iteratorReturn) !== _iteratorReturn)
+              throw new TypeError('Iterator result is not an object');
+          }
         } finally {
           if (_didIteratorError) throw _iteratorError;
         }
@@ -848,22 +1213,32 @@ test('assumption-iterableIsArray/for-of/input.js', async () => {
     {
       var _iteratorNormalCompletion = true,
         _didIteratorError = false,
-        _iteratorError;
+        _iteratorError,
+        _iteratorReturnMethod,
+        _iteratorReturn;
       try {
         for (
-          var _iterator = array[Symbol.iterator](), _step;
-          !(_iteratorNormalCompletion = (_step = _iterator.next()).done);
+          var _iterator = array[Symbol.iterator](), _iteratorNext = _iterator.next, _step;
+          (_step = _iteratorNext.call(_iterator)), !_step.done;
           _iteratorNormalCompletion = true
         ) {
+          if (Object(_step) !== _step) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion = false;
           elm = _step.value;
-          console.log(elm);
+          {
+            console.log(elm);
+          }
         }
       } catch (_iteratorError2) {
         _didIteratorError = true;
         _iteratorError = _iteratorError2;
       } finally {
         try {
-          if (!_iteratorNormalCompletion && _iterator.return != null) _iterator.return();
+          if (!_iteratorNormalCompletion && (_iteratorReturnMethod = _iterator.return) != null) {
+            _iteratorReturn = _iteratorReturnMethod.call(_iterator);
+            if (Object(_iteratorReturn) !== _iteratorReturn)
+              throw new TypeError('Iterator result is not an object');
+          }
         } finally {
           if (_didIteratorError) throw _iteratorError;
         }
@@ -883,21 +1258,31 @@ test('assumption-skipForOfIteratorClosing/identifier/input.js', async () => {
     "{
       var _iteratorNormalCompletion = true,
         _didIteratorError = false,
-        _iteratorError;
+        _iteratorError,
+        _iteratorReturnMethod,
+        _iteratorReturn;
       try {
         for (
-          var _iterator = arr[Symbol.iterator](), _step;
-          !(_iteratorNormalCompletion = (_step = _iterator.next()).done);
+          var _iterator = arr[Symbol.iterator](), _iteratorNext = _iterator.next, _step;
+          (_step = _iteratorNext.call(_iterator)), !_step.done;
           _iteratorNormalCompletion = true
         ) {
+          if (Object(_step) !== _step) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion = false;
           i = _step.value;
+          {
+          }
         }
       } catch (_iteratorError2) {
         _didIteratorError = true;
         _iteratorError = _iteratorError2;
       } finally {
         try {
-          if (!_iteratorNormalCompletion && _iterator.return != null) _iterator.return();
+          if (!_iteratorNormalCompletion && (_iteratorReturnMethod = _iterator.return) != null) {
+            _iteratorReturn = _iteratorReturnMethod.call(_iterator);
+            if (Object(_iteratorReturn) !== _iteratorReturn)
+              throw new TypeError('Iterator result is not an object');
+          }
         } finally {
           if (_didIteratorError) throw _iteratorError;
         }
@@ -917,17 +1302,23 @@ test('assumption-skipForOfIteratorClosing/ignore-cases/input.js', async () => {
     "{
       var _iteratorNormalCompletion = true,
         _didIteratorError = false,
-        _iteratorError;
+        _iteratorError,
+        _iteratorReturnMethod,
+        _iteratorReturn;
       try {
         for (
-          var _iterator = foo[Symbol.iterator](), _step;
-          !(_iteratorNormalCompletion = (_step = _iterator.next()).done);
+          var _iterator = foo[Symbol.iterator](), _iteratorNext = _iterator.next, _step;
+          (_step = _iteratorNext.call(_iterator)), !_step.done;
           _iteratorNormalCompletion = true
         ) {
+          if (Object(_step) !== _step) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion = false;
           var i = _step.value;
-          switch (i) {
-            case 1:
-              break;
+          {
+            switch (i) {
+              case 1:
+                break;
+            }
           }
         }
       } catch (_iteratorError2) {
@@ -935,7 +1326,11 @@ test('assumption-skipForOfIteratorClosing/ignore-cases/input.js', async () => {
         _iteratorError = _iteratorError2;
       } finally {
         try {
-          if (!_iteratorNormalCompletion && _iterator.return != null) _iterator.return();
+          if (!_iteratorNormalCompletion && (_iteratorReturnMethod = _iterator.return) != null) {
+            _iteratorReturn = _iteratorReturnMethod.call(_iterator);
+            if (Object(_iteratorReturn) !== _iteratorReturn)
+              throw new TypeError('Iterator result is not an object');
+          }
         } finally {
           if (_didIteratorError) throw _iteratorError;
         }
@@ -955,21 +1350,31 @@ test('assumption-skipForOfIteratorClosing/let/input.js', async () => {
     "{
       var _iteratorNormalCompletion = true,
         _didIteratorError = false,
-        _iteratorError;
+        _iteratorError,
+        _iteratorReturnMethod,
+        _iteratorReturn;
       try {
         for (
-          var _iterator = arr[Symbol.iterator](), _step;
-          !(_iteratorNormalCompletion = (_step = _iterator.next()).done);
+          var _iterator = arr[Symbol.iterator](), _iteratorNext = _iterator.next, _step;
+          (_step = _iteratorNext.call(_iterator)), !_step.done;
           _iteratorNormalCompletion = true
         ) {
+          if (Object(_step) !== _step) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion = false;
           let i = _step.value;
+          {
+          }
         }
       } catch (_iteratorError2) {
         _didIteratorError = true;
         _iteratorError = _iteratorError2;
       } finally {
         try {
-          if (!_iteratorNormalCompletion && _iterator.return != null) _iterator.return();
+          if (!_iteratorNormalCompletion && (_iteratorReturnMethod = _iterator.return) != null) {
+            _iteratorReturn = _iteratorReturnMethod.call(_iterator);
+            if (Object(_iteratorReturn) !== _iteratorReturn)
+              throw new TypeError('Iterator result is not an object');
+          }
         } finally {
           if (_didIteratorError) throw _iteratorError;
         }
@@ -989,21 +1394,31 @@ test('assumption-skipForOfIteratorClosing/member-expression/input.js', async () 
     "{
       var _iteratorNormalCompletion = true,
         _didIteratorError = false,
-        _iteratorError;
+        _iteratorError,
+        _iteratorReturnMethod,
+        _iteratorReturn;
       try {
         for (
-          var _iterator = arr[Symbol.iterator](), _step;
-          !(_iteratorNormalCompletion = (_step = _iterator.next()).done);
+          var _iterator = arr[Symbol.iterator](), _iteratorNext = _iterator.next, _step;
+          (_step = _iteratorNext.call(_iterator)), !_step.done;
           _iteratorNormalCompletion = true
         ) {
+          if (Object(_step) !== _step) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion = false;
           obj.prop = _step.value;
+          {
+          }
         }
       } catch (_iteratorError2) {
         _didIteratorError = true;
         _iteratorError = _iteratorError2;
       } finally {
         try {
-          if (!_iteratorNormalCompletion && _iterator.return != null) _iterator.return();
+          if (!_iteratorNormalCompletion && (_iteratorReturnMethod = _iterator.return) != null) {
+            _iteratorReturn = _iteratorReturnMethod.call(_iterator);
+            if (Object(_iteratorReturn) !== _iteratorReturn)
+              throw new TypeError('Iterator result is not an object');
+          }
         } finally {
           if (_didIteratorError) throw _iteratorError;
         }
@@ -1023,46 +1438,66 @@ test('assumption-skipForOfIteratorClosing/multiple/input.js', async () => {
     "{
       var _iteratorNormalCompletion = true,
         _didIteratorError = false,
-        _iteratorError;
+        _iteratorError,
+        _iteratorReturnMethod,
+        _iteratorReturn;
       try {
         for (
-          var _iterator = arr[Symbol.iterator](), _step;
-          !(_iteratorNormalCompletion = (_step = _iterator.next()).done);
+          var _iterator = arr[Symbol.iterator](), _iteratorNext = _iterator.next, _step;
+          (_step = _iteratorNext.call(_iterator)), !_step.done;
           _iteratorNormalCompletion = true
         ) {
+          if (Object(_step) !== _step) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion = false;
           var i = _step.value;
+          {
+          }
         }
       } catch (_iteratorError2) {
         _didIteratorError = true;
         _iteratorError = _iteratorError2;
       } finally {
         try {
-          if (!_iteratorNormalCompletion && _iterator.return != null) _iterator.return();
+          if (!_iteratorNormalCompletion && (_iteratorReturnMethod = _iterator.return) != null) {
+            _iteratorReturn = _iteratorReturnMethod.call(_iterator);
+            if (Object(_iteratorReturn) !== _iteratorReturn)
+              throw new TypeError('Iterator result is not an object');
+          }
         } finally {
           if (_didIteratorError) throw _iteratorError;
         }
       }
     }
     {
-      var _iteratorNormalCompletion9 = true,
-        _didIteratorError10 = false,
-        _iteratorError11;
+      var _iteratorNormalCompletion15 = true,
+        _didIteratorError16 = false,
+        _iteratorError17,
+        _iteratorReturnMethod13,
+        _iteratorReturn14;
       try {
         for (
-          var _iterator7 = numbers[Symbol.iterator](), _step8;
-          !(_iteratorNormalCompletion9 = (_step8 = _iterator7.next()).done);
-          _iteratorNormalCompletion9 = true
+          var _iterator10 = numbers[Symbol.iterator](), _iteratorNext11 = _iterator10.next, _step12;
+          (_step12 = _iteratorNext11.call(_iterator10)), !_step12.done;
+          _iteratorNormalCompletion15 = true
         ) {
-          var i = _step8.value;
+          if (Object(_step12) !== _step12) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion15 = false;
+          var i = _step12.value;
+          {
+          }
         }
-      } catch (_iteratorError212) {
-        _didIteratorError10 = true;
-        _iteratorError11 = _iteratorError212;
+      } catch (_iteratorError218) {
+        _didIteratorError16 = true;
+        _iteratorError17 = _iteratorError218;
       } finally {
         try {
-          if (!_iteratorNormalCompletion9 && _iterator7.return != null) _iterator7.return();
+          if (!_iteratorNormalCompletion15 && (_iteratorReturnMethod13 = _iterator10.return) != null) {
+            _iteratorReturn14 = _iteratorReturnMethod13.call(_iterator10);
+            if (Object(_iteratorReturn14) !== _iteratorReturn14)
+              throw new TypeError('Iterator result is not an object');
+          }
         } finally {
-          if (_didIteratorError10) throw _iteratorError11;
+          if (_didIteratorError16) throw _iteratorError17;
         }
       }
     }"
@@ -1080,35 +1515,55 @@ test('assumption-skipForOfIteratorClosing/nested-label-for-of/input.js', async (
     "{
       var _iteratorNormalCompletion = true,
         _didIteratorError = false,
-        _iteratorError;
+        _iteratorError,
+        _iteratorReturnMethod,
+        _iteratorReturn;
       try {
         b: for (
-          var _iterator = d()[Symbol.iterator](), _step;
-          !(_iteratorNormalCompletion = (_step = _iterator.next()).done);
+          var _iterator = d()[Symbol.iterator](), _iteratorNext = _iterator.next, _step;
+          (_step = _iteratorNext.call(_iterator)), !_step.done;
           _iteratorNormalCompletion = true
         ) {
+          if (Object(_step) !== _step) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion = false;
           let c = _step.value;
           {
-            var _iteratorNormalCompletion10 = true,
-              _didIteratorError11 = false,
-              _iteratorError12;
-            try {
-              for (
-                var _iterator8 = f()[Symbol.iterator](), _step9;
-                !(_iteratorNormalCompletion10 = (_step9 = _iterator8.next()).done);
-                _iteratorNormalCompletion10 = true
-              ) {
-                let e = _step9.value;
-                continue b;
-              }
-            } catch (_iteratorError213) {
-              _didIteratorError11 = true;
-              _iteratorError12 = _iteratorError213;
-            } finally {
+            {
+              var _iteratorNormalCompletion16 = true,
+                _didIteratorError17 = false,
+                _iteratorError18,
+                _iteratorReturnMethod14,
+                _iteratorReturn15;
               try {
-                if (!_iteratorNormalCompletion10 && _iterator8.return != null) _iterator8.return();
+                for (
+                  var _iterator11 = f()[Symbol.iterator](), _iteratorNext12 = _iterator11.next, _step13;
+                  (_step13 = _iteratorNext12.call(_iterator11)), !_step13.done;
+                  _iteratorNormalCompletion16 = true
+                ) {
+                  if (Object(_step13) !== _step13)
+                    throw new TypeError('Iterator result is not an object');
+                  _iteratorNormalCompletion16 = false;
+                  let e = _step13.value;
+                  {
+                    continue b;
+                  }
+                }
+              } catch (_iteratorError219) {
+                _didIteratorError17 = true;
+                _iteratorError18 = _iteratorError219;
               } finally {
-                if (_didIteratorError11) throw _iteratorError12;
+                try {
+                  if (
+                    !_iteratorNormalCompletion16 &&
+                    (_iteratorReturnMethod14 = _iterator11.return) != null
+                  ) {
+                    _iteratorReturn15 = _iteratorReturnMethod14.call(_iterator11);
+                    if (Object(_iteratorReturn15) !== _iteratorReturn15)
+                      throw new TypeError('Iterator result is not an object');
+                  }
+                } finally {
+                  if (_didIteratorError17) throw _iteratorError18;
+                }
               }
             }
           }
@@ -1118,7 +1573,11 @@ test('assumption-skipForOfIteratorClosing/nested-label-for-of/input.js', async (
         _iteratorError = _iteratorError2;
       } finally {
         try {
-          if (!_iteratorNormalCompletion && _iterator.return != null) _iterator.return();
+          if (!_iteratorNormalCompletion && (_iteratorReturnMethod = _iterator.return) != null) {
+            _iteratorReturn = _iteratorReturnMethod.call(_iterator);
+            if (Object(_iteratorReturn) !== _iteratorReturn)
+              throw new TypeError('Iterator result is not an object');
+          }
         } finally {
           if (_didIteratorError) throw _iteratorError;
         }
@@ -1138,21 +1597,31 @@ test('assumption-skipForOfIteratorClosing/var/input.js', async () => {
     "{
       var _iteratorNormalCompletion = true,
         _didIteratorError = false,
-        _iteratorError;
+        _iteratorError,
+        _iteratorReturnMethod,
+        _iteratorReturn;
       try {
         for (
-          var _iterator = arr[Symbol.iterator](), _step;
-          !(_iteratorNormalCompletion = (_step = _iterator.next()).done);
+          var _iterator = arr[Symbol.iterator](), _iteratorNext = _iterator.next, _step;
+          (_step = _iteratorNext.call(_iterator)), !_step.done;
           _iteratorNormalCompletion = true
         ) {
+          if (Object(_step) !== _step) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion = false;
           var i = _step.value;
+          {
+          }
         }
       } catch (_iteratorError2) {
         _didIteratorError = true;
         _iteratorError = _iteratorError2;
       } finally {
         try {
-          if (!_iteratorNormalCompletion && _iterator.return != null) _iterator.return();
+          if (!_iteratorNormalCompletion && (_iteratorReturnMethod = _iterator.return) != null) {
+            _iteratorReturn = _iteratorReturnMethod.call(_iterator);
+            if (Object(_iteratorReturn) !== _iteratorReturn)
+              throw new TypeError('Iterator result is not an object');
+          }
         } finally {
           if (_didIteratorError) throw _iteratorError;
         }
@@ -1173,22 +1642,32 @@ test('error/invalid-option/input.js', async () => {
     {
       var _iteratorNormalCompletion = true,
         _didIteratorError = false,
-        _iteratorError;
+        _iteratorError,
+        _iteratorReturnMethod,
+        _iteratorReturn;
       try {
         for (
-          var _iterator = array[Symbol.iterator](), _step;
-          !(_iteratorNormalCompletion = (_step = _iterator.next()).done);
+          var _iterator = array[Symbol.iterator](), _iteratorNext = _iterator.next, _step;
+          (_step = _iteratorNext.call(_iterator)), !_step.done;
           _iteratorNormalCompletion = true
         ) {
+          if (Object(_step) !== _step) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion = false;
           elm = _step.value;
-          console.log(elm);
+          {
+            console.log(elm);
+          }
         }
       } catch (_iteratorError2) {
         _didIteratorError = true;
         _iteratorError = _iteratorError2;
       } finally {
         try {
-          if (!_iteratorNormalCompletion && _iterator.return != null) _iterator.return();
+          if (!_iteratorNormalCompletion && (_iteratorReturnMethod = _iterator.return) != null) {
+            _iteratorReturn = _iteratorReturnMethod.call(_iterator);
+            if (Object(_iteratorReturn) !== _iteratorReturn)
+              throw new TypeError('Iterator result is not an object');
+          }
         } finally {
           if (_didIteratorError) throw _iteratorError;
         }
@@ -1223,22 +1702,32 @@ test('for-of-as-array/for-of-array-pattern/input.js', async () => {
     {
       var _iteratorNormalCompletion = true,
         _didIteratorError = false,
-        _iteratorError;
+        _iteratorError,
+        _iteratorReturnMethod,
+        _iteratorReturn;
       try {
         for (
-          var _iterator = array[Symbol.iterator](), _step;
-          !(_iteratorNormalCompletion = (_step = _iterator.next()).done);
+          var _iterator = array[Symbol.iterator](), _iteratorNext = _iterator.next, _step;
+          (_step = _iteratorNext.call(_iterator)), !_step.done;
           _iteratorNormalCompletion = true
         ) {
+          if (Object(_step) !== _step) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion = false;
           [elm] = _step.value;
-          console.log(elm);
+          {
+            console.log(elm);
+          }
         }
       } catch (_iteratorError2) {
         _didIteratorError = true;
         _iteratorError = _iteratorError2;
       } finally {
         try {
-          if (!_iteratorNormalCompletion && _iterator.return != null) _iterator.return();
+          if (!_iteratorNormalCompletion && (_iteratorReturnMethod = _iterator.return) != null) {
+            _iteratorReturn = _iteratorReturnMethod.call(_iterator);
+            if (Object(_iteratorReturn) !== _iteratorReturn)
+              throw new TypeError('Iterator result is not an object');
+          }
         } finally {
           if (_didIteratorError) throw _iteratorError;
         }
@@ -1258,22 +1747,32 @@ test('for-of-as-array/for-of-declaration-array-pattern/input.js', async () => {
     "{
       var _iteratorNormalCompletion = true,
         _didIteratorError = false,
-        _iteratorError;
+        _iteratorError,
+        _iteratorReturnMethod,
+        _iteratorReturn;
       try {
         for (
-          var _iterator = array[Symbol.iterator](), _step;
-          !(_iteratorNormalCompletion = (_step = _iterator.next()).done);
+          var _iterator = array[Symbol.iterator](), _iteratorNext = _iterator.next, _step;
+          (_step = _iteratorNext.call(_iterator)), !_step.done;
           _iteratorNormalCompletion = true
         ) {
+          if (Object(_step) !== _step) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion = false;
           const [elm] = _step.value;
-          console.log(elm);
+          {
+            console.log(elm);
+          }
         }
       } catch (_iteratorError2) {
         _didIteratorError = true;
         _iteratorError = _iteratorError2;
       } finally {
         try {
-          if (!_iteratorNormalCompletion && _iterator.return != null) _iterator.return();
+          if (!_iteratorNormalCompletion && (_iteratorReturnMethod = _iterator.return) != null) {
+            _iteratorReturn = _iteratorReturnMethod.call(_iterator);
+            if (Object(_iteratorReturn) !== _iteratorReturn)
+              throw new TypeError('Iterator result is not an object');
+          }
         } finally {
           if (_didIteratorError) throw _iteratorError;
         }
@@ -1293,22 +1792,32 @@ test('for-of-as-array/for-of-declaration/input.js', async () => {
     "{
       var _iteratorNormalCompletion = true,
         _didIteratorError = false,
-        _iteratorError;
+        _iteratorError,
+        _iteratorReturnMethod,
+        _iteratorReturn;
       try {
         for (
-          var _iterator = array[Symbol.iterator](), _step;
-          !(_iteratorNormalCompletion = (_step = _iterator.next()).done);
+          var _iterator = array[Symbol.iterator](), _iteratorNext = _iterator.next, _step;
+          (_step = _iteratorNext.call(_iterator)), !_step.done;
           _iteratorNormalCompletion = true
         ) {
+          if (Object(_step) !== _step) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion = false;
           const elm = _step.value;
-          console.log(elm);
+          {
+            console.log(elm);
+          }
         }
       } catch (_iteratorError2) {
         _didIteratorError = true;
         _iteratorError = _iteratorError2;
       } finally {
         try {
-          if (!_iteratorNormalCompletion && _iterator.return != null) _iterator.return();
+          if (!_iteratorNormalCompletion && (_iteratorReturnMethod = _iterator.return) != null) {
+            _iteratorReturn = _iteratorReturnMethod.call(_iterator);
+            if (Object(_iteratorReturn) !== _iteratorReturn)
+              throw new TypeError('Iterator result is not an object');
+          }
         } finally {
           if (_didIteratorError) throw _iteratorError;
         }
@@ -1328,13 +1837,17 @@ test('for-of-as-array/for-of-expression-declaration/input.js', async () => {
     "{
       var _iteratorNormalCompletion = true,
         _didIteratorError = false,
-        _iteratorError;
+        _iteratorError,
+        _iteratorReturnMethod,
+        _iteratorReturn;
       try {
         for (
-          var _iterator = items[Symbol.iterator](), _step;
-          !(_iteratorNormalCompletion = (_step = _iterator.next()).done);
+          var _iterator = items[Symbol.iterator](), _iteratorNext = _iterator.next, _step;
+          (_step = _iteratorNext.call(_iterator)), !_step.done;
           _iteratorNormalCompletion = true
         ) {
+          if (Object(_step) !== _step) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion = false;
           const i = _step.value;
           i;
         }
@@ -1343,7 +1856,11 @@ test('for-of-as-array/for-of-expression-declaration/input.js', async () => {
         _iteratorError = _iteratorError2;
       } finally {
         try {
-          if (!_iteratorNormalCompletion && _iterator.return != null) _iterator.return();
+          if (!_iteratorNormalCompletion && (_iteratorReturnMethod = _iterator.return) != null) {
+            _iteratorReturn = _iteratorReturnMethod.call(_iterator);
+            if (Object(_iteratorReturn) !== _iteratorReturn)
+              throw new TypeError('Iterator result is not an object');
+          }
         } finally {
           if (_didIteratorError) throw _iteratorError;
         }
@@ -1364,13 +1881,17 @@ test('for-of-as-array/for-of-expression/input.js', async () => {
     {
       var _iteratorNormalCompletion = true,
         _didIteratorError = false,
-        _iteratorError;
+        _iteratorError,
+        _iteratorReturnMethod,
+        _iteratorReturn;
       try {
         for (
-          var _iterator = items[Symbol.iterator](), _step;
-          !(_iteratorNormalCompletion = (_step = _iterator.next()).done);
+          var _iterator = items[Symbol.iterator](), _iteratorNext = _iterator.next, _step;
+          (_step = _iteratorNext.call(_iterator)), !_step.done;
           _iteratorNormalCompletion = true
         ) {
+          if (Object(_step) !== _step) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion = false;
           i = _step.value;
           i;
         }
@@ -1379,7 +1900,11 @@ test('for-of-as-array/for-of-expression/input.js', async () => {
         _iteratorError = _iteratorError2;
       } finally {
         try {
-          if (!_iteratorNormalCompletion && _iterator.return != null) _iterator.return();
+          if (!_iteratorNormalCompletion && (_iteratorReturnMethod = _iterator.return) != null) {
+            _iteratorReturn = _iteratorReturnMethod.call(_iterator);
+            if (Object(_iteratorReturn) !== _iteratorReturn)
+              throw new TypeError('Iterator result is not an object');
+          }
         } finally {
           if (_didIteratorError) throw _iteratorError;
         }
@@ -1401,22 +1926,32 @@ test('for-of-as-array/for-of-import-amd/input.mjs', async () => {
     {
       var _iteratorNormalCompletion = true,
         _didIteratorError = false,
-        _iteratorError;
+        _iteratorError,
+        _iteratorReturnMethod,
+        _iteratorReturn;
       try {
         for (
-          var _iterator = array[Symbol.iterator](), _step;
-          !(_iteratorNormalCompletion = (_step = _iterator.next()).done);
+          var _iterator = array[Symbol.iterator](), _iteratorNext = _iterator.next, _step;
+          (_step = _iteratorNext.call(_iterator)), !_step.done;
           _iteratorNormalCompletion = true
         ) {
+          if (Object(_step) !== _step) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion = false;
           const elm = _step.value;
-          console.log(elm);
+          {
+            console.log(elm);
+          }
         }
       } catch (_iteratorError2) {
         _didIteratorError = true;
         _iteratorError = _iteratorError2;
       } finally {
         try {
-          if (!_iteratorNormalCompletion && _iterator.return != null) _iterator.return();
+          if (!_iteratorNormalCompletion && (_iteratorReturnMethod = _iterator.return) != null) {
+            _iteratorReturn = _iteratorReturnMethod.call(_iterator);
+            if (Object(_iteratorReturn) !== _iteratorReturn)
+              throw new TypeError('Iterator result is not an object');
+          }
         } finally {
           if (_didIteratorError) throw _iteratorError;
         }
@@ -1438,22 +1973,32 @@ test('for-of-as-array/for-of-import-commonjs/input.mjs', async () => {
     {
       var _iteratorNormalCompletion = true,
         _didIteratorError = false,
-        _iteratorError;
+        _iteratorError,
+        _iteratorReturnMethod,
+        _iteratorReturn;
       try {
         for (
-          var _iterator = array[Symbol.iterator](), _step;
-          !(_iteratorNormalCompletion = (_step = _iterator.next()).done);
+          var _iterator = array[Symbol.iterator](), _iteratorNext = _iterator.next, _step;
+          (_step = _iteratorNext.call(_iterator)), !_step.done;
           _iteratorNormalCompletion = true
         ) {
+          if (Object(_step) !== _step) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion = false;
           const elm = _step.value;
-          console.log(elm);
+          {
+            console.log(elm);
+          }
         }
       } catch (_iteratorError2) {
         _didIteratorError = true;
         _iteratorError = _iteratorError2;
       } finally {
         try {
-          if (!_iteratorNormalCompletion && _iterator.return != null) _iterator.return();
+          if (!_iteratorNormalCompletion && (_iteratorReturnMethod = _iterator.return) != null) {
+            _iteratorReturn = _iteratorReturnMethod.call(_iterator);
+            if (Object(_iteratorReturn) !== _iteratorReturn)
+              throw new TypeError('Iterator result is not an object');
+          }
         } finally {
           if (_didIteratorError) throw _iteratorError;
         }
@@ -1475,22 +2020,32 @@ test('for-of-as-array/for-of-import-es2015/input.mjs', async () => {
     {
       var _iteratorNormalCompletion = true,
         _didIteratorError = false,
-        _iteratorError;
+        _iteratorError,
+        _iteratorReturnMethod,
+        _iteratorReturn;
       try {
         for (
-          var _iterator = array[Symbol.iterator](), _step;
-          !(_iteratorNormalCompletion = (_step = _iterator.next()).done);
+          var _iterator = array[Symbol.iterator](), _iteratorNext = _iterator.next, _step;
+          (_step = _iteratorNext.call(_iterator)), !_step.done;
           _iteratorNormalCompletion = true
         ) {
+          if (Object(_step) !== _step) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion = false;
           const elm = _step.value;
-          console.log(elm);
+          {
+            console.log(elm);
+          }
         }
       } catch (_iteratorError2) {
         _didIteratorError = true;
         _iteratorError = _iteratorError2;
       } finally {
         try {
-          if (!_iteratorNormalCompletion && _iterator.return != null) _iterator.return();
+          if (!_iteratorNormalCompletion && (_iteratorReturnMethod = _iterator.return) != null) {
+            _iteratorReturn = _iteratorReturnMethod.call(_iterator);
+            if (Object(_iteratorReturn) !== _iteratorReturn)
+              throw new TypeError('Iterator result is not an object');
+          }
         } finally {
           if (_didIteratorError) throw _iteratorError;
         }
@@ -1507,7 +2062,44 @@ test('for-of-as-array/for-of-partial-redeclaration-in-body-array-pattern/input.j
       transforms: { forOf: true },
       helpers: { mode: 'inline' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:post-rewrite-semantic-error"`);
+  ).toMatchInlineSnapshot(`
+    "{
+      var _iteratorNormalCompletion = true,
+        _didIteratorError = false,
+        _iteratorError,
+        _iteratorReturnMethod,
+        _iteratorReturn;
+      try {
+        for (
+          var _iterator = array[Symbol.iterator](), _iteratorNext = _iterator.next, _step;
+          (_step = _iteratorNext.call(_iterator)), !_step.done;
+          _iteratorNormalCompletion = true
+        ) {
+          if (Object(_step) !== _step) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion = false;
+          const [head, ...tail] = _step.value;
+          {
+            const head = 1;
+            console.log(tail);
+            console.log(head);
+          }
+        }
+      } catch (_iteratorError2) {
+        _didIteratorError = true;
+        _iteratorError = _iteratorError2;
+      } finally {
+        try {
+          if (!_iteratorNormalCompletion && (_iteratorReturnMethod = _iterator.return) != null) {
+            _iteratorReturn = _iteratorReturnMethod.call(_iterator);
+            if (Object(_iteratorReturn) !== _iteratorReturn)
+              throw new TypeError('Iterator result is not an object');
+          }
+        } finally {
+          if (_didIteratorError) throw _iteratorError;
+        }
+      }
+    }"
+  `);
 });
 
 test('for-of-as-array/for-of-partial-redeclaration-in-body-object-pattern/input.js', async () => {
@@ -1518,7 +2110,44 @@ test('for-of-as-array/for-of-partial-redeclaration-in-body-object-pattern/input.
       transforms: { forOf: true },
       helpers: { mode: 'inline' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:post-rewrite-semantic-error"`);
+  ).toMatchInlineSnapshot(`
+    "{
+      var _iteratorNormalCompletion = true,
+        _didIteratorError = false,
+        _iteratorError,
+        _iteratorReturnMethod,
+        _iteratorReturn;
+      try {
+        for (
+          var _iterator = array[Symbol.iterator](), _iteratorNext = _iterator.next, _step;
+          (_step = _iteratorNext.call(_iterator)), !_step.done;
+          _iteratorNormalCompletion = true
+        ) {
+          if (Object(_step) !== _step) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion = false;
+          const [type, ...rest] = _step.value;
+          {
+            const type = 1;
+            console.log(rest);
+            console.log(type);
+          }
+        }
+      } catch (_iteratorError2) {
+        _didIteratorError = true;
+        _iteratorError = _iteratorError2;
+      } finally {
+        try {
+          if (!_iteratorNormalCompletion && (_iteratorReturnMethod = _iterator.return) != null) {
+            _iteratorReturn = _iteratorReturnMethod.call(_iterator);
+            if (Object(_iteratorReturn) !== _iteratorReturn)
+              throw new TypeError('Iterator result is not an object');
+          }
+        } finally {
+          if (_didIteratorError) throw _iteratorError;
+        }
+      }
+    }"
+  `);
 });
 
 test('for-of-as-array/for-of-redeclaration-in-body-array-pattern/input.js', async () => {
@@ -1529,7 +2158,45 @@ test('for-of-as-array/for-of-redeclaration-in-body-array-pattern/input.js', asyn
       transforms: { forOf: true },
       helpers: { mode: 'inline' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:post-rewrite-semantic-error"`);
+  ).toMatchInlineSnapshot(`
+    "{
+      var _iteratorNormalCompletion = true,
+        _didIteratorError = false,
+        _iteratorError,
+        _iteratorReturnMethod,
+        _iteratorReturn;
+      try {
+        for (
+          var _iterator = array[Symbol.iterator](), _iteratorNext = _iterator.next, _step;
+          (_step = _iteratorNext.call(_iterator)), !_step.done;
+          _iteratorNormalCompletion = true
+        ) {
+          if (Object(_step) !== _step) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion = false;
+          const [head, ...tail] = _step.value;
+          {
+            const head = 1;
+            let tail;
+            console.log(tail);
+            console.log(head);
+          }
+        }
+      } catch (_iteratorError2) {
+        _didIteratorError = true;
+        _iteratorError = _iteratorError2;
+      } finally {
+        try {
+          if (!_iteratorNormalCompletion && (_iteratorReturnMethod = _iterator.return) != null) {
+            _iteratorReturn = _iteratorReturnMethod.call(_iterator);
+            if (Object(_iteratorReturn) !== _iteratorReturn)
+              throw new TypeError('Iterator result is not an object');
+          }
+        } finally {
+          if (_didIteratorError) throw _iteratorError;
+        }
+      }
+    }"
+  `);
 });
 
 test('for-of-as-array/for-of-redeclaration-in-body-object-pattern/input.js', async () => {
@@ -1540,7 +2207,45 @@ test('for-of-as-array/for-of-redeclaration-in-body-object-pattern/input.js', asy
       transforms: { forOf: true },
       helpers: { mode: 'inline' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:post-rewrite-semantic-error"`);
+  ).toMatchInlineSnapshot(`
+    "{
+      var _iteratorNormalCompletion = true,
+        _didIteratorError = false,
+        _iteratorError,
+        _iteratorReturnMethod,
+        _iteratorReturn;
+      try {
+        for (
+          var _iterator = array[Symbol.iterator](), _iteratorNext = _iterator.next, _step;
+          (_step = _iteratorNext.call(_iterator)), !_step.done;
+          _iteratorNormalCompletion = true
+        ) {
+          if (Object(_step) !== _step) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion = false;
+          const { type, ...rest } = _step.value;
+          {
+            const type = 1;
+            let rest;
+            console.log(rest);
+            console.log(type);
+          }
+        }
+      } catch (_iteratorError2) {
+        _didIteratorError = true;
+        _iteratorError = _iteratorError2;
+      } finally {
+        try {
+          if (!_iteratorNormalCompletion && (_iteratorReturnMethod = _iterator.return) != null) {
+            _iteratorReturn = _iteratorReturnMethod.call(_iterator);
+            if (Object(_iteratorReturn) !== _iteratorReturn)
+              throw new TypeError('Iterator result is not an object');
+          }
+        } finally {
+          if (_didIteratorError) throw _iteratorError;
+        }
+      }
+    }"
+  `);
 });
 
 test('for-of-as-array/for-of-redeclaration-in-body/input.js', async () => {
@@ -1551,7 +2256,76 @@ test('for-of-as-array/for-of-redeclaration-in-body/input.js', async () => {
       transforms: { forOf: true },
       helpers: { mode: 'inline' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:post-rewrite-semantic-error"`);
+  ).toMatchInlineSnapshot(`
+    "{
+      var _iteratorNormalCompletion = true,
+        _didIteratorError = false,
+        _iteratorError,
+        _iteratorReturnMethod,
+        _iteratorReturn;
+      try {
+        for (
+          var _iterator = array[Symbol.iterator](), _iteratorNext = _iterator.next, _step;
+          (_step = _iteratorNext.call(_iterator)), !_step.done;
+          _iteratorNormalCompletion = true
+        ) {
+          if (Object(_step) !== _step) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion = false;
+          const elm = _step.value;
+          {
+            const elm = 2;
+          }
+        }
+      } catch (_iteratorError2) {
+        _didIteratorError = true;
+        _iteratorError = _iteratorError2;
+      } finally {
+        try {
+          if (!_iteratorNormalCompletion && (_iteratorReturnMethod = _iterator.return) != null) {
+            _iteratorReturn = _iteratorReturnMethod.call(_iterator);
+            if (Object(_iteratorReturn) !== _iteratorReturn)
+              throw new TypeError('Iterator result is not an object');
+          }
+        } finally {
+          if (_didIteratorError) throw _iteratorError;
+        }
+      }
+    }
+    {
+      var _iteratorNormalCompletion16 = true,
+        _didIteratorError17 = false,
+        _iteratorError18,
+        _iteratorReturnMethod14,
+        _iteratorReturn15;
+      try {
+        for (
+          var _iterator11 = [][Symbol.iterator](), _iteratorNext12 = _iterator11.next, _step13;
+          (_step13 = _iteratorNext12.call(_iterator11)), !_step13.done;
+          _iteratorNormalCompletion16 = true
+        ) {
+          if (Object(_step13) !== _step13) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion16 = false;
+          let x = _step13.value;
+          {
+            let x = 1;
+          }
+        }
+      } catch (_iteratorError219) {
+        _didIteratorError17 = true;
+        _iteratorError18 = _iteratorError219;
+      } finally {
+        try {
+          if (!_iteratorNormalCompletion16 && (_iteratorReturnMethod14 = _iterator11.return) != null) {
+            _iteratorReturn15 = _iteratorReturnMethod14.call(_iterator11);
+            if (Object(_iteratorReturn15) !== _iteratorReturn15)
+              throw new TypeError('Iterator result is not an object');
+          }
+        } finally {
+          if (_didIteratorError17) throw _iteratorError18;
+        }
+      }
+    }"
+  `);
 });
 
 test('for-of-as-array/for-of-redeclare-iterable/input.js', async () => {
@@ -1565,22 +2339,32 @@ test('for-of-as-array/for-of-redeclare-iterable/input.js', async () => {
     "{
       var _iteratorNormalCompletion = true,
         _didIteratorError = false,
-        _iteratorError;
+        _iteratorError,
+        _iteratorReturnMethod,
+        _iteratorReturn;
       try {
         for (
-          var _iterator = arr[Symbol.iterator](), _step;
-          !(_iteratorNormalCompletion = (_step = _iterator.next()).done);
+          var _iterator = arr[Symbol.iterator](), _iteratorNext = _iterator.next, _step;
+          (_step = _iteratorNext.call(_iterator)), !_step.done;
           _iteratorNormalCompletion = true
         ) {
+          if (Object(_step) !== _step) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion = false;
           let o = _step.value;
-          const arr = o;
+          {
+            const arr = o;
+          }
         }
       } catch (_iteratorError2) {
         _didIteratorError = true;
         _iteratorError = _iteratorError2;
       } finally {
         try {
-          if (!_iteratorNormalCompletion && _iterator.return != null) _iterator.return();
+          if (!_iteratorNormalCompletion && (_iteratorReturnMethod = _iterator.return) != null) {
+            _iteratorReturn = _iteratorReturnMethod.call(_iterator);
+            if (Object(_iteratorReturn) !== _iteratorReturn)
+              throw new TypeError('Iterator result is not an object');
+          }
         } finally {
           if (_didIteratorError) throw _iteratorError;
         }
@@ -1601,22 +2385,32 @@ test('for-of-as-array/for-of-static-declaration/input.js', async () => {
     {
       var _iteratorNormalCompletion = true,
         _didIteratorError = false,
-        _iteratorError;
+        _iteratorError,
+        _iteratorReturnMethod,
+        _iteratorReturn;
       try {
         for (
-          var _iterator = array[Symbol.iterator](), _step;
-          !(_iteratorNormalCompletion = (_step = _iterator.next()).done);
+          var _iterator = array[Symbol.iterator](), _iteratorNext = _iterator.next, _step;
+          (_step = _iteratorNext.call(_iterator)), !_step.done;
           _iteratorNormalCompletion = true
         ) {
+          if (Object(_step) !== _step) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion = false;
           const elm = _step.value;
-          console.log(elm);
+          {
+            console.log(elm);
+          }
         }
       } catch (_iteratorError2) {
         _didIteratorError = true;
         _iteratorError = _iteratorError2;
       } finally {
         try {
-          if (!_iteratorNormalCompletion && _iterator.return != null) _iterator.return();
+          if (!_iteratorNormalCompletion && (_iteratorReturnMethod = _iterator.return) != null) {
+            _iteratorReturn = _iteratorReturnMethod.call(_iterator);
+            if (Object(_iteratorReturn) !== _iteratorReturn)
+              throw new TypeError('Iterator result is not an object');
+          }
         } finally {
           if (_didIteratorError) throw _iteratorError;
         }
@@ -1638,22 +2432,32 @@ test('for-of-as-array/for-of-static/input.js', async () => {
     {
       var _iteratorNormalCompletion = true,
         _didIteratorError = false,
-        _iteratorError;
+        _iteratorError,
+        _iteratorReturnMethod,
+        _iteratorReturn;
       try {
         for (
-          var _iterator = array[Symbol.iterator](), _step;
-          !(_iteratorNormalCompletion = (_step = _iterator.next()).done);
+          var _iterator = array[Symbol.iterator](), _iteratorNext = _iterator.next, _step;
+          (_step = _iteratorNext.call(_iterator)), !_step.done;
           _iteratorNormalCompletion = true
         ) {
+          if (Object(_step) !== _step) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion = false;
           elm = _step.value;
-          console.log(elm);
+          {
+            console.log(elm);
+          }
         }
       } catch (_iteratorError2) {
         _didIteratorError = true;
         _iteratorError = _iteratorError2;
       } finally {
         try {
-          if (!_iteratorNormalCompletion && _iterator.return != null) _iterator.return();
+          if (!_iteratorNormalCompletion && (_iteratorReturnMethod = _iterator.return) != null) {
+            _iteratorReturn = _iteratorReturnMethod.call(_iterator);
+            if (Object(_iteratorReturn) !== _iteratorReturn)
+              throw new TypeError('Iterator result is not an object');
+          }
         } finally {
           if (_didIteratorError) throw _iteratorError;
         }
@@ -1674,22 +2478,32 @@ test('for-of-as-array/for-of/input.js', async () => {
     {
       var _iteratorNormalCompletion = true,
         _didIteratorError = false,
-        _iteratorError;
+        _iteratorError,
+        _iteratorReturnMethod,
+        _iteratorReturn;
       try {
         for (
-          var _iterator = array[Symbol.iterator](), _step;
-          !(_iteratorNormalCompletion = (_step = _iterator.next()).done);
+          var _iterator = array[Symbol.iterator](), _iteratorNext = _iterator.next, _step;
+          (_step = _iteratorNext.call(_iterator)), !_step.done;
           _iteratorNormalCompletion = true
         ) {
+          if (Object(_step) !== _step) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion = false;
           elm = _step.value;
-          console.log(elm);
+          {
+            console.log(elm);
+          }
         }
       } catch (_iteratorError2) {
         _didIteratorError = true;
         _iteratorError = _iteratorError2;
       } finally {
         try {
-          if (!_iteratorNormalCompletion && _iterator.return != null) _iterator.return();
+          if (!_iteratorNormalCompletion && (_iteratorReturnMethod = _iterator.return) != null) {
+            _iteratorReturn = _iteratorReturnMethod.call(_iterator);
+            if (Object(_iteratorReturn) !== _iteratorReturn)
+              throw new TypeError('Iterator result is not an object');
+          }
         } finally {
           if (_didIteratorError) throw _iteratorError;
         }
@@ -1716,13 +2530,17 @@ test('loose-allowArrayLike/holes/exec.js', async () => {
     {
       var _iteratorNormalCompletion = true,
         _didIteratorError = false,
-        _iteratorError;
+        _iteratorError,
+        _iteratorReturnMethod,
+        _iteratorReturn;
       try {
         for (
-          var _iterator = p2[Symbol.iterator](), _step;
-          !(_iteratorNormalCompletion = (_step = _iterator.next()).done);
+          var _iterator = p2[Symbol.iterator](), _iteratorNext = _iterator.next, _step;
+          (_step = _iteratorNext.call(_iterator)), !_step.done;
           _iteratorNormalCompletion = true
         ) {
+          if (Object(_step) !== _step) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion = false;
           var x = _step.value;
           arr.push(x);
         }
@@ -1731,7 +2549,11 @@ test('loose-allowArrayLike/holes/exec.js', async () => {
         _iteratorError = _iteratorError2;
       } finally {
         try {
-          if (!_iteratorNormalCompletion && _iterator.return != null) _iterator.return();
+          if (!_iteratorNormalCompletion && (_iteratorReturnMethod = _iterator.return) != null) {
+            _iteratorReturn = _iteratorReturnMethod.call(_iterator);
+            if (Object(_iteratorReturn) !== _iteratorReturn)
+              throw new TypeError('Iterator result is not an object');
+          }
         } finally {
           if (_didIteratorError) throw _iteratorError;
         }
@@ -1761,13 +2583,17 @@ test('loose-allowArrayLike/length-cropped/exec.js', async () => {
     {
       var _iteratorNormalCompletion = true,
         _didIteratorError = false,
-        _iteratorError;
+        _iteratorError,
+        _iteratorReturnMethod,
+        _iteratorReturn;
       try {
         for (
-          var _iterator = p2[Symbol.iterator](), _step;
-          !(_iteratorNormalCompletion = (_step = _iterator.next()).done);
+          var _iterator = p2[Symbol.iterator](), _iteratorNext = _iterator.next, _step;
+          (_step = _iteratorNext.call(_iterator)), !_step.done;
           _iteratorNormalCompletion = true
         ) {
+          if (Object(_step) !== _step) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion = false;
           var x = _step.value;
           arr.push(x);
         }
@@ -1776,7 +2602,11 @@ test('loose-allowArrayLike/length-cropped/exec.js', async () => {
         _iteratorError = _iteratorError2;
       } finally {
         try {
-          if (!_iteratorNormalCompletion && _iterator.return != null) _iterator.return();
+          if (!_iteratorNormalCompletion && (_iteratorReturnMethod = _iterator.return) != null) {
+            _iteratorReturn = _iteratorReturnMethod.call(_iterator);
+            if (Object(_iteratorReturn) !== _iteratorReturn)
+              throw new TypeError('Iterator result is not an object');
+          }
         } finally {
           if (_didIteratorError) throw _iteratorError;
         }
@@ -1805,13 +2635,17 @@ test('loose-allowArrayLike/simple/exec.js', async () => {
     {
       var _iteratorNormalCompletion = true,
         _didIteratorError = false,
-        _iteratorError;
+        _iteratorError,
+        _iteratorReturnMethod,
+        _iteratorReturn;
       try {
         for (
-          var _iterator = p2[Symbol.iterator](), _step;
-          !(_iteratorNormalCompletion = (_step = _iterator.next()).done);
+          var _iterator = p2[Symbol.iterator](), _iteratorNext = _iterator.next, _step;
+          (_step = _iteratorNext.call(_iterator)), !_step.done;
           _iteratorNormalCompletion = true
         ) {
+          if (Object(_step) !== _step) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion = false;
           var x = _step.value;
           arr.push(x);
         }
@@ -1820,7 +2654,11 @@ test('loose-allowArrayLike/simple/exec.js', async () => {
         _iteratorError = _iteratorError2;
       } finally {
         try {
-          if (!_iteratorNormalCompletion && _iterator.return != null) _iterator.return();
+          if (!_iteratorNormalCompletion && (_iteratorReturnMethod = _iterator.return) != null) {
+            _iteratorReturn = _iteratorReturnMethod.call(_iterator);
+            if (Object(_iteratorReturn) !== _iteratorReturn)
+              throw new TypeError('Iterator result is not an object');
+          }
         } finally {
           if (_didIteratorError) throw _iteratorError;
         }
@@ -1841,13 +2679,17 @@ test('loose-allowArrayLike/simple/input.js', async () => {
     "{
       var _iteratorNormalCompletion = true,
         _didIteratorError = false,
-        _iteratorError;
+        _iteratorError,
+        _iteratorReturnMethod,
+        _iteratorReturn;
       try {
         for (
-          var _iterator = p2[Symbol.iterator](), _step;
-          !(_iteratorNormalCompletion = (_step = _iterator.next()).done);
+          var _iterator = p2[Symbol.iterator](), _iteratorNext = _iterator.next, _step;
+          (_step = _iteratorNext.call(_iterator)), !_step.done;
           _iteratorNormalCompletion = true
         ) {
+          if (Object(_step) !== _step) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion = false;
           var x = _step.value;
           arr.push(x);
         }
@@ -1856,7 +2698,11 @@ test('loose-allowArrayLike/simple/input.js', async () => {
         _iteratorError = _iteratorError2;
       } finally {
         try {
-          if (!_iteratorNormalCompletion && _iterator.return != null) _iterator.return();
+          if (!_iteratorNormalCompletion && (_iteratorReturnMethod = _iterator.return) != null) {
+            _iteratorReturn = _iteratorReturnMethod.call(_iterator);
+            if (Object(_iteratorReturn) !== _iteratorReturn)
+              throw new TypeError('Iterator result is not an object');
+          }
         } finally {
           if (_didIteratorError) throw _iteratorError;
         }
@@ -1873,7 +2719,78 @@ test('loose/for-of-redeclaration-in-body/input.js', async () => {
       transforms: { forOf: true },
       helpers: { mode: 'inline' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:post-rewrite-semantic-error"`);
+  ).toMatchInlineSnapshot(`
+    "{
+      var _iteratorNormalCompletion = true,
+        _didIteratorError = false,
+        _iteratorError,
+        _iteratorReturnMethod,
+        _iteratorReturn;
+      try {
+        for (
+          var _iterator = y[Symbol.iterator](), _iteratorNext = _iterator.next, _step;
+          (_step = _iteratorNext.call(_iterator)), !_step.done;
+          _iteratorNormalCompletion = true
+        ) {
+          if (Object(_step) !== _step) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion = false;
+          let x = _step.value;
+          {
+            let x = 1;
+            let y = 2;
+          }
+        }
+      } catch (_iteratorError2) {
+        _didIteratorError = true;
+        _iteratorError = _iteratorError2;
+      } finally {
+        try {
+          if (!_iteratorNormalCompletion && (_iteratorReturnMethod = _iterator.return) != null) {
+            _iteratorReturn = _iteratorReturnMethod.call(_iterator);
+            if (Object(_iteratorReturn) !== _iteratorReturn)
+              throw new TypeError('Iterator result is not an object');
+          }
+        } finally {
+          if (_didIteratorError) throw _iteratorError;
+        }
+      }
+    }
+    {
+      var _iteratorNormalCompletion16 = true,
+        _didIteratorError17 = false,
+        _iteratorError18,
+        _iteratorReturnMethod14,
+        _iteratorReturn15;
+      try {
+        for (
+          var _iterator11 = [][Symbol.iterator](), _iteratorNext12 = _iterator11.next, _step13;
+          (_step13 = _iteratorNext12.call(_iterator11)), !_step13.done;
+          _iteratorNormalCompletion16 = true
+        ) {
+          if (Object(_step13) !== _step13) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion16 = false;
+          let x = _step13.value;
+          {
+            let x = 1;
+            let y = 2;
+          }
+        }
+      } catch (_iteratorError219) {
+        _didIteratorError17 = true;
+        _iteratorError18 = _iteratorError219;
+      } finally {
+        try {
+          if (!_iteratorNormalCompletion16 && (_iteratorReturnMethod14 = _iterator11.return) != null) {
+            _iteratorReturn15 = _iteratorReturnMethod14.call(_iterator11);
+            if (Object(_iteratorReturn15) !== _iteratorReturn15)
+              throw new TypeError('Iterator result is not an object');
+          }
+        } finally {
+          if (_didIteratorError17) throw _iteratorError18;
+        }
+      }
+    }"
+  `);
 });
 
 test('loose/identifier/input.js', async () => {
@@ -1887,21 +2804,31 @@ test('loose/identifier/input.js', async () => {
     "{
       var _iteratorNormalCompletion = true,
         _didIteratorError = false,
-        _iteratorError;
+        _iteratorError,
+        _iteratorReturnMethod,
+        _iteratorReturn;
       try {
         for (
-          var _iterator = arr[Symbol.iterator](), _step;
-          !(_iteratorNormalCompletion = (_step = _iterator.next()).done);
+          var _iterator = arr[Symbol.iterator](), _iteratorNext = _iterator.next, _step;
+          (_step = _iteratorNext.call(_iterator)), !_step.done;
           _iteratorNormalCompletion = true
         ) {
+          if (Object(_step) !== _step) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion = false;
           i = _step.value;
+          {
+          }
         }
       } catch (_iteratorError2) {
         _didIteratorError = true;
         _iteratorError = _iteratorError2;
       } finally {
         try {
-          if (!_iteratorNormalCompletion && _iterator.return != null) _iterator.return();
+          if (!_iteratorNormalCompletion && (_iteratorReturnMethod = _iterator.return) != null) {
+            _iteratorReturn = _iteratorReturnMethod.call(_iterator);
+            if (Object(_iteratorReturn) !== _iteratorReturn)
+              throw new TypeError('Iterator result is not an object');
+          }
         } finally {
           if (_didIteratorError) throw _iteratorError;
         }
@@ -1921,17 +2848,23 @@ test('loose/ignore-cases/input.js', async () => {
     "{
       var _iteratorNormalCompletion = true,
         _didIteratorError = false,
-        _iteratorError;
+        _iteratorError,
+        _iteratorReturnMethod,
+        _iteratorReturn;
       try {
         for (
-          var _iterator = foo[Symbol.iterator](), _step;
-          !(_iteratorNormalCompletion = (_step = _iterator.next()).done);
+          var _iterator = foo[Symbol.iterator](), _iteratorNext = _iterator.next, _step;
+          (_step = _iteratorNext.call(_iterator)), !_step.done;
           _iteratorNormalCompletion = true
         ) {
+          if (Object(_step) !== _step) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion = false;
           var i = _step.value;
-          switch (i) {
-            case 1:
-              break;
+          {
+            switch (i) {
+              case 1:
+                break;
+            }
           }
         }
       } catch (_iteratorError2) {
@@ -1939,7 +2872,11 @@ test('loose/ignore-cases/input.js', async () => {
         _iteratorError = _iteratorError2;
       } finally {
         try {
-          if (!_iteratorNormalCompletion && _iterator.return != null) _iterator.return();
+          if (!_iteratorNormalCompletion && (_iteratorReturnMethod = _iterator.return) != null) {
+            _iteratorReturn = _iteratorReturnMethod.call(_iterator);
+            if (Object(_iteratorReturn) !== _iteratorReturn)
+              throw new TypeError('Iterator result is not an object');
+          }
         } finally {
           if (_didIteratorError) throw _iteratorError;
         }
@@ -1959,21 +2896,31 @@ test('loose/let/input.js', async () => {
     "{
       var _iteratorNormalCompletion = true,
         _didIteratorError = false,
-        _iteratorError;
+        _iteratorError,
+        _iteratorReturnMethod,
+        _iteratorReturn;
       try {
         for (
-          var _iterator = arr[Symbol.iterator](), _step;
-          !(_iteratorNormalCompletion = (_step = _iterator.next()).done);
+          var _iterator = arr[Symbol.iterator](), _iteratorNext = _iterator.next, _step;
+          (_step = _iteratorNext.call(_iterator)), !_step.done;
           _iteratorNormalCompletion = true
         ) {
+          if (Object(_step) !== _step) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion = false;
           let i = _step.value;
+          {
+          }
         }
       } catch (_iteratorError2) {
         _didIteratorError = true;
         _iteratorError = _iteratorError2;
       } finally {
         try {
-          if (!_iteratorNormalCompletion && _iterator.return != null) _iterator.return();
+          if (!_iteratorNormalCompletion && (_iteratorReturnMethod = _iterator.return) != null) {
+            _iteratorReturn = _iteratorReturnMethod.call(_iterator);
+            if (Object(_iteratorReturn) !== _iteratorReturn)
+              throw new TypeError('Iterator result is not an object');
+          }
         } finally {
           if (_didIteratorError) throw _iteratorError;
         }
@@ -1993,21 +2940,31 @@ test('loose/member-expression/input.js', async () => {
     "{
       var _iteratorNormalCompletion = true,
         _didIteratorError = false,
-        _iteratorError;
+        _iteratorError,
+        _iteratorReturnMethod,
+        _iteratorReturn;
       try {
         for (
-          var _iterator = arr[Symbol.iterator](), _step;
-          !(_iteratorNormalCompletion = (_step = _iterator.next()).done);
+          var _iterator = arr[Symbol.iterator](), _iteratorNext = _iterator.next, _step;
+          (_step = _iteratorNext.call(_iterator)), !_step.done;
           _iteratorNormalCompletion = true
         ) {
+          if (Object(_step) !== _step) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion = false;
           obj.prop = _step.value;
+          {
+          }
         }
       } catch (_iteratorError2) {
         _didIteratorError = true;
         _iteratorError = _iteratorError2;
       } finally {
         try {
-          if (!_iteratorNormalCompletion && _iterator.return != null) _iterator.return();
+          if (!_iteratorNormalCompletion && (_iteratorReturnMethod = _iterator.return) != null) {
+            _iteratorReturn = _iteratorReturnMethod.call(_iterator);
+            if (Object(_iteratorReturn) !== _iteratorReturn)
+              throw new TypeError('Iterator result is not an object');
+          }
         } finally {
           if (_didIteratorError) throw _iteratorError;
         }
@@ -2027,46 +2984,66 @@ test('loose/multiple/input.js', async () => {
     "{
       var _iteratorNormalCompletion = true,
         _didIteratorError = false,
-        _iteratorError;
+        _iteratorError,
+        _iteratorReturnMethod,
+        _iteratorReturn;
       try {
         for (
-          var _iterator = arr[Symbol.iterator](), _step;
-          !(_iteratorNormalCompletion = (_step = _iterator.next()).done);
+          var _iterator = arr[Symbol.iterator](), _iteratorNext = _iterator.next, _step;
+          (_step = _iteratorNext.call(_iterator)), !_step.done;
           _iteratorNormalCompletion = true
         ) {
+          if (Object(_step) !== _step) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion = false;
           var i = _step.value;
+          {
+          }
         }
       } catch (_iteratorError2) {
         _didIteratorError = true;
         _iteratorError = _iteratorError2;
       } finally {
         try {
-          if (!_iteratorNormalCompletion && _iterator.return != null) _iterator.return();
+          if (!_iteratorNormalCompletion && (_iteratorReturnMethod = _iterator.return) != null) {
+            _iteratorReturn = _iteratorReturnMethod.call(_iterator);
+            if (Object(_iteratorReturn) !== _iteratorReturn)
+              throw new TypeError('Iterator result is not an object');
+          }
         } finally {
           if (_didIteratorError) throw _iteratorError;
         }
       }
     }
     {
-      var _iteratorNormalCompletion9 = true,
-        _didIteratorError10 = false,
-        _iteratorError11;
+      var _iteratorNormalCompletion15 = true,
+        _didIteratorError16 = false,
+        _iteratorError17,
+        _iteratorReturnMethod13,
+        _iteratorReturn14;
       try {
         for (
-          var _iterator7 = numbers[Symbol.iterator](), _step8;
-          !(_iteratorNormalCompletion9 = (_step8 = _iterator7.next()).done);
-          _iteratorNormalCompletion9 = true
+          var _iterator10 = numbers[Symbol.iterator](), _iteratorNext11 = _iterator10.next, _step12;
+          (_step12 = _iteratorNext11.call(_iterator10)), !_step12.done;
+          _iteratorNormalCompletion15 = true
         ) {
-          var i = _step8.value;
+          if (Object(_step12) !== _step12) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion15 = false;
+          var i = _step12.value;
+          {
+          }
         }
-      } catch (_iteratorError212) {
-        _didIteratorError10 = true;
-        _iteratorError11 = _iteratorError212;
+      } catch (_iteratorError218) {
+        _didIteratorError16 = true;
+        _iteratorError17 = _iteratorError218;
       } finally {
         try {
-          if (!_iteratorNormalCompletion9 && _iterator7.return != null) _iterator7.return();
+          if (!_iteratorNormalCompletion15 && (_iteratorReturnMethod13 = _iterator10.return) != null) {
+            _iteratorReturn14 = _iteratorReturnMethod13.call(_iterator10);
+            if (Object(_iteratorReturn14) !== _iteratorReturn14)
+              throw new TypeError('Iterator result is not an object');
+          }
         } finally {
-          if (_didIteratorError10) throw _iteratorError11;
+          if (_didIteratorError16) throw _iteratorError17;
         }
       }
     }"
@@ -2084,35 +3061,55 @@ test('loose/nested-label-for-of/input.js', async () => {
     "{
       var _iteratorNormalCompletion = true,
         _didIteratorError = false,
-        _iteratorError;
+        _iteratorError,
+        _iteratorReturnMethod,
+        _iteratorReturn;
       try {
         b: for (
-          var _iterator = d()[Symbol.iterator](), _step;
-          !(_iteratorNormalCompletion = (_step = _iterator.next()).done);
+          var _iterator = d()[Symbol.iterator](), _iteratorNext = _iterator.next, _step;
+          (_step = _iteratorNext.call(_iterator)), !_step.done;
           _iteratorNormalCompletion = true
         ) {
+          if (Object(_step) !== _step) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion = false;
           let c = _step.value;
           {
-            var _iteratorNormalCompletion10 = true,
-              _didIteratorError11 = false,
-              _iteratorError12;
-            try {
-              for (
-                var _iterator8 = f()[Symbol.iterator](), _step9;
-                !(_iteratorNormalCompletion10 = (_step9 = _iterator8.next()).done);
-                _iteratorNormalCompletion10 = true
-              ) {
-                let e = _step9.value;
-                continue b;
-              }
-            } catch (_iteratorError213) {
-              _didIteratorError11 = true;
-              _iteratorError12 = _iteratorError213;
-            } finally {
+            {
+              var _iteratorNormalCompletion16 = true,
+                _didIteratorError17 = false,
+                _iteratorError18,
+                _iteratorReturnMethod14,
+                _iteratorReturn15;
               try {
-                if (!_iteratorNormalCompletion10 && _iterator8.return != null) _iterator8.return();
+                for (
+                  var _iterator11 = f()[Symbol.iterator](), _iteratorNext12 = _iterator11.next, _step13;
+                  (_step13 = _iteratorNext12.call(_iterator11)), !_step13.done;
+                  _iteratorNormalCompletion16 = true
+                ) {
+                  if (Object(_step13) !== _step13)
+                    throw new TypeError('Iterator result is not an object');
+                  _iteratorNormalCompletion16 = false;
+                  let e = _step13.value;
+                  {
+                    continue b;
+                  }
+                }
+              } catch (_iteratorError219) {
+                _didIteratorError17 = true;
+                _iteratorError18 = _iteratorError219;
               } finally {
-                if (_didIteratorError11) throw _iteratorError12;
+                try {
+                  if (
+                    !_iteratorNormalCompletion16 &&
+                    (_iteratorReturnMethod14 = _iterator11.return) != null
+                  ) {
+                    _iteratorReturn15 = _iteratorReturnMethod14.call(_iterator11);
+                    if (Object(_iteratorReturn15) !== _iteratorReturn15)
+                      throw new TypeError('Iterator result is not an object');
+                  }
+                } finally {
+                  if (_didIteratorError17) throw _iteratorError18;
+                }
               }
             }
           }
@@ -2122,7 +3119,11 @@ test('loose/nested-label-for-of/input.js', async () => {
         _iteratorError = _iteratorError2;
       } finally {
         try {
-          if (!_iteratorNormalCompletion && _iterator.return != null) _iterator.return();
+          if (!_iteratorNormalCompletion && (_iteratorReturnMethod = _iterator.return) != null) {
+            _iteratorReturn = _iteratorReturnMethod.call(_iterator);
+            if (Object(_iteratorReturn) !== _iteratorReturn)
+              throw new TypeError('Iterator result is not an object');
+          }
         } finally {
           if (_didIteratorError) throw _iteratorError;
         }
@@ -2142,21 +3143,31 @@ test('loose/var/input.js', async () => {
     "{
       var _iteratorNormalCompletion = true,
         _didIteratorError = false,
-        _iteratorError;
+        _iteratorError,
+        _iteratorReturnMethod,
+        _iteratorReturn;
       try {
         for (
-          var _iterator = arr[Symbol.iterator](), _step;
-          !(_iteratorNormalCompletion = (_step = _iterator.next()).done);
+          var _iterator = arr[Symbol.iterator](), _iteratorNext = _iterator.next, _step;
+          (_step = _iteratorNext.call(_iterator)), !_step.done;
           _iteratorNormalCompletion = true
         ) {
+          if (Object(_step) !== _step) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion = false;
           var i = _step.value;
+          {
+          }
         }
       } catch (_iteratorError2) {
         _didIteratorError = true;
         _iteratorError = _iteratorError2;
       } finally {
         try {
-          if (!_iteratorNormalCompletion && _iterator.return != null) _iterator.return();
+          if (!_iteratorNormalCompletion && (_iteratorReturnMethod = _iterator.return) != null) {
+            _iteratorReturn = _iteratorReturnMethod.call(_iterator);
+            if (Object(_iteratorReturn) !== _iteratorReturn)
+              throw new TypeError('Iterator result is not an object');
+          }
         } finally {
           if (_didIteratorError) throw _iteratorError;
         }
@@ -2178,21 +3189,31 @@ test('opt/array-binding/input.js', async () => {
     {
       var _iteratorNormalCompletion = true,
         _didIteratorError = false,
-        _iteratorError;
+        _iteratorError,
+        _iteratorReturnMethod,
+        _iteratorReturn;
       try {
         for (
-          var _iterator = x[Symbol.iterator](), _step;
-          !(_iteratorNormalCompletion = (_step = _iterator.next()).done);
+          var _iterator = x[Symbol.iterator](), _iteratorNext = _iterator.next, _step;
+          (_step = _iteratorNext.call(_iterator)), !_step.done;
           _iteratorNormalCompletion = true
         ) {
+          if (Object(_step) !== _step) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion = false;
           const y = _step.value;
+          {
+          }
         }
       } catch (_iteratorError2) {
         _didIteratorError = true;
         _iteratorError = _iteratorError2;
       } finally {
         try {
-          if (!_iteratorNormalCompletion && _iterator.return != null) _iterator.return();
+          if (!_iteratorNormalCompletion && (_iteratorReturnMethod = _iterator.return) != null) {
+            _iteratorReturn = _iteratorReturnMethod.call(_iterator);
+            if (Object(_iteratorReturn) !== _iteratorReturn)
+              throw new TypeError('Iterator result is not an object');
+          }
         } finally {
           if (_didIteratorError) throw _iteratorError;
         }
@@ -2200,25 +3221,35 @@ test('opt/array-binding/input.js', async () => {
     }
     const arr = Object.entries(x);
     {
-      var _iteratorNormalCompletion11 = true,
-        _didIteratorError12 = false,
-        _iteratorError13;
+      var _iteratorNormalCompletion17 = true,
+        _didIteratorError18 = false,
+        _iteratorError19,
+        _iteratorReturnMethod15,
+        _iteratorReturn16;
       try {
         for (
-          var _iterator9 = arr[Symbol.iterator](), _step10;
-          !(_iteratorNormalCompletion11 = (_step10 = _iterator9.next()).done);
-          _iteratorNormalCompletion11 = true
+          var _iterator12 = arr[Symbol.iterator](), _iteratorNext13 = _iterator12.next, _step14;
+          (_step14 = _iteratorNext13.call(_iterator12)), !_step14.done;
+          _iteratorNormalCompletion17 = true
         ) {
-          const y = _step10.value;
+          if (Object(_step14) !== _step14) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion17 = false;
+          const y = _step14.value;
+          {
+          }
         }
-      } catch (_iteratorError214) {
-        _didIteratorError12 = true;
-        _iteratorError13 = _iteratorError214;
+      } catch (_iteratorError220) {
+        _didIteratorError18 = true;
+        _iteratorError19 = _iteratorError220;
       } finally {
         try {
-          if (!_iteratorNormalCompletion11 && _iterator9.return != null) _iterator9.return();
+          if (!_iteratorNormalCompletion17 && (_iteratorReturnMethod15 = _iterator12.return) != null) {
+            _iteratorReturn16 = _iteratorReturnMethod15.call(_iterator12);
+            if (Object(_iteratorReturn16) !== _iteratorReturn16)
+              throw new TypeError('Iterator result is not an object');
+          }
         } finally {
-          if (_didIteratorError12) throw _iteratorError13;
+          if (_didIteratorError18) throw _iteratorError19;
         }
       }
     }"
@@ -2237,115 +3268,173 @@ test('opt/built-ins/input.js', async () => {
     "{
       var _iteratorNormalCompletion = true,
         _didIteratorError = false,
-        _iteratorError;
+        _iteratorError,
+        _iteratorReturnMethod,
+        _iteratorReturn;
       try {
         for (
-          var _iterator = [][Symbol.iterator](), _step;
-          !(_iteratorNormalCompletion = (_step = _iterator.next()).done);
+          var _iterator = [][Symbol.iterator](), _iteratorNext = _iterator.next, _step;
+          (_step = _iteratorNext.call(_iterator)), !_step.done;
           _iteratorNormalCompletion = true
         ) {
+          if (Object(_step) !== _step) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion = false;
           const y = _step.value;
+          {
+          }
         }
       } catch (_iteratorError2) {
         _didIteratorError = true;
         _iteratorError = _iteratorError2;
       } finally {
         try {
-          if (!_iteratorNormalCompletion && _iterator.return != null) _iterator.return();
+          if (!_iteratorNormalCompletion && (_iteratorReturnMethod = _iterator.return) != null) {
+            _iteratorReturn = _iteratorReturnMethod.call(_iterator);
+            if (Object(_iteratorReturn) !== _iteratorReturn)
+              throw new TypeError('Iterator result is not an object');
+          }
         } finally {
           if (_didIteratorError) throw _iteratorError;
         }
       }
     }
     {
-      var _iteratorNormalCompletion9 = true,
-        _didIteratorError10 = false,
-        _iteratorError11;
-      try {
-        for (
-          var _iterator7 = Array.from(x)[Symbol.iterator](), _step8;
-          !(_iteratorNormalCompletion9 = (_step8 = _iterator7.next()).done);
-          _iteratorNormalCompletion9 = true
-        ) {
-          const y = _step8.value;
-        }
-      } catch (_iteratorError212) {
-        _didIteratorError10 = true;
-        _iteratorError11 = _iteratorError212;
-      } finally {
-        try {
-          if (!_iteratorNormalCompletion9 && _iterator7.return != null) _iterator7.return();
-        } finally {
-          if (_didIteratorError10) throw _iteratorError11;
-        }
-      }
-    }
-    {
       var _iteratorNormalCompletion15 = true,
         _didIteratorError16 = false,
-        _iteratorError17;
+        _iteratorError17,
+        _iteratorReturnMethod13,
+        _iteratorReturn14;
       try {
         for (
-          var _iterator13 = Object.keys(x)[Symbol.iterator](), _step14;
-          !(_iteratorNormalCompletion15 = (_step14 = _iterator13.next()).done);
+          var _iterator10 = Array.from(x)[Symbol.iterator](),
+            _iteratorNext11 = _iterator10.next,
+            _step12;
+          (_step12 = _iteratorNext11.call(_iterator10)), !_step12.done;
           _iteratorNormalCompletion15 = true
         ) {
-          const y = _step14.value;
+          if (Object(_step12) !== _step12) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion15 = false;
+          const y = _step12.value;
+          {
+          }
         }
       } catch (_iteratorError218) {
         _didIteratorError16 = true;
         _iteratorError17 = _iteratorError218;
       } finally {
         try {
-          if (!_iteratorNormalCompletion15 && _iterator13.return != null) _iterator13.return();
+          if (!_iteratorNormalCompletion15 && (_iteratorReturnMethod13 = _iterator10.return) != null) {
+            _iteratorReturn14 = _iteratorReturnMethod13.call(_iterator10);
+            if (Object(_iteratorReturn14) !== _iteratorReturn14)
+              throw new TypeError('Iterator result is not an object');
+          }
         } finally {
           if (_didIteratorError16) throw _iteratorError17;
         }
       }
     }
     {
-      var _iteratorNormalCompletion21 = true,
-        _didIteratorError22 = false,
-        _iteratorError23;
+      var _iteratorNormalCompletion24 = true,
+        _didIteratorError25 = false,
+        _iteratorError26,
+        _iteratorReturnMethod22,
+        _iteratorReturn23;
       try {
         for (
-          var _iterator19 = Object.values(x)[Symbol.iterator](), _step20;
-          !(_iteratorNormalCompletion21 = (_step20 = _iterator19.next()).done);
-          _iteratorNormalCompletion21 = true
+          var _iterator19 = Object.keys(x)[Symbol.iterator](),
+            _iteratorNext20 = _iterator19.next,
+            _step21;
+          (_step21 = _iteratorNext20.call(_iterator19)), !_step21.done;
+          _iteratorNormalCompletion24 = true
         ) {
-          const y = _step20.value;
+          if (Object(_step21) !== _step21) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion24 = false;
+          const y = _step21.value;
+          {
+          }
         }
-      } catch (_iteratorError224) {
-        _didIteratorError22 = true;
-        _iteratorError23 = _iteratorError224;
+      } catch (_iteratorError227) {
+        _didIteratorError25 = true;
+        _iteratorError26 = _iteratorError227;
       } finally {
         try {
-          if (!_iteratorNormalCompletion21 && _iterator19.return != null) _iterator19.return();
+          if (!_iteratorNormalCompletion24 && (_iteratorReturnMethod22 = _iterator19.return) != null) {
+            _iteratorReturn23 = _iteratorReturnMethod22.call(_iterator19);
+            if (Object(_iteratorReturn23) !== _iteratorReturn23)
+              throw new TypeError('Iterator result is not an object');
+          }
         } finally {
-          if (_didIteratorError22) throw _iteratorError23;
+          if (_didIteratorError25) throw _iteratorError26;
         }
       }
     }
     {
-      var _iteratorNormalCompletion27 = true,
-        _didIteratorError28 = false,
-        _iteratorError29;
+      var _iteratorNormalCompletion33 = true,
+        _didIteratorError34 = false,
+        _iteratorError35,
+        _iteratorReturnMethod31,
+        _iteratorReturn32;
       try {
         for (
-          var _iterator25 = Object.entries(x)[Symbol.iterator](), _step26;
-          !(_iteratorNormalCompletion27 = (_step26 = _iterator25.next()).done);
-          _iteratorNormalCompletion27 = true
+          var _iterator28 = Object.values(x)[Symbol.iterator](),
+            _iteratorNext29 = _iterator28.next,
+            _step30;
+          (_step30 = _iteratorNext29.call(_iterator28)), !_step30.done;
+          _iteratorNormalCompletion33 = true
         ) {
-          const y = _step26.value;
+          if (Object(_step30) !== _step30) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion33 = false;
+          const y = _step30.value;
+          {
+          }
         }
-      } catch (_iteratorError230) {
-        _didIteratorError28 = true;
-        _iteratorError29 = _iteratorError230;
+      } catch (_iteratorError236) {
+        _didIteratorError34 = true;
+        _iteratorError35 = _iteratorError236;
       } finally {
         try {
-          if (!_iteratorNormalCompletion27 && _iterator25.return != null) _iterator25.return();
+          if (!_iteratorNormalCompletion33 && (_iteratorReturnMethod31 = _iterator28.return) != null) {
+            _iteratorReturn32 = _iteratorReturnMethod31.call(_iterator28);
+            if (Object(_iteratorReturn32) !== _iteratorReturn32)
+              throw new TypeError('Iterator result is not an object');
+          }
         } finally {
-          if (_didIteratorError28) throw _iteratorError29;
+          if (_didIteratorError34) throw _iteratorError35;
+        }
+      }
+    }
+    {
+      var _iteratorNormalCompletion42 = true,
+        _didIteratorError43 = false,
+        _iteratorError44,
+        _iteratorReturnMethod40,
+        _iteratorReturn41;
+      try {
+        for (
+          var _iterator37 = Object.entries(x)[Symbol.iterator](),
+            _iteratorNext38 = _iterator37.next,
+            _step39;
+          (_step39 = _iteratorNext38.call(_iterator37)), !_step39.done;
+          _iteratorNormalCompletion42 = true
+        ) {
+          if (Object(_step39) !== _step39) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion42 = false;
+          const y = _step39.value;
+          {
+          }
+        }
+      } catch (_iteratorError245) {
+        _didIteratorError43 = true;
+        _iteratorError44 = _iteratorError245;
+      } finally {
+        try {
+          if (!_iteratorNormalCompletion42 && (_iteratorReturnMethod40 = _iterator37.return) != null) {
+            _iteratorReturn41 = _iteratorReturnMethod40.call(_iterator37);
+            if (Object(_iteratorReturn41) !== _iteratorReturn41)
+              throw new TypeError('Iterator result is not an object');
+          }
+        } finally {
+          if (_didIteratorError43) throw _iteratorError44;
         }
       }
     }"
@@ -2354,23 +3443,96 @@ test('opt/built-ins/input.js', async () => {
 
 test('opt/type-annotation-array-flow-deopt/input.js', async () => {
   const source =
-    "// This won't be optimize because when `for-of` is handled, the b's type annotation has been removed by the Flow plugin\nfunction a(b: Array<any>) {\n  for (const y of b) {}\n}\n";
+    "// @flow\n// This won't be optimize because when `for-of` is handled, the b's type annotation has been removed by the Flow plugin\nfunction a(b: Array<any>) {\n  for (const y of b) {}\n}\n";
   expect(
     await transformOutcome(source, 'input.js', {
       transforms: { forOf: true },
       helpers: { mode: 'inline' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:parse-error"`);
+  ).toMatchInlineSnapshot(`
+    "// @flow
+    // This won't be optimize because when \`for-of\` is handled, the b's type annotation has been removed by the Flow plugin
+    function a(b) {
+      {
+        var _iteratorNormalCompletion = true,
+          _didIteratorError = false,
+          _iteratorError,
+          _iteratorReturnMethod,
+          _iteratorReturn;
+        try {
+          for (
+            var _iterator = b[Symbol.iterator](), _iteratorNext = _iterator.next, _step;
+            (_step = _iteratorNext.call(_iterator)), !_step.done;
+            _iteratorNormalCompletion = true
+          ) {
+            if (Object(_step) !== _step) throw new TypeError('Iterator result is not an object');
+            _iteratorNormalCompletion = false;
+            const y = _step.value;
+            {
+            }
+          }
+        } catch (_iteratorError2) {
+          _didIteratorError = true;
+          _iteratorError = _iteratorError2;
+        } finally {
+          try {
+            if (!_iteratorNormalCompletion && (_iteratorReturnMethod = _iterator.return) != null) {
+              _iteratorReturn = _iteratorReturnMethod.call(_iterator);
+              if (Object(_iteratorReturn) !== _iteratorReturn)
+                throw new TypeError('Iterator result is not an object');
+            }
+          } finally {
+            if (_didIteratorError) throw _iteratorError;
+          }
+        }
+      }
+    }"
+  `);
 });
 
 test('opt/type-annotation-array-flow/input.js', async () => {
-  const source = 'for (const y of (b: Array<any>)) {}\n';
+  const source = '// @flow\nfor (const y of (b: Array<any>)) {}\n';
   expect(
     await transformOutcome(source, 'input.js', {
       transforms: { forOf: true },
       helpers: { mode: 'inline' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:parse-error"`);
+  ).toMatchInlineSnapshot(`
+    "// @flow
+    {
+      var _iteratorNormalCompletion = true,
+        _didIteratorError = false,
+        _iteratorError,
+        _iteratorReturnMethod,
+        _iteratorReturn;
+      try {
+        for (
+          var _iterator = b[Symbol.iterator](), _iteratorNext = _iterator.next, _step;
+          (_step = _iteratorNext.call(_iterator)), !_step.done;
+          _iteratorNormalCompletion = true
+        ) {
+          if (Object(_step) !== _step) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion = false;
+          const y = _step.value;
+          {
+          }
+        }
+      } catch (_iteratorError2) {
+        _didIteratorError = true;
+        _iteratorError = _iteratorError2;
+      } finally {
+        try {
+          if (!_iteratorNormalCompletion && (_iteratorReturnMethod = _iterator.return) != null) {
+            _iteratorReturn = _iteratorReturnMethod.call(_iterator);
+            if (Object(_iteratorReturn) !== _iteratorReturn)
+              throw new TypeError('Iterator result is not an object');
+          }
+        } finally {
+          if (_didIteratorError) throw _iteratorError;
+        }
+      }
+    }"
+  `);
 });
 
 test('opt/type-annotation-array-ts-deopt/input.ts', async () => {
@@ -2387,21 +3549,31 @@ test('opt/type-annotation-array-ts-deopt/input.ts', async () => {
       {
         var _iteratorNormalCompletion = true,
           _didIteratorError = false,
-          _iteratorError;
+          _iteratorError,
+          _iteratorReturnMethod,
+          _iteratorReturn;
         try {
           for (
-            var _iterator = b[Symbol.iterator](), _step;
-            !(_iteratorNormalCompletion = (_step = _iterator.next()).done);
+            var _iterator = b[Symbol.iterator](), _iteratorNext = _iterator.next, _step;
+            (_step = _iteratorNext.call(_iterator)), !_step.done;
             _iteratorNormalCompletion = true
           ) {
+            if (Object(_step) !== _step) throw new TypeError('Iterator result is not an object');
+            _iteratorNormalCompletion = false;
             const y = _step.value;
+            {
+            }
           }
         } catch (_iteratorError2) {
           _didIteratorError = true;
           _iteratorError = _iteratorError2;
         } finally {
           try {
-            if (!_iteratorNormalCompletion && _iterator.return != null) _iterator.return();
+            if (!_iteratorNormalCompletion && (_iteratorReturnMethod = _iterator.return) != null) {
+              _iteratorReturn = _iteratorReturnMethod.call(_iterator);
+              if (Object(_iteratorReturn) !== _iteratorReturn)
+                throw new TypeError('Iterator result is not an object');
+            }
           } finally {
             if (_didIteratorError) throw _iteratorError;
           }
@@ -2422,21 +3594,31 @@ test('opt/type-annotation-array-ts/input.ts', async () => {
     "{
       var _iteratorNormalCompletion = true,
         _didIteratorError = false,
-        _iteratorError;
+        _iteratorError,
+        _iteratorReturnMethod,
+        _iteratorReturn;
       try {
         for (
-          var _iterator = b[Symbol.iterator](), _step;
-          !(_iteratorNormalCompletion = (_step = _iterator.next()).done);
+          var _iterator = b[Symbol.iterator](), _iteratorNext = _iterator.next, _step;
+          (_step = _iteratorNext.call(_iterator)), !_step.done;
           _iteratorNormalCompletion = true
         ) {
+          if (Object(_step) !== _step) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion = false;
           const y = _step.value;
+          {
+          }
         }
       } catch (_iteratorError2) {
         _didIteratorError = true;
         _iteratorError = _iteratorError2;
       } finally {
         try {
-          if (!_iteratorNormalCompletion && _iterator.return != null) _iterator.return();
+          if (!_iteratorNormalCompletion && (_iteratorReturnMethod = _iterator.return) != null) {
+            _iteratorReturn = _iteratorReturnMethod.call(_iterator);
+            if (Object(_iteratorReturn) !== _iteratorReturn)
+              throw new TypeError('Iterator result is not an object');
+          }
         } finally {
           if (_didIteratorError) throw _iteratorError;
         }
@@ -2457,21 +3639,31 @@ test('regression/if-block-label-3858/input.js', async () => {
       {
         var _iteratorNormalCompletion = true,
           _didIteratorError = false,
-          _iteratorError;
+          _iteratorError,
+          _iteratorReturnMethod,
+          _iteratorReturn;
         try {
           loop: for (
-            var _iterator = [][Symbol.iterator](), _step;
-            !(_iteratorNormalCompletion = (_step = _iterator.next()).done);
+            var _iterator = [][Symbol.iterator](), _iteratorNext = _iterator.next, _step;
+            (_step = _iteratorNext.call(_iterator)), !_step.done;
             _iteratorNormalCompletion = true
           ) {
+            if (Object(_step) !== _step) throw new TypeError('Iterator result is not an object');
+            _iteratorNormalCompletion = false;
             let ch = _step.value;
+            {
+            }
           }
         } catch (_iteratorError2) {
           _didIteratorError = true;
           _iteratorError = _iteratorError2;
         } finally {
           try {
-            if (!_iteratorNormalCompletion && _iterator.return != null) _iterator.return();
+            if (!_iteratorNormalCompletion && (_iteratorReturnMethod = _iterator.return) != null) {
+              _iteratorReturn = _iteratorReturnMethod.call(_iterator);
+              if (Object(_iteratorReturn) !== _iteratorReturn)
+                throw new TypeError('Iterator result is not an object');
+            }
           } finally {
             if (_didIteratorError) throw _iteratorError;
           }
@@ -2492,22 +3684,32 @@ test('regression/if-block-label-generic-iterable-12610/input.js', async () => {
     "if (true) {
       var _iteratorNormalCompletion = true,
         _didIteratorError = false,
-        _iteratorError;
+        _iteratorError,
+        _iteratorReturnMethod,
+        _iteratorReturn;
       try {
         actions: for (
-          var _iterator = y[Symbol.iterator](), _step;
-          !(_iteratorNormalCompletion = (_step = _iterator.next()).done);
+          var _iterator = y[Symbol.iterator](), _iteratorNext = _iterator.next, _step;
+          (_step = _iteratorNext.call(_iterator)), !_step.done;
           _iteratorNormalCompletion = true
         ) {
+          if (Object(_step) !== _step) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion = false;
           let x = _step.value;
-          continue actions;
+          {
+            continue actions;
+          }
         }
       } catch (_iteratorError2) {
         _didIteratorError = true;
         _iteratorError = _iteratorError2;
       } finally {
         try {
-          if (!_iteratorNormalCompletion && _iterator.return != null) _iterator.return();
+          if (!_iteratorNormalCompletion && (_iteratorReturnMethod = _iterator.return) != null) {
+            _iteratorReturn = _iteratorReturnMethod.call(_iterator);
+            if (Object(_iteratorReturn) !== _iteratorReturn)
+              throw new TypeError('Iterator result is not an object');
+          }
         } finally {
           if (_didIteratorError) throw _iteratorError;
         }
@@ -2527,21 +3729,31 @@ test('regression/if-label-3858/input.js', async () => {
     "if (true) {
       var _iteratorNormalCompletion = true,
         _didIteratorError = false,
-        _iteratorError;
+        _iteratorError,
+        _iteratorReturnMethod,
+        _iteratorReturn;
       try {
         loop: for (
-          var _iterator = [][Symbol.iterator](), _step;
-          !(_iteratorNormalCompletion = (_step = _iterator.next()).done);
+          var _iterator = [][Symbol.iterator](), _iteratorNext = _iterator.next, _step;
+          (_step = _iteratorNext.call(_iterator)), !_step.done;
           _iteratorNormalCompletion = true
         ) {
+          if (Object(_step) !== _step) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion = false;
           let ch = _step.value;
+          {
+          }
         }
       } catch (_iteratorError2) {
         _didIteratorError = true;
         _iteratorError = _iteratorError2;
       } finally {
         try {
-          if (!_iteratorNormalCompletion && _iterator.return != null) _iterator.return();
+          if (!_iteratorNormalCompletion && (_iteratorReturnMethod = _iterator.return) != null) {
+            _iteratorReturn = _iteratorReturnMethod.call(_iterator);
+            if (Object(_iteratorReturn) !== _iteratorReturn)
+              throw new TypeError('Iterator result is not an object');
+          }
         } finally {
           if (_didIteratorError) throw _iteratorError;
         }
@@ -2561,22 +3773,32 @@ test('regression/if-label-generic-iterable-12610/input.js', async () => {
     "if (true) {
       var _iteratorNormalCompletion = true,
         _didIteratorError = false,
-        _iteratorError;
+        _iteratorError,
+        _iteratorReturnMethod,
+        _iteratorReturn;
       try {
         actions: for (
-          var _iterator = y[Symbol.iterator](), _step;
-          !(_iteratorNormalCompletion = (_step = _iterator.next()).done);
+          var _iterator = y[Symbol.iterator](), _iteratorNext = _iterator.next, _step;
+          (_step = _iteratorNext.call(_iterator)), !_step.done;
           _iteratorNormalCompletion = true
         ) {
+          if (Object(_step) !== _step) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion = false;
           let x = _step.value;
-          continue actions;
+          {
+            continue actions;
+          }
         }
       } catch (_iteratorError2) {
         _didIteratorError = true;
         _iteratorError = _iteratorError2;
       } finally {
         try {
-          if (!_iteratorNormalCompletion && _iterator.return != null) _iterator.return();
+          if (!_iteratorNormalCompletion && (_iteratorReturnMethod = _iterator.return) != null) {
+            _iteratorReturn = _iteratorReturnMethod.call(_iterator);
+            if (Object(_iteratorReturn) !== _iteratorReturn)
+              throw new TypeError('Iterator result is not an object');
+          }
         } finally {
           if (_didIteratorError) throw _iteratorError;
         }
@@ -2596,22 +3818,32 @@ test('regression/label-object-with-comment-4995/input.js', async () => {
     "{
       var _iteratorNormalCompletion = true,
         _didIteratorError = false,
-        _iteratorError;
+        _iteratorError,
+        _iteratorReturnMethod,
+        _iteratorReturn;
       try {
         myLabel: for (
-          var _iterator = b[Symbol.iterator](), _step;
-          !(_iteratorNormalCompletion = (_step = _iterator.next()).done);
+          var _iterator = b[Symbol.iterator](), _iteratorNext = _iterator.next, _step;
+          (_step = _iteratorNext.call(_iterator)), !_step.done;
           _iteratorNormalCompletion = true
         ) {
+          if (Object(_step) !== _step) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion = false;
           let a = _step.value;
-          continue myLabel;
+          {
+            continue myLabel;
+          }
         }
       } catch (_iteratorError2) {
         _didIteratorError = true;
         _iteratorError = _iteratorError2;
       } finally {
         try {
-          if (!_iteratorNormalCompletion && _iterator.return != null) _iterator.return();
+          if (!_iteratorNormalCompletion && (_iteratorReturnMethod = _iterator.return) != null) {
+            _iteratorReturn = _iteratorReturnMethod.call(_iterator);
+            if (Object(_iteratorReturn) !== _iteratorReturn)
+              throw new TypeError('Iterator result is not an object');
+          }
         } finally {
           if (_didIteratorError) throw _iteratorError;
         }
@@ -2632,22 +3864,32 @@ test('regression/redeclare-array-8913/input.js', async () => {
       {
         var _iteratorNormalCompletion = true,
           _didIteratorError = false,
-          _iteratorError;
+          _iteratorError,
+          _iteratorReturnMethod,
+          _iteratorReturn;
         try {
           for (
-            var _iterator = t[Symbol.iterator](), _step;
-            !(_iteratorNormalCompletion = (_step = _iterator.next()).done);
+            var _iterator = t[Symbol.iterator](), _iteratorNext = _iterator.next, _step;
+            (_step = _iteratorNext.call(_iterator)), !_step.done;
             _iteratorNormalCompletion = true
           ) {
+            if (Object(_step) !== _step) throw new TypeError('Iterator result is not an object');
+            _iteratorNormalCompletion = false;
             let o = _step.value;
-            const t = o;
+            {
+              const t = o;
+            }
           }
         } catch (_iteratorError2) {
           _didIteratorError = true;
           _iteratorError = _iteratorError2;
         } finally {
           try {
-            if (!_iteratorNormalCompletion && _iterator.return != null) _iterator.return();
+            if (!_iteratorNormalCompletion && (_iteratorReturnMethod = _iterator.return) != null) {
+              _iteratorReturn = _iteratorReturnMethod.call(_iterator);
+              if (Object(_iteratorReturn) !== _iteratorReturn)
+                throw new TypeError('Iterator result is not an object');
+            }
           } finally {
             if (_didIteratorError) throw _iteratorError;
           }
@@ -2672,23 +3914,33 @@ test('regression/regression-1169/input.js', async () => {
       {
         var _iteratorNormalCompletion = true,
           _didIteratorError = false,
-          _iteratorError;
+          _iteratorError,
+          _iteratorReturnMethod,
+          _iteratorReturn;
         try {
           for (
-            var _iterator = input[Symbol.iterator](), _step;
-            !(_iteratorNormalCompletion = (_step = _iterator.next()).done);
+            var _iterator = input[Symbol.iterator](), _iteratorNext = _iterator.next, _step;
+            (_step = _iteratorNext.call(_iterator)), !_step.done;
             _iteratorNormalCompletion = true
           ) {
+            if (Object(_step) !== _step) throw new TypeError('Iterator result is not an object');
+            _iteratorNormalCompletion = false;
             let c = _step.value;
-            let name = c;
-            output[name] = name;
+            {
+              let name = c;
+              output[name] = name;
+            }
           }
         } catch (_iteratorError2) {
           _didIteratorError = true;
           _iteratorError = _iteratorError2;
         } finally {
           try {
-            if (!_iteratorNormalCompletion && _iterator.return != null) _iterator.return();
+            if (!_iteratorNormalCompletion && (_iteratorReturnMethod = _iterator.return) != null) {
+              _iteratorReturn = _iteratorReturnMethod.call(_iterator);
+              if (Object(_iteratorReturn) !== _iteratorReturn)
+                throw new TypeError('Iterator result is not an object');
+            }
           } finally {
             if (_didIteratorError) throw _iteratorError;
           }
@@ -2713,23 +3965,33 @@ test('regression/scope-9696/exec.js', async () => {
     {
       var _iteratorNormalCompletion = true,
         _didIteratorError = false,
-        _iteratorError;
+        _iteratorError,
+        _iteratorReturnMethod,
+        _iteratorReturn;
       try {
         for (
-          var _iterator = arr[Symbol.iterator](), _step;
-          !(_iteratorNormalCompletion = (_step = _iterator.next()).done);
+          var _iterator = arr[Symbol.iterator](), _iteratorNext = _iterator.next, _step;
+          (_step = _iteratorNext.call(_iterator)), !_step.done;
           _iteratorNormalCompletion = true
         ) {
+          if (Object(_step) !== _step) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion = false;
           let v = _step.value;
-          results.push(v);
-          arr = null;
+          {
+            results.push(v);
+            arr = null;
+          }
         }
       } catch (_iteratorError2) {
         _didIteratorError = true;
         _iteratorError = _iteratorError2;
       } finally {
         try {
-          if (!_iteratorNormalCompletion && _iterator.return != null) _iterator.return();
+          if (!_iteratorNormalCompletion && (_iteratorReturnMethod = _iterator.return) != null) {
+            _iteratorReturn = _iteratorReturnMethod.call(_iterator);
+            if (Object(_iteratorReturn) !== _iteratorReturn)
+              throw new TypeError('Iterator result is not an object');
+          }
         } finally {
           if (_didIteratorError) throw _iteratorError;
         }
@@ -2751,23 +4013,33 @@ test('regression/scope-9696/input.js', async () => {
     {
       var _iteratorNormalCompletion = true,
         _didIteratorError = false,
-        _iteratorError;
+        _iteratorError,
+        _iteratorReturnMethod,
+        _iteratorReturn;
       try {
         for (
-          var _iterator = arr[Symbol.iterator](), _step;
-          !(_iteratorNormalCompletion = (_step = _iterator.next()).done);
+          var _iterator = arr[Symbol.iterator](), _iteratorNext = _iterator.next, _step;
+          (_step = _iteratorNext.call(_iterator)), !_step.done;
           _iteratorNormalCompletion = true
         ) {
+          if (Object(_step) !== _step) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion = false;
           let v = _step.value;
-          console.log(v);
-          arr = null;
+          {
+            console.log(v);
+            arr = null;
+          }
         }
       } catch (_iteratorError2) {
         _didIteratorError = true;
         _iteratorError = _iteratorError2;
       } finally {
         try {
-          if (!_iteratorNormalCompletion && _iterator.return != null) _iterator.return();
+          if (!_iteratorNormalCompletion && (_iteratorReturnMethod = _iterator.return) != null) {
+            _iteratorReturn = _iteratorReturnMethod.call(_iterator);
+            if (Object(_iteratorReturn) !== _iteratorReturn)
+              throw new TypeError('Iterator result is not an object');
+          }
         } finally {
           if (_didIteratorError) throw _iteratorError;
         }
@@ -2787,21 +4059,31 @@ test('spec/identifier/input.js', async () => {
     "{
       var _iteratorNormalCompletion = true,
         _didIteratorError = false,
-        _iteratorError;
+        _iteratorError,
+        _iteratorReturnMethod,
+        _iteratorReturn;
       try {
         for (
-          var _iterator = arr[Symbol.iterator](), _step;
-          !(_iteratorNormalCompletion = (_step = _iterator.next()).done);
+          var _iterator = arr[Symbol.iterator](), _iteratorNext = _iterator.next, _step;
+          (_step = _iteratorNext.call(_iterator)), !_step.done;
           _iteratorNormalCompletion = true
         ) {
+          if (Object(_step) !== _step) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion = false;
           i = _step.value;
+          {
+          }
         }
       } catch (_iteratorError2) {
         _didIteratorError = true;
         _iteratorError = _iteratorError2;
       } finally {
         try {
-          if (!_iteratorNormalCompletion && _iterator.return != null) _iterator.return();
+          if (!_iteratorNormalCompletion && (_iteratorReturnMethod = _iterator.return) != null) {
+            _iteratorReturn = _iteratorReturnMethod.call(_iterator);
+            if (Object(_iteratorReturn) !== _iteratorReturn)
+              throw new TypeError('Iterator result is not an object');
+          }
         } finally {
           if (_didIteratorError) throw _iteratorError;
         }
@@ -2821,17 +4103,23 @@ test('spec/ignore-cases/input.js', async () => {
     "{
       var _iteratorNormalCompletion = true,
         _didIteratorError = false,
-        _iteratorError;
+        _iteratorError,
+        _iteratorReturnMethod,
+        _iteratorReturn;
       try {
         for (
-          var _iterator = foo[Symbol.iterator](), _step;
-          !(_iteratorNormalCompletion = (_step = _iterator.next()).done);
+          var _iterator = foo[Symbol.iterator](), _iteratorNext = _iterator.next, _step;
+          (_step = _iteratorNext.call(_iterator)), !_step.done;
           _iteratorNormalCompletion = true
         ) {
+          if (Object(_step) !== _step) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion = false;
           var i = _step.value;
-          switch (i) {
-            case 1:
-              break;
+          {
+            switch (i) {
+              case 1:
+                break;
+            }
           }
         }
       } catch (_iteratorError2) {
@@ -2839,7 +4127,11 @@ test('spec/ignore-cases/input.js', async () => {
         _iteratorError = _iteratorError2;
       } finally {
         try {
-          if (!_iteratorNormalCompletion && _iterator.return != null) _iterator.return();
+          if (!_iteratorNormalCompletion && (_iteratorReturnMethod = _iterator.return) != null) {
+            _iteratorReturn = _iteratorReturnMethod.call(_iterator);
+            if (Object(_iteratorReturn) !== _iteratorReturn)
+              throw new TypeError('Iterator result is not an object');
+          }
         } finally {
           if (_didIteratorError) throw _iteratorError;
         }
@@ -2859,21 +4151,31 @@ test('spec/let/input.js', async () => {
     "{
       var _iteratorNormalCompletion = true,
         _didIteratorError = false,
-        _iteratorError;
+        _iteratorError,
+        _iteratorReturnMethod,
+        _iteratorReturn;
       try {
         for (
-          var _iterator = arr[Symbol.iterator](), _step;
-          !(_iteratorNormalCompletion = (_step = _iterator.next()).done);
+          var _iterator = arr[Symbol.iterator](), _iteratorNext = _iterator.next, _step;
+          (_step = _iteratorNext.call(_iterator)), !_step.done;
           _iteratorNormalCompletion = true
         ) {
+          if (Object(_step) !== _step) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion = false;
           let i = _step.value;
+          {
+          }
         }
       } catch (_iteratorError2) {
         _didIteratorError = true;
         _iteratorError = _iteratorError2;
       } finally {
         try {
-          if (!_iteratorNormalCompletion && _iterator.return != null) _iterator.return();
+          if (!_iteratorNormalCompletion && (_iteratorReturnMethod = _iterator.return) != null) {
+            _iteratorReturn = _iteratorReturnMethod.call(_iterator);
+            if (Object(_iteratorReturn) !== _iteratorReturn)
+              throw new TypeError('Iterator result is not an object');
+          }
         } finally {
           if (_didIteratorError) throw _iteratorError;
         }
@@ -2893,21 +4195,31 @@ test('spec/member-expression/input.js', async () => {
     "{
       var _iteratorNormalCompletion = true,
         _didIteratorError = false,
-        _iteratorError;
+        _iteratorError,
+        _iteratorReturnMethod,
+        _iteratorReturn;
       try {
         for (
-          var _iterator = arr[Symbol.iterator](), _step;
-          !(_iteratorNormalCompletion = (_step = _iterator.next()).done);
+          var _iterator = arr[Symbol.iterator](), _iteratorNext = _iterator.next, _step;
+          (_step = _iteratorNext.call(_iterator)), !_step.done;
           _iteratorNormalCompletion = true
         ) {
+          if (Object(_step) !== _step) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion = false;
           obj.prop = _step.value;
+          {
+          }
         }
       } catch (_iteratorError2) {
         _didIteratorError = true;
         _iteratorError = _iteratorError2;
       } finally {
         try {
-          if (!_iteratorNormalCompletion && _iterator.return != null) _iterator.return();
+          if (!_iteratorNormalCompletion && (_iteratorReturnMethod = _iterator.return) != null) {
+            _iteratorReturn = _iteratorReturnMethod.call(_iterator);
+            if (Object(_iteratorReturn) !== _iteratorReturn)
+              throw new TypeError('Iterator result is not an object');
+          }
         } finally {
           if (_didIteratorError) throw _iteratorError;
         }
@@ -2927,46 +4239,66 @@ test('spec/multiple/input.js', async () => {
     "{
       var _iteratorNormalCompletion = true,
         _didIteratorError = false,
-        _iteratorError;
+        _iteratorError,
+        _iteratorReturnMethod,
+        _iteratorReturn;
       try {
         for (
-          var _iterator = arr[Symbol.iterator](), _step;
-          !(_iteratorNormalCompletion = (_step = _iterator.next()).done);
+          var _iterator = arr[Symbol.iterator](), _iteratorNext = _iterator.next, _step;
+          (_step = _iteratorNext.call(_iterator)), !_step.done;
           _iteratorNormalCompletion = true
         ) {
+          if (Object(_step) !== _step) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion = false;
           var i = _step.value;
+          {
+          }
         }
       } catch (_iteratorError2) {
         _didIteratorError = true;
         _iteratorError = _iteratorError2;
       } finally {
         try {
-          if (!_iteratorNormalCompletion && _iterator.return != null) _iterator.return();
+          if (!_iteratorNormalCompletion && (_iteratorReturnMethod = _iterator.return) != null) {
+            _iteratorReturn = _iteratorReturnMethod.call(_iterator);
+            if (Object(_iteratorReturn) !== _iteratorReturn)
+              throw new TypeError('Iterator result is not an object');
+          }
         } finally {
           if (_didIteratorError) throw _iteratorError;
         }
       }
     }
     {
-      var _iteratorNormalCompletion9 = true,
-        _didIteratorError10 = false,
-        _iteratorError11;
+      var _iteratorNormalCompletion15 = true,
+        _didIteratorError16 = false,
+        _iteratorError17,
+        _iteratorReturnMethod13,
+        _iteratorReturn14;
       try {
         for (
-          var _iterator7 = numbers[Symbol.iterator](), _step8;
-          !(_iteratorNormalCompletion9 = (_step8 = _iterator7.next()).done);
-          _iteratorNormalCompletion9 = true
+          var _iterator10 = numbers[Symbol.iterator](), _iteratorNext11 = _iterator10.next, _step12;
+          (_step12 = _iteratorNext11.call(_iterator10)), !_step12.done;
+          _iteratorNormalCompletion15 = true
         ) {
-          var i = _step8.value;
+          if (Object(_step12) !== _step12) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion15 = false;
+          var i = _step12.value;
+          {
+          }
         }
-      } catch (_iteratorError212) {
-        _didIteratorError10 = true;
-        _iteratorError11 = _iteratorError212;
+      } catch (_iteratorError218) {
+        _didIteratorError16 = true;
+        _iteratorError17 = _iteratorError218;
       } finally {
         try {
-          if (!_iteratorNormalCompletion9 && _iterator7.return != null) _iterator7.return();
+          if (!_iteratorNormalCompletion15 && (_iteratorReturnMethod13 = _iterator10.return) != null) {
+            _iteratorReturn14 = _iteratorReturnMethod13.call(_iterator10);
+            if (Object(_iteratorReturn14) !== _iteratorReturn14)
+              throw new TypeError('Iterator result is not an object');
+          }
         } finally {
-          if (_didIteratorError10) throw _iteratorError11;
+          if (_didIteratorError16) throw _iteratorError17;
         }
       }
     }"
@@ -2984,35 +4316,55 @@ test('spec/nested-label-for-of/input.js', async () => {
     "{
       var _iteratorNormalCompletion = true,
         _didIteratorError = false,
-        _iteratorError;
+        _iteratorError,
+        _iteratorReturnMethod,
+        _iteratorReturn;
       try {
         b: for (
-          var _iterator = d()[Symbol.iterator](), _step;
-          !(_iteratorNormalCompletion = (_step = _iterator.next()).done);
+          var _iterator = d()[Symbol.iterator](), _iteratorNext = _iterator.next, _step;
+          (_step = _iteratorNext.call(_iterator)), !_step.done;
           _iteratorNormalCompletion = true
         ) {
+          if (Object(_step) !== _step) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion = false;
           let c = _step.value;
           {
-            var _iteratorNormalCompletion10 = true,
-              _didIteratorError11 = false,
-              _iteratorError12;
-            try {
-              for (
-                var _iterator8 = f()[Symbol.iterator](), _step9;
-                !(_iteratorNormalCompletion10 = (_step9 = _iterator8.next()).done);
-                _iteratorNormalCompletion10 = true
-              ) {
-                let e = _step9.value;
-                continue b;
-              }
-            } catch (_iteratorError213) {
-              _didIteratorError11 = true;
-              _iteratorError12 = _iteratorError213;
-            } finally {
+            {
+              var _iteratorNormalCompletion16 = true,
+                _didIteratorError17 = false,
+                _iteratorError18,
+                _iteratorReturnMethod14,
+                _iteratorReturn15;
               try {
-                if (!_iteratorNormalCompletion10 && _iterator8.return != null) _iterator8.return();
+                for (
+                  var _iterator11 = f()[Symbol.iterator](), _iteratorNext12 = _iterator11.next, _step13;
+                  (_step13 = _iteratorNext12.call(_iterator11)), !_step13.done;
+                  _iteratorNormalCompletion16 = true
+                ) {
+                  if (Object(_step13) !== _step13)
+                    throw new TypeError('Iterator result is not an object');
+                  _iteratorNormalCompletion16 = false;
+                  let e = _step13.value;
+                  {
+                    continue b;
+                  }
+                }
+              } catch (_iteratorError219) {
+                _didIteratorError17 = true;
+                _iteratorError18 = _iteratorError219;
               } finally {
-                if (_didIteratorError11) throw _iteratorError12;
+                try {
+                  if (
+                    !_iteratorNormalCompletion16 &&
+                    (_iteratorReturnMethod14 = _iterator11.return) != null
+                  ) {
+                    _iteratorReturn15 = _iteratorReturnMethod14.call(_iterator11);
+                    if (Object(_iteratorReturn15) !== _iteratorReturn15)
+                      throw new TypeError('Iterator result is not an object');
+                  }
+                } finally {
+                  if (_didIteratorError17) throw _iteratorError18;
+                }
               }
             }
           }
@@ -3022,7 +4374,11 @@ test('spec/nested-label-for-of/input.js', async () => {
         _iteratorError = _iteratorError2;
       } finally {
         try {
-          if (!_iteratorNormalCompletion && _iterator.return != null) _iterator.return();
+          if (!_iteratorNormalCompletion && (_iteratorReturnMethod = _iterator.return) != null) {
+            _iteratorReturn = _iteratorReturnMethod.call(_iterator);
+            if (Object(_iteratorReturn) !== _iteratorReturn)
+              throw new TypeError('Iterator result is not an object');
+          }
         } finally {
           if (_didIteratorError) throw _iteratorError;
         }
@@ -3042,21 +4398,31 @@ test('spec/var/input.js', async () => {
     "{
       var _iteratorNormalCompletion = true,
         _didIteratorError = false,
-        _iteratorError;
+        _iteratorError,
+        _iteratorReturnMethod,
+        _iteratorReturn;
       try {
         for (
-          var _iterator = arr[Symbol.iterator](), _step;
-          !(_iteratorNormalCompletion = (_step = _iterator.next()).done);
+          var _iterator = arr[Symbol.iterator](), _iteratorNext = _iterator.next, _step;
+          (_step = _iteratorNext.call(_iterator)), !_step.done;
           _iteratorNormalCompletion = true
         ) {
+          if (Object(_step) !== _step) throw new TypeError('Iterator result is not an object');
+          _iteratorNormalCompletion = false;
           var i = _step.value;
+          {
+          }
         }
       } catch (_iteratorError2) {
         _didIteratorError = true;
         _iteratorError = _iteratorError2;
       } finally {
         try {
-          if (!_iteratorNormalCompletion && _iterator.return != null) _iterator.return();
+          if (!_iteratorNormalCompletion && (_iteratorReturnMethod = _iterator.return) != null) {
+            _iteratorReturn = _iteratorReturnMethod.call(_iterator);
+            if (Object(_iteratorReturn) !== _iteratorReturn)
+              throw new TypeError('Iterator result is not an object');
+          }
         } finally {
           if (_didIteratorError) throw _iteratorError;
         }
