@@ -106,7 +106,7 @@ impl<'a> RegexpLowerer<'a> {
             changed = true;
         }
         if self.unicode && flags.contains('u') {
-            if flags.contains('i') && !pattern.is_ascii() {
+            if flags.contains('i') && unicode_ignore_case_requires_expansion(&pattern) {
                 return Err("regexp-unicode-ignore-case-complex-not-implemented");
             }
             pattern = lower_unicode(&pattern, flags.contains('s'))?;
@@ -191,6 +191,15 @@ impl<'a> RegexpLowerer<'a> {
             );
         }
     }
+}
+
+fn unicode_ignore_case_requires_expansion(pattern: &str) -> bool {
+    pattern
+        .chars()
+        .any(|character| character as u32 > 0xFFFF || matches!(character, '\u{017F}' | '\u{212A}'))
+        || ["\\u017F", "\\u{17F}", "\\u{017F}", "\\u212A", "\\u{212A}"]
+            .iter()
+            .any(|escape| pattern.contains(escape))
 }
 
 pub(super) fn contains_named_group(pattern: &str) -> bool {
@@ -617,6 +626,16 @@ fn lower_astral_classes(pattern: &str) -> Result<String, &'static str> {
     let mut output = String::with_capacity(pattern.len());
     let mut cursor = 0;
     while cursor < bytes.len() {
+        if bytes[cursor] == b'\\' {
+            output.push('\\');
+            cursor += 1;
+            if cursor < bytes.len() {
+                let escaped = pattern[cursor..].chars().next().unwrap();
+                output.push(escaped);
+                cursor += escaped.len_utf8();
+            }
+            continue;
+        }
         if bytes[cursor] != b'[' {
             let character = pattern[cursor..].chars().next().unwrap();
             output.push(character);
@@ -665,16 +684,23 @@ fn lower_astral_classes(pattern: &str) -> Result<String, &'static str> {
             let start = range.start() as u32;
             let end = range.end() as u32;
             if start <= 0xFFFF {
-                bmp_ranges.push((start, end.min(0xFFFF)));
+                let bmp_end = end.min(0xFFFF);
+                if negated && start <= 0xDFFF && bmp_end >= 0xD800 {
+                    if start < 0xD800 {
+                        bmp_ranges.push((start, 0xD7FF));
+                    }
+                    if bmp_end > 0xDFFF {
+                        bmp_ranges.push((0xE000, bmp_end));
+                    }
+                } else {
+                    bmp_ranges.push((start, bmp_end));
+                }
             }
             if end > 0xFFFF {
                 push_astral_range(&mut astral, start.max(0x1_0000), end);
             }
         }
         if negated {
-            // Rust's Unicode scalar model omits surrogate code units from a
-            // complemented class; JavaScript matches lone surrogates.
-            bmp_ranges.push((0xD800, 0xDFFF));
             bmp_ranges = union(bmp_ranges);
         }
         let mut alternatives = Vec::new();
@@ -687,6 +713,14 @@ fn lower_astral_classes(pattern: &str) -> Result<String, &'static str> {
             alternatives.push(class);
         }
         alternatives.extend(astral);
+        if negated {
+            // A complemented Unicode class matches lone surrogate code units,
+            // but not either half of an excluded astral code point. Keeping
+            // them outside the BMP class prevents a valid pair from being
+            // consumed one code unit at a time by a surrounding quantifier.
+            alternatives.push("[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])".to_string());
+            alternatives.push("(?:[^\\uD800-\\uDBFF]|^)[\\uDC00-\\uDFFF]".to_string());
+        }
         if alternatives.len() == 1 {
             output.push_str(&alternatives[0]);
         } else {
