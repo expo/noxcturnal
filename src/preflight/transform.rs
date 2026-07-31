@@ -127,7 +127,8 @@ pub fn transform(
     let regexp_rewrite_selected = options.regexp_unicode == Some(true)
         || options.regexp_unicode_property_escapes == Some(true)
         || options.regexp_dot_all == Some(true)
-        || options.regexp_named_capture_groups == Some(true);
+        || options.regexp_named_capture_groups == Some(true)
+        || options.regexp_unicode_sets == Some(true);
     // Whether anything downstream of the language reads it.
     let selects_source_rewrite = options.block_scoping == Some(true)
         || options.classes == Some(true)
@@ -294,6 +295,7 @@ pub fn transform(
                     unicode_properties: options.regexp_unicode_property_escapes == Some(true),
                     dot_all: options.regexp_dot_all == Some(true),
                     named_groups: options.regexp_named_capture_groups == Some(true),
+                    unicode_sets: options.regexp_unicode_sets == Some(true),
                     inline_helpers: options.helpers_mode.as_deref() == Some("inline"),
                 },
             ) {
@@ -1561,7 +1563,9 @@ fn compile_options(options: &NativePreflightOptions) -> Result<TransformOptions>
     compiled.env.regexp.named_capture_groups = false;
     compiled.env.regexp.look_behind_assertions = options.regexp_look_behind == Some(true);
     compiled.env.regexp.match_indices = options.regexp_match_indices == Some(true);
-    compiled.env.regexp.set_notation = options.regexp_unicode_sets == Some(true);
+    // The focused RegExp pass owns Unicode set notation so unsupported set
+    // grammar yields a precise diagnostic instead of surviving postcondition.
+    compiled.env.regexp.set_notation = false;
     match options.typescript.as_deref() {
         None => {}
         Some("strip") => {}

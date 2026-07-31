@@ -16,6 +16,7 @@ use crate::generated::inline_helpers::{
     INLINE_REGEXP_NAMED_CAPTURE_HELPER_RUNTIME_BINDINGS,
     INLINE_REGEXP_NAMED_CAPTURE_HELPER_RUNTIME_PRETTY,
 };
+use crate::generated::regexp_unicode_properties::{SCRIPT_EXTENSIONS_BERIA_ERFE, SCRIPT_UNKNOWN};
 use crate::preflight::helpers::CustomHelperRequests;
 
 pub(super) struct Options {
@@ -23,6 +24,7 @@ pub(super) struct Options {
     pub(super) unicode_properties: bool,
     pub(super) dot_all: bool,
     pub(super) named_groups: bool,
+    pub(super) unicode_sets: bool,
     pub(super) inline_helpers: bool,
 }
 
@@ -40,6 +42,7 @@ pub(super) fn run<'a>(
         unicode_properties: options.unicode_properties,
         dot_all: options.dot_all,
         named_groups: options.named_groups,
+        unicode_sets: options.unicode_sets,
         named_helper: allocator.alloc_str(&named_helper),
         changed: false,
         needs_named_helper: false,
@@ -83,6 +86,7 @@ struct RegexpLowerer<'a> {
     unicode_properties: bool,
     dot_all: bool,
     named_groups: bool,
+    unicode_sets: bool,
     named_helper: &'a str,
     changed: bool,
     needs_named_helper: bool,
@@ -100,6 +104,12 @@ impl<'a> RegexpLowerer<'a> {
         let mut pattern = literal.regex.pattern.text.as_str().to_owned();
         let mut flags = literal.regex.flags.to_string();
         let mut changed = false;
+        if self.unicode_sets && flags.contains('v') {
+            pattern = lower_unicode_sets(&pattern)?;
+            flags.retain(|flag| flag != 'v');
+            flags.push('u');
+            changed = true;
+        }
         if self.unicode_properties && (pattern.contains("\\p{") || pattern.contains("\\P{")) {
             let drops_unicode_flag = self.unicode && flags.contains('u');
             pattern = lower_unicode_properties(&pattern, drops_unicode_flag)?;
@@ -348,6 +358,10 @@ fn lower_property_class(body: &str, surrogate_pairs: bool) -> Result<String, &'s
         // input requires.
         return Err("regexp-unicode-property-negated-class-not-implemented");
     }
+    Ok(render_ranges(&parse_class_ranges(body)?, surrogate_pairs))
+}
+
+fn parse_class_ranges(body: &str) -> Result<Vec<(u32, u32)>, &'static str> {
     let mut ranges: Vec<(u32, u32)> = Vec::new();
     let mut pending: Option<u32> = None;
     let bytes = body.as_bytes();
@@ -385,7 +399,176 @@ fn lower_property_class(body: &str, surrogate_pairs: bool) -> Result<String, &'s
         ranges.push((single, single));
     }
 
-    Ok(render_ranges(&union(ranges), surrogate_pairs))
+    Ok(union(ranges))
+}
+
+fn lower_unicode_sets(pattern: &str) -> Result<String, &'static str> {
+    let pattern = pattern.replace(
+        "\\p{Emoji_Keycap_Sequence}",
+        "(?:\\*\\uFE0F\\u20E3|#\\uFE0F\\u20E3|0\\uFE0F\\u20E3|1\\uFE0F\\u20E3|2\\uFE0F\\u20E3|3\\uFE0F\\u20E3|4\\uFE0F\\u20E3|5\\uFE0F\\u20E3|6\\uFE0F\\u20E3|7\\uFE0F\\u20E3|8\\uFE0F\\u20E3|9\\uFE0F\\u20E3)",
+    );
+    if [
+        "Basic_Emoji",
+        "RGI_Emoji_Modifier_Sequence",
+        "RGI_Emoji_Flag_Sequence",
+        "RGI_Emoji_Tag_Sequence",
+        "RGI_Emoji_ZWJ_Sequence",
+        "RGI_Emoji",
+    ]
+    .iter()
+    .any(|property| pattern.contains(&format!("\\p{{{property}}}")))
+    {
+        return Err("regexp-unicode-sets-string-property-not-implemented");
+    }
+    let mut output = String::with_capacity(pattern.len());
+    let bytes = pattern.as_bytes();
+    let mut index = 0;
+    while index < bytes.len() {
+        if bytes[index] == b'\\' {
+            let end = (index + 2).min(bytes.len());
+            output.push_str(&pattern[index..end]);
+            index = end;
+            continue;
+        }
+        if bytes[index] != b'[' {
+            let character = pattern[index..].chars().next().unwrap();
+            output.push(character);
+            index += character.len_utf8();
+            continue;
+        }
+        let end = unicode_set_class_end(&pattern, index)
+            .ok_or("regexp-unicode-sets-class-shape-not-implemented")?;
+        let body = &pattern[index + 1..end];
+        output.push_str(&lower_unicode_set_class(body)?);
+        index = end + 1;
+    }
+    Ok(output)
+}
+
+fn unicode_set_class_end(pattern: &str, start: usize) -> Option<usize> {
+    let bytes = pattern.as_bytes();
+    let mut depth = 1;
+    let mut index = start + 1;
+    while index < bytes.len() {
+        match bytes[index] {
+            b'\\' => index += 2,
+            b'[' => {
+                depth += 1;
+                index += 1;
+            }
+            b']' => {
+                depth -= 1;
+                if depth == 0 {
+                    return Some(index);
+                }
+                index += 1;
+            }
+            _ => index += pattern[index..].chars().next()?.len_utf8(),
+        }
+    }
+    None
+}
+
+fn lower_unicode_set_class(body: &str) -> Result<String, &'static str> {
+    let Some((left, operator, right)) = split_unicode_set_operation(body) else {
+        if body.contains("\\q{") {
+            return Err("regexp-unicode-sets-operation-not-implemented");
+        }
+        return Ok(format!("[{body}]"));
+    };
+    if left.contains("&&") || left.contains("--") || right.contains("&&") || right.contains("--") {
+        return Err("regexp-unicode-sets-operation-not-implemented");
+    }
+    let left = unicode_set_operand_ranges(left)?;
+    let right = unicode_set_operand_ranges(right)?;
+    let ranges = if operator == "&&" {
+        intersect_ranges(&left, &right)
+    } else {
+        subtract_ranges(&left, &right)
+    };
+    Ok(render_ranges(&ranges, false))
+}
+
+fn split_unicode_set_operation(body: &str) -> Option<(&str, &str, &str)> {
+    let bytes = body.as_bytes();
+    let mut depth = 0;
+    let mut index = 0;
+    while index + 1 < bytes.len() {
+        match bytes[index] {
+            b'\\' => index += 2,
+            b'[' => {
+                depth += 1;
+                index += 1;
+            }
+            b']' => {
+                depth -= 1;
+                index += 1;
+            }
+            b'&' if depth == 0 && bytes[index + 1] == b'&' => {
+                return Some((&body[..index], "&&", &body[index + 2..]));
+            }
+            b'-' if depth == 0 && bytes[index + 1] == b'-' => {
+                return Some((&body[..index], "--", &body[index + 2..]));
+            }
+            _ => index += 1,
+        }
+    }
+    None
+}
+
+fn unicode_set_operand_ranges(operand: &str) -> Result<Vec<(u32, u32)>, &'static str> {
+    let body = if operand.starts_with('[') && operand.ends_with(']') {
+        &operand[1..operand.len() - 1]
+    } else {
+        operand
+    };
+    if body.contains("&&") || body.contains("--") || body.contains("\\q{") {
+        return Err("regexp-unicode-sets-operation-not-implemented");
+    }
+    if let Some(positive) = body.strip_prefix('^') {
+        Ok(complement_ranges(&parse_class_ranges(positive)?))
+    } else {
+        parse_class_ranges(body)
+    }
+}
+
+fn intersect_ranges(left: &[(u32, u32)], right: &[(u32, u32)]) -> Vec<(u32, u32)> {
+    let mut result = Vec::new();
+    for &(left_start, left_end) in left {
+        for &(right_start, right_end) in right {
+            let start = left_start.max(right_start);
+            let end = left_end.min(right_end);
+            if start <= end {
+                result.push((start, end));
+            }
+        }
+    }
+    union(result)
+}
+
+fn subtract_ranges(left: &[(u32, u32)], right: &[(u32, u32)]) -> Vec<(u32, u32)> {
+    let mut result = Vec::new();
+    for &(start, end) in left {
+        let mut fragments = vec![(start, end)];
+        for &(remove_start, remove_end) in right {
+            let mut next = Vec::new();
+            for (fragment_start, fragment_end) in fragments {
+                if remove_end < fragment_start || remove_start > fragment_end {
+                    next.push((fragment_start, fragment_end));
+                    continue;
+                }
+                if fragment_start < remove_start {
+                    next.push((fragment_start, remove_start - 1));
+                }
+                if remove_end < fragment_end {
+                    next.push((remove_end + 1, fragment_end));
+                }
+            }
+            fragments = next;
+        }
+        result.extend(fragments);
+    }
+    union(result)
 }
 
 enum ClassAtom {
@@ -553,6 +736,24 @@ fn unicode_property_ranges(
             vec![(0xD800, 0xDFFF)]
         });
     }
+    let generated = match property {
+        "Script:Zzzz"
+        | "Script:Unknown"
+        | "Script_Extensions:Zzzz"
+        | "Script_Extensions:Unknown" => Some(SCRIPT_UNKNOWN),
+        "Script:Berf"
+        | "Script:Beria_Erfe"
+        | "Script_Extensions:Berf"
+        | "Script_Extensions:Beria_Erfe" => Some(SCRIPT_EXTENSIONS_BERIA_ERFE),
+        _ => None,
+    };
+    if let Some(ranges) = generated {
+        return Ok(if negative {
+            complement_ranges(ranges)
+        } else {
+            ranges.to_vec()
+        });
+    }
     let expression = format!("\\{}{{{property}}}", if negative { 'P' } else { 'p' });
     let hir = regex_syntax::ParserBuilder::new()
         .unicode(true)
@@ -573,6 +774,21 @@ fn unicode_property_ranges(
         ranges.push((0xD800, 0xDFFF));
     }
     Ok(union(ranges))
+}
+
+fn complement_ranges(ranges: &[(u32, u32)]) -> Vec<(u32, u32)> {
+    let mut complement = Vec::new();
+    let mut next = 0;
+    for &(start, end) in ranges {
+        if next < start {
+            complement.push((next, start - 1));
+        }
+        next = end.saturating_add(1);
+    }
+    if next <= 0x10_FFFF {
+        complement.push((next, 0x10_FFFF));
+    }
+    complement
 }
 
 /// Writes a code point for a pattern that keeps its `u` flag: `\uXXXX` while it
