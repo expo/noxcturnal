@@ -39,6 +39,7 @@ struct AstFunctionPlan {
     anchor: Span,
     wrapper: bool,
     wrapper_arguments: Vec<String>,
+    captures: CaptureAliases,
     setter: bool,
     rest_names: Option<RestNames>,
 }
@@ -110,7 +111,7 @@ pub(super) fn prepare_ast(source: &str, semantic: &Semantic<'_>) -> Result<AstPl
     let mut arrows: FxHashMap<u32, Vec<AstArrowPlan>> = FxHashMap::default();
     let mut hoists: FxHashMap<NodeId, Vec<CaptureAliases>> = FxHashMap::default();
     let mut reserved: FxHashSet<String> = scoping.symbol_names().map(str::to_owned).collect();
-    let (arrow_facts, planning_nodes) = collect_arrow_facts(semantic, &symbols);
+    let (arrow_facts, function_facts, planning_nodes) = collect_lexical_facts(semantic, &symbols);
     // Plan functions and arrows in one traversal, sharing one collision set for
     // every generated capture and rest binding.
     for node_id in planning_nodes {
@@ -132,6 +133,11 @@ pub(super) fn prepare_ast(source: &str, semantic: &Semantic<'_>) -> Result<AstPl
                     body,
                     &param_bindings,
                 );
+                let captures = if wrapper {
+                    plan_function_capture(&function_facts[&node_id], &mut reserved)
+                } else {
+                    CaptureAliases::default()
+                };
                 let rest_names = function.params.rest.as_ref().map(|rest| {
                     let array =
                         (!matches!(&rest.rest.argument, BindingPattern::BindingIdentifier(_))
@@ -151,6 +157,7 @@ pub(super) fn prepare_ast(source: &str, semantic: &Semantic<'_>) -> Result<AstPl
                         anchor: body.span,
                         wrapper,
                         wrapper_arguments,
+                        captures,
                         setter: function.scope_id.get().is_some_and(|scope_id| {
                             scoping.scope_flags(scope_id).is_set_accessor()
                         }),
@@ -852,6 +859,20 @@ impl<'a> VisitMut<'a> for OrdinaryParameterLowerer<'a> {
                 }
             };
             if plan.wrapper {
+                if !plan.captures.is_empty() {
+                    let mut capture_rewriter = CaptureRewriter {
+                        allocator: self.allocator,
+                        aliases: &plan.captures,
+                    };
+                    capture_rewriter.visit_function_body(body);
+                    match self.capture_declaration(&plan.captures, plan.anchor) {
+                        Ok(declaration) => prologue.insert(0, declaration),
+                        Err(error) => {
+                            self.error = Some(error);
+                            return;
+                        }
+                    }
+                }
                 let directives =
                     std::mem::replace(&mut body.directives, ArenaVec::new_in(&self.allocator));
                 let original =
@@ -1004,23 +1025,28 @@ struct ArrowFacts {
 }
 
 enum ActiveOwner {
-    Function { end: u32 },
+    Function { id: NodeId, end: u32 },
     Arrow { id: NodeId, end: u32 },
 }
 
 impl ActiveOwner {
     fn end(&self) -> u32 {
         match self {
-            Self::Function { end } | Self::Arrow { end, .. } => *end,
+            Self::Function { end, .. } | Self::Arrow { end, .. } => *end,
         }
     }
 }
 
-fn collect_arrow_facts(
+fn collect_lexical_facts(
     semantic: &Semantic<'_>,
     symbols: &[SymbolFact<'_>],
-) -> (FxHashMap<NodeId, ArrowFacts>, Vec<NodeId>) {
+) -> (
+    FxHashMap<NodeId, ArrowFacts>,
+    FxHashMap<NodeId, ArrowFacts>,
+    Vec<NodeId>,
+) {
     let mut facts = FxHashMap::default();
+    let mut function_facts = FxHashMap::default();
     let mut planning_nodes = Vec::new();
     let mut active = Vec::<ActiveOwner>::new();
     let mut argument_shadow_ends = Vec::<u32>::new();
@@ -1038,7 +1064,9 @@ fn collect_arrow_facts(
         match node.kind() {
             AstKind::Function(function) => {
                 planning_nodes.push(node_id);
+                function_facts.insert(node_id, ArrowFacts::default());
                 active.push(ActiveOwner::Function {
+                    id: node_id,
                     end: function.span.end,
                 });
                 continue;
@@ -1071,19 +1099,46 @@ fn collect_arrow_facts(
             continue;
         }
         for owner in active.iter().rev() {
-            let ActiveOwner::Arrow { id, .. } = owner else {
-                break;
-            };
-            let arrow_facts = facts.get_mut(id).unwrap();
-            match lexical_kind {
-                0 => arrow_facts.has_super = true,
-                1 => arrow_facts.this_spans.push((span.start, span.end)),
-                2 => arrow_facts.arguments_spans.push((span.start, span.end)),
-                _ => arrow_facts.new_target_spans.push((span.start, span.end)),
+            match owner {
+                ActiveOwner::Arrow { id, .. } => {
+                    let arrow_facts = facts.get_mut(id).unwrap();
+                    match lexical_kind {
+                        0 => arrow_facts.has_super = true,
+                        1 => arrow_facts.this_spans.push((span.start, span.end)),
+                        2 => arrow_facts.arguments_spans.push((span.start, span.end)),
+                        _ => arrow_facts.new_target_spans.push((span.start, span.end)),
+                    }
+                }
+                ActiveOwner::Function { id, .. } => {
+                    let function_facts = function_facts.get_mut(id).unwrap();
+                    match lexical_kind {
+                        2 => function_facts.arguments_spans.push((span.start, span.end)),
+                        3 => function_facts.new_target_spans.push((span.start, span.end)),
+                        _ => {}
+                    }
+                    break;
+                }
             }
         }
     }
-    (facts, planning_nodes)
+    (facts, function_facts, planning_nodes)
+}
+
+fn plan_function_capture(facts: &ArrowFacts, reserved: &mut FxHashSet<String>) -> CaptureAliases {
+    let mut aliases = CaptureAliases::default();
+    if !facts.arguments_spans.is_empty() {
+        aliases.arguments_name = Some(reserve_name("_arguments", reserved));
+        aliases
+            .arguments_spans
+            .extend(facts.arguments_spans.iter().copied());
+    }
+    if !facts.new_target_spans.is_empty() {
+        aliases.new_target_name = Some(reserve_name("_newtarget", reserved));
+        aliases
+            .new_target_spans
+            .extend(facts.new_target_spans.iter().copied());
+    }
+    aliases
 }
 
 struct ArrowCapturePlan {
@@ -1444,7 +1499,7 @@ mod tests {
                 flags: semantic.semantic.scoping().symbol_flags(symbol_id),
             })
             .collect::<Vec<_>>();
-        let (facts, _) = collect_arrow_facts(&semantic.semantic, &symbols);
+        let (facts, _, _) = collect_lexical_facts(&semantic.semantic, &symbols);
         assert_eq!(facts.len(), 128);
         assert!(facts.values().all(|facts| facts.this_spans.len() == 1));
     }
@@ -1499,7 +1554,7 @@ mod tests {
                 })
                 .collect::<Vec<_>>();
             symbols.sort_unstable_by_key(|symbol| symbol.span.start);
-            let (facts, _) = collect_arrow_facts(&semantic.semantic, &symbols);
+            let (facts, _, _) = collect_lexical_facts(&semantic.semantic, &symbols);
             facts
                 .values()
                 .map(|facts| {
