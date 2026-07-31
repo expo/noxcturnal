@@ -827,6 +827,27 @@ pub fn transform(
         if !transformed.diagnostics.is_empty() {
             return Ok(unsupported("transform-error", transformed.diagnostics));
         }
+        if options.logical_assignment_operators == Some(true) {
+            let existing = transformed
+                .scoping
+                .symbol_names()
+                .collect::<rustc_hash::FxHashSet<_>>();
+            let mut suffix = 0;
+            let logical_temp = loop {
+                let candidate = if suffix == 0 {
+                    "_private".to_owned()
+                } else {
+                    format!("_private{suffix}")
+                };
+                if !existing.contains(candidate.as_str()) {
+                    break candidate;
+                }
+                suffix += 1;
+            };
+            if super::logical_assignment::run(allocator, &mut program, &logical_temp) {
+                ast_traversal_count += 1;
+            }
+        }
         if options.private_methods == Some(true) || options.private_property_in_object == Some(true)
         {
             let mut detector = ClassFeaturesUnsupportedDetector(false);

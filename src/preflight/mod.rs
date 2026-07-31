@@ -5,6 +5,7 @@ mod classes;
 mod destructuring;
 mod for_of;
 pub mod helpers;
+mod logical_assignment;
 mod object_spread;
 mod optimize;
 pub mod options;
