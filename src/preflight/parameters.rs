@@ -544,11 +544,12 @@ impl<'a> OrdinaryParameterLowerer<'a> {
         plan: AstArrowPlan,
     ) -> Result<Expression<'a>, &'static str> {
         let ast = self.ast();
-        CaptureRewriter {
+        let mut capture_rewriter = CaptureRewriter {
             allocator: self.allocator,
             aliases: &plan.captures,
-        }
-        .visit_function_body(&mut arrow.body);
+        };
+        capture_rewriter.visit_formal_parameters(&mut arrow.params);
+        capture_rewriter.visit_function_body(&mut arrow.body);
         let mut params = arrow.params.unbox();
         let mut removed = ArenaVec::new_in(&ast);
         removed.extend(params.items.drain(plan.boundary..));
@@ -980,14 +981,8 @@ struct ArrowFacts {
 }
 
 enum ActiveOwner {
-    Function {
-        end: u32,
-    },
-    Arrow {
-        id: NodeId,
-        body_start: u32,
-        end: u32,
-    },
+    Function { end: u32 },
+    Arrow { id: NodeId, end: u32 },
 }
 
 impl ActiveOwner {
@@ -1035,7 +1030,6 @@ fn collect_arrow_facts(
                     planning_nodes.push(node_id);
                     active.push(ActiveOwner::Arrow {
                         id: node_id,
-                        body_start: arrow.body.span.start,
                         end: arrow.span.end,
                     });
                 }
@@ -1054,12 +1048,9 @@ fn collect_arrow_facts(
             continue;
         }
         for owner in active.iter().rev() {
-            let ActiveOwner::Arrow { id, body_start, .. } = owner else {
+            let ActiveOwner::Arrow { id, .. } = owner else {
                 break;
             };
-            if span.start < *body_start {
-                continue;
-            }
             let arrow_facts = facts.get_mut(id).unwrap();
             match lexical_kind {
                 0 => arrow_facts.has_super = true,
@@ -1351,6 +1342,24 @@ mod tests {
         assert!(code.contains("_newtarget = new.target"));
         assert!(code.contains("function()"));
         assert!(code.contains("_this.x + value + _arguments.length + _newtarget"));
+    }
+
+    #[test]
+    fn lexical_arrow_captures_include_parameter_initializers() {
+        let source = "function outer(){return (value=this.x)=>value;}";
+        let allocator = Allocator::default();
+        let parsed = Parser::new(&allocator, source, SourceType::default()).parse();
+        let mut program = parsed.program;
+        let semantic = oxc_semantic::SemanticBuilder::new()
+            .with_build_nodes(true)
+            .build(&program);
+        let plan = prepare_ast(source, &semantic.semantic).unwrap();
+        assert_eq!(plan.arrows.len(), 1);
+        assert_eq!(plan.hoists.len(), 1);
+        assert!(run_ast(&allocator, &mut program, plan).unwrap());
+        let code = Codegen::new().build(&program).code;
+        assert!(code.contains("var _this = this"));
+        assert!(code.contains("_this.x"));
     }
 
     #[test]
