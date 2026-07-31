@@ -33,10 +33,10 @@ description = "Native-backed JavaScript transform runtime with visitor ergonomic
 crate-type = ["cdylib"]
 
 [features]
-default = ["react_compiler"]
+default = ["react_compiler", "flow_parser"]
 react_compiler = ["oxc_transformer/react_compiler", "dep:oxc_react_compiler"]
-# Native Flow erasure. Off by default: it pulls in a Hermes build, which needs
-# CMake and a C++ toolchain the default build does not require.
+# Native Flow erasure. This default capability builds Hermes, requiring CMake,
+# Python, and a C++ toolchain in every supported build environment.
 flow_parser = ["dep:hermes-flow", "hermes-flow/parser"]
 
 [dependencies]

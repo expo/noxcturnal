@@ -73,8 +73,28 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
+      - name: Install Ninja
+        shell: bash
+        run: |
+          if command -v ninja >/dev/null; then exit 0; fi
+          case "${{ runner.os }}" in
+            Linux) sudo apt-get update && sudo apt-get install -y ninja-build ;;
+            macOS) brew install ninja ;;
+            Windows) choco install ninja --no-progress -y ;;
+          esac
+      - name: Install Zig
+        if: endsWith(matrix.target, '-musl')
+        uses: mlugg/setup-zig@v2
+        with:
+          version: 0.14.1
       - run: pnpm install --frozen-lockfile
-      - run: pnpm exec napi build --platform --release --target ${{ matrix.target }}
+      - run: git submodule update --init --depth 1 crates/hermes-parser-sys/hermes
+      - name: Build native package
+        shell: bash
+        run: |
+          cross=''
+          case "${{ matrix.target }}" in *-musl) cross='--cross-compile' ;; esac
+          pnpm exec napi build --platform --release --target ${{ matrix.target }} $cross
       - name: Stage platform binary
         shell: bash
         run: cp noxcturnal.*.node npm/${{ matrix.package }}/
@@ -118,7 +138,7 @@ jobs:
           cd "$RUNNER_TEMP/corpus"
           npm pack react-native@0.86.2 --silent
           tar -xzf react-native-*.tgz
-      - run: pnpm exec napi build --platform --release --features flow_parser
+      - run: pnpm exec napi build --platform --release
       - run: pnpm build:js
       # Divergences always fail. The coverage floor sits well under the measured
       # figure so that ordinary drift shows up as a number rather than as a
@@ -131,74 +151,3 @@ jobs:
         env:
           FLOW_CORPUS: ${{ runner.temp }}/corpus/package
           FLOW_MIN_COVERAGE: 90
-
-  # The gate for native Flow erasure. `flow_parser` builds Hermes' parser
-  # through its own CMake, so it has to hold on every target the package
-  # releases for — including the two musl targets and the Windows cross-build —
-  # before any of the erasure work above it is worth having. Kept separate from
-  # `native` so a failure here never blocks the artifacts that ship today.
-  flow-parser:
-    name: Flow parser ${{ matrix.target }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - target: aarch64-apple-darwin
-            runner: macos-14
-          - target: x86_64-apple-darwin
-            runner: macos-15-intel
-          - target: x86_64-unknown-linux-gnu
-            runner: ubuntu-24.04
-          - target: aarch64-unknown-linux-gnu
-            runner: ubuntu-24.04-arm
-          - target: x86_64-unknown-linux-musl
-            runner: ubuntu-24.04
-          - target: aarch64-unknown-linux-musl
-            runner: ubuntu-24.04-arm
-          - target: x86_64-pc-windows-msvc
-            runner: windows-2022
-          - target: aarch64-pc-windows-msvc
-            runner: windows-11-arm
-    runs-on: ${{ matrix.runner }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10.12.1
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.target }}
-      # CMake ships on every runner image; Ninja does not, and the build script
-      # falls back to the platform default generator when it is missing.
-      - name: Install Ninja
-        shell: bash
-        run: |
-          if command -v ninja >/dev/null; then exit 0; fi
-          case "${{ runner.os }}" in
-            Linux) sudo apt-get update && sudo apt-get install -y ninja-build ;;
-            macOS) brew install ninja ;;
-            Windows) choco install ninja --no-progress -y ;;
-          esac
-      # musl has no C++ toolchain on the stock image. `--cross-compile` routes
-      # non-Windows targets through cargo-zigbuild, which brings its own libc++.
-      - name: Install Zig
-        if: endsWith(matrix.target, '-musl')
-        uses: mlugg/setup-zig@v2
-        with:
-          version: 0.14.1
-      - run: pnpm install --frozen-lockfile
-      - run: git submodule update --init --depth 1 crates/hermes-parser-sys/hermes
-      - name: Build with flow_parser
-        shell: bash
-        run: |
-          cross=''
-          case "${{ matrix.target }}" in *-musl) cross='--cross-compile' ;; esac
-          pnpm exec napi build --platform --release \
-            --target ${{ matrix.target }} --features flow_parser $cross
-      - name: Report artifact size
-        shell: bash
-        run: ls -l noxcturnal.*.node

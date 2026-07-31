@@ -11,9 +11,13 @@
 cmake_minimum_required(VERSION 3.21)
 project(hermes_flow_shim LANGUAGES C CXX)
 
-set(HERMES_SOURCE_DIR "" CACHE PATH "Hermes source checkout")
-if(NOT HERMES_SOURCE_DIR)
-  message(FATAL_ERROR "HERMES_SOURCE_DIR must be set")
+get_filename_component(HERMES_VENDORED_DIR "${CMAKE_CURRENT_LIST_DIR}/../hermes" ABSOLUTE)
+set(HERMES_SOURCE_DIR "${HERMES_VENDORED_DIR}" CACHE PATH "Hermes source checkout")
+if(NOT EXISTS "${HERMES_SOURCE_DIR}/include/hermes/AST/ESTree.def")
+  message(FATAL_ERROR
+    "Hermes checkout not found at ${HERMES_SOURCE_DIR}. "
+    "Initialize crates/hermes-parser-sys/hermes or set HERMES_SOURCE_DIR."
+  )
 endif()
 
 # Parser-only configuration, forced so an inherited cache cannot weaken it.

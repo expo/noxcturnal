@@ -13,9 +13,8 @@ function completed(result: TransformResult): NativeTransformResult {
   return result;
 }
 
-// The `flow_parser` feature is off in the default build, so these only mean
-// anything against a binary that has it. Skipping rather than asserting the
-// fallback keeps the default CI job honest about what it did and did not check.
+// Keep the probe so an explicit `--no-default-features` build can still run the
+// rest of the JavaScript suite without pretending it exercised Flow erasure.
 const withErasure = nativeFlowErasureBuilt() ? describe : describe.skip;
 
 withErasure('native Flow erasure', () => {
@@ -61,7 +60,7 @@ withErasure('native Flow erasure', () => {
     `);
   });
 
-  test('falls back to a registered adapter on proposal syntax', () => {
+  test('falls back to a registered adapter on unsupported proposal syntax', () => {
     const unregister = registerParserAdapter({
       name: 'flow-fallback-fixture',
       version: '1.0.0',
@@ -76,11 +75,7 @@ withErasure('native Flow erasure', () => {
     });
     try {
       const result = completed(
-        transform(
-          '// @flow\ncomponent Foo(bar: string) { return null; }\n',
-          'fixture.js',
-          pipeline,
-        ),
+        transform('// @flow\nconst value = R { field: 1 };\n', 'fixture.js', pipeline),
       );
       assert.deepEqual(result.metadata.sourceAdapter, { adapter: true });
     } finally {
