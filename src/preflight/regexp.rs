@@ -20,7 +20,7 @@ use oxc_regular_expression::{
 };
 use oxc_span::GetSpan;
 use regex_syntax::hir::{Class, HirKind};
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::generated::inline_helpers::{
     INLINE_REGEXP_NAMED_CAPTURE_HELPER, INLINE_REGEXP_NAMED_CAPTURE_HELPER_BINDINGS,
@@ -673,16 +673,21 @@ fn unicode_set_class_value(class: &CharacterClass<'_>) -> Result<UnicodeSetValue
             for operand in operands {
                 let mut operand = operand;
                 normalize_unicode_set_value(&mut operand);
+                let operand_strings = operand
+                    .strings
+                    .iter()
+                    .map(|(_, _, string)| string.as_str())
+                    .collect::<FxHashSet<_>>();
                 if class.kind == CharacterClassContentsKind::Intersection {
                     value.ranges = intersect_ranges(&value.ranges, &operand.ranges);
                     value
                         .strings
-                        .retain(|(_, _, string)| unicode_set_contains_string(&operand, string));
+                        .retain(|(_, _, string)| operand_strings.contains(string.as_str()));
                 } else {
                     value.ranges = subtract_ranges(&value.ranges, &operand.ranges);
                     value
                         .strings
-                        .retain(|(_, _, string)| !unicode_set_contains_string(&operand, string));
+                        .retain(|(_, _, string)| !operand_strings.contains(string.as_str()));
                 }
             }
             value
@@ -750,27 +755,18 @@ fn unicode_set_content_value(
 
 fn normalize_unicode_set_value(value: &mut UnicodeSetValue) {
     let mut strings = Vec::with_capacity(value.strings.len());
+    let mut seen = FxHashSet::default();
     for (length, order, string) in value.strings.drain(..) {
         let mut characters = string.chars();
         if let (Some(character), None) = (characters.next(), characters.next()) {
             let code_point = character as u32;
             value.ranges.push((code_point, code_point));
-        } else if !strings
-            .iter()
-            .any(|(_, _, existing): &(usize, usize, String)| existing == &string)
-        {
+        } else if seen.insert(string.clone()) {
             strings.push((length, order, string));
         }
     }
     value.ranges = union(std::mem::take(&mut value.ranges));
     value.strings = strings;
-}
-
-fn unicode_set_contains_string(value: &UnicodeSetValue, string: &str) -> bool {
-    value
-        .strings
-        .iter()
-        .any(|(_, _, candidate)| candidate == string)
 }
 
 fn render_unicode_set_value(mut value: UnicodeSetValue) -> Result<String, &'static str> {
@@ -1124,42 +1120,52 @@ fn unicode_set_operand_ranges(operand: &str) -> Result<Vec<(u32, u32)>, &'static
 }
 
 fn intersect_ranges(left: &[(u32, u32)], right: &[(u32, u32)]) -> Vec<(u32, u32)> {
-    let mut result = Vec::new();
-    for &(left_start, left_end) in left {
-        for &(right_start, right_end) in right {
-            let start = left_start.max(right_start);
-            let end = left_end.min(right_end);
-            if start <= end {
-                result.push((start, end));
-            }
+    let mut result = Vec::with_capacity(left.len().min(right.len()));
+    let (mut left_index, mut right_index) = (0, 0);
+    while left_index < left.len() && right_index < right.len() {
+        let (left_start, left_end) = left[left_index];
+        let (right_start, right_end) = right[right_index];
+        let start = left_start.max(right_start);
+        let end = left_end.min(right_end);
+        if start <= end {
+            result.push((start, end));
+        }
+        if left_end < right_end {
+            left_index += 1;
+        } else {
+            right_index += 1;
         }
     }
-    union(result)
+    result
 }
 
 fn subtract_ranges(left: &[(u32, u32)], right: &[(u32, u32)]) -> Vec<(u32, u32)> {
-    let mut result = Vec::new();
+    let mut result = Vec::with_capacity(left.len());
+    let mut right_index = 0;
     for &(start, end) in left {
-        let mut fragments = vec![(start, end)];
-        for &(remove_start, remove_end) in right {
-            let mut next = Vec::new();
-            for (fragment_start, fragment_end) in fragments {
-                if remove_end < fragment_start || remove_start > fragment_end {
-                    next.push((fragment_start, fragment_end));
-                    continue;
-                }
-                if fragment_start < remove_start {
-                    next.push((fragment_start, remove_start - 1));
-                }
-                if remove_end < fragment_end {
-                    next.push((remove_end + 1, fragment_end));
-                }
-            }
-            fragments = next;
+        while right_index < right.len() && right[right_index].1 < start {
+            right_index += 1;
         }
-        result.extend(fragments);
+        let mut cursor = start;
+        let mut index = right_index;
+        while index < right.len() && right[index].0 <= end {
+            let (remove_start, remove_end) = right[index];
+            if cursor < remove_start {
+                result.push((cursor, remove_start - 1));
+            }
+            if remove_end >= end {
+                cursor = end.saturating_add(1);
+                break;
+            }
+            cursor = cursor.max(remove_end + 1);
+            index += 1;
+        }
+        right_index = index;
+        if cursor <= end {
+            result.push((cursor, end));
+        }
     }
-    union(result)
+    result
 }
 
 enum ClassAtom {
@@ -2058,4 +2064,63 @@ fn whitespace_ranges() -> Vec<(u32, u32)> {
         (0x3000, 0x3000),
         (0xFEFF, 0xFEFF),
     ]
+}
+
+#[cfg(test)]
+mod range_operation_tests {
+    use super::{intersect_ranges, subtract_ranges, union};
+
+    #[test]
+    fn intersects_normalized_ranges() {
+        assert_eq!(
+            intersect_ranges(&[(1, 5), (10, 20), (30, 40)], &[(0, 2), (4, 12), (18, 35)]),
+            vec![(1, 2), (4, 5), (10, 12), (18, 20), (30, 35)]
+        );
+    }
+
+    #[test]
+    fn subtracts_normalized_ranges() {
+        assert_eq!(
+            subtract_ranges(
+                &[(1, 20), (30, 40), (50, 60)],
+                &[(0, 2), (5, 7), (10, 35), (55, 70)]
+            ),
+            vec![(3, 4), (8, 9), (36, 40), (50, 54)]
+        );
+    }
+
+    #[test]
+    fn linear_range_operations_match_set_membership() {
+        for left_mask in 0u16..256 {
+            for right_mask in 0u16..256 {
+                let ranges = |mask| {
+                    union(
+                        (0..8)
+                            .filter(|bit| mask & (1 << bit) != 0)
+                            .map(|bit| (bit, bit))
+                            .collect(),
+                    )
+                };
+                let left = ranges(left_mask);
+                let right = ranges(right_mask);
+                let intersection = intersect_ranges(&left, &right);
+                let subtraction = subtract_ranges(&left, &right);
+                for value in 0..8 {
+                    let contains = |ranges: &[(u32, u32)]| {
+                        ranges
+                            .iter()
+                            .any(|&(start, end)| start <= value && value <= end)
+                    };
+                    assert_eq!(
+                        contains(&intersection),
+                        left_mask & right_mask & (1 << value) != 0
+                    );
+                    assert_eq!(
+                        contains(&subtraction),
+                        left_mask & !right_mask & (1 << value) != 0
+                    );
+                }
+            }
+        }
+    }
 }
