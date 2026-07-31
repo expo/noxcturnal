@@ -20,8 +20,10 @@ use crate::generated::inline_helpers::{
     INLINE_REGEXP_NAMED_CAPTURE_HELPER_RUNTIME_PRETTY,
 };
 use crate::generated::regexp_unicode_properties::{
-    SCRIPT_EXTENSIONS_BERIA_ERFE, SCRIPT_UNKNOWN, unicode_ignore_case_bmp_atom,
+    SCRIPT_EXTENSIONS_BERIA_ERFE, SCRIPT_UNKNOWN, UNICODE_STRING_PROPERTIES,
+    unicode_ignore_case_astral_class_addition, unicode_ignore_case_atom,
     unicode_ignore_case_bmp_class_addition, unicode_ignore_case_bmp_class_body,
+    unicode_string_property_pattern,
 };
 use crate::preflight::helpers::CustomHelperRequests;
 
@@ -264,11 +266,8 @@ fn expand_unicode_ignore_case_bmp(pattern: &str) -> Result<String, &'static str>
                 output.push_str(&pattern[start..index]);
                 continue;
             };
-            if code_point > 0xFFFF {
-                return Err("regexp-unicode-ignore-case-complex-not-implemented");
-            }
             if let Some(expansion) = if !in_class {
-                unicode_ignore_case_bmp_atom(code_point)
+                unicode_ignore_case_atom(code_point)
             } else {
                 None
             } {
@@ -286,11 +285,8 @@ fn expand_unicode_ignore_case_bmp(pattern: &str) -> Result<String, &'static str>
             _ => {}
         }
         let code_point = character as u32;
-        if code_point > 0xFFFF {
-            return Err("regexp-unicode-ignore-case-complex-not-implemented");
-        }
         if let Some(expansion) = if !in_class {
-            unicode_ignore_case_bmp_atom(code_point)
+            unicode_ignore_case_atom(code_point)
         } else {
             None
         } {
@@ -355,32 +351,42 @@ fn expand_unicode_ignore_case_classes(pattern: &str) -> Result<String, &'static 
                         {
                             additions.push_str(expansion);
                         }
+                        if let Some(expansion) =
+                            unicode_ignore_case_astral_class_addition(code_point)
+                        {
+                            additions.push_str(expansion);
+                        }
                     }
                 }
                 cursor = after;
             } else {
                 if let ClassAtom::Single(code_point) = lower {
-                    if next == body.len() {
+                    if cursor == 0 && next == body.len() && code_point <= 0xFFFF {
                         canonical_singleton = unicode_ignore_case_bmp_class_body(code_point);
                     }
                     if let Some(expansion) = unicode_ignore_case_bmp_class_addition(code_point) {
+                        additions.push_str(expansion);
+                    }
+                    if let Some(expansion) = unicode_ignore_case_astral_class_addition(code_point) {
                         additions.push_str(expansion);
                     }
                 }
                 cursor = next;
             }
         }
-        output.push('[');
         if let Some(canonical) = canonical_singleton {
+            output.push('[');
             if original_body.starts_with('^') {
                 output.push('^');
             }
             output.push_str(canonical);
+            output.push(']');
         } else {
+            output.push('[');
             output.push_str(original_body);
             output.push_str(&sort_class_additions(&additions)?);
+            output.push(']');
         }
-        output.push(']');
         index = end + 1;
     }
     Ok(output)
@@ -543,12 +549,14 @@ fn class_end(pattern: &str, start: usize) -> Option<usize> {
 /// else bails rather than guessing, because a mis-parsed class is a silently
 /// wrong regular expression.
 fn lower_property_class(body: &str, surrogate_pairs: bool) -> Result<String, &'static str> {
-    if body.starts_with('^') {
-        // Complementing needs a decision about lone surrogates that no observed
-        // input requires.
-        return Err("regexp-unicode-property-negated-class-not-implemented");
+    let (body, negative) = body
+        .strip_prefix('^')
+        .map_or((body, false), |body| (body, true));
+    let mut ranges = parse_class_ranges(body)?;
+    if negative {
+        ranges = complement_ranges(&ranges);
     }
-    Ok(render_ranges(&parse_class_ranges(body)?, surrogate_pairs))
+    Ok(render_ranges(&ranges, surrogate_pairs))
 }
 
 fn parse_class_ranges(body: &str) -> Result<Vec<(u32, u32)>, &'static str> {
@@ -593,28 +601,16 @@ fn parse_class_ranges(body: &str) -> Result<Vec<(u32, u32)>, &'static str> {
 }
 
 fn lower_unicode_sets(pattern: &str) -> Result<String, &'static str> {
-    let pattern = pattern.replace(
-        "\\p{Emoji_Keycap_Sequence}",
-        "(?:\\*\\uFE0F\\u20E3|#\\uFE0F\\u20E3|0\\uFE0F\\u20E3|1\\uFE0F\\u20E3|2\\uFE0F\\u20E3|3\\uFE0F\\u20E3|4\\uFE0F\\u20E3|5\\uFE0F\\u20E3|6\\uFE0F\\u20E3|7\\uFE0F\\u20E3|8\\uFE0F\\u20E3|9\\uFE0F\\u20E3)",
-    );
-    if [
-        "Basic_Emoji",
-        "RGI_Emoji_Modifier_Sequence",
-        "RGI_Emoji_Flag_Sequence",
-        "RGI_Emoji_Tag_Sequence",
-        "RGI_Emoji_ZWJ_Sequence",
-        "RGI_Emoji",
-    ]
-    .iter()
-    .any(|property| pattern.contains(&format!("\\p{{{property}}}")))
-    {
-        return Err("regexp-unicode-sets-string-property-not-implemented");
-    }
     let mut output = String::with_capacity(pattern.len());
     let bytes = pattern.as_bytes();
     let mut index = 0;
     while index < bytes.len() {
         if bytes[index] == b'\\' {
+            if let Some((replacement, end)) = unicode_string_property_at(pattern, index) {
+                output.push_str(replacement);
+                index = end;
+                continue;
+            }
             let end = (index + 2).min(bytes.len());
             output.push_str(&pattern[index..end]);
             index = end;
@@ -626,13 +622,25 @@ fn lower_unicode_sets(pattern: &str) -> Result<String, &'static str> {
             index += character.len_utf8();
             continue;
         }
-        let end = unicode_set_class_end(&pattern, index)
+        let end = unicode_set_class_end(pattern, index)
             .ok_or("regexp-unicode-sets-class-shape-not-implemented")?;
         let body = &pattern[index + 1..end];
         output.push_str(&lower_unicode_set_class(body)?);
         index = end + 1;
     }
     Ok(output)
+}
+
+fn unicode_string_property_at(source: &str, index: usize) -> Option<(&'static str, usize)> {
+    let bytes = source.as_bytes();
+    if bytes.get(index..index + 3) != Some(b"\\p{") {
+        return None;
+    }
+    let end = source[index + 3..]
+        .find('}')
+        .map(|offset| index + 3 + offset)?;
+    let property = &source[index + 3..end];
+    unicode_string_property_pattern(property).map(|pattern| (pattern, end + 1))
 }
 
 fn unicode_set_class_end(pattern: &str, start: usize) -> Option<usize> {
@@ -661,14 +669,17 @@ fn unicode_set_class_end(pattern: &str, start: usize) -> Option<usize> {
 
 fn lower_unicode_set_class(body: &str) -> Result<String, &'static str> {
     let Some((left, operator, right)) = split_unicode_set_operation(body) else {
+        if UNICODE_STRING_PROPERTIES
+            .iter()
+            .any(|property| body.contains(&format!("\\p{{{property}}}")))
+        {
+            return lower_unicode_set_string_property_union(body);
+        }
         if body.contains("\\q{") {
             return lower_unicode_set_strings(body);
         }
         return Ok(format!("[{body}]"));
     };
-    if left.contains("&&") || left.contains("--") || right.contains("&&") || right.contains("--") {
-        return Err("regexp-unicode-sets-operation-not-implemented");
-    }
     let left = unicode_set_operand_ranges(left)?;
     let right = unicode_set_operand_ranges(right)?;
     let ranges = if operator == "&&" {
@@ -677,6 +688,39 @@ fn lower_unicode_set_class(body: &str) -> Result<String, &'static str> {
         subtract_ranges(&left, &right)
     };
     Ok(render_ranges(&ranges, false))
+}
+
+fn lower_unicode_set_string_property_union(body: &str) -> Result<String, &'static str> {
+    if body.starts_with('^') || body.contains("\\q{") {
+        return Err("regexp-unicode-sets-operation-not-implemented");
+    }
+    let mut alternatives = Vec::new();
+    let mut characters = String::new();
+    let mut index = 0usize;
+    while index < body.len() {
+        if body.as_bytes()[index] == b'\\'
+            && let Some((replacement, end)) = unicode_string_property_at(body, index)
+        {
+            alternatives.push(replacement.to_owned());
+            index = end;
+            continue;
+        }
+        let end = if body.as_bytes()[index] == b'\\' {
+            regexp_escape_end(body, index)
+        } else {
+            index + body[index..].chars().next().unwrap().len_utf8()
+        };
+        characters.push_str(&body[index..end]);
+        index = end;
+    }
+    if !characters.is_empty() {
+        alternatives.push(format!("[{characters}]"));
+    }
+    match alternatives.as_slice() {
+        [] => Err("regexp-unicode-sets-operation-not-implemented"),
+        [only] => Ok(only.clone()),
+        _ => Ok(format!("(?:{})", alternatives.join("|"))),
+    }
 }
 
 fn lower_unicode_set_strings(body: &str) -> Result<String, &'static str> {
@@ -811,6 +855,7 @@ fn split_unicode_set_operation(body: &str) -> Option<(&str, &str, &str)> {
     let bytes = body.as_bytes();
     let mut depth = 0;
     let mut index = 0;
+    let mut operation = None;
     while index + 1 < bytes.len() {
         match bytes[index] {
             b'\\' => index += 2,
@@ -823,15 +868,17 @@ fn split_unicode_set_operation(body: &str) -> Option<(&str, &str, &str)> {
                 index += 1;
             }
             b'&' if depth == 0 && bytes[index + 1] == b'&' => {
-                return Some((&body[..index], "&&", &body[index + 2..]));
+                operation = Some((&body[..index], "&&", &body[index + 2..]));
+                index += 2;
             }
             b'-' if depth == 0 && bytes[index + 1] == b'-' => {
-                return Some((&body[..index], "--", &body[index + 2..]));
+                operation = Some((&body[..index], "--", &body[index + 2..]));
+                index += 2;
             }
             _ => index += 1,
         }
     }
-    None
+    operation
 }
 
 fn unicode_set_operand_ranges(operand: &str) -> Result<Vec<(u32, u32)>, &'static str> {
@@ -840,8 +887,21 @@ fn unicode_set_operand_ranges(operand: &str) -> Result<Vec<(u32, u32)>, &'static
     } else {
         operand
     };
-    if body.contains("&&") || body.contains("--") || body.contains("\\q{") {
+    if body.contains("\\q{")
+        || UNICODE_STRING_PROPERTIES
+            .iter()
+            .any(|property| body.contains(&format!("\\p{{{property}}}")))
+    {
         return Err("regexp-unicode-sets-operation-not-implemented");
+    }
+    if let Some((left, operator, right)) = split_unicode_set_operation(body) {
+        let left = unicode_set_operand_ranges(left)?;
+        let right = unicode_set_operand_ranges(right)?;
+        return Ok(if operator == "&&" {
+            intersect_ranges(&left, &right)
+        } else {
+            subtract_ranges(&left, &right)
+        });
     }
     if let Some(positive) = body.strip_prefix('^') {
         Ok(complement_ranges(&parse_class_ranges(positive)?))
@@ -956,8 +1016,33 @@ fn class_atom(body: &str, index: usize) -> Result<(ClassAtom, usize), &'static s
         b'0' => Ok((ClassAtom::Single(0x00), index + 2)),
         b'\\' | b']' | b'[' | b'-' | b'^' | b'/' | b'.' | b'$' | b'*' | b'+' | b'?' | b'('
         | b')' | b'{' | b'}' | b'|' => Ok((ClassAtom::Single(escape as u32), index + 2)),
-        // `\d`, `\w`, `\s` and friends are sets rather than code points. They
-        // are easy to add and have simply never appeared beside a property.
+        b'd' | b'D' | b'w' | b'W' | b's' | b'S' => {
+            let ranges = match escape.to_ascii_lowercase() {
+                b'd' => vec![(0x30, 0x39)],
+                b'w' => vec![(0x30, 0x39), (0x41, 0x5A), (0x5F, 0x5F), (0x61, 0x7A)],
+                b's' => vec![
+                    (0x09, 0x0D),
+                    (0x20, 0x20),
+                    (0xA0, 0xA0),
+                    (0x1680, 0x1680),
+                    (0x2000, 0x200A),
+                    (0x2028, 0x2029),
+                    (0x202F, 0x202F),
+                    (0x205F, 0x205F),
+                    (0x3000, 0x3000),
+                    (0xFEFF, 0xFEFF),
+                ],
+                _ => unreachable!(),
+            };
+            Ok((
+                ClassAtom::Ranges(if escape.is_ascii_uppercase() {
+                    complement_ranges(&ranges)
+                } else {
+                    ranges
+                }),
+                index + 2,
+            ))
+        }
         _ => Err("regexp-unicode-property-class-escape-not-implemented"),
     }
 }
@@ -998,10 +1083,24 @@ fn render_ranges(ranges: &[(u32, u32)], surrogate_pairs: bool) -> String {
         return class;
     }
     let mut bmp = Vec::new();
+    let mut lead_surrogates = Vec::new();
+    let mut trail_surrogates = Vec::new();
     let mut astral = Vec::new();
     for &(start, end) in ranges {
         if start <= 0xFFFF {
-            bmp.push((start, end.min(0xFFFF)));
+            let bmp_end = end.min(0xFFFF);
+            if start < 0xD800 {
+                bmp.push((start, bmp_end.min(0xD7FF)));
+            }
+            if start <= 0xDBFF && bmp_end >= 0xD800 {
+                lead_surrogates.push((start.max(0xD800), bmp_end.min(0xDBFF)));
+            }
+            if start <= 0xDFFF && bmp_end >= 0xDC00 {
+                trail_surrogates.push((start.max(0xDC00), bmp_end.min(0xDFFF)));
+            }
+            if bmp_end > 0xDFFF {
+                bmp.push((start.max(0xE000), bmp_end));
+            }
         }
         if end > 0xFFFF {
             astral.push((start.max(0x1_0000), end));
@@ -1018,6 +1117,18 @@ fn render_ranges(ranges: &[(u32, u32)], surrogate_pairs: bool) -> String {
     }
     for (start, end) in astral {
         push_astral_range(&mut alternatives, start, end);
+    }
+    for (start, end) in lead_surrogates {
+        let mut class = String::from("[");
+        push_bmp_range(&mut class, start, end);
+        class.push_str("](?![\\uDC00-\\uDFFF])");
+        alternatives.push(class);
+    }
+    for (start, end) in trail_surrogates {
+        let mut class = String::from("(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[");
+        push_bmp_range(&mut class, start, end);
+        class.push(']');
+        alternatives.push(class);
     }
     match alternatives.as_slice() {
         [] => "(?!)".to_owned(),
@@ -1194,20 +1305,28 @@ fn lower_astral_classes(pattern: &str) -> Result<String, &'static str> {
             return Err("regexp-class-shape-not-implemented");
         }
         let class_source = &pattern[start..cursor];
-        if !class_source_has_astral(class_source) {
+        let negated = class_source.as_bytes().get(1) == Some(&b'^');
+        if !negated && !class_source_has_astral(class_source) {
             output.push_str(class_source);
             continue;
         }
         let hir = regex_syntax::ParserBuilder::new()
             .unicode(true)
             .build()
-            .parse(class_source)
-            .map_err(|_| "regexp-class-shape-not-implemented")?;
+            .parse(class_source);
+        let hir = match hir {
+            Ok(hir) => hir,
+            Err(_) if negated => {
+                let excluded = parse_class_ranges(&class_source[2..class_source.len() - 1])?;
+                output.push_str(&render_ranges(&complement_ranges(&excluded), true));
+                continue;
+            }
+            Err(_) => return Err("regexp-class-shape-not-implemented"),
+        };
         let HirKind::Class(Class::Unicode(class)) = hir.kind() else {
             output.push_str(class_source);
             continue;
         };
-        let negated = class_source.as_bytes().get(1) == Some(&b'^');
         let mut bmp_ranges = Vec::new();
         let mut astral = Vec::new();
         for range in class.ranges() {
@@ -1249,7 +1368,8 @@ fn lower_astral_classes(pattern: &str) -> Result<String, &'static str> {
             // them outside the BMP class prevents a valid pair from being
             // consumed one code unit at a time by a surrounding quantifier.
             alternatives.push("[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])".to_string());
-            alternatives.push("(?:[^\\uD800-\\uDBFF]|^)[\\uDC00-\\uDFFF]".to_string());
+            alternatives
+                .push("(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF]".to_string());
         }
         if alternatives.len() == 1 {
             output.push_str(&alternatives[0]);
@@ -1338,7 +1458,7 @@ fn lower_unicode(pattern: &str, dot_all: bool) -> Result<String, &'static str> {
                 if dot_all {
                     output.push_str("(?:[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\s\\S])");
                 } else {
-                    output.push_str("(?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[^\\uD800-\\uDBFF]|^)[\\uDC00-\\uDFFF])");
+                    output.push_str("(?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF])");
                 }
             }
             character if character as u32 > 0xFFFF => {
