@@ -7,9 +7,10 @@ use oxc_allocator::{Allocator, TakeIn};
 use oxc_ast::{
     AstKind,
     ast::{
-        AssignmentTargetPattern, CatchClause, Class, Decorator, ForOfStatement, FormalParameters,
-        IdentifierReference, MethodDefinition, PrivateInExpression, Program, PropertyDefinition,
-        PropertyKey, RegExpFlags, RegExpLiteral, VariableDeclarator,
+        AssignmentTargetPattern, CatchClause, Class, Decorator, Expression, ForOfStatement,
+        FormalParameters, IdentifierReference, MethodDefinition, PrivateInExpression, Program,
+        PropertyDefinition, PropertyKey, RegExpFlags, RegExpLiteral, StaticMemberExpression,
+        StringLiteral, VariableDeclarator,
     },
 };
 use oxc_ast_visit::{Visit, VisitMut, walk, walk_mut};
@@ -840,6 +841,10 @@ pub fn transform(
         if !transformed.diagnostics.is_empty() {
             return Ok(unsupported("transform-error", transformed.diagnostics));
         }
+        if object_rest_loose {
+            ObjectRestLooseCompletionRewriter { allocator }.visit_program(&mut program);
+            ast_traversal_count += 1;
+        }
         if options.logical_assignment_operators == Some(true) {
             let existing = transformed
                 .scoping
@@ -926,9 +931,7 @@ pub fn transform(
             || options.exponentiation_operator == Some(true)
             || options.regexp_sticky == Some(true)
             || (options.class_static_block == Some(true) && options.classes != Some(true))
-            || (options.object_rest_spread == Some(true)
-                && !(options.object_rest_spread_loose == Some(true)
-                    || options.object_rest_spread_use_built_ins == Some(true)))
+            || options.object_rest_spread == Some(true)
             || (options.class_properties == Some(true) && options.classes != Some(true))
             || (options.private_methods == Some(true) && options.classes != Some(true))
             || (options.private_property_in_object == Some(true) && options.classes != Some(true));
@@ -1005,6 +1008,12 @@ pub fn transform(
         }
         if helper_mode == "runtime" {
             for (helper, source) in &helper_requests {
+                if object_rest_loose && helper.name() == "objectWithoutProperties" {
+                    // The completion rewriter deliberately changes this one
+                    // generated import to Babel's loose helper. The module and
+                    // version have already passed validation above.
+                    continue;
+                }
                 let expected = format!("{helper_module}/helpers/{}", helper.name());
                 if source != &expected {
                     return Ok(unsupported(
@@ -1016,7 +1025,13 @@ pub fn transform(
         }
         let mut helpers_used: Vec<String> = helper_requests
             .into_iter()
-            .map(|(helper, _)| helper.name().to_string())
+            .map(|(helper, _)| {
+                if object_rest_loose && helper.name() == "objectWithoutProperties" {
+                    "objectWithoutPropertiesLoose".to_string()
+                } else {
+                    helper.name().to_string()
+                }
+            })
             .collect();
         helpers_used.extend(custom_helper_requests.into_iter().map(str::to_string));
         helpers_used.sort_unstable();
@@ -1462,14 +1477,11 @@ fn compile_options(options: &NativePreflightOptions) -> Result<TransformOptions>
     compiled.env.es2017.async_to_generator = options.async_functions == Some(true);
     compiled.env.es2016.exponentiation_operator = options.exponentiation_operator == Some(true);
     if options.object_rest_spread == Some(true) {
-        let focused_object_rest = options.object_rest_spread_loose == Some(true)
-            || options.object_rest_spread_use_built_ins == Some(true);
-        // Oxc rejects either option before traversal. The focused AST passes
-        // own every non-default combination, so do not instantiate Oxc's pass
-        // after they have consumed the syntax.
-        if !focused_object_rest {
-            compiled.env.es2018.object_rest_spread = Some(Default::default());
-        }
+        // Focused passes consume declarations, assignments, catches, loops,
+        // and object expressions. Oxc's default/spec pass remains as the
+        // completion pass for object rest in formal parameters. Never forward
+        // `loose` or `useBuiltIns`: Oxc rejects both at construction time.
+        compiled.env.es2018.object_rest_spread = Some(Default::default());
     }
     let mut selected_class_feature_loose = None;
     for (enabled, loose) in [
@@ -1809,6 +1821,39 @@ impl<'a> Visit<'a> for ClassFeaturesUnsupportedDetector {
 
 struct InlineHelperRenamer<'a> {
     binding: &'a str,
+}
+
+struct ObjectRestLooseCompletionRewriter<'a> {
+    allocator: &'a Allocator,
+}
+
+impl<'a> VisitMut<'a> for ObjectRestLooseCompletionRewriter<'a> {
+    fn visit_string_literal(&mut self, literal: &mut StringLiteral<'a>) {
+        if literal
+            .value
+            .as_str()
+            .ends_with("/helpers/objectWithoutProperties")
+        {
+            let replacement = format!("{}Loose", literal.value.as_str());
+            literal.value = self.allocator.alloc_str(&replacement).into();
+            literal.raw = None;
+        }
+    }
+
+    fn visit_static_member_expression(&mut self, member: &mut StaticMemberExpression<'a>) {
+        if member.property.name == "objectWithoutProperties"
+            && matches!(
+                &member.object,
+                Expression::Identifier(identifier) if identifier.name.starts_with("babelHelpers")
+            )
+        {
+            member.property.name = self
+                .allocator
+                .alloc_str("objectWithoutPropertiesLoose")
+                .into();
+        }
+        walk_mut::walk_static_member_expression(self, member);
+    }
 }
 
 impl<'a> VisitMut<'a> for InlineHelperRenamer<'a> {

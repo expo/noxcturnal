@@ -30,6 +30,7 @@ const bundles = {
     'objectDestructuringEmpty',
     'objectSpread2',
     'objectWithoutProperties',
+    'objectWithoutPropertiesLoose',
     'toPropertyKey',
   ],
 };

@@ -660,6 +660,10 @@ fn lower_astral_classes(pattern: &str) -> Result<String, &'static str> {
             return Err("regexp-class-shape-not-implemented");
         }
         let class_source = &pattern[start..cursor];
+        if !class_source_has_astral(class_source) {
+            output.push_str(class_source);
+            continue;
+        }
         let hir = regex_syntax::ParserBuilder::new()
             .unicode(true)
             .build()
@@ -669,14 +673,6 @@ fn lower_astral_classes(pattern: &str) -> Result<String, &'static str> {
             output.push_str(class_source);
             continue;
         };
-        if !class
-            .ranges()
-            .iter()
-            .any(|range| range.end() as u32 > 0xFFFF)
-        {
-            output.push_str(class_source);
-            continue;
-        }
         let negated = class_source.as_bytes().get(1) == Some(&b'^');
         let mut bmp_ranges = Vec::new();
         let mut astral = Vec::new();
@@ -730,6 +726,27 @@ fn lower_astral_classes(pattern: &str) -> Result<String, &'static str> {
         }
     }
     Ok(output)
+}
+
+fn class_source_has_astral(class_source: &str) -> bool {
+    if class_source
+        .chars()
+        .any(|character| character as u32 > 0xFFFF)
+    {
+        return true;
+    }
+    let mut remainder = class_source;
+    while let Some(index) = remainder.find("\\u{") {
+        let digits = &remainder[index + 3..];
+        let Some(end) = digits.find('}') else {
+            return false;
+        };
+        if u32::from_str_radix(&digits[..end], 16).is_ok_and(|value| value > 0xFFFF) {
+            return true;
+        }
+        remainder = &digits[end + 1..];
+    }
+    false
 }
 
 fn lower_unicode(pattern: &str, dot_all: bool) -> Result<String, &'static str> {
