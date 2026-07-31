@@ -3,7 +3,10 @@
 use oxc_allocator::{Allocator, Box as ArenaBox, TakeIn, Vec as ArenaVec};
 use oxc_ast::{
     AstBuilder,
-    ast::{Argument, Expression, Program, PropertyKind, TSTypeParameterInstantiation},
+    ast::{
+        Argument, ArrayExpressionElement, Expression, Program, PropertyKind,
+        TSTypeParameterInstantiation,
+    },
 };
 use oxc_ast_visit::{VisitMut, walk_mut};
 use oxc_span::GetSpan;
@@ -97,7 +100,7 @@ impl<'a> RegexpLowerer<'a> {
     fn lower(
         &mut self,
         expression: &mut Expression<'a>,
-    ) -> Result<Option<FxHashMap<String, usize>>, &'static str> {
+    ) -> Result<Option<FxHashMap<String, Vec<usize>>>, &'static str> {
         let Expression::RegExpLiteral(literal) = expression else {
             return Ok(None);
         };
@@ -157,23 +160,36 @@ impl<'a> RegexpLowerer<'a> {
         Ok(groups)
     }
 
-    fn wrap_named(&self, expression: &mut Expression<'a>, groups: FxHashMap<String, usize>) {
+    fn wrap_named(&self, expression: &mut Expression<'a>, groups: FxHashMap<String, Vec<usize>>) {
         let span = expression.span();
         let regexp = expression.take_in(&self.ast);
         let mut properties = ArenaVec::new_in(&self.ast);
-        for (name, index) in groups {
+        for (name, indices) in groups {
             #[expect(deprecated)]
             let key = self
                 .ast
                 .expression_string_literal(span, self.ast.allocator.alloc_str(&name), None)
                 .into();
             #[expect(deprecated)]
-            let value = self.ast.expression_numeric_literal(
-                span,
-                index as f64,
-                None,
-                oxc_ast::ast::NumberBase::Decimal,
-            );
+            let value = if indices.len() == 1 {
+                self.ast.expression_numeric_literal(
+                    span,
+                    indices[0] as f64,
+                    None,
+                    oxc_ast::ast::NumberBase::Decimal,
+                )
+            } else {
+                let mut elements = ArenaVec::new_in(&self.ast);
+                elements.extend(indices.into_iter().map(|index| {
+                    ArrayExpressionElement::from(self.ast.expression_numeric_literal(
+                        span,
+                        index as f64,
+                        None,
+                        oxc_ast::ast::NumberBase::Decimal,
+                    ))
+                }));
+                self.ast.expression_array(span, elements)
+            };
             #[expect(deprecated)]
             properties.push(self.ast.object_property_kind_object_property(
                 span,
@@ -472,7 +488,7 @@ fn unicode_set_class_end(pattern: &str, start: usize) -> Option<usize> {
 fn lower_unicode_set_class(body: &str) -> Result<String, &'static str> {
     let Some((left, operator, right)) = split_unicode_set_operation(body) else {
         if body.contains("\\q{") {
-            return Err("regexp-unicode-sets-operation-not-implemented");
+            return lower_unicode_set_strings(body);
         }
         return Ok(format!("[{body}]"));
     };
@@ -487,6 +503,134 @@ fn lower_unicode_set_class(body: &str) -> Result<String, &'static str> {
         subtract_ranges(&left, &right)
     };
     Ok(render_ranges(&ranges, false))
+}
+
+fn lower_unicode_set_strings(body: &str) -> Result<String, &'static str> {
+    if body.starts_with('^') {
+        return Err("regexp-unicode-sets-operation-not-implemented");
+    }
+    let bytes = body.as_bytes();
+    let mut character_body = String::new();
+    let mut alternatives = Vec::<(usize, usize, String)>::new();
+    let mut index = 0usize;
+    let mut order = 0usize;
+    while index < bytes.len() {
+        if bytes[index] == b'\\'
+            && bytes.get(index + 1) == Some(&b'q')
+            && bytes.get(index + 2) == Some(&b'{')
+        {
+            let mut cursor = index + 3;
+            let mut start = cursor;
+            let mut closed = false;
+            while cursor < bytes.len() {
+                if bytes[cursor] == b'\\' {
+                    cursor = regexp_escape_end(body, cursor);
+                    continue;
+                }
+                let character = body[cursor..].chars().next().unwrap();
+                if character == '|' || character == '}' {
+                    let raw = &body[start..cursor];
+                    alternatives.push((class_string_length(raw), order, render_class_string(raw)));
+                    order += 1;
+                    if character == '}' {
+                        cursor += 1;
+                        closed = true;
+                        break;
+                    }
+                    start = cursor + 1;
+                }
+                cursor += character.len_utf8();
+            }
+            if !closed {
+                return Err("regexp-unicode-sets-operation-not-implemented");
+            }
+            index = cursor;
+            continue;
+        }
+        let character = body[index..].chars().next().unwrap();
+        character_body.push(character);
+        index += character.len_utf8();
+        if character == '\\' && index < bytes.len() {
+            let escaped = body[index..].chars().next().unwrap();
+            character_body.push(escaped);
+            index += escaped.len_utf8();
+        }
+    }
+    alternatives.sort_by_key(|(length, order, _)| (std::cmp::Reverse(*length), *order));
+    let mut rendered: Vec<String> = alternatives
+        .into_iter()
+        .map(|(_, _, alternative)| alternative)
+        .collect();
+    if !character_body.is_empty() {
+        rendered.push(format!("[{character_body}]"));
+    }
+    match rendered.as_slice() {
+        [] => Err("regexp-unicode-sets-operation-not-implemented"),
+        [only] => Ok(only.clone()),
+        _ => Ok(format!("(?:{})", rendered.join("|"))),
+    }
+}
+
+fn class_string_length(source: &str) -> usize {
+    let mut length = 0;
+    let mut index = 0;
+    while index < source.len() {
+        if source.as_bytes()[index] == b'\\' {
+            index = regexp_escape_end(source, index);
+            length += 1;
+            continue;
+        }
+        index += source[index..].chars().next().unwrap().len_utf8();
+        length += 1;
+    }
+    length
+}
+
+fn render_class_string(source: &str) -> String {
+    let mut output = String::with_capacity(source.len());
+    let mut index = 0;
+    while index < source.len() {
+        if source.as_bytes()[index] == b'\\' {
+            let end = regexp_escape_end(source, index);
+            output.push_str(&source[index..end]);
+            index = end;
+            continue;
+        }
+        let character = source[index..].chars().next().unwrap();
+        if matches!(
+            character,
+            '.' | '*' | '+' | '?' | '(' | ')' | '[' | ']' | '{' | '}' | '^' | '$' | '/' | '|'
+        ) {
+            output.push('\\');
+        }
+        output.push(character);
+        index += character.len_utf8();
+    }
+    output
+}
+
+fn regexp_escape_end(source: &str, index: usize) -> usize {
+    let bytes = source.as_bytes();
+    let Some(escape) = bytes.get(index + 1).copied() else {
+        return source.len();
+    };
+    if escape == b'u' && bytes.get(index + 2) == Some(&b'{') {
+        return source[index + 3..]
+            .find('}')
+            .map_or(source.len(), |offset| index + 4 + offset);
+    }
+    let width = match escape {
+        b'u' => 6,
+        b'x' => 4,
+        b'c' => 3,
+        _ => {
+            return source[index + 1..]
+                .chars()
+                .next()
+                .map_or(source.len(), |character| index + 1 + character.len_utf8());
+        }
+    };
+    (index + width).min(source.len())
 }
 
 fn split_unicode_set_operation(body: &str) -> Option<(&str, &str, &str)> {
@@ -1082,7 +1226,9 @@ fn lower_dot_all(pattern: &str) -> String {
     output
 }
 
-fn lower_named_groups(pattern: &str) -> Result<(String, FxHashMap<String, usize>), &'static str> {
+fn lower_named_groups(
+    pattern: &str,
+) -> Result<(String, FxHashMap<String, Vec<usize>>), &'static str> {
     let bytes = pattern.as_bytes();
     let mut output = String::with_capacity(pattern.len());
     // Named backreferences may precede their capturing group. Discover every
@@ -1101,8 +1247,10 @@ fn lower_named_groups(pattern: &str) -> Result<(String, FxHashMap<String, usize>
                 let capture = groups
                     .get(name)
                     .ok_or("regexp-named-reference-shape-not-implemented")?;
-                output.push('\\');
-                output.push_str(&capture.to_string());
+                for capture in capture {
+                    output.push('\\');
+                    output.push_str(&capture.to_string());
+                }
                 index = end + 1;
                 continue;
             }
@@ -1140,9 +1288,9 @@ fn lower_named_groups(pattern: &str) -> Result<(String, FxHashMap<String, usize>
     Ok((output, groups))
 }
 
-fn collect_named_groups(pattern: &str) -> Result<FxHashMap<String, usize>, &'static str> {
+fn collect_named_groups(pattern: &str) -> Result<FxHashMap<String, Vec<usize>>, &'static str> {
     let bytes = pattern.as_bytes();
-    let mut groups = FxHashMap::default();
+    let mut groups: FxHashMap<String, Vec<usize>> = FxHashMap::default();
     let mut capture_count = 0usize;
     let mut index = 0usize;
     let mut in_class = false;
@@ -1170,9 +1318,10 @@ fn collect_named_groups(pattern: &str) -> Result<FxHashMap<String, usize>, &'sta
                         .ok_or("regexp-named-group-shape-not-implemented")?;
                     let name = &pattern[index + 3..end];
                     capture_count += 1;
-                    if groups.insert(name.to_owned(), capture_count).is_some() {
-                        return Err("regexp-duplicate-named-groups-not-implemented");
-                    }
+                    groups
+                        .entry(name.to_owned())
+                        .or_default()
+                        .push(capture_count);
                     index = end + 1;
                     continue;
                 }
