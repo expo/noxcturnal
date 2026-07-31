@@ -1085,8 +1085,9 @@ fn lower_dot_all(pattern: &str) -> String {
 fn lower_named_groups(pattern: &str) -> Result<(String, FxHashMap<String, usize>), &'static str> {
     let bytes = pattern.as_bytes();
     let mut output = String::with_capacity(pattern.len());
-    let mut groups: FxHashMap<String, usize> = FxHashMap::default();
-    let mut capture_count = 0usize;
+    // Named backreferences may precede their capturing group. Discover every
+    // capture number first, then perform the syntax rewrite in a second pass.
+    let groups = collect_named_groups(pattern)?;
     let mut index = 0usize;
     let mut in_class = false;
     while index < bytes.len() {
@@ -1099,7 +1100,7 @@ fn lower_named_groups(pattern: &str) -> Result<(String, FxHashMap<String, usize>
                 let name = &pattern[index + 3..end];
                 let capture = groups
                     .get(name)
-                    .ok_or("regexp-forward-named-reference-not-implemented")?;
+                    .ok_or("regexp-named-reference-shape-not-implemented")?;
                 output.push('\\');
                 output.push_str(&capture.to_string());
                 index = end + 1;
@@ -1118,29 +1119,68 @@ fn lower_named_groups(pattern: &str) -> Result<(String, FxHashMap<String, usize>
             in_class = true;
         } else if bytes[index] == b']' {
             in_class = false;
-        } else if bytes[index] == b'(' && !in_class {
-            if bytes.get(index + 1) != Some(&b'?') {
-                capture_count += 1;
-            } else if bytes.get(index + 2) == Some(&b'<')
-                && !matches!(bytes.get(index + 3), Some(b'=') | Some(b'!'))
-            {
-                let end = pattern[index + 3..]
-                    .find('>')
-                    .map(|offset| index + 3 + offset)
-                    .ok_or("regexp-named-group-shape-not-implemented")?;
-                let name = &pattern[index + 3..end];
-                capture_count += 1;
-                if groups.insert(name.to_owned(), capture_count).is_some() {
-                    return Err("regexp-duplicate-named-groups-not-implemented");
-                }
-                output.push('(');
-                index = end + 1;
-                continue;
-            }
+        } else if bytes[index] == b'('
+            && !in_class
+            && bytes.get(index + 1) == Some(&b'?')
+            && bytes.get(index + 2) == Some(&b'<')
+            && !matches!(bytes.get(index + 3), Some(b'=') | Some(b'!'))
+        {
+            let end = pattern[index + 3..]
+                .find('>')
+                .map(|offset| index + 3 + offset)
+                .ok_or("regexp-named-group-shape-not-implemented")?;
+            output.push('(');
+            index = end + 1;
+            continue;
         }
         let character = pattern[index..].chars().next().unwrap();
         output.push(character);
         index += character.len_utf8();
     }
     Ok((output, groups))
+}
+
+fn collect_named_groups(pattern: &str) -> Result<FxHashMap<String, usize>, &'static str> {
+    let bytes = pattern.as_bytes();
+    let mut groups = FxHashMap::default();
+    let mut capture_count = 0usize;
+    let mut index = 0usize;
+    let mut in_class = false;
+    while index < bytes.len() {
+        if bytes[index] == b'\\' {
+            let escaped_len = pattern[index + 1..]
+                .chars()
+                .next()
+                .map_or(0, char::len_utf8);
+            index = (index + 1 + escaped_len).min(bytes.len());
+            continue;
+        }
+        match bytes[index] {
+            b'[' => in_class = true,
+            b']' => in_class = false,
+            b'(' if !in_class => {
+                if bytes.get(index + 1) != Some(&b'?') {
+                    capture_count += 1;
+                } else if bytes.get(index + 2) == Some(&b'<')
+                    && !matches!(bytes.get(index + 3), Some(b'=') | Some(b'!'))
+                {
+                    let end = pattern[index + 3..]
+                        .find('>')
+                        .map(|offset| index + 3 + offset)
+                        .ok_or("regexp-named-group-shape-not-implemented")?;
+                    let name = &pattern[index + 3..end];
+                    capture_count += 1;
+                    if groups.insert(name.to_owned(), capture_count).is_some() {
+                        return Err("regexp-duplicate-named-groups-not-implemented");
+                    }
+                    index = end + 1;
+                    continue;
+                }
+            }
+            _ => {}
+        }
+        let character = pattern[index..].chars().next().unwrap();
+        index += character.len_utf8();
+    }
+    Ok(groups)
 }
