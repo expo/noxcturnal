@@ -119,12 +119,19 @@ export function realizeContent(
   if (suffix) parts.push(suffix);
   if (!hasCopy) return { content: parts.join('') };
   const merged: (string | { start: number; end: number })[] = [];
+  let strings: string[] = [];
+  const flushStrings = (): void => {
+    if (strings.length) merged.push(strings.join(''));
+    strings = [];
+  };
   for (const part of parts) {
-    const last = merged[merged.length - 1];
-    if (typeof part === 'string' && typeof last === 'string')
-      merged[merged.length - 1] = last + part;
-    else merged.push(part);
+    if (typeof part === 'string') strings.push(part);
+    else {
+      flushStrings();
+      merged.push(part);
+    }
   }
+  flushStrings();
   return { contentParts: merged };
 }
 
@@ -177,18 +184,15 @@ export const codeFactory: CodeFactory = {
       });
       return { kind: 'composite', parts: composite };
     }
+    const chunks: string[] = [];
+    parts.forEach((part, index) => {
+      chunks.push(part);
+      if (index >= values.length) return;
+      const value = values[index]!;
+      chunks.push(typeof value === 'string' ? value : (value as CodeFragment).code);
+    });
     return {
-      code: parts.reduce(
-        (code, part, index) =>
-          code +
-          part +
-          (index < values.length
-            ? typeof values[index] === 'string'
-              ? (values[index] as string)
-              : (values[index] as CodeFragment).code
-            : ''),
-        '',
-      ),
+      code: chunks.join(''),
       mapping: 'sourceless',
     };
   },

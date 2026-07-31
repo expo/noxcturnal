@@ -923,10 +923,16 @@ pub(super) fn prepare_with_reserved<'a>(
     let scope_preorder = scoping.scope_descendants_from_root().collect::<Vec<_>>();
     let mut scope_index = FxHashMap::default();
     let mut scope_end = FxHashMap::default();
+    let mut scope_depth = FxHashMap::default();
     let mut target_scopes = FxHashMap::default();
     for (index, scope_id) in scope_preorder.iter().copied().enumerate() {
         scope_index.insert(scope_id, index);
         scope_end.insert(scope_id, index);
+        let depth = scoping
+            .scope_parent_id(scope_id)
+            .and_then(|parent| scope_depth.get(&parent).copied())
+            .map_or(0, |depth| depth + 1);
+        scope_depth.insert(scope_id, depth);
         let target_scope = if scoping.scope_flags(scope_id).intersects(ScopeFlags::Var) {
             scope_id
         } else {
@@ -1015,9 +1021,7 @@ pub(super) fn prepare_with_reserved<'a>(
                 !scoping
                     .symbol_flags(*symbol_id)
                     .contains(SymbolFlags::FunctionScopedVariable),
-                scoping
-                    .scope_ancestors(scoping.symbol_scope_id(*symbol_id))
-                    .count(),
+                scope_depth[&scoping.symbol_scope_id(*symbol_id)],
                 scoping.symbol_span(*symbol_id).start,
             )
         });

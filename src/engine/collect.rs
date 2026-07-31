@@ -434,6 +434,7 @@ pub(crate) fn materialize_with_scope_parents(
 fn shortest_uid_prefix(scoping: &Scoping) -> String {
     const DEPTH: usize = 12;
     let mut occupied = [0u64; 128];
+    let mut longest_underscore_prefix = DEPTH;
     // Single-character `_` and `$` namespaces are common conventions and are
     // disproportionately likely to be introduced by a later transform.
     occupied[0] = (1 << 1) | (1 << 2);
@@ -443,6 +444,8 @@ fn shortest_uid_prefix(scoping: &Scoping) -> String {
             .keys()
             .map(|name| name.as_str()),
     ) {
+        longest_underscore_prefix =
+            longest_underscore_prefix.max(name.bytes().take_while(|byte| *byte == b'_').count());
         let mut node = 0usize;
         for byte in name.bytes().take(DEPTH) {
             node = match byte {
@@ -464,22 +467,7 @@ fn shortest_uid_prefix(scoping: &Scoping) -> String {
         }
         return String::from_utf8(bytes[..depth].to_vec()).expect("ASCII UID prefix");
     }
-    let mut candidate = "_".repeat(DEPTH + 1);
-    loop {
-        let occupied = scoping.symbol_names().chain(
-            scoping
-                .root_unresolved_references()
-                .keys()
-                .map(|name| name.as_str()),
-        );
-        if !occupied
-            .into_iter()
-            .any(|name| name.starts_with(&candidate))
-        {
-            return candidate;
-        }
-        candidate.push('_');
-    }
+    "_".repeat(longest_underscore_prefix + 1)
 }
 
 /// Syntax-only sessions conservatively reserve against every identifier-like
@@ -488,8 +476,11 @@ fn shortest_uid_prefix(scoping: &Scoping) -> String {
 fn shortest_uid_prefix_from_names(names: &FxHashSet<String>) -> String {
     const DEPTH: usize = 12;
     let mut occupied = [0u64; 128];
+    let mut longest_underscore_prefix = DEPTH;
     occupied[0] = (1 << 1) | (1 << 2);
     for name in names {
+        longest_underscore_prefix =
+            longest_underscore_prefix.max(name.bytes().take_while(|byte| *byte == b'_').count());
         let mut node = 0usize;
         for byte in name.bytes().take(DEPTH) {
             node = match byte {
@@ -511,11 +502,7 @@ fn shortest_uid_prefix_from_names(names: &FxHashSet<String>) -> String {
         }
         return String::from_utf8(bytes[..depth].to_vec()).expect("ASCII UID prefix");
     }
-    let mut candidate = "_".repeat(DEPTH + 1);
-    while names.iter().any(|name| name.starts_with(&candidate)) {
-        candidate.push('_');
-    }
-    candidate
+    "_".repeat(longest_underscore_prefix + 1)
 }
 
 pub fn materialize_routed_buffer(

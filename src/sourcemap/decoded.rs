@@ -288,18 +288,19 @@ fn encode_decoded(map: &DecodedMap) -> String {
 /// (closest to the original source) to the latest, and encode the final map once.
 pub(crate) fn compose_layer_chain(layers: &[&[u8]]) -> Option<(String, Vec<String>)> {
     let mut layers = layers.iter();
-    let (mut map, mut names) = unpack_decoded_layer(layers.next()?)?;
+    let (mut map, names) = unpack_decoded_layer(layers.next()?)?;
+    let mut name_layers = vec![names];
     for layer in layers {
         let (outer, outer_names) = unpack_decoded_layer(layer)?;
         map = compose_decoded(&outer, &map, outer_names.len() as u32);
-        let mut combined = outer_names;
-        combined.extend(names);
-        names = combined;
+        name_layers.push(outer_names);
     }
     Some((
         encode_decoded(&map),
-        names
+        name_layers
             .into_iter()
+            .rev()
+            .flatten()
             .map(|name| name.as_ref().to_owned())
             .collect(),
     ))

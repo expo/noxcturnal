@@ -27,6 +27,8 @@ pub(super) fn run<'a>(
     if constant_folding {
         ConstantFolder {
             ast: AstBuilder::new(allocator),
+            failed: FxHashSet::default(),
+            addition_depth: 0,
         }
         .visit_program(program);
     }
@@ -37,6 +39,8 @@ pub(super) fn run<'a>(
 
 struct ConstantFolder<'a> {
     ast: AstBuilder<'a>,
+    failed: FxHashSet<(u32, u32)>,
+    addition_depth: usize,
 }
 
 impl<'a> ConstantFolder<'a> {
@@ -62,18 +66,34 @@ impl<'a> ConstantFolder<'a> {
 
 impl<'a> VisitMut<'a> for ConstantFolder<'a> {
     fn visit_expression(&mut self, expression: &mut Expression<'a>) {
+        let addition = matches!(expression, Expression::BinaryExpression(binary) if binary.operator == oxc_syntax::operator::BinaryOperator::Addition);
+        self.addition_depth += usize::from(addition);
         walk_mut::walk_expression(self, expression);
+        self.addition_depth -= usize::from(addition);
+        if addition && self.addition_depth > 0 {
+            return;
+        }
         let span = expression.span();
         match expression {
             Expression::UnaryExpression(_) | Expression::BinaryExpression(_) => {
-                if let Some(value) = evaluate_expression(expression)
+                if expression_has_failed_operand(expression, &self.failed) {
+                    self.failed.insert((span.start, span.end));
+                } else if let Some(value) = evaluate_expression(expression)
                     && let Some(literal) = self.literal(span, value)
                 {
                     *expression = literal;
+                } else {
+                    self.failed.insert((span.start, span.end));
                 }
             }
             Expression::LogicalExpression(logical) => {
+                let left_span = logical.left.span();
+                if self.failed.contains(&(left_span.start, left_span.end)) {
+                    self.failed.insert((span.start, span.end));
+                    return;
+                }
                 let Some(left) = evaluate_expression(&logical.left) else {
+                    self.failed.insert((span.start, span.end));
                     return;
                 };
                 let use_right = match logical.operator {
@@ -90,7 +110,13 @@ impl<'a> VisitMut<'a> for ConstantFolder<'a> {
                 };
             }
             Expression::ConditionalExpression(conditional) => {
+                let test_span = conditional.test.span();
+                if self.failed.contains(&(test_span.start, test_span.end)) {
+                    self.failed.insert((span.start, span.end));
+                    return;
+                }
                 let Some(test) = evaluate_expression(&conditional.test) else {
+                    self.failed.insert((span.start, span.end));
                     return;
                 };
                 *expression = if test.truthy() {
@@ -99,7 +125,13 @@ impl<'a> VisitMut<'a> for ConstantFolder<'a> {
                     conditional.alternate.take_in(&self.ast)
                 };
             }
-            _ => {}
+            _ => {
+                if expression_has_failed_operand(expression, &self.failed)
+                    || evaluate_expression(expression).is_none()
+                {
+                    self.failed.insert((span.start, span.end));
+                }
+            }
         }
     }
 
@@ -130,6 +162,27 @@ impl<'a> VisitMut<'a> for ConstantFolder<'a> {
             #[expect(deprecated)]
             self.ast.statement_empty(if_statement.span)
         };
+    }
+}
+
+fn expression_has_failed_operand(
+    expression: &Expression<'_>,
+    failed: &FxHashSet<(u32, u32)>,
+) -> bool {
+    let failed = |expression: &Expression<'_>| {
+        let span = expression.span();
+        failed.contains(&(span.start, span.end))
+    };
+    match expression {
+        Expression::UnaryExpression(unary) => failed(&unary.argument),
+        Expression::BinaryExpression(binary) => failed(&binary.left) || failed(&binary.right),
+        Expression::ParenthesizedExpression(parenthesized) => failed(&parenthesized.expression),
+        Expression::TSAsExpression(value) => failed(&value.expression),
+        Expression::TSSatisfiesExpression(value) => failed(&value.expression),
+        Expression::TSTypeAssertion(value) => failed(&value.expression),
+        Expression::TSNonNullExpression(value) => failed(&value.expression),
+        Expression::SequenceExpression(sequence) => sequence.expressions.iter().any(failed),
+        _ => false,
     }
 }
 

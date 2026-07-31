@@ -1,3 +1,5 @@
+use std::collections::VecDeque;
+
 use oxc_allocator::{Allocator, Box as ArenaBox, CloneIn, TakeIn, Vec as ArenaVec};
 use oxc_ast::{
     AstBuilder, AstKind,
@@ -39,22 +41,19 @@ use crate::generated::inline_helpers::{
 use crate::preflight::helpers::CustomHelperRequests;
 
 pub(super) struct AstPlan {
-    declarations: FxHashMap<u32, Vec<AstDeclaratorPlan>>,
+    declarations: FxHashMap<(u32, String), VecDeque<AstDeclaratorPlan>>,
     catches: FxHashMap<u32, AstCatchPlan>,
     assignments: FxHashMap<u32, AstAssignmentPlan>,
     for_of_assignments: FxHashMap<u32, AstAssignmentPlan>,
     temporary_declarations: FxHashMap<u32, Vec<String>>,
     helper_requests: CustomHelperRequests,
     helper_names: HelperNames,
-    emitted_helper_names: Vec<String>,
-    nested_remaining: bool,
     base_reserved: FxHashSet<String>,
     planned_allocations: FxHashMap<String, usize>,
 }
 
 struct AstDeclaratorPlan {
     root: String,
-    pattern: String,
     anchor: Span,
     reservation_checkpoint: usize,
 }
@@ -171,13 +170,13 @@ pub(super) fn prepare_ast(
         property_key: String::new(),
         property_key_runtime: String::new(),
     };
-    let mut declarations: FxHashMap<u32, Vec<AstDeclaratorPlan>> = FxHashMap::default();
+    let mut declarations: FxHashMap<(u32, String), VecDeque<AstDeclaratorPlan>> =
+        FxHashMap::default();
     let mut catches = FxHashMap::default();
     let mut assignments = FxHashMap::default();
     let mut for_of_assignments = FxHashMap::default();
     let mut temporary_declarations: FxHashMap<u32, Vec<String>> = FxHashMap::default();
     let mut helper_usage = HelperUsage::default();
-    let mut nested_remaining = false;
     let mut active_pattern_ends = Vec::<u32>::new();
     // One semantic-node walk plans every destructuring shape against a shared
     // temporary-name set.
@@ -189,19 +188,12 @@ pub(super) fn prepare_ast(
         {
             active_pattern_ends.pop();
         }
-        let nested = active_pattern_ends
-            .last()
-            .is_some_and(|end| node_span.end <= *end);
         match node.kind() {
             AstKind::VariableDeclarator(declarator) => {
                 let selected_pattern = !declarator.id.is_binding_identifier()
                     && (!only_object_rest || binding_has_object_rest(&declarator.id));
                 if selected_pattern {
                     active_pattern_ends.push(declarator.id.span().end);
-                }
-                if nested {
-                    nested_remaining = true;
-                    continue;
                 }
                 if !ast_eligible_declarator(semantic.nodes(), node_id, declarator)
                     || (only_object_rest && !binding_has_object_rest(&declarator.id))
@@ -228,11 +220,13 @@ pub(super) fn prepare_ast(
                 let reservation_checkpoint = reserved.checkpoint();
                 plan_binding_names(&declarator.id, &mut reserved, &mut helper_usage);
                 declarations
-                    .entry(declarator.span.start)
+                    .entry((
+                        declarator.span.start,
+                        binding_pattern_fingerprint(&declarator.id),
+                    ))
                     .or_default()
-                    .push(AstDeclaratorPlan {
+                    .push_back(AstDeclaratorPlan {
                         root,
-                        pattern: binding_pattern_fingerprint(&declarator.id),
                         anchor: declarator.span,
                         reservation_checkpoint,
                     });
@@ -245,10 +239,6 @@ pub(super) fn prepare_ast(
                     && (!only_object_rest || binding_has_object_rest(&param.pattern));
                 if selected_pattern {
                     active_pattern_ends.push(param.pattern.span().end);
-                }
-                if nested {
-                    nested_remaining = true;
-                    continue;
                 }
                 if param.pattern.is_binding_identifier()
                     || (only_object_rest && !binding_has_object_rest(&param.pattern))
@@ -272,10 +262,6 @@ pub(super) fn prepare_ast(
                     && (!only_object_rest || assignment_has_object_rest(&assignment.left));
                 if selected_pattern {
                     active_pattern_ends.push(assignment.left.span().end);
-                }
-                if nested {
-                    nested_remaining = true;
-                    continue;
                 }
                 if !assignment.left.is_assignment_target_pattern()
                     || (only_object_rest && !assignment_has_object_rest(&assignment.left))
@@ -517,21 +503,9 @@ pub(super) fn prepare_ast(
         temporary_declarations,
         helper_requests,
         helper_names,
-        emitted_helper_names,
-        nested_remaining,
         base_reserved: reserved.base,
         planned_allocations,
     })
-}
-
-impl AstPlan {
-    pub(super) fn nested_remaining(&self) -> bool {
-        self.nested_remaining
-    }
-
-    pub(super) fn emitted_helper_names(&self) -> &[String] {
-        &self.emitted_helper_names
-    }
 }
 
 pub(super) fn run_ast<'a>(
@@ -561,7 +535,7 @@ pub(super) fn run_ast<'a>(
 
 struct DestructuringDeclaratorLowerer<'a> {
     allocator: &'a Allocator,
-    declarations: FxHashMap<u32, Vec<AstDeclaratorPlan>>,
+    declarations: FxHashMap<(u32, String), VecDeque<AstDeclaratorPlan>>,
     catches: FxHashMap<u32, AstCatchPlan>,
     assignments: FxHashMap<u32, AstAssignmentPlan>,
     for_of_assignments: FxHashMap<u32, AstAssignmentPlan>,
@@ -1030,18 +1004,17 @@ impl<'a> VisitMut<'a> for DestructuringDeclaratorLowerer<'a> {
                 continue;
             }
             let start = declaration.declarations[index].span.start;
-            let Some(plans) = self.declarations.get_mut(&start) else {
+            let pattern = binding_pattern_fingerprint(&declaration.declarations[index].id);
+            let key = (start, pattern);
+            let Some(plans) = self.declarations.get_mut(&key) else {
                 index += 1;
                 continue;
             };
-            let pattern = binding_pattern_fingerprint(&declaration.declarations[index].id);
-            let Some(position) = plans.iter().position(|plan| plan.pattern == pattern) else {
-                self.error = Some("destructuring-declarator-plan-mismatch");
-                return;
-            };
-            let plan = plans.remove(position);
+            let plan = plans
+                .pop_front()
+                .expect("nonempty destructuring plan bucket");
             if plans.is_empty() {
-                self.declarations.remove(&start);
+                self.declarations.remove(&key);
             }
             let ast = self.ast();
             let old = declaration.declarations[index].take_in(&ast);
@@ -1143,17 +1116,16 @@ impl<'a> VisitMut<'a> for DestructuringDeclaratorLowerer<'a> {
 
         let start = declarator.span.start;
         let pattern = binding_pattern_fingerprint(&declarator.id);
-        let Some(plans) = self.declarations.get_mut(&start) else {
+        let key = (start, pattern);
+        let Some(plans) = self.declarations.get_mut(&key) else {
             walk_mut::walk_for_of_statement(self, statement);
             return;
         };
-        let Some(position) = plans.iter().position(|plan| plan.pattern == pattern) else {
-            self.error = Some("destructuring-declarator-plan-mismatch");
-            return;
-        };
-        let plan = plans.remove(position);
+        let plan = plans
+            .pop_front()
+            .expect("nonempty destructuring plan bucket");
         if plans.is_empty() {
-            self.declarations.remove(&start);
+            self.declarations.remove(&key);
         }
 
         let ast = self.ast();

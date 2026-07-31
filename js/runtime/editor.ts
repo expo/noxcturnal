@@ -55,9 +55,12 @@ export function createEditor(
       edits.push({ kind: 'Move', start, end, destination, owner, order: nextOrder() });
     },
     reset(start, end) {
-      for (let index = edits.length - 1; index >= 0; index--)
-        if (edits[index].owner === owner && edits[index].start >= start && edits[index].end <= end)
-          edits.splice(index, 1);
+      let write = 0;
+      for (const edit of edits) {
+        if (edit.owner === owner && edit.start >= start && edit.end <= end) continue;
+        edits[write++] = edit;
+      }
+      edits.length = write;
     },
     indent(prefix = '  ') {
       push(

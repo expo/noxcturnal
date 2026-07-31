@@ -91,3 +91,49 @@ for (const size of [16, 256, 4_096]) {
     { regexpDotAll: true, regexpNamedCaptureGroups: true },
   );
 }
+
+for (const width of [0xffff, 0x10ffff]) {
+  verifiedBench(
+    `regexp Unicode ignore-case range width: U+0..${width.toString(16)}`,
+    String.raw`export const matcher=/[\u{0}-\u{${width.toString(16)}}]/ui;`,
+    { regexpUnicode: true },
+  );
+}
+
+for (const start of [0x10000, 0x80000]) {
+  verifiedBench(
+    `regexp sparse Unicode ignore-case range: U+${start.toString(16)}..U+10ffff`,
+    String.raw`export const matcher=/[\u{${start.toString(16)}}-\u{10ffff}]/ui;`,
+    { regexpUnicode: true },
+  );
+}
+
+for (const count of [32, 256, 1_024]) {
+  const groups = Array.from({ length: count }, (_, index) => `(?<g${index}>a)`).join('');
+  const references = Array.from({ length: count }, (_, index) => `\\k<g${index}>`).join('');
+  verifiedBench(
+    `regexp structural-edit scaling: ${count}`,
+    `const matcher=/${groups}${references}/;`,
+    {
+      regexpNamedCaptureGroups: true,
+    },
+  );
+
+  const operations = Array.from({ length: count }, () => '--[b]').join('');
+  verifiedBench(
+    `regexp flat Unicode-set operation scaling: ${count}`,
+    `const matcher=/[[a-z]${operations}]/v;`,
+    { regexpUnicodeSets: true },
+  );
+}
+
+for (const count of [32, 256, 1_024]) {
+  const collisions = Array.from({ length: count }, (_, index) => `let _wrapRegExp${index + 2};`)
+    .concat('let _wrapRegExp;')
+    .join('');
+  verifiedBench(
+    `regexp helper-name collision scaling: ${count}`,
+    `${collisions}const matcher=/(?<value>a)/;`,
+    { regexpNamedCaptureGroups: true },
+  );
+}

@@ -138,7 +138,39 @@ function unicodeIgnoreCaseMappings() {
           `        0x${row.codePoint.toString(16).toUpperCase()} => Some(${JSON.stringify(row[key])}),`,
       )
       .join('\n');
-  return `pub(crate) fn unicode_ignore_case_atom(code_point: u32) -> Option<&'static str> {
+  const entries = key =>
+    rows
+      .filter(row => row[key] !== undefined)
+      .map(
+        row => `    (0x${row.codePoint.toString(16).toUpperCase()}, ${JSON.stringify(row[key])}),`,
+      )
+      .join('\n');
+  return `const UNICODE_IGNORE_CASE_BMP_CLASS_ADDITIONS: &[(u32, &str)] = &[
+${entries('classAddition')}
+];
+
+const UNICODE_IGNORE_CASE_ASTRAL_CLASS_ADDITIONS: &[(u32, &str)] = &[
+${entries('astralClassAddition')}
+];
+
+pub(crate) fn append_unicode_ignore_case_class_additions(
+    lower: u32,
+    upper: u32,
+    output: &mut String,
+) {
+    for entries in [
+        UNICODE_IGNORE_CASE_BMP_CLASS_ADDITIONS,
+        UNICODE_IGNORE_CASE_ASTRAL_CLASS_ADDITIONS,
+    ] {
+        let start = entries.partition_point(|(code_point, _)| *code_point < lower);
+        let end = entries.partition_point(|(code_point, _)| *code_point <= upper);
+        for (_, addition) in &entries[start..end] {
+            output.push_str(addition);
+        }
+    }
+}
+
+pub(crate) fn unicode_ignore_case_atom(code_point: u32) -> Option<&'static str> {
     match code_point {
 ${arms('atom')}
         _ => None,
@@ -146,10 +178,10 @@ ${arms('atom')}
 }
 
 pub(crate) fn unicode_ignore_case_bmp_class_addition(code_point: u32) -> Option<&'static str> {
-    match code_point {
-${arms('classAddition')}
-        _ => None,
-    }
+    UNICODE_IGNORE_CASE_BMP_CLASS_ADDITIONS
+        .binary_search_by_key(&code_point, |(key, _)| *key)
+        .ok()
+        .map(|index| UNICODE_IGNORE_CASE_BMP_CLASS_ADDITIONS[index].1)
 }
 
 pub(crate) fn unicode_ignore_case_bmp_class_body(code_point: u32) -> Option<&'static str> {
@@ -160,10 +192,10 @@ ${arms('classBody')}
 }
 
 pub(crate) fn unicode_ignore_case_astral_class_addition(code_point: u32) -> Option<&'static str> {
-    match code_point {
-${arms('astralClassAddition')}
-        _ => None,
-    }
+    UNICODE_IGNORE_CASE_ASTRAL_CLASS_ADDITIONS
+        .binary_search_by_key(&code_point, |(key, _)| *key)
+        .ok()
+        .map(|index| UNICODE_IGNORE_CASE_ASTRAL_CLASS_ADDITIONS[index].1)
 }`;
 }
 

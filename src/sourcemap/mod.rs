@@ -289,13 +289,28 @@ fn intern(names: &mut Vec<Rc<str>>, name_ids: &mut FxHashMap<Rc<str>, i64>, name
 }
 
 /// Line/column (UTF-16 columns) of a byte offset, for repositioning inside copies.
-fn position_at(source: &str, line_starts: &[usize], offset: usize) -> (i64, i64) {
+fn position_at(
+    source: &str,
+    line_starts: &[usize],
+    utf16_offsets: &mut Option<Vec<usize>>,
+    offset: usize,
+) -> (i64, i64) {
     let line = line_starts.partition_point(|start| *start <= offset) - 1;
-    let text = &source[line_starts[line]..offset];
-    let column = if text.is_ascii() {
-        text.len() as i64
+    let line_start = line_starts[line];
+    let column = if source.is_ascii() {
+        (offset - line_start) as i64
     } else {
-        text.chars().map(|ch| ch.len_utf16() as i64).sum()
+        let offsets = utf16_offsets.get_or_insert_with(|| {
+            let mut offsets = Vec::with_capacity(source.len() + 1);
+            let mut utf16 = 0;
+            for character in source.chars() {
+                offsets.extend(std::iter::repeat_n(utf16, character.len_utf8()));
+                utf16 += character.len_utf16();
+            }
+            offsets.push(utf16);
+            offsets
+        });
+        (offsets[offset] - offsets[line_start]) as i64
     };
     (line as i64, column)
 }
@@ -306,6 +321,7 @@ fn position_at(source: &str, line_starts: &[usize], offset: usize) -> (i64, i64)
 fn reposition<S: SegmentSink>(
     map: &mut StreamingMap<S>,
     line_starts: &mut Option<Vec<usize>>,
+    utf16_offsets: &mut Option<Vec<usize>>,
     source: &str,
     target: usize,
 ) {
@@ -320,7 +336,7 @@ fn reposition<S: SegmentSink>(
         );
         starts
     });
-    let (line, column) = position_at(source, starts, target);
+    let (line, column) = position_at(source, starts, utf16_offsets, target);
     map.original_line = line;
     map.original_column = column;
 }
@@ -336,6 +352,8 @@ struct Renderer<'a, S: SegmentSink> {
     /// Line index over the source, built lazily on the first repositioning:
     /// relocated pieces (copies) move the original cursor to arbitrary offsets.
     line_starts: Option<Vec<usize>>,
+    /// UTF-16 position at every byte boundary, built lazily for non-ASCII input.
+    utf16_offsets: Option<Vec<usize>>,
     /// Byte offset the map's (original_line, original_column) currently corresponds
     /// to. In-place pieces keep it advancing monotonically; a mismatch means the
     /// previous piece came from elsewhere and the position must be re-derived.
@@ -344,7 +362,13 @@ struct Renderer<'a, S: SegmentSink> {
 
 impl<S: SegmentSink> Renderer<'_, S> {
     fn reposition(&mut self, target: usize) {
-        reposition(&mut self.map, &mut self.line_starts, self.source, target);
+        reposition(
+            &mut self.map,
+            &mut self.line_starts,
+            &mut self.utf16_offsets,
+            self.source,
+            target,
+        );
     }
 
     fn pieces(&mut self, pieces: &[Piece]) {
@@ -433,6 +457,7 @@ fn render_into<'a, S: SegmentSink>(
         names: Vec::new(),
         name_ids: FxHashMap::default(),
         line_starts: None,
+        utf16_offsets: None,
         cursor: 0,
     };
     renderer.pieces(pieces);

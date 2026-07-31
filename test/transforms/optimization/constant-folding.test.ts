@@ -85,6 +85,20 @@ if (value) branch();
   `);
 });
 
+test('scales through long constant-string and failed-expression chains', async () => {
+  const count = 1_024;
+  const strings = Array.from({ length: count }, () => "'x'").join('+');
+  const unknown = Array.from({ length: count }, () => 'value').join('+');
+  const output = await transformSource(
+    `export const text=${strings}; export const untouched=${unknown};`,
+    'input.js',
+    options,
+  );
+  expect(output).toContain(`'${'x'.repeat(count)}'`);
+  expect(output).toContain('export const untouched =');
+  expect(output.match(/\bvalue\b/g)).toHaveLength(count);
+});
+
 test('folds every supported numeric binary operator', async () => {
   const source = `
 export const remainder = 7 % 4;

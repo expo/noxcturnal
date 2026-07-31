@@ -106,6 +106,9 @@ pub(crate) fn constant_for_kind(kind: AstKind<'_>) -> Option<EvaluatedConstant> 
         AstKind::StringLiteral(value) => Some(EvaluatedConstant::String(value.value.to_string())),
         AstKind::UnaryExpression(value) => evaluate_expression(&value.argument)
             .and_then(|argument| evaluate_unary(value.operator, argument)),
+        AstKind::BinaryExpression(value) if value.operator == BinaryOperator::Addition => {
+            evaluate_addition(&value.left, &value.right)
+        }
         AstKind::BinaryExpression(value) => evaluate_binary(
             value.operator,
             evaluate_expression(&value.left)?,
@@ -137,6 +140,9 @@ pub(crate) fn evaluate_expression(expression: &Expression<'_>) -> Option<Evaluat
         }
         Expression::UnaryExpression(value) => evaluate_expression(&value.argument)
             .and_then(|argument| evaluate_unary(value.operator, argument)),
+        Expression::BinaryExpression(value) if value.operator == BinaryOperator::Addition => {
+            evaluate_addition(&value.left, &value.right)
+        }
         Expression::BinaryExpression(value) => evaluate_binary(
             value.operator,
             evaluate_expression(&value.left)?,
@@ -159,6 +165,88 @@ pub(crate) fn evaluate_expression(expression: &Expression<'_>) -> Option<Evaluat
         Expression::TSTypeAssertion(value) => evaluate_expression(&value.expression),
         Expression::TSNonNullExpression(value) => evaluate_expression(&value.expression),
         _ => None,
+    }
+}
+
+enum AdditionValue {
+    Scalar(EvaluatedConstant),
+    String(StringRope),
+}
+
+enum StringRope {
+    Leaf(String),
+    Concat(Box<Self>, Box<Self>, usize),
+}
+
+impl StringRope {
+    fn len(&self) -> usize {
+        match self {
+            Self::Leaf(value) => value.len(),
+            Self::Concat(_, _, len) => *len,
+        }
+    }
+
+    fn append_to(self, output: &mut String) {
+        match self {
+            Self::Leaf(value) => output.push_str(&value),
+            Self::Concat(left, right, _) => {
+                left.append_to(output);
+                right.append_to(output);
+            }
+        }
+    }
+
+    fn into_string(self) -> String {
+        let mut output = String::with_capacity(self.len());
+        self.append_to(&mut output);
+        output
+    }
+}
+
+fn addition_value(expression: &Expression<'_>) -> Option<AdditionValue> {
+    if let Expression::BinaryExpression(binary) = expression
+        && binary.operator == BinaryOperator::Addition
+    {
+        return addition_values(
+            addition_value(&binary.left)?,
+            addition_value(&binary.right)?,
+        );
+    }
+    Some(AdditionValue::Scalar(evaluate_expression(expression)?))
+}
+
+fn string_rope(value: AdditionValue) -> Option<StringRope> {
+    match value {
+        AdditionValue::String(value) => Some(value),
+        AdditionValue::Scalar(value) => Some(StringRope::Leaf(constant_string(&value)?)),
+    }
+}
+
+fn addition_values(left: AdditionValue, right: AdditionValue) -> Option<AdditionValue> {
+    let string_addition = matches!(left, AdditionValue::String(_))
+        || matches!(right, AdditionValue::String(_))
+        || matches!(left, AdditionValue::Scalar(EvaluatedConstant::String(_)))
+        || matches!(right, AdditionValue::Scalar(EvaluatedConstant::String(_)));
+    if string_addition {
+        let left = string_rope(left)?;
+        let right = string_rope(right)?;
+        let len = left.len().checked_add(right.len())?;
+        return Some(AdditionValue::String(StringRope::Concat(
+            Box::new(left),
+            Box::new(right),
+            len,
+        )));
+    }
+    let (AdditionValue::Scalar(left), AdditionValue::Scalar(right)) = (left, right) else {
+        unreachable!();
+    };
+    evaluate_binary(BinaryOperator::Addition, left, right).map(AdditionValue::Scalar)
+}
+
+fn evaluate_addition(left: &Expression<'_>, right: &Expression<'_>) -> Option<EvaluatedConstant> {
+    match addition_values(addition_value(left)?, addition_value(right)?)? {
+        AdditionValue::Scalar(value) => Some(value),
+        AdditionValue::String(value) => Some(EvaluatedConstant::String(value.into_string())),
     }
 }
 

@@ -7,6 +7,10 @@ import {
   type NativeTransformName,
 } from '../preflight/__tests__/native-transform-fixtures';
 import { generateLargeFileSource } from './large-file-corpus';
+import { createEditor } from '../runtime/editor';
+import { codeFactory, makeSourceFragment, realizeContent } from '../runtime/fragments';
+import { NativeTransformSession } from '../runtime/session';
+import type { EditCommand, NativeEvent } from '../types';
 
 function benchmarkTransform(...args: Parameters<typeof transform>) {
   const result = transform(...args);
@@ -76,6 +80,7 @@ const legacySyntaxPipeline = defineNativePipeline({
           classProperties: { loose: true },
           classStaticBlock: true,
         },
+        helpers: { mode: 'inline' },
         comments: false,
       },
     },
@@ -927,3 +932,188 @@ verifiedBench('650 KiB, 3 changed text phases: fused', () => {
 verifiedBench('650 KiB, 3 changed text phases: rendered', () => {
   benchmarkTransform(largeChangedSource, 'generated.js', largeRenderedPhases);
 });
+
+for (const count of [64, 512, 2_048]) {
+  const exports = Array.from(
+    { length: count },
+    (_, index) => `export * as ns${index} from "module-${index}" with { type: "json" };`,
+  ).join('\n');
+  verifiedBench(`export namespace attribute restoration scaling: ${count}`, () => {
+    benchmarkTransform(exports, 'exports.js', legacySyntaxPipeline);
+  });
+
+  const shadowed = `${'{let value;'.repeat(count)}sink(value);${'}'.repeat(count)}`;
+  verifiedBench(`block-scope depth scaling: ${count}`, () => {
+    benchmarkTransform(shadowed, 'blocks.js', legacySyntaxPipeline);
+  });
+
+  const arrows = `${Array.from({ length: count }, () => '(value=0)=>').join('')}this.value`;
+  verifiedBench(`parameter lexical-capture depth scaling: ${count}`, () => {
+    benchmarkTransform(`const value=${arrows};`, 'parameters.js', legacySyntaxPipeline);
+  });
+
+  const deepestReferences = Array.from({ length: count }, () => 'this.value').join('+');
+  const referenceArrows = `${Array.from({ length: 64 }, () => '(value=0)=>').join('')}${deepestReferences}`;
+  verifiedBench(`parameter deepest lexical-reference scaling: ${count}`, () => {
+    benchmarkTransform(`const value=${referenceArrows};`, 'parameters.js', legacySyntaxPipeline);
+  });
+}
+
+for (const depth of [16, 64, 256]) {
+  const pattern = `${'{a:'.repeat(depth)}value=0${'}'.repeat(depth)}`;
+  const fallback = `${'{a:'.repeat(depth)}0${'}'.repeat(depth)}`;
+  const nestedDestructuring = `const read=(${pattern}=${fallback})=>value;sink(read);`;
+  verifiedBench(`destructuring nesting-depth scaling: ${depth}`, () => {
+    benchmarkTransform(nestedDestructuring, 'destructuring.js', legacySyntaxPipeline);
+  });
+}
+
+for (const count of [64, 512, 2_048]) {
+  const syntheticBindings = Array.from(
+    { length: count },
+    (_, index) => `p${index}:value${index}=${index}`,
+  ).join(',');
+  const syntheticInteractions =
+    `function read({${syntheticBindings}}={}){return value0}` + 'sink(read);';
+  verifiedBench(`synthetic-span plan-bucket interaction scaling: ${count}`, () => {
+    benchmarkTransform(syntheticInteractions, 'synthetic-plans.js', legacySyntaxPipeline);
+  });
+}
+
+for (const count of [1_000, 10_000]) {
+  verifiedBench(`editor reset compaction scaling: ${count}`, () => {
+    const edits: EditCommand[] = [];
+    let order = 0;
+    const editorSession = { source: 'x'.repeat(count), commit: () => ({ code: '' }) };
+    const resetEditor = createEditor(editorSession, edits, 'reset', () => order++);
+    const retainedEditor = createEditor(editorSession, edits, 'retained', () => order++);
+    for (let index = 0; index < count; index++) {
+      resetEditor.appendLeft(index, 'x');
+      retainedEditor.appendLeft(index, 'y');
+    }
+    resetEditor.reset(0, count);
+    return edits.length;
+  });
+
+  const parts = Object.assign(
+    Array.from({ length: count + 1 }, () => 'x'),
+    { raw: [] },
+  ) as unknown as TemplateStringsArray;
+  const values = Array.from({ length: count }, () => 'y');
+  verifiedBench(
+    `code template assembly scaling: ${count}`,
+    () => codeFactory.template(parts, ...values).code.length,
+  );
+
+  const fragmentSession = new NativeTransformSession('x', 'fragment.js');
+  const sourceFragment = makeSourceFragment(fragmentSession, 0, 1);
+  const composite = {
+    kind: 'composite' as const,
+    parts: Array.from({ length: count }, () => ['left', sourceFragment, 'right']).flat(),
+  };
+  verifiedBench(`provenance composite assembly scaling: ${count}`, () => {
+    const realized = realizeContent(fragmentSession, composite);
+    return realized.contentParts?.length;
+  });
+}
+
+for (const count of [16, 128, 512]) {
+  const phases = Array.from({ length: count }, (_, index) => ({
+    name: `retained-${index}`,
+    plugins: [
+      defineNativePlugin({
+        name: `retained-plugin-${index}`,
+        visitors: [defineVisitor('Identifier', {}, () => {})],
+      }),
+    ],
+  }));
+  const retainedPipeline = defineNativePipeline({ phases });
+  verifiedBench(`retained phase suffix scaling: ${count}`, () => {
+    benchmarkTransform('const value = input;', 'retained.js', retainedPipeline);
+  });
+}
+
+for (const count of [256, 2_048]) {
+  const nonAsciiFunctions = `const prefix='${'é'.repeat(count)}';${Array.from(
+    { length: count },
+    (_, index) => `function f${index}(){return ${index}}`,
+  ).join('')}`;
+  verifiedBench(`non-ASCII source-map copy reposition scaling: ${count}`, () => {
+    benchmarkTransform(nonAsciiFunctions, 'non-ascii.js', copyHeavyPipeline, {
+      sourceMapMode: 'boundary',
+    });
+  });
+
+  const properties = Array.from({ length: count }, (_, index) => `p${index}: const v${index}`).join(
+    ',',
+  );
+  const flowMatch = `// @flow\nconst result = match (input) { {${properties}} => 1, _ => 0 };`;
+  verifiedBench(`Flow match duplicate-set scaling: ${count}`, () => {
+    benchmarkTransform(flowMatch, 'match.js', visitorPipeline);
+  });
+}
+
+for (const depth of [32, 128, 256]) {
+  const nestedObjectFunction = `const value=${'{a:'.repeat(depth)}function named(){}${'}'.repeat(depth)};`;
+  verifiedBench(`function-map container depth scaling: ${depth}`, () => {
+    benchmarkTransform(nestedObjectFunction, 'function-map.js', visitorPipeline, {
+      functionMap: true,
+    });
+  });
+}
+
+for (const count of [256, 2_048]) {
+  verifiedBench(`retained repeated high-fanout child cache scaling: ${count}`, () => {
+    const session = new NativeTransformSession('', 'children.js');
+    session.seedRetainedChildTypes(['Program']);
+    const event = (id: number, parentId?: number): NativeEvent => ({
+      sequence: id,
+      side: 'enter',
+      id,
+      type: parentId == null ? 'Program' : 'ExpressionStatement',
+      start: 0,
+      end: 0,
+      parentId,
+      parentType: parentId == null ? undefined : 'Program',
+      scopeId: 0,
+      fields: [],
+    });
+    session.cacheEvent(event(0));
+    for (let batch = 0; batch < 4; batch++)
+      for (let id = 1; id <= count; id++) session.cacheEvent(event(id, 0));
+    session.close();
+  });
+}
+
+const uidPrefixes = Array.from({ length: 1 << 12 }, (_, value) => {
+  const prefix = Array.from({ length: 12 }, (_, bit) => (value & (1 << bit) ? '$' : '_')).join('');
+  return `let ${prefix}value;`;
+}).join('');
+const uidFallbackPipeline = defineNativePipeline({
+  phases: [
+    {
+      name: 'uid-fallback',
+      plugins: [
+        defineNativePlugin({
+          name: 'uid-fallback-plugin',
+          visitors: [
+            defineVisitor('Program', { scope: true }, path => void path.scope.generateUid('value')),
+          ],
+        }),
+      ],
+    },
+  ],
+});
+for (const maximumPrefix of [16, 64, 256]) {
+  const sourceWithLongPrefix = `${uidPrefixes}let ${'_'.repeat(maximumPrefix)}value;`;
+  verifiedBench(`UID prefix saturated-table fallback depth: ${maximumPrefix}`, () => {
+    benchmarkTransform(sourceWithLongPrefix, 'uids.js', uidFallbackPipeline);
+  });
+}
+
+for (const phaseCount of [8, 32]) {
+  const pipeline = changedPhasePipeline(phaseCount, false);
+  verifiedBench(`packed source-map name-chain scaling: ${phaseCount}`, () => {
+    benchmarkTransform(source, 'map-chain.js', pipeline, { sourceMapMode: 'boundary' });
+  });
+}

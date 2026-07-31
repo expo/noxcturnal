@@ -1,3 +1,4 @@
+use std::collections::VecDeque;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
@@ -28,6 +29,7 @@ use oxc_transformer::{
     CompilerAssumptions, HelperLoaderMode, JsxOptions, JsxRuntime, ReactRefreshOptions,
     TransformOptions, Transformer,
 };
+use rustc_hash::FxHashMap;
 use self_cell::self_cell;
 
 use crate::sourcemap::{DecodedLayer, compose_decoded_layers, pack_decoded_layer};
@@ -74,37 +76,48 @@ fn restore_export_namespace_attributes<'a>(
     program: &mut Program<'a>,
     attributes: &mut [ExportNamespaceAttribute<'a>],
 ) {
+    let mut pending = FxHashMap::<String, FxHashMap<String, VecDeque<_>>>::default();
     for attribute in attributes {
-        for index in 0..program.body.len().saturating_sub(1) {
-            let (before, after) = program.body.split_at_mut(index + 1);
-            let Statement::ImportDeclaration(import) = &mut before[index] else {
-                continue;
-            };
-            if import.source.value != attribute.source || import.with_clause.is_some() {
-                continue;
-            }
-            let Some(import_specifiers) = import.specifiers.as_ref() else {
-                continue;
-            };
-            let [ImportDeclarationSpecifier::ImportNamespaceSpecifier(namespace)] =
-                import_specifiers.as_slice()
-            else {
-                continue;
-            };
-            let Statement::ExportNamedDeclaration(export) = &after[0] else {
-                continue;
-            };
-            let [specifier] = export.specifiers.as_slice() else {
-                continue;
-            };
-            if specifier.local.name() != namespace.local.name
-                || specifier.exported.name() != attribute.exported
-            {
-                continue;
-            }
-            import.with_clause = attribute.with_clause.take();
-            break;
+        pending
+            .entry(std::mem::take(&mut attribute.source))
+            .or_default()
+            .entry(std::mem::take(&mut attribute.exported))
+            .or_default()
+            .push_back(attribute.with_clause.take());
+    }
+    for index in 0..program.body.len().saturating_sub(1) {
+        let (before, after) = program.body.split_at_mut(index + 1);
+        let Statement::ImportDeclaration(import) = &mut before[index] else {
+            continue;
+        };
+        if import.with_clause.is_some() {
+            continue;
         }
+        let Some(import_specifiers) = import.specifiers.as_ref() else {
+            continue;
+        };
+        let [ImportDeclarationSpecifier::ImportNamespaceSpecifier(namespace)] =
+            import_specifiers.as_slice()
+        else {
+            continue;
+        };
+        let Statement::ExportNamedDeclaration(export) = &after[0] else {
+            continue;
+        };
+        let [specifier] = export.specifiers.as_slice() else {
+            continue;
+        };
+        if specifier.local.name() != namespace.local.name {
+            continue;
+        }
+        let Some(with_clause) = pending
+            .get_mut(import.source.value.as_str())
+            .and_then(|exports| exports.get_mut(specifier.exported.name().as_str()))
+            .and_then(VecDeque::pop_front)
+        else {
+            continue;
+        };
+        import.with_clause = with_clause;
     }
 }
 
@@ -942,16 +955,7 @@ pub fn transform(
         let mut had_destructuring_ast_syntax = false;
         let mut destructuring_custom_helper_requests =
             super::helpers::CustomHelperRequests::default();
-        let mut destructuring_helper_names = classes_custom_helper_requests
-            .scope_names()
-            .map(str::to_owned)
-            .collect::<Vec<_>>();
-        for _ in 0..64 {
-            let Some(plan) = destructuring_ast_plan.take() else {
-                break;
-            };
-            let nested_remaining = plan.nested_remaining();
-            destructuring_helper_names.extend_from_slice(plan.emitted_helper_names());
+        if let Some(plan) = destructuring_ast_plan.take() {
             let (changed, requests) = {
                 ast_traversal_count += 1;
                 match super::destructuring::run_ast(allocator, &mut program, plan) {
@@ -959,47 +963,10 @@ pub fn transform(
                     Err(reason) => return Ok(unsupported(reason, [] as [String; 0])),
                 }
             };
-            if !changed {
-                break;
+            if changed {
+                had_destructuring_ast_syntax = true;
+                destructuring_custom_helper_requests.prepend(requests);
             }
-            had_destructuring_ast_syntax = true;
-            destructuring_custom_helper_requests.prepend(requests);
-            if !nested_remaining {
-                break;
-            }
-            semantic_build_count += 1;
-            ast_traversal_count += 1;
-            let semantic = run(|| {
-                SemanticBuilder::new()
-                    .with_build_nodes(true)
-                    .with_excess_capacity(2.0)
-                    .with_enum_eval(true)
-                    .build(&program)
-            });
-            if !semantic.diagnostics.is_empty() {
-                return Ok(unsupported(
-                    "pre-destructuring-semantic-error",
-                    semantic.diagnostics,
-                ));
-            }
-            destructuring_ast_plan = match super::destructuring::prepare_ast(
-                source,
-                &semantic.semantic,
-                options.helpers_mode.as_deref() == Some("inline"),
-                options.destructuring != Some(true),
-                object_rest_loose,
-                false,
-                &destructuring_helper_names,
-            ) {
-                Ok(plan) => Some(plan),
-                Err(reason) => return Ok(unsupported(reason, [] as [String; 0])),
-            };
-        }
-        if destructuring_ast_plan.is_some() {
-            return Ok(unsupported(
-                "destructuring-fixpoint-limit",
-                [] as [String; 0],
-            ));
         }
         if options.parameters == Some(true) {
             let mut parameters_postcondition = PostconditionDetector {
@@ -2366,7 +2333,7 @@ mod tests {
     }
 
     #[test]
-    fn nested_destructuring_completes_below_the_fixpoint_limit() {
+    fn nested_destructuring_completes_in_one_plan() {
         let result = transform(
             nested_destructuring(12),
             "fixture.js".into(),
@@ -2381,9 +2348,9 @@ mod tests {
     }
 
     #[test]
-    fn destructuring_fixpoint_limit_is_user_visible() {
+    fn deeply_nested_destructuring_has_no_fixpoint_limit() {
         let result = transform(
-            nested_destructuring(65),
+            nested_destructuring(128),
             "fixture.js".into(),
             NativePreflightOptions {
                 destructuring: Some(true),
@@ -2392,10 +2359,6 @@ mod tests {
             },
         )
         .unwrap();
-        assert_eq!(result.status, "unsupported");
-        assert_eq!(
-            result.reason.as_deref(),
-            Some("destructuring-fixpoint-limit")
-        );
+        assert_eq!(result.status, "complete", "{:?}", result.reason);
     }
 }

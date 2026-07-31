@@ -52,6 +52,7 @@ export class NativeTransformSession {
   #queryCache = new WeakMap<QueryRequest, QueryResult>();
   #globalReferencesCache = new Map<string, NodeSummary[]>();
   #childrenCache = new Map<number, number[]>();
+  #childIdsCache = new Map<number, Set<number>>();
   #prefetchedChildTypes = new Set<string>();
   #native: NativeIndexedSessionBinding | null = null;
   #nativeFilename: string;
@@ -125,18 +126,18 @@ export class NativeTransformSession {
       this.#eventCache[event.id] = event;
       if (event.parentId != null) {
         const parent = this.#eventCache[event.parentId];
-        if (
-          parent &&
-          [...this.#prefetchedChildTypes].some(
-            type => type === parent.type || alias(type, parent.type),
-          )
-        ) {
+        if (parent && this.#isPrefetchedChildType(parent.type)) {
           let children = this.#childrenCache.get(event.parentId);
           if (children == null) {
             children = [];
             this.#childrenCache.set(event.parentId, children);
+            this.#childIdsCache.set(event.parentId, new Set());
           }
-          if (!children.includes(event.id)) children.push(event.id);
+          const childIds = this.#childIdsCache.get(event.parentId)!;
+          if (!childIds.has(event.id)) {
+            childIds.add(event.id);
+            children.push(event.id);
+          }
         }
       }
     }
@@ -145,6 +146,11 @@ export class NativeTransformSession {
    * envelope, avoiding a synchronous native prefetch on structural access. */
   seedRetainedChildTypes(types: readonly string[]): void {
     for (const type of types) this.#prefetchedChildTypes.add(type);
+  }
+  #isPrefetchedChildType(parentType: string): boolean {
+    for (const type of this.#prefetchedChildTypes)
+      if (type === parentType || alias(type, parentType)) return true;
+    return false;
   }
   /** Pre-size the event cache to the parse's node count: scattered id stores into a
    * short array degrade to dictionary elements in V8; a packed array stays fast. */
@@ -298,12 +304,10 @@ export class NativeTransformSession {
     const cached = this.#childrenCache.get(parentId);
     if (cached) return cached.flatMap(nodeId => this.event(nodeId) ?? []);
     const parent = this.event(parentId);
-    if (
-      parent &&
-      [...this.#prefetchedChildTypes].some(type => type === parent.type || alias(type, parent.type))
-    ) {
+    if (parent && this.#isPrefetchedChildType(parent.type)) {
       const empty: number[] = [];
       this.#childrenCache.set(parentId, empty);
+      this.#childIdsCache.set(parentId, new Set());
       return [];
     }
     this.prefetchChildren([parentId]);
@@ -352,15 +356,23 @@ export class NativeTransformSession {
         this.#binding('children.prefetch').childrenPackedBuffer(missing, fallbackTypes, typeIds),
       ),
     );
-    for (const parentId of missing) this.#childrenCache.set(parentId, []);
+    for (const parentId of missing) {
+      this.#childrenCache.set(parentId, []);
+      this.#childIdsCache.set(parentId, new Set());
+    }
     for (const event of batch.events) {
       this.#eventCache[event.id] = event;
       let children = this.#childrenCache.get(event.parentId!);
       if (!children) {
         children = [];
         this.#childrenCache.set(event.parentId!, children);
+        this.#childIdsCache.set(event.parentId!, new Set());
       }
-      children.push(event.id);
+      const childIds = this.#childIdsCache.get(event.parentId!)!;
+      if (!childIds.has(event.id)) {
+        childIds.add(event.id);
+        children.push(event.id);
+      }
     }
     for (const type of missingTypes) this.#prefetchedChildTypes.add(type);
     if (

@@ -29,12 +29,13 @@ use crate::generated::inline_helpers::{
     INLINE_REGEXP_NAMED_CAPTURE_HELPER_RUNTIME_PRETTY,
 };
 use crate::generated::regexp_unicode_properties::{
-    UNICODE_STRING_PROPERTIES, unicode_ignore_case_astral_class_addition, unicode_ignore_case_atom,
+    UNICODE_STRING_PROPERTIES, append_unicode_ignore_case_class_additions,
+    unicode_ignore_case_astral_class_addition, unicode_ignore_case_atom,
     unicode_ignore_case_bmp_class_addition, unicode_ignore_case_bmp_class_body,
     unicode_property_supplemental_ranges, unicode_string_property_members,
     unicode_string_property_pattern,
 };
-use crate::preflight::helpers::CustomHelperRequests;
+use crate::preflight::helpers::{CustomHelperRequests, SourceNameReservations};
 
 pub(super) struct Options {
     pub(super) unicode: bool,
@@ -51,8 +52,9 @@ pub(super) fn run<'a>(
     source: &str,
     options: Options,
 ) -> Result<(bool, CustomHelperRequests), &'static str> {
-    let named_helper = reserve_source_name("_wrapRegExp", source);
-    let named_runtime = reserve_source_name("_wrapRegExp2", source);
+    let mut source_names = SourceNameReservations::new(source);
+    let named_helper = source_names.reserve("_wrapRegExp");
+    let named_runtime = source_names.reserve("_wrapRegExp2");
     let mut pass = RegexpLowerer {
         ast: AstBuilder::new(allocator),
         unicode: options.unicode,
@@ -395,17 +397,7 @@ fn expand_unicode_ignore_case_classes(pattern: &str) -> Result<String, &'static 
                 if let (ClassAtom::Single(lower), ClassAtom::Single(upper)) = (lower, upper)
                     && lower <= upper
                 {
-                    for code_point in lower..=upper {
-                        if let Some(expansion) = unicode_ignore_case_bmp_class_addition(code_point)
-                        {
-                            additions.push_str(expansion);
-                        }
-                        if let Some(expansion) =
-                            unicode_ignore_case_astral_class_addition(code_point)
-                        {
-                            additions.push_str(expansion);
-                        }
-                    }
+                    append_unicode_ignore_case_class_additions(lower, upper, &mut additions);
                 }
                 cursor = after;
             } else {
@@ -521,19 +513,6 @@ impl<'a> VisitMut<'a> for RegexpLowerer<'a> {
             Err(error) => self.error = Some(error),
         }
     }
-}
-
-fn reserve_source_name(base: &str, source: &str) -> String {
-    if !source.contains(base) {
-        return base.to_owned();
-    }
-    for suffix in 2.. {
-        let candidate = format!("{base}{suffix}");
-        if !source.contains(&candidate) {
-            return candidate;
-        }
-    }
-    unreachable!()
 }
 
 fn parse_class_ranges(body: &str) -> Result<Vec<(u32, u32)>, &'static str> {
@@ -877,7 +856,7 @@ fn unicode_set_class_end(pattern: &str, start: usize) -> Option<usize> {
 }
 
 fn lower_unicode_set_class(body: &str) -> Result<String, &'static str> {
-    let Some((left, operator, right)) = split_unicode_set_operation(body) else {
+    let Some((first, operations)) = split_unicode_set_operations(body) else {
         if UNICODE_STRING_PROPERTIES
             .iter()
             .any(|property| body.contains(&format!("\\p{{{property}}}")))
@@ -889,13 +868,15 @@ fn lower_unicode_set_class(body: &str) -> Result<String, &'static str> {
         }
         return Ok(format!("[{body}]"));
     };
-    let left = unicode_set_operand_ranges(left)?;
-    let right = unicode_set_operand_ranges(right)?;
-    let ranges = if operator == "&&" {
-        intersect_ranges(&left, &right)
-    } else {
-        subtract_ranges(&left, &right)
-    };
+    let mut ranges = unicode_set_operand_ranges(first)?;
+    for (operator, operand) in operations {
+        let right = unicode_set_operand_ranges(operand)?;
+        ranges = if operator == "&&" {
+            intersect_ranges(&ranges, &right)
+        } else {
+            subtract_ranges(&ranges, &right)
+        };
+    }
     Ok(render_ranges(&ranges, false))
 }
 
@@ -1060,11 +1041,13 @@ fn regexp_escape_end(source: &str, index: usize) -> usize {
     (index + width).min(source.len())
 }
 
-fn split_unicode_set_operation(body: &str) -> Option<(&str, &str, &str)> {
+fn split_unicode_set_operations(body: &str) -> Option<(&str, Vec<(&str, &str)>)> {
     let bytes = body.as_bytes();
     let mut depth = 0;
     let mut index = 0;
-    let mut operation = None;
+    let mut operand_start = 0;
+    let mut first = None;
+    let mut operations: Vec<(&str, &str)> = Vec::new();
     while index + 1 < bytes.len() {
         match bytes[index] {
             b'\\' => index += 2,
@@ -1077,17 +1060,29 @@ fn split_unicode_set_operation(body: &str) -> Option<(&str, &str, &str)> {
                 index += 1;
             }
             b'&' if depth == 0 && bytes[index + 1] == b'&' => {
-                operation = Some((&body[..index], "&&", &body[index + 2..]));
+                first.get_or_insert(&body[..index]);
+                if operand_start != 0 {
+                    operations.last_mut().unwrap().1 = &body[operand_start..index];
+                }
+                operations.push(("&&", ""));
+                operand_start = index + 2;
                 index += 2;
             }
             b'-' if depth == 0 && bytes[index + 1] == b'-' => {
-                operation = Some((&body[..index], "--", &body[index + 2..]));
+                first.get_or_insert(&body[..index]);
+                if operand_start != 0 {
+                    operations.last_mut().unwrap().1 = &body[operand_start..index];
+                }
+                operations.push(("--", ""));
+                operand_start = index + 2;
                 index += 2;
             }
             _ => index += 1,
         }
     }
-    operation
+    let first = first?;
+    operations.last_mut().unwrap().1 = &body[operand_start..];
+    Some((first, operations))
 }
 
 fn unicode_set_operand_ranges(operand: &str) -> Result<Vec<(u32, u32)>, &'static str> {
@@ -1103,14 +1098,17 @@ fn unicode_set_operand_ranges(operand: &str) -> Result<Vec<(u32, u32)>, &'static
     {
         return Err("regexp-unicode-sets-operation-invalid");
     }
-    if let Some((left, operator, right)) = split_unicode_set_operation(body) {
-        let left = unicode_set_operand_ranges(left)?;
-        let right = unicode_set_operand_ranges(right)?;
-        return Ok(if operator == "&&" {
-            intersect_ranges(&left, &right)
-        } else {
-            subtract_ranges(&left, &right)
-        });
+    if let Some((first, operations)) = split_unicode_set_operations(body) {
+        let mut ranges = unicode_set_operand_ranges(first)?;
+        for (operator, operand) in operations {
+            let right = unicode_set_operand_ranges(operand)?;
+            ranges = if operator == "&&" {
+                intersect_ranges(&ranges, &right)
+            } else {
+                subtract_ranges(&ranges, &right)
+            };
+        }
+        return Ok(ranges);
     }
     if let Some(positive) = body.strip_prefix('^') {
         Ok(complement_ranges(&parse_class_ranges(positive)?))
@@ -1736,14 +1734,19 @@ fn apply_pattern_edits(
     mut edits: Vec<PatternEdit>,
 ) -> Result<(), &'static str> {
     edits.sort_unstable_by_key(|(start, end, _)| (*start, *end));
-    let mut next_start = source.len();
-    for (start, end, replacement) in edits.into_iter().rev() {
-        if start > end || end > next_start {
+    let replacement_bytes = edits.iter().map(|(_, _, text)| text.len()).sum::<usize>();
+    let mut output = String::with_capacity(source.len().saturating_add(replacement_bytes));
+    let mut cursor = 0;
+    for (start, end, replacement) in edits {
+        if start < cursor || start > end || end > source.len() {
             return Err("regexp-pattern-edits-overlap");
         }
-        source.replace_range(start..end, &replacement);
-        next_start = start;
+        output.push_str(&source[cursor..start]);
+        output.push_str(&replacement);
+        cursor = end;
     }
+    output.push_str(&source[cursor..]);
+    *source = output;
     Ok(())
 }
 

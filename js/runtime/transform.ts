@@ -451,22 +451,39 @@ export function transform(
       // the shapes of the phases that observe the same source after it. Those
       // shapes are interned, so the whole derivation is cached on their identity
       // chain instead of being repacked for every file.
-      const lookahead: PreparedPhase[] = [];
-      let chain = retainedChains(prepared);
-      for (let futureIndex = phaseIndex + 1; futureIndex < pipeline.phases.length; futureIndex++) {
-        if (phasePlan[futureIndex].requiresPrintedInput) break;
-        if (runtimeEditEffect !== 'none') break;
-        const futurePrepared = preparePhase(pipeline.phases[futureIndex]);
-        lookahead.push(futurePrepared);
-        chain = retainedChains(futurePrepared, chain);
-      }
-      const retained = (chain.plan ??= buildRetainedPlan(prepared, lookahead));
-      const { futureSubscriptions, retentionManifest } = retained;
       const retainedSession = reusableSession;
+      let futureSubscriptions: ReadonlySet<string>;
+      let retentionManifest: Buffer;
+      if (retainedSession == null) {
+        const lookahead: PreparedPhase[] = [];
+        let chain = retainedChains(prepared);
+        if (runtimeEditEffect === 'none') {
+          for (
+            let futureIndex = phaseIndex + 1;
+            futureIndex < pipeline.phases.length;
+            futureIndex++
+          ) {
+            if (phasePlan[futureIndex].requiresPrintedInput) break;
+            const futurePrepared = preparePhase(pipeline.phases[futureIndex]);
+            lookahead.push(futurePrepared);
+            chain = retainedChains(futurePrepared, chain);
+          }
+        }
+        const retained = (chain.plan ??= buildRetainedPlan(prepared, lookahead));
+        ({ futureSubscriptions, retentionManifest } = retained);
+      } else {
+        // The retained session was opened with the complete compatible suffix.
+        // Later phases reuse that native index and do not rebuild progressively
+        // shorter suffix plans.
+        futureSubscriptions = new Set();
+        retentionManifest = manifest;
+      }
+      const nextPhase = pipeline.phases[phaseIndex + 1];
       const canReuseForNextPhase =
         phaseIndex + 1 === pipeline.phases.length ||
-        (pipeline.phases[phaseIndex + 1].native == null &&
-          lookahead[0] === preparePhase(pipeline.phases[phaseIndex + 1]));
+        (runtimeEditEffect === 'none' &&
+          nextPhase?.native == null &&
+          !phasePlan[phaseIndex + 1].requiresPrintedInput);
       const collectFinalFunctionMap =
         options.functionMap === true && isFinalPhase && !/\n#!/.test(observationSource);
       const artifactDemand =

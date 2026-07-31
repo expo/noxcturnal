@@ -1,3 +1,5 @@
+use std::collections::VecDeque;
+
 use oxc_allocator::{Allocator, Box as ArenaBox, TakeIn, Vec as ArenaVec};
 use oxc_ast::{
     AstBuilder, AstKind,
@@ -14,7 +16,7 @@ use oxc_syntax::operator::{AssignmentOperator, BinaryOperator, LogicalOperator, 
 use rustc_hash::{FxHashMap, FxHashSet};
 
 pub(super) struct Plan {
-    names: FxHashMap<(u32, u32), Vec<ForOfNames>>,
+    names: FxHashMap<(u32, u32), VecDeque<ForOfNames>>,
 }
 
 struct ForOfNames {
@@ -36,7 +38,7 @@ pub(super) fn prepare(semantic: &Semantic<'_>) -> Plan {
         .symbol_names()
         .map(str::to_owned)
         .collect::<FxHashSet<_>>();
-    let mut names = FxHashMap::<(u32, u32), Vec<ForOfNames>>::default();
+    let mut names = FxHashMap::<(u32, u32), VecDeque<ForOfNames>>::default();
     let mut depth_buckets = Vec::<Vec<&ForOfStatement<'_>>>::new();
     let mut active_loop_ends = Vec::<u32>::new();
     for (_, node) in nodes.iter_enumerated() {
@@ -68,7 +70,7 @@ pub(super) fn prepare(semantic: &Semantic<'_>) -> Plan {
             names
                 .entry((statement.span.start, statement.span.end))
                 .or_default()
-                .push(ForOfNames {
+                .push_back(ForOfNames {
                     iterator: reserve("_iterator", &mut reserved),
                     next_method: reserve("_iteratorNext", &mut reserved),
                     step: reserve("_step", &mut reserved),
@@ -104,7 +106,7 @@ pub(super) fn run<'a>(
 
 struct ForOfLowerer<'a> {
     ast: AstBuilder<'a>,
-    names: FxHashMap<(u32, u32), Vec<ForOfNames>>,
+    names: FxHashMap<(u32, u32), VecDeque<ForOfNames>>,
     changed: bool,
     error: Option<&'static str>,
 }
@@ -121,7 +123,7 @@ impl<'a> ForOfLowerer<'a> {
         let Some(plans) = self.names.get_mut(&key) else {
             return Err("for-of-ast-target-missing");
         };
-        let names = plans.remove(0);
+        let names = plans.pop_front().expect("nonempty for-of plan bucket");
         if plans.is_empty() {
             self.names.remove(&key);
         }

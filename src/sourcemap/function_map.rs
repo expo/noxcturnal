@@ -328,28 +328,29 @@ impl<'a> FunctionMapCollector<'a> {
     }
 
     fn container_name(&self, ancestors: &[AstKind<'_>]) -> Option<String> {
-        for (index, ancestor) in ancestors.iter().enumerate().rev() {
+        let mut components = Vec::new();
+        for ancestor in ancestors.iter().rev() {
             match ancestor {
                 AstKind::VariableDeclarator(declarator) => {
-                    return Some(self.name_from_span(declarator.id.span()));
+                    components.push(self.name_from_span(declarator.id.span()));
+                    break;
                 }
                 AstKind::AssignmentExpression(assignment) => {
-                    return Some(self.name_from_span(assignment.left.span()));
+                    components.push(self.name_from_span(assignment.left.span()));
+                    break;
                 }
                 AstKind::ObjectProperty(property) => {
-                    let property_name = self.property_name(&property.key);
-                    if let Some(owner) = self.container_name(&ancestors[..index]) {
-                        return Some(format!("{owner}.{property_name}"));
-                    }
-                    return Some(property_name);
+                    components.push(self.property_name(&property.key));
                 }
                 AstKind::CallExpression(call) => {
-                    return Some(self.name_from_span(call.callee.span()));
+                    components.push(self.name_from_span(call.callee.span()));
+                    break;
                 }
                 _ => {}
             }
         }
-        None
+        components.reverse();
+        (!components.is_empty()).then(|| components.join("."))
     }
 }
 

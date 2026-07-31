@@ -18,7 +18,7 @@
 //! because nothing in this model reconstructs a parameter list: it only deletes
 //! byte ranges.
 
-use std::ops::Range;
+use std::{collections::HashSet, ops::Range};
 
 use crate::generated::estree::{FieldType, NODE_KINDS, kind};
 use crate::proposals::{
@@ -1001,7 +1001,7 @@ impl<'a> Walk<'a> {
             let mut key = Key::new();
             // Duplicate binding names are refused per case, as they are in
             // `analyzeCases`, which starts a fresh set for each one.
-            let mut seen = Vec::new();
+            let mut seen = HashSet::new();
             let pattern = self.analyze_pattern(cursor, &mut key, &mut analysis, &mut seen)?;
             let Some(body) = cursor.peek_node()? else {
                 return Err(match_bail("case without a body"));
@@ -1087,7 +1087,7 @@ impl<'a> Walk<'a> {
         cursor: &mut Cursor<'a>,
         key: &mut Key,
         out: &mut Analysis,
-        seen: &mut Vec<String>,
+        seen: &mut HashSet<String>,
     ) -> Result<Range<u32>, Bail> {
         let Some(node) = cursor.node()? else {
             return Err(match_bail("empty pattern"));
@@ -1280,11 +1280,11 @@ impl<'a> Walk<'a> {
         cursor: &mut Cursor<'a>,
         key: &mut Key,
         out: &mut Analysis,
-        seen: &mut Vec<String>,
+        seen: &mut HashSet<String>,
     ) -> Result<(), Bail> {
         let count = cursor.list_len()?;
         let mut exclude = Vec::with_capacity(count as usize);
-        let mut names: Vec<String> = Vec::with_capacity(count as usize);
+        let mut names = HashSet::with_capacity(count as usize);
         for _ in 0..count {
             let Some(property) = cursor.node()? else {
                 return Err(match_bail("empty object pattern property"));
@@ -1293,13 +1293,12 @@ impl<'a> Walk<'a> {
                 return Err(match_bail(property.name()));
             }
             let (step, literal, name) = self.property_key(cursor)?;
-            if names.contains(&name) {
+            if !names.insert(name.clone()) {
                 return Err(self.reject(
                     property.start,
                     &format!("Duplicate property name '{name}' in match object pattern."),
                 ));
             }
-            names.push(name);
             exclude.push(step.clone());
             if self.needs_property_exists(cursor)? {
                 out.conditions.push(Condition::PropertyExists {
@@ -1397,7 +1396,7 @@ impl<'a> Walk<'a> {
     fn rest_pattern(
         &mut self,
         cursor: &mut Cursor<'a>,
-        seen: &mut Vec<String>,
+        seen: &mut HashSet<String>,
     ) -> Result<(bool, Option<Binder>), Bail> {
         let Some(node) = cursor.node()? else {
             return Ok((false, None));
@@ -1422,14 +1421,13 @@ impl<'a> Walk<'a> {
 
     /// Records a binding name for a case, refusing a repeat the way
     /// `checkDuplicateBindingName` does.
-    fn declare(&self, seen: &mut Vec<String>, at: u32, name: String) -> Result<String, Bail> {
-        if seen.contains(&name) {
+    fn declare(&self, seen: &mut HashSet<String>, at: u32, name: String) -> Result<String, Bail> {
+        if !seen.insert(name.clone()) {
             return Err(self.reject(
                 at,
                 &format!("Duplicate variable name '{name}' in match case pattern."),
             ));
         }
-        seen.push(name.clone());
         Ok(name)
     }
 

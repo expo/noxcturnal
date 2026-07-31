@@ -6,7 +6,7 @@ use oxc_ast::{
 use oxc_ast_visit::{VisitMut, walk_mut};
 use oxc_span::{GetSpan, Span};
 
-use crate::preflight::helpers::CustomHelperRequests;
+use crate::preflight::helpers::{CustomHelperRequests, SourceNameReservations};
 
 pub(super) struct Options {
     pub(super) use_built_ins: bool,
@@ -100,17 +100,7 @@ pub(super) fn run_jsx_props<'a>(
 }
 
 fn reserve_helper_name(program: &Program<'_>, base: &str) -> String {
-    let source = &program.source_text;
-    if !source.contains(base) {
-        return base.to_string();
-    }
-    for suffix in 2.. {
-        let candidate = format!("{base}{suffix}");
-        if !source.contains(&candidate) {
-            return candidate;
-        }
-    }
-    unreachable!()
+    SourceNameReservations::new(program.source_text).reserve(base)
 }
 
 struct ObjectSpreadLowerer<'a> {

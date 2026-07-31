@@ -351,12 +351,7 @@ pub fn inline_helpers(
             return Err(format!("inline-helper-not-compatible:{}", helper.name()));
         }
     }
-    let mut binding = "babelHelpers".to_string();
-    let mut suffix = 2;
-    while source.contains(&binding) {
-        binding = format!("babelHelpers{suffix}");
-        suffix += 1;
-    }
+    let binding = SourceNameReservations::new(source).reserve("babelHelpers");
     Ok(Some(InlineHelpers {
         binding,
         // Kept on one generated line so native source-map adjustment is a single
@@ -398,6 +393,37 @@ fn parse_version(value: &str) -> Option<(u32, u32, u32)> {
     let minor = parts.next().unwrap_or("0").parse().ok()?;
     let patch = parts.next().unwrap_or("0").parse().ok()?;
     Some((major, minor, patch))
+}
+
+pub(super) struct SourceNameReservations {
+    names: FxHashSet<String>,
+}
+
+impl SourceNameReservations {
+    pub(super) fn new(source: &str) -> Self {
+        let names = source
+            .split(|character: char| {
+                !(character.is_ascii_alphanumeric() || matches!(character, '_' | '$'))
+            })
+            .filter(|name| !name.is_empty())
+            .map(str::to_owned)
+            .collect();
+        Self { names }
+    }
+
+    pub(super) fn reserve(&mut self, base: &str) -> String {
+        for suffix in 1.. {
+            let candidate = if suffix == 1 {
+                base.to_owned()
+            } else {
+                format!("{base}{suffix}")
+            };
+            if self.names.insert(candidate.clone()) {
+                return candidate;
+            }
+        }
+        unreachable!()
+    }
 }
 
 #[cfg(test)]
