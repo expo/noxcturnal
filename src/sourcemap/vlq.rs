@@ -46,3 +46,42 @@ fn decode_char(value: u8) -> Option<i64> {
         _ => None,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn round_trips_signed_and_multibyte_values() {
+        for value in [i32::MIN as i64, -123_456, -1, 0, 1, 31, 32, 123_456] {
+            let mut encoded = String::new();
+            encode(value, &mut encoded);
+            let mut cursor = 0;
+            assert_eq!(decode(encoded.as_bytes(), &mut cursor), Some(value));
+            assert_eq!(cursor, encoded.len());
+        }
+    }
+
+    #[test]
+    fn decodes_every_base64_character_class() {
+        for encoded in ["A", "a", "0A", "+A", "/A"] {
+            let mut cursor = 0;
+            assert!(
+                decode(encoded.as_bytes(), &mut cursor).is_some(),
+                "{encoded}"
+            );
+            assert_eq!(cursor, encoded.len());
+        }
+    }
+
+    #[test]
+    fn rejects_invalid_and_truncated_sequences() {
+        let mut cursor = 0;
+        assert_eq!(decode(b"!", &mut cursor), None);
+        assert_eq!(cursor, 0);
+
+        let mut cursor = 0;
+        assert_eq!(decode(b"g", &mut cursor), None);
+        assert_eq!(cursor, 1);
+    }
+}

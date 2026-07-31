@@ -56,9 +56,57 @@ mod tests {
     use super::*;
 
     #[test]
-    fn classifies_flow_as_unsupported() {
-        let result = classify_source("fixture.js", "// @flow\nconst x: number = 1");
-        assert!(!result.supported);
-        assert_eq!(result.syntax, "flow");
+    fn classifies_supported_extensions() {
+        for (filename, expected) in [
+            ("fixture.d.ts", "dts"),
+            ("fixture.tsx", "tsx"),
+            ("fixture.ts", "ts"),
+            ("fixture.mts", "ts"),
+            ("fixture.cts", "ts"),
+            ("fixture.jsx", "jsx"),
+            ("fixture.js", "js"),
+            ("fixture.mjs", "js"),
+            ("fixture.cjs", "js"),
+        ] {
+            let result = classify_source(filename, "const value = 1;");
+            assert_eq!(result.syntax, expected, "{filename}");
+            assert!(result.supported, "{filename}");
+            assert_eq!(result.reason, "oxc-supported", "{filename}");
+        }
+    }
+
+    #[test]
+    fn classifies_unsupported_sources() {
+        for (filename, source, syntax, reason) in [
+            (
+                "fixture.js",
+                "// @flow\nconst value: number = 1;",
+                "flow",
+                "flow-requires-parser-adapter",
+            ),
+            (
+                "fixture.txt",
+                "const value = 1;",
+                "unknown",
+                "unknown-extension",
+            ),
+        ] {
+            let result = classify_source(filename, source);
+            assert_eq!(result.syntax, syntax);
+            assert!(!result.supported);
+            assert_eq!(result.reason, reason);
+            assert!(source_type(filename, source).is_err());
+        }
+    }
+
+    #[test]
+    fn detects_codegen_candidates_case_insensitively_by_extension() {
+        let result = classify_source(
+            "Component.TSX",
+            "export default codegenNativeComponent('Component');",
+        );
+        assert_eq!(result.syntax, "tsx");
+        assert!(result.supported);
+        assert!(result.codegen_candidate);
     }
 }
