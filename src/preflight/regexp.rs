@@ -118,12 +118,16 @@ impl<'a> RegexpLowerer<'a> {
             flags.retain(|flag| flag != 's');
             changed = true;
         }
-        let groups = if self.named_groups && pattern.contains("(?<") {
+        let groups = if self.named_groups && contains_named_group(&pattern) {
             let (lowered, names) = lower_named_groups(&pattern)?;
-            pattern = lowered;
-            self.needs_named_helper = true;
-            changed = true;
-            Some(names)
+            if names.is_empty() {
+                None
+            } else {
+                pattern = lowered;
+                self.needs_named_helper = true;
+                changed = true;
+                Some(names)
+            }
         } else {
             None
         };
@@ -187,6 +191,32 @@ impl<'a> RegexpLowerer<'a> {
             );
         }
     }
+}
+
+pub(super) fn contains_named_group(pattern: &str) -> bool {
+    let bytes = pattern.as_bytes();
+    let mut index = 0;
+    let mut in_class = false;
+    while index < bytes.len() {
+        if bytes[index] == b'\\' {
+            index = (index + 2).min(bytes.len());
+            continue;
+        }
+        match bytes[index] {
+            b'[' => in_class = true,
+            b']' => in_class = false,
+            b'(' if !in_class
+                && bytes.get(index + 1) == Some(&b'?')
+                && bytes.get(index + 2) == Some(&b'<')
+                && !matches!(bytes.get(index + 3), Some(b'=') | Some(b'!')) =>
+            {
+                return true;
+            }
+            _ => {}
+        }
+        index += 1;
+    }
+    false
 }
 
 impl<'a> VisitMut<'a> for RegexpLowerer<'a> {
@@ -582,10 +612,97 @@ fn push_astral_range(alternatives: &mut Vec<String>, start: u32, end: u32) {
     alternatives.push(format!("\\u{last_lead:04X}[\\uDC00-\\u{:04X}]", trail(end)));
 }
 
+fn lower_astral_classes(pattern: &str) -> Result<String, &'static str> {
+    let bytes = pattern.as_bytes();
+    let mut output = String::with_capacity(pattern.len());
+    let mut cursor = 0;
+    while cursor < bytes.len() {
+        if bytes[cursor] != b'[' {
+            let character = pattern[cursor..].chars().next().unwrap();
+            output.push(character);
+            cursor += character.len_utf8();
+            continue;
+        }
+        let start = cursor;
+        cursor += 1;
+        let mut escaped = false;
+        while cursor < bytes.len() {
+            let character = pattern[cursor..].chars().next().unwrap();
+            cursor += character.len_utf8();
+            if escaped {
+                escaped = false;
+            } else if character == '\\' {
+                escaped = true;
+            } else if character == ']' {
+                break;
+            }
+        }
+        if !matches!(bytes.get(cursor.saturating_sub(1)), Some(b']')) {
+            return Err("regexp-class-shape-not-implemented");
+        }
+        let class_source = &pattern[start..cursor];
+        let hir = regex_syntax::ParserBuilder::new()
+            .unicode(true)
+            .build()
+            .parse(class_source)
+            .map_err(|_| "regexp-class-shape-not-implemented")?;
+        let HirKind::Class(Class::Unicode(class)) = hir.kind() else {
+            output.push_str(class_source);
+            continue;
+        };
+        if !class
+            .ranges()
+            .iter()
+            .any(|range| range.end() as u32 > 0xFFFF)
+        {
+            output.push_str(class_source);
+            continue;
+        }
+        let negated = class_source.as_bytes().get(1) == Some(&b'^');
+        let mut bmp_ranges = Vec::new();
+        let mut astral = Vec::new();
+        for range in class.ranges() {
+            let start = range.start() as u32;
+            let end = range.end() as u32;
+            if start <= 0xFFFF {
+                bmp_ranges.push((start, end.min(0xFFFF)));
+            }
+            if end > 0xFFFF {
+                push_astral_range(&mut astral, start.max(0x1_0000), end);
+            }
+        }
+        if negated {
+            // Rust's Unicode scalar model omits surrogate code units from a
+            // complemented class; JavaScript matches lone surrogates.
+            bmp_ranges.push((0xD800, 0xDFFF));
+            bmp_ranges = union(bmp_ranges);
+        }
+        let mut alternatives = Vec::new();
+        if !bmp_ranges.is_empty() {
+            let mut class = String::from("[");
+            for (start, end) in bmp_ranges {
+                push_bmp_range(&mut class, start, end);
+            }
+            class.push(']');
+            alternatives.push(class);
+        }
+        alternatives.extend(astral);
+        if alternatives.len() == 1 {
+            output.push_str(&alternatives[0]);
+        } else {
+            output.push_str("(?:");
+            output.push_str(&alternatives.join("|"));
+            output.push(')');
+        }
+    }
+    Ok(output)
+}
+
 fn lower_unicode(pattern: &str, dot_all: bool) -> Result<String, &'static str> {
     if pattern.contains("\\p{") || pattern.contains("\\P{") {
         return Err("regexp-unicode-property-escapes-require-property-transform");
     }
+    let pattern = lower_astral_classes(pattern)?;
     let mut output = String::with_capacity(pattern.len());
     let mut characters = pattern.char_indices().peekable();
     let mut in_class = false;

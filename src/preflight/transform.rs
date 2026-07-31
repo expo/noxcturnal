@@ -1540,7 +1540,9 @@ fn compile_options(options: &NativePreflightOptions) -> Result<TransformOptions>
     compiled.env.regexp.unicode_property_escapes =
         options.regexp_unicode_property_escapes == Some(true);
     compiled.env.regexp.dot_all_flag = options.regexp_dot_all == Some(true);
-    compiled.env.regexp.named_capture_groups = options.regexp_named_capture_groups == Some(true);
+    // The focused RegExp pass owns named groups. Oxc's pass also treats escaped
+    // `\(?<...>` text as a group candidate, producing a semantic mismatch.
+    compiled.env.regexp.named_capture_groups = false;
     compiled.env.regexp.look_behind_assertions = options.regexp_look_behind == Some(true);
     compiled.env.regexp.match_indices = options.regexp_match_indices == Some(true);
     compiled.env.regexp.set_notation = options.regexp_unicode_sets == Some(true);
@@ -1738,17 +1740,10 @@ impl<'a> Visit<'a> for PostconditionDetector {
         self.dot_all |= literal.regex.flags.contains(RegExpFlags::S);
         self.match_indices |= literal.regex.flags.contains(RegExpFlags::D);
         self.unicode_sets |= literal.regex.flags.contains(RegExpFlags::V);
-        let mut remainder = literal.regex.pattern.text.as_str();
+        let remainder = literal.regex.pattern.text.as_str();
         self.unicode_property |= remainder.contains("\\p{") || remainder.contains("\\P{");
         self.look_behind |= remainder.contains("(?<=") || remainder.contains("(?<!");
-        while let Some(index) = remainder.find("(?<") {
-            let discriminator = remainder.as_bytes().get(index + 3).copied();
-            if !matches!(discriminator, Some(b'=') | Some(b'!')) {
-                self.named_capture_groups = true;
-                break;
-            }
-            remainder = &remainder[index + 3..];
-        }
+        self.named_capture_groups |= super::regexp::contains_named_group(remainder);
         walk::walk_reg_exp_literal(self, literal);
     }
 
