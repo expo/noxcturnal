@@ -370,7 +370,7 @@ test('focused runtime adapters expose and validate canonical Babel dependencies'
     'var [value] = input;',
     'fixture.js',
     pipeline(
-      { destructuring: { useBuiltIns: true } },
+      { destructuring: true },
       {
         mode: 'runtime',
         moduleName: '@babel/runtime',
@@ -387,7 +387,7 @@ test('focused runtime adapters expose and validate canonical Babel dependencies'
     'var [value] = input;',
     'fixture.js',
     pipeline(
-      { destructuring: { useBuiltIns: true } },
+      { destructuring: true },
       {
         mode: 'runtime',
         moduleName: '@babel/runtime',

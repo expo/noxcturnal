@@ -1,8 +1,11 @@
 import classProperties from '@babel/plugin-transform-class-properties';
 import privateMethods from '@babel/plugin-transform-private-methods';
 import privatePropertyInObject from '@babel/plugin-transform-private-property-in-object';
+import babel from '@babel/core';
 import { expect, test } from 'vitest';
 
+import type { PreflightTransforms } from '../../../js';
+import { defineNativePipeline, transform } from '../../../js';
 import { alignBabelBehavior } from '../transform';
 
 test('aligns loose private methods with Babel', async () => {
@@ -15,12 +18,70 @@ globalThis.__result = new Example().run();`,
       plugins: [[privateMethods, { loose }]],
       noxcturnal: {
         helpers: { mode: 'inline' },
-        transforms: { privateMethods: { loose } },
+        transforms: { privateMethods: true },
       },
       output: { mustNotMatch: [/#read\b/] },
     }),
   ).resolves.toBe(42);
 });
+
+test('documents the focused class-feature prerequisite matrix against standalone Babel plugins', () => {
+  const source = `class Example {
+  field = 1;
+  #privateField = 2;
+  #method() { return this.#privateField; }
+  static { this.ready = true; }
+  static has(input) { return #privateField in input; }
+}`;
+  const cases = [
+    ['classProperties', classProperties, { classProperties: { loose: true } }],
+    ['privateMethods', privateMethods, { privateMethods: true }],
+    ['privatePropertyInObject', privatePropertyInObject, { privatePropertyInObject: true }],
+  ] as const;
+
+  for (const [name, plugin, transforms] of cases) {
+    // Babel's standalone plugins either retain sibling syntax or reject the
+    // mixed-feature source and require sibling plugins. Noxcturnal deliberately
+    // compiles that prerequisite bundle internally instead.
+    let reference: string | undefined;
+    let rejected = false;
+    try {
+      reference =
+        babel.transformSync(source, {
+          babelrc: false,
+          configFile: false,
+          plugins: [[plugin, { loose: true }]],
+        })?.code ?? undefined;
+    } catch (error) {
+      rejected = /not enabled|plugin-transform-/.test(String(error));
+    }
+    expect(
+      rejected || /#method|#privateField|static \{/.test(reference ?? ''),
+      `${name} standalone Babel boundary`,
+    ).toBe(true);
+
+    const result = transformSourceForMatrix(source, transforms);
+    expect(result.status).toBe('complete');
+    if (result.status === 'complete') {
+      expect(result.code).not.toMatch(/\bclass\s+Example\b|#method|#privateField|static \{/);
+    }
+  }
+});
+
+function transformSourceForMatrix(source: string, transforms: PreflightTransforms) {
+  return transform(
+    source,
+    'input.js',
+    defineNativePipeline({
+      phases: [
+        {
+          name: 'class-feature-matrix',
+          native: { transforms, helpers: { mode: 'inline' } },
+        },
+      ],
+    }),
+  );
+}
 
 test('composes private fields and brand checks as prerequisites', async () => {
   const loose = true;
@@ -41,7 +102,7 @@ globalThis.__result = [value.read(), Example.has(value), Example.has({})];`,
       ],
       noxcturnal: {
         helpers: { mode: 'inline' },
-        transforms: { privateMethods: { loose } },
+        transforms: { privateMethods: true },
       },
       output: { mustNotMatch: [/#value\b/, /#value in input/] },
     }),
@@ -73,8 +134,8 @@ globalThis.__result = [counter.increment(2), Counter.has(counter), Counter.has({
         helpers: { mode: 'inline' },
         transforms: {
           classProperties: { loose },
-          privateMethods: { loose },
-          privatePropertyInObject: { loose },
+          privateMethods: true,
+          privatePropertyInObject: true,
         },
       },
       output: { mustNotMatch: [/#value\b/, /#increment\b/] },

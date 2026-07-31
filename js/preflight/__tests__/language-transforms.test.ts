@@ -44,11 +44,7 @@ test('native for-of preserves iterable closing, control flow, nesting, and destr
     }
     globalThis.answer = [values, closed, labeled];
   `;
-  const result = transform(
-    source,
-    'fixture.js',
-    pipeline({ forOf: true, destructuring: { useBuiltIns: true } }),
-  );
+  const result = transform(source, 'fixture.js', pipeline({ forOf: true, destructuring: true }));
   assert.equal(result.status, 'complete');
   assert.doesNotMatch(result.code, /\bof\b/);
   const context: { answer?: unknown } = {};
@@ -68,11 +64,7 @@ test('native destructuring preserves getters, iterators, defaults, rest, nesting
     try { throw { message: "ok" }; } catch ({ message }) { globalThis.caught = message; }
     globalThis.answer = [nested, rest.extra, first, second, reads, closed, assigned, tail, assignmentValue];
   `;
-  const result = transform(
-    source,
-    'fixture.js',
-    pipeline({ destructuring: { useBuiltIns: true } }),
-  );
+  const result = transform(source, 'fixture.js', pipeline({ destructuring: true }));
   assert.equal(result.status, 'complete');
   assert.doesNotMatch(result.code, /var\s*[{[]|catch\s*\(\s*{/);
   const context: { answer?: unknown; caught?: string } = {};
@@ -88,7 +80,7 @@ test('native destructuring helpers avoid source binding collisions', () => {
     source,
     'fixture.js',
     pipeline({
-      destructuring: { useBuiltIns: true },
+      destructuring: true,
       objectRestSpread: { loose: false, useBuiltIns: false },
     }),
   );
@@ -103,7 +95,7 @@ test('destructuring preserves a binding renamed by block scoping', () => {
   const result = transform(
     'function read(input) { { let routes = 1; globalThis.inner = routes; } const { routes } = input; return routes; } globalThis.result = read({ routes: 2 });',
     'fixture.js',
-    pipeline({ blockScoping: true, destructuring: { useBuiltIns: true } }),
+    pipeline({ blockScoping: true, destructuring: true }),
   );
   assert.equal(result.status, 'complete');
   const context: { inner?: unknown; result?: unknown } = {};
@@ -185,7 +177,7 @@ test('native parameters structurally reparse JSX arrow bodies', () => {
   const result = transform(
     'const View = ({ value, ...props }) => <div {...props}>{value}</div>;',
     'fixture.jsx',
-    pipeline({ parameters: true, destructuring: { useBuiltIns: true } }),
+    pipeline({ parameters: true, destructuring: true }),
   );
   assert.equal(result.status, 'complete');
   assert.match(result.code, /function\s*\(\)/);
@@ -259,13 +251,13 @@ test('transform option objects reject missing and unrelated fields', () => {
             name: 'invalid',
             native: {
               transforms: {
-                destructuring: {} as { useBuiltIns: boolean },
+                destructuring: {} as true,
               },
             },
           },
         ],
       }),
-    /destructuring requires \{ useBuiltIns: boolean \}/,
+    /destructuring must be true/,
   );
   assert.throws(
     () =>
@@ -305,7 +297,7 @@ test('validates shared semantics while class feature representations remain inde
     'fixture.js',
     pipeline({
       classProperties: { loose: false },
-      privateMethods: { loose: true },
+      privateMethods: true,
     }),
   );
   assert.equal(classFeatures.status, 'complete');

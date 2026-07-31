@@ -105,7 +105,7 @@ test('native loose private methods and getter-only accessors remain read-only', 
       pipeline({
         classes: true,
         classProperties: { loose: true },
-        privateMethods: { loose: true },
+        privateMethods: true,
       }),
     );
     assert.equal(result.status, 'complete');
@@ -238,7 +238,7 @@ test('generated prologue statements do not fuse with an unterminated directive',
   for (const [name, transforms, source, answer] of [
     [
       'destructuring',
-      { destructuring: { useBuiltIns: true } },
+      { destructuring: true },
       "'use strict'\nconst { value } = globalThis.input\nglobalThis.answer = value",
       5,
     ],
@@ -473,8 +473,8 @@ test('derived constructors reach private names and super properties', () => {
     pipeline({
       classes: true,
       classProperties: { loose: true },
-      privateMethods: { loose: true },
-      privatePropertyInObject: { loose: true },
+      privateMethods: true,
+      privatePropertyInObject: true,
     }),
   );
   assert.equal(result.status, 'complete');
@@ -509,8 +509,8 @@ test('one method may use both super and private names', () => {
     pipeline({
       classes: true,
       classProperties: { loose: true },
-      privateMethods: { loose: true },
-      privatePropertyInObject: { loose: true },
+      privateMethods: true,
+      privatePropertyInObject: true,
     }),
   );
   assert.equal(result.status, 'complete');
@@ -569,7 +569,7 @@ test('a lexical binding declared inside a loop callback is not a captured loop b
      }
      globalThis.answer = collect([['a', 1]], [['b', 2]]);`,
     'fixture.js',
-    pipeline({ blockScoping: true, destructuring: { useBuiltIns: true }, parameters: true }),
+    pipeline({ blockScoping: true, destructuring: true, parameters: true }),
   );
   assert.equal(result.status, 'complete');
   const context: { answer?: unknown } = {};
@@ -587,7 +587,7 @@ test('a function inside a parameter default is lowered from the body it moves to
      }
      globalThis.answer = useLinking(null);`,
     'fixture.js',
-    pipeline({ destructuring: { useBuiltIns: true }, parameters: true }),
+    pipeline({ destructuring: true, parameters: true }),
   );
   assert.equal(result.status, 'complete');
   const context: { answer?: unknown } = {};
@@ -609,7 +609,7 @@ test('parameter lists that only exist as TypeScript types are not left unlowered
      const format: Formatter = ({ value }) => value;
      globalThis.answer = [format({ value: 'ok' }), new Shape().area(2)];`,
     'fixture.ts',
-    pipeline({ parameters: true, destructuring: { useBuiltIns: true } }),
+    pipeline({ parameters: true, destructuring: true }),
   );
   assert.equal(result.status, 'complete');
   const context: { answer?: unknown } = {};
@@ -667,7 +667,7 @@ test('a parameter name that only collides with a type keeps its own name', () =>
      }
      globalThis.answer = render({ value: 'ok', onChange: () => {} });`,
     'fixture.ts',
-    pipeline({ blockScoping: true, destructuring: { useBuiltIns: true }, parameters: true }),
+    pipeline({ blockScoping: true, destructuring: true, parameters: true }),
   );
   assert.equal(result.status, 'complete');
   assert.doesNotMatch(result.code, /_value\b/);
@@ -700,7 +700,7 @@ test('React Refresh still registers a context used as a JSX element', () => {
             reactRefresh: {},
             transforms: {
               blockScoping: true,
-              destructuring: { useBuiltIns: true },
+              destructuring: true,
               parameters: true,
             },
             helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -727,7 +727,7 @@ test('React Refresh signatures track hook structure after native mutation', () =
         native: {
           jsx: 'automatic',
           reactRefresh: {},
-          transforms: { destructuring: { useBuiltIns: true } },
+          transforms: { destructuring: true },
           helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
           compact: true,
           comments: false,
@@ -890,7 +890,7 @@ test('inline helper materialization gets the same TypeScript treatment', () => {
        type Formatter = ({ value }: { value: string }) => string;
        const format: Formatter = ({ value }) => value;
        globalThis.answer = format({ value: 'ok' });`,
-      { parameters: true, destructuring: { useBuiltIns: true } },
+      { parameters: true, destructuring: true },
     ).answer,
     'ok',
   );

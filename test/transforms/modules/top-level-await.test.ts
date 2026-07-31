@@ -13,7 +13,7 @@ test('preserves top-level await while lowering unrelated syntax', async () => {
   expect(
     await transformSource(source, 'input.mjs', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _objectDestructuringEmpty2 = {

@@ -142,9 +142,9 @@ function bindVisitorParameters(
 
 export function defineNativePipeline(pipeline: NativePipelineDefinition): NativePipeline {
   return composeInternedPhases(
-    pipeline.phases.map(phase =>
-      definedPhases.has(phase) ? phase : normalizePipelinePhase(phase),
-    ),
+    pipeline.phases
+      .map(phase => (definedPhases.has(phase) ? phase : normalizePipelinePhase(phase)))
+      .filter(phase => phase.native == null || hasActiveNativeOperation(phase.native)),
   );
 }
 
@@ -169,7 +169,9 @@ export function composeNativePipeline(phases: readonly PipelinePhase[]): NativeP
   for (const phase of phases)
     if (!definedPhases.has(phase))
       throw new Error('composeNativePipeline requires phases created with definePipelinePhase');
-  return composeInternedPhases(phases);
+  return composeInternedPhases(
+    phases.filter(phase => phase.native == null || hasActiveNativeOperation(phase.native)),
+  );
 }
 
 /** Intern an ordered sequence of already-interned phases. */
@@ -362,8 +364,7 @@ function validateNativePlan(phaseName: string, plan: PreflightPlan): void {
         throw new Error(`${phaseName}: native optimization ${name} must be true or absent`);
     }
   }
-  if (plan.transforms == null) return;
-  for (const [name, value] of Object.entries(plan.transforms)) {
+  for (const [name, value] of Object.entries(plan.transforms ?? {})) {
     if (!NATIVE_TRANSFORMS.has(name))
       throw new Error(`${phaseName}: unknown native transform ${name}`);
     if (value === false)
@@ -392,6 +393,19 @@ function validateNativePlan(phaseName: string, plan: PreflightPlan): void {
         );
     }
   }
+}
+
+function hasActiveNativeOperation(plan: PreflightPlan): boolean {
+  return (
+    Object.keys(plan.transforms ?? {}).length > 0 ||
+    Object.keys(plan.optimize ?? {}).length > 0 ||
+    plan.reactCompiler != null ||
+    plan.reactRefresh != null ||
+    plan.typescript != null ||
+    plan.jsx != null ||
+    plan.compact === true ||
+    plan.comments === false
+  );
 }
 
 function deepFreeze<T>(value: T): T {

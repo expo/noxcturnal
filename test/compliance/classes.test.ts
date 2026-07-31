@@ -244,7 +244,7 @@ test('private methods preserve receiver branding', () => {
     {
       transforms: {
         classProperties: { loose: true },
-        privateMethods: { loose: true },
+        privateMethods: true,
       },
     },
   );
@@ -266,7 +266,7 @@ test('lowered private methods remain non-constructable when exposed', () => {
       transforms: {
         classes: true,
         classProperties: { loose: true },
-        privateMethods: { loose: true },
+        privateMethods: true,
       },
     },
   );
@@ -300,8 +300,8 @@ test('selected private fields, methods, and brand checks preserve receiver seman
     {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: true,
+        privatePropertyInObject: true,
       },
     },
   );
@@ -321,7 +321,7 @@ test('private-in distinguishes branded instances from lookalikes and subclasses'
     {
       transforms: {
         classProperties: { loose: true },
-        privatePropertyInObject: { loose: true },
+        privatePropertyInObject: true,
       },
     },
   );
@@ -657,7 +657,7 @@ test('private accessors preserve getter and setter receivers', () => {
     {
       transforms: {
         classProperties: { loose: true },
-        privateMethods: { loose: true },
+        privateMethods: true,
       },
     },
   );
@@ -677,7 +677,7 @@ test('static private brands reject instances and accept the declaring constructo
     {
       transforms: {
         classProperties: { loose: true },
-        privatePropertyInObject: { loose: true },
+        privatePropertyInObject: true,
       },
     },
   );

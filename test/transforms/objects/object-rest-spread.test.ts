@@ -7,7 +7,7 @@ test('lowers object rest and spread', async () => {
     await transformSource(source, 'input.js', {
       helpers: runtimeHelpers,
       transforms: {
-        destructuring: { useBuiltIns: true },
+        destructuring: true,
         objectRestSpread: { loose: true, useBuiltIns: true },
       },
     }),

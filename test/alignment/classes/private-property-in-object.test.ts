@@ -17,7 +17,7 @@ const instance = new Example(); globalThis.__result = [instance.has(instance), i
       ],
       noxcturnal: {
         helpers: { mode: 'inline' },
-        transforms: { privatePropertyInObject: { loose }, classProperties: { loose } },
+        transforms: { privatePropertyInObject: true, classProperties: { loose } },
       },
       output: { mustNotMatch: [/#value\b/] },
     }),

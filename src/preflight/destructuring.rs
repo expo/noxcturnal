@@ -52,6 +52,16 @@ pub(super) struct AstPlan {
     planned_allocations: FxHashMap<String, usize>,
 }
 
+impl AstPlan {
+    pub(super) fn is_empty(&self) -> bool {
+        self.declarations.is_empty()
+            && self.catches.is_empty()
+            && self.assignments.is_empty()
+            && self.for_of_assignments.is_empty()
+            && self.temporary_declarations.is_empty()
+    }
+}
+
 struct AstDeclaratorPlan {
     root: String,
     anchor: Span,
@@ -145,20 +155,50 @@ impl NameReservations for SnapshotReservations<'_> {
 }
 
 pub(super) fn prepare_ast(
-    _source: &str,
     semantic: &Semantic<'_>,
     inline_helpers: bool,
     only_object_rest: bool,
     object_rest_loose: bool,
-    parameters_selected: bool,
-    previous_helper_names: &[String],
 ) -> Result<AstPlan, &'static str> {
-    let mut base_reserved: FxHashSet<String> = semantic
+    let has_candidate = semantic.nodes().iter().any(|node| match node.kind() {
+        AstKind::VariableDeclarator(declarator) => {
+            !declarator.id.is_binding_identifier()
+                && (!only_object_rest || binding_has_object_rest(&declarator.id))
+        }
+        AstKind::CatchClause(clause) => clause.param.as_ref().is_some_and(|param| {
+            !param.pattern.is_binding_identifier()
+                && (!only_object_rest || binding_has_object_rest(&param.pattern))
+        }),
+        AstKind::AssignmentExpression(assignment) => {
+            assignment.left.is_assignment_target_pattern()
+                && (!only_object_rest || assignment_has_object_rest(&assignment.left))
+        }
+        AstKind::ForOfStatement(statement) => {
+            statement.left.as_assignment_target().is_some_and(|target| {
+                target.is_assignment_target_pattern()
+                    && (!only_object_rest || assignment_has_object_rest(target))
+            })
+        }
+        _ => false,
+    });
+    if !has_candidate {
+        return Ok(AstPlan {
+            declarations: FxHashMap::default(),
+            catches: FxHashMap::default(),
+            assignments: FxHashMap::default(),
+            for_of_assignments: FxHashMap::default(),
+            temporary_declarations: FxHashMap::default(),
+            helper_requests: CustomHelperRequests::default(),
+            helper_names: HelperNames::default(),
+            base_reserved: FxHashSet::default(),
+            planned_allocations: FxHashMap::default(),
+        });
+    }
+    let base_reserved: FxHashSet<String> = semantic
         .scoping()
         .symbol_names()
         .map(str::to_owned)
         .collect();
-    base_reserved.extend(previous_helper_names.iter().cloned());
     let mut reserved = PlanningReservations::new(base_reserved);
     let mut helper_names = HelperNames {
         iter: reserve("_toArray", &mut reserved),
@@ -197,18 +237,10 @@ pub(super) fn prepare_ast(
                 }
                 if !ast_eligible_declarator(semantic.nodes(), node_id, declarator)
                     || (only_object_rest && !binding_has_object_rest(&declarator.id))
-                    // Parameters relocates default expressions into a generated body.
-                    // Keep declarations nested in those expressions on the temporary
-                    // compatibility path until destructuring planning moves after the
-                    // parameter mutation.
-                    || (parameters_selected
-                        && semantic
-                            .nodes()
-                            .ancestor_ids(node_id)
-                            .any(|ancestor| matches!(
-                                semantic.nodes().kind(ancestor),
-                                AstKind::FormalParameters(_)
-                            )))
+                // Parameters relocates default expressions into a generated body.
+                // Keep declarations nested in those expressions on the temporary
+                // compatibility path until destructuring planning moves after the
+                // parameter mutation.
                 {
                     continue;
                 }
@@ -1388,6 +1420,7 @@ fn binding_pattern_fingerprint(pattern: &BindingPattern<'_>) -> String {
     output
 }
 
+#[derive(Default)]
 struct HelperNames {
     iter: String,
     iter_runtime: String,
@@ -1605,8 +1638,7 @@ mod tests {
         let semantic = SemanticBuilder::new()
             .with_build_nodes(true)
             .build(&program);
-        let plan =
-            prepare_ast(source, &semantic.semantic, false, false, false, false, &[]).unwrap();
+        let plan = prepare_ast(&semantic.semantic, false, false, false).unwrap();
         assert_eq!(plan.declarations.len(), 1);
         let (changed, requests) = run_ast(&allocator, &mut program, plan).unwrap();
         assert!(changed);
@@ -1635,8 +1667,7 @@ mod tests {
         let semantic = SemanticBuilder::new()
             .with_build_nodes(true)
             .build(&program);
-        let plan =
-            prepare_ast(source, &semantic.semantic, false, false, false, false, &[]).unwrap();
+        let plan = prepare_ast(&semantic.semantic, false, false, false).unwrap();
         let (changed, _) = run_ast(&allocator, &mut program, plan).unwrap();
         assert!(changed);
         let code = Codegen::new().build(&program).code;
@@ -1654,7 +1685,7 @@ mod tests {
         let semantic = SemanticBuilder::new()
             .with_build_nodes(true)
             .build(&program);
-        let plan = prepare_ast(source, &semantic.semantic, false, true, true, false, &[]).unwrap();
+        let plan = prepare_ast(&semantic.semantic, false, true, true).unwrap();
         let (changed, requests) = run_ast(&allocator, &mut program, plan).unwrap();
         assert!(changed);
         let mut names = Vec::new();
@@ -1678,8 +1709,7 @@ mod tests {
         let semantic = SemanticBuilder::new()
             .with_build_nodes(true)
             .build(&program);
-        let plan =
-            prepare_ast(source, &semantic.semantic, false, false, false, false, &[]).unwrap();
+        let plan = prepare_ast(&semantic.semantic, false, false, false).unwrap();
         let (changed, _) = run_ast(&allocator, &mut program, plan).unwrap();
         assert!(changed);
         let code = Codegen::new().build(&program).code;
@@ -1697,8 +1727,7 @@ mod tests {
         let semantic = SemanticBuilder::new()
             .with_build_nodes(true)
             .build(&program);
-        let plan =
-            prepare_ast(source, &semantic.semantic, false, false, false, false, &[]).unwrap();
+        let plan = prepare_ast(&semantic.semantic, false, false, false).unwrap();
         let (changed, _) = run_ast(&allocator, &mut program, plan).unwrap();
         assert!(changed);
         let code = Codegen::new().build(&program).code;
@@ -1717,8 +1746,7 @@ mod tests {
         let semantic = oxc_semantic::SemanticBuilder::new()
             .with_build_nodes(true)
             .build(&parsed.program);
-        let plan =
-            prepare_ast(&source, &semantic.semantic, true, false, false, false, &[]).unwrap();
+        let plan = prepare_ast(&semantic.semantic, true, false, false).unwrap();
         assert_eq!(plan.declarations.len(), 128);
     }
 }

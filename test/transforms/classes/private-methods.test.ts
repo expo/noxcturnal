@@ -6,7 +6,7 @@ test('lowers private methods', async () => {
   expect(
     await transformSource(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { privateMethods: { loose: true } },
+      transforms: { privateMethods: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase2 = {

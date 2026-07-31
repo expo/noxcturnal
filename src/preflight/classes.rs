@@ -15,7 +15,7 @@ use oxc_ast_visit::{Visit, VisitMut, walk, walk_mut};
 #[cfg(test)]
 use oxc_parser::Parser;
 use oxc_semantic::{NodeId, Semantic};
-use oxc_span::{GetSpan, SourceType, Span};
+use oxc_span::{GetSpan, Span};
 use oxc_syntax::operator::AssignmentOperator;
 use oxc_syntax::scope::ScopeFlags;
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -431,10 +431,7 @@ fn inferred_class_name(nodes: &oxc_semantic::AstNodes<'_>, node_id: NodeId) -> O
     }
 }
 
-#[expect(clippy::too_many_arguments)]
 pub(super) fn prepare_ast(
-    _source: &str,
-    _source_type: SourceType,
     semantic: &Semantic<'_>,
     lower_all_classes: bool,
     class_properties_loose: Option<bool>,
@@ -442,8 +439,14 @@ pub(super) fn prepare_ast(
     private_methods_loose: Option<bool>,
     private_in_loose: Option<bool>,
     inline_helpers: bool,
-    _lower_captured_loops: bool,
 ) -> Result<AstPlan, &'static str> {
+    let class_facts = collect_class_facts(semantic);
+    if class_facts.is_empty() {
+        return Ok(AstPlan {
+            direct: FxHashMap::default(),
+            helper_requests: CustomHelperRequests::default(),
+        });
+    }
     let mut reserved: FxHashSet<String> = semantic
         .scoping()
         .symbol_names()
@@ -460,7 +463,6 @@ pub(super) fn prepare_ast(
         check_in_rhs_runtime: reserve("_checkInRHS2", &mut reserved),
         private_runtime: reserve("_classPrivateFieldLooseBase2", &mut reserved),
     };
-    let class_facts = collect_class_facts(semantic);
     let direct = direct_class_candidates(
         semantic,
         &class_facts,
@@ -4013,6 +4015,7 @@ mod tests {
     use super::*;
     use oxc_codegen::Codegen;
     use oxc_semantic::SemanticBuilder;
+    use oxc_span::SourceType;
     use std::path::Path;
 
     #[test]
@@ -4029,19 +4032,7 @@ mod tests {
         let semantic = SemanticBuilder::new()
             .with_build_nodes(true)
             .build(&program);
-        let plan = prepare_ast(
-            source,
-            SourceType::default(),
-            &semantic.semantic,
-            true,
-            None,
-            false,
-            None,
-            None,
-            false,
-            false,
-        )
-        .unwrap();
+        let plan = prepare_ast(&semantic.semantic, true, None, false, None, None, false).unwrap();
         assert_eq!(plan.direct.len(), 1);
         let (changed, _) = run_ast(&allocator, &mut program, plan).unwrap();
         assert!(changed);
@@ -4123,15 +4114,12 @@ mod tests {
             .with_build_nodes(true)
             .build(&program);
         let plan = prepare_ast(
-            &source,
-            SourceType::default(),
             &semantic.semantic,
             true,
             None,
             false,
             Some(true),
             None,
-            false,
             false,
         )
         .unwrap();
@@ -4153,15 +4141,12 @@ mod tests {
             .with_build_nodes(true)
             .build(&program);
         let plan = prepare_ast(
-            source,
-            SourceType::default(),
             &semantic.semantic,
             true,
             None,
             false,
             Some(true),
             None,
-            false,
             false,
         )
         .unwrap();

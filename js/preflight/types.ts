@@ -39,13 +39,19 @@ export interface PreflightOptimize {
   deadCodeElimination?: true;
 }
 
-/** Orthogonal native syntax transforms. Consumers compose runtime presets from these toggles. */
+/**
+ * Native syntax transforms. Most toggles compose independently, but focused
+ * class-feature transforms share one native class-lowering representation and
+ * can lower sibling class syntax present in the same source. TypeScript is
+ * normalized before these transforms. RegExp Unicode lowering also expands
+ * Unicode property escapes.
+ */
 export interface PreflightTransforms {
   blockScoping?: true;
   classes?: true;
   /** Apply TypeScript-style legacy decorator semantics. */
   legacyDecorators?: true;
-  destructuring?: { useBuiltIns: boolean };
+  destructuring?: true;
   parameters?: true;
   forOf?: true;
   explicitResourceManagement?: true;
@@ -60,8 +66,10 @@ export interface PreflightTransforms {
   asyncGeneratorFunctions?: true;
   asyncFunctions?: true;
   exponentiationOperator?: true;
-  privateMethods?: { loose: boolean };
-  privatePropertyInObject?: { loose: boolean };
+  /** Native private state uses one stable loose representation. */
+  privateMethods?: true;
+  /** Native private state uses one stable loose representation. */
+  privatePropertyInObject?: true;
   regexpSticky?: true;
   regexpUnicode?: true;
   regexpUnicodePropertyEscapes?: true;

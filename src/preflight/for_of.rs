@@ -86,6 +86,12 @@ pub(super) fn prepare(semantic: &Semantic<'_>) -> Plan {
     Plan { names }
 }
 
+impl Plan {
+    pub(super) fn is_empty(&self) -> bool {
+        self.names.is_empty()
+    }
+}
+
 pub(super) fn run<'a>(
     allocator: &'a Allocator,
     program: &mut Program<'a>,

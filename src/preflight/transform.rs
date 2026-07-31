@@ -37,8 +37,7 @@ use crate::syntax::classification::source_type;
 
 use super::block_scoping;
 use super::helpers::{
-    CustomHelperRequests, custom_helpers_introduced, helper_adapter_markers, inline_helpers,
-    validate_custom_runtime_helpers, validate_runtime_helpers,
+    CustomHelperRequests, inline_helpers, validate_custom_runtime_helpers, validate_runtime_helpers,
 };
 use super::object_spread;
 use super::optimize;
@@ -76,6 +75,9 @@ fn restore_export_namespace_attributes<'a>(
     program: &mut Program<'a>,
     attributes: &mut [ExportNamespaceAttribute<'a>],
 ) {
+    if attributes.is_empty() {
+        return;
+    }
     let mut pending = FxHashMap::<String, FxHashMap<String, VecDeque<_>>>::default();
     for attribute in attributes {
         pending
@@ -246,6 +248,9 @@ fn validate_generated_async_iterator_results<'a>(
 #[napi(object)]
 pub struct NativePreflightResult {
     pub status: String,
+    pub changed: bool,
+    pub normalized_javascript: bool,
+    pub jsx: bool,
     pub reason: Option<String>,
     pub code: Option<String>,
     pub map: Option<Buffer>,
@@ -309,17 +314,51 @@ impl OwnedProgram {
 }
 
 pub fn transform(
+    source: String,
+    filename: String,
+    options: NativePreflightOptions,
+) -> Result<NativePreflightResult> {
+    transform_impl(source, filename, options, true, false, None)
+}
+
+pub(crate) fn transform_resident(
+    source: String,
+    filename: String,
+    options: NativePreflightOptions,
+    normalized_javascript: bool,
+    resident_jsx: Option<bool>,
+) -> Result<NativePreflightResult> {
+    transform_impl(
+        source,
+        filename,
+        options,
+        false,
+        normalized_javascript,
+        resident_jsx,
+    )
+}
+
+fn transform_impl(
     mut source: String,
     filename: String,
     mut options: NativePreflightOptions,
+    standalone_identity_map: bool,
+    normalized_javascript: bool,
+    resident_jsx: Option<bool>,
 ) -> Result<NativePreflightResult> {
-    // The one thing the original text is needed for downstream is telling which
-    // custom-helper preludes a rewrite *introduced* — seven `contains` checks.
-    // Precompute those booleans now instead of retaining a whole second copy of
-    // the source across the entire transform.
-    let before_helper_markers = helper_adapter_markers(&source);
-    let mut semantic_build_count = 0;
-    let mut ast_traversal_count = 0;
+    validate_option_ownership(&options)?;
+    let initial_jsx = resident_jsx.unwrap_or_else(|| {
+        let filename = filename.to_ascii_lowercase();
+        filename.ends_with(".jsx") || filename.ends_with(".tsx")
+    });
+    if !has_active_operation(&options) {
+        return Ok(identity_result(
+            source,
+            standalone_identity_map,
+            normalized_javascript,
+            initial_jsx,
+        ));
+    }
     if options.react_compiler == Some(true) && !cfg!(feature = "react_compiler") {
         return Ok(unsupported("react-compiler-not-built", [] as [String; 0]));
     }
@@ -380,6 +419,13 @@ pub fn transform(
     // two against what Babel emits. The React Compiler reads JSX for the same
     // reason. None of them misread TypeScript, so none of them need to move.
     let mut active_source_type = source_type(&filename, &source)?;
+    let mut output_normalized_javascript = normalized_javascript;
+    if normalized_javascript {
+        active_source_type = active_source_type
+            .with_javascript(true)
+            .with_standard(!initial_jsx)
+            .with_jsx(initial_jsx);
+    }
     if options.typescript.as_deref() == Some("strip") {
         active_source_type = active_source_type.with_typescript(true);
     }
@@ -398,7 +444,7 @@ pub fn transform(
     // Attributed to the phases they belong to, so a prepass does not look free.
     if language_prepass {
         let language_allocator = Allocator::default();
-        let parsed = run(|| Parser::new(&language_allocator, &source, active_source_type).parse());
+        let parsed = Parser::new(&language_allocator, &source, active_source_type).parse();
         // A file that does not parse is reported by the parse below, with its
         // original spans rather than the prepass's.
         if parsed.diagnostics.is_empty() {
@@ -406,20 +452,17 @@ pub fn transform(
             let has_decorators = if possible_decorators {
                 let mut decorator_detector = DecoratorDetector(false);
                 decorator_detector.visit_program(&program);
-                ast_traversal_count += 1;
                 decorator_detector.0
             } else {
                 false
             };
             if active_source_type.is_typescript() || has_decorators {
-                semantic_build_count += 1;
-                ast_traversal_count += 1;
-                let built = run(|| {
+                let built = {
                     SemanticBuilder::new()
                         .with_excess_capacity(2.0)
                         .with_enum_eval(true)
                         .build(&program)
-                });
+                };
                 if built.diagnostics.is_empty() {
                     let mut language_options = TransformOptions {
                         cwd: transform_options.cwd.clone(),
@@ -449,7 +492,6 @@ pub fn transform(
                         language_options.decorator.legacy = true;
                         language_options.helper_loader.mode = HelperLoaderMode::External;
                     }
-                    ast_traversal_count += 1;
                     let transformed = Transformer::new(
                         &language_allocator,
                         Path::new(&filename),
@@ -517,23 +559,66 @@ pub fn transform(
                         // setters only ever set — so the language has to be moved to
                         // JavaScript outright. The JSX variant is separate and stays.
                         active_source_type = active_source_type.with_javascript(true);
+                        output_normalized_javascript = true;
                     }
                 }
             }
         }
     }
-    let mut final_program = run(|| {
+    let mut final_program = {
         parse_owned(
             std::mem::take(&mut source),
             active_source_type,
             regexp_ast_selected,
         )
-    });
+    };
     if final_program.has_diagnostics() {
         return Ok(unsupported(
             "parse-error",
             &final_program.borrow_dependent().diagnostics,
         ));
+    }
+    if !requires_generic_pipeline(&options) {
+        let should_render = options.constant_folding == Some(true)
+            || options.dead_code_elimination == Some(true)
+            || options.compact == Some(true)
+            || (options.comments == Some(false)
+                && (final_program.borrow_owner().source.contains("//")
+                    || final_program.borrow_owner().source.contains("/*")));
+        if !should_render {
+            return Ok(identity_result(
+                final_program.into_owner().source,
+                standalone_identity_map,
+                output_normalized_javascript,
+                active_source_type.is_jsx(),
+            ));
+        }
+        return final_program.with_program_mut(|_, allocator, mut program| {
+            optimize::run(
+                allocator,
+                &mut program,
+                options.constant_folding == Some(true),
+                options.dead_code_elimination == Some(true),
+            );
+            let (code, layer) = render_program(
+                &program,
+                &filename,
+                options.compact.unwrap_or(false),
+                options.comments.unwrap_or(true),
+                0,
+            )?;
+            Ok(NativePreflightResult {
+                status: "complete".into(),
+                changed: true,
+                normalized_javascript: output_normalized_javascript,
+                jsx: active_source_type.is_jsx(),
+                reason: None,
+                code: Some(code),
+                map: Some(layer.pack().into()),
+                diagnostics: Vec::new(),
+                helpers_used: Vec::new(),
+            })
+        });
     }
     final_program.with_program_mut(|source, allocator, mut program| {
         let (had_object_spread_syntax, object_spread_helper_requests) = if focused_object_rest {
@@ -548,12 +633,8 @@ pub fn transform(
         } else {
             (false, super::helpers::CustomHelperRequests::default())
         };
-        if focused_object_rest {
-            ast_traversal_count += 1;
-        }
         let (had_regexp_syntax, mut structural_custom_helper_requests) = if regexp_rewrite_selected
         {
-            ast_traversal_count += 1;
             match super::regexp::run(
                 allocator,
                 &mut program,
@@ -581,12 +662,16 @@ pub fn transform(
         if conditional_jsx {
             let mut detector = JsxDetector(false);
             detector.visit_program(&program);
-            ast_traversal_count += 1;
             // A conditional JSX-only phase can return the original bytes
             // without printing. A fused source rewrite still has work even
             // when this particular file contains no JSX.
             if !detector.0 && !selects_source_rewrite {
-                return Ok(identity_result(source.to_owned()));
+                return Ok(identity_result(
+                    source.to_owned(),
+                    standalone_identity_map,
+                    output_normalized_javascript,
+                    false,
+                ));
             }
         }
         if options.classes != Some(true)
@@ -597,19 +682,15 @@ pub fn transform(
             // Rewrite static initializer `super` access before the downstream field
             // transform so inherited accessors observe the same receiver semantics.
             super::classes::rewrite_loose_static_field_super(allocator, &mut program);
-            ast_traversal_count += 1;
         }
         let check_regexp = options.regexp_unicode == Some(true)
             || options.regexp_unicode_property_escapes == Some(true)
             || options.regexp_dot_all == Some(true)
             || options.regexp_named_capture_groups == Some(true)
-            || options.regexp_look_behind == Some(true)
-            || options.regexp_match_indices == Some(true)
             || options.regexp_unicode_sets == Some(true);
         let mut detector = PostconditionDetector {
             // NOTE: The focused class pass now owns class-property/private
             // composition, so Oxc's historical fusion guard is unreachable.
-            check_class_fusion: options.class_properties == Some(true) && !classes_ast_selected,
             check_regexp,
             // Flat declarators now run after semantic planning. Remaining
             // shapes have already taken the compatibility path.
@@ -626,14 +707,11 @@ pub fn transform(
         };
         if detector.is_active() {
             detector.visit_program(&program);
-            ast_traversal_count += 1;
         }
         if let Some(reason) = detector.failure_reason(&options) {
             return Ok(unsupported(reason, [] as [String; 0]));
         }
-        semantic_build_count += 1;
-        ast_traversal_count += 1;
-        let semantic = run(|| {
+        let semantic = {
             SemanticBuilder::new()
                 .with_build_nodes(
                     options.block_scoping == Some(true)
@@ -645,26 +723,22 @@ pub fn transform(
                 .with_excess_capacity(2.0)
                 .with_enum_eval(true)
                 .build(&program)
-        });
+        };
         if !semantic.diagnostics.is_empty() {
             return Ok(unsupported("semantic-error", semantic.diagnostics));
         }
         let mut semantic = semantic;
         if options.block_scoping == Some(true) {
             loop {
-                let plan = match block_scoping::prepare_captured_loop_ast(
-                    source,
-                    active_source_type,
-                    &semantic.semantic,
-                ) {
-                    Ok(plan) => plan,
-                    Err(reason) => return Ok(unsupported(reason, [] as [String; 0])),
-                };
+                let plan =
+                    match block_scoping::prepare_captured_loop_ast(source, &semantic.semantic) {
+                        Ok(plan) => plan,
+                        Err(reason) => return Ok(unsupported(reason, [] as [String; 0])),
+                    };
                 if plan.is_empty() {
                     break;
                 }
                 drop(semantic);
-                ast_traversal_count += 1;
                 match block_scoping::run_captured_loop_ast(allocator, &mut program, plan) {
                     Ok(true) => {}
                     Ok(false) => {
@@ -675,15 +749,13 @@ pub fn transform(
                     }
                     Err(reason) => return Ok(unsupported(reason, [] as [String; 0])),
                 }
-                semantic_build_count += 1;
-                ast_traversal_count += 1;
-                semantic = run(|| {
+                semantic = {
                     SemanticBuilder::new()
                         .with_build_nodes(true)
                         .with_excess_capacity(2.0)
                         .with_enum_eval(true)
                         .build(&program)
-                });
+                };
                 if !semantic.diagnostics.is_empty() {
                     return Ok(unsupported(
                         "captured-loop-post-rewrite-semantic-error",
@@ -694,8 +766,6 @@ pub fn transform(
         }
         let classes_ast_plan = if classes_ast_selected {
             match super::classes::prepare_ast(
-                source,
-                active_source_type,
                 &semantic.semantic,
                 options.classes == Some(true),
                 if options.classes == Some(true) {
@@ -734,7 +804,6 @@ pub fn transform(
                         .or(focused_class_features.then_some(true))
                 },
                 options.helpers_mode.as_deref() == Some("inline"),
-                options.block_scoping == Some(true),
             ) {
                 Ok(plan) => Some(plan),
                 Err(reason) => return Ok(unsupported(reason, [] as [String; 0])),
@@ -748,7 +817,6 @@ pub fn transform(
                 .is_some_and(|plan| !plan.is_empty())
             {
                 drop(semantic);
-                ast_traversal_count += 1;
                 let (changed, requests) = match super::classes::run_ast(
                     allocator,
                     &mut program,
@@ -760,15 +828,13 @@ pub fn transform(
                 if !changed {
                     return Ok(unsupported("classes-ast-target-missing", [] as [String; 0]));
                 }
-                semantic_build_count += 1;
-                ast_traversal_count += 1;
-                let rebuilt = run(|| {
+                let rebuilt = {
                     SemanticBuilder::new()
                         .with_build_nodes(true)
                         .with_excess_capacity(2.0)
                         .with_enum_eval(true)
                         .build(&program)
-                });
+                };
                 if !rebuilt.diagnostics.is_empty() {
                     return Ok(unsupported(
                         "classes-post-rewrite-semantic-error",
@@ -797,7 +863,6 @@ pub fn transform(
                 ..PostconditionDetector::default()
             };
             classes_postcondition.visit_program(&program);
-            ast_traversal_count += 1;
             if classes_postcondition.classes {
                 return Ok(unsupported(
                     "classes-postcondition-failed",
@@ -840,13 +905,10 @@ pub fn transform(
             && options.for_of != Some(true)
         {
             match super::destructuring::prepare_ast(
-                source,
                 &semantic.semantic,
                 options.helpers_mode.as_deref() == Some("inline"),
                 options.destructuring != Some(true),
                 object_rest_loose,
-                false,
-                &[],
             ) {
                 Ok(plan) => Some(plan),
                 Err(reason) => return Ok(unsupported(reason, [] as [String; 0])),
@@ -855,28 +917,26 @@ pub fn transform(
             None
         };
         let mut scoping = semantic.semantic.into_scoping();
-        let had_parameters_ast_syntax = if let Some(plan) = parameters_ast_plan {
-            ast_traversal_count += 1;
-            match super::parameters::run_ast(allocator, &mut program, plan) {
-                Ok(changed) => changed,
-                Err(reason) => return Ok(unsupported(reason, [] as [String; 0])),
-            }
-        } else {
-            false
-        };
+        let had_parameters_ast_syntax =
+            if let Some(plan) = parameters_ast_plan.filter(|plan| !plan.is_empty()) {
+                match super::parameters::run_ast(allocator, &mut program, plan) {
+                    Ok(changed) => changed,
+                    Err(reason) => return Ok(unsupported(reason, [] as [String; 0])),
+                }
+            } else {
+                false
+            };
         let for_of_plan = if options.for_of == Some(true) {
             // Parameters can introduce `_len`, `_key`, and capture aliases.
             // Rebuild before planning ForOf so its reservation set includes
             // every binding now present in the program.
-            semantic_build_count += 1;
-            ast_traversal_count += 1;
-            let mut semantic = run(|| {
+            let mut semantic = {
                 SemanticBuilder::new()
                     .with_build_nodes(true)
                     .with_excess_capacity(2.0)
                     .with_enum_eval(true)
                     .build(&program)
-            });
+            };
             if !semantic.diagnostics.is_empty() {
                 return Ok(unsupported(
                     "pre-for-of-semantic-error",
@@ -891,8 +951,7 @@ pub fn transform(
         } else {
             None
         };
-        let had_for_of_syntax = if let Some(plan) = for_of_plan {
-            ast_traversal_count += 1;
+        let had_for_of_syntax = if let Some(plan) = for_of_plan.filter(|plan| !plan.is_empty()) {
             match super::for_of::run(allocator, &mut program, plan) {
                 Ok(changed) => changed,
                 Err(reason) => return Ok(unsupported(reason, [] as [String; 0])),
@@ -900,13 +959,12 @@ pub fn transform(
         } else {
             false
         };
-        if options.for_of == Some(true) {
+        if had_for_of_syntax {
             let mut for_of_postcondition = PostconditionDetector {
                 check_for_of: true,
                 ..PostconditionDetector::default()
             };
             for_of_postcondition.visit_program(&program);
-            ast_traversal_count += 1;
             if for_of_postcondition.for_of {
                 return Ok(unsupported(
                     "for-of-postcondition-failed",
@@ -917,15 +975,13 @@ pub fn transform(
         let mut destructuring_ast_plan = if early_destructuring_ast_plan.is_some() {
             early_destructuring_ast_plan
         } else if options.destructuring == Some(true) || focused_object_rest {
-            semantic_build_count += 1;
-            ast_traversal_count += 1;
-            let mut semantic = run(|| {
+            let mut semantic = {
                 SemanticBuilder::new()
                     .with_build_nodes(true)
                     .with_excess_capacity(2.0)
                     .with_enum_eval(true)
                     .build(&program)
-            });
+            };
             if !semantic.diagnostics.is_empty() {
                 return Ok(unsupported(
                     "pre-destructuring-semantic-error",
@@ -937,13 +993,10 @@ pub fn transform(
                 classes_custom_helper_requests.scope_names(),
             );
             let plan = match super::destructuring::prepare_ast(
-                source,
                 &semantic.semantic,
                 options.helpers_mode.as_deref() == Some("inline"),
                 options.destructuring != Some(true),
                 object_rest_loose,
-                false,
-                &[],
             ) {
                 Ok(plan) => plan,
                 Err(reason) => return Ok(unsupported(reason, [] as [String; 0])),
@@ -955,9 +1008,11 @@ pub fn transform(
         let mut had_destructuring_ast_syntax = false;
         let mut destructuring_custom_helper_requests =
             super::helpers::CustomHelperRequests::default();
-        if let Some(plan) = destructuring_ast_plan.take() {
+        if let Some(plan) = destructuring_ast_plan
+            .take()
+            .filter(|plan| !plan.is_empty())
+        {
             let (changed, requests) = {
-                ast_traversal_count += 1;
                 match super::destructuring::run_ast(allocator, &mut program, plan) {
                     Ok(result) => result,
                     Err(reason) => return Ok(unsupported(reason, [] as [String; 0])),
@@ -974,7 +1029,6 @@ pub fn transform(
                 ..PostconditionDetector::default()
             };
             parameters_postcondition.visit_program(&program);
-            ast_traversal_count += 1;
             if parameters_postcondition.parameters {
                 return Ok(unsupported(
                     "parameters-postcondition-failed",
@@ -989,15 +1043,13 @@ pub fn transform(
             let plan = if let Some(plan) = early_block_scoping_plan {
                 plan
             } else {
-                semantic_build_count += 1;
-                ast_traversal_count += 1;
-                let semantic = run(|| {
+                let semantic = {
                     SemanticBuilder::new()
                         .with_build_nodes(true)
                         .with_excess_capacity(2.0)
                         .with_enum_eval(true)
                         .build(&program)
-                });
+                };
                 if !semantic.diagnostics.is_empty() {
                     return Ok(unsupported(
                         "pre-block-scoping-semantic-error",
@@ -1022,7 +1074,6 @@ pub fn transform(
                 options.helpers_mode.as_deref() != Some("runtime"),
             );
             structural_custom_helper_requests.prepend(requests);
-            ast_traversal_count += 1;
         }
         if had_classes_ast_syntax
             || had_for_of_syntax
@@ -1032,14 +1083,12 @@ pub fn transform(
             // ForOf introduces a try/catch scope and six bindings. Oxc 0.141
             // has no incremental semantic update, so refresh scoping after all
             // pre-transform mutations and before handing the program to Oxc.
-            semantic_build_count += 1;
-            ast_traversal_count += 1;
-            let rebuilt = run(|| {
+            let rebuilt = {
                 SemanticBuilder::new()
                     .with_excess_capacity(2.0)
                     .with_enum_eval(true)
                     .build(&program)
-            });
+            };
             if !rebuilt.diagnostics.is_empty() {
                 return Ok(unsupported(
                     "post-rewrite-semantic-error",
@@ -1096,7 +1145,6 @@ pub fn transform(
         if let Some(deferred) = deferred_async
             && transformed.diagnostics.is_empty()
         {
-            ast_traversal_count += 1;
             let async_pass = Transformer::new(allocator, Path::new(&filename), &deferred)
                 .build_with_scoping(transformed.scoping, &mut program);
             transformed.diagnostics = async_pass.diagnostics;
@@ -1111,7 +1159,6 @@ pub fn transform(
                 &transformed.scoping,
             );
             if !requests.is_empty() {
-                ast_traversal_count += 2;
                 structural_custom_helper_requests.prepend(requests);
             }
         }
@@ -1128,13 +1175,17 @@ pub fn transform(
                 options.helpers_mode.as_deref() != Some("runtime"),
             );
             if changed {
-                ast_traversal_count += 1;
                 structural_custom_helper_requests.prepend(jsx_helper_requests);
             }
         }
-        if object_rest_loose {
+        #[expect(deprecated)]
+        let rewrites_object_rest_helper = object_rest_loose
+            && transformed
+                .helpers_used
+                .iter()
+                .any(|(helper, _)| *helper == oxc_transformer::Helper::ObjectWithoutProperties);
+        if rewrites_object_rest_helper {
             ObjectRestLooseCompletionRewriter { allocator }.visit_program(&mut program);
-            ast_traversal_count += 1;
         }
         if options.logical_assignment_operators == Some(true) {
             let existing = transformed
@@ -1142,9 +1193,7 @@ pub fn transform(
                 .symbol_names()
                 .map(str::to_owned)
                 .collect::<rustc_hash::FxHashSet<_>>();
-            if super::logical_assignment::run(allocator, &mut program, existing) {
-                ast_traversal_count += 1;
-            }
+            if super::logical_assignment::run(allocator, &mut program, existing) {}
         }
         if options.private_methods == Some(true) || options.private_property_in_object == Some(true)
         {
@@ -1154,7 +1203,6 @@ pub fn transform(
                 ..ClassFeaturesUnsupportedDetector::default()
             };
             detector.visit_program(&program);
-            ast_traversal_count += 1;
             if detector.has_unsupported_syntax() {
                 return Ok(unsupported(
                     "class-features-postcondition-failed",
@@ -1171,14 +1219,12 @@ pub fn transform(
             // lowers what the transformer introduced, with the same collision
             // planning the first round used. Only files that would otherwise have
             // been rejected here pay for the extra semantic build.
-            semantic_build_count += 1;
-            ast_traversal_count += 1;
-            let semantic = run(|| {
+            let semantic = {
                 SemanticBuilder::new()
                     .with_build_nodes(true)
                     .with_excess_capacity(2.0)
                     .build(&program)
-            });
+            };
             if !semantic.diagnostics.is_empty() {
                 return Ok(unsupported(
                     "block-scoping-postcondition-semantic-error",
@@ -1197,7 +1243,6 @@ pub fn transform(
                 }
                 Err(reason) => return Ok(unsupported(reason, [] as [String; 0])),
             }
-            ast_traversal_count += 1;
             if block_scoping::has_remaining_syntax(&program) {
                 return Ok(unsupported(
                     "block-scoping-postcondition-failed",
@@ -1205,12 +1250,14 @@ pub fn transform(
                 ));
             }
         }
-        optimize::run(
-            allocator,
-            &mut program,
-            options.constant_folding == Some(true),
-            options.dead_code_elimination == Some(true),
-        );
+        if options.constant_folding == Some(true) || options.dead_code_elimination == Some(true) {
+            optimize::run(
+                allocator,
+                &mut program,
+                options.constant_folding == Some(true),
+                options.dead_code_elimination == Some(true),
+            );
+        }
         #[expect(deprecated)]
         let helper_requests: Vec<_> = transformed.helpers_used.into_iter().collect();
         let oxc_codegen_only_transform_selected = options.explicit_resource_management
@@ -1247,14 +1294,19 @@ pub fn transform(
             && !(options.comments == Some(false)
                 && (source.contains("//") || source.contains("/*")))
         {
-            return Ok(identity_result(source.to_owned()));
+            return Ok(identity_result(
+                source.to_owned(),
+                standalone_identity_map,
+                output_normalized_javascript,
+                active_source_type.is_jsx(),
+            ));
         }
         let helper_mode = options.helpers_mode.as_deref().unwrap_or("runtime");
         let helper_module = options
             .helpers_module_name
             .as_deref()
             .unwrap_or("@babel/runtime");
-        let mut custom_helper_requests = custom_helpers_introduced(&before_helper_markers, source);
+        let mut custom_helper_requests = Vec::new();
         let mut custom_helper_fragments = Vec::new();
         let compact = options.compact.unwrap_or(false);
         structural_custom_helper_requests.extend_into(
@@ -1331,7 +1383,6 @@ pub fn transform(
         let inline_prefix = inline.map(|inline| {
             let binding = allocator.alloc_str(&inline.binding);
             InlineHelperRenamer { binding }.visit_program(&mut program);
-            ast_traversal_count += 1;
             format!("var {binding}={};\n", inline.prefix)
         });
         let generated_line_offset = u32::from(inline_prefix.is_some());
@@ -1395,6 +1446,10 @@ pub fn transform(
         };
         Ok(NativePreflightResult {
             status: "complete".into(),
+            changed: true,
+            normalized_javascript: output_normalized_javascript
+                || active_source_type.is_typescript(),
+            jsx: active_source_type.is_jsx() && options.jsx.is_none(),
             reason: None,
             code: Some(match inline_prefix {
                 Some(prefix) => prefix + &generated_code,
@@ -1405,6 +1460,130 @@ pub fn transform(
             helpers_used,
         })
     })
+}
+
+fn validate_option_ownership(options: &NativePreflightOptions) -> Result<()> {
+    let invalid = |message: &str| Error::new(Status::InvalidArg, message.to_owned());
+    for (secondary, owner, name) in [
+        (
+            options.class_properties_loose.is_some(),
+            options.class_properties == Some(true),
+            "classPropertiesLoose",
+        ),
+        (
+            options.optional_chaining_loose.is_some(),
+            options.optional_chaining == Some(true),
+            "optionalChainingLoose",
+        ),
+        (
+            options.nullish_coalescing_operator_loose.is_some(),
+            options.nullish_coalescing_operator == Some(true),
+            "nullishCoalescingOperatorLoose",
+        ),
+        (
+            options.object_rest_spread_loose.is_some()
+                || options.object_rest_spread_use_built_ins.is_some(),
+            options.object_rest_spread == Some(true),
+            "objectRestSpread options",
+        ),
+    ] {
+        if secondary && !owner {
+            return Err(invalid(&format!("{name} requires its owning transform")));
+        }
+    }
+    let jsx_secondary = options.jsx_pure.is_some()
+        || options.jsx_throw_if_namespace.is_some()
+        || options.jsx_import_source.is_some()
+        || options.jsx_pragma.is_some()
+        || options.jsx_pragma_frag.is_some();
+    if jsx_secondary && options.jsx.is_none() {
+        return Err(invalid("JSX options require an active JSX mode"));
+    }
+    let refresh_secondary = options.react_refresh_reg.is_some()
+        || options.react_refresh_sig.is_some()
+        || options.react_refresh_emit_full_signatures.is_some();
+    if refresh_secondary && options.react_refresh != Some(true) {
+        return Err(invalid("React Refresh options require reactRefresh"));
+    }
+    Ok(())
+}
+
+fn has_active_operation(options: &NativePreflightOptions) -> bool {
+    options.react_compiler == Some(true)
+        || options.react_refresh == Some(true)
+        || options.typescript.is_some()
+        || options.jsx.is_some()
+        || options.compact == Some(true)
+        || options.comments == Some(false)
+        || [
+            options.constant_folding,
+            options.dead_code_elimination,
+            options.block_scoping,
+            options.classes,
+            options.legacy_decorators,
+            options.destructuring,
+            options.parameters,
+            options.for_of,
+            options.explicit_resource_management,
+            options.class_static_block,
+            options.class_properties,
+            options.logical_assignment_operators,
+            options.optional_chaining,
+            options.nullish_coalescing_operator,
+            options.export_namespace_from,
+            options.optional_catch_binding,
+            options.object_rest_spread,
+            options.async_generator_functions,
+            options.async_functions,
+            options.exponentiation_operator,
+            options.private_methods,
+            options.private_property_in_object,
+            options.regexp_sticky,
+            options.regexp_unicode,
+            options.regexp_unicode_property_escapes,
+            options.regexp_dot_all,
+            options.regexp_named_capture_groups,
+            options.regexp_look_behind,
+            options.regexp_match_indices,
+            options.regexp_unicode_sets,
+        ]
+        .contains(&Some(true))
+}
+
+fn requires_generic_pipeline(options: &NativePreflightOptions) -> bool {
+    options.react_compiler == Some(true)
+        || options.react_refresh == Some(true)
+        || options.typescript.is_some()
+        || options.jsx.is_some()
+        || [
+            options.block_scoping,
+            options.classes,
+            options.legacy_decorators,
+            options.destructuring,
+            options.parameters,
+            options.for_of,
+            options.explicit_resource_management,
+            options.class_static_block,
+            options.class_properties,
+            options.logical_assignment_operators,
+            options.optional_chaining,
+            options.nullish_coalescing_operator,
+            options.export_namespace_from,
+            options.optional_catch_binding,
+            options.object_rest_spread,
+            options.async_generator_functions,
+            options.async_functions,
+            options.exponentiation_operator,
+            options.private_methods,
+            options.private_property_in_object,
+            options.regexp_sticky,
+            options.regexp_unicode,
+            options.regexp_unicode_property_escapes,
+            options.regexp_dot_all,
+            options.regexp_named_capture_groups,
+            options.regexp_unicode_sets,
+        ]
+        .contains(&Some(true))
 }
 
 fn generated_position(source: &str, byte_offset: usize) -> (u32, u32) {
@@ -1426,6 +1605,9 @@ fn reserve_custom_helper_scope_names<'a>(
         .into_iter()
         .map(str::to_owned)
         .collect::<rustc_hash::FxHashSet<_>>();
+    if helper_names.is_empty() {
+        return;
+    }
     let existing_names = scoping
         .symbol_names()
         .map(str::to_owned)
@@ -2016,14 +2198,11 @@ impl<'a> Visit<'a> for DecoratorDetector {
 
 #[derive(Default)]
 struct PostconditionDetector {
-    check_class_fusion: bool,
     check_regexp: bool,
     check_classes: bool,
     check_destructuring: bool,
     check_parameters: bool,
     check_for_of: bool,
-    private_method: bool,
-    private_in: bool,
     unicode: bool,
     unicode_property: bool,
     dot_all: bool,
@@ -2037,8 +2216,7 @@ struct PostconditionDetector {
 
 impl PostconditionDetector {
     fn is_active(&self) -> bool {
-        self.check_class_fusion
-            || self.check_regexp
+        self.check_regexp
             || self.check_classes
             || self.check_destructuring
             || self.check_parameters
@@ -2069,17 +2247,6 @@ impl PostconditionDetector {
 }
 
 impl<'a> Visit<'a> for PostconditionDetector {
-    fn visit_method_definition(&mut self, method: &MethodDefinition<'a>) {
-        self.private_method |=
-            self.check_class_fusion && matches!(method.key, PropertyKey::PrivateIdentifier(_));
-        walk::walk_method_definition(self, method);
-    }
-
-    fn visit_private_in_expression(&mut self, expression: &PrivateInExpression<'a>) {
-        self.private_in |= self.check_class_fusion;
-        walk::walk_private_in_expression(self, expression);
-    }
-
     fn visit_reg_exp_literal(&mut self, literal: &RegExpLiteral<'a>) {
         if !self.check_regexp {
             return;
@@ -2099,7 +2266,10 @@ impl<'a> Visit<'a> for PostconditionDetector {
     }
 
     fn visit_class(&mut self, class: &Class<'a>) {
-        self.classes |= self.check_classes;
+        if self.check_classes {
+            self.classes = true;
+            return;
+        }
         walk::walk_class(self, class);
     }
 
@@ -2123,16 +2293,23 @@ impl<'a> Visit<'a> for PostconditionDetector {
     }
 
     fn visit_formal_parameters(&mut self, parameters: &FormalParameters<'a>) {
-        self.parameters |= self.check_parameters
+        if self.check_parameters
             && (parameters.rest.is_some()
                 || parameters.items.iter().any(|parameter| {
                     parameter.initializer.is_some() || !parameter.pattern.is_binding_identifier()
-                }));
+                }))
+        {
+            self.parameters = true;
+            return;
+        }
         walk::walk_formal_parameters(self, parameters);
     }
 
     fn visit_for_of_statement(&mut self, statement: &ForOfStatement<'a>) {
-        self.for_of |= self.check_for_of && !statement.r#await;
+        if self.check_for_of && !statement.r#await {
+            self.for_of = true;
+            return;
+        }
         walk::walk_for_of_statement(self, statement);
     }
 }
@@ -2156,12 +2333,18 @@ impl<'a> Visit<'a> for ClassFeaturesUnsupportedDetector {
     fn visit_method_definition(&mut self, method: &MethodDefinition<'a>) {
         if matches!(method.key, PropertyKey::PrivateIdentifier(_)) {
             self.private_methods = true;
+            if !self.check_private_in {
+                return;
+            }
         }
         walk::walk_method_definition(self, method);
     }
 
     fn visit_private_in_expression(&mut self, expression: &PrivateInExpression<'a>) {
         self.private_in = true;
+        if !self.check_private_methods {
+            return;
+        }
         walk::walk_private_in_expression(self, expression);
     }
 }
@@ -2176,10 +2359,11 @@ struct ObjectRestLooseCompletionRewriter<'a> {
 
 impl<'a> VisitMut<'a> for ObjectRestLooseCompletionRewriter<'a> {
     fn visit_string_literal(&mut self, literal: &mut StringLiteral<'a>) {
-        if literal
-            .value
-            .as_str()
-            .ends_with("/helpers/objectWithoutProperties")
+        if literal.span.is_empty()
+            && literal
+                .value
+                .as_str()
+                .ends_with("/helpers/objectWithoutProperties")
         {
             let replacement = format!("{}Loose", literal.value.as_str());
             literal.value = self.allocator.alloc_str(&replacement).into();
@@ -2191,7 +2375,9 @@ impl<'a> VisitMut<'a> for ObjectRestLooseCompletionRewriter<'a> {
         if member.property.name == "objectWithoutProperties"
             && matches!(
                 &member.object,
-                Expression::Identifier(identifier) if identifier.name.starts_with("babelHelpers")
+                Expression::Identifier(identifier)
+                    if identifier.span.is_empty()
+                        && identifier.name.starts_with("babelHelpers")
             )
         {
             member.property.name = self
@@ -2212,17 +2398,15 @@ impl<'a> VisitMut<'a> for InlineHelperRenamer<'a> {
     }
 }
 
-#[inline]
-fn run<T>(operation: impl FnOnce() -> T) -> T {
-    operation()
-}
-
 fn unsupported(
     reason: &str,
     diagnostics: impl IntoIterator<Item = impl std::fmt::Debug>,
 ) -> NativePreflightResult {
     NativePreflightResult {
         status: "unsupported".into(),
+        changed: false,
+        normalized_javascript: false,
+        jsx: false,
         reason: Some(reason.into()),
         code: None,
         map: None,
@@ -2234,17 +2418,28 @@ fn unsupported(
     }
 }
 
-fn identity_result(source: String) -> NativePreflightResult {
-    let line_count = source.bytes().filter(|byte| *byte == b'\n').count() as u32 + 1;
-    let mut words = Vec::with_capacity(line_count as usize * 5);
-    for line in 0..line_count {
-        words.extend_from_slice(&[line, 0, line, 0, 0]);
-    }
+fn identity_result(
+    source: String,
+    include_map: bool,
+    normalized_javascript: bool,
+    jsx: bool,
+) -> NativePreflightResult {
+    let map = include_map.then(|| {
+        let line_count = source.bytes().filter(|byte| *byte == b'\n').count() as u32 + 1;
+        let mut words = Vec::with_capacity(line_count as usize * 5);
+        for line in 0..line_count {
+            words.extend_from_slice(&[line, 0, line, 0, 0]);
+        }
+        pack_decoded_layer(&words, &[] as &[String], line_count).into()
+    });
     NativePreflightResult {
         status: "complete".into(),
+        changed: false,
+        normalized_javascript,
+        jsx,
         reason: None,
         code: Some(source),
-        map: Some(pack_decoded_layer(&words, &[] as &[String], line_count).into()),
+        map,
         diagnostics: Vec::new(),
         helpers_used: Vec::new(),
     }
@@ -2360,5 +2555,113 @@ mod tests {
         )
         .unwrap();
         assert_eq!(result.status, "complete", "{:?}", result.reason);
+    }
+
+    #[test]
+    fn loose_object_rest_does_not_rewrite_user_helper_strings() {
+        let marker = "@babel/runtime/helpers/objectWithoutProperties";
+        let result = transform(
+            format!(
+                "const marker = '{marker}'; function read({{ value, ...rest }}) {{ return [marker, rest]; }}"
+            ),
+            "fixture.js".into(),
+            NativePreflightOptions {
+                object_rest_spread: Some(true),
+                object_rest_spread_loose: Some(true),
+                helpers_mode: Some("runtime".into()),
+                helpers_module_name: Some("@babel/runtime".into()),
+                helpers_version: Some("7.29.7".into()),
+                ..NativePreflightOptions::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(result.status, "complete");
+        let code = result.code.unwrap();
+        assert!(code.contains(&format!("marker = \"{marker}\"")), "{code}");
+        assert!(
+            code.contains("helpers/objectWithoutPropertiesLoose"),
+            "{code}"
+        );
+    }
+
+    #[test]
+    fn selected_absent_structural_transforms_are_identity_results() {
+        for options in [
+            NativePreflightOptions {
+                parameters: Some(true),
+                ..NativePreflightOptions::default()
+            },
+            NativePreflightOptions {
+                for_of: Some(true),
+                ..NativePreflightOptions::default()
+            },
+            NativePreflightOptions {
+                destructuring: Some(true),
+                ..NativePreflightOptions::default()
+            },
+        ] {
+            let result =
+                transform("const value = source;".into(), "fixture.js".into(), options).unwrap();
+            assert_eq!(result.status, "complete", "{:?}", result.reason);
+            assert!(!result.changed);
+            assert_eq!(result.code.as_deref(), Some("const value = source;"));
+        }
+    }
+
+    #[test]
+    fn empty_structural_destructuring_plan_preserves_unowned_parameter_syntax() {
+        let result = transform(
+            "function read({ value }) { return value; }".into(),
+            "fixture.js".into(),
+            NativePreflightOptions {
+                destructuring: Some(true),
+                ..NativePreflightOptions::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(result.status, "complete", "{:?}", result.reason);
+        assert!(!result.changed);
+        assert_eq!(
+            result.code.as_deref(),
+            Some("function read({ value }) { return value; }")
+        );
+    }
+
+    #[test]
+    fn language_prepasses_do_not_infer_legacy_helpers_from_user_text() {
+        let marker = "@babel/runtime/helpers/objectWithoutProperties";
+        let typescript = transform(
+            format!("const marker: string = '{marker}'; let value: number = 1;"),
+            "fixture.ts".into(),
+            NativePreflightOptions {
+                typescript: Some("strip".into()),
+                block_scoping: Some(true),
+                ..NativePreflightOptions::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(typescript.status, "complete");
+        assert!(typescript.helpers_used.is_empty());
+        assert!(typescript.code.unwrap().contains(marker));
+
+        let decorators = transform(
+            format!("const marker = '{marker}'; @sealed class Value {{}}"),
+            "fixture.js".into(),
+            NativePreflightOptions {
+                legacy_decorators: Some(true),
+                classes: Some(true),
+                helpers_mode: Some("inline".into()),
+                ..NativePreflightOptions::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(decorators.status, "complete", "{:?}", decorators.reason);
+        assert!(decorators.code.unwrap().contains(marker));
+        assert!(
+            decorators
+                .helpers_used
+                .iter()
+                .all(|helper| !helper.contains("objectWithoutProperties"))
+        );
     }
 }

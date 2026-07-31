@@ -108,8 +108,8 @@ test('private toggles lower owned classes without lowering unrelated class synta
      globalThis.answer = [value.read(value), value.read({}), new Unrelated().field, new Accessors().read()];`,
     'fixture.js',
     pipeline({
-      privateMethods: { loose: true },
-      privatePropertyInObject: { loose: true },
+      privateMethods: true,
+      privatePropertyInObject: true,
     }),
   );
   assert.equal(result.status, 'complete');
@@ -136,7 +136,7 @@ test('classProperties composes private features through the focused representati
     'fixture.js',
     pipeline({
       classProperties: { loose: true },
-      privateMethods: { loose: true },
+      privateMethods: true,
     }),
   );
   assert.equal(repaired.status, 'complete');
@@ -148,10 +148,10 @@ test('classProperties composes private features through the focused representati
 // NOTE: The public option surface accepts either value, but private lowering uses one representation.
 test('private feature options use the selected loose representation', () => {
   for (const [source, transforms] of [
-    ['class Value { #method() {} }', { privateMethods: { loose: false } }],
+    ['class Value { #method() {} }', { privateMethods: true }],
     [
       'class Value { #field; has(input) { return #field in input; } }',
-      { privatePropertyInObject: { loose: false } },
+      { privatePropertyInObject: true },
     ],
   ] satisfies [string, PreflightTransforms][]) {
     const result = transform(source, 'fixture.js', pipeline(transforms));
@@ -178,7 +178,7 @@ test('private feature options use the selected loose representation', () => {
 // table rejected the pair. The initializer's bytes are now left in place, which
 // is what lets the nested edit compose.
 test('native destructuring lowers patterns nested inside an initializer', () => {
-  const lowering = pipeline({ destructuring: { useBuiltIns: true } });
+  const lowering = pipeline({ destructuring: true });
   for (const [source, expected] of [
     // The shape from the corpus: an assignment pattern whose right-hand side
     // contains a function containing another pattern.
@@ -212,8 +212,8 @@ test('native classes skip bodiless TypeScript methods', () => {
   const lowering = pipeline({
     classes: true,
     classProperties: { loose: true },
-    privateMethods: { loose: true },
-    privatePropertyInObject: { loose: true },
+    privateMethods: true,
+    privatePropertyInObject: true,
   });
   for (const [source, expected] of [
     // An overload signature must not shadow the implementation that follows.
@@ -325,8 +325,8 @@ test('native classes lower loose private fields, methods, calls, access, and pri
     pipeline({
       classes: true,
       classProperties: { loose: true },
-      privateMethods: { loose: true },
-      privatePropertyInObject: { loose: true },
+      privateMethods: true,
+      privatePropertyInObject: true,
     }),
   );
   assert.equal(result.status, 'complete');
@@ -356,8 +356,8 @@ test('native classes rewrite private references inside field initializers and st
       classes: true,
       classProperties: { loose: true },
       classStaticBlock: true,
-      privateMethods: { loose: true },
-      privatePropertyInObject: { loose: true },
+      privateMethods: true,
+      privatePropertyInObject: true,
     }),
   );
   assert.equal(result.status, 'complete');
@@ -393,8 +393,8 @@ test('native classes structurally pair loose private accessors', () => {
     pipeline({
       classes: true,
       classProperties: { loose: true },
-      privateMethods: { loose: true },
-      privatePropertyInObject: { loose: true },
+      privateMethods: true,
+      privatePropertyInObject: true,
     }),
   );
   assert.equal(result.status, 'complete');
@@ -412,8 +412,8 @@ test('native class helpers avoid source binding collisions', () => {
     'fixture.js',
     pipeline({
       classes: true,
-      privateMethods: { loose: true },
-      privatePropertyInObject: { loose: true },
+      privateMethods: true,
+      privatePropertyInObject: true,
     }),
   );
   assert.equal(result.status, 'complete');
@@ -434,8 +434,8 @@ test('native private methods lower structurally for sibling classes after the di
     'fixture.js',
     pipeline({
       classes: true,
-      privateMethods: { loose: true },
-      privatePropertyInObject: { loose: true },
+      privateMethods: true,
+      privatePropertyInObject: true,
     }),
   );
   assert.equal(result.status, 'complete');

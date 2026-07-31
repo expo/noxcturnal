@@ -36,6 +36,12 @@ pub(super) struct AstPlan {
     hoists: FxHashMap<NodeId, Vec<CaptureAliases>>,
 }
 
+impl AstPlan {
+    pub(super) fn is_empty(&self) -> bool {
+        self.functions.is_empty() && self.arrows.is_empty() && self.hoists.is_empty()
+    }
+}
+
 struct AstFunctionPlan {
     length_placeholders: Vec<String>,
     anchor: Span,

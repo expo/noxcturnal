@@ -9,7 +9,7 @@ test('001 JS Destructuring > object patterns > extracts basic properties', async
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _objectDestructuringEmpty2 = {
@@ -39,7 +39,7 @@ test('002 JS Destructuring > object patterns > renames properties', async () => 
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _objectDestructuringEmpty2 = {
@@ -68,7 +68,7 @@ test('003 JS Destructuring > object patterns > applies default values for missin
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _objectDestructuringEmpty2 = {
@@ -96,7 +96,7 @@ test('004 JS Destructuring > object patterns > applies default values only for u
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _objectDestructuringEmpty2 = {
@@ -127,7 +127,7 @@ test('005 JS Destructuring > object patterns > renames with default values', asy
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _objectDestructuringEmpty2 = {
@@ -155,7 +155,7 @@ test('006 JS Destructuring > object patterns > extracts computed property keys',
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _objectDestructuringEmpty2 = {
@@ -181,7 +181,7 @@ test('007 JS Destructuring > object patterns > extracts computed property keys w
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _objectDestructuringEmpty2 = {
@@ -216,7 +216,7 @@ test('008 JS Destructuring > object patterns > collects rest properties', async 
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _objectDestructuringEmpty2 = {
@@ -259,7 +259,7 @@ test('009 JS Destructuring > object patterns > rest does not include extracted k
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _objectDestructuringEmpty2 = {
@@ -307,7 +307,7 @@ test('010 JS Destructuring > object patterns > rest produces an empty object whe
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _objectDestructuringEmpty2 = {
@@ -348,7 +348,7 @@ test('011 JS Destructuring > object patterns > handles nested object patterns', 
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _objectDestructuringEmpty2 = {
@@ -373,7 +373,7 @@ test('012 JS Destructuring > object patterns > handles nested objects with defau
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _objectDestructuringEmpty2 = {
@@ -399,7 +399,7 @@ test('013 JS Destructuring > object patterns > handles shorthand for prototype p
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _objectDestructuringEmpty2 = {
@@ -423,7 +423,7 @@ test('014 JS Destructuring > object patterns > handles string keys with special 
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _objectDestructuringEmpty2 = {
@@ -447,7 +447,7 @@ test('015 JS Destructuring > object patterns > handles numeric keys', async () =
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _objectDestructuringEmpty2 = {
@@ -476,7 +476,7 @@ test('016 JS Destructuring > object patterns > extracts from nested defaults at 
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _objectDestructuringEmpty2 = {
@@ -505,7 +505,7 @@ test('017 JS Destructuring > object patterns > does not copy prototype propertie
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _objectDestructuringEmpty2 = {
@@ -545,7 +545,7 @@ test('018 JS Destructuring > object patterns > number key with object rest sprea
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _objectDestructuringEmpty2 = {
@@ -594,7 +594,7 @@ test('019 JS Destructuring > object patterns > function key with object rest spr
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _objectDestructuringEmpty2 = {
@@ -635,7 +635,7 @@ test('020 JS Destructuring > object patterns > object rest with impure computed 
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _objectDestructuringEmpty2 = {
@@ -744,7 +744,7 @@ test('021 JS Destructuring > object patterns > empty object pattern throws on nu
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _objectDestructuringEmpty2 = {
@@ -768,7 +768,7 @@ test('022 JS Destructuring > array patterns > extracts basic elements', async ()
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _toArray2 = {
@@ -797,7 +797,7 @@ test('023 JS Destructuring > array patterns > skips elements with elision', asyn
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _toArray2 = {
@@ -824,7 +824,7 @@ test('024 JS Destructuring > array patterns > applies default values for missing
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _toArray2 = {
@@ -856,7 +856,7 @@ test('025 JS Destructuring > array patterns > applies default values only for un
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _toArray2 = {
@@ -888,7 +888,7 @@ test('026 JS Destructuring > array patterns > collects rest elements', async () 
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _toArray2 = {
@@ -915,7 +915,7 @@ test('027 JS Destructuring > array patterns > rest produces empty array when no 
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _toArray2 = {
@@ -942,7 +942,7 @@ test('028 JS Destructuring > array patterns > handles nested array patterns', as
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _toArray2 = {
@@ -972,7 +972,7 @@ test('029 JS Destructuring > array patterns > destructures string as iterable', 
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _toArray2 = {
@@ -1001,7 +1001,7 @@ test('030 JS Destructuring > array patterns > destructures string with rest', as
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _toArray2 = {
@@ -1028,7 +1028,7 @@ test('031 JS Destructuring > array patterns > handles holes in source array', as
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _toArray2 = {
@@ -1058,7 +1058,7 @@ test('032 JS Destructuring > array patterns > handles holes with defaults', asyn
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _toArray2 = {
@@ -1091,7 +1091,7 @@ test('033 JS Destructuring > array patterns > destructures Set iterable', async 
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _toArray2 = {
@@ -1120,7 +1120,7 @@ test('034 JS Destructuring > array patterns > destructures Map iterable', async 
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _toArray2 = {
@@ -1156,7 +1156,7 @@ test('035 JS Destructuring > array patterns > destructures generator iterable', 
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _toArray2 = {
@@ -1188,7 +1188,7 @@ test('036 JS Destructuring > array patterns > rest with generator consumes remai
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _toArray2 = {
@@ -1220,7 +1220,7 @@ test('037 JS Destructuring > array patterns > destructures custom iterable', asy
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _toArray2 = {
@@ -1263,7 +1263,7 @@ test('038 JS Destructuring > array patterns > destructures empty string', async 
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _toArray2 = {
@@ -1288,7 +1288,7 @@ test('039 JS Destructuring > array patterns > spread from generator into rest', 
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _toArray2 = {
@@ -1318,7 +1318,7 @@ test('040 JS Destructuring > array patterns > rest from extended array produces 
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _toArray2 = {
@@ -1354,7 +1354,7 @@ test('041 JS Destructuring > array patterns > array rest in params does not muta
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "() => {
@@ -1376,7 +1376,7 @@ test('042 JS Destructuring > array patterns > iterator .next getter is evaluated
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _toArray2 = {
@@ -1426,7 +1426,7 @@ test('043 JS Destructuring > mixed patterns > array pattern inside object', asyn
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _toArray2 = {
@@ -1460,7 +1460,7 @@ test('044 JS Destructuring > mixed patterns > object pattern inside array', asyn
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _toArray2 = {
@@ -1499,7 +1499,7 @@ test('045 JS Destructuring > mixed patterns > deeply nested mixed patterns', asy
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _toArray2 = {
@@ -1545,7 +1545,7 @@ test('046 JS Destructuring > mixed patterns > object rest with nested array', as
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _toArray2 = {
@@ -1598,7 +1598,7 @@ test('047 JS Destructuring > function parameters > object destructuring in funct
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "() => {
@@ -1616,7 +1616,7 @@ test('048 JS Destructuring > function parameters > object destructuring with def
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "() => {
@@ -1636,7 +1636,7 @@ test('049 JS Destructuring > function parameters > array destructuring in functi
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "() => {
@@ -1654,7 +1654,7 @@ test('050 JS Destructuring > function parameters > arrow function with object de
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "() => {
@@ -1670,7 +1670,7 @@ test('051 JS Destructuring > function parameters > arrow function with array des
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "() => {
@@ -1686,7 +1686,7 @@ test('052 JS Destructuring > function parameters > nested destructuring in arrow
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "() => {
@@ -1703,7 +1703,7 @@ test('053 JS Destructuring > function parameters > rest in function params', asy
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "() => {
@@ -1723,7 +1723,7 @@ test('054 JS Destructuring > function parameters > default parameter value for e
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "() => {
@@ -1742,7 +1742,7 @@ test('055 JS Destructuring > function parameters > mixed defaults: param-level a
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "() => {
@@ -1762,7 +1762,7 @@ test('056 JS Destructuring > function parameters > default value references prev
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "() => {
@@ -1790,7 +1790,7 @@ test('057 JS Destructuring > loops > for-of with object destructuring', async ()
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _objectDestructuringEmpty2 = {
@@ -1829,7 +1829,7 @@ test('058 JS Destructuring > loops > for-of with array destructuring', async () 
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _toArray2 = {
@@ -1867,7 +1867,7 @@ test('059 JS Destructuring > loops > for-of with nested destructuring', async ()
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _toArray2 = {
@@ -1928,7 +1928,7 @@ test('060 JS Destructuring > loops > for-of with Map entries', async () => {
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _toArray2 = {
@@ -1966,7 +1966,7 @@ test('061 [upstream xit] JS Destructuring > loops > for-of with computed key ref
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _objectDestructuringEmpty2 = {
@@ -2000,7 +2000,7 @@ test('062 JS Destructuring > assignment expressions > object destructuring assig
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _objectDestructuringEmpty2 = {
@@ -2032,7 +2032,7 @@ test('063 JS Destructuring > assignment expressions > array destructuring assign
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _toArray2 = {
@@ -2058,7 +2058,7 @@ test('064 JS Destructuring > assignment expressions > swap via array destructuri
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _toArray2 = {
@@ -2085,7 +2085,7 @@ test('065 JS Destructuring > assignment expressions > nested assignment', async 
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _toArray2 = {
@@ -2126,7 +2126,7 @@ test('066 JS Destructuring > assignment expressions > assignment with rest', asy
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _toArray2 = {
@@ -2156,7 +2156,7 @@ test('067 JS Destructuring > assignment expressions > chained destructuring assi
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _objectDestructuringEmpty2 = {
@@ -2197,7 +2197,7 @@ test('068 JS Destructuring > catch clause > destructures error object in catch',
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _objectDestructuringEmpty2 = {
@@ -2232,7 +2232,7 @@ test('069 JS Destructuring > catch clause > destructures Error instance properti
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _objectDestructuringEmpty2 = {
@@ -2261,7 +2261,7 @@ test('070 JS Destructuring > declaration variants > const with object destructur
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _objectDestructuringEmpty2 = {
@@ -2290,7 +2290,7 @@ test('071 JS Destructuring > declaration variants > let with array destructuring
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _toArray2 = {
@@ -2326,7 +2326,7 @@ test('072 JS Destructuring > declaration variants > var with multiple destructur
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _toArray2 = {
@@ -2361,7 +2361,7 @@ test('073 JS Destructuring > declaration variants > const with nested defaults f
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _objectDestructuringEmpty2 = {
@@ -2389,7 +2389,7 @@ test('074 JS Destructuring > iterator protocol > empty pattern calls iterator.re
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _toArray2 = {
@@ -2424,7 +2424,7 @@ test('075 JS Destructuring > iterator protocol > empty pattern throws if iterato
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _toArray2 = {
@@ -2454,7 +2454,7 @@ test('076 JS Destructuring > iterator protocol > single-element pattern throws i
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _toArray2 = {
@@ -2490,7 +2490,7 @@ test('077 JS Destructuring > iterator protocol > single-element pattern does not
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _toArray2 = {
@@ -2526,7 +2526,7 @@ test('078 JS Destructuring > holes and sparse arrays > default with explicit hol
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _toArray2 = {
@@ -2553,7 +2553,7 @@ test('079 JS Destructuring > holes and sparse arrays > default with hole and tra
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _toArray2 = {
@@ -2582,7 +2582,7 @@ test('080 JS Destructuring > holes and sparse arrays > default interleaves with 
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _toArray2 = {
@@ -2619,7 +2619,7 @@ test('081 JS Destructuring > holes and sparse arrays > assignment pattern with h
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _toArray2 = {
@@ -2652,7 +2652,7 @@ test('082 JS Destructuring > holes and sparse arrays > rest from sparse array fi
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _toArray2 = {
@@ -2678,7 +2678,7 @@ test('083 JS Destructuring > holes and sparse arrays > rest with object pattern 
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _toArray2 = {
@@ -2711,7 +2711,7 @@ test('084 JS Destructuring > holes and sparse arrays > single element from spars
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _toArray2 = {
@@ -2742,7 +2742,7 @@ test('085 JS Destructuring > holes and sparse arrays > object pattern from hole 
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _toArray2 = {
@@ -2782,7 +2782,7 @@ test('086 JS Destructuring > holes and sparse arrays > array pattern from hole t
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _toArray2 = {
@@ -2813,7 +2813,7 @@ test('087 JS Destructuring > empty array pattern > throws on null', async () => 
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _toArray2 = {
@@ -2839,7 +2839,7 @@ test('088 JS Destructuring > empty array pattern > throws on number', async () =
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _toArray2 = {
@@ -2865,7 +2865,7 @@ test('089 JS Destructuring > empty array pattern > throws on plain object', asyn
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _toArray2 = {
@@ -2891,7 +2891,7 @@ test('090 JS Destructuring > empty array pattern > throws if Symbol.iterator ret
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _toArray2 = {
@@ -2917,7 +2917,7 @@ test('091 JS Destructuring > empty array pattern > does not throw on valid itera
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _toArray2 = {
@@ -2957,7 +2957,7 @@ test('092 JS Destructuring > empty array pattern > calls iterator.return on empt
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _toArray2 = {
@@ -2992,7 +2992,7 @@ test('093 JS Destructuring > non-iterable errors > throws on undefined', async (
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _toArray2 = {
@@ -3018,7 +3018,7 @@ test('094 JS Destructuring > non-iterable errors > throws on plain object', asyn
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _toArray2 = {
@@ -3044,7 +3044,7 @@ test('095 JS Destructuring > edge cases > empty object pattern does not throw on
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _objectDestructuringEmpty2 = {
@@ -3069,7 +3069,7 @@ test('096 JS Destructuring > edge cases > empty array pattern does not throw on 
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _toArray2 = {
@@ -3095,7 +3095,7 @@ test('097 JS Destructuring > edge cases > destructuring null throws TypeError', 
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _objectDestructuringEmpty2 = {
@@ -3120,7 +3120,7 @@ test('098 JS Destructuring > edge cases > destructuring undefined throws TypeErr
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _objectDestructuringEmpty2 = {
@@ -3145,7 +3145,7 @@ test('099 JS Destructuring > edge cases > array destructuring from non-iterable 
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _toArray2 = {
@@ -3171,7 +3171,7 @@ test('100 JS Destructuring > edge cases > default value expression is lazily eva
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _objectDestructuringEmpty2 = {
@@ -3198,7 +3198,7 @@ test('101 JS Destructuring > edge cases > default value expression evaluated whe
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _objectDestructuringEmpty2 = {
@@ -3228,7 +3228,7 @@ test('102 JS Destructuring > edge cases > array default value expression is lazi
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _toArray2 = {
@@ -3256,7 +3256,7 @@ test('103 JS Destructuring > edge cases > evaluation order matches spec for obje
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _objectDestructuringEmpty2 = {
@@ -3294,7 +3294,7 @@ test('104 JS Destructuring > edge cases > rest creates a shallow copy', async ()
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _objectDestructuringEmpty2 = {
@@ -3335,7 +3335,7 @@ test('105 JS Destructuring > edge cases > rest with symbol keys are included', a
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _objectDestructuringEmpty2 = {
@@ -3376,7 +3376,7 @@ test('106 JS Destructuring > edge cases > destructuring assignment returns the r
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _toArray2 = {
@@ -3404,7 +3404,7 @@ test('107 JS Destructuring > edge cases > array rest with object pattern', async
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _toArray2 = {
@@ -3438,7 +3438,7 @@ test('108 JS Destructuring > edge cases > handles large number of properties', a
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _objectDestructuringEmpty2 = {

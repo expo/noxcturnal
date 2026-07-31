@@ -158,59 +158,6 @@ pub fn validate_runtime_helpers(
     Ok(())
 }
 
-/// The `var _<helper>` prelude markers a rewrite prints for a custom (non-Oxc)
-/// helper, paired with the runtime helper names each stands for.
-const HELPER_ADAPTERS: [(&str, &[&str]); 7] = [
-    ("var _toArray", &["slicedToArray", "toArray"]),
-    (
-        "var _objectDestructuringEmpty",
-        &["objectDestructuringEmpty"],
-    ),
-    (
-        "var _objectWithoutProperties",
-        &[
-            "objectDestructuringEmpty",
-            "objectWithoutProperties",
-            "objectWithoutPropertiesLoose",
-        ],
-    ),
-    ("var _construct", &["construct"]),
-    ("var _get", &["get"]),
-    (
-        "var _classPrivateFieldLooseBase",
-        &["classPrivateFieldLooseBase"],
-    ),
-    ("var _wrapRegExp", &["wrapRegExp"]),
-];
-
-/// Which helper-adapter markers the original source already carries, so the
-/// caller can answer "introduced by the transform" without retaining a whole
-/// clone of the source purely for a handful of `contains` checks.
-pub fn helper_adapter_markers(source: &str) -> [bool; HELPER_ADAPTERS.len()] {
-    std::array::from_fn(|index| source.contains(HELPER_ADAPTERS[index].0))
-}
-
-/// Custom helpers the transform introduced: a marker present in `after` whose
-/// slot in `before_present` (from [`helper_adapter_markers`] over the original
-/// source) was false.
-pub fn custom_helpers_introduced(
-    before_present: &[bool; HELPER_ADAPTERS.len()],
-    after: &str,
-) -> Vec<&'static str> {
-    let mut helpers = Vec::new();
-    for (index, (marker, names)) in HELPER_ADAPTERS.iter().enumerate() {
-        if after.contains(marker) && !before_present[index] {
-            helpers.extend(names.iter().copied().filter(|name| {
-                after.contains(&format!("@babel/runtime/helpers/{name}"))
-                    || !after.contains("require(\"@babel/runtime/helpers/")
-            }));
-        }
-    }
-    helpers.sort_unstable();
-    helpers.dedup();
-    helpers
-}
-
 pub fn validate_custom_runtime_helpers(
     helpers: &[&str],
     module_name: &str,

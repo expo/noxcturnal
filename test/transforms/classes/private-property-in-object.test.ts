@@ -6,7 +6,7 @@ test('lowers private property checks', async () => {
   expect(
     await transformSource(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { privatePropertyInObject: { loose: true } },
+      transforms: { privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },

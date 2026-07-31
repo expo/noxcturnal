@@ -74,7 +74,7 @@ const legacySyntaxPipeline = defineNativePipeline({
         transforms: {
           blockScoping: true,
           parameters: true,
-          destructuring: { useBuiltIns: true },
+          destructuring: true,
           forOf: true,
           classes: true,
           classProperties: { loose: true },
@@ -100,8 +100,8 @@ const focusedPrivatePipeline = defineNativePipeline({
       name: 'modern-private-features',
       native: {
         transforms: {
-          privateMethods: { loose: true },
-          privatePropertyInObject: { loose: true },
+          privateMethods: true,
+          privatePropertyInObject: true,
         },
         helpers: { mode: 'inline' },
         comments: false,
@@ -133,7 +133,7 @@ const nonHermesLegacyPipeline = defineNativePipeline({
         transforms: {
           blockScoping: true,
           parameters: true,
-          destructuring: { useBuiltIns: true },
+          destructuring: true,
           classes: true,
           classProperties: { loose: true },
           classStaticBlock: true,
@@ -441,7 +441,9 @@ const denseNamedEditPipeline = defineNativePipeline({
   ],
 });
 verifiedBench('dense named edit and map transform', () => {
-  benchmarkTransform(source, 'benchmark.js', denseNamedEditPipeline, { sourceMapMode: 'boundary' });
+  benchmarkTransform(source, 'benchmark.js', denseNamedEditPipeline, {
+    sourceMapMode: 'boundary',
+  });
 });
 
 const broadVisitorPipeline = defineNativePipeline({
@@ -458,7 +460,9 @@ const broadVisitorPipeline = defineNativePipeline({
   ],
 });
 verifiedBench('broad catch-all streaming transform', () => {
-  benchmarkTransform(source, 'benchmark.js', broadVisitorPipeline, { allowBroadVisitors: true });
+  benchmarkTransform(source, 'benchmark.js', broadVisitorPipeline, {
+    allowBroadVisitors: true,
+  });
 });
 
 // Unlike the pre-typed-contract version of this bench, `name` is declared and
@@ -524,7 +528,11 @@ const nativeAsyncGeneratorPreflight = defineNativePipeline({
       name: 'preflight',
       native: {
         transforms: { asyncGeneratorFunctions: true },
-        helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.2' },
+        helpers: {
+          mode: 'runtime',
+          moduleName: '@babel/runtime',
+          version: '7.29.2',
+        },
       },
     },
   ],
@@ -587,7 +595,11 @@ const nativeTransformFamilyPipelines = Object.fromEntries(
           name: `family-${name}`,
           native: {
             transforms: { [name]: option } as PreflightTransforms,
-            helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
+            helpers: {
+              mode: 'runtime',
+              moduleName: '@babel/runtime',
+              version: '7.29.7',
+            },
           },
         },
       ],
@@ -656,7 +668,10 @@ function changedPhasePipeline(count: number, printed: boolean) {
           visitors: [
             defineVisitor(
               'Identifier',
-              { fields: ['name'], where: { name: { oneOf: [`source${index}`] } } },
+              {
+                fields: ['name'],
+                where: { name: { oneOf: [`source${index}`] } },
+              },
               path => {
                 path.replaceWith(`renamed${index}`);
               },
@@ -714,7 +729,12 @@ function allocationVisitor(name: string) {
             ? defineVisitor('Identifier', {}, path => void (path.type + path.start + path.end))
             : defineVisitor('Identifier', {}, () => {});
   return defineNativePipeline({
-    phases: [{ name: 'transform', plugins: [defineNativePlugin({ name, visitors: [visitor] })] }],
+    phases: [
+      {
+        name: 'transform',
+        plugins: [defineNativePlugin({ name, visitors: [visitor] })],
+      },
+    ],
   });
 }
 
@@ -787,7 +807,9 @@ for (const shape of ['nested', 'functions', 'dependencies'] as const) {
 
 const functionMapSource = generateLargeFileSource(650 * 1024, 'functions');
 verifiedBench('650 KiB native function map', () => {
-  benchmarkTransform(functionMapSource, 'generated.js', visitorPipeline, { functionMap: true });
+  benchmarkTransform(functionMapSource, 'generated.js', visitorPipeline, {
+    functionMap: true,
+  });
 });
 
 const sparseEditSource = generateLargeFileSource(650 * 1024, 'sparse-edits');
@@ -984,7 +1006,10 @@ for (const count of [1_000, 10_000]) {
   verifiedBench(`editor reset compaction scaling: ${count}`, () => {
     const edits: EditCommand[] = [];
     let order = 0;
-    const editorSession = { source: 'x'.repeat(count), commit: () => ({ code: '' }) };
+    const editorSession = {
+      source: 'x'.repeat(count),
+      commit: () => ({ code: '' }),
+    };
     const resetEditor = createEditor(editorSession, edits, 'reset', () => order++);
     const retainedEditor = createEditor(editorSession, edits, 'retained', () => order++);
     for (let index = 0; index < count; index++) {
@@ -1114,6 +1139,62 @@ for (const maximumPrefix of [16, 64, 256]) {
 for (const phaseCount of [8, 32]) {
   const pipeline = changedPhasePipeline(phaseCount, false);
   verifiedBench(`packed source-map name-chain scaling: ${phaseCount}`, () => {
-    benchmarkTransform(source, 'map-chain.js', pipeline, { sourceMapMode: 'boundary' });
+    benchmarkTransform(source, 'map-chain.js', pipeline, {
+      sourceMapMode: 'boundary',
+    });
   });
+}
+
+const cleanupCorpus = Array.from(
+  { length: 2_000 },
+  (_, index) => `export const value${index} = source${index}?.value ?? ${index};`,
+).join('\n');
+
+const cleanupProfiles = [
+  ['identity lookbehind', { transforms: { regexpLookBehind: true } }],
+  ['identity match indices', { transforms: { regexpMatchIndices: true } }],
+  ['selected absent destructuring', { transforms: { destructuring: true } }],
+  ['selected absent classes', { transforms: { classes: true }, helpers: { mode: 'inline' } }],
+  ['syntax-free Oxc profile', { transforms: { logicalAssignmentOperators: true } }],
+] as const;
+
+for (const [name, native] of cleanupProfiles) {
+  const pipeline = defineNativePipeline({ phases: [{ name, native }] });
+  verifiedBench(`cleanup ${name}`, () => benchmarkTransform(cleanupCorpus, 'cleanup.js', pipeline));
+}
+
+for (const [name, extra] of [
+  ['without eval text', ''],
+  ['with eval comment prefilter hit', "// eval('text only')\n"],
+] as const) {
+  const pipeline = defineNativePipeline({
+    phases: [{ name, native: { optimize: { deadCodeElimination: true } } }],
+  });
+  verifiedBench(`cleanup DCE ${name}`, () =>
+    benchmarkTransform(`${extra}${cleanupCorpus}`, 'cleanup.js', pipeline),
+  );
+}
+
+const postconditionCorpus = Array.from(
+  { length: 500 },
+  (_, index) =>
+    `class Value${index}{read(input=${index}){for(const value of input){sink(value)}return input}}`,
+).join('\n');
+for (const [name, transforms] of [
+  ['classes', { classes: true }],
+  ['parameters', { parameters: true }],
+  ['for-of', { forOf: true }],
+  ['fused boundaries', { classes: true, parameters: true, forOf: true }],
+] as const) {
+  const pipeline = defineNativePipeline({
+    phases: [
+      {
+        name: `postcondition ${name}`,
+        native: { transforms, helpers: { mode: 'inline' } },
+      },
+    ],
+  });
+  verifiedBench(`cleanup postcondition ${name}`, () =>
+    benchmarkTransform(postconditionCorpus, 'metro-bundle.js', pipeline),
+  );
 }

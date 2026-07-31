@@ -50,6 +50,7 @@ test('freezes native options and includes them in the pipeline cache key', () =>
       }),
     /cannot contain visitor plugins/,
   );
+  assert.equal(defineNativePipeline({ phases: [{ name: 'empty', native: {} }] }).phases.length, 0);
   assert.throws(
     () =>
       defineNativePipeline({
@@ -102,7 +103,7 @@ test('combines block scoping and destructuring lowering', () => {
           native: {
             transforms: {
               blockScoping: true,
-              destructuring: { useBuiltIns: true },
+              destructuring: true,
             },
             helpers: { mode: 'inline' },
           },
@@ -301,7 +302,7 @@ test('retains dependencies reached from an exported function', () => {
   assert.match(result.code, /export function factory\(\)/);
 });
 
-test('keeps a native legacy no-op byte-identical with an identity map', () => {
+test('keeps a native legacy no-op byte-identical without an identity map', () => {
   const source = '  var value= require("dep");\nmodule.exports=value;';
   const result = transform(
     source,
@@ -314,7 +315,7 @@ test('keeps a native legacy no-op byte-identical with an identity map', () => {
             transforms: {
               blockScoping: true,
               parameters: true,
-              destructuring: { useBuiltIns: true },
+              destructuring: true,
               classes: true,
               classProperties: { loose: true },
               classStaticBlock: true,
@@ -328,7 +329,7 @@ test('keeps a native legacy no-op byte-identical with an identity map', () => {
   );
   assert.equal(result.status, 'complete');
   assert.equal(result.code, source);
-  assert.ok(result.map.mappings.length > 0);
+  assert.equal(result.map.mappings, '');
 });
 
 test('keeps Metro postflight operations independently selectable', () => {

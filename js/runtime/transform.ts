@@ -318,7 +318,7 @@ export function transform(
       const result = results[resultIndex];
       const { phase: batchPhase } = batch[resultIndex];
       const complete = result.status === 'complete';
-      if (complete)
+      if (complete && result.changed)
         currentVersion = sourceVersions.commit(currentVersion, {
           normalizedEditCount: 1,
           codeChanged: true,

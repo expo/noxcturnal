@@ -9985,8 +9985,8 @@ test('misc/missing-class-properties-transform-private/input.js', async () => {
       transforms: {
         classes: true,
         classProperties: { loose: false },
-        privateMethods: { loose: true },
-        privatePropertyInObject: { loose: true },
+        privateMethods: true,
+        privatePropertyInObject: true,
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -15258,8 +15258,8 @@ test('spec/relaxed-method-coercion/input.js', async () => {
       transforms: {
         classes: true,
         classProperties: { loose: false },
-        privateMethods: { loose: true },
-        privatePropertyInObject: { loose: true },
+        privateMethods: true,
+        privatePropertyInObject: true,
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),

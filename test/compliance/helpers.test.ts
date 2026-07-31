@@ -30,7 +30,7 @@ test('runtime class helpers preserve private field behavior', () => {
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
       transforms: {
         classProperties: { loose: true },
-        privateMethods: { loose: true },
+        privateMethods: true,
       },
     },
     { require },

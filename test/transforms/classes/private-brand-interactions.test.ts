@@ -15,7 +15,7 @@ test('lowers inherited private brands referenced from a static block', async () 
       transforms: {
         classStaticBlock: true,
         classProperties: { loose: true },
-        privatePropertyInObject: { loose: true },
+        privatePropertyInObject: true,
       },
     }),
   ).toMatchInlineSnapshot(`

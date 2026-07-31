@@ -9,7 +9,7 @@ test('001 JS Private Properties > private field declaration and access > basic p
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase = require('@babel/runtime/helpers/classPrivateFieldLooseBase');
@@ -38,7 +38,7 @@ test('002 JS Private Properties > private field declaration and access > private
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase = require('@babel/runtime/helpers/classPrivateFieldLooseBase');
@@ -67,7 +67,7 @@ test('003 JS Private Properties > private field declaration and access > private
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase = require('@babel/runtime/helpers/classPrivateFieldLooseBase');
@@ -97,7 +97,7 @@ test('004 JS Private Properties > private field declaration and access > private
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase = require('@babel/runtime/helpers/classPrivateFieldLooseBase');
@@ -134,7 +134,7 @@ test('005 JS Private Properties > private field declaration and access > multipl
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase = require('@babel/runtime/helpers/classPrivateFieldLooseBase');
@@ -170,7 +170,7 @@ test('006 JS Private Properties > private field declaration and access > private
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase = require('@babel/runtime/helpers/classPrivateFieldLooseBase');
@@ -251,7 +251,7 @@ test('007 JS Private Properties > private field declaration and access > private
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase = require('@babel/runtime/helpers/classPrivateFieldLooseBase');
@@ -284,7 +284,7 @@ test('008 JS Private Properties > private field declaration and access > private
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase = require('@babel/runtime/helpers/classPrivateFieldLooseBase');
@@ -321,7 +321,7 @@ test('009 JS Private Properties > private field declaration and access > private
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseKey = require('@babel/runtime/helpers/classPrivateFieldLooseKey');
@@ -349,7 +349,7 @@ test('010 JS Private Properties > private field declaration and access > private
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseKey = require('@babel/runtime/helpers/classPrivateFieldLooseKey');
@@ -380,7 +380,7 @@ test('011 JS Private Properties > private field declaration and access > private
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseKey = require('@babel/runtime/helpers/classPrivateFieldLooseKey');
@@ -408,7 +408,7 @@ test('012 JS Private Properties > private field declaration and access > private
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseKey = require('@babel/runtime/helpers/classPrivateFieldLooseKey');
@@ -436,7 +436,7 @@ test('013 JS Private Properties > private field mutation > compound assignment o
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase = require('@babel/runtime/helpers/classPrivateFieldLooseBase');
@@ -480,7 +480,7 @@ test('014 JS Private Properties > private field mutation > prefix and postfix in
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase = require('@babel/runtime/helpers/classPrivateFieldLooseBase');
@@ -529,7 +529,7 @@ test('015 JS Private Properties > private field mutation > logical assignment op
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase = require('@babel/runtime/helpers/classPrivateFieldLooseBase');
@@ -588,7 +588,7 @@ test('016 JS Private Properties > private field mutation > destructuring assignm
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase = require('@babel/runtime/helpers/classPrivateFieldLooseBase');
@@ -633,7 +633,7 @@ test('017 JS Private Properties > static private fields > basic static private f
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase = require('@babel/runtime/helpers/classPrivateFieldLooseBase');
@@ -660,7 +660,7 @@ test('018 JS Private Properties > static private fields > static private field m
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase = require('@babel/runtime/helpers/classPrivateFieldLooseBase');
@@ -694,7 +694,7 @@ test('019 JS Private Properties > static private fields > static private field a
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase = require('@babel/runtime/helpers/classPrivateFieldLooseBase');
@@ -721,7 +721,7 @@ test('020 JS Private Properties > static private fields > static private field n
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase = require('@babel/runtime/helpers/classPrivateFieldLooseBase');
@@ -749,7 +749,7 @@ test('021 JS Private Properties > static private fields > static private field w
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase = require('@babel/runtime/helpers/classPrivateFieldLooseBase');
@@ -776,7 +776,7 @@ test('022 JS Private Properties > private field inheritance > subclass does not 
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase = require('@babel/runtime/helpers/classPrivateFieldLooseBase');
@@ -813,7 +813,7 @@ test('023 JS Private Properties > private field inheritance > subclass can have 
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase = require('@babel/runtime/helpers/classPrivateFieldLooseBase');
@@ -857,7 +857,7 @@ test('024 JS Private Properties > private field inheritance > subclass construct
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase = require('@babel/runtime/helpers/classPrivateFieldLooseBase');
@@ -895,7 +895,7 @@ test('025 JS Private Properties > private field inheritance > private field per-
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase = require('@babel/runtime/helpers/classPrivateFieldLooseBase');
@@ -933,7 +933,7 @@ test('026 JS Private Properties > private field interactions > private field wit
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase = require('@babel/runtime/helpers/classPrivateFieldLooseBase');
@@ -963,7 +963,7 @@ test('027 JS Private Properties > private field interactions > private field ini
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseKey = require('@babel/runtime/helpers/classPrivateFieldLooseKey');
@@ -1000,7 +1000,7 @@ test('028 JS Private Properties > private field interactions > private field wit
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase = require('@babel/runtime/helpers/classPrivateFieldLooseBase');
@@ -1030,7 +1030,7 @@ test('029 JS Private Properties > private field interactions > private field wit
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase = require('@babel/runtime/helpers/classPrivateFieldLooseBase');
@@ -1066,7 +1066,7 @@ test('030 JS Private Properties > private field interactions > private field use
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase = require('@babel/runtime/helpers/classPrivateFieldLooseBase');
@@ -1109,7 +1109,7 @@ test('031 JS Private Properties > private field interactions > private field use
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase = require('@babel/runtime/helpers/classPrivateFieldLooseBase');
@@ -1148,7 +1148,7 @@ test('032 JS Private Properties > private field interactions > private field acc
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase = require('@babel/runtime/helpers/classPrivateFieldLooseBase');
@@ -1179,7 +1179,7 @@ test('033 JS Private Properties > private field interactions > private field acc
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase = require('@babel/runtime/helpers/classPrivateFieldLooseBase');
@@ -1209,7 +1209,7 @@ test('034 JS Private Properties > private instance field brand checks > basic #f
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
@@ -1254,7 +1254,7 @@ test('035 JS Private Properties > private instance field brand checks > #field i
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
@@ -1299,7 +1299,7 @@ test('036 JS Private Properties > private instance field brand checks > #field i
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseKey = require('@babel/runtime/helpers/classPrivateFieldLooseKey');
@@ -1354,7 +1354,7 @@ test('037 JS Private Properties > private instance field brand checks > multiple
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
@@ -1423,7 +1423,7 @@ test('038 JS Private Properties > private instance field brand checks > #field i
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
@@ -1468,7 +1468,7 @@ test('039 JS Private Properties > private instance field brand checks > instance
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
@@ -1515,7 +1515,7 @@ test('040 JS Private Properties > private instance method brand checks > #method
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
@@ -1586,7 +1586,7 @@ test('041 JS Private Properties > private instance method brand checks > #method
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
@@ -1635,7 +1635,7 @@ test('042 JS Private Properties > private accessor brand checks > #getter in obj
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
@@ -1683,7 +1683,7 @@ test('043 JS Private Properties > private accessor brand checks > #setter in obj
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
@@ -1730,7 +1730,7 @@ test('044 JS Private Properties > private accessor brand checks > #accessor (get
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase2 = {
@@ -1796,7 +1796,7 @@ test('045 JS Private Properties > private accessor brand checks > brand check do
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
@@ -1848,7 +1848,7 @@ test('046 JS Private Properties > private static field brand checks > #staticFie
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
@@ -1893,7 +1893,7 @@ test('047 JS Private Properties > private static field brand checks > #staticFie
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
@@ -1938,7 +1938,7 @@ test('048 JS Private Properties > private static field brand checks > #staticFie
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
@@ -1983,7 +1983,7 @@ test('049 JS Private Properties > private static method brand checks > #staticMe
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
@@ -2029,7 +2029,7 @@ test('050 JS Private Properties > private static method brand checks > #staticMe
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
@@ -2075,7 +2075,7 @@ test('051 JS Private Properties > private static accessor brand checks > static 
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
@@ -2123,7 +2123,7 @@ test('052 JS Private Properties > RHS not an object > throws TypeError for numbe
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
@@ -2168,7 +2168,7 @@ test('053 JS Private Properties > RHS not an object > throws TypeError for strin
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
@@ -2213,7 +2213,7 @@ test('054 JS Private Properties > RHS not an object > throws TypeError for boole
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
@@ -2258,7 +2258,7 @@ test('055 JS Private Properties > RHS not an object > throws TypeError for undef
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
@@ -2303,7 +2303,7 @@ test('056 JS Private Properties > RHS not an object > throws TypeError for null'
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
@@ -2348,7 +2348,7 @@ test('057 JS Private Properties > RHS not an object > throws TypeError for symbo
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
@@ -2393,7 +2393,7 @@ test('058 JS Private Properties > RHS not an object > throws for static private 
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
@@ -2440,7 +2440,7 @@ test('059 JS Private Properties > RHS not an object > throws for private method 
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
@@ -2487,7 +2487,7 @@ test('060 JS Private Properties > class name shadowing > static private field ch
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
@@ -2538,7 +2538,7 @@ test('061 JS Private Properties > class name shadowing > instance private field 
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
@@ -2586,7 +2586,7 @@ test('062 JS Private Properties > inheritance > #field in subclass instance retu
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
@@ -2633,7 +2633,7 @@ test('063 JS Private Properties > inheritance > subclass private field is indepe
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
@@ -2728,7 +2728,7 @@ test('064 JS Private Properties > inheritance > #staticField in subclass returns
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
@@ -2776,7 +2776,7 @@ test('065 JS Private Properties > inheritance > private method brand check on su
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
@@ -2824,7 +2824,7 @@ test('066 JS Private Properties > usage in expressions > negation: !(#field in o
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
@@ -2870,7 +2870,7 @@ test('067 JS Private Properties > usage in expressions > ternary: #field in obj 
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
@@ -2916,7 +2916,7 @@ test('068 JS Private Properties > usage in expressions > logical AND: #field in 
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
@@ -2962,7 +2962,7 @@ test('069 JS Private Properties > usage in expressions > logical OR: #field in o
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
@@ -3008,7 +3008,7 @@ test('070 JS Private Properties > usage in expressions > if/else with brand chec
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
@@ -3058,7 +3058,7 @@ test('071 JS Private Properties > usage in expressions > brand check in while lo
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
@@ -3108,7 +3108,7 @@ test('072 JS Private Properties > usage in expressions > brand check with nullis
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
@@ -3155,7 +3155,7 @@ test('073 JS Private Properties > practical patterns > static factory with brand
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase2 = {
@@ -3217,7 +3217,7 @@ test('074 JS Private Properties > practical patterns > safe unwrap pattern', asy
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase2 = {
@@ -3296,7 +3296,7 @@ test('075 JS Private Properties > practical patterns > type narrowing with multi
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
@@ -3374,7 +3374,7 @@ test('076 JS Private Properties > practical patterns > filtering an array by bra
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
@@ -3428,7 +3428,7 @@ test('077 JS Private Properties > cross-class isolation > same field name in dif
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
@@ -3506,7 +3506,7 @@ test('078 JS Private Properties > cross-class isolation > nested class brand che
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
@@ -3594,7 +3594,7 @@ test('079 JS Private Properties > various object types as RHS > works with array
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
@@ -3639,7 +3639,7 @@ test('080 JS Private Properties > various object types as RHS > works with funct
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
@@ -3684,7 +3684,7 @@ test('081 JS Private Properties > various object types as RHS > works with class
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
@@ -3730,7 +3730,7 @@ test('082 JS Private Properties > various object types as RHS > works with Objec
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
@@ -3775,7 +3775,7 @@ test('083 JS Private Properties > various object types as RHS > works with Date,
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
@@ -3822,7 +3822,7 @@ test('084 JS Private Properties > edge cases > brand check in constructor', asyn
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
@@ -3854,7 +3854,7 @@ test('085 JS Private Properties > edge cases > brand check during field initiali
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
@@ -3885,7 +3885,7 @@ test('086 JS Private Properties > edge cases > brand check in static block', asy
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
@@ -3919,7 +3919,7 @@ test('087 JS Private Properties > edge cases > brand check result is always a bo
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
@@ -3967,7 +3967,7 @@ test('088 JS Private Properties > edge cases > brand check on Proxy-wrapped obje
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
@@ -4017,7 +4017,7 @@ test('089 JS Private Properties > edge cases > multiple brand checks in single e
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseKey = require('@babel/runtime/helpers/classPrivateFieldLooseKey');
@@ -4103,7 +4103,7 @@ test('090 JS Private Properties > edge cases > brand check after Object.freeze',
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
@@ -4149,7 +4149,7 @@ test('091 JS Private Properties > edge cases > brand check after Object.seal', a
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
@@ -4195,7 +4195,7 @@ test('092 JS Private Properties > edge cases > brand check with Object.preventEx
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
@@ -4242,7 +4242,7 @@ test('093 JS Private Properties > edge cases > expression class with brand check
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
+      transforms: { classProperties: { loose: true }, privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },

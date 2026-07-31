@@ -161,6 +161,45 @@ export { inspect };
   `);
 });
 
+test('does not treat eval text or property calls as direct eval', async () => {
+  const source = `
+// eval('comment only')
+const marker = "eval('string only')";
+const unused = () => 42;
+globalThis.eval('external()');
+export { marker };
+`;
+  expect(await transformSource(source, 'input.js', options)).toMatchInlineSnapshot(`
+    "// eval('comment only')
+    const marker = \"eval('string only')\";
+    globalThis.eval('external()');
+    export { marker };"
+  `);
+});
+
+test('does not treat an indirect eval call as direct eval', async () => {
+  const source = `
+const unused = () => 42;
+(0, eval)('external()');
+export const value = 1;
+`;
+  expect(await transformSource(source, 'input.js', options)).toMatchInlineSnapshot(`
+    "(0, eval)('external()');
+    export const value = 1;"
+  `);
+});
+
+test('conservatively retains bindings around syntactically direct shadowed eval', async () => {
+  const source = `
+function inspect(eval) {
+  const hidden = () => 42;
+  return eval('hidden()');
+}
+export { inspect };
+`;
+  expect(await transformSource(source, 'input.js', options)).toContain('const hidden = () => 42');
+});
+
 test('does not empty variable declarations used as for initializers', async () => {
   const source = `for (let unused = () => 1; condition(); update()) work();`;
   expect(await transformSource(source, 'input.js', options)).toMatchInlineSnapshot(

@@ -32,7 +32,6 @@ interface NativePreflightOptionsInput {
   classes?: boolean;
   legacyDecorators?: boolean;
   destructuring?: boolean;
-  destructuringUseBuiltIns?: boolean;
   parameters?: boolean;
   forOf?: boolean;
   explicitResourceManagement?: boolean;
@@ -53,9 +52,7 @@ interface NativePreflightOptionsInput {
   asyncFunctions?: boolean;
   exponentiationOperator?: boolean;
   privateMethods?: boolean;
-  privateMethodsLoose?: boolean;
   privatePropertyInObject?: boolean;
-  privatePropertyInObjectLoose?: boolean;
   regexpSticky?: boolean;
   regexpUnicode?: boolean;
   regexpUnicodePropertyEscapes?: boolean;
@@ -68,6 +65,9 @@ interface NativePreflightOptionsInput {
 
 export interface NativePreflightResultOutput {
   status: 'complete' | 'unsupported';
+  changed: boolean;
+  normalizedJavascript: boolean;
+  jsx: boolean;
   reason?: string;
   /** Present only on the free-function path; the pipeline session keeps it resident. */
   code?: string;
@@ -341,8 +341,7 @@ export function nativePreflightOptions(plan: PreflightPlan): NativePreflightOpti
     blockScoping: plan.transforms?.blockScoping,
     classes: plan.transforms?.classes,
     legacyDecorators: plan.transforms?.legacyDecorators,
-    destructuring: plan.transforms?.destructuring != null,
-    destructuringUseBuiltIns: plan.transforms?.destructuring?.useBuiltIns,
+    destructuring: plan.transforms?.destructuring,
     parameters: plan.transforms?.parameters,
     forOf: plan.transforms?.forOf,
     explicitResourceManagement: plan.transforms?.explicitResourceManagement,
@@ -362,10 +361,8 @@ export function nativePreflightOptions(plan: PreflightPlan): NativePreflightOpti
     asyncGeneratorFunctions: plan.transforms?.asyncGeneratorFunctions,
     asyncFunctions: plan.transforms?.asyncFunctions,
     exponentiationOperator: plan.transforms?.exponentiationOperator,
-    privateMethods: plan.transforms?.privateMethods != null,
-    privateMethodsLoose: plan.transforms?.privateMethods?.loose,
-    privatePropertyInObject: plan.transforms?.privatePropertyInObject != null,
-    privatePropertyInObjectLoose: plan.transforms?.privatePropertyInObject?.loose,
+    privateMethods: plan.transforms?.privateMethods,
+    privatePropertyInObject: plan.transforms?.privatePropertyInObject,
     regexpSticky: plan.transforms?.regexpSticky,
     regexpUnicode: plan.transforms?.regexpUnicode,
     regexpUnicodePropertyEscapes: plan.transforms?.regexpUnicodePropertyEscapes,

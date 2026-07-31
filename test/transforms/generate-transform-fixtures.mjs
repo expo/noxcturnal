@@ -44,28 +44,24 @@ const transforms = [
     'classes',
     'private-methods',
     'private-methods',
-    [true].map(loose => ({
-      transforms: { privateMethods: { loose } },
-      helpers: runtimeHelpers,
-    })),
+    [{ transforms: { privateMethods: true }, helpers: runtimeHelpers }],
   ],
   [
     'classes',
     'private-property-in-object',
     'private-property-in-object',
-    [true].map(loose => ({
-      transforms: { privatePropertyInObject: { loose } },
-      helpers: runtimeHelpers,
-    })),
+    [
+      {
+        transforms: { privatePropertyInObject: true },
+        helpers: runtimeHelpers,
+      },
+    ],
   ],
   [
     'destructuring',
     'destructuring',
     'destructuring',
-    [false, true].map(useBuiltIns => ({
-      transforms: { destructuring: { useBuiltIns } },
-      helpers: runtimeHelpers,
-    })),
+    [{ transforms: { destructuring: true }, helpers: runtimeHelpers }],
   ],
   ['functions', 'parameters', 'parameters', [{ transforms: { parameters: true } }]],
   [
@@ -78,14 +74,24 @@ const transforms = [
     'functions',
     'async-generators',
     'async-generator-functions',
-    [{ transforms: { asyncGeneratorFunctions: true }, helpers: { mode: 'inline' } }],
+    [
+      {
+        transforms: { asyncGeneratorFunctions: true },
+        helpers: { mode: 'inline' },
+      },
+    ],
   ],
   ['loops', 'for-of', 'for-of', [{ transforms: { forOf: true }, helpers: { mode: 'inline' } }]],
   [
     'resources',
     'explicit-resource-management',
     'explicit-resource-management',
-    [{ transforms: { explicitResourceManagement: true }, helpers: { mode: 'inline' } }],
+    [
+      {
+        transforms: { explicitResourceManagement: true },
+        helpers: { mode: 'inline' },
+      },
+    ],
   ],
   [
     'operators',
@@ -97,13 +103,17 @@ const transforms = [
     'operators',
     'optional-chaining',
     'optional-chaining',
-    [false, true].map(loose => ({ transforms: { optionalChaining: { loose } } })),
+    [false, true].map(loose => ({
+      transforms: { optionalChaining: { loose } },
+    })),
   ],
   [
     'operators',
     'nullish-coalescing',
     'nullish-coalescing-operator',
-    [false, true].map(loose => ({ transforms: { nullishCoalescingOperator: { loose } } })),
+    [false, true].map(loose => ({
+      transforms: { nullishCoalescingOperator: { loose } },
+    })),
   ],
   [
     'operators',
@@ -140,14 +150,24 @@ const transforms = [
     'regexp',
     'unicode-property-escapes',
     'unicode-property-regex',
-    [{ transforms: { regexpUnicodePropertyEscapes: true }, helpers: { mode: 'inline' } }],
+    [
+      {
+        transforms: { regexpUnicodePropertyEscapes: true },
+        helpers: { mode: 'inline' },
+      },
+    ],
   ],
   ['regexp', 'dot-all', 'dotall-regex', [{ transforms: { regexpDotAll: true } }]],
   [
     'regexp',
     'named-capture-groups',
     'named-capturing-groups-regex',
-    [{ transforms: { regexpNamedCaptureGroups: true }, helpers: { mode: 'inline' } }],
+    [
+      {
+        transforms: { regexpNamedCaptureGroups: true },
+        helpers: { mode: 'inline' },
+      },
+    ],
   ],
   [
     'regexp',

@@ -8,7 +8,7 @@ test('allowArrayLike/holes/exec.js [helpers]', async () => {
     'var o = { 0: "a", 2: "c", length: 3 };\n\nvar [...rest] = o;\n\nexpect(rest).toEqual(["a", undefined, "c"]);\nexpect(1 in rest).toBe(true); // Not holey\n';
   expect(
     await transformOutcome(source, 'exec.js', {
-      transforms: { destructuring: { useBuiltIns: false } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -37,7 +37,7 @@ test('allowArrayLike/holes/exec.js [built-ins]', async () => {
     'var o = { 0: "a", 2: "c", length: 3 };\n\nvar [...rest] = o;\n\nexpect(rest).toEqual(["a", undefined, "c"]);\nexpect(1 in rest).toBe(true); // Not holey\n';
   expect(
     await transformOutcome(source, 'exec.js', {
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -66,7 +66,7 @@ test('allowArrayLike/length-cropped/exec.js [helpers]', async () => {
     'var o = { 0: "a", 1: "b", 2: "c", length: 2 };\n\nvar [first, ...rest] = o;\n\nexpect(first).toBe("a");\nexpect(rest).toEqual(["b"]);\n';
   expect(
     await transformOutcome(source, 'exec.js', {
-      transforms: { destructuring: { useBuiltIns: false } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -97,7 +97,7 @@ test('allowArrayLike/length-cropped/exec.js [built-ins]', async () => {
     'var o = { 0: "a", 1: "b", 2: "c", length: 2 };\n\nvar [first, ...rest] = o;\n\nexpect(first).toBe("a");\nexpect(rest).toEqual(["b"]);\n';
   expect(
     await transformOutcome(source, 'exec.js', {
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -128,7 +128,7 @@ test('allowArrayLike/simple/exec.js [helpers]', async () => {
     'var o = { 0: "a", 1: "b", 2: "c", length: 3 };\n\nvar [first, ...rest] = o;\n\nexpect(first).toBe("a");\nexpect(rest).toEqual(["b", "c"]);\n';
   expect(
     await transformOutcome(source, 'exec.js', {
-      transforms: { destructuring: { useBuiltIns: false } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -159,7 +159,7 @@ test('allowArrayLike/simple/exec.js [built-ins]', async () => {
     'var o = { 0: "a", 1: "b", 2: "c", length: 3 };\n\nvar [first, ...rest] = o;\n\nexpect(first).toBe("a");\nexpect(rest).toEqual(["b", "c"]);\n';
   expect(
     await transformOutcome(source, 'exec.js', {
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -189,7 +189,7 @@ test('allowArrayLike/simple/input.js [helpers]', async () => {
   const source = 'var [first, ...rest] = o;\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: false } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -211,7 +211,7 @@ test('allowArrayLike/simple/input.js [built-ins]', async () => {
   const source = 'var [first, ...rest] = o;\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -234,7 +234,7 @@ test('assumption-arrayLikeIsIterable/holes/exec.js [helpers]', async () => {
     'var o = { 0: "a", 2: "c", length: 3 };\n\nvar [...rest] = o;\n\nexpect(rest).toEqual(["a", undefined, "c"]);\nexpect(1 in rest).toBe(true); // Not holey\n';
   expect(
     await transformOutcome(source, 'exec.js', {
-      transforms: { destructuring: { useBuiltIns: false } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -263,7 +263,7 @@ test('assumption-arrayLikeIsIterable/holes/exec.js [built-ins]', async () => {
     'var o = { 0: "a", 2: "c", length: 3 };\n\nvar [...rest] = o;\n\nexpect(rest).toEqual(["a", undefined, "c"]);\nexpect(1 in rest).toBe(true); // Not holey\n';
   expect(
     await transformOutcome(source, 'exec.js', {
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -292,7 +292,7 @@ test('assumption-arrayLikeIsIterable/length-cropped/exec.js [helpers]', async ()
     'var o = { 0: "a", 1: "b", 2: "c", length: 2 };\n\nvar [first, ...rest] = o;\n\nexpect(first).toBe("a");\nexpect(rest).toEqual(["b"]);\n';
   expect(
     await transformOutcome(source, 'exec.js', {
-      transforms: { destructuring: { useBuiltIns: false } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -323,7 +323,7 @@ test('assumption-arrayLikeIsIterable/length-cropped/exec.js [built-ins]', async 
     'var o = { 0: "a", 1: "b", 2: "c", length: 2 };\n\nvar [first, ...rest] = o;\n\nexpect(first).toBe("a");\nexpect(rest).toEqual(["b"]);\n';
   expect(
     await transformOutcome(source, 'exec.js', {
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -354,7 +354,7 @@ test('assumption-arrayLikeIsIterable/simple/exec.js [helpers]', async () => {
     'var o = { 0: "a", 1: "b", 2: "c", length: 3 };\n\nvar [first, ...rest] = o;\n\nexpect(first).toBe("a");\nexpect(rest).toEqual(["b", "c"]);\n';
   expect(
     await transformOutcome(source, 'exec.js', {
-      transforms: { destructuring: { useBuiltIns: false } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -385,7 +385,7 @@ test('assumption-arrayLikeIsIterable/simple/exec.js [built-ins]', async () => {
     'var o = { 0: "a", 1: "b", 2: "c", length: 3 };\n\nvar [first, ...rest] = o;\n\nexpect(first).toBe("a");\nexpect(rest).toEqual(["b", "c"]);\n';
   expect(
     await transformOutcome(source, 'exec.js', {
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -415,7 +415,7 @@ test('assumption-arrayLikeIsIterable/simple/input.js [helpers]', async () => {
   const source = 'var [first, ...rest] = o;\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: false } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -437,7 +437,7 @@ test('assumption-arrayLikeIsIterable/simple/input.js [built-ins]', async () => {
   const source = 'var [first, ...rest] = o;\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -459,7 +459,7 @@ test('assumption-iterableIsArray/basic/input.js [helpers]', async () => {
   const source = 'let [foo, bar] = baz;\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: false } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -481,7 +481,7 @@ test('assumption-iterableIsArray/basic/input.js [built-ins]', async () => {
   const source = 'let [foo, bar] = baz;\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -504,7 +504,7 @@ test('assumption-iterableIsArray/for-in/input.js [helpers]', async () => {
     'for (var [name, value] in obj) {\n  print("Name: " + name + ", Value: " + value);\n}\n\nfor ([name, value] in obj) {\n  print("Name: " + name + ", Value: " + value);\n}\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: false } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -523,7 +523,7 @@ test('assumption-iterableIsArray/for-in/input.js [built-ins]', async () => {
     'for (var [name, value] in obj) {\n  print("Name: " + name + ", Value: " + value);\n}\n\nfor ([name, value] in obj) {\n  print("Name: " + name + ", Value: " + value);\n}\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -541,7 +541,7 @@ test('assumption-objectRestNoSymbols/rest-assignment-expression/input.js [helper
   const source = '({ a, b, ...c } = obj);\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: false } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -575,7 +575,7 @@ test('assumption-objectRestNoSymbols/rest-assignment-expression/input.js [built-
   const source = '({ a, b, ...c } = obj);\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -609,7 +609,7 @@ test('assumption-objectRestNoSymbols/rest-computed/input.js [helpers]', async ()
   const source = 'let { [a]: b, ...c } = obj;\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: false } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -645,7 +645,7 @@ test('assumption-objectRestNoSymbols/rest-computed/input.js [built-ins]', async 
   const source = 'let { [a]: b, ...c } = obj;\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -682,7 +682,7 @@ test('assumption-objectRestNoSymbols/rest-ignore-symbols/exec.js [helpers]', asy
     'let sym = Symbol();\n\nlet { a, ...r } = { a: 1, b: 2, [sym]: 3 };\n\nexpect(a).toBe(1);\nexpect(r.b).toBe(2);\nexpect(sym in r).toBe(false);\n';
   expect(
     await transformOutcome(source, 'exec.js', {
-      transforms: { destructuring: { useBuiltIns: false } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -722,7 +722,7 @@ test('assumption-objectRestNoSymbols/rest-ignore-symbols/exec.js [built-ins]', a
     'let sym = Symbol();\n\nlet { a, ...r } = { a: 1, b: 2, [sym]: 3 };\n\nexpect(a).toBe(1);\nexpect(r.b).toBe(2);\nexpect(sym in r).toBe(false);\n';
   expect(
     await transformOutcome(source, 'exec.js', {
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -761,7 +761,7 @@ test('assumption-objectRestNoSymbols/rest-nested/input.js [helpers]', async () =
   const source = 'let { a, nested: { b, c, ...d }, e } = obj;\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: false } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -796,7 +796,7 @@ test('assumption-objectRestNoSymbols/rest-nested/input.js [built-ins]', async ()
   const source = 'let { a, nested: { b, c, ...d }, e } = obj;\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -831,7 +831,7 @@ test('assumption-objectRestNoSymbols/rest-var-declaration/input.js [helpers]', a
   const source = 'var { a, b, ...c } = obj;\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: false } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -863,7 +863,7 @@ test('assumption-objectRestNoSymbols/rest-var-declaration/input.js [built-ins]',
   const source = 'var { a, b, ...c } = obj;\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -896,7 +896,7 @@ test('destructuring/array-symbol-unsupported/exec.js [helpers]', async () => {
     'var a = (() => [1, 2, 3])();\n\n// Simulate old environment\nglobal.Symbol = void 0;\n\nvar [first, ...rest] = a;\n\nexpect(first).toBe(1);\nexpect(rest).toEqual([2, 3]);\n';
   expect(
     await transformOutcome(source, 'exec.js', {
-      transforms: { destructuring: { useBuiltIns: false } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -924,7 +924,7 @@ test('destructuring/array-symbol-unsupported/exec.js [built-ins]', async () => {
     'var a = (() => [1, 2, 3])();\n\n// Simulate old environment\nglobal.Symbol = void 0;\n\nvar [first, ...rest] = a;\n\nexpect(first).toBe(1);\nexpect(rest).toEqual([2, 3]);\n';
   expect(
     await transformOutcome(source, 'exec.js', {
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -952,7 +952,7 @@ test('destructuring/array-symbol-unsupported/input.js [helpers]', async () => {
     "var a = (() => [1, 2, 3])();\n\n// !!! In order to run this test, this shouldn't be optimized using type inference\n// If it's optimized and doesn't call toArray, please modify this test\n// and exec.js\nvar [first, ...rest] = a;\n";
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: false } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -979,7 +979,7 @@ test('destructuring/array-symbol-unsupported/input.js [built-ins]', async () => 
     "var a = (() => [1, 2, 3])();\n\n// !!! In order to run this test, this shouldn't be optimized using type inference\n// If it's optimized and doesn't call toArray, please modify this test\n// and exec.js\nvar [first, ...rest] = a;\n";
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -1006,7 +1006,7 @@ test('destructuring/array-unpack-optimisation/input.js [helpers]', async () => {
     'var [a, b] = [1, 2];\nvar [[a, b]] = [[1, 2]];\nvar [a, b, ...c] = [1, 2, 3, 4];\nvar [[a, b, ...c]] = [[1, 2, 3, 4]];\n\nvar [a, b] = [1, 2, 3];\nvar [[a, b]] = [[1, 2, 3]];\nvar [a, b] = [a, b];\n[a[0], a[1]] = [a[1], a[0]];\nvar [a, b] = [...foo, bar];\nvar [a, b] = [foo(), bar];\nvar [a, b] = [clazz.foo(), bar];\nvar [a, b] = [clazz.foo, bar];\nvar [a, b] = [, 2];\n[a, b] = [1, 2];\n[a, b] = [, 2];\n; // Avoid completion record special case\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: false } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -1090,7 +1090,7 @@ test('destructuring/array-unpack-optimisation/input.js [built-ins]', async () =>
     'var [a, b] = [1, 2];\nvar [[a, b]] = [[1, 2]];\nvar [a, b, ...c] = [1, 2, 3, 4];\nvar [[a, b, ...c]] = [[1, 2, 3, 4]];\n\nvar [a, b] = [1, 2, 3];\nvar [[a, b]] = [[1, 2, 3]];\nvar [a, b] = [a, b];\n[a[0], a[1]] = [a[1], a[0]];\nvar [a, b] = [...foo, bar];\nvar [a, b] = [foo(), bar];\nvar [a, b] = [clazz.foo(), bar];\nvar [a, b] = [clazz.foo, bar];\nvar [a, b] = [, 2];\n[a, b] = [1, 2];\n[a, b] = [, 2];\n; // Avoid completion record special case\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -1174,7 +1174,7 @@ test('destructuring/array/input.js [helpers]', async () => {
     'var [a, [b], [c]] = ["hello", [", ", "junk"], ["world"]];\n[a, [b], [c]] = ["hello", [", ", "junk"], ["world"]];\n;\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: false } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -1209,7 +1209,7 @@ test('destructuring/array/input.js [built-ins]', async () => {
     'var [a, [b], [c]] = ["hello", [", ", "junk"], ["world"]];\n[a, [b], [c]] = ["hello", [", ", "junk"], ["world"]];\n;\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -1243,7 +1243,7 @@ test('destructuring/assignment-arrow-function-block/input.js [helpers]', async (
   const source = '() => { [a, b] = [1, 2] }\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: false } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -1265,7 +1265,7 @@ test('destructuring/assignment-arrow-function-block/input.js [built-ins]', async
   const source = '() => { [a, b] = [1, 2] }\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -1287,7 +1287,7 @@ test('destructuring/assignment-arrow-function-no-block/input.js [helpers]', asyn
   const source = '() => [a, b] = [1, 2]\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: false } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -1309,7 +1309,7 @@ test('destructuring/assignment-arrow-function-no-block/input.js [built-ins]', as
   const source = '() => [a, b] = [1, 2]\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -1331,7 +1331,7 @@ test('destructuring/assignment-expression-completion-record/input.js [helpers]',
   const source = 'var x, y;\n[x, y] = [1, 2];\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: false } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -1352,7 +1352,7 @@ test('destructuring/assignment-expression-completion-record/input.js [built-ins]
   const source = 'var x, y;\n[x, y] = [1, 2];\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -1373,7 +1373,7 @@ test('destructuring/assignment-expression-pattern/input.js [helpers]', async () 
   const source = 'var z = {};\nvar { x: { y } = {} } = z;\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: false } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -1396,7 +1396,7 @@ test('destructuring/assignment-expression-pattern/input.js [built-ins]', async (
   const source = 'var z = {};\nvar { x: { y } = {} } = z;\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -1419,7 +1419,7 @@ test('destructuring/assignment-expression/input.js [helpers]', async () => {
   const source = 'console.log([x] = [123]);\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: false } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -1439,7 +1439,7 @@ test('destructuring/assignment-expression/input.js [built-ins]', async () => {
   const source = 'console.log([x] = [123]);\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -1459,7 +1459,7 @@ test('destructuring/assignment-sequence-expression-completion-record/input.js [h
   const source = 'var x, y;\n([x, y] = [1, 2], y);\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: false } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -1480,7 +1480,7 @@ test('destructuring/assignment-sequence-expression-completion-record/input.js [b
   const source = 'var x, y;\n([x, y] = [1, 2], y);\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -1501,7 +1501,7 @@ test('destructuring/assignment-statement/input.js [helpers]', async () => {
   const source = '[a, b] = f();\n;\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: false } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -1521,7 +1521,7 @@ test('destructuring/assignment-statement/input.js [built-ins]', async () => {
   const source = '[a, b] = f();\n;\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -1542,7 +1542,7 @@ test('destructuring/chained/exec.js [helpers]', async () => {
     'var a, b, c, d;\n({ a, b } = ({ c, d } = { a: 1, b: 2, c: 3, d: 4}));\nexpect(a).toBe(1);\nexpect(b).toBe(2);\nexpect(c).toBe(3);\nexpect(d).toBe(4);\n';
   expect(
     await transformOutcome(source, 'exec.js', {
-      transforms: { destructuring: { useBuiltIns: false } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -1581,7 +1581,7 @@ test('destructuring/chained/exec.js [built-ins]', async () => {
     'var a, b, c, d;\n({ a, b } = ({ c, d } = { a: 1, b: 2, c: 3, d: 4}));\nexpect(a).toBe(1);\nexpect(b).toBe(2);\nexpect(c).toBe(3);\nexpect(d).toBe(4);\n';
   expect(
     await transformOutcome(source, 'exec.js', {
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -1620,7 +1620,7 @@ test('destructuring/check-iterator-return/exec.js [helpers]', async () => {
     'expect(() => {\n  var [] = {\n    [Symbol.iterator]: () => {\n      return {\n        return: () => {},\n      };\n    },\n  };\n}).toThrow(TypeError);\n\nexpect(() => {\n  var [] = {\n    [Symbol.iterator]: () => {\n      return {\n        return: () => ({}),\n      };\n    },\n  };\n}).not.toThrow();\n\nexpect(() => {\n  var [x] = {\n    [Symbol.iterator]: () => {\n      return {\n        next: () => ({ done: false, value: 1 }),\n        return: () => {},\n      };\n    },\n  };\n}).toThrow(TypeError);\n\nexpect(() => {\n  var [x] = {\n    [Symbol.iterator]: () => {\n      return {\n        next: () => ({ done: false, value: 1 }),\n        return: () => ({}),\n      };\n    },\n  };\n}).not.toThrow();\n';
   expect(
     await transformOutcome(source, 'exec.js', {
-      transforms: { destructuring: { useBuiltIns: false } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -1685,7 +1685,7 @@ test('destructuring/check-iterator-return/exec.js [built-ins]', async () => {
     'expect(() => {\n  var [] = {\n    [Symbol.iterator]: () => {\n      return {\n        return: () => {},\n      };\n    },\n  };\n}).toThrow(TypeError);\n\nexpect(() => {\n  var [] = {\n    [Symbol.iterator]: () => {\n      return {\n        return: () => ({}),\n      };\n    },\n  };\n}).not.toThrow();\n\nexpect(() => {\n  var [x] = {\n    [Symbol.iterator]: () => {\n      return {\n        next: () => ({ done: false, value: 1 }),\n        return: () => {},\n      };\n    },\n  };\n}).toThrow(TypeError);\n\nexpect(() => {\n  var [x] = {\n    [Symbol.iterator]: () => {\n      return {\n        next: () => ({ done: false, value: 1 }),\n        return: () => ({}),\n      };\n    },\n  };\n}).not.toThrow();\n';
   expect(
     await transformOutcome(source, 'exec.js', {
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -1750,7 +1750,7 @@ test('destructuring/check-iterator-return/input.js [helpers]', async () => {
     'var [] = {\n  [Symbol.iterator]: () => {\n    return {\n      return: () => {},\n    };\n  },\n};\n\nvar [] = {\n  [Symbol.iterator]: () => {\n    return {\n      return: () => ({}),\n    };\n  },\n};\n\nvar [x] = {\n  [Symbol.iterator]: () => {\n    return {\n      next: () => ({ done: false, value: 1 }),\n      return: () => {},\n    };\n  },\n};\n\nvar [x] = {\n  [Symbol.iterator]: () => {\n    return {\n      next: () => ({ done: false, value: 1 }),\n      return: () => ({}),\n    };\n  },\n};\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: false } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -1807,7 +1807,7 @@ test('destructuring/check-iterator-return/input.js [built-ins]', async () => {
     'var [] = {\n  [Symbol.iterator]: () => {\n    return {\n      return: () => {},\n    };\n  },\n};\n\nvar [] = {\n  [Symbol.iterator]: () => {\n    return {\n      return: () => ({}),\n    };\n  },\n};\n\nvar [x] = {\n  [Symbol.iterator]: () => {\n    return {\n      next: () => ({ done: false, value: 1 }),\n      return: () => {},\n    };\n  },\n};\n\nvar [x] = {\n  [Symbol.iterator]: () => {\n    return {\n      next: () => ({ done: false, value: 1 }),\n      return: () => ({}),\n    };\n  },\n};\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -1864,7 +1864,7 @@ test('destructuring/check-no-hoisting-when-using-template-strings/input.js [help
     "const example = (obj) => {\n  const foo = 'foo';\n  const { [`prefix_${foo}`]: _, ...rest } = obj;\n};\n";
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: false } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -1904,7 +1904,7 @@ test('destructuring/check-no-hoisting-when-using-template-strings/input.js [buil
     "const example = (obj) => {\n  const foo = 'foo';\n  const { [`prefix_${foo}`]: _, ...rest } = obj;\n};\n";
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -1944,7 +1944,7 @@ test('destructuring/const/exec.js [helpers]', async () => {
     'const getState = () => ({});\n\nconst { data: { courses: oldCourses = [] } = {} } = getState();\n\nexpect(oldCourses).toEqual([]);\n';
   expect(
     await transformOutcome(source, 'exec.js', {
-      transforms: { destructuring: { useBuiltIns: false } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -1970,7 +1970,7 @@ test('destructuring/const/exec.js [built-ins]', async () => {
     'const getState = () => ({});\n\nconst { data: { courses: oldCourses = [] } = {} } = getState();\n\nexpect(oldCourses).toEqual([]);\n';
   expect(
     await transformOutcome(source, 'exec.js', {
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -1995,7 +1995,7 @@ test('destructuring/const/input.js [helpers]', async () => {
   const source = 'const { data: { courses: oldCourses = [] } = {} } = getState();\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: false } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -2018,7 +2018,7 @@ test('destructuring/const/input.js [built-ins]', async () => {
   const source = 'const { data: { courses: oldCourses = [] } = {} } = getState();\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -2042,7 +2042,7 @@ test('destructuring/default-precedence/exec.js [helpers]', async () => {
     'var f0 = function (a, b = a, c = b) {\n  return [a, b, c];\n};\n\nexpect(f0(1)).toEqual([1, 1, 1]);\n\nvar f1 = function ({a}, b = a, c = b) {\n  return [a, b, c];\n};\n\nexpect(f1({a: 1})).toEqual([1, 1, 1]);\n\nvar f2 = function ({a}, b = a, c = a) {\n  return [a, b, c];\n};\n\nexpect(f2({a: 1})).toEqual([1, 1, 1]);\n';
   expect(
     await transformOutcome(source, 'exec.js', {
-      transforms: { destructuring: { useBuiltIns: false } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -2071,7 +2071,7 @@ test('destructuring/default-precedence/exec.js [built-ins]', async () => {
     'var f0 = function (a, b = a, c = b) {\n  return [a, b, c];\n};\n\nexpect(f0(1)).toEqual([1, 1, 1]);\n\nvar f1 = function ({a}, b = a, c = b) {\n  return [a, b, c];\n};\n\nexpect(f1({a: 1})).toEqual([1, 1, 1]);\n\nvar f2 = function ({a}, b = a, c = a) {\n  return [a, b, c];\n};\n\nexpect(f2({a: 1})).toEqual([1, 1, 1]);\n';
   expect(
     await transformOutcome(source, 'exec.js', {
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -2100,7 +2100,7 @@ test('destructuring/default-precedence/input.js [helpers]', async () => {
     'var f0 = function (a, b = a, c = b) {\n  return [a, b, c];\n};\n\nexpect(f0(1)).toEqual([1, 1, 1]);\n\nvar f1 = function ({a}, b = a, c = b) {\n  return [a, b, c];\n};\n\nexpect(f1({a: 1})).toEqual([1, 1, 1]);\n\nvar f2 = function ({a}, b = a, c = a) {\n  return [a, b, c];\n};\n\nexpect(f2({a: 1})).toEqual([1, 1, 1]);\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: false } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -2129,7 +2129,7 @@ test('destructuring/default-precedence/input.js [built-ins]', async () => {
     'var f0 = function (a, b = a, c = b) {\n  return [a, b, c];\n};\n\nexpect(f0(1)).toEqual([1, 1, 1]);\n\nvar f1 = function ({a}, b = a, c = b) {\n  return [a, b, c];\n};\n\nexpect(f1({a: 1})).toEqual([1, 1, 1]);\n\nvar f2 = function ({a}, b = a, c = a) {\n  return [a, b, c];\n};\n\nexpect(f2({a: 1})).toEqual([1, 1, 1]);\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -2158,7 +2158,7 @@ test('destructuring/destructuring-empty-in-for/input.js [helpers]', async () => 
     'for ( let x in y ) for ( ; ; ) var { } = x ;\n\nfor ( let x in y ) for ( var { } = x ; ; ) ;\n\nfor ( let x in y ) for ( ; { } = x ; {} = x ) var { } = x ;\n\nfor ( let { } = 0 ; 0 ; ) ;\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: false } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -2187,7 +2187,7 @@ test('destructuring/destructuring-empty-in-for/input.js [built-ins]', async () =
     'for ( let x in y ) for ( ; ; ) var { } = x ;\n\nfor ( let x in y ) for ( var { } = x ; ; ) ;\n\nfor ( let x in y ) for ( ; { } = x ; {} = x ) var { } = x ;\n\nfor ( let { } = 0 ; 0 ; ) ;\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -2216,7 +2216,7 @@ test('destructuring/empty-array-pattern/exec.js [helpers]', async () => {
     'expect(() => {\n  var [] = null;\n}).toThrow(TypeError);\n\nexpect(() => {\n  var [] = 42;\n}).toThrow(TypeError);\n\nexpect(() => {\n  var [] = {};\n}).toThrow(TypeError);\n\nexpect(() => {\n  var [] = { [Symbol.iterator]: () => {} };\n}).toThrow(TypeError);\n\nexpect(() => {\n  var [] = [];\n  var [] = [0, 1, 2];\n  var [] = "foo";\n  var [] = (function*() { throw new Error("Should not throw"); })();\n  var [] = { [Symbol.iterator]: () => ({}) };\n  var [] = { [Symbol.iterator]: () => () => {} };\n  var [] = { [Symbol.iterator]: async function*() {} };\n}).not.toThrow();\n\n// iterator.return should be called\nvar returnCalled = false;\nvar [] = {\n  [Symbol.iterator]: () => {\n    return {\n      return: () => {\n        returnCalled = true;\n        return {};\n      },\n    };\n  },\n};\nexpect(returnCalled).toStrictEqual(true);\n\n// #15154\nexpect(() => {\n  var [] = { [Symbol.iterator]: () => [] };\n}).not.toThrow();\n\n// #15168\nexpect(() => {\n  var [] = { [Symbol.iterator]: () => async function* () {} };\n}).not.toThrow();\n';
   expect(
     await transformOutcome(source, 'exec.js', {
-      transforms: { destructuring: { useBuiltIns: false } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -2293,7 +2293,7 @@ test('destructuring/empty-array-pattern/exec.js [built-ins]', async () => {
     'expect(() => {\n  var [] = null;\n}).toThrow(TypeError);\n\nexpect(() => {\n  var [] = 42;\n}).toThrow(TypeError);\n\nexpect(() => {\n  var [] = {};\n}).toThrow(TypeError);\n\nexpect(() => {\n  var [] = { [Symbol.iterator]: () => {} };\n}).toThrow(TypeError);\n\nexpect(() => {\n  var [] = [];\n  var [] = [0, 1, 2];\n  var [] = "foo";\n  var [] = (function*() { throw new Error("Should not throw"); })();\n  var [] = { [Symbol.iterator]: () => ({}) };\n  var [] = { [Symbol.iterator]: () => () => {} };\n  var [] = { [Symbol.iterator]: async function*() {} };\n}).not.toThrow();\n\n// iterator.return should be called\nvar returnCalled = false;\nvar [] = {\n  [Symbol.iterator]: () => {\n    return {\n      return: () => {\n        returnCalled = true;\n        return {};\n      },\n    };\n  },\n};\nexpect(returnCalled).toStrictEqual(true);\n\n// #15154\nexpect(() => {\n  var [] = { [Symbol.iterator]: () => [] };\n}).not.toThrow();\n\n// #15168\nexpect(() => {\n  var [] = { [Symbol.iterator]: () => async function* () {} };\n}).not.toThrow();\n';
   expect(
     await transformOutcome(source, 'exec.js', {
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -2370,7 +2370,7 @@ test('destructuring/empty-array-pattern/input.js [helpers]', async () => {
     'var [] = null;\nvar [] = 42;\nvar [] = {};\nvar [] = { [Symbol.iterator]: () => {} };\n\nvar [] = [];\nvar [] = [0, 1, 2];\nvar [] = "foo";\nvar [] = (function*() { throw new Error("Should not throw"); })();\nvar [] = { [Symbol.iterator]: () => ({}) };\nvar [] = { [Symbol.iterator]: () => () => {} };\nvar [] = { [Symbol.iterator]: async function*() {} };\n\n// iterator.return should be called\nvar returnCalled = false;\nvar [] = {\n  [Symbol.iterator]: () => {\n    return {\n      return: () => {\n        returnCalled = true;\n        return {};\n      },\n    };\n  },\n};\n\n// #15154\nvar [] = { [Symbol.iterator]: () => [] };\n\n// #15168\nvar [] = { [Symbol.iterator]: () => async function* () {} };\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: false } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -2432,7 +2432,7 @@ test('destructuring/empty-array-pattern/input.js [built-ins]', async () => {
     'var [] = null;\nvar [] = 42;\nvar [] = {};\nvar [] = { [Symbol.iterator]: () => {} };\n\nvar [] = [];\nvar [] = [0, 1, 2];\nvar [] = "foo";\nvar [] = (function*() { throw new Error("Should not throw"); })();\nvar [] = { [Symbol.iterator]: () => ({}) };\nvar [] = { [Symbol.iterator]: () => () => {} };\nvar [] = { [Symbol.iterator]: async function*() {} };\n\n// iterator.return should be called\nvar returnCalled = false;\nvar [] = {\n  [Symbol.iterator]: () => {\n    return {\n      return: () => {\n        returnCalled = true;\n        return {};\n      },\n    };\n  },\n};\n\n// #15154\nvar [] = { [Symbol.iterator]: () => [] };\n\n// #15168\nvar [] = { [Symbol.iterator]: () => async function* () {} };\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -2493,7 +2493,7 @@ test('destructuring/empty-object-pattern/exec.js [helpers]', async () => {
   const source = 'expect(function () {\n  var {} = null;\n}).toThrow("Cannot destructure null");\n';
   expect(
     await transformOutcome(source, 'exec.js', {
-      transforms: { destructuring: { useBuiltIns: false } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -2514,7 +2514,7 @@ test('destructuring/empty-object-pattern/exec.js [built-ins]', async () => {
   const source = 'expect(function () {\n  var {} = null;\n}).toThrow("Cannot destructure null");\n';
   expect(
     await transformOutcome(source, 'exec.js', {
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -2535,7 +2535,7 @@ test('destructuring/empty-object-pattern/input.js [helpers]', async () => {
   const source = 'var {} = null;\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: false } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -2554,7 +2554,7 @@ test('destructuring/empty-object-pattern/input.js [built-ins]', async () => {
   const source = 'var {} = null;\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -2573,7 +2573,7 @@ test('destructuring/empty-string/exec.js [helpers]', async () => {
   const source = "let [a] = '';\n\nexpect(a).toBe(undefined)\n";
   expect(
     await transformOutcome(source, 'exec.js', {
-      transforms: { destructuring: { useBuiltIns: false } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -2595,7 +2595,7 @@ test('destructuring/empty-string/exec.js [built-ins]', async () => {
   const source = "let [a] = '';\n\nexpect(a).toBe(undefined)\n";
   expect(
     await transformOutcome(source, 'exec.js', {
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -2617,7 +2617,7 @@ test('destructuring/empty-string/input.js [helpers]', async () => {
   const source = "let [a] = '';\n";
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: false } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -2638,7 +2638,7 @@ test('destructuring/empty-string/input.js [built-ins]', async () => {
   const source = "let [a] = '';\n";
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -2659,7 +2659,7 @@ test('destructuring/empty/input.js [helpers]', async () => {
   const source = 'var [, a, [b], [c], d] = ["foo", "hello", [", ", "junk"], ["world"]];\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: false } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -2685,7 +2685,7 @@ test('destructuring/empty/input.js [built-ins]', async () => {
   const source = 'var [, a, [b], [c], d] = ["foo", "hello", [", ", "junk"], ["world"]];\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -2712,7 +2712,7 @@ test('destructuring/es7-object-rest-builtins/input.js [helpers]', async () => {
     'var z = {};\nvar { ...x } = z;\nvar { x, ...y } = z;\nvar { [x]: x, ...y } = z;\n(function({ x, ...y }) { });\n\n({ x, y, ...z } = o);\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: false } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -2765,7 +2765,7 @@ test('destructuring/es7-object-rest-builtins/input.js [built-ins]', async () => 
     'var z = {};\nvar { ...x } = z;\nvar { x, ...y } = z;\nvar { [x]: x, ...y } = z;\n(function({ x, ...y }) { });\n\n({ x, y, ...z } = o);\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -2818,7 +2818,7 @@ test('destructuring/es7-object-rest-loose/input.js [helpers]', async () => {
     'var z = {};\nvar { ...x } = z;\nvar { x, ...y } = z;\nvar { [x]: x, ...y } = z;\n(function({ x, ...y }) { });\n\n({ x, y, ...z } = o);\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: false } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -2871,7 +2871,7 @@ test('destructuring/es7-object-rest-loose/input.js [built-ins]', async () => {
     'var z = {};\nvar { ...x } = z;\nvar { x, ...y } = z;\nvar { [x]: x, ...y } = z;\n(function({ x, ...y }) { });\n\n({ x, y, ...z } = o);\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -2924,7 +2924,7 @@ test('destructuring/es7-object-rest/input.js [helpers]', async () => {
     'var z = {};\nvar { ...x } = z;\nvar { x, ...y } = z;\nvar { [x]: x, ...y } = z;\n(function({ x, ...y }) { });\n\n({ x, y, ...z } = o);\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: false } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -2977,7 +2977,7 @@ test('destructuring/es7-object-rest/input.js [built-ins]', async () => {
     'var z = {};\nvar { ...x } = z;\nvar { x, ...y } = z;\nvar { [x]: x, ...y } = z;\n(function({ x, ...y }) { });\n\n({ x, y, ...z } = o);\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -3029,7 +3029,7 @@ test('destructuring/export-variable/input.mjs [helpers]', async () => {
   const source = '\nexport let {a, b, c: {d, e: {f = 4}}} = {};\n';
   expect(
     await transformOutcome(source, 'input.mjs', {
-      transforms: { destructuring: { useBuiltIns: false } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -3055,7 +3055,7 @@ test('destructuring/export-variable/input.mjs [built-ins]', async () => {
   const source = '\nexport let {a, b, c: {d, e: {f = 4}}} = {};\n';
   expect(
     await transformOutcome(source, 'input.mjs', {
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -3082,7 +3082,7 @@ test('destructuring/for-in/input.js [helpers]', async () => {
     'for (var [name, value] in obj) {\n  print("Name: " + name + ", Value: " + value);\n}\n\nfor ([name, value] in obj) {\n  print("Name: " + name + ", Value: " + value);\n}\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: false } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -3101,7 +3101,7 @@ test('destructuring/for-in/input.js [built-ins]', async () => {
     'for (var [name, value] in obj) {\n  print("Name: " + name + ", Value: " + value);\n}\n\nfor ([name, value] in obj) {\n  print("Name: " + name + ", Value: " + value);\n}\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -3119,7 +3119,7 @@ test('destructuring/for-let-nest/input.js [helpers]', async () => {
   const source = 'for (let [[x] = [1]] = [];  ;  ) {\n}';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: false } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -3145,7 +3145,7 @@ test('destructuring/for-let-nest/input.js [built-ins]', async () => {
   const source = 'for (let [[x] = [1]] = [];  ;  ) {\n}';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -3171,7 +3171,7 @@ test('destructuring/for-let/input.js [helpers]', async () => {
   const source = 'for (let [ i, n ] = range; ; ) {\n}\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: false } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -3190,7 +3190,7 @@ test('destructuring/for-let/input.js [built-ins]', async () => {
   const source = 'for (let [ i, n ] = range; ; ) {\n}\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -3210,7 +3210,7 @@ test('destructuring/for-of-shadowed-block-scoped/exec.js [helpers]', async () =>
     'var O = {\n  a: "a"\n}\nconst a = "a";\nfor (const { [a]: _ } of [O]) { const a = "A"; }\n\nvar _;\nfor ({ [a]: _ } of [O]) { const a = "A"; }\n';
   expect(
     await transformOutcome(source, 'exec.js', {
-      transforms: { destructuring: { useBuiltIns: false } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -3246,7 +3246,7 @@ test('destructuring/for-of-shadowed-block-scoped/exec.js [built-ins]', async () 
     'var O = {\n  a: "a"\n}\nconst a = "a";\nfor (const { [a]: _ } of [O]) { const a = "A"; }\n\nvar _;\nfor ({ [a]: _ } of [O]) { const a = "A"; }\n';
   expect(
     await transformOutcome(source, 'exec.js', {
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -3282,7 +3282,7 @@ test('destructuring/for-of-shadowed-block-scoped/input.js [helpers]', async () =
     'var O = {\n  a: "a"\n}\nconst a = "a";\nfor (const { [a]: _ } of [O]) { const a = "A"; }\n\nvar _;\nfor ({ [a]: _ } of [O]) { const a = "A"; }\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: false } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -3318,7 +3318,7 @@ test('destructuring/for-of-shadowed-block-scoped/input.js [built-ins]', async ()
     'var O = {\n  a: "a"\n}\nconst a = "a";\nfor (const { [a]: _ } of [O]) { const a = "A"; }\n\nvar _;\nfor ({ [a]: _ } of [O]) { const a = "A"; }\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -3354,7 +3354,7 @@ test('destructuring/for-of/input.js [helpers]', async () => {
     'for (var [ name, before, after ] of test.expectation.registers) {\n\n}\n\nfor ([ name, before, after ] of test.expectation.registers) {\n\n}\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: false } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -3390,7 +3390,7 @@ test('destructuring/for-of/input.js [built-ins]', async () => {
     'for (var [ name, before, after ] of test.expectation.registers) {\n\n}\n\nfor ([ name, before, after ] of test.expectation.registers) {\n\n}\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -3426,7 +3426,7 @@ test('destructuring/function-key-with-object-rest-spread/exec.js [helpers]', asy
     'const { [(() => 1)()]: a, ...rest } = { 1: "a" };\n\nexpect(a).toBe("a");\nexpect(rest).toEqual({});\n';
   expect(
     await transformOutcome(source, 'exec.js', {
-      transforms: { destructuring: { useBuiltIns: false } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -3465,7 +3465,7 @@ test('destructuring/function-key-with-object-rest-spread/exec.js [built-ins]', a
     'const { [(() => 1)()]: a, ...rest } = { 1: "a" };\n\nexpect(a).toBe("a");\nexpect(rest).toEqual({});\n';
   expect(
     await transformOutcome(source, 'exec.js', {
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -3504,7 +3504,7 @@ test('destructuring/inherited-array/exec.js [helpers]', async () => {
     'class ExtendedArray extends Array {\n  constructor(...args) {\n    super(...args);\n  }\n}\n\nlet extArr = new ExtendedArray(1,2,3,4,5);\nlet [first, second , ...rest] = extArr;\n\nexpect(Object.getPrototypeOf(rest).constructor.name).toBe("Array");\n';
   expect(
     await transformOutcome(source, 'exec.js', {
-      transforms: { destructuring: { useBuiltIns: false } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -3535,7 +3535,7 @@ test('destructuring/inherited-array/exec.js [built-ins]', async () => {
     'class ExtendedArray extends Array {\n  constructor(...args) {\n    super(...args);\n  }\n}\n\nlet extArr = new ExtendedArray(1,2,3,4,5);\nlet [first, second , ...rest] = extArr;\n\nexpect(Object.getPrototypeOf(rest).constructor.name).toBe("Array");\n';
   expect(
     await transformOutcome(source, 'exec.js', {
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -3566,7 +3566,7 @@ test('destructuring/init-hole/exec.js [helpers]', async () => {
     'let [x = 23] = [,];\nexpect(x).toEqual(23);\n\nconst [y = 24, z] = [, 42];\nexpect(y).toEqual(24);\nexpect(z).toEqual(42);\n\nfunction* foo() {\n    yield 1;\n    yield 2;\n}\n\nlet bar = foo();\n\nconst [a = bar.next().value, b] = [, bar.next().value];\n\nexpect(a).toEqual(2);\nexpect(b).toEqual(1);\n\nconst arr = [c = 42] = [,];\nexpect(c).toEqual(42);\nexpect(arr).toStrictEqual([,]);\n\nvar iterCount = 0;\n\nfor (const [x = 23] = [,]; iterCount < 1; ) {\n    expect(x).toEqual(23);\n    // another statement\n\n    iterCount += 1;\n}\n\nexpect(iterCount).toEqual(1);\n\nconst [...d] = [,];\nconst [...{ 0: e }] = [,];\n\nexpect(d).toStrictEqual([undefined,]);\nexpect(e).toEqual(undefined);\n\nconst [f] = [,];\nexpect(f).toEqual(undefined);\n\nlet [g] = [,];\nexpect(g).toEqual(undefined);\n\nlet thrown;\ntry {\n  thrown = false;\n  [{}] = [,];\n} catch (e) {\n  thrown = true;\n}\nexpect(thrown).toEqual(true);\n\ntry {\n  thrown = false;\n  [[]] = [,];\n} catch (e) {\n  thrown = true;\n}\nexpect(thrown).toEqual(true);\n';
   expect(
     await transformOutcome(source, 'exec.js', {
-      transforms: { destructuring: { useBuiltIns: false } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -3675,7 +3675,7 @@ test('destructuring/init-hole/exec.js [built-ins]', async () => {
     'let [x = 23] = [,];\nexpect(x).toEqual(23);\n\nconst [y = 24, z] = [, 42];\nexpect(y).toEqual(24);\nexpect(z).toEqual(42);\n\nfunction* foo() {\n    yield 1;\n    yield 2;\n}\n\nlet bar = foo();\n\nconst [a = bar.next().value, b] = [, bar.next().value];\n\nexpect(a).toEqual(2);\nexpect(b).toEqual(1);\n\nconst arr = [c = 42] = [,];\nexpect(c).toEqual(42);\nexpect(arr).toStrictEqual([,]);\n\nvar iterCount = 0;\n\nfor (const [x = 23] = [,]; iterCount < 1; ) {\n    expect(x).toEqual(23);\n    // another statement\n\n    iterCount += 1;\n}\n\nexpect(iterCount).toEqual(1);\n\nconst [...d] = [,];\nconst [...{ 0: e }] = [,];\n\nexpect(d).toStrictEqual([undefined,]);\nexpect(e).toEqual(undefined);\n\nconst [f] = [,];\nexpect(f).toEqual(undefined);\n\nlet [g] = [,];\nexpect(g).toEqual(undefined);\n\nlet thrown;\ntry {\n  thrown = false;\n  [{}] = [,];\n} catch (e) {\n  thrown = true;\n}\nexpect(thrown).toEqual(true);\n\ntry {\n  thrown = false;\n  [[]] = [,];\n} catch (e) {\n  thrown = true;\n}\nexpect(thrown).toEqual(true);\n';
   expect(
     await transformOutcome(source, 'exec.js', {
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -3784,7 +3784,7 @@ test('destructuring/init-hole/input.js [helpers]', async () => {
     'let [x = 23] = [,];\nexpect(x).toEqual(23);\n\nconst [y = 24, z] = [, 42];\nexpect(y).toEqual(24);\nexpect(z).toEqual(42);\n\nfunction* foo() {\n    yield 1;\n    yield 2;\n}\n\nlet bar = foo();\n\nconst [a = bar.next().value, b] = [, bar.next().value];\n\nexpect(a).toEqual(2);\nexpect(b).toEqual(1);\n\nconst arr = [c = 42] = [,];\nexpect(c).toEqual(42);\nexpect(arr).toStrictEqual([,]);\n\nvar iterCount = 0;\n\nfor (const [x = 23] = [,]; iterCount < 1; ) {\n    expect(x).toEqual(23);\n    // another statement\n\n    iterCount += 1;\n}\n\nexpect(iterCount).toEqual(1);\n\nconst [...d] = [,];\nconst [...{ 0: e }] = [,];\n\nexpect(d).toStrictEqual([,]);\nexpect(e).toEqual(undefined);\n\nconst [f] = [,];\nexpect(f).toEqual(undefined);\n\nlet [g] = [,];\nexpect(g).toEqual(undefined);\n\nlet thrown;\ntry {\n  thrown = false;\n  [{}] = [,];\n} catch (e) {\n  thrown = true;\n}\nexpect(thrown).toEqual(true);\n\ntry {\n  thrown = false;\n  [[]] = [,];\n} catch (e) {\n  thrown = true;\n}\nexpect(thrown).toEqual(true);\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: false } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -3893,7 +3893,7 @@ test('destructuring/init-hole/input.js [built-ins]', async () => {
     'let [x = 23] = [,];\nexpect(x).toEqual(23);\n\nconst [y = 24, z] = [, 42];\nexpect(y).toEqual(24);\nexpect(z).toEqual(42);\n\nfunction* foo() {\n    yield 1;\n    yield 2;\n}\n\nlet bar = foo();\n\nconst [a = bar.next().value, b] = [, bar.next().value];\n\nexpect(a).toEqual(2);\nexpect(b).toEqual(1);\n\nconst arr = [c = 42] = [,];\nexpect(c).toEqual(42);\nexpect(arr).toStrictEqual([,]);\n\nvar iterCount = 0;\n\nfor (const [x = 23] = [,]; iterCount < 1; ) {\n    expect(x).toEqual(23);\n    // another statement\n\n    iterCount += 1;\n}\n\nexpect(iterCount).toEqual(1);\n\nconst [...d] = [,];\nconst [...{ 0: e }] = [,];\n\nexpect(d).toStrictEqual([,]);\nexpect(e).toEqual(undefined);\n\nconst [f] = [,];\nexpect(f).toEqual(undefined);\n\nlet [g] = [,];\nexpect(g).toEqual(undefined);\n\nlet thrown;\ntry {\n  thrown = false;\n  [{}] = [,];\n} catch (e) {\n  thrown = true;\n}\nexpect(thrown).toEqual(true);\n\ntry {\n  thrown = false;\n  [[]] = [,];\n} catch (e) {\n  thrown = true;\n}\nexpect(thrown).toEqual(true);\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -4002,7 +4002,7 @@ test('destructuring/issue-3081/input.js [helpers]', async () => {
     'let list = [1, 2, 3, 4];\nfor (let i = 0, { length } = list; i < length; i++) {\n  list[i];\n}\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: false } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -4028,7 +4028,7 @@ test('destructuring/issue-3081/input.js [built-ins]', async () => {
     'let list = [1, 2, 3, 4];\nfor (let i = 0, { length } = list; i < length; i++) {\n  list[i];\n}\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -4054,7 +4054,7 @@ test('destructuring/issue-5090/exec.js [helpers]', async () => {
     'const assign = function([...arr], index, value) {\n  arr[index] = value;\n  return arr;\n}\n\nconst arr = [1, 2, 3];\nassign(arr, 1, 42);\n\nexpect(arr).toEqual([1, 2, 3]);\n';
   expect(
     await transformOutcome(source, 'exec.js', {
-      transforms: { destructuring: { useBuiltIns: false } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -4075,7 +4075,7 @@ test('destructuring/issue-5090/exec.js [built-ins]', async () => {
     'const assign = function([...arr], index, value) {\n  arr[index] = value;\n  return arr;\n}\n\nconst arr = [1, 2, 3];\nassign(arr, 1, 42);\n\nexpect(arr).toEqual([1, 2, 3]);\n';
   expect(
     await transformOutcome(source, 'exec.js', {
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -4096,7 +4096,7 @@ test('destructuring/issue-5628/input.js [helpers]', async () => {
     '(function () {\n  let q;\n  let w;\n  let e;\n  if (true) [q, w, e] = [1, 2, 3].map(()=>123);\n})();\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: false } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -4128,7 +4128,7 @@ test('destructuring/issue-5628/input.js [built-ins]', async () => {
     '(function () {\n  let q;\n  let w;\n  let e;\n  if (true) [q, w, e] = [1, 2, 3].map(()=>123);\n})();\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -4159,7 +4159,7 @@ test('destructuring/issue-5744/input.js [helpers]', async () => {
   const source = 'if (true) [a, b] = [b, a];\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: false } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -4179,7 +4179,7 @@ test('destructuring/issue-5744/input.js [built-ins]', async () => {
   const source = 'if (true) [a, b] = [b, a];\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -4200,7 +4200,7 @@ test('destructuring/issue-6373/input.mjs [helpers]', async () => {
     'import { NestedObjects } from "./some-module"\n\nconst { Foo, Bar } = NestedObjects\n';
   expect(
     await transformOutcome(source, 'input.mjs', {
-      transforms: { destructuring: { useBuiltIns: false } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -4223,7 +4223,7 @@ test('destructuring/issue-6373/input.mjs [built-ins]', async () => {
     'import { NestedObjects } from "./some-module"\n\nconst { Foo, Bar } = NestedObjects\n';
   expect(
     await transformOutcome(source, 'input.mjs', {
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -4246,7 +4246,7 @@ test('destructuring/issue-9834/input.js [helpers]', async () => {
     "const input = {};\n\nconst {\n  given_name: givenName,\n  'last_name': lastName,\n  [`country`]: country,\n  [prefix + 'state']: state,\n  [`${prefix}consents`]: consents,\n  ...rest\n} = input;\n";
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: false } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -4290,7 +4290,7 @@ test('destructuring/issue-9834/input.js [built-ins]', async () => {
     "const input = {};\n\nconst {\n  given_name: givenName,\n  'last_name': lastName,\n  [`country`]: country,\n  [prefix + 'state']: state,\n  [`${prefix}consents`]: consents,\n  ...rest\n} = input;\n";
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -4333,7 +4333,7 @@ test('destructuring/known-array/input.js [helpers]', async () => {
   const source = 'var z = [];\nvar [x, ...y] = z;\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: false } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -4356,7 +4356,7 @@ test('destructuring/known-array/input.js [built-ins]', async () => {
   const source = 'var z = [];\nvar [x, ...y] = z;\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -4379,7 +4379,7 @@ test('destructuring/member-expression/input.js [helpers]', async () => {
   const source = '[foo.foo, foo.bar] = [1, 2];\n;\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: false } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -4403,7 +4403,7 @@ test('destructuring/member-expression/input.js [built-ins]', async () => {
   const source = '[foo.foo, foo.bar] = [1, 2];\n;\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -4427,7 +4427,7 @@ test('destructuring/mixed/input.js [helpers]', async () => {
   const source = 'var rect = {};\nvar {topLeft: [x1, y1], bottomRight: [x2, y2] } = rect;\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: false } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -4460,7 +4460,7 @@ test('destructuring/mixed/input.js [built-ins]', async () => {
   const source = 'var rect = {};\nvar {topLeft: [x1, y1], bottomRight: [x2, y2] } = rect;\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -4493,7 +4493,7 @@ test('destructuring/multiple/input.js [helpers]', async () => {
   const source = 'var coords = [1, 2];\nvar { x, y } = coords,\n    foo = "bar";\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: false } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -4516,7 +4516,7 @@ test('destructuring/multiple/input.js [built-ins]', async () => {
   const source = 'var coords = [1, 2];\nvar { x, y } = coords,\n    foo = "bar";\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -4540,7 +4540,7 @@ test('destructuring/next-eval-once/exec.js [helpers]', async () => {
     'let gets = 0;\nlet it = {\n  [Symbol.iterator]: () => ({\n    get next() {\n      gets++;\n      let i = 0;\n      return () => ({ done: false, value: i++ });\n    },\n  }),\n};\n\nlet [] = it;\nexpect(gets).toBe(1);\n\nlet [a] = it;\nexpect(gets).toBe(2);\nexpect(a).toBe(0);\n\nlet [b, c] = it;\nexpect(gets).toBe(3);\nexpect(b).toBe(0);\nexpect(c).toBe(1);\n';
   expect(
     await transformOutcome(source, 'exec.js', {
-      transforms: { destructuring: { useBuiltIns: false } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -4587,7 +4587,7 @@ test('destructuring/next-eval-once/exec.js [built-ins]', async () => {
     'let gets = 0;\nlet it = {\n  [Symbol.iterator]: () => ({\n    get next() {\n      gets++;\n      let i = 0;\n      return () => ({ done: false, value: i++ });\n    },\n  }),\n};\n\nlet [] = it;\nexpect(gets).toBe(1);\n\nlet [a] = it;\nexpect(gets).toBe(2);\nexpect(a).toBe(0);\n\nlet [b, c] = it;\nexpect(gets).toBe(3);\nexpect(b).toBe(0);\nexpect(c).toBe(1);\n';
   expect(
     await transformOutcome(source, 'exec.js', {
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -4634,7 +4634,7 @@ test('destructuring/non-iterable/exec.js [helpers]', async () => {
     'var foo, bar;\n\nexpect(\n  () => [foo, bar] = undefined\n).toThrow(/destructure non-iterable/);\n\nexpect(\n  () => [foo, bar] = {}\n).toThrow(/destructure non-iterable/);\n\nglobal.Symbol = void 0;\n\nexpect(\n  () => [foo, bar] = {}\n).toThrow(/destructure non-iterable/);\n';
   expect(
     await transformOutcome(source, 'exec.js', {
-      transforms: { destructuring: { useBuiltIns: false } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -4681,7 +4681,7 @@ test('destructuring/non-iterable/exec.js [built-ins]', async () => {
     'var foo, bar;\n\nexpect(\n  () => [foo, bar] = undefined\n).toThrow(/destructure non-iterable/);\n\nexpect(\n  () => [foo, bar] = {}\n).toThrow(/destructure non-iterable/);\n\nglobal.Symbol = void 0;\n\nexpect(\n  () => [foo, bar] = {}\n).toThrow(/destructure non-iterable/);\n';
   expect(
     await transformOutcome(source, 'exec.js', {
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -4728,7 +4728,7 @@ test('destructuring/number-key-with-object-rest-spread/exec.js [helpers]', async
     'const foo = {\n  1: "a",\n  2: "b",\n  3: "c",\n};\n\nconst { [1]: bar, ...rest } = foo;\n\nexpect(bar).toBe("a");\nexpect(rest).toEqual({ 2: "b", 3: "c" });\n';
   expect(
     await transformOutcome(source, 'exec.js', {
-      transforms: { destructuring: { useBuiltIns: false } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -4775,7 +4775,7 @@ test('destructuring/number-key-with-object-rest-spread/exec.js [built-ins]', asy
     'const foo = {\n  1: "a",\n  2: "b",\n  3: "c",\n};\n\nconst { [1]: bar, ...rest } = foo;\n\nexpect(bar).toBe("a");\nexpect(rest).toEqual({ 2: "b", 3: "c" });\n';
   expect(
     await transformOutcome(source, 'exec.js', {
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -4822,7 +4822,7 @@ test('destructuring/object-advanced/input.js [helpers]', async () => {
     'var rect = {};\nvar {topLeft: {x: x1, y: y1}, bottomRight: {x: x2, y: y2}} = rect;\nvar { 3: foo, 5: bar } = [0, 1, 2, 3, 4, 5, 6];\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: false } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -4853,7 +4853,7 @@ test('destructuring/object-advanced/input.js [built-ins]', async () => {
     'var rect = {};\nvar {topLeft: {x: x1, y: y1}, bottomRight: {x: x2, y: y2}} = rect;\nvar { 3: foo, 5: bar } = [0, 1, 2, 3, 4, 5, 6];\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -4883,7 +4883,7 @@ test('destructuring/object-basic/input.js [helpers]', async () => {
   const source = 'var coords = [1, 2];\nvar { x, y } = coords;\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: false } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -4905,7 +4905,7 @@ test('destructuring/object-basic/input.js [built-ins]', async () => {
   const source = 'var coords = [1, 2];\nvar { x, y } = coords;\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -4928,7 +4928,7 @@ test('destructuring/object-rest-impure-computed-keys/exec.js [helpers]', async (
     'var key, x, y, z;\n// impure\nkey = 1;\nvar { [key++]: y, ...x } = { 1: 1, a: 1 };\nexpect(x).toEqual({ a: 1 });\nexpect(key).toBe(2);\nexpect(1).toBe(y);\n\n// takes care of the order\n\nkey = 1;\nvar { [++key]: y, [++key]: z, ...rest} = {2: 2, 3: 3};\nexpect(y).toBe(2);\nexpect(z).toBe(3);\n\n// pure, computed property should remain as-is\nkey = 2;\n({ [key]: y, z, ...x } = {2: "two", z: "zee"});\nexpect(y).toBe("two");\nexpect(x).toEqual({});\nexpect(z).toBe("zee");\n\n// rhs evaluated before lhs\nvar order = [];\nfunction left() {\n  order.push("left");\n  return 0;\n}\nfunction right() {\n  order.push("right");\n  return {};\n}\nvar { [left()]: y, ...x} = right();\nexpect(order).toEqual(["right", "left"]);\n';
   expect(
     await transformOutcome(source, 'exec.js', {
-      transforms: { destructuring: { useBuiltIns: false } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -5020,7 +5020,7 @@ test('destructuring/object-rest-impure-computed-keys/exec.js [built-ins]', async
     'var key, x, y, z;\n// impure\nkey = 1;\nvar { [key++]: y, ...x } = { 1: 1, a: 1 };\nexpect(x).toEqual({ a: 1 });\nexpect(key).toBe(2);\nexpect(1).toBe(y);\n\n// takes care of the order\n\nkey = 1;\nvar { [++key]: y, [++key]: z, ...rest} = {2: 2, 3: 3};\nexpect(y).toBe(2);\nexpect(z).toBe(3);\n\n// pure, computed property should remain as-is\nkey = 2;\n({ [key]: y, z, ...x } = {2: "two", z: "zee"});\nexpect(y).toBe("two");\nexpect(x).toEqual({});\nexpect(z).toBe("zee");\n\n// rhs evaluated before lhs\nvar order = [];\nfunction left() {\n  order.push("left");\n  return 0;\n}\nfunction right() {\n  order.push("right");\n  return {};\n}\nvar { [left()]: y, ...x} = right();\nexpect(order).toEqual(["right", "left"]);\n';
   expect(
     await transformOutcome(source, 'exec.js', {
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -5111,7 +5111,7 @@ test('destructuring/object-rest-impure-computed-keys/input.js [helpers]', async 
   const source = 'var { [fn()]: x, ...y } = z;\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: false } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -5147,7 +5147,7 @@ test('destructuring/object-rest-impure-computed-keys/input.js [built-ins]', asyn
   const source = 'var { [fn()]: x, ...y } = z;\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -5184,7 +5184,7 @@ test('destructuring/parameters/input.js [helpers]', async () => {
     'function somethingAdvanced({topLeft: {x: x1, y: y1} = {}, bottomRight: {x: x2, y: y2} = {}}, p2, p3){\n\n}\n\nfunction unpackObject({title: title, author: author}) {\n  return title + " " + author;\n}\n\nconsole.log(unpackObject({title: "title", author: "author"}));\n\nvar unpackArray = function ([a, b, c], [x, y, z]) {\n  return a+b+c;\n};\n\nconsole.log(unpackArray(["hello", ", ", "world"], [1, 2, 3]));\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: false } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -5213,7 +5213,7 @@ test('destructuring/parameters/input.js [built-ins]', async () => {
     'function somethingAdvanced({topLeft: {x: x1, y: y1} = {}, bottomRight: {x: x2, y: y2} = {}}, p2, p3){\n\n}\n\nfunction unpackObject({title: title, author: author}) {\n  return title + " " + author;\n}\n\nconsole.log(unpackObject({title: "title", author: "author"}));\n\nvar unpackArray = function ([a, b, c], [x, y, z]) {\n  return a+b+c;\n};\n\nconsole.log(unpackArray(["hello", ", ", "world"], [1, 2, 3]));\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -5242,7 +5242,7 @@ test('destructuring/spread-generator/exec.js [helpers]', async () => {
     'function* f() {\n  for (var i = 0; i < 3; i++) {\n    yield i;\n  }\n}\nvar [...xs] = f();\nexpect(xs).toEqual([0, 1, 2]);\n';
   expect(
     await transformOutcome(source, 'exec.js', {
-      transforms: { destructuring: { useBuiltIns: false } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -5270,7 +5270,7 @@ test('destructuring/spread-generator/exec.js [built-ins]', async () => {
     'function* f() {\n  for (var i = 0; i < 3; i++) {\n    yield i;\n  }\n}\nvar [...xs] = f();\nexpect(xs).toEqual([0, 1, 2]);\n';
   expect(
     await transformOutcome(source, 'exec.js', {
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -5298,7 +5298,7 @@ test('destructuring/spread/input.js [helpers]', async () => {
     'function isSorted([x, y, ...wow]) {\n  if (!zs.length) return true\n  if (y > x) return isSorted(zs)\n  return false\n}\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: false } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -5315,7 +5315,7 @@ test('destructuring/spread/input.js [built-ins]', async () => {
     'function isSorted([x, y, ...wow]) {\n  if (!zs.length) return true\n  if (y > x) return isSorted(zs)\n  return false\n}\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -5331,7 +5331,7 @@ test('regression/11210/input.mjs [helpers]', async () => {
   const source = 'export default class A {\n  handle = value => {\n    ({ value } = {});\n  }\n}\n';
   expect(
     await transformOutcome(source, 'input.mjs', {
-      transforms: { destructuring: { useBuiltIns: false } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -5354,7 +5354,7 @@ test('regression/11210/input.mjs [built-ins]', async () => {
   const source = 'export default class A {\n  handle = value => {\n    ({ value } = {});\n  }\n}\n';
   expect(
     await transformOutcome(source, 'input.mjs', {
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -5378,7 +5378,7 @@ test('regression/8528/input.js [helpers]', async () => {
     'function isBetween(x, a, b) {\n  if (a > b) [a, b] = [b, a];\n  return x > a && x < b;\n}\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: false } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -5403,7 +5403,7 @@ test('regression/8528/input.js [built-ins]', async () => {
     'function isBetween(x, a, b) {\n  if (a > b) [a, b] = [b, a];\n  return x > a && x < b;\n}\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -5427,7 +5427,7 @@ test('sourcemap/declaration-loc/input.js [helpers]', async () => {
   const source = 'const fn = (arg) => {\n  var [x, y] = arg;\n}\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: false } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -5451,7 +5451,7 @@ test('sourcemap/declaration-loc/input.js [built-ins]', async () => {
   const source = 'const fn = (arg) => {\n  var [x, y] = arg;\n}\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`

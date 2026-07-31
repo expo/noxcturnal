@@ -63,9 +63,7 @@ exports[`every public native transform has an explicit ownership fixture 4`] = `
     ],
   },
   "name": "destructuring",
-  "option": {
-    "useBuiltIns": true,
-  },
+  "option": true,
   "reason": undefined,
   "source": "var { value } = input;",
   "status": "complete",
@@ -329,9 +327,7 @@ exports[`every public native transform has an explicit ownership fixture 19`] = 
     ],
   },
   "name": "privateMethods",
-  "option": {
-    "loose": true,
-  },
+  "option": true,
   "reason": undefined,
   "source": "class Value { #read() {} }",
   "status": "complete",
@@ -354,9 +350,7 @@ exports[`every public native transform has an explicit ownership fixture 20`] = 
     ],
   },
   "name": "privatePropertyInObject",
-  "option": {
-    "loose": true,
-  },
+  "option": true,
   "reason": undefined,
   "source": "class Value { #field; has(input) { return #field in input; } }",
   "status": "complete",

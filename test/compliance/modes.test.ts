@@ -74,11 +74,9 @@ test('destructuring helper modes preserve nested patterns and rest values', () =
     const { nested: { first }, ...rest } = input;
     globalThis.result = [first, rest];
   `;
-  for (const useBuiltIns of [false, true]) {
-    expect(
-      execute<{ result: unknown[] }>(source, {
-        transforms: { destructuring: { useBuiltIns } },
-      }).result,
-    ).toEqual([1, { second: 2, third: 3 }]);
-  }
+  expect(
+    execute<{ result: unknown[] }>(source, {
+      transforms: { destructuring: true },
+    }).result,
+  ).toEqual([1, { second: 2, third: 3 }]);
 });

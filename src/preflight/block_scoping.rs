@@ -12,7 +12,7 @@ use oxc_ast::{
 };
 use oxc_ast_visit::{Visit, VisitMut, walk, walk_mut};
 use oxc_semantic::{NodeId, ScopeId, Semantic, SymbolId};
-use oxc_span::{GetSpan, SourceType, Span};
+use oxc_span::{GetSpan, Span};
 use oxc_syntax::{operator::AssignmentOperator, scope::ScopeFlags, symbol::SymbolFlags};
 use rustc_hash::{FxHashMap, FxHashSet};
 
@@ -66,7 +66,6 @@ impl CapturedLoopAstPlan {
 
 pub(super) fn prepare_captured_loop_ast(
     source: &str,
-    _source_type: SourceType,
     semantic: &Semantic<'_>,
 ) -> Result<CapturedLoopAstPlan, &'static str> {
     Ok(CapturedLoopAstPlan {
@@ -1679,6 +1678,7 @@ mod tests {
     use super::*;
     use oxc_parser::Parser;
     use oxc_semantic::SemanticBuilder;
+    use oxc_span::SourceType;
 
     #[test]
     fn captured_loop_classifies_all_siblings() {

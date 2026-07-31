@@ -9,7 +9,7 @@ test('001 JS Private Methods > private instance methods > private method can be 
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { privateMethods: { loose: true } },
+      transforms: { privateMethods: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase2 = {
@@ -50,7 +50,7 @@ test('002 JS Private Methods > private instance methods > private method preserv
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { privateMethods: { loose: true } },
+      transforms: { privateMethods: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase2 = {
@@ -110,7 +110,7 @@ test('003 JS Private Methods > private instance methods > private method called 
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { privateMethods: { loose: true } },
+      transforms: { privateMethods: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase2 = {
@@ -168,7 +168,7 @@ test('004 JS Private Methods > private instance methods > exfiltrated private me
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { privateMethods: { loose: true } },
+      transforms: { privateMethods: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase2 = {
@@ -223,7 +223,7 @@ test('005 JS Private Methods > private instance methods > private method availab
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { privateMethods: { loose: true } },
+      transforms: { privateMethods: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase2 = {
@@ -264,7 +264,7 @@ test('006 JS Private Methods > private instance methods > multiple private metho
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { privateMethods: { loose: true } },
+      transforms: { privateMethods: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase2 = {
@@ -326,7 +326,7 @@ test('007 JS Private Methods > private instance methods > private method is read
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { privateMethods: { loose: true } },
+      transforms: { privateMethods: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase2 = {
@@ -369,7 +369,7 @@ test('008 JS Private Methods > private instance methods > private method compoun
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { privateMethods: { loose: true } },
+      transforms: { privateMethods: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase2 = {
@@ -412,7 +412,7 @@ test('009 JS Private Methods > private instance methods > private method increme
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { privateMethods: { loose: true } },
+      transforms: { privateMethods: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase2 = {
@@ -455,7 +455,7 @@ test('010 JS Private Methods > private instance methods > class name binding pre
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { privateMethods: { loose: true } },
+      transforms: { privateMethods: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase2 = {
@@ -510,7 +510,7 @@ test('011 JS Private Methods > private instance methods > super method access fr
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { privateMethods: { loose: true } },
+      transforms: { privateMethods: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase2 = {
@@ -593,7 +593,7 @@ test('012 [upstream xit] JS Private Methods > private instance methods > private
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { privateMethods: { loose: true } },
+      transforms: { privateMethods: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase2 = {
@@ -653,7 +653,7 @@ test('013 JS Private Methods > private instance methods > private method with pa
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { privateMethods: { loose: true } },
+      transforms: { privateMethods: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase2 = {
@@ -708,7 +708,7 @@ test('014 JS Private Methods > private instance methods > private method with de
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { privateMethods: { loose: true } },
+      transforms: { privateMethods: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase2 = {
@@ -764,7 +764,7 @@ test('015 JS Private Methods > private instance methods > private method with re
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { privateMethods: { loose: true } },
+      transforms: { privateMethods: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase2 = {
@@ -819,7 +819,7 @@ test('016 JS Private Methods > private instance methods > private method with de
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { privateMethods: { loose: true } },
+      transforms: { privateMethods: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase2 = {
@@ -879,7 +879,7 @@ test('017 JS Private Methods > private instance methods > private method not acc
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { privateMethods: { loose: true } },
+      transforms: { privateMethods: true },
     }),
   ).toMatchInlineSnapshot(`
     "() => {
@@ -911,7 +911,7 @@ test('018 JS Private Methods > private instance methods > private method not acc
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { privateMethods: { loose: true } },
+      transforms: { privateMethods: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase2 = {
@@ -968,7 +968,7 @@ test('019 JS Private Methods > private instance methods > private method calling
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { privateMethods: { loose: true } },
+      transforms: { privateMethods: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase2 = {
@@ -1030,7 +1030,7 @@ test('020 JS Private Methods > private instance methods > private method returni
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { privateMethods: { loose: true } },
+      transforms: { privateMethods: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase2 = {
@@ -1095,7 +1095,7 @@ test('021 JS Private Methods > async private methods > async private method retu
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { privateMethods: { loose: true } },
+      transforms: { privateMethods: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase2 = {
@@ -1149,7 +1149,7 @@ test('022 JS Private Methods > async private methods > async private method with
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { privateMethods: { loose: true } },
+      transforms: { privateMethods: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase2 = {
@@ -1203,7 +1203,7 @@ test('023 JS Private Methods > async private methods > async private method erro
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { privateMethods: { loose: true } },
+      transforms: { privateMethods: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase2 = {
@@ -1261,7 +1261,7 @@ test('024 JS Private Methods > generator private methods > private generator met
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { privateMethods: { loose: true } },
+      transforms: { privateMethods: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase2 = {
@@ -1317,7 +1317,7 @@ test('025 JS Private Methods > generator private methods > private async generat
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { privateMethods: { loose: true } },
+      transforms: { privateMethods: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase2 = {
@@ -1376,7 +1376,7 @@ test('026 JS Private Methods > generator private methods > private generator wit
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { privateMethods: { loose: true } },
+      transforms: { privateMethods: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase2 = {
@@ -1441,7 +1441,7 @@ test('027 JS Private Methods > private accessors > private getter', async () => 
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { privateMethods: { loose: true } },
+      transforms: { privateMethods: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase2 = {
@@ -1501,7 +1501,7 @@ test('028 JS Private Methods > private accessors > private setter', async () => 
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { privateMethods: { loose: true } },
+      transforms: { privateMethods: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase2 = {
@@ -1577,7 +1577,7 @@ test('029 JS Private Methods > private accessors > private getter and setter pai
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { privateMethods: { loose: true } },
+      transforms: { privateMethods: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase2 = {
@@ -1642,7 +1642,7 @@ test('030 JS Private Methods > private accessors > getter-only private accessor 
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { privateMethods: { loose: true } },
+      transforms: { privateMethods: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase2 = {
@@ -1686,7 +1686,7 @@ test('031 [upstream xit] JS Private Methods > private accessors > setter-only pr
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { privateMethods: { loose: true } },
+      transforms: { privateMethods: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase2 = {
@@ -1727,7 +1727,7 @@ test('032 JS Private Methods > private accessors > private accessor available du
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { privateMethods: { loose: true } },
+      transforms: { privateMethods: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase2 = {
@@ -1768,7 +1768,7 @@ test('033 JS Private Methods > private accessors > private getter with computed 
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { privateMethods: { loose: true } },
+      transforms: { privateMethods: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase2 = {
@@ -1837,7 +1837,7 @@ test('034 JS Private Methods > private accessors > private accessor increment/de
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { privateMethods: { loose: true } },
+      transforms: { privateMethods: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase2 = {
@@ -1920,7 +1920,7 @@ test('035 JS Private Methods > private static methods > basic static private met
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { privateMethods: { loose: true } },
+      transforms: { privateMethods: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase2 = {
@@ -1974,7 +1974,7 @@ test('036 JS Private Methods > private static methods > static private method wi
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { privateMethods: { loose: true } },
+      transforms: { privateMethods: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase2 = {
@@ -2028,7 +2028,7 @@ test('037 JS Private Methods > private static methods > exfiltrated static priva
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { privateMethods: { loose: true } },
+      transforms: { privateMethods: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase2 = {
@@ -2082,7 +2082,7 @@ test('038 JS Private Methods > private static methods > multiple static private 
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { privateMethods: { loose: true } },
+      transforms: { privateMethods: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase2 = {
@@ -2143,7 +2143,7 @@ test('039 JS Private Methods > private static methods > static private method is
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { privateMethods: { loose: true } },
+      transforms: { privateMethods: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase2 = {
@@ -2187,7 +2187,7 @@ test('040 JS Private Methods > private static methods > static private method co
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { privateMethods: { loose: true } },
+      transforms: { privateMethods: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase2 = {
@@ -2231,7 +2231,7 @@ test('041 JS Private Methods > private static methods > super access from static
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { privateMethods: { loose: true } },
+      transforms: { privateMethods: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase2 = {
@@ -2311,7 +2311,7 @@ test('042 JS Private Methods > private static methods > this in static private m
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { privateMethods: { loose: true } },
+      transforms: { privateMethods: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase2 = {
@@ -2366,7 +2366,7 @@ test('043 [upstream xit] JS Private Methods > private static methods > static pr
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { privateMethods: { loose: true } },
+      transforms: { privateMethods: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase2 = {
@@ -2425,7 +2425,7 @@ test('044 JS Private Methods > private static methods > static private generator
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { privateMethods: { loose: true } },
+      transforms: { privateMethods: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase2 = {
@@ -2479,7 +2479,7 @@ test('045 JS Private Methods > private static methods > static private async met
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { privateMethods: { loose: true } },
+      transforms: { privateMethods: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase2 = {
@@ -2531,7 +2531,7 @@ test('046 JS Private Methods > private static accessors > static private getter'
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { privateMethods: { loose: true } },
+      transforms: { privateMethods: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase2 = {
@@ -2590,7 +2590,7 @@ test('047 JS Private Methods > private static accessors > static private setter'
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { privateMethods: { loose: true } },
+      transforms: { privateMethods: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase2 = {
@@ -2665,7 +2665,7 @@ test('048 JS Private Methods > private static accessors > static private getter 
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { privateMethods: { loose: true } },
+      transforms: { privateMethods: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase2 = {
@@ -2729,7 +2729,7 @@ test('049 JS Private Methods > private static accessors > static getter-only thr
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { privateMethods: { loose: true } },
+      transforms: { privateMethods: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase2 = {
@@ -2774,7 +2774,7 @@ test('050 JS Private Methods > inheritance and isolation > private methods are p
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { privateMethods: { loose: true } },
+      transforms: { privateMethods: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase2 = {
@@ -2831,7 +2831,7 @@ test('051 JS Private Methods > inheritance and isolation > subclass can define s
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { privateMethods: { loose: true } },
+      transforms: { privateMethods: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase2 = {
@@ -2936,7 +2936,7 @@ test('052 JS Private Methods > inheritance and isolation > private method access
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { privateMethods: { loose: true } },
+      transforms: { privateMethods: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase2 = {
@@ -2993,7 +2993,7 @@ test('053 JS Private Methods > inheritance and isolation > different classes wit
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { privateMethods: { loose: true } },
+      transforms: { privateMethods: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase2 = {
@@ -3078,7 +3078,7 @@ test('054 JS Private Methods > private fields interaction > private method acces
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { privateMethods: { loose: true } },
+      transforms: { privateMethods: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase2 = {
@@ -3137,7 +3137,7 @@ test('055 JS Private Methods > private fields interaction > private method mutat
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { privateMethods: { loose: true } },
+      transforms: { privateMethods: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase2 = {
@@ -3199,7 +3199,7 @@ test('056 JS Private Methods > private fields interaction > private setter valid
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { privateMethods: { loose: true } },
+      transforms: { privateMethods: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase2 = {
@@ -3283,7 +3283,7 @@ test('057 JS Private Methods > edge cases > private method in expression class',
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { privateMethods: { loose: true } },
+      transforms: { privateMethods: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase2 = {
@@ -3341,7 +3341,7 @@ test('058 JS Private Methods > edge cases > private method in nested class', asy
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { privateMethods: { loose: true } },
+      transforms: { privateMethods: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase2 = {
@@ -3400,7 +3400,7 @@ test('059 JS Private Methods > edge cases > private method with symbol property 
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { privateMethods: { loose: true } },
+      transforms: { privateMethods: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase2 = {
@@ -3456,7 +3456,7 @@ test('060 JS Private Methods > edge cases > private method with computed public 
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { privateMethods: { loose: true } },
+      transforms: { privateMethods: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase2 = {
@@ -3516,7 +3516,7 @@ test('061 JS Private Methods > edge cases > multiple instances have independent 
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { privateMethods: { loose: true } },
+      transforms: { privateMethods: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase2 = {
@@ -3596,7 +3596,7 @@ test('062 JS Private Methods > edge cases > private method in class with constru
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { privateMethods: { loose: true } },
+      transforms: { privateMethods: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase2 = {
@@ -3656,7 +3656,7 @@ test('063 JS Private Methods > edge cases > private static method not accessible
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { privateMethods: { loose: true } },
+      transforms: { privateMethods: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase2 = {
@@ -3726,7 +3726,7 @@ test('064 [upstream xit] JS Private Methods > edge cases > toString does not rev
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { privateMethods: { loose: true } },
+      transforms: { privateMethods: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase2 = {
@@ -3783,7 +3783,7 @@ test('065 JS Private Methods > edge cases > for-in does not enumerate private me
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { privateMethods: { loose: true } },
+      transforms: { privateMethods: true },
     }),
   ).toMatchInlineSnapshot(`
     "() => {
@@ -3822,7 +3822,7 @@ test('066 JS Private Methods > edge cases > JSON.stringify only includes public 
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { privateMethods: { loose: true } },
+      transforms: { privateMethods: true },
     }),
   ).toMatchInlineSnapshot(`
     "() => {
@@ -3858,7 +3858,7 @@ test('067 JS Private Methods > edge cases > Object.keys does not include private
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { privateMethods: { loose: true } },
+      transforms: { privateMethods: true },
     }),
   ).toMatchInlineSnapshot(`
     "() => {
@@ -3890,7 +3890,7 @@ test('068 JS Private Methods > edge cases > typeof private method is function', 
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { privateMethods: { loose: true } },
+      transforms: { privateMethods: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase2 = {
@@ -3943,7 +3943,7 @@ test('069 JS Private Methods > edge cases > constructor returning different obje
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { privateMethods: { loose: true } },
+      transforms: { privateMethods: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase2 = {
@@ -4009,7 +4009,7 @@ test('070 JS Private Methods > edge cases > private method as detached callback 
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { privateMethods: { loose: true } },
+      transforms: { privateMethods: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase2 = {
@@ -4089,7 +4089,7 @@ test('071 JS Private Methods > edge cases > private method with closure over con
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { privateMethods: { loose: true } },
+      transforms: { privateMethods: true },
     }),
   ).toMatchInlineSnapshot(`
     "() => {
@@ -4113,7 +4113,7 @@ test('072 JS Private Methods > static blocks > static block can access private s
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { privateMethods: { loose: true } },
+      transforms: { privateMethods: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase2 = {
@@ -4156,7 +4156,7 @@ test('073 JS Private Methods > static blocks > static block can access private s
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { privateMethods: { loose: true } },
+      transforms: { privateMethods: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseBase2 = {
@@ -4204,7 +4204,7 @@ test('074 JS Private Methods > private-in checks (ergonomic brand checks) > #fie
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { privateMethods: { loose: true } },
+      transforms: { privateMethods: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
@@ -4253,7 +4253,7 @@ test('075 JS Private Methods > private-in checks (ergonomic brand checks) > #fie
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { privateMethods: { loose: true } },
+      transforms: { privateMethods: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
@@ -4299,7 +4299,7 @@ test('076 JS Private Methods > private-in checks (ergonomic brand checks) > #fie
   expect(
     await transformOutcome(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { privateMethods: { loose: true } },
+      transforms: { privateMethods: true },
     }),
   ).toMatchInlineSnapshot(`
     "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },

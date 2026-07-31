@@ -78,10 +78,10 @@ impl<'a> VisitMut<'a> for ConstantFolder<'a> {
             Expression::UnaryExpression(_) | Expression::BinaryExpression(_) => {
                 if expression_has_failed_operand(expression, &self.failed) {
                     self.failed.insert((span.start, span.end));
-                } else if let Some(value) = evaluate_expression(expression)
-                    && let Some(literal) = self.literal(span, value)
-                {
-                    *expression = literal;
+                } else if let Some(value) = evaluate_expression(expression) {
+                    if let Some(literal) = self.literal(span, value) {
+                        *expression = literal;
+                    }
                 } else {
                     self.failed.insert((span.start, span.end));
                 }
@@ -187,13 +187,15 @@ fn expression_has_failed_operand(
 }
 
 fn eliminate_dead_functions(program: &mut Program<'_>) {
-    let mut direct_eval = DirectEvalDetector(false);
-    direct_eval.visit_program(program);
-    if direct_eval.0 {
-        // A direct eval can resolve any binding in its lexical environment.
-        // Without parsing and linking the runtime string, static reference
-        // counts cannot prove a function binding dead.
-        return;
+    if program.source_text.contains("eval") {
+        let mut direct_eval = DirectEvalDetector(false);
+        direct_eval.visit_program(program);
+        if direct_eval.0 {
+            // A direct eval can resolve any binding in its lexical environment.
+            // Without parsing and linking the runtime string, static reference
+            // counts cannot prove a function binding dead.
+            return;
+        }
     }
     // Metro's Babel pass repeatedly removes unreferenced function bindings and
     // recrawls scope until reaching a fixed point. Rebuilding the complete

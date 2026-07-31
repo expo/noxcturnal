@@ -22,7 +22,7 @@ const suites = {
   },
   JSDestructuring: {
     output: 'destructuring/destructuring-corpus.test.ts',
-    preflight: `{ helpers: runtimeHelpers, transforms: { destructuring: { useBuiltIns: true } } }`,
+    preflight: `{ helpers: runtimeHelpers, transforms: { destructuring: true } }`,
   },
   JSHermesMisc: { output: 'syntax/hermes-corpus.test.ts', preflight: `{}` },
   JSNamedGroupsRegexes: {
@@ -39,11 +39,11 @@ const suites = {
   },
   JSPrivateMethods: {
     output: 'classes/private-methods-corpus.test.ts',
-    preflight: `{ helpers: runtimeHelpers, transforms: { privateMethods: { loose: true } } }`,
+    preflight: `{ helpers: runtimeHelpers, transforms: { privateMethods: true } }`,
   },
   JSPrivateProperties: {
     output: 'classes/private-properties-corpus.test.ts',
-    preflight: `{ helpers: runtimeHelpers, transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } } }`,
+    preflight: `{ helpers: runtimeHelpers, transforms: { classProperties: { loose: true }, privatePropertyInObject: true } }`,
   },
   JSReactJSX: {
     output: 'jsx/react-jsx-corpus.test.ts',

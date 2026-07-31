@@ -113,7 +113,7 @@ test('destructuring preserves computed-key evaluation order and object rest', ()
       const { [(() => { order.push('key'); return 'first'; })()]: value, second, ...rest } = source;
       globalThis.result = [order, value, second, rest];
     `,
-    { transforms: { destructuring: { useBuiltIns: true } } },
+    { transforms: { destructuring: true } },
   );
   expect(result.result).toEqual([['key'], 1, 2, { third: 3 }]);
 });
@@ -128,7 +128,7 @@ test('object rest applies ToPropertyKey to computed exclusions exactly once', ()
       const { [key]: selected, ...rest } = { 0: 'selected', keep: 'kept' };
       globalThis.result = [selected, rest, calls];
     `,
-    { transforms: { destructuring: { useBuiltIns: true } } },
+    { transforms: { destructuring: true } },
   );
   expect(result.result).toEqual(['selected', { keep: 'kept' }, ['string']]);
 });
@@ -142,7 +142,7 @@ test('object-rest computed keys reject non-primitive Symbol.toPrimitive results'
       catch (error) { threw = error instanceof TypeError; }
       globalThis.result = threw;
     `,
-    { transforms: { destructuring: { useBuiltIns: true } } },
+    { transforms: { destructuring: true } },
   );
   expect(result.result).toBe(true);
 });
@@ -471,7 +471,7 @@ test('array destructuring consumes iterators, applies defaults, and closes after
       const [first = 1, second] = iterable;
       globalThis.result = [first, second, calls];
     `,
-    { transforms: { destructuring: { useBuiltIns: true } } },
+    { transforms: { destructuring: true } },
   );
   expect(result.result).toEqual([1, 2, ['next', 'next', 'return']]);
 });
@@ -501,7 +501,7 @@ test.fails('array destructuring closes the iterator when a default initializer t
       }
       globalThis.result = calls;
     `,
-    { transforms: { destructuring: { useBuiltIns: true } } },
+    { transforms: { destructuring: true } },
   );
   expect(result.result).toEqual(['next', 'default', 'return', 'boom']);
 });
@@ -525,7 +525,7 @@ test('array rest exhausts its iterator without an extra IteratorClose', () => {
       const [first, ...rest] = iterable;
       globalThis.result = [first, rest, calls];
     `,
-    { transforms: { destructuring: { useBuiltIns: true } } },
+    { transforms: { destructuring: true } },
   );
   expect(result.result).toEqual([1, [2], ['next', 'next', 'next']]);
 });
@@ -546,7 +546,7 @@ test('IteratorClose validates a non-object return result', () => {
       catch (error) { threw = error instanceof TypeError; }
       globalThis.result = [threw];
     `,
-    { transforms: { destructuring: { useBuiltIns: true } } },
+    { transforms: { destructuring: true } },
   );
   expect(result.result).toEqual([true]);
 });
@@ -560,7 +560,7 @@ test('destructuring assignment evaluates its target references once', () => {
       ({ value: object().value = 4 } = { value: undefined });
       globalThis.result = [target.value, reads];
     `,
-    { transforms: { destructuring: { useBuiltIns: true } } },
+    { transforms: { destructuring: true } },
   );
   expect(result.result).toEqual([4, 1]);
 });
@@ -582,7 +582,7 @@ test('for-of declaration destructuring preserves iteration bindings and body sco
       }
       globalThis.result = [callbacks.map(read => read()), seen];
     `,
-    { transforms: { destructuring: { useBuiltIns: true } } },
+    { transforms: { destructuring: true } },
   );
   expect(result.result).toEqual([
     [
@@ -605,7 +605,7 @@ test('for-of assignment destructuring preserves outer targets and body scope', (
       }
       globalThis.result = [value, seen];
     `,
-    { transforms: { destructuring: { useBuiltIns: true } } },
+    { transforms: { destructuring: true } },
   );
   expect(result.result).toEqual([
     2,

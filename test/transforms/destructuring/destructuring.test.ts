@@ -6,7 +6,7 @@ test('lowers destructuring', async () => {
   expect(
     await transformSource(source, 'input.js', {
       helpers: runtimeHelpers,
-      transforms: { destructuring: { useBuiltIns: true } },
+      transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
     "export function read({ value }, [first]) {
