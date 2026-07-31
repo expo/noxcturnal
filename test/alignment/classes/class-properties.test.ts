@@ -3,25 +3,37 @@ import { expect, test } from 'vitest';
 
 import { alignBabelBehavior } from '../transform';
 
+function alignClassPropertiesBehavior(
+  source: string,
+  loose: boolean,
+  mustNotMatch: RegExp[],
+): Promise<unknown> {
+  return alignBabelBehavior({
+    source,
+    filename: 'input.js',
+    plugins: [[classProperties, { loose }]],
+    noxcturnal: {
+      helpers: { mode: 'inline' },
+      transforms: { classProperties: { loose } },
+    },
+    output: { mustNotMatch },
+  });
+}
+
 test.each([false, true])('aligns class properties with Babel (loose=%s)', async loose => {
   await expect(
-    alignBabelBehavior({
-      source: `class Counter { value = 2; static factor = 3; read() { return this.value * Counter.factor; } }
+    alignClassPropertiesBehavior(
+      `class Counter { value = 2; static factor = 3; read() { return this.value * Counter.factor; } }
 globalThis.__result = new Counter().read();`,
-      filename: 'input.js',
-      plugins: [[classProperties, { loose }]],
-      noxcturnal: {
-        helpers: { mode: 'inline' },
-        transforms: { classProperties: { loose } },
-      },
-      output: { mustNotMatch: [/^\s*value\s*=/m, /^\s*static\s+factor\s*=/m] },
-    }),
+      loose,
+      [/^\s*value\s*=/m, /^\s*static\s+factor\s*=/m],
+    ),
   ).resolves.toBe(6);
 });
 
 async function alignStaticFieldSuper(loose: boolean): Promise<unknown> {
-  return alignBabelBehavior({
-    source: `class Base {
+  return alignClassPropertiesBehavior(
+    `class Base {
   static get value() { return this.seed; }
 }
 class Child extends Base {
@@ -33,14 +45,9 @@ const original = Child;
 Child = null;
 const [receiver, value] = original.arrow();
 globalThis.__result = [original.direct, receiver === original, value];`,
-    filename: 'input.js',
-    plugins: [[classProperties, { loose }]],
-    noxcturnal: {
-      helpers: { mode: 'inline' },
-      transforms: { classProperties: { loose } },
-    },
-    output: { mustNotMatch: [/^\s*static\s+(?:seed|direct|arrow)\s*=/m] },
-  });
+    loose,
+    [/^\s*static\s+(?:seed|direct|arrow)\s*=/m],
+  );
 }
 
 test('aligns static field this and super evaluation with Babel in spec mode', async () => {
@@ -53,8 +60,8 @@ test('aligns static field this and super evaluation in loose mode', async () => 
 
 test('aligns loose computed super calls with a complex heritage expression', async () => {
   await expect(
-    alignBabelBehavior({
-      source: `let heritageCalls = 0;
+    alignClassPropertiesBehavior(
+      `let heritageCalls = 0;
 const key = 'read';
 class Base { static read() { return this.seed; } }
 class Child extends (heritageCalls++, Base) {
@@ -62,13 +69,8 @@ class Child extends (heritageCalls++, Base) {
   static value = super[key]();
 }
 globalThis.__result = [heritageCalls, Child.value];`,
-      filename: 'input.js',
-      plugins: [[classProperties, { loose: true }]],
-      noxcturnal: {
-        helpers: { mode: 'inline' },
-        transforms: { classProperties: { loose: true } },
-      },
-      output: { mustMatch: [], mustNotMatch: [] },
-    }),
+      true,
+      [],
+    ),
   ).resolves.toEqual([1, 34]);
 });

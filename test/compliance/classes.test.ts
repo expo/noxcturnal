@@ -108,11 +108,19 @@ test('inferred anonymous class names are visible to static initialization', () =
 });
 
 test.each([
-  [false, [21, true, 21, true, 7, 7, 1, 2, 21, 1]],
-  [true, [undefined, true, undefined, true, 7, 7, 1, 2, undefined, 1]],
+  {
+    mode: 'spec',
+    loose: false,
+    expected: [21, true, 21, true, 7, 7, 1, 2, 21, 1],
+  },
+  {
+    mode: 'loose',
+    loose: true,
+    expected: [undefined, true, undefined, true, 7, 7, 1, 2, undefined, 1],
+  },
 ] as const)(
-  'static field initializers preserve Babel this and super semantics (loose=%s)',
-  (loose, expected) => {
+  '$mode static field initializers preserve Babel this and super semantics',
+  ({ loose, expected }) => {
     const result = execute<{ result: unknown[] }>(
       `
       class Base {
@@ -155,11 +163,19 @@ test.each([
 );
 
 test.each([
-  [false, [21, true, 21, true, 7, 7, 1, 2, 21, 1]],
-  [true, [undefined, true, undefined, true, 7, 7, 1, 2, undefined, 1]],
+  {
+    mode: 'spec',
+    loose: false,
+    expected: [21, true, 21, true, 7, 7, 1, 2, 21, 1],
+  },
+  {
+    mode: 'loose',
+    loose: true,
+    expected: [undefined, true, undefined, true, 7, 7, 1, 2, undefined, 1],
+  },
 ] as const)(
-  'instance field initializers preserve Babel this and super semantics (loose=%s)',
-  (loose, expected) => {
+  '$mode instance field initializers preserve Babel this and super semantics',
+  ({ loose, expected }) => {
     const result = execute<{ result: unknown[] }>(
       `
         class Base {

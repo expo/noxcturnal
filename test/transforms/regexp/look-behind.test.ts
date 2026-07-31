@@ -11,7 +11,7 @@ const cases = [
 ] as const;
 
 for (const [name, regexp] of cases) {
-  test(name, async () => {
+  test(`preserves ${name} as a native RegExp identity boundary`, async () => {
     await expect(
       transformSource(`export const matcher = ${regexp};`, 'input.js', {
         transforms: { regexpLookBehind: true },

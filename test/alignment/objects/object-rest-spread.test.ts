@@ -3,6 +3,24 @@ import { expect, test } from 'vitest';
 
 import { alignBabelBehavior } from '../transform';
 
+function alignObjectRestSpreadBehavior(
+  source: string,
+  loose: boolean,
+  useBuiltIns: boolean,
+  mustNotMatch: RegExp[],
+): Promise<unknown> {
+  return alignBabelBehavior({
+    source,
+    filename: 'input.js',
+    plugins: [[objectRestSpread, { loose, useBuiltIns }]],
+    noxcturnal: {
+      helpers: { mode: 'inline' },
+      transforms: { objectRestSpread: { loose, useBuiltIns } },
+    },
+    output: { mustNotMatch },
+  });
+}
+
 test.each([
   { loose: false, useBuiltIns: false },
   { loose: false, useBuiltIns: true },
@@ -11,26 +29,22 @@ test.each([
 ])('aligns object rest/spread with Babel ($loose, $useBuiltIns)', async options => {
   const { loose, useBuiltIns } = options;
   await expect(
-    alignBabelBehavior({
-      source: `const symbol = Symbol('symbol');
+    alignObjectRestSpreadBehavior(
+      `const symbol = Symbol('symbol');
 const source = { a: 20, b: 22, [symbol]: 1 }; const { a, ...rest } = source;
 function pick({ a, ...parameterRest }) { return [a, parameterRest[symbol]]; }
 globalThis.__result = [{ zero: 0, ...rest }.b + a, Object.keys(rest), rest[symbol], pick(source)];`,
-      filename: 'input.js',
-      plugins: [[objectRestSpread, { loose, useBuiltIns }]],
-      noxcturnal: {
-        helpers: { mode: 'inline' },
-        transforms: { objectRestSpread: { loose, useBuiltIns } },
-      },
-      output: { mustNotMatch: [/\.\.\.rest/] },
-    }),
+      loose,
+      useBuiltIns,
+      [/\.\.\.rest/],
+    ),
   ).resolves.toEqual([42, ['b'], loose ? undefined : 1, [20, loose ? undefined : 1]]);
 });
 
 test.each([false, true])('aligns proxy trap ordering with Babel (loose=%s)', async loose => {
   await expect(
-    alignBabelBehavior({
-      source: `const calls = [];
+    alignObjectRestSpreadBehavior(
+      `const calls = [];
 const target = { a: 1, b: 2 };
 const proxy = new Proxy(target, {
   ownKeys(value) { calls.push('ownKeys'); return Reflect.ownKeys(value); },
@@ -46,14 +60,10 @@ const proxy = new Proxy(target, {
 const spread = { ...proxy };
 const { a, ...rest } = proxy;
 globalThis.__result = [spread, rest, a, calls];`,
-      filename: 'input.js',
-      plugins: [[objectRestSpread, { loose, useBuiltIns: false }]],
-      noxcturnal: {
-        helpers: { mode: 'inline' },
-        transforms: { objectRestSpread: { loose, useBuiltIns: false } },
-      },
-      output: { mustNotMatch: [/\.\.\.proxy/] },
-    }),
+      loose,
+      false,
+      [/\.\.\.proxy/],
+    ),
   ).resolves.toEqual([
     { a: 1, b: 2 },
     { b: 2 },

@@ -3,48 +3,60 @@ import { expect, test } from 'vitest';
 
 import { alignBabelBehavior } from '../transform';
 
-test.each([false, true])('aligns destructuring with Babel (built-ins=%s)', async useBuiltIns => {
-  await expect(
-    alignBabelBehavior({
-      source: `let calls = 0; const read = () => { calls++; return { a: 20, nested: [22] }; };
-const { a, nested: [b] } = read(); globalThis.__result = [a + b, calls];`,
-      filename: 'input.js',
-      plugins: [[destructuring, { useBuiltIns }]],
-      noxcturnal: {
-        helpers: { mode: 'inline' },
-        transforms: { destructuring: true },
-      },
-      output: { mustNotMatch: [/\{\s*a\s*,\s*nested\s*:/] },
-    }),
-  ).resolves.toEqual([42, 1]);
-});
+const babelModes = [{ useBuiltIns: false }, { useBuiltIns: true }] as const;
 
-test.each([false, true])(
-  'aligns primitive computed object-rest key coercion with Babel (built-ins=%s)',
-  async useBuiltIns => {
+function alignDestructuringBehavior(
+  source: string,
+  useBuiltIns: boolean,
+  mustNotMatch: RegExp,
+): Promise<unknown> {
+  return alignBabelBehavior({
+    source,
+    filename: 'input.js',
+    plugins: [[destructuring, { useBuiltIns }]],
+    noxcturnal: {
+      helpers: { mode: 'inline' },
+      transforms: { destructuring: true },
+    },
+    output: { mustNotMatch: [mustNotMatch] },
+  });
+}
+
+test.each(babelModes)(
+  'aligns destructuring with Babel (built-ins=$useBuiltIns)',
+  async ({ useBuiltIns }) => {
     await expect(
-      alignBabelBehavior({
-        source: `const key = 0;
+      alignDestructuringBehavior(
+        `let calls = 0; const read = () => { calls++; return { a: 20, nested: [22] }; };
+const { a, nested: [b] } = read(); globalThis.__result = [a + b, calls];`,
+        useBuiltIns,
+        /\{\s*a\s*,\s*nested\s*:/,
+      ),
+    ).resolves.toEqual([42, 1]);
+  },
+);
+
+test.each(babelModes)(
+  'aligns primitive computed object-rest key coercion with Babel (built-ins=$useBuiltIns)',
+  async ({ useBuiltIns }) => {
+    await expect(
+      alignDestructuringBehavior(
+        `const key = 0;
 const { [key]: selected, ...rest } = { 0: 'selected', keep: 'kept' };
 globalThis.__result = [selected, rest];`,
-        filename: 'input.js',
-        plugins: [[destructuring, { useBuiltIns }]],
-        noxcturnal: {
-          helpers: { mode: 'inline' },
-          transforms: { destructuring: true },
-        },
-        output: { mustNotMatch: [/\.\.\.rest/] },
-      }),
+        useBuiltIns,
+        /\.\.\.rest/,
+      ),
     ).resolves.toEqual(['selected', { keep: 'kept' }]);
   },
 );
 
-test.each([false, true])(
-  'aligns for-of declaration destructuring and body lexical scope with Babel (built-ins=%s)',
-  async useBuiltIns => {
+test.each(babelModes)(
+  'aligns for-of declaration destructuring and body lexical scope with Babel (built-ins=$useBuiltIns)',
+  async ({ useBuiltIns }) => {
     await expect(
-      alignBabelBehavior({
-        source: `const key = 'value'; const callbacks = []; const seen = [];
+      alignDestructuringBehavior(
+        `const key = 'value'; const callbacks = []; const seen = [];
 for (const { [key]: value, nested: [first = 9] } of [
   { value: 1, nested: [] }, { value: 2, nested: [3] }
 ]) {
@@ -54,14 +66,9 @@ for (const { [key]: value, nested: [first = 9] } of [
   seen.push(value);
 }
 globalThis.__result = [callbacks.map(read => read()), seen];`,
-        filename: 'input.js',
-        plugins: [[destructuring, { useBuiltIns }]],
-        noxcturnal: {
-          helpers: { mode: 'inline' },
-          transforms: { destructuring: true },
-        },
-        output: { mustNotMatch: [/for\s*\(const\s*\{/] },
-      }),
+        useBuiltIns,
+        /for\s*\(const\s*\{/,
+      ),
     ).resolves.toEqual([
       [
         [1, 9, 'shadow'],
@@ -72,25 +79,20 @@ globalThis.__result = [callbacks.map(read => read()), seen];`,
   },
 );
 
-test.each([false, true])(
-  'aligns for-of assignment destructuring with Babel (built-ins=%s)',
-  async useBuiltIns => {
+test.each(babelModes)(
+  'aligns for-of assignment destructuring with Babel (built-ins=$useBuiltIns)',
+  async ({ useBuiltIns }) => {
     await expect(
-      alignBabelBehavior({
-        source: `const key = 'value'; let value; const seen = [];
+      alignDestructuringBehavior(
+        `const key = 'value'; let value; const seen = [];
 for ({ [key]: value } of [{ value: 1 }, { value: 2 }]) {
   const key = 'shadow';
   seen.push([value, key]);
 }
 globalThis.__result = [value, seen];`,
-        filename: 'input.js',
-        plugins: [[destructuring, { useBuiltIns }]],
-        noxcturnal: {
-          helpers: { mode: 'inline' },
-          transforms: { destructuring: true },
-        },
-        output: { mustNotMatch: [/for\s*\(\s*\{/] },
-      }),
+        useBuiltIns,
+        /for\s*\(\s*\{/,
+      ),
     ).resolves.toEqual([
       2,
       [
@@ -101,12 +103,12 @@ globalThis.__result = [value, seen];`,
   },
 );
 
-test.each([false, true])(
-  'aligns Babel helper IteratorClose ordering around default initializers (built-ins=%s)',
-  async useBuiltIns => {
+test.each(babelModes)(
+  'aligns Babel helper IteratorClose ordering around default initializers (built-ins=$useBuiltIns)',
+  async ({ useBuiltIns }) => {
     await expect(
-      alignBabelBehavior({
-        source: `const calls = [];
+      alignDestructuringBehavior(
+        `const calls = [];
 const iterable = {
   [Symbol.iterator]() {
     return {
@@ -122,14 +124,9 @@ try {
   calls.push(error.message);
 }
 globalThis.__result = calls;`,
-        filename: 'input.js',
-        plugins: [[destructuring, { useBuiltIns }]],
-        noxcturnal: {
-          helpers: { mode: 'inline' },
-          transforms: { destructuring: true },
-        },
-        output: { mustNotMatch: [/\[value\s*=/] },
-      }),
+        useBuiltIns,
+        /\[value\s*=/,
+      ),
     ).resolves.toEqual(['next', 'return', 'default', 'boom']);
   },
 );

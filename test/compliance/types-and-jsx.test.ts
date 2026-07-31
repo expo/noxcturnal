@@ -107,7 +107,10 @@ test('JSX namespaces become string tag and attribute names when explicitly allow
     { React },
     'input.jsx',
   );
-  expect(result.result).toEqual({ type: 'f:image', props: { 'n:attr': 'value' } });
+  expect(result.result).toEqual({
+    type: 'f:image',
+    props: { 'n:attr': 'value' },
+  });
 });
 
 test('export-namespace-from preserves a live namespace object', async () => {
@@ -115,7 +118,10 @@ test('export-namespace-from preserves a live namespace object', async () => {
   const module = await executeModule(`export * as dependency from ${JSON.stringify(dependency)};`, {
     transforms: { exportNamespaceFrom: true },
   });
-  const namespace = module.dependency as { value: number; set(value: number): void };
+  const namespace = module.dependency as {
+    value: number;
+    set(value: number): void;
+  };
   expect(namespace.value).toBe(1);
   namespace.set(2);
   expect(namespace.value).toBe(2);
@@ -168,7 +174,11 @@ test('TypeScript-only class and function syntax erases without changing behavior
 });
 
 test('custom classic JSX pragmas preserve fragment and child behavior', () => {
-  const h = (type: unknown, props: unknown, ...children: unknown[]) => ({ type, props, children });
+  const h = (type: unknown, props: unknown, ...children: unknown[]) => ({
+    type,
+    props,
+    children,
+  });
   const Fragment = Symbol('Fragment');
   const result = execute<{ result: unknown }>(
     `globalThis.result = <><Item value={1} />text</>;`,
@@ -189,14 +199,19 @@ test('classic development JSX provides source and self metadata without changing
       return { type, props, children };
     },
   };
-  const result = execute<{ result: { props: Record<string, unknown>; children: unknown[] } }>(
+  const result = execute<{
+    result: { props: Record<string, unknown>; children: unknown[] };
+  }>(
     `globalThis.result = <Item>value</Item>;`,
     { jsx: 'classic-development' },
     { React, Item: 'Item' },
     'fixture.jsx',
   );
   expect(result.result.children).toEqual(['value']);
-  expect(result.result.props.__source).toMatchObject({ fileName: 'fixture.jsx', lineNumber: 1 });
+  expect(result.result.props.__source).toMatchObject({
+    fileName: 'fixture.jsx',
+    lineNumber: 1,
+  });
   expect(result.result.props).toHaveProperty('__self');
 });
 
@@ -263,16 +278,17 @@ test('automatic development JSX preserves source metadata and children', async (
   });
 });
 
-test('TypeScript erasure executes .mts and .cts inputs', () => {
-  for (const filename of ['input.mts', 'input.cts']) {
-    const result = execute<{ result: number }>(
-      `const value: number = 3; globalThis.result = value;`,
-      { typescript: 'strip' },
-      {},
-      filename,
-    );
-    expect(result.result).toBe(3);
-  }
+test.each([
+  { moduleKind: 'ESM-oriented .mts', filename: 'input.mts' },
+  { moduleKind: 'CommonJS-oriented .cts', filename: 'input.cts' },
+] as const)('TypeScript erasure executes $moduleKind input', ({ filename }) => {
+  const result = execute<{ result: number }>(
+    `const value: number = 3; globalThis.result = value;`,
+    { typescript: 'strip' },
+    {},
+    filename,
+  );
+  expect(result.result).toBe(3);
 });
 
 test('top-level await remains executable module syntax', async () => {
@@ -288,7 +304,10 @@ test('automatic-if-present transforms JSX and leaves JSX-free programs runnable'
     { jsx: 'automatic-if-present', jsxImportSource: 'react' },
     'input.jsx',
   ).replace(/(['"])react\/jsx-runtime\1/, JSON.stringify(runtimeUrl));
-  expect((await importCode(withJsx)).result).toMatchObject({ type: 'Item', props: { value: 1 } });
+  expect((await importCode(withJsx)).result).toMatchObject({
+    type: 'Item',
+    props: { value: 1 },
+  });
 
   const withoutJsx = execute<{ result: number }>(`globalThis.result = 42;`, {
     jsx: 'automatic-if-present',
