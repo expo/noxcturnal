@@ -287,18 +287,9 @@ test('loose/ignoreFunctionLength/input.js', async () => {
 test('parameters/arrow-default-super-no-classes-plugin/input.js', async () => {
   const source =
     'class Bar extends Foo {\n    constructor() {\n        let f = (x = super()) => x;\n        f();\n    }\n}\n';
-  expect(await transformOutcome(source, 'input.js', { transforms: { parameters: true } }))
-    .toMatchInlineSnapshot(`
-    "class Bar extends Foo {
-      constructor() {
-        let f = function () {
-          let x = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : super();
-          return x;
-        };
-        f();
-      }
-    }"
-  `);
+  expect(
+    await transformOutcome(source, 'input.js', { transforms: { parameters: true } }),
+  ).toMatchInlineSnapshot(`"[bailout] preflight:arrow-parameters-lexical-super-not-implemented"`);
 });
 
 test('parameters/arrow-rest-super-no-classes-plugin/input.js', async () => {
