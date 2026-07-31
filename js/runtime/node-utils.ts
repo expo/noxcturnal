@@ -1,6 +1,6 @@
-import type { NativeIndexedSessionBinding } from '../native/binding.js';
-import { coerceFieldValue } from '../protocol/events.js';
-import type { NativeEvent, NodeView, QueryResult } from '../types.js';
+import type { NativeIndexedSessionBinding } from '../native/binding';
+import { coerceFieldValue } from '../protocol/events';
+import type { NativeEvent, NodeView, QueryResult } from '../types';
 
 export function toNodeView(event: NativeEvent): NodeView {
   if (event.fields.length === 0) return event as unknown as NodeView;

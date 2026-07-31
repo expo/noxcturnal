@@ -3,9 +3,9 @@ import {
   NODE_TYPE_IDS,
   NODE_TYPES,
   PREDICATE_FIELDS,
-} from '../generated/event-schema.js';
-import type { ScalarPredicate, ScalarValue } from '../types.js';
-import { ROUTE_MANIFEST_MAGIC, paddingFor } from './constants.js';
+} from '../generated/event-schema';
+import type { ScalarPredicate, ScalarValue } from '../types';
+import { ROUTE_MANIFEST_MAGIC, paddingFor } from './constants';
 
 export interface NativeRouteManifestEntry {
   id: number;

@@ -1,6 +1,6 @@
-import type { EditEffect } from '../types.js';
-import type { CompiledPhasePlan, NativePipeline } from '../contracts/visitor.js';
-import { ArtifactDemand, closeArtifactDemand } from './artifacts.js';
+import type { EditEffect } from '../types';
+import type { CompiledPhasePlan, NativePipeline } from '../contracts/visitor';
+import { ArtifactDemand, closeArtifactDemand } from './artifacts';
 
 const EDIT_EFFECT_RANK: Readonly<Record<EditEffect, number>> = {
   none: 0,

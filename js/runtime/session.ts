@@ -1,12 +1,12 @@
-import { parserFilename } from '../adapters/classification.js';
-import { FIELD_KEY_IDS, NODE_TYPE_IDS, NODE_TYPES } from '../generated/event-schema.js';
-import { native, type NativeIndexedSessionBinding } from '../native/binding.js';
+import { parserFilename } from '../adapters/classification';
+import { FIELD_KEY_IDS, NODE_TYPE_IDS, NODE_TYPES } from '../generated/event-schema';
+import { native, type NativeIndexedSessionBinding } from '../native/binding';
 import {
   decodeEventBatch,
   decodePackedEnvelope,
   decodeRoutedEnvelope,
   type RoutedEventBatch,
-} from '../protocol/events.js';
+} from '../protocol/events';
 import type {
   EditCommand,
   FunctionMap,
@@ -18,10 +18,10 @@ import type {
   QueryResult,
   SourceLocation,
   TransformOptions,
-} from '../types.js';
-import { commitWithDedupe } from './editor.js';
-import { adaptBindingFact, toNodeView } from './node-utils.js';
-import { alias, querySubscriptions } from '../pipeline/route-utils.js';
+} from '../types';
+import { commitWithDedupe } from './editor';
+import { adaptBindingFact, toNodeView } from './node-utils';
+import { alias, querySubscriptions } from '../pipeline/route-utils';
 
 /** One allocator spans every native parse of a transform. The native side only
  * chooses a namespace once; reparses neither rescan names nor lengthen it. */

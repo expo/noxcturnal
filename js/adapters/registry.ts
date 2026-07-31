@@ -1,4 +1,4 @@
-import type { ParseClassification, ParserAdapter } from '../types.js';
+import type { ParseClassification, ParserAdapter } from '../types';
 
 const parserAdapters = new Map<string, ParserAdapter>();
 

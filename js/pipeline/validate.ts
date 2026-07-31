@@ -5,8 +5,8 @@ import {
   NODE_TYPES,
   PREDICATE_FIELDS,
   PREDICATE_VALUE_DOMAINS,
-} from '../generated/event-schema.js';
-import type { ControlFlowCapability, ScalarPredicate, ScalarValue } from '../types.js';
+} from '../generated/event-schema';
+import type { ControlFlowCapability, ScalarPredicate, ScalarValue } from '../types';
 
 export interface PredicateRequirements {
   where?: Readonly<

@@ -1,6 +1,6 @@
-import type { NativeEditor } from '../contracts/visitor.js';
-import { packEdits } from '../protocol/edits.js';
-import type { EditCommand } from '../types.js';
+import type { NativeEditor } from '../contracts/visitor';
+import { packEdits } from '../protocol/edits';
+import type { EditCommand } from '../types';
 
 type EditKind = EditCommand['kind'];
 

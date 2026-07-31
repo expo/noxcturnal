@@ -1,14 +1,16 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "module": "CommonJS",
-    "moduleResolution": "Node",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
     "strict": true,
     "noUnusedLocals": true,
-    "declaration": true,
-    "outDir": "dist",
-    "rootDir": "js",
+    "noUnusedParameters": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "types": ["node", "vitest/globals"],
     "skipLibCheck": true
   },
-  "include": ["js/**/*.ts"]
+  "include": ["js/**/*.ts", "test/**/*.ts"],
+  "exclude": ["js/**/__benchmarks__/**"]
 }

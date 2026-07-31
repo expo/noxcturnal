@@ -1,26 +1,26 @@
-import { classifyForTransform, parserFilename, sourceHints } from '../adapters/classification.js';
-import { selectParserAdapter } from '../adapters/registry.js';
-import { compilePhasePlan } from '../pipeline/compile.js';
-import { closeDefinitionScope } from '../pipeline/define.js';
-import type { CompiledRouteTemplate, PreparedPhase } from '../pipeline/types.js';
+import { classifyForTransform, parserFilename, sourceHints } from '../adapters/classification';
+import { selectParserAdapter } from '../adapters/registry';
+import { compilePhasePlan } from '../pipeline/compile';
+import { closeDefinitionScope } from '../pipeline/define';
+import type { CompiledRouteTemplate, PreparedPhase } from '../pipeline/types';
 import {
   compileNestedVisitor,
   mergeFieldRequests,
   nestedManifest,
   preparePhase,
-} from '../pipeline/routes.js';
-import { Bailout, createDispatcher } from './dispatch.js';
-import { SourceVersionStore, type SourceVersionId } from './source-versions.js';
-import { ArtifactDemand, hasSemanticDemand } from '../pipeline/artifacts.js';
-import { locationOffset } from './path.js';
-import type { IntentRegistration } from './fragments.js';
+} from '../pipeline/routes';
+import { Bailout, createDispatcher } from './dispatch';
+import { SourceVersionStore, type SourceVersionId } from './source-versions';
+import { ArtifactDemand, hasSemanticDemand } from '../pipeline/artifacts';
+import { locationOffset } from './path';
+import type { IntentRegistration } from './fragments';
 import {
   native,
   nativePreflightOptions,
   type NativePreflightResultOutput,
-} from '../native/binding.js';
-import { decodeRoutedEnvelope, type RoutedEventBatch } from '../protocol/events.js';
-import { packRouteManifest } from '../protocol/manifest.js';
+} from '../native/binding';
+import { decodeRoutedEnvelope, type RoutedEventBatch } from '../protocol/events';
+import { packRouteManifest } from '../protocol/manifest';
 import type {
   Diagnostic,
   EditCommand,
@@ -29,15 +29,15 @@ import type {
   NativeVlqMap,
   TransformOptions,
   TransformResult,
-} from '../types.js';
+} from '../types';
 import {
   NativePipeline,
   NativePlugin,
   TransformDecision,
   NativeTransformError,
-} from '../contracts/visitor.js';
-import { NativeTransformSession, TransformUidAllocator } from './session.js';
-import { commitWithDedupe } from './editor.js';
+} from '../contracts/visitor';
+import { NativeTransformSession, TransformUidAllocator } from './session';
+import { commitWithDedupe } from './editor';
 
 interface RetainedPlan {
   futureSubscriptions: ReadonlySet<string>;

@@ -1,5 +1,5 @@
-import { alias, expandSubscriptions } from '../pipeline/route-utils.js';
-import { createEditor } from './editor.js';
+import { alias, expandSubscriptions } from '../pipeline/route-utils';
+import { createEditor } from './editor';
 import {
   codeFactory,
   directivePrologueEnd,
@@ -8,7 +8,7 @@ import {
   realizeContent,
   type IntentRegistration,
   type RealizedContent,
-} from './fragments.js';
+} from './fragments';
 import {
   childRoleIsDeclared,
   eventIsSkipped,
@@ -17,16 +17,16 @@ import {
   resetSkippedTraversal,
   type PathRuntime,
   type PathState,
-} from './path.js';
-import { dispatchRoutedEvents, type RoutedEventBatch } from '../protocol/events.js';
-import { packRouteManifest } from '../protocol/manifest.js';
+} from './path';
+import { dispatchRoutedEvents, type RoutedEventBatch } from '../protocol/events';
+import { packRouteManifest } from '../protocol/manifest';
 import type {
   CompiledNestedRoutes,
   CompiledRouteTemplate,
   DispatchRoute,
   PreparedPluginPlan,
   RouteCapabilities,
-} from '../pipeline/types.js';
+} from '../pipeline/types';
 import type {
   Code,
   DefinedVisitor,
@@ -34,9 +34,9 @@ import type {
   NativePlugin,
   PipelinePhase,
   PluginContext,
-} from '../contracts/visitor.js';
-import type { ControlFlowCapability, Diagnostic, EditCommand, NativeEvent } from '../types.js';
-import type { NativeTransformSession } from './session.js';
+} from '../contracts/visitor';
+import type { ControlFlowCapability, Diagnostic, EditCommand, NativeEvent } from '../types';
+import type { NativeTransformSession } from './session';
 
 export class Bailout extends Error {}
 
@@ -106,7 +106,7 @@ export function createDispatcher(
       context: undefined as unknown as PluginContext,
     };
     const realizeIntentContent = (code: Code): RealizedContent =>
-      realizeContent(session, code, (message, fragment) => {
+      realizeContent(session, code, () => {
         provenance.degradations++;
       });
     /** Register `(kind, key)` for this plugin, or return the existing registration

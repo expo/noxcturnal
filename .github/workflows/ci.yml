@@ -26,11 +26,8 @@ jobs:
           components: clippy, rustfmt
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
-      - run: pnpm verify
+      - run: pnpm check
       - run: pnpm benchmark
-      - run: pnpm rust:format
-      - run: pnpm rust:lint
-      - run: pnpm pack --pack-destination "$(mktemp -d)"
       - run: git diff --check
 
   native:
@@ -106,8 +103,7 @@ jobs:
           components: clippy, rustfmt
       - run: sudo apt-get update && sudo apt-get install -y ninja-build
       - run: pnpm install --frozen-lockfile
-      - run: pnpm hermes:fetch
-      - run: pnpm hermes:check
+      - run: git submodule update --init --depth 1 crates/hermes-parser-sys/hermes
       - run: pnpm codegen:estree:check
       - run: cargo test -p hermes-parser-sys -p hermes-flow --features hermes-flow/parser
       - run: cargo clippy -p hermes-parser-sys -p hermes-flow --all-targets --features hermes-flow/parser -- -D warnings
@@ -120,14 +116,21 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/corpus"
           cd "$RUNNER_TEMP/corpus"
-          npm pack react-native --silent
+          npm pack react-native@0.86.2 --silent
           tar -xzf react-native-*.tgz
       - run: pnpm exec napi build --platform --release --features flow_parser
       - run: pnpm build:js
       # Divergences always fail. The coverage floor sits well under the measured
       # figure so that ordinary drift shows up as a number rather than as a
       # broken build, and only a collapse stops the line.
-      - run: node scripts/flow-equivalence.mjs --corpus "$RUNNER_TEMP/corpus/package" --min-coverage 90
+      - name: Verify Flow corpus equivalence
+        run: >-
+          pnpm exec vitest run
+          test/integration/flow-equivalence.test.ts
+          js/adapters/__tests__/flow-erasure.test.ts
+        env:
+          FLOW_CORPUS: ${{ runner.temp }}/corpus/package
+          FLOW_MIN_COVERAGE: 90
 
   # The gate for native Flow erasure. `flow_parser` builds Hermes' parser
   # through its own CMake, so it has to hold on every target the package
@@ -188,7 +191,7 @@ jobs:
         with:
           version: 0.14.1
       - run: pnpm install --frozen-lockfile
-      - run: pnpm hermes:fetch
+      - run: git submodule update --init --depth 1 crates/hermes-parser-sys/hermes
       - name: Build with flow_parser
         shell: bash
         run: |

@@ -6,5 +6,3 @@ target/
 dist/
 coverage/
 .DS_Store
-# Fetched by `pnpm hermes:fetch`; pinned in crates/hermes-parser-sys/hermes-pin.txt.
-crates/hermes-parser-sys/hermes/

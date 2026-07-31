@@ -219,21 +219,7 @@ const rust = execFileSync('rustfmt', ['--edition', '2024', '--emit', 'stdout'], 
   encoding: 'utf8',
   input: rustUnformatted,
 });
-const metadata = `${JSON.stringify(
-  {
-    schemaVersion: 1,
-    generatedBy: 'node scripts/generate-inline-helpers.mjs',
-    runtimeVersion: runtimePackage.version,
-    bundles: generated,
-  },
-  null,
-  2,
-)}\n`;
-
-const outputs = new Map([
-  ['src/generated/inline_helpers.rs', rust],
-  ['audit/inline-helper-bundles.json', metadata],
-]);
+const outputs = new Map([['src/generated/inline_helpers.rs', rust]]);
 for (const [path, content] of outputs) {
   const target = join(root, path);
   if (check) {

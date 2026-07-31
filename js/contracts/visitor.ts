@@ -4,8 +4,8 @@ import type {
   NativeRouteFields,
   NativeRoutePredicates,
   NativeRouteTypes,
-} from '../generated/event-schema.js';
-import { native } from '../native/binding.js';
+} from '../generated/event-schema';
+import { native } from '../native/binding';
 import type {
   ControlFlowCapability,
   Diagnostic,
@@ -23,7 +23,7 @@ import type {
   ScalarValue,
   SourceLocation,
   TransformOptions,
-} from '../types.js';
+} from '../types';
 
 export class NativeTransformError extends Error {
   constructor(
@@ -965,7 +965,7 @@ export interface PipelinePhase {
   /** JavaScript visitor plugins. Mutually exclusive with `native`. */
   plugins?: readonly NativePlugin<any, any>[];
   /** Fused parse/transform/codegen phase executed entirely in Rust. */
-  native?: import('../preflight/types.js').PreflightPlan;
+  native?: import('../preflight/types').PreflightPlan;
   editEffect?: EditEffect;
   requiresPrintedInput?: boolean;
   requiresFreshSemantics?: boolean;
@@ -979,7 +979,7 @@ export interface CompiledPhasePlan {
   requiresFreshSemantics: boolean;
   requiresRealizedMap: boolean;
   /** Closed bit set of derived artifacts declared before per-file routing. */
-  artifactDemand: import('../pipeline/artifacts.js').ArtifactDemand;
+  artifactDemand: import('../pipeline/artifacts').ArtifactDemand;
 }
 
 /** An immutable, reusable transform configuration. */

@@ -5,9 +5,9 @@ import type {
   CompositeFragment,
   NativeNodePath,
   SourceFragment,
-} from '../contracts/visitor.js';
-import { native } from '../native/binding.js';
-import type { NativeTransformSession } from './session.js';
+} from '../contracts/visitor';
+import { native } from '../native/binding';
+import type { NativeTransformSession } from './session';
 
 const SOURCE_FRAGMENT_SESSIONS = new WeakMap<SourceFragment, NativeTransformSession>();
 const DIRECTIVE_PROLOGUE =

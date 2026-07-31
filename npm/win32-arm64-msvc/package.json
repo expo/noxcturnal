@@ -1,5 +1,5 @@
 {
-  "name": "noxcturnal-win32-arm64-msvc",
+  "name": "@noxcturnal/noxcturnal-win32-arm64-msvc",
   "version": "0.1.0",
   "description": "Native-backed JavaScript transform runtime with visitor ergonomics",
   "license": "MIT",

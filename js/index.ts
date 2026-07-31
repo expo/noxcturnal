@@ -1,4 +1,4 @@
-export type * from './types.js';
+export type * from './types';
 export type {
   PreflightHelpers,
   PreflightJsxMode,
@@ -6,7 +6,7 @@ export type {
   PreflightReactCompiler,
   PreflightTransforms,
   PreflightTypeScriptMode,
-} from './preflight/types.js';
+} from './preflight/types';
 export type {
   AncestryCapability,
   ChildContract,
@@ -43,19 +43,19 @@ export type {
   TypedVisitorHandler,
   VisitorRouteSpec,
   VisitorContract,
-} from './contracts/visitor.js';
-export { defineVisitor, NativeTransformError } from './contracts/visitor.js';
+} from './contracts/visitor';
+export { defineVisitor, NativeTransformError } from './contracts/visitor';
 export {
   composeNativePipeline,
   defineNativePipeline,
   defineNativePlugin,
   definePipelinePhase,
   parameter,
-} from './pipeline/define.js';
-export { compilePhasePlan } from './pipeline/compile.js';
-export { pipelineCacheKey, transformClassificationCacheKey } from './pipeline/cache-key.js';
-export { registerParserAdapter } from './adapters/registry.js';
-export { transform } from './runtime/transform.js';
+} from './pipeline/define';
+export { compilePhasePlan } from './pipeline/compile';
+export { pipelineCacheKey, transformClassificationCacheKey } from './pipeline/cache-key';
+export { registerParserAdapter } from './adapters/registry';
+export { transform } from './runtime/transform';
 
-import { native } from './native/binding.js';
+import { native } from './native/binding';
 export const classify = native.classify;

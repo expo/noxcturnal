@@ -4,5 +4,11 @@
   "printWidth": 100,
   "singleQuote": true,
   "trailingComma": "all",
-  "ignorePatterns": ["dist/**", "js/generated-event-schema.ts", "src/generated_event_schema.rs"]
+  "ignorePatterns": [
+    "dist/**",
+    "crates/hermes-parser-sys/hermes/**",
+    "js/generated-event-schema.ts",
+    "scripts/rollup.config.mjs",
+    "src/generated_event_schema.rs"
+  ]
 }

@@ -1,4 +1,4 @@
-import type { ParseClassification, TransformOptions } from '../types.js';
+import type { ParseClassification, TransformOptions } from '../types';
 
 const SOURCE_HINTS = [
   'process.env',

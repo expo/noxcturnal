@@ -1,11 +1,11 @@
-import { FIELD_KEY_IDS } from '../generated/event-schema.js';
-import { alias, array } from '../pipeline/route-utils.js';
+import { FIELD_KEY_IDS } from '../generated/event-schema';
+import { alias, array } from '../pipeline/route-utils';
 import {
   isProvenanceCode,
   makeSourceFragment,
   realizeContent,
   sourceFragmentBelongsTo,
-} from './fragments.js';
+} from './fragments';
 import type {
   ControlFlowCapability,
   EditCommand,
@@ -16,7 +16,7 @@ import type {
   NodeView,
   QueryResult,
   SourceLocation,
-} from '../types.js';
+} from '../types';
 import {
   NativeTransformError,
   type Code,
@@ -29,11 +29,11 @@ import {
   type PluginContext,
   type SnapshotOptions,
   type SourceFragment,
-} from '../contracts/visitor.js';
-import type { NativeTransformSession } from './session.js';
-import type { RouteCapabilities } from '../pipeline/types.js';
+} from '../contracts/visitor';
+import type { NativeTransformSession } from './session';
+import type { RouteCapabilities } from '../pipeline/types';
 
-export type { RouteCapabilities } from '../pipeline/types.js';
+export type { RouteCapabilities } from '../pipeline/types';
 
 export function childRoleIsDeclared(roles: readonly string[], requestedRole: string): boolean {
   for (const role of roles) {
@@ -456,7 +456,7 @@ export class NodePathImpl implements NativeNodePath {
       order: this.runtime.nextOrder(),
     });
   }
-  #degraded = (message: string, target: SourceFragment): void => {
+  #degraded = (_message: string, _target: SourceFragment): void => {
     this.runtime.provenance.degradations++;
   };
   insertBefore(content: Code): void {

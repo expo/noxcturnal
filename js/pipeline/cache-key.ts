@@ -1,11 +1,11 @@
 import { createHash } from 'node:crypto';
 
-import { classifyForTransform, parserFilename } from '../adapters/classification.js';
-import { parserAdapterCacheDescriptor } from '../adapters/registry.js';
-import type { DefinedVisitor, NativePipeline } from '../contracts/visitor.js';
-import { nativeFlowErasureBuilt } from '../native/binding.js';
-import type { TransformOptions } from '../types.js';
-import { compilePhasePlan } from './compile.js';
+import { classifyForTransform, parserFilename } from '../adapters/classification';
+import { parserAdapterCacheDescriptor } from '../adapters/registry';
+import type { DefinedVisitor, NativePipeline } from '../contracts/visitor';
+import { nativeFlowErasureBuilt } from '../native/binding';
+import type { TransformOptions } from '../types';
+import { compilePhasePlan } from './compile';
 
 export function pipelineCacheKey(
   pipeline: NativePipeline,

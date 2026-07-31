@@ -1,6 +1,6 @@
-import { CHILD_ROLES } from '../generated/event-schema.js';
-import { maxEditEffect } from './compile.js';
-import { stableJson } from './cache-key.js';
+import { CHILD_ROLES } from '../generated/event-schema';
+import { maxEditEffect } from './compile';
+import { stableJson } from './cache-key';
 import {
   concreteRouteTypes,
   isCollapsedClassKey,
@@ -8,7 +8,7 @@ import {
   validatePredicates,
   validateRouteSpec,
   type PredicateRequirements,
-} from './validate.js';
+} from './validate';
 import type {
   CompiledNestedRoutes,
   CompiledPhaseRoutes,
@@ -18,8 +18,8 @@ import type {
   PreparedPluginPlan,
   ResolvedVisitor,
   RouteCapabilities,
-} from './types.js';
-import { packRouteManifest, type NativeRouteManifestEntry } from '../protocol/manifest.js';
+} from './types';
+import { packRouteManifest, type NativeRouteManifestEntry } from '../protocol/manifest';
 import type {
   ChildContract,
   DefinedVisitor,
@@ -28,7 +28,7 @@ import type {
   PipelinePhase,
   StoredVisitorContract,
   VisitorRouteSpec,
-} from '../contracts/visitor.js';
+} from '../contracts/visitor';
 import type {
   ControlFlowCapability,
   NativeFieldKey,
@@ -36,7 +36,7 @@ import type {
   QueryRequest,
   ScalarPredicate,
   ScalarValue,
-} from '../types.js';
+} from '../types';
 
 const validatedVisitors = new WeakSet<DefinedVisitor<any>>();
 
@@ -493,7 +493,6 @@ export function preparePhase(phase: PipelinePhase): PreparedPhase {
       retentionCapabilities |= RETAIN_INSPECTION;
   }
   const routed = compilePhaseRoutes(
-    phase,
     activePlugins,
     plans,
     includeParent,
@@ -550,7 +549,6 @@ export function preparePhase(phase: PipelinePhase): PreparedPhase {
 }
 
 function compilePhaseRoutes(
-  phase: PipelinePhase,
   plugins: readonly NativePlugin<any, any>[],
   plans: ReadonlyMap<NativePlugin<any, any>, PreparedPluginPlan>,
   includeParent: boolean,

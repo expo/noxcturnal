@@ -3,8 +3,8 @@ import {
   closeArtifactDemand,
   planArtifacts,
   type ArtifactPlan,
-} from '../pipeline/artifacts.js';
-import type { EditCommand, FunctionMap } from '../types.js';
+} from '../pipeline/artifacts';
+import type { EditCommand, FunctionMap } from '../types';
 
 export type SourceVersionId = number & { readonly __sourceVersionId: unique symbol };
 

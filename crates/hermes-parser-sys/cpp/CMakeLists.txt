@@ -11,7 +11,7 @@
 cmake_minimum_required(VERSION 3.21)
 project(hermes_flow_shim LANGUAGES C CXX)
 
-set(HERMES_SOURCE_DIR "" CACHE PATH "Hermes checkout at the pinned release tag")
+set(HERMES_SOURCE_DIR "" CACHE PATH "Hermes source checkout")
 if(NOT HERMES_SOURCE_DIR)
   message(FATAL_ERROR "HERMES_SOURCE_DIR must be set")
 endif()

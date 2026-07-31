@@ -1,4 +1,4 @@
-import type { PreflightTransforms } from './types.js';
+import type { PreflightTransforms } from './types';
 
 /** Runtime schema for validating the public per-transform configuration. */
 export const NATIVE_TRANSFORM_NAMES = [

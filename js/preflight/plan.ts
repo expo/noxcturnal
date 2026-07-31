@@ -1,1 +1,1 @@
-export type { PreflightPlan } from './types.js';
+export type { PreflightPlan } from './types';

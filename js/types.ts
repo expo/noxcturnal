@@ -4,10 +4,10 @@ import type {
   NativeNodeType,
   NativeRouteFields,
   NativeRouteTypes,
-} from './generated/event-schema.js';
-import type { PreflightPlan } from './preflight/types.js';
+} from './generated/event-schema';
+import type { PreflightPlan } from './preflight/types';
 
-export type { NativeFieldKey, NativeNodeType } from './generated/event-schema.js';
+export type { NativeFieldKey, NativeNodeType } from './generated/event-schema';
 /** Alias route names, derived from the generated expansion table. */
 export type NativeVisitorAlias = Extract<keyof NativeRouteTypes, string>;
 export type NativeVisitorRoute = NativeNodeType | NativeVisitorAlias;

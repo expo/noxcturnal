@@ -3,8 +3,8 @@ import type {
   Handler,
   NativePlugin,
   StoredVisitorContract,
-} from '../contracts/visitor.js';
-import type { NativeRouteManifestEntry } from '../protocol/manifest.js';
+} from '../contracts/visitor';
+import type { NativeRouteManifestEntry } from '../protocol/manifest';
 import type {
   ControlFlowCapability,
   EditEffect,
@@ -12,7 +12,7 @@ import type {
   NativeNodeType,
   QueryRequest,
   ScalarPredicate,
-} from '../types.js';
+} from '../types';
 
 export interface RouteCapabilities {
   scope: boolean;

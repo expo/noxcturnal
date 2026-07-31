@@ -1,5 +1,5 @@
 {
-  "name": "noxcturnal-linux-arm64-gnu",
+  "name": "@noxcturnal/noxcturnal-linux-arm64-gnu",
   "version": "0.1.0",
   "description": "Native-backed JavaScript transform runtime with visitor ergonomics",
   "license": "MIT",

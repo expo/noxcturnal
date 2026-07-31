@@ -1,5 +1,5 @@
 {
-  "name": "noxcturnal-darwin-arm64",
+  "name": "@noxcturnal/noxcturnal-darwin-arm64",
   "version": "0.1.0",
   "description": "Native-backed JavaScript transform runtime with visitor ergonomics",
   "license": "MIT",

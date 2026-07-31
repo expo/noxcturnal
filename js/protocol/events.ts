@@ -1,5 +1,5 @@
-import { FIELD_KEYS, NODE_TYPES } from '../generated/event-schema.js';
-import type { EventBatch, NativeEvent } from '../types.js';
+import { FIELD_KEYS, NODE_TYPES } from '../generated/event-schema';
+import type { EventBatch, NativeEvent } from '../types';
 import {
   DYNAMIC_TAG,
   EXIT_TAG,
@@ -13,7 +13,7 @@ import {
   TAG_INDEX,
   alignToWord,
   paddingFor,
-} from './constants.js';
+} from './constants';
 
 export interface PackedEventBatch {
   data: Buffer;

@@ -1,7 +1,7 @@
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 
-import type { FunctionMap, NativeVlqMap, ParseClassification } from '../types.js';
-import type { PreflightPlan } from '../preflight/types.js';
+import type { FunctionMap, NativeVlqMap, ParseClassification } from '../types';
+import type { PreflightPlan } from '../preflight/types';
 
 interface NativePreflightOptionsInput {
   reactCompiler?: boolean;
@@ -261,7 +261,8 @@ interface NativeBinding {
 }
 
 function loadBinding(): NativeBinding {
-  const root = join(__dirname, '../..');
+  // Source tests load this file from js/native; Rollup places it in dist/noxcturnal.js.
+  const root = join(__dirname, basename(__dirname) === 'native' ? '../..' : '..');
   const suffix = platformSuffix();
   // Probe by requiring rather than fs-checking: test environments routinely mock `fs`,
   // and module resolution is the authority on loadability anyway.
@@ -269,7 +270,7 @@ function loadBinding(): NativeBinding {
     return require(join(root, `noxcturnal.${suffix}.node`)) as NativeBinding;
   } catch (error) {
     if ((error as { code?: string }).code !== 'MODULE_NOT_FOUND') throw error;
-    return require(`noxcturnal-${suffix}`) as NativeBinding;
+    return require(`@noxcturnal/noxcturnal-${suffix}`) as NativeBinding;
   }
 }
 function platformSuffix(): string {

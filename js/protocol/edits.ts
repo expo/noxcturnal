@@ -1,6 +1,6 @@
-import { FIELD_KEY_IDS, NODE_TYPE_IDS } from '../generated/event-schema.js';
-import type { EditCommand } from '../types.js';
-import { MISSING_VALUE, PARTS_TAG, alignToWord } from './constants.js';
+import { FIELD_KEY_IDS, NODE_TYPE_IDS } from '../generated/event-schema';
+import type { EditCommand } from '../types';
+import { MISSING_VALUE, PARTS_TAG, alignToWord } from './constants';
 
 const EDIT_KINDS: Record<EditCommand['kind'], number> = {
   Replace: 0,

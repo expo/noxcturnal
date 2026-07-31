@@ -7,16 +7,16 @@ import type {
   NativePluginDefinition,
   PipelinePhase,
   PluginContract,
-} from '../contracts/visitor.js';
-import type { PredicateParameter, ScalarPredicate, ScalarValue } from '../types.js';
-import { stableJson } from './cache-key.js';
-import { preparePhase } from './routes.js';
-import type { PreflightPlan } from '../preflight/types.js';
+} from '../contracts/visitor';
+import type { PredicateParameter, ScalarPredicate, ScalarValue } from '../types';
+import { stableJson } from './cache-key';
+import { preparePhase } from './routes';
+import type { PreflightPlan } from '../preflight/types';
 import {
   NATIVE_TRANSFORM_NAMES,
   NATIVE_TRANSFORM_OPTION_NAMES,
   NATIVE_TRANSFORM_OPTION_KEYS,
-} from '../preflight/schema.js';
+} from '../preflight/schema';
 
 const NATIVE_TRANSFORMS = new Set<string>(NATIVE_TRANSFORM_NAMES);
 const NATIVE_TRANSFORM_OPTIONS = new Set<string>(NATIVE_TRANSFORM_OPTION_NAMES);

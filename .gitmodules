@@ -1,0 +1,3 @@
+[submodule "hermes"]
+	path = crates/hermes-parser-sys/hermes
+	url = https://github.com/facebook/hermes.git

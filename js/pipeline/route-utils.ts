@@ -1,5 +1,5 @@
-import { ALIAS_EXPANSIONS } from '../generated/event-schema.js';
-import type { QueryRequest } from '../types.js';
+import { ALIAS_EXPANSIONS } from '../generated/event-schema';
+import type { QueryRequest } from '../types';
 
 const ALIAS_SETS = new Map<string, ReadonlySet<string>>(
   Object.entries(ALIAS_EXPANSIONS).map(([key, expansion]) => [key, new Set(expansion)]),

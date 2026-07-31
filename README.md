@@ -10,10 +10,8 @@ It is not a Metro transformer and does not expose dependency collection, module 
 nix develop
 pnpm install
 pnpm build
-pnpm verify
+pnpm check
 pnpm benchmark
-pnpm rust:format
-pnpm rust:lint
 ```
 
 Rust tooling is available through the Nix development shell and all native dependencies are pinned
@@ -21,9 +19,9 @@ in `Cargo.lock`. Package scripts invoke Cargo directly, so activate `nix develop
 equivalent Rust toolchain before running them.
 
 Installing dependencies prepares a repository-local pre-commit hook that runs lint-staged with
-Oxfmt. Run `pnpm format` to format the repository manually. User-visible changes should include a
-`pnpm changeset`; the JavaScript package and all eight native platform packages are versioned as one
-fixed release group.
+Oxfmt. Run `pnpm format` to format the TypeScript and Rust sources, or `pnpm lint` to run Clippy
+independently. User-visible changes should include a `pnpm changeset`; the JavaScript package and all
+eight native platform packages are versioned as one fixed release group.
 
 ## Transform contract
 
