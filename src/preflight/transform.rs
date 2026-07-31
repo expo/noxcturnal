@@ -9,8 +9,8 @@ use oxc_ast::{
     ast::{
         AssignmentTargetPattern, CatchClause, Class, Decorator, Expression, ForOfStatement,
         FormalParameters, IdentifierReference, MethodDefinition, PrivateInExpression, Program,
-        PropertyDefinition, PropertyKey, RegExpFlags, RegExpLiteral, StaticMemberExpression,
-        StringLiteral, VariableDeclarator,
+        PropertyKey, RegExpFlags, RegExpLiteral, StaticMemberExpression, StringLiteral,
+        VariableDeclarator,
     },
 };
 use oxc_ast_visit::{Visit, VisitMut, walk, walk_mut};
@@ -868,10 +868,14 @@ pub fn transform(
         }
         if options.private_methods == Some(true) || options.private_property_in_object == Some(true)
         {
-            let mut detector = ClassFeaturesUnsupportedDetector(false);
+            let mut detector = ClassFeaturesUnsupportedDetector {
+                check_private_methods: options.private_methods == Some(true),
+                check_private_in: options.private_property_in_object == Some(true),
+                ..ClassFeaturesUnsupportedDetector::default()
+            };
             detector.visit_program(&program);
             ast_traversal_count += 1;
-            if detector.0 {
+            if detector.has_unsupported_syntax() {
                 return Ok(unsupported(
                     "class-features-postcondition-failed",
                     [] as [String; 0],
@@ -1798,23 +1802,31 @@ impl<'a> Visit<'a> for PostconditionDetector {
     }
 }
 
-struct ClassFeaturesUnsupportedDetector(bool);
+#[derive(Default)]
+struct ClassFeaturesUnsupportedDetector {
+    private_methods: bool,
+    private_in: bool,
+    check_private_methods: bool,
+    check_private_in: bool,
+}
+
+impl ClassFeaturesUnsupportedDetector {
+    fn has_unsupported_syntax(&self) -> bool {
+        (self.check_private_methods && self.private_methods)
+            || (self.check_private_in && self.private_in)
+    }
+}
 
 impl<'a> Visit<'a> for ClassFeaturesUnsupportedDetector {
-    fn visit_property_definition(&mut self, property: &PropertyDefinition<'a>) {
-        self.0 |= matches!(property.key, PropertyKey::PrivateIdentifier(_));
-        walk::walk_property_definition(self, property);
-    }
-
     fn visit_method_definition(&mut self, method: &MethodDefinition<'a>) {
         if matches!(method.key, PropertyKey::PrivateIdentifier(_)) {
-            self.0 = true;
+            self.private_methods = true;
         }
         walk::walk_method_definition(self, method);
     }
 
     fn visit_private_in_expression(&mut self, expression: &PrivateInExpression<'a>) {
-        self.0 = true;
+        self.private_in = true;
         walk::walk_private_in_expression(self, expression);
     }
 }
