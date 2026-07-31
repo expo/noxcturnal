@@ -2767,10 +2767,9 @@ test('059 JS Private Methods > edge cases > private method with symbol property 
     }
     () => {
       const sym = Symbol('test');
-      var Foo = (() => {
+      var Foo = (_key => {
         'use strict';
         var _bar = '__private_Foo_bar';
-        var _key = sym;
         function Foo() {
           if (!(this instanceof Foo)) throw new TypeError('Cannot call a class as a function');
           this[_key] = 'symbol-val';
@@ -2788,7 +2787,7 @@ test('059 JS Private Methods > edge cases > private method with symbol property 
           configurable: true,
         });
         return Foo;
-      })();
+      })(sym);
       expect(new Foo().test()).toBe('symbol-val');
     };"
   `);
@@ -2814,7 +2813,7 @@ test('060 JS Private Methods > edge cases > private method with computed public 
     }
     () => {
       const key = 'myMethod';
-      var Foo = (() => {
+      var Foo = (_key => {
         'use strict';
         var _priv = '__private_Foo_priv';
         function Foo() {
@@ -2825,7 +2824,7 @@ test('060 JS Private Methods > edge cases > private method with computed public 
             },
           });
         }
-        Object.defineProperty(Foo.prototype, key, {
+        Object.defineProperty(Foo.prototype, _key, {
           value: function () {
             return _classPrivateMethodCall(this, _priv, []);
           },
@@ -2833,7 +2832,7 @@ test('060 JS Private Methods > edge cases > private method with computed public 
           configurable: true,
         });
         return Foo;
-      })();
+      })(key);
       expect(new Foo().myMethod()).toBe('private');
     };"
   `);
