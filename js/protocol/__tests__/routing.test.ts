@@ -3,6 +3,7 @@ import { test } from 'vitest';
 
 import { defineNativePipeline, defineNativePlugin, defineVisitor, transform } from '../../index';
 import { native } from '../../native/binding';
+import { packFieldRequests } from '../../protocol/edits';
 import { decodeRoutedEnvelope } from '../../protocol/events';
 import { packRouteManifest } from '../../protocol/manifest';
 import { NativeTransformSession } from '../../runtime/session';
@@ -19,6 +20,19 @@ const openRetained = (
     options,
     packRouteManifest([], false, false, ALL_RETAINED_CAPABILITIES),
   );
+
+test('packs only known field requests into the native request format', () => {
+  assert.equal(packFieldRequests(), undefined);
+  const packed = packFieldRequests({
+    Identifier: ['name', 'unknown-field'],
+    UnknownNode: ['name'],
+  });
+  assert.ok(packed);
+  assert.equal(packed.length, 12);
+  assert.notEqual(packed.readUInt32LE(0), 0);
+  assert.equal(packed.readUInt32LE(4), 1);
+  assert.notEqual(packed.readUInt32LE(8), 0);
+});
 
 test('rejects malformed routed string tables before decoding records', () => {
   const invalidCount = Buffer.alloc(32);

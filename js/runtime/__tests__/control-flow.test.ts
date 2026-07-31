@@ -125,6 +125,37 @@ test('widens over only the remaining traversal and suppresses duplicates', () =>
   assert.deepEqual(seen, ['before', 'mark', 'after']);
 });
 
+test('supports path-scoped and lexical-scope dynamic subscriptions', () => {
+  const calls: string[] = [];
+  const identifiers: string[] = [];
+  const plugin = defineNativePlugin({
+    name: 'path-widen',
+    visitors: [
+      defineVisitor(
+        'CallExpression',
+        { fields: ['calleeName'], controlFlow: ['dynamic-subscriptions'] },
+        path => {
+          calls.push(String(path.node.calleeName));
+          if (path.node.calleeName === 'within') path.subscribeWithin('Identifier');
+          if (path.node.calleeName === 'scope') path.subscribeForScope('Identifier');
+        },
+      ),
+      defineVisitor(
+        'Identifier',
+        { fields: ['name'], controlFlow: ['dynamic-subscriptions'] },
+        path => identifiers.push(String(path.node.name)),
+      ),
+    ],
+  });
+  transform(
+    'within(inner); function run() { scope(); after; }',
+    'fixture.js',
+    defineNativePipeline({ phases: [{ name: 'visit', plugins: [plugin] }] }),
+  );
+  assert.deepEqual(calls, ['within', 'scope']);
+  assert.deepEqual(identifiers, ['within', 'inner', 'run', 'scope', 'after']);
+});
+
 test('implements per-plugin skip and stop', () => {
   const skipped: string[] = [];
   const stopped: string[] = [];
@@ -452,6 +483,29 @@ test('resolves the nearest binding and renames only its semantic references', ()
     result.code,
     'let renamed = 1; use(renamed); const object = { value: renamed }; ({ value: renamed } = object); function nested(value) { return value }',
   );
+});
+
+test('resolves multiple bindings through one scope lookup', () => {
+  let observed: unknown;
+  const plugin = defineNativePlugin({
+    name: 'binding-batch',
+    visitors: [
+      defineVisitor('Program', { scope: true }, path => {
+        observed = path.scope
+          .getBindings(['first', 'second', 'missing'])
+          .map(binding => [binding.name, binding.references.length]);
+      }),
+    ],
+  });
+  transform(
+    'const first = 1, second = first; use(second);',
+    'fixture.js',
+    defineNativePipeline({ phases: [{ name: 'bindings', plugins: [plugin] }] }),
+  );
+  assert.deepEqual(observed, [
+    ['first', 1],
+    ['second', 1],
+  ]);
 });
 
 test('exposes lazy Babel-shaped binding paths and scope parent chains', () => {

@@ -117,24 +117,4 @@ export class SourceVersionStore {
     version.functionMap = functionMap;
     version.availableArtifacts |= ArtifactDemand.FunctionMap;
   }
-
-  snapshot(): readonly {
-    id: SourceVersionId;
-    parentId: SourceVersionId | null;
-    normalizedEditCount: number;
-    codeChanged: boolean;
-    mapChanged: boolean;
-    availableArtifacts: ArtifactDemand;
-    hasRenderedText: boolean;
-  }[] {
-    return this.#versions.map(version => ({
-      id: version.id,
-      parentId: version.parentId,
-      normalizedEditCount: version.normalizedEditCount,
-      codeChanged: version.codeChanged,
-      mapChanged: version.mapChanged,
-      availableArtifacts: version.availableArtifacts,
-      hasRenderedText: version.renderedText != null,
-    }));
-  }
 }

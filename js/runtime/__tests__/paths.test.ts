@@ -105,6 +105,71 @@ test('provides parent paths backed by native indexed records', () => {
   assert.equal(parentType, 'VariableDeclarator');
 });
 
+test('provides source locations, parent summaries, and self-inclusive ancestry search', () => {
+  let observed: unknown;
+  const plugin = defineNativePlugin({
+    name: 'path-observation',
+    visitors: [
+      defineVisitor('NumericLiteral', { ancestry: { mode: 'programParent' } }, path => {
+        observed = {
+          location: path.getLocation(),
+          parentType: path.parent?.type,
+          self: path.find(candidate => candidate.id === path.id) === path,
+        };
+      }),
+    ],
+  });
+  transform(
+    'const value =\n  1;',
+    'fixture.js',
+    defineNativePipeline({ phases: [{ name: 'observe', plugins: [plugin] }] }),
+  );
+  assert.deepEqual(observed, {
+    location: { start: { line: 2, column: 2 }, end: { line: 2, column: 3 } },
+    parentType: 'VariableDeclarator',
+    self: true,
+  });
+});
+
+test('supports wildcard child access through getChildren', () => {
+  let childTypes: string[] = [];
+  const plugin = defineNativePlugin({
+    name: 'all-children',
+    visitors: [
+      defineVisitor('Program', { children: { '*': { route: '*' } } }, path => {
+        childTypes = path.getChildren().map(child => child.node.type);
+      }),
+    ],
+  });
+  transform(
+    'const value = 1; use(value);',
+    'fixture.js',
+    defineNativePipeline({ phases: [{ name: 'children', plugins: [plugin] }] }),
+  );
+  assert.deepEqual(childTypes, ['VariableDeclaration', 'ExpressionStatement']);
+});
+
+test('supports path mutation aliases, insertion, and comments', () => {
+  const plugin = defineNativePlugin({
+    name: 'path-mutations',
+    visitors: [
+      defineVisitor('NumericLiteral', { fields: ['value'] }, path => {
+        if (path.node.value === 1) path.update('2');
+        else if (path.node.value === 3) path.overwrite('4');
+        else if (path.node.value === 5) path.insertBefore('/* before */');
+        else if (path.node.value === 6) path.addComment('trailing', ' after ');
+      }),
+    ],
+  });
+  const result = transform(
+    '[1, 3, 5, 6];',
+    'fixture.js',
+    defineNativePipeline({ phases: [{ name: 'mutate', plugins: [plugin] }] }),
+  );
+  assert.equal(result.status, 'complete');
+  assert.equal(result.code, '[2, 4, /* before */5, 6/* after */];');
+});
+
 test('provides lazy ancestor helpers without recursive node materialization', () => {
   let ancestors: unknown;
   const plugin = defineNativePlugin({

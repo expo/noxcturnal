@@ -29,10 +29,6 @@ export class TransformUidAllocator {
   #prefix: string | undefined;
   #uids = new Set<string>();
 
-  get initialized(): boolean {
-    return this.#prefix !== undefined;
-  }
-
   initialize(prefix: string | null): void {
     if (this.#prefix === undefined) this.#prefix = prefix ?? '_';
   }
