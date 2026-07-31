@@ -81,3 +81,50 @@ export const retained = 1;
     export const retained = 1;"
   `);
 });
+
+test('retains a default-exported function declaration', async () => {
+  const source = `export default function entry() { return 1; }`;
+  expect(await transformSource(source, 'input.js', options)).toMatchInlineSnapshot(`
+    "export default function entry() {
+      return 1;
+    }"
+  `);
+});
+
+test('retains functions referenced from top-level expressions', async () => {
+  const source = `
+function invoked() { return 1; }
+consume(invoked);
+`;
+  expect(await transformSource(source, 'input.js', options)).toMatchInlineSnapshot(`
+    "function invoked() {
+      return 1;
+    }
+    consume(invoked);"
+  `);
+});
+
+test('removes only function-valued bindings from mixed declarator lists', async () => {
+  const source = `
+const unused = () => 1, retained = sideEffect(), value = 2;
+export { value };
+`;
+  expect(await transformSource(source, 'input.js', options)).toMatchInlineSnapshot(`
+    "const retained = sideEffect(),
+      value = 2;
+    export { value };"
+  `);
+});
+
+test('removes unreferenced nested function declarations with their dead owner', async () => {
+  const source = `
+function outer() {
+  function inner() { return 1; }
+  return inner();
+}
+export const value = 1;
+`;
+  expect(await transformSource(source, 'input.js', options)).toMatchInlineSnapshot(
+    `"export const value = 1;"`,
+  );
+});

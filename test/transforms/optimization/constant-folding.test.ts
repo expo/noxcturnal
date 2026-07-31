@@ -84,3 +84,75 @@ if (value) branch();
     if (value) branch();"
   `);
 });
+
+test('folds every supported numeric binary operator', async () => {
+  const source = `
+export const remainder = 7 % 4;
+export const exponent = 2 ** 5;
+export const lessEqual = 2 <= 2;
+export const greater = 3 > 2;
+export const greaterEqual = 3 >= 3;
+export const shiftLeft = 3 << 2;
+export const shiftRight = -8 >> 2;
+export const shiftRightUnsigned = -1 >>> 30;
+export const xor = 6 ^ 3;
+`;
+  expect(await transformSource(source, 'input.js', options)).toMatchInlineSnapshot(`
+    "export const remainder = 3;
+    export const exponent = 32;
+    export const lessEqual = true;
+    export const greater = true;
+    export const greaterEqual = true;
+    export const shiftLeft = 12;
+    export const shiftRight = -2;
+    export const shiftRightUnsigned = 0;
+    export const xor = 5;"
+  `);
+});
+
+test('folds string concatenation and ECMAScript constant coercions', async () => {
+  const source = `
+export const concatenated = 'value: ' + 2;
+export const nullString = '' + null;
+export const booleanString = true + ' value';
+export const looseNumber = '2' == 2;
+export const looseBoolean = false == 0;
+export const looseNull = null == 0;
+export const strictDifferentKinds = '2' === 2;
+export const notEqual = 1 != '2';
+export const strictlyNotEqual = 1 !== 2;
+export const lexical = 'alpha' < 'beta';
+`;
+  expect(await transformSource(source, 'input.js', options)).toMatchInlineSnapshot(`
+    "export const concatenated = 'value: 2';
+    export const nullString = 'null';
+    export const booleanString = 'true value';
+    export const looseNumber = true;
+    export const looseBoolean = true;
+    export const looseNull = false;
+    export const strictDifferentKinds = false;
+    export const notEqual = true;
+    export const strictlyNotEqual = true;
+    export const lexical = true;"
+  `);
+});
+
+test('folds parenthesized and side-effect-free sequence expressions', async () => {
+  const source = `
+export const grouped = ((1 + 2) * (3 + 1));
+export const sequence = (1, 2, 3 + 4);
+export const nested = (false || (2 + 3)) ? 'yes' : 'no';
+`;
+  expect(await transformSource(source, 'input.js', options)).toMatchInlineSnapshot(`
+    "export const grouped = 12;
+    export const sequence = (1, 2, 7);
+    export const nested = 'yes';"
+  `);
+});
+
+test('retains sequences when any preceding expression cannot be evaluated safely', async () => {
+  const source = `export const value = (sideEffect(), 1 + 2);`;
+  expect(await transformSource(source, 'input.js', options)).toMatchInlineSnapshot(
+    `"export const value = (sideEffect(), 3);"`,
+  );
+});
