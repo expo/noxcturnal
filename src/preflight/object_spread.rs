@@ -6,23 +6,77 @@ use oxc_ast::{
 use oxc_ast_visit::{VisitMut, walk_mut};
 use oxc_span::{GetSpan, Span};
 
+use crate::preflight::helpers::CustomHelperRequests;
+
+pub(super) struct Options {
+    pub(super) use_built_ins: bool,
+    pub(super) inline_helpers: bool,
+}
+
 /// Lower object-expression spreads directly on the shared preflight AST.
 ///
 /// Moved expressions and property groups retain their source spans. Synthetic
 /// `Object.assign` syntax is anchored to the enclosing object expression,
 /// matching the nearest-origin policy of the former boundary-mapped text edit.
-pub(super) fn run<'a>(allocator: &'a Allocator, program: &mut Program<'a>) -> bool {
+pub(super) fn run<'a>(
+    allocator: &'a Allocator,
+    program: &mut Program<'a>,
+    options: Options,
+) -> (bool, CustomHelperRequests) {
+    let helper_name = if options.use_built_ins {
+        None
+    } else {
+        Some(reserve_helper_name(program, "_extends"))
+    };
+    let helper_binding = helper_name
+        .as_ref()
+        .map(|name| allocator.alloc_str(name.as_str()));
     let mut pass = ObjectSpreadLowerer {
         ast: AstBuilder::new(allocator),
         changed: false,
+        helper_name: helper_binding,
     };
     pass.visit_program(program);
-    pass.changed
+    let mut requests = CustomHelperRequests::default();
+    if pass.changed
+        && let Some(helper_name) = helper_name
+    {
+        requests.request("extends");
+        requests.reserve_scope_names([helper_name.clone()]);
+        if options.inline_helpers {
+            requests.push_fragment(
+                format!("function {helper_name}(){{return {helper_name}=Object.assign?Object.assign.bind():function(target){{for(var i=1;i<arguments.length;i++){{var source=arguments[i];for(var key in source)if(Object.prototype.hasOwnProperty.call(source,key))target[key]=source[key]}}return target}},{helper_name}.apply(null,arguments)}}\n"),
+                format!("function {helper_name}() {{\n  return ({helper_name} = Object.assign\n    ? Object.assign.bind()\n    : function (target) {{\n        for (var i = 1; i < arguments.length; i++) {{\n          var source = arguments[i];\n          for (var key in source)\n            if (Object.prototype.hasOwnProperty.call(source, key)) target[key] = source[key];\n        }}\n        return target;\n      }}), {helper_name}.apply(null, arguments);\n}}\n"),
+            );
+        } else {
+            let fragment =
+                format!("var {helper_name}=require('@babel/runtime/helpers/extends');\n");
+            let pretty =
+                format!("var {helper_name} = require('@babel/runtime/helpers/extends');\n");
+            requests.push_fragment(fragment, pretty);
+        }
+    }
+    (pass.changed, requests)
+}
+
+fn reserve_helper_name(program: &Program<'_>, base: &str) -> String {
+    let source = &program.source_text;
+    if !source.contains(base) {
+        return base.to_string();
+    }
+    for suffix in 2.. {
+        let candidate = format!("{base}{suffix}");
+        if !source.contains(&candidate) {
+            return candidate;
+        }
+    }
+    unreachable!()
 }
 
 struct ObjectSpreadLowerer<'a> {
     ast: AstBuilder<'a>,
     changed: bool,
+    helper_name: Option<&'a str>,
 }
 
 impl<'a> ObjectSpreadLowerer<'a> {
@@ -95,17 +149,24 @@ impl<'a> VisitMut<'a> for ObjectSpreadLowerer<'a> {
         self.flush_properties(&mut grouped, &mut arguments, object_span);
 
         #[expect(deprecated)]
-        let callee = self.ast.member_expression_static(
-            object_span,
-            self.ast.expression_identifier(object_span, "Object"),
-            self.ast.identifier_name(object_span, "assign"),
-            false,
-        );
+        let callee = if let Some(helper_name) = self.helper_name {
+            self.ast
+                .expression_identifier(object_span, self.ast.allocator.alloc_str(helper_name))
+        } else {
+            self.ast
+                .member_expression_static(
+                    object_span,
+                    self.ast.expression_identifier(object_span, "Object"),
+                    self.ast.identifier_name(object_span, "assign"),
+                    false,
+                )
+                .into()
+        };
         #[expect(deprecated)]
         {
             *expression = self.ast.expression_call(
                 object_span,
-                callee.into(),
+                callee,
                 None::<ArenaBox<'a, TSTypeParameterInstantiation<'a>>>,
                 arguments,
                 false,

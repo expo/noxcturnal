@@ -115,9 +115,10 @@ pub fn transform(
     }
     let mut transform_options = compile_options(&options)?;
     let mut rewrite_layers = Vec::new();
-    let loose_object_rest = options.object_rest_spread == Some(true)
-        && options.object_rest_spread_loose == Some(true)
-        && options.object_rest_spread_use_built_ins == Some(true);
+    let focused_object_rest = options.object_rest_spread == Some(true)
+        && (options.object_rest_spread_loose == Some(true)
+            || options.object_rest_spread_use_built_ins == Some(true));
+    let object_rest_loose = options.object_rest_spread_loose == Some(true);
     let focused_private_features =
         options.private_methods == Some(true) || options.private_property_in_object == Some(true);
     let class_rewrite_selected = options.classes == Some(true) || focused_private_features;
@@ -133,7 +134,7 @@ pub fn transform(
         || options.parameters == Some(true)
         || options.for_of == Some(true)
         || options.destructuring == Some(true)
-        || loose_object_rest
+        || focused_object_rest
         || regexp_rewrite_selected;
     // Language prepass.
     //
@@ -265,12 +266,23 @@ pub fn transform(
         ));
     }
     final_program.with_program_mut(|source, allocator, mut program| {
-        let had_object_spread_syntax =
-            loose_object_rest && object_spread::run(allocator, &mut program);
-        if loose_object_rest {
+        let (had_object_spread_syntax, object_spread_helper_requests) = if focused_object_rest {
+            object_spread::run(
+                allocator,
+                &mut program,
+                object_spread::Options {
+                    use_built_ins: options.object_rest_spread_use_built_ins == Some(true),
+                    inline_helpers: options.helpers_mode.as_deref() == Some("inline"),
+                },
+            )
+        } else {
+            (false, super::helpers::CustomHelperRequests::default())
+        };
+        if focused_object_rest {
             ast_traversal_count += 1;
         }
-        let (had_regexp_syntax, structural_custom_helper_requests) = if regexp_rewrite_selected {
+        let (had_regexp_syntax, mut structural_custom_helper_requests) = if regexp_rewrite_selected
+        {
             ast_traversal_count += 1;
             match super::regexp::run(
                 allocator,
@@ -290,6 +302,7 @@ pub fn transform(
         } else {
             (false, super::helpers::CustomHelperRequests::default())
         };
+        structural_custom_helper_requests.prepend(object_spread_helper_requests);
         if conditional_jsx {
             let mut detector = JsxDetector(false);
             detector.visit_program(&program);
@@ -343,7 +356,7 @@ pub fn transform(
                     options.block_scoping == Some(true)
                         || options.parameters == Some(true)
                         || options.destructuring == Some(true)
-                        || loose_object_rest
+                        || focused_object_rest
                         || classes_ast_selected,
                 )
                 .with_excess_capacity(2.0)
@@ -498,7 +511,7 @@ pub fn transform(
             && options.parameters != Some(true)
             && options.for_of != Some(true)
             && options.destructuring != Some(true)
-            && !loose_object_rest
+            && !focused_object_rest
         {
             match block_scoping::prepare_with_reserved(
                 &semantic.semantic,
@@ -521,7 +534,7 @@ pub fn transform(
             None
         };
         let early_destructuring_ast_plan = if (options.destructuring == Some(true)
-            || loose_object_rest)
+            || focused_object_rest)
             && options.parameters != Some(true)
             && options.for_of != Some(true)
         {
@@ -530,7 +543,7 @@ pub fn transform(
                 &semantic.semantic,
                 options.helpers_mode.as_deref() == Some("inline"),
                 options.destructuring != Some(true),
-                loose_object_rest,
+                object_rest_loose,
                 false,
                 &[],
             ) {
@@ -602,7 +615,7 @@ pub fn transform(
         }
         let mut destructuring_ast_plan = if early_destructuring_ast_plan.is_some() {
             early_destructuring_ast_plan
-        } else if options.destructuring == Some(true) || loose_object_rest {
+        } else if options.destructuring == Some(true) || focused_object_rest {
             semantic_build_count += 1;
             ast_traversal_count += 1;
             let mut semantic = run(|| {
@@ -627,7 +640,7 @@ pub fn transform(
                 &semantic.semantic,
                 options.helpers_mode.as_deref() == Some("inline"),
                 options.destructuring != Some(true),
-                loose_object_rest,
+                object_rest_loose,
                 false,
                 &[],
             ) {
@@ -686,7 +699,7 @@ pub fn transform(
                 &semantic.semantic,
                 options.helpers_mode.as_deref() == Some("inline"),
                 options.destructuring != Some(true),
-                loose_object_rest,
+                object_rest_loose,
                 false,
                 &destructuring_helper_names,
             ) {
@@ -915,7 +928,7 @@ pub fn transform(
             || (options.class_static_block == Some(true) && options.classes != Some(true))
             || (options.object_rest_spread == Some(true)
                 && !(options.object_rest_spread_loose == Some(true)
-                    && options.object_rest_spread_use_built_ins == Some(true)))
+                    || options.object_rest_spread_use_built_ins == Some(true)))
             || (options.class_properties == Some(true) && options.classes != Some(true))
             || (options.private_methods == Some(true) && options.classes != Some(true))
             || (options.private_property_in_object == Some(true) && options.classes != Some(true));
@@ -1449,17 +1462,14 @@ fn compile_options(options: &NativePreflightOptions) -> Result<TransformOptions>
     compiled.env.es2017.async_to_generator = options.async_functions == Some(true);
     compiled.env.es2016.exponentiation_operator = options.exponentiation_operator == Some(true);
     if options.object_rest_spread == Some(true) {
-        compiled.env.es2018.object_rest_spread = Some(Default::default());
-        let object_rest_spread = compiled.env.es2018.object_rest_spread.as_mut().unwrap();
-        let focused_loose_built_in = options.object_rest_spread_loose == Some(true)
-            && options.object_rest_spread_use_built_ins == Some(true);
-        // The focused pass consumes source-level loose+built-in syntax first.
-        // Keep Oxc's spec mode enabled for object spreads introduced later by
-        // JSX and other transforms, exactly as the legacy prepass did.
-        object_rest_spread.loose =
-            options.object_rest_spread_loose.unwrap_or(false) && !focused_loose_built_in;
-        object_rest_spread.use_built_ins =
-            options.object_rest_spread_use_built_ins.unwrap_or(false) && !focused_loose_built_in;
+        let focused_object_rest = options.object_rest_spread_loose == Some(true)
+            || options.object_rest_spread_use_built_ins == Some(true);
+        // Oxc rejects either option before traversal. The focused AST passes
+        // own every non-default combination, so do not instantiate Oxc's pass
+        // after they have consumed the syntax.
+        if !focused_object_rest {
+            compiled.env.es2018.object_rest_spread = Some(Default::default());
+        }
     }
     let mut selected_class_feature_loose = None;
     for (enabled, loose) in [

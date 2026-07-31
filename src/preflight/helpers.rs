@@ -224,6 +224,7 @@ pub fn validate_custom_runtime_helpers(
         let minimum = match *helper {
             "classPrivateFieldLooseBase" => (7, 10, 0),
             "construct"
+            | "extends"
             | "get"
             | "objectDestructuringEmpty"
             | "objectWithoutProperties"
