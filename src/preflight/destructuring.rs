@@ -161,15 +161,15 @@ pub(super) fn prepare_ast(
         .collect();
     base_reserved.extend(previous_helper_names.iter().cloned());
     let mut reserved = PlanningReservations::new(base_reserved);
-    let helper_names = HelperNames {
+    let mut helper_names = HelperNames {
         iter: reserve("_toArray", &mut reserved),
         iter_runtime: reserve("_toArray2", &mut reserved),
         object: reserve("_objectDestructuringEmpty", &mut reserved),
         object_runtime: reserve("_objectDestructuringEmpty2", &mut reserved),
         rest: reserve("_objectWithoutProperties", &mut reserved),
         rest_runtime: reserve("_objectWithoutProperties2", &mut reserved),
-        property_key: reserve("_toPropertyKey", &mut reserved),
-        property_key_runtime: reserve("_toPropertyKey2", &mut reserved),
+        property_key: String::new(),
+        property_key_runtime: String::new(),
     };
     let mut declarations: FxHashMap<u32, Vec<AstDeclaratorPlan>> = FxHashMap::default();
     let mut catches = FxHashMap::default();
@@ -348,6 +348,10 @@ pub(super) fn prepare_ast(
             _ => {}
         }
     }
+    if helper_usage.property_key {
+        helper_names.property_key = reserve("_toPropertyKey", &mut reserved);
+        helper_names.property_key_runtime = reserve("_toPropertyKey2", &mut reserved);
+    }
     let mut helper_fragment = String::new();
     let mut pretty_helper_fragment = String::new();
     let mut helper_requests = CustomHelperRequests::default();
@@ -461,11 +465,11 @@ pub(super) fn prepare_ast(
             let (property_key, property_key_pretty) = if inline_helpers {
                 (
                     format!(
-                        "function {}(t){{var e=typeof t;return(e===\"object\"&&t!==null||e===\"function\")&&(e=t[Symbol.toPrimitive])!==void 0?(t=e.call(t,\"string\"),typeof t===\"object\"?(()=>{{throw new TypeError(\"@@toPrimitive must return a primitive value.\")}})():typeof t===\"symbol\"?t:t+\"\"):typeof t===\"symbol\"?t:String(t)}}",
+                        "function {}(t){{var e=typeof t;return(e===\"object\"&&t!==null||e===\"function\")&&(e=t[Symbol.toPrimitive])!==void 0?(t=e.call(t,\"string\"),(typeof t===\"object\"&&t!==null||typeof t===\"function\")?(()=>{{throw new TypeError(\"@@toPrimitive must return a primitive value.\")}})():typeof t===\"symbol\"?t:t+\"\"):typeof t===\"symbol\"?t:String(t)}}",
                         helper_names.property_key,
                     ),
                     format!(
-                        "function {}(value) {{\n  const type = typeof value;\n  if ((type === 'object' && value !== null) || type === 'function') {{\n    const exotic = value[Symbol.toPrimitive];\n    if (exotic !== void 0) {{\n      value = exotic.call(value, 'string');\n      if (typeof value === 'object') throw new TypeError('@@toPrimitive must return a primitive value.');\n      return typeof value === 'symbol' ? value : value + '';\n    }}\n  }}\n  return typeof value === 'symbol' ? value : String(value);\n}}\n",
+                        "function {}(value) {{\n  const type = typeof value;\n  if ((type === 'object' && value !== null) || type === 'function') {{\n    const exotic = value[Symbol.toPrimitive];\n    if (exotic !== void 0) {{\n      value = exotic.call(value, 'string');\n      if ((typeof value === 'object' && value !== null) || typeof value === 'function') {{\n        throw new TypeError('@@toPrimitive must return a primitive value.');\n      }}\n      return typeof value === 'symbol' ? value : value + '';\n    }}\n  }}\n  return typeof value === 'symbol' ? value : String(value);\n}}\n",
                         helper_names.property_key,
                     ),
                 )

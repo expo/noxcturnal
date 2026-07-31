@@ -2,14 +2,14 @@ use oxc_allocator::{Allocator, Box as ArenaBox, CloneIn, TakeIn, Vec as ArenaVec
 use oxc_ast::{
     AstBuilder, AstKind,
     ast::{
-        Argument, ArrayExpressionElement, ArrowFunctionExpression, BindingPattern, Directive,
-        Expression, FormalParameter, FormalParameterKind, FormalParameterRest, FormalParameters,
-        Function, FunctionBody, FunctionType, NumberBase, Program, Statement, TSThisParameter,
-        TSTypeAnnotation, TSTypeParameterDeclaration, TSTypeParameterInstantiation,
-        VariableDeclarationKind,
+        Argument, ArrayExpressionElement, ArrowFunctionExpression, BindingIdentifier,
+        BindingPattern, Class, Directive, Expression, FormalParameter, FormalParameterKind,
+        FormalParameterRest, FormalParameters, Function, FunctionBody, FunctionType, NumberBase,
+        Program, Statement, TSThisParameter, TSTypeAnnotation, TSTypeParameterDeclaration,
+        TSTypeParameterInstantiation, VariableDeclarationKind,
     },
 };
-use oxc_ast_visit::{VisitMut, walk_mut};
+use oxc_ast_visit::{Visit, VisitMut, walk_mut};
 #[cfg(test)]
 use oxc_parser::Parser;
 use oxc_semantic::{NodeId, Semantic};
@@ -38,6 +38,7 @@ struct AstFunctionPlan {
     boundary: usize,
     anchor: Span,
     wrapper: bool,
+    wrapper_arguments: Vec<String>,
     setter: bool,
     rest_names: Option<RestNames>,
 }
@@ -46,6 +47,7 @@ struct AstArrowPlan {
     anchor: Span,
     boundary: usize,
     wrapper: bool,
+    wrapper_arguments: Vec<String>,
     rest_names: Option<RestNames>,
     captures: CaptureAliases,
     capture_in_place: bool,
@@ -123,7 +125,7 @@ pub(super) fn prepare_ast(source: &str, semantic: &Semantic<'_>) -> Result<AstPl
                 let boundary =
                     non_simple(&function.params).expect("eligible function is non-simple");
                 let param_bindings = parameter_binding_names(&symbols, &function.params);
-                let wrapper = body_scope_requires_wrapper(
+                let (wrapper, wrapper_arguments) = body_scope_wrapper_plan(
                     source,
                     &symbols,
                     &function.params,
@@ -148,6 +150,7 @@ pub(super) fn prepare_ast(source: &str, semantic: &Semantic<'_>) -> Result<AstPl
                         boundary,
                         anchor: body.span,
                         wrapper,
+                        wrapper_arguments,
                         setter: function.scope_id.get().is_some_and(|scope_id| {
                             scoping.scope_flags(scope_id).is_set_accessor()
                         }),
@@ -164,7 +167,7 @@ pub(super) fn prepare_ast(source: &str, semantic: &Semantic<'_>) -> Result<AstPl
                 }
                 let capture = plan_arrow_capture(source, semantic, node_id, facts, &mut reserved);
                 let boundary = non_simple(&arrow.params).expect("non-simple arrow");
-                let wrapper = body_scope_requires_wrapper(
+                let (wrapper, wrapper_arguments) = body_scope_wrapper_plan(
                     source,
                     &symbols,
                     &arrow.params,
@@ -195,6 +198,7 @@ pub(super) fn prepare_ast(source: &str, semantic: &Semantic<'_>) -> Result<AstPl
                         anchor: arrow.span,
                         boundary,
                         wrapper,
+                        wrapper_arguments,
                         rest_names,
                         captures: capture.aliases,
                         capture_in_place: capture.in_place,
@@ -581,6 +585,7 @@ impl<'a> OrdinaryParameterLowerer<'a> {
                 false,
                 statements,
                 directives,
+                &plan.wrapper_arguments,
                 plan.anchor,
             )?);
             body.statements = prologue;
@@ -857,6 +862,7 @@ impl<'a> VisitMut<'a> for OrdinaryParameterLowerer<'a> {
                     function.generator,
                     original,
                     directives,
+                    &plan.wrapper_arguments,
                     plan.anchor,
                 ) {
                     Ok(wrapper) => {
@@ -888,12 +894,14 @@ fn clear_leading_pure_annotation(expression: &mut Expression<'_>) {
     }
 }
 
+#[expect(deprecated)]
 fn parse_wrapper_statement<'a>(
     allocator: &'a Allocator,
     r#async: bool,
     generator: bool,
     statements: ArenaVec<'a, Statement<'a>>,
     directives: ArenaVec<'a, Directive<'a>>,
+    wrapper_arguments: &[String],
     enclosing: Span,
 ) -> Result<Statement<'a>, &'static str> {
     let anchor = Span::new(
@@ -901,11 +909,24 @@ fn parse_wrapper_statement<'a>(
         enclosing.start.saturating_add(1).min(enclosing.end),
     );
     let ast = AstBuilder::new(allocator);
-    #[expect(deprecated)]
+    let mut items = ArenaVec::new_in(&ast);
+    for name in wrapper_arguments {
+        items.push(ast.formal_parameter(
+            anchor,
+            ArenaVec::new_in(&ast),
+            ast.binding_pattern_binding_identifier(anchor, allocator.alloc_str(name)),
+            None::<ArenaBox<'a, TSTypeAnnotation<'a>>>,
+            None::<ArenaBox<'a, Expression<'a>>>,
+            false,
+            None,
+            false,
+            false,
+        ));
+    }
     let params = ast.alloc_formal_parameters(
         anchor,
         FormalParameterKind::FormalParameter,
-        ArenaVec::new_in(&ast),
+        items,
         None::<ArenaBox<'a, FormalParameterRest<'a>>>,
     );
     #[expect(deprecated)]
@@ -925,24 +946,26 @@ fn parse_wrapper_statement<'a>(
         Some(body),
     );
     #[expect(deprecated)]
-    let apply = Expression::from(ast.member_expression_static(
+    let call_member = Expression::from(ast.member_expression_static(
         anchor,
         function,
-        ast.identifier_name(anchor, "apply"),
+        ast.identifier_name(anchor, "call"),
         false,
     ));
     let mut arguments = ArenaVec::new_in(&ast);
     #[expect(deprecated)]
     {
         arguments.push(Argument::from(ast.expression_this(anchor)));
-        arguments.push(Argument::from(
-            ast.expression_identifier(anchor, "arguments"),
-        ));
+        for name in wrapper_arguments {
+            arguments.push(Argument::from(
+                ast.expression_identifier(anchor, allocator.alloc_str(name)),
+            ));
+        }
     }
     #[expect(deprecated)]
     let call = ast.expression_call(
         anchor,
-        apply,
+        call_member,
         None::<ArenaBox<'a, TSTypeParameterInstantiation<'a>>>,
         arguments,
         false,
@@ -1195,24 +1218,32 @@ fn parameter_binding_names(
         .collect()
 }
 
-fn body_scope_requires_wrapper(
+fn body_scope_wrapper_plan(
     source: &str,
     symbols: &[SymbolFact<'_>],
     params: &FormalParameters<'_>,
     body: &FunctionBody<'_>,
     param_bindings: &FxHashSet<String>,
-) -> bool {
-    let body_names: FxHashSet<&str> = symbols_in(symbols, body.span)
+) -> (bool, Vec<String>) {
+    let mut body_names: FxHashSet<&str> = symbols_in(symbols, body.span)
         .filter(|symbol| symbol.span.start > body.span.start && symbol.span.end < body.span.end)
         .map(|symbol| symbol.name)
         .collect();
-    if param_bindings
+    // Semantic analysis merges `var` and function declarations with a
+    // same-named non-simple parameter and retains only the parameter's symbol
+    // span. Collect body bindings from the AST as well so those declarations
+    // still trigger the separate parameter/body environments required by the
+    // specification.
+    let mut collector = BodyBindingCollector::default();
+    collector.visit_function_body(body);
+    body_names.extend(collector.names);
+    let mut wrapper_arguments = param_bindings
         .iter()
-        .any(|name| body_names.contains(name.as_str()))
-    {
-        return true;
-    }
-    params.items.iter().any(|parameter| {
+        .filter(|name| body_names.contains(name.as_str()))
+        .cloned()
+        .collect::<Vec<_>>();
+    wrapper_arguments.sort_unstable();
+    let initializer_uses_body_name = params.items.iter().any(|parameter| {
         parameter.initializer.as_ref().is_some_and(|initializer| {
             let initializer = slice(source, initializer.span());
             let mut token_start = None;
@@ -1227,7 +1258,38 @@ fn body_scope_requires_wrapper(
             }
             token_start.is_some_and(|start| body_names.contains(&initializer[start..]))
         })
-    })
+    });
+    (
+        !wrapper_arguments.is_empty() || initializer_uses_body_name,
+        wrapper_arguments,
+    )
+}
+
+#[derive(Default)]
+struct BodyBindingCollector<'a> {
+    names: FxHashSet<&'a str>,
+}
+
+impl<'a> Visit<'a> for BodyBindingCollector<'a> {
+    fn visit_binding_identifier(&mut self, identifier: &BindingIdentifier<'a>) {
+        self.names.insert(identifier.name.as_str());
+    }
+
+    fn visit_function(&mut self, function: &Function<'a>, _flags: oxc_syntax::scope::ScopeFlags) {
+        if function.r#type == FunctionType::FunctionDeclaration
+            && let Some(identifier) = &function.id
+        {
+            self.names.insert(identifier.name.as_str());
+        }
+    }
+
+    fn visit_arrow_function_expression(&mut self, _arrow: &ArrowFunctionExpression<'a>) {}
+
+    fn visit_class(&mut self, class: &Class<'a>) {
+        if let Some(identifier) = &class.id {
+            self.names.insert(identifier.name.as_str());
+        }
+    }
 }
 
 fn symbols_in<'a>(
@@ -1300,7 +1362,7 @@ mod tests {
         let code = Codegen::new().build(&program).code;
         assert!(code.contains("let value = arguments.length"));
         assert!(code.contains("return function()"));
-        assert!(code.contains(".apply(this, arguments)"));
+        assert!(code.contains(".call(this)"));
     }
 
     #[test]

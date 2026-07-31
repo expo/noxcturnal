@@ -159,15 +159,10 @@ impl<'a> ForOfLowerer<'a> {
                 self.ast.statement_expression(assignment.span(), assignment)
             }
         };
-        let mut body = match statement.body {
-            Statement::BlockStatement(block) => block.unbox().body,
-            statement => {
-                let mut statements = ArenaVec::new_in(&self.ast);
-                statements.push(statement);
-                statements
-            }
-        };
-        body.insert(0, binding);
+        // The loop-head binding and the source body have distinct lexical
+        // environments. Keep an existing body block nested so declarations in
+        // it may legally shadow the per-iteration binding.
+        let body = self.vec([binding, statement.body]);
 
         let symbol_iterator = self.member(anchor, self.id(anchor, "Symbol"), "iterator");
         let iterator_method = {
