@@ -3,9 +3,10 @@ use oxc_ast::{
     AstBuilder, AstKind,
     ast::{
         Argument, ArrayExpressionElement, AssignmentTarget, AssignmentTargetMaybeDefault,
-        AssignmentTargetProperty, BindingPattern, Expression, FunctionBody, NumberBase, Program,
-        PropertyKey, Statement, TSTypeAnnotation, TSTypeParameterInstantiation,
-        VariableDeclaration, VariableDeclarationKind, VariableDeclarator,
+        AssignmentTargetProperty, BindingPattern, Expression, ForStatementLeft, FunctionBody,
+        NumberBase, Program, PropertyKey, Statement, TSTypeAnnotation,
+        TSTypeParameterInstantiation, VariableDeclaration, VariableDeclarationKind,
+        VariableDeclarator,
     },
 };
 use oxc_ast_visit::{VisitMut, walk_mut};
@@ -41,6 +42,7 @@ pub(super) struct AstPlan {
     declarations: FxHashMap<u32, Vec<AstDeclaratorPlan>>,
     catches: FxHashMap<u32, AstCatchPlan>,
     assignments: FxHashMap<u32, AstAssignmentPlan>,
+    for_of_assignments: FxHashMap<u32, AstAssignmentPlan>,
     temporary_declarations: FxHashMap<u32, Vec<String>>,
     helper_requests: CustomHelperRequests,
     helper_names: HelperNames,
@@ -166,10 +168,13 @@ pub(super) fn prepare_ast(
         object_runtime: reserve("_objectDestructuringEmpty2", &mut reserved),
         rest: reserve("_objectWithoutProperties", &mut reserved),
         rest_runtime: reserve("_objectWithoutProperties2", &mut reserved),
+        property_key: reserve("_toPropertyKey", &mut reserved),
+        property_key_runtime: reserve("_toPropertyKey2", &mut reserved),
     };
     let mut declarations: FxHashMap<u32, Vec<AstDeclaratorPlan>> = FxHashMap::default();
     let mut catches = FxHashMap::default();
     let mut assignments = FxHashMap::default();
+    let mut for_of_assignments = FxHashMap::default();
     let mut temporary_declarations: FxHashMap<u32, Vec<String>> = FxHashMap::default();
     let mut helper_usage = HelperUsage::default();
     let mut nested_remaining = false;
@@ -303,6 +308,43 @@ pub(super) fn prepare_ast(
                     .or_default()
                     .extend(reserved.allocations[before..].iter().cloned());
             }
+            AstKind::ForOfStatement(statement)
+                if !matches!(statement.left, ForStatementLeft::VariableDeclaration(_)) =>
+            {
+                let Some(target) = statement.left.as_assignment_target() else {
+                    continue;
+                };
+                if !target.is_assignment_target_pattern()
+                    || (only_object_rest && !assignment_has_object_rest(target))
+                {
+                    continue;
+                }
+                let before = reserved.checkpoint();
+                let root = reserve("_ref", &mut reserved);
+                let reservation_checkpoint = reserved.checkpoint();
+                plan_assignment_names(target, &mut reserved, &mut helper_usage);
+                for_of_assignments.insert(
+                    statement.span.start,
+                    AstAssignmentPlan {
+                        root,
+                        anchor: statement.left.span(),
+                        reservation_checkpoint,
+                    },
+                );
+                let scope_start = semantic
+                    .nodes()
+                    .ancestor_ids(node_id)
+                    .find_map(|ancestor| match semantic.nodes().kind(ancestor) {
+                        AstKind::FunctionBody(body) => Some(body.span.start),
+                        AstKind::Program(program) => Some(program.span.start),
+                        _ => None,
+                    })
+                    .unwrap_or(0);
+                temporary_declarations
+                    .entry(scope_start)
+                    .or_default()
+                    .extend(reserved.allocations[before..].iter().cloned());
+            }
             _ => {}
         }
     }
@@ -414,6 +456,42 @@ pub(super) fn prepare_ast(
         helper_fragment.push_str(&rewrite(helper));
         pretty_helper_fragment.push_str(&rewrite(pretty_helper));
         emitted_helper_names.extend(bindings.iter().map(|binding| rewrite(binding)));
+        if helper_usage.property_key {
+            helper_requests.request("toPropertyKey");
+            let (property_key, property_key_pretty) = if inline_helpers {
+                (
+                    format!(
+                        "function {}(t){{var e=typeof t;return(e===\"object\"&&t!==null||e===\"function\")&&(e=t[Symbol.toPrimitive])!==void 0?(t=e.call(t,\"string\"),typeof t===\"object\"?(()=>{{throw new TypeError(\"@@toPrimitive must return a primitive value.\")}})():typeof t===\"symbol\"?t:t+\"\"):typeof t===\"symbol\"?t:String(t)}}",
+                        helper_names.property_key,
+                    ),
+                    format!(
+                        "function {}(value) {{\n  const type = typeof value;\n  if ((type === 'object' && value !== null) || type === 'function') {{\n    const exotic = value[Symbol.toPrimitive];\n    if (exotic !== void 0) {{\n      value = exotic.call(value, 'string');\n      if (typeof value === 'object') throw new TypeError('@@toPrimitive must return a primitive value.');\n      return typeof value === 'symbol' ? value : value + '';\n    }}\n  }}\n  return typeof value === 'symbol' ? value : String(value);\n}}\n",
+                        helper_names.property_key,
+                    ),
+                )
+            } else {
+                (
+                    format!(
+                        "var {}=require(\"@babel/runtime/helpers/toPropertyKey\");function {}(t){{return {}(t)}}",
+                        helper_names.property_key_runtime,
+                        helper_names.property_key,
+                        helper_names.property_key_runtime,
+                    ),
+                    format!(
+                        "var {} = require('@babel/runtime/helpers/toPropertyKey');\nfunction {}(value) {{\n  return {}(value);\n}}\n",
+                        helper_names.property_key_runtime,
+                        helper_names.property_key,
+                        helper_names.property_key_runtime,
+                    ),
+                )
+            };
+            helper_fragment.push_str(&property_key);
+            pretty_helper_fragment.push_str(&property_key_pretty);
+            emitted_helper_names.push(helper_names.property_key.clone());
+            if !inline_helpers {
+                emitted_helper_names.push(helper_names.property_key_runtime.clone());
+            }
+        }
     }
     if !helper_fragment.is_empty() {
         helper_requests.push_fragment(helper_fragment, pretty_helper_fragment);
@@ -431,6 +509,7 @@ pub(super) fn prepare_ast(
         declarations,
         catches,
         assignments,
+        for_of_assignments,
         temporary_declarations,
         helper_requests,
         helper_names,
@@ -461,6 +540,7 @@ pub(super) fn run_ast<'a>(
         declarations: plan.declarations,
         catches: plan.catches,
         assignments: plan.assignments,
+        for_of_assignments: plan.for_of_assignments,
         temporary_declarations: plan.temporary_declarations,
         helper_names: plan.helper_names,
         base_reserved: plan.base_reserved,
@@ -480,6 +560,7 @@ struct DestructuringDeclaratorLowerer<'a> {
     declarations: FxHashMap<u32, Vec<AstDeclaratorPlan>>,
     catches: FxHashMap<u32, AstCatchPlan>,
     assignments: FxHashMap<u32, AstAssignmentPlan>,
+    for_of_assignments: FxHashMap<u32, AstAssignmentPlan>,
     temporary_declarations: FxHashMap<u32, Vec<String>>,
     helper_names: HelperNames,
     base_reserved: FxHashSet<String>,
@@ -685,6 +766,7 @@ impl<'a> DestructuringDeclaratorLowerer<'a> {
             }
             AssignmentTarget::ObjectAssignmentTarget(pattern) => {
                 let pattern = pattern.unbox();
+                let has_rest = pattern.rest.is_some();
                 let object = reserve("_obj", reserved);
                 let converted = self.call(anchor, &self.helper_names.object, [value]);
                 output.push(self.assign_name(anchor, &object, converted));
@@ -721,8 +803,15 @@ impl<'a> DestructuringDeclaratorLowerer<'a> {
                             let property = property.unbox();
                             let (access, exclusion) = if property.computed {
                                 let key = reserve("_key", reserved);
-                                let key_expression = Expression::try_from(property.name)
+                                let mut key_expression = Expression::try_from(property.name)
                                     .map_err(|_| "destructuring-computed-key-not-expression")?;
+                                if has_rest {
+                                    key_expression = self.call(
+                                        anchor,
+                                        &self.helper_names.property_key,
+                                        [key_expression],
+                                    );
+                                }
                                 output.push(self.assign_name(anchor, &key, key_expression));
                                 (
                                     self.computed(
@@ -838,6 +927,7 @@ impl<'a> DestructuringDeclaratorLowerer<'a> {
             }
             BindingPattern::ObjectPattern(pattern) => {
                 let pattern = pattern.unbox();
+                let has_rest = pattern.rest.is_some();
                 let object = reserve("_obj", reserved);
                 let converted = self.call(anchor, &self.helper_names.object, [value]);
                 output.push(self.declarator(anchor, kind, &object, Some(converted)));
@@ -846,8 +936,15 @@ impl<'a> DestructuringDeclaratorLowerer<'a> {
                 for property in pattern.properties {
                     let (access, exclusion) = if property.computed {
                         let key = reserve("_key", reserved);
-                        let key_expression = Expression::try_from(property.key)
+                        let mut key_expression = Expression::try_from(property.key)
                             .map_err(|_| "destructuring-computed-key-not-expression")?;
+                        if has_rest {
+                            key_expression = self.call(
+                                anchor,
+                                &self.helper_names.property_key,
+                                [key_expression],
+                            );
+                        }
                         output.push(self.declarator(anchor, kind, &key, Some(key_expression)));
                         (
                             self.computed(anchor, self.id(anchor, &object), self.id(anchor, &key)),
@@ -974,6 +1071,129 @@ impl<'a> VisitMut<'a> for DestructuringDeclaratorLowerer<'a> {
             self.changed = true;
         }
         walk_mut::walk_variable_declaration(self, declaration);
+    }
+
+    #[expect(deprecated)]
+    fn visit_for_of_statement(&mut self, statement: &mut oxc_ast::ast::ForOfStatement<'a>) {
+        if let Some(plan) = self.for_of_assignments.remove(&statement.span.start) {
+            let ast = self.ast();
+            let old_left = statement.left.take_in(&ast);
+            let target = match AssignmentTarget::try_from(old_left) {
+                Ok(target) => target,
+                Err(_) => {
+                    self.error = Some("destructuring-for-of-target-missing");
+                    return;
+                }
+            };
+            statement.left = ast
+                .simple_assignment_target_assignment_target_identifier(
+                    plan.anchor,
+                    self.allocator.alloc_str(&plan.root),
+                )
+                .into();
+            let mut expressions = ArenaVec::new_in(&ast);
+            let mut reserved = SnapshotReservations {
+                base: &self.base_reserved,
+                planned: &self.planned_allocations,
+                checkpoint: plan.reservation_checkpoint,
+                local: FxHashSet::default(),
+            };
+            if let Err(error) = self.lower_assignment(
+                target,
+                self.id(plan.anchor, &plan.root),
+                plan.anchor,
+                &mut expressions,
+                &mut reserved,
+            ) {
+                self.error = Some(error);
+                return;
+            }
+            #[expect(deprecated)]
+            let binding = ast.statement_expression(
+                plan.anchor,
+                ast.expression_sequence(plan.anchor, expressions),
+            );
+            let body = &mut statement.body;
+            let old_body = body.take_in(&ast);
+            #[expect(deprecated)]
+            {
+                *body = ast.statement_block(plan.anchor, ast.vec_from_array([binding, old_body]));
+            }
+            self.changed = true;
+            walk_mut::walk_for_of_statement(self, statement);
+            return;
+        }
+
+        let ForStatementLeft::VariableDeclaration(declaration) = &mut statement.left else {
+            walk_mut::walk_for_of_statement(self, statement);
+            return;
+        };
+        let Some(declarator) = declaration.declarations.first_mut() else {
+            walk_mut::walk_for_of_statement(self, statement);
+            return;
+        };
+        if declarator.id.is_binding_identifier() {
+            walk_mut::walk_for_of_statement(self, statement);
+            return;
+        }
+
+        let start = declarator.span.start;
+        let pattern = binding_pattern_fingerprint(&declarator.id);
+        let Some(plans) = self.declarations.get_mut(&start) else {
+            walk_mut::walk_for_of_statement(self, statement);
+            return;
+        };
+        let Some(position) = plans.iter().position(|plan| plan.pattern == pattern) else {
+            self.error = Some("destructuring-declarator-plan-mismatch");
+            return;
+        };
+        let plan = plans.remove(position);
+        if plans.is_empty() {
+            self.declarations.remove(&start);
+        }
+
+        let ast = self.ast();
+        let old = declarator.take_in(&ast);
+        debug_assert!(old.init.is_none(), "for-of declarators have no initializer");
+        *declarator = self.declarator(plan.anchor, old.kind, &plan.root, None);
+
+        let mut lowered = ArenaVec::new_in(&ast);
+        let mut reserved = SnapshotReservations {
+            base: &self.base_reserved,
+            planned: &self.planned_allocations,
+            checkpoint: plan.reservation_checkpoint,
+            local: FxHashSet::default(),
+        };
+        if let Err(error) = self.lower_binding(
+            old.id,
+            self.id(plan.anchor, &plan.root),
+            old.kind,
+            plan.anchor,
+            &mut lowered,
+            &mut reserved,
+        ) {
+            self.error = Some(error);
+            return;
+        }
+        #[expect(deprecated)]
+        let binding = Statement::VariableDeclaration(ast.alloc_variable_declaration(
+            plan.anchor,
+            old.kind,
+            lowered,
+            false,
+        ));
+        let body = &mut statement.body;
+        let old_body = body.take_in(&ast);
+        #[expect(deprecated)]
+        {
+            // Keep an existing block nested. Its lexical environment is the
+            // original loop-body environment; destructuring computed keys are
+            // evaluated before entering it and therefore must not observe the
+            // TDZ of same-named `let`/`const` declarations in that body.
+            *body = ast.statement_block(plan.anchor, ast.vec_from_array([binding, old_body]));
+        }
+        self.changed = true;
+        walk_mut::walk_for_of_statement(self, statement);
     }
 
     fn visit_catch_clause(&mut self, clause: &mut oxc_ast::ast::CatchClause<'a>) {
@@ -1199,6 +1419,8 @@ struct HelperNames {
     object_runtime: String,
     rest: String,
     rest_runtime: String,
+    property_key: String,
+    property_key_runtime: String,
 }
 
 #[derive(Default)]
@@ -1206,6 +1428,7 @@ struct HelperUsage {
     iter: bool,
     object: bool,
     rest: bool,
+    property_key: bool,
 }
 
 fn plan_binding_names(
@@ -1231,6 +1454,10 @@ fn plan_binding_names(
         }
         BindingPattern::ObjectPattern(pattern) => {
             helpers.object = true;
+            if pattern.rest.is_some() && pattern.properties.iter().any(|property| property.computed)
+            {
+                helpers.property_key = true;
+            }
             reserve("_obj", reserved);
             for property in &pattern.properties {
                 if property.computed {
@@ -1264,6 +1491,13 @@ fn plan_assignment_names(
         }
         AssignmentTarget::ObjectAssignmentTarget(pattern) => {
             helpers.object = true;
+            if pattern.rest.is_some()
+                && pattern.properties.iter().any(|property| {
+                    matches!(property, AssignmentTargetProperty::AssignmentTargetPropertyProperty(property) if property.computed)
+                })
+            {
+                helpers.property_key = true;
+            }
             reserve("_obj", reserved);
             for property in &pattern.properties {
                 match property {

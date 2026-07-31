@@ -228,6 +228,7 @@ pub fn validate_custom_runtime_helpers(
             | "objectDestructuringEmpty"
             | "objectWithoutProperties"
             | "objectWithoutPropertiesLoose"
+            | "toPropertyKey"
             | "slicedToArray"
             | "toArray"
             | "wrapRegExp" => (7, 0, 0),
