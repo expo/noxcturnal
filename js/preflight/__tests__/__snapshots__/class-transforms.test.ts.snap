@@ -36,6 +36,22 @@ exports[`every public native transform has an explicit ownership fixture 2`] = `
 
 exports[`every public native transform has an explicit ownership fixture 3`] = `
 {
+  "code": "function _decorate(e,t,r,n){var o=arguments.length,a=o<3?t:n===null?n=Object.getOwnPropertyDescriptor(t,r):n,l;for(var c=e.length-1;c>=0;c--)if(l=e[c])a=(o<3?l(a):o>3?l(t,r,a):l(t,r))||a;return o>3&&a&&Object.defineProperty(t,r,a),a}let Value=class Value{};Value=_decorate([sealed],Value);",
+  "helpers": [],
+  "map": {
+    "mappings": "yOAAA,IAAc,MAAd,MAAc,KAAM,CAAC,EAApB,MAAA,UAAA,CAAA,MAAM,EAAG,KAAK;;",
+    "names": [],
+  },
+  "name": "legacyDecorators",
+  "option": true,
+  "reason": undefined,
+  "source": "@sealed class Value {}",
+  "status": "complete",
+}
+`;
+
+exports[`every public native transform has an explicit ownership fixture 4`] = `
+{
   "code": "var _objectDestructuringEmpty2={objectDestructuringEmpty:require("@babel/runtime/helpers/objectDestructuringEmpty")};function _objectDestructuringEmpty(t){return _objectDestructuringEmpty2.objectDestructuringEmpty(t),t}var _ref=input,_obj=_objectDestructuringEmpty(_ref),value=_obj.value;",
   "helpers": [
     "objectDestructuringEmpty",
@@ -56,7 +72,7 @@ exports[`every public native transform has an explicit ownership fixture 3`] = `
 }
 `;
 
-exports[`every public native transform has an explicit ownership fixture 4`] = `
+exports[`every public native transform has an explicit ownership fixture 5`] = `
 {
   "code": "function read(){let value=arguments.length>0&&arguments[0]!==void 0?arguments[0]:1;return value}",
   "helpers": [],
@@ -74,7 +90,7 @@ exports[`every public native transform has an explicit ownership fixture 4`] = `
 }
 `;
 
-exports[`every public native transform has an explicit ownership fixture 5`] = `
+exports[`every public native transform has an explicit ownership fixture 6`] = `
 {
   "code": "{var _iteratorNormalCompletion=true,_didIteratorError=false,_iteratorError,_iteratorReturnMethod,_iteratorReturn;try{for(var _iterator=values[Symbol.iterator](),_iteratorNext=_iterator.next,_step;_step=_iteratorNext.call(_iterator),!_step.done;_iteratorNormalCompletion=true){if(Object(_step)!==_step)throw new TypeError(\`Iterator result is not an object\`);_iteratorNormalCompletion=false;var value=_step.value;consume(value)}}catch(_iteratorError2){_didIteratorError=true;_iteratorError=_iteratorError2}finally{try{if(!_iteratorNormalCompletion&&(_iteratorReturnMethod=_iterator.return)!=null){_iteratorReturn=_iteratorReturnMethod.call(_iterator);if(Object(_iteratorReturn)!==_iteratorReturn)throw new TypeError(\`Iterator result is not an object\`)}}finally{if(_didIteratorError)throw _iteratorError}}}",
   "helpers": [],
@@ -92,7 +108,7 @@ exports[`every public native transform has an explicit ownership fixture 5`] = `
 }
 `;
 
-exports[`every public native transform has an explicit ownership fixture 6`] = `
+exports[`every public native transform has an explicit ownership fixture 7`] = `
 {
   "code": "var _usingCtx2=require("@babel/runtime/helpers/usingCtx");try{var _usingCtx=_usingCtx2();var value=_usingCtx.u(acquire())}catch(_){_usingCtx.e=_}finally{_usingCtx.d()}",
   "helpers": [
@@ -110,7 +126,7 @@ exports[`every public native transform has an explicit ownership fixture 6`] = `
 }
 `;
 
-exports[`every public native transform has an explicit ownership fixture 7`] = `
+exports[`every public native transform has an explicit ownership fixture 8`] = `
 {
   "code": "class Value{static#_=this.value=1}",
   "helpers": [],
@@ -126,7 +142,7 @@ exports[`every public native transform has an explicit ownership fixture 7`] = `
 }
 `;
 
-exports[`every public native transform has an explicit ownership fixture 8`] = `
+exports[`every public native transform has an explicit ownership fixture 9`] = `
 {
   "code": "class Value{constructor(){this.field=1}}",
   "helpers": [],
@@ -144,7 +160,7 @@ exports[`every public native transform has an explicit ownership fixture 8`] = `
 }
 `;
 
-exports[`every public native transform has an explicit ownership fixture 9`] = `
+exports[`every public native transform has an explicit ownership fixture 10`] = `
 {
   "code": "value||(value=1);",
   "helpers": [],
@@ -160,7 +176,7 @@ exports[`every public native transform has an explicit ownership fixture 9`] = `
 }
 `;
 
-exports[`every public native transform has an explicit ownership fixture 10`] = `
+exports[`every public native transform has an explicit ownership fixture 11`] = `
 {
   "code": "var _value;(_value=value)===null||_value===void 0?void 0:_value.field;",
   "helpers": [],
@@ -178,7 +194,7 @@ exports[`every public native transform has an explicit ownership fixture 10`] = 
 }
 `;
 
-exports[`every public native transform has an explicit ownership fixture 11`] = `
+exports[`every public native transform has an explicit ownership fixture 12`] = `
 {
   "code": "var _value;(_value=value)!==null&&_value!==void 0?_value:fallback;",
   "helpers": [],
@@ -196,7 +212,7 @@ exports[`every public native transform has an explicit ownership fixture 11`] = 
 }
 `;
 
-exports[`every public native transform has an explicit ownership fixture 12`] = `
+exports[`every public native transform has an explicit ownership fixture 13`] = `
 {
   "code": "import*as _value from"pkg";export{_value as value};",
   "helpers": [],
@@ -212,7 +228,7 @@ exports[`every public native transform has an explicit ownership fixture 12`] = 
 }
 `;
 
-exports[`every public native transform has an explicit ownership fixture 13`] = `
+exports[`every public native transform has an explicit ownership fixture 14`] = `
 {
   "code": "try{}catch(_unused){}",
   "helpers": [],
@@ -228,7 +244,7 @@ exports[`every public native transform has an explicit ownership fixture 13`] = 
 }
 `;
 
-exports[`every public native transform has an explicit ownership fixture 14`] = `
+exports[`every public native transform has an explicit ownership fixture 15`] = `
 {
   "code": "var value=Object.assign({},input);",
   "helpers": [],
@@ -249,7 +265,7 @@ exports[`every public native transform has an explicit ownership fixture 14`] = 
 }
 `;
 
-exports[`every public native transform has an explicit ownership fixture 15`] = `
+exports[`every public native transform has an explicit ownership fixture 16`] = `
 {
   "code": "var _wrapAsyncGenerator=require("@babel/runtime/helpers/wrapAsyncGenerator");function values(){return _values.apply(this,arguments)}function _values(){_values=_wrapAsyncGenerator(function*(){yield 1});return _values.apply(this,arguments)}",
   "helpers": [
@@ -267,7 +283,7 @@ exports[`every public native transform has an explicit ownership fixture 15`] = 
 }
 `;
 
-exports[`every public native transform has an explicit ownership fixture 16`] = `
+exports[`every public native transform has an explicit ownership fixture 17`] = `
 {
   "code": "var _asyncToGenerator=require("@babel/runtime/helpers/asyncToGenerator");function value(){return _value.apply(this,arguments)}function _value(){_value=_asyncToGenerator(function*(){return 1});return _value.apply(this,arguments)}",
   "helpers": [
@@ -285,7 +301,7 @@ exports[`every public native transform has an explicit ownership fixture 16`] = 
 }
 `;
 
-exports[`every public native transform has an explicit ownership fixture 17`] = `
+exports[`every public native transform has an explicit ownership fixture 18`] = `
 {
   "code": "var _value;_value=value,value=Math.pow(_value,2);",
   "helpers": [],
@@ -301,7 +317,7 @@ exports[`every public native transform has an explicit ownership fixture 17`] = 
 }
 `;
 
-exports[`every public native transform has an explicit ownership fixture 18`] = `
+exports[`every public native transform has an explicit ownership fixture 19`] = `
 {
   "code": "let Value=(()=>{"use strict";var _read=\`__private_Value_read\`;const Value=function Value(){if(!new.target)throw new TypeError(\`Cannot call a class as a function\`);Object.defineProperty(this,_read,{value:function(){if(new.target)throw new TypeError(\`Class methods cannot be invoked with 'new'\`)}})};Object.defineProperty(Value,"prototype",{writable:false});return Value})();",
   "helpers": [],
@@ -322,12 +338,14 @@ exports[`every public native transform has an explicit ownership fixture 18`] = 
 }
 `;
 
-exports[`every public native transform has an explicit ownership fixture 19`] = `
+exports[`every public native transform has an explicit ownership fixture 20`] = `
 {
-  "code": "let Value=(()=>{"use strict";var _field=\`__private_Value_field\`;const Value=function Value(){if(!new.target)throw new TypeError(\`Cannot call a class as a function\`);Object.defineProperty(this,_field,{writable:true,value:void 0})};Object.defineProperty(Value.prototype,"has",{value:Object.defineProperty(function(input){if(new.target)throw new TypeError(\`Class methods cannot be invoked with 'new'\`);return Object.prototype.hasOwnProperty.call(input,_field)},"name",{value:\`has\`,configurable:true}),writable:true,configurable:true});Object.defineProperty(Value,"prototype",{writable:false});return Value})();",
-  "helpers": [],
+  "code": "var _checkInRHS2={checkInRHS:require("@babel/runtime/helpers/checkInRHS")},_checkInRHS=_checkInRHS2.checkInRHS;let Value=(()=>{"use strict";var _field=\`__private_Value_field\`;const Value=function Value(){if(!new.target)throw new TypeError(\`Cannot call a class as a function\`);Object.defineProperty(this,_field,{writable:true,value:void 0})};Object.defineProperty(Value.prototype,"has",{value:Object.defineProperty(function(input){if(new.target)throw new TypeError(\`Class methods cannot be invoked with 'new'\`);return Object.prototype.hasOwnProperty.call(_checkInRHS(input),_field)},"name",{value:\`has\`,configurable:true}),writable:true,configurable:true});Object.defineProperty(Value,"prototype",{writable:false});return Value})();",
+  "helpers": [
+    "checkInRHS",
+  ],
   "map": {
-    "mappings": "AAAA,IAAM,WAAN,oJAA6D,EAA/CA,6DAAM,EAAyC,EAA7DC,yEAAyB,SAAC,MAAO,CAAX,8EAAqC,EAAxB,OAAOC,qCAAU,MAAVC,MAAc,CAAG,EAA3D,qCAA6D,GAA7DF,+BAA6D,GAA7DA,uDAA6D,GAA7D,YAA6D;",
+    "mappings": "+GAAA,IAAM,WAAN,oJAA6D,EAA/CA,6DAAM,EAAyC,EAA7DC,yEAAyB,SAAC,MAAO,CAAX,8EAAqC,EAAxB,OAAOC,iDAAU,KAAI,EAAdC,MAAc,CAAG,EAA3D,qCAA6D,GAA7DF,+BAA6D,GAA7DA,uDAA6D,GAA7D,YAA6D;",
     "names": [
       "#field;",
       "class Value { #field; has(input) { return #field in input; } }",
@@ -345,7 +363,7 @@ exports[`every public native transform has an explicit ownership fixture 19`] = 
 }
 `;
 
-exports[`every public native transform has an explicit ownership fixture 20`] = `
+exports[`every public native transform has an explicit ownership fixture 21`] = `
 {
   "code": "var value=new RegExp(\`a\`,\`y\`);",
   "helpers": [],
@@ -361,7 +379,7 @@ exports[`every public native transform has an explicit ownership fixture 20`] = 
 }
 `;
 
-exports[`every public native transform has an explicit ownership fixture 21`] = `
+exports[`every public native transform has an explicit ownership fixture 22`] = `
 {
   "code": "var value=/(?:\\uD83D\\uDE00)/;",
   "helpers": [],
@@ -377,7 +395,7 @@ exports[`every public native transform has an explicit ownership fixture 21`] = 
 }
 `;
 
-exports[`every public native transform has an explicit ownership fixture 22`] = `
+exports[`every public native transform has an explicit ownership fixture 23`] = `
 {
   "code": "var value=/[\\u0000-\\u007F]/u;",
   "helpers": [],
@@ -393,7 +411,7 @@ exports[`every public native transform has an explicit ownership fixture 22`] = 
 }
 `;
 
-exports[`every public native transform has an explicit ownership fixture 23`] = `
+exports[`every public native transform has an explicit ownership fixture 24`] = `
 {
   "code": "var value=/a[^]b/;",
   "helpers": [],
@@ -409,7 +427,7 @@ exports[`every public native transform has an explicit ownership fixture 23`] = 
 }
 `;
 
-exports[`every public native transform has an explicit ownership fixture 24`] = `
+exports[`every public native transform has an explicit ownership fixture 25`] = `
 {
   "code": "var _wrapRegExp2={wrapRegExp:require("@babel/runtime/helpers/wrapRegExp")},_wrapRegExp=_wrapRegExp2.wrapRegExp;var value=_wrapRegExp(/(a)/,{"value":1});",
   "helpers": [
@@ -429,33 +447,39 @@ exports[`every public native transform has an explicit ownership fixture 24`] = 
 }
 `;
 
-exports[`every public native transform has an explicit ownership fixture 25`] = `
-{
-  "code": undefined,
-  "helpers": undefined,
-  "map": undefined,
-  "name": "regexpLookBehind",
-  "option": true,
-  "reason": "syntax:regexp-look-behind-semantic-mismatch",
-  "source": "var value = /(?<=a)b/;",
-  "status": "bailout",
-}
-`;
-
 exports[`every public native transform has an explicit ownership fixture 26`] = `
 {
-  "code": undefined,
-  "helpers": undefined,
-  "map": undefined,
-  "name": "regexpMatchIndices",
+  "code": "var value=/(?<=a)b/;",
+  "helpers": [],
+  "map": {
+    "mappings": "AAAA,IAAI,MAAQ;",
+    "names": [],
+  },
+  "name": "regexpLookBehind",
   "option": true,
-  "reason": "syntax:regexp-match-indices-semantic-mismatch",
-  "source": "var value = /a/d;",
-  "status": "bailout",
+  "reason": undefined,
+  "source": "var value = /(?<=a)b/;",
+  "status": "complete",
 }
 `;
 
 exports[`every public native transform has an explicit ownership fixture 27`] = `
+{
+  "code": "var value=/a/d;",
+  "helpers": [],
+  "map": {
+    "mappings": "AAAA,IAAI,MAAQ;",
+    "names": [],
+  },
+  "name": "regexpMatchIndices",
+  "option": true,
+  "reason": undefined,
+  "source": "var value = /a/d;",
+  "status": "complete",
+}
+`;
+
+exports[`every public native transform has an explicit ownership fixture 28`] = `
 {
   "code": "var value=/(?!)/u;",
   "helpers": [],

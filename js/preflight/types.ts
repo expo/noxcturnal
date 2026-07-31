@@ -43,6 +43,8 @@ export interface PreflightOptimize {
 export interface PreflightTransforms {
   blockScoping?: true;
   classes?: true;
+  /** Apply TypeScript-style legacy decorator semantics. */
+  legacyDecorators?: true;
   destructuring?: { useBuiltIns: boolean };
   parameters?: true;
   forOf?: true;

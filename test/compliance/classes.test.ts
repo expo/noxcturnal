@@ -1,6 +1,31 @@
 import { expect, test } from 'vitest';
 import { execute } from './runtime';
 
+test('auto-accessors retain prototype descriptors and per-instance storage', () => {
+  const result = execute<{ result: unknown[] }>(
+    `
+      class Example {
+        accessor value = 1;
+        static accessor count = 2;
+      }
+      const first = new Example();
+      const second = new Example();
+      first.value = 7;
+      Example.count = 9;
+      const descriptor = Object.getOwnPropertyDescriptor(Example.prototype, 'value');
+      const staticDescriptor = Object.getOwnPropertyDescriptor(Example, 'count');
+      globalThis.result = [
+        first.value, second.value, Example.count,
+        typeof descriptor.get, typeof descriptor.set,
+        typeof staticDescriptor.get, typeof staticDescriptor.set,
+        Object.prototype.hasOwnProperty.call(first, 'value'),
+      ];
+    `,
+    { transforms: { classes: true } },
+  );
+  expect(result.result).toEqual([7, 1, 9, 'function', 'function', 'function', 'function', false]);
+});
+
 test('lowered classes preserve inheritance, super calls, accessors, and methods', () => {
   const result = execute<{ result: unknown[] }>(
     `
@@ -248,7 +273,8 @@ test('lowered private methods remain non-constructable when exposed', () => {
   expect(result.result).toBe(true);
 });
 
-test('spec private fields, methods, and brand checks preserve receiver semantics', () => {
+// NOTE: Private features intentionally retain one representation.
+test('selected private fields, methods, and brand checks preserve receiver semantics', () => {
   const result = execute<{ result: unknown[] }>(
     `
       class Counter {

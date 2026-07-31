@@ -110,3 +110,26 @@ test('aligns every Unicode property of strings with Babel', async () => {
     false,
   ]);
 });
+
+test('aligns Unicode-set string intersection and subtraction with Babel', async () => {
+  await expect(
+    alignBabelBehavior({
+      source: String.raw`
+        const intersection = /^[\q{ab|cd}&&\q{cd|ef}]$/v;
+        const subtraction = /^[\q{ab|cd}--\q{cd}]$/v;
+        const propertyIntersection = /^[\p{Basic_Emoji}&&\q{a|😀}]$/v;
+        const propertySubtraction = /^[\p{Basic_Emoji}--\q{😀}]$/v;
+        globalThis.__result = [
+          intersection.test('cd'), intersection.test('ab'),
+          subtraction.test('ab'), subtraction.test('cd'),
+          propertyIntersection.test('😀'), propertyIntersection.test('a'),
+          propertySubtraction.test('😀'), propertySubtraction.test('©️'),
+        ];
+      `,
+      filename: 'input.js',
+      plugins: [unicodeSetsRegex],
+      noxcturnal: { transforms: { regexpUnicodeSets: true } },
+      output: { mustNotMatch: [/\/v\b/, /&&/, /--/] },
+    }),
+  ).resolves.toEqual([true, false, true, false, true, false, false, true]);
+});

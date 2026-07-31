@@ -2145,7 +2145,40 @@ test('039 JS Private Methods > private static methods > static private method is
       helpers: runtimeHelpers,
       transforms: { privateMethods: { loose: true } },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-direct-shape-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _classPrivateFieldLooseBase2 = {
+      classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+    };
+    function _classPrivateFieldLooseBase(e, s) {
+      return _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+    }
+    function _classPrivateMethodCall(e, s, a) {
+      return _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s)[s].apply(e, a);
+    }
+    () => {
+      expect(() => {
+        let Foo = (() => {
+          'use strict';
+          var _bar = '__private_Foo_bar';
+          const Foo = function Foo() {
+            if (!new.target) throw new TypeError('Cannot call a class as a function');
+          };
+          Object.defineProperty(Foo, 'prototype', { writable: false });
+          (function () {
+            (() => {
+              throw new TypeError('Attempted to set read only private field');
+            })();
+          }).call(Foo);
+          Object.defineProperty(Foo, _bar, {
+            value: function () {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            },
+          });
+          return Foo;
+        })();
+      }).toThrow();
+    };"
+  `);
 });
 
 test('040 JS Private Methods > private static methods > static private method compound assignment throws', async () => {
@@ -2156,7 +2189,40 @@ test('040 JS Private Methods > private static methods > static private method co
       helpers: runtimeHelpers,
       transforms: { privateMethods: { loose: true } },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-direct-shape-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _classPrivateFieldLooseBase2 = {
+      classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+    };
+    function _classPrivateFieldLooseBase(e, s) {
+      return _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+    }
+    function _classPrivateMethodCall(e, s, a) {
+      return _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s)[s].apply(e, a);
+    }
+    () => {
+      expect(() => {
+        let Foo = (() => {
+          'use strict';
+          var _bar = '__private_Foo_bar';
+          const Foo = function Foo() {
+            if (!new.target) throw new TypeError('Cannot call a class as a function');
+          };
+          Object.defineProperty(Foo, 'prototype', { writable: false });
+          (function () {
+            (() => {
+              throw new TypeError('Attempted to set read only private field');
+            })();
+          }).call(Foo);
+          Object.defineProperty(Foo, _bar, {
+            value: function () {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            },
+          });
+          return Foo;
+        })();
+      }).toThrow();
+    };"
+  `);
 });
 
 test('041 JS Private Methods > private static methods > super access from static private method', async () => {
@@ -2665,7 +2731,41 @@ test('049 JS Private Methods > private static accessors > static getter-only thr
       helpers: runtimeHelpers,
       transforms: { privateMethods: { loose: true } },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-direct-shape-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _classPrivateFieldLooseBase2 = {
+      classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+    };
+    function _classPrivateFieldLooseBase(e, s) {
+      return _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+    }
+    function _classPrivateMethodCall(e, s, a) {
+      return _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s)[s].apply(e, a);
+    }
+    () => {
+      expect(() => {
+        let Foo = (() => {
+          'use strict';
+          var _bar = '__private_Foo_bar';
+          const Foo = function Foo() {
+            if (!new.target) throw new TypeError('Cannot call a class as a function');
+          };
+          Object.defineProperty(Foo, 'prototype', { writable: false });
+          (function () {
+            (() => {
+              throw new TypeError('Attempted to set read only private field');
+            })();
+          }).call(Foo);
+          Object.defineProperty(Foo, _bar, {
+            get: function () {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              return 1;
+            },
+          });
+          return Foo;
+        })();
+      }).toThrow();
+    };"
+  `);
 });
 
 test('050 JS Private Methods > inheritance and isolation > private methods are per-class (not inherited)', async () => {
@@ -2780,12 +2880,12 @@ test('051 JS Private Methods > inheritance and isolation > subclass can define s
       })();
       let Child = (__nox_super_178_347 => {
         'use strict';
-        var _method11 = '__private_Child_method';
+        var _method13 = '__private_Child_method';
         const Child = function Child() {
           if (!new.target) throw new TypeError('Cannot call a class as a function');
           var _this = _construct(__nox_super_178_347, arguments, new.target || Child);
           (function () {
-            Object.defineProperty(this, _method11, {
+            Object.defineProperty(this, _method13, {
               value: function () {
                 if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
                 return 'child';
@@ -2809,7 +2909,7 @@ test('051 JS Private Methods > inheritance and isolation > subclass can define s
           value: Object.defineProperty(
             function () {
               if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
-              return _classPrivateMethodCall(this, _method11, []);
+              return _classPrivateMethodCall(this, _method13, []);
             },
             'name',
             {
@@ -2938,10 +3038,10 @@ test('053 JS Private Methods > inheritance and isolation > different classes wit
       })();
       let B = (() => {
         'use strict';
-        var _x10 = '__private_B_x';
+        var _x12 = '__private_B_x';
         const B = function B() {
           if (!new.target) throw new TypeError('Cannot call a class as a function');
-          Object.defineProperty(this, _x10, {
+          Object.defineProperty(this, _x12, {
             value: function () {
               if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
               return 'B';
@@ -2952,7 +3052,7 @@ test('053 JS Private Methods > inheritance and isolation > different classes wit
           value: Object.defineProperty(
             function () {
               if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
-              return _classPrivateMethodCall(this, _x10, []);
+              return _classPrivateMethodCall(this, _x12, []);
             },
             'name',
             {
@@ -4015,7 +4115,39 @@ test('072 JS Private Methods > static blocks > static block can access private s
       helpers: runtimeHelpers,
       transforms: { privateMethods: { loose: true } },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-direct-shape-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _classPrivateFieldLooseBase2 = {
+      classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+    };
+    function _classPrivateFieldLooseBase(e, s) {
+      return _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+    }
+    function _classPrivateMethodCall(e, s, a) {
+      return _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s)[s].apply(e, a);
+    }
+    () => {
+      let captured;
+      let Foo = (() => {
+        'use strict';
+        var _bar = '__private_Foo_bar';
+        const Foo = function Foo() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
+        Object.defineProperty(Foo, 'prototype', { writable: false });
+        (function () {
+          captured = _classPrivateMethodCall(Foo, _bar, []);
+        }).call(Foo);
+        Object.defineProperty(Foo, _bar, {
+          value: function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            return 'from static block';
+          },
+        });
+        return Foo;
+      })();
+      expect(captured).toBe('from static block');
+    };"
+  `);
 });
 
 test('073 JS Private Methods > static blocks > static block can access private static accessor', async () => {
@@ -4026,7 +4158,44 @@ test('073 JS Private Methods > static blocks > static block can access private s
       helpers: runtimeHelpers,
       transforms: { privateMethods: { loose: true } },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-direct-shape-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _classPrivateFieldLooseBase2 = {
+      classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+    };
+    function _classPrivateFieldLooseBase(e, s) {
+      return _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+    }
+    function _classPrivateMethodCall(e, s, a) {
+      return _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s)[s].apply(e, a);
+    }
+    () => {
+      let captured;
+      let Foo = (() => {
+        'use strict';
+        var _value = '__private_Foo_value';
+        var _x = '__private_Foo_x';
+        const Foo = function Foo() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
+        Object.defineProperty(Foo, 'prototype', { writable: false });
+        Object.defineProperty(Foo, _x, {
+          writable: true,
+          value: 42,
+        });
+        (function () {
+          captured = _classPrivateFieldLooseBase(Foo, _value)[_value];
+        }).call(Foo);
+        Object.defineProperty(Foo, _value, {
+          get: function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            return _classPrivateFieldLooseBase(Foo, _x)[_x];
+          },
+        });
+        return Foo;
+      })();
+      expect(captured).toBe(42);
+    };"
+  `);
 });
 
 test('074 JS Private Methods > private-in checks (ergonomic brand checks) > #field in obj for instance with private method', async () => {
@@ -4037,7 +4206,45 @@ test('074 JS Private Methods > private-in checks (ergonomic brand checks) > #fie
       helpers: runtimeHelpers,
       transforms: { privateMethods: { loose: true } },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-direct-shape-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+      _checkInRHS = _checkInRHS2.checkInRHS;
+    () => {
+      let Foo = (() => {
+        'use strict';
+        var _bar = '__private_Foo_bar';
+        const Foo = function Foo() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+          Object.defineProperty(this, _bar, {
+            value: function () {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            },
+          });
+        };
+        Object.defineProperty(Foo, 'check', {
+          value: Object.defineProperty(
+            function (obj) {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              return Object.prototype.hasOwnProperty.call(_checkInRHS(obj), _bar);
+            },
+            'name',
+            {
+              value: 'check',
+              configurable: true,
+            },
+          ),
+          writable: true,
+          configurable: true,
+        });
+        Object.defineProperty(Foo, 'prototype', { writable: false });
+        return Foo;
+      })();
+      expect(Foo.check(new Foo())).toBe(true);
+      expect(Foo.check({})).toBe(false);
+      // \`in\` operator throws TypeError for non-object right-hand side
+      expect(() => Foo.check(42)).toThrow();
+    };"
+  `);
 });
 
 test('075 JS Private Methods > private-in checks (ergonomic brand checks) > #field in obj for instance with private field', async () => {
@@ -4049,13 +4256,37 @@ test('075 JS Private Methods > private-in checks (ergonomic brand checks) > #fie
       transforms: { privateMethods: { loose: true } },
     }),
   ).toMatchInlineSnapshot(`
-    "() => {
-      class Foo {
-        #x = 1;
-        static check(obj) {
-          return #x in obj;
-        }
-      }
+    "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+      _checkInRHS = _checkInRHS2.checkInRHS;
+    () => {
+      let Foo = (() => {
+        'use strict';
+        var _x = '__private_Foo_x';
+        const Foo = function Foo() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+          Object.defineProperty(this, _x, {
+            writable: true,
+            value: 1,
+          });
+        };
+        Object.defineProperty(Foo, 'check', {
+          value: Object.defineProperty(
+            function (obj) {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              return Object.prototype.hasOwnProperty.call(_checkInRHS(obj), _x);
+            },
+            'name',
+            {
+              value: 'check',
+              configurable: true,
+            },
+          ),
+          writable: true,
+          configurable: true,
+        });
+        Object.defineProperty(Foo, 'prototype', { writable: false });
+        return Foo;
+      })();
       expect(Foo.check(new Foo())).toBe(true);
       expect(Foo.check({})).toBe(false);
     };"
@@ -4070,5 +4301,43 @@ test('076 JS Private Methods > private-in checks (ergonomic brand checks) > #fie
       helpers: runtimeHelpers,
       transforms: { privateMethods: { loose: true } },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-direct-shape-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+      _checkInRHS = _checkInRHS2.checkInRHS;
+    () => {
+      let Base = (() => {
+        'use strict';
+        var _secret = '__private_Base_secret';
+        const Base = function Base() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+          Object.defineProperty(this, _secret, {
+            value: function () {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            },
+          });
+        };
+        Object.defineProperty(Base, 'check', {
+          value: Object.defineProperty(
+            function (obj) {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              return Object.prototype.hasOwnProperty.call(_checkInRHS(obj), _secret);
+            },
+            'name',
+            {
+              value: 'check',
+              configurable: true,
+            },
+          ),
+          writable: true,
+          configurable: true,
+        });
+        Object.defineProperty(Base, 'prototype', { writable: false });
+        return Base;
+      })();
+      class Child extends Base {}
+      expect(Base.check(new Base())).toBe(true);
+      expect(Base.check(new Child())).toBe(true);
+      expect(Base.check({})).toBe(false);
+    };"
+  `);
 });

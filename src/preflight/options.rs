@@ -34,6 +34,7 @@ pub struct NativePreflightOptions {
     pub dead_code_elimination: Option<bool>,
     pub block_scoping: Option<bool>,
     pub classes: Option<bool>,
+    pub legacy_decorators: Option<bool>,
     pub destructuring: Option<bool>,
     pub destructuring_use_built_ins: Option<bool>,
     pub parameters: Option<bool>,

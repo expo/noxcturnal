@@ -51,6 +51,7 @@ struct AstArrowPlan {
     rest_names: Option<RestNames>,
     captures: CaptureAliases,
     capture_in_place: bool,
+    retain_arrow: bool,
 }
 
 struct RestNames {
@@ -124,13 +125,10 @@ pub(super) fn prepare_ast(source: &str, semantic: &Semantic<'_>) -> Result<AstPl
                 }
                 let boundary =
                     non_simple(&function.params).expect("eligible function is non-simple");
-                if function
+                let is_accessor = function
                     .scope_id
                     .get()
-                    .is_some_and(|scope_id| scoping.scope_flags(scope_id).is_set_accessor())
-                {
-                    return Err("parameters-setter-semantics-not-implemented");
-                }
+                    .is_some_and(|scope_id| scoping.scope_flags(scope_id).is_set_accessor());
                 let param_bindings = parameter_binding_names(&symbols, &function.params);
                 let (wrapper, wrapper_arguments) = body_scope_wrapper_plan(
                     source,
@@ -155,7 +153,11 @@ pub(super) fn prepare_ast(source: &str, semantic: &Semantic<'_>) -> Result<AstPl
                         array,
                     }
                 });
-                let length_placeholders = (0..boundary)
+                // Setters must retain exactly one formal parameter after lowering.
+                // Babel chooses the same unavoidable length change for a default or
+                // destructured setter parameter instead of patching the descriptor.
+                let placeholder_count = if is_accessor { 1 } else { boundary };
+                let length_placeholders = (0..placeholder_count)
                     .map(|_| reserve_name("_arg", &mut reserved))
                     .collect();
                 functions
@@ -175,10 +177,19 @@ pub(super) fn prepare_ast(source: &str, semantic: &Semantic<'_>) -> Result<AstPl
                     continue;
                 }
                 let facts = &arrow_facts[&node_id];
-                if facts.has_super {
-                    return Err("arrow-parameters-lexical-super-not-implemented");
-                }
-                let capture = plan_arrow_capture(source, semantic, node_id, facts, &mut reserved);
+                // An arrow containing lexical `super` cannot become an ordinary
+                // function. Retain the arrow while moving its parameter work into
+                // the body; this also preserves lexical `this` and `new.target`.
+                let retain_arrow = facts.has_super;
+                let capture = if retain_arrow {
+                    ArrowCapturePlan {
+                        aliases: CaptureAliases::default(),
+                        hoist: None,
+                        in_place: false,
+                    }
+                } else {
+                    plan_arrow_capture(source, semantic, node_id, facts, &mut reserved)
+                };
                 let boundary = non_simple(&arrow.params).expect("non-simple arrow");
                 let (wrapper, wrapper_arguments) = body_scope_wrapper_plan(
                     source,
@@ -215,6 +226,7 @@ pub(super) fn prepare_ast(source: &str, semantic: &Semantic<'_>) -> Result<AstPl
                         rest_names,
                         captures: capture.aliases,
                         capture_in_place: capture.in_place,
+                        retain_arrow,
                     });
             }
             _ => {}
@@ -552,6 +564,19 @@ impl<'a> OrdinaryParameterLowerer<'a> {
             body.statements = prologue;
         } else {
             body.statements.splice(0..0, prologue);
+        }
+        #[expect(deprecated)]
+        if plan.retain_arrow {
+            params.kind = FormalParameterKind::ArrowFormalParameters;
+            return Ok(ast.expression_arrow_function(
+                plan.anchor,
+                false,
+                arrow.r#async,
+                arrow.type_parameters,
+                ast.alloc_formal_parameters(params.span, params.kind, params.items, params.rest),
+                arrow.return_type,
+                ast.alloc_function_body(body.span, body.directives, body.statements),
+            ));
         }
         #[expect(deprecated)]
         let function = ast.expression_function(

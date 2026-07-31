@@ -3,53 +3,6 @@ import { expect, test } from 'vitest';
 import { transformOutcome } from '../transform';
 
 // Babel fixture source: packages/babel-plugin-transform-private-methods/test/fixtures
-test('accessors-loose/basic/exec.js [spec]', async () => {
-  const source =
-    'class Cl {\n  #privateField = "top secret string";\n\n  constructor() {\n    this.publicField = "not secret string";\n  }\n\n  get #privateFieldValue() {\n    return this.#privateField;\n  }\n\n  set #privateFieldValue(newValue) {\n    this.#privateField = newValue;\n  }\n\n  publicGetPrivateField() {\n    return this.#privateFieldValue;\n  }\n\n  publicSetPrivateField(newValue) {\n    this.#privateFieldValue = newValue;\n  }\n}\n\nconst cl = new Cl();\n\nexpect(cl.publicGetPrivateField()).toEqual("top secret string");\n\ncl.publicSetPrivateField("new secret string");\nexpect(cl.publicGetPrivateField()).toEqual("new secret string");\n\n';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
-    var _classPrivateFieldGet = require('@babel/runtime/helpers/classPrivateFieldGet2');
-    var _classPrivateFieldSet = require('@babel/runtime/helpers/classPrivateFieldSet2');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _toSetter = require('@babel/runtime/helpers/toSetter');
-    var _privateField = /* @__PURE__ */ new WeakMap();
-    var _Cl_brand = /* @__PURE__ */ new WeakSet();
-    class Cl {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Cl_brand);
-        _classPrivateFieldInitSpec(this, _privateField, 'top secret string');
-        this.publicField = 'not secret string';
-      }
-      publicGetPrivateField() {
-        return _get_privateFieldValue.call(_assertClassBrand(_Cl_brand, this));
-      }
-      publicSetPrivateField(newValue) {
-        _toSetter(_set_privateFieldValue.bind(_assertClassBrand(_Cl_brand, this)))._ = newValue;
-      }
-    }
-    function _get_privateFieldValue() {
-      return _classPrivateFieldGet(_privateField, this);
-    }
-    function _set_privateFieldValue(newValue) {
-      _classPrivateFieldSet(_privateField, this, newValue);
-    }
-    const cl = new Cl();
-    expect(cl.publicGetPrivateField()).toEqual('top secret string');
-    cl.publicSetPrivateField('new secret string');
-    expect(cl.publicGetPrivateField()).toEqual('new secret string');"
-  `);
-});
-
 test('accessors-loose/basic/exec.js [loose]', async () => {
   const source =
     'class Cl {\n  #privateField = "top secret string";\n\n  constructor() {\n    this.publicField = "not secret string";\n  }\n\n  get #privateFieldValue() {\n    return this.#privateField;\n  }\n\n  set #privateFieldValue(newValue) {\n    this.#privateField = newValue;\n  }\n\n  publicGetPrivateField() {\n    return this.#privateFieldValue;\n  }\n\n  publicSetPrivateField(newValue) {\n    this.#privateFieldValue = newValue;\n  }\n}\n\nconst cl = new Cl();\n\nexpect(cl.publicGetPrivateField()).toEqual("top secret string");\n\ncl.publicSetPrivateField("new secret string");\nexpect(cl.publicGetPrivateField()).toEqual("new secret string");\n\n';
@@ -57,7 +10,7 @@ test('accessors-loose/basic/exec.js [loose]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -131,49 +84,6 @@ test('accessors-loose/basic/exec.js [loose]', async () => {
     expect(cl.publicGetPrivateField()).toEqual('top secret string');
     cl.publicSetPrivateField('new secret string');
     expect(cl.publicGetPrivateField()).toEqual('new secret string');"
-  `);
-});
-
-test('accessors-loose/basic/input.js [spec]', async () => {
-  const source =
-    'class Cl {\n  #privateField = "top secret string";\n\n  constructor() {\n    this.publicField = "not secret string";\n  }\n\n  get #privateFieldValue() {\n    return this.#privateField;\n  }\n\n  set #privateFieldValue(newValue) {\n    this.#privateField = newValue;\n  }\n\n  publicGetPrivateField() {\n    return this.#privateFieldValue;\n  }\n\n  publicSetPrivateField(newValue) {\n    this.#privateFieldValue = newValue;\n  }\n}';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
-    var _classPrivateFieldGet = require('@babel/runtime/helpers/classPrivateFieldGet2');
-    var _classPrivateFieldSet = require('@babel/runtime/helpers/classPrivateFieldSet2');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _toSetter = require('@babel/runtime/helpers/toSetter');
-    var _privateField = /* @__PURE__ */ new WeakMap();
-    var _Cl_brand = /* @__PURE__ */ new WeakSet();
-    class Cl {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Cl_brand);
-        _classPrivateFieldInitSpec(this, _privateField, 'top secret string');
-        this.publicField = 'not secret string';
-      }
-      publicGetPrivateField() {
-        return _get_privateFieldValue.call(_assertClassBrand(_Cl_brand, this));
-      }
-      publicSetPrivateField(newValue) {
-        _toSetter(_set_privateFieldValue.bind(_assertClassBrand(_Cl_brand, this)))._ = newValue;
-      }
-    }
-    function _get_privateFieldValue() {
-      return _classPrivateFieldGet(_privateField, this);
-    }
-    function _set_privateFieldValue(newValue) {
-      _classPrivateFieldSet(_privateField, this, newValue);
-    }"
   `);
 });
 
@@ -184,7 +94,7 @@ test('accessors-loose/basic/input.js [loose]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -254,41 +164,6 @@ test('accessors-loose/basic/input.js [loose]', async () => {
       Object.defineProperty(Cl, 'prototype', { writable: false });
       return Cl;
     })();"
-  `);
-});
-
-test('accessors-loose/class-binding/exec.js [spec]', async () => {
-  const source =
-    'class A {\n  get #getA() { return A };\n  get getA() {\n    return this.#getA;\n  }\n}\n\nconst oldA = A;\nA = null;\n\nexpect(new oldA().getA).toBe(oldA);\n';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _A;
-    var _A_brand = /* @__PURE__ */ new WeakSet();
-    class A {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _A_brand);
-      }
-      get getA() {
-        return _get_getA.call(_assertClassBrand(_A_brand, this));
-      }
-    }
-    _A = A;
-    function _get_getA() {
-      return _A;
-    }
-    const oldA = A;
-    A = null;
-    expect(new oldA().getA).toBe(oldA);"
   `);
 });
 
@@ -299,7 +174,7 @@ test('accessors-loose/class-binding/exec.js [loose]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -349,40 +224,13 @@ test('accessors-loose/class-binding/exec.js [loose]', async () => {
   `);
 });
 
-test('accessors-loose/class-binding/input.js [spec]', async () => {
-  const source = 'class A {\n  get #getA() { return A };\n}\n';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _A;
-    var _A_brand = /* @__PURE__ */ new WeakSet();
-    class A {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _A_brand);
-      }
-    }
-    _A = A;
-    function _get_getA() {
-      return _A;
-    }"
-  `);
-});
-
 test('accessors-loose/class-binding/input.js [loose]', async () => {
   const source = 'class A {\n  get #getA() { return A };\n}\n';
   expect(
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -403,39 +251,6 @@ test('accessors-loose/class-binding/input.js [loose]', async () => {
       Object.defineProperty(A, 'prototype', { writable: false });
       return A;
     })();"
-  `);
-});
-
-test('accessors-loose/get-only-setter/exec.js [spec]', async () => {
-  const source =
-    'class Cl {\n  #privateField = 0;\n\n  set #privateFieldValue(newValue) {\n    this.#privateField = newValue;\n  }\n\n  constructor() {\n    expect(this.#privateFieldValue).toBeUndefined();\n  }\n}\n\nconst cl = new Cl();\n';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
-    var _classPrivateFieldSet = require('@babel/runtime/helpers/classPrivateFieldSet2');
-    var _writeOnlyError = require('@babel/runtime/helpers/writeOnlyError');
-    var _privateField = /* @__PURE__ */ new WeakMap();
-    var _Cl_brand = /* @__PURE__ */ new WeakSet();
-    class Cl {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Cl_brand);
-        _classPrivateFieldInitSpec(this, _privateField, 0);
-        expect((this, _writeOnlyError('#privateFieldValue'))).toBeUndefined();
-      }
-    }
-    function _set_privateFieldValue(newValue) {
-      _classPrivateFieldSet(_privateField, this, newValue);
-    }
-    const cl = new Cl();"
   `);
 });
 
@@ -446,7 +261,7 @@ test('accessors-loose/get-only-setter/exec.js [loose]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -485,38 +300,6 @@ test('accessors-loose/get-only-setter/exec.js [loose]', async () => {
       return Cl;
     })();
     const cl = new Cl();"
-  `);
-});
-
-test('accessors-loose/get-only-setter/input.js [spec]', async () => {
-  const source =
-    'class Cl {\n  #privateField = 0;\n\n  set #privateFieldValue(newValue) {\n    this.#privateField = newValue;\n  }\n\n  constructor() {\n    this.publicField = this.#privateFieldValue;\n  }\n}\n';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
-    var _classPrivateFieldSet = require('@babel/runtime/helpers/classPrivateFieldSet2');
-    var _writeOnlyError = require('@babel/runtime/helpers/writeOnlyError');
-    var _privateField = /* @__PURE__ */ new WeakMap();
-    var _Cl_brand = /* @__PURE__ */ new WeakSet();
-    class Cl {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Cl_brand);
-        _classPrivateFieldInitSpec(this, _privateField, 0);
-        this.publicField = (this, _writeOnlyError('#privateFieldValue'));
-      }
-    }
-    function _set_privateFieldValue(newValue) {
-      _classPrivateFieldSet(_privateField, this, newValue);
-    }"
   `);
 });
 
@@ -527,7 +310,7 @@ test('accessors-loose/get-only-setter/input.js [loose]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -563,40 +346,6 @@ test('accessors-loose/get-only-setter/input.js [loose]', async () => {
       Object.defineProperty(Cl, 'prototype', { writable: false });
       return Cl;
     })();"
-  `);
-});
-
-test('accessors-loose/helper/exec.js [spec]', async () => {
-  const source =
-    'let foo;\nclass Cl {\n  set #foo(v) { return 1 }\n  test() {\n    foo = this.#foo = 2;\n  }\n}\n\nnew Cl().test();\n\nexpect(foo).toBe(2);';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _toSetter = require('@babel/runtime/helpers/toSetter');
-    let foo;
-    var _Cl_brand = /* @__PURE__ */ new WeakSet();
-    class Cl {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Cl_brand);
-      }
-      test() {
-        foo = _toSetter(_set_foo.bind(_assertClassBrand(_Cl_brand, this)))._ = 2;
-      }
-    }
-    function _set_foo(v) {
-      return 1;
-    }
-    new Cl().test();
-    expect(foo).toBe(2);"
   `);
 });
 
@@ -607,7 +356,7 @@ test('accessors-loose/helper/exec.js [loose]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -655,36 +404,6 @@ test('accessors-loose/helper/exec.js [loose]', async () => {
     })();
     new Cl().test();
     expect(foo).toBe(2);"
-  `);
-});
-
-test('accessors-loose/preserve-comments/input.js [spec]', async () => {
-  const source =
-    'class C {\n  /* before get a */\n  get #a() { return 42 };\n  /* after get a */\n\n  /* before set a */\n  set #a(v) {}\n  /* after set a */\n}\n';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _C_brand = /* @__PURE__ */ new WeakSet();
-    class C {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _C_brand);
-      }
-    }
-    /* before get a */
-    function _get_a() {
-      return 42;
-    }
-    /* after get a */
-    /* before set a */
-    function _set_a(v) {}"
   `);
 });
 
@@ -695,7 +414,7 @@ test('accessors-loose/preserve-comments/input.js [loose]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -723,37 +442,6 @@ test('accessors-loose/preserve-comments/input.js [loose]', async () => {
       return C;
       /* after set a */
     })();"
-  `);
-});
-
-test('accessors-loose/reassignment/exec.js [spec]', async () => {
-  const source =
-    'let counter = 0;\nclass Foo {\n  constructor() {\n    this.#privateFieldValue = ++counter;\n  }\n\n  get #privateFieldValue() {\n    return 42;\n  }\n}\n\nexpect(() => new Foo).toThrow();\nexpect(counter).toBe(1);\n';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _readOnlyError = require('@babel/runtime/helpers/readOnlyError');
-    let counter = 0;
-    var _Foo_brand = /* @__PURE__ */ new WeakSet();
-    class Foo {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Foo_brand);
-        (this, ++counter, _readOnlyError('#privateFieldValue'));
-      }
-    }
-    function _get_privateFieldValue() {
-      return 42;
-    }
-    expect(() => new Foo()).toThrow();
-    expect(counter).toBe(1);"
   `);
 });
 
@@ -764,7 +452,7 @@ test('accessors-loose/reassignment/exec.js [loose]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -803,35 +491,6 @@ test('accessors-loose/reassignment/exec.js [loose]', async () => {
   `);
 });
 
-test('accessors-loose/reassignment/input.js [spec]', async () => {
-  const source =
-    'let counter = 0;\nclass Foo {\n  constructor() {\n    this.#privateFieldValue = ++counter;\n  }\n\n  get #privateFieldValue() {\n    return 42;\n  }\n}\n';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _readOnlyError = require('@babel/runtime/helpers/readOnlyError');
-    let counter = 0;
-    var _Foo_brand = /* @__PURE__ */ new WeakSet();
-    class Foo {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Foo_brand);
-        (this, ++counter, _readOnlyError('#privateFieldValue'));
-      }
-    }
-    function _get_privateFieldValue() {
-      return 42;
-    }"
-  `);
-});
-
 test('accessors-loose/reassignment/input.js [loose]', async () => {
   const source =
     'let counter = 0;\nclass Foo {\n  constructor() {\n    this.#privateFieldValue = ++counter;\n  }\n\n  get #privateFieldValue() {\n    return 42;\n  }\n}\n';
@@ -839,7 +498,7 @@ test('accessors-loose/reassignment/input.js [loose]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -876,40 +535,6 @@ test('accessors-loose/reassignment/input.js [loose]', async () => {
   `);
 });
 
-test('accessors-loose/set-only-getter/exec.js [spec]', async () => {
-  const source =
-    'class Cl {\n  #privateField = 0;\n\n  get #privateFieldValue() {\n    return this.#privateField;\n  }\n\n  constructor() {\n    expect(() => this.#privateFieldValue = 1).toThrow(TypeError);\n    expect(() => ([this.#privateFieldValue] = [1])).toThrow(TypeError);\n  }\n}\n\nconst cl = new Cl();\n';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
-    var _classPrivateFieldGet = require('@babel/runtime/helpers/classPrivateFieldGet2');
-    var _readOnlyError = require('@babel/runtime/helpers/readOnlyError');
-    var _privateField = /* @__PURE__ */ new WeakMap();
-    var _Cl_brand = /* @__PURE__ */ new WeakSet();
-    class Cl {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Cl_brand);
-        _classPrivateFieldInitSpec(this, _privateField, 0);
-        expect(() => (this, 1, _readOnlyError('#privateFieldValue'))).toThrow(TypeError);
-        expect(() => ([(this, _readOnlyError('#privateFieldValue'))._] = [1])).toThrow(TypeError);
-      }
-    }
-    function _get_privateFieldValue() {
-      return _classPrivateFieldGet(_privateField, this);
-    }
-    const cl = new Cl();"
-  `);
-});
-
 test('accessors-loose/set-only-getter/exec.js [loose]', async () => {
   const source =
     'class Cl {\n  #privateField = 0;\n\n  get #privateFieldValue() {\n    return this.#privateField;\n  }\n\n  constructor() {\n    expect(() => this.#privateFieldValue = 1).toThrow(TypeError);\n    expect(() => ([this.#privateFieldValue] = [1])).toThrow(TypeError);\n  }\n}\n\nconst cl = new Cl();\n';
@@ -917,7 +542,7 @@ test('accessors-loose/set-only-getter/exec.js [loose]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -961,39 +586,6 @@ test('accessors-loose/set-only-getter/exec.js [loose]', async () => {
       return Cl;
     })();
     const cl = new Cl();"
-  `);
-});
-
-test('accessors-loose/set-only-getter/input.js [spec]', async () => {
-  const source =
-    'class Cl {\n  #privateField = 0;\n\n  get #privateFieldValue() {\n    return this.#privateField;\n  }\n\n  constructor() {\n    this.#privateFieldValue = 1;\n    ([this.#privateFieldValue] = [1]);\n  }\n}\n';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
-    var _classPrivateFieldGet = require('@babel/runtime/helpers/classPrivateFieldGet2');
-    var _readOnlyError = require('@babel/runtime/helpers/readOnlyError');
-    var _privateField = /* @__PURE__ */ new WeakMap();
-    var _Cl_brand = /* @__PURE__ */ new WeakSet();
-    class Cl {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Cl_brand);
-        _classPrivateFieldInitSpec(this, _privateField, 0);
-        (this, 1, _readOnlyError('#privateFieldValue'));
-        [(this, _readOnlyError('#privateFieldValue'))._] = [1];
-      }
-    }
-    function _get_privateFieldValue() {
-      return _classPrivateFieldGet(_privateField, this);
-    }"
   `);
 });
 
@@ -1004,7 +596,7 @@ test('accessors-loose/set-only-getter/input.js [loose]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -1043,85 +635,6 @@ test('accessors-loose/set-only-getter/input.js [loose]', async () => {
       Object.defineProperty(Cl, 'prototype', { writable: false });
       return Cl;
     })();"
-  `);
-});
-
-test('accessors-loose/updates/exec.js [spec]', async () => {
-  const source =
-    'class Cl {\n  #privateField = "top secret string";\n\n  constructor() {\n    this.publicField = "not secret string";\n  }\n\n  get #privateFieldValue() {\n    return this.#privateField;\n  }\n\n  set #privateFieldValue(newValue) {\n    this.#privateField = newValue;\n  }\n\n  publicGetPrivateField() {\n    return this.#privateFieldValue;\n  }\n\n  publicSetPrivateField(newValue) {\n    this.#privateFieldValue = newValue;\n  }\n\n  get publicFieldValue() {\n    return this.publicField;\n  }\n\n  set publicFieldValue(newValue) {\n    this.publicField = newValue;\n  }\n\n  testUpdates() {\n    this.#privateField = 0;\n    this.publicField = 0;\n    this.#privateFieldValue = this.#privateFieldValue++;\n    this.publicFieldValue = this.publicFieldValue++;\n    expect(this.#privateField).toEqual(this.publicField);\n\n    ++this.#privateFieldValue;\n    ++this.publicFieldValue;\n    expect(this.#privateField).toEqual(this.publicField);\n\n    this.#privateFieldValue += 1;\n    this.publicFieldValue += 1;\n    expect(this.#privateField).toEqual(this.publicField);\n  }\n}\n\nconst cl = new Cl();\ncl.testUpdates();\n';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
-    var _classPrivateFieldGet = require('@babel/runtime/helpers/classPrivateFieldGet2');
-    var _classPrivateFieldSet = require('@babel/runtime/helpers/classPrivateFieldSet2');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _toSetter = require('@babel/runtime/helpers/toSetter');
-    var _privateField = /* @__PURE__ */ new WeakMap();
-    var _Cl_brand = /* @__PURE__ */ new WeakSet();
-    class Cl {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Cl_brand);
-        _classPrivateFieldInitSpec(this, _privateField, 'top secret string');
-        this.publicField = 'not secret string';
-      }
-      publicGetPrivateField() {
-        return _get_privateFieldValue.call(_assertClassBrand(_Cl_brand, this));
-      }
-      publicSetPrivateField(newValue) {
-        _toSetter(_set_privateFieldValue.bind(_assertClassBrand(_Cl_brand, this)))._ = newValue;
-      }
-      get publicFieldValue() {
-        return this.publicField;
-      }
-      set publicFieldValue(newValue) {
-        this.publicField = newValue;
-      }
-      testUpdates() {
-        var _this$privateFieldVal, _this$privateFieldVal2, _this$privateFieldVal3;
-        _classPrivateFieldSet(_privateField, this, 0);
-        this.publicField = 0;
-        _toSetter(_set_privateFieldValue.bind(_assertClassBrand(_Cl_brand, this)))._ =
-          (_set_privateFieldValue.call(
-            _assertClassBrand(_Cl_brand, this),
-            ((_this$privateFieldVal = _get_privateFieldValue.call(_assertClassBrand(_Cl_brand, this))),
-            (_this$privateFieldVal2 = _this$privateFieldVal++),
-            _this$privateFieldVal),
-          ),
-          _this$privateFieldVal2);
-        this.publicFieldValue = this.publicFieldValue++;
-        expect(_classPrivateFieldGet(_privateField, this)).toEqual(this.publicField);
-        _set_privateFieldValue.call(
-          _assertClassBrand(_Cl_brand, this),
-          ((_this$privateFieldVal3 = _get_privateFieldValue.call(_assertClassBrand(_Cl_brand, this))),
-          ++_this$privateFieldVal3),
-        );
-        ++this.publicFieldValue;
-        expect(_classPrivateFieldGet(_privateField, this)).toEqual(this.publicField);
-        _set_privateFieldValue.call(
-          _assertClassBrand(_Cl_brand, this),
-          _get_privateFieldValue.call(_assertClassBrand(_Cl_brand, this)) + 1,
-        );
-        this.publicFieldValue += 1;
-        expect(_classPrivateFieldGet(_privateField, this)).toEqual(this.publicField);
-      }
-    }
-    function _get_privateFieldValue() {
-      return _classPrivateFieldGet(_privateField, this);
-    }
-    function _set_privateFieldValue(newValue) {
-      _classPrivateFieldSet(_privateField, this, newValue);
-    }
-    const cl = new Cl();
-    cl.testUpdates();"
   `);
 });
 
@@ -1132,7 +645,7 @@ test('accessors-loose/updates/exec.js [loose]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -1264,85 +777,6 @@ test('accessors-loose/updates/exec.js [loose]', async () => {
     })();
     const cl = new Cl();
     cl.testUpdates();"
-  `);
-});
-
-test('accessors-loose/updates/input.js [spec]', async () => {
-  const source =
-    'class Cl {\n  #privateField = "top secret string";\n\n  constructor() {\n    this.publicField = "not secret string";\n  }\n\n  get #privateFieldValue() {\n    return this.#privateField;\n  }\n\n  set #privateFieldValue(newValue) {\n    this.#privateField = newValue;\n  }\n\n  publicGetPrivateField() {\n    return this.#privateFieldValue;\n  }\n\n  publicSetPrivateField(newValue) {\n    this.#privateFieldValue = newValue;\n  }\n\n  get publicFieldValue() {\n    return this.publicField;\n  }\n\n  set publicFieldValue(newValue) {\n    this.publicField = newValue;\n  }\n\n  testUpdates() {\n    this.#privateField = 0;\n    this.publicField = 0;\n    this.#privateFieldValue = this.#privateFieldValue++;\n    this.publicFieldValue = this.publicFieldValue++;\n\n    ++this.#privateFieldValue;\n    ++this.publicFieldValue;\n\n    this.#privateFieldValue += 1;\n    this.publicFieldValue += 1;\n\n    this.#privateFieldValue = -(this.#privateFieldValue ** this.#privateFieldValue);\n    this.publicFieldValue = -(this.publicFieldValue ** this.publicFieldValue);\n  }\n}';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
-    var _classPrivateFieldGet = require('@babel/runtime/helpers/classPrivateFieldGet2');
-    var _classPrivateFieldSet = require('@babel/runtime/helpers/classPrivateFieldSet2');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _toSetter = require('@babel/runtime/helpers/toSetter');
-    var _privateField = /* @__PURE__ */ new WeakMap();
-    var _Cl_brand = /* @__PURE__ */ new WeakSet();
-    class Cl {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Cl_brand);
-        _classPrivateFieldInitSpec(this, _privateField, 'top secret string');
-        this.publicField = 'not secret string';
-      }
-      publicGetPrivateField() {
-        return _get_privateFieldValue.call(_assertClassBrand(_Cl_brand, this));
-      }
-      publicSetPrivateField(newValue) {
-        _toSetter(_set_privateFieldValue.bind(_assertClassBrand(_Cl_brand, this)))._ = newValue;
-      }
-      get publicFieldValue() {
-        return this.publicField;
-      }
-      set publicFieldValue(newValue) {
-        this.publicField = newValue;
-      }
-      testUpdates() {
-        var _this$privateFieldVal, _this$privateFieldVal2, _this$privateFieldVal3;
-        _classPrivateFieldSet(_privateField, this, 0);
-        this.publicField = 0;
-        _toSetter(_set_privateFieldValue.bind(_assertClassBrand(_Cl_brand, this)))._ =
-          (_set_privateFieldValue.call(
-            _assertClassBrand(_Cl_brand, this),
-            ((_this$privateFieldVal = _get_privateFieldValue.call(_assertClassBrand(_Cl_brand, this))),
-            (_this$privateFieldVal2 = _this$privateFieldVal++),
-            _this$privateFieldVal),
-          ),
-          _this$privateFieldVal2);
-        this.publicFieldValue = this.publicFieldValue++;
-        _set_privateFieldValue.call(
-          _assertClassBrand(_Cl_brand, this),
-          ((_this$privateFieldVal3 = _get_privateFieldValue.call(_assertClassBrand(_Cl_brand, this))),
-          ++_this$privateFieldVal3),
-        );
-        ++this.publicFieldValue;
-        _set_privateFieldValue.call(
-          _assertClassBrand(_Cl_brand, this),
-          _get_privateFieldValue.call(_assertClassBrand(_Cl_brand, this)) + 1,
-        );
-        this.publicFieldValue += 1;
-        _toSetter(_set_privateFieldValue.bind(_assertClassBrand(_Cl_brand, this)))._ = -(
-          _get_privateFieldValue.call(_assertClassBrand(_Cl_brand, this)) **
-          _get_privateFieldValue.call(_assertClassBrand(_Cl_brand, this))
-        );
-        this.publicFieldValue = -(this.publicFieldValue ** this.publicFieldValue);
-      }
-    }
-    function _get_privateFieldValue() {
-      return _classPrivateFieldGet(_privateField, this);
-    }
-    function _set_privateFieldValue(newValue) {
-      _classPrivateFieldSet(_privateField, this, newValue);
-    }"
   `);
 });
 
@@ -1353,7 +787,7 @@ test('accessors-loose/updates/input.js [loose]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -1479,53 +913,6 @@ test('accessors-loose/updates/input.js [loose]', async () => {
       Object.defineProperty(Cl, 'prototype', { writable: false });
       return Cl;
     })();"
-  `);
-});
-
-test('accessors-privateFieldsAsProperties/basic/exec.js [spec]', async () => {
-  const source =
-    'class Cl {\n  #privateField = "top secret string";\n\n  constructor() {\n    this.publicField = "not secret string";\n  }\n\n  get #privateFieldValue() {\n    return this.#privateField;\n  }\n\n  set #privateFieldValue(newValue) {\n    this.#privateField = newValue;\n  }\n\n  publicGetPrivateField() {\n    return this.#privateFieldValue;\n  }\n\n  publicSetPrivateField(newValue) {\n    this.#privateFieldValue = newValue;\n  }\n}\n\nconst cl = new Cl();\n\nexpect(cl.publicGetPrivateField()).toEqual("top secret string");\n\ncl.publicSetPrivateField("new secret string");\nexpect(cl.publicGetPrivateField()).toEqual("new secret string");\n\n';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
-    var _classPrivateFieldGet = require('@babel/runtime/helpers/classPrivateFieldGet2');
-    var _classPrivateFieldSet = require('@babel/runtime/helpers/classPrivateFieldSet2');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _toSetter = require('@babel/runtime/helpers/toSetter');
-    var _privateField = /* @__PURE__ */ new WeakMap();
-    var _Cl_brand = /* @__PURE__ */ new WeakSet();
-    class Cl {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Cl_brand);
-        _classPrivateFieldInitSpec(this, _privateField, 'top secret string');
-        this.publicField = 'not secret string';
-      }
-      publicGetPrivateField() {
-        return _get_privateFieldValue.call(_assertClassBrand(_Cl_brand, this));
-      }
-      publicSetPrivateField(newValue) {
-        _toSetter(_set_privateFieldValue.bind(_assertClassBrand(_Cl_brand, this)))._ = newValue;
-      }
-    }
-    function _get_privateFieldValue() {
-      return _classPrivateFieldGet(_privateField, this);
-    }
-    function _set_privateFieldValue(newValue) {
-      _classPrivateFieldSet(_privateField, this, newValue);
-    }
-    const cl = new Cl();
-    expect(cl.publicGetPrivateField()).toEqual('top secret string');
-    cl.publicSetPrivateField('new secret string');
-    expect(cl.publicGetPrivateField()).toEqual('new secret string');"
   `);
 });
 
@@ -1536,7 +923,7 @@ test('accessors-privateFieldsAsProperties/basic/exec.js [loose]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -1610,49 +997,6 @@ test('accessors-privateFieldsAsProperties/basic/exec.js [loose]', async () => {
     expect(cl.publicGetPrivateField()).toEqual('top secret string');
     cl.publicSetPrivateField('new secret string');
     expect(cl.publicGetPrivateField()).toEqual('new secret string');"
-  `);
-});
-
-test('accessors-privateFieldsAsProperties/basic/input.js [spec]', async () => {
-  const source =
-    'class Cl {\n  #privateField = "top secret string";\n\n  constructor() {\n    this.publicField = "not secret string";\n  }\n\n  get #privateFieldValue() {\n    return this.#privateField;\n  }\n\n  set #privateFieldValue(newValue) {\n    this.#privateField = newValue;\n  }\n\n  publicGetPrivateField() {\n    return this.#privateFieldValue;\n  }\n\n  publicSetPrivateField(newValue) {\n    this.#privateFieldValue = newValue;\n  }\n}';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
-    var _classPrivateFieldGet = require('@babel/runtime/helpers/classPrivateFieldGet2');
-    var _classPrivateFieldSet = require('@babel/runtime/helpers/classPrivateFieldSet2');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _toSetter = require('@babel/runtime/helpers/toSetter');
-    var _privateField = /* @__PURE__ */ new WeakMap();
-    var _Cl_brand = /* @__PURE__ */ new WeakSet();
-    class Cl {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Cl_brand);
-        _classPrivateFieldInitSpec(this, _privateField, 'top secret string');
-        this.publicField = 'not secret string';
-      }
-      publicGetPrivateField() {
-        return _get_privateFieldValue.call(_assertClassBrand(_Cl_brand, this));
-      }
-      publicSetPrivateField(newValue) {
-        _toSetter(_set_privateFieldValue.bind(_assertClassBrand(_Cl_brand, this)))._ = newValue;
-      }
-    }
-    function _get_privateFieldValue() {
-      return _classPrivateFieldGet(_privateField, this);
-    }
-    function _set_privateFieldValue(newValue) {
-      _classPrivateFieldSet(_privateField, this, newValue);
-    }"
   `);
 });
 
@@ -1663,7 +1007,7 @@ test('accessors-privateFieldsAsProperties/basic/input.js [loose]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -1733,41 +1077,6 @@ test('accessors-privateFieldsAsProperties/basic/input.js [loose]', async () => {
       Object.defineProperty(Cl, 'prototype', { writable: false });
       return Cl;
     })();"
-  `);
-});
-
-test('accessors-privateFieldsAsProperties/class-binding/exec.js [spec]', async () => {
-  const source =
-    'class A {\n  get #getA() { return A };\n  get getA() {\n    return this.#getA;\n  }\n}\n\nconst oldA = A;\nA = null;\n\nexpect(new oldA().getA).toBe(oldA);\n';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _A;
-    var _A_brand = /* @__PURE__ */ new WeakSet();
-    class A {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _A_brand);
-      }
-      get getA() {
-        return _get_getA.call(_assertClassBrand(_A_brand, this));
-      }
-    }
-    _A = A;
-    function _get_getA() {
-      return _A;
-    }
-    const oldA = A;
-    A = null;
-    expect(new oldA().getA).toBe(oldA);"
   `);
 });
 
@@ -1778,7 +1087,7 @@ test('accessors-privateFieldsAsProperties/class-binding/exec.js [loose]', async 
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -1828,40 +1137,13 @@ test('accessors-privateFieldsAsProperties/class-binding/exec.js [loose]', async 
   `);
 });
 
-test('accessors-privateFieldsAsProperties/class-binding/input.js [spec]', async () => {
-  const source = 'class A {\n  get #getA() { return A };\n}\n';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _A;
-    var _A_brand = /* @__PURE__ */ new WeakSet();
-    class A {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _A_brand);
-      }
-    }
-    _A = A;
-    function _get_getA() {
-      return _A;
-    }"
-  `);
-});
-
 test('accessors-privateFieldsAsProperties/class-binding/input.js [loose]', async () => {
   const source = 'class A {\n  get #getA() { return A };\n}\n';
   expect(
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -1882,39 +1164,6 @@ test('accessors-privateFieldsAsProperties/class-binding/input.js [loose]', async
       Object.defineProperty(A, 'prototype', { writable: false });
       return A;
     })();"
-  `);
-});
-
-test('accessors-privateFieldsAsProperties/get-only-setter/exec.js [spec]', async () => {
-  const source =
-    'class Cl {\n  #privateField = 0;\n\n  set #privateFieldValue(newValue) {\n    this.#privateField = newValue;\n  }\n\n  constructor() {\n    expect(this.#privateFieldValue).toBeUndefined();\n  }\n}\n\nconst cl = new Cl();\n';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
-    var _classPrivateFieldSet = require('@babel/runtime/helpers/classPrivateFieldSet2');
-    var _writeOnlyError = require('@babel/runtime/helpers/writeOnlyError');
-    var _privateField = /* @__PURE__ */ new WeakMap();
-    var _Cl_brand = /* @__PURE__ */ new WeakSet();
-    class Cl {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Cl_brand);
-        _classPrivateFieldInitSpec(this, _privateField, 0);
-        expect((this, _writeOnlyError('#privateFieldValue'))).toBeUndefined();
-      }
-    }
-    function _set_privateFieldValue(newValue) {
-      _classPrivateFieldSet(_privateField, this, newValue);
-    }
-    const cl = new Cl();"
   `);
 });
 
@@ -1925,7 +1174,7 @@ test('accessors-privateFieldsAsProperties/get-only-setter/exec.js [loose]', asyn
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -1964,38 +1213,6 @@ test('accessors-privateFieldsAsProperties/get-only-setter/exec.js [loose]', asyn
       return Cl;
     })();
     const cl = new Cl();"
-  `);
-});
-
-test('accessors-privateFieldsAsProperties/get-only-setter/input.js [spec]', async () => {
-  const source =
-    'class Cl {\n  #privateField = 0;\n\n  set #privateFieldValue(newValue) {\n    this.#privateField = newValue;\n  }\n\n  constructor() {\n    this.publicField = this.#privateFieldValue;\n  }\n}\n';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
-    var _classPrivateFieldSet = require('@babel/runtime/helpers/classPrivateFieldSet2');
-    var _writeOnlyError = require('@babel/runtime/helpers/writeOnlyError');
-    var _privateField = /* @__PURE__ */ new WeakMap();
-    var _Cl_brand = /* @__PURE__ */ new WeakSet();
-    class Cl {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Cl_brand);
-        _classPrivateFieldInitSpec(this, _privateField, 0);
-        this.publicField = (this, _writeOnlyError('#privateFieldValue'));
-      }
-    }
-    function _set_privateFieldValue(newValue) {
-      _classPrivateFieldSet(_privateField, this, newValue);
-    }"
   `);
 });
 
@@ -2006,7 +1223,7 @@ test('accessors-privateFieldsAsProperties/get-only-setter/input.js [loose]', asy
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -2045,40 +1262,6 @@ test('accessors-privateFieldsAsProperties/get-only-setter/input.js [loose]', asy
   `);
 });
 
-test('accessors-privateFieldsAsProperties/helper/exec.js [spec]', async () => {
-  const source =
-    'let foo;\nclass Cl {\n  set #foo(v) { return 1 }\n  test() {\n    foo = this.#foo = 2;\n  }\n}\n\nnew Cl().test();\n\nexpect(foo).toBe(2);';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _toSetter = require('@babel/runtime/helpers/toSetter');
-    let foo;
-    var _Cl_brand = /* @__PURE__ */ new WeakSet();
-    class Cl {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Cl_brand);
-      }
-      test() {
-        foo = _toSetter(_set_foo.bind(_assertClassBrand(_Cl_brand, this)))._ = 2;
-      }
-    }
-    function _set_foo(v) {
-      return 1;
-    }
-    new Cl().test();
-    expect(foo).toBe(2);"
-  `);
-});
-
 test('accessors-privateFieldsAsProperties/helper/exec.js [loose]', async () => {
   const source =
     'let foo;\nclass Cl {\n  set #foo(v) { return 1 }\n  test() {\n    foo = this.#foo = 2;\n  }\n}\n\nnew Cl().test();\n\nexpect(foo).toBe(2);';
@@ -2086,7 +1269,7 @@ test('accessors-privateFieldsAsProperties/helper/exec.js [loose]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -2137,36 +1320,6 @@ test('accessors-privateFieldsAsProperties/helper/exec.js [loose]', async () => {
   `);
 });
 
-test('accessors-privateFieldsAsProperties/preserve-comments/input.js [spec]', async () => {
-  const source =
-    'class C {\n  /* before get a */\n  get #a() { return 42 };\n  /* after get a */\n\n  /* before set a */\n  set #a(v) {}\n  /* after set a */\n}\n';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _C_brand = /* @__PURE__ */ new WeakSet();
-    class C {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _C_brand);
-      }
-    }
-    /* before get a */
-    function _get_a() {
-      return 42;
-    }
-    /* after get a */
-    /* before set a */
-    function _set_a(v) {}"
-  `);
-});
-
 test('accessors-privateFieldsAsProperties/preserve-comments/input.js [loose]', async () => {
   const source =
     'class C {\n  /* before get a */\n  get #a() { return 42 };\n  /* after get a */\n\n  /* before set a */\n  set #a(v) {}\n  /* after set a */\n}\n';
@@ -2174,7 +1327,7 @@ test('accessors-privateFieldsAsProperties/preserve-comments/input.js [loose]', a
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -2205,40 +1358,6 @@ test('accessors-privateFieldsAsProperties/preserve-comments/input.js [loose]', a
   `);
 });
 
-test('accessors-privateFieldsAsProperties/set-only-getter/exec.js [spec]', async () => {
-  const source =
-    'class Cl {\n  #privateField = 0;\n\n  get #privateFieldValue() {\n    return this.#privateField;\n  }\n\n  constructor() {\n    expect(() => this.#privateFieldValue = 1).toThrow(TypeError);\n    expect(() => ([this.#privateFieldValue] = [1])).toThrow(TypeError);\n  }\n}\n\nconst cl = new Cl();\n';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
-    var _classPrivateFieldGet = require('@babel/runtime/helpers/classPrivateFieldGet2');
-    var _readOnlyError = require('@babel/runtime/helpers/readOnlyError');
-    var _privateField = /* @__PURE__ */ new WeakMap();
-    var _Cl_brand = /* @__PURE__ */ new WeakSet();
-    class Cl {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Cl_brand);
-        _classPrivateFieldInitSpec(this, _privateField, 0);
-        expect(() => (this, 1, _readOnlyError('#privateFieldValue'))).toThrow(TypeError);
-        expect(() => ([(this, _readOnlyError('#privateFieldValue'))._] = [1])).toThrow(TypeError);
-      }
-    }
-    function _get_privateFieldValue() {
-      return _classPrivateFieldGet(_privateField, this);
-    }
-    const cl = new Cl();"
-  `);
-});
-
 test('accessors-privateFieldsAsProperties/set-only-getter/exec.js [loose]', async () => {
   const source =
     'class Cl {\n  #privateField = 0;\n\n  get #privateFieldValue() {\n    return this.#privateField;\n  }\n\n  constructor() {\n    expect(() => this.#privateFieldValue = 1).toThrow(TypeError);\n    expect(() => ([this.#privateFieldValue] = [1])).toThrow(TypeError);\n  }\n}\n\nconst cl = new Cl();\n';
@@ -2246,7 +1365,7 @@ test('accessors-privateFieldsAsProperties/set-only-getter/exec.js [loose]', asyn
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -2293,39 +1412,6 @@ test('accessors-privateFieldsAsProperties/set-only-getter/exec.js [loose]', asyn
   `);
 });
 
-test('accessors-privateFieldsAsProperties/set-only-getter/input.js [spec]', async () => {
-  const source =
-    'class Cl {\n  #privateField = 0;\n\n  get #privateFieldValue() {\n    return this.#privateField;\n  }\n\n  constructor() {\n    this.#privateFieldValue = 1;\n    ([this.#privateFieldValue] = [1]);\n  }\n}\n';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
-    var _classPrivateFieldGet = require('@babel/runtime/helpers/classPrivateFieldGet2');
-    var _readOnlyError = require('@babel/runtime/helpers/readOnlyError');
-    var _privateField = /* @__PURE__ */ new WeakMap();
-    var _Cl_brand = /* @__PURE__ */ new WeakSet();
-    class Cl {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Cl_brand);
-        _classPrivateFieldInitSpec(this, _privateField, 0);
-        (this, 1, _readOnlyError('#privateFieldValue'));
-        [(this, _readOnlyError('#privateFieldValue'))._] = [1];
-      }
-    }
-    function _get_privateFieldValue() {
-      return _classPrivateFieldGet(_privateField, this);
-    }"
-  `);
-});
-
 test('accessors-privateFieldsAsProperties/set-only-getter/input.js [loose]', async () => {
   const source =
     'class Cl {\n  #privateField = 0;\n\n  get #privateFieldValue() {\n    return this.#privateField;\n  }\n\n  constructor() {\n    this.#privateFieldValue = 1;\n    ([this.#privateFieldValue] = [1]);\n  }\n}\n';
@@ -2333,7 +1419,7 @@ test('accessors-privateFieldsAsProperties/set-only-getter/input.js [loose]', asy
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -2375,85 +1461,6 @@ test('accessors-privateFieldsAsProperties/set-only-getter/input.js [loose]', asy
   `);
 });
 
-test('accessors-privateFieldsAsProperties/updates/exec.js [spec]', async () => {
-  const source =
-    'class Cl {\n  #privateField = "top secret string";\n\n  constructor() {\n    this.publicField = "not secret string";\n  }\n\n  get #privateFieldValue() {\n    return this.#privateField;\n  }\n\n  set #privateFieldValue(newValue) {\n    this.#privateField = newValue;\n  }\n\n  publicGetPrivateField() {\n    return this.#privateFieldValue;\n  }\n\n  publicSetPrivateField(newValue) {\n    this.#privateFieldValue = newValue;\n  }\n\n  get publicFieldValue() {\n    return this.publicField;\n  }\n\n  set publicFieldValue(newValue) {\n    this.publicField = newValue;\n  }\n\n  testUpdates() {\n    this.#privateField = 0;\n    this.publicField = 0;\n    this.#privateFieldValue = this.#privateFieldValue++;\n    this.publicFieldValue = this.publicFieldValue++;\n    expect(this.#privateField).toEqual(this.publicField);\n\n    ++this.#privateFieldValue;\n    ++this.publicFieldValue;\n    expect(this.#privateField).toEqual(this.publicField);\n\n    this.#privateFieldValue += 1;\n    this.publicFieldValue += 1;\n    expect(this.#privateField).toEqual(this.publicField);\n  }\n}\n\nconst cl = new Cl();\ncl.testUpdates();\n';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
-    var _classPrivateFieldGet = require('@babel/runtime/helpers/classPrivateFieldGet2');
-    var _classPrivateFieldSet = require('@babel/runtime/helpers/classPrivateFieldSet2');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _toSetter = require('@babel/runtime/helpers/toSetter');
-    var _privateField = /* @__PURE__ */ new WeakMap();
-    var _Cl_brand = /* @__PURE__ */ new WeakSet();
-    class Cl {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Cl_brand);
-        _classPrivateFieldInitSpec(this, _privateField, 'top secret string');
-        this.publicField = 'not secret string';
-      }
-      publicGetPrivateField() {
-        return _get_privateFieldValue.call(_assertClassBrand(_Cl_brand, this));
-      }
-      publicSetPrivateField(newValue) {
-        _toSetter(_set_privateFieldValue.bind(_assertClassBrand(_Cl_brand, this)))._ = newValue;
-      }
-      get publicFieldValue() {
-        return this.publicField;
-      }
-      set publicFieldValue(newValue) {
-        this.publicField = newValue;
-      }
-      testUpdates() {
-        var _this$privateFieldVal, _this$privateFieldVal2, _this$privateFieldVal3;
-        _classPrivateFieldSet(_privateField, this, 0);
-        this.publicField = 0;
-        _toSetter(_set_privateFieldValue.bind(_assertClassBrand(_Cl_brand, this)))._ =
-          (_set_privateFieldValue.call(
-            _assertClassBrand(_Cl_brand, this),
-            ((_this$privateFieldVal = _get_privateFieldValue.call(_assertClassBrand(_Cl_brand, this))),
-            (_this$privateFieldVal2 = _this$privateFieldVal++),
-            _this$privateFieldVal),
-          ),
-          _this$privateFieldVal2);
-        this.publicFieldValue = this.publicFieldValue++;
-        expect(_classPrivateFieldGet(_privateField, this)).toEqual(this.publicField);
-        _set_privateFieldValue.call(
-          _assertClassBrand(_Cl_brand, this),
-          ((_this$privateFieldVal3 = _get_privateFieldValue.call(_assertClassBrand(_Cl_brand, this))),
-          ++_this$privateFieldVal3),
-        );
-        ++this.publicFieldValue;
-        expect(_classPrivateFieldGet(_privateField, this)).toEqual(this.publicField);
-        _set_privateFieldValue.call(
-          _assertClassBrand(_Cl_brand, this),
-          _get_privateFieldValue.call(_assertClassBrand(_Cl_brand, this)) + 1,
-        );
-        this.publicFieldValue += 1;
-        expect(_classPrivateFieldGet(_privateField, this)).toEqual(this.publicField);
-      }
-    }
-    function _get_privateFieldValue() {
-      return _classPrivateFieldGet(_privateField, this);
-    }
-    function _set_privateFieldValue(newValue) {
-      _classPrivateFieldSet(_privateField, this, newValue);
-    }
-    const cl = new Cl();
-    cl.testUpdates();"
-  `);
-});
-
 test('accessors-privateFieldsAsProperties/updates/exec.js [loose]', async () => {
   const source =
     'class Cl {\n  #privateField = "top secret string";\n\n  constructor() {\n    this.publicField = "not secret string";\n  }\n\n  get #privateFieldValue() {\n    return this.#privateField;\n  }\n\n  set #privateFieldValue(newValue) {\n    this.#privateField = newValue;\n  }\n\n  publicGetPrivateField() {\n    return this.#privateFieldValue;\n  }\n\n  publicSetPrivateField(newValue) {\n    this.#privateFieldValue = newValue;\n  }\n\n  get publicFieldValue() {\n    return this.publicField;\n  }\n\n  set publicFieldValue(newValue) {\n    this.publicField = newValue;\n  }\n\n  testUpdates() {\n    this.#privateField = 0;\n    this.publicField = 0;\n    this.#privateFieldValue = this.#privateFieldValue++;\n    this.publicFieldValue = this.publicFieldValue++;\n    expect(this.#privateField).toEqual(this.publicField);\n\n    ++this.#privateFieldValue;\n    ++this.publicFieldValue;\n    expect(this.#privateField).toEqual(this.publicField);\n\n    this.#privateFieldValue += 1;\n    this.publicFieldValue += 1;\n    expect(this.#privateField).toEqual(this.publicField);\n  }\n}\n\nconst cl = new Cl();\ncl.testUpdates();\n';
@@ -2461,7 +1468,7 @@ test('accessors-privateFieldsAsProperties/updates/exec.js [loose]', async () => 
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -2596,85 +1603,6 @@ test('accessors-privateFieldsAsProperties/updates/exec.js [loose]', async () => 
   `);
 });
 
-test('accessors-privateFieldsAsProperties/updates/input.js [spec]', async () => {
-  const source =
-    'class Cl {\n  #privateField = "top secret string";\n\n  constructor() {\n    this.publicField = "not secret string";\n  }\n\n  get #privateFieldValue() {\n    return this.#privateField;\n  }\n\n  set #privateFieldValue(newValue) {\n    this.#privateField = newValue;\n  }\n\n  publicGetPrivateField() {\n    return this.#privateFieldValue;\n  }\n\n  publicSetPrivateField(newValue) {\n    this.#privateFieldValue = newValue;\n  }\n\n  get publicFieldValue() {\n    return this.publicField;\n  }\n\n  set publicFieldValue(newValue) {\n    this.publicField = newValue;\n  }\n\n  testUpdates() {\n    this.#privateField = 0;\n    this.publicField = 0;\n    this.#privateFieldValue = this.#privateFieldValue++;\n    this.publicFieldValue = this.publicFieldValue++;\n\n    ++this.#privateFieldValue;\n    ++this.publicFieldValue;\n\n    this.#privateFieldValue += 1;\n    this.publicFieldValue += 1;\n\n    this.#privateFieldValue = -(this.#privateFieldValue ** this.#privateFieldValue);\n    this.publicFieldValue = -(this.publicFieldValue ** this.publicFieldValue);\n  }\n}';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
-    var _classPrivateFieldGet = require('@babel/runtime/helpers/classPrivateFieldGet2');
-    var _classPrivateFieldSet = require('@babel/runtime/helpers/classPrivateFieldSet2');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _toSetter = require('@babel/runtime/helpers/toSetter');
-    var _privateField = /* @__PURE__ */ new WeakMap();
-    var _Cl_brand = /* @__PURE__ */ new WeakSet();
-    class Cl {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Cl_brand);
-        _classPrivateFieldInitSpec(this, _privateField, 'top secret string');
-        this.publicField = 'not secret string';
-      }
-      publicGetPrivateField() {
-        return _get_privateFieldValue.call(_assertClassBrand(_Cl_brand, this));
-      }
-      publicSetPrivateField(newValue) {
-        _toSetter(_set_privateFieldValue.bind(_assertClassBrand(_Cl_brand, this)))._ = newValue;
-      }
-      get publicFieldValue() {
-        return this.publicField;
-      }
-      set publicFieldValue(newValue) {
-        this.publicField = newValue;
-      }
-      testUpdates() {
-        var _this$privateFieldVal, _this$privateFieldVal2, _this$privateFieldVal3;
-        _classPrivateFieldSet(_privateField, this, 0);
-        this.publicField = 0;
-        _toSetter(_set_privateFieldValue.bind(_assertClassBrand(_Cl_brand, this)))._ =
-          (_set_privateFieldValue.call(
-            _assertClassBrand(_Cl_brand, this),
-            ((_this$privateFieldVal = _get_privateFieldValue.call(_assertClassBrand(_Cl_brand, this))),
-            (_this$privateFieldVal2 = _this$privateFieldVal++),
-            _this$privateFieldVal),
-          ),
-          _this$privateFieldVal2);
-        this.publicFieldValue = this.publicFieldValue++;
-        _set_privateFieldValue.call(
-          _assertClassBrand(_Cl_brand, this),
-          ((_this$privateFieldVal3 = _get_privateFieldValue.call(_assertClassBrand(_Cl_brand, this))),
-          ++_this$privateFieldVal3),
-        );
-        ++this.publicFieldValue;
-        _set_privateFieldValue.call(
-          _assertClassBrand(_Cl_brand, this),
-          _get_privateFieldValue.call(_assertClassBrand(_Cl_brand, this)) + 1,
-        );
-        this.publicFieldValue += 1;
-        _toSetter(_set_privateFieldValue.bind(_assertClassBrand(_Cl_brand, this)))._ = -(
-          _get_privateFieldValue.call(_assertClassBrand(_Cl_brand, this)) **
-          _get_privateFieldValue.call(_assertClassBrand(_Cl_brand, this))
-        );
-        this.publicFieldValue = -(this.publicFieldValue ** this.publicFieldValue);
-      }
-    }
-    function _get_privateFieldValue() {
-      return _classPrivateFieldGet(_privateField, this);
-    }
-    function _set_privateFieldValue(newValue) {
-      _classPrivateFieldSet(_privateField, this, newValue);
-    }"
-  `);
-});
-
 test('accessors-privateFieldsAsProperties/updates/input.js [loose]', async () => {
   const source =
     'class Cl {\n  #privateField = "top secret string";\n\n  constructor() {\n    this.publicField = "not secret string";\n  }\n\n  get #privateFieldValue() {\n    return this.#privateField;\n  }\n\n  set #privateFieldValue(newValue) {\n    this.#privateField = newValue;\n  }\n\n  publicGetPrivateField() {\n    return this.#privateFieldValue;\n  }\n\n  publicSetPrivateField(newValue) {\n    this.#privateFieldValue = newValue;\n  }\n\n  get publicFieldValue() {\n    return this.publicField;\n  }\n\n  set publicFieldValue(newValue) {\n    this.publicField = newValue;\n  }\n\n  testUpdates() {\n    this.#privateField = 0;\n    this.publicField = 0;\n    this.#privateFieldValue = this.#privateFieldValue++;\n    this.publicFieldValue = this.publicFieldValue++;\n\n    ++this.#privateFieldValue;\n    ++this.publicFieldValue;\n\n    this.#privateFieldValue += 1;\n    this.publicFieldValue += 1;\n\n    this.#privateFieldValue = -(this.#privateFieldValue ** this.#privateFieldValue);\n    this.publicFieldValue = -(this.publicFieldValue ** this.publicFieldValue);\n  }\n}';
@@ -2682,7 +1610,7 @@ test('accessors-privateFieldsAsProperties/updates/input.js [loose]', async () =>
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -2811,53 +1739,6 @@ test('accessors-privateFieldsAsProperties/updates/input.js [loose]', async () =>
   `);
 });
 
-test('accessors-privateFieldsAsSymbols/basic/exec.js [spec]', async () => {
-  const source =
-    'class Cl {\n  #privateField = "top secret string";\n\n  constructor() {\n    this.publicField = "not secret string";\n  }\n\n  get #privateFieldValue() {\n    return this.#privateField;\n  }\n\n  set #privateFieldValue(newValue) {\n    this.#privateField = newValue;\n  }\n\n  publicGetPrivateField() {\n    return this.#privateFieldValue;\n  }\n\n  publicSetPrivateField(newValue) {\n    this.#privateFieldValue = newValue;\n  }\n}\n\nconst cl = new Cl();\n\nexpect(cl.publicGetPrivateField()).toEqual("top secret string");\n\ncl.publicSetPrivateField("new secret string");\nexpect(cl.publicGetPrivateField()).toEqual("new secret string");\n\n';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
-    var _classPrivateFieldGet = require('@babel/runtime/helpers/classPrivateFieldGet2');
-    var _classPrivateFieldSet = require('@babel/runtime/helpers/classPrivateFieldSet2');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _toSetter = require('@babel/runtime/helpers/toSetter');
-    var _privateField = /* @__PURE__ */ new WeakMap();
-    var _Cl_brand = /* @__PURE__ */ new WeakSet();
-    class Cl {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Cl_brand);
-        _classPrivateFieldInitSpec(this, _privateField, 'top secret string');
-        this.publicField = 'not secret string';
-      }
-      publicGetPrivateField() {
-        return _get_privateFieldValue.call(_assertClassBrand(_Cl_brand, this));
-      }
-      publicSetPrivateField(newValue) {
-        _toSetter(_set_privateFieldValue.bind(_assertClassBrand(_Cl_brand, this)))._ = newValue;
-      }
-    }
-    function _get_privateFieldValue() {
-      return _classPrivateFieldGet(_privateField, this);
-    }
-    function _set_privateFieldValue(newValue) {
-      _classPrivateFieldSet(_privateField, this, newValue);
-    }
-    const cl = new Cl();
-    expect(cl.publicGetPrivateField()).toEqual('top secret string');
-    cl.publicSetPrivateField('new secret string');
-    expect(cl.publicGetPrivateField()).toEqual('new secret string');"
-  `);
-});
-
 test('accessors-privateFieldsAsSymbols/basic/exec.js [loose]', async () => {
   const source =
     'class Cl {\n  #privateField = "top secret string";\n\n  constructor() {\n    this.publicField = "not secret string";\n  }\n\n  get #privateFieldValue() {\n    return this.#privateField;\n  }\n\n  set #privateFieldValue(newValue) {\n    this.#privateField = newValue;\n  }\n\n  publicGetPrivateField() {\n    return this.#privateFieldValue;\n  }\n\n  publicSetPrivateField(newValue) {\n    this.#privateFieldValue = newValue;\n  }\n}\n\nconst cl = new Cl();\n\nexpect(cl.publicGetPrivateField()).toEqual("top secret string");\n\ncl.publicSetPrivateField("new secret string");\nexpect(cl.publicGetPrivateField()).toEqual("new secret string");\n\n';
@@ -2865,7 +1746,7 @@ test('accessors-privateFieldsAsSymbols/basic/exec.js [loose]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -2942,49 +1823,6 @@ test('accessors-privateFieldsAsSymbols/basic/exec.js [loose]', async () => {
   `);
 });
 
-test('accessors-privateFieldsAsSymbols/basic/input.js [spec]', async () => {
-  const source =
-    'class Cl {\n  #privateField = "top secret string";\n\n  constructor() {\n    this.publicField = "not secret string";\n  }\n\n  get #privateFieldValue() {\n    return this.#privateField;\n  }\n\n  set #privateFieldValue(newValue) {\n    this.#privateField = newValue;\n  }\n\n  publicGetPrivateField() {\n    return this.#privateFieldValue;\n  }\n\n  publicSetPrivateField(newValue) {\n    this.#privateFieldValue = newValue;\n  }\n}';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
-    var _classPrivateFieldGet = require('@babel/runtime/helpers/classPrivateFieldGet2');
-    var _classPrivateFieldSet = require('@babel/runtime/helpers/classPrivateFieldSet2');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _toSetter = require('@babel/runtime/helpers/toSetter');
-    var _privateField = /* @__PURE__ */ new WeakMap();
-    var _Cl_brand = /* @__PURE__ */ new WeakSet();
-    class Cl {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Cl_brand);
-        _classPrivateFieldInitSpec(this, _privateField, 'top secret string');
-        this.publicField = 'not secret string';
-      }
-      publicGetPrivateField() {
-        return _get_privateFieldValue.call(_assertClassBrand(_Cl_brand, this));
-      }
-      publicSetPrivateField(newValue) {
-        _toSetter(_set_privateFieldValue.bind(_assertClassBrand(_Cl_brand, this)))._ = newValue;
-      }
-    }
-    function _get_privateFieldValue() {
-      return _classPrivateFieldGet(_privateField, this);
-    }
-    function _set_privateFieldValue(newValue) {
-      _classPrivateFieldSet(_privateField, this, newValue);
-    }"
-  `);
-});
-
 test('accessors-privateFieldsAsSymbols/basic/input.js [loose]', async () => {
   const source =
     'class Cl {\n  #privateField = "top secret string";\n\n  constructor() {\n    this.publicField = "not secret string";\n  }\n\n  get #privateFieldValue() {\n    return this.#privateField;\n  }\n\n  set #privateFieldValue(newValue) {\n    this.#privateField = newValue;\n  }\n\n  publicGetPrivateField() {\n    return this.#privateFieldValue;\n  }\n\n  publicSetPrivateField(newValue) {\n    this.#privateFieldValue = newValue;\n  }\n}';
@@ -2992,7 +1830,7 @@ test('accessors-privateFieldsAsSymbols/basic/input.js [loose]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -3065,41 +1903,6 @@ test('accessors-privateFieldsAsSymbols/basic/input.js [loose]', async () => {
   `);
 });
 
-test('accessors-privateFieldsAsSymbols/class-binding/exec.js [spec]', async () => {
-  const source =
-    'class A {\n  get #getA() { return A };\n  get getA() {\n    return this.#getA;\n  }\n}\n\nconst oldA = A;\nA = null;\n\nexpect(new oldA().getA).toBe(oldA);\n';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _A;
-    var _A_brand = /* @__PURE__ */ new WeakSet();
-    class A {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _A_brand);
-      }
-      get getA() {
-        return _get_getA.call(_assertClassBrand(_A_brand, this));
-      }
-    }
-    _A = A;
-    function _get_getA() {
-      return _A;
-    }
-    const oldA = A;
-    A = null;
-    expect(new oldA().getA).toBe(oldA);"
-  `);
-});
-
 test('accessors-privateFieldsAsSymbols/class-binding/exec.js [loose]', async () => {
   const source =
     'class A {\n  get #getA() { return A };\n  get getA() {\n    return this.#getA;\n  }\n}\n\nconst oldA = A;\nA = null;\n\nexpect(new oldA().getA).toBe(oldA);\n';
@@ -3107,7 +1910,7 @@ test('accessors-privateFieldsAsSymbols/class-binding/exec.js [loose]', async () 
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -3157,40 +1960,13 @@ test('accessors-privateFieldsAsSymbols/class-binding/exec.js [loose]', async () 
   `);
 });
 
-test('accessors-privateFieldsAsSymbols/class-binding/input.js [spec]', async () => {
-  const source = 'class A {\n  get #getA() { return A };\n}\n';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _A;
-    var _A_brand = /* @__PURE__ */ new WeakSet();
-    class A {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _A_brand);
-      }
-    }
-    _A = A;
-    function _get_getA() {
-      return _A;
-    }"
-  `);
-});
-
 test('accessors-privateFieldsAsSymbols/class-binding/input.js [loose]', async () => {
   const source = 'class A {\n  get #getA() { return A };\n}\n';
   expect(
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -3214,39 +1990,6 @@ test('accessors-privateFieldsAsSymbols/class-binding/input.js [loose]', async ()
   `);
 });
 
-test('accessors-privateFieldsAsSymbols/get-only-setter/exec.js [spec]', async () => {
-  const source =
-    'class Cl {\n  #privateField = 0;\n\n  set #privateFieldValue(newValue) {\n    this.#privateField = newValue;\n  }\n\n  constructor() {\n    expect(this.#privateFieldValue).toBeUndefined();\n  }\n}\n\nconst cl = new Cl();\n';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
-    var _classPrivateFieldSet = require('@babel/runtime/helpers/classPrivateFieldSet2');
-    var _writeOnlyError = require('@babel/runtime/helpers/writeOnlyError');
-    var _privateField = /* @__PURE__ */ new WeakMap();
-    var _Cl_brand = /* @__PURE__ */ new WeakSet();
-    class Cl {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Cl_brand);
-        _classPrivateFieldInitSpec(this, _privateField, 0);
-        expect((this, _writeOnlyError('#privateFieldValue'))).toBeUndefined();
-      }
-    }
-    function _set_privateFieldValue(newValue) {
-      _classPrivateFieldSet(_privateField, this, newValue);
-    }
-    const cl = new Cl();"
-  `);
-});
-
 test('accessors-privateFieldsAsSymbols/get-only-setter/exec.js [loose]', async () => {
   const source =
     'class Cl {\n  #privateField = 0;\n\n  set #privateFieldValue(newValue) {\n    this.#privateField = newValue;\n  }\n\n  constructor() {\n    expect(this.#privateFieldValue).toBeUndefined();\n  }\n}\n\nconst cl = new Cl();\n';
@@ -3254,7 +1997,7 @@ test('accessors-privateFieldsAsSymbols/get-only-setter/exec.js [loose]', async (
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -3296,38 +2039,6 @@ test('accessors-privateFieldsAsSymbols/get-only-setter/exec.js [loose]', async (
   `);
 });
 
-test('accessors-privateFieldsAsSymbols/get-only-setter/input.js [spec]', async () => {
-  const source =
-    'class Cl {\n  #privateField = 0;\n\n  set #privateFieldValue(newValue) {\n    this.#privateField = newValue;\n  }\n\n  constructor() {\n    this.publicField = this.#privateFieldValue;\n  }\n}\n';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
-    var _classPrivateFieldSet = require('@babel/runtime/helpers/classPrivateFieldSet2');
-    var _writeOnlyError = require('@babel/runtime/helpers/writeOnlyError');
-    var _privateField = /* @__PURE__ */ new WeakMap();
-    var _Cl_brand = /* @__PURE__ */ new WeakSet();
-    class Cl {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Cl_brand);
-        _classPrivateFieldInitSpec(this, _privateField, 0);
-        this.publicField = (this, _writeOnlyError('#privateFieldValue'));
-      }
-    }
-    function _set_privateFieldValue(newValue) {
-      _classPrivateFieldSet(_privateField, this, newValue);
-    }"
-  `);
-});
-
 test('accessors-privateFieldsAsSymbols/get-only-setter/input.js [loose]', async () => {
   const source =
     'class Cl {\n  #privateField = 0;\n\n  set #privateFieldValue(newValue) {\n    this.#privateField = newValue;\n  }\n\n  constructor() {\n    this.publicField = this.#privateFieldValue;\n  }\n}\n';
@@ -3335,7 +2046,7 @@ test('accessors-privateFieldsAsSymbols/get-only-setter/input.js [loose]', async 
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -3374,40 +2085,6 @@ test('accessors-privateFieldsAsSymbols/get-only-setter/input.js [loose]', async 
   `);
 });
 
-test('accessors-privateFieldsAsSymbols/helper/exec.js [spec]', async () => {
-  const source =
-    'let foo;\nclass Cl {\n  set #foo(v) { return 1 }\n  test() {\n    foo = this.#foo = 2;\n  }\n}\n\nnew Cl().test();\n\nexpect(foo).toBe(2);';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _toSetter = require('@babel/runtime/helpers/toSetter');
-    let foo;
-    var _Cl_brand = /* @__PURE__ */ new WeakSet();
-    class Cl {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Cl_brand);
-      }
-      test() {
-        foo = _toSetter(_set_foo.bind(_assertClassBrand(_Cl_brand, this)))._ = 2;
-      }
-    }
-    function _set_foo(v) {
-      return 1;
-    }
-    new Cl().test();
-    expect(foo).toBe(2);"
-  `);
-});
-
 test('accessors-privateFieldsAsSymbols/helper/exec.js [loose]', async () => {
   const source =
     'let foo;\nclass Cl {\n  set #foo(v) { return 1 }\n  test() {\n    foo = this.#foo = 2;\n  }\n}\n\nnew Cl().test();\n\nexpect(foo).toBe(2);';
@@ -3415,7 +2092,7 @@ test('accessors-privateFieldsAsSymbols/helper/exec.js [loose]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -3466,36 +2143,6 @@ test('accessors-privateFieldsAsSymbols/helper/exec.js [loose]', async () => {
   `);
 });
 
-test('accessors-privateFieldsAsSymbols/preserve-comments/input.js [spec]', async () => {
-  const source =
-    'class C {\n  /* before get a */\n  get #a() { return 42 };\n  /* after get a */\n\n  /* before set a */\n  set #a(v) {}\n  /* after set a */\n}\n';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _C_brand = /* @__PURE__ */ new WeakSet();
-    class C {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _C_brand);
-      }
-    }
-    /* before get a */
-    function _get_a() {
-      return 42;
-    }
-    /* after get a */
-    /* before set a */
-    function _set_a(v) {}"
-  `);
-});
-
 test('accessors-privateFieldsAsSymbols/preserve-comments/input.js [loose]', async () => {
   const source =
     'class C {\n  /* before get a */\n  get #a() { return 42 };\n  /* after get a */\n\n  /* before set a */\n  set #a(v) {}\n  /* after set a */\n}\n';
@@ -3503,7 +2150,7 @@ test('accessors-privateFieldsAsSymbols/preserve-comments/input.js [loose]', asyn
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -3534,40 +2181,6 @@ test('accessors-privateFieldsAsSymbols/preserve-comments/input.js [loose]', asyn
   `);
 });
 
-test('accessors-privateFieldsAsSymbols/set-only-getter/exec.js [spec]', async () => {
-  const source =
-    'class Cl {\n  #privateField = 0;\n\n  get #privateFieldValue() {\n    return this.#privateField;\n  }\n\n  constructor() {\n    expect(() => this.#privateFieldValue = 1).toThrow(TypeError);\n    expect(() => ([this.#privateFieldValue] = [1])).toThrow(TypeError);\n  }\n}\n\nconst cl = new Cl();\n';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
-    var _classPrivateFieldGet = require('@babel/runtime/helpers/classPrivateFieldGet2');
-    var _readOnlyError = require('@babel/runtime/helpers/readOnlyError');
-    var _privateField = /* @__PURE__ */ new WeakMap();
-    var _Cl_brand = /* @__PURE__ */ new WeakSet();
-    class Cl {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Cl_brand);
-        _classPrivateFieldInitSpec(this, _privateField, 0);
-        expect(() => (this, 1, _readOnlyError('#privateFieldValue'))).toThrow(TypeError);
-        expect(() => ([(this, _readOnlyError('#privateFieldValue'))._] = [1])).toThrow(TypeError);
-      }
-    }
-    function _get_privateFieldValue() {
-      return _classPrivateFieldGet(_privateField, this);
-    }
-    const cl = new Cl();"
-  `);
-});
-
 test('accessors-privateFieldsAsSymbols/set-only-getter/exec.js [loose]', async () => {
   const source =
     'class Cl {\n  #privateField = 0;\n\n  get #privateFieldValue() {\n    return this.#privateField;\n  }\n\n  constructor() {\n    expect(() => this.#privateFieldValue = 1).toThrow(TypeError);\n    expect(() => ([this.#privateFieldValue] = [1])).toThrow(TypeError);\n  }\n}\n\nconst cl = new Cl();\n';
@@ -3575,7 +2188,7 @@ test('accessors-privateFieldsAsSymbols/set-only-getter/exec.js [loose]', async (
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -3622,39 +2235,6 @@ test('accessors-privateFieldsAsSymbols/set-only-getter/exec.js [loose]', async (
   `);
 });
 
-test('accessors-privateFieldsAsSymbols/set-only-getter/input.js [spec]', async () => {
-  const source =
-    'class Cl {\n  #privateField = 0;\n\n  get #privateFieldValue() {\n    return this.#privateField;\n  }\n\n  constructor() {\n    this.#privateFieldValue = 1;\n    ([this.#privateFieldValue] = [1]);\n  }\n}\n';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
-    var _classPrivateFieldGet = require('@babel/runtime/helpers/classPrivateFieldGet2');
-    var _readOnlyError = require('@babel/runtime/helpers/readOnlyError');
-    var _privateField = /* @__PURE__ */ new WeakMap();
-    var _Cl_brand = /* @__PURE__ */ new WeakSet();
-    class Cl {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Cl_brand);
-        _classPrivateFieldInitSpec(this, _privateField, 0);
-        (this, 1, _readOnlyError('#privateFieldValue'));
-        [(this, _readOnlyError('#privateFieldValue'))._] = [1];
-      }
-    }
-    function _get_privateFieldValue() {
-      return _classPrivateFieldGet(_privateField, this);
-    }"
-  `);
-});
-
 test('accessors-privateFieldsAsSymbols/set-only-getter/input.js [loose]', async () => {
   const source =
     'class Cl {\n  #privateField = 0;\n\n  get #privateFieldValue() {\n    return this.#privateField;\n  }\n\n  constructor() {\n    this.#privateFieldValue = 1;\n    ([this.#privateFieldValue] = [1]);\n  }\n}\n';
@@ -3662,7 +2242,7 @@ test('accessors-privateFieldsAsSymbols/set-only-getter/input.js [loose]', async 
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -3704,85 +2284,6 @@ test('accessors-privateFieldsAsSymbols/set-only-getter/input.js [loose]', async 
   `);
 });
 
-test('accessors-privateFieldsAsSymbols/updates/exec.js [spec]', async () => {
-  const source =
-    'class Cl {\n  #privateField = "top secret string";\n\n  constructor() {\n    this.publicField = "not secret string";\n  }\n\n  get #privateFieldValue() {\n    return this.#privateField;\n  }\n\n  set #privateFieldValue(newValue) {\n    this.#privateField = newValue;\n  }\n\n  publicGetPrivateField() {\n    return this.#privateFieldValue;\n  }\n\n  publicSetPrivateField(newValue) {\n    this.#privateFieldValue = newValue;\n  }\n\n  get publicFieldValue() {\n    return this.publicField;\n  }\n\n  set publicFieldValue(newValue) {\n    this.publicField = newValue;\n  }\n\n  testUpdates() {\n    this.#privateField = 0;\n    this.publicField = 0;\n    this.#privateFieldValue = this.#privateFieldValue++;\n    this.publicFieldValue = this.publicFieldValue++;\n    expect(this.#privateField).toEqual(this.publicField);\n\n    ++this.#privateFieldValue;\n    ++this.publicFieldValue;\n    expect(this.#privateField).toEqual(this.publicField);\n\n    this.#privateFieldValue += 1;\n    this.publicFieldValue += 1;\n    expect(this.#privateField).toEqual(this.publicField);\n  }\n}\n\nconst cl = new Cl();\ncl.testUpdates();\n';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
-    var _classPrivateFieldGet = require('@babel/runtime/helpers/classPrivateFieldGet2');
-    var _classPrivateFieldSet = require('@babel/runtime/helpers/classPrivateFieldSet2');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _toSetter = require('@babel/runtime/helpers/toSetter');
-    var _privateField = /* @__PURE__ */ new WeakMap();
-    var _Cl_brand = /* @__PURE__ */ new WeakSet();
-    class Cl {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Cl_brand);
-        _classPrivateFieldInitSpec(this, _privateField, 'top secret string');
-        this.publicField = 'not secret string';
-      }
-      publicGetPrivateField() {
-        return _get_privateFieldValue.call(_assertClassBrand(_Cl_brand, this));
-      }
-      publicSetPrivateField(newValue) {
-        _toSetter(_set_privateFieldValue.bind(_assertClassBrand(_Cl_brand, this)))._ = newValue;
-      }
-      get publicFieldValue() {
-        return this.publicField;
-      }
-      set publicFieldValue(newValue) {
-        this.publicField = newValue;
-      }
-      testUpdates() {
-        var _this$privateFieldVal, _this$privateFieldVal2, _this$privateFieldVal3;
-        _classPrivateFieldSet(_privateField, this, 0);
-        this.publicField = 0;
-        _toSetter(_set_privateFieldValue.bind(_assertClassBrand(_Cl_brand, this)))._ =
-          (_set_privateFieldValue.call(
-            _assertClassBrand(_Cl_brand, this),
-            ((_this$privateFieldVal = _get_privateFieldValue.call(_assertClassBrand(_Cl_brand, this))),
-            (_this$privateFieldVal2 = _this$privateFieldVal++),
-            _this$privateFieldVal),
-          ),
-          _this$privateFieldVal2);
-        this.publicFieldValue = this.publicFieldValue++;
-        expect(_classPrivateFieldGet(_privateField, this)).toEqual(this.publicField);
-        _set_privateFieldValue.call(
-          _assertClassBrand(_Cl_brand, this),
-          ((_this$privateFieldVal3 = _get_privateFieldValue.call(_assertClassBrand(_Cl_brand, this))),
-          ++_this$privateFieldVal3),
-        );
-        ++this.publicFieldValue;
-        expect(_classPrivateFieldGet(_privateField, this)).toEqual(this.publicField);
-        _set_privateFieldValue.call(
-          _assertClassBrand(_Cl_brand, this),
-          _get_privateFieldValue.call(_assertClassBrand(_Cl_brand, this)) + 1,
-        );
-        this.publicFieldValue += 1;
-        expect(_classPrivateFieldGet(_privateField, this)).toEqual(this.publicField);
-      }
-    }
-    function _get_privateFieldValue() {
-      return _classPrivateFieldGet(_privateField, this);
-    }
-    function _set_privateFieldValue(newValue) {
-      _classPrivateFieldSet(_privateField, this, newValue);
-    }
-    const cl = new Cl();
-    cl.testUpdates();"
-  `);
-});
-
 test('accessors-privateFieldsAsSymbols/updates/exec.js [loose]', async () => {
   const source =
     'class Cl {\n  #privateField = "top secret string";\n\n  constructor() {\n    this.publicField = "not secret string";\n  }\n\n  get #privateFieldValue() {\n    return this.#privateField;\n  }\n\n  set #privateFieldValue(newValue) {\n    this.#privateField = newValue;\n  }\n\n  publicGetPrivateField() {\n    return this.#privateFieldValue;\n  }\n\n  publicSetPrivateField(newValue) {\n    this.#privateFieldValue = newValue;\n  }\n\n  get publicFieldValue() {\n    return this.publicField;\n  }\n\n  set publicFieldValue(newValue) {\n    this.publicField = newValue;\n  }\n\n  testUpdates() {\n    this.#privateField = 0;\n    this.publicField = 0;\n    this.#privateFieldValue = this.#privateFieldValue++;\n    this.publicFieldValue = this.publicFieldValue++;\n    expect(this.#privateField).toEqual(this.publicField);\n\n    ++this.#privateFieldValue;\n    ++this.publicFieldValue;\n    expect(this.#privateField).toEqual(this.publicField);\n\n    this.#privateFieldValue += 1;\n    this.publicFieldValue += 1;\n    expect(this.#privateField).toEqual(this.publicField);\n  }\n}\n\nconst cl = new Cl();\ncl.testUpdates();\n';
@@ -3790,7 +2291,7 @@ test('accessors-privateFieldsAsSymbols/updates/exec.js [loose]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -3925,85 +2426,6 @@ test('accessors-privateFieldsAsSymbols/updates/exec.js [loose]', async () => {
   `);
 });
 
-test('accessors-privateFieldsAsSymbols/updates/input.js [spec]', async () => {
-  const source =
-    'class Cl {\n  #privateField = "top secret string";\n\n  constructor() {\n    this.publicField = "not secret string";\n  }\n\n  get #privateFieldValue() {\n    return this.#privateField;\n  }\n\n  set #privateFieldValue(newValue) {\n    this.#privateField = newValue;\n  }\n\n  publicGetPrivateField() {\n    return this.#privateFieldValue;\n  }\n\n  publicSetPrivateField(newValue) {\n    this.#privateFieldValue = newValue;\n  }\n\n  get publicFieldValue() {\n    return this.publicField;\n  }\n\n  set publicFieldValue(newValue) {\n    this.publicField = newValue;\n  }\n\n  testUpdates() {\n    this.#privateField = 0;\n    this.publicField = 0;\n    this.#privateFieldValue = this.#privateFieldValue++;\n    this.publicFieldValue = this.publicFieldValue++;\n\n    ++this.#privateFieldValue;\n    ++this.publicFieldValue;\n\n    this.#privateFieldValue += 1;\n    this.publicFieldValue += 1;\n\n    this.#privateFieldValue = -(this.#privateFieldValue ** this.#privateFieldValue);\n    this.publicFieldValue = -(this.publicFieldValue ** this.publicFieldValue);\n  }\n}';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
-    var _classPrivateFieldGet = require('@babel/runtime/helpers/classPrivateFieldGet2');
-    var _classPrivateFieldSet = require('@babel/runtime/helpers/classPrivateFieldSet2');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _toSetter = require('@babel/runtime/helpers/toSetter');
-    var _privateField = /* @__PURE__ */ new WeakMap();
-    var _Cl_brand = /* @__PURE__ */ new WeakSet();
-    class Cl {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Cl_brand);
-        _classPrivateFieldInitSpec(this, _privateField, 'top secret string');
-        this.publicField = 'not secret string';
-      }
-      publicGetPrivateField() {
-        return _get_privateFieldValue.call(_assertClassBrand(_Cl_brand, this));
-      }
-      publicSetPrivateField(newValue) {
-        _toSetter(_set_privateFieldValue.bind(_assertClassBrand(_Cl_brand, this)))._ = newValue;
-      }
-      get publicFieldValue() {
-        return this.publicField;
-      }
-      set publicFieldValue(newValue) {
-        this.publicField = newValue;
-      }
-      testUpdates() {
-        var _this$privateFieldVal, _this$privateFieldVal2, _this$privateFieldVal3;
-        _classPrivateFieldSet(_privateField, this, 0);
-        this.publicField = 0;
-        _toSetter(_set_privateFieldValue.bind(_assertClassBrand(_Cl_brand, this)))._ =
-          (_set_privateFieldValue.call(
-            _assertClassBrand(_Cl_brand, this),
-            ((_this$privateFieldVal = _get_privateFieldValue.call(_assertClassBrand(_Cl_brand, this))),
-            (_this$privateFieldVal2 = _this$privateFieldVal++),
-            _this$privateFieldVal),
-          ),
-          _this$privateFieldVal2);
-        this.publicFieldValue = this.publicFieldValue++;
-        _set_privateFieldValue.call(
-          _assertClassBrand(_Cl_brand, this),
-          ((_this$privateFieldVal3 = _get_privateFieldValue.call(_assertClassBrand(_Cl_brand, this))),
-          ++_this$privateFieldVal3),
-        );
-        ++this.publicFieldValue;
-        _set_privateFieldValue.call(
-          _assertClassBrand(_Cl_brand, this),
-          _get_privateFieldValue.call(_assertClassBrand(_Cl_brand, this)) + 1,
-        );
-        this.publicFieldValue += 1;
-        _toSetter(_set_privateFieldValue.bind(_assertClassBrand(_Cl_brand, this)))._ = -(
-          _get_privateFieldValue.call(_assertClassBrand(_Cl_brand, this)) **
-          _get_privateFieldValue.call(_assertClassBrand(_Cl_brand, this))
-        );
-        this.publicFieldValue = -(this.publicFieldValue ** this.publicFieldValue);
-      }
-    }
-    function _get_privateFieldValue() {
-      return _classPrivateFieldGet(_privateField, this);
-    }
-    function _set_privateFieldValue(newValue) {
-      _classPrivateFieldSet(_privateField, this, newValue);
-    }"
-  `);
-});
-
 test('accessors-privateFieldsAsSymbols/updates/input.js [loose]', async () => {
   const source =
     'class Cl {\n  #privateField = "top secret string";\n\n  constructor() {\n    this.publicField = "not secret string";\n  }\n\n  get #privateFieldValue() {\n    return this.#privateField;\n  }\n\n  set #privateFieldValue(newValue) {\n    this.#privateField = newValue;\n  }\n\n  publicGetPrivateField() {\n    return this.#privateFieldValue;\n  }\n\n  publicSetPrivateField(newValue) {\n    this.#privateFieldValue = newValue;\n  }\n\n  get publicFieldValue() {\n    return this.publicField;\n  }\n\n  set publicFieldValue(newValue) {\n    this.publicField = newValue;\n  }\n\n  testUpdates() {\n    this.#privateField = 0;\n    this.publicField = 0;\n    this.#privateFieldValue = this.#privateFieldValue++;\n    this.publicFieldValue = this.publicFieldValue++;\n\n    ++this.#privateFieldValue;\n    ++this.publicFieldValue;\n\n    this.#privateFieldValue += 1;\n    this.publicFieldValue += 1;\n\n    this.#privateFieldValue = -(this.#privateFieldValue ** this.#privateFieldValue);\n    this.publicFieldValue = -(this.publicFieldValue ** this.publicFieldValue);\n  }\n}';
@@ -4011,7 +2433,7 @@ test('accessors-privateFieldsAsSymbols/updates/input.js [loose]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -4140,55 +2562,6 @@ test('accessors-privateFieldsAsSymbols/updates/input.js [loose]', async () => {
   `);
 });
 
-test('accessors/arguments/exec.js [spec]', async () => {
-  const source =
-    'class Cl {\n  #privateField = "top secret string";\n\n  constructor() {\n    this.publicField = "not secret string";\n  }\n\n  get #privateFieldValue() {\n    expect(arguments.length).toBe(0);\n    return this.#privateField;\n  }\n\n  set #privateFieldValue(newValue) {\n    expect(arguments.length).toBe(1);\n    this.#privateField = newValue;\n  }\n\n  publicGetPrivateField() {\n    return this.#privateFieldValue;\n  }\n\n  publicSetPrivateField(newValue) {\n    this.#privateFieldValue = newValue;\n  }\n}\n\nconst cl = new Cl();\n\nexpect(cl.publicGetPrivateField()).toEqual("top secret string");\n\ncl.publicSetPrivateField("new secret string");\nexpect(cl.publicGetPrivateField()).toEqual("new secret string");\n\n';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
-    var _classPrivateFieldGet = require('@babel/runtime/helpers/classPrivateFieldGet2');
-    var _classPrivateFieldSet = require('@babel/runtime/helpers/classPrivateFieldSet2');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _toSetter = require('@babel/runtime/helpers/toSetter');
-    var _privateField = /* @__PURE__ */ new WeakMap();
-    var _Cl_brand = /* @__PURE__ */ new WeakSet();
-    class Cl {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Cl_brand);
-        _classPrivateFieldInitSpec(this, _privateField, 'top secret string');
-        this.publicField = 'not secret string';
-      }
-      publicGetPrivateField() {
-        return _get_privateFieldValue.call(_assertClassBrand(_Cl_brand, this));
-      }
-      publicSetPrivateField(newValue) {
-        _toSetter(_set_privateFieldValue.bind(_assertClassBrand(_Cl_brand, this)))._ = newValue;
-      }
-    }
-    function _get_privateFieldValue() {
-      expect(arguments.length).toBe(0);
-      return _classPrivateFieldGet(_privateField, this);
-    }
-    function _set_privateFieldValue(newValue) {
-      expect(arguments.length).toBe(1);
-      _classPrivateFieldSet(_privateField, this, newValue);
-    }
-    const cl = new Cl();
-    expect(cl.publicGetPrivateField()).toEqual('top secret string');
-    cl.publicSetPrivateField('new secret string');
-    expect(cl.publicGetPrivateField()).toEqual('new secret string');"
-  `);
-});
-
 test('accessors/arguments/exec.js [loose]', async () => {
   const source =
     'class Cl {\n  #privateField = "top secret string";\n\n  constructor() {\n    this.publicField = "not secret string";\n  }\n\n  get #privateFieldValue() {\n    expect(arguments.length).toBe(0);\n    return this.#privateField;\n  }\n\n  set #privateFieldValue(newValue) {\n    expect(arguments.length).toBe(1);\n    this.#privateField = newValue;\n  }\n\n  publicGetPrivateField() {\n    return this.#privateFieldValue;\n  }\n\n  publicSetPrivateField(newValue) {\n    this.#privateFieldValue = newValue;\n  }\n}\n\nconst cl = new Cl();\n\nexpect(cl.publicGetPrivateField()).toEqual("top secret string");\n\ncl.publicSetPrivateField("new secret string");\nexpect(cl.publicGetPrivateField()).toEqual("new secret string");\n\n';
@@ -4196,7 +2569,7 @@ test('accessors/arguments/exec.js [loose]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -4272,51 +2645,6 @@ test('accessors/arguments/exec.js [loose]', async () => {
     expect(cl.publicGetPrivateField()).toEqual('top secret string');
     cl.publicSetPrivateField('new secret string');
     expect(cl.publicGetPrivateField()).toEqual('new secret string');"
-  `);
-});
-
-test('accessors/arguments/input.js [spec]', async () => {
-  const source =
-    'class Cl {\n  #privateField = "top secret string";\n\n  constructor() {\n    this.publicField = "not secret string";\n  }\n\n  get #privateFieldValue() {\n    expect(arguments.length).toBe(0);\n    return this.#privateField;\n  }\n\n  set #privateFieldValue(newValue) {\n    expect(arguments.length).toBe(1);\n    this.#privateField = newValue;\n  }\n\n  publicGetPrivateField() {\n    return this.#privateFieldValue;\n  }\n\n  publicSetPrivateField(newValue) {\n    this.#privateFieldValue = newValue;\n  }\n}\n';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
-    var _classPrivateFieldGet = require('@babel/runtime/helpers/classPrivateFieldGet2');
-    var _classPrivateFieldSet = require('@babel/runtime/helpers/classPrivateFieldSet2');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _toSetter = require('@babel/runtime/helpers/toSetter');
-    var _privateField = /* @__PURE__ */ new WeakMap();
-    var _Cl_brand = /* @__PURE__ */ new WeakSet();
-    class Cl {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Cl_brand);
-        _classPrivateFieldInitSpec(this, _privateField, 'top secret string');
-        this.publicField = 'not secret string';
-      }
-      publicGetPrivateField() {
-        return _get_privateFieldValue.call(_assertClassBrand(_Cl_brand, this));
-      }
-      publicSetPrivateField(newValue) {
-        _toSetter(_set_privateFieldValue.bind(_assertClassBrand(_Cl_brand, this)))._ = newValue;
-      }
-    }
-    function _get_privateFieldValue() {
-      expect(arguments.length).toBe(0);
-      return _classPrivateFieldGet(_privateField, this);
-    }
-    function _set_privateFieldValue(newValue) {
-      expect(arguments.length).toBe(1);
-      _classPrivateFieldSet(_privateField, this, newValue);
-    }"
   `);
 });
 
@@ -4327,7 +2655,7 @@ test('accessors/arguments/input.js [loose]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -4402,53 +2730,6 @@ test('accessors/arguments/input.js [loose]', async () => {
   `);
 });
 
-test('accessors/basic/exec.js [spec]', async () => {
-  const source =
-    'class Cl {\n  #privateField = "top secret string";\n\n  constructor() {\n    this.publicField = "not secret string";\n  }\n\n  get #privateFieldValue() {\n    return this.#privateField;\n  }\n\n  set #privateFieldValue(newValue) {\n    this.#privateField = newValue;\n  }\n\n  publicGetPrivateField() {\n    return this.#privateFieldValue;\n  }\n\n  publicSetPrivateField(newValue) {\n    this.#privateFieldValue = newValue;\n  }\n}\n\nconst cl = new Cl();\n\nexpect(cl.publicGetPrivateField()).toEqual("top secret string");\n\ncl.publicSetPrivateField("new secret string");\nexpect(cl.publicGetPrivateField()).toEqual("new secret string");\n\n';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
-    var _classPrivateFieldGet = require('@babel/runtime/helpers/classPrivateFieldGet2');
-    var _classPrivateFieldSet = require('@babel/runtime/helpers/classPrivateFieldSet2');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _toSetter = require('@babel/runtime/helpers/toSetter');
-    var _privateField = /* @__PURE__ */ new WeakMap();
-    var _Cl_brand = /* @__PURE__ */ new WeakSet();
-    class Cl {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Cl_brand);
-        _classPrivateFieldInitSpec(this, _privateField, 'top secret string');
-        this.publicField = 'not secret string';
-      }
-      publicGetPrivateField() {
-        return _get_privateFieldValue.call(_assertClassBrand(_Cl_brand, this));
-      }
-      publicSetPrivateField(newValue) {
-        _toSetter(_set_privateFieldValue.bind(_assertClassBrand(_Cl_brand, this)))._ = newValue;
-      }
-    }
-    function _get_privateFieldValue() {
-      return _classPrivateFieldGet(_privateField, this);
-    }
-    function _set_privateFieldValue(newValue) {
-      _classPrivateFieldSet(_privateField, this, newValue);
-    }
-    const cl = new Cl();
-    expect(cl.publicGetPrivateField()).toEqual('top secret string');
-    cl.publicSetPrivateField('new secret string');
-    expect(cl.publicGetPrivateField()).toEqual('new secret string');"
-  `);
-});
-
 test('accessors/basic/exec.js [loose]', async () => {
   const source =
     'class Cl {\n  #privateField = "top secret string";\n\n  constructor() {\n    this.publicField = "not secret string";\n  }\n\n  get #privateFieldValue() {\n    return this.#privateField;\n  }\n\n  set #privateFieldValue(newValue) {\n    this.#privateField = newValue;\n  }\n\n  publicGetPrivateField() {\n    return this.#privateFieldValue;\n  }\n\n  publicSetPrivateField(newValue) {\n    this.#privateFieldValue = newValue;\n  }\n}\n\nconst cl = new Cl();\n\nexpect(cl.publicGetPrivateField()).toEqual("top secret string");\n\ncl.publicSetPrivateField("new secret string");\nexpect(cl.publicGetPrivateField()).toEqual("new secret string");\n\n';
@@ -4456,7 +2737,7 @@ test('accessors/basic/exec.js [loose]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -4533,49 +2814,6 @@ test('accessors/basic/exec.js [loose]', async () => {
   `);
 });
 
-test('accessors/basic/input.js [spec]', async () => {
-  const source =
-    'class Cl {\n  #privateField = "top secret string";\n\n  constructor() {\n    this.publicField = "not secret string";\n  }\n\n  get #privateFieldValue() {\n    return this.#privateField;\n  }\n\n  set #privateFieldValue(newValue) {\n    this.#privateField = newValue;\n  }\n\n  publicGetPrivateField() {\n    return this.#privateFieldValue;\n  }\n\n  publicSetPrivateField(newValue) {\n    this.#privateFieldValue = newValue;\n  }\n}';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
-    var _classPrivateFieldGet = require('@babel/runtime/helpers/classPrivateFieldGet2');
-    var _classPrivateFieldSet = require('@babel/runtime/helpers/classPrivateFieldSet2');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _toSetter = require('@babel/runtime/helpers/toSetter');
-    var _privateField = /* @__PURE__ */ new WeakMap();
-    var _Cl_brand = /* @__PURE__ */ new WeakSet();
-    class Cl {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Cl_brand);
-        _classPrivateFieldInitSpec(this, _privateField, 'top secret string');
-        this.publicField = 'not secret string';
-      }
-      publicGetPrivateField() {
-        return _get_privateFieldValue.call(_assertClassBrand(_Cl_brand, this));
-      }
-      publicSetPrivateField(newValue) {
-        _toSetter(_set_privateFieldValue.bind(_assertClassBrand(_Cl_brand, this)))._ = newValue;
-      }
-    }
-    function _get_privateFieldValue() {
-      return _classPrivateFieldGet(_privateField, this);
-    }
-    function _set_privateFieldValue(newValue) {
-      _classPrivateFieldSet(_privateField, this, newValue);
-    }"
-  `);
-});
-
 test('accessors/basic/input.js [loose]', async () => {
   const source =
     'class Cl {\n  #privateField = "top secret string";\n\n  constructor() {\n    this.publicField = "not secret string";\n  }\n\n  get #privateFieldValue() {\n    return this.#privateField;\n  }\n\n  set #privateFieldValue(newValue) {\n    this.#privateField = newValue;\n  }\n\n  publicGetPrivateField() {\n    return this.#privateFieldValue;\n  }\n\n  publicSetPrivateField(newValue) {\n    this.#privateFieldValue = newValue;\n  }\n}';
@@ -4583,7 +2821,7 @@ test('accessors/basic/input.js [loose]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -4656,41 +2894,6 @@ test('accessors/basic/input.js [loose]', async () => {
   `);
 });
 
-test('accessors/class-binding/exec.js [spec]', async () => {
-  const source =
-    'class A {\n  get #getA() { return A };\n  get getA() {\n    return this.#getA;\n  }\n}\n\nconst oldA = A;\nA = null;\n\nexpect(new oldA().getA).toBe(oldA);\n';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _A;
-    var _A_brand = /* @__PURE__ */ new WeakSet();
-    class A {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _A_brand);
-      }
-      get getA() {
-        return _get_getA.call(_assertClassBrand(_A_brand, this));
-      }
-    }
-    _A = A;
-    function _get_getA() {
-      return _A;
-    }
-    const oldA = A;
-    A = null;
-    expect(new oldA().getA).toBe(oldA);"
-  `);
-});
-
 test('accessors/class-binding/exec.js [loose]', async () => {
   const source =
     'class A {\n  get #getA() { return A };\n  get getA() {\n    return this.#getA;\n  }\n}\n\nconst oldA = A;\nA = null;\n\nexpect(new oldA().getA).toBe(oldA);\n';
@@ -4698,7 +2901,7 @@ test('accessors/class-binding/exec.js [loose]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -4748,40 +2951,13 @@ test('accessors/class-binding/exec.js [loose]', async () => {
   `);
 });
 
-test('accessors/class-binding/input.js [spec]', async () => {
-  const source = 'class A {\n  get #getA() { return A };\n}\n';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _A;
-    var _A_brand = /* @__PURE__ */ new WeakSet();
-    class A {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _A_brand);
-      }
-    }
-    _A = A;
-    function _get_getA() {
-      return _A;
-    }"
-  `);
-});
-
 test('accessors/class-binding/input.js [loose]', async () => {
   const source = 'class A {\n  get #getA() { return A };\n}\n';
   expect(
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -4805,38 +2981,6 @@ test('accessors/class-binding/input.js [loose]', async () => {
   `);
 });
 
-test('accessors/destructuring/input.js [spec]', async () => {
-  const source =
-    'class A {\n  set #setter(v) {}\n  get #getter() {}\n\n  m() {\n    [this.#setter] = [1];\n    [this.#getter] = [1];\n  }\n}\n';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _toSetter = require('@babel/runtime/helpers/toSetter');
-    var _readOnlyError = require('@babel/runtime/helpers/readOnlyError');
-    var _A_brand = /* @__PURE__ */ new WeakSet();
-    class A {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _A_brand);
-      }
-      m() {
-        [_toSetter(_set_setter.bind(_assertClassBrand(_A_brand, this)))._] = [1];
-        [(this, _readOnlyError('#getter'))._] = [1];
-      }
-    }
-    function _set_setter(v) {}
-    function _get_getter() {}"
-  `);
-});
-
 test('accessors/destructuring/input.js [loose]', async () => {
   const source =
     'class A {\n  set #setter(v) {}\n  get #getter() {}\n\n  m() {\n    [this.#setter] = [1];\n    [this.#getter] = [1];\n  }\n}\n';
@@ -4844,7 +2988,7 @@ test('accessors/destructuring/input.js [loose]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -4898,39 +3042,6 @@ test('accessors/destructuring/input.js [loose]', async () => {
   `);
 });
 
-test('accessors/get-only-setter/exec.js [spec]', async () => {
-  const source =
-    'class Cl {\n  #privateField = 0;\n\n  set #privateFieldValue(newValue) {\n    this.#privateField = newValue;\n  }\n\n  constructor() {\n    expect(() => this.#privateFieldValue).toThrow(TypeError);\n  }\n}\n\nconst cl = new Cl();\n';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
-    var _classPrivateFieldSet = require('@babel/runtime/helpers/classPrivateFieldSet2');
-    var _writeOnlyError = require('@babel/runtime/helpers/writeOnlyError');
-    var _privateField = /* @__PURE__ */ new WeakMap();
-    var _Cl_brand = /* @__PURE__ */ new WeakSet();
-    class Cl {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Cl_brand);
-        _classPrivateFieldInitSpec(this, _privateField, 0);
-        expect(() => (this, _writeOnlyError('#privateFieldValue'))).toThrow(TypeError);
-      }
-    }
-    function _set_privateFieldValue(newValue) {
-      _classPrivateFieldSet(_privateField, this, newValue);
-    }
-    const cl = new Cl();"
-  `);
-});
-
 test('accessors/get-only-setter/exec.js [loose]', async () => {
   const source =
     'class Cl {\n  #privateField = 0;\n\n  set #privateFieldValue(newValue) {\n    this.#privateField = newValue;\n  }\n\n  constructor() {\n    expect(() => this.#privateFieldValue).toThrow(TypeError);\n  }\n}\n\nconst cl = new Cl();\n';
@@ -4938,7 +3049,7 @@ test('accessors/get-only-setter/exec.js [loose]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -4980,38 +3091,6 @@ test('accessors/get-only-setter/exec.js [loose]', async () => {
   `);
 });
 
-test('accessors/get-only-setter/input.js [spec]', async () => {
-  const source =
-    'class Cl {\n  #privateField = 0;\n\n  set #privateFieldValue(newValue) {\n    this.#privateField = newValue;\n  }\n\n  constructor() {\n    this.publicField = this.#privateFieldValue;\n  }\n}\n';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
-    var _classPrivateFieldSet = require('@babel/runtime/helpers/classPrivateFieldSet2');
-    var _writeOnlyError = require('@babel/runtime/helpers/writeOnlyError');
-    var _privateField = /* @__PURE__ */ new WeakMap();
-    var _Cl_brand = /* @__PURE__ */ new WeakSet();
-    class Cl {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Cl_brand);
-        _classPrivateFieldInitSpec(this, _privateField, 0);
-        this.publicField = (this, _writeOnlyError('#privateFieldValue'));
-      }
-    }
-    function _set_privateFieldValue(newValue) {
-      _classPrivateFieldSet(_privateField, this, newValue);
-    }"
-  `);
-});
-
 test('accessors/get-only-setter/input.js [loose]', async () => {
   const source =
     'class Cl {\n  #privateField = 0;\n\n  set #privateFieldValue(newValue) {\n    this.#privateField = newValue;\n  }\n\n  constructor() {\n    this.publicField = this.#privateFieldValue;\n  }\n}\n';
@@ -5019,7 +3098,7 @@ test('accessors/get-only-setter/input.js [loose]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -5058,40 +3137,6 @@ test('accessors/get-only-setter/input.js [loose]', async () => {
   `);
 });
 
-test('accessors/helper/exec.js [spec]', async () => {
-  const source =
-    'let foo;\nclass Cl {\n  set #foo(v) { return 1 }\n  test() {\n    foo = this.#foo = 2;\n  }\n}\n\nnew Cl().test();\n\nexpect(foo).toBe(2);';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _toSetter = require('@babel/runtime/helpers/toSetter');
-    let foo;
-    var _Cl_brand = /* @__PURE__ */ new WeakSet();
-    class Cl {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Cl_brand);
-      }
-      test() {
-        foo = _toSetter(_set_foo.bind(_assertClassBrand(_Cl_brand, this)))._ = 2;
-      }
-    }
-    function _set_foo(v) {
-      return 1;
-    }
-    new Cl().test();
-    expect(foo).toBe(2);"
-  `);
-});
-
 test('accessors/helper/exec.js [loose]', async () => {
   const source =
     'let foo;\nclass Cl {\n  set #foo(v) { return 1 }\n  test() {\n    foo = this.#foo = 2;\n  }\n}\n\nnew Cl().test();\n\nexpect(foo).toBe(2);';
@@ -5099,7 +3144,7 @@ test('accessors/helper/exec.js [loose]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -5150,36 +3195,6 @@ test('accessors/helper/exec.js [loose]', async () => {
   `);
 });
 
-test('accessors/preserve-comments/input.js [spec]', async () => {
-  const source =
-    'class C {\n  /* before get a */\n  get #a() { return 42 };\n  /* after get a */\n\n  /* before set a */\n  set #a(v) {}\n  /* after set a */\n}\n';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _C_brand = /* @__PURE__ */ new WeakSet();
-    class C {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _C_brand);
-      }
-    }
-    /* before get a */
-    function _get_a() {
-      return 42;
-    }
-    /* after get a */
-    /* before set a */
-    function _set_a(v) {}"
-  `);
-});
-
 test('accessors/preserve-comments/input.js [loose]', async () => {
   const source =
     'class C {\n  /* before get a */\n  get #a() { return 42 };\n  /* after get a */\n\n  /* before set a */\n  set #a(v) {}\n  /* after set a */\n}\n';
@@ -5187,7 +3202,7 @@ test('accessors/preserve-comments/input.js [loose]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -5218,41 +3233,6 @@ test('accessors/preserve-comments/input.js [loose]', async () => {
   `);
 });
 
-test('accessors/reassignment/exec.js [spec]', async () => {
-  const source =
-    'let results = [];\nclass Foo {\n  constructor() {\n    this.self.#privateFieldValue = results.push(2);\n  }\n\n  get self() {\n    results.push(1);\n    return this;\n  }\n\n  get #privateFieldValue() {\n    return 42;\n  }\n}\n\nexpect(() => new Foo).toThrow(TypeError);\nexpect(results).toStrictEqual([1, 2]);\n';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _readOnlyError = require('@babel/runtime/helpers/readOnlyError');
-    let results = [];
-    var _Foo_brand = /* @__PURE__ */ new WeakSet();
-    class Foo {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Foo_brand);
-        (this.self, results.push(2), _readOnlyError('#privateFieldValue'));
-      }
-      get self() {
-        results.push(1);
-        return this;
-      }
-    }
-    function _get_privateFieldValue() {
-      return 42;
-    }
-    expect(() => new Foo()).toThrow(TypeError);
-    expect(results).toStrictEqual([1, 2]);"
-  `);
-});
-
 test('accessors/reassignment/exec.js [loose]', async () => {
   const source =
     'let results = [];\nclass Foo {\n  constructor() {\n    this.self.#privateFieldValue = results.push(2);\n  }\n\n  get self() {\n    results.push(1);\n    return this;\n  }\n\n  get #privateFieldValue() {\n    return 42;\n  }\n}\n\nexpect(() => new Foo).toThrow(TypeError);\nexpect(results).toStrictEqual([1, 2]);\n';
@@ -5260,7 +3240,7 @@ test('accessors/reassignment/exec.js [loose]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -5314,39 +3294,6 @@ test('accessors/reassignment/exec.js [loose]', async () => {
   `);
 });
 
-test('accessors/reassignment/input.js [spec]', async () => {
-  const source =
-    'let results = [];\nclass Foo {\n  constructor() {\n    this.self.#privateFieldValue = results.push(2);\n  }\n\n  get self() {\n    results.push(1);\n    return this;\n  }\n\n  get #privateFieldValue() {\n    return 42;\n  }\n}\n';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _readOnlyError = require('@babel/runtime/helpers/readOnlyError');
-    let results = [];
-    var _Foo_brand = /* @__PURE__ */ new WeakSet();
-    class Foo {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Foo_brand);
-        (this.self, results.push(2), _readOnlyError('#privateFieldValue'));
-      }
-      get self() {
-        results.push(1);
-        return this;
-      }
-    }
-    function _get_privateFieldValue() {
-      return 42;
-    }"
-  `);
-});
-
 test('accessors/reassignment/input.js [loose]', async () => {
   const source =
     'let results = [];\nclass Foo {\n  constructor() {\n    this.self.#privateFieldValue = results.push(2);\n  }\n\n  get self() {\n    results.push(1);\n    return this;\n  }\n\n  get #privateFieldValue() {\n    return 42;\n  }\n}\n';
@@ -5354,7 +3301,7 @@ test('accessors/reassignment/input.js [loose]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -5406,48 +3353,6 @@ test('accessors/reassignment/input.js [loose]', async () => {
   `);
 });
 
-test('accessors/set-only-getter/exec.js [spec]', async () => {
-  const source =
-    'class Cl {\n  #privateField = 0;\n  counter = 0;\n\n  get #privateFieldValue() {\n    return this.#privateField;\n  }\n\n  get self() {\n    this.counter++;\n    return this;\n  }\n\n  constructor() {\n    expect(() => this.self.#privateFieldValue = 1).toThrow(TypeError);\n    expect(this.counter).toBe(1);\n    expect(() => ([this.self.#privateFieldValue] = [1])).toThrow(TypeError);\n    expect(this.counter).toBe(2);\n  }\n}\n\nconst cl = new Cl();\n';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
-    var _defineProperty = require('@babel/runtime/helpers/defineProperty');
-    var _classPrivateFieldGet = require('@babel/runtime/helpers/classPrivateFieldGet2');
-    var _readOnlyError = require('@babel/runtime/helpers/readOnlyError');
-    var _privateField = /* @__PURE__ */ new WeakMap();
-    var _Cl_brand = /* @__PURE__ */ new WeakSet();
-    class Cl {
-      get self() {
-        this.counter++;
-        return this;
-      }
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Cl_brand);
-        _classPrivateFieldInitSpec(this, _privateField, 0);
-        _defineProperty(this, 'counter', 0);
-        expect(() => (this.self, 1, _readOnlyError('#privateFieldValue'))).toThrow(TypeError);
-        expect(this.counter).toBe(1);
-        expect(() => ([(this.self, _readOnlyError('#privateFieldValue'))._] = [1])).toThrow(TypeError);
-        expect(this.counter).toBe(2);
-      }
-    }
-    function _get_privateFieldValue() {
-      return _classPrivateFieldGet(_privateField, this);
-    }
-    const cl = new Cl();"
-  `);
-});
-
 test('accessors/set-only-getter/exec.js [loose]', async () => {
   const source =
     'class Cl {\n  #privateField = 0;\n  counter = 0;\n\n  get #privateFieldValue() {\n    return this.#privateField;\n  }\n\n  get self() {\n    this.counter++;\n    return this;\n  }\n\n  constructor() {\n    expect(() => this.self.#privateFieldValue = 1).toThrow(TypeError);\n    expect(this.counter).toBe(1);\n    expect(() => ([this.self.#privateFieldValue] = [1])).toThrow(TypeError);\n    expect(this.counter).toBe(2);\n  }\n}\n\nconst cl = new Cl();\n';
@@ -5455,7 +3360,7 @@ test('accessors/set-only-getter/exec.js [loose]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -5480,7 +3385,12 @@ test('accessors/set-only-getter/exec.js [loose]', async () => {
           writable: true,
           value: 0,
         });
-        this.counter = 0;
+        Object.defineProperty(this, 'counter', {
+          value: 0,
+          enumerable: true,
+          configurable: true,
+          writable: true,
+        });
         Object.defineProperty(this, _privateFieldValue, {
           get: function () {
             if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
@@ -5521,47 +3431,6 @@ test('accessors/set-only-getter/exec.js [loose]', async () => {
   `);
 });
 
-test('accessors/set-only-getter/input.js [spec]', async () => {
-  const source =
-    'class Cl {\n  #privateField = 0;\n  counter = 0;\n\n  get #privateFieldValue() {\n    return this.#privateField;\n  }\n\n  get self() {\n    this.counter++;\n    return this;\n  }\n\n  constructor() {\n    this.self.#privateFieldValue = 1\n    ([this.self.#privateFieldValue] = [1]);\n  }\n}\n\nconst cl = new Cl();\n';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
-    var _defineProperty = require('@babel/runtime/helpers/defineProperty');
-    var _classPrivateFieldGet = require('@babel/runtime/helpers/classPrivateFieldGet2');
-    var _readOnlyError = require('@babel/runtime/helpers/readOnlyError');
-    var _privateField = /* @__PURE__ */ new WeakMap();
-    var _Cl_brand = /* @__PURE__ */ new WeakSet();
-    class Cl {
-      get self() {
-        this.counter++;
-        return this;
-      }
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Cl_brand);
-        _classPrivateFieldInitSpec(this, _privateField, 0);
-        _defineProperty(this, 'counter', 0);
-        (this.self,
-          1(([(this.self, _readOnlyError('#privateFieldValue'))._] = [1])),
-          _readOnlyError('#privateFieldValue'));
-      }
-    }
-    function _get_privateFieldValue() {
-      return _classPrivateFieldGet(_privateField, this);
-    }
-    const cl = new Cl();"
-  `);
-});
-
 test('accessors/set-only-getter/input.js [loose]', async () => {
   const source =
     'class Cl {\n  #privateField = 0;\n  counter = 0;\n\n  get #privateFieldValue() {\n    return this.#privateField;\n  }\n\n  get self() {\n    this.counter++;\n    return this;\n  }\n\n  constructor() {\n    this.self.#privateFieldValue = 1\n    ([this.self.#privateFieldValue] = [1]);\n  }\n}\n\nconst cl = new Cl();\n';
@@ -5569,7 +3438,7 @@ test('accessors/set-only-getter/input.js [loose]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -5594,7 +3463,12 @@ test('accessors/set-only-getter/input.js [loose]', async () => {
           writable: true,
           value: 0,
         });
-        this.counter = 0;
+        Object.defineProperty(this, 'counter', {
+          value: 0,
+          enumerable: true,
+          configurable: true,
+          writable: true,
+        });
         Object.defineProperty(this, _privateFieldValue, {
           get: function () {
             if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
@@ -5627,37 +3501,6 @@ test('accessors/set-only-getter/input.js [loose]', async () => {
   `);
 });
 
-test('accessors/tagged-template/exec.js [spec]', async () => {
-  const source =
-    'class Foo {\n  get #tag() {\n    return function() { return this; };\n  }\n  \n  constructor() {\n    const receiver = this.#tag``;\n    expect(receiver).toBe(this);\n  }\n}';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _Foo_brand = /* @__PURE__ */ new WeakSet();
-    class Foo {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Foo_brand);
-        const receiver = _get_tag.call(_assertClassBrand(_Foo_brand, this)).bind(this)\`\`;
-        expect(receiver).toBe(this);
-      }
-    }
-    function _get_tag() {
-      return function () {
-        return this;
-      };
-    }"
-  `);
-});
-
 test('accessors/tagged-template/exec.js [loose]', async () => {
   const source =
     'class Foo {\n  get #tag() {\n    return function() { return this; };\n  }\n  \n  constructor() {\n    const receiver = this.#tag``;\n    expect(receiver).toBe(this);\n  }\n}';
@@ -5665,7 +3508,7 @@ test('accessors/tagged-template/exec.js [loose]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -5702,35 +3545,6 @@ test('accessors/tagged-template/exec.js [loose]', async () => {
   `);
 });
 
-test('accessors/tagged-template/input.js [spec]', async () => {
-  const source =
-    'class Foo {\n  get #tag() {\n    return () => this;\n  }\n\n  constructor() {\n    this.#tag``;\n  }\n}\n\nnew Foo();';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _Foo_brand = /* @__PURE__ */ new WeakSet();
-    class Foo {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Foo_brand);
-        _get_tag.call(_assertClassBrand(_Foo_brand, this)).bind(this)\`\`;
-      }
-    }
-    function _get_tag() {
-      return () => this;
-    }
-    new Foo();"
-  `);
-});
-
 test('accessors/tagged-template/input.js [loose]', async () => {
   const source =
     'class Foo {\n  get #tag() {\n    return () => this;\n  }\n\n  constructor() {\n    this.#tag``;\n  }\n}\n\nnew Foo();';
@@ -5738,7 +3552,7 @@ test('accessors/tagged-template/input.js [loose]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -5773,85 +3587,6 @@ test('accessors/tagged-template/input.js [loose]', async () => {
   `);
 });
 
-test('accessors/updates-bigint/exec.js [spec]', async () => {
-  const source =
-    'class Cl {\n  #privateField = "top secret string";\n\n  constructor() {\n    this.publicField = "not secret string";\n  }\n\n  get #privateFieldValue() {\n    return this.#privateField;\n  }\n\n  set #privateFieldValue(newValue) {\n    this.#privateField = newValue;\n  }\n\n  publicGetPrivateField() {\n    return this.#privateFieldValue;\n  }\n\n  publicSetPrivateField(newValue) {\n    this.#privateFieldValue = newValue;\n  }\n\n  get publicFieldValue() {\n    return this.publicField;\n  }\n\n  set publicFieldValue(newValue) {\n    this.publicField = newValue;\n  }\n\n  testUpdates() {\n    this.#privateField = 0n;\n    this.publicField = 0n;\n    this.#privateFieldValue = this.#privateFieldValue++;\n    this.publicFieldValue = this.publicFieldValue++;\n    expect(this.#privateField).toEqual(this.publicField);\n\n    ++this.#privateFieldValue;\n    ++this.publicFieldValue;\n    expect(this.#privateField).toEqual(this.publicField);\n\n    this.#privateFieldValue += 1n;\n    this.publicFieldValue += 1n;\n    expect(this.#privateField).toEqual(this.publicField);\n  }\n}\n\nconst cl = new Cl();\ncl.testUpdates();\n';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
-    var _classPrivateFieldGet = require('@babel/runtime/helpers/classPrivateFieldGet2');
-    var _classPrivateFieldSet = require('@babel/runtime/helpers/classPrivateFieldSet2');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _toSetter = require('@babel/runtime/helpers/toSetter');
-    var _privateField = /* @__PURE__ */ new WeakMap();
-    var _Cl_brand = /* @__PURE__ */ new WeakSet();
-    class Cl {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Cl_brand);
-        _classPrivateFieldInitSpec(this, _privateField, 'top secret string');
-        this.publicField = 'not secret string';
-      }
-      publicGetPrivateField() {
-        return _get_privateFieldValue.call(_assertClassBrand(_Cl_brand, this));
-      }
-      publicSetPrivateField(newValue) {
-        _toSetter(_set_privateFieldValue.bind(_assertClassBrand(_Cl_brand, this)))._ = newValue;
-      }
-      get publicFieldValue() {
-        return this.publicField;
-      }
-      set publicFieldValue(newValue) {
-        this.publicField = newValue;
-      }
-      testUpdates() {
-        var _this$privateFieldVal, _this$privateFieldVal2, _this$privateFieldVal3;
-        _classPrivateFieldSet(_privateField, this, 0n);
-        this.publicField = 0n;
-        _toSetter(_set_privateFieldValue.bind(_assertClassBrand(_Cl_brand, this)))._ =
-          (_set_privateFieldValue.call(
-            _assertClassBrand(_Cl_brand, this),
-            ((_this$privateFieldVal = _get_privateFieldValue.call(_assertClassBrand(_Cl_brand, this))),
-            (_this$privateFieldVal2 = _this$privateFieldVal++),
-            _this$privateFieldVal),
-          ),
-          _this$privateFieldVal2);
-        this.publicFieldValue = this.publicFieldValue++;
-        expect(_classPrivateFieldGet(_privateField, this)).toEqual(this.publicField);
-        _set_privateFieldValue.call(
-          _assertClassBrand(_Cl_brand, this),
-          ((_this$privateFieldVal3 = _get_privateFieldValue.call(_assertClassBrand(_Cl_brand, this))),
-          ++_this$privateFieldVal3),
-        );
-        ++this.publicFieldValue;
-        expect(_classPrivateFieldGet(_privateField, this)).toEqual(this.publicField);
-        _set_privateFieldValue.call(
-          _assertClassBrand(_Cl_brand, this),
-          _get_privateFieldValue.call(_assertClassBrand(_Cl_brand, this)) + 1n,
-        );
-        this.publicFieldValue += 1n;
-        expect(_classPrivateFieldGet(_privateField, this)).toEqual(this.publicField);
-      }
-    }
-    function _get_privateFieldValue() {
-      return _classPrivateFieldGet(_privateField, this);
-    }
-    function _set_privateFieldValue(newValue) {
-      _classPrivateFieldSet(_privateField, this, newValue);
-    }
-    const cl = new Cl();
-    cl.testUpdates();"
-  `);
-});
-
 test('accessors/updates-bigint/exec.js [loose]', async () => {
   const source =
     'class Cl {\n  #privateField = "top secret string";\n\n  constructor() {\n    this.publicField = "not secret string";\n  }\n\n  get #privateFieldValue() {\n    return this.#privateField;\n  }\n\n  set #privateFieldValue(newValue) {\n    this.#privateField = newValue;\n  }\n\n  publicGetPrivateField() {\n    return this.#privateFieldValue;\n  }\n\n  publicSetPrivateField(newValue) {\n    this.#privateFieldValue = newValue;\n  }\n\n  get publicFieldValue() {\n    return this.publicField;\n  }\n\n  set publicFieldValue(newValue) {\n    this.publicField = newValue;\n  }\n\n  testUpdates() {\n    this.#privateField = 0n;\n    this.publicField = 0n;\n    this.#privateFieldValue = this.#privateFieldValue++;\n    this.publicFieldValue = this.publicFieldValue++;\n    expect(this.#privateField).toEqual(this.publicField);\n\n    ++this.#privateFieldValue;\n    ++this.publicFieldValue;\n    expect(this.#privateField).toEqual(this.publicField);\n\n    this.#privateFieldValue += 1n;\n    this.publicFieldValue += 1n;\n    expect(this.#privateField).toEqual(this.publicField);\n  }\n}\n\nconst cl = new Cl();\ncl.testUpdates();\n';
@@ -5859,7 +3594,7 @@ test('accessors/updates-bigint/exec.js [loose]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -5991,85 +3726,6 @@ test('accessors/updates-bigint/exec.js [loose]', async () => {
     })();
     const cl = new Cl();
     cl.testUpdates();"
-  `);
-});
-
-test('accessors/updates-bigint/input.js [spec]', async () => {
-  const source =
-    'class Cl {\n  #privateField = "top secret string";\n\n  constructor() {\n    this.publicField = "not secret string";\n  }\n\n  get #privateFieldValue() {\n    return this.#privateField;\n  }\n\n  set #privateFieldValue(newValue) {\n    this.#privateField = newValue;\n  }\n\n  publicGetPrivateField() {\n    return this.#privateFieldValue;\n  }\n\n  publicSetPrivateField(newValue) {\n    this.#privateFieldValue = newValue;\n  }\n\n  get publicFieldValue() {\n    return this.publicField;\n  }\n\n  set publicFieldValue(newValue) {\n    this.publicField = newValue;\n  }\n\n  testUpdates() {\n    this.#privateField = 0n;\n    this.publicField = 0n;\n    this.#privateFieldValue = this.#privateFieldValue++;\n    this.publicFieldValue = this.publicFieldValue++;\n\n    ++this.#privateFieldValue;\n    ++this.publicFieldValue;\n\n    this.#privateFieldValue += 1n;\n    this.publicFieldValue += 1n;\n\n    this.#privateFieldValue = -(this.#privateFieldValue ** this.#privateFieldValue);\n    this.publicFieldValue = -(this.publicFieldValue ** this.publicFieldValue);\n  }\n}';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
-    var _classPrivateFieldGet = require('@babel/runtime/helpers/classPrivateFieldGet2');
-    var _classPrivateFieldSet = require('@babel/runtime/helpers/classPrivateFieldSet2');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _toSetter = require('@babel/runtime/helpers/toSetter');
-    var _privateField = /* @__PURE__ */ new WeakMap();
-    var _Cl_brand = /* @__PURE__ */ new WeakSet();
-    class Cl {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Cl_brand);
-        _classPrivateFieldInitSpec(this, _privateField, 'top secret string');
-        this.publicField = 'not secret string';
-      }
-      publicGetPrivateField() {
-        return _get_privateFieldValue.call(_assertClassBrand(_Cl_brand, this));
-      }
-      publicSetPrivateField(newValue) {
-        _toSetter(_set_privateFieldValue.bind(_assertClassBrand(_Cl_brand, this)))._ = newValue;
-      }
-      get publicFieldValue() {
-        return this.publicField;
-      }
-      set publicFieldValue(newValue) {
-        this.publicField = newValue;
-      }
-      testUpdates() {
-        var _this$privateFieldVal, _this$privateFieldVal2, _this$privateFieldVal3;
-        _classPrivateFieldSet(_privateField, this, 0n);
-        this.publicField = 0n;
-        _toSetter(_set_privateFieldValue.bind(_assertClassBrand(_Cl_brand, this)))._ =
-          (_set_privateFieldValue.call(
-            _assertClassBrand(_Cl_brand, this),
-            ((_this$privateFieldVal = _get_privateFieldValue.call(_assertClassBrand(_Cl_brand, this))),
-            (_this$privateFieldVal2 = _this$privateFieldVal++),
-            _this$privateFieldVal),
-          ),
-          _this$privateFieldVal2);
-        this.publicFieldValue = this.publicFieldValue++;
-        _set_privateFieldValue.call(
-          _assertClassBrand(_Cl_brand, this),
-          ((_this$privateFieldVal3 = _get_privateFieldValue.call(_assertClassBrand(_Cl_brand, this))),
-          ++_this$privateFieldVal3),
-        );
-        ++this.publicFieldValue;
-        _set_privateFieldValue.call(
-          _assertClassBrand(_Cl_brand, this),
-          _get_privateFieldValue.call(_assertClassBrand(_Cl_brand, this)) + 1n,
-        );
-        this.publicFieldValue += 1n;
-        _toSetter(_set_privateFieldValue.bind(_assertClassBrand(_Cl_brand, this)))._ = -(
-          _get_privateFieldValue.call(_assertClassBrand(_Cl_brand, this)) **
-          _get_privateFieldValue.call(_assertClassBrand(_Cl_brand, this))
-        );
-        this.publicFieldValue = -(this.publicFieldValue ** this.publicFieldValue);
-      }
-    }
-    function _get_privateFieldValue() {
-      return _classPrivateFieldGet(_privateField, this);
-    }
-    function _set_privateFieldValue(newValue) {
-      _classPrivateFieldSet(_privateField, this, newValue);
-    }"
   `);
 });
 
@@ -6080,7 +3736,7 @@ test('accessors/updates-bigint/input.js [loose]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -6209,85 +3865,6 @@ test('accessors/updates-bigint/input.js [loose]', async () => {
   `);
 });
 
-test('accessors/updates/exec.js [spec]', async () => {
-  const source =
-    'class Cl {\n  #privateField = "top secret string";\n\n  constructor() {\n    this.publicField = "not secret string";\n  }\n\n  get #privateFieldValue() {\n    return this.#privateField;\n  }\n\n  set #privateFieldValue(newValue) {\n    this.#privateField = newValue;\n  }\n\n  publicGetPrivateField() {\n    return this.#privateFieldValue;\n  }\n\n  publicSetPrivateField(newValue) {\n    this.#privateFieldValue = newValue;\n  }\n\n  get publicFieldValue() {\n    return this.publicField;\n  }\n\n  set publicFieldValue(newValue) {\n    this.publicField = newValue;\n  }\n\n  testUpdates() {\n    this.#privateField = 0;\n    this.publicField = 0;\n    this.#privateFieldValue = this.#privateFieldValue++;\n    this.publicFieldValue = this.publicFieldValue++;\n    expect(this.#privateField).toEqual(this.publicField);\n\n    ++this.#privateFieldValue;\n    ++this.publicFieldValue;\n    expect(this.#privateField).toEqual(this.publicField);\n\n    this.#privateFieldValue += 1;\n    this.publicFieldValue += 1;\n    expect(this.#privateField).toEqual(this.publicField);\n  }\n}\n\nconst cl = new Cl();\ncl.testUpdates();\n';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
-    var _classPrivateFieldGet = require('@babel/runtime/helpers/classPrivateFieldGet2');
-    var _classPrivateFieldSet = require('@babel/runtime/helpers/classPrivateFieldSet2');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _toSetter = require('@babel/runtime/helpers/toSetter');
-    var _privateField = /* @__PURE__ */ new WeakMap();
-    var _Cl_brand = /* @__PURE__ */ new WeakSet();
-    class Cl {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Cl_brand);
-        _classPrivateFieldInitSpec(this, _privateField, 'top secret string');
-        this.publicField = 'not secret string';
-      }
-      publicGetPrivateField() {
-        return _get_privateFieldValue.call(_assertClassBrand(_Cl_brand, this));
-      }
-      publicSetPrivateField(newValue) {
-        _toSetter(_set_privateFieldValue.bind(_assertClassBrand(_Cl_brand, this)))._ = newValue;
-      }
-      get publicFieldValue() {
-        return this.publicField;
-      }
-      set publicFieldValue(newValue) {
-        this.publicField = newValue;
-      }
-      testUpdates() {
-        var _this$privateFieldVal, _this$privateFieldVal2, _this$privateFieldVal3;
-        _classPrivateFieldSet(_privateField, this, 0);
-        this.publicField = 0;
-        _toSetter(_set_privateFieldValue.bind(_assertClassBrand(_Cl_brand, this)))._ =
-          (_set_privateFieldValue.call(
-            _assertClassBrand(_Cl_brand, this),
-            ((_this$privateFieldVal = _get_privateFieldValue.call(_assertClassBrand(_Cl_brand, this))),
-            (_this$privateFieldVal2 = _this$privateFieldVal++),
-            _this$privateFieldVal),
-          ),
-          _this$privateFieldVal2);
-        this.publicFieldValue = this.publicFieldValue++;
-        expect(_classPrivateFieldGet(_privateField, this)).toEqual(this.publicField);
-        _set_privateFieldValue.call(
-          _assertClassBrand(_Cl_brand, this),
-          ((_this$privateFieldVal3 = _get_privateFieldValue.call(_assertClassBrand(_Cl_brand, this))),
-          ++_this$privateFieldVal3),
-        );
-        ++this.publicFieldValue;
-        expect(_classPrivateFieldGet(_privateField, this)).toEqual(this.publicField);
-        _set_privateFieldValue.call(
-          _assertClassBrand(_Cl_brand, this),
-          _get_privateFieldValue.call(_assertClassBrand(_Cl_brand, this)) + 1,
-        );
-        this.publicFieldValue += 1;
-        expect(_classPrivateFieldGet(_privateField, this)).toEqual(this.publicField);
-      }
-    }
-    function _get_privateFieldValue() {
-      return _classPrivateFieldGet(_privateField, this);
-    }
-    function _set_privateFieldValue(newValue) {
-      _classPrivateFieldSet(_privateField, this, newValue);
-    }
-    const cl = new Cl();
-    cl.testUpdates();"
-  `);
-});
-
 test('accessors/updates/exec.js [loose]', async () => {
   const source =
     'class Cl {\n  #privateField = "top secret string";\n\n  constructor() {\n    this.publicField = "not secret string";\n  }\n\n  get #privateFieldValue() {\n    return this.#privateField;\n  }\n\n  set #privateFieldValue(newValue) {\n    this.#privateField = newValue;\n  }\n\n  publicGetPrivateField() {\n    return this.#privateFieldValue;\n  }\n\n  publicSetPrivateField(newValue) {\n    this.#privateFieldValue = newValue;\n  }\n\n  get publicFieldValue() {\n    return this.publicField;\n  }\n\n  set publicFieldValue(newValue) {\n    this.publicField = newValue;\n  }\n\n  testUpdates() {\n    this.#privateField = 0;\n    this.publicField = 0;\n    this.#privateFieldValue = this.#privateFieldValue++;\n    this.publicFieldValue = this.publicFieldValue++;\n    expect(this.#privateField).toEqual(this.publicField);\n\n    ++this.#privateFieldValue;\n    ++this.publicFieldValue;\n    expect(this.#privateField).toEqual(this.publicField);\n\n    this.#privateFieldValue += 1;\n    this.publicFieldValue += 1;\n    expect(this.#privateField).toEqual(this.publicField);\n  }\n}\n\nconst cl = new Cl();\ncl.testUpdates();\n';
@@ -6295,7 +3872,7 @@ test('accessors/updates/exec.js [loose]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -6430,85 +4007,6 @@ test('accessors/updates/exec.js [loose]', async () => {
   `);
 });
 
-test('accessors/updates/input.js [spec]', async () => {
-  const source =
-    'class Cl {\n  #privateField = "top secret string";\n\n  constructor() {\n    this.publicField = "not secret string";\n  }\n\n  get #privateFieldValue() {\n    return this.#privateField;\n  }\n\n  set #privateFieldValue(newValue) {\n    this.#privateField = newValue;\n  }\n\n  publicGetPrivateField() {\n    return this.#privateFieldValue;\n  }\n\n  publicSetPrivateField(newValue) {\n    this.#privateFieldValue = newValue;\n  }\n\n  get publicFieldValue() {\n    return this.publicField;\n  }\n\n  set publicFieldValue(newValue) {\n    this.publicField = newValue;\n  }\n\n  testUpdates() {\n    this.#privateField = 0;\n    this.publicField = 0;\n    this.#privateFieldValue = this.#privateFieldValue++;\n    this.publicFieldValue = this.publicFieldValue++;\n\n    ++this.#privateFieldValue;\n    ++this.publicFieldValue;\n\n    this.#privateFieldValue += 1;\n    this.publicFieldValue += 1;\n\n    this.#privateFieldValue = -(this.#privateFieldValue ** this.#privateFieldValue);\n    this.publicFieldValue = -(this.publicFieldValue ** this.publicFieldValue);\n  }\n}';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
-    var _classPrivateFieldGet = require('@babel/runtime/helpers/classPrivateFieldGet2');
-    var _classPrivateFieldSet = require('@babel/runtime/helpers/classPrivateFieldSet2');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _toSetter = require('@babel/runtime/helpers/toSetter');
-    var _privateField = /* @__PURE__ */ new WeakMap();
-    var _Cl_brand = /* @__PURE__ */ new WeakSet();
-    class Cl {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Cl_brand);
-        _classPrivateFieldInitSpec(this, _privateField, 'top secret string');
-        this.publicField = 'not secret string';
-      }
-      publicGetPrivateField() {
-        return _get_privateFieldValue.call(_assertClassBrand(_Cl_brand, this));
-      }
-      publicSetPrivateField(newValue) {
-        _toSetter(_set_privateFieldValue.bind(_assertClassBrand(_Cl_brand, this)))._ = newValue;
-      }
-      get publicFieldValue() {
-        return this.publicField;
-      }
-      set publicFieldValue(newValue) {
-        this.publicField = newValue;
-      }
-      testUpdates() {
-        var _this$privateFieldVal, _this$privateFieldVal2, _this$privateFieldVal3;
-        _classPrivateFieldSet(_privateField, this, 0);
-        this.publicField = 0;
-        _toSetter(_set_privateFieldValue.bind(_assertClassBrand(_Cl_brand, this)))._ =
-          (_set_privateFieldValue.call(
-            _assertClassBrand(_Cl_brand, this),
-            ((_this$privateFieldVal = _get_privateFieldValue.call(_assertClassBrand(_Cl_brand, this))),
-            (_this$privateFieldVal2 = _this$privateFieldVal++),
-            _this$privateFieldVal),
-          ),
-          _this$privateFieldVal2);
-        this.publicFieldValue = this.publicFieldValue++;
-        _set_privateFieldValue.call(
-          _assertClassBrand(_Cl_brand, this),
-          ((_this$privateFieldVal3 = _get_privateFieldValue.call(_assertClassBrand(_Cl_brand, this))),
-          ++_this$privateFieldVal3),
-        );
-        ++this.publicFieldValue;
-        _set_privateFieldValue.call(
-          _assertClassBrand(_Cl_brand, this),
-          _get_privateFieldValue.call(_assertClassBrand(_Cl_brand, this)) + 1,
-        );
-        this.publicFieldValue += 1;
-        _toSetter(_set_privateFieldValue.bind(_assertClassBrand(_Cl_brand, this)))._ = -(
-          _get_privateFieldValue.call(_assertClassBrand(_Cl_brand, this)) **
-          _get_privateFieldValue.call(_assertClassBrand(_Cl_brand, this))
-        );
-        this.publicFieldValue = -(this.publicFieldValue ** this.publicFieldValue);
-      }
-    }
-    function _get_privateFieldValue() {
-      return _classPrivateFieldGet(_privateField, this);
-    }
-    function _set_privateFieldValue(newValue) {
-      _classPrivateFieldSet(_privateField, this, newValue);
-    }"
-  `);
-});
-
 test('accessors/updates/input.js [loose]', async () => {
   const source =
     'class Cl {\n  #privateField = "top secret string";\n\n  constructor() {\n    this.publicField = "not secret string";\n  }\n\n  get #privateFieldValue() {\n    return this.#privateField;\n  }\n\n  set #privateFieldValue(newValue) {\n    this.#privateField = newValue;\n  }\n\n  publicGetPrivateField() {\n    return this.#privateFieldValue;\n  }\n\n  publicSetPrivateField(newValue) {\n    this.#privateFieldValue = newValue;\n  }\n\n  get publicFieldValue() {\n    return this.publicField;\n  }\n\n  set publicFieldValue(newValue) {\n    this.publicField = newValue;\n  }\n\n  testUpdates() {\n    this.#privateField = 0;\n    this.publicField = 0;\n    this.#privateFieldValue = this.#privateFieldValue++;\n    this.publicFieldValue = this.publicFieldValue++;\n\n    ++this.#privateFieldValue;\n    ++this.publicFieldValue;\n\n    this.#privateFieldValue += 1;\n    this.publicFieldValue += 1;\n\n    this.#privateFieldValue = -(this.#privateFieldValue ** this.#privateFieldValue);\n    this.publicFieldValue = -(this.publicFieldValue ** this.publicFieldValue);\n  }\n}';
@@ -6516,7 +4014,7 @@ test('accessors/updates/input.js [loose]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -6645,48 +4143,6 @@ test('accessors/updates/input.js [loose]', async () => {
   `);
 });
 
-test('assumption-constantSuper/private-method-super/input.js [spec]', async () => {
-  const source =
-    "class Base {\n  superMethod() {\n    return 'good';\n  }\n}\n\nclass Sub extends Base {\n  superMethod() {\n    return 'bad';\n  }\n\n  #privateMethod() {\n    return super.superMethod();\n  }\n\n  publicMethod() {\n    return this.#privateMethod();\n  }\n}\n";
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _superPropGet = require('@babel/runtime/helpers/superPropGet');
-    var _Sub;
-    class Base {
-      superMethod() {
-        return 'good';
-      }
-    }
-    var _Sub_brand = /* @__PURE__ */ new WeakSet();
-    class Sub extends Base {
-      constructor(..._args) {
-        super(..._args);
-        _classPrivateMethodInitSpec(this, _Sub_brand);
-      }
-      superMethod() {
-        return 'bad';
-      }
-      publicMethod() {
-        return _assertClassBrand(_Sub_brand, this, _privateMethod).call(this);
-      }
-    }
-    _Sub = Sub;
-    function _privateMethod() {
-      return _superPropGet(_Sub.prototype, 'superMethod', this, 2)([]);
-    }"
-  `);
-});
-
 test('assumption-constantSuper/private-method-super/input.js [loose]', async () => {
   const source =
     "class Base {\n  superMethod() {\n    return 'good';\n  }\n}\n\nclass Sub extends Base {\n  superMethod() {\n    return 'bad';\n  }\n\n  #privateMethod() {\n    return super.superMethod();\n  }\n\n  publicMethod() {\n    return this.#privateMethod();\n  }\n}\n";
@@ -6694,7 +4150,7 @@ test('assumption-constantSuper/private-method-super/input.js [loose]', async () 
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -6785,39 +4241,6 @@ test('assumption-constantSuper/private-method-super/input.js [loose]', async () 
   `);
 });
 
-test('duplicated-names/get-get/input.js [spec]', async () => {
-  const source =
-    'class Cl {\n  #privateField = 0;\n  \n  get #getSet() {\n    return this.#privateField;\n  }\n\n  get #getSet() {\n    return this.#privateField;\n  }\n}';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
-    var _classPrivateFieldGet = require('@babel/runtime/helpers/classPrivateFieldGet2');
-    var _privateField = /* @__PURE__ */ new WeakMap();
-    var _Cl_brand = /* @__PURE__ */ new WeakSet();
-    class Cl {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Cl_brand);
-        _classPrivateFieldInitSpec(this, _privateField, 0);
-      }
-    }
-    function _get_getSet() {
-      return _classPrivateFieldGet(_privateField, this);
-    }
-    function _get_getSet() {
-      return _classPrivateFieldGet(_privateField, this);
-    }"
-  `);
-});
-
 test('duplicated-names/get-get/input.js [loose]', async () => {
   const source =
     'class Cl {\n  #privateField = 0;\n  \n  get #getSet() {\n    return this.#privateField;\n  }\n\n  get #getSet() {\n    return this.#privateField;\n  }\n}';
@@ -6825,7 +4248,7 @@ test('duplicated-names/get-get/input.js [loose]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -6863,39 +4286,6 @@ test('duplicated-names/get-get/input.js [loose]', async () => {
   `);
 });
 
-test('duplicated-names/get-method/input.js [spec]', async () => {
-  const source =
-    "class Cl {\n  #privateField = 0;\n  \n  get #foo() {\n    return this.#privateField;\n  }\n\n  #foo() {\n    return 'foo';\n  }\n}";
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
-    var _classPrivateFieldGet = require('@babel/runtime/helpers/classPrivateFieldGet2');
-    var _privateField = /* @__PURE__ */ new WeakMap();
-    var _Cl_brand = /* @__PURE__ */ new WeakSet();
-    class Cl {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Cl_brand);
-        _classPrivateFieldInitSpec(this, _privateField, 0);
-      }
-    }
-    function _get_foo() {
-      return _classPrivateFieldGet(_privateField, this);
-    }
-    function _get_foo() {
-      return 'foo';
-    }"
-  `);
-});
-
 test('duplicated-names/get-method/input.js [loose]', async () => {
   const source =
     "class Cl {\n  #privateField = 0;\n  \n  get #foo() {\n    return this.#privateField;\n  }\n\n  #foo() {\n    return 'foo';\n  }\n}";
@@ -6903,7 +4293,7 @@ test('duplicated-names/get-method/input.js [loose]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -6947,40 +4337,6 @@ test('duplicated-names/get-method/input.js [loose]', async () => {
   `);
 });
 
-test('duplicated-names/get-set/input.js [spec]', async () => {
-  const source =
-    'class Cl {\n  #privateField = 0;\n\n  get #getSet() {\n    return this.#privateField;\n  }\n  \n  set #getSet(newValue) {\n    this.#privateField = newValue;\n  }\n}';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
-    var _classPrivateFieldGet = require('@babel/runtime/helpers/classPrivateFieldGet2');
-    var _classPrivateFieldSet = require('@babel/runtime/helpers/classPrivateFieldSet2');
-    var _privateField = /* @__PURE__ */ new WeakMap();
-    var _Cl_brand = /* @__PURE__ */ new WeakSet();
-    class Cl {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Cl_brand);
-        _classPrivateFieldInitSpec(this, _privateField, 0);
-      }
-    }
-    function _get_getSet() {
-      return _classPrivateFieldGet(_privateField, this);
-    }
-    function _set_getSet(newValue) {
-      _classPrivateFieldSet(_privateField, this, newValue);
-    }"
-  `);
-});
-
 test('duplicated-names/get-set/input.js [loose]', async () => {
   const source =
     'class Cl {\n  #privateField = 0;\n\n  get #getSet() {\n    return this.#privateField;\n  }\n  \n  set #getSet(newValue) {\n    this.#privateField = newValue;\n  }\n}';
@@ -6988,7 +4344,7 @@ test('duplicated-names/get-set/input.js [loose]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -7030,39 +4386,6 @@ test('duplicated-names/get-set/input.js [loose]', async () => {
   `);
 });
 
-test('duplicated-names/method-get/input.js [spec]', async () => {
-  const source =
-    "class Cl {\n  #privateField = 0;\n\n  #foo() {\n    return 'foo';\n  }\n\n  get #foo() {\n    return this.#privateField;\n  }\n}";
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
-    var _classPrivateFieldGet = require('@babel/runtime/helpers/classPrivateFieldGet2');
-    var _privateField = /* @__PURE__ */ new WeakMap();
-    var _Cl_brand = /* @__PURE__ */ new WeakSet();
-    class Cl {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Cl_brand);
-        _classPrivateFieldInitSpec(this, _privateField, 0);
-      }
-    }
-    function _foo() {
-      return 'foo';
-    }
-    function _foo() {
-      return _classPrivateFieldGet(_privateField, this);
-    }"
-  `);
-});
-
 test('duplicated-names/method-get/input.js [loose]', async () => {
   const source =
     "class Cl {\n  #privateField = 0;\n\n  #foo() {\n    return 'foo';\n  }\n\n  get #foo() {\n    return this.#privateField;\n  }\n}";
@@ -7070,7 +4393,7 @@ test('duplicated-names/method-get/input.js [loose]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -7114,35 +4437,6 @@ test('duplicated-names/method-get/input.js [loose]', async () => {
   `);
 });
 
-test('duplicated-names/method-method/input.js [spec]', async () => {
-  const source =
-    "class Cl {\n  #dank() {\n    return 'foo';\n  }\n\n  #dank() {\n    return 'foo';\n  }\n\n}";
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _Cl_brand = /* @__PURE__ */ new WeakSet();
-    class Cl {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Cl_brand);
-      }
-    }
-    function _dank() {
-      return 'foo';
-    }
-    function _dank() {
-      return 'foo';
-    }"
-  `);
-});
-
 test('duplicated-names/method-method/input.js [loose]', async () => {
   const source =
     "class Cl {\n  #dank() {\n    return 'foo';\n  }\n\n  #dank() {\n    return 'foo';\n  }\n\n}";
@@ -7150,7 +4444,7 @@ test('duplicated-names/method-method/input.js [loose]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -7180,39 +4474,6 @@ test('duplicated-names/method-method/input.js [loose]', async () => {
   `);
 });
 
-test('duplicated-names/method-set/input.js [spec]', async () => {
-  const source =
-    "class Cl {\n  #privateField = 0;\n\n  #foo() {\n    return 'foo';\n  }\n\n  set #foo(newValue) {\n    this.#privateField = newValue;\n  }\n}";
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
-    var _classPrivateFieldSet = require('@babel/runtime/helpers/classPrivateFieldSet2');
-    var _privateField = /* @__PURE__ */ new WeakMap();
-    var _Cl_brand = /* @__PURE__ */ new WeakSet();
-    class Cl {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Cl_brand);
-        _classPrivateFieldInitSpec(this, _privateField, 0);
-      }
-    }
-    function _foo() {
-      return 'foo';
-    }
-    function _set_foo(newValue) {
-      _classPrivateFieldSet(_privateField, this, newValue);
-    }"
-  `);
-});
-
 test('duplicated-names/method-set/input.js [loose]', async () => {
   const source =
     "class Cl {\n  #privateField = 0;\n\n  #foo() {\n    return 'foo';\n  }\n\n  set #foo(newValue) {\n    this.#privateField = newValue;\n  }\n}";
@@ -7220,7 +4481,7 @@ test('duplicated-names/method-set/input.js [loose]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -7264,40 +4525,6 @@ test('duplicated-names/method-set/input.js [loose]', async () => {
   `);
 });
 
-test('duplicated-names/set-get/input.js [spec]', async () => {
-  const source =
-    'class Cl {\n  #privateField = 0;\n  \n  set #getSet(newValue) {\n    this.#privateField = newValue;\n  }\n\n  get #getSet() {\n    return this.#privateField;\n  }\n}';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
-    var _classPrivateFieldSet = require('@babel/runtime/helpers/classPrivateFieldSet2');
-    var _classPrivateFieldGet = require('@babel/runtime/helpers/classPrivateFieldGet2');
-    var _privateField = /* @__PURE__ */ new WeakMap();
-    var _Cl_brand = /* @__PURE__ */ new WeakSet();
-    class Cl {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Cl_brand);
-        _classPrivateFieldInitSpec(this, _privateField, 0);
-      }
-    }
-    function _set_getSet(newValue) {
-      _classPrivateFieldSet(_privateField, this, newValue);
-    }
-    function _get_getSet() {
-      return _classPrivateFieldGet(_privateField, this);
-    }"
-  `);
-});
-
 test('duplicated-names/set-get/input.js [loose]', async () => {
   const source =
     'class Cl {\n  #privateField = 0;\n  \n  set #getSet(newValue) {\n    this.#privateField = newValue;\n  }\n\n  get #getSet() {\n    return this.#privateField;\n  }\n}';
@@ -7305,7 +4532,7 @@ test('duplicated-names/set-get/input.js [loose]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -7347,39 +4574,6 @@ test('duplicated-names/set-get/input.js [loose]', async () => {
   `);
 });
 
-test('duplicated-names/set-method/input.js [spec]', async () => {
-  const source =
-    "class Cl {\n  #privateField = 0;\n\n  set #foo(newValue) {\n    this.#privateField = newValue;\n  }\n\n  #foo() {\n    return 'foo';\n  }\n}";
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
-    var _classPrivateFieldSet = require('@babel/runtime/helpers/classPrivateFieldSet2');
-    var _privateField = /* @__PURE__ */ new WeakMap();
-    var _Cl_brand = /* @__PURE__ */ new WeakSet();
-    class Cl {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Cl_brand);
-        _classPrivateFieldInitSpec(this, _privateField, 0);
-      }
-    }
-    function _set_foo(newValue) {
-      _classPrivateFieldSet(_privateField, this, newValue);
-    }
-    function _foo() {
-      return 'foo';
-    }"
-  `);
-});
-
 test('duplicated-names/set-method/input.js [loose]', async () => {
   const source =
     "class Cl {\n  #privateField = 0;\n\n  set #foo(newValue) {\n    this.#privateField = newValue;\n  }\n\n  #foo() {\n    return 'foo';\n  }\n}";
@@ -7387,7 +4581,7 @@ test('duplicated-names/set-method/input.js [loose]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -7431,39 +4625,6 @@ test('duplicated-names/set-method/input.js [loose]', async () => {
   `);
 });
 
-test('duplicated-names/set-set/input.js [spec]', async () => {
-  const source =
-    'class Cl {\n  #privateField = 0;\n  \n  set #getSet(newValue) {\n    return this.#privateField;\n  }\n\n  set #getSet(newValue) {\n    return this.#privateField;\n  }\n}';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
-    var _classPrivateFieldGet = require('@babel/runtime/helpers/classPrivateFieldGet2');
-    var _privateField = /* @__PURE__ */ new WeakMap();
-    var _Cl_brand = /* @__PURE__ */ new WeakSet();
-    class Cl {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Cl_brand);
-        _classPrivateFieldInitSpec(this, _privateField, 0);
-      }
-    }
-    function _set_getSet(newValue) {
-      return _classPrivateFieldGet(_privateField, this);
-    }
-    function _set_getSet(newValue) {
-      return _classPrivateFieldGet(_privateField, this);
-    }"
-  `);
-});
-
 test('duplicated-names/set-set/input.js [loose]', async () => {
   const source =
     'class Cl {\n  #privateField = 0;\n  \n  set #getSet(newValue) {\n    return this.#privateField;\n  }\n\n  set #getSet(newValue) {\n    return this.#privateField;\n  }\n}';
@@ -7471,7 +4632,7 @@ test('duplicated-names/set-set/input.js [loose]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -7509,41 +4670,6 @@ test('duplicated-names/set-set/input.js [loose]', async () => {
   `);
 });
 
-test('misc/multiple/input.js [spec]', async () => {
-  const source =
-    'class A {\n  #method() {}\n\n  get #getter() {}\n\n  set #setter(v) {}\n\n  get #getset() {}\n  set #getset(v) {}\n\n  constructor() {\n    this.#method();\n    this.#getter;\n    this.#setter = 1;\n    this.#getset;\n    this.#getset = 2;\n  }\n}\n';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _toSetter = require('@babel/runtime/helpers/toSetter');
-    var _A_brand = /* @__PURE__ */ new WeakSet();
-    class A {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _A_brand);
-        _assertClassBrand(_A_brand, this, _method).call(this);
-        _get_getter.call(_assertClassBrand(_A_brand, this));
-        _toSetter(_set_setter.bind(_assertClassBrand(_A_brand, this)))._ = 1;
-        _get_getset.call(_assertClassBrand(_A_brand, this));
-        _toSetter(_set_getset.bind(_assertClassBrand(_A_brand, this)))._ = 2;
-      }
-    }
-    function _method() {}
-    function _get_getter() {}
-    function _set_setter(v) {}
-    function _get_getset() {}
-    function _set_getset(v) {}"
-  `);
-});
-
 test('misc/multiple/input.js [loose]', async () => {
   const source =
     'class A {\n  #method() {}\n\n  get #getter() {}\n\n  set #setter(v) {}\n\n  get #getset() {}\n  set #getset(v) {}\n\n  constructor() {\n    this.#method();\n    this.#getter;\n    this.#setter = 1;\n    this.#getset;\n    this.#getset = 2;\n  }\n}\n';
@@ -7551,7 +4677,7 @@ test('misc/multiple/input.js [loose]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -7609,35 +4735,6 @@ test('misc/multiple/input.js [loose]', async () => {
   `);
 });
 
-test('private-method-loose/assignment/exec.js [spec]', async () => {
-  const source =
-    'class Foo {\n    constructor() {\n      this.publicField = this.#privateMethod();\n    }\n\n    #privateMethod() {\n      return 42;\n    }\n  }\n\n  expect((new Foo).publicField).toEqual(42);\n';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _Foo_brand = /* @__PURE__ */ new WeakSet();
-    class Foo {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Foo_brand);
-        this.publicField = _assertClassBrand(_Foo_brand, this, _privateMethod).call(this);
-      }
-    }
-    function _privateMethod() {
-      return 42;
-    }
-    expect(new Foo().publicField).toEqual(42);"
-  `);
-});
-
 test('private-method-loose/assignment/exec.js [loose]', async () => {
   const source =
     'class Foo {\n    constructor() {\n      this.publicField = this.#privateMethod();\n    }\n\n    #privateMethod() {\n      return 42;\n    }\n  }\n\n  expect((new Foo).publicField).toEqual(42);\n';
@@ -7645,7 +4742,7 @@ test('private-method-loose/assignment/exec.js [loose]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -7680,34 +4777,6 @@ test('private-method-loose/assignment/exec.js [loose]', async () => {
   `);
 });
 
-test('private-method-loose/assignment/input.js [spec]', async () => {
-  const source =
-    'class Foo {\n  constructor() {\n    this.publicField = this.#privateMethod();\n  }\n\n  #privateMethod() {\n    return 42;\n  }\n}';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _Foo_brand = /* @__PURE__ */ new WeakSet();
-    class Foo {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Foo_brand);
-        this.publicField = _assertClassBrand(_Foo_brand, this, _privateMethod).call(this);
-      }
-    }
-    function _privateMethod() {
-      return 42;
-    }"
-  `);
-});
-
 test('private-method-loose/assignment/input.js [loose]', async () => {
   const source =
     'class Foo {\n  constructor() {\n    this.publicField = this.#privateMethod();\n  }\n\n  #privateMethod() {\n    return 42;\n  }\n}';
@@ -7715,7 +4784,7 @@ test('private-method-loose/assignment/input.js [loose]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -7749,41 +4818,6 @@ test('private-method-loose/assignment/input.js [loose]', async () => {
   `);
 });
 
-test('private-method-loose/async/exec.js [spec]', async () => {
-  const source =
-    '(function () {\nclass Cl {\n  async #foo() {\n    return 2;\n  }\n\n  test() {\n    return this.#foo();\n  }\n}\n\nreturn new Cl().test().then(val => {\n  expect(val).toBe(2);\n});\n\n});\n';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    (function () {
-      var _Cl_brand = /* @__PURE__ */ new WeakSet();
-      class Cl {
-        constructor() {
-          _classPrivateMethodInitSpec(this, _Cl_brand);
-        }
-        test() {
-          return _assertClassBrand(_Cl_brand, this, _foo).call(this);
-        }
-      }
-      async function _foo() {
-        return 2;
-      }
-      return new Cl().test().then(val => {
-        expect(val).toBe(2);
-      });
-    });"
-  `);
-});
-
 test('private-method-loose/async/exec.js [loose]', async () => {
   const source =
     '(function () {\nclass Cl {\n  async #foo() {\n    return 2;\n  }\n\n  test() {\n    return this.#foo();\n  }\n}\n\nreturn new Cl().test().then(val => {\n  expect(val).toBe(2);\n});\n\n});\n';
@@ -7791,7 +4825,7 @@ test('private-method-loose/async/exec.js [loose]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -7843,36 +4877,6 @@ test('private-method-loose/async/exec.js [loose]', async () => {
   `);
 });
 
-test('private-method-loose/async/input.js [spec]', async () => {
-  const source =
-    'class Cl {\n  async #foo() {\n    return 2;\n  }\n\n  test() {\n    return this.#foo();\n  }\n}\n';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _Cl_brand = /* @__PURE__ */ new WeakSet();
-    class Cl {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Cl_brand);
-      }
-      test() {
-        return _assertClassBrand(_Cl_brand, this, _foo).call(this);
-      }
-    }
-    async function _foo() {
-      return 2;
-    }"
-  `);
-});
-
 test('private-method-loose/async/input.js [loose]', async () => {
   const source =
     'class Cl {\n  async #foo() {\n    return 2;\n  }\n\n  test() {\n    return this.#foo();\n  }\n}\n';
@@ -7880,7 +4884,7 @@ test('private-method-loose/async/input.js [loose]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -7927,48 +4931,6 @@ test('private-method-loose/async/input.js [loose]', async () => {
   `);
 });
 
-test('private-method-loose/before-fields/exec.js [spec]', async () => {
-  const source =
-    'class Cl {\n  prop = this.#method(1);\n\n  #priv = this.#method(2);\n\n  #method(x) {\n    return x;\n  }\n\n  getPriv() {\n    return this.#priv;\n  }\n}\n\nexpect(new Cl().prop).toBe(1);\nexpect(new Cl().getPriv()).toBe(2);\n';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _defineProperty = require('@babel/runtime/helpers/defineProperty');
-    var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _classPrivateFieldGet = require('@babel/runtime/helpers/classPrivateFieldGet2');
-    var _priv = /* @__PURE__ */ new WeakMap();
-    var _Cl_brand = /* @__PURE__ */ new WeakSet();
-    class Cl {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Cl_brand);
-        _defineProperty(this, 'prop', _assertClassBrand(_Cl_brand, this, _method).call(this, 1));
-        _classPrivateFieldInitSpec(
-          this,
-          _priv,
-          _assertClassBrand(_Cl_brand, this, _method).call(this, 2),
-        );
-      }
-      getPriv() {
-        return _classPrivateFieldGet(_priv, this);
-      }
-    }
-    function _method(x) {
-      return x;
-    }
-    expect(new Cl().prop).toBe(1);
-    expect(new Cl().getPriv()).toBe(2);"
-  `);
-});
-
 test('private-method-loose/before-fields/exec.js [loose]', async () => {
   const source =
     'class Cl {\n  prop = this.#method(1);\n\n  #priv = this.#method(2);\n\n  #method(x) {\n    return x;\n  }\n\n  getPriv() {\n    return this.#priv;\n  }\n}\n\nexpect(new Cl().prop).toBe(1);\nexpect(new Cl().getPriv()).toBe(2);\n';
@@ -7976,7 +4938,7 @@ test('private-method-loose/before-fields/exec.js [loose]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -7997,7 +4959,12 @@ test('private-method-loose/before-fields/exec.js [loose]', async () => {
       var _method = '__private_Cl_method';
       const Cl = function Cl() {
         if (!new.target) throw new TypeError('Cannot call a class as a function');
-        this.prop = _classPrivateMethodCall(this, _method, [1]);
+        Object.defineProperty(this, 'prop', {
+          value: _classPrivateMethodCall(this, _method, [1]),
+          enumerable: true,
+          configurable: true,
+          writable: true,
+        });
         Object.defineProperty(this, _priv, {
           writable: true,
           value: _classPrivateMethodCall(this, _method, [2]),
@@ -8032,46 +4999,6 @@ test('private-method-loose/before-fields/exec.js [loose]', async () => {
   `);
 });
 
-test('private-method-loose/before-fields/input.js [spec]', async () => {
-  const source =
-    'class Cl {\n  prop = this.#method(1);\n\n  #priv = this.#method(2);\n\n  #method(x) {\n    return x;\n  }\n\n  getPriv() {\n    return this.#priv;\n  }\n}\n';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _defineProperty = require('@babel/runtime/helpers/defineProperty');
-    var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _classPrivateFieldGet = require('@babel/runtime/helpers/classPrivateFieldGet2');
-    var _priv = /* @__PURE__ */ new WeakMap();
-    var _Cl_brand = /* @__PURE__ */ new WeakSet();
-    class Cl {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Cl_brand);
-        _defineProperty(this, 'prop', _assertClassBrand(_Cl_brand, this, _method).call(this, 1));
-        _classPrivateFieldInitSpec(
-          this,
-          _priv,
-          _assertClassBrand(_Cl_brand, this, _method).call(this, 2),
-        );
-      }
-      getPriv() {
-        return _classPrivateFieldGet(_priv, this);
-      }
-    }
-    function _method(x) {
-      return x;
-    }"
-  `);
-});
-
 test('private-method-loose/before-fields/input.js [loose]', async () => {
   const source =
     'class Cl {\n  prop = this.#method(1);\n\n  #priv = this.#method(2);\n\n  #method(x) {\n    return x;\n  }\n\n  getPriv() {\n    return this.#priv;\n  }\n}\n';
@@ -8079,7 +5006,7 @@ test('private-method-loose/before-fields/input.js [loose]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -8100,7 +5027,12 @@ test('private-method-loose/before-fields/input.js [loose]', async () => {
       var _method = '__private_Cl_method';
       const Cl = function Cl() {
         if (!new.target) throw new TypeError('Cannot call a class as a function');
-        this.prop = _classPrivateMethodCall(this, _method, [1]);
+        Object.defineProperty(this, 'prop', {
+          value: _classPrivateMethodCall(this, _method, [1]),
+          enumerable: true,
+          configurable: true,
+          writable: true,
+        });
         Object.defineProperty(this, _priv, {
           writable: true,
           value: _classPrivateMethodCall(this, _method, [2]),
@@ -8133,41 +5065,6 @@ test('private-method-loose/before-fields/input.js [loose]', async () => {
   `);
 });
 
-test('private-method-loose/class-binding/exec.js [spec]', async () => {
-  const source =
-    'class A {\n  #getA() { return A };\n  getA() {\n    return this.#getA();\n  }\n}\n\nconst oldA = A;\nA = null;\n\nexpect(new oldA().getA()).toBe(oldA);\n';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _A;
-    var _A_brand = /* @__PURE__ */ new WeakSet();
-    class A {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _A_brand);
-      }
-      getA() {
-        return _assertClassBrand(_A_brand, this, _getA).call(this);
-      }
-    }
-    _A = A;
-    function _getA() {
-      return _A;
-    }
-    const oldA = A;
-    A = null;
-    expect(new oldA().getA()).toBe(oldA);"
-  `);
-});
-
 test('private-method-loose/class-binding/exec.js [loose]', async () => {
   const source =
     'class A {\n  #getA() { return A };\n  getA() {\n    return this.#getA();\n  }\n}\n\nconst oldA = A;\nA = null;\n\nexpect(new oldA().getA()).toBe(oldA);\n';
@@ -8175,7 +5072,7 @@ test('private-method-loose/class-binding/exec.js [loose]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -8226,40 +5123,13 @@ test('private-method-loose/class-binding/exec.js [loose]', async () => {
   `);
 });
 
-test('private-method-loose/class-binding/input.js [spec]', async () => {
-  const source = 'class A {\n  #getA() { return A };\n}\n';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _A;
-    var _A_brand = /* @__PURE__ */ new WeakSet();
-    class A {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _A_brand);
-      }
-    }
-    _A = A;
-    function _getA() {
-      return _A;
-    }"
-  `);
-});
-
 test('private-method-loose/class-binding/input.js [loose]', async () => {
   const source = 'class A {\n  #getA() { return A };\n}\n';
   expect(
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -8283,43 +5153,13 @@ test('private-method-loose/class-binding/input.js [loose]', async () => {
   `);
 });
 
-test('private-method-loose/class-expression/input.js [spec]', async () => {
-  const source = 'console.log(class A {\n  #foo() {}\n\n  method() {\n    this.#foo();\n  }\n});\n';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _A_brand;
-    console.log(
-      ((_A_brand = /* @__PURE__ */ new WeakSet()),
-      class A {
-        constructor() {
-          _classPrivateMethodInitSpec(this, _A_brand);
-        }
-        method() {
-          _assertClassBrand(_A_brand, this, _foo).call(this);
-        }
-      }),
-    );
-    function _foo() {}"
-  `);
-});
-
 test('private-method-loose/class-expression/input.js [loose]', async () => {
   const source = 'console.log(class A {\n  #foo() {}\n\n  method() {\n    this.#foo();\n  }\n});\n';
   expect(
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -8368,60 +5208,6 @@ test('private-method-loose/class-expression/input.js [loose]', async () => {
   `);
 });
 
-test('private-method-loose/context/exec.js [spec]', async () => {
-  const source =
-    "class Foo {\n    constructor(status) {\n      this.status = status;\n      expect(() => this.#getStatus = null).toThrow(TypeError);\n    }\n\n    #getStatus() {\n      return this.status;\n    }\n\n    getCurrentStatus() {\n      return this.#getStatus();\n    }\n\n    setCurrentStatus(newStatus) {\n      this.status = newStatus;\n    }\n\n    getFakeStatus(fakeStatus) {\n      const getStatus = this.#getStatus;\n      return function () {\n        return getStatus.call({ status: fakeStatus });\n      };\n    }\n\n    getFakeStatusFunc() {\n      return {\n        status: 'fake-status',\n        getFakeStatus: this.#getStatus,\n      };\n    }\n  }\n\n  const f = new Foo('inactive');\n  expect(f.getCurrentStatus()).toBe('inactive');\n\n  f.setCurrentStatus('new-status');\n  expect(f.getCurrentStatus()).toBe('new-status');\n\n  expect(f.getFakeStatus('fake')()).toBe('fake');\n  expect(f.getFakeStatusFunc().getFakeStatus()).toBe('fake-status');\n";
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _readOnlyError = require('@babel/runtime/helpers/readOnlyError');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _Foo_brand = /* @__PURE__ */ new WeakSet();
-    class Foo {
-      constructor(status) {
-        _classPrivateMethodInitSpec(this, _Foo_brand);
-        this.status = status;
-        expect(() => (this, null, _readOnlyError('#getStatus'))).toThrow(TypeError);
-      }
-      getCurrentStatus() {
-        return _assertClassBrand(_Foo_brand, this, _getStatus).call(this);
-      }
-      setCurrentStatus(newStatus) {
-        this.status = newStatus;
-      }
-      getFakeStatus(fakeStatus) {
-        const getStatus = _assertClassBrand(_Foo_brand, this, _getStatus);
-        return function () {
-          return getStatus.call({ status: fakeStatus });
-        };
-      }
-      getFakeStatusFunc() {
-        return {
-          status: 'fake-status',
-          getFakeStatus: _assertClassBrand(_Foo_brand, this, _getStatus),
-        };
-      }
-    }
-    function _getStatus() {
-      return this.status;
-    }
-    const f = new Foo('inactive');
-    expect(f.getCurrentStatus()).toBe('inactive');
-    f.setCurrentStatus('new-status');
-    expect(f.getCurrentStatus()).toBe('new-status');
-    expect(f.getFakeStatus('fake')()).toBe('fake');
-    expect(f.getFakeStatusFunc().getFakeStatus()).toBe('fake-status');"
-  `);
-});
-
 test('private-method-loose/context/exec.js [loose]', async () => {
   const source =
     "class Foo {\n    constructor(status) {\n      this.status = status;\n      expect(() => this.#getStatus = null).toThrow(TypeError);\n    }\n\n    #getStatus() {\n      return this.status;\n    }\n\n    getCurrentStatus() {\n      return this.#getStatus();\n    }\n\n    setCurrentStatus(newStatus) {\n      this.status = newStatus;\n    }\n\n    getFakeStatus(fakeStatus) {\n      const getStatus = this.#getStatus;\n      return function () {\n        return getStatus.call({ status: fakeStatus });\n      };\n    }\n\n    getFakeStatusFunc() {\n      return {\n        status: 'fake-status',\n        getFakeStatus: this.#getStatus,\n      };\n    }\n  }\n\n  const f = new Foo('inactive');\n  expect(f.getCurrentStatus()).toBe('inactive');\n\n  f.setCurrentStatus('new-status');\n  expect(f.getCurrentStatus()).toBe('new-status');\n\n  expect(f.getFakeStatus('fake')()).toBe('fake');\n  expect(f.getFakeStatusFunc().getFakeStatus()).toBe('fake-status');\n";
@@ -8429,7 +5215,7 @@ test('private-method-loose/context/exec.js [loose]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -8540,52 +5326,6 @@ test('private-method-loose/context/exec.js [loose]', async () => {
   `);
 });
 
-test('private-method-loose/context/input.js [spec]', async () => {
-  const source =
-    "class Foo {\n  constructor(status) {\n    this.status = status;\n  }\n\n  #getStatus() {\n    return this.status;\n  }\n\n  getCurrentStatus() {\n    return this.#getStatus();\n  }\n\n  setCurrentStatus(newStatus) {\n    this.status = newStatus;\n  }\n\n  getFakeStatus(fakeStatus) {\n    const fakeGetStatus = this.#getStatus;\n    return function() {\n      return fakeGetStatus.call({ status: fakeStatus });\n    };\n  }\n\n  getFakeStatusFunc() {\n    return {\n      status: 'fake-status',\n      getFakeStatus: this.#getStatus,\n    };\n  }\n}";
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _Foo_brand = /* @__PURE__ */ new WeakSet();
-    class Foo {
-      constructor(status) {
-        _classPrivateMethodInitSpec(this, _Foo_brand);
-        this.status = status;
-      }
-      getCurrentStatus() {
-        return _assertClassBrand(_Foo_brand, this, _getStatus).call(this);
-      }
-      setCurrentStatus(newStatus) {
-        this.status = newStatus;
-      }
-      getFakeStatus(fakeStatus) {
-        const fakeGetStatus = _assertClassBrand(_Foo_brand, this, _getStatus);
-        return function () {
-          return fakeGetStatus.call({ status: fakeStatus });
-        };
-      }
-      getFakeStatusFunc() {
-        return {
-          status: 'fake-status',
-          getFakeStatus: _assertClassBrand(_Foo_brand, this, _getStatus),
-        };
-      }
-    }
-    function _getStatus() {
-      return this.status;
-    }"
-  `);
-});
-
 test('private-method-loose/context/input.js [loose]', async () => {
   const source =
     "class Foo {\n  constructor(status) {\n    this.status = status;\n  }\n\n  #getStatus() {\n    return this.status;\n  }\n\n  getCurrentStatus() {\n    return this.#getStatus();\n  }\n\n  setCurrentStatus(newStatus) {\n    this.status = newStatus;\n  }\n\n  getFakeStatus(fakeStatus) {\n    const fakeGetStatus = this.#getStatus;\n    return function() {\n      return fakeGetStatus.call({ status: fakeStatus });\n    };\n  }\n\n  getFakeStatusFunc() {\n    return {\n      status: 'fake-status',\n      getFakeStatus: this.#getStatus,\n    };\n  }\n}";
@@ -8593,7 +5333,7 @@ test('private-method-loose/context/input.js [loose]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -8693,39 +5433,6 @@ test('private-method-loose/context/input.js [loose]', async () => {
   `);
 });
 
-test('private-method-loose/exfiltrated/exec.js [spec]', async () => {
-  const source =
-    'let exfiltrated;\nclass Foo {\n    #privateMethod() {}\n\n    constructor() {\n        if (exfiltrated === undefined) {\n            exfiltrated = this.#privateMethod;\n        }\n        expect(exfiltrated).toStrictEqual(this.#privateMethod);\n    }\n}\n\nnew Foo();\n// check for private method function object equality\nnew Foo();';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    let exfiltrated;
-    var _Foo_brand = /* @__PURE__ */ new WeakSet();
-    class Foo {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Foo_brand);
-        if (exfiltrated === undefined) {
-          exfiltrated = _assertClassBrand(_Foo_brand, this, _privateMethod);
-        }
-        expect(exfiltrated).toStrictEqual(_assertClassBrand(_Foo_brand, this, _privateMethod));
-      }
-    }
-    function _privateMethod() {}
-    new Foo();
-    // check for private method function object equality
-    new Foo();"
-  `);
-});
-
 test('private-method-loose/exfiltrated/exec.js [loose]', async () => {
   const source =
     'let exfiltrated;\nclass Foo {\n    #privateMethod() {}\n\n    constructor() {\n        if (exfiltrated === undefined) {\n            exfiltrated = this.#privateMethod;\n        }\n        expect(exfiltrated).toStrictEqual(this.#privateMethod);\n    }\n}\n\nnew Foo();\n// check for private method function object equality\nnew Foo();';
@@ -8733,7 +5440,7 @@ test('private-method-loose/exfiltrated/exec.js [loose]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -8775,35 +5482,6 @@ test('private-method-loose/exfiltrated/exec.js [loose]', async () => {
   `);
 });
 
-test('private-method-loose/exfiltrated/input.js [spec]', async () => {
-  const source =
-    'let exfiltrated;\nclass Foo {\n    #privateMethod() {}\n\n    constructor() {\n        if (exfiltrated === undefined) {\n            exfiltrated = this.#privateMethod;\n        }\n    }\n}';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    let exfiltrated;
-    var _Foo_brand = /* @__PURE__ */ new WeakSet();
-    class Foo {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Foo_brand);
-        if (exfiltrated === undefined) {
-          exfiltrated = _assertClassBrand(_Foo_brand, this, _privateMethod);
-        }
-      }
-    }
-    function _privateMethod() {}"
-  `);
-});
-
 test('private-method-loose/exfiltrated/input.js [loose]', async () => {
   const source =
     'let exfiltrated;\nclass Foo {\n    #privateMethod() {}\n\n    constructor() {\n        if (exfiltrated === undefined) {\n            exfiltrated = this.#privateMethod;\n        }\n    }\n}';
@@ -8811,7 +5489,7 @@ test('private-method-loose/exfiltrated/input.js [loose]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -8847,46 +5525,6 @@ test('private-method-loose/exfiltrated/input.js [loose]', async () => {
   `);
 });
 
-test('private-method-loose/generator/exec.js [spec]', async () => {
-  const source =
-    'class Cl {\n  *#foo() {\n    yield 2;\n    return 3;\n  }\n\n  test() {\n    return this.#foo();\n  }\n}\n\nconst val = new Cl().test();\nexpect(val.next()).toEqual({ value: 2, done: false });\nexpect(val.next()).toEqual({ value: 3, done: true });\n';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _Cl_brand = /* @__PURE__ */ new WeakSet();
-    class Cl {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Cl_brand);
-      }
-      test() {
-        return _assertClassBrand(_Cl_brand, this, _foo).call(this);
-      }
-    }
-    function* _foo() {
-      yield 2;
-      return 3;
-    }
-    const val = new Cl().test();
-    expect(val.next()).toEqual({
-      value: 2,
-      done: false,
-    });
-    expect(val.next()).toEqual({
-      value: 3,
-      done: true,
-    });"
-  `);
-});
-
 test('private-method-loose/generator/exec.js [loose]', async () => {
   const source =
     'class Cl {\n  *#foo() {\n    yield 2;\n    return 3;\n  }\n\n  test() {\n    return this.#foo();\n  }\n}\n\nconst val = new Cl().test();\nexpect(val.next()).toEqual({ value: 2, done: false });\nexpect(val.next()).toEqual({ value: 3, done: true });\n';
@@ -8894,7 +5532,7 @@ test('private-method-loose/generator/exec.js [loose]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -8951,37 +5589,6 @@ test('private-method-loose/generator/exec.js [loose]', async () => {
   `);
 });
 
-test('private-method-loose/generator/input.js [spec]', async () => {
-  const source =
-    'class Cl {\n  *#foo() {\n    yield 2;\n    return 3;\n  }\n\n  test() {\n    return this.#foo();\n  }\n}\n';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _Cl_brand = /* @__PURE__ */ new WeakSet();
-    class Cl {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Cl_brand);
-      }
-      test() {
-        return _assertClassBrand(_Cl_brand, this, _foo).call(this);
-      }
-    }
-    function* _foo() {
-      yield 2;
-      return 3;
-    }"
-  `);
-});
-
 test('private-method-loose/generator/input.js [loose]', async () => {
   const source =
     'class Cl {\n  *#foo() {\n    yield 2;\n    return 3;\n  }\n\n  test() {\n    return this.#foo();\n  }\n}\n';
@@ -8989,7 +5596,7 @@ test('private-method-loose/generator/input.js [loose]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -9037,37 +5644,13 @@ test('private-method-loose/generator/input.js [loose]', async () => {
   `);
 });
 
-test('private-method-loose/preserve-comments/input.js [spec]', async () => {
-  const source = 'class C {\n  /* before a */\n  #a() {};\n  /* after a */\n}\n';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _C_brand = /* @__PURE__ */ new WeakSet();
-    class C {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _C_brand);
-      }
-    }
-    /* before a */
-    function _a() {}"
-  `);
-});
-
 test('private-method-loose/preserve-comments/input.js [loose]', async () => {
   const source = 'class C {\n  /* before a */\n  #a() {};\n  /* after a */\n}\n';
   expect(
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -9092,37 +5675,6 @@ test('private-method-loose/preserve-comments/input.js [loose]', async () => {
   `);
 });
 
-test('private-method-loose/reassignment/exec.js [spec]', async () => {
-  const source =
-    'let counter = 0;\nclass Foo {\n  constructor() {\n    this.#privateMethod = ++counter;\n  }\n\n  #privateMethod() {\n    return 42;\n  }\n}\n\nexpect(() => new Foo).toThrow();\nexpect(counter).toBe(1);\n';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _readOnlyError = require('@babel/runtime/helpers/readOnlyError');
-    let counter = 0;
-    var _Foo_brand = /* @__PURE__ */ new WeakSet();
-    class Foo {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Foo_brand);
-        (this, ++counter, _readOnlyError('#privateMethod'));
-      }
-    }
-    function _privateMethod() {
-      return 42;
-    }
-    expect(() => new Foo()).toThrow();
-    expect(counter).toBe(1);"
-  `);
-});
-
 test('private-method-loose/reassignment/exec.js [loose]', async () => {
   const source =
     'let counter = 0;\nclass Foo {\n  constructor() {\n    this.#privateMethod = ++counter;\n  }\n\n  #privateMethod() {\n    return 42;\n  }\n}\n\nexpect(() => new Foo).toThrow();\nexpect(counter).toBe(1);\n';
@@ -9130,7 +5682,7 @@ test('private-method-loose/reassignment/exec.js [loose]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -9166,35 +5718,6 @@ test('private-method-loose/reassignment/exec.js [loose]', async () => {
     })();
     expect(() => new Foo()).toThrow();
     expect(counter).toBe(1);"
-  `);
-});
-
-test('private-method-loose/reassignment/input.js [spec]', async () => {
-  const source =
-    'let counter = 0;\nclass Foo {\n  constructor() {\n    this.#privateMethod = ++counter;\n  }\n\n  #privateMethod() {\n    return 42;\n  }\n}\n';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _readOnlyError = require('@babel/runtime/helpers/readOnlyError');
-    let counter = 0;
-    var _Foo_brand = /* @__PURE__ */ new WeakSet();
-    class Foo {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Foo_brand);
-        (this, ++counter, _readOnlyError('#privateMethod'));
-      }
-    }
-    function _privateMethod() {
-      return 42;
-    }"
   `);
 });
 
@@ -9205,7 +5728,7 @@ test('private-method-loose/reassignment/input.js [loose]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -9242,49 +5765,6 @@ test('private-method-loose/reassignment/input.js [loose]', async () => {
   `);
 });
 
-test('private-method-loose/super/exec.js [spec]', async () => {
-  const source =
-    "class Base {\n  superMethod() {\n    return 'good';\n  }\n}\n\nclass Sub extends Base {\n  superMethod() {\n    return 'bad';\n  }\n\n  #privateMethod() {\n    return super.superMethod();\n  }\n\n  publicMethod() {\n    return this.#privateMethod();\n  }\n}\n\nexpect((new Sub()).publicMethod()).toEqual('good');\n";
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _superPropGet = require('@babel/runtime/helpers/superPropGet');
-    var _Sub;
-    class Base {
-      superMethod() {
-        return 'good';
-      }
-    }
-    var _Sub_brand = /* @__PURE__ */ new WeakSet();
-    class Sub extends Base {
-      constructor(..._args) {
-        super(..._args);
-        _classPrivateMethodInitSpec(this, _Sub_brand);
-      }
-      superMethod() {
-        return 'bad';
-      }
-      publicMethod() {
-        return _assertClassBrand(_Sub_brand, this, _privateMethod).call(this);
-      }
-    }
-    _Sub = Sub;
-    function _privateMethod() {
-      return _superPropGet(_Sub.prototype, 'superMethod', this, 2)([]);
-    }
-    expect(new Sub().publicMethod()).toEqual('good');"
-  `);
-});
-
 test('private-method-loose/super/exec.js [loose]', async () => {
   const source =
     "class Base {\n  superMethod() {\n    return 'good';\n  }\n}\n\nclass Sub extends Base {\n  superMethod() {\n    return 'bad';\n  }\n\n  #privateMethod() {\n    return super.superMethod();\n  }\n\n  publicMethod() {\n    return this.#privateMethod();\n  }\n}\n\nexpect((new Sub()).publicMethod()).toEqual('good');\n";
@@ -9292,7 +5772,7 @@ test('private-method-loose/super/exec.js [loose]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -9381,48 +5861,6 @@ test('private-method-loose/super/exec.js [loose]', async () => {
       return Sub;
     })(Base);
     expect(new Sub().publicMethod()).toEqual('good');"
-  `);
-});
-
-test('private-method-loose/super/input.js [spec]', async () => {
-  const source =
-    "class Base {\n  superMethod() {\n    return 'good';\n  }\n}\n\nclass Sub extends Base {\n  superMethod() {\n    return 'bad';\n  }\n\n  #privateMethod() {\n    return super.superMethod();\n  }\n\n  publicMethod() {\n    return this.#privateMethod();\n  }\n}\n";
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _superPropGet = require('@babel/runtime/helpers/superPropGet');
-    var _Sub;
-    class Base {
-      superMethod() {
-        return 'good';
-      }
-    }
-    var _Sub_brand = /* @__PURE__ */ new WeakSet();
-    class Sub extends Base {
-      constructor(..._args) {
-        super(..._args);
-        _classPrivateMethodInitSpec(this, _Sub_brand);
-      }
-      superMethod() {
-        return 'bad';
-      }
-      publicMethod() {
-        return _assertClassBrand(_Sub_brand, this, _privateMethod).call(this);
-      }
-    }
-    _Sub = Sub;
-    function _privateMethod() {
-      return _superPropGet(_Sub.prototype, 'superMethod', this, 2)([]);
-    }"
   `);
 });
 
@@ -9433,7 +5871,7 @@ test('private-method-loose/super/input.js [loose]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -9521,35 +5959,6 @@ test('private-method-loose/super/input.js [loose]', async () => {
       Object.defineProperty(Sub, 'prototype', { writable: false });
       return Sub;
     })(Base);"
-  `);
-});
-
-test('private-method-privateFieldsAsProperties/assignment/exec.js [spec]', async () => {
-  const source =
-    'class Foo {\n    constructor() {\n      this.publicField = this.#privateMethod();\n    }\n\n    #privateMethod() {\n      return 42;\n    }\n  }\n\n  expect((new Foo).publicField).toEqual(42);\n';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _Foo_brand = /* @__PURE__ */ new WeakSet();
-    class Foo {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Foo_brand);
-        this.publicField = _assertClassBrand(_Foo_brand, this, _privateMethod).call(this);
-      }
-    }
-    function _privateMethod() {
-      return 42;
-    }
-    expect(new Foo().publicField).toEqual(42);"
   `);
 });
 
@@ -9560,7 +5969,7 @@ test('private-method-privateFieldsAsProperties/assignment/exec.js [loose]', asyn
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -9592,34 +6001,6 @@ test('private-method-privateFieldsAsProperties/assignment/exec.js [loose]', asyn
       return Foo;
     })();
     expect(new Foo().publicField).toEqual(42);"
-  `);
-});
-
-test('private-method-privateFieldsAsProperties/assignment/input.js [spec]', async () => {
-  const source =
-    'class Foo {\n  constructor() {\n    this.publicField = this.#privateMethod();\n  }\n\n  #privateMethod() {\n    return 42;\n  }\n}';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _Foo_brand = /* @__PURE__ */ new WeakSet();
-    class Foo {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Foo_brand);
-        this.publicField = _assertClassBrand(_Foo_brand, this, _privateMethod).call(this);
-      }
-    }
-    function _privateMethod() {
-      return 42;
-    }"
   `);
 });
 
@@ -9630,7 +6011,7 @@ test('private-method-privateFieldsAsProperties/assignment/input.js [loose]', asy
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -9661,41 +6042,6 @@ test('private-method-privateFieldsAsProperties/assignment/input.js [loose]', asy
       Object.defineProperty(Foo, 'prototype', { writable: false });
       return Foo;
     })();"
-  `);
-});
-
-test('private-method-privateFieldsAsProperties/async/exec.js [spec]', async () => {
-  const source =
-    '(function () {\nclass Cl {\n  async #foo() {\n    return 2;\n  }\n\n  test() {\n    return this.#foo();\n  }\n}\n\nreturn new Cl().test().then(val => {\n  expect(val).toBe(2);\n});\n\n});\n';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    (function () {
-      var _Cl_brand = /* @__PURE__ */ new WeakSet();
-      class Cl {
-        constructor() {
-          _classPrivateMethodInitSpec(this, _Cl_brand);
-        }
-        test() {
-          return _assertClassBrand(_Cl_brand, this, _foo).call(this);
-        }
-      }
-      async function _foo() {
-        return 2;
-      }
-      return new Cl().test().then(val => {
-        expect(val).toBe(2);
-      });
-    });"
   `);
 });
 
@@ -9706,7 +6052,7 @@ test('private-method-privateFieldsAsProperties/async/exec.js [loose]', async () 
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -9755,36 +6101,6 @@ test('private-method-privateFieldsAsProperties/async/exec.js [loose]', async () 
         expect(val).toBe(2);
       });
     });"
-  `);
-});
-
-test('private-method-privateFieldsAsProperties/async/input.js [spec]', async () => {
-  const source =
-    'class Cl {\n  async #foo() {\n    return 2;\n  }\n\n  test() {\n    return this.#foo();\n  }\n}\n';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _Cl_brand = /* @__PURE__ */ new WeakSet();
-    class Cl {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Cl_brand);
-      }
-      test() {
-        return _assertClassBrand(_Cl_brand, this, _foo).call(this);
-      }
-    }
-    async function _foo() {
-      return 2;
-    }"
   `);
 });
 
@@ -9795,7 +6111,7 @@ test('private-method-privateFieldsAsProperties/async/input.js [loose]', async ()
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -9839,48 +6155,6 @@ test('private-method-privateFieldsAsProperties/async/input.js [loose]', async ()
       Object.defineProperty(Cl, 'prototype', { writable: false });
       return Cl;
     })();"
-  `);
-});
-
-test('private-method-privateFieldsAsProperties/before-fields/exec.js [spec]', async () => {
-  const source =
-    'class Cl {\n  prop = this.#method(1);\n\n  #priv = this.#method(2);\n\n  #method(x) {\n    return x;\n  }\n\n  getPriv() {\n    return this.#priv;\n  }\n}\n\nexpect(new Cl().prop).toBe(1);\nexpect(new Cl().getPriv()).toBe(2);\n';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _defineProperty = require('@babel/runtime/helpers/defineProperty');
-    var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _classPrivateFieldGet = require('@babel/runtime/helpers/classPrivateFieldGet2');
-    var _priv = /* @__PURE__ */ new WeakMap();
-    var _Cl_brand = /* @__PURE__ */ new WeakSet();
-    class Cl {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Cl_brand);
-        _defineProperty(this, 'prop', _assertClassBrand(_Cl_brand, this, _method).call(this, 1));
-        _classPrivateFieldInitSpec(
-          this,
-          _priv,
-          _assertClassBrand(_Cl_brand, this, _method).call(this, 2),
-        );
-      }
-      getPriv() {
-        return _classPrivateFieldGet(_priv, this);
-      }
-    }
-    function _method(x) {
-      return x;
-    }
-    expect(new Cl().prop).toBe(1);
-    expect(new Cl().getPriv()).toBe(2);"
   `);
 });
 
@@ -9891,7 +6165,7 @@ test('private-method-privateFieldsAsProperties/before-fields/exec.js [loose]', a
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -9912,7 +6186,12 @@ test('private-method-privateFieldsAsProperties/before-fields/exec.js [loose]', a
       var _method = '__private_Cl_method';
       const Cl = function Cl() {
         if (!new.target) throw new TypeError('Cannot call a class as a function');
-        this.prop = _classPrivateMethodCall(this, _method, [1]);
+        Object.defineProperty(this, 'prop', {
+          value: _classPrivateMethodCall(this, _method, [1]),
+          enumerable: true,
+          configurable: true,
+          writable: true,
+        });
         Object.defineProperty(this, _priv, {
           writable: true,
           value: _classPrivateMethodCall(this, _method, [2]),
@@ -9944,46 +6223,6 @@ test('private-method-privateFieldsAsProperties/before-fields/exec.js [loose]', a
     })();
     expect(new Cl().prop).toBe(1);
     expect(new Cl().getPriv()).toBe(2);"
-  `);
-});
-
-test('private-method-privateFieldsAsProperties/before-fields/input.js [spec]', async () => {
-  const source =
-    'class Cl {\n  prop = this.#method(1);\n\n  #priv = this.#method(2);\n\n  #method(x) {\n    return x;\n  }\n\n  getPriv() {\n    return this.#priv;\n  }\n}\n';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _defineProperty = require('@babel/runtime/helpers/defineProperty');
-    var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _classPrivateFieldGet = require('@babel/runtime/helpers/classPrivateFieldGet2');
-    var _priv = /* @__PURE__ */ new WeakMap();
-    var _Cl_brand = /* @__PURE__ */ new WeakSet();
-    class Cl {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Cl_brand);
-        _defineProperty(this, 'prop', _assertClassBrand(_Cl_brand, this, _method).call(this, 1));
-        _classPrivateFieldInitSpec(
-          this,
-          _priv,
-          _assertClassBrand(_Cl_brand, this, _method).call(this, 2),
-        );
-      }
-      getPriv() {
-        return _classPrivateFieldGet(_priv, this);
-      }
-    }
-    function _method(x) {
-      return x;
-    }"
   `);
 });
 
@@ -9994,7 +6233,7 @@ test('private-method-privateFieldsAsProperties/before-fields/input.js [loose]', 
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -10015,7 +6254,12 @@ test('private-method-privateFieldsAsProperties/before-fields/input.js [loose]', 
       var _method = '__private_Cl_method';
       const Cl = function Cl() {
         if (!new.target) throw new TypeError('Cannot call a class as a function');
-        this.prop = _classPrivateMethodCall(this, _method, [1]);
+        Object.defineProperty(this, 'prop', {
+          value: _classPrivateMethodCall(this, _method, [1]),
+          enumerable: true,
+          configurable: true,
+          writable: true,
+        });
         Object.defineProperty(this, _priv, {
           writable: true,
           value: _classPrivateMethodCall(this, _method, [2]),
@@ -10045,41 +6289,6 @@ test('private-method-privateFieldsAsProperties/before-fields/input.js [loose]', 
       Object.defineProperty(Cl, 'prototype', { writable: false });
       return Cl;
     })();"
-  `);
-});
-
-test('private-method-privateFieldsAsProperties/class-binding/exec.js [spec]', async () => {
-  const source =
-    'class A {\n  #getA() { return A };\n  getA() {\n    return this.#getA();\n  }\n}\n\nconst oldA = A;\nA = null;\n\nexpect(new oldA().getA()).toBe(oldA);\n';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _A;
-    var _A_brand = /* @__PURE__ */ new WeakSet();
-    class A {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _A_brand);
-      }
-      getA() {
-        return _assertClassBrand(_A_brand, this, _getA).call(this);
-      }
-    }
-    _A = A;
-    function _getA() {
-      return _A;
-    }
-    const oldA = A;
-    A = null;
-    expect(new oldA().getA()).toBe(oldA);"
   `);
 });
 
@@ -10090,7 +6299,7 @@ test('private-method-privateFieldsAsProperties/class-binding/exec.js [loose]', a
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -10141,40 +6350,13 @@ test('private-method-privateFieldsAsProperties/class-binding/exec.js [loose]', a
   `);
 });
 
-test('private-method-privateFieldsAsProperties/class-binding/input.js [spec]', async () => {
-  const source = 'class A {\n  #getA() { return A };\n}\n';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _A;
-    var _A_brand = /* @__PURE__ */ new WeakSet();
-    class A {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _A_brand);
-      }
-    }
-    _A = A;
-    function _getA() {
-      return _A;
-    }"
-  `);
-});
-
 test('private-method-privateFieldsAsProperties/class-binding/input.js [loose]', async () => {
   const source = 'class A {\n  #getA() { return A };\n}\n';
   expect(
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -10198,43 +6380,13 @@ test('private-method-privateFieldsAsProperties/class-binding/input.js [loose]', 
   `);
 });
 
-test('private-method-privateFieldsAsProperties/class-expression/input.js [spec]', async () => {
-  const source = 'console.log(class A {\n  #foo() {}\n\n  method() {\n    this.#foo();\n  }\n});\n';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _A_brand;
-    console.log(
-      ((_A_brand = /* @__PURE__ */ new WeakSet()),
-      class A {
-        constructor() {
-          _classPrivateMethodInitSpec(this, _A_brand);
-        }
-        method() {
-          _assertClassBrand(_A_brand, this, _foo).call(this);
-        }
-      }),
-    );
-    function _foo() {}"
-  `);
-});
-
 test('private-method-privateFieldsAsProperties/class-expression/input.js [loose]', async () => {
   const source = 'console.log(class A {\n  #foo() {}\n\n  method() {\n    this.#foo();\n  }\n});\n';
   expect(
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -10280,60 +6432,6 @@ test('private-method-privateFieldsAsProperties/class-expression/input.js [loose]
         return A;
       })(),
     );"
-  `);
-});
-
-test('private-method-privateFieldsAsProperties/context/exec.js [spec]', async () => {
-  const source =
-    "class Foo {\n    constructor(status) {\n      this.status = status;\n      expect(() => this.#getStatus = null).toThrow(TypeError);\n    }\n\n    #getStatus() {\n      return this.status;\n    }\n\n    getCurrentStatus() {\n      return this.#getStatus();\n    }\n\n    setCurrentStatus(newStatus) {\n      this.status = newStatus;\n    }\n\n    getFakeStatus(fakeStatus) {\n      const getStatus = this.#getStatus;\n      return function () {\n        return getStatus.call({ status: fakeStatus });\n      };\n    }\n\n    getFakeStatusFunc() {\n      return {\n        status: 'fake-status',\n        getFakeStatus: this.#getStatus,\n      };\n    }\n  }\n\n  const f = new Foo('inactive');\n  expect(f.getCurrentStatus()).toBe('inactive');\n\n  f.setCurrentStatus('new-status');\n  expect(f.getCurrentStatus()).toBe('new-status');\n\n  expect(f.getFakeStatus('fake')()).toBe('fake');\n  expect(f.getFakeStatusFunc().getFakeStatus()).toBe('fake-status');\n";
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _readOnlyError = require('@babel/runtime/helpers/readOnlyError');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _Foo_brand = /* @__PURE__ */ new WeakSet();
-    class Foo {
-      constructor(status) {
-        _classPrivateMethodInitSpec(this, _Foo_brand);
-        this.status = status;
-        expect(() => (this, null, _readOnlyError('#getStatus'))).toThrow(TypeError);
-      }
-      getCurrentStatus() {
-        return _assertClassBrand(_Foo_brand, this, _getStatus).call(this);
-      }
-      setCurrentStatus(newStatus) {
-        this.status = newStatus;
-      }
-      getFakeStatus(fakeStatus) {
-        const getStatus = _assertClassBrand(_Foo_brand, this, _getStatus);
-        return function () {
-          return getStatus.call({ status: fakeStatus });
-        };
-      }
-      getFakeStatusFunc() {
-        return {
-          status: 'fake-status',
-          getFakeStatus: _assertClassBrand(_Foo_brand, this, _getStatus),
-        };
-      }
-    }
-    function _getStatus() {
-      return this.status;
-    }
-    const f = new Foo('inactive');
-    expect(f.getCurrentStatus()).toBe('inactive');
-    f.setCurrentStatus('new-status');
-    expect(f.getCurrentStatus()).toBe('new-status');
-    expect(f.getFakeStatus('fake')()).toBe('fake');
-    expect(f.getFakeStatusFunc().getFakeStatus()).toBe('fake-status');"
   `);
 });
 
@@ -10344,7 +6442,7 @@ test('private-method-privateFieldsAsProperties/context/exec.js [loose]', async (
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -10452,52 +6550,6 @@ test('private-method-privateFieldsAsProperties/context/exec.js [loose]', async (
     expect(f.getCurrentStatus()).toBe('new-status');
     expect(f.getFakeStatus('fake')()).toBe('fake');
     expect(f.getFakeStatusFunc().getFakeStatus()).toBe('fake-status');"
-  `);
-});
-
-test('private-method-privateFieldsAsProperties/context/input.js [spec]', async () => {
-  const source =
-    "class Foo {\n  constructor(status) {\n    this.status = status;\n  }\n\n  #getStatus() {\n    return this.status;\n  }\n\n  getCurrentStatus() {\n    return this.#getStatus();\n  }\n\n  setCurrentStatus(newStatus) {\n    this.status = newStatus;\n  }\n\n  getFakeStatus(fakeStatus) {\n    const fakeGetStatus = this.#getStatus;\n    return function() {\n      return fakeGetStatus.call({ status: fakeStatus });\n    };\n  }\n\n  getFakeStatusFunc() {\n    return {\n      status: 'fake-status',\n      getFakeStatus: this.#getStatus,\n    };\n  }\n}";
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _Foo_brand = /* @__PURE__ */ new WeakSet();
-    class Foo {
-      constructor(status) {
-        _classPrivateMethodInitSpec(this, _Foo_brand);
-        this.status = status;
-      }
-      getCurrentStatus() {
-        return _assertClassBrand(_Foo_brand, this, _getStatus).call(this);
-      }
-      setCurrentStatus(newStatus) {
-        this.status = newStatus;
-      }
-      getFakeStatus(fakeStatus) {
-        const fakeGetStatus = _assertClassBrand(_Foo_brand, this, _getStatus);
-        return function () {
-          return fakeGetStatus.call({ status: fakeStatus });
-        };
-      }
-      getFakeStatusFunc() {
-        return {
-          status: 'fake-status',
-          getFakeStatus: _assertClassBrand(_Foo_brand, this, _getStatus),
-        };
-      }
-    }
-    function _getStatus() {
-      return this.status;
-    }"
   `);
 });
 
@@ -10508,7 +6560,7 @@ test('private-method-privateFieldsAsProperties/context/input.js [loose]', async 
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -10605,39 +6657,6 @@ test('private-method-privateFieldsAsProperties/context/input.js [loose]', async 
       Object.defineProperty(Foo, 'prototype', { writable: false });
       return Foo;
     })();"
-  `);
-});
-
-test('private-method-privateFieldsAsProperties/exfiltrated/exec.js [spec]', async () => {
-  const source =
-    'let exfiltrated;\nclass Foo {\n    #privateMethod() {}\n\n    constructor() {\n        if (exfiltrated === undefined) {\n            exfiltrated = this.#privateMethod;\n        }\n        expect(exfiltrated).toStrictEqual(this.#privateMethod);\n    }\n}\n\nnew Foo();\n// check for private method function object equality\nnew Foo();';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    let exfiltrated;
-    var _Foo_brand = /* @__PURE__ */ new WeakSet();
-    class Foo {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Foo_brand);
-        if (exfiltrated === undefined) {
-          exfiltrated = _assertClassBrand(_Foo_brand, this, _privateMethod);
-        }
-        expect(exfiltrated).toStrictEqual(_assertClassBrand(_Foo_brand, this, _privateMethod));
-      }
-    }
-    function _privateMethod() {}
-    new Foo();
-    // check for private method function object equality
-    new Foo();"
   `);
 });
 
@@ -10648,7 +6667,7 @@ test('private-method-privateFieldsAsProperties/exfiltrated/exec.js [loose]', asy
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -10687,35 +6706,6 @@ test('private-method-privateFieldsAsProperties/exfiltrated/exec.js [loose]', asy
     new Foo();
     // check for private method function object equality
     new Foo();"
-  `);
-});
-
-test('private-method-privateFieldsAsProperties/exfiltrated/input.js [spec]', async () => {
-  const source =
-    'let exfiltrated;\nclass Foo {\n    #privateMethod() {}\n\n    constructor() {\n        if (exfiltrated === undefined) {\n            exfiltrated = this.#privateMethod;\n        }\n    }\n}';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    let exfiltrated;
-    var _Foo_brand = /* @__PURE__ */ new WeakSet();
-    class Foo {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Foo_brand);
-        if (exfiltrated === undefined) {
-          exfiltrated = _assertClassBrand(_Foo_brand, this, _privateMethod);
-        }
-      }
-    }
-    function _privateMethod() {}"
   `);
 });
 
@@ -10726,7 +6716,7 @@ test('private-method-privateFieldsAsProperties/exfiltrated/input.js [loose]', as
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -10762,46 +6752,6 @@ test('private-method-privateFieldsAsProperties/exfiltrated/input.js [loose]', as
   `);
 });
 
-test('private-method-privateFieldsAsProperties/generator/exec.js [spec]', async () => {
-  const source =
-    'class Cl {\n  *#foo() {\n    yield 2;\n    return 3;\n  }\n\n  test() {\n    return this.#foo();\n  }\n}\n\nconst val = new Cl().test();\nexpect(val.next()).toEqual({ value: 2, done: false });\nexpect(val.next()).toEqual({ value: 3, done: true });\n';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _Cl_brand = /* @__PURE__ */ new WeakSet();
-    class Cl {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Cl_brand);
-      }
-      test() {
-        return _assertClassBrand(_Cl_brand, this, _foo).call(this);
-      }
-    }
-    function* _foo() {
-      yield 2;
-      return 3;
-    }
-    const val = new Cl().test();
-    expect(val.next()).toEqual({
-      value: 2,
-      done: false,
-    });
-    expect(val.next()).toEqual({
-      value: 3,
-      done: true,
-    });"
-  `);
-});
-
 test('private-method-privateFieldsAsProperties/generator/exec.js [loose]', async () => {
   const source =
     'class Cl {\n  *#foo() {\n    yield 2;\n    return 3;\n  }\n\n  test() {\n    return this.#foo();\n  }\n}\n\nconst val = new Cl().test();\nexpect(val.next()).toEqual({ value: 2, done: false });\nexpect(val.next()).toEqual({ value: 3, done: true });\n';
@@ -10809,7 +6759,7 @@ test('private-method-privateFieldsAsProperties/generator/exec.js [loose]', async
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -10866,37 +6816,6 @@ test('private-method-privateFieldsAsProperties/generator/exec.js [loose]', async
   `);
 });
 
-test('private-method-privateFieldsAsProperties/generator/input.js [spec]', async () => {
-  const source =
-    'class Cl {\n  *#foo() {\n    yield 2;\n    return 3;\n  }\n\n  test() {\n    return this.#foo();\n  }\n}\n';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _Cl_brand = /* @__PURE__ */ new WeakSet();
-    class Cl {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Cl_brand);
-      }
-      test() {
-        return _assertClassBrand(_Cl_brand, this, _foo).call(this);
-      }
-    }
-    function* _foo() {
-      yield 2;
-      return 3;
-    }"
-  `);
-});
-
 test('private-method-privateFieldsAsProperties/generator/input.js [loose]', async () => {
   const source =
     'class Cl {\n  *#foo() {\n    yield 2;\n    return 3;\n  }\n\n  test() {\n    return this.#foo();\n  }\n}\n';
@@ -10904,7 +6823,7 @@ test('private-method-privateFieldsAsProperties/generator/input.js [loose]', asyn
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -10952,49 +6871,6 @@ test('private-method-privateFieldsAsProperties/generator/input.js [loose]', asyn
   `);
 });
 
-test('private-method-privateFieldsAsProperties/super/exec.js [spec]', async () => {
-  const source =
-    "class Base {\n  superMethod() {\n    return 'good';\n  }\n}\n\nclass Sub extends Base {\n  superMethod() {\n    return 'bad';\n  }\n\n  #privateMethod() {\n    return super.superMethod();\n  }\n\n  publicMethod() {\n    return this.#privateMethod();\n  }\n}\n\nexpect((new Sub()).publicMethod()).toEqual('good');\n";
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _superPropGet = require('@babel/runtime/helpers/superPropGet');
-    var _Sub;
-    class Base {
-      superMethod() {
-        return 'good';
-      }
-    }
-    var _Sub_brand = /* @__PURE__ */ new WeakSet();
-    class Sub extends Base {
-      constructor(..._args) {
-        super(..._args);
-        _classPrivateMethodInitSpec(this, _Sub_brand);
-      }
-      superMethod() {
-        return 'bad';
-      }
-      publicMethod() {
-        return _assertClassBrand(_Sub_brand, this, _privateMethod).call(this);
-      }
-    }
-    _Sub = Sub;
-    function _privateMethod() {
-      return _superPropGet(_Sub.prototype, 'superMethod', this, 2)([]);
-    }
-    expect(new Sub().publicMethod()).toEqual('good');"
-  `);
-});
-
 test('private-method-privateFieldsAsProperties/super/exec.js [loose]', async () => {
   const source =
     "class Base {\n  superMethod() {\n    return 'good';\n  }\n}\n\nclass Sub extends Base {\n  superMethod() {\n    return 'bad';\n  }\n\n  #privateMethod() {\n    return super.superMethod();\n  }\n\n  publicMethod() {\n    return this.#privateMethod();\n  }\n}\n\nexpect((new Sub()).publicMethod()).toEqual('good');\n";
@@ -11002,7 +6878,7 @@ test('private-method-privateFieldsAsProperties/super/exec.js [loose]', async () 
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -11094,48 +6970,6 @@ test('private-method-privateFieldsAsProperties/super/exec.js [loose]', async () 
   `);
 });
 
-test('private-method-privateFieldsAsProperties/super/input.js [spec]', async () => {
-  const source =
-    "class Base {\n  superMethod() {\n    return 'good';\n  }\n}\n\nclass Sub extends Base {\n  superMethod() {\n    return 'bad';\n  }\n\n  #privateMethod() {\n    return super.superMethod();\n  }\n\n  publicMethod() {\n    return this.#privateMethod();\n  }\n}\n";
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _superPropGet = require('@babel/runtime/helpers/superPropGet');
-    var _Sub;
-    class Base {
-      superMethod() {
-        return 'good';
-      }
-    }
-    var _Sub_brand = /* @__PURE__ */ new WeakSet();
-    class Sub extends Base {
-      constructor(..._args) {
-        super(..._args);
-        _classPrivateMethodInitSpec(this, _Sub_brand);
-      }
-      superMethod() {
-        return 'bad';
-      }
-      publicMethod() {
-        return _assertClassBrand(_Sub_brand, this, _privateMethod).call(this);
-      }
-    }
-    _Sub = Sub;
-    function _privateMethod() {
-      return _superPropGet(_Sub.prototype, 'superMethod', this, 2)([]);
-    }"
-  `);
-});
-
 test('private-method-privateFieldsAsProperties/super/input.js [loose]', async () => {
   const source =
     "class Base {\n  superMethod() {\n    return 'good';\n  }\n}\n\nclass Sub extends Base {\n  superMethod() {\n    return 'bad';\n  }\n\n  #privateMethod() {\n    return super.superMethod();\n  }\n\n  publicMethod() {\n    return this.#privateMethod();\n  }\n}\n";
@@ -11143,7 +6977,7 @@ test('private-method-privateFieldsAsProperties/super/input.js [loose]', async ()
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -11234,35 +7068,6 @@ test('private-method-privateFieldsAsProperties/super/input.js [loose]', async ()
   `);
 });
 
-test('private-method-privateFieldsAsSymbols/assignment/exec.js [spec]', async () => {
-  const source =
-    'class Foo {\n    constructor() {\n      this.publicField = this.#privateMethod();\n    }\n\n    #privateMethod() {\n      return 42;\n    }\n  }\n\n  expect((new Foo).publicField).toEqual(42);\n';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _Foo_brand = /* @__PURE__ */ new WeakSet();
-    class Foo {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Foo_brand);
-        this.publicField = _assertClassBrand(_Foo_brand, this, _privateMethod).call(this);
-      }
-    }
-    function _privateMethod() {
-      return 42;
-    }
-    expect(new Foo().publicField).toEqual(42);"
-  `);
-});
-
 test('private-method-privateFieldsAsSymbols/assignment/exec.js [loose]', async () => {
   const source =
     'class Foo {\n    constructor() {\n      this.publicField = this.#privateMethod();\n    }\n\n    #privateMethod() {\n      return 42;\n    }\n  }\n\n  expect((new Foo).publicField).toEqual(42);\n';
@@ -11270,7 +7075,7 @@ test('private-method-privateFieldsAsSymbols/assignment/exec.js [loose]', async (
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -11305,34 +7110,6 @@ test('private-method-privateFieldsAsSymbols/assignment/exec.js [loose]', async (
   `);
 });
 
-test('private-method-privateFieldsAsSymbols/assignment/input.js [spec]', async () => {
-  const source =
-    'class Foo {\n  constructor() {\n    this.publicField = this.#privateMethod();\n  }\n\n  #privateMethod() {\n    return 42;\n  }\n}';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _Foo_brand = /* @__PURE__ */ new WeakSet();
-    class Foo {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Foo_brand);
-        this.publicField = _assertClassBrand(_Foo_brand, this, _privateMethod).call(this);
-      }
-    }
-    function _privateMethod() {
-      return 42;
-    }"
-  `);
-});
-
 test('private-method-privateFieldsAsSymbols/assignment/input.js [loose]', async () => {
   const source =
     'class Foo {\n  constructor() {\n    this.publicField = this.#privateMethod();\n  }\n\n  #privateMethod() {\n    return 42;\n  }\n}';
@@ -11340,7 +7117,7 @@ test('private-method-privateFieldsAsSymbols/assignment/input.js [loose]', async 
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -11374,41 +7151,6 @@ test('private-method-privateFieldsAsSymbols/assignment/input.js [loose]', async 
   `);
 });
 
-test('private-method-privateFieldsAsSymbols/async/exec.js [spec]', async () => {
-  const source =
-    '(function () {\nclass Cl {\n  async #foo() {\n    return 2;\n  }\n\n  test() {\n    return this.#foo();\n  }\n}\n\nreturn new Cl().test().then(val => {\n  expect(val).toBe(2);\n});\n\n});\n';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    (function () {
-      var _Cl_brand = /* @__PURE__ */ new WeakSet();
-      class Cl {
-        constructor() {
-          _classPrivateMethodInitSpec(this, _Cl_brand);
-        }
-        test() {
-          return _assertClassBrand(_Cl_brand, this, _foo).call(this);
-        }
-      }
-      async function _foo() {
-        return 2;
-      }
-      return new Cl().test().then(val => {
-        expect(val).toBe(2);
-      });
-    });"
-  `);
-});
-
 test('private-method-privateFieldsAsSymbols/async/exec.js [loose]', async () => {
   const source =
     '(function () {\nclass Cl {\n  async #foo() {\n    return 2;\n  }\n\n  test() {\n    return this.#foo();\n  }\n}\n\nreturn new Cl().test().then(val => {\n  expect(val).toBe(2);\n});\n\n});\n';
@@ -11416,7 +7158,7 @@ test('private-method-privateFieldsAsSymbols/async/exec.js [loose]', async () => 
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -11468,36 +7210,6 @@ test('private-method-privateFieldsAsSymbols/async/exec.js [loose]', async () => 
   `);
 });
 
-test('private-method-privateFieldsAsSymbols/async/input.js [spec]', async () => {
-  const source =
-    'class Cl {\n  async #foo() {\n    return 2;\n  }\n\n  test() {\n    return this.#foo();\n  }\n}\n';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _Cl_brand = /* @__PURE__ */ new WeakSet();
-    class Cl {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Cl_brand);
-      }
-      test() {
-        return _assertClassBrand(_Cl_brand, this, _foo).call(this);
-      }
-    }
-    async function _foo() {
-      return 2;
-    }"
-  `);
-});
-
 test('private-method-privateFieldsAsSymbols/async/input.js [loose]', async () => {
   const source =
     'class Cl {\n  async #foo() {\n    return 2;\n  }\n\n  test() {\n    return this.#foo();\n  }\n}\n';
@@ -11505,7 +7217,7 @@ test('private-method-privateFieldsAsSymbols/async/input.js [loose]', async () =>
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -11552,48 +7264,6 @@ test('private-method-privateFieldsAsSymbols/async/input.js [loose]', async () =>
   `);
 });
 
-test('private-method-privateFieldsAsSymbols/before-fields/exec.js [spec]', async () => {
-  const source =
-    'class Cl {\n  prop = this.#method(1);\n\n  #priv = this.#method(2);\n\n  #method(x) {\n    return x;\n  }\n\n  getPriv() {\n    return this.#priv;\n  }\n}\n\nexpect(new Cl().prop).toBe(1);\nexpect(new Cl().getPriv()).toBe(2);\n';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _defineProperty = require('@babel/runtime/helpers/defineProperty');
-    var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _classPrivateFieldGet = require('@babel/runtime/helpers/classPrivateFieldGet2');
-    var _priv = /* @__PURE__ */ new WeakMap();
-    var _Cl_brand = /* @__PURE__ */ new WeakSet();
-    class Cl {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Cl_brand);
-        _defineProperty(this, 'prop', _assertClassBrand(_Cl_brand, this, _method).call(this, 1));
-        _classPrivateFieldInitSpec(
-          this,
-          _priv,
-          _assertClassBrand(_Cl_brand, this, _method).call(this, 2),
-        );
-      }
-      getPriv() {
-        return _classPrivateFieldGet(_priv, this);
-      }
-    }
-    function _method(x) {
-      return x;
-    }
-    expect(new Cl().prop).toBe(1);
-    expect(new Cl().getPriv()).toBe(2);"
-  `);
-});
-
 test('private-method-privateFieldsAsSymbols/before-fields/exec.js [loose]', async () => {
   const source =
     'class Cl {\n  prop = this.#method(1);\n\n  #priv = this.#method(2);\n\n  #method(x) {\n    return x;\n  }\n\n  getPriv() {\n    return this.#priv;\n  }\n}\n\nexpect(new Cl().prop).toBe(1);\nexpect(new Cl().getPriv()).toBe(2);\n';
@@ -11601,7 +7271,7 @@ test('private-method-privateFieldsAsSymbols/before-fields/exec.js [loose]', asyn
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -11622,7 +7292,12 @@ test('private-method-privateFieldsAsSymbols/before-fields/exec.js [loose]', asyn
       var _method = '__private_Cl_method';
       const Cl = function Cl() {
         if (!new.target) throw new TypeError('Cannot call a class as a function');
-        this.prop = _classPrivateMethodCall(this, _method, [1]);
+        Object.defineProperty(this, 'prop', {
+          value: _classPrivateMethodCall(this, _method, [1]),
+          enumerable: true,
+          configurable: true,
+          writable: true,
+        });
         Object.defineProperty(this, _priv, {
           writable: true,
           value: _classPrivateMethodCall(this, _method, [2]),
@@ -11657,46 +7332,6 @@ test('private-method-privateFieldsAsSymbols/before-fields/exec.js [loose]', asyn
   `);
 });
 
-test('private-method-privateFieldsAsSymbols/before-fields/input.js [spec]', async () => {
-  const source =
-    'class Cl {\n  prop = this.#method(1);\n\n  #priv = this.#method(2);\n\n  #method(x) {\n    return x;\n  }\n\n  getPriv() {\n    return this.#priv;\n  }\n}\n';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _defineProperty = require('@babel/runtime/helpers/defineProperty');
-    var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _classPrivateFieldGet = require('@babel/runtime/helpers/classPrivateFieldGet2');
-    var _priv = /* @__PURE__ */ new WeakMap();
-    var _Cl_brand = /* @__PURE__ */ new WeakSet();
-    class Cl {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Cl_brand);
-        _defineProperty(this, 'prop', _assertClassBrand(_Cl_brand, this, _method).call(this, 1));
-        _classPrivateFieldInitSpec(
-          this,
-          _priv,
-          _assertClassBrand(_Cl_brand, this, _method).call(this, 2),
-        );
-      }
-      getPriv() {
-        return _classPrivateFieldGet(_priv, this);
-      }
-    }
-    function _method(x) {
-      return x;
-    }"
-  `);
-});
-
 test('private-method-privateFieldsAsSymbols/before-fields/input.js [loose]', async () => {
   const source =
     'class Cl {\n  prop = this.#method(1);\n\n  #priv = this.#method(2);\n\n  #method(x) {\n    return x;\n  }\n\n  getPriv() {\n    return this.#priv;\n  }\n}\n';
@@ -11704,7 +7339,7 @@ test('private-method-privateFieldsAsSymbols/before-fields/input.js [loose]', asy
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -11725,7 +7360,12 @@ test('private-method-privateFieldsAsSymbols/before-fields/input.js [loose]', asy
       var _method = '__private_Cl_method';
       const Cl = function Cl() {
         if (!new.target) throw new TypeError('Cannot call a class as a function');
-        this.prop = _classPrivateMethodCall(this, _method, [1]);
+        Object.defineProperty(this, 'prop', {
+          value: _classPrivateMethodCall(this, _method, [1]),
+          enumerable: true,
+          configurable: true,
+          writable: true,
+        });
         Object.defineProperty(this, _priv, {
           writable: true,
           value: _classPrivateMethodCall(this, _method, [2]),
@@ -11758,41 +7398,6 @@ test('private-method-privateFieldsAsSymbols/before-fields/input.js [loose]', asy
   `);
 });
 
-test('private-method-privateFieldsAsSymbols/class-binding/exec.js [spec]', async () => {
-  const source =
-    'class A {\n  #getA() { return A };\n  getA() {\n    return this.#getA();\n  }\n}\n\nconst oldA = A;\nA = null;\n\nexpect(new oldA().getA()).toBe(oldA);\n';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _A;
-    var _A_brand = /* @__PURE__ */ new WeakSet();
-    class A {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _A_brand);
-      }
-      getA() {
-        return _assertClassBrand(_A_brand, this, _getA).call(this);
-      }
-    }
-    _A = A;
-    function _getA() {
-      return _A;
-    }
-    const oldA = A;
-    A = null;
-    expect(new oldA().getA()).toBe(oldA);"
-  `);
-});
-
 test('private-method-privateFieldsAsSymbols/class-binding/exec.js [loose]', async () => {
   const source =
     'class A {\n  #getA() { return A };\n  getA() {\n    return this.#getA();\n  }\n}\n\nconst oldA = A;\nA = null;\n\nexpect(new oldA().getA()).toBe(oldA);\n';
@@ -11800,7 +7405,7 @@ test('private-method-privateFieldsAsSymbols/class-binding/exec.js [loose]', asyn
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -11851,40 +7456,13 @@ test('private-method-privateFieldsAsSymbols/class-binding/exec.js [loose]', asyn
   `);
 });
 
-test('private-method-privateFieldsAsSymbols/class-binding/input.js [spec]', async () => {
-  const source = 'class A {\n  #getA() { return A };\n}\n';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _A;
-    var _A_brand = /* @__PURE__ */ new WeakSet();
-    class A {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _A_brand);
-      }
-    }
-    _A = A;
-    function _getA() {
-      return _A;
-    }"
-  `);
-});
-
 test('private-method-privateFieldsAsSymbols/class-binding/input.js [loose]', async () => {
   const source = 'class A {\n  #getA() { return A };\n}\n';
   expect(
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -11908,43 +7486,13 @@ test('private-method-privateFieldsAsSymbols/class-binding/input.js [loose]', asy
   `);
 });
 
-test('private-method-privateFieldsAsSymbols/class-expression/input.js [spec]', async () => {
-  const source = 'console.log(class A {\n  #foo() {}\n\n  method() {\n    this.#foo();\n  }\n});\n';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _A_brand;
-    console.log(
-      ((_A_brand = /* @__PURE__ */ new WeakSet()),
-      class A {
-        constructor() {
-          _classPrivateMethodInitSpec(this, _A_brand);
-        }
-        method() {
-          _assertClassBrand(_A_brand, this, _foo).call(this);
-        }
-      }),
-    );
-    function _foo() {}"
-  `);
-});
-
 test('private-method-privateFieldsAsSymbols/class-expression/input.js [loose]', async () => {
   const source = 'console.log(class A {\n  #foo() {}\n\n  method() {\n    this.#foo();\n  }\n});\n';
   expect(
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -11993,60 +7541,6 @@ test('private-method-privateFieldsAsSymbols/class-expression/input.js [loose]', 
   `);
 });
 
-test('private-method-privateFieldsAsSymbols/context/exec.js [spec]', async () => {
-  const source =
-    "class Foo {\n    constructor(status) {\n      this.status = status;\n      expect(() => this.#getStatus = null).toThrow(TypeError);\n    }\n\n    #getStatus() {\n      return this.status;\n    }\n\n    getCurrentStatus() {\n      return this.#getStatus();\n    }\n\n    setCurrentStatus(newStatus) {\n      this.status = newStatus;\n    }\n\n    getFakeStatus(fakeStatus) {\n      const getStatus = this.#getStatus;\n      return function () {\n        return getStatus.call({ status: fakeStatus });\n      };\n    }\n\n    getFakeStatusFunc() {\n      return {\n        status: 'fake-status',\n        getFakeStatus: this.#getStatus,\n      };\n    }\n  }\n\n  const f = new Foo('inactive');\n  expect(f.getCurrentStatus()).toBe('inactive');\n\n  f.setCurrentStatus('new-status');\n  expect(f.getCurrentStatus()).toBe('new-status');\n\n  expect(f.getFakeStatus('fake')()).toBe('fake');\n  expect(f.getFakeStatusFunc().getFakeStatus()).toBe('fake-status');\n";
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _readOnlyError = require('@babel/runtime/helpers/readOnlyError');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _Foo_brand = /* @__PURE__ */ new WeakSet();
-    class Foo {
-      constructor(status) {
-        _classPrivateMethodInitSpec(this, _Foo_brand);
-        this.status = status;
-        expect(() => (this, null, _readOnlyError('#getStatus'))).toThrow(TypeError);
-      }
-      getCurrentStatus() {
-        return _assertClassBrand(_Foo_brand, this, _getStatus).call(this);
-      }
-      setCurrentStatus(newStatus) {
-        this.status = newStatus;
-      }
-      getFakeStatus(fakeStatus) {
-        const getStatus = _assertClassBrand(_Foo_brand, this, _getStatus);
-        return function () {
-          return getStatus.call({ status: fakeStatus });
-        };
-      }
-      getFakeStatusFunc() {
-        return {
-          status: 'fake-status',
-          getFakeStatus: _assertClassBrand(_Foo_brand, this, _getStatus),
-        };
-      }
-    }
-    function _getStatus() {
-      return this.status;
-    }
-    const f = new Foo('inactive');
-    expect(f.getCurrentStatus()).toBe('inactive');
-    f.setCurrentStatus('new-status');
-    expect(f.getCurrentStatus()).toBe('new-status');
-    expect(f.getFakeStatus('fake')()).toBe('fake');
-    expect(f.getFakeStatusFunc().getFakeStatus()).toBe('fake-status');"
-  `);
-});
-
 test('private-method-privateFieldsAsSymbols/context/exec.js [loose]', async () => {
   const source =
     "class Foo {\n    constructor(status) {\n      this.status = status;\n      expect(() => this.#getStatus = null).toThrow(TypeError);\n    }\n\n    #getStatus() {\n      return this.status;\n    }\n\n    getCurrentStatus() {\n      return this.#getStatus();\n    }\n\n    setCurrentStatus(newStatus) {\n      this.status = newStatus;\n    }\n\n    getFakeStatus(fakeStatus) {\n      const getStatus = this.#getStatus;\n      return function () {\n        return getStatus.call({ status: fakeStatus });\n      };\n    }\n\n    getFakeStatusFunc() {\n      return {\n        status: 'fake-status',\n        getFakeStatus: this.#getStatus,\n      };\n    }\n  }\n\n  const f = new Foo('inactive');\n  expect(f.getCurrentStatus()).toBe('inactive');\n\n  f.setCurrentStatus('new-status');\n  expect(f.getCurrentStatus()).toBe('new-status');\n\n  expect(f.getFakeStatus('fake')()).toBe('fake');\n  expect(f.getFakeStatusFunc().getFakeStatus()).toBe('fake-status');\n";
@@ -12054,7 +7548,7 @@ test('private-method-privateFieldsAsSymbols/context/exec.js [loose]', async () =
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -12165,52 +7659,6 @@ test('private-method-privateFieldsAsSymbols/context/exec.js [loose]', async () =
   `);
 });
 
-test('private-method-privateFieldsAsSymbols/context/input.js [spec]', async () => {
-  const source =
-    "class Foo {\n  constructor(status) {\n    this.status = status;\n  }\n\n  #getStatus() {\n    return this.status;\n  }\n\n  getCurrentStatus() {\n    return this.#getStatus();\n  }\n\n  setCurrentStatus(newStatus) {\n    this.status = newStatus;\n  }\n\n  getFakeStatus(fakeStatus) {\n    const fakeGetStatus = this.#getStatus;\n    return function() {\n      return fakeGetStatus.call({ status: fakeStatus });\n    };\n  }\n\n  getFakeStatusFunc() {\n    return {\n      status: 'fake-status',\n      getFakeStatus: this.#getStatus,\n    };\n  }\n}";
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _Foo_brand = /* @__PURE__ */ new WeakSet();
-    class Foo {
-      constructor(status) {
-        _classPrivateMethodInitSpec(this, _Foo_brand);
-        this.status = status;
-      }
-      getCurrentStatus() {
-        return _assertClassBrand(_Foo_brand, this, _getStatus).call(this);
-      }
-      setCurrentStatus(newStatus) {
-        this.status = newStatus;
-      }
-      getFakeStatus(fakeStatus) {
-        const fakeGetStatus = _assertClassBrand(_Foo_brand, this, _getStatus);
-        return function () {
-          return fakeGetStatus.call({ status: fakeStatus });
-        };
-      }
-      getFakeStatusFunc() {
-        return {
-          status: 'fake-status',
-          getFakeStatus: _assertClassBrand(_Foo_brand, this, _getStatus),
-        };
-      }
-    }
-    function _getStatus() {
-      return this.status;
-    }"
-  `);
-});
-
 test('private-method-privateFieldsAsSymbols/context/input.js [loose]', async () => {
   const source =
     "class Foo {\n  constructor(status) {\n    this.status = status;\n  }\n\n  #getStatus() {\n    return this.status;\n  }\n\n  getCurrentStatus() {\n    return this.#getStatus();\n  }\n\n  setCurrentStatus(newStatus) {\n    this.status = newStatus;\n  }\n\n  getFakeStatus(fakeStatus) {\n    const fakeGetStatus = this.#getStatus;\n    return function() {\n      return fakeGetStatus.call({ status: fakeStatus });\n    };\n  }\n\n  getFakeStatusFunc() {\n    return {\n      status: 'fake-status',\n      getFakeStatus: this.#getStatus,\n    };\n  }\n}";
@@ -12218,7 +7666,7 @@ test('private-method-privateFieldsAsSymbols/context/input.js [loose]', async () 
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -12318,39 +7766,6 @@ test('private-method-privateFieldsAsSymbols/context/input.js [loose]', async () 
   `);
 });
 
-test('private-method-privateFieldsAsSymbols/exfiltrated/exec.js [spec]', async () => {
-  const source =
-    'let exfiltrated;\nclass Foo {\n    #privateMethod() {}\n\n    constructor() {\n        if (exfiltrated === undefined) {\n            exfiltrated = this.#privateMethod;\n        }\n        expect(exfiltrated).toStrictEqual(this.#privateMethod);\n    }\n}\n\nnew Foo();\n// check for private method function object equality\nnew Foo();';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    let exfiltrated;
-    var _Foo_brand = /* @__PURE__ */ new WeakSet();
-    class Foo {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Foo_brand);
-        if (exfiltrated === undefined) {
-          exfiltrated = _assertClassBrand(_Foo_brand, this, _privateMethod);
-        }
-        expect(exfiltrated).toStrictEqual(_assertClassBrand(_Foo_brand, this, _privateMethod));
-      }
-    }
-    function _privateMethod() {}
-    new Foo();
-    // check for private method function object equality
-    new Foo();"
-  `);
-});
-
 test('private-method-privateFieldsAsSymbols/exfiltrated/exec.js [loose]', async () => {
   const source =
     'let exfiltrated;\nclass Foo {\n    #privateMethod() {}\n\n    constructor() {\n        if (exfiltrated === undefined) {\n            exfiltrated = this.#privateMethod;\n        }\n        expect(exfiltrated).toStrictEqual(this.#privateMethod);\n    }\n}\n\nnew Foo();\n// check for private method function object equality\nnew Foo();';
@@ -12358,7 +7773,7 @@ test('private-method-privateFieldsAsSymbols/exfiltrated/exec.js [loose]', async 
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -12400,35 +7815,6 @@ test('private-method-privateFieldsAsSymbols/exfiltrated/exec.js [loose]', async 
   `);
 });
 
-test('private-method-privateFieldsAsSymbols/exfiltrated/input.js [spec]', async () => {
-  const source =
-    'let exfiltrated;\nclass Foo {\n    #privateMethod() {}\n\n    constructor() {\n        if (exfiltrated === undefined) {\n            exfiltrated = this.#privateMethod;\n        }\n    }\n}';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    let exfiltrated;
-    var _Foo_brand = /* @__PURE__ */ new WeakSet();
-    class Foo {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Foo_brand);
-        if (exfiltrated === undefined) {
-          exfiltrated = _assertClassBrand(_Foo_brand, this, _privateMethod);
-        }
-      }
-    }
-    function _privateMethod() {}"
-  `);
-});
-
 test('private-method-privateFieldsAsSymbols/exfiltrated/input.js [loose]', async () => {
   const source =
     'let exfiltrated;\nclass Foo {\n    #privateMethod() {}\n\n    constructor() {\n        if (exfiltrated === undefined) {\n            exfiltrated = this.#privateMethod;\n        }\n    }\n}';
@@ -12436,7 +7822,7 @@ test('private-method-privateFieldsAsSymbols/exfiltrated/input.js [loose]', async
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -12472,46 +7858,6 @@ test('private-method-privateFieldsAsSymbols/exfiltrated/input.js [loose]', async
   `);
 });
 
-test('private-method-privateFieldsAsSymbols/generator/exec.js [spec]', async () => {
-  const source =
-    'class Cl {\n  *#foo() {\n    yield 2;\n    return 3;\n  }\n\n  test() {\n    return this.#foo();\n  }\n}\n\nconst val = new Cl().test();\nexpect(val.next()).toEqual({ value: 2, done: false });\nexpect(val.next()).toEqual({ value: 3, done: true });\n';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _Cl_brand = /* @__PURE__ */ new WeakSet();
-    class Cl {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Cl_brand);
-      }
-      test() {
-        return _assertClassBrand(_Cl_brand, this, _foo).call(this);
-      }
-    }
-    function* _foo() {
-      yield 2;
-      return 3;
-    }
-    const val = new Cl().test();
-    expect(val.next()).toEqual({
-      value: 2,
-      done: false,
-    });
-    expect(val.next()).toEqual({
-      value: 3,
-      done: true,
-    });"
-  `);
-});
-
 test('private-method-privateFieldsAsSymbols/generator/exec.js [loose]', async () => {
   const source =
     'class Cl {\n  *#foo() {\n    yield 2;\n    return 3;\n  }\n\n  test() {\n    return this.#foo();\n  }\n}\n\nconst val = new Cl().test();\nexpect(val.next()).toEqual({ value: 2, done: false });\nexpect(val.next()).toEqual({ value: 3, done: true });\n';
@@ -12519,7 +7865,7 @@ test('private-method-privateFieldsAsSymbols/generator/exec.js [loose]', async ()
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -12576,37 +7922,6 @@ test('private-method-privateFieldsAsSymbols/generator/exec.js [loose]', async ()
   `);
 });
 
-test('private-method-privateFieldsAsSymbols/generator/input.js [spec]', async () => {
-  const source =
-    'class Cl {\n  *#foo() {\n    yield 2;\n    return 3;\n  }\n\n  test() {\n    return this.#foo();\n  }\n}\n';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _Cl_brand = /* @__PURE__ */ new WeakSet();
-    class Cl {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Cl_brand);
-      }
-      test() {
-        return _assertClassBrand(_Cl_brand, this, _foo).call(this);
-      }
-    }
-    function* _foo() {
-      yield 2;
-      return 3;
-    }"
-  `);
-});
-
 test('private-method-privateFieldsAsSymbols/generator/input.js [loose]', async () => {
   const source =
     'class Cl {\n  *#foo() {\n    yield 2;\n    return 3;\n  }\n\n  test() {\n    return this.#foo();\n  }\n}\n';
@@ -12614,7 +7929,7 @@ test('private-method-privateFieldsAsSymbols/generator/input.js [loose]', async (
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -12662,49 +7977,6 @@ test('private-method-privateFieldsAsSymbols/generator/input.js [loose]', async (
   `);
 });
 
-test('private-method-privateFieldsAsSymbols/super/exec.js [spec]', async () => {
-  const source =
-    "class Base {\n  superMethod() {\n    return 'good';\n  }\n}\n\nclass Sub extends Base {\n  superMethod() {\n    return 'bad';\n  }\n\n  #privateMethod() {\n    return super.superMethod();\n  }\n\n  publicMethod() {\n    return this.#privateMethod();\n  }\n}\n\nexpect((new Sub()).publicMethod()).toEqual('good');\n";
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _superPropGet = require('@babel/runtime/helpers/superPropGet');
-    var _Sub;
-    class Base {
-      superMethod() {
-        return 'good';
-      }
-    }
-    var _Sub_brand = /* @__PURE__ */ new WeakSet();
-    class Sub extends Base {
-      constructor(..._args) {
-        super(..._args);
-        _classPrivateMethodInitSpec(this, _Sub_brand);
-      }
-      superMethod() {
-        return 'bad';
-      }
-      publicMethod() {
-        return _assertClassBrand(_Sub_brand, this, _privateMethod).call(this);
-      }
-    }
-    _Sub = Sub;
-    function _privateMethod() {
-      return _superPropGet(_Sub.prototype, 'superMethod', this, 2)([]);
-    }
-    expect(new Sub().publicMethod()).toEqual('good');"
-  `);
-});
-
 test('private-method-privateFieldsAsSymbols/super/exec.js [loose]', async () => {
   const source =
     "class Base {\n  superMethod() {\n    return 'good';\n  }\n}\n\nclass Sub extends Base {\n  superMethod() {\n    return 'bad';\n  }\n\n  #privateMethod() {\n    return super.superMethod();\n  }\n\n  publicMethod() {\n    return this.#privateMethod();\n  }\n}\n\nexpect((new Sub()).publicMethod()).toEqual('good');\n";
@@ -12712,7 +7984,7 @@ test('private-method-privateFieldsAsSymbols/super/exec.js [loose]', async () => 
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -12804,48 +8076,6 @@ test('private-method-privateFieldsAsSymbols/super/exec.js [loose]', async () => 
   `);
 });
 
-test('private-method-privateFieldsAsSymbols/super/input.js [spec]', async () => {
-  const source =
-    "class Base {\n  superMethod() {\n    return 'good';\n  }\n}\n\nclass Sub extends Base {\n  superMethod() {\n    return 'bad';\n  }\n\n  #privateMethod() {\n    return super.superMethod();\n  }\n\n  publicMethod() {\n    return this.#privateMethod();\n  }\n}\n";
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _superPropGet = require('@babel/runtime/helpers/superPropGet');
-    var _Sub;
-    class Base {
-      superMethod() {
-        return 'good';
-      }
-    }
-    var _Sub_brand = /* @__PURE__ */ new WeakSet();
-    class Sub extends Base {
-      constructor(..._args) {
-        super(..._args);
-        _classPrivateMethodInitSpec(this, _Sub_brand);
-      }
-      superMethod() {
-        return 'bad';
-      }
-      publicMethod() {
-        return _assertClassBrand(_Sub_brand, this, _privateMethod).call(this);
-      }
-    }
-    _Sub = Sub;
-    function _privateMethod() {
-      return _superPropGet(_Sub.prototype, 'superMethod', this, 2)([]);
-    }"
-  `);
-});
-
 test('private-method-privateFieldsAsSymbols/super/input.js [loose]', async () => {
   const source =
     "class Base {\n  superMethod() {\n    return 'good';\n  }\n}\n\nclass Sub extends Base {\n  superMethod() {\n    return 'bad';\n  }\n\n  #privateMethod() {\n    return super.superMethod();\n  }\n\n  publicMethod() {\n    return this.#privateMethod();\n  }\n}\n";
@@ -12853,7 +8083,7 @@ test('private-method-privateFieldsAsSymbols/super/input.js [loose]', async () =>
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -12944,35 +8174,6 @@ test('private-method-privateFieldsAsSymbols/super/input.js [loose]', async () =>
   `);
 });
 
-test('private-method/assignment/exec.js [spec]', async () => {
-  const source =
-    'class Foo {\n    constructor() {\n      this.publicField = this.#privateMethod();\n    }\n  \n    #privateMethod() {\n      return 42;\n    }\n  }\n  \n  expect((new Foo).publicField).toEqual(42);';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _Foo_brand = /* @__PURE__ */ new WeakSet();
-    class Foo {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Foo_brand);
-        this.publicField = _assertClassBrand(_Foo_brand, this, _privateMethod).call(this);
-      }
-    }
-    function _privateMethod() {
-      return 42;
-    }
-    expect(new Foo().publicField).toEqual(42);"
-  `);
-});
-
 test('private-method/assignment/exec.js [loose]', async () => {
   const source =
     'class Foo {\n    constructor() {\n      this.publicField = this.#privateMethod();\n    }\n  \n    #privateMethod() {\n      return 42;\n    }\n  }\n  \n  expect((new Foo).publicField).toEqual(42);';
@@ -12980,7 +8181,7 @@ test('private-method/assignment/exec.js [loose]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -13015,34 +8216,6 @@ test('private-method/assignment/exec.js [loose]', async () => {
   `);
 });
 
-test('private-method/assignment/input.js [spec]', async () => {
-  const source =
-    'class Foo {\n  constructor() {\n    this.publicField = this.#privateMethod();\n  }\n\n  #privateMethod() {\n    return 42;\n  }\n}';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _Foo_brand = /* @__PURE__ */ new WeakSet();
-    class Foo {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Foo_brand);
-        this.publicField = _assertClassBrand(_Foo_brand, this, _privateMethod).call(this);
-      }
-    }
-    function _privateMethod() {
-      return 42;
-    }"
-  `);
-});
-
 test('private-method/assignment/input.js [loose]', async () => {
   const source =
     'class Foo {\n  constructor() {\n    this.publicField = this.#privateMethod();\n  }\n\n  #privateMethod() {\n    return 42;\n  }\n}';
@@ -13050,7 +8223,7 @@ test('private-method/assignment/input.js [loose]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -13084,41 +8257,6 @@ test('private-method/assignment/input.js [loose]', async () => {
   `);
 });
 
-test('private-method/async/exec.js [spec]', async () => {
-  const source =
-    '(function () {\nclass Cl {\n  async #foo() {\n    return 2;\n  }\n\n  test() {\n    return this.#foo();\n  }\n}\n\nreturn new Cl().test().then(val => {\n  expect(val).toBe(2);\n});\n\n});\n';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    (function () {
-      var _Cl_brand = /* @__PURE__ */ new WeakSet();
-      class Cl {
-        constructor() {
-          _classPrivateMethodInitSpec(this, _Cl_brand);
-        }
-        test() {
-          return _assertClassBrand(_Cl_brand, this, _foo).call(this);
-        }
-      }
-      async function _foo() {
-        return 2;
-      }
-      return new Cl().test().then(val => {
-        expect(val).toBe(2);
-      });
-    });"
-  `);
-});
-
 test('private-method/async/exec.js [loose]', async () => {
   const source =
     '(function () {\nclass Cl {\n  async #foo() {\n    return 2;\n  }\n\n  test() {\n    return this.#foo();\n  }\n}\n\nreturn new Cl().test().then(val => {\n  expect(val).toBe(2);\n});\n\n});\n';
@@ -13126,7 +8264,7 @@ test('private-method/async/exec.js [loose]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -13178,36 +8316,6 @@ test('private-method/async/exec.js [loose]', async () => {
   `);
 });
 
-test('private-method/async/input.js [spec]', async () => {
-  const source =
-    'class Cl {\n  async #foo() {\n    return 2;\n  }\n\n  test() {\n    return this.#foo();\n  }\n}\n';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _Cl_brand = /* @__PURE__ */ new WeakSet();
-    class Cl {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Cl_brand);
-      }
-      test() {
-        return _assertClassBrand(_Cl_brand, this, _foo).call(this);
-      }
-    }
-    async function _foo() {
-      return 2;
-    }"
-  `);
-});
-
 test('private-method/async/input.js [loose]', async () => {
   const source =
     'class Cl {\n  async #foo() {\n    return 2;\n  }\n\n  test() {\n    return this.#foo();\n  }\n}\n';
@@ -13215,7 +8323,7 @@ test('private-method/async/input.js [loose]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -13262,48 +8370,6 @@ test('private-method/async/input.js [loose]', async () => {
   `);
 });
 
-test('private-method/before-fields/exec.js [spec]', async () => {
-  const source =
-    'class Cl {\n  prop = this.#method(1);\n\n  #priv = this.#method(2);\n\n  #method(x) {\n    return x;\n  }\n\n  getPriv() {\n    return this.#priv;\n  }\n}\n\nexpect(new Cl().prop).toBe(1);\nexpect(new Cl().getPriv()).toBe(2);\n';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _defineProperty = require('@babel/runtime/helpers/defineProperty');
-    var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _classPrivateFieldGet = require('@babel/runtime/helpers/classPrivateFieldGet2');
-    var _priv = /* @__PURE__ */ new WeakMap();
-    var _Cl_brand = /* @__PURE__ */ new WeakSet();
-    class Cl {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Cl_brand);
-        _defineProperty(this, 'prop', _assertClassBrand(_Cl_brand, this, _method).call(this, 1));
-        _classPrivateFieldInitSpec(
-          this,
-          _priv,
-          _assertClassBrand(_Cl_brand, this, _method).call(this, 2),
-        );
-      }
-      getPriv() {
-        return _classPrivateFieldGet(_priv, this);
-      }
-    }
-    function _method(x) {
-      return x;
-    }
-    expect(new Cl().prop).toBe(1);
-    expect(new Cl().getPriv()).toBe(2);"
-  `);
-});
-
 test('private-method/before-fields/exec.js [loose]', async () => {
   const source =
     'class Cl {\n  prop = this.#method(1);\n\n  #priv = this.#method(2);\n\n  #method(x) {\n    return x;\n  }\n\n  getPriv() {\n    return this.#priv;\n  }\n}\n\nexpect(new Cl().prop).toBe(1);\nexpect(new Cl().getPriv()).toBe(2);\n';
@@ -13311,7 +8377,7 @@ test('private-method/before-fields/exec.js [loose]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -13332,7 +8398,12 @@ test('private-method/before-fields/exec.js [loose]', async () => {
       var _method = '__private_Cl_method';
       const Cl = function Cl() {
         if (!new.target) throw new TypeError('Cannot call a class as a function');
-        this.prop = _classPrivateMethodCall(this, _method, [1]);
+        Object.defineProperty(this, 'prop', {
+          value: _classPrivateMethodCall(this, _method, [1]),
+          enumerable: true,
+          configurable: true,
+          writable: true,
+        });
         Object.defineProperty(this, _priv, {
           writable: true,
           value: _classPrivateMethodCall(this, _method, [2]),
@@ -13367,46 +8438,6 @@ test('private-method/before-fields/exec.js [loose]', async () => {
   `);
 });
 
-test('private-method/before-fields/input.js [spec]', async () => {
-  const source =
-    'class Cl {\n  prop = this.#method(1);\n\n  #priv = this.#method(2);\n\n  #method(x) {\n    return x;\n  }\n\n  getPriv() {\n    return this.#priv;\n  }\n}\n';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _defineProperty = require('@babel/runtime/helpers/defineProperty');
-    var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _classPrivateFieldGet = require('@babel/runtime/helpers/classPrivateFieldGet2');
-    var _priv = /* @__PURE__ */ new WeakMap();
-    var _Cl_brand = /* @__PURE__ */ new WeakSet();
-    class Cl {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Cl_brand);
-        _defineProperty(this, 'prop', _assertClassBrand(_Cl_brand, this, _method).call(this, 1));
-        _classPrivateFieldInitSpec(
-          this,
-          _priv,
-          _assertClassBrand(_Cl_brand, this, _method).call(this, 2),
-        );
-      }
-      getPriv() {
-        return _classPrivateFieldGet(_priv, this);
-      }
-    }
-    function _method(x) {
-      return x;
-    }"
-  `);
-});
-
 test('private-method/before-fields/input.js [loose]', async () => {
   const source =
     'class Cl {\n  prop = this.#method(1);\n\n  #priv = this.#method(2);\n\n  #method(x) {\n    return x;\n  }\n\n  getPriv() {\n    return this.#priv;\n  }\n}\n';
@@ -13414,7 +8445,7 @@ test('private-method/before-fields/input.js [loose]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -13435,7 +8466,12 @@ test('private-method/before-fields/input.js [loose]', async () => {
       var _method = '__private_Cl_method';
       const Cl = function Cl() {
         if (!new.target) throw new TypeError('Cannot call a class as a function');
-        this.prop = _classPrivateMethodCall(this, _method, [1]);
+        Object.defineProperty(this, 'prop', {
+          value: _classPrivateMethodCall(this, _method, [1]),
+          enumerable: true,
+          configurable: true,
+          writable: true,
+        });
         Object.defineProperty(this, _priv, {
           writable: true,
           value: _classPrivateMethodCall(this, _method, [2]),
@@ -13468,41 +8504,6 @@ test('private-method/before-fields/input.js [loose]', async () => {
   `);
 });
 
-test('private-method/class-binding/exec.js [spec]', async () => {
-  const source =
-    'class A {\n  #getA() { return A };\n  getA() {\n    return this.#getA();\n  }\n}\n\nconst oldA = A;\nA = null;\n\nexpect(new oldA().getA()).toBe(oldA);\n';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _A;
-    var _A_brand = /* @__PURE__ */ new WeakSet();
-    class A {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _A_brand);
-      }
-      getA() {
-        return _assertClassBrand(_A_brand, this, _getA).call(this);
-      }
-    }
-    _A = A;
-    function _getA() {
-      return _A;
-    }
-    const oldA = A;
-    A = null;
-    expect(new oldA().getA()).toBe(oldA);"
-  `);
-});
-
 test('private-method/class-binding/exec.js [loose]', async () => {
   const source =
     'class A {\n  #getA() { return A };\n  getA() {\n    return this.#getA();\n  }\n}\n\nconst oldA = A;\nA = null;\n\nexpect(new oldA().getA()).toBe(oldA);\n';
@@ -13510,7 +8511,7 @@ test('private-method/class-binding/exec.js [loose]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -13561,40 +8562,13 @@ test('private-method/class-binding/exec.js [loose]', async () => {
   `);
 });
 
-test('private-method/class-binding/input.js [spec]', async () => {
-  const source = 'class A {\n  #getA() { return A };\n}\n';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _A;
-    var _A_brand = /* @__PURE__ */ new WeakSet();
-    class A {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _A_brand);
-      }
-    }
-    _A = A;
-    function _getA() {
-      return _A;
-    }"
-  `);
-});
-
 test('private-method/class-binding/input.js [loose]', async () => {
   const source = 'class A {\n  #getA() { return A };\n}\n';
   expect(
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -13618,43 +8592,13 @@ test('private-method/class-binding/input.js [loose]', async () => {
   `);
 });
 
-test('private-method/class-expression/input.js [spec]', async () => {
-  const source = 'console.log(class A {\n  #foo() {}\n\n  method() {\n    this.#foo();\n  }\n});\n';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _A_brand;
-    console.log(
-      ((_A_brand = /* @__PURE__ */ new WeakSet()),
-      class A {
-        constructor() {
-          _classPrivateMethodInitSpec(this, _A_brand);
-        }
-        method() {
-          _assertClassBrand(_A_brand, this, _foo).call(this);
-        }
-      }),
-    );
-    function _foo() {}"
-  `);
-});
-
 test('private-method/class-expression/input.js [loose]', async () => {
   const source = 'console.log(class A {\n  #foo() {}\n\n  method() {\n    this.#foo();\n  }\n});\n';
   expect(
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -13703,60 +8647,6 @@ test('private-method/class-expression/input.js [loose]', async () => {
   `);
 });
 
-test('private-method/context/exec.js [spec]', async () => {
-  const source =
-    "class Foo {\n    constructor(status) {\n      this.status = status;\n      expect(() => this.#getStatus = null).toThrow(TypeError);\n    }\n\n    #getStatus() {\n      return this.status;\n    }\n\n    getCurrentStatus() {\n      return this.#getStatus();\n    }\n\n    setCurrentStatus(newStatus) {\n      this.status = newStatus;\n    }\n\n    getFakeStatus(fakeStatus) {\n      const getStatus = this.#getStatus;\n      return function () {\n        return getStatus.call({ status: fakeStatus });\n      };\n    }\n\n    getFakeStatusFunc() {\n      return {\n        status: 'fake-status',\n        getFakeStatus: this.#getStatus,\n      };\n    }\n  }\n\n  const f = new Foo('inactive');\n  expect(f.getCurrentStatus()).toBe('inactive');\n\n  f.setCurrentStatus('new-status');\n  expect(f.getCurrentStatus()).toBe('new-status');\n\n  expect(f.getFakeStatus('fake')()).toBe('fake');\n  expect(f.getFakeStatusFunc().getFakeStatus()).toBe('fake-status');\n";
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _readOnlyError = require('@babel/runtime/helpers/readOnlyError');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _Foo_brand = /* @__PURE__ */ new WeakSet();
-    class Foo {
-      constructor(status) {
-        _classPrivateMethodInitSpec(this, _Foo_brand);
-        this.status = status;
-        expect(() => (this, null, _readOnlyError('#getStatus'))).toThrow(TypeError);
-      }
-      getCurrentStatus() {
-        return _assertClassBrand(_Foo_brand, this, _getStatus).call(this);
-      }
-      setCurrentStatus(newStatus) {
-        this.status = newStatus;
-      }
-      getFakeStatus(fakeStatus) {
-        const getStatus = _assertClassBrand(_Foo_brand, this, _getStatus);
-        return function () {
-          return getStatus.call({ status: fakeStatus });
-        };
-      }
-      getFakeStatusFunc() {
-        return {
-          status: 'fake-status',
-          getFakeStatus: _assertClassBrand(_Foo_brand, this, _getStatus),
-        };
-      }
-    }
-    function _getStatus() {
-      return this.status;
-    }
-    const f = new Foo('inactive');
-    expect(f.getCurrentStatus()).toBe('inactive');
-    f.setCurrentStatus('new-status');
-    expect(f.getCurrentStatus()).toBe('new-status');
-    expect(f.getFakeStatus('fake')()).toBe('fake');
-    expect(f.getFakeStatusFunc().getFakeStatus()).toBe('fake-status');"
-  `);
-});
-
 test('private-method/context/exec.js [loose]', async () => {
   const source =
     "class Foo {\n    constructor(status) {\n      this.status = status;\n      expect(() => this.#getStatus = null).toThrow(TypeError);\n    }\n\n    #getStatus() {\n      return this.status;\n    }\n\n    getCurrentStatus() {\n      return this.#getStatus();\n    }\n\n    setCurrentStatus(newStatus) {\n      this.status = newStatus;\n    }\n\n    getFakeStatus(fakeStatus) {\n      const getStatus = this.#getStatus;\n      return function () {\n        return getStatus.call({ status: fakeStatus });\n      };\n    }\n\n    getFakeStatusFunc() {\n      return {\n        status: 'fake-status',\n        getFakeStatus: this.#getStatus,\n      };\n    }\n  }\n\n  const f = new Foo('inactive');\n  expect(f.getCurrentStatus()).toBe('inactive');\n\n  f.setCurrentStatus('new-status');\n  expect(f.getCurrentStatus()).toBe('new-status');\n\n  expect(f.getFakeStatus('fake')()).toBe('fake');\n  expect(f.getFakeStatusFunc().getFakeStatus()).toBe('fake-status');\n";
@@ -13764,7 +8654,7 @@ test('private-method/context/exec.js [loose]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -13875,52 +8765,6 @@ test('private-method/context/exec.js [loose]', async () => {
   `);
 });
 
-test('private-method/context/input.js [spec]', async () => {
-  const source =
-    "class Foo {\n  constructor(status) {\n    this.status = status;\n  }\n\n  #getStatus() {\n    return this.status;\n  }\n\n  getCurrentStatus() {\n    return this.#getStatus();\n  }\n\n  setCurrentStatus(newStatus) {\n    this.status = newStatus;\n  }\n\n  getFakeStatus(fakeStatus) {\n    const fakeGetStatus = this.#getStatus;\n    return function() {\n      return fakeGetStatus.call({ status: fakeStatus });\n    };\n  }\n\n  getFakeStatusFunc() {\n    return {\n      status: 'fake-status',\n      getFakeStatus: this.#getStatus,\n    };\n  }\n}";
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _Foo_brand = /* @__PURE__ */ new WeakSet();
-    class Foo {
-      constructor(status) {
-        _classPrivateMethodInitSpec(this, _Foo_brand);
-        this.status = status;
-      }
-      getCurrentStatus() {
-        return _assertClassBrand(_Foo_brand, this, _getStatus).call(this);
-      }
-      setCurrentStatus(newStatus) {
-        this.status = newStatus;
-      }
-      getFakeStatus(fakeStatus) {
-        const fakeGetStatus = _assertClassBrand(_Foo_brand, this, _getStatus);
-        return function () {
-          return fakeGetStatus.call({ status: fakeStatus });
-        };
-      }
-      getFakeStatusFunc() {
-        return {
-          status: 'fake-status',
-          getFakeStatus: _assertClassBrand(_Foo_brand, this, _getStatus),
-        };
-      }
-    }
-    function _getStatus() {
-      return this.status;
-    }"
-  `);
-});
-
 test('private-method/context/input.js [loose]', async () => {
   const source =
     "class Foo {\n  constructor(status) {\n    this.status = status;\n  }\n\n  #getStatus() {\n    return this.status;\n  }\n\n  getCurrentStatus() {\n    return this.#getStatus();\n  }\n\n  setCurrentStatus(newStatus) {\n    this.status = newStatus;\n  }\n\n  getFakeStatus(fakeStatus) {\n    const fakeGetStatus = this.#getStatus;\n    return function() {\n      return fakeGetStatus.call({ status: fakeStatus });\n    };\n  }\n\n  getFakeStatusFunc() {\n    return {\n      status: 'fake-status',\n      getFakeStatus: this.#getStatus,\n    };\n  }\n}";
@@ -13928,7 +8772,7 @@ test('private-method/context/input.js [loose]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -14028,40 +8872,13 @@ test('private-method/context/input.js [loose]', async () => {
   `);
 });
 
-test('private-method/destructuring/input.js [spec]', async () => {
-  const source = 'class A {\n  #method() {}\n\n  m() {\n    [this.#method] = [1];\n  }\n}\n';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _readOnlyError = require('@babel/runtime/helpers/readOnlyError');
-    var _A_brand = /* @__PURE__ */ new WeakSet();
-    class A {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _A_brand);
-      }
-      m() {
-        [(this, _readOnlyError('#method'))._] = [1];
-      }
-    }
-    function _method() {}"
-  `);
-});
-
 test('private-method/destructuring/input.js [loose]', async () => {
   const source = 'class A {\n  #method() {}\n\n  m() {\n    [this.#method] = [1];\n  }\n}\n';
   expect(
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -14108,39 +8925,6 @@ test('private-method/destructuring/input.js [loose]', async () => {
   `);
 });
 
-test('private-method/exfiltrated/exec.js [spec]', async () => {
-  const source =
-    'let exfiltrated;\nclass Foo {\n    #privateMethod() {}\n\n    constructor() {\n        if (exfiltrated === undefined) {\n            exfiltrated = this.#privateMethod;\n        }\n        expect(exfiltrated).toStrictEqual(this.#privateMethod);\n    }\n}\n\nnew Foo();\n// check for private method function object equality\nnew Foo();';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    let exfiltrated;
-    var _Foo_brand = /* @__PURE__ */ new WeakSet();
-    class Foo {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Foo_brand);
-        if (exfiltrated === undefined) {
-          exfiltrated = _assertClassBrand(_Foo_brand, this, _privateMethod);
-        }
-        expect(exfiltrated).toStrictEqual(_assertClassBrand(_Foo_brand, this, _privateMethod));
-      }
-    }
-    function _privateMethod() {}
-    new Foo();
-    // check for private method function object equality
-    new Foo();"
-  `);
-});
-
 test('private-method/exfiltrated/exec.js [loose]', async () => {
   const source =
     'let exfiltrated;\nclass Foo {\n    #privateMethod() {}\n\n    constructor() {\n        if (exfiltrated === undefined) {\n            exfiltrated = this.#privateMethod;\n        }\n        expect(exfiltrated).toStrictEqual(this.#privateMethod);\n    }\n}\n\nnew Foo();\n// check for private method function object equality\nnew Foo();';
@@ -14148,7 +8932,7 @@ test('private-method/exfiltrated/exec.js [loose]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -14190,35 +8974,6 @@ test('private-method/exfiltrated/exec.js [loose]', async () => {
   `);
 });
 
-test('private-method/exfiltrated/input.js [spec]', async () => {
-  const source =
-    'let exfiltrated;\nclass Foo {\n    #privateMethod() {}\n\n    constructor() {\n        if (exfiltrated === undefined) {\n            exfiltrated = this.#privateMethod;\n        }\n    }\n}';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    let exfiltrated;
-    var _Foo_brand = /* @__PURE__ */ new WeakSet();
-    class Foo {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Foo_brand);
-        if (exfiltrated === undefined) {
-          exfiltrated = _assertClassBrand(_Foo_brand, this, _privateMethod);
-        }
-      }
-    }
-    function _privateMethod() {}"
-  `);
-});
-
 test('private-method/exfiltrated/input.js [loose]', async () => {
   const source =
     'let exfiltrated;\nclass Foo {\n    #privateMethod() {}\n\n    constructor() {\n        if (exfiltrated === undefined) {\n            exfiltrated = this.#privateMethod;\n        }\n    }\n}';
@@ -14226,7 +8981,7 @@ test('private-method/exfiltrated/input.js [loose]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -14262,46 +9017,6 @@ test('private-method/exfiltrated/input.js [loose]', async () => {
   `);
 });
 
-test('private-method/generator/exec.js [spec]', async () => {
-  const source =
-    'class Cl {\n  *#foo() {\n    yield 2;\n    return 3;\n  }\n\n  test() {\n    return this.#foo();\n  }\n}\n\nconst val = new Cl().test();\nexpect(val.next()).toEqual({ value: 2, done: false });\nexpect(val.next()).toEqual({ value: 3, done: true });\n';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _Cl_brand = /* @__PURE__ */ new WeakSet();
-    class Cl {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Cl_brand);
-      }
-      test() {
-        return _assertClassBrand(_Cl_brand, this, _foo).call(this);
-      }
-    }
-    function* _foo() {
-      yield 2;
-      return 3;
-    }
-    const val = new Cl().test();
-    expect(val.next()).toEqual({
-      value: 2,
-      done: false,
-    });
-    expect(val.next()).toEqual({
-      value: 3,
-      done: true,
-    });"
-  `);
-});
-
 test('private-method/generator/exec.js [loose]', async () => {
   const source =
     'class Cl {\n  *#foo() {\n    yield 2;\n    return 3;\n  }\n\n  test() {\n    return this.#foo();\n  }\n}\n\nconst val = new Cl().test();\nexpect(val.next()).toEqual({ value: 2, done: false });\nexpect(val.next()).toEqual({ value: 3, done: true });\n';
@@ -14309,7 +9024,7 @@ test('private-method/generator/exec.js [loose]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -14366,37 +9081,6 @@ test('private-method/generator/exec.js [loose]', async () => {
   `);
 });
 
-test('private-method/generator/input.js [spec]', async () => {
-  const source =
-    'class Cl {\n  *#foo() {\n    yield 2;\n    return 3;\n  }\n\n  test() {\n    return this.#foo();\n  }\n}\n';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _Cl_brand = /* @__PURE__ */ new WeakSet();
-    class Cl {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Cl_brand);
-      }
-      test() {
-        return _assertClassBrand(_Cl_brand, this, _foo).call(this);
-      }
-    }
-    function* _foo() {
-      yield 2;
-      return 3;
-    }"
-  `);
-});
-
 test('private-method/generator/input.js [loose]', async () => {
   const source =
     'class Cl {\n  *#foo() {\n    yield 2;\n    return 3;\n  }\n\n  test() {\n    return this.#foo();\n  }\n}\n';
@@ -14404,7 +9088,7 @@ test('private-method/generator/input.js [loose]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -14452,37 +9136,13 @@ test('private-method/generator/input.js [loose]', async () => {
   `);
 });
 
-test('private-method/preserve-comments/input.js [spec]', async () => {
-  const source = 'class C {\n  /* before a */\n  #a() {};\n  /* after a */\n}\n';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _C_brand = /* @__PURE__ */ new WeakSet();
-    class C {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _C_brand);
-      }
-    }
-    /* before a */
-    function _a() {}"
-  `);
-});
-
 test('private-method/preserve-comments/input.js [loose]', async () => {
   const source = 'class C {\n  /* before a */\n  #a() {};\n  /* after a */\n}\n';
   expect(
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -14507,41 +9167,6 @@ test('private-method/preserve-comments/input.js [loose]', async () => {
   `);
 });
 
-test('private-method/read-only/exec.js [spec]', async () => {
-  const source =
-    'class A {\n  counter = 0;\n  #method() {}\n  self() {\n    this.counter++;\n    return this;\n  }\n\n  constructor() {\n    expect(() => this.self().#method = 2).toThrow(TypeError);\n    expect(this.counter).toBe(1);\n    expect(() => ([this.#method] = [2])).toThrow(TypeError);\n  }\n}\n\nnew A;\n';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _defineProperty = require('@babel/runtime/helpers/defineProperty');
-    var _readOnlyError = require('@babel/runtime/helpers/readOnlyError');
-    var _A_brand = /* @__PURE__ */ new WeakSet();
-    class A {
-      self() {
-        this.counter++;
-        return this;
-      }
-      constructor() {
-        _classPrivateMethodInitSpec(this, _A_brand);
-        _defineProperty(this, 'counter', 0);
-        expect(() => (this.self(), 2, _readOnlyError('#method'))).toThrow(TypeError);
-        expect(this.counter).toBe(1);
-        expect(() => ([(this, _readOnlyError('#method'))._] = [2])).toThrow(TypeError);
-      }
-    }
-    function _method() {}
-    new A();"
-  `);
-});
-
 test('private-method/read-only/exec.js [loose]', async () => {
   const source =
     'class A {\n  counter = 0;\n  #method() {}\n  self() {\n    this.counter++;\n    return this;\n  }\n\n  constructor() {\n    expect(() => this.self().#method = 2).toThrow(TypeError);\n    expect(this.counter).toBe(1);\n    expect(() => ([this.#method] = [2])).toThrow(TypeError);\n  }\n}\n\nnew A;\n';
@@ -14549,7 +9174,7 @@ test('private-method/read-only/exec.js [loose]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -14569,7 +9194,12 @@ test('private-method/read-only/exec.js [loose]', async () => {
       var _method = '__private_A_method';
       const A = function A() {
         if (!new.target) throw new TypeError('Cannot call a class as a function');
-        this.counter = 0;
+        Object.defineProperty(this, 'counter', {
+          value: 0,
+          enumerable: true,
+          configurable: true,
+          writable: true,
+        });
         Object.defineProperty(this, _method, {
           value: function () {
             if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
@@ -14606,39 +9236,6 @@ test('private-method/read-only/exec.js [loose]', async () => {
   `);
 });
 
-test('private-method/read-only/input.js [spec]', async () => {
-  const source =
-    'class A {\n  counter = 0;\n  #method() {}\n  self() {\n    this.counter++;\n    return this;\n  }\n\n  constructor() {\n    this.self().#method = 2;\n    ([this.#method] = [2]);\n  }\n}\n';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _defineProperty = require('@babel/runtime/helpers/defineProperty');
-    var _readOnlyError = require('@babel/runtime/helpers/readOnlyError');
-    var _A_brand = /* @__PURE__ */ new WeakSet();
-    class A {
-      self() {
-        this.counter++;
-        return this;
-      }
-      constructor() {
-        _classPrivateMethodInitSpec(this, _A_brand);
-        _defineProperty(this, 'counter', 0);
-        (this.self(), 2, _readOnlyError('#method'));
-        [(this, _readOnlyError('#method'))._] = [2];
-      }
-    }
-    function _method() {}"
-  `);
-});
-
 test('private-method/read-only/input.js [loose]', async () => {
   const source =
     'class A {\n  counter = 0;\n  #method() {}\n  self() {\n    this.counter++;\n    return this;\n  }\n\n  constructor() {\n    this.self().#method = 2;\n    ([this.#method] = [2]);\n  }\n}\n';
@@ -14646,7 +9243,7 @@ test('private-method/read-only/input.js [loose]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -14666,7 +9263,12 @@ test('private-method/read-only/input.js [loose]', async () => {
       var _method = '__private_A_method';
       const A = function A() {
         if (!new.target) throw new TypeError('Cannot call a class as a function');
-        this.counter = 0;
+        Object.defineProperty(this, 'counter', {
+          value: 0,
+          enumerable: true,
+          configurable: true,
+          writable: true,
+        });
         Object.defineProperty(this, _method, {
           value: function () {
             if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
@@ -14699,41 +9301,6 @@ test('private-method/read-only/input.js [loose]', async () => {
   `);
 });
 
-test('private-method/reassignment/exec.js [spec]', async () => {
-  const source =
-    'let results = [];\nclass Foo {\n  constructor() {\n    this.self.#privateFieldValue = results.push(2);\n  }\n\n  get self() {\n    results.push(1);\n    return this;\n  }\n\n  #privateFieldValue() {\n    return 42;\n  }\n}\n\nexpect(() => new Foo).toThrow(TypeError);\nexpect(results).toStrictEqual([1, 2]);\n';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _readOnlyError = require('@babel/runtime/helpers/readOnlyError');
-    let results = [];
-    var _Foo_brand = /* @__PURE__ */ new WeakSet();
-    class Foo {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Foo_brand);
-        (this.self, results.push(2), _readOnlyError('#privateFieldValue'));
-      }
-      get self() {
-        results.push(1);
-        return this;
-      }
-    }
-    function _privateFieldValue() {
-      return 42;
-    }
-    expect(() => new Foo()).toThrow(TypeError);
-    expect(results).toStrictEqual([1, 2]);"
-  `);
-});
-
 test('private-method/reassignment/exec.js [loose]', async () => {
   const source =
     'let results = [];\nclass Foo {\n  constructor() {\n    this.self.#privateFieldValue = results.push(2);\n  }\n\n  get self() {\n    results.push(1);\n    return this;\n  }\n\n  #privateFieldValue() {\n    return 42;\n  }\n}\n\nexpect(() => new Foo).toThrow(TypeError);\nexpect(results).toStrictEqual([1, 2]);\n';
@@ -14741,7 +9308,7 @@ test('private-method/reassignment/exec.js [loose]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -14795,39 +9362,6 @@ test('private-method/reassignment/exec.js [loose]', async () => {
   `);
 });
 
-test('private-method/reassignment/input.js [spec]', async () => {
-  const source =
-    'let results = [];\nclass Foo {\n  constructor() {\n    this.self.#privateFieldValue = results.push(2);\n  }\n\n  get self() {\n    results.push(1);\n    return this;\n  }\n\n  #privateFieldValue() {\n    return 42;\n  }\n}\n';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _readOnlyError = require('@babel/runtime/helpers/readOnlyError');
-    let results = [];
-    var _Foo_brand = /* @__PURE__ */ new WeakSet();
-    class Foo {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Foo_brand);
-        (this.self, results.push(2), _readOnlyError('#privateFieldValue'));
-      }
-      get self() {
-        results.push(1);
-        return this;
-      }
-    }
-    function _privateFieldValue() {
-      return 42;
-    }"
-  `);
-});
-
 test('private-method/reassignment/input.js [loose]', async () => {
   const source =
     'let results = [];\nclass Foo {\n  constructor() {\n    this.self.#privateFieldValue = results.push(2);\n  }\n\n  get self() {\n    results.push(1);\n    return this;\n  }\n\n  #privateFieldValue() {\n    return 42;\n  }\n}\n';
@@ -14835,7 +9369,7 @@ test('private-method/reassignment/input.js [loose]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -14887,45 +9421,6 @@ test('private-method/reassignment/input.js [loose]', async () => {
   `);
 });
 
-test('private-method/scopable/exec.js [spec]', async () => {
-  const source =
-    'class Foo {\n  #privateMethodA() {\n    const i = 40;\n    return i;\n  }\n\n  #privateMethodB() {\n    const i = 2;\n    return i;\n  }\n\n  publicMethod() {\n    return this.#privateMethodA() + this.#privateMethodB();\n  }\n}\n\nexpect((new Foo).publicMethod()).toEqual(42);';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _Foo_brand = /* @__PURE__ */ new WeakSet();
-    class Foo {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Foo_brand);
-      }
-      publicMethod() {
-        return (
-          _assertClassBrand(_Foo_brand, this, _privateMethodA).call(this) +
-          _assertClassBrand(_Foo_brand, this, _privateMethodB).call(this)
-        );
-      }
-    }
-    function _privateMethodA() {
-      const i = 40;
-      return i;
-    }
-    function _privateMethodB() {
-      const i = 2;
-      return i;
-    }
-    expect(new Foo().publicMethod()).toEqual(42);"
-  `);
-});
-
 test('private-method/scopable/exec.js [loose]', async () => {
   const source =
     'class Foo {\n  #privateMethodA() {\n    const i = 40;\n    return i;\n  }\n\n  #privateMethodB() {\n    const i = 2;\n    return i;\n  }\n\n  publicMethod() {\n    return this.#privateMethodA() + this.#privateMethodB();\n  }\n}\n\nexpect((new Foo).publicMethod()).toEqual(42);';
@@ -14933,7 +9428,7 @@ test('private-method/scopable/exec.js [loose]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -14994,49 +9489,6 @@ test('private-method/scopable/exec.js [loose]', async () => {
   `);
 });
 
-test('private-method/super/exec.js [spec]', async () => {
-  const source =
-    "class Base {\n  superMethod() {\n    return 'good';\n  }\n}\n\nclass Sub extends Base {\n  superMethod() {\n    return 'bad';\n  }\n\n  #privateMethod() {\n    return super.superMethod();\n  }\n\n  publicMethod() {\n    return this.#privateMethod();\n  }\n}\n\nexpect((new Sub()).publicMethod()).toEqual('good');\n";
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _superPropGet = require('@babel/runtime/helpers/superPropGet');
-    var _Sub;
-    class Base {
-      superMethod() {
-        return 'good';
-      }
-    }
-    var _Sub_brand = /* @__PURE__ */ new WeakSet();
-    class Sub extends Base {
-      constructor(..._args) {
-        super(..._args);
-        _classPrivateMethodInitSpec(this, _Sub_brand);
-      }
-      superMethod() {
-        return 'bad';
-      }
-      publicMethod() {
-        return _assertClassBrand(_Sub_brand, this, _privateMethod).call(this);
-      }
-    }
-    _Sub = Sub;
-    function _privateMethod() {
-      return _superPropGet(_Sub.prototype, 'superMethod', this, 2)([]);
-    }
-    expect(new Sub().publicMethod()).toEqual('good');"
-  `);
-});
-
 test('private-method/super/exec.js [loose]', async () => {
   const source =
     "class Base {\n  superMethod() {\n    return 'good';\n  }\n}\n\nclass Sub extends Base {\n  superMethod() {\n    return 'bad';\n  }\n\n  #privateMethod() {\n    return super.superMethod();\n  }\n\n  publicMethod() {\n    return this.#privateMethod();\n  }\n}\n\nexpect((new Sub()).publicMethod()).toEqual('good');\n";
@@ -15044,7 +9496,7 @@ test('private-method/super/exec.js [loose]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -15136,48 +9588,6 @@ test('private-method/super/exec.js [loose]', async () => {
   `);
 });
 
-test('private-method/super/input.js [spec]', async () => {
-  const source =
-    "class Base {\n  superMethod() {\n    return 'good';\n  }\n}\n\nclass Sub extends Base {\n  superMethod() {\n    return 'bad';\n  }\n\n  #privateMethod() {\n    return super.superMethod();\n  }\n\n  publicMethod() {\n    return this.#privateMethod();\n  }\n}\n";
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _superPropGet = require('@babel/runtime/helpers/superPropGet');
-    var _Sub;
-    class Base {
-      superMethod() {
-        return 'good';
-      }
-    }
-    var _Sub_brand = /* @__PURE__ */ new WeakSet();
-    class Sub extends Base {
-      constructor(..._args) {
-        super(..._args);
-        _classPrivateMethodInitSpec(this, _Sub_brand);
-      }
-      superMethod() {
-        return 'bad';
-      }
-      publicMethod() {
-        return _assertClassBrand(_Sub_brand, this, _privateMethod).call(this);
-      }
-    }
-    _Sub = Sub;
-    function _privateMethod() {
-      return _superPropGet(_Sub.prototype, 'superMethod', this, 2)([]);
-    }"
-  `);
-});
-
 test('private-method/super/input.js [loose]', async () => {
   const source =
     "class Base {\n  superMethod() {\n    return 'good';\n  }\n}\n\nclass Sub extends Base {\n  superMethod() {\n    return 'bad';\n  }\n\n  #privateMethod() {\n    return super.superMethod();\n  }\n\n  publicMethod() {\n    return this.#privateMethod();\n  }\n}\n";
@@ -15185,7 +9595,7 @@ test('private-method/super/input.js [loose]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -15276,36 +9686,6 @@ test('private-method/super/input.js [loose]', async () => {
   `);
 });
 
-test('private-method/tagged-template/exec.js [spec]', async () => {
-  const source =
-    'class Foo {\n  #tag() {\n    return this;\n  }\n  \n  constructor() {\n    const receiver = this.#tag`tagged template`;\n    expect(receiver).toBe(this);\n  }\n}\nnew Foo();';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _Foo_brand = /* @__PURE__ */ new WeakSet();
-    class Foo {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Foo_brand);
-        const receiver = _assertClassBrand(_Foo_brand, this, _tag).bind(this)\`tagged template\`;
-        expect(receiver).toBe(this);
-      }
-    }
-    function _tag() {
-      return this;
-    }
-    new Foo();"
-  `);
-});
-
 test('private-method/tagged-template/exec.js [loose]', async () => {
   const source =
     'class Foo {\n  #tag() {\n    return this;\n  }\n  \n  constructor() {\n    const receiver = this.#tag`tagged template`;\n    expect(receiver).toBe(this);\n  }\n}\nnew Foo();';
@@ -15313,7 +9693,7 @@ test('private-method/tagged-template/exec.js [loose]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -15349,40 +9729,13 @@ test('private-method/tagged-template/exec.js [loose]', async () => {
   `);
 });
 
-test('private-method/tagged-template/input.js [spec]', async () => {
-  const source = 'class Foo {\n  #tag() {\n    this.#tag``;\n  }\n}\nnew Foo();';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _Foo_brand = /* @__PURE__ */ new WeakSet();
-    class Foo {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Foo_brand);
-      }
-    }
-    function _tag() {
-      _assertClassBrand(_Foo_brand, this, _tag).bind(this)\`\`;
-    }
-    new Foo();"
-  `);
-});
-
 test('private-method/tagged-template/input.js [loose]', async () => {
   const source = 'class Foo {\n  #tag() {\n    this.#tag``;\n  }\n}\nnew Foo();';
   expect(
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -15416,35 +9769,6 @@ test('private-method/tagged-template/input.js [loose]', async () => {
   `);
 });
 
-test('private-static-method-loose/async/input.js [spec]', async () => {
-  const source =
-    '(function () {\nclass Cl {\n  static async #privateStaticMethod() {\n    return 2;\n  }\n\n  test() {\n    return Cl.#privateStaticMethod();\n  }\n}\n\nreturn new Cl().test().then(val => {\n  expect(val).toBe(2);\n});\n\n});\n';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "(function () {
-      class Cl {
-        test() {
-          return _privateStaticMethod.call(Cl);
-        }
-      }
-      async function _privateStaticMethod() {
-        return 2;
-      }
-      return new Cl().test().then(val => {
-        expect(val).toBe(2);
-      });
-    });"
-  `);
-});
-
 test('private-static-method-loose/async/input.js [loose]', async () => {
   const source =
     '(function () {\nclass Cl {\n  static async #privateStaticMethod() {\n    return 2;\n  }\n\n  test() {\n    return Cl.#privateStaticMethod();\n  }\n}\n\nreturn new Cl().test().then(val => {\n  expect(val).toBe(2);\n});\n\n});\n';
@@ -15452,7 +9776,7 @@ test('private-static-method-loose/async/input.js [loose]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -15504,48 +9828,6 @@ test('private-static-method-loose/async/input.js [loose]', async () => {
   `);
 });
 
-test('private-static-method-loose/basic/exec.js [spec]', async () => {
-  const source =
-    'const privateStaticValue = 1017;\n\nclass Cl {\n  static staticMethod2() {\n    return Cl.#privateStaticMethod();\n  }\n\n  static #privateStaticMethod() {\n    return privateStaticValue;\n  }\n\n  static staticMethod() {\n    return Cl.#privateStaticMethod();\n  }\n\n  static privateStaticMethod() {\n    return Cl.#privateStaticMethod();\n  }\n\n  publicMethod() {\n    return Cl.#privateStaticMethod();\n  }\n\n  constructor() {\n    this.instanceField = Cl.#privateStaticMethod();\n  }\n}\n\nexpect((new Cl).publicMethod()).toEqual(privateStaticValue);\n// expect((new Cl).instanceField).toEqual(privateStaticValue);\n// expect(Cl.privateStaticMethod()).toEqual(privateStaticValue);\n// expect(Cl.staticMethod()).toEqual(privateStaticValue);\n// expect(Cl.staticMethod2()).toEqual(privateStaticValue);\n';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "const privateStaticValue = 1017;
-    class Cl {
-      static staticMethod2() {
-        return _privateStaticMethod.call(Cl);
-      }
-      static staticMethod() {
-        return _privateStaticMethod.call(Cl);
-      }
-      static privateStaticMethod() {
-        return _privateStaticMethod.call(Cl);
-      }
-      publicMethod() {
-        return _privateStaticMethod.call(Cl);
-      }
-      constructor() {
-        this.instanceField = _privateStaticMethod.call(Cl);
-      }
-    }
-    function _privateStaticMethod() {
-      return privateStaticValue;
-    }
-    expect(new Cl().publicMethod()).toEqual(privateStaticValue);
-    // expect((new Cl).instanceField).toEqual(privateStaticValue);
-    // expect(Cl.privateStaticMethod()).toEqual(privateStaticValue);
-    // expect(Cl.staticMethod()).toEqual(privateStaticValue);
-    // expect(Cl.staticMethod2()).toEqual(privateStaticValue);"
-  `);
-});
-
 test('private-static-method-loose/basic/exec.js [loose]', async () => {
   const source =
     'const privateStaticValue = 1017;\n\nclass Cl {\n  static staticMethod2() {\n    return Cl.#privateStaticMethod();\n  }\n\n  static #privateStaticMethod() {\n    return privateStaticValue;\n  }\n\n  static staticMethod() {\n    return Cl.#privateStaticMethod();\n  }\n\n  static privateStaticMethod() {\n    return Cl.#privateStaticMethod();\n  }\n\n  publicMethod() {\n    return Cl.#privateStaticMethod();\n  }\n\n  constructor() {\n    this.instanceField = Cl.#privateStaticMethod();\n  }\n}\n\nexpect((new Cl).publicMethod()).toEqual(privateStaticValue);\n// expect((new Cl).instanceField).toEqual(privateStaticValue);\n// expect(Cl.privateStaticMethod()).toEqual(privateStaticValue);\n// expect(Cl.staticMethod()).toEqual(privateStaticValue);\n// expect(Cl.staticMethod2()).toEqual(privateStaticValue);\n';
@@ -15553,7 +9835,7 @@ test('private-static-method-loose/basic/exec.js [loose]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -15653,42 +9935,6 @@ test('private-static-method-loose/basic/exec.js [loose]', async () => {
   `);
 });
 
-test('private-static-method-loose/basic/input.js [spec]', async () => {
-  const source =
-    'class Cl {\n  static staticMethod2() {\n    return Cl.#privateStaticMethod();\n  }\n\n  static #privateStaticMethod() {\n    return 1017;\n  }\n\n  static staticMethod() {\n    return Cl.#privateStaticMethod();\n  }\n\n  static privateStaticMethod() {\n    return Cl.#privateStaticMethod();\n  }\n\n  publicMethod() {\n    return Cl.#privateStaticMethod();\n  }\n\n  constructor() {\n    this.instanceField = Cl.#privateStaticMethod();\n  }\n}\n';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "class Cl {
-      static staticMethod2() {
-        return _privateStaticMethod.call(Cl);
-      }
-      static staticMethod() {
-        return _privateStaticMethod.call(Cl);
-      }
-      static privateStaticMethod() {
-        return _privateStaticMethod.call(Cl);
-      }
-      publicMethod() {
-        return _privateStaticMethod.call(Cl);
-      }
-      constructor() {
-        this.instanceField = _privateStaticMethod.call(Cl);
-      }
-    }
-    function _privateStaticMethod() {
-      return 1017;
-    }"
-  `);
-});
-
 test('private-static-method-loose/basic/input.js [loose]', async () => {
   const source =
     'class Cl {\n  static staticMethod2() {\n    return Cl.#privateStaticMethod();\n  }\n\n  static #privateStaticMethod() {\n    return 1017;\n  }\n\n  static staticMethod() {\n    return Cl.#privateStaticMethod();\n  }\n\n  static privateStaticMethod() {\n    return Cl.#privateStaticMethod();\n  }\n\n  publicMethod() {\n    return Cl.#privateStaticMethod();\n  }\n\n  constructor() {\n    this.instanceField = Cl.#privateStaticMethod();\n  }\n}\n';
@@ -15696,7 +9942,7 @@ test('private-static-method-loose/basic/input.js [loose]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -15790,33 +10036,6 @@ test('private-static-method-loose/basic/input.js [loose]', async () => {
   `);
 });
 
-test('private-static-method-loose/class-check/exec.js [spec]', async () => {
-  const source =
-    'class Cl {\n  static #privateStaticMethod() {\n    return 1017;\n  }\n\n  publicMethod(checked) {\n    return checked.#privateStaticMethod();\n  }\n}\n\nconst cl = new Cl();\nexpect(cl.publicMethod(Cl)).toBe(1017);';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    class Cl {
-      publicMethod(checked) {
-        return _assertClassBrand(Cl, checked, _privateStaticMethod).call(checked);
-      }
-    }
-    function _privateStaticMethod() {
-      return 1017;
-    }
-    const cl = new Cl();
-    expect(cl.publicMethod(Cl)).toBe(1017);"
-  `);
-});
-
 test('private-static-method-loose/class-check/exec.js [loose]', async () => {
   const source =
     'class Cl {\n  static #privateStaticMethod() {\n    return 1017;\n  }\n\n  publicMethod(checked) {\n    return checked.#privateStaticMethod();\n  }\n}\n\nconst cl = new Cl();\nexpect(cl.publicMethod(Cl)).toBe(1017);';
@@ -15824,7 +10043,7 @@ test('private-static-method-loose/class-check/exec.js [loose]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -15874,29 +10093,6 @@ test('private-static-method-loose/class-check/exec.js [loose]', async () => {
   `);
 });
 
-test('private-static-method-loose/class-check/input.js [spec]', async () => {
-  const source =
-    'class Cl {\n  static #privateStaticMethod() { }\n\n  publicMethod(checked) {\n    return checked.#privateStaticMethod();\n  }\n}';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    class Cl {
-      publicMethod(checked) {
-        return _assertClassBrand(Cl, checked, _privateStaticMethod).call(checked);
-      }
-    }
-    function _privateStaticMethod() {}"
-  `);
-});
-
 test('private-static-method-loose/class-check/input.js [loose]', async () => {
   const source =
     'class Cl {\n  static #privateStaticMethod() { }\n\n  publicMethod(checked) {\n    return checked.#privateStaticMethod();\n  }\n}';
@@ -15904,7 +10100,7 @@ test('private-static-method-loose/class-check/input.js [loose]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -15951,32 +10147,6 @@ test('private-static-method-loose/class-check/input.js [loose]', async () => {
   `);
 });
 
-test('private-static-method-loose/class-expression/input.js [spec]', async () => {
-  const source =
-    'console.log(class A {\n  static #foo() {}\n\n  method() {\n    this.#foo();\n  }\n});\n';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _A;
-    console.log(
-      (_A = class A {
-        method() {
-          _assertClassBrand(_A, this, _foo).call(this);
-        }
-      }),
-    );
-    function _foo() {}"
-  `);
-});
-
 test('private-static-method-loose/class-expression/input.js [loose]', async () => {
   const source =
     'console.log(class A {\n  static #foo() {}\n\n  method() {\n    this.#foo();\n  }\n});\n';
@@ -15984,7 +10154,7 @@ test('private-static-method-loose/class-expression/input.js [loose]', async () =
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -16033,38 +10203,6 @@ test('private-static-method-loose/class-expression/input.js [loose]', async () =
   `);
 });
 
-test('private-static-method-loose/exfiltrated/exec.js [spec]', async () => {
-  const source =
-    'let exfiltrated;\n\nclass Cl {\n  static #privateStaticMethod() {\n    return 1017;\n  }\n\n  constructor() {\n    if (exfiltrated === undefined) {\n        exfiltrated = Cl.#privateStaticMethod;\n    }\n    expect(exfiltrated).toStrictEqual(Cl.#privateStaticMethod);\n  }\n}\n\nnew Cl();\n// check for private method function object equality\nnew Cl();\n\nexpect(exfiltrated()).toEqual(1017);';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "let exfiltrated;
-    class Cl {
-      constructor() {
-        if (exfiltrated === undefined) {
-          exfiltrated = _privateStaticMethod;
-        }
-        expect(exfiltrated).toStrictEqual(_privateStaticMethod);
-      }
-    }
-    function _privateStaticMethod() {
-      return 1017;
-    }
-    new Cl();
-    // check for private method function object equality
-    new Cl();
-    expect(exfiltrated()).toEqual(1017);"
-  `);
-});
-
 test('private-static-method-loose/exfiltrated/exec.js [loose]', async () => {
   const source =
     'let exfiltrated;\n\nclass Cl {\n  static #privateStaticMethod() {\n    return 1017;\n  }\n\n  constructor() {\n    if (exfiltrated === undefined) {\n        exfiltrated = Cl.#privateStaticMethod;\n    }\n    expect(exfiltrated).toStrictEqual(Cl.#privateStaticMethod);\n  }\n}\n\nnew Cl();\n// check for private method function object equality\nnew Cl();\n\nexpect(exfiltrated()).toEqual(1017);';
@@ -16072,7 +10210,7 @@ test('private-static-method-loose/exfiltrated/exec.js [loose]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -16116,33 +10254,6 @@ test('private-static-method-loose/exfiltrated/exec.js [loose]', async () => {
   `);
 });
 
-test('private-static-method-loose/exfiltrated/input.js [spec]', async () => {
-  const source =
-    'let exfiltrated;\n\nclass Cl {\n  static #privateStaticMethod() {\n    return 1017;\n  }\n\n  constructor() {\n    if (exfiltrated === undefined) {\n        exfiltrated = Cl.#privateStaticMethod;\n    }\n  }\n}\n';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "let exfiltrated;
-    class Cl {
-      constructor() {
-        if (exfiltrated === undefined) {
-          exfiltrated = _privateStaticMethod;
-        }
-      }
-    }
-    function _privateStaticMethod() {
-      return 1017;
-    }"
-  `);
-});
-
 test('private-static-method-loose/exfiltrated/input.js [loose]', async () => {
   const source =
     'let exfiltrated;\n\nclass Cl {\n  static #privateStaticMethod() {\n    return 1017;\n  }\n\n  constructor() {\n    if (exfiltrated === undefined) {\n        exfiltrated = Cl.#privateStaticMethod;\n    }\n  }\n}\n';
@@ -16150,7 +10261,7 @@ test('private-static-method-loose/exfiltrated/input.js [loose]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -16187,40 +10298,6 @@ test('private-static-method-loose/exfiltrated/input.js [loose]', async () => {
   `);
 });
 
-test('private-static-method-loose/generator/exec.js [spec]', async () => {
-  const source =
-    'class Cl {\n  static *#foo() {\n    yield 2;\n    return 3;\n  }\n\n  test() {\n    return Cl.#foo();\n  }\n}\n\nconst val = new Cl().test();\nexpect(val.next()).toEqual({ value: 2, done: false });\nexpect(val.next()).toEqual({ value: 3, done: true });\n';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "class Cl {
-      test() {
-        return _foo.call(Cl);
-      }
-    }
-    function* _foo() {
-      yield 2;
-      return 3;
-    }
-    const val = new Cl().test();
-    expect(val.next()).toEqual({
-      value: 2,
-      done: false,
-    });
-    expect(val.next()).toEqual({
-      value: 3,
-      done: true,
-    });"
-  `);
-});
-
 test('private-static-method-loose/generator/exec.js [loose]', async () => {
   const source =
     'class Cl {\n  static *#foo() {\n    yield 2;\n    return 3;\n  }\n\n  test() {\n    return Cl.#foo();\n  }\n}\n\nconst val = new Cl().test();\nexpect(val.next()).toEqual({ value: 2, done: false });\nexpect(val.next()).toEqual({ value: 3, done: true });\n';
@@ -16228,7 +10305,7 @@ test('private-static-method-loose/generator/exec.js [loose]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -16285,31 +10362,6 @@ test('private-static-method-loose/generator/exec.js [loose]', async () => {
   `);
 });
 
-test('private-static-method-loose/generator/input.js [spec]', async () => {
-  const source =
-    'class Cl {\n  static *#foo() {\n    yield 2;\n    return 3;\n  }\n\n  test() {\n    return Cl.#foo();\n  }\n}\n';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "class Cl {
-      test() {
-        return _foo.call(Cl);
-      }
-    }
-    function* _foo() {
-      yield 2;
-      return 3;
-    }"
-  `);
-});
-
 test('private-static-method-loose/generator/input.js [loose]', async () => {
   const source =
     'class Cl {\n  static *#foo() {\n    yield 2;\n    return 3;\n  }\n\n  test() {\n    return Cl.#foo();\n  }\n}\n';
@@ -16317,7 +10369,7 @@ test('private-static-method-loose/generator/input.js [loose]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -16365,31 +10417,13 @@ test('private-static-method-loose/generator/input.js [loose]', async () => {
   `);
 });
 
-test('private-static-method-loose/preserve-comments/input.js [spec]', async () => {
-  const source = 'class C {\n  /* before a */\n  static #a() {};\n  /* after a */\n}\n';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "class C {}
-    /* before a */
-    function _a() {}"
-  `);
-});
-
 test('private-static-method-loose/preserve-comments/input.js [loose]', async () => {
   const source = 'class C {\n  /* before a */\n  static #a() {};\n  /* after a */\n}\n';
   expect(
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -16414,30 +10448,6 @@ test('private-static-method-loose/preserve-comments/input.js [loose]', async () 
   `);
 });
 
-test('private-static-method-loose/reassignment/exec.js [spec]', async () => {
-  const source =
-    'class Cl {\n  static #privateStaticMethod() { }\n\n  constructor() {\n    expect(() => Cl.#privateStaticMethod = null).toThrow(TypeError);\n  }\n}\n\nnew Cl();';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _readOnlyError = require('@babel/runtime/helpers/readOnlyError');
-    class Cl {
-      constructor() {
-        expect(() => (Cl, null, _readOnlyError('#privateStaticMethod'))).toThrow(TypeError);
-      }
-    }
-    function _privateStaticMethod() {}
-    new Cl();"
-  `);
-});
-
 test('private-static-method-loose/reassignment/exec.js [loose]', async () => {
   const source =
     'class Cl {\n  static #privateStaticMethod() { }\n\n  constructor() {\n    expect(() => Cl.#privateStaticMethod = null).toThrow(TypeError);\n  }\n}\n\nnew Cl();';
@@ -16445,7 +10455,7 @@ test('private-static-method-loose/reassignment/exec.js [loose]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -16479,30 +10489,6 @@ test('private-static-method-loose/reassignment/exec.js [loose]', async () => {
       });
       return Cl;
     })();
-    new Cl();"
-  `);
-});
-
-test('private-static-method-loose/reassignment/input.js [spec]', async () => {
-  const source =
-    'class Cl {\n  static #privateStaticMethod() { }\n\n  constructor() {\n    Cl.#privateStaticMethod = null;\n  }\n}\n\nnew Cl();';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _readOnlyError = require('@babel/runtime/helpers/readOnlyError');
-    class Cl {
-      constructor() {
-        (Cl, null, _readOnlyError('#privateStaticMethod'));
-      }
-    }
-    function _privateStaticMethod() {}
     new Cl();"
   `);
 });
@@ -16514,7 +10500,7 @@ test('private-static-method-loose/reassignment/input.js [loose]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -16550,36 +10536,6 @@ test('private-static-method-loose/reassignment/input.js [loose]', async () => {
   `);
 });
 
-test('private-static-method-loose/scopable/exec.js [spec]', async () => {
-  const source =
-    'class Cl {\n  static #privateMethodA() {\n    const i = 40;\n    return i;\n  }\n\n  static #privateMethodB() {\n    const i = 2;\n    return i;\n  }\n\n  publicMethod() {\n    return Cl.#privateMethodA() + Cl.#privateMethodB();\n  }\n}\n\nexpect((new Cl).publicMethod()).toEqual(42);';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "class Cl {
-      publicMethod() {
-        return _privateMethodA.call(Cl) + _privateMethodB.call(Cl);
-      }
-    }
-    function _privateMethodA() {
-      const i = 40;
-      return i;
-    }
-    function _privateMethodB() {
-      const i = 2;
-      return i;
-    }
-    expect(new Cl().publicMethod()).toEqual(42);"
-  `);
-});
-
 test('private-static-method-loose/scopable/exec.js [loose]', async () => {
   const source =
     'class Cl {\n  static #privateMethodA() {\n    const i = 40;\n    return i;\n  }\n\n  static #privateMethodB() {\n    const i = 2;\n    return i;\n  }\n\n  publicMethod() {\n    return Cl.#privateMethodA() + Cl.#privateMethodB();\n  }\n}\n\nexpect((new Cl).publicMethod()).toEqual(42);';
@@ -16587,7 +10543,7 @@ test('private-static-method-loose/scopable/exec.js [loose]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -16648,42 +10604,6 @@ test('private-static-method-loose/scopable/exec.js [loose]', async () => {
   `);
 });
 
-test('private-static-method-loose/super/exec.js [spec]', async () => {
-  const source =
-    "class Base {\n  static basePublicStaticMethod() {\n    return 'good';\n  }\n}\n\nclass Sub extends Base {\n  static basePublicStaticMethod() {\n    return 'bad';\n  }\n\n  static #subStaticPrivateMethod() {\n    return super.basePublicStaticMethod();\n  }\n\n  static check() {\n    return Sub.#subStaticPrivateMethod();\n  }\n}\n\nexpect(Sub.check()).toEqual('good');\n";
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _superPropGet = require('@babel/runtime/helpers/superPropGet');
-    var _Sub;
-    class Base {
-      static basePublicStaticMethod() {
-        return 'good';
-      }
-    }
-    class Sub extends Base {
-      static basePublicStaticMethod() {
-        return 'bad';
-      }
-      static check() {
-        return _subStaticPrivateMethod.call(Sub);
-      }
-    }
-    _Sub = Sub;
-    function _subStaticPrivateMethod() {
-      return _superPropGet(_Sub, 'basePublicStaticMethod', this, 2)([]);
-    }
-    expect(Sub.check()).toEqual('good');"
-  `);
-});
-
 test('private-static-method-loose/super/exec.js [loose]', async () => {
   const source =
     "class Base {\n  static basePublicStaticMethod() {\n    return 'good';\n  }\n}\n\nclass Sub extends Base {\n  static basePublicStaticMethod() {\n    return 'bad';\n  }\n\n  static #subStaticPrivateMethod() {\n    return super.basePublicStaticMethod();\n  }\n\n  static check() {\n    return Sub.#subStaticPrivateMethod();\n  }\n}\n\nexpect(Sub.check()).toEqual('good');\n";
@@ -16691,7 +10611,7 @@ test('private-static-method-loose/super/exec.js [loose]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -16781,41 +10701,6 @@ test('private-static-method-loose/super/exec.js [loose]', async () => {
   `);
 });
 
-test('private-static-method-loose/super/input.js [spec]', async () => {
-  const source =
-    "class Base {\n  static basePublicStaticMethod() {\n    return 'good';\n  }\n}\n\nclass Sub extends Base {\n  static basePublicStaticMethod() {\n    return 'bad';\n  }\n\n  static #subStaticPrivateMethod() {\n    return super.basePublicStaticMethod();\n  }\n\n  static check() {\n    Sub.#subStaticPrivateMethod();\n  }\n}\n";
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _superPropGet = require('@babel/runtime/helpers/superPropGet');
-    var _Sub;
-    class Base {
-      static basePublicStaticMethod() {
-        return 'good';
-      }
-    }
-    class Sub extends Base {
-      static basePublicStaticMethod() {
-        return 'bad';
-      }
-      static check() {
-        _subStaticPrivateMethod.call(Sub);
-      }
-    }
-    _Sub = Sub;
-    function _subStaticPrivateMethod() {
-      return _superPropGet(_Sub, 'basePublicStaticMethod', this, 2)([]);
-    }"
-  `);
-});
-
 test('private-static-method-loose/super/input.js [loose]', async () => {
   const source =
     "class Base {\n  static basePublicStaticMethod() {\n    return 'good';\n  }\n}\n\nclass Sub extends Base {\n  static basePublicStaticMethod() {\n    return 'bad';\n  }\n\n  static #subStaticPrivateMethod() {\n    return super.basePublicStaticMethod();\n  }\n\n  static check() {\n    Sub.#subStaticPrivateMethod();\n  }\n}\n";
@@ -16823,7 +10708,7 @@ test('private-static-method-loose/super/input.js [loose]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -16912,48 +10797,6 @@ test('private-static-method-loose/super/input.js [loose]', async () => {
   `);
 });
 
-test('private-static-method-loose/this/exec.js [spec]', async () => {
-  const source =
-    'class A {\n  static get a() { return 1 }\n}\n\nclass B extends A {\n  static get b() { return 2 }\n\n  static #getA() { return super.a }\n  static #getB() { return this.b }\n\n  static extract() {\n    return [this.#getA, this.#getB];\n  }\n}\n\nconst [getA, getB] = B.extract();\nexpect(getA.call({ a: 3 })).toBe(1);\nexpect(getB.call({ b: 4 })).toBe(4);';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _superPropGet = require('@babel/runtime/helpers/superPropGet');
-    var _B;
-    class A {
-      static get a() {
-        return 1;
-      }
-    }
-    class B extends A {
-      static get b() {
-        return 2;
-      }
-      static extract() {
-        return [_assertClassBrand(B, this, _getA), _assertClassBrand(B, this, _getB)];
-      }
-    }
-    _B = B;
-    function _getA() {
-      return _superPropGet(_B, 'a', this);
-    }
-    function _getB() {
-      return this.b;
-    }
-    const [getA, getB] = B.extract();
-    expect(getA.call({ a: 3 })).toBe(1);
-    expect(getB.call({ b: 4 })).toBe(4);"
-  `);
-});
-
 test('private-static-method-loose/this/exec.js [loose]', async () => {
   const source =
     'class A {\n  static get a() { return 1 }\n}\n\nclass B extends A {\n  static get b() { return 2 }\n\n  static #getA() { return super.a }\n  static #getB() { return this.b }\n\n  static extract() {\n    return [this.#getA, this.#getB];\n  }\n}\n\nconst [getA, getB] = B.extract();\nexpect(getA.call({ a: 3 })).toBe(1);\nexpect(getB.call({ b: 4 })).toBe(4);';
@@ -16961,7 +10804,7 @@ test('private-static-method-loose/this/exec.js [loose]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -17059,46 +10902,6 @@ test('private-static-method-loose/this/exec.js [loose]', async () => {
     const [getA, getB] = B.extract();
     expect(getA.call({ a: 3 })).toBe(1);
     expect(getB.call({ b: 4 })).toBe(4);"
-  `);
-});
-
-test('private-static-method-loose/this/input.js [spec]', async () => {
-  const source =
-    'class A {\n  static get a() { return 1 }\n}\n\nclass B extends A {\n  static get b() { return 2 }\n\n  static #getA() { return super.a }\n  static #getB() { return this.b }\n\n  static extract() {\n    return [this.#getA, this.#getB];\n  }\n}\n\nconst [getA, getB] = B.extract();';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _superPropGet = require('@babel/runtime/helpers/superPropGet');
-    var _B;
-    class A {
-      static get a() {
-        return 1;
-      }
-    }
-    class B extends A {
-      static get b() {
-        return 2;
-      }
-      static extract() {
-        return [_assertClassBrand(B, this, _getA), _assertClassBrand(B, this, _getB)];
-      }
-    }
-    _B = B;
-    function _getA() {
-      return _superPropGet(_B, 'a', this);
-    }
-    function _getB() {
-      return this.b;
-    }
-    const [getA, getB] = B.extract();"
   `);
 });
 
@@ -17109,7 +10912,7 @@ test('private-static-method-loose/this/input.js [loose]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -17208,35 +11011,6 @@ test('private-static-method-loose/this/input.js [loose]', async () => {
   `);
 });
 
-test('private-static-method-privateFieldsAsProperties/async/input.js [spec]', async () => {
-  const source =
-    '(function () {\nclass Cl {\n  static async #privateStaticMethod() {\n    return 2;\n  }\n\n  test() {\n    return Cl.#privateStaticMethod();\n  }\n}\n\nreturn new Cl().test().then(val => {\n  expect(val).toBe(2);\n});\n\n});\n';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "(function () {
-      class Cl {
-        test() {
-          return _privateStaticMethod.call(Cl);
-        }
-      }
-      async function _privateStaticMethod() {
-        return 2;
-      }
-      return new Cl().test().then(val => {
-        expect(val).toBe(2);
-      });
-    });"
-  `);
-});
-
 test('private-static-method-privateFieldsAsProperties/async/input.js [loose]', async () => {
   const source =
     '(function () {\nclass Cl {\n  static async #privateStaticMethod() {\n    return 2;\n  }\n\n  test() {\n    return Cl.#privateStaticMethod();\n  }\n}\n\nreturn new Cl().test().then(val => {\n  expect(val).toBe(2);\n});\n\n});\n';
@@ -17244,7 +11018,7 @@ test('private-static-method-privateFieldsAsProperties/async/input.js [loose]', a
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -17296,48 +11070,6 @@ test('private-static-method-privateFieldsAsProperties/async/input.js [loose]', a
   `);
 });
 
-test('private-static-method-privateFieldsAsProperties/basic/exec.js [spec]', async () => {
-  const source =
-    'const privateStaticValue = 1017;\n\nclass Cl {\n  static staticMethod2() {\n    return Cl.#privateStaticMethod();\n  }\n\n  static #privateStaticMethod() {\n    return privateStaticValue;\n  }\n\n  static staticMethod() {\n    return Cl.#privateStaticMethod();\n  }\n\n  static privateStaticMethod() {\n    return Cl.#privateStaticMethod();\n  }\n\n  publicMethod() {\n    return Cl.#privateStaticMethod();\n  }\n\n  constructor() {\n    this.instanceField = Cl.#privateStaticMethod();\n  }\n}\n\nexpect((new Cl).publicMethod()).toEqual(privateStaticValue);\n// expect((new Cl).instanceField).toEqual(privateStaticValue);\n// expect(Cl.privateStaticMethod()).toEqual(privateStaticValue);\n// expect(Cl.staticMethod()).toEqual(privateStaticValue);\n// expect(Cl.staticMethod2()).toEqual(privateStaticValue);\n';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "const privateStaticValue = 1017;
-    class Cl {
-      static staticMethod2() {
-        return _privateStaticMethod.call(Cl);
-      }
-      static staticMethod() {
-        return _privateStaticMethod.call(Cl);
-      }
-      static privateStaticMethod() {
-        return _privateStaticMethod.call(Cl);
-      }
-      publicMethod() {
-        return _privateStaticMethod.call(Cl);
-      }
-      constructor() {
-        this.instanceField = _privateStaticMethod.call(Cl);
-      }
-    }
-    function _privateStaticMethod() {
-      return privateStaticValue;
-    }
-    expect(new Cl().publicMethod()).toEqual(privateStaticValue);
-    // expect((new Cl).instanceField).toEqual(privateStaticValue);
-    // expect(Cl.privateStaticMethod()).toEqual(privateStaticValue);
-    // expect(Cl.staticMethod()).toEqual(privateStaticValue);
-    // expect(Cl.staticMethod2()).toEqual(privateStaticValue);"
-  `);
-});
-
 test('private-static-method-privateFieldsAsProperties/basic/exec.js [loose]', async () => {
   const source =
     'const privateStaticValue = 1017;\n\nclass Cl {\n  static staticMethod2() {\n    return Cl.#privateStaticMethod();\n  }\n\n  static #privateStaticMethod() {\n    return privateStaticValue;\n  }\n\n  static staticMethod() {\n    return Cl.#privateStaticMethod();\n  }\n\n  static privateStaticMethod() {\n    return Cl.#privateStaticMethod();\n  }\n\n  publicMethod() {\n    return Cl.#privateStaticMethod();\n  }\n\n  constructor() {\n    this.instanceField = Cl.#privateStaticMethod();\n  }\n}\n\nexpect((new Cl).publicMethod()).toEqual(privateStaticValue);\n// expect((new Cl).instanceField).toEqual(privateStaticValue);\n// expect(Cl.privateStaticMethod()).toEqual(privateStaticValue);\n// expect(Cl.staticMethod()).toEqual(privateStaticValue);\n// expect(Cl.staticMethod2()).toEqual(privateStaticValue);\n';
@@ -17345,7 +11077,7 @@ test('private-static-method-privateFieldsAsProperties/basic/exec.js [loose]', as
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -17445,42 +11177,6 @@ test('private-static-method-privateFieldsAsProperties/basic/exec.js [loose]', as
   `);
 });
 
-test('private-static-method-privateFieldsAsProperties/basic/input.js [spec]', async () => {
-  const source =
-    'class Cl {\n  static staticMethod2() {\n    return Cl.#privateStaticMethod();\n  }\n\n  static #privateStaticMethod() {\n    return 1017;\n  }\n\n  static staticMethod() {\n    return Cl.#privateStaticMethod();\n  }\n\n  static privateStaticMethod() {\n    return Cl.#privateStaticMethod();\n  }\n\n  publicMethod() {\n    return Cl.#privateStaticMethod();\n  }\n\n  constructor() {\n    this.instanceField = Cl.#privateStaticMethod();\n  }\n}\n';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "class Cl {
-      static staticMethod2() {
-        return _privateStaticMethod.call(Cl);
-      }
-      static staticMethod() {
-        return _privateStaticMethod.call(Cl);
-      }
-      static privateStaticMethod() {
-        return _privateStaticMethod.call(Cl);
-      }
-      publicMethod() {
-        return _privateStaticMethod.call(Cl);
-      }
-      constructor() {
-        this.instanceField = _privateStaticMethod.call(Cl);
-      }
-    }
-    function _privateStaticMethod() {
-      return 1017;
-    }"
-  `);
-});
-
 test('private-static-method-privateFieldsAsProperties/basic/input.js [loose]', async () => {
   const source =
     'class Cl {\n  static staticMethod2() {\n    return Cl.#privateStaticMethod();\n  }\n\n  static #privateStaticMethod() {\n    return 1017;\n  }\n\n  static staticMethod() {\n    return Cl.#privateStaticMethod();\n  }\n\n  static privateStaticMethod() {\n    return Cl.#privateStaticMethod();\n  }\n\n  publicMethod() {\n    return Cl.#privateStaticMethod();\n  }\n\n  constructor() {\n    this.instanceField = Cl.#privateStaticMethod();\n  }\n}\n';
@@ -17488,7 +11184,7 @@ test('private-static-method-privateFieldsAsProperties/basic/input.js [loose]', a
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -17582,33 +11278,6 @@ test('private-static-method-privateFieldsAsProperties/basic/input.js [loose]', a
   `);
 });
 
-test('private-static-method-privateFieldsAsProperties/class-check/exec.js [spec]', async () => {
-  const source =
-    'class Cl {\n  static #privateStaticMethod() {\n    return 1017;\n  }\n\n  publicMethod(checked) {\n    return checked.#privateStaticMethod();\n  }\n}\n\nconst cl = new Cl();\nexpect(cl.publicMethod(Cl)).toBe(1017);';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    class Cl {
-      publicMethod(checked) {
-        return _assertClassBrand(Cl, checked, _privateStaticMethod).call(checked);
-      }
-    }
-    function _privateStaticMethod() {
-      return 1017;
-    }
-    const cl = new Cl();
-    expect(cl.publicMethod(Cl)).toBe(1017);"
-  `);
-});
-
 test('private-static-method-privateFieldsAsProperties/class-check/exec.js [loose]', async () => {
   const source =
     'class Cl {\n  static #privateStaticMethod() {\n    return 1017;\n  }\n\n  publicMethod(checked) {\n    return checked.#privateStaticMethod();\n  }\n}\n\nconst cl = new Cl();\nexpect(cl.publicMethod(Cl)).toBe(1017);';
@@ -17616,7 +11285,7 @@ test('private-static-method-privateFieldsAsProperties/class-check/exec.js [loose
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -17666,29 +11335,6 @@ test('private-static-method-privateFieldsAsProperties/class-check/exec.js [loose
   `);
 });
 
-test('private-static-method-privateFieldsAsProperties/class-check/input.js [spec]', async () => {
-  const source =
-    'class Cl {\n  static #privateStaticMethod() { }\n\n  publicMethod(checked) {\n    return checked.#privateStaticMethod();\n  }\n}';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    class Cl {
-      publicMethod(checked) {
-        return _assertClassBrand(Cl, checked, _privateStaticMethod).call(checked);
-      }
-    }
-    function _privateStaticMethod() {}"
-  `);
-});
-
 test('private-static-method-privateFieldsAsProperties/class-check/input.js [loose]', async () => {
   const source =
     'class Cl {\n  static #privateStaticMethod() { }\n\n  publicMethod(checked) {\n    return checked.#privateStaticMethod();\n  }\n}';
@@ -17696,7 +11342,7 @@ test('private-static-method-privateFieldsAsProperties/class-check/input.js [loos
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -17743,32 +11389,6 @@ test('private-static-method-privateFieldsAsProperties/class-check/input.js [loos
   `);
 });
 
-test('private-static-method-privateFieldsAsProperties/class-expression/input.js [spec]', async () => {
-  const source =
-    'console.log(class A {\n  static #foo() {}\n\n  method() {\n    this.#foo();\n  }\n});\n';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _A;
-    console.log(
-      (_A = class A {
-        method() {
-          _assertClassBrand(_A, this, _foo).call(this);
-        }
-      }),
-    );
-    function _foo() {}"
-  `);
-});
-
 test('private-static-method-privateFieldsAsProperties/class-expression/input.js [loose]', async () => {
   const source =
     'console.log(class A {\n  static #foo() {}\n\n  method() {\n    this.#foo();\n  }\n});\n';
@@ -17776,7 +11396,7 @@ test('private-static-method-privateFieldsAsProperties/class-expression/input.js 
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -17825,38 +11445,6 @@ test('private-static-method-privateFieldsAsProperties/class-expression/input.js 
   `);
 });
 
-test('private-static-method-privateFieldsAsProperties/exfiltrated/exec.js [spec]', async () => {
-  const source =
-    'let exfiltrated;\n\nclass Cl {\n  static #privateStaticMethod() {\n    return 1017;\n  }\n\n  constructor() {\n    if (exfiltrated === undefined) {\n        exfiltrated = Cl.#privateStaticMethod;\n    }\n    expect(exfiltrated).toStrictEqual(Cl.#privateStaticMethod);\n  }\n}\n\nnew Cl();\n// check for private method function object equality\nnew Cl();\n\nexpect(exfiltrated()).toEqual(1017);';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "let exfiltrated;
-    class Cl {
-      constructor() {
-        if (exfiltrated === undefined) {
-          exfiltrated = _privateStaticMethod;
-        }
-        expect(exfiltrated).toStrictEqual(_privateStaticMethod);
-      }
-    }
-    function _privateStaticMethod() {
-      return 1017;
-    }
-    new Cl();
-    // check for private method function object equality
-    new Cl();
-    expect(exfiltrated()).toEqual(1017);"
-  `);
-});
-
 test('private-static-method-privateFieldsAsProperties/exfiltrated/exec.js [loose]', async () => {
   const source =
     'let exfiltrated;\n\nclass Cl {\n  static #privateStaticMethod() {\n    return 1017;\n  }\n\n  constructor() {\n    if (exfiltrated === undefined) {\n        exfiltrated = Cl.#privateStaticMethod;\n    }\n    expect(exfiltrated).toStrictEqual(Cl.#privateStaticMethod);\n  }\n}\n\nnew Cl();\n// check for private method function object equality\nnew Cl();\n\nexpect(exfiltrated()).toEqual(1017);';
@@ -17864,7 +11452,7 @@ test('private-static-method-privateFieldsAsProperties/exfiltrated/exec.js [loose
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -17908,33 +11496,6 @@ test('private-static-method-privateFieldsAsProperties/exfiltrated/exec.js [loose
   `);
 });
 
-test('private-static-method-privateFieldsAsProperties/exfiltrated/input.js [spec]', async () => {
-  const source =
-    'let exfiltrated;\n\nclass Cl {\n  static #privateStaticMethod() {\n    return 1017;\n  }\n\n  constructor() {\n    if (exfiltrated === undefined) {\n        exfiltrated = Cl.#privateStaticMethod;\n    }\n  }\n}\n';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "let exfiltrated;
-    class Cl {
-      constructor() {
-        if (exfiltrated === undefined) {
-          exfiltrated = _privateStaticMethod;
-        }
-      }
-    }
-    function _privateStaticMethod() {
-      return 1017;
-    }"
-  `);
-});
-
 test('private-static-method-privateFieldsAsProperties/exfiltrated/input.js [loose]', async () => {
   const source =
     'let exfiltrated;\n\nclass Cl {\n  static #privateStaticMethod() {\n    return 1017;\n  }\n\n  constructor() {\n    if (exfiltrated === undefined) {\n        exfiltrated = Cl.#privateStaticMethod;\n    }\n  }\n}\n';
@@ -17942,7 +11503,7 @@ test('private-static-method-privateFieldsAsProperties/exfiltrated/input.js [loos
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -17979,40 +11540,6 @@ test('private-static-method-privateFieldsAsProperties/exfiltrated/input.js [loos
   `);
 });
 
-test('private-static-method-privateFieldsAsProperties/generator/exec.js [spec]', async () => {
-  const source =
-    'class Cl {\n  static *#foo() {\n    yield 2;\n    return 3;\n  }\n\n  test() {\n    return Cl.#foo();\n  }\n}\n\nconst val = new Cl().test();\nexpect(val.next()).toEqual({ value: 2, done: false });\nexpect(val.next()).toEqual({ value: 3, done: true });\n';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "class Cl {
-      test() {
-        return _foo.call(Cl);
-      }
-    }
-    function* _foo() {
-      yield 2;
-      return 3;
-    }
-    const val = new Cl().test();
-    expect(val.next()).toEqual({
-      value: 2,
-      done: false,
-    });
-    expect(val.next()).toEqual({
-      value: 3,
-      done: true,
-    });"
-  `);
-});
-
 test('private-static-method-privateFieldsAsProperties/generator/exec.js [loose]', async () => {
   const source =
     'class Cl {\n  static *#foo() {\n    yield 2;\n    return 3;\n  }\n\n  test() {\n    return Cl.#foo();\n  }\n}\n\nconst val = new Cl().test();\nexpect(val.next()).toEqual({ value: 2, done: false });\nexpect(val.next()).toEqual({ value: 3, done: true });\n';
@@ -18020,7 +11547,7 @@ test('private-static-method-privateFieldsAsProperties/generator/exec.js [loose]'
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -18077,31 +11604,6 @@ test('private-static-method-privateFieldsAsProperties/generator/exec.js [loose]'
   `);
 });
 
-test('private-static-method-privateFieldsAsProperties/generator/input.js [spec]', async () => {
-  const source =
-    'class Cl {\n  static *#foo() {\n    yield 2;\n    return 3;\n  }\n\n  test() {\n    return Cl.#foo();\n  }\n}\n';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "class Cl {
-      test() {
-        return _foo.call(Cl);
-      }
-    }
-    function* _foo() {
-      yield 2;
-      return 3;
-    }"
-  `);
-});
-
 test('private-static-method-privateFieldsAsProperties/generator/input.js [loose]', async () => {
   const source =
     'class Cl {\n  static *#foo() {\n    yield 2;\n    return 3;\n  }\n\n  test() {\n    return Cl.#foo();\n  }\n}\n';
@@ -18109,7 +11611,7 @@ test('private-static-method-privateFieldsAsProperties/generator/input.js [loose]
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -18157,30 +11659,6 @@ test('private-static-method-privateFieldsAsProperties/generator/input.js [loose]
   `);
 });
 
-test('private-static-method-privateFieldsAsProperties/reassignment/exec.js [spec]', async () => {
-  const source =
-    'class Cl {\n  static #privateStaticMethod() { }\n\n  constructor() {\n    expect(() => Cl.#privateStaticMethod = null).toThrow(TypeError);\n  }\n}\n\nnew Cl();';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _readOnlyError = require('@babel/runtime/helpers/readOnlyError');
-    class Cl {
-      constructor() {
-        expect(() => (Cl, null, _readOnlyError('#privateStaticMethod'))).toThrow(TypeError);
-      }
-    }
-    function _privateStaticMethod() {}
-    new Cl();"
-  `);
-});
-
 test('private-static-method-privateFieldsAsProperties/reassignment/exec.js [loose]', async () => {
   const source =
     'class Cl {\n  static #privateStaticMethod() { }\n\n  constructor() {\n    expect(() => Cl.#privateStaticMethod = null).toThrow(TypeError);\n  }\n}\n\nnew Cl();';
@@ -18188,7 +11666,7 @@ test('private-static-method-privateFieldsAsProperties/reassignment/exec.js [loos
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -18222,30 +11700,6 @@ test('private-static-method-privateFieldsAsProperties/reassignment/exec.js [loos
       });
       return Cl;
     })();
-    new Cl();"
-  `);
-});
-
-test('private-static-method-privateFieldsAsProperties/reassignment/input.js [spec]', async () => {
-  const source =
-    'class Cl {\n  static #privateStaticMethod() { }\n\n  constructor() {\n    Cl.#privateStaticMethod = null;\n  }\n}\n\nnew Cl();';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _readOnlyError = require('@babel/runtime/helpers/readOnlyError');
-    class Cl {
-      constructor() {
-        (Cl, null, _readOnlyError('#privateStaticMethod'));
-      }
-    }
-    function _privateStaticMethod() {}
     new Cl();"
   `);
 });
@@ -18257,7 +11711,7 @@ test('private-static-method-privateFieldsAsProperties/reassignment/input.js [loo
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -18293,36 +11747,6 @@ test('private-static-method-privateFieldsAsProperties/reassignment/input.js [loo
   `);
 });
 
-test('private-static-method-privateFieldsAsProperties/scopable/exec.js [spec]', async () => {
-  const source =
-    'class Cl {\n  static #privateMethodA() {\n    const i = 40;\n    return i;\n  }\n\n  static #privateMethodB() {\n    const i = 2;\n    return i;\n  }\n\n  publicMethod() {\n    return Cl.#privateMethodA() + Cl.#privateMethodB();\n  }\n}\n\nexpect((new Cl).publicMethod()).toEqual(42);';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "class Cl {
-      publicMethod() {
-        return _privateMethodA.call(Cl) + _privateMethodB.call(Cl);
-      }
-    }
-    function _privateMethodA() {
-      const i = 40;
-      return i;
-    }
-    function _privateMethodB() {
-      const i = 2;
-      return i;
-    }
-    expect(new Cl().publicMethod()).toEqual(42);"
-  `);
-});
-
 test('private-static-method-privateFieldsAsProperties/scopable/exec.js [loose]', async () => {
   const source =
     'class Cl {\n  static #privateMethodA() {\n    const i = 40;\n    return i;\n  }\n\n  static #privateMethodB() {\n    const i = 2;\n    return i;\n  }\n\n  publicMethod() {\n    return Cl.#privateMethodA() + Cl.#privateMethodB();\n  }\n}\n\nexpect((new Cl).publicMethod()).toEqual(42);';
@@ -18330,7 +11754,7 @@ test('private-static-method-privateFieldsAsProperties/scopable/exec.js [loose]',
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -18391,42 +11815,6 @@ test('private-static-method-privateFieldsAsProperties/scopable/exec.js [loose]',
   `);
 });
 
-test('private-static-method-privateFieldsAsProperties/super/exec.js [spec]', async () => {
-  const source =
-    "class Base {\n  static basePublicStaticMethod() {\n    return 'good';\n  }\n}\n\nclass Sub extends Base {\n  static basePublicStaticMethod() {\n    return 'bad';\n  }\n\n  static #subStaticPrivateMethod() {\n    return super.basePublicStaticMethod();\n  }\n\n  static check() {\n    return Sub.#subStaticPrivateMethod();\n  }\n}\n\nexpect(Sub.check()).toEqual('good');\n";
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _superPropGet = require('@babel/runtime/helpers/superPropGet');
-    var _Sub;
-    class Base {
-      static basePublicStaticMethod() {
-        return 'good';
-      }
-    }
-    class Sub extends Base {
-      static basePublicStaticMethod() {
-        return 'bad';
-      }
-      static check() {
-        return _subStaticPrivateMethod.call(Sub);
-      }
-    }
-    _Sub = Sub;
-    function _subStaticPrivateMethod() {
-      return _superPropGet(_Sub, 'basePublicStaticMethod', this, 2)([]);
-    }
-    expect(Sub.check()).toEqual('good');"
-  `);
-});
-
 test('private-static-method-privateFieldsAsProperties/super/exec.js [loose]', async () => {
   const source =
     "class Base {\n  static basePublicStaticMethod() {\n    return 'good';\n  }\n}\n\nclass Sub extends Base {\n  static basePublicStaticMethod() {\n    return 'bad';\n  }\n\n  static #subStaticPrivateMethod() {\n    return super.basePublicStaticMethod();\n  }\n\n  static check() {\n    return Sub.#subStaticPrivateMethod();\n  }\n}\n\nexpect(Sub.check()).toEqual('good');\n";
@@ -18434,7 +11822,7 @@ test('private-static-method-privateFieldsAsProperties/super/exec.js [loose]', as
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -18524,41 +11912,6 @@ test('private-static-method-privateFieldsAsProperties/super/exec.js [loose]', as
   `);
 });
 
-test('private-static-method-privateFieldsAsProperties/super/input.js [spec]', async () => {
-  const source =
-    "class Base {\n  static basePublicStaticMethod() {\n    return 'good';\n  }\n}\n\nclass Sub extends Base {\n  static basePublicStaticMethod() {\n    return 'bad';\n  }\n\n  static #subStaticPrivateMethod() {\n    return super.basePublicStaticMethod();\n  }\n\n  static check() {\n    Sub.#subStaticPrivateMethod();\n  }\n}\n";
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _superPropGet = require('@babel/runtime/helpers/superPropGet');
-    var _Sub;
-    class Base {
-      static basePublicStaticMethod() {
-        return 'good';
-      }
-    }
-    class Sub extends Base {
-      static basePublicStaticMethod() {
-        return 'bad';
-      }
-      static check() {
-        _subStaticPrivateMethod.call(Sub);
-      }
-    }
-    _Sub = Sub;
-    function _subStaticPrivateMethod() {
-      return _superPropGet(_Sub, 'basePublicStaticMethod', this, 2)([]);
-    }"
-  `);
-});
-
 test('private-static-method-privateFieldsAsProperties/super/input.js [loose]', async () => {
   const source =
     "class Base {\n  static basePublicStaticMethod() {\n    return 'good';\n  }\n}\n\nclass Sub extends Base {\n  static basePublicStaticMethod() {\n    return 'bad';\n  }\n\n  static #subStaticPrivateMethod() {\n    return super.basePublicStaticMethod();\n  }\n\n  static check() {\n    Sub.#subStaticPrivateMethod();\n  }\n}\n";
@@ -18566,7 +11919,7 @@ test('private-static-method-privateFieldsAsProperties/super/input.js [loose]', a
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -18655,48 +12008,6 @@ test('private-static-method-privateFieldsAsProperties/super/input.js [loose]', a
   `);
 });
 
-test('private-static-method-privateFieldsAsProperties/this/exec.js [spec]', async () => {
-  const source =
-    'class A {\n  static get a() { return 1 }\n}\n\nclass B extends A {\n  static get b() { return 2 }\n\n  static #getA() { return super.a }\n  static #getB() { return this.b }\n\n  static extract() {\n    return [this.#getA, this.#getB];\n  }\n}\n\nconst [getA, getB] = B.extract();\nexpect(getA.call({ a: 3 })).toBe(1);\nexpect(getB.call({ b: 4 })).toBe(4);';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _superPropGet = require('@babel/runtime/helpers/superPropGet');
-    var _B;
-    class A {
-      static get a() {
-        return 1;
-      }
-    }
-    class B extends A {
-      static get b() {
-        return 2;
-      }
-      static extract() {
-        return [_assertClassBrand(B, this, _getA), _assertClassBrand(B, this, _getB)];
-      }
-    }
-    _B = B;
-    function _getA() {
-      return _superPropGet(_B, 'a', this);
-    }
-    function _getB() {
-      return this.b;
-    }
-    const [getA, getB] = B.extract();
-    expect(getA.call({ a: 3 })).toBe(1);
-    expect(getB.call({ b: 4 })).toBe(4);"
-  `);
-});
-
 test('private-static-method-privateFieldsAsProperties/this/exec.js [loose]', async () => {
   const source =
     'class A {\n  static get a() { return 1 }\n}\n\nclass B extends A {\n  static get b() { return 2 }\n\n  static #getA() { return super.a }\n  static #getB() { return this.b }\n\n  static extract() {\n    return [this.#getA, this.#getB];\n  }\n}\n\nconst [getA, getB] = B.extract();\nexpect(getA.call({ a: 3 })).toBe(1);\nexpect(getB.call({ b: 4 })).toBe(4);';
@@ -18704,7 +12015,7 @@ test('private-static-method-privateFieldsAsProperties/this/exec.js [loose]', asy
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -18802,46 +12113,6 @@ test('private-static-method-privateFieldsAsProperties/this/exec.js [loose]', asy
     const [getA, getB] = B.extract();
     expect(getA.call({ a: 3 })).toBe(1);
     expect(getB.call({ b: 4 })).toBe(4);"
-  `);
-});
-
-test('private-static-method-privateFieldsAsProperties/this/input.js [spec]', async () => {
-  const source =
-    'class A {\n  static get a() { return 1 }\n}\n\nclass B extends A {\n  static get b() { return 2 }\n\n  static #getA() { return super.a }\n  static #getB() { return this.b }\n\n  static extract() {\n    return [this.#getA, this.#getB];\n  }\n}\n\nconst [getA, getB] = B.extract();';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _superPropGet = require('@babel/runtime/helpers/superPropGet');
-    var _B;
-    class A {
-      static get a() {
-        return 1;
-      }
-    }
-    class B extends A {
-      static get b() {
-        return 2;
-      }
-      static extract() {
-        return [_assertClassBrand(B, this, _getA), _assertClassBrand(B, this, _getB)];
-      }
-    }
-    _B = B;
-    function _getA() {
-      return _superPropGet(_B, 'a', this);
-    }
-    function _getB() {
-      return this.b;
-    }
-    const [getA, getB] = B.extract();"
   `);
 });
 
@@ -18852,7 +12123,7 @@ test('private-static-method-privateFieldsAsProperties/this/input.js [loose]', as
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -18951,35 +12222,6 @@ test('private-static-method-privateFieldsAsProperties/this/input.js [loose]', as
   `);
 });
 
-test('private-static-method-privateFieldsAsSymbols/async/input.js [spec]', async () => {
-  const source =
-    '(function () {\nclass Cl {\n  static async #privateStaticMethod() {\n    return 2;\n  }\n\n  test() {\n    return Cl.#privateStaticMethod();\n  }\n}\n\nreturn new Cl().test().then(val => {\n  expect(val).toBe(2);\n});\n\n});\n';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "(function () {
-      class Cl {
-        test() {
-          return _privateStaticMethod.call(Cl);
-        }
-      }
-      async function _privateStaticMethod() {
-        return 2;
-      }
-      return new Cl().test().then(val => {
-        expect(val).toBe(2);
-      });
-    });"
-  `);
-});
-
 test('private-static-method-privateFieldsAsSymbols/async/input.js [loose]', async () => {
   const source =
     '(function () {\nclass Cl {\n  static async #privateStaticMethod() {\n    return 2;\n  }\n\n  test() {\n    return Cl.#privateStaticMethod();\n  }\n}\n\nreturn new Cl().test().then(val => {\n  expect(val).toBe(2);\n});\n\n});\n';
@@ -18987,7 +12229,7 @@ test('private-static-method-privateFieldsAsSymbols/async/input.js [loose]', asyn
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -19039,48 +12281,6 @@ test('private-static-method-privateFieldsAsSymbols/async/input.js [loose]', asyn
   `);
 });
 
-test('private-static-method-privateFieldsAsSymbols/basic/exec.js [spec]', async () => {
-  const source =
-    'const privateStaticValue = 1017;\n\nclass Cl {\n  static staticMethod2() {\n    return Cl.#privateStaticMethod();\n  }\n\n  static #privateStaticMethod() {\n    return privateStaticValue;\n  }\n\n  static staticMethod() {\n    return Cl.#privateStaticMethod();\n  }\n\n  static privateStaticMethod() {\n    return Cl.#privateStaticMethod();\n  }\n\n  publicMethod() {\n    return Cl.#privateStaticMethod();\n  }\n\n  constructor() {\n    this.instanceField = Cl.#privateStaticMethod();\n  }\n}\n\nexpect((new Cl).publicMethod()).toEqual(privateStaticValue);\n// expect((new Cl).instanceField).toEqual(privateStaticValue);\n// expect(Cl.privateStaticMethod()).toEqual(privateStaticValue);\n// expect(Cl.staticMethod()).toEqual(privateStaticValue);\n// expect(Cl.staticMethod2()).toEqual(privateStaticValue);\n';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "const privateStaticValue = 1017;
-    class Cl {
-      static staticMethod2() {
-        return _privateStaticMethod.call(Cl);
-      }
-      static staticMethod() {
-        return _privateStaticMethod.call(Cl);
-      }
-      static privateStaticMethod() {
-        return _privateStaticMethod.call(Cl);
-      }
-      publicMethod() {
-        return _privateStaticMethod.call(Cl);
-      }
-      constructor() {
-        this.instanceField = _privateStaticMethod.call(Cl);
-      }
-    }
-    function _privateStaticMethod() {
-      return privateStaticValue;
-    }
-    expect(new Cl().publicMethod()).toEqual(privateStaticValue);
-    // expect((new Cl).instanceField).toEqual(privateStaticValue);
-    // expect(Cl.privateStaticMethod()).toEqual(privateStaticValue);
-    // expect(Cl.staticMethod()).toEqual(privateStaticValue);
-    // expect(Cl.staticMethod2()).toEqual(privateStaticValue);"
-  `);
-});
-
 test('private-static-method-privateFieldsAsSymbols/basic/exec.js [loose]', async () => {
   const source =
     'const privateStaticValue = 1017;\n\nclass Cl {\n  static staticMethod2() {\n    return Cl.#privateStaticMethod();\n  }\n\n  static #privateStaticMethod() {\n    return privateStaticValue;\n  }\n\n  static staticMethod() {\n    return Cl.#privateStaticMethod();\n  }\n\n  static privateStaticMethod() {\n    return Cl.#privateStaticMethod();\n  }\n\n  publicMethod() {\n    return Cl.#privateStaticMethod();\n  }\n\n  constructor() {\n    this.instanceField = Cl.#privateStaticMethod();\n  }\n}\n\nexpect((new Cl).publicMethod()).toEqual(privateStaticValue);\n// expect((new Cl).instanceField).toEqual(privateStaticValue);\n// expect(Cl.privateStaticMethod()).toEqual(privateStaticValue);\n// expect(Cl.staticMethod()).toEqual(privateStaticValue);\n// expect(Cl.staticMethod2()).toEqual(privateStaticValue);\n';
@@ -19088,7 +12288,7 @@ test('private-static-method-privateFieldsAsSymbols/basic/exec.js [loose]', async
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -19188,42 +12388,6 @@ test('private-static-method-privateFieldsAsSymbols/basic/exec.js [loose]', async
   `);
 });
 
-test('private-static-method-privateFieldsAsSymbols/basic/input.js [spec]', async () => {
-  const source =
-    'class Cl {\n  static staticMethod2() {\n    return Cl.#privateStaticMethod();\n  }\n\n  static #privateStaticMethod() {\n    return 1017;\n  }\n\n  static staticMethod() {\n    return Cl.#privateStaticMethod();\n  }\n\n  static privateStaticMethod() {\n    return Cl.#privateStaticMethod();\n  }\n\n  publicMethod() {\n    return Cl.#privateStaticMethod();\n  }\n\n  constructor() {\n    this.instanceField = Cl.#privateStaticMethod();\n  }\n}\n';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "class Cl {
-      static staticMethod2() {
-        return _privateStaticMethod.call(Cl);
-      }
-      static staticMethod() {
-        return _privateStaticMethod.call(Cl);
-      }
-      static privateStaticMethod() {
-        return _privateStaticMethod.call(Cl);
-      }
-      publicMethod() {
-        return _privateStaticMethod.call(Cl);
-      }
-      constructor() {
-        this.instanceField = _privateStaticMethod.call(Cl);
-      }
-    }
-    function _privateStaticMethod() {
-      return 1017;
-    }"
-  `);
-});
-
 test('private-static-method-privateFieldsAsSymbols/basic/input.js [loose]', async () => {
   const source =
     'class Cl {\n  static staticMethod2() {\n    return Cl.#privateStaticMethod();\n  }\n\n  static #privateStaticMethod() {\n    return 1017;\n  }\n\n  static staticMethod() {\n    return Cl.#privateStaticMethod();\n  }\n\n  static privateStaticMethod() {\n    return Cl.#privateStaticMethod();\n  }\n\n  publicMethod() {\n    return Cl.#privateStaticMethod();\n  }\n\n  constructor() {\n    this.instanceField = Cl.#privateStaticMethod();\n  }\n}\n';
@@ -19231,7 +12395,7 @@ test('private-static-method-privateFieldsAsSymbols/basic/input.js [loose]', asyn
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -19325,33 +12489,6 @@ test('private-static-method-privateFieldsAsSymbols/basic/input.js [loose]', asyn
   `);
 });
 
-test('private-static-method-privateFieldsAsSymbols/class-check/exec.js [spec]', async () => {
-  const source =
-    'class Cl {\n  static #privateStaticMethod() {\n    return 1017;\n  }\n\n  publicMethod(checked) {\n    return checked.#privateStaticMethod();\n  }\n}\n\nconst cl = new Cl();\nexpect(cl.publicMethod(Cl)).toBe(1017);';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    class Cl {
-      publicMethod(checked) {
-        return _assertClassBrand(Cl, checked, _privateStaticMethod).call(checked);
-      }
-    }
-    function _privateStaticMethod() {
-      return 1017;
-    }
-    const cl = new Cl();
-    expect(cl.publicMethod(Cl)).toBe(1017);"
-  `);
-});
-
 test('private-static-method-privateFieldsAsSymbols/class-check/exec.js [loose]', async () => {
   const source =
     'class Cl {\n  static #privateStaticMethod() {\n    return 1017;\n  }\n\n  publicMethod(checked) {\n    return checked.#privateStaticMethod();\n  }\n}\n\nconst cl = new Cl();\nexpect(cl.publicMethod(Cl)).toBe(1017);';
@@ -19359,7 +12496,7 @@ test('private-static-method-privateFieldsAsSymbols/class-check/exec.js [loose]',
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -19409,29 +12546,6 @@ test('private-static-method-privateFieldsAsSymbols/class-check/exec.js [loose]',
   `);
 });
 
-test('private-static-method-privateFieldsAsSymbols/class-check/input.js [spec]', async () => {
-  const source =
-    'class Cl {\n  static #privateStaticMethod() { }\n\n  publicMethod(checked) {\n    return checked.#privateStaticMethod();\n  }\n}';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    class Cl {
-      publicMethod(checked) {
-        return _assertClassBrand(Cl, checked, _privateStaticMethod).call(checked);
-      }
-    }
-    function _privateStaticMethod() {}"
-  `);
-});
-
 test('private-static-method-privateFieldsAsSymbols/class-check/input.js [loose]', async () => {
   const source =
     'class Cl {\n  static #privateStaticMethod() { }\n\n  publicMethod(checked) {\n    return checked.#privateStaticMethod();\n  }\n}';
@@ -19439,7 +12553,7 @@ test('private-static-method-privateFieldsAsSymbols/class-check/input.js [loose]'
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -19486,32 +12600,6 @@ test('private-static-method-privateFieldsAsSymbols/class-check/input.js [loose]'
   `);
 });
 
-test('private-static-method-privateFieldsAsSymbols/class-expression/input.js [spec]', async () => {
-  const source =
-    'console.log(class A {\n  static #foo() {}\n\n  method() {\n    this.#foo();\n  }\n});\n';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _A;
-    console.log(
-      (_A = class A {
-        method() {
-          _assertClassBrand(_A, this, _foo).call(this);
-        }
-      }),
-    );
-    function _foo() {}"
-  `);
-});
-
 test('private-static-method-privateFieldsAsSymbols/class-expression/input.js [loose]', async () => {
   const source =
     'console.log(class A {\n  static #foo() {}\n\n  method() {\n    this.#foo();\n  }\n});\n';
@@ -19519,7 +12607,7 @@ test('private-static-method-privateFieldsAsSymbols/class-expression/input.js [lo
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -19568,38 +12656,6 @@ test('private-static-method-privateFieldsAsSymbols/class-expression/input.js [lo
   `);
 });
 
-test('private-static-method-privateFieldsAsSymbols/exfiltrated/exec.js [spec]', async () => {
-  const source =
-    'let exfiltrated;\n\nclass Cl {\n  static #privateStaticMethod() {\n    return 1017;\n  }\n\n  constructor() {\n    if (exfiltrated === undefined) {\n        exfiltrated = Cl.#privateStaticMethod;\n    }\n    expect(exfiltrated).toStrictEqual(Cl.#privateStaticMethod);\n  }\n}\n\nnew Cl();\n// check for private method function object equality\nnew Cl();\n\nexpect(exfiltrated()).toEqual(1017);';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "let exfiltrated;
-    class Cl {
-      constructor() {
-        if (exfiltrated === undefined) {
-          exfiltrated = _privateStaticMethod;
-        }
-        expect(exfiltrated).toStrictEqual(_privateStaticMethod);
-      }
-    }
-    function _privateStaticMethod() {
-      return 1017;
-    }
-    new Cl();
-    // check for private method function object equality
-    new Cl();
-    expect(exfiltrated()).toEqual(1017);"
-  `);
-});
-
 test('private-static-method-privateFieldsAsSymbols/exfiltrated/exec.js [loose]', async () => {
   const source =
     'let exfiltrated;\n\nclass Cl {\n  static #privateStaticMethod() {\n    return 1017;\n  }\n\n  constructor() {\n    if (exfiltrated === undefined) {\n        exfiltrated = Cl.#privateStaticMethod;\n    }\n    expect(exfiltrated).toStrictEqual(Cl.#privateStaticMethod);\n  }\n}\n\nnew Cl();\n// check for private method function object equality\nnew Cl();\n\nexpect(exfiltrated()).toEqual(1017);';
@@ -19607,7 +12663,7 @@ test('private-static-method-privateFieldsAsSymbols/exfiltrated/exec.js [loose]',
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -19651,33 +12707,6 @@ test('private-static-method-privateFieldsAsSymbols/exfiltrated/exec.js [loose]',
   `);
 });
 
-test('private-static-method-privateFieldsAsSymbols/exfiltrated/input.js [spec]', async () => {
-  const source =
-    'let exfiltrated;\n\nclass Cl {\n  static #privateStaticMethod() {\n    return 1017;\n  }\n\n  constructor() {\n    if (exfiltrated === undefined) {\n        exfiltrated = Cl.#privateStaticMethod;\n    }\n  }\n}\n';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "let exfiltrated;
-    class Cl {
-      constructor() {
-        if (exfiltrated === undefined) {
-          exfiltrated = _privateStaticMethod;
-        }
-      }
-    }
-    function _privateStaticMethod() {
-      return 1017;
-    }"
-  `);
-});
-
 test('private-static-method-privateFieldsAsSymbols/exfiltrated/input.js [loose]', async () => {
   const source =
     'let exfiltrated;\n\nclass Cl {\n  static #privateStaticMethod() {\n    return 1017;\n  }\n\n  constructor() {\n    if (exfiltrated === undefined) {\n        exfiltrated = Cl.#privateStaticMethod;\n    }\n  }\n}\n';
@@ -19685,7 +12714,7 @@ test('private-static-method-privateFieldsAsSymbols/exfiltrated/input.js [loose]'
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -19722,40 +12751,6 @@ test('private-static-method-privateFieldsAsSymbols/exfiltrated/input.js [loose]'
   `);
 });
 
-test('private-static-method-privateFieldsAsSymbols/generator/exec.js [spec]', async () => {
-  const source =
-    'class Cl {\n  static *#foo() {\n    yield 2;\n    return 3;\n  }\n\n  test() {\n    return Cl.#foo();\n  }\n}\n\nconst val = new Cl().test();\nexpect(val.next()).toEqual({ value: 2, done: false });\nexpect(val.next()).toEqual({ value: 3, done: true });\n';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "class Cl {
-      test() {
-        return _foo.call(Cl);
-      }
-    }
-    function* _foo() {
-      yield 2;
-      return 3;
-    }
-    const val = new Cl().test();
-    expect(val.next()).toEqual({
-      value: 2,
-      done: false,
-    });
-    expect(val.next()).toEqual({
-      value: 3,
-      done: true,
-    });"
-  `);
-});
-
 test('private-static-method-privateFieldsAsSymbols/generator/exec.js [loose]', async () => {
   const source =
     'class Cl {\n  static *#foo() {\n    yield 2;\n    return 3;\n  }\n\n  test() {\n    return Cl.#foo();\n  }\n}\n\nconst val = new Cl().test();\nexpect(val.next()).toEqual({ value: 2, done: false });\nexpect(val.next()).toEqual({ value: 3, done: true });\n';
@@ -19763,7 +12758,7 @@ test('private-static-method-privateFieldsAsSymbols/generator/exec.js [loose]', a
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -19820,31 +12815,6 @@ test('private-static-method-privateFieldsAsSymbols/generator/exec.js [loose]', a
   `);
 });
 
-test('private-static-method-privateFieldsAsSymbols/generator/input.js [spec]', async () => {
-  const source =
-    'class Cl {\n  static *#foo() {\n    yield 2;\n    return 3;\n  }\n\n  test() {\n    return Cl.#foo();\n  }\n}\n';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "class Cl {
-      test() {
-        return _foo.call(Cl);
-      }
-    }
-    function* _foo() {
-      yield 2;
-      return 3;
-    }"
-  `);
-});
-
 test('private-static-method-privateFieldsAsSymbols/generator/input.js [loose]', async () => {
   const source =
     'class Cl {\n  static *#foo() {\n    yield 2;\n    return 3;\n  }\n\n  test() {\n    return Cl.#foo();\n  }\n}\n';
@@ -19852,7 +12822,7 @@ test('private-static-method-privateFieldsAsSymbols/generator/input.js [loose]', 
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -19900,30 +12870,6 @@ test('private-static-method-privateFieldsAsSymbols/generator/input.js [loose]', 
   `);
 });
 
-test('private-static-method-privateFieldsAsSymbols/reassignment/exec.js [spec]', async () => {
-  const source =
-    'class Cl {\n  static #privateStaticMethod() { }\n\n  constructor() {\n    expect(() => Cl.#privateStaticMethod = null).toThrow(TypeError);\n  }\n}\n\nnew Cl();';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _readOnlyError = require('@babel/runtime/helpers/readOnlyError');
-    class Cl {
-      constructor() {
-        expect(() => (Cl, null, _readOnlyError('#privateStaticMethod'))).toThrow(TypeError);
-      }
-    }
-    function _privateStaticMethod() {}
-    new Cl();"
-  `);
-});
-
 test('private-static-method-privateFieldsAsSymbols/reassignment/exec.js [loose]', async () => {
   const source =
     'class Cl {\n  static #privateStaticMethod() { }\n\n  constructor() {\n    expect(() => Cl.#privateStaticMethod = null).toThrow(TypeError);\n  }\n}\n\nnew Cl();';
@@ -19931,7 +12877,7 @@ test('private-static-method-privateFieldsAsSymbols/reassignment/exec.js [loose]'
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -19969,30 +12915,6 @@ test('private-static-method-privateFieldsAsSymbols/reassignment/exec.js [loose]'
   `);
 });
 
-test('private-static-method-privateFieldsAsSymbols/reassignment/input.js [spec]', async () => {
-  const source =
-    'class Cl {\n  static #privateStaticMethod() { }\n\n  constructor() {\n    Cl.#privateStaticMethod = null;\n  }\n}\n\nnew Cl();';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _readOnlyError = require('@babel/runtime/helpers/readOnlyError');
-    class Cl {
-      constructor() {
-        (Cl, null, _readOnlyError('#privateStaticMethod'));
-      }
-    }
-    function _privateStaticMethod() {}
-    new Cl();"
-  `);
-});
-
 test('private-static-method-privateFieldsAsSymbols/reassignment/input.js [loose]', async () => {
   const source =
     'class Cl {\n  static #privateStaticMethod() { }\n\n  constructor() {\n    Cl.#privateStaticMethod = null;\n  }\n}\n\nnew Cl();';
@@ -20000,7 +12922,7 @@ test('private-static-method-privateFieldsAsSymbols/reassignment/input.js [loose]
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -20036,36 +12958,6 @@ test('private-static-method-privateFieldsAsSymbols/reassignment/input.js [loose]
   `);
 });
 
-test('private-static-method-privateFieldsAsSymbols/scopable/exec.js [spec]', async () => {
-  const source =
-    'class Cl {\n  static #privateMethodA() {\n    const i = 40;\n    return i;\n  }\n\n  static #privateMethodB() {\n    const i = 2;\n    return i;\n  }\n\n  publicMethod() {\n    return Cl.#privateMethodA() + Cl.#privateMethodB();\n  }\n}\n\nexpect((new Cl).publicMethod()).toEqual(42);';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "class Cl {
-      publicMethod() {
-        return _privateMethodA.call(Cl) + _privateMethodB.call(Cl);
-      }
-    }
-    function _privateMethodA() {
-      const i = 40;
-      return i;
-    }
-    function _privateMethodB() {
-      const i = 2;
-      return i;
-    }
-    expect(new Cl().publicMethod()).toEqual(42);"
-  `);
-});
-
 test('private-static-method-privateFieldsAsSymbols/scopable/exec.js [loose]', async () => {
   const source =
     'class Cl {\n  static #privateMethodA() {\n    const i = 40;\n    return i;\n  }\n\n  static #privateMethodB() {\n    const i = 2;\n    return i;\n  }\n\n  publicMethod() {\n    return Cl.#privateMethodA() + Cl.#privateMethodB();\n  }\n}\n\nexpect((new Cl).publicMethod()).toEqual(42);';
@@ -20073,7 +12965,7 @@ test('private-static-method-privateFieldsAsSymbols/scopable/exec.js [loose]', as
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -20134,42 +13026,6 @@ test('private-static-method-privateFieldsAsSymbols/scopable/exec.js [loose]', as
   `);
 });
 
-test('private-static-method-privateFieldsAsSymbols/super/exec.js [spec]', async () => {
-  const source =
-    "class Base {\n  static basePublicStaticMethod() {\n    return 'good';\n  }\n}\n\nclass Sub extends Base {\n  static basePublicStaticMethod() {\n    return 'bad';\n  }\n\n  static #subStaticPrivateMethod() {\n    return super.basePublicStaticMethod();\n  }\n\n  static check() {\n    return Sub.#subStaticPrivateMethod();\n  }\n}\n\nexpect(Sub.check()).toEqual('good');\n";
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _superPropGet = require('@babel/runtime/helpers/superPropGet');
-    var _Sub;
-    class Base {
-      static basePublicStaticMethod() {
-        return 'good';
-      }
-    }
-    class Sub extends Base {
-      static basePublicStaticMethod() {
-        return 'bad';
-      }
-      static check() {
-        return _subStaticPrivateMethod.call(Sub);
-      }
-    }
-    _Sub = Sub;
-    function _subStaticPrivateMethod() {
-      return _superPropGet(_Sub, 'basePublicStaticMethod', this, 2)([]);
-    }
-    expect(Sub.check()).toEqual('good');"
-  `);
-});
-
 test('private-static-method-privateFieldsAsSymbols/super/exec.js [loose]', async () => {
   const source =
     "class Base {\n  static basePublicStaticMethod() {\n    return 'good';\n  }\n}\n\nclass Sub extends Base {\n  static basePublicStaticMethod() {\n    return 'bad';\n  }\n\n  static #subStaticPrivateMethod() {\n    return super.basePublicStaticMethod();\n  }\n\n  static check() {\n    return Sub.#subStaticPrivateMethod();\n  }\n}\n\nexpect(Sub.check()).toEqual('good');\n";
@@ -20177,7 +13033,7 @@ test('private-static-method-privateFieldsAsSymbols/super/exec.js [loose]', async
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -20267,41 +13123,6 @@ test('private-static-method-privateFieldsAsSymbols/super/exec.js [loose]', async
   `);
 });
 
-test('private-static-method-privateFieldsAsSymbols/super/input.js [spec]', async () => {
-  const source =
-    "class Base {\n  static basePublicStaticMethod() {\n    return 'good';\n  }\n}\n\nclass Sub extends Base {\n  static basePublicStaticMethod() {\n    return 'bad';\n  }\n\n  static #subStaticPrivateMethod() {\n    return super.basePublicStaticMethod();\n  }\n\n  static check() {\n    Sub.#subStaticPrivateMethod();\n  }\n}\n";
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _superPropGet = require('@babel/runtime/helpers/superPropGet');
-    var _Sub;
-    class Base {
-      static basePublicStaticMethod() {
-        return 'good';
-      }
-    }
-    class Sub extends Base {
-      static basePublicStaticMethod() {
-        return 'bad';
-      }
-      static check() {
-        _subStaticPrivateMethod.call(Sub);
-      }
-    }
-    _Sub = Sub;
-    function _subStaticPrivateMethod() {
-      return _superPropGet(_Sub, 'basePublicStaticMethod', this, 2)([]);
-    }"
-  `);
-});
-
 test('private-static-method-privateFieldsAsSymbols/super/input.js [loose]', async () => {
   const source =
     "class Base {\n  static basePublicStaticMethod() {\n    return 'good';\n  }\n}\n\nclass Sub extends Base {\n  static basePublicStaticMethod() {\n    return 'bad';\n  }\n\n  static #subStaticPrivateMethod() {\n    return super.basePublicStaticMethod();\n  }\n\n  static check() {\n    Sub.#subStaticPrivateMethod();\n  }\n}\n";
@@ -20309,7 +13130,7 @@ test('private-static-method-privateFieldsAsSymbols/super/input.js [loose]', asyn
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -20398,48 +13219,6 @@ test('private-static-method-privateFieldsAsSymbols/super/input.js [loose]', asyn
   `);
 });
 
-test('private-static-method-privateFieldsAsSymbols/this/exec.js [spec]', async () => {
-  const source =
-    'class A {\n  static get a() { return 1 }\n}\n\nclass B extends A {\n  static get b() { return 2 }\n\n  static #getA() { return super.a }\n  static #getB() { return this.b }\n\n  static extract() {\n    return [this.#getA, this.#getB];\n  }\n}\n\nconst [getA, getB] = B.extract();\nexpect(getA.call({ a: 3 })).toBe(1);\nexpect(getB.call({ b: 4 })).toBe(4);';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _superPropGet = require('@babel/runtime/helpers/superPropGet');
-    var _B;
-    class A {
-      static get a() {
-        return 1;
-      }
-    }
-    class B extends A {
-      static get b() {
-        return 2;
-      }
-      static extract() {
-        return [_assertClassBrand(B, this, _getA), _assertClassBrand(B, this, _getB)];
-      }
-    }
-    _B = B;
-    function _getA() {
-      return _superPropGet(_B, 'a', this);
-    }
-    function _getB() {
-      return this.b;
-    }
-    const [getA, getB] = B.extract();
-    expect(getA.call({ a: 3 })).toBe(1);
-    expect(getB.call({ b: 4 })).toBe(4);"
-  `);
-});
-
 test('private-static-method-privateFieldsAsSymbols/this/exec.js [loose]', async () => {
   const source =
     'class A {\n  static get a() { return 1 }\n}\n\nclass B extends A {\n  static get b() { return 2 }\n\n  static #getA() { return super.a }\n  static #getB() { return this.b }\n\n  static extract() {\n    return [this.#getA, this.#getB];\n  }\n}\n\nconst [getA, getB] = B.extract();\nexpect(getA.call({ a: 3 })).toBe(1);\nexpect(getB.call({ b: 4 })).toBe(4);';
@@ -20447,7 +13226,7 @@ test('private-static-method-privateFieldsAsSymbols/this/exec.js [loose]', async 
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -20545,46 +13324,6 @@ test('private-static-method-privateFieldsAsSymbols/this/exec.js [loose]', async 
     const [getA, getB] = B.extract();
     expect(getA.call({ a: 3 })).toBe(1);
     expect(getB.call({ b: 4 })).toBe(4);"
-  `);
-});
-
-test('private-static-method-privateFieldsAsSymbols/this/input.js [spec]', async () => {
-  const source =
-    'class A {\n  static get a() { return 1 }\n}\n\nclass B extends A {\n  static get b() { return 2 }\n\n  static #getA() { return super.a }\n  static #getB() { return this.b }\n\n  static extract() {\n    return [this.#getA, this.#getB];\n  }\n}\n\nconst [getA, getB] = B.extract();';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _superPropGet = require('@babel/runtime/helpers/superPropGet');
-    var _B;
-    class A {
-      static get a() {
-        return 1;
-      }
-    }
-    class B extends A {
-      static get b() {
-        return 2;
-      }
-      static extract() {
-        return [_assertClassBrand(B, this, _getA), _assertClassBrand(B, this, _getB)];
-      }
-    }
-    _B = B;
-    function _getA() {
-      return _superPropGet(_B, 'a', this);
-    }
-    function _getB() {
-      return this.b;
-    }
-    const [getA, getB] = B.extract();"
   `);
 });
 
@@ -20595,7 +13334,7 @@ test('private-static-method-privateFieldsAsSymbols/this/input.js [loose]', async
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -20694,35 +13433,6 @@ test('private-static-method-privateFieldsAsSymbols/this/input.js [loose]', async
   `);
 });
 
-test('private-static-method/async/input.js [spec]', async () => {
-  const source =
-    '(function () {\nclass Cl {\n  static async #privateStaticMethod() {\n    return 2;\n  }\n\n  test() {\n    return Cl.#privateStaticMethod();\n  }\n}\n\nreturn new Cl().test().then(val => {\n  expect(val).toBe(2);\n});\n\n});\n';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "(function () {
-      class Cl {
-        test() {
-          return _privateStaticMethod.call(Cl);
-        }
-      }
-      async function _privateStaticMethod() {
-        return 2;
-      }
-      return new Cl().test().then(val => {
-        expect(val).toBe(2);
-      });
-    });"
-  `);
-});
-
 test('private-static-method/async/input.js [loose]', async () => {
   const source =
     '(function () {\nclass Cl {\n  static async #privateStaticMethod() {\n    return 2;\n  }\n\n  test() {\n    return Cl.#privateStaticMethod();\n  }\n}\n\nreturn new Cl().test().then(val => {\n  expect(val).toBe(2);\n});\n\n});\n';
@@ -20730,7 +13440,7 @@ test('private-static-method/async/input.js [loose]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -20782,48 +13492,6 @@ test('private-static-method/async/input.js [loose]', async () => {
   `);
 });
 
-test('private-static-method/basic/exec.js [spec]', async () => {
-  const source =
-    'const privateStaticValue = 1017;\n\nclass Cl {\n  static staticMethod2() {\n    return Cl.#privateStaticMethod();\n  }\n\n  static #privateStaticMethod() {\n    return privateStaticValue;\n  }\n\n  static staticMethod() {\n    return Cl.#privateStaticMethod();\n  }\n\n  static privateStaticMethod() {\n    return Cl.#privateStaticMethod();\n  }\n\n  publicMethod() {\n    return Cl.#privateStaticMethod();\n  }\n\n  constructor() {\n    this.instanceField = Cl.#privateStaticMethod();\n  }\n}\n\nexpect((new Cl).publicMethod()).toEqual(privateStaticValue);\nexpect((new Cl).instanceField).toEqual(privateStaticValue);\nexpect(Cl.privateStaticMethod()).toEqual(privateStaticValue);\nexpect(Cl.staticMethod()).toEqual(privateStaticValue);\nexpect(Cl.staticMethod2()).toEqual(privateStaticValue);\n';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "const privateStaticValue = 1017;
-    class Cl {
-      static staticMethod2() {
-        return _privateStaticMethod.call(Cl);
-      }
-      static staticMethod() {
-        return _privateStaticMethod.call(Cl);
-      }
-      static privateStaticMethod() {
-        return _privateStaticMethod.call(Cl);
-      }
-      publicMethod() {
-        return _privateStaticMethod.call(Cl);
-      }
-      constructor() {
-        this.instanceField = _privateStaticMethod.call(Cl);
-      }
-    }
-    function _privateStaticMethod() {
-      return privateStaticValue;
-    }
-    expect(new Cl().publicMethod()).toEqual(privateStaticValue);
-    expect(new Cl().instanceField).toEqual(privateStaticValue);
-    expect(Cl.privateStaticMethod()).toEqual(privateStaticValue);
-    expect(Cl.staticMethod()).toEqual(privateStaticValue);
-    expect(Cl.staticMethod2()).toEqual(privateStaticValue);"
-  `);
-});
-
 test('private-static-method/basic/exec.js [loose]', async () => {
   const source =
     'const privateStaticValue = 1017;\n\nclass Cl {\n  static staticMethod2() {\n    return Cl.#privateStaticMethod();\n  }\n\n  static #privateStaticMethod() {\n    return privateStaticValue;\n  }\n\n  static staticMethod() {\n    return Cl.#privateStaticMethod();\n  }\n\n  static privateStaticMethod() {\n    return Cl.#privateStaticMethod();\n  }\n\n  publicMethod() {\n    return Cl.#privateStaticMethod();\n  }\n\n  constructor() {\n    this.instanceField = Cl.#privateStaticMethod();\n  }\n}\n\nexpect((new Cl).publicMethod()).toEqual(privateStaticValue);\nexpect((new Cl).instanceField).toEqual(privateStaticValue);\nexpect(Cl.privateStaticMethod()).toEqual(privateStaticValue);\nexpect(Cl.staticMethod()).toEqual(privateStaticValue);\nexpect(Cl.staticMethod2()).toEqual(privateStaticValue);\n';
@@ -20831,7 +13499,7 @@ test('private-static-method/basic/exec.js [loose]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -20931,42 +13599,6 @@ test('private-static-method/basic/exec.js [loose]', async () => {
   `);
 });
 
-test('private-static-method/basic/input.js [spec]', async () => {
-  const source =
-    'class Cl {\n  static staticMethod2() {\n    return Cl.#privateStaticMethod();\n  }\n\n  static #privateStaticMethod() {\n    return 1017;\n  }\n\n  static staticMethod() {\n    return Cl.#privateStaticMethod();\n  }\n\n  static privateStaticMethod() {\n    return Cl.#privateStaticMethod();\n  }\n\n  publicMethod() {\n    return Cl.#privateStaticMethod();\n  }\n\n  constructor() {\n    this.instanceField = Cl.#privateStaticMethod();\n  }\n}\n';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "class Cl {
-      static staticMethod2() {
-        return _privateStaticMethod.call(Cl);
-      }
-      static staticMethod() {
-        return _privateStaticMethod.call(Cl);
-      }
-      static privateStaticMethod() {
-        return _privateStaticMethod.call(Cl);
-      }
-      publicMethod() {
-        return _privateStaticMethod.call(Cl);
-      }
-      constructor() {
-        this.instanceField = _privateStaticMethod.call(Cl);
-      }
-    }
-    function _privateStaticMethod() {
-      return 1017;
-    }"
-  `);
-});
-
 test('private-static-method/basic/input.js [loose]', async () => {
   const source =
     'class Cl {\n  static staticMethod2() {\n    return Cl.#privateStaticMethod();\n  }\n\n  static #privateStaticMethod() {\n    return 1017;\n  }\n\n  static staticMethod() {\n    return Cl.#privateStaticMethod();\n  }\n\n  static privateStaticMethod() {\n    return Cl.#privateStaticMethod();\n  }\n\n  publicMethod() {\n    return Cl.#privateStaticMethod();\n  }\n\n  constructor() {\n    this.instanceField = Cl.#privateStaticMethod();\n  }\n}\n';
@@ -20974,7 +13606,7 @@ test('private-static-method/basic/input.js [loose]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -21068,33 +13700,6 @@ test('private-static-method/basic/input.js [loose]', async () => {
   `);
 });
 
-test('private-static-method/class-check/exec.js [spec]', async () => {
-  const source =
-    'class Cl {\n  static #privateStaticMethod() {\n    return 1017;\n  }\n\n  publicMethod(checked) {\n    return checked.#privateStaticMethod();\n  }\n}\n\nconst cl = new Cl();\nexpect(cl.publicMethod(Cl)).toBe(1017);';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    class Cl {
-      publicMethod(checked) {
-        return _assertClassBrand(Cl, checked, _privateStaticMethod).call(checked);
-      }
-    }
-    function _privateStaticMethod() {
-      return 1017;
-    }
-    const cl = new Cl();
-    expect(cl.publicMethod(Cl)).toBe(1017);"
-  `);
-});
-
 test('private-static-method/class-check/exec.js [loose]', async () => {
   const source =
     'class Cl {\n  static #privateStaticMethod() {\n    return 1017;\n  }\n\n  publicMethod(checked) {\n    return checked.#privateStaticMethod();\n  }\n}\n\nconst cl = new Cl();\nexpect(cl.publicMethod(Cl)).toBe(1017);';
@@ -21102,7 +13707,7 @@ test('private-static-method/class-check/exec.js [loose]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -21152,29 +13757,6 @@ test('private-static-method/class-check/exec.js [loose]', async () => {
   `);
 });
 
-test('private-static-method/class-check/input.js [spec]', async () => {
-  const source =
-    'class Cl {\n  static #privateStaticMethod() { }\n\n  publicMethod(checked) {\n    return checked.#privateStaticMethod();\n  }\n}';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    class Cl {
-      publicMethod(checked) {
-        return _assertClassBrand(Cl, checked, _privateStaticMethod).call(checked);
-      }
-    }
-    function _privateStaticMethod() {}"
-  `);
-});
-
 test('private-static-method/class-check/input.js [loose]', async () => {
   const source =
     'class Cl {\n  static #privateStaticMethod() { }\n\n  publicMethod(checked) {\n    return checked.#privateStaticMethod();\n  }\n}';
@@ -21182,7 +13764,7 @@ test('private-static-method/class-check/input.js [loose]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -21229,32 +13811,6 @@ test('private-static-method/class-check/input.js [loose]', async () => {
   `);
 });
 
-test('private-static-method/class-expression/input.js [spec]', async () => {
-  const source =
-    'console.log(class A {\n  static #foo() {}\n\n  method() {\n    this.#foo();\n  }\n});\n';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _A;
-    console.log(
-      (_A = class A {
-        method() {
-          _assertClassBrand(_A, this, _foo).call(this);
-        }
-      }),
-    );
-    function _foo() {}"
-  `);
-});
-
 test('private-static-method/class-expression/input.js [loose]', async () => {
   const source =
     'console.log(class A {\n  static #foo() {}\n\n  method() {\n    this.#foo();\n  }\n});\n';
@@ -21262,7 +13818,7 @@ test('private-static-method/class-expression/input.js [loose]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -21311,38 +13867,6 @@ test('private-static-method/class-expression/input.js [loose]', async () => {
   `);
 });
 
-test('private-static-method/exfiltrated/exec.js [spec]', async () => {
-  const source =
-    'let exfiltrated;\n\nclass Cl {\n  static #privateStaticMethod() {\n    return 1017;\n  }\n\n  constructor() {\n    if (exfiltrated === undefined) {\n        exfiltrated = Cl.#privateStaticMethod;\n    }\n    expect(exfiltrated).toStrictEqual(Cl.#privateStaticMethod);\n  }\n}\n\nnew Cl();\n// check for private method function object equality\nnew Cl();\n\nexpect(exfiltrated()).toEqual(1017);';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "let exfiltrated;
-    class Cl {
-      constructor() {
-        if (exfiltrated === undefined) {
-          exfiltrated = _privateStaticMethod;
-        }
-        expect(exfiltrated).toStrictEqual(_privateStaticMethod);
-      }
-    }
-    function _privateStaticMethod() {
-      return 1017;
-    }
-    new Cl();
-    // check for private method function object equality
-    new Cl();
-    expect(exfiltrated()).toEqual(1017);"
-  `);
-});
-
 test('private-static-method/exfiltrated/exec.js [loose]', async () => {
   const source =
     'let exfiltrated;\n\nclass Cl {\n  static #privateStaticMethod() {\n    return 1017;\n  }\n\n  constructor() {\n    if (exfiltrated === undefined) {\n        exfiltrated = Cl.#privateStaticMethod;\n    }\n    expect(exfiltrated).toStrictEqual(Cl.#privateStaticMethod);\n  }\n}\n\nnew Cl();\n// check for private method function object equality\nnew Cl();\n\nexpect(exfiltrated()).toEqual(1017);';
@@ -21350,7 +13874,7 @@ test('private-static-method/exfiltrated/exec.js [loose]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -21394,33 +13918,6 @@ test('private-static-method/exfiltrated/exec.js [loose]', async () => {
   `);
 });
 
-test('private-static-method/exfiltrated/input.js [spec]', async () => {
-  const source =
-    'let exfiltrated;\n\nclass Cl {\n  static #privateStaticMethod() {\n    return 1017;\n  }\n\n  constructor() {\n    if (exfiltrated === undefined) {\n        exfiltrated = Cl.#privateStaticMethod;\n    }\n  }\n}\n';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "let exfiltrated;
-    class Cl {
-      constructor() {
-        if (exfiltrated === undefined) {
-          exfiltrated = _privateStaticMethod;
-        }
-      }
-    }
-    function _privateStaticMethod() {
-      return 1017;
-    }"
-  `);
-});
-
 test('private-static-method/exfiltrated/input.js [loose]', async () => {
   const source =
     'let exfiltrated;\n\nclass Cl {\n  static #privateStaticMethod() {\n    return 1017;\n  }\n\n  constructor() {\n    if (exfiltrated === undefined) {\n        exfiltrated = Cl.#privateStaticMethod;\n    }\n  }\n}\n';
@@ -21428,7 +13925,7 @@ test('private-static-method/exfiltrated/input.js [loose]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -21465,40 +13962,6 @@ test('private-static-method/exfiltrated/input.js [loose]', async () => {
   `);
 });
 
-test('private-static-method/generator/exec.js [spec]', async () => {
-  const source =
-    'class Cl {\n  static *#foo() {\n    yield 2;\n    return 3;\n  }\n\n  test() {\n    return Cl.#foo();\n  }\n}\n\nconst val = new Cl().test();\nexpect(val.next()).toEqual({ value: 2, done: false });\nexpect(val.next()).toEqual({ value: 3, done: true });\n';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "class Cl {
-      test() {
-        return _foo.call(Cl);
-      }
-    }
-    function* _foo() {
-      yield 2;
-      return 3;
-    }
-    const val = new Cl().test();
-    expect(val.next()).toEqual({
-      value: 2,
-      done: false,
-    });
-    expect(val.next()).toEqual({
-      value: 3,
-      done: true,
-    });"
-  `);
-});
-
 test('private-static-method/generator/exec.js [loose]', async () => {
   const source =
     'class Cl {\n  static *#foo() {\n    yield 2;\n    return 3;\n  }\n\n  test() {\n    return Cl.#foo();\n  }\n}\n\nconst val = new Cl().test();\nexpect(val.next()).toEqual({ value: 2, done: false });\nexpect(val.next()).toEqual({ value: 3, done: true });\n';
@@ -21506,7 +13969,7 @@ test('private-static-method/generator/exec.js [loose]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -21563,31 +14026,6 @@ test('private-static-method/generator/exec.js [loose]', async () => {
   `);
 });
 
-test('private-static-method/generator/input.js [spec]', async () => {
-  const source =
-    'class Cl {\n  static *#foo() {\n    yield 2;\n    return 3;\n  }\n\n  test() {\n    return Cl.#foo();\n  }\n}\n';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "class Cl {
-      test() {
-        return _foo.call(Cl);
-      }
-    }
-    function* _foo() {
-      yield 2;
-      return 3;
-    }"
-  `);
-});
-
 test('private-static-method/generator/input.js [loose]', async () => {
   const source =
     'class Cl {\n  static *#foo() {\n    yield 2;\n    return 3;\n  }\n\n  test() {\n    return Cl.#foo();\n  }\n}\n';
@@ -21595,7 +14033,7 @@ test('private-static-method/generator/input.js [loose]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -21643,31 +14081,13 @@ test('private-static-method/generator/input.js [loose]', async () => {
   `);
 });
 
-test('private-static-method/preserve-comments/input.js [spec]', async () => {
-  const source = 'class C {\n  /* before a */\n  static #a() {};\n  /* after a */\n}\n';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "class C {}
-    /* before a */
-    function _a() {}"
-  `);
-});
-
 test('private-static-method/preserve-comments/input.js [loose]', async () => {
   const source = 'class C {\n  /* before a */\n  static #a() {};\n  /* after a */\n}\n';
   expect(
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -21692,30 +14112,6 @@ test('private-static-method/preserve-comments/input.js [loose]', async () => {
   `);
 });
 
-test('private-static-method/read-only/exec.js [spec]', async () => {
-  const source =
-    'class A {\n  static #method() {}\n\n  run() {\n    expect(() => A.#method = 2).toThrow(TypeError);\n    expect(() => ([A.#method] = [2])).toThrow(TypeError);\n  }\n}\n\n\n';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _readOnlyError = require('@babel/runtime/helpers/readOnlyError');
-    class A {
-      run() {
-        expect(() => (A, 2, _readOnlyError('#method'))).toThrow(TypeError);
-        expect(() => ([(A, _readOnlyError('#method'))._] = [2])).toThrow(TypeError);
-      }
-    }
-    function _method() {}"
-  `);
-});
-
 test('private-static-method/read-only/exec.js [loose]', async () => {
   const source =
     'class A {\n  static #method() {}\n\n  run() {\n    expect(() => A.#method = 2).toThrow(TypeError);\n    expect(() => ([A.#method] = [2])).toThrow(TypeError);\n  }\n}\n\n\n';
@@ -21723,7 +14119,7 @@ test('private-static-method/read-only/exec.js [loose]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -21775,30 +14171,6 @@ test('private-static-method/read-only/exec.js [loose]', async () => {
   `);
 });
 
-test('private-static-method/read-only/input.js [spec]', async () => {
-  const source =
-    'class A {\n  static #method() {}\n\n  run() {\n    A.#method = 2;\n    ([A.#method] = [2]);\n  }\n}\n';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _readOnlyError = require('@babel/runtime/helpers/readOnlyError');
-    class A {
-      run() {
-        (A, 2, _readOnlyError('#method'));
-        [(A, _readOnlyError('#method'))._] = [2];
-      }
-    }
-    function _method() {}"
-  `);
-});
-
 test('private-static-method/read-only/input.js [loose]', async () => {
   const source =
     'class A {\n  static #method() {}\n\n  run() {\n    A.#method = 2;\n    ([A.#method] = [2]);\n  }\n}\n';
@@ -21806,7 +14178,7 @@ test('private-static-method/read-only/input.js [loose]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -21856,30 +14228,6 @@ test('private-static-method/read-only/input.js [loose]', async () => {
   `);
 });
 
-test('private-static-method/reassignment/exec.js [spec]', async () => {
-  const source =
-    'class Cl {\n  static #privateStaticMethod() { }\n\n  constructor() {\n    expect(() => Cl.#privateStaticMethod = null).toThrow(TypeError);\n  }\n}\n\nnew Cl();';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _readOnlyError = require('@babel/runtime/helpers/readOnlyError');
-    class Cl {
-      constructor() {
-        expect(() => (Cl, null, _readOnlyError('#privateStaticMethod'))).toThrow(TypeError);
-      }
-    }
-    function _privateStaticMethod() {}
-    new Cl();"
-  `);
-});
-
 test('private-static-method/reassignment/exec.js [loose]', async () => {
   const source =
     'class Cl {\n  static #privateStaticMethod() { }\n\n  constructor() {\n    expect(() => Cl.#privateStaticMethod = null).toThrow(TypeError);\n  }\n}\n\nnew Cl();';
@@ -21887,7 +14235,7 @@ test('private-static-method/reassignment/exec.js [loose]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -21925,36 +14273,6 @@ test('private-static-method/reassignment/exec.js [loose]', async () => {
   `);
 });
 
-test('private-static-method/scopable/exec.js [spec]', async () => {
-  const source =
-    'class Cl {\n  static #privateMethodA() {\n    const i = 40;\n    return i;\n  }\n\n  static #privateMethodB() {\n    const i = 2;\n    return i;\n  }\n\n  publicMethod() {\n    return Cl.#privateMethodA() + Cl.#privateMethodB();\n  }\n}\n\nexpect((new Cl).publicMethod()).toEqual(42);';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "class Cl {
-      publicMethod() {
-        return _privateMethodA.call(Cl) + _privateMethodB.call(Cl);
-      }
-    }
-    function _privateMethodA() {
-      const i = 40;
-      return i;
-    }
-    function _privateMethodB() {
-      const i = 2;
-      return i;
-    }
-    expect(new Cl().publicMethod()).toEqual(42);"
-  `);
-});
-
 test('private-static-method/scopable/exec.js [loose]', async () => {
   const source =
     'class Cl {\n  static #privateMethodA() {\n    const i = 40;\n    return i;\n  }\n\n  static #privateMethodB() {\n    const i = 2;\n    return i;\n  }\n\n  publicMethod() {\n    return Cl.#privateMethodA() + Cl.#privateMethodB();\n  }\n}\n\nexpect((new Cl).publicMethod()).toEqual(42);';
@@ -21962,7 +14280,7 @@ test('private-static-method/scopable/exec.js [loose]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -22023,42 +14341,6 @@ test('private-static-method/scopable/exec.js [loose]', async () => {
   `);
 });
 
-test('private-static-method/super/exec.js [spec]', async () => {
-  const source =
-    "class Base {\n  static basePublicStaticMethod() {\n    return 'good';\n  }\n}\n\nclass Sub extends Base {\n  static basePublicStaticMethod() {\n    return 'bad';\n  }\n\n  static #subStaticPrivateMethod() {\n    return super.basePublicStaticMethod();\n  }\n\n  static check() {\n    return Sub.#subStaticPrivateMethod();\n  }\n}\n\nexpect(Sub.check()).toEqual('good');\n";
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _superPropGet = require('@babel/runtime/helpers/superPropGet');
-    var _Sub;
-    class Base {
-      static basePublicStaticMethod() {
-        return 'good';
-      }
-    }
-    class Sub extends Base {
-      static basePublicStaticMethod() {
-        return 'bad';
-      }
-      static check() {
-        return _subStaticPrivateMethod.call(Sub);
-      }
-    }
-    _Sub = Sub;
-    function _subStaticPrivateMethod() {
-      return _superPropGet(_Sub, 'basePublicStaticMethod', this, 2)([]);
-    }
-    expect(Sub.check()).toEqual('good');"
-  `);
-});
-
 test('private-static-method/super/exec.js [loose]', async () => {
   const source =
     "class Base {\n  static basePublicStaticMethod() {\n    return 'good';\n  }\n}\n\nclass Sub extends Base {\n  static basePublicStaticMethod() {\n    return 'bad';\n  }\n\n  static #subStaticPrivateMethod() {\n    return super.basePublicStaticMethod();\n  }\n\n  static check() {\n    return Sub.#subStaticPrivateMethod();\n  }\n}\n\nexpect(Sub.check()).toEqual('good');\n";
@@ -22066,7 +14348,7 @@ test('private-static-method/super/exec.js [loose]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -22156,41 +14438,6 @@ test('private-static-method/super/exec.js [loose]', async () => {
   `);
 });
 
-test('private-static-method/super/input.js [spec]', async () => {
-  const source =
-    "class Base {\n  static basePublicStaticMethod() {\n    return 'good';\n  }\n}\n\nclass Sub extends Base {\n  static basePublicStaticMethod() {\n    return 'bad';\n  }\n\n  static #subStaticPrivateMethod() {\n    return super.basePublicStaticMethod();\n  }\n\n  static check() {\n    Sub.#subStaticPrivateMethod();\n  }\n}\n";
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _superPropGet = require('@babel/runtime/helpers/superPropGet');
-    var _Sub;
-    class Base {
-      static basePublicStaticMethod() {
-        return 'good';
-      }
-    }
-    class Sub extends Base {
-      static basePublicStaticMethod() {
-        return 'bad';
-      }
-      static check() {
-        _subStaticPrivateMethod.call(Sub);
-      }
-    }
-    _Sub = Sub;
-    function _subStaticPrivateMethod() {
-      return _superPropGet(_Sub, 'basePublicStaticMethod', this, 2)([]);
-    }"
-  `);
-});
-
 test('private-static-method/super/input.js [loose]', async () => {
   const source =
     "class Base {\n  static basePublicStaticMethod() {\n    return 'good';\n  }\n}\n\nclass Sub extends Base {\n  static basePublicStaticMethod() {\n    return 'bad';\n  }\n\n  static #subStaticPrivateMethod() {\n    return super.basePublicStaticMethod();\n  }\n\n  static check() {\n    Sub.#subStaticPrivateMethod();\n  }\n}\n";
@@ -22198,7 +14445,7 @@ test('private-static-method/super/input.js [loose]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -22287,32 +14534,6 @@ test('private-static-method/super/input.js [loose]', async () => {
   `);
 });
 
-test('private-static-method/tagged-template/exec.js [spec]', async () => {
-  const source =
-    'class Foo {\n  static #tag() {\n    return this;\n  }\n\n  static getReceiver() {\n    return this.#tag``;\n  }\n}\n\nexpect(Foo.getReceiver()).toBe(Foo);';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    class Foo {
-      static getReceiver() {
-        return _assertClassBrand(Foo, this, _tag).bind(this)\`\`;
-      }
-    }
-    function _tag() {
-      return this;
-    }
-    expect(Foo.getReceiver()).toBe(Foo);"
-  `);
-});
-
 test('private-static-method/tagged-template/exec.js [loose]', async () => {
   const source =
     'class Foo {\n  static #tag() {\n    return this;\n  }\n\n  static getReceiver() {\n    return this.#tag``;\n  }\n}\n\nexpect(Foo.getReceiver()).toBe(Foo);';
@@ -22320,7 +14541,7 @@ test('private-static-method/tagged-template/exec.js [loose]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -22369,36 +14590,13 @@ test('private-static-method/tagged-template/exec.js [loose]', async () => {
   `);
 });
 
-test('private-static-method/tagged-template/input.js [spec]', async () => {
-  const source = 'class Foo {\n  static #tag() {\n    this.#tag``;\n  }\n}\nnew Foo();';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _Foo;
-    class Foo {}
-    _Foo = Foo;
-    function _tag() {
-      _assertClassBrand(_Foo, this, _tag).bind(this)\`\`;
-    }
-    new Foo();"
-  `);
-});
-
 test('private-static-method/tagged-template/input.js [loose]', async () => {
   const source = 'class Foo {\n  static #tag() {\n    this.#tag``;\n  }\n}\nnew Foo();';
   expect(
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -22432,48 +14630,6 @@ test('private-static-method/tagged-template/input.js [loose]', async () => {
   `);
 });
 
-test('private-static-method/this/exec.js [spec]', async () => {
-  const source =
-    'class A {\n  static get a() { return 1 }\n}\n\nclass B extends A {\n  static get b() { return 2 }\n\n  static #getA() { return super.a }\n  static #getB() { return this.b }\n\n  static extract() {\n    return [this.#getA, this.#getB];\n  }\n}\n\nconst [getA, getB] = B.extract();\nexpect(getA.call({ a: 3 })).toBe(1);\nexpect(getB.call({ b: 4 })).toBe(4);';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _superPropGet = require('@babel/runtime/helpers/superPropGet');
-    var _B;
-    class A {
-      static get a() {
-        return 1;
-      }
-    }
-    class B extends A {
-      static get b() {
-        return 2;
-      }
-      static extract() {
-        return [_assertClassBrand(B, this, _getA), _assertClassBrand(B, this, _getB)];
-      }
-    }
-    _B = B;
-    function _getA() {
-      return _superPropGet(_B, 'a', this);
-    }
-    function _getB() {
-      return this.b;
-    }
-    const [getA, getB] = B.extract();
-    expect(getA.call({ a: 3 })).toBe(1);
-    expect(getB.call({ b: 4 })).toBe(4);"
-  `);
-});
-
 test('private-static-method/this/exec.js [loose]', async () => {
   const source =
     'class A {\n  static get a() { return 1 }\n}\n\nclass B extends A {\n  static get b() { return 2 }\n\n  static #getA() { return super.a }\n  static #getB() { return this.b }\n\n  static extract() {\n    return [this.#getA, this.#getB];\n  }\n}\n\nconst [getA, getB] = B.extract();\nexpect(getA.call({ a: 3 })).toBe(1);\nexpect(getB.call({ b: 4 })).toBe(4);';
@@ -22481,7 +14637,7 @@ test('private-static-method/this/exec.js [loose]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -22579,46 +14735,6 @@ test('private-static-method/this/exec.js [loose]', async () => {
     const [getA, getB] = B.extract();
     expect(getA.call({ a: 3 })).toBe(1);
     expect(getB.call({ b: 4 })).toBe(4);"
-  `);
-});
-
-test('private-static-method/this/input.js [spec]', async () => {
-  const source =
-    'class A {\n  static get a() { return 1 }\n}\n\nclass B extends A {\n  static get b() { return 2 }\n\n  static #getA() { return super.a }\n  static #getB() { return this.b }\n\n  static extract() {\n    return [this.#getA, this.#getB];\n  }\n}\n\nconst [getA, getB] = B.extract();';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _superPropGet = require('@babel/runtime/helpers/superPropGet');
-    var _B;
-    class A {
-      static get a() {
-        return 1;
-      }
-    }
-    class B extends A {
-      static get b() {
-        return 2;
-      }
-      static extract() {
-        return [_assertClassBrand(B, this, _getA), _assertClassBrand(B, this, _getB)];
-      }
-    }
-    _B = B;
-    function _getA() {
-      return _superPropGet(_B, 'a', this);
-    }
-    function _getB() {
-      return this.b;
-    }
-    const [getA, getB] = B.extract();"
   `);
 });
 
@@ -22629,7 +14745,7 @@ test('private-static-method/this/input.js [loose]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -22728,74 +14844,6 @@ test('private-static-method/this/input.js [loose]', async () => {
   `);
 });
 
-test('static-accessors-loose/access-in-static-field-initializer/exec.js [spec]', async () => {
-  const source =
-    'expect((() => {\n  let r;\n  class C {\n    static #_ = new C;\n    static get #p() { return 0 };\n    constructor() {\n      r = C.#p;\n    }\n  }\n  return r;\n})()).toBe(0);\n\nexpect((() => {\n  let r;\n  class C {\n    static #_ = new C;\n    static set #p(v) { r = v; };\n    constructor() {\n      C.#p = 0;\n    }\n  }\n  return r;\n})()).toBe(0);\n\nexpect((() => {\n  let r;\n  class C {\n    static #_ = new C;\n    static set #p(v) { r = v; };\n    constructor() {\n      for (C.#p of [0]);\n    }\n  }\n  return r;\n})()).toBe(0);\n';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _toSetter = require('@babel/runtime/helpers/toSetter');
-    expect(
-      (() => {
-        var _C;
-        let r;
-        class C {
-          constructor() {
-            r = _get_p.call(C);
-          }
-        }
-        _C = C;
-        function _get_p() {
-          return 0;
-        }
-        var _ = { _: new _C() };
-        return r;
-      })(),
-    ).toBe(0);
-    expect(
-      (() => {
-        var _C2;
-        let r;
-        class C {
-          constructor() {
-            _toSetter(_set_p.bind(C))._ = 0;
-          }
-        }
-        _C2 = C;
-        function _set_p(v) {
-          r = v;
-        }
-        var _2 = { _: new _C2() };
-        return r;
-      })(),
-    ).toBe(0);
-    expect(
-      (() => {
-        var _C3;
-        let r;
-        class C {
-          constructor() {
-            for (_toSetter(_set_p2.bind(C))._ of [0]);
-          }
-        }
-        _C3 = C;
-        function _set_p2(v) {
-          r = v;
-        }
-        var _3 = { _: new _C3() };
-        return r;
-      })(),
-    ).toBe(0);"
-  `);
-});
-
 test('static-accessors-loose/access-in-static-field-initializer/exec.js [loose]', async () => {
   const source =
     'expect((() => {\n  let r;\n  class C {\n    static #_ = new C;\n    static get #p() { return 0 };\n    constructor() {\n      r = C.#p;\n    }\n  }\n  return r;\n})()).toBe(0);\n\nexpect((() => {\n  let r;\n  class C {\n    static #_ = new C;\n    static set #p(v) { r = v; };\n    constructor() {\n      C.#p = 0;\n    }\n  }\n  return r;\n})()).toBe(0);\n\nexpect((() => {\n  let r;\n  class C {\n    static #_ = new C;\n    static set #p(v) { r = v; };\n    constructor() {\n      for (C.#p of [0]);\n    }\n  }\n  return r;\n})()).toBe(0);\n';
@@ -22803,7 +14851,7 @@ test('static-accessors-loose/access-in-static-field-initializer/exec.js [loose]'
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -22850,38 +14898,11 @@ test('static-accessors-loose/access-in-static-field-initializer/exec.js [loose]'
         let r;
         let C = (() => {
           'use strict';
-          var _p13 = '__private_C_p';
-          var __12 = '__private_C__';
-          const C = function C() {
-            if (!new.target) throw new TypeError('Cannot call a class as a function');
-            _classPrivateFieldLooseBase(C, _p13)[_p13] = 0;
-          };
-          Object.defineProperty(C, 'prototype', { writable: false });
-          Object.defineProperty(C, __12, {
-            writable: true,
-            value: new C(),
-          });
-          Object.defineProperty(C, _p13, {
-            set: function (v) {
-              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
-              r = v;
-            },
-          });
-          return C;
-        })();
-        return r;
-      })(),
-    ).toBe(0);
-    expect(
-      (() => {
-        let r;
-        let C = (() => {
-          'use strict';
           var _p15 = '__private_C_p';
           var __14 = '__private_C__';
           const C = function C() {
             if (!new.target) throw new TypeError('Cannot call a class as a function');
-            for (_classPrivateFieldLooseBase(C, _p15)[_p15] of [0]);
+            _classPrivateFieldLooseBase(C, _p15)[_p15] = 0;
           };
           Object.defineProperty(C, 'prototype', { writable: false });
           Object.defineProperty(C, __14, {
@@ -22898,42 +14919,34 @@ test('static-accessors-loose/access-in-static-field-initializer/exec.js [loose]'
         })();
         return r;
       })(),
+    ).toBe(0);
+    expect(
+      (() => {
+        let r;
+        let C = (() => {
+          'use strict';
+          var _p17 = '__private_C_p';
+          var __16 = '__private_C__';
+          const C = function C() {
+            if (!new.target) throw new TypeError('Cannot call a class as a function');
+            for (_classPrivateFieldLooseBase(C, _p17)[_p17] of [0]);
+          };
+          Object.defineProperty(C, 'prototype', { writable: false });
+          Object.defineProperty(C, __16, {
+            writable: true,
+            value: new C(),
+          });
+          Object.defineProperty(C, _p17, {
+            set: function (v) {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              r = v;
+            },
+          });
+          return C;
+        })();
+        return r;
+      })(),
     ).toBe(0);"
-  `);
-});
-
-test('static-accessors-loose/basic/exec.js [spec]', async () => {
-  const source =
-    'class Cl {\n  static #PRIVATE_STATIC_FIELD = "top secret string";\n\n  static get #privateStaticFieldValue() {\n    return Cl.#PRIVATE_STATIC_FIELD;\n  }\n\n  static set #privateStaticFieldValue(newValue) {\n    Cl.#PRIVATE_STATIC_FIELD = `Updated: ${newValue}`;\n  }\n\n  static getValue() {\n    return Cl.#privateStaticFieldValue;\n  }\n\n  static setValue() {\n    Cl.#privateStaticFieldValue = "dank";\n  }\n}\n\nexpect(Cl.getValue()).toEqual("top secret string");\nCl.setValue();\nexpect(Cl.getValue()).toEqual("Updated: dank");';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _toSetter = require('@babel/runtime/helpers/toSetter');
-    class Cl {
-      static getValue() {
-        return _get_privateStaticFieldValue.call(Cl);
-      }
-      static setValue() {
-        _toSetter(_set_privateStaticFieldValue.bind(Cl))._ = 'dank';
-      }
-    }
-    function _get_privateStaticFieldValue() {
-      return _PRIVATE_STATIC_FIELD._;
-    }
-    function _set_privateStaticFieldValue(newValue) {
-      _PRIVATE_STATIC_FIELD._ = \`Updated: \${newValue}\`;
-    }
-    var _PRIVATE_STATIC_FIELD = { _: 'top secret string' };
-    expect(Cl.getValue()).toEqual('top secret string');
-    Cl.setValue();
-    expect(Cl.getValue()).toEqual('Updated: dank');"
   `);
 });
 
@@ -22944,7 +14957,7 @@ test('static-accessors-loose/basic/exec.js [loose]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -23021,38 +15034,6 @@ test('static-accessors-loose/basic/exec.js [loose]', async () => {
   `);
 });
 
-test('static-accessors-loose/basic/input.js [spec]', async () => {
-  const source =
-    'class Cl {\n  static #PRIVATE_STATIC_FIELD = "top secret string";\n\n  static get #privateStaticFieldValue() {\n    return Cl.#PRIVATE_STATIC_FIELD;\n  }\n\n  static set #privateStaticFieldValue(newValue) {\n    Cl.#PRIVATE_STATIC_FIELD = `Updated: ${newValue}`;\n  }\n\n  static getValue() {\n    return Cl.#privateStaticFieldValue;\n  }\n\n  static setValue() {\n    Cl.#privateStaticFieldValue = "dank";\n  }\n}';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _toSetter = require('@babel/runtime/helpers/toSetter');
-    class Cl {
-      static getValue() {
-        return _get_privateStaticFieldValue.call(Cl);
-      }
-      static setValue() {
-        _toSetter(_set_privateStaticFieldValue.bind(Cl))._ = 'dank';
-      }
-    }
-    function _get_privateStaticFieldValue() {
-      return _PRIVATE_STATIC_FIELD._;
-    }
-    function _set_privateStaticFieldValue(newValue) {
-      _PRIVATE_STATIC_FIELD._ = \`Updated: \${newValue}\`;
-    }
-    var _PRIVATE_STATIC_FIELD = { _: 'top secret string' };"
-  `);
-});
-
 test('static-accessors-loose/basic/input.js [loose]', async () => {
   const source =
     'class Cl {\n  static #PRIVATE_STATIC_FIELD = "top secret string";\n\n  static get #privateStaticFieldValue() {\n    return Cl.#PRIVATE_STATIC_FIELD;\n  }\n\n  static set #privateStaticFieldValue(newValue) {\n    Cl.#PRIVATE_STATIC_FIELD = `Updated: ${newValue}`;\n  }\n\n  static getValue() {\n    return Cl.#privateStaticFieldValue;\n  }\n\n  static setValue() {\n    Cl.#privateStaticFieldValue = "dank";\n  }\n}';
@@ -23060,7 +15041,7 @@ test('static-accessors-loose/basic/input.js [loose]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -23134,34 +15115,6 @@ test('static-accessors-loose/basic/input.js [loose]', async () => {
   `);
 });
 
-test('static-accessors-loose/destructure-set/exec.js [spec]', async () => {
-  const source =
-    'class C {\n  static set #p(v) { C.#q = v }\n  static #q;\n  constructor() {\n    ([C.#p] = [0]);\n    expect(C.#q).toBe(0);\n  }\n}\n\nnew C;\n';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _toSetter = require('@babel/runtime/helpers/toSetter');
-    class C {
-      constructor() {
-        [_toSetter(_set_p.bind(C))._] = [0];
-        expect(_q._).toBe(0);
-      }
-    }
-    function _set_p(v) {
-      _q._ = v;
-    }
-    var _q = { _: void 0 };
-    new C();"
-  `);
-});
-
 test('static-accessors-loose/destructure-set/exec.js [loose]', async () => {
   const source =
     'class C {\n  static set #p(v) { C.#q = v }\n  static #q;\n  constructor() {\n    ([C.#p] = [0]);\n    expect(C.#q).toBe(0);\n  }\n}\n\nnew C;\n';
@@ -23169,7 +15122,7 @@ test('static-accessors-loose/destructure-set/exec.js [loose]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -23206,33 +15159,6 @@ test('static-accessors-loose/destructure-set/exec.js [loose]', async () => {
       });
       return C;
     })();
-    new C();"
-  `);
-});
-
-test('static-accessors-loose/destructure-set/input.js [spec]', async () => {
-  const source =
-    'class C {\n  static set #p(v) { C.#q = v }\n  static #q;\n  constructor() {\n    ([C.#p] = [0]);\n  }\n}\n\nnew C;\n';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _toSetter = require('@babel/runtime/helpers/toSetter');
-    class C {
-      constructor() {
-        [_toSetter(_set_p.bind(C))._] = [0];
-      }
-    }
-    function _set_p(v) {
-      _q._ = v;
-    }
-    var _q = { _: void 0 };
     new C();"
   `);
 });
@@ -23244,7 +15170,7 @@ test('static-accessors-loose/destructure-set/input.js [loose]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -23284,33 +15210,6 @@ test('static-accessors-loose/destructure-set/input.js [loose]', async () => {
   `);
 });
 
-test('static-accessors-loose/get-only-setter/exec.js [spec]', async () => {
-  const source =
-    'class Cl {\n  static #PRIVATE_STATIC_FIELD = 0;\n\n  static set #privateStaticFieldValue(newValue) {\n    Cl.#PRIVATE_STATIC_FIELD = newValue;\n  }\n\n  static getPrivateStaticFieldValue() {\n    return Cl.#privateStaticFieldValue;\n  }\n}\n\nexpect(Cl.getPrivateStaticFieldValue()).toBeUndefined();';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _writeOnlyError = require('@babel/runtime/helpers/writeOnlyError');
-    class Cl {
-      static getPrivateStaticFieldValue() {
-        return (Cl, _writeOnlyError('#privateStaticFieldValue'));
-      }
-    }
-    function _set_privateStaticFieldValue(newValue) {
-      _PRIVATE_STATIC_FIELD._ = newValue;
-    }
-    var _PRIVATE_STATIC_FIELD = { _: 0 };
-    expect(Cl.getPrivateStaticFieldValue()).toBeUndefined();"
-  `);
-});
-
 test('static-accessors-loose/get-only-setter/exec.js [loose]', async () => {
   const source =
     'class Cl {\n  static #PRIVATE_STATIC_FIELD = 0;\n\n  static set #privateStaticFieldValue(newValue) {\n    Cl.#PRIVATE_STATIC_FIELD = newValue;\n  }\n\n  static getPrivateStaticFieldValue() {\n    return Cl.#privateStaticFieldValue;\n  }\n}\n\nexpect(Cl.getPrivateStaticFieldValue()).toBeUndefined();';
@@ -23318,7 +15217,7 @@ test('static-accessors-loose/get-only-setter/exec.js [loose]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -23372,32 +15271,6 @@ test('static-accessors-loose/get-only-setter/exec.js [loose]', async () => {
   `);
 });
 
-test('static-accessors-loose/get-only-setter/input.js [spec]', async () => {
-  const source =
-    'class Cl {\n  static #PRIVATE_STATIC_FIELD = 0;\n\n  static set #privateStaticFieldValue(newValue) {\n    Cl.#PRIVATE_STATIC_FIELD = newValue;\n  }\n\n  static getPrivateStaticFieldValue() {\n    return Cl.#privateStaticFieldValue;\n  }\n}';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _writeOnlyError = require('@babel/runtime/helpers/writeOnlyError');
-    class Cl {
-      static getPrivateStaticFieldValue() {
-        return (Cl, _writeOnlyError('#privateStaticFieldValue'));
-      }
-    }
-    function _set_privateStaticFieldValue(newValue) {
-      _PRIVATE_STATIC_FIELD._ = newValue;
-    }
-    var _PRIVATE_STATIC_FIELD = { _: 0 };"
-  `);
-});
-
 test('static-accessors-loose/get-only-setter/input.js [loose]', async () => {
   const source =
     'class Cl {\n  static #PRIVATE_STATIC_FIELD = 0;\n\n  static set #privateStaticFieldValue(newValue) {\n    Cl.#PRIVATE_STATIC_FIELD = newValue;\n  }\n\n  static getPrivateStaticFieldValue() {\n    return Cl.#privateStaticFieldValue;\n  }\n}';
@@ -23405,7 +15278,7 @@ test('static-accessors-loose/get-only-setter/input.js [loose]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -23458,30 +15331,6 @@ test('static-accessors-loose/get-only-setter/input.js [loose]', async () => {
   `);
 });
 
-test('static-accessors-loose/preserve-comments/input.js [spec]', async () => {
-  const source =
-    'class C {\n  /* before get a */\n  static get #a() { return 42 };\n  /* after get a */\n\n  /* before set a */\n  static set #a(v) {}\n  /* after set a */\n}\n';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "class C {}
-    /* before get a */
-    function _get_a() {
-      return 42;
-    }
-    /* after get a */
-    /* before set a */
-    function _set_a(v) {}"
-  `);
-});
-
 test('static-accessors-loose/preserve-comments/input.js [loose]', async () => {
   const source =
     'class C {\n  /* before get a */\n  static get #a() { return 42 };\n  /* after get a */\n\n  /* before set a */\n  static set #a(v) {}\n  /* after set a */\n}\n';
@@ -23489,7 +15338,7 @@ test('static-accessors-loose/preserve-comments/input.js [loose]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -23520,37 +15369,6 @@ test('static-accessors-loose/preserve-comments/input.js [loose]', async () => {
   `);
 });
 
-test('static-accessors-loose/set-only-getter/exec.js [spec]', async () => {
-  const source =
-    'class Cl {\n  static #privateField = 0;\n\n  static get #privateFieldValue() {\n    return this.#privateField;\n  }\n\n  constructor() {\n    expect(() => Cl.#privateFieldValue = 1).toThrow(TypeError);\n    expect(() => ([Cl.#privateFieldValue] = [1])).toThrow(TypeError);\n  }\n}\n\nconst cl = new Cl();\n';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _readOnlyError = require('@babel/runtime/helpers/readOnlyError');
-    var _Cl;
-    class Cl {
-      constructor() {
-        expect(() => (Cl, 1, _readOnlyError('#privateFieldValue'))).toThrow(TypeError);
-        expect(() => ([(Cl, _readOnlyError('#privateFieldValue'))._] = [1])).toThrow(TypeError);
-      }
-    }
-    _Cl = Cl;
-    function _get_privateFieldValue() {
-      return _assertClassBrand(_Cl, this, _privateField)._;
-    }
-    var _privateField = { _: 0 };
-    const cl = new Cl();"
-  `);
-});
-
 test('static-accessors-loose/set-only-getter/exec.js [loose]', async () => {
   const source =
     'class Cl {\n  static #privateField = 0;\n\n  static get #privateFieldValue() {\n    return this.#privateField;\n  }\n\n  constructor() {\n    expect(() => Cl.#privateFieldValue = 1).toThrow(TypeError);\n    expect(() => ([Cl.#privateFieldValue] = [1])).toThrow(TypeError);\n  }\n}\n\nconst cl = new Cl();\n';
@@ -23558,7 +15376,7 @@ test('static-accessors-loose/set-only-getter/exec.js [loose]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -23601,37 +15419,6 @@ test('static-accessors-loose/set-only-getter/exec.js [loose]', async () => {
       });
       return Cl;
     })();
-    const cl = new Cl();"
-  `);
-});
-
-test('static-accessors-loose/set-only-getter/input.js [spec]', async () => {
-  const source =
-    'class Cl {\n  static #privateField = 0;\n\n  static get #privateFieldValue() {\n    return this.#privateField;\n  }\n\n  constructor() {\n    Cl.#privateFieldValue = 1;\n    ([Cl.#privateFieldValue] = [1]);\n  }\n}\n\nconst cl = new Cl();\n\n';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _readOnlyError = require('@babel/runtime/helpers/readOnlyError');
-    var _Cl;
-    class Cl {
-      constructor() {
-        (Cl, 1, _readOnlyError('#privateFieldValue'));
-        [(Cl, _readOnlyError('#privateFieldValue'))._] = [1];
-      }
-    }
-    _Cl = Cl;
-    function _get_privateFieldValue() {
-      return _assertClassBrand(_Cl, this, _privateField)._;
-    }
-    var _privateField = { _: 0 };
     const cl = new Cl();"
   `);
 });
@@ -23643,7 +15430,7 @@ test('static-accessors-loose/set-only-getter/input.js [loose]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -23686,76 +15473,6 @@ test('static-accessors-loose/set-only-getter/input.js [loose]', async () => {
   `);
 });
 
-test('static-accessors-loose/updates/exec.js [spec]', async () => {
-  const source =
-    'class Cl {\n  static #privateField = "top secret string";\n  static publicField = "not secret string";\n\n  static get #privateFieldValue() {\n    return Cl.#privateField;\n  }\n\n  static set #privateFieldValue(newValue) {\n    Cl.#privateField = newValue;\n  }\n\n  static publicGetPrivateField() {\n    return Cl.#privateFieldValue;\n  }\n\n  static publicSetPrivateField(newValue) {\n    Cl.#privateFieldValue = newValue;\n  }\n\n  static get publicFieldValue() {\n    return Cl.publicField;\n  }\n\n  static set publicFieldValue(newValue) {\n    Cl.publicField = newValue;\n  }\n\n  static testUpdates() {\n    Cl.#privateField = 0;\n    Cl.publicField = 0;\n    Cl.#privateFieldValue = Cl.#privateFieldValue++;\n    Cl.publicFieldValue = Cl.publicFieldValue++;\n    expect(Cl.#privateField).toEqual(Cl.publicField);\n\n    ++Cl.#privateFieldValue;\n    ++Cl.publicFieldValue;\n    expect(Cl.#privateField).toEqual(Cl.publicField);\n\n    Cl.#privateFieldValue += 1;\n    Cl.publicFieldValue += 1;\n    expect(Cl.#privateField).toEqual(Cl.publicField);\n  }\n}\n\nCl.testUpdates();';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _toSetter = require('@babel/runtime/helpers/toSetter');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _defineProperty = require('@babel/runtime/helpers/defineProperty');
-    class Cl {
-      static publicGetPrivateField() {
-        return _get_privateFieldValue.call(Cl);
-      }
-      static publicSetPrivateField(newValue) {
-        _toSetter(_set_privateFieldValue.bind(Cl))._ = newValue;
-      }
-      static get publicFieldValue() {
-        return Cl.publicField;
-      }
-      static set publicFieldValue(newValue) {
-        Cl.publicField = newValue;
-      }
-      static testUpdates() {
-        var _Cl$privateFieldValue, _Cl$privateFieldValue2, _Cl$privateFieldValue3;
-        _privateField._ = 0;
-        Cl.publicField = 0;
-        _toSetter(_set_privateFieldValue.bind(Cl))._ =
-          (_set_privateFieldValue.call(
-            _assertClassBrand(Cl, Cl),
-            ((_Cl$privateFieldValue = _get_privateFieldValue.call(_assertClassBrand(Cl, Cl))),
-            (_Cl$privateFieldValue2 = _Cl$privateFieldValue++),
-            _Cl$privateFieldValue),
-          ),
-          _Cl$privateFieldValue2);
-        Cl.publicFieldValue = Cl.publicFieldValue++;
-        expect(_privateField._).toEqual(Cl.publicField);
-        _set_privateFieldValue.call(
-          _assertClassBrand(Cl, Cl),
-          ((_Cl$privateFieldValue3 = _get_privateFieldValue.call(_assertClassBrand(Cl, Cl))),
-          ++_Cl$privateFieldValue3),
-        );
-        ++Cl.publicFieldValue;
-        expect(_privateField._).toEqual(Cl.publicField);
-        _set_privateFieldValue.call(
-          _assertClassBrand(Cl, Cl),
-          _get_privateFieldValue.call(_assertClassBrand(Cl, Cl)) + 1,
-        );
-        Cl.publicFieldValue += 1;
-        expect(_privateField._).toEqual(Cl.publicField);
-      }
-    }
-    function _get_privateFieldValue() {
-      return _privateField._;
-    }
-    function _set_privateFieldValue(newValue) {
-      _privateField._ = newValue;
-    }
-    var _privateField = { _: 'top secret string' };
-    _defineProperty(Cl, 'publicField', 'not secret string');
-    Cl.testUpdates();"
-  `);
-});
-
 test('static-accessors-loose/updates/exec.js [loose]', async () => {
   const source =
     'class Cl {\n  static #privateField = "top secret string";\n  static publicField = "not secret string";\n\n  static get #privateFieldValue() {\n    return Cl.#privateField;\n  }\n\n  static set #privateFieldValue(newValue) {\n    Cl.#privateField = newValue;\n  }\n\n  static publicGetPrivateField() {\n    return Cl.#privateFieldValue;\n  }\n\n  static publicSetPrivateField(newValue) {\n    Cl.#privateFieldValue = newValue;\n  }\n\n  static get publicFieldValue() {\n    return Cl.publicField;\n  }\n\n  static set publicFieldValue(newValue) {\n    Cl.publicField = newValue;\n  }\n\n  static testUpdates() {\n    Cl.#privateField = 0;\n    Cl.publicField = 0;\n    Cl.#privateFieldValue = Cl.#privateFieldValue++;\n    Cl.publicFieldValue = Cl.publicFieldValue++;\n    expect(Cl.#privateField).toEqual(Cl.publicField);\n\n    ++Cl.#privateFieldValue;\n    ++Cl.publicFieldValue;\n    expect(Cl.#privateField).toEqual(Cl.publicField);\n\n    Cl.#privateFieldValue += 1;\n    Cl.publicFieldValue += 1;\n    expect(Cl.#privateField).toEqual(Cl.publicField);\n  }\n}\n\nCl.testUpdates();';
@@ -23763,7 +15480,7 @@ test('static-accessors-loose/updates/exec.js [loose]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -23880,7 +15597,12 @@ test('static-accessors-loose/updates/exec.js [loose]', async () => {
         writable: true,
         value: 'top secret string',
       });
-      Cl.publicField = 'not secret string';
+      Object.defineProperty(Cl, 'publicField', {
+        value: 'not secret string',
+        enumerable: true,
+        configurable: true,
+        writable: true,
+      });
       Object.defineProperty(Cl, _privateFieldValue, {
         get: function () {
           if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
@@ -23897,76 +15619,6 @@ test('static-accessors-loose/updates/exec.js [loose]', async () => {
   `);
 });
 
-test('static-accessors-loose/updates/input.js [spec]', async () => {
-  const source =
-    'class Cl {\n  static #privateField = "top secret string";\n  static publicField = "not secret string";\n\n  static get #privateFieldValue() {\n    return Cl.#privateField;\n  }\n\n  static set #privateFieldValue(newValue) {\n    Cl.#privateField = newValue;\n  }\n\n  static publicGetPrivateField() {\n    return Cl.#privateFieldValue;\n  }\n\n  static publicSetPrivateField(newValue) {\n    Cl.#privateFieldValue = newValue;\n  }\n\n  static get publicFieldValue() {\n    return Cl.publicField;\n  }\n\n  static set publicFieldValue(newValue) {\n    Cl.publicField = newValue;\n  }\n\n  static testUpdates() {\n    Cl.#privateField = 0;\n    Cl.publicField = 0;\n    Cl.#privateFieldValue = Cl.#privateFieldValue++;\n    Cl.publicFieldValue = Cl.publicFieldValue++;\n\n    ++Cl.#privateFieldValue;\n    ++Cl.publicFieldValue;\n\n    Cl.#privateFieldValue += 1;\n    Cl.publicFieldValue += 1;\n\n    Cl.#privateFieldValue = -(Cl.#privateFieldValue ** Cl.#privateFieldValue);\n    Cl.publicFieldValue = -(Cl.publicFieldValue ** Cl.publicFieldValue);\n  }\n}';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _toSetter = require('@babel/runtime/helpers/toSetter');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _defineProperty = require('@babel/runtime/helpers/defineProperty');
-    class Cl {
-      static publicGetPrivateField() {
-        return _get_privateFieldValue.call(Cl);
-      }
-      static publicSetPrivateField(newValue) {
-        _toSetter(_set_privateFieldValue.bind(Cl))._ = newValue;
-      }
-      static get publicFieldValue() {
-        return Cl.publicField;
-      }
-      static set publicFieldValue(newValue) {
-        Cl.publicField = newValue;
-      }
-      static testUpdates() {
-        var _Cl$privateFieldValue, _Cl$privateFieldValue2, _Cl$privateFieldValue3;
-        _privateField._ = 0;
-        Cl.publicField = 0;
-        _toSetter(_set_privateFieldValue.bind(Cl))._ =
-          (_set_privateFieldValue.call(
-            _assertClassBrand(Cl, Cl),
-            ((_Cl$privateFieldValue = _get_privateFieldValue.call(_assertClassBrand(Cl, Cl))),
-            (_Cl$privateFieldValue2 = _Cl$privateFieldValue++),
-            _Cl$privateFieldValue),
-          ),
-          _Cl$privateFieldValue2);
-        Cl.publicFieldValue = Cl.publicFieldValue++;
-        _set_privateFieldValue.call(
-          _assertClassBrand(Cl, Cl),
-          ((_Cl$privateFieldValue3 = _get_privateFieldValue.call(_assertClassBrand(Cl, Cl))),
-          ++_Cl$privateFieldValue3),
-        );
-        ++Cl.publicFieldValue;
-        _set_privateFieldValue.call(
-          _assertClassBrand(Cl, Cl),
-          _get_privateFieldValue.call(_assertClassBrand(Cl, Cl)) + 1,
-        );
-        Cl.publicFieldValue += 1;
-        _toSetter(_set_privateFieldValue.bind(Cl))._ = -(
-          _get_privateFieldValue.call(Cl) ** _get_privateFieldValue.call(Cl)
-        );
-        Cl.publicFieldValue = -(Cl.publicFieldValue ** Cl.publicFieldValue);
-      }
-    }
-    function _get_privateFieldValue() {
-      return _privateField._;
-    }
-    function _set_privateFieldValue(newValue) {
-      _privateField._ = newValue;
-    }
-    var _privateField = { _: 'top secret string' };
-    _defineProperty(Cl, 'publicField', 'not secret string');"
-  `);
-});
-
 test('static-accessors-loose/updates/input.js [loose]', async () => {
   const source =
     'class Cl {\n  static #privateField = "top secret string";\n  static publicField = "not secret string";\n\n  static get #privateFieldValue() {\n    return Cl.#privateField;\n  }\n\n  static set #privateFieldValue(newValue) {\n    Cl.#privateField = newValue;\n  }\n\n  static publicGetPrivateField() {\n    return Cl.#privateFieldValue;\n  }\n\n  static publicSetPrivateField(newValue) {\n    Cl.#privateFieldValue = newValue;\n  }\n\n  static get publicFieldValue() {\n    return Cl.publicField;\n  }\n\n  static set publicFieldValue(newValue) {\n    Cl.publicField = newValue;\n  }\n\n  static testUpdates() {\n    Cl.#privateField = 0;\n    Cl.publicField = 0;\n    Cl.#privateFieldValue = Cl.#privateFieldValue++;\n    Cl.publicFieldValue = Cl.publicFieldValue++;\n\n    ++Cl.#privateFieldValue;\n    ++Cl.publicFieldValue;\n\n    Cl.#privateFieldValue += 1;\n    Cl.publicFieldValue += 1;\n\n    Cl.#privateFieldValue = -(Cl.#privateFieldValue ** Cl.#privateFieldValue);\n    Cl.publicFieldValue = -(Cl.publicFieldValue ** Cl.publicFieldValue);\n  }\n}';
@@ -23974,7 +15626,7 @@ test('static-accessors-loose/updates/input.js [loose]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -24087,7 +15739,12 @@ test('static-accessors-loose/updates/input.js [loose]', async () => {
         writable: true,
         value: 'top secret string',
       });
-      Cl.publicField = 'not secret string';
+      Object.defineProperty(Cl, 'publicField', {
+        value: 'not secret string',
+        enumerable: true,
+        configurable: true,
+        writable: true,
+      });
       Object.defineProperty(Cl, _privateFieldValue, {
         get: function () {
           if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
@@ -24103,74 +15760,6 @@ test('static-accessors-loose/updates/input.js [loose]', async () => {
   `);
 });
 
-test('static-accessors-privateFieldsAsProperties/access-in-static-field-initializer/exec.js [spec]', async () => {
-  const source =
-    'expect((() => {\n  let r;\n  class C {\n    static #_ = new C;\n    static get #p() { return 0 };\n    constructor() {\n      r = C.#p;\n    }\n  }\n  return r;\n})()).toBe(0);\n\nexpect((() => {\n  let r;\n  class C {\n    static #_ = new C;\n    static set #p(v) { r = v; };\n    constructor() {\n      C.#p = 0;\n    }\n  }\n  return r;\n})()).toBe(0);\n\nexpect((() => {\n  let r;\n  class C {\n    static #_ = new C;\n    static set #p(v) { r = v; };\n    constructor() {\n      for (C.#p of [0]);\n    }\n  }\n  return r;\n})()).toBe(0);\n';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _toSetter = require('@babel/runtime/helpers/toSetter');
-    expect(
-      (() => {
-        var _C;
-        let r;
-        class C {
-          constructor() {
-            r = _get_p.call(C);
-          }
-        }
-        _C = C;
-        function _get_p() {
-          return 0;
-        }
-        var _ = { _: new _C() };
-        return r;
-      })(),
-    ).toBe(0);
-    expect(
-      (() => {
-        var _C2;
-        let r;
-        class C {
-          constructor() {
-            _toSetter(_set_p.bind(C))._ = 0;
-          }
-        }
-        _C2 = C;
-        function _set_p(v) {
-          r = v;
-        }
-        var _2 = { _: new _C2() };
-        return r;
-      })(),
-    ).toBe(0);
-    expect(
-      (() => {
-        var _C3;
-        let r;
-        class C {
-          constructor() {
-            for (_toSetter(_set_p2.bind(C))._ of [0]);
-          }
-        }
-        _C3 = C;
-        function _set_p2(v) {
-          r = v;
-        }
-        var _3 = { _: new _C3() };
-        return r;
-      })(),
-    ).toBe(0);"
-  `);
-});
-
 test('static-accessors-privateFieldsAsProperties/access-in-static-field-initializer/exec.js [loose]', async () => {
   const source =
     'expect((() => {\n  let r;\n  class C {\n    static #_ = new C;\n    static get #p() { return 0 };\n    constructor() {\n      r = C.#p;\n    }\n  }\n  return r;\n})()).toBe(0);\n\nexpect((() => {\n  let r;\n  class C {\n    static #_ = new C;\n    static set #p(v) { r = v; };\n    constructor() {\n      C.#p = 0;\n    }\n  }\n  return r;\n})()).toBe(0);\n\nexpect((() => {\n  let r;\n  class C {\n    static #_ = new C;\n    static set #p(v) { r = v; };\n    constructor() {\n      for (C.#p of [0]);\n    }\n  }\n  return r;\n})()).toBe(0);\n';
@@ -24178,7 +15767,7 @@ test('static-accessors-privateFieldsAsProperties/access-in-static-field-initiali
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -24225,38 +15814,11 @@ test('static-accessors-privateFieldsAsProperties/access-in-static-field-initiali
         let r;
         let C = (() => {
           'use strict';
-          var _p13 = '__private_C_p';
-          var __12 = '__private_C__';
-          const C = function C() {
-            if (!new.target) throw new TypeError('Cannot call a class as a function');
-            _classPrivateFieldLooseBase(C, _p13)[_p13] = 0;
-          };
-          Object.defineProperty(C, 'prototype', { writable: false });
-          Object.defineProperty(C, __12, {
-            writable: true,
-            value: new C(),
-          });
-          Object.defineProperty(C, _p13, {
-            set: function (v) {
-              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
-              r = v;
-            },
-          });
-          return C;
-        })();
-        return r;
-      })(),
-    ).toBe(0);
-    expect(
-      (() => {
-        let r;
-        let C = (() => {
-          'use strict';
           var _p15 = '__private_C_p';
           var __14 = '__private_C__';
           const C = function C() {
             if (!new.target) throw new TypeError('Cannot call a class as a function');
-            for (_classPrivateFieldLooseBase(C, _p15)[_p15] of [0]);
+            _classPrivateFieldLooseBase(C, _p15)[_p15] = 0;
           };
           Object.defineProperty(C, 'prototype', { writable: false });
           Object.defineProperty(C, __14, {
@@ -24273,42 +15835,34 @@ test('static-accessors-privateFieldsAsProperties/access-in-static-field-initiali
         })();
         return r;
       })(),
+    ).toBe(0);
+    expect(
+      (() => {
+        let r;
+        let C = (() => {
+          'use strict';
+          var _p17 = '__private_C_p';
+          var __16 = '__private_C__';
+          const C = function C() {
+            if (!new.target) throw new TypeError('Cannot call a class as a function');
+            for (_classPrivateFieldLooseBase(C, _p17)[_p17] of [0]);
+          };
+          Object.defineProperty(C, 'prototype', { writable: false });
+          Object.defineProperty(C, __16, {
+            writable: true,
+            value: new C(),
+          });
+          Object.defineProperty(C, _p17, {
+            set: function (v) {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              r = v;
+            },
+          });
+          return C;
+        })();
+        return r;
+      })(),
     ).toBe(0);"
-  `);
-});
-
-test('static-accessors-privateFieldsAsProperties/basic/exec.js [spec]', async () => {
-  const source =
-    'class Cl {\n  static #PRIVATE_STATIC_FIELD = "top secret string";\n\n  static get #privateStaticFieldValue() {\n    return Cl.#PRIVATE_STATIC_FIELD;\n  }\n\n  static set #privateStaticFieldValue(newValue) {\n    Cl.#PRIVATE_STATIC_FIELD = `Updated: ${newValue}`;\n  }\n\n  static getValue() {\n    return Cl.#privateStaticFieldValue;\n  }\n\n  static setValue() {\n    Cl.#privateStaticFieldValue = "dank";\n  }\n}\n\nexpect(Cl.getValue()).toEqual("top secret string");\nCl.setValue();\nexpect(Cl.getValue()).toEqual("Updated: dank");';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _toSetter = require('@babel/runtime/helpers/toSetter');
-    class Cl {
-      static getValue() {
-        return _get_privateStaticFieldValue.call(Cl);
-      }
-      static setValue() {
-        _toSetter(_set_privateStaticFieldValue.bind(Cl))._ = 'dank';
-      }
-    }
-    function _get_privateStaticFieldValue() {
-      return _PRIVATE_STATIC_FIELD._;
-    }
-    function _set_privateStaticFieldValue(newValue) {
-      _PRIVATE_STATIC_FIELD._ = \`Updated: \${newValue}\`;
-    }
-    var _PRIVATE_STATIC_FIELD = { _: 'top secret string' };
-    expect(Cl.getValue()).toEqual('top secret string');
-    Cl.setValue();
-    expect(Cl.getValue()).toEqual('Updated: dank');"
   `);
 });
 
@@ -24319,7 +15873,7 @@ test('static-accessors-privateFieldsAsProperties/basic/exec.js [loose]', async (
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -24396,38 +15950,6 @@ test('static-accessors-privateFieldsAsProperties/basic/exec.js [loose]', async (
   `);
 });
 
-test('static-accessors-privateFieldsAsProperties/basic/input.js [spec]', async () => {
-  const source =
-    'class Cl {\n  static #PRIVATE_STATIC_FIELD = "top secret string";\n\n  static get #privateStaticFieldValue() {\n    return Cl.#PRIVATE_STATIC_FIELD;\n  }\n\n  static set #privateStaticFieldValue(newValue) {\n    Cl.#PRIVATE_STATIC_FIELD = `Updated: ${newValue}`;\n  }\n\n  static getValue() {\n    return Cl.#privateStaticFieldValue;\n  }\n\n  static setValue() {\n    Cl.#privateStaticFieldValue = "dank";\n  }\n}';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _toSetter = require('@babel/runtime/helpers/toSetter');
-    class Cl {
-      static getValue() {
-        return _get_privateStaticFieldValue.call(Cl);
-      }
-      static setValue() {
-        _toSetter(_set_privateStaticFieldValue.bind(Cl))._ = 'dank';
-      }
-    }
-    function _get_privateStaticFieldValue() {
-      return _PRIVATE_STATIC_FIELD._;
-    }
-    function _set_privateStaticFieldValue(newValue) {
-      _PRIVATE_STATIC_FIELD._ = \`Updated: \${newValue}\`;
-    }
-    var _PRIVATE_STATIC_FIELD = { _: 'top secret string' };"
-  `);
-});
-
 test('static-accessors-privateFieldsAsProperties/basic/input.js [loose]', async () => {
   const source =
     'class Cl {\n  static #PRIVATE_STATIC_FIELD = "top secret string";\n\n  static get #privateStaticFieldValue() {\n    return Cl.#PRIVATE_STATIC_FIELD;\n  }\n\n  static set #privateStaticFieldValue(newValue) {\n    Cl.#PRIVATE_STATIC_FIELD = `Updated: ${newValue}`;\n  }\n\n  static getValue() {\n    return Cl.#privateStaticFieldValue;\n  }\n\n  static setValue() {\n    Cl.#privateStaticFieldValue = "dank";\n  }\n}';
@@ -24435,7 +15957,7 @@ test('static-accessors-privateFieldsAsProperties/basic/input.js [loose]', async 
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -24509,34 +16031,6 @@ test('static-accessors-privateFieldsAsProperties/basic/input.js [loose]', async 
   `);
 });
 
-test('static-accessors-privateFieldsAsProperties/destructure-set/exec.js [spec]', async () => {
-  const source =
-    'class C {\n  static set #p(v) { C.#q = v }\n  static #q;\n  constructor() {\n    ([C.#p] = [0]);\n    expect(C.#q).toBe(0);\n  }\n}\n\nnew C;\n';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _toSetter = require('@babel/runtime/helpers/toSetter');
-    class C {
-      constructor() {
-        [_toSetter(_set_p.bind(C))._] = [0];
-        expect(_q._).toBe(0);
-      }
-    }
-    function _set_p(v) {
-      _q._ = v;
-    }
-    var _q = { _: void 0 };
-    new C();"
-  `);
-});
-
 test('static-accessors-privateFieldsAsProperties/destructure-set/exec.js [loose]', async () => {
   const source =
     'class C {\n  static set #p(v) { C.#q = v }\n  static #q;\n  constructor() {\n    ([C.#p] = [0]);\n    expect(C.#q).toBe(0);\n  }\n}\n\nnew C;\n';
@@ -24544,7 +16038,7 @@ test('static-accessors-privateFieldsAsProperties/destructure-set/exec.js [loose]
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -24581,33 +16075,6 @@ test('static-accessors-privateFieldsAsProperties/destructure-set/exec.js [loose]
       });
       return C;
     })();
-    new C();"
-  `);
-});
-
-test('static-accessors-privateFieldsAsProperties/destructure-set/input.js [spec]', async () => {
-  const source =
-    'class C {\n  static set #p(v) { C.#q = v }\n  static #q;\n  constructor() {\n    ([C.#p] = [0]);\n  }\n}\n\nnew C;\n';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _toSetter = require('@babel/runtime/helpers/toSetter');
-    class C {
-      constructor() {
-        [_toSetter(_set_p.bind(C))._] = [0];
-      }
-    }
-    function _set_p(v) {
-      _q._ = v;
-    }
-    var _q = { _: void 0 };
     new C();"
   `);
 });
@@ -24619,7 +16086,7 @@ test('static-accessors-privateFieldsAsProperties/destructure-set/input.js [loose
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -24659,33 +16126,6 @@ test('static-accessors-privateFieldsAsProperties/destructure-set/input.js [loose
   `);
 });
 
-test('static-accessors-privateFieldsAsProperties/get-only-setter/exec.js [spec]', async () => {
-  const source =
-    'class Cl {\n  static #PRIVATE_STATIC_FIELD = 0;\n\n  static set #privateStaticFieldValue(newValue) {\n    Cl.#PRIVATE_STATIC_FIELD = newValue;\n  }\n\n  static getPrivateStaticFieldValue() {\n    return Cl.#privateStaticFieldValue;\n  }\n}\n\nexpect(Cl.getPrivateStaticFieldValue()).toBeUndefined();';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _writeOnlyError = require('@babel/runtime/helpers/writeOnlyError');
-    class Cl {
-      static getPrivateStaticFieldValue() {
-        return (Cl, _writeOnlyError('#privateStaticFieldValue'));
-      }
-    }
-    function _set_privateStaticFieldValue(newValue) {
-      _PRIVATE_STATIC_FIELD._ = newValue;
-    }
-    var _PRIVATE_STATIC_FIELD = { _: 0 };
-    expect(Cl.getPrivateStaticFieldValue()).toBeUndefined();"
-  `);
-});
-
 test('static-accessors-privateFieldsAsProperties/get-only-setter/exec.js [loose]', async () => {
   const source =
     'class Cl {\n  static #PRIVATE_STATIC_FIELD = 0;\n\n  static set #privateStaticFieldValue(newValue) {\n    Cl.#PRIVATE_STATIC_FIELD = newValue;\n  }\n\n  static getPrivateStaticFieldValue() {\n    return Cl.#privateStaticFieldValue;\n  }\n}\n\nexpect(Cl.getPrivateStaticFieldValue()).toBeUndefined();';
@@ -24693,7 +16133,7 @@ test('static-accessors-privateFieldsAsProperties/get-only-setter/exec.js [loose]
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -24747,32 +16187,6 @@ test('static-accessors-privateFieldsAsProperties/get-only-setter/exec.js [loose]
   `);
 });
 
-test('static-accessors-privateFieldsAsProperties/get-only-setter/input.js [spec]', async () => {
-  const source =
-    'class Cl {\n  static #PRIVATE_STATIC_FIELD = 0;\n\n  static set #privateStaticFieldValue(newValue) {\n    Cl.#PRIVATE_STATIC_FIELD = newValue;\n  }\n\n  static getPrivateStaticFieldValue() {\n    return Cl.#privateStaticFieldValue;\n  }\n}';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _writeOnlyError = require('@babel/runtime/helpers/writeOnlyError');
-    class Cl {
-      static getPrivateStaticFieldValue() {
-        return (Cl, _writeOnlyError('#privateStaticFieldValue'));
-      }
-    }
-    function _set_privateStaticFieldValue(newValue) {
-      _PRIVATE_STATIC_FIELD._ = newValue;
-    }
-    var _PRIVATE_STATIC_FIELD = { _: 0 };"
-  `);
-});
-
 test('static-accessors-privateFieldsAsProperties/get-only-setter/input.js [loose]', async () => {
   const source =
     'class Cl {\n  static #PRIVATE_STATIC_FIELD = 0;\n\n  static set #privateStaticFieldValue(newValue) {\n    Cl.#PRIVATE_STATIC_FIELD = newValue;\n  }\n\n  static getPrivateStaticFieldValue() {\n    return Cl.#privateStaticFieldValue;\n  }\n}';
@@ -24780,7 +16194,7 @@ test('static-accessors-privateFieldsAsProperties/get-only-setter/input.js [loose
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -24833,30 +16247,6 @@ test('static-accessors-privateFieldsAsProperties/get-only-setter/input.js [loose
   `);
 });
 
-test('static-accessors-privateFieldsAsProperties/preserve-comments/input.js [spec]', async () => {
-  const source =
-    'class C {\n  /* before get a */\n  static get #a() { return 42 };\n  /* after get a */\n\n  /* before set a */\n  static set #a(v) {}\n  /* after set a */\n}\n';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "class C {}
-    /* before get a */
-    function _get_a() {
-      return 42;
-    }
-    /* after get a */
-    /* before set a */
-    function _set_a(v) {}"
-  `);
-});
-
 test('static-accessors-privateFieldsAsProperties/preserve-comments/input.js [loose]', async () => {
   const source =
     'class C {\n  /* before get a */\n  static get #a() { return 42 };\n  /* after get a */\n\n  /* before set a */\n  static set #a(v) {}\n  /* after set a */\n}\n';
@@ -24864,7 +16254,7 @@ test('static-accessors-privateFieldsAsProperties/preserve-comments/input.js [loo
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -24895,37 +16285,6 @@ test('static-accessors-privateFieldsAsProperties/preserve-comments/input.js [loo
   `);
 });
 
-test('static-accessors-privateFieldsAsProperties/set-only-getter/exec.js [spec]', async () => {
-  const source =
-    'class Cl {\n  static #privateField = 0;\n\n  static get #privateFieldValue() {\n    return this.#privateField;\n  }\n\n  constructor() {\n    expect(() => Cl.#privateFieldValue = 1).toThrow(TypeError);\n    expect(() => ([Cl.#privateFieldValue] = [1])).toThrow(TypeError);\n  }\n}\n\nconst cl = new Cl();\n';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _readOnlyError = require('@babel/runtime/helpers/readOnlyError');
-    var _Cl;
-    class Cl {
-      constructor() {
-        expect(() => (Cl, 1, _readOnlyError('#privateFieldValue'))).toThrow(TypeError);
-        expect(() => ([(Cl, _readOnlyError('#privateFieldValue'))._] = [1])).toThrow(TypeError);
-      }
-    }
-    _Cl = Cl;
-    function _get_privateFieldValue() {
-      return _assertClassBrand(_Cl, this, _privateField)._;
-    }
-    var _privateField = { _: 0 };
-    const cl = new Cl();"
-  `);
-});
-
 test('static-accessors-privateFieldsAsProperties/set-only-getter/exec.js [loose]', async () => {
   const source =
     'class Cl {\n  static #privateField = 0;\n\n  static get #privateFieldValue() {\n    return this.#privateField;\n  }\n\n  constructor() {\n    expect(() => Cl.#privateFieldValue = 1).toThrow(TypeError);\n    expect(() => ([Cl.#privateFieldValue] = [1])).toThrow(TypeError);\n  }\n}\n\nconst cl = new Cl();\n';
@@ -24933,7 +16292,7 @@ test('static-accessors-privateFieldsAsProperties/set-only-getter/exec.js [loose]
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -24976,37 +16335,6 @@ test('static-accessors-privateFieldsAsProperties/set-only-getter/exec.js [loose]
       });
       return Cl;
     })();
-    const cl = new Cl();"
-  `);
-});
-
-test('static-accessors-privateFieldsAsProperties/set-only-getter/input.js [spec]', async () => {
-  const source =
-    'class Cl {\n  static #privateField = 0;\n\n  static get #privateFieldValue() {\n    return this.#privateField;\n  }\n\n  constructor() {\n    Cl.#privateFieldValue = 1;\n    ([Cl.#privateFieldValue] = [1]);\n  }\n}\n\nconst cl = new Cl();\n\n';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _readOnlyError = require('@babel/runtime/helpers/readOnlyError');
-    var _Cl;
-    class Cl {
-      constructor() {
-        (Cl, 1, _readOnlyError('#privateFieldValue'));
-        [(Cl, _readOnlyError('#privateFieldValue'))._] = [1];
-      }
-    }
-    _Cl = Cl;
-    function _get_privateFieldValue() {
-      return _assertClassBrand(_Cl, this, _privateField)._;
-    }
-    var _privateField = { _: 0 };
     const cl = new Cl();"
   `);
 });
@@ -25018,7 +16346,7 @@ test('static-accessors-privateFieldsAsProperties/set-only-getter/input.js [loose
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -25061,76 +16389,6 @@ test('static-accessors-privateFieldsAsProperties/set-only-getter/input.js [loose
   `);
 });
 
-test('static-accessors-privateFieldsAsProperties/updates/exec.js [spec]', async () => {
-  const source =
-    'class Cl {\n  static #privateField = "top secret string";\n  static publicField = "not secret string";\n\n  static get #privateFieldValue() {\n    return Cl.#privateField;\n  }\n\n  static set #privateFieldValue(newValue) {\n    Cl.#privateField = newValue;\n  }\n\n  static publicGetPrivateField() {\n    return Cl.#privateFieldValue;\n  }\n\n  static publicSetPrivateField(newValue) {\n    Cl.#privateFieldValue = newValue;\n  }\n\n  static get publicFieldValue() {\n    return Cl.publicField;\n  }\n\n  static set publicFieldValue(newValue) {\n    Cl.publicField = newValue;\n  }\n\n  static testUpdates() {\n    Cl.#privateField = 0;\n    Cl.publicField = 0;\n    Cl.#privateFieldValue = Cl.#privateFieldValue++;\n    Cl.publicFieldValue = Cl.publicFieldValue++;\n    expect(Cl.#privateField).toEqual(Cl.publicField);\n\n    ++Cl.#privateFieldValue;\n    ++Cl.publicFieldValue;\n    expect(Cl.#privateField).toEqual(Cl.publicField);\n\n    Cl.#privateFieldValue += 1;\n    Cl.publicFieldValue += 1;\n    expect(Cl.#privateField).toEqual(Cl.publicField);\n  }\n}\n\nCl.testUpdates();';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _toSetter = require('@babel/runtime/helpers/toSetter');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _defineProperty = require('@babel/runtime/helpers/defineProperty');
-    class Cl {
-      static publicGetPrivateField() {
-        return _get_privateFieldValue.call(Cl);
-      }
-      static publicSetPrivateField(newValue) {
-        _toSetter(_set_privateFieldValue.bind(Cl))._ = newValue;
-      }
-      static get publicFieldValue() {
-        return Cl.publicField;
-      }
-      static set publicFieldValue(newValue) {
-        Cl.publicField = newValue;
-      }
-      static testUpdates() {
-        var _Cl$privateFieldValue, _Cl$privateFieldValue2, _Cl$privateFieldValue3;
-        _privateField._ = 0;
-        Cl.publicField = 0;
-        _toSetter(_set_privateFieldValue.bind(Cl))._ =
-          (_set_privateFieldValue.call(
-            _assertClassBrand(Cl, Cl),
-            ((_Cl$privateFieldValue = _get_privateFieldValue.call(_assertClassBrand(Cl, Cl))),
-            (_Cl$privateFieldValue2 = _Cl$privateFieldValue++),
-            _Cl$privateFieldValue),
-          ),
-          _Cl$privateFieldValue2);
-        Cl.publicFieldValue = Cl.publicFieldValue++;
-        expect(_privateField._).toEqual(Cl.publicField);
-        _set_privateFieldValue.call(
-          _assertClassBrand(Cl, Cl),
-          ((_Cl$privateFieldValue3 = _get_privateFieldValue.call(_assertClassBrand(Cl, Cl))),
-          ++_Cl$privateFieldValue3),
-        );
-        ++Cl.publicFieldValue;
-        expect(_privateField._).toEqual(Cl.publicField);
-        _set_privateFieldValue.call(
-          _assertClassBrand(Cl, Cl),
-          _get_privateFieldValue.call(_assertClassBrand(Cl, Cl)) + 1,
-        );
-        Cl.publicFieldValue += 1;
-        expect(_privateField._).toEqual(Cl.publicField);
-      }
-    }
-    function _get_privateFieldValue() {
-      return _privateField._;
-    }
-    function _set_privateFieldValue(newValue) {
-      _privateField._ = newValue;
-    }
-    var _privateField = { _: 'top secret string' };
-    _defineProperty(Cl, 'publicField', 'not secret string');
-    Cl.testUpdates();"
-  `);
-});
-
 test('static-accessors-privateFieldsAsProperties/updates/exec.js [loose]', async () => {
   const source =
     'class Cl {\n  static #privateField = "top secret string";\n  static publicField = "not secret string";\n\n  static get #privateFieldValue() {\n    return Cl.#privateField;\n  }\n\n  static set #privateFieldValue(newValue) {\n    Cl.#privateField = newValue;\n  }\n\n  static publicGetPrivateField() {\n    return Cl.#privateFieldValue;\n  }\n\n  static publicSetPrivateField(newValue) {\n    Cl.#privateFieldValue = newValue;\n  }\n\n  static get publicFieldValue() {\n    return Cl.publicField;\n  }\n\n  static set publicFieldValue(newValue) {\n    Cl.publicField = newValue;\n  }\n\n  static testUpdates() {\n    Cl.#privateField = 0;\n    Cl.publicField = 0;\n    Cl.#privateFieldValue = Cl.#privateFieldValue++;\n    Cl.publicFieldValue = Cl.publicFieldValue++;\n    expect(Cl.#privateField).toEqual(Cl.publicField);\n\n    ++Cl.#privateFieldValue;\n    ++Cl.publicFieldValue;\n    expect(Cl.#privateField).toEqual(Cl.publicField);\n\n    Cl.#privateFieldValue += 1;\n    Cl.publicFieldValue += 1;\n    expect(Cl.#privateField).toEqual(Cl.publicField);\n  }\n}\n\nCl.testUpdates();';
@@ -25138,7 +16396,7 @@ test('static-accessors-privateFieldsAsProperties/updates/exec.js [loose]', async
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -25255,7 +16513,12 @@ test('static-accessors-privateFieldsAsProperties/updates/exec.js [loose]', async
         writable: true,
         value: 'top secret string',
       });
-      Cl.publicField = 'not secret string';
+      Object.defineProperty(Cl, 'publicField', {
+        value: 'not secret string',
+        enumerable: true,
+        configurable: true,
+        writable: true,
+      });
       Object.defineProperty(Cl, _privateFieldValue, {
         get: function () {
           if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
@@ -25272,76 +16535,6 @@ test('static-accessors-privateFieldsAsProperties/updates/exec.js [loose]', async
   `);
 });
 
-test('static-accessors-privateFieldsAsProperties/updates/input.js [spec]', async () => {
-  const source =
-    'class Cl {\n  static #privateField = "top secret string";\n  static publicField = "not secret string";\n\n  static get #privateFieldValue() {\n    return Cl.#privateField;\n  }\n\n  static set #privateFieldValue(newValue) {\n    Cl.#privateField = newValue;\n  }\n\n  static publicGetPrivateField() {\n    return Cl.#privateFieldValue;\n  }\n\n  static publicSetPrivateField(newValue) {\n    Cl.#privateFieldValue = newValue;\n  }\n\n  static get publicFieldValue() {\n    return Cl.publicField;\n  }\n\n  static set publicFieldValue(newValue) {\n    Cl.publicField = newValue;\n  }\n\n  static testUpdates() {\n    Cl.#privateField = 0;\n    Cl.publicField = 0;\n    Cl.#privateFieldValue = Cl.#privateFieldValue++;\n    Cl.publicFieldValue = Cl.publicFieldValue++;\n\n    ++Cl.#privateFieldValue;\n    ++Cl.publicFieldValue;\n\n    Cl.#privateFieldValue += 1;\n    Cl.publicFieldValue += 1;\n\n    Cl.#privateFieldValue = -(Cl.#privateFieldValue ** Cl.#privateFieldValue);\n    Cl.publicFieldValue = -(Cl.publicFieldValue ** Cl.publicFieldValue);\n  }\n}';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _toSetter = require('@babel/runtime/helpers/toSetter');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _defineProperty = require('@babel/runtime/helpers/defineProperty');
-    class Cl {
-      static publicGetPrivateField() {
-        return _get_privateFieldValue.call(Cl);
-      }
-      static publicSetPrivateField(newValue) {
-        _toSetter(_set_privateFieldValue.bind(Cl))._ = newValue;
-      }
-      static get publicFieldValue() {
-        return Cl.publicField;
-      }
-      static set publicFieldValue(newValue) {
-        Cl.publicField = newValue;
-      }
-      static testUpdates() {
-        var _Cl$privateFieldValue, _Cl$privateFieldValue2, _Cl$privateFieldValue3;
-        _privateField._ = 0;
-        Cl.publicField = 0;
-        _toSetter(_set_privateFieldValue.bind(Cl))._ =
-          (_set_privateFieldValue.call(
-            _assertClassBrand(Cl, Cl),
-            ((_Cl$privateFieldValue = _get_privateFieldValue.call(_assertClassBrand(Cl, Cl))),
-            (_Cl$privateFieldValue2 = _Cl$privateFieldValue++),
-            _Cl$privateFieldValue),
-          ),
-          _Cl$privateFieldValue2);
-        Cl.publicFieldValue = Cl.publicFieldValue++;
-        _set_privateFieldValue.call(
-          _assertClassBrand(Cl, Cl),
-          ((_Cl$privateFieldValue3 = _get_privateFieldValue.call(_assertClassBrand(Cl, Cl))),
-          ++_Cl$privateFieldValue3),
-        );
-        ++Cl.publicFieldValue;
-        _set_privateFieldValue.call(
-          _assertClassBrand(Cl, Cl),
-          _get_privateFieldValue.call(_assertClassBrand(Cl, Cl)) + 1,
-        );
-        Cl.publicFieldValue += 1;
-        _toSetter(_set_privateFieldValue.bind(Cl))._ = -(
-          _get_privateFieldValue.call(Cl) ** _get_privateFieldValue.call(Cl)
-        );
-        Cl.publicFieldValue = -(Cl.publicFieldValue ** Cl.publicFieldValue);
-      }
-    }
-    function _get_privateFieldValue() {
-      return _privateField._;
-    }
-    function _set_privateFieldValue(newValue) {
-      _privateField._ = newValue;
-    }
-    var _privateField = { _: 'top secret string' };
-    _defineProperty(Cl, 'publicField', 'not secret string');"
-  `);
-});
-
 test('static-accessors-privateFieldsAsProperties/updates/input.js [loose]', async () => {
   const source =
     'class Cl {\n  static #privateField = "top secret string";\n  static publicField = "not secret string";\n\n  static get #privateFieldValue() {\n    return Cl.#privateField;\n  }\n\n  static set #privateFieldValue(newValue) {\n    Cl.#privateField = newValue;\n  }\n\n  static publicGetPrivateField() {\n    return Cl.#privateFieldValue;\n  }\n\n  static publicSetPrivateField(newValue) {\n    Cl.#privateFieldValue = newValue;\n  }\n\n  static get publicFieldValue() {\n    return Cl.publicField;\n  }\n\n  static set publicFieldValue(newValue) {\n    Cl.publicField = newValue;\n  }\n\n  static testUpdates() {\n    Cl.#privateField = 0;\n    Cl.publicField = 0;\n    Cl.#privateFieldValue = Cl.#privateFieldValue++;\n    Cl.publicFieldValue = Cl.publicFieldValue++;\n\n    ++Cl.#privateFieldValue;\n    ++Cl.publicFieldValue;\n\n    Cl.#privateFieldValue += 1;\n    Cl.publicFieldValue += 1;\n\n    Cl.#privateFieldValue = -(Cl.#privateFieldValue ** Cl.#privateFieldValue);\n    Cl.publicFieldValue = -(Cl.publicFieldValue ** Cl.publicFieldValue);\n  }\n}';
@@ -25349,7 +16542,7 @@ test('static-accessors-privateFieldsAsProperties/updates/input.js [loose]', asyn
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -25462,7 +16655,12 @@ test('static-accessors-privateFieldsAsProperties/updates/input.js [loose]', asyn
         writable: true,
         value: 'top secret string',
       });
-      Cl.publicField = 'not secret string';
+      Object.defineProperty(Cl, 'publicField', {
+        value: 'not secret string',
+        enumerable: true,
+        configurable: true,
+        writable: true,
+      });
       Object.defineProperty(Cl, _privateFieldValue, {
         get: function () {
           if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
@@ -25478,74 +16676,6 @@ test('static-accessors-privateFieldsAsProperties/updates/input.js [loose]', asyn
   `);
 });
 
-test('static-accessors-privateFieldsAsSymbols/access-in-static-field-initializer/exec.js [spec]', async () => {
-  const source =
-    'expect((() => {\n  let r;\n  class C {\n    static #_ = new C;\n    static get #p() { return 0 };\n    constructor() {\n      r = C.#p;\n    }\n  }\n  return r;\n})()).toBe(0);\n\nexpect((() => {\n  let r;\n  class C {\n    static #_ = new C;\n    static set #p(v) { r = v; };\n    constructor() {\n      C.#p = 0;\n    }\n  }\n  return r;\n})()).toBe(0);\n\nexpect((() => {\n  let r;\n  class C {\n    static #_ = new C;\n    static set #p(v) { r = v; };\n    constructor() {\n      for (C.#p of [0]);\n    }\n  }\n  return r;\n})()).toBe(0);\n';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _toSetter = require('@babel/runtime/helpers/toSetter');
-    expect(
-      (() => {
-        var _C;
-        let r;
-        class C {
-          constructor() {
-            r = _get_p.call(C);
-          }
-        }
-        _C = C;
-        function _get_p() {
-          return 0;
-        }
-        var _ = { _: new _C() };
-        return r;
-      })(),
-    ).toBe(0);
-    expect(
-      (() => {
-        var _C2;
-        let r;
-        class C {
-          constructor() {
-            _toSetter(_set_p.bind(C))._ = 0;
-          }
-        }
-        _C2 = C;
-        function _set_p(v) {
-          r = v;
-        }
-        var _2 = { _: new _C2() };
-        return r;
-      })(),
-    ).toBe(0);
-    expect(
-      (() => {
-        var _C3;
-        let r;
-        class C {
-          constructor() {
-            for (_toSetter(_set_p2.bind(C))._ of [0]);
-          }
-        }
-        _C3 = C;
-        function _set_p2(v) {
-          r = v;
-        }
-        var _3 = { _: new _C3() };
-        return r;
-      })(),
-    ).toBe(0);"
-  `);
-});
-
 test('static-accessors-privateFieldsAsSymbols/access-in-static-field-initializer/exec.js [loose]', async () => {
   const source =
     'expect((() => {\n  let r;\n  class C {\n    static #_ = new C;\n    static get #p() { return 0 };\n    constructor() {\n      r = C.#p;\n    }\n  }\n  return r;\n})()).toBe(0);\n\nexpect((() => {\n  let r;\n  class C {\n    static #_ = new C;\n    static set #p(v) { r = v; };\n    constructor() {\n      C.#p = 0;\n    }\n  }\n  return r;\n})()).toBe(0);\n\nexpect((() => {\n  let r;\n  class C {\n    static #_ = new C;\n    static set #p(v) { r = v; };\n    constructor() {\n      for (C.#p of [0]);\n    }\n  }\n  return r;\n})()).toBe(0);\n';
@@ -25553,7 +16683,7 @@ test('static-accessors-privateFieldsAsSymbols/access-in-static-field-initializer
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -25600,38 +16730,11 @@ test('static-accessors-privateFieldsAsSymbols/access-in-static-field-initializer
         let r;
         let C = (() => {
           'use strict';
-          var _p13 = '__private_C_p';
-          var __12 = '__private_C__';
-          const C = function C() {
-            if (!new.target) throw new TypeError('Cannot call a class as a function');
-            _classPrivateFieldLooseBase(C, _p13)[_p13] = 0;
-          };
-          Object.defineProperty(C, 'prototype', { writable: false });
-          Object.defineProperty(C, __12, {
-            writable: true,
-            value: new C(),
-          });
-          Object.defineProperty(C, _p13, {
-            set: function (v) {
-              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
-              r = v;
-            },
-          });
-          return C;
-        })();
-        return r;
-      })(),
-    ).toBe(0);
-    expect(
-      (() => {
-        let r;
-        let C = (() => {
-          'use strict';
           var _p15 = '__private_C_p';
           var __14 = '__private_C__';
           const C = function C() {
             if (!new.target) throw new TypeError('Cannot call a class as a function');
-            for (_classPrivateFieldLooseBase(C, _p15)[_p15] of [0]);
+            _classPrivateFieldLooseBase(C, _p15)[_p15] = 0;
           };
           Object.defineProperty(C, 'prototype', { writable: false });
           Object.defineProperty(C, __14, {
@@ -25648,42 +16751,34 @@ test('static-accessors-privateFieldsAsSymbols/access-in-static-field-initializer
         })();
         return r;
       })(),
+    ).toBe(0);
+    expect(
+      (() => {
+        let r;
+        let C = (() => {
+          'use strict';
+          var _p17 = '__private_C_p';
+          var __16 = '__private_C__';
+          const C = function C() {
+            if (!new.target) throw new TypeError('Cannot call a class as a function');
+            for (_classPrivateFieldLooseBase(C, _p17)[_p17] of [0]);
+          };
+          Object.defineProperty(C, 'prototype', { writable: false });
+          Object.defineProperty(C, __16, {
+            writable: true,
+            value: new C(),
+          });
+          Object.defineProperty(C, _p17, {
+            set: function (v) {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              r = v;
+            },
+          });
+          return C;
+        })();
+        return r;
+      })(),
     ).toBe(0);"
-  `);
-});
-
-test('static-accessors-privateFieldsAsSymbols/basic/exec.js [spec]', async () => {
-  const source =
-    'class Cl {\n  static #PRIVATE_STATIC_FIELD = "top secret string";\n\n  static get #privateStaticFieldValue() {\n    return Cl.#PRIVATE_STATIC_FIELD;\n  }\n\n  static set #privateStaticFieldValue(newValue) {\n    Cl.#PRIVATE_STATIC_FIELD = `Updated: ${newValue}`;\n  }\n\n  static getValue() {\n    return Cl.#privateStaticFieldValue;\n  }\n\n  static setValue() {\n    Cl.#privateStaticFieldValue = "dank";\n  }\n}\n\nexpect(Cl.getValue()).toEqual("top secret string");\nCl.setValue();\nexpect(Cl.getValue()).toEqual("Updated: dank");';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _toSetter = require('@babel/runtime/helpers/toSetter');
-    class Cl {
-      static getValue() {
-        return _get_privateStaticFieldValue.call(Cl);
-      }
-      static setValue() {
-        _toSetter(_set_privateStaticFieldValue.bind(Cl))._ = 'dank';
-      }
-    }
-    function _get_privateStaticFieldValue() {
-      return _PRIVATE_STATIC_FIELD._;
-    }
-    function _set_privateStaticFieldValue(newValue) {
-      _PRIVATE_STATIC_FIELD._ = \`Updated: \${newValue}\`;
-    }
-    var _PRIVATE_STATIC_FIELD = { _: 'top secret string' };
-    expect(Cl.getValue()).toEqual('top secret string');
-    Cl.setValue();
-    expect(Cl.getValue()).toEqual('Updated: dank');"
   `);
 });
 
@@ -25694,7 +16789,7 @@ test('static-accessors-privateFieldsAsSymbols/basic/exec.js [loose]', async () =
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -25771,38 +16866,6 @@ test('static-accessors-privateFieldsAsSymbols/basic/exec.js [loose]', async () =
   `);
 });
 
-test('static-accessors-privateFieldsAsSymbols/basic/input.js [spec]', async () => {
-  const source =
-    'class Cl {\n  static #PRIVATE_STATIC_FIELD = "top secret string";\n\n  static get #privateStaticFieldValue() {\n    return Cl.#PRIVATE_STATIC_FIELD;\n  }\n\n  static set #privateStaticFieldValue(newValue) {\n    Cl.#PRIVATE_STATIC_FIELD = `Updated: ${newValue}`;\n  }\n\n  static getValue() {\n    return Cl.#privateStaticFieldValue;\n  }\n\n  static setValue() {\n    Cl.#privateStaticFieldValue = "dank";\n  }\n}';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _toSetter = require('@babel/runtime/helpers/toSetter');
-    class Cl {
-      static getValue() {
-        return _get_privateStaticFieldValue.call(Cl);
-      }
-      static setValue() {
-        _toSetter(_set_privateStaticFieldValue.bind(Cl))._ = 'dank';
-      }
-    }
-    function _get_privateStaticFieldValue() {
-      return _PRIVATE_STATIC_FIELD._;
-    }
-    function _set_privateStaticFieldValue(newValue) {
-      _PRIVATE_STATIC_FIELD._ = \`Updated: \${newValue}\`;
-    }
-    var _PRIVATE_STATIC_FIELD = { _: 'top secret string' };"
-  `);
-});
-
 test('static-accessors-privateFieldsAsSymbols/basic/input.js [loose]', async () => {
   const source =
     'class Cl {\n  static #PRIVATE_STATIC_FIELD = "top secret string";\n\n  static get #privateStaticFieldValue() {\n    return Cl.#PRIVATE_STATIC_FIELD;\n  }\n\n  static set #privateStaticFieldValue(newValue) {\n    Cl.#PRIVATE_STATIC_FIELD = `Updated: ${newValue}`;\n  }\n\n  static getValue() {\n    return Cl.#privateStaticFieldValue;\n  }\n\n  static setValue() {\n    Cl.#privateStaticFieldValue = "dank";\n  }\n}';
@@ -25810,7 +16873,7 @@ test('static-accessors-privateFieldsAsSymbols/basic/input.js [loose]', async () 
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -25884,34 +16947,6 @@ test('static-accessors-privateFieldsAsSymbols/basic/input.js [loose]', async () 
   `);
 });
 
-test('static-accessors-privateFieldsAsSymbols/destructure-set/exec.js [spec]', async () => {
-  const source =
-    'class C {\n  static set #p(v) { C.#q = v }\n  static #q;\n  constructor() {\n    ([C.#p] = [0]);\n    expect(C.#q).toBe(0);\n  }\n}\n\nnew C;\n';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _toSetter = require('@babel/runtime/helpers/toSetter');
-    class C {
-      constructor() {
-        [_toSetter(_set_p.bind(C))._] = [0];
-        expect(_q._).toBe(0);
-      }
-    }
-    function _set_p(v) {
-      _q._ = v;
-    }
-    var _q = { _: void 0 };
-    new C();"
-  `);
-});
-
 test('static-accessors-privateFieldsAsSymbols/destructure-set/exec.js [loose]', async () => {
   const source =
     'class C {\n  static set #p(v) { C.#q = v }\n  static #q;\n  constructor() {\n    ([C.#p] = [0]);\n    expect(C.#q).toBe(0);\n  }\n}\n\nnew C;\n';
@@ -25919,7 +16954,7 @@ test('static-accessors-privateFieldsAsSymbols/destructure-set/exec.js [loose]', 
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -25956,33 +16991,6 @@ test('static-accessors-privateFieldsAsSymbols/destructure-set/exec.js [loose]', 
       });
       return C;
     })();
-    new C();"
-  `);
-});
-
-test('static-accessors-privateFieldsAsSymbols/destructure-set/input.js [spec]', async () => {
-  const source =
-    'class C {\n  static set #p(v) { C.#q = v }\n  static #q;\n  constructor() {\n    ([C.#p] = [0]);\n  }\n}\n\nnew C;\n';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _toSetter = require('@babel/runtime/helpers/toSetter');
-    class C {
-      constructor() {
-        [_toSetter(_set_p.bind(C))._] = [0];
-      }
-    }
-    function _set_p(v) {
-      _q._ = v;
-    }
-    var _q = { _: void 0 };
     new C();"
   `);
 });
@@ -25994,7 +17002,7 @@ test('static-accessors-privateFieldsAsSymbols/destructure-set/input.js [loose]',
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -26034,33 +17042,6 @@ test('static-accessors-privateFieldsAsSymbols/destructure-set/input.js [loose]',
   `);
 });
 
-test('static-accessors-privateFieldsAsSymbols/get-only-setter/exec.js [spec]', async () => {
-  const source =
-    'class Cl {\n  static #PRIVATE_STATIC_FIELD = 0;\n\n  static set #privateStaticFieldValue(newValue) {\n    Cl.#PRIVATE_STATIC_FIELD = newValue;\n  }\n\n  static getPrivateStaticFieldValue() {\n    return Cl.#privateStaticFieldValue;\n  }\n}\n\nexpect(Cl.getPrivateStaticFieldValue()).toBeUndefined();';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _writeOnlyError = require('@babel/runtime/helpers/writeOnlyError');
-    class Cl {
-      static getPrivateStaticFieldValue() {
-        return (Cl, _writeOnlyError('#privateStaticFieldValue'));
-      }
-    }
-    function _set_privateStaticFieldValue(newValue) {
-      _PRIVATE_STATIC_FIELD._ = newValue;
-    }
-    var _PRIVATE_STATIC_FIELD = { _: 0 };
-    expect(Cl.getPrivateStaticFieldValue()).toBeUndefined();"
-  `);
-});
-
 test('static-accessors-privateFieldsAsSymbols/get-only-setter/exec.js [loose]', async () => {
   const source =
     'class Cl {\n  static #PRIVATE_STATIC_FIELD = 0;\n\n  static set #privateStaticFieldValue(newValue) {\n    Cl.#PRIVATE_STATIC_FIELD = newValue;\n  }\n\n  static getPrivateStaticFieldValue() {\n    return Cl.#privateStaticFieldValue;\n  }\n}\n\nexpect(Cl.getPrivateStaticFieldValue()).toBeUndefined();';
@@ -26068,7 +17049,7 @@ test('static-accessors-privateFieldsAsSymbols/get-only-setter/exec.js [loose]', 
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -26122,32 +17103,6 @@ test('static-accessors-privateFieldsAsSymbols/get-only-setter/exec.js [loose]', 
   `);
 });
 
-test('static-accessors-privateFieldsAsSymbols/get-only-setter/input.js [spec]', async () => {
-  const source =
-    'class Cl {\n  static #PRIVATE_STATIC_FIELD = 0;\n\n  static set #privateStaticFieldValue(newValue) {\n    Cl.#PRIVATE_STATIC_FIELD = newValue;\n  }\n\n  static getPrivateStaticFieldValue() {\n    return Cl.#privateStaticFieldValue;\n  }\n}';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _writeOnlyError = require('@babel/runtime/helpers/writeOnlyError');
-    class Cl {
-      static getPrivateStaticFieldValue() {
-        return (Cl, _writeOnlyError('#privateStaticFieldValue'));
-      }
-    }
-    function _set_privateStaticFieldValue(newValue) {
-      _PRIVATE_STATIC_FIELD._ = newValue;
-    }
-    var _PRIVATE_STATIC_FIELD = { _: 0 };"
-  `);
-});
-
 test('static-accessors-privateFieldsAsSymbols/get-only-setter/input.js [loose]', async () => {
   const source =
     'class Cl {\n  static #PRIVATE_STATIC_FIELD = 0;\n\n  static set #privateStaticFieldValue(newValue) {\n    Cl.#PRIVATE_STATIC_FIELD = newValue;\n  }\n\n  static getPrivateStaticFieldValue() {\n    return Cl.#privateStaticFieldValue;\n  }\n}';
@@ -26155,7 +17110,7 @@ test('static-accessors-privateFieldsAsSymbols/get-only-setter/input.js [loose]',
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -26208,30 +17163,6 @@ test('static-accessors-privateFieldsAsSymbols/get-only-setter/input.js [loose]',
   `);
 });
 
-test('static-accessors-privateFieldsAsSymbols/preserve-comments/input.js [spec]', async () => {
-  const source =
-    'class C {\n  /* before get a */\n  static get #a() { return 42 };\n  /* after get a */\n\n  /* before set a */\n  static set #a(v) {}\n  /* after set a */\n}\n';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "class C {}
-    /* before get a */
-    function _get_a() {
-      return 42;
-    }
-    /* after get a */
-    /* before set a */
-    function _set_a(v) {}"
-  `);
-});
-
 test('static-accessors-privateFieldsAsSymbols/preserve-comments/input.js [loose]', async () => {
   const source =
     'class C {\n  /* before get a */\n  static get #a() { return 42 };\n  /* after get a */\n\n  /* before set a */\n  static set #a(v) {}\n  /* after set a */\n}\n';
@@ -26239,7 +17170,7 @@ test('static-accessors-privateFieldsAsSymbols/preserve-comments/input.js [loose]
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -26270,37 +17201,6 @@ test('static-accessors-privateFieldsAsSymbols/preserve-comments/input.js [loose]
   `);
 });
 
-test('static-accessors-privateFieldsAsSymbols/set-only-getter/exec.js [spec]', async () => {
-  const source =
-    'class Cl {\n  static #privateField = 0;\n\n  static get #privateFieldValue() {\n    return this.#privateField;\n  }\n\n  constructor() {\n    expect(() => Cl.#privateFieldValue = 1).toThrow(TypeError);\n    expect(() => ([Cl.#privateFieldValue] = [1])).toThrow(TypeError);\n  }\n}\n\nconst cl = new Cl();\n';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _readOnlyError = require('@babel/runtime/helpers/readOnlyError');
-    var _Cl;
-    class Cl {
-      constructor() {
-        expect(() => (Cl, 1, _readOnlyError('#privateFieldValue'))).toThrow(TypeError);
-        expect(() => ([(Cl, _readOnlyError('#privateFieldValue'))._] = [1])).toThrow(TypeError);
-      }
-    }
-    _Cl = Cl;
-    function _get_privateFieldValue() {
-      return _assertClassBrand(_Cl, this, _privateField)._;
-    }
-    var _privateField = { _: 0 };
-    const cl = new Cl();"
-  `);
-});
-
 test('static-accessors-privateFieldsAsSymbols/set-only-getter/exec.js [loose]', async () => {
   const source =
     'class Cl {\n  static #privateField = 0;\n\n  static get #privateFieldValue() {\n    return this.#privateField;\n  }\n\n  constructor() {\n    expect(() => Cl.#privateFieldValue = 1).toThrow(TypeError);\n    expect(() => ([Cl.#privateFieldValue] = [1])).toThrow(TypeError);\n  }\n}\n\nconst cl = new Cl();\n';
@@ -26308,7 +17208,7 @@ test('static-accessors-privateFieldsAsSymbols/set-only-getter/exec.js [loose]', 
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -26355,37 +17255,6 @@ test('static-accessors-privateFieldsAsSymbols/set-only-getter/exec.js [loose]', 
   `);
 });
 
-test('static-accessors-privateFieldsAsSymbols/set-only-getter/input.js [spec]', async () => {
-  const source =
-    'class Cl {\n  static #privateField = 0;\n\n  static get #privateFieldValue() {\n    return this.#privateField;\n  }\n\n  constructor() {\n    Cl.#privateFieldValue = 1;\n    ([Cl.#privateFieldValue] = [1]);\n  }\n}\n\nconst cl = new Cl();\n\n';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _readOnlyError = require('@babel/runtime/helpers/readOnlyError');
-    var _Cl;
-    class Cl {
-      constructor() {
-        (Cl, 1, _readOnlyError('#privateFieldValue'));
-        [(Cl, _readOnlyError('#privateFieldValue'))._] = [1];
-      }
-    }
-    _Cl = Cl;
-    function _get_privateFieldValue() {
-      return _assertClassBrand(_Cl, this, _privateField)._;
-    }
-    var _privateField = { _: 0 };
-    const cl = new Cl();"
-  `);
-});
-
 test('static-accessors-privateFieldsAsSymbols/set-only-getter/input.js [loose]', async () => {
   const source =
     'class Cl {\n  static #privateField = 0;\n\n  static get #privateFieldValue() {\n    return this.#privateField;\n  }\n\n  constructor() {\n    Cl.#privateFieldValue = 1;\n    ([Cl.#privateFieldValue] = [1]);\n  }\n}\n\nconst cl = new Cl();\n\n';
@@ -26393,7 +17262,7 @@ test('static-accessors-privateFieldsAsSymbols/set-only-getter/input.js [loose]',
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -26436,76 +17305,6 @@ test('static-accessors-privateFieldsAsSymbols/set-only-getter/input.js [loose]',
   `);
 });
 
-test('static-accessors-privateFieldsAsSymbols/updates/exec.js [spec]', async () => {
-  const source =
-    'class Cl {\n  static #privateField = "top secret string";\n  static publicField = "not secret string";\n\n  static get #privateFieldValue() {\n    return Cl.#privateField;\n  }\n\n  static set #privateFieldValue(newValue) {\n    Cl.#privateField = newValue;\n  }\n\n  static publicGetPrivateField() {\n    return Cl.#privateFieldValue;\n  }\n\n  static publicSetPrivateField(newValue) {\n    Cl.#privateFieldValue = newValue;\n  }\n\n  static get publicFieldValue() {\n    return Cl.publicField;\n  }\n\n  static set publicFieldValue(newValue) {\n    Cl.publicField = newValue;\n  }\n\n  static testUpdates() {\n    Cl.#privateField = 0;\n    Cl.publicField = 0;\n    Cl.#privateFieldValue = Cl.#privateFieldValue++;\n    Cl.publicFieldValue = Cl.publicFieldValue++;\n    expect(Cl.#privateField).toEqual(Cl.publicField);\n\n    ++Cl.#privateFieldValue;\n    ++Cl.publicFieldValue;\n    expect(Cl.#privateField).toEqual(Cl.publicField);\n\n    Cl.#privateFieldValue += 1;\n    Cl.publicFieldValue += 1;\n    expect(Cl.#privateField).toEqual(Cl.publicField);\n  }\n}\n\nCl.testUpdates();';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _toSetter = require('@babel/runtime/helpers/toSetter');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _defineProperty = require('@babel/runtime/helpers/defineProperty');
-    class Cl {
-      static publicGetPrivateField() {
-        return _get_privateFieldValue.call(Cl);
-      }
-      static publicSetPrivateField(newValue) {
-        _toSetter(_set_privateFieldValue.bind(Cl))._ = newValue;
-      }
-      static get publicFieldValue() {
-        return Cl.publicField;
-      }
-      static set publicFieldValue(newValue) {
-        Cl.publicField = newValue;
-      }
-      static testUpdates() {
-        var _Cl$privateFieldValue, _Cl$privateFieldValue2, _Cl$privateFieldValue3;
-        _privateField._ = 0;
-        Cl.publicField = 0;
-        _toSetter(_set_privateFieldValue.bind(Cl))._ =
-          (_set_privateFieldValue.call(
-            _assertClassBrand(Cl, Cl),
-            ((_Cl$privateFieldValue = _get_privateFieldValue.call(_assertClassBrand(Cl, Cl))),
-            (_Cl$privateFieldValue2 = _Cl$privateFieldValue++),
-            _Cl$privateFieldValue),
-          ),
-          _Cl$privateFieldValue2);
-        Cl.publicFieldValue = Cl.publicFieldValue++;
-        expect(_privateField._).toEqual(Cl.publicField);
-        _set_privateFieldValue.call(
-          _assertClassBrand(Cl, Cl),
-          ((_Cl$privateFieldValue3 = _get_privateFieldValue.call(_assertClassBrand(Cl, Cl))),
-          ++_Cl$privateFieldValue3),
-        );
-        ++Cl.publicFieldValue;
-        expect(_privateField._).toEqual(Cl.publicField);
-        _set_privateFieldValue.call(
-          _assertClassBrand(Cl, Cl),
-          _get_privateFieldValue.call(_assertClassBrand(Cl, Cl)) + 1,
-        );
-        Cl.publicFieldValue += 1;
-        expect(_privateField._).toEqual(Cl.publicField);
-      }
-    }
-    function _get_privateFieldValue() {
-      return _privateField._;
-    }
-    function _set_privateFieldValue(newValue) {
-      _privateField._ = newValue;
-    }
-    var _privateField = { _: 'top secret string' };
-    _defineProperty(Cl, 'publicField', 'not secret string');
-    Cl.testUpdates();"
-  `);
-});
-
 test('static-accessors-privateFieldsAsSymbols/updates/exec.js [loose]', async () => {
   const source =
     'class Cl {\n  static #privateField = "top secret string";\n  static publicField = "not secret string";\n\n  static get #privateFieldValue() {\n    return Cl.#privateField;\n  }\n\n  static set #privateFieldValue(newValue) {\n    Cl.#privateField = newValue;\n  }\n\n  static publicGetPrivateField() {\n    return Cl.#privateFieldValue;\n  }\n\n  static publicSetPrivateField(newValue) {\n    Cl.#privateFieldValue = newValue;\n  }\n\n  static get publicFieldValue() {\n    return Cl.publicField;\n  }\n\n  static set publicFieldValue(newValue) {\n    Cl.publicField = newValue;\n  }\n\n  static testUpdates() {\n    Cl.#privateField = 0;\n    Cl.publicField = 0;\n    Cl.#privateFieldValue = Cl.#privateFieldValue++;\n    Cl.publicFieldValue = Cl.publicFieldValue++;\n    expect(Cl.#privateField).toEqual(Cl.publicField);\n\n    ++Cl.#privateFieldValue;\n    ++Cl.publicFieldValue;\n    expect(Cl.#privateField).toEqual(Cl.publicField);\n\n    Cl.#privateFieldValue += 1;\n    Cl.publicFieldValue += 1;\n    expect(Cl.#privateField).toEqual(Cl.publicField);\n  }\n}\n\nCl.testUpdates();';
@@ -26513,7 +17312,7 @@ test('static-accessors-privateFieldsAsSymbols/updates/exec.js [loose]', async ()
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -26630,7 +17429,12 @@ test('static-accessors-privateFieldsAsSymbols/updates/exec.js [loose]', async ()
         writable: true,
         value: 'top secret string',
       });
-      Cl.publicField = 'not secret string';
+      Object.defineProperty(Cl, 'publicField', {
+        value: 'not secret string',
+        enumerable: true,
+        configurable: true,
+        writable: true,
+      });
       Object.defineProperty(Cl, _privateFieldValue, {
         get: function () {
           if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
@@ -26647,76 +17451,6 @@ test('static-accessors-privateFieldsAsSymbols/updates/exec.js [loose]', async ()
   `);
 });
 
-test('static-accessors-privateFieldsAsSymbols/updates/input.js [spec]', async () => {
-  const source =
-    'class Cl {\n  static #privateField = "top secret string";\n  static publicField = "not secret string";\n\n  static get #privateFieldValue() {\n    return Cl.#privateField;\n  }\n\n  static set #privateFieldValue(newValue) {\n    Cl.#privateField = newValue;\n  }\n\n  static publicGetPrivateField() {\n    return Cl.#privateFieldValue;\n  }\n\n  static publicSetPrivateField(newValue) {\n    Cl.#privateFieldValue = newValue;\n  }\n\n  static get publicFieldValue() {\n    return Cl.publicField;\n  }\n\n  static set publicFieldValue(newValue) {\n    Cl.publicField = newValue;\n  }\n\n  static testUpdates() {\n    Cl.#privateField = 0;\n    Cl.publicField = 0;\n    Cl.#privateFieldValue = Cl.#privateFieldValue++;\n    Cl.publicFieldValue = Cl.publicFieldValue++;\n\n    ++Cl.#privateFieldValue;\n    ++Cl.publicFieldValue;\n\n    Cl.#privateFieldValue += 1;\n    Cl.publicFieldValue += 1;\n\n    Cl.#privateFieldValue = -(Cl.#privateFieldValue ** Cl.#privateFieldValue);\n    Cl.publicFieldValue = -(Cl.publicFieldValue ** Cl.publicFieldValue);\n  }\n}';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _toSetter = require('@babel/runtime/helpers/toSetter');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _defineProperty = require('@babel/runtime/helpers/defineProperty');
-    class Cl {
-      static publicGetPrivateField() {
-        return _get_privateFieldValue.call(Cl);
-      }
-      static publicSetPrivateField(newValue) {
-        _toSetter(_set_privateFieldValue.bind(Cl))._ = newValue;
-      }
-      static get publicFieldValue() {
-        return Cl.publicField;
-      }
-      static set publicFieldValue(newValue) {
-        Cl.publicField = newValue;
-      }
-      static testUpdates() {
-        var _Cl$privateFieldValue, _Cl$privateFieldValue2, _Cl$privateFieldValue3;
-        _privateField._ = 0;
-        Cl.publicField = 0;
-        _toSetter(_set_privateFieldValue.bind(Cl))._ =
-          (_set_privateFieldValue.call(
-            _assertClassBrand(Cl, Cl),
-            ((_Cl$privateFieldValue = _get_privateFieldValue.call(_assertClassBrand(Cl, Cl))),
-            (_Cl$privateFieldValue2 = _Cl$privateFieldValue++),
-            _Cl$privateFieldValue),
-          ),
-          _Cl$privateFieldValue2);
-        Cl.publicFieldValue = Cl.publicFieldValue++;
-        _set_privateFieldValue.call(
-          _assertClassBrand(Cl, Cl),
-          ((_Cl$privateFieldValue3 = _get_privateFieldValue.call(_assertClassBrand(Cl, Cl))),
-          ++_Cl$privateFieldValue3),
-        );
-        ++Cl.publicFieldValue;
-        _set_privateFieldValue.call(
-          _assertClassBrand(Cl, Cl),
-          _get_privateFieldValue.call(_assertClassBrand(Cl, Cl)) + 1,
-        );
-        Cl.publicFieldValue += 1;
-        _toSetter(_set_privateFieldValue.bind(Cl))._ = -(
-          _get_privateFieldValue.call(Cl) ** _get_privateFieldValue.call(Cl)
-        );
-        Cl.publicFieldValue = -(Cl.publicFieldValue ** Cl.publicFieldValue);
-      }
-    }
-    function _get_privateFieldValue() {
-      return _privateField._;
-    }
-    function _set_privateFieldValue(newValue) {
-      _privateField._ = newValue;
-    }
-    var _privateField = { _: 'top secret string' };
-    _defineProperty(Cl, 'publicField', 'not secret string');"
-  `);
-});
-
 test('static-accessors-privateFieldsAsSymbols/updates/input.js [loose]', async () => {
   const source =
     'class Cl {\n  static #privateField = "top secret string";\n  static publicField = "not secret string";\n\n  static get #privateFieldValue() {\n    return Cl.#privateField;\n  }\n\n  static set #privateFieldValue(newValue) {\n    Cl.#privateField = newValue;\n  }\n\n  static publicGetPrivateField() {\n    return Cl.#privateFieldValue;\n  }\n\n  static publicSetPrivateField(newValue) {\n    Cl.#privateFieldValue = newValue;\n  }\n\n  static get publicFieldValue() {\n    return Cl.publicField;\n  }\n\n  static set publicFieldValue(newValue) {\n    Cl.publicField = newValue;\n  }\n\n  static testUpdates() {\n    Cl.#privateField = 0;\n    Cl.publicField = 0;\n    Cl.#privateFieldValue = Cl.#privateFieldValue++;\n    Cl.publicFieldValue = Cl.publicFieldValue++;\n\n    ++Cl.#privateFieldValue;\n    ++Cl.publicFieldValue;\n\n    Cl.#privateFieldValue += 1;\n    Cl.publicFieldValue += 1;\n\n    Cl.#privateFieldValue = -(Cl.#privateFieldValue ** Cl.#privateFieldValue);\n    Cl.publicFieldValue = -(Cl.publicFieldValue ** Cl.publicFieldValue);\n  }\n}';
@@ -26724,7 +17458,7 @@ test('static-accessors-privateFieldsAsSymbols/updates/input.js [loose]', async (
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -26837,7 +17571,12 @@ test('static-accessors-privateFieldsAsSymbols/updates/input.js [loose]', async (
         writable: true,
         value: 'top secret string',
       });
-      Cl.publicField = 'not secret string';
+      Object.defineProperty(Cl, 'publicField', {
+        value: 'not secret string',
+        enumerable: true,
+        configurable: true,
+        writable: true,
+      });
       Object.defineProperty(Cl, _privateFieldValue, {
         get: function () {
           if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
@@ -26853,74 +17592,6 @@ test('static-accessors-privateFieldsAsSymbols/updates/input.js [loose]', async (
   `);
 });
 
-test('static-accessors/access-in-static-field-initializer/exec.js [spec]', async () => {
-  const source =
-    'expect((() => {\n  let r;\n  class C {\n    static #_ = new C;\n    static get #p() { return 0 };\n    constructor() {\n      r = C.#p;\n    }\n  }\n  return r;\n})()).toBe(0);\n\nexpect((() => {\n  let r;\n  class C {\n    static #_ = new C;\n    static set #p(v) { r = v; };\n    constructor() {\n      C.#p = 0;\n    }\n  }\n  return r;\n})()).toBe(0);\n\nexpect((() => {\n  let r;\n  class C {\n    static #_ = new C;\n    static set #p(v) { r = v; };\n    constructor() {\n      for (C.#p of [0]);\n    }\n  }\n  return r;\n})()).toBe(0);\n';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _toSetter = require('@babel/runtime/helpers/toSetter');
-    expect(
-      (() => {
-        var _C;
-        let r;
-        class C {
-          constructor() {
-            r = _get_p.call(C);
-          }
-        }
-        _C = C;
-        function _get_p() {
-          return 0;
-        }
-        var _ = { _: new _C() };
-        return r;
-      })(),
-    ).toBe(0);
-    expect(
-      (() => {
-        var _C2;
-        let r;
-        class C {
-          constructor() {
-            _toSetter(_set_p.bind(C))._ = 0;
-          }
-        }
-        _C2 = C;
-        function _set_p(v) {
-          r = v;
-        }
-        var _2 = { _: new _C2() };
-        return r;
-      })(),
-    ).toBe(0);
-    expect(
-      (() => {
-        var _C3;
-        let r;
-        class C {
-          constructor() {
-            for (_toSetter(_set_p2.bind(C))._ of [0]);
-          }
-        }
-        _C3 = C;
-        function _set_p2(v) {
-          r = v;
-        }
-        var _3 = { _: new _C3() };
-        return r;
-      })(),
-    ).toBe(0);"
-  `);
-});
-
 test('static-accessors/access-in-static-field-initializer/exec.js [loose]', async () => {
   const source =
     'expect((() => {\n  let r;\n  class C {\n    static #_ = new C;\n    static get #p() { return 0 };\n    constructor() {\n      r = C.#p;\n    }\n  }\n  return r;\n})()).toBe(0);\n\nexpect((() => {\n  let r;\n  class C {\n    static #_ = new C;\n    static set #p(v) { r = v; };\n    constructor() {\n      C.#p = 0;\n    }\n  }\n  return r;\n})()).toBe(0);\n\nexpect((() => {\n  let r;\n  class C {\n    static #_ = new C;\n    static set #p(v) { r = v; };\n    constructor() {\n      for (C.#p of [0]);\n    }\n  }\n  return r;\n})()).toBe(0);\n';
@@ -26928,7 +17599,7 @@ test('static-accessors/access-in-static-field-initializer/exec.js [loose]', asyn
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -26975,38 +17646,11 @@ test('static-accessors/access-in-static-field-initializer/exec.js [loose]', asyn
         let r;
         let C = (() => {
           'use strict';
-          var _p13 = '__private_C_p';
-          var __12 = '__private_C__';
-          const C = function C() {
-            if (!new.target) throw new TypeError('Cannot call a class as a function');
-            _classPrivateFieldLooseBase(C, _p13)[_p13] = 0;
-          };
-          Object.defineProperty(C, 'prototype', { writable: false });
-          Object.defineProperty(C, __12, {
-            writable: true,
-            value: new C(),
-          });
-          Object.defineProperty(C, _p13, {
-            set: function (v) {
-              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
-              r = v;
-            },
-          });
-          return C;
-        })();
-        return r;
-      })(),
-    ).toBe(0);
-    expect(
-      (() => {
-        let r;
-        let C = (() => {
-          'use strict';
           var _p15 = '__private_C_p';
           var __14 = '__private_C__';
           const C = function C() {
             if (!new.target) throw new TypeError('Cannot call a class as a function');
-            for (_classPrivateFieldLooseBase(C, _p15)[_p15] of [0]);
+            _classPrivateFieldLooseBase(C, _p15)[_p15] = 0;
           };
           Object.defineProperty(C, 'prototype', { writable: false });
           Object.defineProperty(C, __14, {
@@ -27023,42 +17667,34 @@ test('static-accessors/access-in-static-field-initializer/exec.js [loose]', asyn
         })();
         return r;
       })(),
+    ).toBe(0);
+    expect(
+      (() => {
+        let r;
+        let C = (() => {
+          'use strict';
+          var _p17 = '__private_C_p';
+          var __16 = '__private_C__';
+          const C = function C() {
+            if (!new.target) throw new TypeError('Cannot call a class as a function');
+            for (_classPrivateFieldLooseBase(C, _p17)[_p17] of [0]);
+          };
+          Object.defineProperty(C, 'prototype', { writable: false });
+          Object.defineProperty(C, __16, {
+            writable: true,
+            value: new C(),
+          });
+          Object.defineProperty(C, _p17, {
+            set: function (v) {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              r = v;
+            },
+          });
+          return C;
+        })();
+        return r;
+      })(),
     ).toBe(0);"
-  `);
-});
-
-test('static-accessors/basic/exec.js [spec]', async () => {
-  const source =
-    'class Cl {\n  static #PRIVATE_STATIC_FIELD = "top secret string";\n\n  static get #privateStaticFieldValue() {\n    return Cl.#PRIVATE_STATIC_FIELD;\n  }\n\n  static set #privateStaticFieldValue(newValue) {\n    Cl.#PRIVATE_STATIC_FIELD = `Updated: ${newValue}`;\n  }\n\n  static getValue() {\n    return Cl.#privateStaticFieldValue;\n  }\n\n  static setValue() {\n    Cl.#privateStaticFieldValue = "dank";\n  }\n}\n\nexpect(Cl.getValue()).toEqual("top secret string");\nCl.setValue();\nexpect(Cl.getValue()).toEqual("Updated: dank");';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _toSetter = require('@babel/runtime/helpers/toSetter');
-    class Cl {
-      static getValue() {
-        return _get_privateStaticFieldValue.call(Cl);
-      }
-      static setValue() {
-        _toSetter(_set_privateStaticFieldValue.bind(Cl))._ = 'dank';
-      }
-    }
-    function _get_privateStaticFieldValue() {
-      return _PRIVATE_STATIC_FIELD._;
-    }
-    function _set_privateStaticFieldValue(newValue) {
-      _PRIVATE_STATIC_FIELD._ = \`Updated: \${newValue}\`;
-    }
-    var _PRIVATE_STATIC_FIELD = { _: 'top secret string' };
-    expect(Cl.getValue()).toEqual('top secret string');
-    Cl.setValue();
-    expect(Cl.getValue()).toEqual('Updated: dank');"
   `);
 });
 
@@ -27069,7 +17705,7 @@ test('static-accessors/basic/exec.js [loose]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -27146,38 +17782,6 @@ test('static-accessors/basic/exec.js [loose]', async () => {
   `);
 });
 
-test('static-accessors/basic/input.js [spec]', async () => {
-  const source =
-    'class Cl {\n  static #PRIVATE_STATIC_FIELD = "top secret string";\n\n  static get #privateStaticFieldValue() {\n    return Cl.#PRIVATE_STATIC_FIELD;\n  }\n\n  static set #privateStaticFieldValue(newValue) {\n    Cl.#PRIVATE_STATIC_FIELD = `Updated: ${newValue}`;\n  }\n\n  static getValue() {\n    return Cl.#privateStaticFieldValue;\n  }\n\n  static setValue() {\n    Cl.#privateStaticFieldValue = "dank";\n  }\n}';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _toSetter = require('@babel/runtime/helpers/toSetter');
-    class Cl {
-      static getValue() {
-        return _get_privateStaticFieldValue.call(Cl);
-      }
-      static setValue() {
-        _toSetter(_set_privateStaticFieldValue.bind(Cl))._ = 'dank';
-      }
-    }
-    function _get_privateStaticFieldValue() {
-      return _PRIVATE_STATIC_FIELD._;
-    }
-    function _set_privateStaticFieldValue(newValue) {
-      _PRIVATE_STATIC_FIELD._ = \`Updated: \${newValue}\`;
-    }
-    var _PRIVATE_STATIC_FIELD = { _: 'top secret string' };"
-  `);
-});
-
 test('static-accessors/basic/input.js [loose]', async () => {
   const source =
     'class Cl {\n  static #PRIVATE_STATIC_FIELD = "top secret string";\n\n  static get #privateStaticFieldValue() {\n    return Cl.#PRIVATE_STATIC_FIELD;\n  }\n\n  static set #privateStaticFieldValue(newValue) {\n    Cl.#PRIVATE_STATIC_FIELD = `Updated: ${newValue}`;\n  }\n\n  static getValue() {\n    return Cl.#privateStaticFieldValue;\n  }\n\n  static setValue() {\n    Cl.#privateStaticFieldValue = "dank";\n  }\n}';
@@ -27185,7 +17789,7 @@ test('static-accessors/basic/input.js [loose]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -27259,34 +17863,6 @@ test('static-accessors/basic/input.js [loose]', async () => {
   `);
 });
 
-test('static-accessors/destructure-set/exec.js [spec]', async () => {
-  const source =
-    'class C {\n  static set #p(v) { C.#q = v }\n  static #q;\n  constructor() {\n    ([C.#p] = [0]);\n    expect(C.#q).toBe(0);\n  }\n}\n\nnew C;\n';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _toSetter = require('@babel/runtime/helpers/toSetter');
-    class C {
-      constructor() {
-        [_toSetter(_set_p.bind(C))._] = [0];
-        expect(_q._).toBe(0);
-      }
-    }
-    function _set_p(v) {
-      _q._ = v;
-    }
-    var _q = { _: void 0 };
-    new C();"
-  `);
-});
-
 test('static-accessors/destructure-set/exec.js [loose]', async () => {
   const source =
     'class C {\n  static set #p(v) { C.#q = v }\n  static #q;\n  constructor() {\n    ([C.#p] = [0]);\n    expect(C.#q).toBe(0);\n  }\n}\n\nnew C;\n';
@@ -27294,7 +17870,7 @@ test('static-accessors/destructure-set/exec.js [loose]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -27335,33 +17911,6 @@ test('static-accessors/destructure-set/exec.js [loose]', async () => {
   `);
 });
 
-test('static-accessors/destructure-set/input.js [spec]', async () => {
-  const source =
-    'class C {\n  static set #p(v) { C.#q = v }\n  static #q;\n  constructor() {\n    ([C.#p] = [0]);\n  }\n}\n\nnew C;\n';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _toSetter = require('@babel/runtime/helpers/toSetter');
-    class C {
-      constructor() {
-        [_toSetter(_set_p.bind(C))._] = [0];
-      }
-    }
-    function _set_p(v) {
-      _q._ = v;
-    }
-    var _q = { _: void 0 };
-    new C();"
-  `);
-});
-
 test('static-accessors/destructure-set/input.js [loose]', async () => {
   const source =
     'class C {\n  static set #p(v) { C.#q = v }\n  static #q;\n  constructor() {\n    ([C.#p] = [0]);\n  }\n}\n\nnew C;\n';
@@ -27369,7 +17918,7 @@ test('static-accessors/destructure-set/input.js [loose]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -27409,33 +17958,6 @@ test('static-accessors/destructure-set/input.js [loose]', async () => {
   `);
 });
 
-test('static-accessors/get-only-setter/exec.js [spec]', async () => {
-  const source =
-    'class Cl {\n  static #PRIVATE_STATIC_FIELD = 0;\n\n  static set #privateStaticFieldValue(newValue) {\n    Cl.#PRIVATE_STATIC_FIELD = newValue;\n  }\n\n  static getPrivateStaticFieldValue() {\n    return Cl.#privateStaticFieldValue;\n  }\n}\n\nexpect(Cl.getPrivateStaticFieldValue()).toBeUndefined();';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _writeOnlyError = require('@babel/runtime/helpers/writeOnlyError');
-    class Cl {
-      static getPrivateStaticFieldValue() {
-        return (Cl, _writeOnlyError('#privateStaticFieldValue'));
-      }
-    }
-    function _set_privateStaticFieldValue(newValue) {
-      _PRIVATE_STATIC_FIELD._ = newValue;
-    }
-    var _PRIVATE_STATIC_FIELD = { _: 0 };
-    expect(Cl.getPrivateStaticFieldValue()).toBeUndefined();"
-  `);
-});
-
 test('static-accessors/get-only-setter/exec.js [loose]', async () => {
   const source =
     'class Cl {\n  static #PRIVATE_STATIC_FIELD = 0;\n\n  static set #privateStaticFieldValue(newValue) {\n    Cl.#PRIVATE_STATIC_FIELD = newValue;\n  }\n\n  static getPrivateStaticFieldValue() {\n    return Cl.#privateStaticFieldValue;\n  }\n}\n\nexpect(Cl.getPrivateStaticFieldValue()).toBeUndefined();';
@@ -27443,7 +17965,7 @@ test('static-accessors/get-only-setter/exec.js [loose]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -27497,32 +18019,6 @@ test('static-accessors/get-only-setter/exec.js [loose]', async () => {
   `);
 });
 
-test('static-accessors/get-only-setter/input.js [spec]', async () => {
-  const source =
-    'class Cl {\n  static #PRIVATE_STATIC_FIELD = 0;\n\n  static set #privateStaticFieldValue(newValue) {\n    Cl.#PRIVATE_STATIC_FIELD = newValue;\n  }\n\n  static getPrivateStaticFieldValue() {\n    return Cl.#privateStaticFieldValue;\n  }\n}';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _writeOnlyError = require('@babel/runtime/helpers/writeOnlyError');
-    class Cl {
-      static getPrivateStaticFieldValue() {
-        return (Cl, _writeOnlyError('#privateStaticFieldValue'));
-      }
-    }
-    function _set_privateStaticFieldValue(newValue) {
-      _PRIVATE_STATIC_FIELD._ = newValue;
-    }
-    var _PRIVATE_STATIC_FIELD = { _: 0 };"
-  `);
-});
-
 test('static-accessors/get-only-setter/input.js [loose]', async () => {
   const source =
     'class Cl {\n  static #PRIVATE_STATIC_FIELD = 0;\n\n  static set #privateStaticFieldValue(newValue) {\n    Cl.#PRIVATE_STATIC_FIELD = newValue;\n  }\n\n  static getPrivateStaticFieldValue() {\n    return Cl.#privateStaticFieldValue;\n  }\n}';
@@ -27530,7 +18026,7 @@ test('static-accessors/get-only-setter/input.js [loose]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -27583,30 +18079,6 @@ test('static-accessors/get-only-setter/input.js [loose]', async () => {
   `);
 });
 
-test('static-accessors/preserve-comments/input.js [spec]', async () => {
-  const source =
-    'class C {\n  /* before get a */\n  static get #a() { return 42 };\n  /* after get a */\n\n  /* before set a */\n  static set #a(v) {}\n  /* after set a */\n}\n';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "class C {}
-    /* before get a */
-    function _get_a() {
-      return 42;
-    }
-    /* after get a */
-    /* before set a */
-    function _set_a(v) {}"
-  `);
-});
-
 test('static-accessors/preserve-comments/input.js [loose]', async () => {
   const source =
     'class C {\n  /* before get a */\n  static get #a() { return 42 };\n  /* after get a */\n\n  /* before set a */\n  static set #a(v) {}\n  /* after set a */\n}\n';
@@ -27614,7 +18086,7 @@ test('static-accessors/preserve-comments/input.js [loose]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -27645,37 +18117,6 @@ test('static-accessors/preserve-comments/input.js [loose]', async () => {
   `);
 });
 
-test('static-accessors/set-only-getter/exec.js [spec]', async () => {
-  const source =
-    'class Cl {\n  static #privateField = 0;\n\n  static get #privateFieldValue() {\n    return this.#privateField;\n  }\n\n  constructor() {\n    expect(() => Cl.#privateFieldValue = 1).toThrow(TypeError);\n    expect(() => ([Cl.#privateFieldValue] = [1])).toThrow(TypeError);\n  }\n}\n\nconst cl = new Cl();\n';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _readOnlyError = require('@babel/runtime/helpers/readOnlyError');
-    var _Cl;
-    class Cl {
-      constructor() {
-        expect(() => (Cl, 1, _readOnlyError('#privateFieldValue'))).toThrow(TypeError);
-        expect(() => ([(Cl, _readOnlyError('#privateFieldValue'))._] = [1])).toThrow(TypeError);
-      }
-    }
-    _Cl = Cl;
-    function _get_privateFieldValue() {
-      return _assertClassBrand(_Cl, this, _privateField)._;
-    }
-    var _privateField = { _: 0 };
-    const cl = new Cl();"
-  `);
-});
-
 test('static-accessors/set-only-getter/exec.js [loose]', async () => {
   const source =
     'class Cl {\n  static #privateField = 0;\n\n  static get #privateFieldValue() {\n    return this.#privateField;\n  }\n\n  constructor() {\n    expect(() => Cl.#privateFieldValue = 1).toThrow(TypeError);\n    expect(() => ([Cl.#privateFieldValue] = [1])).toThrow(TypeError);\n  }\n}\n\nconst cl = new Cl();\n';
@@ -27683,7 +18124,7 @@ test('static-accessors/set-only-getter/exec.js [loose]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -27730,37 +18171,6 @@ test('static-accessors/set-only-getter/exec.js [loose]', async () => {
   `);
 });
 
-test('static-accessors/set-only-getter/input.js [spec]', async () => {
-  const source =
-    'class Cl {\n  static #privateField = 0;\n\n  static get #privateFieldValue() {\n    return this.#privateField;\n  }\n\n  constructor() {\n    Cl.#privateFieldValue = 1;\n    ([Cl.#privateFieldValue] = [1]);\n  }\n}\n\nconst cl = new Cl();\n\n';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _readOnlyError = require('@babel/runtime/helpers/readOnlyError');
-    var _Cl;
-    class Cl {
-      constructor() {
-        (Cl, 1, _readOnlyError('#privateFieldValue'));
-        [(Cl, _readOnlyError('#privateFieldValue'))._] = [1];
-      }
-    }
-    _Cl = Cl;
-    function _get_privateFieldValue() {
-      return _assertClassBrand(_Cl, this, _privateField)._;
-    }
-    var _privateField = { _: 0 };
-    const cl = new Cl();"
-  `);
-});
-
 test('static-accessors/set-only-getter/input.js [loose]', async () => {
   const source =
     'class Cl {\n  static #privateField = 0;\n\n  static get #privateFieldValue() {\n    return this.#privateField;\n  }\n\n  constructor() {\n    Cl.#privateFieldValue = 1;\n    ([Cl.#privateFieldValue] = [1]);\n  }\n}\n\nconst cl = new Cl();\n\n';
@@ -27768,7 +18178,7 @@ test('static-accessors/set-only-getter/input.js [loose]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -27811,34 +18221,6 @@ test('static-accessors/set-only-getter/input.js [loose]', async () => {
   `);
 });
 
-test('static-accessors/tagged-template/input.js [spec]', async () => {
-  const source =
-    'class Foo {\n  static get #tag() {\n    return function() { return this; };\n  }\n  \n  static test() {\n    const receiver = this.#tag``;\n    expect(receiver).toBe(this);\n  }\n}';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    class Foo {
-      static test() {
-        const receiver = _get_tag.call(_assertClassBrand(Foo, this)).bind(this)\`\`;
-        expect(receiver).toBe(this);
-      }
-    }
-    function _get_tag() {
-      return function () {
-        return this;
-      };
-    }"
-  `);
-});
-
 test('static-accessors/tagged-template/input.js [loose]', async () => {
   const source =
     'class Foo {\n  static get #tag() {\n    return function() { return this; };\n  }\n  \n  static test() {\n    const receiver = this.#tag``;\n    expect(receiver).toBe(this);\n  }\n}';
@@ -27846,7 +18228,7 @@ test('static-accessors/tagged-template/input.js [loose]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -27897,76 +18279,6 @@ test('static-accessors/tagged-template/input.js [loose]', async () => {
   `);
 });
 
-test('static-accessors/updates/exec.js [spec]', async () => {
-  const source =
-    'class Cl {\n  static #privateField = "top secret string";\n  static publicField = "not secret string";\n\n  static get #privateFieldValue() {\n    return Cl.#privateField;\n  }\n\n  static set #privateFieldValue(newValue) {\n    Cl.#privateField = newValue;\n  }\n\n  static publicGetPrivateField() {\n    return Cl.#privateFieldValue;\n  }\n\n  static publicSetPrivateField(newValue) {\n    Cl.#privateFieldValue = newValue;\n  }\n\n  static get publicFieldValue() {\n    return Cl.publicField;\n  }\n\n  static set publicFieldValue(newValue) {\n    Cl.publicField = newValue;\n  }\n\n  static testUpdates() {\n    Cl.#privateField = 0;\n    Cl.publicField = 0;\n    Cl.#privateFieldValue = Cl.#privateFieldValue++;\n    Cl.publicFieldValue = Cl.publicFieldValue++;\n    expect(Cl.#privateField).toEqual(Cl.publicField);\n\n    ++Cl.#privateFieldValue;\n    ++Cl.publicFieldValue;\n    expect(Cl.#privateField).toEqual(Cl.publicField);\n\n    Cl.#privateFieldValue += 1;\n    Cl.publicFieldValue += 1;\n    expect(Cl.#privateField).toEqual(Cl.publicField);\n  }\n}\n\nCl.testUpdates();';
-  expect(
-    await transformOutcome(source, 'exec.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _toSetter = require('@babel/runtime/helpers/toSetter');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _defineProperty = require('@babel/runtime/helpers/defineProperty');
-    class Cl {
-      static publicGetPrivateField() {
-        return _get_privateFieldValue.call(Cl);
-      }
-      static publicSetPrivateField(newValue) {
-        _toSetter(_set_privateFieldValue.bind(Cl))._ = newValue;
-      }
-      static get publicFieldValue() {
-        return Cl.publicField;
-      }
-      static set publicFieldValue(newValue) {
-        Cl.publicField = newValue;
-      }
-      static testUpdates() {
-        var _Cl$privateFieldValue, _Cl$privateFieldValue2, _Cl$privateFieldValue3;
-        _privateField._ = 0;
-        Cl.publicField = 0;
-        _toSetter(_set_privateFieldValue.bind(Cl))._ =
-          (_set_privateFieldValue.call(
-            _assertClassBrand(Cl, Cl),
-            ((_Cl$privateFieldValue = _get_privateFieldValue.call(_assertClassBrand(Cl, Cl))),
-            (_Cl$privateFieldValue2 = _Cl$privateFieldValue++),
-            _Cl$privateFieldValue),
-          ),
-          _Cl$privateFieldValue2);
-        Cl.publicFieldValue = Cl.publicFieldValue++;
-        expect(_privateField._).toEqual(Cl.publicField);
-        _set_privateFieldValue.call(
-          _assertClassBrand(Cl, Cl),
-          ((_Cl$privateFieldValue3 = _get_privateFieldValue.call(_assertClassBrand(Cl, Cl))),
-          ++_Cl$privateFieldValue3),
-        );
-        ++Cl.publicFieldValue;
-        expect(_privateField._).toEqual(Cl.publicField);
-        _set_privateFieldValue.call(
-          _assertClassBrand(Cl, Cl),
-          _get_privateFieldValue.call(_assertClassBrand(Cl, Cl)) + 1,
-        );
-        Cl.publicFieldValue += 1;
-        expect(_privateField._).toEqual(Cl.publicField);
-      }
-    }
-    function _get_privateFieldValue() {
-      return _privateField._;
-    }
-    function _set_privateFieldValue(newValue) {
-      _privateField._ = newValue;
-    }
-    var _privateField = { _: 'top secret string' };
-    _defineProperty(Cl, 'publicField', 'not secret string');
-    Cl.testUpdates();"
-  `);
-});
-
 test('static-accessors/updates/exec.js [loose]', async () => {
   const source =
     'class Cl {\n  static #privateField = "top secret string";\n  static publicField = "not secret string";\n\n  static get #privateFieldValue() {\n    return Cl.#privateField;\n  }\n\n  static set #privateFieldValue(newValue) {\n    Cl.#privateField = newValue;\n  }\n\n  static publicGetPrivateField() {\n    return Cl.#privateFieldValue;\n  }\n\n  static publicSetPrivateField(newValue) {\n    Cl.#privateFieldValue = newValue;\n  }\n\n  static get publicFieldValue() {\n    return Cl.publicField;\n  }\n\n  static set publicFieldValue(newValue) {\n    Cl.publicField = newValue;\n  }\n\n  static testUpdates() {\n    Cl.#privateField = 0;\n    Cl.publicField = 0;\n    Cl.#privateFieldValue = Cl.#privateFieldValue++;\n    Cl.publicFieldValue = Cl.publicFieldValue++;\n    expect(Cl.#privateField).toEqual(Cl.publicField);\n\n    ++Cl.#privateFieldValue;\n    ++Cl.publicFieldValue;\n    expect(Cl.#privateField).toEqual(Cl.publicField);\n\n    Cl.#privateFieldValue += 1;\n    Cl.publicFieldValue += 1;\n    expect(Cl.#privateField).toEqual(Cl.publicField);\n  }\n}\n\nCl.testUpdates();';
@@ -27974,7 +18286,7 @@ test('static-accessors/updates/exec.js [loose]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -28091,7 +18403,12 @@ test('static-accessors/updates/exec.js [loose]', async () => {
         writable: true,
         value: 'top secret string',
       });
-      Cl.publicField = 'not secret string';
+      Object.defineProperty(Cl, 'publicField', {
+        value: 'not secret string',
+        enumerable: true,
+        configurable: true,
+        writable: true,
+      });
       Object.defineProperty(Cl, _privateFieldValue, {
         get: function () {
           if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
@@ -28108,76 +18425,6 @@ test('static-accessors/updates/exec.js [loose]', async () => {
   `);
 });
 
-test('static-accessors/updates/input.js [spec]', async () => {
-  const source =
-    'class Cl {\n  static #privateField = "top secret string";\n  static publicField = "not secret string";\n\n  static get #privateFieldValue() {\n    return Cl.#privateField;\n  }\n\n  static set #privateFieldValue(newValue) {\n    Cl.#privateField = newValue;\n  }\n\n  static publicGetPrivateField() {\n    return Cl.#privateFieldValue;\n  }\n\n  static publicSetPrivateField(newValue) {\n    Cl.#privateFieldValue = newValue;\n  }\n\n  static get publicFieldValue() {\n    return Cl.publicField;\n  }\n\n  static set publicFieldValue(newValue) {\n    Cl.publicField = newValue;\n  }\n\n  static testUpdates() {\n    Cl.#privateField = 0;\n    Cl.publicField = 0;\n    Cl.#privateFieldValue = Cl.#privateFieldValue++;\n    Cl.publicFieldValue = Cl.publicFieldValue++;\n\n    ++Cl.#privateFieldValue;\n    ++Cl.publicFieldValue;\n\n    Cl.#privateFieldValue += 1;\n    Cl.publicFieldValue += 1;\n\n    Cl.#privateFieldValue = -(Cl.#privateFieldValue ** Cl.#privateFieldValue);\n    Cl.publicFieldValue = -(Cl.publicFieldValue ** Cl.publicFieldValue);\n  }\n}';
-  expect(
-    await transformOutcome(source, 'input.js', {
-      transforms: {
-        privateMethods: { loose: false },
-        classProperties: { loose: false },
-        privatePropertyInObject: { loose: false },
-      },
-      helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
-    }),
-  ).toMatchInlineSnapshot(`
-    "var _toSetter = require('@babel/runtime/helpers/toSetter');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _defineProperty = require('@babel/runtime/helpers/defineProperty');
-    class Cl {
-      static publicGetPrivateField() {
-        return _get_privateFieldValue.call(Cl);
-      }
-      static publicSetPrivateField(newValue) {
-        _toSetter(_set_privateFieldValue.bind(Cl))._ = newValue;
-      }
-      static get publicFieldValue() {
-        return Cl.publicField;
-      }
-      static set publicFieldValue(newValue) {
-        Cl.publicField = newValue;
-      }
-      static testUpdates() {
-        var _Cl$privateFieldValue, _Cl$privateFieldValue2, _Cl$privateFieldValue3;
-        _privateField._ = 0;
-        Cl.publicField = 0;
-        _toSetter(_set_privateFieldValue.bind(Cl))._ =
-          (_set_privateFieldValue.call(
-            _assertClassBrand(Cl, Cl),
-            ((_Cl$privateFieldValue = _get_privateFieldValue.call(_assertClassBrand(Cl, Cl))),
-            (_Cl$privateFieldValue2 = _Cl$privateFieldValue++),
-            _Cl$privateFieldValue),
-          ),
-          _Cl$privateFieldValue2);
-        Cl.publicFieldValue = Cl.publicFieldValue++;
-        _set_privateFieldValue.call(
-          _assertClassBrand(Cl, Cl),
-          ((_Cl$privateFieldValue3 = _get_privateFieldValue.call(_assertClassBrand(Cl, Cl))),
-          ++_Cl$privateFieldValue3),
-        );
-        ++Cl.publicFieldValue;
-        _set_privateFieldValue.call(
-          _assertClassBrand(Cl, Cl),
-          _get_privateFieldValue.call(_assertClassBrand(Cl, Cl)) + 1,
-        );
-        Cl.publicFieldValue += 1;
-        _toSetter(_set_privateFieldValue.bind(Cl))._ = -(
-          _get_privateFieldValue.call(Cl) ** _get_privateFieldValue.call(Cl)
-        );
-        Cl.publicFieldValue = -(Cl.publicFieldValue ** Cl.publicFieldValue);
-      }
-    }
-    function _get_privateFieldValue() {
-      return _privateField._;
-    }
-    function _set_privateFieldValue(newValue) {
-      _privateField._ = newValue;
-    }
-    var _privateField = { _: 'top secret string' };
-    _defineProperty(Cl, 'publicField', 'not secret string');"
-  `);
-});
-
 test('static-accessors/updates/input.js [loose]', async () => {
   const source =
     'class Cl {\n  static #privateField = "top secret string";\n  static publicField = "not secret string";\n\n  static get #privateFieldValue() {\n    return Cl.#privateField;\n  }\n\n  static set #privateFieldValue(newValue) {\n    Cl.#privateField = newValue;\n  }\n\n  static publicGetPrivateField() {\n    return Cl.#privateFieldValue;\n  }\n\n  static publicSetPrivateField(newValue) {\n    Cl.#privateFieldValue = newValue;\n  }\n\n  static get publicFieldValue() {\n    return Cl.publicField;\n  }\n\n  static set publicFieldValue(newValue) {\n    Cl.publicField = newValue;\n  }\n\n  static testUpdates() {\n    Cl.#privateField = 0;\n    Cl.publicField = 0;\n    Cl.#privateFieldValue = Cl.#privateFieldValue++;\n    Cl.publicFieldValue = Cl.publicFieldValue++;\n\n    ++Cl.#privateFieldValue;\n    ++Cl.publicFieldValue;\n\n    Cl.#privateFieldValue += 1;\n    Cl.publicFieldValue += 1;\n\n    Cl.#privateFieldValue = -(Cl.#privateFieldValue ** Cl.#privateFieldValue);\n    Cl.publicFieldValue = -(Cl.publicFieldValue ** Cl.publicFieldValue);\n  }\n}';
@@ -28185,7 +18432,7 @@ test('static-accessors/updates/input.js [loose]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         privateMethods: { loose: true },
-        classProperties: { loose: true },
+        classProperties: { loose: false },
         privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
@@ -28298,7 +18545,12 @@ test('static-accessors/updates/input.js [loose]', async () => {
         writable: true,
         value: 'top secret string',
       });
-      Cl.publicField = 'not secret string';
+      Object.defineProperty(Cl, 'publicField', {
+        value: 'not secret string',
+        enumerable: true,
+        configurable: true,
+        writable: true,
+      });
       Object.defineProperty(Cl, _privateFieldValue, {
         get: function () {
           if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");

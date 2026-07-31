@@ -1,7 +1,7 @@
 import parameters from '@babel/plugin-transform-parameters';
 import { expect, test } from 'vitest';
 
-import { alignBabelBehavior, expectBabelSupportedNoxcturnalBailout } from '../transform';
+import { alignBabelBehavior } from '../transform';
 
 test('aligns default, destructured, and rest parameters with Babel', async () => {
   await expect(
@@ -50,14 +50,14 @@ globalThis.__result = [Read(), new Read()];`,
   ]);
 });
 
-test('records the non-simple setter boundary against Babel', () => {
-  expectBabelSupportedNoxcturnalBailout(
-    {
+test('aligns non-simple setters with Babel', async () => {
+  await expect(
+    alignBabelBehavior({
       source: `const value = { set field(next = 1) {} };`,
       filename: 'input.js',
       plugins: [parameters],
       noxcturnal: { transforms: { parameters: true } },
-    },
-    'alignment:parameters-setter-semantics-not-implemented',
-  );
+      output: { mustNotMatch: [/next = 1/] },
+    }),
+  ).resolves.toBeUndefined();
 });

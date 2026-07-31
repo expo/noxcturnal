@@ -18,8 +18,9 @@ const requestedOutputs = new Set(process.argv.slice(2));
  * regenerating this corpus, never when running it.
  *
  * A fixture is run in every public Noxcturnal mode relevant to that transform.
- * This is intentionally broader than copying Babel's fixture options: it makes
- * our spec/loose and built-in-helper contracts visible independently.
+ * This is intentionally broader than copying Babel's fixture options where
+ * both behaviors remain supported. Private features intentionally retain only
+ * the selected loose representation.
  */
 const transforms = [
   ['variables', 'block-scoping', 'block-scoping', [{ transforms: { blockScoping: true } }]],
@@ -43,7 +44,7 @@ const transforms = [
     'classes',
     'private-methods',
     'private-methods',
-    [false, true].map(loose => ({
+    [true].map(loose => ({
       transforms: { privateMethods: { loose } },
       helpers: runtimeHelpers,
     })),
@@ -52,7 +53,7 @@ const transforms = [
     'classes',
     'private-property-in-object',
     'private-property-in-object',
-    [false, true].map(loose => ({
+    [true].map(loose => ({
       transforms: { privatePropertyInObject: { loose } },
       helpers: runtimeHelpers,
     })),
@@ -253,15 +254,17 @@ for (const [category, outputName, babelName, plans] of transforms) {
         effectivePlan.jsxThrowIfNamespace = false;
       }
       if (category === 'classes' && source.includes('#')) {
-        const loose =
-          effectivePlan.transforms?.classProperties?.loose ??
-          effectivePlan.transforms?.privateMethods?.loose ??
-          effectivePlan.transforms?.privatePropertyInObject?.loose ??
-          false;
+        const publicLoose = effectivePlan.transforms?.classProperties?.loose ?? false;
         effectivePlan.transforms ??= {};
-        effectivePlan.transforms.classProperties ??= { loose };
-        effectivePlan.transforms.privateMethods ??= { loose };
-        effectivePlan.transforms.privatePropertyInObject ??= { loose };
+        effectivePlan.transforms.classProperties ??= { loose: publicLoose };
+        effectivePlan.transforms.privateMethods = { loose: true };
+        effectivePlan.transforms.privatePropertyInObject = { loose: true };
+      }
+      if (source.includes('@')) {
+        // NOTE: Decorator syntax is incidental in these upstream transform
+        // corpora, so compose its independent lowering explicitly.
+        effectivePlan.transforms ??= {};
+        effectivePlan.transforms.legacyDecorators = true;
       }
       const jsxMode = plan.jsx ? ` [${plan.jsx}]` : '';
       const title = `${relative}${modeName(plan)}${jsxMode}`;

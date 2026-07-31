@@ -276,17 +276,37 @@ test('loose/ignoreFunctionLength/input.js', async () => {
 test('parameters/arrow-default-super-no-classes-plugin/input.js', async () => {
   const source =
     'class Bar extends Foo {\n    constructor() {\n        let f = (x = super()) => x;\n        f();\n    }\n}\n';
-  expect(
-    await transformOutcome(source, 'input.js', { transforms: { parameters: true } }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:arrow-parameters-lexical-super-not-implemented"`);
+  expect(await transformOutcome(source, 'input.js', { transforms: { parameters: true } }))
+    .toMatchInlineSnapshot(`
+    "class Bar extends Foo {
+      constructor() {
+        let f = () => {
+          let x = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : super();
+          return x;
+        };
+        f();
+      }
+    }"
+  `);
 });
 
 test('parameters/arrow-rest-super-no-classes-plugin/input.js', async () => {
   const source =
     'class Bar extends Foo {\n    constructor() {\n        let f = (...args) => super(...args);\n        f();\n    }\n}\n';
-  expect(
-    await transformOutcome(source, 'input.js', { transforms: { parameters: true } }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:arrow-parameters-lexical-super-not-implemented"`);
+  expect(await transformOutcome(source, 'input.js', { transforms: { parameters: true } }))
+    .toMatchInlineSnapshot(`
+    "class Bar extends Foo {
+      constructor() {
+        let f = () => {
+          for (var _len = arguments.length, args = [], _key = 0; _key < _len; _key++) {
+            args[_key - 0] = arguments[_key];
+          }
+          return super(...args);
+        };
+        f();
+      }
+    }"
+  `);
 });
 
 test('parameters/async-generator/exec.js', async () => {
@@ -619,16 +639,31 @@ test('parameters/default-rest/input.js', async () => {
 test('parameters/default-setter/exec.js', async () => {
   const source =
     'const defaultValue = 1;\nconst obj = {\n  set field(num = defaultValue) {\n    this.num = num;\n  }\n};\nobj.field = void 0;\n\nexpect(obj.num).toBe(defaultValue);\n';
-  expect(
-    await transformOutcome(source, 'exec.js', { transforms: { parameters: true } }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:parameters-setter-semantics-not-implemented"`);
+  expect(await transformOutcome(source, 'exec.js', { transforms: { parameters: true } }))
+    .toMatchInlineSnapshot(`
+    "const defaultValue = 1;
+    const obj = {
+      set field(_arg) {
+        let num = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : defaultValue;
+        this.num = num;
+      },
+    };
+    obj.field = void 0;
+    expect(obj.num).toBe(defaultValue);"
+  `);
 });
 
 test('parameters/default-setter/input.js', async () => {
   const source = 'const obj = {\n  set field(num = 1) {\n    this.num = num;\n  }\n};\n';
-  expect(
-    await transformOutcome(source, 'input.js', { transforms: { parameters: true } }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:parameters-setter-semantics-not-implemented"`);
+  expect(await transformOutcome(source, 'input.js', { transforms: { parameters: true } }))
+    .toMatchInlineSnapshot(`
+    "const obj = {
+      set field(_arg) {
+        let num = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : 1;
+        this.num = num;
+      },
+    };"
+  `);
 });
 
 test('parameters/default-single/input.js', async () => {
@@ -1961,17 +1996,47 @@ test('regression/11344-typescript/input.js', async () => {
 test('regression/13939-complex/input.js', async () => {
   const source =
     'class A extends B {\n  handle = ((x = 0) => {\n    console.log(x, this, new.target, super.y);\n  })(() => {\n    let y = 0;\n    return (x = y) => x + this;\n  })((x = 1) => {})(this);\n}\n';
-  expect(
-    await transformOutcome(source, 'input.js', { transforms: { parameters: true } }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:arrow-parameters-lexical-super-not-implemented"`);
+  expect(await transformOutcome(source, 'input.js', { transforms: { parameters: true } }))
+    .toMatchInlineSnapshot(`
+    "class A extends B {
+      handle = (() => {
+        let x = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : 0;
+        console.log(x, this, new.target, super.y);
+      })(() => {
+        let y = 0;
+        var _this = this;
+        return function () {
+          let x = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : y;
+          return x + _this;
+        };
+      })(function () {
+        let x = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : 1;
+      })(this);
+    }"
+  `);
 });
 
 test('regression/13939-private-complex/input.js', async () => {
   const source =
     'class A extends B {\n  #handle = ((x = 0) => {\n    console.log(x, this, new.target, super.y);\n  })(() => {\n    let y = 0;\n    return (x = y) => x + this;\n  })((x = 1) => {})(this);\n}\n';
-  expect(
-    await transformOutcome(source, 'input.js', { transforms: { parameters: true } }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:arrow-parameters-lexical-super-not-implemented"`);
+  expect(await transformOutcome(source, 'input.js', { transforms: { parameters: true } }))
+    .toMatchInlineSnapshot(`
+    "class A extends B {
+      #handle = (() => {
+        let x = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : 0;
+        console.log(x, this, new.target, super.y);
+      })(() => {
+        let y = 0;
+        var _this = this;
+        return function () {
+          let x = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : y;
+          return x + _this;
+        };
+      })(function () {
+        let x = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : 1;
+      })(this);
+    }"
+  `);
 });
 
 test('regression/13939-private/input.js', async () => {

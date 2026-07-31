@@ -19,7 +19,9 @@ test('lowers inherited private brands referenced from a static block', async () 
       },
     }),
   ).toMatchInlineSnapshot(`
-    "export let Base = (() => {
+    "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+      _checkInRHS = _checkInRHS2.checkInRHS;
+    export let Base = (() => {
       'use strict';
       var _value = '__private_Base_value';
       const Base = function Base() {
@@ -31,7 +33,7 @@ test('lowers inherited private brands referenced from a static block', async () 
       };
       Object.defineProperty(Base, 'prototype', { writable: false });
       (function () {
-        this.accepts = input => Object.prototype.hasOwnProperty.call(input, _value);
+        this.accepts = input => Object.prototype.hasOwnProperty.call(_checkInRHS(input), _value);
       }).call(Base);
       return Base;
     })();

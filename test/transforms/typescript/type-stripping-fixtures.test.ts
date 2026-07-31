@@ -57,24 +57,112 @@ test('class/abstract-allowDeclareFields-true/input.ts', async () => {
 test('class/abstract-class-decorated-method/input.ts', async () => {
   const source =
     "import { computed } from 'mobx';\n\nabstract class Foo {\n  @computed get id() {}\n}\n";
-  expect(await transformOutcome(source, 'input.ts', { typescript: 'strip' })).toMatchInlineSnapshot(
-    `"[bailout] preflight:decorators-not-supported"`,
-  );
+  expect(
+    await transformOutcome(source, 'input.ts', {
+      typescript: 'strip',
+      transforms: { legacyDecorators: true },
+    }),
+  ).toMatchInlineSnapshot(`
+    "function _decorate(decorators, target, key, descriptor) {
+      var argumentCount = arguments.length;
+      var result =
+        argumentCount < 3
+          ? target
+          : descriptor === null
+            ? (descriptor = Object.getOwnPropertyDescriptor(target, key))
+            : descriptor;
+      var decorator;
+      for (var index = decorators.length - 1; index >= 0; index--) {
+        if ((decorator = decorators[index]))
+          result =
+            (argumentCount < 3
+              ? decorator(result)
+              : argumentCount > 3
+                ? decorator(target, key, result)
+                : decorator(target, key)) || result;
+      }
+      if (argumentCount > 3 && result) Object.defineProperty(target, key, result);
+      return result;
+    }
+    import { computed } from 'mobx';
+    class Foo {
+      get id() {}
+    }
+    _decorate([computed], Foo.prototype, 'id', null);"
+  `);
 });
 
 test('class/abstract-class-decorated-parameter/input.ts', async () => {
   const source =
     "import { observable } from 'mobx';\n\nabstract class Foo {\n  @observable id = null;\n}\n";
-  expect(await transformOutcome(source, 'input.ts', { typescript: 'strip' })).toMatchInlineSnapshot(
-    `"[bailout] preflight:decorators-not-supported"`,
-  );
+  expect(
+    await transformOutcome(source, 'input.ts', {
+      typescript: 'strip',
+      transforms: { legacyDecorators: true },
+    }),
+  ).toMatchInlineSnapshot(`
+    "function _decorate(decorators, target, key, descriptor) {
+      var argumentCount = arguments.length;
+      var result =
+        argumentCount < 3
+          ? target
+          : descriptor === null
+            ? (descriptor = Object.getOwnPropertyDescriptor(target, key))
+            : descriptor;
+      var decorator;
+      for (var index = decorators.length - 1; index >= 0; index--) {
+        if ((decorator = decorators[index]))
+          result =
+            (argumentCount < 3
+              ? decorator(result)
+              : argumentCount > 3
+                ? decorator(target, key, result)
+                : decorator(target, key)) || result;
+      }
+      if (argumentCount > 3 && result) Object.defineProperty(target, key, result);
+      return result;
+    }
+    import { observable } from 'mobx';
+    class Foo {
+      id = null;
+    }
+    _decorate([observable], Foo.prototype, 'id', void 0);"
+  `);
 });
 
 test('class/abstract-class-decorated/input.ts', async () => {
   const source = "import { observer } from 'mobx-react';\n\n@observer\nabstract class Foo {}\n";
-  expect(await transformOutcome(source, 'input.ts', { typescript: 'strip' })).toMatchInlineSnapshot(
-    `"[bailout] preflight:decorators-not-supported"`,
-  );
+  expect(
+    await transformOutcome(source, 'input.ts', {
+      typescript: 'strip',
+      transforms: { legacyDecorators: true },
+    }),
+  ).toMatchInlineSnapshot(`
+    "function _decorate(decorators, target, key, descriptor) {
+      var argumentCount = arguments.length;
+      var result =
+        argumentCount < 3
+          ? target
+          : descriptor === null
+            ? (descriptor = Object.getOwnPropertyDescriptor(target, key))
+            : descriptor;
+      var decorator;
+      for (var index = decorators.length - 1; index >= 0; index--) {
+        if ((decorator = decorators[index]))
+          result =
+            (argumentCount < 3
+              ? decorator(result)
+              : argumentCount > 3
+                ? decorator(target, key, result)
+                : decorator(target, key)) || result;
+      }
+      if (argumentCount > 3 && result) Object.defineProperty(target, key, result);
+      return result;
+    }
+    import { observer } from 'mobx-react';
+    let Foo = class Foo {};
+    Foo = _decorate([observer], Foo);"
+  `);
 });
 
 test('class/accessor-allowDeclareFields-false/input.ts', async () => {
@@ -95,16 +183,70 @@ test('class/accessor-allowDeclareFields-true/input.ts', async () => {
 
 test('class/declare/input.ts', async () => {
   const source = 'class A {\n  declare x;\n  @foo declare y: string;\n}\n';
-  expect(await transformOutcome(source, 'input.ts', { typescript: 'strip' })).toMatchInlineSnapshot(
-    `"[bailout] preflight:decorators-not-supported"`,
-  );
+  expect(
+    await transformOutcome(source, 'input.ts', {
+      typescript: 'strip',
+      transforms: { legacyDecorators: true },
+    }),
+  ).toMatchInlineSnapshot(`
+    "function _decorate(decorators, target, key, descriptor) {
+      var argumentCount = arguments.length;
+      var result =
+        argumentCount < 3
+          ? target
+          : descriptor === null
+            ? (descriptor = Object.getOwnPropertyDescriptor(target, key))
+            : descriptor;
+      var decorator;
+      for (var index = decorators.length - 1; index >= 0; index--) {
+        if ((decorator = decorators[index]))
+          result =
+            (argumentCount < 3
+              ? decorator(result)
+              : argumentCount > 3
+                ? decorator(target, key, result)
+                : decorator(target, key)) || result;
+      }
+      if (argumentCount > 3 && result) Object.defineProperty(target, key, result);
+      return result;
+    }
+    class A {}
+    _decorate([foo], A.prototype, 'y', void 0);"
+  `);
 });
 
 test('class/decorated-declare-properties/input.ts', async () => {
   const source = 'class Foo {\n  @decorator declare bar: string;\n}\n';
-  expect(await transformOutcome(source, 'input.ts', { typescript: 'strip' })).toMatchInlineSnapshot(
-    `"[bailout] preflight:decorators-not-supported"`,
-  );
+  expect(
+    await transformOutcome(source, 'input.ts', {
+      typescript: 'strip',
+      transforms: { legacyDecorators: true },
+    }),
+  ).toMatchInlineSnapshot(`
+    "function _decorate(decorators, target, key, descriptor) {
+      var argumentCount = arguments.length;
+      var result =
+        argumentCount < 3
+          ? target
+          : descriptor === null
+            ? (descriptor = Object.getOwnPropertyDescriptor(target, key))
+            : descriptor;
+      var decorator;
+      for (var index = decorators.length - 1; index >= 0; index--) {
+        if ((decorator = decorators[index]))
+          result =
+            (argumentCount < 3
+              ? decorator(result)
+              : argumentCount > 3
+                ? decorator(target, key, result)
+                : decorator(target, key)) || result;
+      }
+      if (argumentCount > 3 && result) Object.defineProperty(target, key, result);
+      return result;
+    }
+    class Foo {}
+    _decorate([decorator], Foo.prototype, 'bar', void 0);"
+  `);
 });
 
 test('class/export-default-abstract/input.ts', async () => {
@@ -284,9 +426,48 @@ test('class/private-method-override/input.ts', async () => {
 test('class/properties/input.ts', async () => {
   const source =
     'class C {\n    public a?: number;\n    private b: number = 0;\n    readonly c: number = 1;\n    @foo d: number;\n    @foo e: number = 3;\n    f!: number;\n    @foo g!: number;\n    #h: string;\n    #i: number = 10;\n}\n';
-  expect(await transformOutcome(source, 'input.ts', { typescript: 'strip' })).toMatchInlineSnapshot(
-    `"[bailout] preflight:decorators-not-supported"`,
-  );
+  expect(
+    await transformOutcome(source, 'input.ts', {
+      typescript: 'strip',
+      transforms: { legacyDecorators: true },
+    }),
+  ).toMatchInlineSnapshot(`
+    "function _decorate(decorators, target, key, descriptor) {
+      var argumentCount = arguments.length;
+      var result =
+        argumentCount < 3
+          ? target
+          : descriptor === null
+            ? (descriptor = Object.getOwnPropertyDescriptor(target, key))
+            : descriptor;
+      var decorator;
+      for (var index = decorators.length - 1; index >= 0; index--) {
+        if ((decorator = decorators[index]))
+          result =
+            (argumentCount < 3
+              ? decorator(result)
+              : argumentCount > 3
+                ? decorator(target, key, result)
+                : decorator(target, key)) || result;
+      }
+      if (argumentCount > 3 && result) Object.defineProperty(target, key, result);
+      return result;
+    }
+    class C {
+      a;
+      b = 0;
+      c = 1;
+      d;
+      e = 3;
+      f;
+      g;
+      #h;
+      #i = 10;
+    }
+    _decorate([foo], C.prototype, 'd', void 0);
+    _decorate([foo], C.prototype, 'e', void 0);
+    _decorate([foo], C.prototype, 'g', void 0);"
+  `);
 });
 
 test('class/transform-properties-declare-wrong-order/input.ts', async () => {
@@ -473,8 +654,12 @@ test('enum/inner-references/input.ts', async () => {
 test('enum/mix-references/input.ts', async () => {
   const source =
     'var x = 10;\n\nenum Foo {\n    a = 10,\n    b = a,\n    c = b + x,\n}\n\nenum Bar {\n    D = Foo.a,\n    E = D,\n    F = Math.E,\n    G = E + Foo.c,\n}\n\nenum Baz {\n    a = 0,\n    b = 1,\n    // @ts-ignore\n    x = a.toString(),\n}\n\nenum A {\n    a = 0,\n    b = (() => { let a = 1; return a + 1 })(), // a is shadowed\n    c = (() => { return a + 2 })(), // a refers to A.a\n}';
-  expect(await transformOutcome(source, 'input.ts', { typescript: 'strip' }))
-    .toMatchInlineSnapshot(`
+  expect(
+    await transformOutcome(source, 'input.ts', {
+      typescript: 'strip',
+      transforms: { legacyDecorators: true },
+    }),
+  ).toMatchInlineSnapshot(`
     "var x = 10;
     var Foo = /* @__PURE__ */ (function (Foo) {
       Foo[(Foo['a'] = 10)] = 'a';
@@ -783,8 +968,12 @@ test('exports/export-globals/input.ts', async () => {
 test('exports/export-import=/input.ts', async () => {
   const source =
     "import * as joint from '@joint/core';\n\nexport import JGraph = joint.dia.Graph;\n";
-  expect(await transformOutcome(source, 'input.ts', { typescript: 'strip' }))
-    .toMatchInlineSnapshot(`
+  expect(
+    await transformOutcome(source, 'input.ts', {
+      typescript: 'strip',
+      transforms: { legacyDecorators: true },
+    }),
+  ).toMatchInlineSnapshot(`
     "import * as joint from '@joint/core';
     export var JGraph = joint.dia.Graph;"
   `);
@@ -857,8 +1046,12 @@ test('exports/interface/input.ts', async () => {
 test('exports/issue-9916-1/input.ts', async () => {
   const source =
     "/**\n * @module\n */\n\nimport '../message-bus';\n\n/**\n * @typedef {Function} PromiseResolveCb\n */\nexport type PromiseResolveCb<T> = (value?: T | PromiseLike<T>) => void;\n\n/**\n * @typedef {Function} PromiseRejectCb\n */\nexport type PromiseRejectCb = (reason?: any) => void;\n\nvar a;";
-  expect(await transformOutcome(source, 'input.ts', { typescript: 'strip' }))
-    .toMatchInlineSnapshot(`
+  expect(
+    await transformOutcome(source, 'input.ts', {
+      typescript: 'strip',
+      transforms: { legacyDecorators: true },
+    }),
+  ).toMatchInlineSnapshot(`
     "/**
      * @module
      */
@@ -870,8 +1063,12 @@ test('exports/issue-9916-1/input.ts', async () => {
 test('exports/issue-9916-2/input.ts', async () => {
   const source =
     "/**\n * @module\n */\n\nimport '../message-bus';\n\n/**\n * @typedef {Function} PromiseResolveCb\n */\nexport type PromiseResolveCb<T> = (value?: T | PromiseLike<T>) => void;\n\n/**\n * @typedef {Function} PromiseRejectCb\n */\nexport type PromiseRejectCb = (reason?: any) => void;\n";
-  expect(await transformOutcome(source, 'input.ts', { typescript: 'strip' }))
-    .toMatchInlineSnapshot(`
+  expect(
+    await transformOutcome(source, 'input.ts', {
+      typescript: 'strip',
+      transforms: { legacyDecorators: true },
+    }),
+  ).toMatchInlineSnapshot(`
     "/**
      * @module
      */
@@ -882,8 +1079,12 @@ test('exports/issue-9916-2/input.ts', async () => {
 test('exports/issue-9916-3/input.ts', async () => {
   const source =
     '/**\n * @module\n */\n\n/**\n * @typedef {Function} PromiseResolveCb\n */\nexport type PromiseResolveCb<T> = (value?: T | PromiseLike<T>) => void;\n\n/**\n * @typedef {Function} PromiseRejectCb\n */\nexport type PromiseRejectCb = (reason?: any) => void;\n\nvar a;';
-  expect(await transformOutcome(source, 'input.ts', { typescript: 'strip' }))
-    .toMatchInlineSnapshot(`
+  expect(
+    await transformOutcome(source, 'input.ts', {
+      typescript: 'strip',
+      transforms: { legacyDecorators: true },
+    }),
+  ).toMatchInlineSnapshot(`
     "var a;
     export {};"
   `);
@@ -978,8 +1179,13 @@ test('imports/elide-injected/input.ts', async () => {
 test('imports/elide-jsx-pragma-namespace-no/input.ts', async () => {
   const source =
     '/* @jsx jsx.htm */\n// Don\'t elide htm if a JSX element appears somewhere.\nimport * as jsx from "fake-jsx-package";\n<div></div>;\n';
-  expect(await transformOutcome(source, 'input.ts', { typescript: 'strip', jsx: 'preserve' }))
-    .toMatchInlineSnapshot(`
+  expect(
+    await transformOutcome(source, 'input.ts', {
+      typescript: 'strip',
+      jsx: 'preserve',
+      transforms: { legacyDecorators: true },
+    }),
+  ).toMatchInlineSnapshot(`
     "/* @jsx jsx.htm */
     // Don't elide htm if a JSX element appears somewhere.
     import * as jsx from 'fake-jsx-package';
@@ -990,8 +1196,13 @@ test('imports/elide-jsx-pragma-namespace-no/input.ts', async () => {
 test('imports/elide-jsx-pragma-no/input.ts', async () => {
   const source =
     '/* @jsx htm */\n// Don\'t elide htm if a JSX element appears somewhere.\nimport { htm } from "fake-jsx-package";\n<div></div>;\n';
-  expect(await transformOutcome(source, 'input.ts', { typescript: 'strip', jsx: 'preserve' }))
-    .toMatchInlineSnapshot(`
+  expect(
+    await transformOutcome(source, 'input.ts', {
+      typescript: 'strip',
+      jsx: 'preserve',
+      transforms: { legacyDecorators: true },
+    }),
+  ).toMatchInlineSnapshot(`
     "/* @jsx htm */
     // Don't elide htm if a JSX element appears somewhere.
     import { htm } from 'fake-jsx-package';
@@ -1002,8 +1213,13 @@ test('imports/elide-jsx-pragma-no/input.ts', async () => {
 test('imports/elide-jsx-pragmaFrag-namespace-no/input.ts', async () => {
   const source =
     '/* @jsxFrag jsx.htm */\n// Don\'t elide htm if a JSX fragment appears somewhere.\nimport * as jsx from "fake-jsx-package";\n<></>;\n';
-  expect(await transformOutcome(source, 'input.ts', { typescript: 'strip', jsx: 'preserve' }))
-    .toMatchInlineSnapshot(`
+  expect(
+    await transformOutcome(source, 'input.ts', {
+      typescript: 'strip',
+      jsx: 'preserve',
+      transforms: { legacyDecorators: true },
+    }),
+  ).toMatchInlineSnapshot(`
     "/* @jsxFrag jsx.htm */
     // Don't elide htm if a JSX fragment appears somewhere.
     import * as jsx from 'fake-jsx-package';
@@ -1014,8 +1230,13 @@ test('imports/elide-jsx-pragmaFrag-namespace-no/input.ts', async () => {
 test('imports/elide-jsx-pragmaFrag-no/input.ts', async () => {
   const source =
     '/* @jsxFrag htm */\n// Don\'t elide htm if a JSX fragment appears somewhere.\nimport { htm } from "fake-jsx-package";\n<></>;\n';
-  expect(await transformOutcome(source, 'input.ts', { typescript: 'strip', jsx: 'preserve' }))
-    .toMatchInlineSnapshot(`
+  expect(
+    await transformOutcome(source, 'input.ts', {
+      typescript: 'strip',
+      jsx: 'preserve',
+      transforms: { legacyDecorators: true },
+    }),
+  ).toMatchInlineSnapshot(`
     "/* @jsxFrag htm */
     // Don't elide htm if a JSX fragment appears somewhere.
     import { htm } from 'fake-jsx-package';
@@ -1293,9 +1514,48 @@ test('imports/only-remove-type-imports/input.ts', async () => {
 test('imports/parameter-decorators/input.ts', async () => {
   const source =
     "import { NgModule, Optional, SkipSelf } from '@angular/core';\n\n@NgModule({})\nexport class CoreModule {\n  constructor(@Optional() @SkipSelf() parentModule) { }\n}\n";
-  expect(await transformOutcome(source, 'input.ts', { typescript: 'strip' })).toMatchInlineSnapshot(
-    `"[bailout] preflight:decorators-not-supported"`,
-  );
+  expect(
+    await transformOutcome(source, 'input.ts', {
+      typescript: 'strip',
+      transforms: { legacyDecorators: true },
+    }),
+  ).toMatchInlineSnapshot(`
+    "function _decorate(decorators, target, key, descriptor) {
+      var argumentCount = arguments.length;
+      var result =
+        argumentCount < 3
+          ? target
+          : descriptor === null
+            ? (descriptor = Object.getOwnPropertyDescriptor(target, key))
+            : descriptor;
+      var decorator;
+      for (var index = decorators.length - 1; index >= 0; index--) {
+        if ((decorator = decorators[index]))
+          result =
+            (argumentCount < 3
+              ? decorator(result)
+              : argumentCount > 3
+                ? decorator(target, key, result)
+                : decorator(target, key)) || result;
+      }
+      if (argumentCount > 3 && result) Object.defineProperty(target, key, result);
+      return result;
+    }
+    function _decorateParam(index, decorator) {
+      return function (target, key) {
+        decorator(target, key, index);
+      };
+    }
+    import { NgModule, Optional, SkipSelf } from '@angular/core';
+    let CoreModule = class CoreModule {
+      constructor(parentModule) {}
+    };
+    CoreModule = _decorate(
+      [NgModule({}), _decorateParam(0, Optional()), _decorateParam(0, SkipSelf())],
+      CoreModule,
+    );
+    export { CoreModule };"
+  `);
 });
 
 test('imports/property-signature/input.ts', async () => {
@@ -1377,8 +1637,12 @@ test('lvalues/type-assertion/input.ts', async () => {
 test('namespace/alias/input.ts', async () => {
   const source =
     "declare namespace LongNameModule {\n  export type SomeType = number;\n  export const foo: number;\n  namespace Inner {\n    export type T = string;\n    export const bar: boolean;\n  }\n}\n\nimport * as babel from '@babel/core';\n\n/** type only */\nimport b = babel;\nimport AliasModule = LongNameModule;\n\nconst some: AliasModule.SomeType = 3;\nconst bar = AliasModule.foo;\nconst baz = AliasModule.Inner.bar;\nlet str: LongNameModule.Inner.T;\nlet node: b.OptionManager;\n\nconsole.log(some);\n";
-  expect(await transformOutcome(source, 'input.ts', { typescript: 'strip' }))
-    .toMatchInlineSnapshot(`
+  expect(
+    await transformOutcome(source, 'input.ts', {
+      typescript: 'strip',
+      transforms: { legacyDecorators: true },
+    }),
+  ).toMatchInlineSnapshot(`
     "var AliasModule = LongNameModule;
     const some = 3;
     const bar = AliasModule.foo;

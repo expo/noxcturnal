@@ -5,7 +5,7 @@ use napi::{Error, Result, Status, bindgen_prelude::Buffer};
 use napi_derive::napi;
 use oxc_allocator::{Allocator, Box as ArenaBox, CloneIn, TakeIn};
 use oxc_ast::{
-    AstKind,
+    AstBuilder, AstKind,
     ast::{
         Argument, AssignmentTargetPattern, CatchClause, Class, Decorator, Expression,
         ForOfStatement, ForStatement, ForStatementInit, FormalParameters, IdentifierReference,
@@ -316,21 +316,16 @@ pub fn transform(
     }
     let mut transform_options = compile_options(&options)?;
     let mut rewrite_layers = Vec::new();
+    let mut decorator_helper_requests = CustomHelperRequests::default();
     let focused_object_rest = options.object_rest_spread == Some(true)
         && (options.object_rest_spread_loose == Some(true)
             || options.object_rest_spread_use_built_ins == Some(true));
     let object_rest_loose = options.object_rest_spread_loose == Some(true);
-    let focused_private_features =
-        options.private_methods == Some(true) || options.private_property_in_object == Some(true);
-    let oxc_spec_private_bundle = options.classes != Some(true)
-        && options.class_properties == Some(true)
-        && options.class_properties_loose != Some(true)
-        && (options.private_methods == Some(true)
-            || options.private_property_in_object == Some(true))
-        && options.private_methods_loose != Some(true)
-        && options.private_property_in_object_loose != Some(true);
-    let class_rewrite_selected = options.classes == Some(true) || focused_private_features;
-    let classes_ast_selected = class_rewrite_selected && !oxc_spec_private_bundle;
+    let focused_class_features = options.class_properties == Some(true)
+        || options.private_methods == Some(true)
+        || options.private_property_in_object == Some(true);
+    let class_rewrite_selected = options.classes == Some(true) || focused_class_features;
+    let classes_ast_selected = class_rewrite_selected;
     let regexp_rewrite_selected = options.regexp_unicode == Some(true)
         || options.regexp_unicode_property_escapes == Some(true)
         || options.regexp_dot_all == Some(true)
@@ -342,7 +337,7 @@ pub fn transform(
     // Whether anything downstream of the language reads it.
     let selects_source_rewrite = options.block_scoping == Some(true)
         || options.classes == Some(true)
-        || focused_private_features
+        || focused_class_features
         || options.parameters == Some(true)
         || options.for_of == Some(true)
         || options.destructuring == Some(true)
@@ -378,12 +373,15 @@ pub fn transform(
     if options.jsx.is_some() {
         active_source_type = active_source_type.with_jsx(true);
     }
-    let language_prepass = active_source_type.is_typescript()
+    let possible_decorators =
+        options.legacy_decorators == Some(true) && source.contains('@') && source.contains("class");
+    let language_prepass = (active_source_type.is_typescript()
         // Nothing downstream would read the language otherwise: the rewrites do,
         // and so does block scoping, because Oxc's `enum` lowering emits a `let`.
         // `automatic-if-present` is the one conditional phase, and the pipeline
         // requires it to stand alone, so it selects nothing here either.
-        && selects_source_rewrite;
+        && selects_source_rewrite)
+        || possible_decorators;
     // Attributed to the phases they belong to, so a prepass does not look free.
     if language_prepass {
         let language_allocator = Allocator::default();
@@ -392,86 +390,121 @@ pub fn transform(
         // original spans rather than the prepass's.
         if parsed.diagnostics.is_empty() {
             let mut program = parsed.program;
-            // Decorators have to be caught here, on the file as written. Neither
-            // this pass nor the `classes` rewrite implements them, and both drop
-            // them on the way past — so by the time the check further down runs,
-            // on the rewritten source, there is nothing left for it to find and
-            // the class ships without its decorator. Every decorator attaches to
-            // a class or a class element, so the two substrings are a lossless
-            // prerequisite for the walk.
-            if source.contains('@') && source.contains("class") {
+            let has_decorators = if possible_decorators {
                 let mut decorator_detector = DecoratorDetector(false);
                 decorator_detector.visit_program(&program);
                 ast_traversal_count += 1;
-                if decorator_detector.0 {
-                    return Ok(unsupported("decorators-not-supported", [] as [String; 0]));
-                }
-            }
-            semantic_build_count += 1;
-            ast_traversal_count += 1;
-            let built = run(|| {
-                SemanticBuilder::new()
-                    .with_excess_capacity(2.0)
-                    .with_enum_eval(true)
-                    .build(&program)
-            });
-            if built.diagnostics.is_empty() {
-                let language_options = TransformOptions {
-                    cwd: transform_options.cwd.clone(),
-                    assumptions: CompilerAssumptions {
-                        // Oxc's TypeScript pass owns class fields when this is
-                        // set and the class-properties plugin is not, lowering
-                        // `static x = 1` to `static { this.x = 1 }`. A class
-                        // field is an ES feature, so it stays for whoever the
-                        // caller selected to lower it — here, the `classes`
-                        // rewrite, which does not implement static blocks unless
-                        // the caller asked for them.
-                        set_public_class_fields: false,
-                        ..transform_options.assumptions
-                    },
-                    jsx: JsxOptions::disable(),
-                    // No helper loader, because `oxc_transformer::typescript`
-                    // requests no helper. That is what lets this run under inline
-                    // helper materialization as well: that mode recognises
-                    // `babelHelpers` references by their empty span, and printing
-                    // one here would give it a span it could no longer match.
-                    ..TransformOptions::default()
-                };
+                decorator_detector.0
+            } else {
+                false
+            };
+            if active_source_type.is_typescript() || has_decorators {
+                semantic_build_count += 1;
                 ast_traversal_count += 1;
-                let transformed =
-                    Transformer::new(&language_allocator, Path::new(&filename), &language_options)
-                        .build_with_scoping(built.semantic.into_scoping(), &mut program);
-                if transformed.diagnostics.is_empty() {
-                    // The intermediate is never the output, so it is printed
-                    // unminified whatever the caller asked for: the final codegen
-                    // does the minifying, and readable input keeps the rewrites'
-                    // own textual guards honest.
-                    let (printed, layer) = render_program(
-                        &program,
-                        &filename,
-                        false,
-                        options.comments.unwrap_or(true),
-                        0,
-                    )?;
-                    source = printed;
-                    rewrite_layers.push(layer);
-                    #[expect(deprecated)]
-                    {
-                        debug_assert!(
-                            transformed.helpers_used.is_empty(),
-                            "the language prepass must not request helpers"
-                        );
+                let built = run(|| {
+                    SemanticBuilder::new()
+                        .with_excess_capacity(2.0)
+                        .with_enum_eval(true)
+                        .build(&program)
+                });
+                if built.diagnostics.is_empty() {
+                    let mut language_options = TransformOptions {
+                        cwd: transform_options.cwd.clone(),
+                        assumptions: CompilerAssumptions {
+                            // Oxc's TypeScript pass owns class fields when this is
+                            // set and the class-properties plugin is not, lowering
+                            // `static x = 1` to `static { this.x = 1 }`. A class
+                            // field is an ES feature, so it stays for whoever the
+                            // caller selected to lower it — here, the `classes`
+                            // rewrite, which does not implement static blocks unless
+                            // the caller asked for them.
+                            set_public_class_fields: false,
+                            ..transform_options.assumptions
+                        },
+                        jsx: JsxOptions::disable(),
+                        // No helper loader, because `oxc_transformer::typescript`
+                        // requests no helper. That is what lets this run under inline
+                        // helper materialization as well: that mode recognises
+                        // `babelHelpers` references by their empty span, and printing
+                        // one here would give it a span it could no longer match.
+                        ..TransformOptions::default()
+                    };
+                    if has_decorators {
+                        // NOTE: Decorators use the legacy evaluation model. Lower them
+                        // before type and class rewrites so those passes never discard
+                        // decorator expressions attached to syntax they consume.
+                        language_options.decorator.legacy = true;
+                        language_options.helper_loader.mode = HelperLoaderMode::External;
                     }
-                    // The strip is selected by the program's source type rather
-                    // than by an option, so the intermediate is reclassified for
-                    // what it now is — the way the Flow adapter reclassifies its
-                    // own output. Left as TypeScript, the strip would run a
-                    // second time and, with no JSX pragma left to hold it,
-                    // elide the `React` import it had just decided to keep.
-                    // `with_typescript(false)` is a no-op — Oxc's `with_*`
-                    // setters only ever set — so the language has to be moved to
-                    // JavaScript outright. The JSX variant is separate and stays.
-                    active_source_type = active_source_type.with_javascript(true);
+                    ast_traversal_count += 1;
+                    let transformed = Transformer::new(
+                        &language_allocator,
+                        Path::new(&filename),
+                        &language_options,
+                    )
+                    .build_with_scoping(built.semantic.into_scoping(), &mut program);
+                    if transformed.diagnostics.is_empty() {
+                        if has_decorators {
+                            #[expect(deprecated)]
+                            let decorate = transformed
+                                .helpers_used
+                                .contains_key(&oxc_transformer::Helper::Decorate);
+                            #[expect(deprecated)]
+                            let decorate_param = transformed
+                                .helpers_used
+                                .contains_key(&oxc_transformer::Helper::DecorateParam);
+                            let mut reserved = transformed
+                                .scoping
+                                .symbol_names()
+                                .map(str::to_owned)
+                                .collect::<std::collections::HashSet<_>>();
+                            let decorate_name = reserve_prepass_name("_decorate", &mut reserved);
+                            let decorate_param_name =
+                                reserve_prepass_name("_decorateParam", &mut reserved);
+                            DecoratorHelperReferenceRewriter {
+                                allocator: &language_allocator,
+                                decorate_name: &decorate_name,
+                                decorate_param_name: &decorate_param_name,
+                            }
+                            .visit_program(&mut program);
+                            decorator_helper_requests = decorator_helpers(
+                                &decorate_name,
+                                &decorate_param_name,
+                                decorate,
+                                decorate_param,
+                            );
+                        }
+                        // The intermediate is never the output, so it is printed
+                        // unminified whatever the caller asked for: the final codegen
+                        // does the minifying, and readable input keeps the rewrites'
+                        // own textual guards honest.
+                        let (printed, layer) = render_program(
+                            &program,
+                            &filename,
+                            false,
+                            options.comments.unwrap_or(true),
+                            0,
+                        )?;
+                        source = printed;
+                        rewrite_layers.push(layer);
+                        #[expect(deprecated)]
+                        {
+                            debug_assert!(
+                                has_decorators || transformed.helpers_used.is_empty(),
+                                "only the decorator prepass may request language helpers"
+                            );
+                        }
+                        // The strip is selected by the program's source type rather
+                        // than by an option, so the intermediate is reclassified for
+                        // what it now is — the way the Flow adapter reclassifies its
+                        // own output. Left as TypeScript, the strip would run a
+                        // second time and, with no JSX pragma left to hold it,
+                        // elide the `React` import it had just decided to keep.
+                        // `with_typescript(false)` is a no-op — Oxc's `with_*`
+                        // setters only ever set — so the language has to be moved to
+                        // JavaScript outright. The JSX variant is separate and stays.
+                        active_source_type = active_source_type.with_javascript(true);
+                    }
                 }
             }
         }
@@ -514,7 +547,10 @@ pub fn transform(
                 source,
                 super::regexp::Options {
                     unicode: options.regexp_unicode == Some(true),
-                    unicode_properties: options.regexp_unicode_property_escapes == Some(true),
+                    // Babel's transform-unicode-regex expands Unicode property
+                    // escapes as a prerequisite before removing the `u` flag.
+                    unicode_properties: options.regexp_unicode == Some(true)
+                        || options.regexp_unicode_property_escapes == Some(true),
                     dot_all: options.regexp_dot_all == Some(true),
                     named_groups: options.regexp_named_capture_groups == Some(true),
                     unicode_sets: options.regexp_unicode_sets == Some(true),
@@ -528,6 +564,7 @@ pub fn transform(
             (false, super::helpers::CustomHelperRequests::default())
         };
         structural_custom_helper_requests.prepend(object_spread_helper_requests);
+        structural_custom_helper_requests.prepend(decorator_helper_requests);
         if conditional_jsx {
             let mut detector = JsxDetector(false);
             detector.visit_program(&program);
@@ -539,7 +576,16 @@ pub fn transform(
                 return Ok(identity_result(source.to_owned()));
             }
         }
-        let check_decorators = source.contains('@') && source.contains("class");
+        if options.classes != Some(true)
+            && options.class_properties == Some(true)
+            && options.class_properties_loose == Some(true)
+        {
+            // NOTE: Loose public fields assume the superclass binding is constant.
+            // Rewrite static initializer `super` access before the downstream field
+            // transform so inherited accessors observe the same receiver semantics.
+            super::classes::rewrite_loose_static_field_super(allocator, &mut program);
+            ast_traversal_count += 1;
+        }
         let check_regexp = options.regexp_unicode == Some(true)
             || options.regexp_unicode_property_escapes == Some(true)
             || options.regexp_dot_all == Some(true)
@@ -548,11 +594,10 @@ pub fn transform(
             || options.regexp_match_indices == Some(true)
             || options.regexp_unicode_sets == Some(true);
         let mut detector = PostconditionDetector {
-            check_decorators,
-            check_class_fusion: options.class_properties == Some(true),
+            // NOTE: The focused class pass now owns class-property/private
+            // composition, so Oxc's historical fusion guard is unreachable.
+            check_class_fusion: options.class_properties == Some(true) && !classes_ast_selected,
             check_regexp,
-            // Structurally owned classes run after semantic planning below.
-            check_classes: options.classes == Some(true) && !classes_ast_selected,
             // Flat declarators now run after semantic planning. Remaining
             // shapes have already taken the compatibility path.
             check_destructuring: false,
@@ -641,22 +686,40 @@ pub fn transform(
                 &semantic.semantic,
                 options.classes == Some(true),
                 if options.classes == Some(true) {
+                    // NOTE: Class lowering uses spec-style public fields by default.
+                    // The direct pass must own fields even when the prerequisite
+                    // transform was not separately selected, because no class can
+                    // remain after this phase.
+                    Some(options.class_properties_loose.unwrap_or(false))
+                } else {
                     options
                         .class_properties
                         .filter(|enabled| *enabled)
-                        .map(|_| options.class_properties_loose.unwrap_or(false))
-                } else {
-                    Some(true)
+                        .map_or(Some(true), |_| {
+                            Some(options.class_properties_loose.unwrap_or(false))
+                        })
                 },
-                options.class_static_block == Some(true),
-                options
-                    .private_methods
-                    .filter(|enabled| *enabled)
-                    .map(|_| options.private_methods_loose.unwrap_or(false)),
-                options
-                    .private_property_in_object
-                    .filter(|enabled| *enabled)
-                    .map(|_| options.private_property_in_object_loose.unwrap_or(false)),
+                class_rewrite_selected || options.class_static_block == Some(true),
+                if options.classes == Some(true) {
+                    // NOTE: Use the loose private representation and do not retain a second
+                    // class-lowering implementation solely for spec private state.
+                    Some(true)
+                } else {
+                    options
+                        .private_methods
+                        .filter(|enabled| *enabled)
+                        .map(|_| true)
+                        .or(focused_class_features.then_some(true))
+                },
+                if options.classes == Some(true) {
+                    Some(true)
+                } else {
+                    options
+                        .private_property_in_object
+                        .filter(|enabled| *enabled)
+                        .map(|_| true)
+                        .or(focused_class_features.then_some(true))
+                },
                 options.helpers_mode.as_deref() == Some("inline"),
                 options.block_scoping == Some(true),
             ) {
@@ -1745,26 +1808,10 @@ fn compile_options(options: &NativePreflightOptions) -> Result<TransformOptions>
         // `loose` or `useBuiltIns`: Oxc rejects both at construction time.
         compiled.env.es2018.object_rest_spread = Some(Default::default());
     }
-    let mut selected_class_feature_loose = None;
-    for (enabled, loose) in [
-        (options.class_properties, options.class_properties_loose),
-        (options.private_methods, options.private_methods_loose),
-        (
-            options.private_property_in_object,
-            options.private_property_in_object_loose,
-        ),
-    ] {
-        if enabled == Some(true) {
-            let loose = loose.unwrap_or(false);
-            if selected_class_feature_loose.is_some_and(|selected| selected != loose) {
-                return Err(Error::new(
-                    Status::InvalidArg,
-                    "classProperties, privateMethods, and privatePropertyInObject must use the same loose value",
-                ));
-            }
-            selected_class_feature_loose = Some(loose);
-        }
-    }
+    // NOTE: Public fields use spec semantics while private fields use the loose
+    // representation. The focused class pass owns private syntax, so the
+    // historical Babel plugin requirement that every `loose` option agree is
+    // neither necessary nor representative of the selected transform semantics.
     if options.class_properties == Some(true) && !class_features_owned_by_rewrite {
         // `ClassProperties::new` already reads `loose` into both
         // `set_public_class_fields` and `private_fields_as_properties`, and only
@@ -1817,8 +1864,10 @@ fn compile_options(options: &NativePreflightOptions) -> Result<TransformOptions>
     // The focused RegExp pass owns named groups. Oxc's pass also treats escaped
     // `\(?<...>` text as a group candidate, producing a semantic mismatch.
     compiled.env.regexp.named_capture_groups = false;
-    compiled.env.regexp.look_behind_assertions = options.regexp_look_behind == Some(true);
-    compiled.env.regexp.match_indices = options.regexp_match_indices == Some(true);
+    // Lookbehind and match indices have no semantics-preserving syntax-only
+    // lowering. Selecting either option explicitly retains the native syntax.
+    compiled.env.regexp.look_behind_assertions = false;
+    compiled.env.regexp.match_indices = false;
     // The focused RegExp pass owns Unicode set notation so unsupported set
     // grammar yields a precise diagnostic instead of surviving postcondition.
     compiled.env.regexp.set_notation = false;
@@ -1902,6 +1951,89 @@ struct DecoratorDetector(bool);
 
 struct JsxDetector(bool);
 
+fn reserve_prepass_name(
+    preferred: &str,
+    reserved: &mut std::collections::HashSet<String>,
+) -> String {
+    if reserved.insert(preferred.to_owned()) {
+        return preferred.to_owned();
+    }
+    let mut suffix = 2;
+    loop {
+        let candidate = format!("{preferred}{suffix}");
+        if reserved.insert(candidate.clone()) {
+            return candidate;
+        }
+        suffix += 1;
+    }
+}
+
+fn decorator_helpers(
+    decorate_name: &str,
+    decorate_param_name: &str,
+    decorate: bool,
+    decorate_param: bool,
+) -> CustomHelperRequests {
+    let mut requests = CustomHelperRequests::default();
+    if decorate {
+        requests.push_fragment(
+            format!(
+                "function {decorate_name}(e,t,r,n){{var o=arguments.length,a=o<3?t:n===null?n=Object.getOwnPropertyDescriptor(t,r):n,l;for(var c=e.length-1;c>=0;c--)if(l=e[c])a=(o<3?l(a):o>3?l(t,r,a):l(t,r))||a;return o>3&&a&&Object.defineProperty(t,r,a),a}}"
+            ),
+            format!(
+                "function {decorate_name}(decorators, target, key, descriptor) {{\n  var argumentCount = arguments.length;\n  var result = argumentCount < 3 ? target : descriptor === null ? descriptor = Object.getOwnPropertyDescriptor(target, key) : descriptor;\n  var decorator;\n  for (var index = decorators.length - 1; index >= 0; index--) {{\n    if (decorator = decorators[index]) result = (argumentCount < 3 ? decorator(result) : argumentCount > 3 ? decorator(target, key, result) : decorator(target, key)) || result;\n  }}\n  if (argumentCount > 3 && result) Object.defineProperty(target, key, result);\n  return result;\n}}"
+            ),
+        );
+        requests.reserve_scope_names([decorate_name.to_owned()]);
+    }
+    if decorate_param {
+        requests.push_fragment(
+            format!(
+                "function {decorate_param_name}(e,t){{return function(r,n){{t(r,n,e)}}}}"
+            ),
+            format!(
+                "function {decorate_param_name}(index, decorator) {{\n  return function (target, key) {{\n    decorator(target, key, index);\n  }};\n}}"
+            ),
+        );
+        requests.reserve_scope_names([decorate_param_name.to_owned()]);
+    }
+    requests
+}
+
+struct DecoratorHelperReferenceRewriter<'a, 'n> {
+    allocator: &'a Allocator,
+    decorate_name: &'n str,
+    decorate_param_name: &'n str,
+}
+
+impl<'a> VisitMut<'a> for DecoratorHelperReferenceRewriter<'a, '_> {
+    #[expect(deprecated)]
+    fn visit_expression(&mut self, expression: &mut Expression<'a>) {
+        let Expression::StaticMemberExpression(member) = expression else {
+            walk_mut::walk_expression(self, expression);
+            return;
+        };
+        let Expression::Identifier(object) = &member.object else {
+            walk_mut::walk_expression(self, expression);
+            return;
+        };
+        if object.name != "babelHelpers" {
+            walk_mut::walk_expression(self, expression);
+            return;
+        }
+        let replacement = match member.property.name.as_str() {
+            "decorate" => self.decorate_name,
+            "decorateParam" => self.decorate_param_name,
+            _ => {
+                walk_mut::walk_expression(self, expression);
+                return;
+            }
+        };
+        *expression = AstBuilder::new(self.allocator)
+            .expression_identifier(member.span, self.allocator.alloc_str(replacement));
+    }
+}
+
 impl<'a> Visit<'a> for JsxDetector {
     fn enter_node(&mut self, kind: AstKind<'a>) {
         self.0 |= matches!(kind, AstKind::JSXElement(_) | AstKind::JSXFragment(_));
@@ -1917,22 +2049,18 @@ impl<'a> Visit<'a> for DecoratorDetector {
 
 #[derive(Default)]
 struct PostconditionDetector {
-    check_decorators: bool,
     check_class_fusion: bool,
     check_regexp: bool,
     check_classes: bool,
     check_destructuring: bool,
     check_parameters: bool,
     check_for_of: bool,
-    decorators: bool,
     private_method: bool,
     private_in: bool,
     unicode: bool,
     unicode_property: bool,
     dot_all: bool,
     named_capture_groups: bool,
-    look_behind: bool,
-    match_indices: bool,
     unicode_sets: bool,
     classes: bool,
     destructuring: bool,
@@ -1942,8 +2070,7 @@ struct PostconditionDetector {
 
 impl PostconditionDetector {
     fn is_active(&self) -> bool {
-        self.check_decorators
-            || self.check_class_fusion
+        self.check_class_fusion
             || self.check_regexp
             || self.check_classes
             || self.check_destructuring
@@ -1952,40 +2079,22 @@ impl PostconditionDetector {
     }
 
     fn failure_reason(&self, options: &NativePreflightOptions) -> Option<&'static str> {
-        if self.check_decorators && self.decorators {
-            Some("decorators-not-supported")
-        } else if self.check_class_fusion
-            && options.private_methods != Some(true)
-            && self.private_method
-        {
-            Some("oxc-class-properties-private-method-fusion")
-        } else if self.check_class_fusion
-            && options.private_property_in_object != Some(true)
-            && self.private_in
-        {
-            Some("oxc-class-properties-private-in-fusion")
-        } else if options.regexp_unicode == Some(true) && self.unicode {
-            Some("regexp-unicode-semantic-mismatch")
+        if options.regexp_unicode == Some(true) && self.unicode {
+            Some("regexp-unicode-postcondition-failed")
         } else if options.regexp_unicode_property_escapes == Some(true) && self.unicode_property {
-            Some("regexp-unicode-property-escapes-semantic-mismatch")
+            Some("regexp-unicode-property-escapes-postcondition-failed")
         } else if options.regexp_dot_all == Some(true) && self.dot_all {
-            Some("regexp-dot-all-semantic-mismatch")
+            Some("regexp-dot-all-postcondition-failed")
         } else if options.regexp_named_capture_groups == Some(true) && self.named_capture_groups {
-            Some("regexp-named-capture-groups-semantic-mismatch")
-        } else if options.regexp_look_behind == Some(true) && self.look_behind {
-            Some("regexp-look-behind-semantic-mismatch")
-        } else if options.regexp_match_indices == Some(true) && self.match_indices {
-            Some("regexp-match-indices-semantic-mismatch")
+            Some("regexp-named-capture-groups-postcondition-failed")
         } else if options.regexp_unicode_sets == Some(true) && self.unicode_sets {
-            Some("regexp-unicode-sets-semantic-mismatch")
-        } else if self.check_classes && self.classes {
-            Some("classes-not-implemented")
+            Some("regexp-unicode-sets-postcondition-failed")
         } else if self.check_destructuring && self.destructuring {
-            Some("destructuring-not-implemented")
+            Some("destructuring-postcondition-failed")
         } else if self.check_parameters && self.parameters {
             Some("parameters-postcondition-failed")
         } else if self.check_for_of && self.for_of {
-            Some("for-of-not-implemented")
+            Some("for-of-postcondition-failed")
         } else {
             None
         }
@@ -1993,11 +2102,6 @@ impl PostconditionDetector {
 }
 
 impl<'a> Visit<'a> for PostconditionDetector {
-    fn visit_decorator(&mut self, decorator: &Decorator<'a>) {
-        self.decorators |= self.check_decorators;
-        walk::walk_decorator(self, decorator);
-    }
-
     fn visit_method_definition(&mut self, method: &MethodDefinition<'a>) {
         self.private_method |=
             self.check_class_fusion && matches!(method.key, PropertyKey::PrivateIdentifier(_));
@@ -2015,11 +2119,9 @@ impl<'a> Visit<'a> for PostconditionDetector {
         }
         self.unicode |= literal.regex.flags.contains(RegExpFlags::U);
         self.dot_all |= literal.regex.flags.contains(RegExpFlags::S);
-        self.match_indices |= literal.regex.flags.contains(RegExpFlags::D);
         self.unicode_sets |= literal.regex.flags.contains(RegExpFlags::V);
         let remainder = literal.regex.pattern.text.as_str();
         self.unicode_property |= remainder.contains("\\p{") || remainder.contains("\\P{");
-        self.look_behind |= remainder.contains("(?<=") || remainder.contains("(?<!");
         self.named_capture_groups |= literal
             .regex
             .pattern

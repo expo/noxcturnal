@@ -15,6 +15,20 @@ test('aligns Unicode regular expressions with Babel', async () => {
   ).resolves.toEqual([true, false]);
 });
 
+test('aligns Unicode property escape composition with Babel', async () => {
+  await expect(
+    alignBabelBehavior({
+      source: String.raw`const ascii = /^\p{ASCII}+$/u;
+const nonNumber = /^\P{Number}+$/u;
+globalThis.__result = [ascii.test('abc'), ascii.test('é'), nonNumber.test('abc'), nonNumber.test('٣')];`,
+      filename: 'input.js',
+      plugins: [unicodeRegex],
+      noxcturnal: { transforms: { regexpUnicode: true } },
+      output: { mustNotMatch: [/\\[pP]\{/u, /\/[dgimsuvy]*u[dgimsuvy]*/u] },
+    }),
+  ).resolves.toEqual([true, false, true, false]);
+});
+
 test('aligns astral Unicode character classes with Babel', async () => {
   await expect(
     alignBabelBehavior({

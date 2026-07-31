@@ -113,8 +113,8 @@ pub const fn compatibility(helper: Helper) -> Option<HelperCompatibility> {
         | Helper::SuperPropGet
         | Helper::SuperPropSet => ((7, 24, 0), "Babel 7.24 class-feature ABI"),
         Helper::UsingCtx => ((7, 28, 0), "Babel explicit-resource-management ABI"),
-        // Decorators are rejected before transformation, so these helpers must never
-        // be reachable from a supported preflight transform set.
+        // NOTE: The decorator prepass materializes collision-safe local helpers,
+        // so decorator helpers must never reach the final runtime loader.
         Helper::Decorate | Helper::DecorateParam | Helper::DecorateMetadata => return None,
     };
     Some(HelperCompatibility {
@@ -228,6 +228,7 @@ pub fn validate_custom_runtime_helpers(
     for helper in helpers {
         let minimum = match *helper {
             "classPrivateFieldLooseBase" => (7, 10, 0),
+            "checkInRHS" => (7, 22, 0),
             "construct"
             | "extends"
             | "get"

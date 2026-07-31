@@ -9,7 +9,9 @@ test('lowers private property checks', async () => {
       transforms: { privatePropertyInObject: { loose: true } },
     }),
   ).toMatchInlineSnapshot(`
-    "export let Counter = (() => {
+    "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+      _checkInRHS = _checkInRHS2.checkInRHS;
+    export let Counter = (() => {
       'use strict';
       var _value = '__private_Counter_value';
       const Counter = function Counter() {
@@ -23,7 +25,7 @@ test('lowers private property checks', async () => {
         value: Object.defineProperty(
           function (input) {
             if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
-            return Object.prototype.hasOwnProperty.call(input, _value);
+            return Object.prototype.hasOwnProperty.call(_checkInRHS(input), _value);
           },
           'name',
           {

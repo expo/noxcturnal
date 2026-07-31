@@ -1,5 +1,5 @@
-import { test } from 'vitest';
-import { expectBailout } from '../transform';
+import { expect, test } from 'vitest';
+import { transformSource } from '../transform';
 
 const cases = [
   ['plain match indices', String.raw`/value/d`],
@@ -11,13 +11,10 @@ const cases = [
 
 for (const [name, regexp] of cases) {
   test(name, async () => {
-    expectBailout(
-      `export const matcher = ${regexp};`,
-      'input.js',
-      {
+    await expect(
+      transformSource(`export const matcher = ${regexp};`, 'input.js', {
         transforms: { regexpMatchIndices: true },
-      },
-      'preflight:regexp-match-indices-semantic-mismatch',
-    );
+      }),
+    ).resolves.toBe(`export const matcher = ${regexp};`);
   });
 }

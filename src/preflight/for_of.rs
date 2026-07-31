@@ -156,7 +156,7 @@ impl<'a> ForOfLowerer<'a> {
             }
             target => {
                 let target = AssignmentTarget::try_from(target)
-                    .map_err(|_| "for-of-assignment-target-not-implemented")?;
+                    .map_err(|_| "for-of-assignment-target-invalid")?;
                 #[expect(deprecated)]
                 let assignment = self.ast.expression_assignment(
                     target.span(),

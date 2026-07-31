@@ -252,7 +252,13 @@ const inventory: InventoryEntry[] = [
     reason: 'Separate native conformance suite',
   },
   { transform: 'react-native-codegen', status: 'excluded', profiles: ['native'] },
-  { transform: 'lazy-decorators', status: 'excluded', profiles: ['all'] },
+  {
+    transform: 'lazy-decorators',
+    status: 'aligned',
+    testFile: 'decorators/legacy-decorators.test.ts',
+    profiles: ['all'],
+    options: 'legacy',
+  },
   { transform: 'reanimated/worklets', status: 'excluded', profiles: ['installed'] },
   { transform: 'react-native-web', status: 'excluded', profiles: ['web'] },
 ];

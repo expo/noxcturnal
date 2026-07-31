@@ -237,14 +237,17 @@ test('native parameters do not capture lexical state from nested ordinary functi
   assert.deepEqual(inner.call({ flag: 'inner' }, 2), [1, 'inner', 2, undefined]);
 });
 
-test('native parameters retain an explicit boundary for arrow lexical super', () => {
+test('native parameters preserve arrow lexical super', () => {
   const result = transform(
     'class Base { method(value) { return value; } } class Derived extends Base { method() { return (value = 1) => super.method(value); } }',
     'fixture.js',
     pipeline({ parameters: true }),
   );
-  assert.equal(result.status, 'bailout');
-  assert.equal(result.reason, 'syntax:arrow-parameters-lexical-super-not-implemented');
+  assert.equal(result.status, 'complete');
+  const Derived = new Function(`${result.code}; return Derived;`)() as new () => {
+    method(): (value?: number) => number;
+  };
+  assert.equal(new Derived().method()(), 1);
 });
 
 test('transform option objects reject missing and unrelated fields', () => {
@@ -284,7 +287,7 @@ test('transform option objects reject missing and unrelated fields', () => {
   );
 });
 
-test('rejects conflicting semantic options instead of resolving them as a preset', () => {
+test('validates shared semantics while class feature representations remain independent', () => {
   assert.throws(
     () =>
       transform(
@@ -297,18 +300,15 @@ test('rejects conflicting semantic options instead of resolving them as a preset
       ),
     /must use the same loose value/,
   );
-  assert.throws(
-    () =>
-      transform(
-        'class Value { field = 1; #method() {} }',
-        'fixture.js',
-        pipeline({
-          classProperties: { loose: false },
-          privateMethods: { loose: true },
-        }),
-      ),
-    /must use the same loose value/,
+  const classFeatures = transform(
+    'class Value { field = 1; #method() {} }',
+    'fixture.js',
+    pipeline({
+      classProperties: { loose: false },
+      privateMethods: { loose: true },
+    }),
   );
+  assert.equal(classFeatures.status, 'complete');
 });
 
 test('classProperties owns loose assignment semantics explicitly', () => {
@@ -441,22 +441,15 @@ test('inline object and class helpers preserve symbols, getters, and field defin
   assert.deepEqual(context.result, [2, 1, 3, 4]);
 });
 
-test('regexp toggles reject constructor-only output that is not Babel lowering', () => {
-  for (const [source, transforms, reason] of [
-    [
-      'var expression = /(?<=a)b/;',
-      { regexpLookBehind: true },
-      'regexp-look-behind-semantic-mismatch',
-    ],
-    [
-      'var expression = /a/d;',
-      { regexpMatchIndices: true },
-      'regexp-match-indices-semantic-mismatch',
-    ],
-  ] satisfies [string, PreflightTransforms, string][]) {
+test('regexp toggles preserve native syntax without constructor rewrites', () => {
+  for (const [source, transforms] of [
+    ['var expression = /(?<=a)b/;', { regexpLookBehind: true }],
+    ['var expression = /a/d;', { regexpMatchIndices: true }],
+  ] satisfies [string, PreflightTransforms][]) {
     const result = transform(source, 'fixture.js', pipeline(transforms));
-    assert.equal(result.status, 'bailout');
-    assert.equal(result.reason, `syntax:${reason}`);
+    assert.equal(result.status, 'complete');
+    assert.match(result.code, transforms.regexpLookBehind ? /\(\?<=a\)b/ : /\/a\/d/);
+    assert.doesNotMatch(result.code, /new RegExp/);
   }
 
   const unicodeSets = transform(

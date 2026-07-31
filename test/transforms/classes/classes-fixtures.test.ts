@@ -569,7 +569,8 @@ test('assumption-setClassMethods/method-name-non-bmp/method-name-non-bmp-not-sup
 });
 
 test('assumption-setClassMethods/method-return-type-annotation/input.js', async () => {
-  const source = "// @flow\nclass C {\n  m(x: number): string {\n    return 'a';\n  }\n}\n";
+  const source =
+    "// @flow\n// @flow\nclass C {\n  m(x: number): string {\n    return 'a';\n  }\n}\n";
   expect(
     await transformOutcome(source, 'input.js', {
       transforms: { classes: true },
@@ -577,6 +578,7 @@ test('assumption-setClassMethods/method-return-type-annotation/input.js', async 
     }),
   ).toMatchInlineSnapshot(`
     "// @flow
+    // @flow
     let C = (() => {
       'use strict';
       const C = function C() {
@@ -5757,7 +5759,7 @@ test('get-set/change-computed-key/exec.js', async () => {
     }),
   ).toMatchInlineSnapshot(`
     "let x = 1;
-    let A = ((_key, _key11, _key12) => {
+    let A = ((_key, _key13, _key14) => {
       'use strict';
       const A = function A() {
         if (!new.target) throw new TypeError('Cannot call a class as a function');
@@ -5781,7 +5783,7 @@ test('get-set/change-computed-key/exec.js', async () => {
         ),
         configurable: true,
       });
-      Object.defineProperty(A.prototype, _key11, {
+      Object.defineProperty(A.prototype, _key13, {
         value: Object.defineProperty(
           function () {
             if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
@@ -5789,18 +5791,18 @@ test('get-set/change-computed-key/exec.js', async () => {
           'name',
           {
             value:
-              typeof _key11 === 'symbol'
-                ? _key11.description === void 0
+              typeof _key13 === 'symbol'
+                ? _key13.description === void 0
                   ? ''
-                  : '[' + _key11.description + ']'
-                : String(_key11),
+                  : '[' + _key13.description + ']'
+                : String(_key13),
             configurable: true,
           },
         ),
         writable: true,
         configurable: true,
       });
-      Object.defineProperty(A.prototype, _key12, {
+      Object.defineProperty(A.prototype, _key14, {
         set: Object.defineProperty(
           function (_) {
             if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
@@ -5809,11 +5811,11 @@ test('get-set/change-computed-key/exec.js', async () => {
           {
             value:
               'set ' +
-              (typeof _key12 === 'symbol'
-                ? _key12.description === void 0
+              (typeof _key14 === 'symbol'
+                ? _key14.description === void 0
                   ? ''
-                  : '[' + _key12.description + ']'
-                : String(_key12)),
+                  : '[' + _key14.description + ']'
+                : String(_key14)),
             configurable: true,
           },
         ),
@@ -5844,7 +5846,7 @@ test('get-set/change-computed-key/input.js', async () => {
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "let A = ((_key, _key10, _key11) => {
+    "let A = ((_key, _key12, _key13) => {
       'use strict';
       const A = function A() {
         if (!new.target) throw new TypeError('Cannot call a class as a function');
@@ -5868,7 +5870,7 @@ test('get-set/change-computed-key/input.js', async () => {
         ),
         configurable: true,
       });
-      Object.defineProperty(A.prototype, _key10, {
+      Object.defineProperty(A.prototype, _key12, {
         value: Object.defineProperty(
           function () {
             if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
@@ -5876,18 +5878,18 @@ test('get-set/change-computed-key/input.js', async () => {
           'name',
           {
             value:
-              typeof _key10 === 'symbol'
-                ? _key10.description === void 0
+              typeof _key12 === 'symbol'
+                ? _key12.description === void 0
                   ? ''
-                  : '[' + _key10.description + ']'
-                : String(_key10),
+                  : '[' + _key12.description + ']'
+                : String(_key12),
             configurable: true,
           },
         ),
         writable: true,
         configurable: true,
       });
-      Object.defineProperty(A.prototype, _key11, {
+      Object.defineProperty(A.prototype, _key13, {
         set: Object.defineProperty(
           function (_) {
             if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
@@ -5896,11 +5898,11 @@ test('get-set/change-computed-key/input.js', async () => {
           {
             value:
               'set ' +
-              (typeof _key11 === 'symbol'
-                ? _key11.description === void 0
+              (typeof _key13 === 'symbol'
+                ? _key13.description === void 0
                   ? ''
-                  : '[' + _key11.description + ']'
-                : String(_key11)),
+                  : '[' + _key13.description + ']'
+                : String(_key13)),
             configurable: true,
           },
         ),
@@ -7154,7 +7156,7 @@ test('get-set/numeric-keys/input.js', async () => {
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "let A = ((_key, _key10) => {
+    "let A = ((_key, _key12) => {
       'use strict';
       const A = function A() {
         if (!new.target) throw new TypeError('Cannot call a class as a function');
@@ -7208,7 +7210,7 @@ test('get-set/numeric-keys/input.js', async () => {
         },
         configurable: true,
       });
-      Object.defineProperty(A.prototype, _key10, {
+      Object.defineProperty(A.prototype, _key12, {
         get: Object.defineProperty(
           function () {
             if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
@@ -7217,11 +7219,11 @@ test('get-set/numeric-keys/input.js', async () => {
           {
             value:
               'get ' +
-              (typeof _key10 === 'symbol'
-                ? _key10.description === void 0
+              (typeof _key12 === 'symbol'
+                ? _key12.description === void 0
                   ? ''
-                  : '[' + _key10.description + ']'
-                : String(_key10)),
+                  : '[' + _key12.description + ']'
+                : String(_key12)),
             configurable: true,
           },
         ),
@@ -9372,7 +9374,8 @@ test('loose/method-name-non-bmp/input.js', async () => {
 });
 
 test('loose/method-return-type-annotation/input.js', async () => {
-  const source = "// @flow\nclass C {\n  m(x: number): string {\n    return 'a';\n  }\n}\n";
+  const source =
+    "// @flow\n// @flow\nclass C {\n  m(x: number): string {\n    return 'a';\n  }\n}\n";
   expect(
     await transformOutcome(source, 'input.js', {
       transforms: { classes: true },
@@ -9380,6 +9383,7 @@ test('loose/method-return-type-annotation/input.js', async () => {
     }),
   ).toMatchInlineSnapshot(`
     "// @flow
+    // @flow
     let C = (() => {
       'use strict';
       const C = function C() {
@@ -9945,6 +9949,7 @@ test('misc/function-name-ts-annotation/input.ts', async () => {
     await transformOutcome(source, 'input.ts', {
       transforms: { classes: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
+      typescript: 'strip',
     }),
   ).toMatchInlineSnapshot(`
     "let Database = (() => {
@@ -9980,12 +9985,50 @@ test('misc/missing-class-properties-transform-private/input.js', async () => {
       transforms: {
         classes: true,
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-spec-private-features-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _classPrivateFieldLooseBase2 = {
+      classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+    };
+    function _classPrivateFieldLooseBase(e, s) {
+      return _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+    }
+    function _classPrivateMethodCall(e, s, a) {
+      return _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s)[s].apply(e, a);
+    }
+    let Test = (() => {
+      'use strict';
+      var _key = '__private_Test_key';
+      const Test = function Test() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+        Object.defineProperty(this, _key, {
+          writable: true,
+          value: '',
+        });
+      };
+      Object.defineProperty(Test.prototype, 'method', {
+        value: Object.defineProperty(
+          function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            return _classPrivateFieldLooseBase(this, _key)[_key];
+          },
+          'name',
+          {
+            value: 'method',
+            configurable: true,
+          },
+        ),
+        writable: true,
+        configurable: true,
+      });
+      Object.defineProperty(Test, 'prototype', { writable: false });
+      return Test;
+    })();"
+  `);
 });
 
 test('misc/missing-class-properties-transform-public/input.js', async () => {
@@ -9995,7 +10038,37 @@ test('misc/missing-class-properties-transform-public/input.js', async () => {
       transforms: { classes: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-direct-shape-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "let Test = (() => {
+      'use strict';
+      const Test = function Test() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+        Object.defineProperty(this, 'key', {
+          value: '',
+          enumerable: true,
+          configurable: true,
+          writable: true,
+        });
+      };
+      Object.defineProperty(Test.prototype, 'method', {
+        value: Object.defineProperty(
+          function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            return this.key;
+          },
+          'name',
+          {
+            value: 'method',
+            configurable: true,
+          },
+        ),
+        writable: true,
+        configurable: true,
+      });
+      Object.defineProperty(Test, 'prototype', { writable: false });
+      return Test;
+    })();"
+  `);
 });
 
 test('misc/this-before-super-2/input.js', async () => {
@@ -11574,7 +11647,7 @@ test('spec/computed-keys-call-order/exec.js', async () => {
     }),
   ).toMatchInlineSnapshot(`
     "var log = [];
-    let A = ((_key, _key10, _key11, _key12) => {
+    let A = ((_key, _key12, _key13, _key14) => {
       'use strict';
       const A = function A() {
         if (!new.target) throw new TypeError('Cannot call a class as a function');
@@ -11598,44 +11671,6 @@ test('spec/computed-keys-call-order/exec.js', async () => {
         writable: true,
         configurable: true,
       });
-      Object.defineProperty(A, _key10, {
-        value: Object.defineProperty(
-          function () {
-            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
-          },
-          'name',
-          {
-            value:
-              typeof _key10 === 'symbol'
-                ? _key10.description === void 0
-                  ? ''
-                  : '[' + _key10.description + ']'
-                : String(_key10),
-            configurable: true,
-          },
-        ),
-        writable: true,
-        configurable: true,
-      });
-      Object.defineProperty(A.prototype, _key11, {
-        value: Object.defineProperty(
-          function () {
-            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
-          },
-          'name',
-          {
-            value:
-              typeof _key11 === 'symbol'
-                ? _key11.description === void 0
-                  ? ''
-                  : '[' + _key11.description + ']'
-                : String(_key11),
-            configurable: true,
-          },
-        ),
-        writable: true,
-        configurable: true,
-      });
       Object.defineProperty(A, _key12, {
         value: Object.defineProperty(
           function () {
@@ -11649,6 +11684,44 @@ test('spec/computed-keys-call-order/exec.js', async () => {
                   ? ''
                   : '[' + _key12.description + ']'
                 : String(_key12),
+            configurable: true,
+          },
+        ),
+        writable: true,
+        configurable: true,
+      });
+      Object.defineProperty(A.prototype, _key13, {
+        value: Object.defineProperty(
+          function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          },
+          'name',
+          {
+            value:
+              typeof _key13 === 'symbol'
+                ? _key13.description === void 0
+                  ? ''
+                  : '[' + _key13.description + ']'
+                : String(_key13),
+            configurable: true,
+          },
+        ),
+        writable: true,
+        configurable: true,
+      });
+      Object.defineProperty(A, _key14, {
+        value: Object.defineProperty(
+          function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          },
+          'name',
+          {
+            value:
+              typeof _key14 === 'symbol'
+                ? _key14.description === void 0
+                  ? ''
+                  : '[' + _key14.description + ']'
+                : String(_key14),
             configurable: true,
           },
         ),
@@ -11703,7 +11776,7 @@ test('spec/computed-keys-yield-await/input.js', async () => {
         Object.defineProperty(A, 'prototype', { writable: false });
         return A;
       })(yield 1);
-      let B = ((__nox_super_61_103, _key11) => {
+      let B = ((__nox_super_61_103, _key13) => {
         'use strict';
         const B = function B() {
           if (!new.target) throw new TypeError('Cannot call a class as a function');
@@ -11721,7 +11794,7 @@ test('spec/computed-keys-yield-await/input.js', async () => {
         });
         if (Object.setPrototypeOf) Object.setPrototypeOf(B, __nox_super_61_103);
         else B.__proto__ = __nox_super_61_103;
-        Object.defineProperty(B.prototype, _key11, {
+        Object.defineProperty(B.prototype, _key13, {
           value: Object.defineProperty(
             function () {
               if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
@@ -11729,11 +11802,11 @@ test('spec/computed-keys-yield-await/input.js', async () => {
             'name',
             {
               value:
-                typeof _key11 === 'symbol'
-                  ? _key11.description === void 0
+                typeof _key13 === 'symbol'
+                  ? _key13.description === void 0
                     ? ''
-                    : '[' + _key11.description + ']'
-                  : String(_key11),
+                    : '[' + _key13.description + ']'
+                  : String(_key13),
               configurable: true,
             },
           ),
@@ -11793,7 +11866,7 @@ test('spec/computed-methods/exec.js', async () => {
       Object.defineProperty(Foo, 'prototype', { writable: false });
       return Foo;
     })(sym);
-    let Bar = ((__nox_super_69_140, _key12) => {
+    let Bar = ((__nox_super_69_140, _key14) => {
       'use strict';
       const Bar = function Bar() {
         if (!new.target) throw new TypeError('Cannot call a class as a function');
@@ -11811,7 +11884,7 @@ test('spec/computed-methods/exec.js', async () => {
       });
       if (Object.setPrototypeOf) Object.setPrototypeOf(Bar, __nox_super_69_140);
       else Bar.__proto__ = __nox_super_69_140;
-      Object.defineProperty(Bar.prototype, _key12, {
+      Object.defineProperty(Bar.prototype, _key14, {
         value: Object.defineProperty(
           function () {
             if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
@@ -11820,11 +11893,11 @@ test('spec/computed-methods/exec.js', async () => {
           'name',
           {
             value:
-              typeof _key12 === 'symbol'
-                ? _key12.description === void 0
+              typeof _key14 === 'symbol'
+                ? _key14.description === void 0
                   ? ''
-                  : '[' + _key12.description + ']'
-                : String(_key12),
+                  : '[' + _key14.description + ']'
+                : String(_key14),
             configurable: true,
           },
         ),
@@ -11848,7 +11921,7 @@ test('spec/computed-methods/input.js', async () => {
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "let Foo = ((_key, _key9) => {
+    "let Foo = ((_key, _key11) => {
       'use strict';
       const Foo = function Foo() {
         if (!new.target) throw new TypeError('Cannot call a class as a function');
@@ -11894,7 +11967,7 @@ test('spec/computed-methods/input.js', async () => {
         writable: true,
         configurable: true,
       });
-      Object.defineProperty(Foo.prototype, _key9, {
+      Object.defineProperty(Foo.prototype, _key11, {
         value: Object.defineProperty(
           function () {
             if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
@@ -11902,11 +11975,11 @@ test('spec/computed-methods/input.js', async () => {
           'name',
           {
             value:
-              typeof _key9 === 'symbol'
-                ? _key9.description === void 0
+              typeof _key11 === 'symbol'
+                ? _key11.description === void 0
                   ? ''
-                  : '[' + _key9.description + ']'
-                : String(_key9),
+                  : '[' + _key11.description + ']'
+                : String(_key11),
             configurable: true,
           },
         ),
@@ -11960,12 +12033,12 @@ test('spec/computed-toPrimitive/exec.js', async () => {
       })(foo))().foo(),
     ).toBe(0);
     expect(
-      new ((_key13 => {
+      new ((_key15 => {
         'use strict';
-        const _Class12 = function _Class12() {
+        const _Class14 = function _Class14() {
           if (!new.target) throw new TypeError('Cannot call a class as a function');
         };
-        Object.defineProperty(_Class12.prototype, _key13, {
+        Object.defineProperty(_Class14.prototype, _key15, {
           get: Object.defineProperty(
             function () {
               if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
@@ -11975,36 +12048,6 @@ test('spec/computed-toPrimitive/exec.js', async () => {
             {
               value:
                 'get ' +
-                (typeof _key13 === 'symbol'
-                  ? _key13.description === void 0
-                    ? ''
-                    : '[' + _key13.description + ']'
-                  : String(_key13)),
-              configurable: true,
-            },
-          ),
-          configurable: true,
-        });
-        Object.defineProperty(_Class12, 'prototype', { writable: false });
-        return _Class12;
-      })(foo))().foo,
-    ).toBe(0);
-    expect(
-      (new ((_key15 => {
-        'use strict';
-        const _Class14 = function _Class14() {
-          if (!new.target) throw new TypeError('Cannot call a class as a function');
-        };
-        Object.defineProperty(_Class14.prototype, _key15, {
-          set: Object.defineProperty(
-            function (v) {
-              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
-              return v;
-            },
-            'name',
-            {
-              value:
-                'set ' +
                 (typeof _key15 === 'symbol'
                   ? _key15.description === void 0
                     ? ''
@@ -12017,40 +12060,39 @@ test('spec/computed-toPrimitive/exec.js', async () => {
         });
         Object.defineProperty(_Class14, 'prototype', { writable: false });
         return _Class14;
+      })(foo))().foo,
+    ).toBe(0);
+    expect(
+      (new ((_key17 => {
+        'use strict';
+        const _Class16 = function _Class16() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
+        Object.defineProperty(_Class16.prototype, _key17, {
+          set: Object.defineProperty(
+            function (v) {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              return v;
+            },
+            'name',
+            {
+              value:
+                'set ' +
+                (typeof _key17 === 'symbol'
+                  ? _key17.description === void 0
+                    ? ''
+                    : '[' + _key17.description + ']'
+                  : String(_key17)),
+              configurable: true,
+            },
+          ),
+          configurable: true,
+        });
+        Object.defineProperty(_Class16, 'prototype', { writable: false });
+        return _Class16;
       })(foo))().foo = 0),
     ).toBe(0);
     const arrayLike = { [Symbol.toPrimitive]: () => [] };
-    expect(
-      () =>
-        new ((_key17 => {
-          'use strict';
-          const _Class16 = function _Class16() {
-            if (!new.target) throw new TypeError('Cannot call a class as a function');
-          };
-          Object.defineProperty(_Class16.prototype, _key17, {
-            value: Object.defineProperty(
-              function () {
-                if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
-                return 0;
-              },
-              'name',
-              {
-                value:
-                  typeof _key17 === 'symbol'
-                    ? _key17.description === void 0
-                      ? ''
-                      : '[' + _key17.description + ']'
-                    : String(_key17),
-                configurable: true,
-              },
-            ),
-            writable: true,
-            configurable: true,
-          });
-          Object.defineProperty(_Class16, 'prototype', { writable: false });
-          return _Class16;
-        })(arrayLike))(),
-    ).toThrow('@@toPrimitive must return a primitive value.');
     expect(
       () =>
         new ((_key19 => {
@@ -12059,7 +12101,7 @@ test('spec/computed-toPrimitive/exec.js', async () => {
             if (!new.target) throw new TypeError('Cannot call a class as a function');
           };
           Object.defineProperty(_Class18.prototype, _key19, {
-            get: Object.defineProperty(
+            value: Object.defineProperty(
               function () {
                 if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
                 return 0;
@@ -12067,15 +12109,15 @@ test('spec/computed-toPrimitive/exec.js', async () => {
               'name',
               {
                 value:
-                  'get ' +
-                  (typeof _key19 === 'symbol'
+                  typeof _key19 === 'symbol'
                     ? _key19.description === void 0
                       ? ''
                       : '[' + _key19.description + ']'
-                    : String(_key19)),
+                    : String(_key19),
                 configurable: true,
               },
             ),
+            writable: true,
             configurable: true,
           });
           Object.defineProperty(_Class18, 'prototype', { writable: false });
@@ -12090,15 +12132,15 @@ test('spec/computed-toPrimitive/exec.js', async () => {
             if (!new.target) throw new TypeError('Cannot call a class as a function');
           };
           Object.defineProperty(_Class20.prototype, _key21, {
-            set: Object.defineProperty(
-              function (v) {
+            get: Object.defineProperty(
+              function () {
                 if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
-                return v;
+                return 0;
               },
               'name',
               {
                 value:
-                  'set ' +
+                  'get ' +
                   (typeof _key21 === 'symbol'
                     ? _key21.description === void 0
                       ? ''
@@ -12111,6 +12153,37 @@ test('spec/computed-toPrimitive/exec.js', async () => {
           });
           Object.defineProperty(_Class20, 'prototype', { writable: false });
           return _Class20;
+        })(arrayLike))(),
+    ).toThrow('@@toPrimitive must return a primitive value.');
+    expect(
+      () =>
+        new ((_key23 => {
+          'use strict';
+          const _Class22 = function _Class22() {
+            if (!new.target) throw new TypeError('Cannot call a class as a function');
+          };
+          Object.defineProperty(_Class22.prototype, _key23, {
+            set: Object.defineProperty(
+              function (v) {
+                if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+                return v;
+              },
+              'name',
+              {
+                value:
+                  'set ' +
+                  (typeof _key23 === 'symbol'
+                    ? _key23.description === void 0
+                      ? ''
+                      : '[' + _key23.description + ']'
+                    : String(_key23)),
+                configurable: true,
+              },
+            ),
+            configurable: true,
+          });
+          Object.defineProperty(_Class22, 'prototype', { writable: false });
+          return _Class22;
         })(arrayLike))(),
     ).toThrow('@@toPrimitive must return a primitive value.');"
   `);
@@ -12157,12 +12230,12 @@ test('spec/computed-toPrimitive/input.js', async () => {
       })(foo))().foo(),
     ).toBe(0);
     expect(
-      new ((_key13 => {
+      new ((_key15 => {
         'use strict';
-        const _Class12 = function _Class12() {
+        const _Class14 = function _Class14() {
           if (!new.target) throw new TypeError('Cannot call a class as a function');
         };
-        Object.defineProperty(_Class12.prototype, _key13, {
+        Object.defineProperty(_Class14.prototype, _key15, {
           get: Object.defineProperty(
             function () {
               if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
@@ -12172,36 +12245,6 @@ test('spec/computed-toPrimitive/input.js', async () => {
             {
               value:
                 'get ' +
-                (typeof _key13 === 'symbol'
-                  ? _key13.description === void 0
-                    ? ''
-                    : '[' + _key13.description + ']'
-                  : String(_key13)),
-              configurable: true,
-            },
-          ),
-          configurable: true,
-        });
-        Object.defineProperty(_Class12, 'prototype', { writable: false });
-        return _Class12;
-      })(foo))().foo,
-    ).toBe(0);
-    expect(
-      (new ((_key15 => {
-        'use strict';
-        const _Class14 = function _Class14() {
-          if (!new.target) throw new TypeError('Cannot call a class as a function');
-        };
-        Object.defineProperty(_Class14.prototype, _key15, {
-          set: Object.defineProperty(
-            function (v) {
-              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
-              return v;
-            },
-            'name',
-            {
-              value:
-                'set ' +
                 (typeof _key15 === 'symbol'
                   ? _key15.description === void 0
                     ? ''
@@ -12214,40 +12257,39 @@ test('spec/computed-toPrimitive/input.js', async () => {
         });
         Object.defineProperty(_Class14, 'prototype', { writable: false });
         return _Class14;
+      })(foo))().foo,
+    ).toBe(0);
+    expect(
+      (new ((_key17 => {
+        'use strict';
+        const _Class16 = function _Class16() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
+        Object.defineProperty(_Class16.prototype, _key17, {
+          set: Object.defineProperty(
+            function (v) {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              return v;
+            },
+            'name',
+            {
+              value:
+                'set ' +
+                (typeof _key17 === 'symbol'
+                  ? _key17.description === void 0
+                    ? ''
+                    : '[' + _key17.description + ']'
+                  : String(_key17)),
+              configurable: true,
+            },
+          ),
+          configurable: true,
+        });
+        Object.defineProperty(_Class16, 'prototype', { writable: false });
+        return _Class16;
       })(foo))().foo = 0),
     ).toBe(0);
     const arrayLike = { [Symbol.toPrimitive]: () => [] };
-    expect(
-      () =>
-        new ((_key17 => {
-          'use strict';
-          const _Class16 = function _Class16() {
-            if (!new.target) throw new TypeError('Cannot call a class as a function');
-          };
-          Object.defineProperty(_Class16.prototype, _key17, {
-            value: Object.defineProperty(
-              function () {
-                if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
-                return 0;
-              },
-              'name',
-              {
-                value:
-                  typeof _key17 === 'symbol'
-                    ? _key17.description === void 0
-                      ? ''
-                      : '[' + _key17.description + ']'
-                    : String(_key17),
-                configurable: true,
-              },
-            ),
-            writable: true,
-            configurable: true,
-          });
-          Object.defineProperty(_Class16, 'prototype', { writable: false });
-          return _Class16;
-        })(arrayLike))(),
-    ).toThrow('@@toPrimitive must return a primitive value.');
     expect(
       () =>
         new ((_key19 => {
@@ -12256,7 +12298,7 @@ test('spec/computed-toPrimitive/input.js', async () => {
             if (!new.target) throw new TypeError('Cannot call a class as a function');
           };
           Object.defineProperty(_Class18.prototype, _key19, {
-            get: Object.defineProperty(
+            value: Object.defineProperty(
               function () {
                 if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
                 return 0;
@@ -12264,15 +12306,15 @@ test('spec/computed-toPrimitive/input.js', async () => {
               'name',
               {
                 value:
-                  'get ' +
-                  (typeof _key19 === 'symbol'
+                  typeof _key19 === 'symbol'
                     ? _key19.description === void 0
                       ? ''
                       : '[' + _key19.description + ']'
-                    : String(_key19)),
+                    : String(_key19),
                 configurable: true,
               },
             ),
+            writable: true,
             configurable: true,
           });
           Object.defineProperty(_Class18, 'prototype', { writable: false });
@@ -12287,15 +12329,15 @@ test('spec/computed-toPrimitive/input.js', async () => {
             if (!new.target) throw new TypeError('Cannot call a class as a function');
           };
           Object.defineProperty(_Class20.prototype, _key21, {
-            set: Object.defineProperty(
-              function (v) {
+            get: Object.defineProperty(
+              function () {
                 if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
-                return v;
+                return 0;
               },
               'name',
               {
                 value:
-                  'set ' +
+                  'get ' +
                   (typeof _key21 === 'symbol'
                     ? _key21.description === void 0
                       ? ''
@@ -12308,6 +12350,37 @@ test('spec/computed-toPrimitive/input.js', async () => {
           });
           Object.defineProperty(_Class20, 'prototype', { writable: false });
           return _Class20;
+        })(arrayLike))(),
+    ).toThrow('@@toPrimitive must return a primitive value.');
+    expect(
+      () =>
+        new ((_key23 => {
+          'use strict';
+          const _Class22 = function _Class22() {
+            if (!new.target) throw new TypeError('Cannot call a class as a function');
+          };
+          Object.defineProperty(_Class22.prototype, _key23, {
+            set: Object.defineProperty(
+              function (v) {
+                if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+                return v;
+              },
+              'name',
+              {
+                value:
+                  'set ' +
+                  (typeof _key23 === 'symbol'
+                    ? _key23.description === void 0
+                      ? ''
+                      : '[' + _key23.description + ']'
+                    : String(_key23)),
+                configurable: true,
+              },
+            ),
+            configurable: true,
+          });
+          Object.defineProperty(_Class22, 'prototype', { writable: false });
+          return _Class22;
         })(arrayLike))(),
     ).toThrow('@@toPrimitive must return a primitive value.');"
   `);
@@ -12615,10 +12688,10 @@ test('spec/delete-super-property-to-property-key/exec.js', async () => {
     expect(() => {
       new ((() => {
         'use strict';
-        const _Class9 = function _Class9() {
+        const _Class11 = function _Class11() {
           if (!new.target) throw new TypeError('Cannot call a class as a function');
         };
-        Object.defineProperty(_Class9.prototype, 'f', {
+        Object.defineProperty(_Class11.prototype, 'f', {
           value: Object.defineProperty(
             function () {
               if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
@@ -12639,8 +12712,8 @@ test('spec/delete-super-property-to-property-key/exec.js', async () => {
           writable: true,
           configurable: true,
         });
-        Object.defineProperty(_Class9, 'prototype', { writable: false });
-        return _Class9;
+        Object.defineProperty(_Class11, 'prototype', { writable: false });
+        return _Class11;
       })())().f();
     }).toThrow(TypeError);"
   `);
@@ -12694,10 +12767,10 @@ test('spec/delete-super-property-to-property-key/input.js', async () => {
     // [Symbol.toPrimitive] must return a primitive value
     new ((() => {
       'use strict';
-      const _Class9 = function _Class9() {
+      const _Class11 = function _Class11() {
         if (!new.target) throw new TypeError('Cannot call a class as a function');
       };
-      Object.defineProperty(_Class9.prototype, 'f', {
+      Object.defineProperty(_Class11.prototype, 'f', {
         value: Object.defineProperty(
           function () {
             if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
@@ -12718,8 +12791,8 @@ test('spec/delete-super-property-to-property-key/input.js', async () => {
         writable: true,
         configurable: true,
       });
-      Object.defineProperty(_Class9, 'prototype', { writable: false });
-      return _Class9;
+      Object.defineProperty(_Class11, 'prototype', { writable: false });
+      return _Class11;
     })())().f();"
   `);
 });
@@ -12765,10 +12838,10 @@ test('spec/delete-super-property/exec.js', async () => {
     expect(() => {
       new ((() => {
         'use strict';
-        const _Class9 = function _Class9() {
+        const _Class11 = function _Class11() {
           if (!new.target) throw new TypeError('Cannot call a class as a function');
         };
-        Object.defineProperty(_Class9.prototype, 'f', {
+        Object.defineProperty(_Class11.prototype, 'f', {
           value: Object.defineProperty(
             function () {
               if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
@@ -12783,8 +12856,8 @@ test('spec/delete-super-property/exec.js', async () => {
           writable: true,
           configurable: true,
         });
-        Object.defineProperty(_Class9, 'prototype', { writable: false });
-        return _Class9;
+        Object.defineProperty(_Class11, 'prototype', { writable: false });
+        return _Class11;
       })())().f();
     }).toThrow(ReferenceError);
     // [expr] should be evaluated
@@ -12792,10 +12865,10 @@ test('spec/delete-super-property/exec.js', async () => {
     expect(() => {
       new ((() => {
         'use strict';
-        const _Class10 = function _Class10() {
+        const _Class12 = function _Class12() {
           if (!new.target) throw new TypeError('Cannot call a class as a function');
         };
-        Object.defineProperty(_Class10.prototype, 'f', {
+        Object.defineProperty(_Class12.prototype, 'f', {
           value: Object.defineProperty(
             function () {
               if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
@@ -12810,8 +12883,8 @@ test('spec/delete-super-property/exec.js', async () => {
           writable: true,
           configurable: true,
         });
-        Object.defineProperty(_Class10, 'prototype', { writable: false });
-        return _Class10;
+        Object.defineProperty(_Class12, 'prototype', { writable: false });
+        return _Class12;
       })())().f();
     }).toThrow(ReferenceError);
     expect(counter).toBe(1);
@@ -12819,10 +12892,10 @@ test('spec/delete-super-property/exec.js', async () => {
     expect(() => {
       new ((() => {
         'use strict';
-        const _Class11 = function _Class11() {
+        const _Class13 = function _Class13() {
           if (!new.target) throw new TypeError('Cannot call a class as a function');
         };
-        Object.defineProperty(_Class11.prototype, 'f', {
+        Object.defineProperty(_Class13.prototype, 'f', {
           value: Object.defineProperty(
             function () {
               if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
@@ -12837,8 +12910,8 @@ test('spec/delete-super-property/exec.js', async () => {
           writable: true,
           configurable: true,
         });
-        Object.defineProperty(_Class11, 'prototype', { writable: false });
-        return _Class11;
+        Object.defineProperty(_Class13, 'prototype', { writable: false });
+        return _Class13;
       })())().f();
     }).toThrow(TypeError);"
   `);
@@ -12882,10 +12955,10 @@ test('spec/delete-super-property/input.js', async () => {
     })())().f();
     new ((() => {
       'use strict';
-      const _Class9 = function _Class9() {
+      const _Class11 = function _Class11() {
         if (!new.target) throw new TypeError('Cannot call a class as a function');
       };
-      Object.defineProperty(_Class9.prototype, 'f', {
+      Object.defineProperty(_Class11.prototype, 'f', {
         value: Object.defineProperty(
           function () {
             if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
@@ -12900,17 +12973,17 @@ test('spec/delete-super-property/input.js', async () => {
         writable: true,
         configurable: true,
       });
-      Object.defineProperty(_Class9, 'prototype', { writable: false });
-      return _Class9;
+      Object.defineProperty(_Class11, 'prototype', { writable: false });
+      return _Class11;
     })())().f();
     // [expr] should be evaluated
     var counter = 0;
     new ((() => {
       'use strict';
-      const _Class10 = function _Class10() {
+      const _Class12 = function _Class12() {
         if (!new.target) throw new TypeError('Cannot call a class as a function');
       };
-      Object.defineProperty(_Class10.prototype, 'f', {
+      Object.defineProperty(_Class12.prototype, 'f', {
         value: Object.defineProperty(
           function () {
             if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
@@ -12925,16 +12998,16 @@ test('spec/delete-super-property/input.js', async () => {
         writable: true,
         configurable: true,
       });
-      Object.defineProperty(_Class10, 'prototype', { writable: false });
-      return _Class10;
+      Object.defineProperty(_Class12, 'prototype', { writable: false });
+      return _Class12;
     })())().f();
     // TypeError before ReferenceError
     new ((() => {
       'use strict';
-      const _Class11 = function _Class11() {
+      const _Class13 = function _Class13() {
         if (!new.target) throw new TypeError('Cannot call a class as a function');
       };
-      Object.defineProperty(_Class11.prototype, 'f', {
+      Object.defineProperty(_Class13.prototype, 'f', {
         value: Object.defineProperty(
           function () {
             if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
@@ -12949,8 +13022,8 @@ test('spec/delete-super-property/input.js', async () => {
         writable: true,
         configurable: true,
       });
-      Object.defineProperty(_Class11, 'prototype', { writable: false });
-      return _Class11;
+      Object.defineProperty(_Class13, 'prototype', { writable: false });
+      return _Class13;
     })())().f();"
   `);
 });
@@ -14033,7 +14106,8 @@ test('spec/method-name-non-bmp/input.js', async () => {
 });
 
 test('spec/method-return-type-annotation/input.js', async () => {
-  const source = "// @flow\nclass C {\n  m(x: number): string {\n    return 'a';\n  }\n}\n";
+  const source =
+    "// @flow\n// @flow\nclass C {\n  m(x: number): string {\n    return 'a';\n  }\n}\n";
   expect(
     await transformOutcome(source, 'input.js', {
       transforms: { classes: true },
@@ -14041,6 +14115,7 @@ test('spec/method-return-type-annotation/input.js', async () => {
     }),
   ).toMatchInlineSnapshot(`
     "// @flow
+    // @flow
     let C = (() => {
       'use strict';
       const C = function C() {
@@ -15183,14 +15258,14 @@ test('spec/relaxed-method-coercion/input.js', async () => {
       transforms: {
         classes: true,
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
     "// #1649
-    let Foo = ((_key, _key9) => {
+    let Foo = ((_key, _key11) => {
       'use strict';
       const Foo = function Foo() {
         if (!new.target) throw new TypeError('Cannot call a class as a function');
@@ -15214,7 +15289,7 @@ test('spec/relaxed-method-coercion/input.js', async () => {
         writable: true,
         configurable: true,
       });
-      Object.defineProperty(Foo.prototype, _key9, {
+      Object.defineProperty(Foo.prototype, _key11, {
         value: Object.defineProperty(
           function () {
             if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
@@ -15222,11 +15297,11 @@ test('spec/relaxed-method-coercion/input.js', async () => {
           'name',
           {
             value:
-              typeof _key9 === 'symbol'
-                ? _key9.description === void 0
+              typeof _key11 === 'symbol'
+                ? _key11.description === void 0
                   ? ''
-                  : '[' + _key9.description + ']'
-                : String(_key9),
+                  : '[' + _key11.description + ']'
+                : String(_key11),
             configurable: true,
           },
         ),
@@ -15447,14 +15522,14 @@ test('spec/statement/input.js', async () => {
     })();
     var BaseView = (() => {
       'use strict';
-      const _Class9 = function _Class9() {
+      const _Class11 = function _Class11() {
         if (!new.target) throw new TypeError('Cannot call a class as a function');
       };
-      Object.defineProperty(_Class9, 'name', {
+      Object.defineProperty(_Class11, 'name', {
         value: 'BaseView',
         configurable: true,
       });
-      Object.defineProperty(_Class9.prototype, 'foo', {
+      Object.defineProperty(_Class11.prototype, 'foo', {
         value: Object.defineProperty(
           function () {
             if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
@@ -15469,8 +15544,8 @@ test('spec/statement/input.js', async () => {
         writable: true,
         configurable: true,
       });
-      Object.defineProperty(_Class9, 'prototype', { writable: false });
-      return _Class9;
+      Object.defineProperty(_Class11, 'prototype', { writable: false });
+      return _Class11;
     })();"
   `);
 });
@@ -15604,11 +15679,11 @@ test('spec/super-class-anonymous/input.js', async () => {
     })(
       (() => {
         'use strict';
-        const _Class13 = function _Class13() {
+        const _Class15 = function _Class15() {
           if (!new.target) throw new TypeError('Cannot call a class as a function');
         };
-        Object.defineProperty(_Class13, 'prototype', { writable: false });
-        return _Class13;
+        Object.defineProperty(_Class15, 'prototype', { writable: false });
+        return _Class15;
       })(),
     );
     let TestMethodOnly = (__nox_super_108_164 => {
@@ -15634,10 +15709,10 @@ test('spec/super-class-anonymous/input.js', async () => {
     })(
       (() => {
         'use strict';
-        const _Class14 = function _Class14() {
+        const _Class16 = function _Class16() {
           if (!new.target) throw new TypeError('Cannot call a class as a function');
         };
-        Object.defineProperty(_Class14.prototype, 'method', {
+        Object.defineProperty(_Class16.prototype, 'method', {
           value: Object.defineProperty(
             function () {
               if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
@@ -15651,8 +15726,8 @@ test('spec/super-class-anonymous/input.js', async () => {
           writable: true,
           configurable: true,
         });
-        Object.defineProperty(_Class14, 'prototype', { writable: false });
-        return _Class14;
+        Object.defineProperty(_Class16, 'prototype', { writable: false });
+        return _Class16;
       })(),
     );
     let TestConstructorAndMethod = (__nox_super_166_253 => {
@@ -15681,10 +15756,10 @@ test('spec/super-class-anonymous/input.js', async () => {
     })(
       (() => {
         'use strict';
-        const _Class15 = function _Class15() {
+        const _Class17 = function _Class17() {
           if (!new.target) throw new TypeError('Cannot call a class as a function');
         };
-        Object.defineProperty(_Class15.prototype, 'method', {
+        Object.defineProperty(_Class17.prototype, 'method', {
           value: Object.defineProperty(
             function () {
               if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
@@ -15698,8 +15773,8 @@ test('spec/super-class-anonymous/input.js', async () => {
           writable: true,
           configurable: true,
         });
-        Object.defineProperty(_Class15, 'prototype', { writable: false });
-        return _Class15;
+        Object.defineProperty(_Class17, 'prototype', { writable: false });
+        return _Class17;
       })(),
     );
     let TestMultipleMethods = (__nox_super_255_323 => {
@@ -15728,10 +15803,10 @@ test('spec/super-class-anonymous/input.js', async () => {
     })(
       (() => {
         'use strict';
-        const _Class16 = function _Class16() {
+        const _Class18 = function _Class18() {
           if (!new.target) throw new TypeError('Cannot call a class as a function');
         };
-        Object.defineProperty(_Class16.prototype, 'm1', {
+        Object.defineProperty(_Class18.prototype, 'm1', {
           value: Object.defineProperty(
             function () {
               if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
@@ -15745,7 +15820,7 @@ test('spec/super-class-anonymous/input.js', async () => {
           writable: true,
           configurable: true,
         });
-        Object.defineProperty(_Class16.prototype, 'm2', {
+        Object.defineProperty(_Class18.prototype, 'm2', {
           value: Object.defineProperty(
             function () {
               if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
@@ -15759,8 +15834,8 @@ test('spec/super-class-anonymous/input.js', async () => {
           writable: true,
           configurable: true,
         });
-        Object.defineProperty(_Class16, 'prototype', { writable: false });
-        return _Class16;
+        Object.defineProperty(_Class18, 'prototype', { writable: false });
+        return _Class18;
       })(),
     );"
   `);
@@ -16152,12 +16227,12 @@ test('spec/super-guaranteed/input.js', async () => {
     })(Base))();
     new ((__nox_super_91_152 => {
       'use strict';
-      const _Class9 = function _Class9() {
+      const _Class11 = function _Class11() {
         if (!new.target) throw new TypeError('Cannot call a class as a function');
         var _this,
           _newtarget = new.target;
         function _super() {
-          _this = _construct(__nox_super_91_152, arguments, _newtarget || _Class9);
+          _this = _construct(__nox_super_91_152, arguments, _newtarget || _Class11);
           return _this;
         }
         var _result = function () {
@@ -16174,26 +16249,26 @@ test('spec/super-guaranteed/input.js', async () => {
       };
       if (__nox_super_91_152 !== null && typeof __nox_super_91_152 !== 'function')
         throw new TypeError('Super expression must either be null or a function');
-      _Class9.prototype = Object.create(__nox_super_91_152 && __nox_super_91_152.prototype, {
+      _Class11.prototype = Object.create(__nox_super_91_152 && __nox_super_91_152.prototype, {
         constructor: {
-          value: _Class9,
+          value: _Class11,
           writable: true,
           configurable: true,
         },
       });
-      if (Object.setPrototypeOf) Object.setPrototypeOf(_Class9, __nox_super_91_152);
-      else _Class9.__proto__ = __nox_super_91_152;
-      Object.defineProperty(_Class9, 'prototype', { writable: false });
-      return _Class9;
+      if (Object.setPrototypeOf) Object.setPrototypeOf(_Class11, __nox_super_91_152);
+      else _Class11.__proto__ = __nox_super_91_152;
+      Object.defineProperty(_Class11, 'prototype', { writable: false });
+      return _Class11;
     })(Base))();
     new ((__nox_super_158_223 => {
       'use strict';
-      const _Class10 = function _Class10() {
+      const _Class12 = function _Class12() {
         if (!new.target) throw new TypeError('Cannot call a class as a function');
         var _this,
           _newtarget = new.target;
         function _super() {
-          _this = _construct(__nox_super_158_223, arguments, _newtarget || _Class10);
+          _this = _construct(__nox_super_158_223, arguments, _newtarget || _Class12);
           return _this;
         }
         var _result = function () {
@@ -16210,26 +16285,26 @@ test('spec/super-guaranteed/input.js', async () => {
       };
       if (__nox_super_158_223 !== null && typeof __nox_super_158_223 !== 'function')
         throw new TypeError('Super expression must either be null or a function');
-      _Class10.prototype = Object.create(__nox_super_158_223 && __nox_super_158_223.prototype, {
+      _Class12.prototype = Object.create(__nox_super_158_223 && __nox_super_158_223.prototype, {
         constructor: {
-          value: _Class10,
+          value: _Class12,
           writable: true,
           configurable: true,
         },
       });
-      if (Object.setPrototypeOf) Object.setPrototypeOf(_Class10, __nox_super_158_223);
-      else _Class10.__proto__ = __nox_super_158_223;
-      Object.defineProperty(_Class10, 'prototype', { writable: false });
-      return _Class10;
+      if (Object.setPrototypeOf) Object.setPrototypeOf(_Class12, __nox_super_158_223);
+      else _Class12.__proto__ = __nox_super_158_223;
+      Object.defineProperty(_Class12, 'prototype', { writable: false });
+      return _Class12;
     })(Base))();
     new ((__nox_super_229_290 => {
       'use strict';
-      const _Class11 = function _Class11() {
+      const _Class13 = function _Class13() {
         if (!new.target) throw new TypeError('Cannot call a class as a function');
         var _this,
           _newtarget = new.target;
         function _super() {
-          _this = _construct(__nox_super_229_290, arguments, _newtarget || _Class11);
+          _this = _construct(__nox_super_229_290, arguments, _newtarget || _Class13);
           return _this;
         }
         var _result = function () {
@@ -16246,17 +16321,17 @@ test('spec/super-guaranteed/input.js', async () => {
       };
       if (__nox_super_229_290 !== null && typeof __nox_super_229_290 !== 'function')
         throw new TypeError('Super expression must either be null or a function');
-      _Class11.prototype = Object.create(__nox_super_229_290 && __nox_super_229_290.prototype, {
+      _Class13.prototype = Object.create(__nox_super_229_290 && __nox_super_229_290.prototype, {
         constructor: {
-          value: _Class11,
+          value: _Class13,
           writable: true,
           configurable: true,
         },
       });
-      if (Object.setPrototypeOf) Object.setPrototypeOf(_Class11, __nox_super_229_290);
-      else _Class11.__proto__ = __nox_super_229_290;
-      Object.defineProperty(_Class11, 'prototype', { writable: false });
-      return _Class11;
+      if (Object.setPrototypeOf) Object.setPrototypeOf(_Class13, __nox_super_229_290);
+      else _Class13.__proto__ = __nox_super_229_290;
+      Object.defineProperty(_Class13, 'prototype', { writable: false });
+      return _Class13;
     })(Base))();"
   `);
 });
@@ -16362,12 +16437,12 @@ test('spec/super-missing/exec.js', async () => {
       () =>
         new ((__nox_super_137_211 => {
           'use strict';
-          const _Class9 = function _Class9() {
+          const _Class11 = function _Class11() {
             if (!new.target) throw new TypeError('Cannot call a class as a function');
             var _this,
               _newtarget = new.target;
             function _super() {
-              _this = _construct(__nox_super_137_211, arguments, _newtarget || _Class9);
+              _this = _construct(__nox_super_137_211, arguments, _newtarget || _Class11);
               return _this;
             }
             var _result = function () {
@@ -16387,29 +16462,29 @@ test('spec/super-missing/exec.js', async () => {
           };
           if (__nox_super_137_211 !== null && typeof __nox_super_137_211 !== 'function')
             throw new TypeError('Super expression must either be null or a function');
-          _Class9.prototype = Object.create(__nox_super_137_211 && __nox_super_137_211.prototype, {
+          _Class11.prototype = Object.create(__nox_super_137_211 && __nox_super_137_211.prototype, {
             constructor: {
-              value: _Class9,
+              value: _Class11,
               writable: true,
               configurable: true,
             },
           });
-          if (Object.setPrototypeOf) Object.setPrototypeOf(_Class9, __nox_super_137_211);
-          else _Class9.__proto__ = __nox_super_137_211;
-          Object.defineProperty(_Class9, 'prototype', { writable: false });
-          return _Class9;
+          if (Object.setPrototypeOf) Object.setPrototypeOf(_Class11, __nox_super_137_211);
+          else _Class11.__proto__ = __nox_super_137_211;
+          Object.defineProperty(_Class11, 'prototype', { writable: false });
+          return _Class11;
         })(Base))(),
     ).toThrow();
     expect(
       () =>
         new ((__nox_super_242_325 => {
           'use strict';
-          const _Class10 = function _Class10() {
+          const _Class12 = function _Class12() {
             if (!new.target) throw new TypeError('Cannot call a class as a function');
             var _this,
               _newtarget = new.target;
             function _super() {
-              _this = _construct(__nox_super_242_325, arguments, _newtarget || _Class10);
+              _this = _construct(__nox_super_242_325, arguments, _newtarget || _Class12);
               return _this;
             }
             var _result = function () {
@@ -16429,29 +16504,29 @@ test('spec/super-missing/exec.js', async () => {
           };
           if (__nox_super_242_325 !== null && typeof __nox_super_242_325 !== 'function')
             throw new TypeError('Super expression must either be null or a function');
-          _Class10.prototype = Object.create(__nox_super_242_325 && __nox_super_242_325.prototype, {
+          _Class12.prototype = Object.create(__nox_super_242_325 && __nox_super_242_325.prototype, {
             constructor: {
-              value: _Class10,
+              value: _Class12,
               writable: true,
               configurable: true,
             },
           });
-          if (Object.setPrototypeOf) Object.setPrototypeOf(_Class10, __nox_super_242_325);
-          else _Class10.__proto__ = __nox_super_242_325;
-          Object.defineProperty(_Class10, 'prototype', { writable: false });
-          return _Class10;
+          if (Object.setPrototypeOf) Object.setPrototypeOf(_Class12, __nox_super_242_325);
+          else _Class12.__proto__ = __nox_super_242_325;
+          Object.defineProperty(_Class12, 'prototype', { writable: false });
+          return _Class12;
         })(Base))(),
     ).toThrow();
     expect(
       () =>
         new ((__nox_super_356_421 => {
           'use strict';
-          const _Class11 = function _Class11() {
+          const _Class13 = function _Class13() {
             if (!new.target) throw new TypeError('Cannot call a class as a function');
             var _this,
               _newtarget = new.target;
             function _super() {
-              _this = _construct(__nox_super_356_421, arguments, _newtarget || _Class11);
+              _this = _construct(__nox_super_356_421, arguments, _newtarget || _Class13);
               return _this;
             }
             var _result = function () {
@@ -16468,29 +16543,29 @@ test('spec/super-missing/exec.js', async () => {
           };
           if (__nox_super_356_421 !== null && typeof __nox_super_356_421 !== 'function')
             throw new TypeError('Super expression must either be null or a function');
-          _Class11.prototype = Object.create(__nox_super_356_421 && __nox_super_356_421.prototype, {
+          _Class13.prototype = Object.create(__nox_super_356_421 && __nox_super_356_421.prototype, {
             constructor: {
-              value: _Class11,
+              value: _Class13,
               writable: true,
               configurable: true,
             },
           });
-          if (Object.setPrototypeOf) Object.setPrototypeOf(_Class11, __nox_super_356_421);
-          else _Class11.__proto__ = __nox_super_356_421;
-          Object.defineProperty(_Class11, 'prototype', { writable: false });
-          return _Class11;
+          if (Object.setPrototypeOf) Object.setPrototypeOf(_Class13, __nox_super_356_421);
+          else _Class13.__proto__ = __nox_super_356_421;
+          Object.defineProperty(_Class13, 'prototype', { writable: false });
+          return _Class13;
         })(Base))(),
     ).toThrow();
     expect(
       () =>
         new ((__nox_super_452_517 => {
           'use strict';
-          const _Class12 = function _Class12() {
+          const _Class14 = function _Class14() {
             if (!new.target) throw new TypeError('Cannot call a class as a function');
             var _this,
               _newtarget = new.target;
             function _super() {
-              _this = _construct(__nox_super_452_517, arguments, _newtarget || _Class12);
+              _this = _construct(__nox_super_452_517, arguments, _newtarget || _Class14);
               return _this;
             }
             var _result = function () {
@@ -16507,29 +16582,29 @@ test('spec/super-missing/exec.js', async () => {
           };
           if (__nox_super_452_517 !== null && typeof __nox_super_452_517 !== 'function')
             throw new TypeError('Super expression must either be null or a function');
-          _Class12.prototype = Object.create(__nox_super_452_517 && __nox_super_452_517.prototype, {
+          _Class14.prototype = Object.create(__nox_super_452_517 && __nox_super_452_517.prototype, {
             constructor: {
-              value: _Class12,
+              value: _Class14,
               writable: true,
               configurable: true,
             },
           });
-          if (Object.setPrototypeOf) Object.setPrototypeOf(_Class12, __nox_super_452_517);
-          else _Class12.__proto__ = __nox_super_452_517;
-          Object.defineProperty(_Class12, 'prototype', { writable: false });
-          return _Class12;
+          if (Object.setPrototypeOf) Object.setPrototypeOf(_Class14, __nox_super_452_517);
+          else _Class14.__proto__ = __nox_super_452_517;
+          Object.defineProperty(_Class14, 'prototype', { writable: false });
+          return _Class14;
         })(Base))(),
     ).toThrow();
     expect(
       () =>
         new ((__nox_super_548_614 => {
           'use strict';
-          const _Class13 = function _Class13() {
+          const _Class15 = function _Class15() {
             if (!new.target) throw new TypeError('Cannot call a class as a function');
             var _this,
               _newtarget = new.target;
             function _super() {
-              _this = _construct(__nox_super_548_614, arguments, _newtarget || _Class13);
+              _this = _construct(__nox_super_548_614, arguments, _newtarget || _Class15);
               return _this;
             }
             var _result = function () {
@@ -16546,29 +16621,29 @@ test('spec/super-missing/exec.js', async () => {
           };
           if (__nox_super_548_614 !== null && typeof __nox_super_548_614 !== 'function')
             throw new TypeError('Super expression must either be null or a function');
-          _Class13.prototype = Object.create(__nox_super_548_614 && __nox_super_548_614.prototype, {
+          _Class15.prototype = Object.create(__nox_super_548_614 && __nox_super_548_614.prototype, {
             constructor: {
-              value: _Class13,
+              value: _Class15,
               writable: true,
               configurable: true,
             },
           });
-          if (Object.setPrototypeOf) Object.setPrototypeOf(_Class13, __nox_super_548_614);
-          else _Class13.__proto__ = __nox_super_548_614;
-          Object.defineProperty(_Class13, 'prototype', { writable: false });
-          return _Class13;
+          if (Object.setPrototypeOf) Object.setPrototypeOf(_Class15, __nox_super_548_614);
+          else _Class15.__proto__ = __nox_super_548_614;
+          Object.defineProperty(_Class15, 'prototype', { writable: false });
+          return _Class15;
         })(Base))(),
     ).toThrow();
     expect(
       () =>
         new ((__nox_super_645_710 => {
           'use strict';
-          const _Class14 = function _Class14() {
+          const _Class16 = function _Class16() {
             if (!new.target) throw new TypeError('Cannot call a class as a function');
             var _this,
               _newtarget = new.target;
             function _super() {
-              _this = _construct(__nox_super_645_710, arguments, _newtarget || _Class14);
+              _this = _construct(__nox_super_645_710, arguments, _newtarget || _Class16);
               return _this;
             }
             var _result = function () {
@@ -16585,29 +16660,29 @@ test('spec/super-missing/exec.js', async () => {
           };
           if (__nox_super_645_710 !== null && typeof __nox_super_645_710 !== 'function')
             throw new TypeError('Super expression must either be null or a function');
-          _Class14.prototype = Object.create(__nox_super_645_710 && __nox_super_645_710.prototype, {
+          _Class16.prototype = Object.create(__nox_super_645_710 && __nox_super_645_710.prototype, {
             constructor: {
-              value: _Class14,
+              value: _Class16,
               writable: true,
               configurable: true,
             },
           });
-          if (Object.setPrototypeOf) Object.setPrototypeOf(_Class14, __nox_super_645_710);
-          else _Class14.__proto__ = __nox_super_645_710;
-          Object.defineProperty(_Class14, 'prototype', { writable: false });
-          return _Class14;
+          if (Object.setPrototypeOf) Object.setPrototypeOf(_Class16, __nox_super_645_710);
+          else _Class16.__proto__ = __nox_super_645_710;
+          Object.defineProperty(_Class16, 'prototype', { writable: false });
+          return _Class16;
         })(Base))(),
     ).toThrow();
     expect(
       () =>
         new ((__nox_super_742_807 => {
           'use strict';
-          const _Class15 = function _Class15() {
+          const _Class17 = function _Class17() {
             if (!new.target) throw new TypeError('Cannot call a class as a function');
             var _this,
               _newtarget = new.target;
             function _super() {
-              _this = _construct(__nox_super_742_807, arguments, _newtarget || _Class15);
+              _this = _construct(__nox_super_742_807, arguments, _newtarget || _Class17);
               return _this;
             }
             var _result = function () {
@@ -16624,17 +16699,17 @@ test('spec/super-missing/exec.js', async () => {
           };
           if (__nox_super_742_807 !== null && typeof __nox_super_742_807 !== 'function')
             throw new TypeError('Super expression must either be null or a function');
-          _Class15.prototype = Object.create(__nox_super_742_807 && __nox_super_742_807.prototype, {
+          _Class17.prototype = Object.create(__nox_super_742_807 && __nox_super_742_807.prototype, {
             constructor: {
-              value: _Class15,
+              value: _Class17,
               writable: true,
               configurable: true,
             },
           });
-          if (Object.setPrototypeOf) Object.setPrototypeOf(_Class15, __nox_super_742_807);
-          else _Class15.__proto__ = __nox_super_742_807;
-          Object.defineProperty(_Class15, 'prototype', { writable: false });
-          return _Class15;
+          if (Object.setPrototypeOf) Object.setPrototypeOf(_Class17, __nox_super_742_807);
+          else _Class17.__proto__ = __nox_super_742_807;
+          Object.defineProperty(_Class17, 'prototype', { writable: false });
+          return _Class17;
         })(Base))(),
     ).toThrow();"
   `);
@@ -16707,12 +16782,12 @@ test('spec/super-missing/input.js', async () => {
       () =>
         new ((__nox_super_137_211 => {
           'use strict';
-          const _Class9 = function _Class9() {
+          const _Class11 = function _Class11() {
             if (!new.target) throw new TypeError('Cannot call a class as a function');
             var _this,
               _newtarget = new.target;
             function _super() {
-              _this = _construct(__nox_super_137_211, arguments, _newtarget || _Class9);
+              _this = _construct(__nox_super_137_211, arguments, _newtarget || _Class11);
               return _this;
             }
             var _result = function () {
@@ -16732,29 +16807,29 @@ test('spec/super-missing/input.js', async () => {
           };
           if (__nox_super_137_211 !== null && typeof __nox_super_137_211 !== 'function')
             throw new TypeError('Super expression must either be null or a function');
-          _Class9.prototype = Object.create(__nox_super_137_211 && __nox_super_137_211.prototype, {
+          _Class11.prototype = Object.create(__nox_super_137_211 && __nox_super_137_211.prototype, {
             constructor: {
-              value: _Class9,
+              value: _Class11,
               writable: true,
               configurable: true,
             },
           });
-          if (Object.setPrototypeOf) Object.setPrototypeOf(_Class9, __nox_super_137_211);
-          else _Class9.__proto__ = __nox_super_137_211;
-          Object.defineProperty(_Class9, 'prototype', { writable: false });
-          return _Class9;
+          if (Object.setPrototypeOf) Object.setPrototypeOf(_Class11, __nox_super_137_211);
+          else _Class11.__proto__ = __nox_super_137_211;
+          Object.defineProperty(_Class11, 'prototype', { writable: false });
+          return _Class11;
         })(Base))(),
     ).toThrow();
     expect(
       () =>
         new ((__nox_super_242_325 => {
           'use strict';
-          const _Class10 = function _Class10() {
+          const _Class12 = function _Class12() {
             if (!new.target) throw new TypeError('Cannot call a class as a function');
             var _this,
               _newtarget = new.target;
             function _super() {
-              _this = _construct(__nox_super_242_325, arguments, _newtarget || _Class10);
+              _this = _construct(__nox_super_242_325, arguments, _newtarget || _Class12);
               return _this;
             }
             var _result = function () {
@@ -16774,29 +16849,29 @@ test('spec/super-missing/input.js', async () => {
           };
           if (__nox_super_242_325 !== null && typeof __nox_super_242_325 !== 'function')
             throw new TypeError('Super expression must either be null or a function');
-          _Class10.prototype = Object.create(__nox_super_242_325 && __nox_super_242_325.prototype, {
+          _Class12.prototype = Object.create(__nox_super_242_325 && __nox_super_242_325.prototype, {
             constructor: {
-              value: _Class10,
+              value: _Class12,
               writable: true,
               configurable: true,
             },
           });
-          if (Object.setPrototypeOf) Object.setPrototypeOf(_Class10, __nox_super_242_325);
-          else _Class10.__proto__ = __nox_super_242_325;
-          Object.defineProperty(_Class10, 'prototype', { writable: false });
-          return _Class10;
+          if (Object.setPrototypeOf) Object.setPrototypeOf(_Class12, __nox_super_242_325);
+          else _Class12.__proto__ = __nox_super_242_325;
+          Object.defineProperty(_Class12, 'prototype', { writable: false });
+          return _Class12;
         })(Base))(),
     ).toThrow();
     expect(
       () =>
         new ((__nox_super_356_421 => {
           'use strict';
-          const _Class11 = function _Class11() {
+          const _Class13 = function _Class13() {
             if (!new.target) throw new TypeError('Cannot call a class as a function');
             var _this,
               _newtarget = new.target;
             function _super() {
-              _this = _construct(__nox_super_356_421, arguments, _newtarget || _Class11);
+              _this = _construct(__nox_super_356_421, arguments, _newtarget || _Class13);
               return _this;
             }
             var _result = function () {
@@ -16813,29 +16888,29 @@ test('spec/super-missing/input.js', async () => {
           };
           if (__nox_super_356_421 !== null && typeof __nox_super_356_421 !== 'function')
             throw new TypeError('Super expression must either be null or a function');
-          _Class11.prototype = Object.create(__nox_super_356_421 && __nox_super_356_421.prototype, {
+          _Class13.prototype = Object.create(__nox_super_356_421 && __nox_super_356_421.prototype, {
             constructor: {
-              value: _Class11,
+              value: _Class13,
               writable: true,
               configurable: true,
             },
           });
-          if (Object.setPrototypeOf) Object.setPrototypeOf(_Class11, __nox_super_356_421);
-          else _Class11.__proto__ = __nox_super_356_421;
-          Object.defineProperty(_Class11, 'prototype', { writable: false });
-          return _Class11;
+          if (Object.setPrototypeOf) Object.setPrototypeOf(_Class13, __nox_super_356_421);
+          else _Class13.__proto__ = __nox_super_356_421;
+          Object.defineProperty(_Class13, 'prototype', { writable: false });
+          return _Class13;
         })(Base))(),
     ).toThrow();
     expect(
       () =>
         new ((__nox_super_452_517 => {
           'use strict';
-          const _Class12 = function _Class12() {
+          const _Class14 = function _Class14() {
             if (!new.target) throw new TypeError('Cannot call a class as a function');
             var _this,
               _newtarget = new.target;
             function _super() {
-              _this = _construct(__nox_super_452_517, arguments, _newtarget || _Class12);
+              _this = _construct(__nox_super_452_517, arguments, _newtarget || _Class14);
               return _this;
             }
             var _result = function () {
@@ -16852,29 +16927,29 @@ test('spec/super-missing/input.js', async () => {
           };
           if (__nox_super_452_517 !== null && typeof __nox_super_452_517 !== 'function')
             throw new TypeError('Super expression must either be null or a function');
-          _Class12.prototype = Object.create(__nox_super_452_517 && __nox_super_452_517.prototype, {
+          _Class14.prototype = Object.create(__nox_super_452_517 && __nox_super_452_517.prototype, {
             constructor: {
-              value: _Class12,
+              value: _Class14,
               writable: true,
               configurable: true,
             },
           });
-          if (Object.setPrototypeOf) Object.setPrototypeOf(_Class12, __nox_super_452_517);
-          else _Class12.__proto__ = __nox_super_452_517;
-          Object.defineProperty(_Class12, 'prototype', { writable: false });
-          return _Class12;
+          if (Object.setPrototypeOf) Object.setPrototypeOf(_Class14, __nox_super_452_517);
+          else _Class14.__proto__ = __nox_super_452_517;
+          Object.defineProperty(_Class14, 'prototype', { writable: false });
+          return _Class14;
         })(Base))(),
     ).toThrow();
     expect(
       () =>
         new ((__nox_super_548_614 => {
           'use strict';
-          const _Class13 = function _Class13() {
+          const _Class15 = function _Class15() {
             if (!new.target) throw new TypeError('Cannot call a class as a function');
             var _this,
               _newtarget = new.target;
             function _super() {
-              _this = _construct(__nox_super_548_614, arguments, _newtarget || _Class13);
+              _this = _construct(__nox_super_548_614, arguments, _newtarget || _Class15);
               return _this;
             }
             var _result = function () {
@@ -16891,29 +16966,29 @@ test('spec/super-missing/input.js', async () => {
           };
           if (__nox_super_548_614 !== null && typeof __nox_super_548_614 !== 'function')
             throw new TypeError('Super expression must either be null or a function');
-          _Class13.prototype = Object.create(__nox_super_548_614 && __nox_super_548_614.prototype, {
+          _Class15.prototype = Object.create(__nox_super_548_614 && __nox_super_548_614.prototype, {
             constructor: {
-              value: _Class13,
+              value: _Class15,
               writable: true,
               configurable: true,
             },
           });
-          if (Object.setPrototypeOf) Object.setPrototypeOf(_Class13, __nox_super_548_614);
-          else _Class13.__proto__ = __nox_super_548_614;
-          Object.defineProperty(_Class13, 'prototype', { writable: false });
-          return _Class13;
+          if (Object.setPrototypeOf) Object.setPrototypeOf(_Class15, __nox_super_548_614);
+          else _Class15.__proto__ = __nox_super_548_614;
+          Object.defineProperty(_Class15, 'prototype', { writable: false });
+          return _Class15;
         })(Base))(),
     ).toThrow();
     expect(
       () =>
         new ((__nox_super_645_710 => {
           'use strict';
-          const _Class14 = function _Class14() {
+          const _Class16 = function _Class16() {
             if (!new.target) throw new TypeError('Cannot call a class as a function');
             var _this,
               _newtarget = new.target;
             function _super() {
-              _this = _construct(__nox_super_645_710, arguments, _newtarget || _Class14);
+              _this = _construct(__nox_super_645_710, arguments, _newtarget || _Class16);
               return _this;
             }
             var _result = function () {
@@ -16930,29 +17005,29 @@ test('spec/super-missing/input.js', async () => {
           };
           if (__nox_super_645_710 !== null && typeof __nox_super_645_710 !== 'function')
             throw new TypeError('Super expression must either be null or a function');
-          _Class14.prototype = Object.create(__nox_super_645_710 && __nox_super_645_710.prototype, {
+          _Class16.prototype = Object.create(__nox_super_645_710 && __nox_super_645_710.prototype, {
             constructor: {
-              value: _Class14,
+              value: _Class16,
               writable: true,
               configurable: true,
             },
           });
-          if (Object.setPrototypeOf) Object.setPrototypeOf(_Class14, __nox_super_645_710);
-          else _Class14.__proto__ = __nox_super_645_710;
-          Object.defineProperty(_Class14, 'prototype', { writable: false });
-          return _Class14;
+          if (Object.setPrototypeOf) Object.setPrototypeOf(_Class16, __nox_super_645_710);
+          else _Class16.__proto__ = __nox_super_645_710;
+          Object.defineProperty(_Class16, 'prototype', { writable: false });
+          return _Class16;
         })(Base))(),
     ).toThrow();
     expect(
       () =>
         new ((__nox_super_742_807 => {
           'use strict';
-          const _Class15 = function _Class15() {
+          const _Class17 = function _Class17() {
             if (!new.target) throw new TypeError('Cannot call a class as a function');
             var _this,
               _newtarget = new.target;
             function _super() {
-              _this = _construct(__nox_super_742_807, arguments, _newtarget || _Class15);
+              _this = _construct(__nox_super_742_807, arguments, _newtarget || _Class17);
               return _this;
             }
             var _result = function () {
@@ -16969,17 +17044,17 @@ test('spec/super-missing/input.js', async () => {
           };
           if (__nox_super_742_807 !== null && typeof __nox_super_742_807 !== 'function')
             throw new TypeError('Super expression must either be null or a function');
-          _Class15.prototype = Object.create(__nox_super_742_807 && __nox_super_742_807.prototype, {
+          _Class17.prototype = Object.create(__nox_super_742_807 && __nox_super_742_807.prototype, {
             constructor: {
-              value: _Class15,
+              value: _Class17,
               writable: true,
               configurable: true,
             },
           });
-          if (Object.setPrototypeOf) Object.setPrototypeOf(_Class15, __nox_super_742_807);
-          else _Class15.__proto__ = __nox_super_742_807;
-          Object.defineProperty(_Class15, 'prototype', { writable: false });
-          return _Class15;
+          if (Object.setPrototypeOf) Object.setPrototypeOf(_Class17, __nox_super_742_807);
+          else _Class17.__proto__ = __nox_super_742_807;
+          Object.defineProperty(_Class17, 'prototype', { writable: false });
+          return _Class17;
         })(Base))(),
     ).toThrow();"
   `);

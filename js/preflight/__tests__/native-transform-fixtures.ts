@@ -6,6 +6,7 @@ export type NativeTransformName = (typeof NATIVE_TRANSFORM_NAMES)[number];
 export const NATIVE_TRANSFORM_OWNERSHIP_FIXTURES = {
   blockScoping: ['let value = 1;', true],
   classes: ['class Value {}', true],
+  legacyDecorators: ['@sealed class Value {}', true],
   destructuring: ['var { value } = input;', { useBuiltIns: true }],
   parameters: ['function read(value = 1) { return value; }', true],
   forOf: ['for (var value of values) consume(value);', true],
@@ -39,7 +40,4 @@ export const NATIVE_TRANSFORM_OWNERSHIP_FIXTURES = {
   readonly [string, PreflightTransforms[NativeTransformName]]
 >;
 
-export const NATIVE_TRANSFORM_COMPATIBILITY_BOUNDARIES = new Set<NativeTransformName>([
-  'regexpLookBehind',
-  'regexpMatchIndices',
-]);
+export const NATIVE_TRANSFORM_COMPATIBILITY_BOUNDARIES = new Set<NativeTransformName>();

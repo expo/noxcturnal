@@ -398,6 +398,43 @@ pub const INLINE_CLASS_PRIVATE_HELPERS_RUNTIME_BINDINGS: &[&str] = &[
     "_classPrivateFieldLooseBase2",
     "_classPrivateMethodCall",
 ];
+pub const INLINE_CLASS_PRIVATE_IN_HELPER: &str = r#"var _checkInRHS2=(()=>{var c={typeof:function(e,t){function n(p){"@babel/helpers - typeof";return e.exports=n=typeof Symbol=="function"&&typeof Symbol.iterator=="symbol"?function(o){return typeof o}:function(o){return o&&typeof Symbol=="function"&&o.constructor===Symbol&&o!==Symbol.prototype?"symbol":typeof o},e.exports.__esModule=!0,e.exports.default=e.exports,n(p)}e.exports=n,e.exports.__esModule=!0,e.exports.default=e.exports},checkInRHS:function(e,t){var n=t("typeof").default;function p(o){if(Object(o)!==o)throw TypeError("right-hand side of 'in' should be an object, got "+(o!==null?n(o):"null"));return o}e.exports=p,e.exports.__esModule=!0,e.exports.default=e.exports}},r={};function u(e){if(r[e])return r[e].exports;var t=r[e]={exports:{}};return c[e](t,u),t.exports}return{checkInRHS:u("checkInRHS")}})(),_checkInRHS=_checkInRHS2.checkInRHS;"#;
+pub const INLINE_CLASS_PRIVATE_IN_HELPER_PRETTY: &str = r#"var _checkInRHS2 = (() => {
+	var c = {
+		typeof: function(e, t) {
+			function n(p) {
+				"@babel/helpers - typeof";
+				return e.exports = n = typeof Symbol == "function" && typeof Symbol.iterator == "symbol" ? function(o) {
+					return typeof o;
+				} : function(o) {
+					return o && typeof Symbol == "function" && o.constructor === Symbol && o !== Symbol.prototype ? "symbol" : typeof o;
+				}, e.exports.__esModule = !0, e.exports.default = e.exports, n(p);
+			}
+			e.exports = n, e.exports.__esModule = !0, e.exports.default = e.exports;
+		},
+		checkInRHS: function(e, t) {
+			var n = t("typeof").default;
+			function p(o) {
+				if (Object(o) !== o) throw TypeError("right-hand side of 'in' should be an object, got " + (o !== null ? n(o) : "null"));
+				return o;
+			}
+			e.exports = p, e.exports.__esModule = !0, e.exports.default = e.exports;
+		}
+	}, r = {};
+	function u(e) {
+		if (r[e]) return r[e].exports;
+		var t = r[e] = { exports: {} };
+		return c[e](t, u), t.exports;
+	}
+	return { checkInRHS: u("checkInRHS") };
+})(), _checkInRHS = _checkInRHS2.checkInRHS;
+"#;
+pub const INLINE_CLASS_PRIVATE_IN_HELPER_BINDINGS: &[&str] = &["_checkInRHS", "_checkInRHS2"];
+pub const INLINE_CLASS_PRIVATE_IN_HELPER_RUNTIME: &str = r#"var _checkInRHS2={checkInRHS:require("@babel/runtime/helpers/checkInRHS")},_checkInRHS=_checkInRHS2.checkInRHS;"#;
+pub const INLINE_CLASS_PRIVATE_IN_HELPER_RUNTIME_PRETTY: &str = r#"var _checkInRHS2 = { checkInRHS: require("@babel/runtime/helpers/checkInRHS") }, _checkInRHS = _checkInRHS2.checkInRHS;
+"#;
+pub const INLINE_CLASS_PRIVATE_IN_HELPER_RUNTIME_BINDINGS: &[&str] =
+    &["_checkInRHS", "_checkInRHS2"];
 pub const INLINE_REGEXP_NAMED_CAPTURE_HELPER: &str = r#"var _wrapRegExp2=(()=>{var h={typeof:function(e,s){function u(a){"@babel/helpers - typeof";return e.exports=u=typeof Symbol=="function"&&typeof Symbol.iterator=="symbol"?function(t){return typeof t}:function(t){return t&&typeof Symbol=="function"&&t.constructor===Symbol&&t!==Symbol.prototype?"symbol":typeof t},e.exports.__esModule=!0,e.exports.default=e.exports,u(a)}e.exports=u,e.exports.__esModule=!0,e.exports.default=e.exports},setPrototypeOf:function(e,s){function u(a,t){return e.exports=u=Object.setPrototypeOf?Object.setPrototypeOf.bind():function(p,c){return p.__proto__=c,p},e.exports.__esModule=!0,e.exports.default=e.exports,u(a,t)}e.exports=u,e.exports.__esModule=!0,e.exports.default=e.exports},inherits:function(e,s){var u=s("setPrototypeOf");function a(t,p){if(typeof p!="function"&&p!==null)throw new TypeError("Super expression must either be null or a function");t.prototype=Object.create(p&&p.prototype,{constructor:{value:t,writable:!0,configurable:!0}}),Object.defineProperty(t,"prototype",{writable:!1}),p&&u(t,p)}e.exports=a,e.exports.__esModule=!0,e.exports.default=e.exports},wrapRegExp:function(e,s){var u=s("typeof").default,a=s("setPrototypeOf"),t=s("inherits");function p(){e.exports=p=function(o,r){return new x(o,void 0,r)},e.exports.__esModule=!0,e.exports.default=e.exports;var c=RegExp.prototype,b=new WeakMap;function x(o,r,f){var i=RegExp(o,r);return b.set(i,f||b.get(o)),a(i,x.prototype)}function v(o,r){var f=b.get(r);return Object.keys(f).reduce(function(i,n){var l=f[n];if(typeof l=="number")i[n]=o[l];else{for(var y=0;o[l[y]]===void 0&&y+1<l.length;)y++;i[n]=o[l[y]]}return i},Object.create(null))}return t(x,RegExp),x.prototype.exec=function(o){var r=c.exec.call(this,o);if(r){r.groups=v(r,this);var f=r.indices;f&&(f.groups=v(f,this))}return r},x.prototype[Symbol.replace]=function(o,r){if(typeof r=="string"){var f=b.get(this);return c[Symbol.replace].call(this,o,r.replace(/\$<([^>]+)(>|$)/g,function(n,l,y){if(y==="")return n;var g=f[l];return Array.isArray(g)?"$"+g.join("$"):typeof g=="number"?"$"+g:""}))}if(typeof r=="function"){var i=this;return c[Symbol.replace].call(this,o,function(){var n=arguments;return u(n[n.length-1])!="object"&&(n=[].slice.call(n)).push(v(n,i)),r.apply(this,n)})}return c[Symbol.replace].call(this,o,r)},p.apply(this,arguments)}e.exports=p,e.exports.__esModule=!0,e.exports.default=e.exports}},d={};function _(e){if(d[e])return d[e].exports;var s=d[e]={exports:{}};return h[e](s,_),s.exports}return{wrapRegExp:_("wrapRegExp")}})(),_wrapRegExp=_wrapRegExp2.wrapRegExp;"#;
 pub const INLINE_REGEXP_NAMED_CAPTURE_HELPER_PRETTY: &str = r#"var _wrapRegExp2 = (() => {
 	var h = {

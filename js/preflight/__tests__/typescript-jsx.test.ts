@@ -93,16 +93,20 @@ test('removes type-only module edges before following visitor phases', () => {
   assert.match(result.code, /runtime-edge/);
 });
 
-test('routes legacy and modern decorators to explicit fallback', () => {
+test('lowers decorators before TypeScript erasure', () => {
   for (const source of ['@sealed class Example {}', 'class Example { @logged value = 1 }']) {
     const result = transform(
       source,
       'fixture.ts',
-      nativePipeline('fixture.ts', { typescript: 'strip' }).pipeline,
+      nativePipeline('fixture.ts', {
+        typescript: 'strip',
+        helpers: { mode: 'inline' },
+        transforms: { legacyDecorators: true },
+      }).pipeline,
     );
-    assert.equal(result.status, 'bailout');
-    assert.equal(result.reason, 'preflight:decorators-not-supported');
-    assert.equal(result.source, source);
+    assert.equal(result.status, 'complete');
+    assert.doesNotMatch(result.code, /@(?:sealed|logged)/);
+    assert.match(result.code, /_decorate/);
   }
 });
 

@@ -648,6 +648,31 @@ test('simple parameters before a default remain unmapped from arguments', () => 
   expect(result.result).toEqual([9, 7, 2]);
 });
 
+test('default and destructured setter parameters preserve assignment behavior', () => {
+  const result = execute<{ result: unknown[] }>(
+    `
+      const target = {
+        values: [],
+        set defaulted(value = 3) { this.values.push(value); },
+        set destructured({ value }) { this.values.push(value); }
+      };
+      target.defaulted = undefined;
+      target.defaulted = 5;
+      target.destructured = { value: 7 };
+      const descriptors = [
+        Object.getOwnPropertyDescriptor(target, 'defaulted').set.length,
+        Object.getOwnPropertyDescriptor(target, 'destructured').set.length
+      ];
+      globalThis.result = [target.values, descriptors];
+    `,
+    { transforms: { parameters: true } },
+  );
+  expect(result.result).toEqual([
+    [3, 5, 7],
+    [1, 1],
+  ]);
+});
+
 test('rest parameter arrays ignore lexical and global Array bindings', () => {
   const result = execute<{ result: unknown[] }>(
     `

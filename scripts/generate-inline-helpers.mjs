@@ -149,6 +149,11 @@ const adapterBundles = {
     adapter:
       'function _classPrivateFieldLooseBase(receiver,key){return _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(receiver,key)}function _classPrivateMethodCall(receiver,key,args){return _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(receiver,key)[key].apply(receiver,args)}',
   },
+  INLINE_CLASS_PRIVATE_IN_HELPER: {
+    roots: ['checkInRHS'],
+    binding: '_checkInRHS2',
+    adapter: 'var _checkInRHS=_checkInRHS2.checkInRHS;',
+  },
   INLINE_REGEXP_NAMED_CAPTURE_HELPER: {
     roots: ['wrapRegExp'],
     binding: '_wrapRegExp2',

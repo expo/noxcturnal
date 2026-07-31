@@ -1212,7 +1212,9 @@ test('034 JS Private Properties > private instance field brand checks > basic #f
       transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
     }),
   ).toMatchInlineSnapshot(`
-    "() => {
+    "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+      _checkInRHS = _checkInRHS2.checkInRHS;
+    () => {
       let Foo = (() => {
         'use strict';
         var _x = '__private_Foo_x';
@@ -1227,7 +1229,7 @@ test('034 JS Private Properties > private instance field brand checks > basic #f
           value: Object.defineProperty(
             function (obj) {
               if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
-              return Object.prototype.hasOwnProperty.call(obj, _x);
+              return Object.prototype.hasOwnProperty.call(_checkInRHS(obj), _x);
             },
             'name',
             {
@@ -1255,7 +1257,9 @@ test('035 JS Private Properties > private instance field brand checks > #field i
       transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
     }),
   ).toMatchInlineSnapshot(`
-    "() => {
+    "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+      _checkInRHS = _checkInRHS2.checkInRHS;
+    () => {
       let Foo = (() => {
         'use strict';
         var _x = '__private_Foo_x';
@@ -1270,7 +1274,7 @@ test('035 JS Private Properties > private instance field brand checks > #field i
           value: Object.defineProperty(
             function (obj) {
               if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
-              return Object.prototype.hasOwnProperty.call(obj, _x);
+              return Object.prototype.hasOwnProperty.call(_checkInRHS(obj), _x);
             },
             'name',
             {
@@ -1299,6 +1303,8 @@ test('036 JS Private Properties > private instance field brand checks > #field i
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseKey = require('@babel/runtime/helpers/classPrivateFieldLooseKey');
+    var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+      _checkInRHS = _checkInRHS2.checkInRHS;
     () => {
       let A = (() => {
         'use strict';
@@ -1314,7 +1320,7 @@ test('036 JS Private Properties > private instance field brand checks > #field i
           value: Object.defineProperty(
             function (obj) {
               if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
-              return Object.prototype.hasOwnProperty.call(obj, _x);
+              return Object.prototype.hasOwnProperty.call(_checkInRHS(obj), _x);
             },
             'name',
             {
@@ -1351,7 +1357,9 @@ test('037 JS Private Properties > private instance field brand checks > multiple
       transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
     }),
   ).toMatchInlineSnapshot(`
-    "() => {
+    "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+      _checkInRHS = _checkInRHS2.checkInRHS;
+    () => {
       let Foo = (() => {
         'use strict';
         var _a = '__private_Foo_a';
@@ -1371,7 +1379,7 @@ test('037 JS Private Properties > private instance field brand checks > multiple
           value: Object.defineProperty(
             function (obj) {
               if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
-              return Object.prototype.hasOwnProperty.call(obj, _a);
+              return Object.prototype.hasOwnProperty.call(_checkInRHS(obj), _a);
             },
             'name',
             {
@@ -1386,7 +1394,7 @@ test('037 JS Private Properties > private instance field brand checks > multiple
           value: Object.defineProperty(
             function (obj) {
               if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
-              return Object.prototype.hasOwnProperty.call(obj, _b);
+              return Object.prototype.hasOwnProperty.call(_checkInRHS(obj), _b);
             },
             'name',
             {
@@ -1418,7 +1426,9 @@ test('038 JS Private Properties > private instance field brand checks > #field i
       transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
     }),
   ).toMatchInlineSnapshot(`
-    "() => {
+    "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+      _checkInRHS = _checkInRHS2.checkInRHS;
+    () => {
       let Foo = (() => {
         'use strict';
         var _x = '__private_Foo_x';
@@ -1433,7 +1443,7 @@ test('038 JS Private Properties > private instance field brand checks > #field i
           value: Object.defineProperty(
             function (obj) {
               if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
-              return Object.prototype.hasOwnProperty.call(obj, _x);
+              return Object.prototype.hasOwnProperty.call(_checkInRHS(obj), _x);
             },
             'name',
             {
@@ -1461,7 +1471,9 @@ test('039 JS Private Properties > private instance field brand checks > instance
       transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
     }),
   ).toMatchInlineSnapshot(`
-    "() => {
+    "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+      _checkInRHS = _checkInRHS2.checkInRHS;
+    () => {
       let Foo = (() => {
         'use strict';
         var _x = '__private_Foo_x';
@@ -1476,7 +1488,7 @@ test('039 JS Private Properties > private instance field brand checks > instance
           value: Object.defineProperty(
             function (obj) {
               if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
-              return Object.prototype.hasOwnProperty.call(obj, _x);
+              return Object.prototype.hasOwnProperty.call(_checkInRHS(obj), _x);
             },
             'name',
             {
@@ -1505,7 +1517,67 @@ test('040 JS Private Properties > private instance method brand checks > #method
       helpers: runtimeHelpers,
       transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:oxc-class-properties-private-method-fusion"`);
+  ).toMatchInlineSnapshot(`
+    "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+      _checkInRHS = _checkInRHS2.checkInRHS;
+    () => {
+      let Foo = (() => {
+        'use strict';
+        var _foo = '__private_Foo_foo';
+        var _foo2 = '__private_Foo_foo2';
+        const Foo = function Foo() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+          Object.defineProperty(this, _foo, {
+            value: function () {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            },
+          });
+          Object.defineProperty(this, _foo2, {
+            value: function () {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            },
+          });
+        };
+        Object.defineProperty(Foo.prototype, 'test', {
+          value: Object.defineProperty(
+            function (other) {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              return Object.prototype.hasOwnProperty.call(_checkInRHS(other), _foo);
+            },
+            'name',
+            {
+              value: 'test',
+              configurable: true,
+            },
+          ),
+          writable: true,
+          configurable: true,
+        });
+        Object.defineProperty(Foo.prototype, 'test2', {
+          value: Object.defineProperty(
+            function (other) {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              return Object.prototype.hasOwnProperty.call(_checkInRHS(other), _foo2);
+            },
+            'name',
+            {
+              value: 'test2',
+              configurable: true,
+            },
+          ),
+          writable: true,
+          configurable: true,
+        });
+        Object.defineProperty(Foo, 'prototype', { writable: false });
+        return Foo;
+      })();
+      const cl = new Foo();
+      expect(cl.test({})).toBe(false);
+      expect(cl.test(cl)).toBe(true);
+      expect(cl.test2({})).toBe(false);
+      expect(cl.test2(cl)).toBe(true);
+    };"
+  `);
 });
 
 test('041 JS Private Properties > private instance method brand checks > #method in obj for different instances of same class', async () => {
@@ -1516,7 +1588,45 @@ test('041 JS Private Properties > private instance method brand checks > #method
       helpers: runtimeHelpers,
       transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:oxc-class-properties-private-method-fusion"`);
+  ).toMatchInlineSnapshot(`
+    "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+      _checkInRHS = _checkInRHS2.checkInRHS;
+    () => {
+      let Foo = (() => {
+        'use strict';
+        var _bar = '__private_Foo_bar';
+        const Foo = function Foo() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+          Object.defineProperty(this, _bar, {
+            value: function () {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            },
+          });
+        };
+        Object.defineProperty(Foo, 'check', {
+          value: Object.defineProperty(
+            function (obj) {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              return Object.prototype.hasOwnProperty.call(_checkInRHS(obj), _bar);
+            },
+            'name',
+            {
+              value: 'check',
+              configurable: true,
+            },
+          ),
+          writable: true,
+          configurable: true,
+        });
+        Object.defineProperty(Foo, 'prototype', { writable: false });
+        return Foo;
+      })();
+      const a = new Foo();
+      const b = new Foo();
+      expect(Foo.check(a)).toBe(true);
+      expect(Foo.check(b)).toBe(true);
+    };"
+  `);
 });
 
 test('042 JS Private Properties > private accessor brand checks > #getter in obj returns true for instance', async () => {
@@ -1527,7 +1637,44 @@ test('042 JS Private Properties > private accessor brand checks > #getter in obj
       helpers: runtimeHelpers,
       transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:oxc-class-properties-private-method-fusion"`);
+  ).toMatchInlineSnapshot(`
+    "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+      _checkInRHS = _checkInRHS2.checkInRHS;
+    () => {
+      let Foo = (() => {
+        'use strict';
+        var _value = '__private_Foo_value';
+        const Foo = function Foo() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+          Object.defineProperty(this, _value, {
+            get: function () {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              return 42;
+            },
+          });
+        };
+        Object.defineProperty(Foo, 'check', {
+          value: Object.defineProperty(
+            function (obj) {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              return Object.prototype.hasOwnProperty.call(_checkInRHS(obj), _value);
+            },
+            'name',
+            {
+              value: 'check',
+              configurable: true,
+            },
+          ),
+          writable: true,
+          configurable: true,
+        });
+        Object.defineProperty(Foo, 'prototype', { writable: false });
+        return Foo;
+      })();
+      expect(Foo.check(new Foo())).toBe(true);
+      expect(Foo.check({})).toBe(false);
+    };"
+  `);
 });
 
 test('043 JS Private Properties > private accessor brand checks > #setter in obj returns true for instance', async () => {
@@ -1538,7 +1685,43 @@ test('043 JS Private Properties > private accessor brand checks > #setter in obj
       helpers: runtimeHelpers,
       transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:oxc-class-properties-private-method-fusion"`);
+  ).toMatchInlineSnapshot(`
+    "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+      _checkInRHS = _checkInRHS2.checkInRHS;
+    () => {
+      let Foo = (() => {
+        'use strict';
+        var _value = '__private_Foo_value';
+        const Foo = function Foo() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+          Object.defineProperty(this, _value, {
+            set: function (v) {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            },
+          });
+        };
+        Object.defineProperty(Foo, 'check', {
+          value: Object.defineProperty(
+            function (obj) {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              return Object.prototype.hasOwnProperty.call(_checkInRHS(obj), _value);
+            },
+            'name',
+            {
+              value: 'check',
+              configurable: true,
+            },
+          ),
+          writable: true,
+          configurable: true,
+        });
+        Object.defineProperty(Foo, 'prototype', { writable: false });
+        return Foo;
+      })();
+      expect(Foo.check(new Foo())).toBe(true);
+      expect(Foo.check({})).toBe(false);
+    };"
+  `);
 });
 
 test('044 JS Private Properties > private accessor brand checks > #accessor (getter+setter) in obj returns true', async () => {
@@ -1549,7 +1732,62 @@ test('044 JS Private Properties > private accessor brand checks > #accessor (get
       helpers: runtimeHelpers,
       transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:oxc-class-properties-private-method-fusion"`);
+  ).toMatchInlineSnapshot(`
+    "var _classPrivateFieldLooseBase2 = {
+      classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+    };
+    function _classPrivateFieldLooseBase(e, s) {
+      return _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+    }
+    function _classPrivateMethodCall(e, s, a) {
+      return _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s)[s].apply(e, a);
+    }
+    var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+      _checkInRHS = _checkInRHS2.checkInRHS;
+    () => {
+      let Foo = (() => {
+        'use strict';
+        var _value = '__private_Foo_value';
+        var _x = '__private_Foo_x';
+        const Foo = function Foo() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+          Object.defineProperty(this, _x, {
+            writable: true,
+            value: 0,
+          });
+          Object.defineProperty(this, _value, {
+            get: function () {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              return _classPrivateFieldLooseBase(this, _x)[_x];
+            },
+            set: function (v) {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              _classPrivateFieldLooseBase(this, _x)[_x] = v;
+            },
+          });
+        };
+        Object.defineProperty(Foo, 'check', {
+          value: Object.defineProperty(
+            function (obj) {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              return Object.prototype.hasOwnProperty.call(_checkInRHS(obj), _value);
+            },
+            'name',
+            {
+              value: 'check',
+              configurable: true,
+            },
+          ),
+          writable: true,
+          configurable: true,
+        });
+        Object.defineProperty(Foo, 'prototype', { writable: false });
+        return Foo;
+      })();
+      expect(Foo.check(new Foo())).toBe(true);
+      expect(Foo.check({})).toBe(false);
+    };"
+  `);
 });
 
 test('045 JS Private Properties > private accessor brand checks > brand check does not trigger getter side effects', async () => {
@@ -1560,7 +1798,48 @@ test('045 JS Private Properties > private accessor brand checks > brand check do
       helpers: runtimeHelpers,
       transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:oxc-class-properties-private-method-fusion"`);
+  ).toMatchInlineSnapshot(`
+    "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+      _checkInRHS = _checkInRHS2.checkInRHS;
+    () => {
+      let getterCalled = false;
+      let Foo = (() => {
+        'use strict';
+        var _value = '__private_Foo_value';
+        const Foo = function Foo() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+          Object.defineProperty(this, _value, {
+            get: function () {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              getterCalled = true;
+              return 42;
+            },
+          });
+        };
+        Object.defineProperty(Foo, 'check', {
+          value: Object.defineProperty(
+            function (obj) {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              return Object.prototype.hasOwnProperty.call(_checkInRHS(obj), _value);
+            },
+            'name',
+            {
+              value: 'check',
+              configurable: true,
+            },
+          ),
+          writable: true,
+          configurable: true,
+        });
+        Object.defineProperty(Foo, 'prototype', { writable: false });
+        return Foo;
+      })();
+      const foo = new Foo();
+      getterCalled = false;
+      Foo.check(foo);
+      expect(getterCalled).toBe(false);
+    };"
+  `);
 });
 
 test('046 JS Private Properties > private static field brand checks > #staticField in Class returns true', async () => {
@@ -1572,7 +1851,9 @@ test('046 JS Private Properties > private static field brand checks > #staticFie
       transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
     }),
   ).toMatchInlineSnapshot(`
-    "() => {
+    "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+      _checkInRHS = _checkInRHS2.checkInRHS;
+    () => {
       let Foo = (() => {
         'use strict';
         var _x = '__private_Foo_x';
@@ -1583,7 +1864,7 @@ test('046 JS Private Properties > private static field brand checks > #staticFie
           value: Object.defineProperty(
             function (obj) {
               if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
-              return Object.prototype.hasOwnProperty.call(obj, _x);
+              return Object.prototype.hasOwnProperty.call(_checkInRHS(obj), _x);
             },
             'name',
             {
@@ -1615,7 +1896,9 @@ test('047 JS Private Properties > private static field brand checks > #staticFie
       transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
     }),
   ).toMatchInlineSnapshot(`
-    "() => {
+    "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+      _checkInRHS = _checkInRHS2.checkInRHS;
+    () => {
       let Foo = (() => {
         'use strict';
         var _x = '__private_Foo_x';
@@ -1626,7 +1909,7 @@ test('047 JS Private Properties > private static field brand checks > #staticFie
           value: Object.defineProperty(
             function (obj) {
               if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
-              return Object.prototype.hasOwnProperty.call(obj, _x);
+              return Object.prototype.hasOwnProperty.call(_checkInRHS(obj), _x);
             },
             'name',
             {
@@ -1658,7 +1941,9 @@ test('048 JS Private Properties > private static field brand checks > #staticFie
       transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
     }),
   ).toMatchInlineSnapshot(`
-    "() => {
+    "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+      _checkInRHS = _checkInRHS2.checkInRHS;
+    () => {
       let Foo = (() => {
         'use strict';
         var _x = '__private_Foo_x';
@@ -1669,7 +1954,7 @@ test('048 JS Private Properties > private static field brand checks > #staticFie
           value: Object.defineProperty(
             function (obj) {
               if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
-              return Object.prototype.hasOwnProperty.call(obj, _x);
+              return Object.prototype.hasOwnProperty.call(_checkInRHS(obj), _x);
             },
             'name',
             {
@@ -1700,7 +1985,42 @@ test('049 JS Private Properties > private static method brand checks > #staticMe
       helpers: runtimeHelpers,
       transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:oxc-class-properties-private-method-fusion"`);
+  ).toMatchInlineSnapshot(`
+    "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+      _checkInRHS = _checkInRHS2.checkInRHS;
+    () => {
+      let Foo = (() => {
+        'use strict';
+        var _bar = '__private_Foo_bar';
+        const Foo = function Foo() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
+        Object.defineProperty(Foo, 'check', {
+          value: Object.defineProperty(
+            function (obj) {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              return Object.prototype.hasOwnProperty.call(_checkInRHS(obj), _bar);
+            },
+            'name',
+            {
+              value: 'check',
+              configurable: true,
+            },
+          ),
+          writable: true,
+          configurable: true,
+        });
+        Object.defineProperty(Foo, 'prototype', { writable: false });
+        Object.defineProperty(Foo, _bar, {
+          value: function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          },
+        });
+        return Foo;
+      })();
+      expect(Foo.check(Foo)).toBe(true);
+    };"
+  `);
 });
 
 test('050 JS Private Properties > private static method brand checks > #staticMethod in instance returns false', async () => {
@@ -1711,7 +2031,42 @@ test('050 JS Private Properties > private static method brand checks > #staticMe
       helpers: runtimeHelpers,
       transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:oxc-class-properties-private-method-fusion"`);
+  ).toMatchInlineSnapshot(`
+    "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+      _checkInRHS = _checkInRHS2.checkInRHS;
+    () => {
+      let Foo = (() => {
+        'use strict';
+        var _bar = '__private_Foo_bar';
+        const Foo = function Foo() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
+        Object.defineProperty(Foo, 'check', {
+          value: Object.defineProperty(
+            function (obj) {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              return Object.prototype.hasOwnProperty.call(_checkInRHS(obj), _bar);
+            },
+            'name',
+            {
+              value: 'check',
+              configurable: true,
+            },
+          ),
+          writable: true,
+          configurable: true,
+        });
+        Object.defineProperty(Foo, 'prototype', { writable: false });
+        Object.defineProperty(Foo, _bar, {
+          value: function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          },
+        });
+        return Foo;
+      })();
+      expect(Foo.check(new Foo())).toBe(false);
+    };"
+  `);
 });
 
 test('051 JS Private Properties > private static accessor brand checks > static #getter in Class returns true', async () => {
@@ -1722,7 +2077,44 @@ test('051 JS Private Properties > private static accessor brand checks > static 
       helpers: runtimeHelpers,
       transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:oxc-class-properties-private-method-fusion"`);
+  ).toMatchInlineSnapshot(`
+    "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+      _checkInRHS = _checkInRHS2.checkInRHS;
+    () => {
+      let Foo = (() => {
+        'use strict';
+        var _value = '__private_Foo_value';
+        const Foo = function Foo() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
+        Object.defineProperty(Foo, 'check', {
+          value: Object.defineProperty(
+            function (obj) {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              return Object.prototype.hasOwnProperty.call(_checkInRHS(obj), _value);
+            },
+            'name',
+            {
+              value: 'check',
+              configurable: true,
+            },
+          ),
+          writable: true,
+          configurable: true,
+        });
+        Object.defineProperty(Foo, 'prototype', { writable: false });
+        Object.defineProperty(Foo, _value, {
+          get: function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            return 1;
+          },
+        });
+        return Foo;
+      })();
+      expect(Foo.check(Foo)).toBe(true);
+      expect(Foo.check({})).toBe(false);
+    };"
+  `);
 });
 
 test('052 JS Private Properties > RHS not an object > throws TypeError for number', async () => {
@@ -1734,7 +2126,9 @@ test('052 JS Private Properties > RHS not an object > throws TypeError for numbe
       transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
     }),
   ).toMatchInlineSnapshot(`
-    "() => {
+    "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+      _checkInRHS = _checkInRHS2.checkInRHS;
+    () => {
       let Foo = (() => {
         'use strict';
         var _x = '__private_Foo_x';
@@ -1749,7 +2143,7 @@ test('052 JS Private Properties > RHS not an object > throws TypeError for numbe
           value: Object.defineProperty(
             function (obj) {
               if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
-              return Object.prototype.hasOwnProperty.call(obj, _x);
+              return Object.prototype.hasOwnProperty.call(_checkInRHS(obj), _x);
             },
             'name',
             {
@@ -1777,7 +2171,9 @@ test('053 JS Private Properties > RHS not an object > throws TypeError for strin
       transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
     }),
   ).toMatchInlineSnapshot(`
-    "() => {
+    "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+      _checkInRHS = _checkInRHS2.checkInRHS;
+    () => {
       let Foo = (() => {
         'use strict';
         var _x = '__private_Foo_x';
@@ -1792,7 +2188,7 @@ test('053 JS Private Properties > RHS not an object > throws TypeError for strin
           value: Object.defineProperty(
             function (obj) {
               if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
-              return Object.prototype.hasOwnProperty.call(obj, _x);
+              return Object.prototype.hasOwnProperty.call(_checkInRHS(obj), _x);
             },
             'name',
             {
@@ -1820,7 +2216,9 @@ test('054 JS Private Properties > RHS not an object > throws TypeError for boole
       transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
     }),
   ).toMatchInlineSnapshot(`
-    "() => {
+    "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+      _checkInRHS = _checkInRHS2.checkInRHS;
+    () => {
       let Foo = (() => {
         'use strict';
         var _x = '__private_Foo_x';
@@ -1835,7 +2233,7 @@ test('054 JS Private Properties > RHS not an object > throws TypeError for boole
           value: Object.defineProperty(
             function (obj) {
               if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
-              return Object.prototype.hasOwnProperty.call(obj, _x);
+              return Object.prototype.hasOwnProperty.call(_checkInRHS(obj), _x);
             },
             'name',
             {
@@ -1863,7 +2261,9 @@ test('055 JS Private Properties > RHS not an object > throws TypeError for undef
       transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
     }),
   ).toMatchInlineSnapshot(`
-    "() => {
+    "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+      _checkInRHS = _checkInRHS2.checkInRHS;
+    () => {
       let Foo = (() => {
         'use strict';
         var _x = '__private_Foo_x';
@@ -1878,7 +2278,7 @@ test('055 JS Private Properties > RHS not an object > throws TypeError for undef
           value: Object.defineProperty(
             function (obj) {
               if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
-              return Object.prototype.hasOwnProperty.call(obj, _x);
+              return Object.prototype.hasOwnProperty.call(_checkInRHS(obj), _x);
             },
             'name',
             {
@@ -1906,7 +2306,9 @@ test('056 JS Private Properties > RHS not an object > throws TypeError for null'
       transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
     }),
   ).toMatchInlineSnapshot(`
-    "() => {
+    "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+      _checkInRHS = _checkInRHS2.checkInRHS;
+    () => {
       let Foo = (() => {
         'use strict';
         var _x = '__private_Foo_x';
@@ -1921,7 +2323,7 @@ test('056 JS Private Properties > RHS not an object > throws TypeError for null'
           value: Object.defineProperty(
             function (obj) {
               if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
-              return Object.prototype.hasOwnProperty.call(obj, _x);
+              return Object.prototype.hasOwnProperty.call(_checkInRHS(obj), _x);
             },
             'name',
             {
@@ -1949,7 +2351,9 @@ test('057 JS Private Properties > RHS not an object > throws TypeError for symbo
       transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
     }),
   ).toMatchInlineSnapshot(`
-    "() => {
+    "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+      _checkInRHS = _checkInRHS2.checkInRHS;
+    () => {
       let Foo = (() => {
         'use strict';
         var _x = '__private_Foo_x';
@@ -1964,7 +2368,7 @@ test('057 JS Private Properties > RHS not an object > throws TypeError for symbo
           value: Object.defineProperty(
             function (obj) {
               if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
-              return Object.prototype.hasOwnProperty.call(obj, _x);
+              return Object.prototype.hasOwnProperty.call(_checkInRHS(obj), _x);
             },
             'name',
             {
@@ -1992,7 +2396,9 @@ test('058 JS Private Properties > RHS not an object > throws for static private 
       transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
     }),
   ).toMatchInlineSnapshot(`
-    "() => {
+    "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+      _checkInRHS = _checkInRHS2.checkInRHS;
+    () => {
       let Foo = (() => {
         'use strict';
         var _x = '__private_Foo_x';
@@ -2003,7 +2409,7 @@ test('058 JS Private Properties > RHS not an object > throws for static private 
           value: Object.defineProperty(
             function (obj) {
               if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
-              return Object.prototype.hasOwnProperty.call(obj, _x);
+              return Object.prototype.hasOwnProperty.call(_checkInRHS(obj), _x);
             },
             'name',
             {
@@ -2036,7 +2442,43 @@ test('059 JS Private Properties > RHS not an object > throws for private method 
       helpers: runtimeHelpers,
       transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:oxc-class-properties-private-method-fusion"`);
+  ).toMatchInlineSnapshot(`
+    "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+      _checkInRHS = _checkInRHS2.checkInRHS;
+    () => {
+      let Foo = (() => {
+        'use strict';
+        var _m = '__private_Foo_m';
+        const Foo = function Foo() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+          Object.defineProperty(this, _m, {
+            value: function () {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            },
+          });
+        };
+        Object.defineProperty(Foo, 'check', {
+          value: Object.defineProperty(
+            function (obj) {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              return Object.prototype.hasOwnProperty.call(_checkInRHS(obj), _m);
+            },
+            'name',
+            {
+              value: 'check',
+              configurable: true,
+            },
+          ),
+          writable: true,
+          configurable: true,
+        });
+        Object.defineProperty(Foo, 'prototype', { writable: false });
+        return Foo;
+      })();
+      expect(() => Foo.check(42)).toThrow();
+      expect(() => Foo.check(undefined)).toThrow();
+    };"
+  `);
 });
 
 test('060 JS Private Properties > class name shadowing > static private field check works when class name is shadowed', async () => {
@@ -2048,7 +2490,9 @@ test('060 JS Private Properties > class name shadowing > static private field ch
       transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
     }),
   ).toMatchInlineSnapshot(`
-    "() => {
+    "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+      _checkInRHS = _checkInRHS2.checkInRHS;
+    () => {
       let Test = (() => {
         'use strict';
         var _x = '__private_Test_x';
@@ -2062,7 +2506,7 @@ test('060 JS Private Properties > class name shadowing > static private field ch
               const Test = 2;
               const func = () => {
                 const Test = 3;
-                return Object.prototype.hasOwnProperty.call(other, _x) && Test;
+                return Object.prototype.hasOwnProperty.call(_checkInRHS(other), _x) && Test;
               };
               return func() + Test;
             },
@@ -2097,7 +2541,9 @@ test('061 JS Private Properties > class name shadowing > instance private field 
       transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
     }),
   ).toMatchInlineSnapshot(`
-    "() => {
+    "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+      _checkInRHS = _checkInRHS2.checkInRHS;
+    () => {
       let Foo = (() => {
         'use strict';
         var _x = '__private_Foo_x';
@@ -2113,7 +2559,7 @@ test('061 JS Private Properties > class name shadowing > instance private field 
             function (obj) {
               if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
               const Foo = 'shadowed';
-              return Object.prototype.hasOwnProperty.call(obj, _x);
+              return Object.prototype.hasOwnProperty.call(_checkInRHS(obj), _x);
             },
             'name',
             {
@@ -2143,7 +2589,9 @@ test('062 JS Private Properties > inheritance > #field in subclass instance retu
       transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
     }),
   ).toMatchInlineSnapshot(`
-    "() => {
+    "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+      _checkInRHS = _checkInRHS2.checkInRHS;
+    () => {
       let Base = (() => {
         'use strict';
         var _x = '__private_Base_x';
@@ -2158,7 +2606,7 @@ test('062 JS Private Properties > inheritance > #field in subclass instance retu
           value: Object.defineProperty(
             function (obj) {
               if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
-              return Object.prototype.hasOwnProperty.call(obj, _x);
+              return Object.prototype.hasOwnProperty.call(_checkInRHS(obj), _x);
             },
             'name',
             {
@@ -2188,7 +2636,9 @@ test('063 JS Private Properties > inheritance > subclass private field is indepe
       transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
     }),
   ).toMatchInlineSnapshot(`
-    "var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
+    "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+      _checkInRHS = _checkInRHS2.checkInRHS;
+    var _construct2 = { construct: require('@babel/runtime/helpers/construct') };
     function _construct(t, r, c) {
       return _construct2.construct(t, r, c);
     }
@@ -2207,7 +2657,7 @@ test('063 JS Private Properties > inheritance > subclass private field is indepe
           value: Object.defineProperty(
             function (obj) {
               if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
-              return Object.prototype.hasOwnProperty.call(obj, _x);
+              return Object.prototype.hasOwnProperty.call(_checkInRHS(obj), _x);
             },
             'name',
             {
@@ -2250,7 +2700,7 @@ test('063 JS Private Properties > inheritance > subclass private field is indepe
           value: Object.defineProperty(
             function (obj) {
               if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
-              return Object.prototype.hasOwnProperty.call(obj, _y);
+              return Object.prototype.hasOwnProperty.call(_checkInRHS(obj), _y);
             },
             'name',
             {
@@ -2281,7 +2731,9 @@ test('064 JS Private Properties > inheritance > #staticField in subclass returns
       transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
     }),
   ).toMatchInlineSnapshot(`
-    "() => {
+    "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+      _checkInRHS = _checkInRHS2.checkInRHS;
+    () => {
       let Base = (() => {
         'use strict';
         var _x = '__private_Base_x';
@@ -2292,7 +2744,7 @@ test('064 JS Private Properties > inheritance > #staticField in subclass returns
           value: Object.defineProperty(
             function (obj) {
               if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
-              return Object.prototype.hasOwnProperty.call(obj, _x);
+              return Object.prototype.hasOwnProperty.call(_checkInRHS(obj), _x);
             },
             'name',
             {
@@ -2326,7 +2778,44 @@ test('065 JS Private Properties > inheritance > private method brand check on su
       helpers: runtimeHelpers,
       transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:oxc-class-properties-private-method-fusion"`);
+  ).toMatchInlineSnapshot(`
+    "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+      _checkInRHS = _checkInRHS2.checkInRHS;
+    () => {
+      let Base = (() => {
+        'use strict';
+        var _secret = '__private_Base_secret';
+        const Base = function Base() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+          Object.defineProperty(this, _secret, {
+            value: function () {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            },
+          });
+        };
+        Object.defineProperty(Base, 'check', {
+          value: Object.defineProperty(
+            function (obj) {
+              if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+              return Object.prototype.hasOwnProperty.call(_checkInRHS(obj), _secret);
+            },
+            'name',
+            {
+              value: 'check',
+              configurable: true,
+            },
+          ),
+          writable: true,
+          configurable: true,
+        });
+        Object.defineProperty(Base, 'prototype', { writable: false });
+        return Base;
+      })();
+      class Child extends Base {}
+      expect(Base.check(new Child())).toBe(true);
+      expect(Base.check({})).toBe(false);
+    };"
+  `);
 });
 
 test('066 JS Private Properties > usage in expressions > negation: !(#field in obj)', async () => {
@@ -2338,7 +2827,9 @@ test('066 JS Private Properties > usage in expressions > negation: !(#field in o
       transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
     }),
   ).toMatchInlineSnapshot(`
-    "() => {
+    "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+      _checkInRHS = _checkInRHS2.checkInRHS;
+    () => {
       let Foo = (() => {
         'use strict';
         var _x = '__private_Foo_x';
@@ -2353,7 +2844,7 @@ test('066 JS Private Properties > usage in expressions > negation: !(#field in o
           value: Object.defineProperty(
             function (obj) {
               if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
-              return !Object.prototype.hasOwnProperty.call(obj, _x);
+              return !Object.prototype.hasOwnProperty.call(_checkInRHS(obj), _x);
             },
             'name',
             {
@@ -2382,7 +2873,9 @@ test('067 JS Private Properties > usage in expressions > ternary: #field in obj 
       transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
     }),
   ).toMatchInlineSnapshot(`
-    "() => {
+    "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+      _checkInRHS = _checkInRHS2.checkInRHS;
+    () => {
       let Foo = (() => {
         'use strict';
         var _x = '__private_Foo_x';
@@ -2397,7 +2890,7 @@ test('067 JS Private Properties > usage in expressions > ternary: #field in obj 
           value: Object.defineProperty(
             function (obj) {
               if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
-              return Object.prototype.hasOwnProperty.call(obj, _x) ? 'foo' : 'not foo';
+              return Object.prototype.hasOwnProperty.call(_checkInRHS(obj), _x) ? 'foo' : 'not foo';
             },
             'name',
             {
@@ -2426,7 +2919,9 @@ test('068 JS Private Properties > usage in expressions > logical AND: #field in 
       transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
     }),
   ).toMatchInlineSnapshot(`
-    "() => {
+    "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+      _checkInRHS = _checkInRHS2.checkInRHS;
+    () => {
       let Foo = (() => {
         'use strict';
         var _x = '__private_Foo_x';
@@ -2441,7 +2936,7 @@ test('068 JS Private Properties > usage in expressions > logical AND: #field in 
           value: Object.defineProperty(
             function (obj) {
               if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
-              return Object.prototype.hasOwnProperty.call(obj, _x) && 'yes';
+              return Object.prototype.hasOwnProperty.call(_checkInRHS(obj), _x) && 'yes';
             },
             'name',
             {
@@ -2470,7 +2965,9 @@ test('069 JS Private Properties > usage in expressions > logical OR: #field in o
       transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
     }),
   ).toMatchInlineSnapshot(`
-    "() => {
+    "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+      _checkInRHS = _checkInRHS2.checkInRHS;
+    () => {
       let Foo = (() => {
         'use strict';
         var _x = '__private_Foo_x';
@@ -2485,7 +2982,7 @@ test('069 JS Private Properties > usage in expressions > logical OR: #field in o
           value: Object.defineProperty(
             function (obj) {
               if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
-              return Object.prototype.hasOwnProperty.call(obj, _x) || 'fallback';
+              return Object.prototype.hasOwnProperty.call(_checkInRHS(obj), _x) || 'fallback';
             },
             'name',
             {
@@ -2514,7 +3011,9 @@ test('070 JS Private Properties > usage in expressions > if/else with brand chec
       transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
     }),
   ).toMatchInlineSnapshot(`
-    "() => {
+    "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+      _checkInRHS = _checkInRHS2.checkInRHS;
+    () => {
       let Foo = (() => {
         'use strict';
         var _x = '__private_Foo_x';
@@ -2529,7 +3028,7 @@ test('070 JS Private Properties > usage in expressions > if/else with brand chec
           value: Object.defineProperty(
             function (obj) {
               if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
-              if (Object.prototype.hasOwnProperty.call(obj, _x)) {
+              if (Object.prototype.hasOwnProperty.call(_checkInRHS(obj), _x)) {
                 return 'is Foo';
               } else {
                 return 'not Foo';
@@ -2562,7 +3061,9 @@ test('071 JS Private Properties > usage in expressions > brand check in while lo
       transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
     }),
   ).toMatchInlineSnapshot(`
-    "() => {
+    "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+      _checkInRHS = _checkInRHS2.checkInRHS;
+    () => {
       let Foo = (() => {
         'use strict';
         var _x = '__private_Foo_x';
@@ -2577,7 +3078,7 @@ test('071 JS Private Properties > usage in expressions > brand check in while lo
           value: Object.defineProperty(
             function (obj) {
               if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
-              return Object.prototype.hasOwnProperty.call(obj, _x);
+              return Object.prototype.hasOwnProperty.call(_checkInRHS(obj), _x);
             },
             'name',
             {
@@ -2610,7 +3111,9 @@ test('072 JS Private Properties > usage in expressions > brand check with nullis
       transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
     }),
   ).toMatchInlineSnapshot(`
-    "() => {
+    "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+      _checkInRHS = _checkInRHS2.checkInRHS;
+    () => {
       let Foo = (() => {
         'use strict';
         var _x = '__private_Foo_x';
@@ -2625,7 +3128,7 @@ test('072 JS Private Properties > usage in expressions > brand check with nullis
           value: Object.defineProperty(
             function (obj) {
               if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
-              return Object.prototype.hasOwnProperty.call(obj, _x) ?? 'never';
+              return Object.prototype.hasOwnProperty.call(_checkInRHS(obj), _x) ?? 'never';
             },
             'name',
             {
@@ -2664,6 +3167,8 @@ test('073 JS Private Properties > practical patterns > static factory with brand
     function _classPrivateMethodCall(e, s, a) {
       return _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s)[s].apply(e, a);
     }
+    var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+      _checkInRHS = _checkInRHS2.checkInRHS;
     () => {
       let MyClass = (() => {
         'use strict';
@@ -2681,7 +3186,7 @@ test('073 JS Private Properties > practical patterns > static factory with brand
             function (obj) {
               if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
               try {
-                return Object.prototype.hasOwnProperty.call(obj, _brand);
+                return Object.prototype.hasOwnProperty.call(_checkInRHS(obj), _brand);
               } catch {
                 return false;
               }
@@ -2724,6 +3229,8 @@ test('074 JS Private Properties > practical patterns > safe unwrap pattern', asy
     function _classPrivateMethodCall(e, s, a) {
       return _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s)[s].apply(e, a);
     }
+    var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+      _checkInRHS = _checkInRHS2.checkInRHS;
     () => {
       let Wrapper = (() => {
         'use strict';
@@ -2743,7 +3250,7 @@ test('074 JS Private Properties > practical patterns > safe unwrap pattern', asy
               if (
                 typeof obj === 'object' &&
                 obj !== null &&
-                Object.prototype.hasOwnProperty.call(obj, _value)
+                Object.prototype.hasOwnProperty.call(_checkInRHS(obj), _value)
               ) {
                 return obj.getValue();
               }
@@ -2792,7 +3299,9 @@ test('075 JS Private Properties > practical patterns > type narrowing with multi
       transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
     }),
   ).toMatchInlineSnapshot(`
-    "() => {
+    "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+      _checkInRHS = _checkInRHS2.checkInRHS;
+    () => {
       let Dog = (() => {
         'use strict';
         var _bark = '__private_Dog_bark';
@@ -2807,7 +3316,7 @@ test('075 JS Private Properties > practical patterns > type narrowing with multi
           value: Object.defineProperty(
             function (obj) {
               if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
-              return Object.prototype.hasOwnProperty.call(obj, _bark);
+              return Object.prototype.hasOwnProperty.call(_checkInRHS(obj), _bark);
             },
             'name',
             {
@@ -2835,7 +3344,7 @@ test('075 JS Private Properties > practical patterns > type narrowing with multi
           value: Object.defineProperty(
             function (obj) {
               if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
-              return Object.prototype.hasOwnProperty.call(obj, _meow);
+              return Object.prototype.hasOwnProperty.call(_checkInRHS(obj), _meow);
             },
             'name',
             {
@@ -2868,7 +3377,9 @@ test('076 JS Private Properties > practical patterns > filtering an array by bra
       transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
     }),
   ).toMatchInlineSnapshot(`
-    "() => {
+    "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+      _checkInRHS = _checkInRHS2.checkInRHS;
+    () => {
       let Special = (() => {
         'use strict';
         var _mark = '__private_Special_mark';
@@ -2886,7 +3397,7 @@ test('076 JS Private Properties > practical patterns > filtering an array by bra
               return (
                 typeof obj === 'object' &&
                 obj !== null &&
-                Object.prototype.hasOwnProperty.call(obj, _mark)
+                Object.prototype.hasOwnProperty.call(_checkInRHS(obj), _mark)
               );
             },
             'name',
@@ -2920,7 +3431,9 @@ test('077 JS Private Properties > cross-class isolation > same field name in dif
       transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
     }),
   ).toMatchInlineSnapshot(`
-    "() => {
+    "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+      _checkInRHS = _checkInRHS2.checkInRHS;
+    () => {
       let A = (() => {
         'use strict';
         var _x = '__private_A_x';
@@ -2935,7 +3448,7 @@ test('077 JS Private Properties > cross-class isolation > same field name in dif
           value: Object.defineProperty(
             function (obj) {
               if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
-              return Object.prototype.hasOwnProperty.call(obj, _x);
+              return Object.prototype.hasOwnProperty.call(_checkInRHS(obj), _x);
             },
             'name',
             {
@@ -2951,10 +3464,10 @@ test('077 JS Private Properties > cross-class isolation > same field name in dif
       })();
       let B = (() => {
         'use strict';
-        var _x13 = '__private_B_x';
+        var _x15 = '__private_B_x';
         const B = function B() {
           if (!new.target) throw new TypeError('Cannot call a class as a function');
-          Object.defineProperty(this, _x13, {
+          Object.defineProperty(this, _x15, {
             writable: true,
             value: 2,
           });
@@ -2963,7 +3476,7 @@ test('077 JS Private Properties > cross-class isolation > same field name in dif
           value: Object.defineProperty(
             function (obj) {
               if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
-              return Object.prototype.hasOwnProperty.call(obj, _x13);
+              return Object.prototype.hasOwnProperty.call(_checkInRHS(obj), _x15);
             },
             'name',
             {
@@ -2996,7 +3509,9 @@ test('078 JS Private Properties > cross-class isolation > nested class brand che
       transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
     }),
   ).toMatchInlineSnapshot(`
-    "() => {
+    "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+      _checkInRHS = _checkInRHS2.checkInRHS;
+    () => {
       let Outer = (() => {
         'use strict';
         var _x = '__private_Outer_x';
@@ -3011,7 +3526,7 @@ test('078 JS Private Properties > cross-class isolation > nested class brand che
           value: Object.defineProperty(
             function (obj) {
               if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
-              return Object.prototype.hasOwnProperty.call(obj, _x);
+              return Object.prototype.hasOwnProperty.call(_checkInRHS(obj), _x);
             },
             'name',
             {
@@ -3028,10 +3543,10 @@ test('078 JS Private Properties > cross-class isolation > nested class brand che
               if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
               return new ((() => {
                 'use strict';
-                var _x12 = '__private_Inner_x';
+                var _x14 = '__private_Inner_x';
                 const Inner = function Inner() {
                   if (!new.target) throw new TypeError('Cannot call a class as a function');
-                  Object.defineProperty(this, _x12, {
+                  Object.defineProperty(this, _x14, {
                     writable: true,
                     value: 2,
                   });
@@ -3040,7 +3555,7 @@ test('078 JS Private Properties > cross-class isolation > nested class brand che
                   value: Object.defineProperty(
                     function (obj) {
                       if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
-                      return Object.prototype.hasOwnProperty.call(obj, _x12);
+                      return Object.prototype.hasOwnProperty.call(_checkInRHS(obj), _x14);
                     },
                     'name',
                     {
@@ -3082,7 +3597,9 @@ test('079 JS Private Properties > various object types as RHS > works with array
       transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
     }),
   ).toMatchInlineSnapshot(`
-    "() => {
+    "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+      _checkInRHS = _checkInRHS2.checkInRHS;
+    () => {
       let Foo = (() => {
         'use strict';
         var _x = '__private_Foo_x';
@@ -3097,7 +3614,7 @@ test('079 JS Private Properties > various object types as RHS > works with array
           value: Object.defineProperty(
             function (obj) {
               if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
-              return Object.prototype.hasOwnProperty.call(obj, _x);
+              return Object.prototype.hasOwnProperty.call(_checkInRHS(obj), _x);
             },
             'name',
             {
@@ -3125,7 +3642,9 @@ test('080 JS Private Properties > various object types as RHS > works with funct
       transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
     }),
   ).toMatchInlineSnapshot(`
-    "() => {
+    "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+      _checkInRHS = _checkInRHS2.checkInRHS;
+    () => {
       let Foo = (() => {
         'use strict';
         var _x = '__private_Foo_x';
@@ -3140,7 +3659,7 @@ test('080 JS Private Properties > various object types as RHS > works with funct
           value: Object.defineProperty(
             function (obj) {
               if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
-              return Object.prototype.hasOwnProperty.call(obj, _x);
+              return Object.prototype.hasOwnProperty.call(_checkInRHS(obj), _x);
             },
             'name',
             {
@@ -3168,7 +3687,9 @@ test('081 JS Private Properties > various object types as RHS > works with class
       transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
     }),
   ).toMatchInlineSnapshot(`
-    "() => {
+    "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+      _checkInRHS = _checkInRHS2.checkInRHS;
+    () => {
       let Foo = (() => {
         'use strict';
         var _x = '__private_Foo_x';
@@ -3183,7 +3704,7 @@ test('081 JS Private Properties > various object types as RHS > works with class
           value: Object.defineProperty(
             function (obj) {
               if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
-              return Object.prototype.hasOwnProperty.call(obj, _x);
+              return Object.prototype.hasOwnProperty.call(_checkInRHS(obj), _x);
             },
             'name',
             {
@@ -3212,7 +3733,9 @@ test('082 JS Private Properties > various object types as RHS > works with Objec
       transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
     }),
   ).toMatchInlineSnapshot(`
-    "() => {
+    "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+      _checkInRHS = _checkInRHS2.checkInRHS;
+    () => {
       let Foo = (() => {
         'use strict';
         var _x = '__private_Foo_x';
@@ -3227,7 +3750,7 @@ test('082 JS Private Properties > various object types as RHS > works with Objec
           value: Object.defineProperty(
             function (obj) {
               if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
-              return Object.prototype.hasOwnProperty.call(obj, _x);
+              return Object.prototype.hasOwnProperty.call(_checkInRHS(obj), _x);
             },
             'name',
             {
@@ -3255,7 +3778,9 @@ test('083 JS Private Properties > various object types as RHS > works with Date,
       transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
     }),
   ).toMatchInlineSnapshot(`
-    "() => {
+    "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+      _checkInRHS = _checkInRHS2.checkInRHS;
+    () => {
       let Foo = (() => {
         'use strict';
         var _x = '__private_Foo_x';
@@ -3270,7 +3795,7 @@ test('083 JS Private Properties > various object types as RHS > works with Date,
           value: Object.defineProperty(
             function (obj) {
               if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
-              return Object.prototype.hasOwnProperty.call(obj, _x);
+              return Object.prototype.hasOwnProperty.call(_checkInRHS(obj), _x);
             },
             'name',
             {
@@ -3300,7 +3825,9 @@ test('084 JS Private Properties > edge cases > brand check in constructor', asyn
       transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
     }),
   ).toMatchInlineSnapshot(`
-    "() => {
+    "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+      _checkInRHS = _checkInRHS2.checkInRHS;
+    () => {
       let Foo = (() => {
         'use strict';
         var _x = '__private_Foo_x';
@@ -3311,7 +3838,7 @@ test('084 JS Private Properties > edge cases > brand check in constructor', asyn
             value: 1,
           });
           this.hasBrand = void 0;
-          this.hasBrand = Object.prototype.hasOwnProperty.call(this, _x);
+          this.hasBrand = Object.prototype.hasOwnProperty.call(_checkInRHS(this), _x);
         };
         Object.defineProperty(Foo, 'prototype', { writable: false });
         return Foo;
@@ -3330,7 +3857,9 @@ test('085 JS Private Properties > edge cases > brand check during field initiali
       transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
     }),
   ).toMatchInlineSnapshot(`
-    "() => {
+    "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+      _checkInRHS = _checkInRHS2.checkInRHS;
+    () => {
       let Foo = (() => {
         'use strict';
         var _x = '__private_Foo_x';
@@ -3340,7 +3869,7 @@ test('085 JS Private Properties > edge cases > brand check during field initiali
             writable: true,
             value: 1,
           });
-          this.hasBrand = Object.prototype.hasOwnProperty.call(this, _x);
+          this.hasBrand = Object.prototype.hasOwnProperty.call(_checkInRHS(this), _x);
         };
         Object.defineProperty(Foo, 'prototype', { writable: false });
         return Foo;
@@ -3358,7 +3887,30 @@ test('086 JS Private Properties > edge cases > brand check in static block', asy
       helpers: runtimeHelpers,
       transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:classes-direct-shape-not-implemented"`);
+  ).toMatchInlineSnapshot(`
+    "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+      _checkInRHS = _checkInRHS2.checkInRHS;
+    () => {
+      let result;
+      let Foo = (() => {
+        'use strict';
+        var _x = '__private_Foo_x';
+        const Foo = function Foo() {
+          if (!new.target) throw new TypeError('Cannot call a class as a function');
+        };
+        Object.defineProperty(Foo, 'prototype', { writable: false });
+        Object.defineProperty(Foo, _x, {
+          writable: true,
+          value: 1,
+        });
+        (function () {
+          result = Object.prototype.hasOwnProperty.call(_checkInRHS(Foo), _x);
+        }).call(Foo);
+        return Foo;
+      })();
+      expect(result).toBe(true);
+    };"
+  `);
 });
 
 test('087 JS Private Properties > edge cases > brand check result is always a boolean', async () => {
@@ -3370,7 +3922,9 @@ test('087 JS Private Properties > edge cases > brand check result is always a bo
       transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
     }),
   ).toMatchInlineSnapshot(`
-    "() => {
+    "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+      _checkInRHS = _checkInRHS2.checkInRHS;
+    () => {
       let Foo = (() => {
         'use strict';
         var _x = '__private_Foo_x';
@@ -3385,7 +3939,7 @@ test('087 JS Private Properties > edge cases > brand check result is always a bo
           value: Object.defineProperty(
             function (obj) {
               if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
-              return Object.prototype.hasOwnProperty.call(obj, _x);
+              return Object.prototype.hasOwnProperty.call(_checkInRHS(obj), _x);
             },
             'name',
             {
@@ -3416,7 +3970,9 @@ test('088 JS Private Properties > edge cases > brand check on Proxy-wrapped obje
       transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
     }),
   ).toMatchInlineSnapshot(`
-    "() => {
+    "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+      _checkInRHS = _checkInRHS2.checkInRHS;
+    () => {
       let Foo = (() => {
         'use strict';
         var _x = '__private_Foo_x';
@@ -3431,7 +3987,7 @@ test('088 JS Private Properties > edge cases > brand check on Proxy-wrapped obje
           value: Object.defineProperty(
             function (obj) {
               if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
-              return Object.prototype.hasOwnProperty.call(obj, _x);
+              return Object.prototype.hasOwnProperty.call(_checkInRHS(obj), _x);
             },
             'name',
             {
@@ -3465,6 +4021,8 @@ test('089 JS Private Properties > edge cases > multiple brand checks in single e
     }),
   ).toMatchInlineSnapshot(`
     "var _classPrivateFieldLooseKey = require('@babel/runtime/helpers/classPrivateFieldLooseKey');
+    var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+      _checkInRHS = _checkInRHS2.checkInRHS;
     () => {
       let A = (() => {
         'use strict';
@@ -3480,7 +4038,7 @@ test('089 JS Private Properties > edge cases > multiple brand checks in single e
           value: Object.defineProperty(
             function (obj) {
               if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
-              return Object.prototype.hasOwnProperty.call(obj, _a);
+              return Object.prototype.hasOwnProperty.call(_checkInRHS(obj), _a);
             },
             'name',
             {
@@ -3508,7 +4066,7 @@ test('089 JS Private Properties > edge cases > multiple brand checks in single e
           value: Object.defineProperty(
             function (obj) {
               if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
-              return Object.prototype.hasOwnProperty.call(obj, _b);
+              return Object.prototype.hasOwnProperty.call(_checkInRHS(obj), _b);
             },
             'name',
             {
@@ -3548,7 +4106,9 @@ test('090 JS Private Properties > edge cases > brand check after Object.freeze',
       transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
     }),
   ).toMatchInlineSnapshot(`
-    "() => {
+    "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+      _checkInRHS = _checkInRHS2.checkInRHS;
+    () => {
       let Foo = (() => {
         'use strict';
         var _x = '__private_Foo_x';
@@ -3563,7 +4123,7 @@ test('090 JS Private Properties > edge cases > brand check after Object.freeze',
           value: Object.defineProperty(
             function (obj) {
               if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
-              return Object.prototype.hasOwnProperty.call(obj, _x);
+              return Object.prototype.hasOwnProperty.call(_checkInRHS(obj), _x);
             },
             'name',
             {
@@ -3592,7 +4152,9 @@ test('091 JS Private Properties > edge cases > brand check after Object.seal', a
       transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
     }),
   ).toMatchInlineSnapshot(`
-    "() => {
+    "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+      _checkInRHS = _checkInRHS2.checkInRHS;
+    () => {
       let Foo = (() => {
         'use strict';
         var _x = '__private_Foo_x';
@@ -3607,7 +4169,7 @@ test('091 JS Private Properties > edge cases > brand check after Object.seal', a
           value: Object.defineProperty(
             function (obj) {
               if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
-              return Object.prototype.hasOwnProperty.call(obj, _x);
+              return Object.prototype.hasOwnProperty.call(_checkInRHS(obj), _x);
             },
             'name',
             {
@@ -3636,7 +4198,9 @@ test('092 JS Private Properties > edge cases > brand check with Object.preventEx
       transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
     }),
   ).toMatchInlineSnapshot(`
-    "() => {
+    "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+      _checkInRHS = _checkInRHS2.checkInRHS;
+    () => {
       let Foo = (() => {
         'use strict';
         var _x = '__private_Foo_x';
@@ -3651,7 +4215,7 @@ test('092 JS Private Properties > edge cases > brand check with Object.preventEx
           value: Object.defineProperty(
             function (obj) {
               if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
-              return Object.prototype.hasOwnProperty.call(obj, _x);
+              return Object.prototype.hasOwnProperty.call(_checkInRHS(obj), _x);
             },
             'name',
             {
@@ -3681,7 +4245,9 @@ test('093 JS Private Properties > edge cases > expression class with brand check
       transforms: { classProperties: { loose: true }, privatePropertyInObject: { loose: true } },
     }),
   ).toMatchInlineSnapshot(`
-    "() => {
+    "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+      _checkInRHS = _checkInRHS2.checkInRHS;
+    () => {
       const Foo = (() => {
         'use strict';
         var _x = '__private__Class_x';
@@ -3700,7 +4266,7 @@ test('093 JS Private Properties > edge cases > expression class with brand check
           value: Object.defineProperty(
             function (obj) {
               if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
-              return Object.prototype.hasOwnProperty.call(obj, _x);
+              return Object.prototype.hasOwnProperty.call(_checkInRHS(obj), _x);
             },
             'name',
             {

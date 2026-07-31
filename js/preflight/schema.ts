@@ -4,6 +4,7 @@ import type { PreflightTransforms } from './types';
 export const NATIVE_TRANSFORM_NAMES = [
   'blockScoping',
   'classes',
+  'legacyDecorators',
   'destructuring',
   'parameters',
   'forOf',

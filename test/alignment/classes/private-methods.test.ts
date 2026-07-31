@@ -22,7 +22,7 @@ globalThis.__result = new Example().run();`,
   ).resolves.toBe(42);
 });
 
-test('leaves private fields and brand checks to their individual Babel transforms', async () => {
+test('composes private fields and brand checks as prerequisites', async () => {
   const loose = true;
   await expect(
     alignBabelBehavior({
@@ -34,18 +34,23 @@ test('leaves private fields and brand checks to their individual Babel transform
 const value = new Example();
 globalThis.__result = [value.read(), Example.has(value), Example.has({})];`,
       filename: 'input.js',
-      plugins: [[privateMethods, { loose }]],
+      plugins: [
+        [privatePropertyInObject, { loose }],
+        [privateMethods, { loose }],
+        [classProperties, { loose }],
+      ],
       noxcturnal: {
         helpers: { mode: 'inline' },
         transforms: { privateMethods: { loose } },
       },
-      output: { mustMatch: [/#value\b/, /#value in input/], mustNotMatch: [] },
+      output: { mustNotMatch: [/#value\b/, /#value in input/] },
     }),
   ).resolves.toEqual([42, true, false]);
 });
 
-test('aligns the complete spec private-feature bundle with Babel', async () => {
-  const loose = false;
+// NOTE: Private features intentionally retain one representation.
+test('aligns the selected private-feature representation with Babel', async () => {
+  const loose = true;
   await expect(
     alignBabelBehavior({
       source: `class Counter {

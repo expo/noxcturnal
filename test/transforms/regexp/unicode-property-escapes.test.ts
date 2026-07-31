@@ -10,6 +10,20 @@ test('lowers Unicode property escapes', async () => {
   ).toMatchInlineSnapshot(`"export const matcher = /[\\u0000-\\u007F]+/u;"`);
 });
 
+test('lowers every property missing from regex-syntax Unicode data', async () => {
+  const output = await transformSource(
+    String.raw`export const line = /\p{Line_Separator}/u;
+export const paragraph = /\p{Paragraph_Separator}/u;
+export const sidetic = /\p{Script=Sidetic}/u;
+export const taiYo = /\p{Script_Extensions=Tai_Yo}/u;
+export const tolongSiki = /\p{Script=Tolong_Siki}/u;
+export const nfkc = /\p{Changes_When_NFKC_Casefolded}/u;`,
+    'input.js',
+    { transforms: { regexpUnicodePropertyEscapes: true } },
+  );
+  expect(output).not.toMatch(/\\p\{/u);
+});
+
 test('lowers negated and mixed Unicode property classes', async () => {
   const output = await transformSource(
     String.raw`export const outer = /[^\p{ASCII}]/u; export const mixed = /[\p{Lowercase_Letter}\d\s]/u; export const complements = /[\p{ASCII}\D]/u;`,

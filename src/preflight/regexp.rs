@@ -29,9 +29,9 @@ use crate::generated::inline_helpers::{
     INLINE_REGEXP_NAMED_CAPTURE_HELPER_RUNTIME_PRETTY,
 };
 use crate::generated::regexp_unicode_properties::{
-    SCRIPT_EXTENSIONS_BERIA_ERFE, SCRIPT_UNKNOWN, UNICODE_STRING_PROPERTIES,
-    unicode_ignore_case_astral_class_addition, unicode_ignore_case_atom,
+    UNICODE_STRING_PROPERTIES, unicode_ignore_case_astral_class_addition, unicode_ignore_case_atom,
     unicode_ignore_case_bmp_class_addition, unicode_ignore_case_bmp_class_body,
+    unicode_property_supplemental_ranges, unicode_string_property_members,
     unicode_string_property_pattern,
 };
 use crate::preflight::helpers::CustomHelperRequests;
@@ -142,7 +142,7 @@ impl<'a> RegexpLowerer<'a> {
                 // ECMA-262 requires those ranges to be nested. Preserve that
                 // established output through the compatibility lowering.
                 Err(_) if is_unicode_sets && !self.named_groups => {}
-                Err(_) => return Err("regexp-pattern-shape-not-implemented"),
+                Err(_) => return Err("regexp-pattern-invalid"),
             }
         }
         let regexp_pattern = literal.regex.pattern.pattern.as_deref();
@@ -208,7 +208,7 @@ impl<'a> RegexpLowerer<'a> {
             .try_fold(oxc_ast::ast::RegExpFlags::empty(), |flags, flag| {
                 oxc_ast::ast::RegExpFlags::try_from(flag).map(|parsed| flags | parsed)
             })
-            .map_err(|_| "regexp-flags-not-implemented")?;
+            .map_err(|_| "regexp-flags-invalid")?;
         literal.raw = None;
         self.changed = true;
         Ok(groups)
@@ -291,19 +291,19 @@ fn expand_unicode_ignore_case_bmp(pattern: &str) -> Result<String, &'static str>
                 let end = pattern[index + 3..]
                     .find('}')
                     .map(|offset| index + 3 + offset)
-                    .ok_or("regexp-unicode-ignore-case-complex-not-implemented")?;
+                    .ok_or("regexp-unicode-ignore-case-invalid-shape")?;
                 let code_point = u32::from_str_radix(&pattern[index + 3..end], 16)
-                    .map_err(|_| "regexp-unicode-ignore-case-complex-not-implemented")?;
+                    .map_err(|_| "regexp-unicode-ignore-case-invalid-shape")?;
                 index = end + 1;
                 Some(code_point)
             } else if escape == b'u' && index + 6 <= bytes.len() {
                 let code_point = u32::from_str_radix(&pattern[index + 2..index + 6], 16)
-                    .map_err(|_| "regexp-unicode-ignore-case-complex-not-implemented")?;
+                    .map_err(|_| "regexp-unicode-ignore-case-invalid-shape")?;
                 index += 6;
                 Some(code_point)
             } else if escape == b'x' && index + 4 <= bytes.len() {
                 let code_point = u32::from_str_radix(&pattern[index + 2..index + 4], 16)
-                    .map_err(|_| "regexp-unicode-ignore-case-complex-not-implemented")?;
+                    .map_err(|_| "regexp-unicode-ignore-case-invalid-shape")?;
                 index += 4;
                 Some(code_point)
             } else {
@@ -366,7 +366,7 @@ fn expand_unicode_ignore_case_classes(pattern: &str) -> Result<String, &'static 
             continue;
         }
         let end = unicode_set_class_end(pattern, index)
-            .ok_or("regexp-unicode-ignore-case-complex-not-implemented")?;
+            .ok_or("regexp-unicode-ignore-case-invalid-shape")?;
         let original_body = &pattern[index + 1..end];
         let mut body = original_body;
         if let Some(positive) = body.strip_prefix('^') {
@@ -447,7 +447,7 @@ fn sort_class_additions(additions: &str) -> Result<String, &'static str> {
     while index < additions.len() {
         let (atom, next) = class_atom(additions, index)?;
         let ClassAtom::Single(code_point) = atom else {
-            return Err("regexp-unicode-ignore-case-complex-not-implemented");
+            return Err("regexp-unicode-ignore-case-invalid-shape");
         };
         atoms.push((code_point, &additions[index..next]));
         index = next;
@@ -548,13 +548,13 @@ fn parse_class_ranges(body: &str) -> Result<Vec<(u32, u32)>, &'static str> {
             index += 1;
             let (upper, next) = class_atom(body, index)?;
             let ClassAtom::Single(upper) = upper else {
-                return Err("regexp-unicode-property-class-range-not-implemented");
+                return Err("regexp-unicode-property-class-range-invalid");
             };
             let lower = pending
                 .take()
                 .ok_or("regexp-unicode-property-class-shape")?;
             if upper < lower {
-                return Err("regexp-unicode-property-class-range-not-implemented");
+                return Err("regexp-unicode-property-class-range-invalid");
             }
             ranges.push((lower, upper));
             index = next;
@@ -627,12 +627,12 @@ impl<'a> RegExpVisit<'a> for UnicodeSetEditCollector {
         }
         if property.strings {
             if property.negative {
-                self.error = Some("regexp-unicode-sets-operation-not-implemented");
+                self.error = Some("regexp-unicode-sets-operation-invalid");
                 return;
             }
             match unicode_string_property_pattern(property.name.as_str()) {
                 Some(replacement) => self.push_edit(property.span, replacement.to_owned()),
-                None => self.error = Some("regexp-unicode-property-unsupported"),
+                None => self.error = Some("regexp-unicode-property-invalid"),
             }
         } else {
             match unicode_property_escape_ranges(property) {
@@ -661,33 +661,36 @@ fn unicode_set_class_value(class: &CharacterClass<'_>) -> Result<UnicodeSetValue
                 value.ranges.append(&mut operand.ranges);
                 value.strings.append(&mut operand.strings);
             }
-            value.ranges = union(value.ranges);
+            normalize_unicode_set_value(&mut value);
             value
         }
         CharacterClassContentsKind::Intersection | CharacterClassContentsKind::Subtraction => {
             let mut operands = operands.into_iter();
             let mut value = operands
                 .next()
-                .ok_or("regexp-unicode-sets-operation-not-implemented")?;
-            if !value.strings.is_empty() {
-                return Err("regexp-unicode-sets-operation-not-implemented");
-            }
+                .ok_or("regexp-unicode-sets-operation-invalid")?;
+            normalize_unicode_set_value(&mut value);
             for operand in operands {
-                if !operand.strings.is_empty() {
-                    return Err("regexp-unicode-sets-operation-not-implemented");
-                }
-                value.ranges = if class.kind == CharacterClassContentsKind::Intersection {
-                    intersect_ranges(&value.ranges, &operand.ranges)
+                let mut operand = operand;
+                normalize_unicode_set_value(&mut operand);
+                if class.kind == CharacterClassContentsKind::Intersection {
+                    value.ranges = intersect_ranges(&value.ranges, &operand.ranges);
+                    value
+                        .strings
+                        .retain(|(_, _, string)| unicode_set_contains_string(&operand, string));
                 } else {
-                    subtract_ranges(&value.ranges, &operand.ranges)
-                };
+                    value.ranges = subtract_ranges(&value.ranges, &operand.ranges);
+                    value
+                        .strings
+                        .retain(|(_, _, string)| !unicode_set_contains_string(&operand, string));
+                }
             }
             value
         }
     };
     if class.negative {
         if !value.strings.is_empty() {
-            return Err("regexp-unicode-sets-operation-not-implemented");
+            return Err("regexp-unicode-sets-operation-invalid");
         }
         value.ranges = complement_ranges(&value.ranges);
     }
@@ -708,11 +711,16 @@ fn unicode_set_content_value(
         CharacterClassContents::UnicodePropertyEscape(property) => {
             if property.strings {
                 if property.negative {
-                    return Err("regexp-unicode-sets-operation-not-implemented");
+                    return Err("regexp-unicode-sets-operation-invalid");
                 }
-                let replacement = unicode_string_property_pattern(property.name.as_str())
-                    .ok_or("regexp-unicode-property-unsupported")?;
-                value.strings.push((usize::MAX, 0, replacement.to_owned()));
+                let members = unicode_string_property_members(property.name.as_str())
+                    .ok_or("regexp-unicode-property-invalid")?;
+                value.ranges.extend_from_slice(members.ranges);
+                value.strings.extend(
+                    members.strings.iter().enumerate().map(|(order, string)| {
+                        (string.chars().count(), order, (*string).to_owned())
+                    }),
+                );
             } else {
                 value.ranges = unicode_property_escape_ranges(property)?;
             }
@@ -725,16 +733,44 @@ fn unicode_set_content_value(
         }
         CharacterClassContents::ClassStringDisjunction(disjunction) => {
             for (order, string) in disjunction.body.iter().enumerate() {
-                let mut rendered = String::new();
+                let mut value_string = String::new();
                 for character in &string.body {
-                    render_regexp_character(character.value, &mut rendered)?;
+                    value_string.push(
+                        char::from_u32(character.value)
+                            .ok_or("regexp-unicode-code-point-out-of-range")?,
+                    );
                 }
-                value.strings.push((string.body.len(), order, rendered));
+                value.strings.push((string.body.len(), order, value_string));
             }
         }
     }
-    value.ranges = union(value.ranges);
+    normalize_unicode_set_value(&mut value);
     Ok(value)
+}
+
+fn normalize_unicode_set_value(value: &mut UnicodeSetValue) {
+    let mut strings = Vec::with_capacity(value.strings.len());
+    for (length, order, string) in value.strings.drain(..) {
+        let mut characters = string.chars();
+        if let (Some(character), None) = (characters.next(), characters.next()) {
+            let code_point = character as u32;
+            value.ranges.push((code_point, code_point));
+        } else if !strings
+            .iter()
+            .any(|(_, _, existing): &(usize, usize, String)| existing == &string)
+        {
+            strings.push((length, order, string));
+        }
+    }
+    value.ranges = union(std::mem::take(&mut value.ranges));
+    value.strings = strings;
+}
+
+fn unicode_set_contains_string(value: &UnicodeSetValue, string: &str) -> bool {
+    value
+        .strings
+        .iter()
+        .any(|(_, _, candidate)| candidate == string)
 }
 
 fn render_unicode_set_value(mut value: UnicodeSetValue) -> Result<String, &'static str> {
@@ -744,8 +780,14 @@ fn render_unicode_set_value(mut value: UnicodeSetValue) -> Result<String, &'stat
     let mut alternatives: Vec<String> = value
         .strings
         .into_iter()
-        .map(|(_, _, rendered)| rendered)
-        .collect();
+        .map(|(_, _, string)| {
+            let mut rendered = String::new();
+            for character in string.chars() {
+                render_regexp_character(character as u32, &mut rendered)?;
+            }
+            Ok(rendered)
+        })
+        .collect::<Result<_, &'static str>>()?;
     if !value.ranges.is_empty() {
         alternatives.push(render_ranges(&value.ranges, false));
     }
@@ -794,7 +836,7 @@ fn lower_babel_range_operand_unicode_sets(pattern: &str) -> Result<String, &'sta
             continue;
         }
         let end = unicode_set_class_end(pattern, index)
-            .ok_or("regexp-unicode-sets-class-shape-not-implemented")?;
+            .ok_or("regexp-unicode-sets-class-invalid-shape")?;
         let body = &pattern[index + 1..end];
         output.push_str(&lower_unicode_set_class(body)?);
         index = end + 1;
@@ -863,7 +905,7 @@ fn lower_unicode_set_class(body: &str) -> Result<String, &'static str> {
 
 fn lower_unicode_set_string_property_union(body: &str) -> Result<String, &'static str> {
     if body.starts_with('^') || body.contains("\\q{") {
-        return Err("regexp-unicode-sets-operation-not-implemented");
+        return Err("regexp-unicode-sets-operation-invalid");
     }
     let mut alternatives = Vec::new();
     let mut characters = String::new();
@@ -888,7 +930,7 @@ fn lower_unicode_set_string_property_union(body: &str) -> Result<String, &'stati
         alternatives.push(format!("[{characters}]"));
     }
     match alternatives.as_slice() {
-        [] => Err("regexp-unicode-sets-operation-not-implemented"),
+        [] => Err("regexp-unicode-sets-operation-invalid"),
         [only] => Ok(only.clone()),
         _ => Ok(format!("(?:{})", alternatives.join("|"))),
     }
@@ -896,7 +938,7 @@ fn lower_unicode_set_string_property_union(body: &str) -> Result<String, &'stati
 
 fn lower_unicode_set_strings(body: &str) -> Result<String, &'static str> {
     if body.starts_with('^') {
-        return Err("regexp-unicode-sets-operation-not-implemented");
+        return Err("regexp-unicode-sets-operation-invalid");
     }
     let bytes = body.as_bytes();
     let mut character_body = String::new();
@@ -931,7 +973,7 @@ fn lower_unicode_set_strings(body: &str) -> Result<String, &'static str> {
                 cursor += character.len_utf8();
             }
             if !closed {
-                return Err("regexp-unicode-sets-operation-not-implemented");
+                return Err("regexp-unicode-sets-operation-invalid");
             }
             index = cursor;
             continue;
@@ -954,7 +996,7 @@ fn lower_unicode_set_strings(body: &str) -> Result<String, &'static str> {
         rendered.push(format!("[{character_body}]"));
     }
     match rendered.as_slice() {
-        [] => Err("regexp-unicode-sets-operation-not-implemented"),
+        [] => Err("regexp-unicode-sets-operation-invalid"),
         [only] => Ok(only.clone()),
         _ => Ok(format!("(?:{})", rendered.join("|"))),
     }
@@ -1063,7 +1105,7 @@ fn unicode_set_operand_ranges(operand: &str) -> Result<Vec<(u32, u32)>, &'static
             .iter()
             .any(|property| body.contains(&format!("\\p{{{property}}}")))
     {
-        return Err("regexp-unicode-sets-operation-not-implemented");
+        return Err("regexp-unicode-sets-operation-invalid");
     }
     if let Some((left, operator, right)) = split_unicode_set_operation(body) {
         let left = unicode_set_operand_ranges(left)?;
@@ -1144,12 +1186,12 @@ fn class_atom(body: &str, index: usize) -> Result<(ClassAtom, usize), &'static s
     match escape {
         b'p' | b'P' => {
             if bytes.get(index + 2) != Some(&b'{') {
-                return Err("regexp-unicode-property-shape-not-implemented");
+                return Err("regexp-unicode-property-invalid-shape");
             }
             let end = body[index + 3..]
                 .find('}')
                 .map(|offset| index + 3 + offset)
-                .ok_or("regexp-unicode-property-shape-not-implemented")?;
+                .ok_or("regexp-unicode-property-invalid-shape")?;
             let property = body[index + 3..end].replace('=', ":");
             let ranges = unicode_property_ranges(&property, escape == b'P')?;
             Ok((ClassAtom::Ranges(ranges), end + 1))
@@ -1214,7 +1256,7 @@ fn class_atom(body: &str, index: usize) -> Result<(ClassAtom, usize), &'static s
                 index + 2,
             ))
         }
-        _ => Err("regexp-unicode-property-class-escape-not-implemented"),
+        _ => Err("regexp-unicode-property-class-escape-invalid"),
     }
 }
 
@@ -1336,18 +1378,7 @@ fn unicode_property_ranges(
             vec![(0xD800, 0xDFFF)]
         });
     }
-    let generated = match property {
-        "Script:Zzzz"
-        | "Script:Unknown"
-        | "Script_Extensions:Zzzz"
-        | "Script_Extensions:Unknown" => Some(SCRIPT_UNKNOWN),
-        "Script:Berf"
-        | "Script:Beria_Erfe"
-        | "Script_Extensions:Berf"
-        | "Script_Extensions:Beria_Erfe" => Some(SCRIPT_EXTENSIONS_BERIA_ERFE),
-        _ => None,
-    };
-    if let Some(ranges) = generated {
+    if let Some(ranges) = unicode_property_supplemental_ranges(property) {
         return Ok(if negative {
             complement_ranges(ranges)
         } else {
@@ -1359,9 +1390,9 @@ fn unicode_property_ranges(
         .unicode(true)
         .build()
         .parse(&expression)
-        .map_err(|_| "regexp-unicode-property-unsupported")?;
+        .map_err(|_| "regexp-unicode-property-invalid")?;
     let HirKind::Class(Class::Unicode(class)) = hir.kind() else {
-        return Err("regexp-unicode-property-unsupported");
+        return Err("regexp-unicode-property-invalid");
     };
     let mut ranges: Vec<(u32, u32)> = class
         .ranges()
@@ -1473,7 +1504,7 @@ fn lower_astral_classes(pattern: &str) -> Result<String, &'static str> {
             }
         }
         if !matches!(bytes.get(cursor.saturating_sub(1)), Some(b']')) {
-            return Err("regexp-class-shape-not-implemented");
+            return Err("regexp-class-invalid-shape");
         }
         let class_source = &pattern[start..cursor];
         let negated = class_source.as_bytes().get(1) == Some(&b'^');
@@ -1492,7 +1523,7 @@ fn lower_astral_classes(pattern: &str) -> Result<String, &'static str> {
                 output.push_str(&render_ranges(&complement_ranges(&excluded), true));
                 continue;
             }
-            Err(_) => return Err("regexp-class-shape-not-implemented"),
+            Err(_) => return Err("regexp-class-invalid-shape"),
         };
         let HirKind::Class(Class::Unicode(class)) = hir.kind() else {
             output.push_str(class_source);
@@ -1576,7 +1607,7 @@ fn class_source_has_astral(class_source: &str) -> bool {
 
 fn lower_unicode(pattern: &str, dot_all: bool) -> Result<String, &'static str> {
     if pattern.contains("\\p{") || pattern.contains("\\P{") {
-        return Err("regexp-unicode-property-escapes-require-property-transform");
+        return Err("regexp-unicode-property-prerequisite-postcondition-failed");
     }
     let pattern = lower_astral_classes(pattern)?;
     let mut output = String::with_capacity(pattern.len());
@@ -1601,15 +1632,15 @@ fn lower_unicode(pattern: &str, dot_all: bool) -> Result<String, &'static str> {
                         value.push(digit);
                     }
                     if !closed {
-                        return Err("regexp-unicode-code-point-escape-shape-not-implemented");
+                        return Err("regexp-unicode-code-point-escape-invalid-shape");
                     }
                     let code_point = u32::from_str_radix(&value, 16)
-                        .map_err(|_| "regexp-unicode-code-point-escape-shape-not-implemented")?;
+                        .map_err(|_| "regexp-unicode-code-point-escape-invalid-shape")?;
                     if code_point > 0x10_FFFF {
                         return Err("regexp-unicode-code-point-out-of-range");
                     }
                     if in_class && code_point > 0xFFFF {
-                        return Err("regexp-unicode-astral-class-not-implemented");
+                        return Err("regexp-unicode-astral-class-postcondition-failed");
                     }
                     push_code_point(&mut output, code_point, !in_class);
                 } else {
@@ -1634,7 +1665,7 @@ fn lower_unicode(pattern: &str, dot_all: bool) -> Result<String, &'static str> {
             }
             character if character as u32 > 0xFFFF => {
                 if in_class {
-                    return Err("regexp-unicode-astral-class-not-implemented");
+                    return Err("regexp-unicode-astral-class-postcondition-failed");
                 }
                 push_code_point(&mut output, character as u32, true);
             }
@@ -1724,7 +1755,7 @@ fn collect_named_group_edits(
         let indices = collector
             .groups
             .get(&reference.name)
-            .ok_or("regexp-named-reference-shape-not-implemented")?;
+            .ok_or("regexp-named-reference-invalid-shape")?;
         let replacement = indices.iter().map(|index| format!("\\{index}")).collect();
         edits.push((reference.start, reference.end, replacement));
     }
@@ -1811,7 +1842,7 @@ impl<'s> NamedGroupCollector<'s> {
                             let prefix_end = start + 3 + offset + 1;
                             self.edits.push((start, prefix_end, "(".to_owned()));
                         } else {
-                            self.error = Some("regexp-named-group-shape-not-implemented");
+                            self.error = Some("regexp-named-group-invalid-shape");
                         }
                     }
                     Err(error) => self.error = Some(error),
@@ -1953,7 +1984,7 @@ fn character_class_has_unicode_property(class: &CharacterClass<'_>) -> bool {
 
 fn character_class_ranges(class: &CharacterClass<'_>) -> Result<Vec<(u32, u32)>, &'static str> {
     if class.kind != CharacterClassContentsKind::Union || class.strings {
-        return Err("regexp-unicode-property-class-range-not-implemented");
+        return Err("regexp-unicode-property-class-range-invalid");
     }
     let mut ranges = Vec::new();
     for content in &class.body {
@@ -1972,7 +2003,7 @@ fn character_class_ranges(class: &CharacterClass<'_>) -> Result<Vec<(u32, u32)>,
             }
             CharacterClassContents::NestedCharacterClass(_)
             | CharacterClassContents::ClassStringDisjunction(_) => {
-                return Err("regexp-unicode-property-class-range-not-implemented");
+                return Err("regexp-unicode-property-class-range-invalid");
             }
         }
     }
@@ -1983,7 +2014,7 @@ fn unicode_property_escape_ranges(
     property: &UnicodePropertyEscape<'_>,
 ) -> Result<Vec<(u32, u32)>, &'static str> {
     if property.strings {
-        return Err("regexp-unicode-property-class-range-not-implemented");
+        return Err("regexp-unicode-property-class-range-invalid");
     }
     let normalized = property.value.as_ref().map_or_else(
         || property.name.to_string(),

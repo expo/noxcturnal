@@ -28,11 +28,10 @@ test('assumption-constantSuper/complex-super-class/input.js [loose]', async () =
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "var _superPropGet = require('@babel/runtime/helpers/superPropGet');
-    var _A;
+    "var _A;
     class A extends class B {} {}
     _A = A;
-    A.x = _superPropGet(_A, 'x', _A);"
+    A.x = Object.getPrototypeOf(_A).x;"
   `);
 });
 
@@ -96,11 +95,10 @@ test('assumption-constantSuper/static-field/input.js [loose]', async () => {
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "var _superPropGet = require('@babel/runtime/helpers/superPropGet');
-    var _A;
+    "var _A;
     class A extends B {}
     _A = A;
-    A.foo = _superPropGet(_A, 'bar', _A);"
+    A.foo = Object.getPrototypeOf(_A).bar;"
   `);
 });
 
@@ -111,8 +109,8 @@ test('assumption-noDocumentAll/optional-chain-before-member-call/exec.js [spec]'
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -1494,8 +1492,8 @@ test('assumption-noDocumentAll/optional-chain-before-member-call/input.js [spec]
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -2064,8 +2062,8 @@ test('assumption-noDocumentAll/optional-chain-cast-to-boolean/exec.js [spec]', a
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -2415,8 +2413,8 @@ test('assumption-noDocumentAll/optional-chain-cast-to-boolean/input.js [spec]', 
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -2708,8 +2706,8 @@ test('assumption-noUninitializedPrivateFieldAccess/static-private/exec.js [spec]
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -2783,8 +2781,8 @@ test('assumption-noUninitializedPrivateFieldAccess/static-private/input.js [spec
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -3816,15 +3814,14 @@ test('assumption-setPublicClassFields/static-super-loose/input.js [loose]', asyn
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "var _superPropGet = require('@babel/runtime/helpers/superPropGet');
-    var _B;
+    "var _B;
     class A {}
     A.prop = 1;
     class B extends A {}
     _B = B;
     B.prop = 2;
-    B.propA = _superPropGet(_B, 'prop', _B);
-    B.getPropA = () => _superPropGet(_B, 'prop', _B);"
+    B.propA = Object.getPrototypeOf(_B).prop;
+    B.getPropA = () => Object.getPrototypeOf(_B).prop;"
   `);
 });
 
@@ -3868,15 +3865,14 @@ test('assumption-setPublicClassFields/static-super/exec.js [loose]', async () =>
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "var _superPropGet = require('@babel/runtime/helpers/superPropGet');
-    var _B;
+    "var _B;
     class A {}
     A.prop = 1;
     class B extends A {}
     _B = B;
     B.prop = 2;
-    B.propA = _superPropGet(_B, 'prop', _B);
-    B.getPropA = () => _superPropGet(_B, 'prop', _B);
+    B.propA = Object.getPrototypeOf(_B).prop;
+    B.getPropA = () => Object.getPrototypeOf(_B).prop;
     const { prop, propA, getPropA } = B;
     expect(prop).toBe(2);
     expect(propA).toBe(1);
@@ -3920,15 +3916,14 @@ test('assumption-setPublicClassFields/static-super/input.js [loose]', async () =
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "var _superPropGet = require('@babel/runtime/helpers/superPropGet');
-    var _B;
+    "var _B;
     class A {}
     A.prop = 1;
     class B extends A {}
     _B = B;
     B.prop = 2;
-    B.propA = _superPropGet(_B, 'prop', _B);
-    B.getPropA = () => _superPropGet(_B, 'prop', _B);"
+    B.propA = Object.getPrototypeOf(_B).prop;
+    B.getPropA = () => Object.getPrototypeOf(_B).prop;"
   `);
 });
 
@@ -4302,20 +4297,85 @@ test('class-name-tdz/decorator-interop/input.js [spec]', async () => {
   const source = 'function dec() {}\n\nclass A {\n  @dec a;\n\n  [Symbol.search]() {}\n}\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { classProperties: { loose: false } },
+      transforms: { classProperties: { loose: false }, legacyDecorators: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:decorators-not-supported"`);
+  ).toMatchInlineSnapshot(`
+    "var _defineProperty = require('@babel/runtime/helpers/defineProperty');
+    let _Symbol$search;
+    function _decorate(decorators, target, key, descriptor) {
+      var argumentCount = arguments.length;
+      var result =
+        argumentCount < 3
+          ? target
+          : descriptor === null
+            ? (descriptor = Object.getOwnPropertyDescriptor(target, key))
+            : descriptor;
+      var decorator;
+      for (var index = decorators.length - 1; index >= 0; index--) {
+        if ((decorator = decorators[index]))
+          result =
+            (argumentCount < 3
+              ? decorator(result)
+              : argumentCount > 3
+                ? decorator(target, key, result)
+                : decorator(target, key)) || result;
+      }
+      if (argumentCount > 3 && result) Object.defineProperty(target, key, result);
+      return result;
+    }
+    function dec() {}
+    _Symbol$search = Symbol.search;
+    class A {
+      constructor() {
+        _defineProperty(this, 'a', void 0);
+      }
+      [_Symbol$search]() {}
+    }
+    _decorate([dec], A.prototype, 'a', void 0);"
+  `);
 });
 
 test('class-name-tdz/decorator-interop/input.js [loose]', async () => {
   const source = 'function dec() {}\n\nclass A {\n  @dec a;\n\n  [Symbol.search]() {}\n}\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { classProperties: { loose: true } },
+      transforms: { classProperties: { loose: true }, legacyDecorators: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:decorators-not-supported"`);
+  ).toMatchInlineSnapshot(`
+    "let _Symbol$search;
+    function _decorate(decorators, target, key, descriptor) {
+      var argumentCount = arguments.length;
+      var result =
+        argumentCount < 3
+          ? target
+          : descriptor === null
+            ? (descriptor = Object.getOwnPropertyDescriptor(target, key))
+            : descriptor;
+      var decorator;
+      for (var index = decorators.length - 1; index >= 0; index--) {
+        if ((decorator = decorators[index]))
+          result =
+            (argumentCount < 3
+              ? decorator(result)
+              : argumentCount > 3
+                ? decorator(target, key, result)
+                : decorator(target, key)) || result;
+      }
+      if (argumentCount > 3 && result) Object.defineProperty(target, key, result);
+      return result;
+    }
+    function dec() {}
+    _Symbol$search = Symbol.search;
+    class A {
+      constructor() {
+        this.a = void 0;
+      }
+      [_Symbol$search]() {}
+    }
+    _decorate([dec], A.prototype, 'a', void 0);"
+  `);
 });
 
 test('class-name-tdz/general/exec.js [spec]', async () => {
@@ -4606,22 +4666,79 @@ test('class-name-tdz/typescript-type/input.ts [spec]', async () => {
   const source = 'class Foo {\n  @dec(function (this: Foo) {})\n  a;\n}\n';
   expect(
     await transformOutcome(source, 'input.ts', {
-      transforms: { classProperties: { loose: false } },
+      transforms: { classProperties: { loose: false }, legacyDecorators: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
       typescript: 'strip',
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:decorators-not-supported"`);
+  ).toMatchInlineSnapshot(`
+    "var _defineProperty = require('@babel/runtime/helpers/defineProperty');
+    function _decorate(decorators, target, key, descriptor) {
+      var argumentCount = arguments.length;
+      var result =
+        argumentCount < 3
+          ? target
+          : descriptor === null
+            ? (descriptor = Object.getOwnPropertyDescriptor(target, key))
+            : descriptor;
+      var decorator;
+      for (var index = decorators.length - 1; index >= 0; index--) {
+        if ((decorator = decorators[index]))
+          result =
+            (argumentCount < 3
+              ? decorator(result)
+              : argumentCount > 3
+                ? decorator(target, key, result)
+                : decorator(target, key)) || result;
+      }
+      if (argumentCount > 3 && result) Object.defineProperty(target, key, result);
+      return result;
+    }
+    class Foo {
+      constructor() {
+        _defineProperty(this, 'a', void 0);
+      }
+    }
+    _decorate([dec(function () {})], Foo.prototype, 'a', void 0);"
+  `);
 });
 
 test('class-name-tdz/typescript-type/input.ts [loose]', async () => {
   const source = 'class Foo {\n  @dec(function (this: Foo) {})\n  a;\n}\n';
   expect(
     await transformOutcome(source, 'input.ts', {
-      transforms: { classProperties: { loose: true } },
+      transforms: { classProperties: { loose: true }, legacyDecorators: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
       typescript: 'strip',
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:decorators-not-supported"`);
+  ).toMatchInlineSnapshot(`
+    "function _decorate(decorators, target, key, descriptor) {
+      var argumentCount = arguments.length;
+      var result =
+        argumentCount < 3
+          ? target
+          : descriptor === null
+            ? (descriptor = Object.getOwnPropertyDescriptor(target, key))
+            : descriptor;
+      var decorator;
+      for (var index = decorators.length - 1; index >= 0; index--) {
+        if ((decorator = decorators[index]))
+          result =
+            (argumentCount < 3
+              ? decorator(result)
+              : argumentCount > 3
+                ? decorator(target, key, result)
+                : decorator(target, key)) || result;
+      }
+      if (argumentCount > 3 && result) Object.defineProperty(target, key, result);
+      return result;
+    }
+    class Foo {
+      constructor() {
+        this.a = void 0;
+      }
+    }
+    _decorate([dec(function () {})], Foo.prototype, 'a', void 0);"
+  `);
 });
 
 test('compile-to-class/constructor-collision-ignores-types-loose/input.js [spec]', async () => {
@@ -4759,10 +4876,45 @@ test('decorators-legacy-interop/local-define-property/input.js [spec]', async ()
     'function dec() {}\n\n// Create a local function binding so babel has to change the name of the helper\nfunction _defineProperty() {}\n\nclass A {\n  @dec a;\n\n  @dec b = 123;\n\n  c = 456;\n}\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { classProperties: { loose: false } },
+      transforms: { classProperties: { loose: false }, legacyDecorators: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:decorators-not-supported"`);
+  ).toMatchInlineSnapshot(`
+    "var _defineProperty2 = require('@babel/runtime/helpers/defineProperty');
+    function _decorate(decorators, target, key, descriptor) {
+      var argumentCount = arguments.length;
+      var result =
+        argumentCount < 3
+          ? target
+          : descriptor === null
+            ? (descriptor = Object.getOwnPropertyDescriptor(target, key))
+            : descriptor;
+      var decorator;
+      for (var index = decorators.length - 1; index >= 0; index--) {
+        if ((decorator = decorators[index]))
+          result =
+            (argumentCount < 3
+              ? decorator(result)
+              : argumentCount > 3
+                ? decorator(target, key, result)
+                : decorator(target, key)) || result;
+      }
+      if (argumentCount > 3 && result) Object.defineProperty(target, key, result);
+      return result;
+    }
+    function dec() {}
+    // Create a local function binding so babel has to change the name of the helper
+    function _defineProperty() {}
+    class A {
+      constructor() {
+        _defineProperty2(this, 'a', void 0);
+        _defineProperty2(this, 'b', 123);
+        _defineProperty2(this, 'c', 456);
+      }
+    }
+    _decorate([dec], A.prototype, 'a', void 0);
+    _decorate([dec], A.prototype, 'b', void 0);"
+  `);
 });
 
 test('decorators-legacy-interop/local-define-property/input.js [loose]', async () => {
@@ -4770,70 +4922,282 @@ test('decorators-legacy-interop/local-define-property/input.js [loose]', async (
     'function dec() {}\n\n// Create a local function binding so babel has to change the name of the helper\nfunction _defineProperty() {}\n\nclass A {\n  @dec a;\n\n  @dec b = 123;\n\n  c = 456;\n}\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { classProperties: { loose: true } },
+      transforms: { classProperties: { loose: true }, legacyDecorators: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:decorators-not-supported"`);
+  ).toMatchInlineSnapshot(`
+    "function _decorate(decorators, target, key, descriptor) {
+      var argumentCount = arguments.length;
+      var result =
+        argumentCount < 3
+          ? target
+          : descriptor === null
+            ? (descriptor = Object.getOwnPropertyDescriptor(target, key))
+            : descriptor;
+      var decorator;
+      for (var index = decorators.length - 1; index >= 0; index--) {
+        if ((decorator = decorators[index]))
+          result =
+            (argumentCount < 3
+              ? decorator(result)
+              : argumentCount > 3
+                ? decorator(target, key, result)
+                : decorator(target, key)) || result;
+      }
+      if (argumentCount > 3 && result) Object.defineProperty(target, key, result);
+      return result;
+    }
+    function dec() {}
+    // Create a local function binding so babel has to change the name of the helper
+    function _defineProperty() {}
+    class A {
+      constructor() {
+        this.a = void 0;
+        this.b = 123;
+        this.c = 456;
+      }
+    }
+    _decorate([dec], A.prototype, 'a', void 0);
+    _decorate([dec], A.prototype, 'b', void 0);"
+  `);
 });
 
 test('decorators-legacy-interop/loose/input.js [spec]', async () => {
   const source = 'function dec() {}\n\nclass A {\n  @dec a;\n\n  @dec b = 123;\n\n  c = 456;\n}\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { classProperties: { loose: false } },
+      transforms: { classProperties: { loose: false }, legacyDecorators: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:decorators-not-supported"`);
+  ).toMatchInlineSnapshot(`
+    "var _defineProperty = require('@babel/runtime/helpers/defineProperty');
+    function _decorate(decorators, target, key, descriptor) {
+      var argumentCount = arguments.length;
+      var result =
+        argumentCount < 3
+          ? target
+          : descriptor === null
+            ? (descriptor = Object.getOwnPropertyDescriptor(target, key))
+            : descriptor;
+      var decorator;
+      for (var index = decorators.length - 1; index >= 0; index--) {
+        if ((decorator = decorators[index]))
+          result =
+            (argumentCount < 3
+              ? decorator(result)
+              : argumentCount > 3
+                ? decorator(target, key, result)
+                : decorator(target, key)) || result;
+      }
+      if (argumentCount > 3 && result) Object.defineProperty(target, key, result);
+      return result;
+    }
+    function dec() {}
+    class A {
+      constructor() {
+        _defineProperty(this, 'a', void 0);
+        _defineProperty(this, 'b', 123);
+        _defineProperty(this, 'c', 456);
+      }
+    }
+    _decorate([dec], A.prototype, 'a', void 0);
+    _decorate([dec], A.prototype, 'b', void 0);"
+  `);
 });
 
 test('decorators-legacy-interop/loose/input.js [loose]', async () => {
   const source = 'function dec() {}\n\nclass A {\n  @dec a;\n\n  @dec b = 123;\n\n  c = 456;\n}\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { classProperties: { loose: true } },
+      transforms: { classProperties: { loose: true }, legacyDecorators: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:decorators-not-supported"`);
+  ).toMatchInlineSnapshot(`
+    "function _decorate(decorators, target, key, descriptor) {
+      var argumentCount = arguments.length;
+      var result =
+        argumentCount < 3
+          ? target
+          : descriptor === null
+            ? (descriptor = Object.getOwnPropertyDescriptor(target, key))
+            : descriptor;
+      var decorator;
+      for (var index = decorators.length - 1; index >= 0; index--) {
+        if ((decorator = decorators[index]))
+          result =
+            (argumentCount < 3
+              ? decorator(result)
+              : argumentCount > 3
+                ? decorator(target, key, result)
+                : decorator(target, key)) || result;
+      }
+      if (argumentCount > 3 && result) Object.defineProperty(target, key, result);
+      return result;
+    }
+    function dec() {}
+    class A {
+      constructor() {
+        this.a = void 0;
+        this.b = 123;
+        this.c = 456;
+      }
+    }
+    _decorate([dec], A.prototype, 'a', void 0);
+    _decorate([dec], A.prototype, 'b', void 0);"
+  `);
 });
 
 test('decorators-legacy-interop/strict/input.js [spec]', async () => {
   const source = 'function dec() {}\n\nclass A {\n  @dec a;\n\n  @dec b = 123;\n\n  c = 456;\n}\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { classProperties: { loose: false } },
+      transforms: { classProperties: { loose: false }, legacyDecorators: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:decorators-not-supported"`);
+  ).toMatchInlineSnapshot(`
+    "var _defineProperty = require('@babel/runtime/helpers/defineProperty');
+    function _decorate(decorators, target, key, descriptor) {
+      var argumentCount = arguments.length;
+      var result =
+        argumentCount < 3
+          ? target
+          : descriptor === null
+            ? (descriptor = Object.getOwnPropertyDescriptor(target, key))
+            : descriptor;
+      var decorator;
+      for (var index = decorators.length - 1; index >= 0; index--) {
+        if ((decorator = decorators[index]))
+          result =
+            (argumentCount < 3
+              ? decorator(result)
+              : argumentCount > 3
+                ? decorator(target, key, result)
+                : decorator(target, key)) || result;
+      }
+      if (argumentCount > 3 && result) Object.defineProperty(target, key, result);
+      return result;
+    }
+    function dec() {}
+    class A {
+      constructor() {
+        _defineProperty(this, 'a', void 0);
+        _defineProperty(this, 'b', 123);
+        _defineProperty(this, 'c', 456);
+      }
+    }
+    _decorate([dec], A.prototype, 'a', void 0);
+    _decorate([dec], A.prototype, 'b', void 0);"
+  `);
 });
 
 test('decorators-legacy-interop/strict/input.js [loose]', async () => {
   const source = 'function dec() {}\n\nclass A {\n  @dec a;\n\n  @dec b = 123;\n\n  c = 456;\n}\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { classProperties: { loose: true } },
+      transforms: { classProperties: { loose: true }, legacyDecorators: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:decorators-not-supported"`);
+  ).toMatchInlineSnapshot(`
+    "function _decorate(decorators, target, key, descriptor) {
+      var argumentCount = arguments.length;
+      var result =
+        argumentCount < 3
+          ? target
+          : descriptor === null
+            ? (descriptor = Object.getOwnPropertyDescriptor(target, key))
+            : descriptor;
+      var decorator;
+      for (var index = decorators.length - 1; index >= 0; index--) {
+        if ((decorator = decorators[index]))
+          result =
+            (argumentCount < 3
+              ? decorator(result)
+              : argumentCount > 3
+                ? decorator(target, key, result)
+                : decorator(target, key)) || result;
+      }
+      if (argumentCount > 3 && result) Object.defineProperty(target, key, result);
+      return result;
+    }
+    function dec() {}
+    class A {
+      constructor() {
+        this.a = void 0;
+        this.b = 123;
+        this.c = 456;
+      }
+    }
+    _decorate([dec], A.prototype, 'a', void 0);
+    _decorate([dec], A.prototype, 'b', void 0);"
+  `);
 });
 
 test('decorators-legacy-interop/wrong-order/input.js [spec]', async () => {
   const source = '@deco\nclass Foo {}';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { classProperties: { loose: false } },
+      transforms: { classProperties: { loose: false }, legacyDecorators: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:decorators-not-supported"`);
+  ).toMatchInlineSnapshot(`
+    "function _decorate(decorators, target, key, descriptor) {
+      var argumentCount = arguments.length;
+      var result =
+        argumentCount < 3
+          ? target
+          : descriptor === null
+            ? (descriptor = Object.getOwnPropertyDescriptor(target, key))
+            : descriptor;
+      var decorator;
+      for (var index = decorators.length - 1; index >= 0; index--) {
+        if ((decorator = decorators[index]))
+          result =
+            (argumentCount < 3
+              ? decorator(result)
+              : argumentCount > 3
+                ? decorator(target, key, result)
+                : decorator(target, key)) || result;
+      }
+      if (argumentCount > 3 && result) Object.defineProperty(target, key, result);
+      return result;
+    }
+    let Foo = class Foo {};
+    Foo = _decorate([deco], Foo);"
+  `);
 });
 
 test('decorators-legacy-interop/wrong-order/input.js [loose]', async () => {
   const source = '@deco\nclass Foo {}';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { classProperties: { loose: true } },
+      transforms: { classProperties: { loose: true }, legacyDecorators: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:decorators-not-supported"`);
+  ).toMatchInlineSnapshot(`
+    "function _decorate(decorators, target, key, descriptor) {
+      var argumentCount = arguments.length;
+      var result =
+        argumentCount < 3
+          ? target
+          : descriptor === null
+            ? (descriptor = Object.getOwnPropertyDescriptor(target, key))
+            : descriptor;
+      var decorator;
+      for (var index = decorators.length - 1; index >= 0; index--) {
+        if ((decorator = decorators[index]))
+          result =
+            (argumentCount < 3
+              ? decorator(result)
+              : argumentCount > 3
+                ? decorator(target, key, result)
+                : decorator(target, key)) || result;
+      }
+      if (argumentCount > 3 && result) Object.defineProperty(target, key, result);
+      return result;
+    }
+    let Foo = class Foo {};
+    Foo = _decorate([deco], Foo);"
+  `);
 });
 
 test('nested-class/super-call-in-decorator/exec.js [spec]', async () => {
@@ -4841,10 +5205,51 @@ test('nested-class/super-call-in-decorator/exec.js [spec]', async () => {
     '"use strict";\nclass Hello {\n  constructor() {\n    return () => () => "hello";\n  }\n}\n\nclass Outer extends Hello {\n  constructor() {\n    class Inner {\n      @(super()) hello;\n    }\n\n    return new Inner();\n  }\n}\n\nexpect(new Outer().hello).toBe(\'hello\');\n';
   expect(
     await transformOutcome(source, 'exec.js', {
-      transforms: { classProperties: { loose: false } },
+      transforms: { classProperties: { loose: false }, legacyDecorators: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:decorators-not-supported"`);
+  ).toMatchInlineSnapshot(`
+    "'use strict';
+    var _defineProperty = require('@babel/runtime/helpers/defineProperty');
+    function _decorate(decorators, target, key, descriptor) {
+      var argumentCount = arguments.length;
+      var result =
+        argumentCount < 3
+          ? target
+          : descriptor === null
+            ? (descriptor = Object.getOwnPropertyDescriptor(target, key))
+            : descriptor;
+      var decorator;
+      for (var index = decorators.length - 1; index >= 0; index--) {
+        if ((decorator = decorators[index]))
+          result =
+            (argumentCount < 3
+              ? decorator(result)
+              : argumentCount > 3
+                ? decorator(target, key, result)
+                : decorator(target, key)) || result;
+      }
+      if (argumentCount > 3 && result) Object.defineProperty(target, key, result);
+      return result;
+    }
+    class Hello {
+      constructor() {
+        return () => () => 'hello';
+      }
+    }
+    class Outer extends Hello {
+      constructor() {
+        class Inner {
+          constructor() {
+            _defineProperty(this, 'hello', void 0);
+          }
+        }
+        _decorate([super()], Inner.prototype, 'hello', void 0);
+        return new Inner();
+      }
+    }
+    expect(new Outer().hello).toBe('hello');"
+  `);
 });
 
 test('nested-class/super-call-in-decorator/exec.js [loose]', async () => {
@@ -4852,10 +5257,50 @@ test('nested-class/super-call-in-decorator/exec.js [loose]', async () => {
     '"use strict";\nclass Hello {\n  constructor() {\n    return () => () => "hello";\n  }\n}\n\nclass Outer extends Hello {\n  constructor() {\n    class Inner {\n      @(super()) hello;\n    }\n\n    return new Inner();\n  }\n}\n\nexpect(new Outer().hello).toBe(\'hello\');\n';
   expect(
     await transformOutcome(source, 'exec.js', {
-      transforms: { classProperties: { loose: true } },
+      transforms: { classProperties: { loose: true }, legacyDecorators: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:decorators-not-supported"`);
+  ).toMatchInlineSnapshot(`
+    "'use strict';
+    function _decorate(decorators, target, key, descriptor) {
+      var argumentCount = arguments.length;
+      var result =
+        argumentCount < 3
+          ? target
+          : descriptor === null
+            ? (descriptor = Object.getOwnPropertyDescriptor(target, key))
+            : descriptor;
+      var decorator;
+      for (var index = decorators.length - 1; index >= 0; index--) {
+        if ((decorator = decorators[index]))
+          result =
+            (argumentCount < 3
+              ? decorator(result)
+              : argumentCount > 3
+                ? decorator(target, key, result)
+                : decorator(target, key)) || result;
+      }
+      if (argumentCount > 3 && result) Object.defineProperty(target, key, result);
+      return result;
+    }
+    class Hello {
+      constructor() {
+        return () => () => 'hello';
+      }
+    }
+    class Outer extends Hello {
+      constructor() {
+        class Inner {
+          constructor() {
+            this.hello = void 0;
+          }
+        }
+        _decorate([super()], Inner.prototype, 'hello', void 0);
+        return new Inner();
+      }
+    }
+    expect(new Outer().hello).toBe('hello');"
+  `);
 });
 
 test('nested-class/super-call-in-decorator/input.js [spec]', async () => {
@@ -4863,10 +5308,51 @@ test('nested-class/super-call-in-decorator/input.js [spec]', async () => {
     '"use strict";\nclass Hello {\n  constructor() {\n    return () => () => "hello";\n  }\n}\n\nclass Outer extends Hello {\n  constructor() {\n    class Inner {\n      @(super()) hello;\n    }\n\n    return new Inner();\n  }\n}\n\nexpect(new Outer().hello).toBe(\'hello\');\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { classProperties: { loose: false } },
+      transforms: { classProperties: { loose: false }, legacyDecorators: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:decorators-not-supported"`);
+  ).toMatchInlineSnapshot(`
+    "'use strict';
+    var _defineProperty = require('@babel/runtime/helpers/defineProperty');
+    function _decorate(decorators, target, key, descriptor) {
+      var argumentCount = arguments.length;
+      var result =
+        argumentCount < 3
+          ? target
+          : descriptor === null
+            ? (descriptor = Object.getOwnPropertyDescriptor(target, key))
+            : descriptor;
+      var decorator;
+      for (var index = decorators.length - 1; index >= 0; index--) {
+        if ((decorator = decorators[index]))
+          result =
+            (argumentCount < 3
+              ? decorator(result)
+              : argumentCount > 3
+                ? decorator(target, key, result)
+                : decorator(target, key)) || result;
+      }
+      if (argumentCount > 3 && result) Object.defineProperty(target, key, result);
+      return result;
+    }
+    class Hello {
+      constructor() {
+        return () => () => 'hello';
+      }
+    }
+    class Outer extends Hello {
+      constructor() {
+        class Inner {
+          constructor() {
+            _defineProperty(this, 'hello', void 0);
+          }
+        }
+        _decorate([super()], Inner.prototype, 'hello', void 0);
+        return new Inner();
+      }
+    }
+    expect(new Outer().hello).toBe('hello');"
+  `);
 });
 
 test('nested-class/super-call-in-decorator/input.js [loose]', async () => {
@@ -4874,10 +5360,50 @@ test('nested-class/super-call-in-decorator/input.js [loose]', async () => {
     '"use strict";\nclass Hello {\n  constructor() {\n    return () => () => "hello";\n  }\n}\n\nclass Outer extends Hello {\n  constructor() {\n    class Inner {\n      @(super()) hello;\n    }\n\n    return new Inner();\n  }\n}\n\nexpect(new Outer().hello).toBe(\'hello\');\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { classProperties: { loose: true } },
+      transforms: { classProperties: { loose: true }, legacyDecorators: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:decorators-not-supported"`);
+  ).toMatchInlineSnapshot(`
+    "'use strict';
+    function _decorate(decorators, target, key, descriptor) {
+      var argumentCount = arguments.length;
+      var result =
+        argumentCount < 3
+          ? target
+          : descriptor === null
+            ? (descriptor = Object.getOwnPropertyDescriptor(target, key))
+            : descriptor;
+      var decorator;
+      for (var index = decorators.length - 1; index >= 0; index--) {
+        if ((decorator = decorators[index]))
+          result =
+            (argumentCount < 3
+              ? decorator(result)
+              : argumentCount > 3
+                ? decorator(target, key, result)
+                : decorator(target, key)) || result;
+      }
+      if (argumentCount > 3 && result) Object.defineProperty(target, key, result);
+      return result;
+    }
+    class Hello {
+      constructor() {
+        return () => () => 'hello';
+      }
+    }
+    class Outer extends Hello {
+      constructor() {
+        class Inner {
+          constructor() {
+            this.hello = void 0;
+          }
+        }
+        _decorate([super()], Inner.prototype, 'hello', void 0);
+        return new Inner();
+      }
+    }
+    expect(new Outer().hello).toBe('hello');"
+  `);
 });
 
 test('nested-class/super-call-in-key/exec.js [spec]', async () => {
@@ -5139,10 +5665,52 @@ test('nested-class/super-property-in-decorator/exec.js [spec]', async () => {
     '"use strict";\nclass Hello {\n  dec() { return () => "hello" }\n}\n\nclass Outer extends Hello {\n  constructor() {\n    super();\n    class Inner {\n      @(super.dec) hello;\n    }\n\n    return new Inner();\n  }\n}\n\nexpect(new Outer().hello).toBe(\'hello\');\n';
   expect(
     await transformOutcome(source, 'exec.js', {
-      transforms: { classProperties: { loose: false } },
+      transforms: { classProperties: { loose: false }, legacyDecorators: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:decorators-not-supported"`);
+  ).toMatchInlineSnapshot(`
+    "'use strict';
+    var _defineProperty = require('@babel/runtime/helpers/defineProperty');
+    function _decorate(decorators, target, key, descriptor) {
+      var argumentCount = arguments.length;
+      var result =
+        argumentCount < 3
+          ? target
+          : descriptor === null
+            ? (descriptor = Object.getOwnPropertyDescriptor(target, key))
+            : descriptor;
+      var decorator;
+      for (var index = decorators.length - 1; index >= 0; index--) {
+        if ((decorator = decorators[index]))
+          result =
+            (argumentCount < 3
+              ? decorator(result)
+              : argumentCount > 3
+                ? decorator(target, key, result)
+                : decorator(target, key)) || result;
+      }
+      if (argumentCount > 3 && result) Object.defineProperty(target, key, result);
+      return result;
+    }
+    class Hello {
+      dec() {
+        return () => 'hello';
+      }
+    }
+    class Outer extends Hello {
+      constructor() {
+        super();
+        class Inner {
+          constructor() {
+            _defineProperty(this, 'hello', void 0);
+          }
+        }
+        _decorate([super.dec], Inner.prototype, 'hello', void 0);
+        return new Inner();
+      }
+    }
+    expect(new Outer().hello).toBe('hello');"
+  `);
 });
 
 test('nested-class/super-property-in-decorator/exec.js [loose]', async () => {
@@ -5150,10 +5718,51 @@ test('nested-class/super-property-in-decorator/exec.js [loose]', async () => {
     '"use strict";\nclass Hello {\n  dec() { return () => "hello" }\n}\n\nclass Outer extends Hello {\n  constructor() {\n    super();\n    class Inner {\n      @(super.dec) hello;\n    }\n\n    return new Inner();\n  }\n}\n\nexpect(new Outer().hello).toBe(\'hello\');\n';
   expect(
     await transformOutcome(source, 'exec.js', {
-      transforms: { classProperties: { loose: true } },
+      transforms: { classProperties: { loose: true }, legacyDecorators: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:decorators-not-supported"`);
+  ).toMatchInlineSnapshot(`
+    "'use strict';
+    function _decorate(decorators, target, key, descriptor) {
+      var argumentCount = arguments.length;
+      var result =
+        argumentCount < 3
+          ? target
+          : descriptor === null
+            ? (descriptor = Object.getOwnPropertyDescriptor(target, key))
+            : descriptor;
+      var decorator;
+      for (var index = decorators.length - 1; index >= 0; index--) {
+        if ((decorator = decorators[index]))
+          result =
+            (argumentCount < 3
+              ? decorator(result)
+              : argumentCount > 3
+                ? decorator(target, key, result)
+                : decorator(target, key)) || result;
+      }
+      if (argumentCount > 3 && result) Object.defineProperty(target, key, result);
+      return result;
+    }
+    class Hello {
+      dec() {
+        return () => 'hello';
+      }
+    }
+    class Outer extends Hello {
+      constructor() {
+        super();
+        class Inner {
+          constructor() {
+            this.hello = void 0;
+          }
+        }
+        _decorate([super.dec], Inner.prototype, 'hello', void 0);
+        return new Inner();
+      }
+    }
+    expect(new Outer().hello).toBe('hello');"
+  `);
 });
 
 test('nested-class/super-property-in-decorator/input.js [spec]', async () => {
@@ -5161,10 +5770,52 @@ test('nested-class/super-property-in-decorator/input.js [spec]', async () => {
     '"use strict";\nclass Hello {\n  dec() { return () => "hello" }\n}\n\nclass Outer extends Hello {\n  constructor() {\n    super();\n    class Inner {\n      @(super.dec) hello;\n    }\n\n    return new Inner();\n  }\n}\n\nexpect(new Outer().hello).toBe(\'hello\');\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { classProperties: { loose: false } },
+      transforms: { classProperties: { loose: false }, legacyDecorators: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:decorators-not-supported"`);
+  ).toMatchInlineSnapshot(`
+    "'use strict';
+    var _defineProperty = require('@babel/runtime/helpers/defineProperty');
+    function _decorate(decorators, target, key, descriptor) {
+      var argumentCount = arguments.length;
+      var result =
+        argumentCount < 3
+          ? target
+          : descriptor === null
+            ? (descriptor = Object.getOwnPropertyDescriptor(target, key))
+            : descriptor;
+      var decorator;
+      for (var index = decorators.length - 1; index >= 0; index--) {
+        if ((decorator = decorators[index]))
+          result =
+            (argumentCount < 3
+              ? decorator(result)
+              : argumentCount > 3
+                ? decorator(target, key, result)
+                : decorator(target, key)) || result;
+      }
+      if (argumentCount > 3 && result) Object.defineProperty(target, key, result);
+      return result;
+    }
+    class Hello {
+      dec() {
+        return () => 'hello';
+      }
+    }
+    class Outer extends Hello {
+      constructor() {
+        super();
+        class Inner {
+          constructor() {
+            _defineProperty(this, 'hello', void 0);
+          }
+        }
+        _decorate([super.dec], Inner.prototype, 'hello', void 0);
+        return new Inner();
+      }
+    }
+    expect(new Outer().hello).toBe('hello');"
+  `);
 });
 
 test('nested-class/super-property-in-decorator/input.js [loose]', async () => {
@@ -5172,10 +5823,51 @@ test('nested-class/super-property-in-decorator/input.js [loose]', async () => {
     '"use strict";\nclass Hello {\n  dec() { return () => "hello" }\n}\n\nclass Outer extends Hello {\n  constructor() {\n    super();\n    class Inner {\n      @(super.dec) hello;\n    }\n\n    return new Inner();\n  }\n}\n\nexpect(new Outer().hello).toBe(\'hello\');\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { classProperties: { loose: true } },
+      transforms: { classProperties: { loose: true }, legacyDecorators: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
-  ).toMatchInlineSnapshot(`"[bailout] preflight:decorators-not-supported"`);
+  ).toMatchInlineSnapshot(`
+    "'use strict';
+    function _decorate(decorators, target, key, descriptor) {
+      var argumentCount = arguments.length;
+      var result =
+        argumentCount < 3
+          ? target
+          : descriptor === null
+            ? (descriptor = Object.getOwnPropertyDescriptor(target, key))
+            : descriptor;
+      var decorator;
+      for (var index = decorators.length - 1; index >= 0; index--) {
+        if ((decorator = decorators[index]))
+          result =
+            (argumentCount < 3
+              ? decorator(result)
+              : argumentCount > 3
+                ? decorator(target, key, result)
+                : decorator(target, key)) || result;
+      }
+      if (argumentCount > 3 && result) Object.defineProperty(target, key, result);
+      return result;
+    }
+    class Hello {
+      dec() {
+        return () => 'hello';
+      }
+    }
+    class Outer extends Hello {
+      constructor() {
+        super();
+        class Inner {
+          constructor() {
+            this.hello = void 0;
+          }
+        }
+        _decorate([super.dec], Inner.prototype, 'hello', void 0);
+        return new Inner();
+      }
+    }
+    expect(new Outer().hello).toBe('hello');"
+  `);
 });
 
 test('nested-class/super-property-in-key/exec.js [spec]', async () => {
@@ -5315,8 +6007,8 @@ test('private-loose/access-before-declaration/exec.js [spec]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -5439,8 +6131,8 @@ test('private-loose/assignment/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -5508,8 +6200,8 @@ test('private-loose/call/exec.js [spec]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -5585,8 +6277,8 @@ test('private-loose/call/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -5649,8 +6341,8 @@ test('private-loose/canonical/exec.js [spec]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -5844,8 +6536,8 @@ test('private-loose/canonical/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -5948,8 +6640,8 @@ test('private-loose/class-shadow-builtins/input.mjs [spec]', async () => {
     await transformOutcome(source, 'input.mjs', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -5996,8 +6688,8 @@ test('private-loose/constructor-collision/exec.js [spec]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -6063,8 +6755,8 @@ test('private-loose/constructor-collision/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -6116,8 +6808,8 @@ test('private-loose/declaration-order/exec.js [spec]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -6176,8 +6868,8 @@ test('private-loose/declaration-order/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -6236,8 +6928,8 @@ test('private-loose/derived-multiple-supers/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -6303,8 +6995,8 @@ test('private-loose/derived/exec.js [spec]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -6393,8 +7085,8 @@ test('private-loose/derived/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -6459,8 +7151,8 @@ test('private-loose/destructuring-array-pattern-1/exec.js [spec]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -6538,8 +7230,8 @@ test('private-loose/destructuring-array-pattern-1/input.js [spec]', async () => 
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -6603,8 +7295,8 @@ test('private-loose/destructuring-array-pattern-2/exec.js [spec]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -6670,8 +7362,8 @@ test('private-loose/destructuring-array-pattern-2/input.js [spec]', async () => 
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -6724,8 +7416,8 @@ test('private-loose/destructuring-array-pattern-3/exec.js [spec]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -6789,8 +7481,8 @@ test('private-loose/destructuring-array-pattern-3/input.js [spec]', async () => 
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -6843,8 +7535,8 @@ test('private-loose/destructuring-array-pattern-static/exec.js [spec]', async ()
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -6903,8 +7595,8 @@ test('private-loose/destructuring-array-pattern-static/input.js [spec]', async (
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -6953,8 +7645,8 @@ test('private-loose/destructuring-array-pattern/exec.js [spec]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -7018,8 +7710,8 @@ test('private-loose/destructuring-array-pattern/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -7072,8 +7764,8 @@ test('private-loose/destructuring-object-pattern-1/exec.js [spec]', async () => 
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -7151,8 +7843,8 @@ test('private-loose/destructuring-object-pattern-1/input.js [spec]', async () =>
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -7216,8 +7908,8 @@ test('private-loose/destructuring-object-pattern-2-exec/exec.js [spec]', async (
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -7297,8 +7989,8 @@ test('private-loose/destructuring-object-pattern-2/input.js [spec]', async () =>
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -7351,8 +8043,8 @@ test('private-loose/destructuring-object-pattern-3/exec.js [spec]', async () => 
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -7416,8 +8108,8 @@ test('private-loose/destructuring-object-pattern-3/input.js [spec]', async () =>
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -7470,8 +8162,8 @@ test('private-loose/destructuring-object-pattern-static/exec.js [spec]', async (
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -7530,8 +8222,8 @@ test('private-loose/destructuring-object-pattern-static/input.js [spec]', async 
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -7580,8 +8272,8 @@ test('private-loose/destructuring-object-pattern/exec.js [spec]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -7645,8 +8337,8 @@ test('private-loose/destructuring-object-pattern/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -7699,8 +8391,8 @@ test('private-loose/extracted-this/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -7757,8 +8449,8 @@ test('private-loose/foobar/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -7812,8 +8504,8 @@ test('private-loose/instance-undefined/exec.js [spec]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -7870,8 +8562,8 @@ test('private-loose/instance-undefined/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -7918,8 +8610,8 @@ test('private-loose/instance/exec.js [spec]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -7988,8 +8680,8 @@ test('private-loose/instance/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -8036,8 +8728,8 @@ test('private-loose/logical-assignment/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -8122,8 +8814,8 @@ test('private-loose/multiple/exec.js [spec]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -8189,8 +8881,8 @@ test('private-loose/multiple/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -8246,8 +8938,8 @@ test('private-loose/native-classes/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -8325,8 +9017,8 @@ test('private-loose/nested-class-computed-redeclared/exec.js [spec]', async () =
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -8411,8 +9103,8 @@ test('private-loose/nested-class-computed-redeclared/input.js [spec]', async () 
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -8489,8 +9181,8 @@ test('private-loose/nested-class-computed/exec.js [spec]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -8560,8 +9252,8 @@ test('private-loose/nested-class-computed/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -8623,8 +9315,8 @@ test('private-loose/nested-class-extends-computed-redeclared/exec.js [spec]', as
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -8725,8 +9417,8 @@ test('private-loose/nested-class-extends-computed-redeclared/input.js [spec]', a
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -8819,8 +9511,8 @@ test('private-loose/nested-class-extends-computed/exec.js [spec]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -8914,8 +9606,8 @@ test('private-loose/nested-class-extends-computed/input.js [spec]', async () => 
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -8999,8 +9691,8 @@ test('private-loose/nested-class-other-redeclared/input.js [spec]', async () => 
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -9088,8 +9780,8 @@ test('private-loose/nested-class-redeclared/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -9166,8 +9858,8 @@ test('private-loose/nested-class/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -9233,8 +9925,8 @@ test('private-loose/non-block-arrow-func/input.mjs [spec]', async () => {
     await transformOutcome(source, 'input.mjs', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -9302,8 +9994,8 @@ test('private-loose/optional-chain-before-member-call-with-transform/exec.js [sp
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -10685,8 +11377,8 @@ test('private-loose/optional-chain-before-member-call-with-transform/input.js [s
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -11255,8 +11947,8 @@ test('private-loose/optional-chain-before-member-call/exec.js [spec]', async () 
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -12638,8 +13330,8 @@ test('private-loose/optional-chain-before-member-call/input.js [spec]', async ()
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -13208,8 +13900,8 @@ test('private-loose/optional-chain-before-property-with-transform/exec.js [spec]
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -14379,8 +15071,8 @@ test('private-loose/optional-chain-before-property-with-transform/input.js [spec
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -14839,8 +15531,8 @@ test('private-loose/optional-chain-before-property/exec.js [spec]', async () => 
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -16010,8 +16702,8 @@ test('private-loose/optional-chain-before-property/input.js [spec]', async () =>
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -16470,8 +17162,8 @@ test('private-loose/optional-chain-cast-to-boolean/exec.js [spec]', async () => 
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -16821,8 +17513,8 @@ test('private-loose/optional-chain-cast-to-boolean/input.js [spec]', async () =>
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -17114,8 +17806,8 @@ test('private-loose/optional-chain-delete-property-with-transform/exec.js [spec]
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -17910,8 +18602,8 @@ test('private-loose/optional-chain-delete-property-with-transform/input.js [spec
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -18189,8 +18881,8 @@ test('private-loose/optional-chain-delete-property/exec.js [spec]', async () => 
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -18985,8 +19677,8 @@ test('private-loose/optional-chain-delete-property/input.js [spec]', async () =>
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -19264,8 +19956,8 @@ test('private-loose/optional-chain-in-function-param-with-transform/exec.js [spe
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -19471,8 +20163,8 @@ test('private-loose/optional-chain-in-function-param-with-transform/input.js [sp
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -19678,8 +20370,8 @@ test('private-loose/optional-chain-in-function-param/exec.js [spec]', async () =
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -19885,8 +20577,8 @@ test('private-loose/optional-chain-in-function-param/input.js [spec]', async () 
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -20092,8 +20784,8 @@ test('private-loose/optional-chain-member-optional-call-spread-arguments/exec.js
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -20172,8 +20864,8 @@ test('private-loose/optional-chain-member-optional-call-spread-arguments/input.j
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -20248,8 +20940,8 @@ test('private-loose/optional-chain-member-optional-call-with-transform/exec.js [
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -21643,8 +22335,8 @@ test('private-loose/optional-chain-member-optional-call-with-transform/input.js 
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -22221,8 +22913,8 @@ test('private-loose/optional-chain-member-optional-call/exec.js [spec]', async (
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -23616,8 +24308,8 @@ test('private-loose/optional-chain-member-optional-call/input.js [spec]', async 
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -24194,8 +24886,8 @@ test('private-loose/optional-chain-optional-member-call-with-transform/exec.js [
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -25508,8 +26200,8 @@ test('private-loose/optional-chain-optional-member-call-with-transform/input.js 
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -26050,8 +26742,8 @@ test('private-loose/optional-chain-optional-member-call/exec.js [spec]', async (
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -27364,8 +28056,8 @@ test('private-loose/optional-chain-optional-member-call/input.js [spec]', async 
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -27940,8 +28632,8 @@ test('private-loose/optional-chain-optional-property-with-transform/exec.js [spe
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -29240,8 +29932,8 @@ test('private-loose/optional-chain-optional-property-with-transform/input.js [sp
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -29768,8 +30460,8 @@ test('private-loose/optional-chain-optional-property/exec.js [spec]', async () =
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -31068,8 +31760,8 @@ test('private-loose/optional-chain-optional-property/input.js [spec]', async () 
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -31596,8 +32288,8 @@ test('private-loose/parenthesized-optional-member-call-with-transform/exec.js [s
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -31889,8 +32581,8 @@ test('private-loose/parenthesized-optional-member-call-with-transform/input.js [
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -32040,8 +32732,8 @@ test('private-loose/parenthesized-optional-member-call/exec.js [spec]', async ()
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -32333,8 +33025,8 @@ test('private-loose/parenthesized-optional-member-call/input.js [spec]', async (
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -32484,8 +33176,8 @@ test('private-loose/preserve-comments/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -32539,8 +33231,8 @@ test('private-loose/private-in-derived/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -32592,8 +33284,8 @@ test('private-loose/reevaluated/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -32718,8 +33410,8 @@ test('private-loose/reference-in-other-property/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -32788,8 +33480,8 @@ test('private-loose/static-call/exec.js [spec]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -32850,8 +33542,8 @@ test('private-loose/static-call/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -32906,8 +33598,8 @@ test('private-loose/static-class-binding/exec.js [spec]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -32979,8 +33671,8 @@ test('private-loose/static-class-binding/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -33029,8 +33721,8 @@ test('private-loose/static-export/input.mjs [spec]', async () => {
     await transformOutcome(source, 'input.mjs', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -33077,8 +33769,8 @@ test('private-loose/static-infer-name/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -33120,8 +33812,8 @@ test('private-loose/static-inherited/exec.js [spec]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -33277,8 +33969,8 @@ test('private-loose/static-inherited/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -33364,8 +34056,8 @@ test('private-loose/static-shadow/exec.js [spec]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -33427,8 +34119,8 @@ test('private-loose/static-shadow/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -33488,8 +34180,8 @@ test('private-loose/static-this/exec.js [spec]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -33567,8 +34259,8 @@ test('private-loose/static-this/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -33617,8 +34309,8 @@ test('private-loose/static-undefined/exec.js [spec]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -33679,8 +34371,8 @@ test('private-loose/static-undefined/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -33735,8 +34427,8 @@ test('private-loose/static/exec.js [spec]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -33797,8 +34489,8 @@ test('private-loose/static/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -33853,8 +34545,8 @@ test('private-loose/super-expression/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -33912,8 +34604,8 @@ test('private-loose/super-statement/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -33963,8 +34655,8 @@ test('private-loose/update/exec.js [spec]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -34087,8 +34779,8 @@ test('private-loose/update/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -34179,8 +34871,8 @@ test('private/1-helpermemberexpressionfunction/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -34301,8 +34993,8 @@ test('private/access-before-declaration/exec.js [spec]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -34425,8 +35117,8 @@ test('private/assignment/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -34494,8 +35186,8 @@ test('private/call/exec.js [spec]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -34571,8 +35263,8 @@ test('private/call/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -34635,8 +35327,8 @@ test('private/canonical/exec.js [spec]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -34830,8 +35522,8 @@ test('private/canonical/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -34934,8 +35626,8 @@ test('private/class-shadow-builtins/input.mjs [spec]', async () => {
     await transformOutcome(source, 'input.mjs', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -34982,8 +35674,8 @@ test('private/constructor-collision/exec.js [spec]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -35049,8 +35741,8 @@ test('private/constructor-collision/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -35102,8 +35794,8 @@ test('private/declaration-order/exec.js [spec]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -35162,8 +35854,8 @@ test('private/declaration-order/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -35222,8 +35914,8 @@ test('private/derived-multiple-supers/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -35289,8 +35981,8 @@ test('private/derived/exec.js [spec]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -35379,8 +36071,8 @@ test('private/derived/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -35445,8 +36137,8 @@ test('private/destructuring-array-pattern-1/exec.js [spec]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -35524,8 +36216,8 @@ test('private/destructuring-array-pattern-1/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -35589,8 +36281,8 @@ test('private/destructuring-array-pattern-2/exec.js [spec]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -35656,8 +36348,8 @@ test('private/destructuring-array-pattern-2/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -35710,8 +36402,8 @@ test('private/destructuring-array-pattern-3/exec.js [spec]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -35775,8 +36467,8 @@ test('private/destructuring-array-pattern-3/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -35829,8 +36521,8 @@ test('private/destructuring-array-pattern-static/exec.js [spec]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -35889,8 +36581,8 @@ test('private/destructuring-array-pattern-static/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -35939,8 +36631,8 @@ test('private/destructuring-array-pattern/exec.js [spec]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -36004,8 +36696,8 @@ test('private/destructuring-array-pattern/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -36058,8 +36750,8 @@ test('private/destructuring-object-pattern-1/exec.js [spec]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -36137,8 +36829,8 @@ test('private/destructuring-object-pattern-1/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -36202,8 +36894,8 @@ test('private/destructuring-object-pattern-2-exec/exec.js [spec]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -36283,8 +36975,8 @@ test('private/destructuring-object-pattern-2/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -36337,8 +37029,8 @@ test('private/destructuring-object-pattern-3/exec.js [spec]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -36402,8 +37094,8 @@ test('private/destructuring-object-pattern-3/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -36456,8 +37148,8 @@ test('private/destructuring-object-pattern-static/exec.js [spec]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -36516,8 +37208,8 @@ test('private/destructuring-object-pattern-static/input.js [spec]', async () => 
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -36566,8 +37258,8 @@ test('private/destructuring-object-pattern/exec.js [spec]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -36631,8 +37323,8 @@ test('private/destructuring-object-pattern/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -36685,8 +37377,8 @@ test('private/extracted-this/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -36743,8 +37435,8 @@ test('private/foobar/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -36798,8 +37490,8 @@ test('private/instance-undefined/exec.js [spec]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -36856,8 +37548,8 @@ test('private/instance-undefined/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -36904,8 +37596,8 @@ test('private/instance/exec.js [spec]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -37011,8 +37703,8 @@ test('private/instance/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -37059,8 +37751,8 @@ test('private/logical-assignment/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -37145,8 +37837,8 @@ test('private/multiple/exec.js [spec]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -37212,8 +37904,8 @@ test('private/multiple/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -37269,8 +37961,8 @@ test('private/native-classes/exec.js [spec]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -37348,8 +38040,8 @@ test('private/native-classes/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -37417,8 +38109,8 @@ test('private/nested-class-computed-redeclared/exec.js [spec]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -37503,8 +38195,8 @@ test('private/nested-class-computed-redeclared/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -37581,8 +38273,8 @@ test('private/nested-class-computed/exec.js [spec]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -37652,8 +38344,8 @@ test('private/nested-class-computed/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -37715,8 +38407,8 @@ test('private/nested-class-extends-computed-redeclared/exec.js [spec]', async ()
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -37817,8 +38509,8 @@ test('private/nested-class-extends-computed-redeclared/input.js [spec]', async (
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -37911,8 +38603,8 @@ test('private/nested-class-extends-computed/exec.js [spec]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -38006,8 +38698,8 @@ test('private/nested-class-extends-computed/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -38091,8 +38783,8 @@ test('private/nested-class-other-redeclared/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -38180,8 +38872,8 @@ test('private/nested-class-redeclared/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -38258,8 +38950,8 @@ test('private/nested-class/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -38325,8 +39017,8 @@ test('private/non-block-arrow-func/input.mjs [spec]', async () => {
     await transformOutcome(source, 'input.mjs', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -38394,8 +39086,8 @@ test('private/optional-chain-before-member-call-with-transform/exec.js [spec]', 
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -39777,8 +40469,8 @@ test('private/optional-chain-before-member-call-with-transform/input.js [spec]',
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -40347,8 +41039,8 @@ test('private/optional-chain-before-member-call/exec.js [spec]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -41730,8 +42422,8 @@ test('private/optional-chain-before-member-call/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -42300,8 +42992,8 @@ test('private/optional-chain-before-property-with-transform/exec.js [spec]', asy
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -43471,8 +44163,8 @@ test('private/optional-chain-before-property-with-transform/input.js [spec]', as
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -43931,8 +44623,8 @@ test('private/optional-chain-before-property/exec.js [spec]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -45102,8 +45794,8 @@ test('private/optional-chain-before-property/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -45562,8 +46254,8 @@ test('private/optional-chain-cast-to-boolean/exec.js [spec]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -45913,8 +46605,8 @@ test('private/optional-chain-cast-to-boolean/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -46206,8 +46898,8 @@ test('private/optional-chain-delete-property-with-transform/exec.js [spec]', asy
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -47002,8 +47694,8 @@ test('private/optional-chain-delete-property-with-transform/input.js [spec]', as
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -47281,8 +47973,8 @@ test('private/optional-chain-delete-property/exec.js [spec]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -48077,8 +48769,8 @@ test('private/optional-chain-delete-property/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -48356,8 +49048,8 @@ test('private/optional-chain-in-function-param-with-transform/exec.js [spec]', a
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -48563,8 +49255,8 @@ test('private/optional-chain-in-function-param-with-transform/input.js [spec]', 
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -48770,8 +49462,8 @@ test('private/optional-chain-in-function-param/exec.js [spec]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -48977,8 +49669,8 @@ test('private/optional-chain-in-function-param/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -49184,8 +49876,8 @@ test('private/optional-chain-member-optional-call-spread-arguments/exec.js [spec
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -49264,8 +49956,8 @@ test('private/optional-chain-member-optional-call-spread-arguments/input.js [spe
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -49340,8 +50032,8 @@ test('private/optional-chain-member-optional-call-with-transform/exec.js [spec]'
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -50735,8 +51427,8 @@ test('private/optional-chain-member-optional-call-with-transform/input.js [spec]
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -51313,8 +52005,8 @@ test('private/optional-chain-member-optional-call/exec.js [spec]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -52708,8 +53400,8 @@ test('private/optional-chain-member-optional-call/input.js [spec]', async () => 
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -53286,8 +53978,8 @@ test('private/optional-chain-optional-member-call-with-transform/exec.js [spec]'
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -54600,8 +55292,8 @@ test('private/optional-chain-optional-member-call-with-transform/input.js [spec]
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -55142,8 +55834,8 @@ test('private/optional-chain-optional-member-call/exec.js [spec]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -56456,8 +57148,8 @@ test('private/optional-chain-optional-member-call/input.js [spec]', async () => 
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -57032,8 +57724,8 @@ test('private/optional-chain-optional-property-with-transform/exec.js [spec]', a
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -58332,8 +59024,8 @@ test('private/optional-chain-optional-property-with-transform/input.js [spec]', 
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -58860,8 +59552,8 @@ test('private/optional-chain-optional-property/exec.js [spec]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -60160,8 +60852,8 @@ test('private/optional-chain-optional-property/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -60688,8 +61380,8 @@ test('private/parenthesized-optional-member-call-with-transform/exec.js [spec]',
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -60981,8 +61673,8 @@ test('private/parenthesized-optional-member-call-with-transform/input.js [spec]'
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -61132,8 +61824,8 @@ test('private/parenthesized-optional-member-call/exec.js [spec]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -61425,8 +62117,8 @@ test('private/parenthesized-optional-member-call/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -61576,8 +62268,8 @@ test('private/preserve-comments/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -61631,8 +62323,8 @@ test('private/private-in-derived/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -61684,8 +62376,8 @@ test('private/reevaluated/exec.js [spec]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -61826,8 +62518,8 @@ test('private/reevaluated/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -61920,8 +62612,8 @@ test('private/reference-in-other-property/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -61990,8 +62682,8 @@ test('private/regression-T2983/input.mjs [spec]', async () => {
     await transformOutcome(source, 'input.mjs', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -62043,8 +62735,8 @@ test('private/regression-T6719/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -62110,8 +62802,8 @@ test('private/regression-T7364/input.mjs [spec]', async () => {
     await transformOutcome(source, 'input.mjs', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -62203,8 +62895,8 @@ test('private/static-call/exec.js [spec]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -62265,8 +62957,8 @@ test('private/static-call/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -62321,8 +63013,8 @@ test('private/static-class-binding/exec.js [spec]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -62394,8 +63086,8 @@ test('private/static-class-binding/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -62444,8 +63136,8 @@ test('private/static-export/input.mjs [spec]', async () => {
     await transformOutcome(source, 'input.mjs', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -62492,8 +63184,8 @@ test('private/static-infer-name/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -62535,8 +63227,8 @@ test('private/static-inherited/exec.js [spec]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -62692,8 +63384,8 @@ test('private/static-inherited/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -62779,8 +63471,8 @@ test('private/static-self-field/exec.js [spec]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -62850,8 +63542,8 @@ test('private/static-self-field/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -62895,38 +63587,75 @@ test('private/static-self-method/exec.js [spec]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _Foo;
-    const f = (_Foo = class Foo {
-      static extract() {
-        return {
-          bar: _assertClassBrand(_Foo, Foo, _bar),
-          method: _assertClassBrand(_Foo, Foo, _method),
-          method_shadowed: _assertClassBrand(_Foo, Foo, _method_shadowed),
-        };
-      }
-    });
-    function _bar() {
-      return _Foo;
+    "var _classPrivateFieldLooseBase2 = {
+      classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+    };
+    function _classPrivateFieldLooseBase(e, s) {
+      return _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
     }
-    function _method() {
-      return function inner() {
-        return _Foo;
+    function _classPrivateMethodCall(e, s, a) {
+      return _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s)[s].apply(e, a);
+    }
+    const f = (() => {
+      'use strict';
+      var _method_shadowed = '__private_Foo_method_shadowed';
+      var _method = '__private_Foo_method';
+      var _bar = '__private_Foo_bar';
+      const Foo = function Foo() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
       };
-    }
-    function _method_shadowed() {
-      new _Foo();
-      return function inner() {
-        let Foo = 3;
-        return Foo;
-      };
-    }
+      Object.defineProperty(Foo, 'extract', {
+        value: Object.defineProperty(
+          function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            return {
+              bar: _classPrivateFieldLooseBase(Foo, _bar)[_bar],
+              method: _classPrivateFieldLooseBase(Foo, _method)[_method],
+              method_shadowed: _classPrivateFieldLooseBase(Foo, _method_shadowed)[_method_shadowed],
+            };
+          },
+          'name',
+          {
+            value: 'extract',
+            configurable: true,
+          },
+        ),
+        writable: true,
+        configurable: true,
+      });
+      Object.defineProperty(Foo, 'prototype', { writable: false });
+      Object.defineProperty(Foo, _bar, {
+        value: function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          return Foo;
+        },
+      });
+      Object.defineProperty(Foo, _method, {
+        value: function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          return function inner() {
+            return Foo;
+          };
+        },
+      });
+      Object.defineProperty(Foo, _method_shadowed, {
+        value: function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          new Foo();
+          return function inner() {
+            let Foo = 3;
+            return Foo;
+          };
+        },
+      });
+      return Foo;
+    })();
     const { bar, method, method_shadowed } = f.extract();
     expect(bar()).toBe(f);
     expect(method()()).toBe(f);
@@ -63024,29 +63753,47 @@ test('private/static-self-method/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "var _Foo;
-    const f = (_Foo = class Foo {});
-    function _bar() {
-      return _Foo;
-    }
-    function _method() {
-      return function inner() {
-        return _Foo;
+    "const f = (() => {
+      'use strict';
+      var _method_shadowed = '__private_Foo_method_shadowed';
+      var _method = '__private_Foo_method';
+      var _bar = '__private_Foo_bar';
+      const Foo = function Foo() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
       };
-    }
-    function _method_shadowed() {
-      new _Foo();
-      return function inner() {
-        let Foo = 3;
-        return Foo;
-      };
-    }"
+      Object.defineProperty(Foo, 'prototype', { writable: false });
+      Object.defineProperty(Foo, _bar, {
+        value: function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          return Foo;
+        },
+      });
+      Object.defineProperty(Foo, _method, {
+        value: function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          return function inner() {
+            return Foo;
+          };
+        },
+      });
+      Object.defineProperty(Foo, _method_shadowed, {
+        value: function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          new Foo();
+          return function inner() {
+            let Foo = 3;
+            return Foo;
+          };
+        },
+      });
+      return Foo;
+    })();"
   `);
 });
 
@@ -63108,8 +63855,8 @@ test('private/static-shadow/exec.js [spec]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -63171,8 +63918,8 @@ test('private/static-shadow/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -63232,8 +63979,8 @@ test('private/static-this/exec.js [spec]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -63311,8 +64058,8 @@ test('private/static-this/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -63361,8 +64108,8 @@ test('private/static-undefined/exec.js [spec]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -63423,8 +64170,8 @@ test('private/static-undefined/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -63479,8 +64226,8 @@ test('private/static/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -63541,8 +64288,8 @@ test('private/super-call/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -63602,8 +64349,8 @@ test('private/super-expression/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -63661,8 +64408,8 @@ test('private/super-statement/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -63712,8 +64459,8 @@ test('private/tagged-template-static/exec.js [spec]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -63771,8 +64518,8 @@ test('private/tagged-template-static/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -63828,33 +64575,47 @@ test('private/tagged-template/exec.js [spec]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _classPrivateFieldGet = require('@babel/runtime/helpers/classPrivateFieldGet2');
-    var _Foo_brand = /* @__PURE__ */ new WeakSet();
-    var _tag2 = /* @__PURE__ */ new WeakMap();
-    class Foo {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _Foo_brand);
-        _classPrivateFieldInitSpec(this, _tag2, function () {
-          return this;
+    "var _classPrivateFieldLooseBase2 = {
+      classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+    };
+    function _classPrivateFieldLooseBase(e, s) {
+      return _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+    }
+    function _classPrivateMethodCall(e, s, a) {
+      return _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s)[s].apply(e, a);
+    }
+    let Foo = (() => {
+      'use strict';
+      var _tag = '__private_Foo_tag';
+      var _tag2 = '__private_Foo_tag2';
+      const Foo = function Foo() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+        Object.defineProperty(this, _tag2, {
+          writable: true,
+          value: function () {
+            return this;
+          },
         });
-        const receiver = _assertClassBrand(_Foo_brand, this, _tag).bind(this)\`tagged template\`;
+        Object.defineProperty(this, _tag, {
+          value: function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            return this;
+          },
+        });
+        const receiver = _classPrivateFieldLooseBase(this, _tag)[_tag]\`tagged template\`;
         expect(receiver).toBe(this);
-        const receiver2 = _classPrivateFieldGet(_tag2, this).bind(this)\`tagged template\`;
+        const receiver2 = _classPrivateFieldLooseBase(this, _tag2)[_tag2]\`tagged template\`;
         expect(receiver2).toBe(this);
-      }
-    }
-    function _tag() {
-      return this;
-    }
+      };
+      Object.defineProperty(Foo, 'prototype', { writable: false });
+      return Foo;
+    })();
     new Foo();"
   `);
 });
@@ -63917,8 +64678,8 @@ test('private/tagged-template/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -63975,8 +64736,8 @@ test('private/update/exec.js [spec]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -64099,8 +64860,8 @@ test('private/update/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -65249,15 +66010,14 @@ test('public-loose/static-super/exec.js [loose]', async () => {
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "var _superPropGet = require('@babel/runtime/helpers/superPropGet');
-    var _B;
+    "var _B;
     class A {}
     A.prop = 1;
     class B extends A {}
     _B = B;
     B.prop = 2;
-    B.propA = _superPropGet(_B, 'prop', _B);
-    B.getPropA = () => _superPropGet(_B, 'prop', _B);
+    B.propA = Object.getPrototypeOf(_B).prop;
+    B.getPropA = () => Object.getPrototypeOf(_B).prop;
     const { prop, propA, getPropA } = B;
     expect(prop).toBe(2);
     expect(propA).toBe(1);
@@ -65301,15 +66061,14 @@ test('public-loose/static-super/input.js [loose]', async () => {
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "var _superPropGet = require('@babel/runtime/helpers/superPropGet');
-    var _B;
+    "var _B;
     class A {}
     A.prop = 1;
     class B extends A {}
     _B = B;
     B.prop = 2;
-    B.propA = _superPropGet(_B, 'prop', _B);
-    B.getPropA = () => _superPropGet(_B, 'prop', _B);"
+    B.propA = Object.getPrototypeOf(_B).prop;
+    B.getPropA = () => Object.getPrototypeOf(_B).prop;"
   `);
 });
 
@@ -66049,7 +66808,7 @@ test('public/computed-toPrimitive/exec.js [spec]', async () => {
     'const foo = { [Symbol.toPrimitive]: () => "foo" };\n\nexpect((class { static [foo] = 0 }).foo).toBe(0);\nexpect((class { static [foo](){ return 0; } }).foo()).toBe(0);\nexpect((class { static get [foo](){ return 0; } }).foo).toBe(0);\nexpect((class { static set [foo](v){ return v; } }).foo = 0).toBe(0);\n\nexpect((new class { [foo] = 0 }).foo).toBe(0);\n\nconst arrayLike = { [Symbol.toPrimitive] : () => [] };\n\nexpect(() => class { static [arrayLike] = 0 }).toThrow("@@toPrimitive must return a primitive value.");\nexpect(() => class { static [arrayLike](){ return 0; } }).toThrow("@@toPrimitive must return a primitive value.");\nexpect(() => class { static get [arrayLike](){ return 0; } }).toThrow("@@toPrimitive must return a primitive value.");\nexpect(() => class { static set [arrayLike](v){ return v; } }).toThrow("@@toPrimitive must return a primitive value.");\n\nexpect(() => new class { [arrayLike] = 0 }).toThrow("@@toPrimitive must return a primitive value.");\n';
   expect(
     await transformOutcome(source, 'exec.js', {
-      transforms: { classProperties: { loose: false } },
+      transforms: { classProperties: { loose: false }, legacyDecorators: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -66130,7 +66889,7 @@ test('public/computed-toPrimitive/exec.js [loose]', async () => {
     'const foo = { [Symbol.toPrimitive]: () => "foo" };\n\nexpect((class { static [foo] = 0 }).foo).toBe(0);\nexpect((class { static [foo](){ return 0; } }).foo()).toBe(0);\nexpect((class { static get [foo](){ return 0; } }).foo).toBe(0);\nexpect((class { static set [foo](v){ return v; } }).foo = 0).toBe(0);\n\nexpect((new class { [foo] = 0 }).foo).toBe(0);\n\nconst arrayLike = { [Symbol.toPrimitive] : () => [] };\n\nexpect(() => class { static [arrayLike] = 0 }).toThrow("@@toPrimitive must return a primitive value.");\nexpect(() => class { static [arrayLike](){ return 0; } }).toThrow("@@toPrimitive must return a primitive value.");\nexpect(() => class { static get [arrayLike](){ return 0; } }).toThrow("@@toPrimitive must return a primitive value.");\nexpect(() => class { static set [arrayLike](v){ return v; } }).toThrow("@@toPrimitive must return a primitive value.");\n\nexpect(() => new class { [arrayLike] = 0 }).toThrow("@@toPrimitive must return a primitive value.");\n';
   expect(
     await transformOutcome(source, 'exec.js', {
-      transforms: { classProperties: { loose: true } },
+      transforms: { classProperties: { loose: true }, legacyDecorators: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -66210,7 +66969,7 @@ test('public/computed-toPrimitive/input.js [spec]', async () => {
     'const foo = { [Symbol.toPrimitive]: () => "foo" };\n\nexpect((class { static [foo] = 0 }).foo).toBe(0);\nexpect((class { static [foo](){ return 0; } }).foo()).toBe(0);\nexpect((class { static get [foo](){ return 0; } }).foo).toBe(0);\nexpect((class { static set [foo](v){ return v; } }).foo = 0).toBe(0);\n\nexpect((new class { [foo] = 0 }).foo).toBe(0);\n\nconst arrayLike = { [Symbol.toPrimitive] : () => [] };\n\nexpect(() => class { static [arrayLike] = 0 }).toThrow("@@toPrimitive must return a primitive value.");\nexpect(() => class { static [arrayLike](){ return 0; } }).toThrow("@@toPrimitive must return a primitive value.");\nexpect(() => class { static get [arrayLike](){ return 0; } }).toThrow("@@toPrimitive must return a primitive value.");\nexpect(() => class { static set [arrayLike](v){ return v; } }).toThrow("@@toPrimitive must return a primitive value.");\n\nexpect(() => new class { [arrayLike] = 0 }).toThrow("@@toPrimitive must return a primitive value.");\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { classProperties: { loose: false } },
+      transforms: { classProperties: { loose: false }, legacyDecorators: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -66291,7 +67050,7 @@ test('public/computed-toPrimitive/input.js [loose]', async () => {
     'const foo = { [Symbol.toPrimitive]: () => "foo" };\n\nexpect((class { static [foo] = 0 }).foo).toBe(0);\nexpect((class { static [foo](){ return 0; } }).foo()).toBe(0);\nexpect((class { static get [foo](){ return 0; } }).foo).toBe(0);\nexpect((class { static set [foo](v){ return v; } }).foo = 0).toBe(0);\n\nexpect((new class { [foo] = 0 }).foo).toBe(0);\n\nconst arrayLike = { [Symbol.toPrimitive] : () => [] };\n\nexpect(() => class { static [arrayLike] = 0 }).toThrow("@@toPrimitive must return a primitive value.");\nexpect(() => class { static [arrayLike](){ return 0; } }).toThrow("@@toPrimitive must return a primitive value.");\nexpect(() => class { static get [arrayLike](){ return 0; } }).toThrow("@@toPrimitive must return a primitive value.");\nexpect(() => class { static set [arrayLike](v){ return v; } }).toThrow("@@toPrimitive must return a primitive value.");\n\nexpect(() => new class { [arrayLike] = 0 }).toThrow("@@toPrimitive must return a primitive value.");\n';
   expect(
     await transformOutcome(source, 'input.js', {
-      transforms: { classProperties: { loose: true } },
+      transforms: { classProperties: { loose: true }, legacyDecorators: true },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
@@ -66657,8 +67416,7 @@ test('public/delete-super-property/exec.js [loose]', async () => {
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "var _superPropGet = require('@babel/runtime/helpers/superPropGet');
-    expect(() => {
+    "expect(() => {
       new (class {
         constructor() {
           this.y = delete super.x;
@@ -66676,13 +67434,13 @@ test('public/delete-super-property/exec.js [loose]', async () => {
       var _X;
       class X1 {}
       _X = X1;
-      X1.y = delete _superPropGet(_X, 'x', _X);
+      X1.y = delete Object.getPrototypeOf(_X).x;
     }).toThrow(ReferenceError);
     expect(() => {
       var _X2;
       class X2 {}
       _X2 = X2;
-      X2.y = delete _superPropGet(_X2, 0, _X2);
+      X2.y = delete Object.getPrototypeOf(_X2)[0];
     }).toThrow(ReferenceError);"
   `);
 });
@@ -66727,8 +67485,7 @@ test('public/delete-super-property/input.js [loose]', async () => {
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "var _superPropGet = require('@babel/runtime/helpers/superPropGet');
-    var _X, _X2;
+    "var _X, _X2;
     new (class {
       constructor() {
         this.y = delete super.x;
@@ -66741,10 +67498,10 @@ test('public/delete-super-property/input.js [loose]', async () => {
     })();
     class X1 {}
     _X = X1;
-    X1.y = delete _superPropGet(_X, 'x', _X);
+    X1.y = delete Object.getPrototypeOf(_X).x;
     class X2 {}
     _X2 = X2;
-    X2.y = delete _superPropGet(_X2, 0, _X2);"
+    X2.y = delete Object.getPrototypeOf(_X2)[0];"
   `);
 });
 
@@ -67877,15 +68634,14 @@ test('public/static-super/exec.js [loose]', async () => {
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "var _superPropGet = require('@babel/runtime/helpers/superPropGet');
-    var _B;
+    "var _B;
     class A {}
     A.prop = 1;
     class B extends A {}
     _B = B;
     B.prop = 2;
-    B.propA = _superPropGet(_B, 'prop', _B);
-    B.getPropA = () => _superPropGet(_B, 'prop', _B);
+    B.propA = Object.getPrototypeOf(_B).prop;
+    B.getPropA = () => Object.getPrototypeOf(_B).prop;
     const { prop, propA, getPropA } = B;
     expect(prop).toBe(2);
     expect(propA).toBe(1);
@@ -67929,15 +68685,14 @@ test('public/static-super/input.js [loose]', async () => {
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "var _superPropGet = require('@babel/runtime/helpers/superPropGet');
-    var _B;
+    "var _B;
     class A {}
     A.prop = 1;
     class B extends A {}
     _B = B;
     B.prop = 2;
-    B.propA = _superPropGet(_B, 'prop', _B);
-    B.getPropA = () => _superPropGet(_B, 'prop', _B);"
+    B.propA = Object.getPrototypeOf(_B).prop;
+    B.getPropA = () => Object.getPrototypeOf(_B).prop;"
   `);
 });
 
@@ -68816,8 +69571,7 @@ test('regression/6154/input.js [loose]', async () => {
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "var _superPropGet = require('@babel/runtime/helpers/superPropGet');
-    class Test {
+    "class Test {
       constructor() {
         var _Other;
         class Other extends Test {
@@ -68827,7 +69581,7 @@ test('regression/6154/input.js [loose]', async () => {
           }
         }
         _Other = Other;
-        Other.a = () => _superPropGet(_Other, 'test', _Other);
+        Other.a = () => Object.getPrototypeOf(_Other).test;
       }
     }"
   `);
@@ -69246,8 +70000,8 @@ test('regression/8882/exec.js [spec]', async () => {
     await transformOutcome(source, 'exec.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -69342,8 +70096,8 @@ test('regression/8882/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -69612,32 +70366,64 @@ test('source-maps/private-get/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
-    var _classPrivateFieldGet = require('@babel/runtime/helpers/classPrivateFieldGet2');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _field = /* @__PURE__ */ new WeakMap();
-    var _A_brand = /* @__PURE__ */ new WeakSet();
-    class A {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _A_brand);
-        _classPrivateFieldInitSpec(this, _field, void 0);
-      }
-      method() {
-        _classPrivateFieldGet(_field, this);
-        _get_getter.call(_assertClassBrand(_A_brand, this));
-        _assertClassBrand(_A_brand, this, _method);
-        inExpr(_classPrivateFieldGet(_field, this));
-      }
+    "var _classPrivateFieldLooseBase2 = {
+      classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+    };
+    function _classPrivateFieldLooseBase(e, s) {
+      return _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
     }
-    function _get_getter() {}
-    function _method() {}"
+    function _classPrivateMethodCall(e, s, a) {
+      return _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s)[s].apply(e, a);
+    }
+    let A = (() => {
+      'use strict';
+      var _field = '__private_A_field';
+      var _getter = '__private_A_getter';
+      var _method = '__private_A_method';
+      const A = function A() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+        Object.defineProperty(this, _field, {
+          writable: true,
+          value: void 0,
+        });
+        Object.defineProperty(this, _method, {
+          value: function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          },
+        });
+        Object.defineProperty(this, _getter, {
+          get: function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          },
+        });
+      };
+      Object.defineProperty(A.prototype, 'method', {
+        value: Object.defineProperty(
+          function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            _classPrivateFieldLooseBase(this, _field)[_field];
+            _classPrivateFieldLooseBase(this, _getter)[_getter];
+            _classPrivateFieldLooseBase(this, _method)[_method];
+            inExpr(_classPrivateFieldLooseBase(this, _field)[_field]);
+          },
+          'name',
+          {
+            value: 'method',
+            configurable: true,
+          },
+        ),
+        writable: true,
+        configurable: true,
+      });
+      Object.defineProperty(A, 'prototype', { writable: false });
+      return A;
+    })();"
   `);
 });
 
@@ -69716,31 +70502,57 @@ test('source-maps/private-set/input.js [spec]', async () => {
     await transformOutcome(source, 'input.js', {
       transforms: {
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "var _classPrivateMethodInitSpec = require('@babel/runtime/helpers/classPrivateMethodInitSpec');
-    var _classPrivateFieldInitSpec = require('@babel/runtime/helpers/classPrivateFieldInitSpec');
-    var _classPrivateFieldSet = require('@babel/runtime/helpers/classPrivateFieldSet2');
-    var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _toSetter = require('@babel/runtime/helpers/toSetter');
-    var _field = /* @__PURE__ */ new WeakMap();
-    var _A_brand = /* @__PURE__ */ new WeakSet();
-    class A {
-      constructor() {
-        _classPrivateMethodInitSpec(this, _A_brand);
-        _classPrivateFieldInitSpec(this, _field, void 0);
-      }
-      method() {
-        _classPrivateFieldSet(_field, this, 42);
-        _toSetter(_set_setter.bind(_assertClassBrand(_A_brand, this)))._ = 43;
-        inExpr(_classPrivateFieldSet(_field, this, 5));
-      }
+    "var _classPrivateFieldLooseBase2 = {
+      classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+    };
+    function _classPrivateFieldLooseBase(e, s) {
+      return _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
     }
-    function _set_setter(value) {}"
+    function _classPrivateMethodCall(e, s, a) {
+      return _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s)[s].apply(e, a);
+    }
+    let A = (() => {
+      'use strict';
+      var _field = '__private_A_field';
+      var _setter = '__private_A_setter';
+      const A = function A() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+        Object.defineProperty(this, _field, {
+          writable: true,
+          value: void 0,
+        });
+        Object.defineProperty(this, _setter, {
+          set: function (value) {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          },
+        });
+      };
+      Object.defineProperty(A.prototype, 'method', {
+        value: Object.defineProperty(
+          function () {
+            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+            _classPrivateFieldLooseBase(this, _field)[_field] = 42;
+            _classPrivateFieldLooseBase(this, _setter)[_setter] = 43;
+            inExpr((_classPrivateFieldLooseBase(this, _field)[_field] = 5));
+          },
+          'name',
+          {
+            value: 'method',
+            configurable: true,
+          },
+        ),
+        writable: true,
+        configurable: true,
+      });
+      Object.defineProperty(A, 'prototype', { writable: false });
+      return A;
+    })();"
   `);
 });
 

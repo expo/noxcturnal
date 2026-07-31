@@ -11,8 +11,8 @@ test('class-static-block/before-static-fields/input.js', async () => {
       transforms: {
         classStaticBlock: true,
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -221,8 +221,8 @@ test('class-static-block/multiple-static-initializers/exec.js', async () => {
       transforms: {
         classStaticBlock: true,
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -253,8 +253,8 @@ test('class-static-block/multiple-static-initializers/input.js', async () => {
       transforms: {
         classStaticBlock: true,
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -285,8 +285,8 @@ test('class-static-block/name-conflict/exec.js', async () => {
       transforms: {
         classStaticBlock: true,
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -309,18 +309,39 @@ test('class-static-block/name-conflict/input.js', async () => {
       transforms: {
         classStaticBlock: true,
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _Foo;
-    class Foo {}
-    _Foo = Foo;
-    function _() {}
-    _Foo.foo = _assertClassBrand(_Foo, _Foo, _);
+    "var _classPrivateFieldLooseBase2 = {
+      classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+    };
+    function _classPrivateFieldLooseBase(e, s) {
+      return _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+    }
+    function _classPrivateMethodCall(e, s, a) {
+      return _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s)[s].apply(e, a);
+    }
+    let Foo = (() => {
+      'use strict';
+      var __ = '__private_Foo__';
+      const Foo = function Foo() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+      };
+      Object.defineProperty(Foo, 'prototype', { writable: false });
+      // static block can not be transformed as \`#_\` here
+      (function () {
+        this.foo = _classPrivateFieldLooseBase(this, __)[__];
+      }).call(Foo);
+      Object.defineProperty(Foo, __, {
+        value: function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        },
+      });
+      return Foo;
+    })();
     expect(Foo.foo).toBe(42);"
   `);
 });
@@ -416,8 +437,8 @@ test('class-static-block/private-elements-access/exec.js', async () => {
       transforms: {
         classStaticBlock: true,
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -696,8 +717,8 @@ test('integration-loose/multiple-static-initializers/exec.js', async () => {
       transforms: {
         classStaticBlock: true,
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -728,8 +749,8 @@ test('integration-loose/multiple-static-initializers/input.js', async () => {
       transforms: {
         classStaticBlock: true,
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -757,8 +778,8 @@ test('integration-loose/name-conflict/exec.js', async () => {
       transforms: {
         classStaticBlock: true,
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -781,8 +802,8 @@ test('integration-loose/name-conflict/input.js', async () => {
       transforms: {
         classStaticBlock: true,
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -848,8 +869,8 @@ test('integration-loose/private-elements-access/exec.js', async () => {
       transforms: {
         classStaticBlock: true,
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -873,18 +894,30 @@ test('integration-loose/private-in/exec.js', async () => {
       transforms: {
         classStaticBlock: true,
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "var _checkInRHS = require('@babel/runtime/helpers/checkInRHS');
-    var _Foo;
-    class Foo {}
-    _Foo = Foo;
-    var _bar = { _: 21 };
-    _Foo.foo = _checkInRHS(_Foo) === _Foo;
+    "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+      _checkInRHS = _checkInRHS2.checkInRHS;
+    let Foo = (() => {
+      'use strict';
+      var _bar = '__private_Foo_bar';
+      const Foo = function Foo() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+      };
+      Object.defineProperty(Foo, 'prototype', { writable: false });
+      Object.defineProperty(Foo, _bar, {
+        writable: true,
+        value: 21,
+      });
+      (function () {
+        this.foo = Object.prototype.hasOwnProperty.call(_checkInRHS(this), _bar);
+      }).call(Foo);
+      return Foo;
+    })();
     expect(Foo.foo).toBe(true);"
   `);
 });
@@ -897,21 +930,40 @@ test('integration-loose/private-methods-access/exec.js', async () => {
       transforms: {
         classStaticBlock: true,
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _Foo;
-    let getFoo;
-    class Foo {}
-    _Foo = Foo;
-    function _foo() {
-      return 42;
+    "var _classPrivateFieldLooseBase2 = {
+      classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+    };
+    function _classPrivateFieldLooseBase(e, s) {
+      return _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
     }
-    getFoo = () => _assertClassBrand(_Foo, _Foo, _foo).call(_Foo);
+    function _classPrivateMethodCall(e, s, a) {
+      return _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s)[s].apply(e, a);
+    }
+    let getFoo;
+    let Foo = (() => {
+      'use strict';
+      var _foo = '__private_Foo_foo';
+      const Foo = function Foo() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+      };
+      Object.defineProperty(Foo, 'prototype', { writable: false });
+      (function () {
+        getFoo = () => _classPrivateMethodCall(this, _foo, []);
+      }).call(Foo);
+      Object.defineProperty(Foo, _foo, {
+        value: function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          return 42;
+        },
+      });
+      return Foo;
+    })();
     expect(getFoo()).toBe(42);"
   `);
 });
@@ -1106,8 +1158,8 @@ test('integration/multiple-static-initializers/exec.js', async () => {
       transforms: {
         classStaticBlock: true,
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -1138,8 +1190,8 @@ test('integration/multiple-static-initializers/input.js', async () => {
       transforms: {
         classStaticBlock: true,
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -1167,8 +1219,8 @@ test('integration/name-conflict/exec.js', async () => {
       transforms: {
         classStaticBlock: true,
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -1191,8 +1243,8 @@ test('integration/name-conflict/input.js', async () => {
       transforms: {
         classStaticBlock: true,
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -1298,8 +1350,8 @@ test('integration/private-elements-access/exec.js', async () => {
       transforms: {
         classStaticBlock: true,
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
@@ -1323,18 +1375,30 @@ test('integration/private-in/exec.js', async () => {
       transforms: {
         classStaticBlock: true,
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "var _checkInRHS = require('@babel/runtime/helpers/checkInRHS');
-    var _Foo;
-    class Foo {}
-    _Foo = Foo;
-    var _bar = { _: 21 };
-    _Foo.foo = _checkInRHS(_Foo) === _Foo;
+    "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+      _checkInRHS = _checkInRHS2.checkInRHS;
+    let Foo = (() => {
+      'use strict';
+      var _bar = '__private_Foo_bar';
+      const Foo = function Foo() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+      };
+      Object.defineProperty(Foo, 'prototype', { writable: false });
+      Object.defineProperty(Foo, _bar, {
+        writable: true,
+        value: 21,
+      });
+      (function () {
+        this.foo = Object.prototype.hasOwnProperty.call(_checkInRHS(this), _bar);
+      }).call(Foo);
+      return Foo;
+    })();
     expect(Foo.foo).toBe(true);"
   `);
 });
@@ -1347,21 +1411,40 @@ test('integration/private-methods-access/exec.js', async () => {
       transforms: {
         classStaticBlock: true,
         classProperties: { loose: false },
-        privateMethods: { loose: false },
-        privatePropertyInObject: { loose: false },
+        privateMethods: { loose: true },
+        privatePropertyInObject: { loose: true },
       },
       helpers: { mode: 'runtime', moduleName: '@babel/runtime', version: '7.29.7' },
     }),
   ).toMatchInlineSnapshot(`
-    "var _assertClassBrand = require('@babel/runtime/helpers/assertClassBrand');
-    var _Foo;
-    let getFoo;
-    class Foo {}
-    _Foo = Foo;
-    function _foo() {
-      return 42;
+    "var _classPrivateFieldLooseBase2 = {
+      classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
+    };
+    function _classPrivateFieldLooseBase(e, s) {
+      return _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
     }
-    getFoo = () => _assertClassBrand(_Foo, _Foo, _foo).call(_Foo);
+    function _classPrivateMethodCall(e, s, a) {
+      return _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s)[s].apply(e, a);
+    }
+    let getFoo;
+    let Foo = (() => {
+      'use strict';
+      var _foo = '__private_Foo_foo';
+      const Foo = function Foo() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+      };
+      Object.defineProperty(Foo, 'prototype', { writable: false });
+      (function () {
+        getFoo = () => _classPrivateMethodCall(this, _foo, []);
+      }).call(Foo);
+      Object.defineProperty(Foo, _foo, {
+        value: function () {
+          if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+          return 42;
+        },
+      });
+      return Foo;
+    })();
     expect(getFoo()).toBe(42);"
   `);
 });

@@ -9,6 +9,10 @@ const supported = [
   ['string alternatives', String.raw`/[x\q{a|long|mid}]/v`],
   ['chained intersection', String.raw`/[a-z&&[^aeiou]&&[^x-z]]/v`],
   ['chained subtraction', String.raw`/[a-z--[aeiou]--[x-z]]/v`],
+  ['string intersection', String.raw`/[\q{ab|cd}&&\q{cd|ef}]/v`],
+  ['string subtraction', String.raw`/[\q{ab|cd}--\q{cd}]/v`],
+  ['string-property intersection', String.raw`/[\p{Basic_Emoji}&&\q{a|😀}]/v`],
+  ['string-property subtraction', String.raw`/[\p{Basic_Emoji}--\q{😀}]/v`],
 ] as const;
 
 for (const [name, regexp] of supported) {

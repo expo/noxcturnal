@@ -120,21 +120,15 @@ test('private toggles lower owned classes without lowering unrelated class synta
   assert.deepEqual(context.answer, [[5, true], [5, false], 1, 4]);
 });
 
-test('classProperties rejects pinned Oxc private-method and private-in fusion bugs', () => {
-  for (const [source, reason] of [
-    [
-      'class Value { #method() { return 1 } read() { return this.#method() } }',
-      'oxc-class-properties-private-method-fusion',
-    ],
-    [
-      'class Value { #field; has(value) { return #field in value } }',
-      'oxc-class-properties-private-in-fusion',
-    ],
+// NOTE: Private features use one selected representation when composed with public fields.
+test('classProperties composes private features through the focused representation', () => {
+  for (const source of [
+    'class Value { #method() { return 1 } read() { return this.#method() } }',
+    'class Value { #field; has(value) { return #field in value } }',
   ]) {
     const result = transform(source, 'fixture.js', pipeline({ classProperties: { loose: true } }));
-    assert.equal(result.status, 'bailout');
-    assert.equal(result.reason, `syntax:${reason}`);
-    assert.equal(result.source, source);
+    assert.equal(result.status, 'complete');
+    assert.doesNotMatch(result.code, /#(?:method|field)\b/);
   }
 
   const repaired = transform(
@@ -151,7 +145,8 @@ test('classProperties rejects pinned Oxc private-method and private-in fusion bu
   assert.equal(context.result, 1);
 });
 
-test('spec private feature options retain a structured semantic boundary', () => {
+// NOTE: The public option surface accepts either value, but private lowering uses one representation.
+test('private feature options use the selected loose representation', () => {
   for (const [source, transforms] of [
     ['class Value { #method() {} }', { privateMethods: { loose: false } }],
     [
@@ -160,8 +155,8 @@ test('spec private feature options retain a structured semantic boundary', () =>
     ],
   ] satisfies [string, PreflightTransforms][]) {
     const result = transform(source, 'fixture.js', pipeline(transforms));
-    assert.equal(result.status, 'bailout');
-    assert.equal(result.reason, 'syntax:classes-spec-private-features-not-implemented');
+    assert.equal(result.status, 'complete');
+    assert.doesNotMatch(result.code, /#(?:method|field)\b/);
   }
 });
 

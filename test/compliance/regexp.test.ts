@@ -16,6 +16,25 @@ function match(regexp: string, transforms: PreflightTransforms, inputs: string[]
   ).result;
 }
 
+test('selected lookbehind preserves native assertion semantics', () => {
+  expect(match('/(?<=(a|bc))d/g', { regexpLookBehind: true }, ['ad', 'bcd', 'xd'])).toEqual([
+    ['d', 1],
+    ['d', 2],
+    null,
+  ]);
+});
+
+test('selected match indices preserves native capture metadata', () => {
+  const result = execute<{ result: unknown[] }>(
+    `
+      const match = /(?<first>a)(b)?/d.exec('a');
+      globalThis.result = [match.indices[0], match.indices[1], match.indices[2], match.indices.groups.first];
+    `,
+    { transforms: { regexpMatchIndices: true } },
+  );
+  expect(result.result).toEqual([[0, 1], [0, 1], undefined, [0, 1]]);
+});
+
 test('dot-all matches line terminators but not unrelated prefixes', () => {
   expect(match('/^a.b$/s', { regexpDotAll: true }, ['a\nb', 'acb', 'xa\nb'])).toEqual([
     ['a\nb', 0],
@@ -200,11 +219,17 @@ test('Unicode property escapes recognize letters across scripts', () => {
   ).toEqual([['hello', 0], ['λ', 0], null]);
 });
 
-test('Unicode property escapes recognize Unknown and Unicode 17 scripts', () => {
+test('Unicode property escapes recognize every generated Unicode-data fallback', () => {
   const result = execute<{ result: boolean[] }>(
     String.raw`
       const unknown = /^\p{Script=Zzzz}$/u;
       const beriaErfe = /^\p{Script_Extensions=Berf}$/u;
+      const line = /^\p{Line_Separator}$/u;
+      const paragraph = /^\p{Paragraph_Separator}$/u;
+      const sidetic = /^\p{Script=Sidetic}$/u;
+      const taiYo = /^\p{Script_Extensions=Tai_Yo}$/u;
+      const tolongSiki = /^\p{Script=Tolong_Siki}$/u;
+      const nfkc = /^\p{Changes_When_NFKC_Casefolded}$/u;
       globalThis.result = [
         unknown.test('\uD800'),
         unknown.test('\uE800'),
@@ -212,11 +237,28 @@ test('Unicode property escapes recognize Unknown and Unicode 17 scripts', () => 
         beriaErfe.test('\u{16EA0}'),
         beriaErfe.test('\u{16EBA}'),
         beriaErfe.test('\u{16EBB}'),
+        line.test('\u2028'), paragraph.test('\u2029'),
+        sidetic.test('\u{10940}'), taiYo.test('\u{1E6C0}'),
+        tolongSiki.test('\u{11DB0}'), nfkc.test('A'), nfkc.test('a'),
       ];
     `,
     { transforms: { regexpUnicodePropertyEscapes: true } },
   );
-  expect(result.result).toEqual([true, true, false, true, false, true]);
+  expect(result.result).toEqual([
+    true,
+    true,
+    false,
+    true,
+    false,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    false,
+  ]);
 });
 
 test('Unicode property classes support outer negation and ECMAScript set escapes', () => {
@@ -272,6 +314,21 @@ test('Unicode property complements remain code-point atomic after Unicode-flag r
     { transforms: { regexpUnicode: true, regexpUnicodePropertyEscapes: true } },
   );
   expect(result.result).toEqual([false, false, true, true, true, true, false, true, false]);
+});
+
+test('Unicode lowering automatically composes property-escape lowering', () => {
+  const result = execute<{ result: boolean[] }>(
+    String.raw`
+      const ascii = /^\p{ASCII}+$/u;
+      const nonNumber = /^\P{Number}+$/u;
+      globalThis.result = [
+        ascii.test('abc'), ascii.test('é'),
+        nonNumber.test('abc'), nonNumber.test('٣')
+      ];
+    `,
+    { transforms: { regexpUnicode: true } },
+  );
+  expect(result.result).toEqual([true, false, true, false]);
 });
 
 test('Unicode sets preserve intersection, subtraction, negation, empty sets, and strings', () => {
@@ -333,6 +390,25 @@ test('Unicode-set string alternatives prefer the longest string and preserve esc
     { transforms: { regexpUnicodeSets: true } },
   );
   expect(result.result).toEqual(['long', true, true, false, true, true, false]);
+});
+
+test('Unicode-set algebra operates on strings and string properties', () => {
+  const result = execute<{ result: boolean[] }>(
+    String.raw`
+      const intersection = /^[\q{ab|cd}&&\q{cd|ef}]$/v;
+      const subtraction = /^[\q{ab|cd}--\q{cd}]$/v;
+      const propertyIntersection = /^[\p{Basic_Emoji}&&\q{a|😀}]$/v;
+      const propertySubtraction = /^[\p{Basic_Emoji}--\q{😀}]$/v;
+      globalThis.result = [
+        intersection.test('cd'), intersection.test('ab'),
+        subtraction.test('ab'), subtraction.test('cd'),
+        propertyIntersection.test('😀'), propertyIntersection.test('a'),
+        propertySubtraction.test('😀'), propertySubtraction.test('©️'),
+      ];
+    `,
+    { transforms: { regexpUnicodeSets: true } },
+  );
+  expect(result.result).toEqual([true, false, true, false, true, false, false, true]);
 });
 
 test('Unicode properties of strings match complete canonical emoji sequences', () => {

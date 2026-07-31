@@ -10,6 +10,16 @@ test('lowers Unicode regular expressions', async () => {
   ).toMatchInlineSnapshot(`"export const matcher = /(?:\\uD83D\\uDE00)/;"`);
 });
 
+test('lowers Unicode property escapes without a separately selected property transform', async () => {
+  const output = await transformSource(
+    String.raw`export const ascii = /^\p{ASCII}+$/u; export const nonNumber = /^\P{Number}+$/u;`,
+    'input.js',
+    { transforms: { regexpUnicode: true } },
+  );
+  expect(output).not.toMatch(/\\[pP]\{|\/[dgimsuvy]*u[dgimsuvy]*/u);
+  expect(output).toContain('\\u0000-\\u007F');
+});
+
 test('lowers mixed, ranged, and negated astral ignore-case classes', async () => {
   const output = await transformSource(
     String.raw`export const mixed = /[A\u{10400}]/iu; export const ranged = /[\u{10400}-\u{10401}]/iu; export const negated = /[^\u{10400}]/iu;`,

@@ -47,6 +47,28 @@ test('aligns static field this and super evaluation with Babel in spec mode', as
   await expect(alignStaticFieldSuper(false)).resolves.toEqual([21, true, 21]);
 });
 
-test.fails('documents Oxc loose static-super getter receiver divergence from Babel', async () => {
-  await alignStaticFieldSuper(true);
+test('aligns static field this and super evaluation in loose mode', async () => {
+  await expect(alignStaticFieldSuper(true)).resolves.toEqual([undefined, true, undefined]);
+});
+
+test('aligns loose computed super calls with a complex heritage expression', async () => {
+  await expect(
+    alignBabelBehavior({
+      source: `let heritageCalls = 0;
+const key = 'read';
+class Base { static read() { return this.seed; } }
+class Child extends (heritageCalls++, Base) {
+  static seed = 34;
+  static value = super[key]();
+}
+globalThis.__result = [heritageCalls, Child.value];`,
+      filename: 'input.js',
+      plugins: [[classProperties, { loose: true }]],
+      noxcturnal: {
+        helpers: { mode: 'inline' },
+        transforms: { classProperties: { loose: true } },
+      },
+      output: { mustMatch: [], mustNotMatch: [] },
+    }),
+  ).resolves.toEqual([1, 34]);
 });

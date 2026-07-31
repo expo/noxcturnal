@@ -70,6 +70,8 @@ test('composes the native portion of the legacy Hermes language profile in one p
     function _classPrivateMethodCall(e, s, a) {
       return _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s)[s].apply(e, a);
     }
+    var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+      _checkInRHS = _checkInRHS2.checkInRHS;
     export var Reader = (() => {
       'use strict';
       var _value = \`__private_Reader_value\`;
@@ -81,7 +83,7 @@ test('composes the native portion of the legacy Hermes language profile in one p
         value: Object.defineProperty(
           function (input) {
             if (new.target) throw new TypeError(\`Class methods cannot be invoked with 'new'\`);
-            return Object.prototype.hasOwnProperty.call(input, _value);
+            return Object.prototype.hasOwnProperty.call(_checkInRHS(input), _value);
           },
           'name',
           { value: \`has\`, configurable: true },
@@ -94,9 +96,9 @@ test('composes the native portion of the legacy Hermes language profile in one p
           _asyncToGenerator(function* () {
             var _ref = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : {},
               _obj = _objectDestructuringEmpty(_ref),
-              _value17 = _obj.value,
+              _value19 = _obj.value,
               value =
-                _value17 === void 0 ? _classPrivateFieldLooseBase(this, _value)[_value] : _value17;
+                _value19 === void 0 ? _classPrivateFieldLooseBase(this, _value)[_value] : _value19;
             return yield value;
           }),
           'name',

@@ -896,11 +896,7 @@ test('inline helper materialization gets the same TypeScript treatment', () => {
   );
 });
 
-test('a decorator is refused rather than dropped on the way through', () => {
-  // Neither the TypeScript pass nor the `classes` rewrite implements decorators,
-  // and both discard them in passing. Checked only after the rewrites, as it
-  // used to be, there is nothing left to find and the class ships undecorated —
-  // which is what `ActionSheetScreen.tsx` had been doing.
+test('decorators are applied before class and TypeScript lowering', () => {
   for (const source of [
     '@wrap\nclass App { render() { return 1 } }',
     'class App { @bound method() { return 1 } }',
@@ -909,10 +905,14 @@ test('a decorator is refused rather than dropped on the way through', () => {
     const result = transform(
       `${source}\nglobalThis.answer = new App();`,
       'fixture.ts',
-      pipeline({ classes: true, classProperties: { loose: true } }),
+      pipeline({
+        legacyDecorators: true,
+        classes: true,
+        classProperties: { loose: true },
+      }),
     );
-    assert.equal(result.status, 'bailout');
-    assert.ok(result.status === 'bailout');
-    assert.equal(result.reason, 'syntax:decorators-not-supported');
+    assert.equal(result.status, 'complete');
+    assert.doesNotMatch(result.code, /@(?:wrap|bound|inject)/);
+    assert.match(result.code, /_decorate/);
   }
 });

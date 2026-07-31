@@ -30,6 +30,7 @@ interface NativePreflightOptionsInput {
   deadCodeElimination?: boolean;
   blockScoping?: boolean;
   classes?: boolean;
+  legacyDecorators?: boolean;
   destructuring?: boolean;
   destructuringUseBuiltIns?: boolean;
   parameters?: boolean;
@@ -339,6 +340,7 @@ export function nativePreflightOptions(plan: PreflightPlan): NativePreflightOpti
     deadCodeElimination: plan.optimize?.deadCodeElimination,
     blockScoping: plan.transforms?.blockScoping,
     classes: plan.transforms?.classes,
+    legacyDecorators: plan.transforms?.legacyDecorators,
     destructuring: plan.transforms?.destructuring != null,
     destructuringUseBuiltIns: plan.transforms?.destructuring?.useBuiltIns,
     parameters: plan.transforms?.parameters,
