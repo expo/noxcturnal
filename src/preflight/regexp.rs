@@ -19,7 +19,10 @@ use crate::generated::inline_helpers::{
     INLINE_REGEXP_NAMED_CAPTURE_HELPER_RUNTIME_BINDINGS,
     INLINE_REGEXP_NAMED_CAPTURE_HELPER_RUNTIME_PRETTY,
 };
-use crate::generated::regexp_unicode_properties::{SCRIPT_EXTENSIONS_BERIA_ERFE, SCRIPT_UNKNOWN};
+use crate::generated::regexp_unicode_properties::{
+    SCRIPT_EXTENSIONS_BERIA_ERFE, SCRIPT_UNKNOWN, unicode_ignore_case_bmp_atom,
+    unicode_ignore_case_bmp_class_addition, unicode_ignore_case_bmp_class_body,
+};
 use crate::preflight::helpers::CustomHelperRequests;
 
 pub(super) struct Options {
@@ -119,8 +122,8 @@ impl<'a> RegexpLowerer<'a> {
             changed = true;
         }
         if self.unicode && flags.contains('u') {
-            if flags.contains('i') && unicode_ignore_case_requires_expansion(&pattern) {
-                return Err("regexp-unicode-ignore-case-complex-not-implemented");
+            if flags.contains('i') {
+                pattern = expand_unicode_ignore_case_bmp(&pattern)?;
             }
             pattern = lower_unicode(&pattern, flags.contains('s'))?;
             flags.retain(|flag| flag != 'u');
@@ -219,13 +222,184 @@ impl<'a> RegexpLowerer<'a> {
     }
 }
 
-fn unicode_ignore_case_requires_expansion(pattern: &str) -> bool {
-    pattern
-        .chars()
-        .any(|character| character as u32 > 0xFFFF || matches!(character, '\u{017F}' | '\u{212A}'))
-        || ["\\u017F", "\\u{17F}", "\\u{017F}", "\\u212A", "\\u{212A}"]
-            .iter()
-            .any(|escape| pattern.contains(escape))
+fn expand_unicode_ignore_case_bmp(pattern: &str) -> Result<String, &'static str> {
+    let pattern = expand_unicode_ignore_case_classes(pattern)?;
+    let pattern = pattern.as_str();
+    let bytes = pattern.as_bytes();
+    let mut output = String::with_capacity(pattern.len());
+    let mut index = 0usize;
+    let mut in_class = false;
+    while index < bytes.len() {
+        if bytes[index] == b'\\' {
+            let start = index;
+            let Some(escape) = bytes.get(index + 1).copied() else {
+                output.push('\\');
+                break;
+            };
+            let parsed = if escape == b'u' && bytes.get(index + 2) == Some(&b'{') {
+                let end = pattern[index + 3..]
+                    .find('}')
+                    .map(|offset| index + 3 + offset)
+                    .ok_or("regexp-unicode-ignore-case-complex-not-implemented")?;
+                let code_point = u32::from_str_radix(&pattern[index + 3..end], 16)
+                    .map_err(|_| "regexp-unicode-ignore-case-complex-not-implemented")?;
+                index = end + 1;
+                Some(code_point)
+            } else if escape == b'u' && index + 6 <= bytes.len() {
+                let code_point = u32::from_str_radix(&pattern[index + 2..index + 6], 16)
+                    .map_err(|_| "regexp-unicode-ignore-case-complex-not-implemented")?;
+                index += 6;
+                Some(code_point)
+            } else if escape == b'x' && index + 4 <= bytes.len() {
+                let code_point = u32::from_str_radix(&pattern[index + 2..index + 4], 16)
+                    .map_err(|_| "regexp-unicode-ignore-case-complex-not-implemented")?;
+                index += 4;
+                Some(code_point)
+            } else {
+                let escaped = pattern[index + 1..].chars().next().unwrap();
+                index += 1 + escaped.len_utf8();
+                None
+            };
+            let Some(code_point) = parsed else {
+                output.push_str(&pattern[start..index]);
+                continue;
+            };
+            if code_point > 0xFFFF {
+                return Err("regexp-unicode-ignore-case-complex-not-implemented");
+            }
+            if let Some(expansion) = if !in_class {
+                unicode_ignore_case_bmp_atom(code_point)
+            } else {
+                None
+            } {
+                output.push_str(expansion);
+            } else {
+                output.push_str(&pattern[start..index]);
+            }
+            continue;
+        }
+        let character = pattern[index..].chars().next().unwrap();
+        let end = index + character.len_utf8();
+        match character {
+            '[' => in_class = true,
+            ']' => in_class = false,
+            _ => {}
+        }
+        let code_point = character as u32;
+        if code_point > 0xFFFF {
+            return Err("regexp-unicode-ignore-case-complex-not-implemented");
+        }
+        if let Some(expansion) = if !in_class {
+            unicode_ignore_case_bmp_atom(code_point)
+        } else {
+            None
+        } {
+            output.push_str(expansion);
+        } else {
+            output.push(character);
+        }
+        index = end;
+    }
+    Ok(output)
+}
+
+fn expand_unicode_ignore_case_classes(pattern: &str) -> Result<String, &'static str> {
+    let bytes = pattern.as_bytes();
+    let mut output = String::with_capacity(pattern.len());
+    let mut index = 0usize;
+    while index < bytes.len() {
+        if bytes[index] == b'\\' {
+            let end = regexp_escape_end(pattern, index);
+            output.push_str(&pattern[index..end]);
+            index = end;
+            continue;
+        }
+        if bytes[index] != b'[' {
+            let character = pattern[index..].chars().next().unwrap();
+            output.push(character);
+            index += character.len_utf8();
+            continue;
+        }
+        let end = unicode_set_class_end(pattern, index)
+            .ok_or("regexp-unicode-ignore-case-complex-not-implemented")?;
+        let original_body = &pattern[index + 1..end];
+        let mut body = original_body;
+        if let Some(positive) = body.strip_prefix('^') {
+            body = positive;
+        }
+        let mut additions = String::new();
+        let mut canonical_singleton = None;
+        let mut cursor = 0usize;
+        while cursor < body.len() {
+            let (lower, next) = match class_atom(body, cursor) {
+                Ok(atom) => atom,
+                Err(_) => {
+                    cursor = if body.as_bytes()[cursor] == b'\\' {
+                        regexp_escape_end(body, cursor)
+                    } else {
+                        cursor + body[cursor..].chars().next().unwrap().len_utf8()
+                    };
+                    continue;
+                }
+            };
+            if body.as_bytes().get(next) == Some(&b'-') && next + 1 < body.len() {
+                let Ok((upper, after)) = class_atom(body, next + 1) else {
+                    cursor = next + 1;
+                    continue;
+                };
+                if let (ClassAtom::Single(lower), ClassAtom::Single(upper)) = (lower, upper)
+                    && lower <= upper
+                {
+                    for code_point in lower..=upper {
+                        if let Some(expansion) = unicode_ignore_case_bmp_class_addition(code_point)
+                        {
+                            additions.push_str(expansion);
+                        }
+                    }
+                }
+                cursor = after;
+            } else {
+                if let ClassAtom::Single(code_point) = lower {
+                    if next == body.len() {
+                        canonical_singleton = unicode_ignore_case_bmp_class_body(code_point);
+                    }
+                    if let Some(expansion) = unicode_ignore_case_bmp_class_addition(code_point) {
+                        additions.push_str(expansion);
+                    }
+                }
+                cursor = next;
+            }
+        }
+        output.push('[');
+        if let Some(canonical) = canonical_singleton {
+            if original_body.starts_with('^') {
+                output.push('^');
+            }
+            output.push_str(canonical);
+        } else {
+            output.push_str(original_body);
+            output.push_str(&sort_class_additions(&additions)?);
+        }
+        output.push(']');
+        index = end + 1;
+    }
+    Ok(output)
+}
+
+fn sort_class_additions(additions: &str) -> Result<String, &'static str> {
+    let mut atoms = Vec::new();
+    let mut index = 0usize;
+    while index < additions.len() {
+        let (atom, next) = class_atom(additions, index)?;
+        let ClassAtom::Single(code_point) = atom else {
+            return Err("regexp-unicode-ignore-case-complex-not-implemented");
+        };
+        atoms.push((code_point, &additions[index..next]));
+        index = next;
+    }
+    atoms.sort_unstable_by_key(|(code_point, _)| *code_point);
+    atoms.dedup_by_key(|(code_point, _)| *code_point);
+    Ok(atoms.into_iter().map(|(_, token)| token).collect())
 }
 
 pub(super) fn contains_named_group(pattern: &str) -> bool {

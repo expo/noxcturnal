@@ -177,6 +177,9 @@ importers:
       regenerate-unicode-properties:
         specifier: 10.2.2
         version: 10.2.2
+      regexpu-core:
+        specifier: 6.4.0
+        version: 6.4.0
       rimraf:
         specifier: ^6.1.3
         version: 6.1.3
