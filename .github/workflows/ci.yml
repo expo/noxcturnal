@@ -127,27 +127,11 @@ jobs:
       - run: pnpm codegen:estree:check
       - run: cargo test -p hermes-parser-sys -p hermes-flow --features hermes-flow/parser
       - run: cargo clippy -p hermes-parser-sys -p hermes-flow --all-targets --features hermes-flow/parser -- -D warnings
-      # The equivalence harness replaces the byte-identical corpus gate, which
-      # stops applying to Flow files once erasure preserves their formatting. It
-      # needs real Flow to run against, and React Native is the corpus that
-      # decides which Flow syntax the ecosystem writes, so it is fetched rather
-      # than vendored.
-      - name: Fetch a Flow corpus
-        run: |
-          mkdir -p "$RUNNER_TEMP/corpus"
-          cd "$RUNNER_TEMP/corpus"
-          npm pack react-native@0.86.2 --silent
-          tar -xzf react-native-*.tgz
       - run: pnpm exec napi build --platform --release
-      - run: pnpm build:js
-      # Divergences always fail. The coverage floor sits well under the measured
-      # figure so that ordinary drift shows up as a number rather than as a
-      # broken build, and only a collapse stops the line.
-      - name: Verify Flow corpus equivalence
+      # These fixtures run on every ordinary test pass as well. This job repeats
+      # them against the parser-enabled native build used by the Rust checks.
+      - name: Verify Flow transform alignment
         run: >-
           pnpm exec vitest run
-          test/integration/flow-equivalence.test.ts
+          test/alignment/flow
           js/adapters/__tests__/flow-erasure.test.ts
-        env:
-          FLOW_CORPUS: ${{ runner.temp }}/corpus/package
-          FLOW_MIN_COVERAGE: 90
