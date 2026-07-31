@@ -33,6 +33,22 @@ const bundles = {
     'objectWithoutPropertiesLoose',
     'toPropertyKey',
   ],
+  INLINE_OXC_CLASS_FEATURE_HELPERS: [
+    'classPrivateFieldInitSpec',
+    'classPrivateMethodInitSpec',
+    'classPrivateFieldGet2',
+    'classPrivateFieldSet2',
+    'assertClassBrand',
+    'toSetter',
+    'classPrivateFieldLooseKey',
+    'classPrivateFieldLooseBase',
+    'superPropGet',
+    'superPropSet',
+    'readOnlyError',
+    'writeOnlyError',
+    'checkInRHS',
+    'taggedTemplateLiteral',
+  ],
 };
 
 const dependencyPattern = /require\(["']\.\/([^"']+?)(?:\.js)?["']\)/g;

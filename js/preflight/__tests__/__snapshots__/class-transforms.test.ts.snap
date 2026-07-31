@@ -74,10 +74,10 @@ exports[`every public native transform has an explicit ownership fixture 4`] = `
 
 exports[`every public native transform has an explicit ownership fixture 5`] = `
 {
-  "code": "{var _iteratorNormalCompletion=true,_didIteratorError=false,_iteratorError;try{for(var _iterator=values[Symbol.iterator](),_step;!(_iteratorNormalCompletion=(_step=_iterator.next()).done);_iteratorNormalCompletion=true){var value=_step.value;consume(value)}}catch(_iteratorError2){_didIteratorError=true;_iteratorError=_iteratorError2}finally{try{if(!_iteratorNormalCompletion&&_iterator.return!=null)_iterator.return()}finally{if(_didIteratorError)throw _iteratorError}}}",
+  "code": "{var _iteratorNormalCompletion=true,_didIteratorError=false,_iteratorError,_iteratorReturnMethod,_iteratorReturn;try{for(var _iterator=values[Symbol.iterator](),_iteratorNext=_iterator.next,_step;!(_iteratorNormalCompletion=(_step=_iteratorNext.call(_iterator)).done);_iteratorNormalCompletion=true){var value=_step.value;consume(value)}}catch(_iteratorError2){_didIteratorError=true;_iteratorError=_iteratorError2}finally{try{if(!_iteratorNormalCompletion&&(_iteratorReturnMethod=_iterator.return)!=null){_iteratorReturn=_iteratorReturnMethod.call(_iterator);if(Object(_iteratorReturn)!==_iteratorReturn)throw new TypeError(\`Iterator result is not an object\`)}}finally{if(_didIteratorError)throw _iteratorError}}}",
   "helpers": [],
   "map": {
-    "mappings": "AAAA,iGAAkB,OAAlBA,gBAAC,CAAD,4DAAC,CAADA,sCAAK,IAAI,MAATA,YAA0B,QAAQ,KAAK,CAAvC,uNAAwC;",
+    "mappings": "AAAA,uIAAkB,OAAlBA,gBAAC,CAAD,sGAAC,CAADA,sCAAK,IAAI,MAATA,YAA0B,QAAQ,KAAK,CAAvC,yXAAwC;",
     "names": [
       "f",
     ],
@@ -454,13 +454,16 @@ exports[`every public native transform has an explicit ownership fixture 26`] = 
 
 exports[`every public native transform has an explicit ownership fixture 27`] = `
 {
-  "code": undefined,
-  "helpers": undefined,
-  "map": undefined,
+  "code": "var value=/(?!)/u;",
+  "helpers": [],
+  "map": {
+    "mappings": "AAAA,IAAI,MAAQ;",
+    "names": [],
+  },
   "name": "regexpUnicodeSets",
   "option": true,
-  "reason": "syntax:regexp-unicode-sets-semantic-mismatch",
+  "reason": undefined,
   "source": "var value = /[a&&b]/v;",
-  "status": "bailout",
+  "status": "complete",
 }
 `;

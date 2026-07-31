@@ -85,6 +85,8 @@ export interface PreflightPlan {
   jsx?: PreflightJsxMode;
   /** Emit pure annotations for generated JSX calls. Defaults to false for development modes. */
   jsxPure?: boolean;
+  /** Reject JSX namespace tags and attributes. Matches Babel's default of true. */
+  jsxThrowIfNamespace?: boolean;
   jsxImportSource?: string;
   jsxPragma?: string;
   jsxPragmaFrag?: string;

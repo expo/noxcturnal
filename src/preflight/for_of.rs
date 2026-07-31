@@ -19,7 +19,10 @@ pub(super) struct Plan {
 
 struct ForOfNames {
     iterator: String,
+    next_method: String,
     step: String,
+    return_method: String,
+    return_result: String,
     normal: String,
     failed: String,
     error: String,
@@ -67,7 +70,10 @@ pub(super) fn prepare(semantic: &Semantic<'_>) -> Plan {
                 .or_default()
                 .push(ForOfNames {
                     iterator: reserve("_iterator", &mut reserved),
+                    next_method: reserve("_iteratorNext", &mut reserved),
                     step: reserve("_step", &mut reserved),
+                    return_method: reserve("_iteratorReturnMethod", &mut reserved),
+                    return_result: reserve("_iteratorReturn", &mut reserved),
                     normal: reserve("_iteratorNormalCompletion", &mut reserved),
                     failed: reserve("_didIteratorError", &mut reserved),
                     error: reserve("_iteratorError", &mut reserved),
@@ -121,7 +127,10 @@ impl<'a> ForOfLowerer<'a> {
         }
         let ForOfNames {
             iterator,
+            next_method,
             step,
+            return_method,
+            return_result,
             normal,
             failed,
             error,
@@ -178,18 +187,33 @@ impl<'a> ForOfLowerer<'a> {
         };
         let iterator_init = self.call0(anchor, iterator_method);
         let iterator_declaration = self.declarator(anchor, &iterator, Some(iterator_init));
+        let next_method_declaration = self.declarator(
+            anchor,
+            &next_method,
+            Some(self.member(anchor, self.id(anchor, &iterator), "next")),
+        );
         let step_declaration = self.declarator(anchor, &step, None);
         #[expect(deprecated)]
         let init = self.ast.for_statement_init_variable_declaration(
             anchor,
             VariableDeclarationKind::Var,
-            self.vec([iterator_declaration, step_declaration]),
+            self.vec([
+                iterator_declaration,
+                next_method_declaration,
+                step_declaration,
+            ]),
             false,
         );
 
-        let next = self.call0(
+        let mut next_arguments = ArenaVec::new_in(&self.ast);
+        next_arguments.push(Argument::from(self.id(anchor, &iterator)));
+        #[expect(deprecated)]
+        let next = self.ast.expression_call(
             anchor,
-            self.member(anchor, self.id(anchor, &iterator), "next"),
+            self.member(anchor, self.id(anchor, &next_method), "call"),
+            None::<ArenaBox<'a, TSTypeParameterInstantiation<'a>>>,
+            next_arguments,
+            false,
         );
         let assign_step = self.assign_name(anchor, &step, next);
         let done = self.member(anchor, assign_step, "done");
@@ -262,7 +286,11 @@ impl<'a> ForOfLowerer<'a> {
         #[expect(deprecated)]
         let has_return = self.ast.expression_binary(
             anchor,
-            self.member(anchor, self.id(anchor, &iterator), "return"),
+            self.assign_name(
+                anchor,
+                &return_method,
+                self.member(anchor, self.id(anchor, &iterator), "return"),
+            ),
             BinaryOperator::Inequality,
             self.ast.expression_null_literal(anchor),
         );
@@ -270,17 +298,65 @@ impl<'a> ForOfLowerer<'a> {
         let should_return =
             self.ast
                 .expression_logical(anchor, not_normal, LogicalOperator::And, has_return);
-        let call_return = self.call0(
+        let mut return_arguments = ArenaVec::new_in(&self.ast);
+        return_arguments.push(Argument::from(self.id(anchor, &iterator)));
+        #[expect(deprecated)]
+        let call_return = self.ast.expression_call(
             anchor,
-            self.member(anchor, self.id(anchor, &iterator), "return"),
+            self.member(anchor, self.id(anchor, &return_method), "call"),
+            None::<ArenaBox<'a, TSTypeParameterInstantiation<'a>>>,
+            return_arguments,
+            false,
+        );
+        let assign_return = self.assign_name(anchor, &return_result, call_return);
+        let mut object_arguments = ArenaVec::new_in(&self.ast);
+        object_arguments.push(Argument::from(self.id(anchor, &return_result)));
+        #[expect(deprecated)]
+        let object_result = self.ast.expression_call(
+            anchor,
+            self.id(anchor, "Object"),
+            None::<ArenaBox<'a, TSTypeParameterInstantiation<'a>>>,
+            object_arguments,
+            false,
         );
         #[expect(deprecated)]
-        let return_if = self.ast.statement_if(
+        let invalid_return = self.ast.expression_binary(
             anchor,
-            should_return,
-            self.expression_statement(anchor, call_return),
+            object_result,
+            BinaryOperator::StrictInequality,
+            self.id(anchor, &return_result),
+        );
+        let mut error_arguments = ArenaVec::new_in(&self.ast);
+        error_arguments.push(Argument::from(self.ast.expression_string_literal(
+            anchor,
+            "Iterator result is not an object",
+            None,
+        )));
+        let invalid_return_error = self.ast.expression_new(
+            anchor,
+            self.id(anchor, "TypeError"),
+            None::<ArenaBox<'a, TSTypeParameterInstantiation<'a>>>,
+            error_arguments,
+        );
+        #[expect(deprecated)]
+        let validate_return = self.ast.statement_if(
+            anchor,
+            invalid_return,
+            self.ast.statement_throw(anchor, invalid_return_error),
             None,
         );
+        #[expect(deprecated)]
+        let return_body = self.ast.statement_block(
+            anchor,
+            self.vec([
+                self.expression_statement(anchor, assign_return),
+                validate_return,
+            ]),
+        );
+        #[expect(deprecated)]
+        let return_if = self
+            .ast
+            .statement_if(anchor, should_return, return_body, None);
         let inner_try_block = self
             .ast
             .alloc_block_statement(anchor, self.vec([return_if]));
@@ -319,6 +395,8 @@ impl<'a> ForOfLowerer<'a> {
                 Some(self.ast.expression_boolean_literal(anchor, false)),
             ),
             self.declarator(anchor, &error, None),
+            self.declarator(anchor, &return_method, None),
+            self.declarator(anchor, &return_result, None),
         ]);
         let variables = Statement::VariableDeclaration(self.ast.alloc_variable_declaration(
             anchor,

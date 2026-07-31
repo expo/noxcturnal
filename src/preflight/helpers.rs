@@ -7,6 +7,7 @@ use crate::generated::inline_helpers::{
     INLINE_ASYNC_HELPERS as GENERATED_INLINE_ASYNC_HELPERS,
     INLINE_ASYNC_TO_GENERATOR as GENERATED_INLINE_ASYNC_TO_GENERATOR,
     INLINE_OBJECT_HELPERS as GENERATED_INLINE_OBJECT_HELPERS,
+    INLINE_OXC_CLASS_FEATURE_HELPERS as GENERATED_INLINE_CLASS_FEATURE_HELPERS,
     INLINE_USING_CTX as GENERATED_INLINE_USING_CTX,
 };
 
@@ -275,6 +276,25 @@ pub fn inline_helpers(
                 | Helper::AsyncToGenerator
         )
     });
+    let has_class_feature_helpers = helpers.iter().any(|helper| {
+        matches!(
+            helper,
+            Helper::ClassPrivateFieldInitSpec
+                | Helper::ClassPrivateMethodInitSpec
+                | Helper::ClassPrivateFieldGet2
+                | Helper::ClassPrivateFieldSet2
+                | Helper::AssertClassBrand
+                | Helper::ToSetter
+                | Helper::ClassPrivateFieldLooseKey
+                | Helper::ClassPrivateFieldLooseBase
+                | Helper::SuperPropGet
+                | Helper::SuperPropSet
+                | Helper::ReadOnlyError
+                | Helper::WriteOnlyError
+                | Helper::CheckInRHS
+                | Helper::TaggedTemplateLiteral
+        )
+    });
     let async_to_generator_only = has_async
         && helpers.iter().all(|helper| {
             !matches!(
@@ -304,6 +324,23 @@ pub fn inline_helpers(
                     | Helper::WrapAsyncGenerator
                     | Helper::AsyncToGenerator
             )
+            && !matches!(
+                helper,
+                Helper::ClassPrivateFieldInitSpec
+                    | Helper::ClassPrivateMethodInitSpec
+                    | Helper::ClassPrivateFieldGet2
+                    | Helper::ClassPrivateFieldSet2
+                    | Helper::AssertClassBrand
+                    | Helper::ToSetter
+                    | Helper::ClassPrivateFieldLooseKey
+                    | Helper::ClassPrivateFieldLooseBase
+                    | Helper::SuperPropGet
+                    | Helper::SuperPropSet
+                    | Helper::ReadOnlyError
+                    | Helper::WriteOnlyError
+                    | Helper::CheckInRHS
+                    | Helper::TaggedTemplateLiteral
+            )
         {
             return Err(format!("inline-helper-not-compatible:{}", helper.name()));
         }
@@ -328,6 +365,7 @@ pub fn inline_helpers(
                 }),
                 has_using_ctx.then_some(GENERATED_INLINE_USING_CTX),
                 has_object_helpers.then_some(GENERATED_INLINE_OBJECT_HELPERS),
+                has_class_feature_helpers.then_some(GENERATED_INLINE_CLASS_FEATURE_HELPERS),
             ]
             .into_iter()
             .flatten()

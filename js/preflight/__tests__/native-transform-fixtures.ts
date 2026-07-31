@@ -42,5 +42,4 @@ export const NATIVE_TRANSFORM_OWNERSHIP_FIXTURES = {
 export const NATIVE_TRANSFORM_COMPATIBILITY_BOUNDARIES = new Set<NativeTransformName>([
   'regexpLookBehind',
   'regexpMatchIndices',
-  'regexpUnicodeSets',
 ]);

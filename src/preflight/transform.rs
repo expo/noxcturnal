@@ -122,8 +122,15 @@ pub fn transform(
     let object_rest_loose = options.object_rest_spread_loose == Some(true);
     let focused_private_features =
         options.private_methods == Some(true) || options.private_property_in_object == Some(true);
+    let oxc_spec_private_bundle = options.classes != Some(true)
+        && options.class_properties == Some(true)
+        && options.class_properties_loose != Some(true)
+        && (options.private_methods == Some(true)
+            || options.private_property_in_object == Some(true))
+        && options.private_methods_loose != Some(true)
+        && options.private_property_in_object_loose != Some(true);
     let class_rewrite_selected = options.classes == Some(true) || focused_private_features;
-    let classes_ast_selected = class_rewrite_selected;
+    let classes_ast_selected = class_rewrite_selected && !oxc_spec_private_bundle;
     let regexp_rewrite_selected = options.regexp_unicode == Some(true)
         || options.regexp_unicode_property_escapes == Some(true)
         || options.regexp_dot_all == Some(true)
@@ -162,6 +169,12 @@ pub fn transform(
     // two against what Babel emits. The React Compiler reads JSX for the same
     // reason. None of them misread TypeScript, so none of them need to move.
     let mut active_source_type = source_type(&filename, &source)?;
+    if options.typescript.as_deref() == Some("strip") {
+        active_source_type = active_source_type.with_typescript(true);
+    }
+    if options.jsx.is_some() {
+        active_source_type = active_source_type.with_jsx(true);
+    }
     let language_prepass = active_source_type.is_typescript()
         // Nothing downstream would read the language otherwise: the rewrites do,
         // and so does block scoping, because Oxc's `enum` lowering emits a `let`.
@@ -1599,6 +1612,7 @@ fn compile_options(options: &NativePreflightOptions) -> Result<TransformOptions>
                 mode,
                 "classic-development" | "automatic-development"
             ));
+            compiled.jsx.throw_if_namespace = options.jsx_throw_if_namespace.unwrap_or(true);
             compiled.jsx.import_source = if compiled.jsx.runtime == JsxRuntime::Automatic {
                 Some(
                     options

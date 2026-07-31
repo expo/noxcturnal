@@ -17,6 +17,7 @@ interface NativePreflightOptionsInput {
   typescript?: string;
   jsx?: string;
   jsxPure?: boolean;
+  jsxThrowIfNamespace?: boolean;
   jsxImportSource?: string;
   jsxPragma?: string;
   jsxPragmaFrag?: string;
@@ -325,6 +326,7 @@ export function nativePreflightOptions(plan: PreflightPlan): NativePreflightOpti
     typescript: plan.typescript,
     jsx: plan.jsx,
     jsxPure: plan.jsxPure,
+    jsxThrowIfNamespace: plan.jsxThrowIfNamespace,
     jsxImportSource: plan.jsxImportSource,
     jsxPragma: plan.jsxPragma,
     jsxPragmaFrag: plan.jsxPragmaFrag,

@@ -21,6 +21,7 @@ pub struct NativePreflightOptions {
     pub typescript: Option<String>,
     pub jsx: Option<String>,
     pub jsx_pure: Option<bool>,
+    pub jsx_throw_if_namespace: Option<bool>,
     pub jsx_import_source: Option<String>,
     pub jsx_pragma: Option<String>,
     pub jsx_pragma_frag: Option<String>,

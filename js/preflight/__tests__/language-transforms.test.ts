@@ -441,7 +441,7 @@ test('inline object and class helpers preserve symbols, getters, and field defin
   assert.deepEqual(context.result, [2, 1, 3, 4]);
 });
 
-test('regexp toggles reject Oxc constructor-only output that is not Babel lowering', () => {
+test('regexp toggles reject constructor-only output that is not Babel lowering', () => {
   for (const [source, transforms, reason] of [
     [
       'var expression = /(?<=a)b/;',
@@ -453,14 +453,17 @@ test('regexp toggles reject Oxc constructor-only output that is not Babel loweri
       { regexpMatchIndices: true },
       'regexp-match-indices-semantic-mismatch',
     ],
-    [
-      'var expression = /[a&&b]/v;',
-      { regexpUnicodeSets: true },
-      'regexp-unicode-sets-semantic-mismatch',
-    ],
   ] satisfies [string, PreflightTransforms, string][]) {
     const result = transform(source, 'fixture.js', pipeline(transforms));
     assert.equal(result.status, 'bailout');
     assert.equal(result.reason, `syntax:${reason}`);
   }
+
+  const unicodeSets = transform(
+    'var expression = /[a&&b]/v;',
+    'fixture.js',
+    pipeline({ regexpUnicodeSets: true }),
+  );
+  assert.equal(unicodeSets.status, 'complete');
+  assert.match(unicodeSets.code, /\/\(\?!\)\/u/);
 });
