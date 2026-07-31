@@ -22,12 +22,7 @@ use oxc_span::GetSpan;
 use regex_syntax::hir::{Class, HirKind};
 use rustc_hash::{FxHashMap, FxHashSet};
 
-use crate::generated::inline_helpers::{
-    INLINE_REGEXP_NAMED_CAPTURE_HELPER, INLINE_REGEXP_NAMED_CAPTURE_HELPER_BINDINGS,
-    INLINE_REGEXP_NAMED_CAPTURE_HELPER_PRETTY, INLINE_REGEXP_NAMED_CAPTURE_HELPER_RUNTIME,
-    INLINE_REGEXP_NAMED_CAPTURE_HELPER_RUNTIME_BINDINGS,
-    INLINE_REGEXP_NAMED_CAPTURE_HELPER_RUNTIME_PRETTY,
-};
+use crate::generated::inline_helpers::INLINE_REGEXP_NAMED_CAPTURE_HELPER_DESCRIPTOR;
 use crate::generated::regexp_unicode_properties::{
     UNICODE_STRING_PROPERTIES, append_unicode_ignore_case_class_additions,
     unicode_ignore_case_astral_class_addition, unicode_ignore_case_atom,
@@ -73,28 +68,14 @@ pub(super) fn run<'a>(
     }
     let mut requests = CustomHelperRequests::default();
     if pass.needs_named_helper {
-        requests.request("wrapRegExp");
-        let (helper, pretty_helper, bindings) = if options.inline_helpers {
-            (
-                INLINE_REGEXP_NAMED_CAPTURE_HELPER,
-                INLINE_REGEXP_NAMED_CAPTURE_HELPER_PRETTY,
-                INLINE_REGEXP_NAMED_CAPTURE_HELPER_BINDINGS,
-            )
-        } else {
-            (
-                INLINE_REGEXP_NAMED_CAPTURE_HELPER_RUNTIME,
-                INLINE_REGEXP_NAMED_CAPTURE_HELPER_RUNTIME_PRETTY,
-                INLINE_REGEXP_NAMED_CAPTURE_HELPER_RUNTIME_BINDINGS,
-            )
-        };
-        let rewrite = |source: &str| {
-            source
-                .replace("_wrapRegExp2", "__BABEL_WRAP_REGEXP_RUNTIME__")
-                .replace("_wrapRegExp", &named_helper)
-                .replace("__BABEL_WRAP_REGEXP_RUNTIME__", &named_runtime)
-        };
-        requests.push_fragment(rewrite(helper), rewrite(pretty_helper));
-        requests.reserve_scope_names(bindings.iter().map(|binding| rewrite(binding)));
+        requests.materialize_generated(
+            &INLINE_REGEXP_NAMED_CAPTURE_HELPER_DESCRIPTOR,
+            options.inline_helpers,
+            &[
+                ("_wrapRegExp", &named_helper),
+                ("_wrapRegExp2", &named_runtime),
+            ],
+        );
     }
     Ok((pass.changed, requests))
 }

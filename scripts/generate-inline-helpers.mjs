@@ -52,6 +52,7 @@ const bundles = {
 };
 
 const dependencyPattern = /require\(["']\.\/([^"']+?)(?:\.js)?["']\)/g;
+const relativeRequirePattern = /require\s*\(\s*["']\.[^"']*["']\s*\)/g;
 const moduleSources = new Map();
 
 async function loadClosure(name, ordered, visiting = new Set()) {
@@ -59,6 +60,16 @@ async function loadClosure(name, ordered, visiting = new Set()) {
   assert(!visiting.has(name), `cyclic Babel runtime helper dependency at ${name}`);
   visiting.add(name);
   const source = await readFile(join(runtimeRoot, 'helpers', `${name}.js`), 'utf8');
+  require.resolve(`@babel/runtime/helpers/${name}`);
+  assert.doesNotMatch(source, /\b(?:import|export)\s/, `${name} uses an unsupported ESM form`);
+  const relativeRequires = [...source.matchAll(relativeRequirePattern)].map(match => match[0]);
+  const recognizedRequires = [...source.matchAll(dependencyPattern)].map(match => match[0]);
+  assert.deepEqual(
+    relativeRequires,
+    recognizedRequires,
+    `${name} contains an unsupported relative CommonJS dependency`,
+  );
+  assert.match(source, /module\.exports\s*=/, `${name} has an unsupported export shape`);
   moduleSources.set(name, source);
   const dependencies = [...source.matchAll(dependencyPattern)].map(match => match[1]);
   for (const dependency of dependencies) await loadClosure(dependency, ordered, visiting);
@@ -109,6 +120,21 @@ const generated = {};
 for (const [name, roots] of Object.entries(bundles)) generated[name] = await buildBundle(roots);
 
 const adapterBundles = {
+  INLINE_EXTENDS_HELPER: {
+    roots: ['extends'],
+    binding: '_extends2',
+    adapter: 'var _extends=_extends2.extends;',
+  },
+  INLINE_READ_ONLY_ERROR_HELPER: {
+    roots: ['readOnlyError'],
+    binding: '_readOnlyError2',
+    adapter: 'var _readOnlyError=_readOnlyError2.readOnlyError;',
+  },
+  INLINE_TO_PROPERTY_KEY_HELPER: {
+    roots: ['toPropertyKey'],
+    binding: '_toPropertyKey2',
+    adapter: 'function _toPropertyKey(value){return _toPropertyKey2.toPropertyKey(value)}',
+  },
   INLINE_DESTRUCTURING_ITER_HELPER: {
     roots: ['slicedToArray', 'toArray'],
     binding: '_toArray2',
@@ -192,8 +218,101 @@ for (const [name, { roots, binding, adapter }] of Object.entries(adapterBundles)
   };
 }
 
+function generatedDirectFragment(source, helpers) {
+  const code = transformSync(source, {
+    charset: 'ascii',
+    legalComments: 'inline',
+    minifyWhitespace: true,
+    minifySyntax: true,
+    minifyIdentifiers: false,
+    target: 'es2018',
+  }).code.trim();
+  return {
+    code,
+    helpers,
+    hash: `sha256-${createHash('sha256').update(code).digest('hex')}`,
+  };
+}
+
+// Direct callable roots do not need an object adapter. These implementations
+// are still read from the installed runtime; only Babel's CommonJS self-export
+// bookkeeping is removed from the inline declaration.
+const extendsFunction = require('@babel/runtime/helpers/extends')
+  .toString()
+  .replace('return module.exports = _extends =', 'return _extends =')
+  .replace(
+    ', module.exports.__esModule = true, module.exports["default"] = module.exports, _extends.apply',
+    ', _extends.apply',
+  );
+generated.INLINE_EXTENDS_HELPER = generatedDirectFragment(extendsFunction, ['extends']);
+generated.INLINE_EXTENDS_HELPER_RUNTIME = generatedDirectFragment(
+  'var _extends=require("@babel/runtime/helpers/extends");',
+  ['extends'],
+);
+generated.INLINE_READ_ONLY_ERROR_HELPER = generatedDirectFragment(
+  require('@babel/runtime/helpers/readOnlyError').toString(),
+  ['readOnlyError'],
+);
+generated.INLINE_READ_ONLY_ERROR_HELPER_RUNTIME = generatedDirectFragment(
+  'var _readOnlyError=require("@babel/runtime/helpers/readOnlyError");',
+  ['readOnlyError'],
+);
+generated.INLINE_TO_PROPERTY_KEY_HELPER_RUNTIME = generatedDirectFragment(
+  'var _toPropertyKey2=require("@babel/runtime/helpers/toPropertyKey");function _toPropertyKey(value){return _toPropertyKey2(value)}',
+  ['toPropertyKey'],
+);
+
+function materializeGeneratedFunction(name, binding) {
+  return Function(`"use strict";${generated[name].code};return ${binding}`)();
+}
+
+{
+  const inlineExtends = materializeGeneratedFunction('INLINE_EXTENDS_HELPER', '_extends');
+  const runtimeExtends = require('@babel/runtime/helpers/extends');
+  for (const implementation of [inlineExtends, runtimeExtends]) {
+    const symbol = Symbol('key');
+    const target = {};
+    assert.equal(implementation(target, { value: 1, [symbol]: 2 }), target);
+    assert.deepEqual(target, { value: 1, [symbol]: 2 });
+  }
+
+  const inlineReadOnly = materializeGeneratedFunction(
+    'INLINE_READ_ONLY_ERROR_HELPER',
+    '_readOnlyError',
+  );
+  const runtimeReadOnly = require('@babel/runtime/helpers/readOnlyError');
+  for (const implementation of [inlineReadOnly, runtimeReadOnly]) {
+    assert.throws(() => implementation('value'), {
+      name: 'TypeError',
+      message: '"value" is read-only',
+    });
+  }
+
+  const inlinePropertyKey = materializeGeneratedFunction(
+    'INLINE_TO_PROPERTY_KEY_HELPER',
+    '_toPropertyKey',
+  );
+  const runtimePropertyKey = require('@babel/runtime/helpers/toPropertyKey');
+  const symbol = Symbol('property');
+  for (const implementation of [inlinePropertyKey, runtimePropertyKey]) {
+    assert.equal(implementation({ [Symbol.toPrimitive]: () => symbol }), symbol);
+    assert.equal(implementation({ [Symbol.toPrimitive]: () => 7 }), '7');
+    assert.match(
+      implementation({ [Symbol.toPrimitive]: () => function callable() {} }),
+      /function callable/,
+    );
+    assert.throws(
+      () => implementation({ [Symbol.toPrimitive]: () => ({}) }),
+      /@@toPrimitive must return a primitive value/,
+    );
+  }
+}
+
 for (const [name, value] of Object.entries(generated)) {
   if (
+    !name.startsWith('INLINE_EXTENDS_') &&
+    !name.startsWith('INLINE_READ_ONLY_ERROR_') &&
+    !name.startsWith('INLINE_TO_PROPERTY_KEY_') &&
     !name.startsWith('INLINE_DESTRUCTURING_') &&
     !name.startsWith('INLINE_CLASS_') &&
     !name.startsWith('INLINE_REGEXP_')
@@ -221,6 +340,7 @@ for (const [name, value] of Object.entries(generated)) {
 const rustUnformatted = [
   '// @generated by scripts/generate-inline-helpers.mjs from @babel/runtime.',
   '// Do not edit by hand.',
+  'use crate::preflight::helpers::GeneratedHelperFragment;',
   ...Object.entries(generated).flatMap(([name, value]) => [
     `pub const ${name}: &str = r#"${value.code}"#;`,
     ...(value.prettyCode == null
@@ -233,7 +353,18 @@ const rustUnformatted = [
             .map(binding => JSON.stringify(binding))
             .join(',')}];`,
         ]),
+    ...(value.bindings == null || !name.endsWith('_RUNTIME')
+      ? []
+      : [
+          `pub const ${name}_DEPENDENCIES: &[&str] = &[${value.helpers
+            .map(helper => JSON.stringify(helper))
+            .join(',')}];`,
+        ]),
   ]),
+  ...Object.keys(adapterBundles).map(
+    name =>
+      `pub static ${name}_DESCRIPTOR: GeneratedHelperFragment = GeneratedHelperFragment { inline_compact: ${name}, inline_pretty: ${name}_PRETTY, runtime_compact: ${name}_RUNTIME, runtime_pretty: ${name}_RUNTIME_PRETTY, inline_bindings: ${name}_BINDINGS, runtime_bindings: ${name}_RUNTIME_BINDINGS, babel_dependencies: ${name}_RUNTIME_DEPENDENCIES };`,
+  ),
   '',
 ].join('\n');
 const rust = execFileSync('rustfmt', ['--edition', '2024', '--emit', 'stdout'], {

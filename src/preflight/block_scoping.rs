@@ -16,6 +16,7 @@ use oxc_span::{GetSpan, Span};
 use oxc_syntax::{operator::AssignmentOperator, scope::ScopeFlags, symbol::SymbolFlags};
 use rustc_hash::{FxHashMap, FxHashSet};
 
+use crate::generated::inline_helpers::INLINE_READ_ONLY_ERROR_HELPER_DESCRIPTOR;
 use crate::preflight::helpers::CustomHelperRequests;
 
 struct CapturedLoop {
@@ -1344,19 +1345,13 @@ pub(super) fn run<'a>(
     let mut requests = CustomHelperRequests::default();
     if let Some(helper_name) = helper_name {
         let temp_name = temp_name.expect("const writes reserve a temporary");
-        requests.reserve_scope_names([helper_name.clone(), temp_name.clone()]);
-        if inline_helpers {
-            requests.push_fragment(
-                format!("var {temp_name};function {helper_name}(r){{throw new TypeError('\"'+r+'\" is read-only')}}\n"),
-                format!("var {temp_name};\nfunction {helper_name}(r) {{\n  throw new TypeError('\"' + r + '\" is read-only');\n}}\n"),
-            );
-        } else {
-            requests.request("readOnlyError");
-            requests.push_fragment(
-                format!("var {temp_name},{helper_name}=require('@babel/runtime/helpers/readOnlyError');\n"),
-                format!("var {temp_name},\n  {helper_name} = require('@babel/runtime/helpers/readOnlyError');\n"),
-            );
-        }
+        requests.reserve_scope_names([temp_name.clone()]);
+        requests.push_declaration(format!("var {temp_name};"), format!("var {temp_name};\n"));
+        requests.materialize_generated(
+            &INLINE_READ_ONLY_ERROR_HELPER_DESCRIPTOR,
+            inline_helpers,
+            &[("_readOnlyError", &helper_name)],
+        );
     }
     requests
 }

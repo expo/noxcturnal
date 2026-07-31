@@ -21,18 +21,8 @@ use oxc_syntax::scope::ScopeFlags;
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::generated::inline_helpers::{
-    INLINE_CLASS_CONSTRUCT_HELPER, INLINE_CLASS_CONSTRUCT_HELPER_BINDINGS,
-    INLINE_CLASS_CONSTRUCT_HELPER_PRETTY, INLINE_CLASS_CONSTRUCT_HELPER_RUNTIME,
-    INLINE_CLASS_CONSTRUCT_HELPER_RUNTIME_BINDINGS, INLINE_CLASS_CONSTRUCT_HELPER_RUNTIME_PRETTY,
-    INLINE_CLASS_PRIVATE_HELPERS, INLINE_CLASS_PRIVATE_HELPERS_BINDINGS,
-    INLINE_CLASS_PRIVATE_HELPERS_PRETTY, INLINE_CLASS_PRIVATE_HELPERS_RUNTIME,
-    INLINE_CLASS_PRIVATE_HELPERS_RUNTIME_BINDINGS, INLINE_CLASS_PRIVATE_HELPERS_RUNTIME_PRETTY,
-    INLINE_CLASS_PRIVATE_IN_HELPER, INLINE_CLASS_PRIVATE_IN_HELPER_BINDINGS,
-    INLINE_CLASS_PRIVATE_IN_HELPER_PRETTY, INLINE_CLASS_PRIVATE_IN_HELPER_RUNTIME,
-    INLINE_CLASS_PRIVATE_IN_HELPER_RUNTIME_BINDINGS, INLINE_CLASS_PRIVATE_IN_HELPER_RUNTIME_PRETTY,
-    INLINE_CLASS_SUPER_GET_HELPER, INLINE_CLASS_SUPER_GET_HELPER_BINDINGS,
-    INLINE_CLASS_SUPER_GET_HELPER_PRETTY, INLINE_CLASS_SUPER_GET_HELPER_RUNTIME,
-    INLINE_CLASS_SUPER_GET_HELPER_RUNTIME_BINDINGS, INLINE_CLASS_SUPER_GET_HELPER_RUNTIME_PRETTY,
+    INLINE_CLASS_CONSTRUCT_HELPER_DESCRIPTOR, INLINE_CLASS_PRIVATE_HELPERS_DESCRIPTOR,
+    INLINE_CLASS_PRIVATE_IN_HELPER_DESCRIPTOR, INLINE_CLASS_SUPER_GET_HELPER_DESCRIPTOR,
 };
 use crate::preflight::helpers::CustomHelperRequests;
 
@@ -122,111 +112,45 @@ fn class_helper_requests(
 ) -> CustomHelperRequests {
     let mut requests = CustomHelperRequests::default();
     if private {
-        requests.request("classPrivateFieldLooseBase");
-        let (compact, pretty, bindings) = if inline {
-            (
-                INLINE_CLASS_PRIVATE_HELPERS,
-                INLINE_CLASS_PRIVATE_HELPERS_PRETTY,
-                INLINE_CLASS_PRIVATE_HELPERS_BINDINGS,
-            )
-        } else {
-            (
-                INLINE_CLASS_PRIVATE_HELPERS_RUNTIME,
-                INLINE_CLASS_PRIVATE_HELPERS_RUNTIME_PRETTY,
-                INLINE_CLASS_PRIVATE_HELPERS_RUNTIME_BINDINGS,
-            )
-        };
-        let rewrite = |source: &str| {
-            source
-                .replace(
-                    "_classPrivateFieldLooseBase2",
-                    "__BABEL_PRIVATE_FIELD_LOOSE_BASE_RUNTIME__",
-                )
-                .replace("_classPrivateFieldLooseBase", &names.private_base)
-                .replace("_classPrivateMethodCall", &names.private_call)
-                .replace("_checkInRHS", &names.check_in_rhs)
-                .replace(
-                    "__BABEL_PRIVATE_FIELD_LOOSE_BASE_RUNTIME__",
-                    &names.private_runtime,
-                )
-        };
-        requests.push_fragment(rewrite(compact), rewrite(pretty));
-        requests.reserve_scope_names(bindings.iter().map(|binding| rewrite(binding)));
+        requests.materialize_generated(
+            &INLINE_CLASS_PRIVATE_HELPERS_DESCRIPTOR,
+            inline,
+            &[
+                ("_classPrivateFieldLooseBase", &names.private_base),
+                ("_classPrivateMethodCall", &names.private_call),
+                ("_classPrivateFieldLooseBase2", &names.private_runtime),
+            ],
+        );
     }
     if check_in_rhs {
-        requests.request("checkInRHS");
-        let (compact, pretty, bindings) = if inline {
-            (
-                INLINE_CLASS_PRIVATE_IN_HELPER,
-                INLINE_CLASS_PRIVATE_IN_HELPER_PRETTY,
-                INLINE_CLASS_PRIVATE_IN_HELPER_BINDINGS,
-            )
-        } else {
-            (
-                INLINE_CLASS_PRIVATE_IN_HELPER_RUNTIME,
-                INLINE_CLASS_PRIVATE_IN_HELPER_RUNTIME_PRETTY,
-                INLINE_CLASS_PRIVATE_IN_HELPER_RUNTIME_BINDINGS,
-            )
-        };
-        let rewrite = |source: &str| {
-            source
-                .replace("_checkInRHS2", "__BABEL_CHECK_IN_RHS_RUNTIME__")
-                .replace("_checkInRHS", &names.check_in_rhs)
-                .replace(
-                    "__BABEL_CHECK_IN_RHS_RUNTIME__",
-                    &names.check_in_rhs_runtime,
-                )
-        };
-        requests.push_fragment(rewrite(compact), rewrite(pretty));
-        requests.reserve_scope_names(bindings.iter().map(|binding| rewrite(binding)));
+        requests.materialize_generated(
+            &INLINE_CLASS_PRIVATE_IN_HELPER_DESCRIPTOR,
+            inline,
+            &[
+                ("_checkInRHS", &names.check_in_rhs),
+                ("_checkInRHS2", &names.check_in_rhs_runtime),
+            ],
+        );
     }
     if construct {
-        requests.request("construct");
-        let (compact, pretty, bindings) = if inline {
-            (
-                INLINE_CLASS_CONSTRUCT_HELPER,
-                INLINE_CLASS_CONSTRUCT_HELPER_PRETTY,
-                INLINE_CLASS_CONSTRUCT_HELPER_BINDINGS,
-            )
-        } else {
-            (
-                INLINE_CLASS_CONSTRUCT_HELPER_RUNTIME,
-                INLINE_CLASS_CONSTRUCT_HELPER_RUNTIME_PRETTY,
-                INLINE_CLASS_CONSTRUCT_HELPER_RUNTIME_BINDINGS,
-            )
-        };
-        let rewrite = |source: &str| {
-            source
-                .replace("_construct2", "__BABEL_CONSTRUCT_RUNTIME__")
-                .replace("_construct", &names.construct)
-                .replace("__BABEL_CONSTRUCT_RUNTIME__", &names.construct_runtime)
-        };
-        requests.push_fragment(rewrite(compact), rewrite(pretty));
-        requests.reserve_scope_names(bindings.iter().map(|binding| rewrite(binding)));
+        requests.materialize_generated(
+            &INLINE_CLASS_CONSTRUCT_HELPER_DESCRIPTOR,
+            inline,
+            &[
+                ("_construct", &names.construct),
+                ("_construct2", &names.construct_runtime),
+            ],
+        );
     }
     if super_get {
-        requests.request("get");
-        let (compact, pretty, bindings) = if inline {
-            (
-                INLINE_CLASS_SUPER_GET_HELPER,
-                INLINE_CLASS_SUPER_GET_HELPER_PRETTY,
-                INLINE_CLASS_SUPER_GET_HELPER_BINDINGS,
-            )
-        } else {
-            (
-                INLINE_CLASS_SUPER_GET_HELPER_RUNTIME,
-                INLINE_CLASS_SUPER_GET_HELPER_RUNTIME_PRETTY,
-                INLINE_CLASS_SUPER_GET_HELPER_RUNTIME_BINDINGS,
-            )
-        };
-        let rewrite = |source: &str| {
-            source
-                .replace("_get2", "__BABEL_GET_RUNTIME__")
-                .replace("_get", &names.super_get)
-                .replace("__BABEL_GET_RUNTIME__", &names.super_get_runtime)
-        };
-        requests.push_fragment(rewrite(compact), rewrite(pretty));
-        requests.reserve_scope_names(bindings.iter().map(|binding| rewrite(binding)));
+        requests.materialize_generated(
+            &INLINE_CLASS_SUPER_GET_HELPER_DESCRIPTOR,
+            inline,
+            &[
+                ("_get", &names.super_get),
+                ("_get2", &names.super_get_runtime),
+            ],
+        );
     }
     requests
 }

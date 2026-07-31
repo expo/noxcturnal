@@ -22,21 +22,9 @@ use oxc_syntax::operator::{AssignmentOperator, BinaryOperator, UnaryOperator};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::generated::inline_helpers::{
-    INLINE_DESTRUCTURING_ITER_HELPER, INLINE_DESTRUCTURING_ITER_HELPER_BINDINGS,
-    INLINE_DESTRUCTURING_ITER_HELPER_PRETTY, INLINE_DESTRUCTURING_ITER_HELPER_RUNTIME,
-    INLINE_DESTRUCTURING_ITER_HELPER_RUNTIME_BINDINGS,
-    INLINE_DESTRUCTURING_ITER_HELPER_RUNTIME_PRETTY, INLINE_DESTRUCTURING_LOOSE_REST_HELPER,
-    INLINE_DESTRUCTURING_LOOSE_REST_HELPER_BINDINGS, INLINE_DESTRUCTURING_LOOSE_REST_HELPER_PRETTY,
-    INLINE_DESTRUCTURING_LOOSE_REST_HELPER_RUNTIME,
-    INLINE_DESTRUCTURING_LOOSE_REST_HELPER_RUNTIME_BINDINGS,
-    INLINE_DESTRUCTURING_LOOSE_REST_HELPER_RUNTIME_PRETTY, INLINE_DESTRUCTURING_OBJECT_HELPER,
-    INLINE_DESTRUCTURING_OBJECT_HELPER_BINDINGS, INLINE_DESTRUCTURING_OBJECT_HELPER_PRETTY,
-    INLINE_DESTRUCTURING_OBJECT_HELPER_RUNTIME,
-    INLINE_DESTRUCTURING_OBJECT_HELPER_RUNTIME_BINDINGS,
-    INLINE_DESTRUCTURING_OBJECT_HELPER_RUNTIME_PRETTY, INLINE_DESTRUCTURING_REST_HELPER,
-    INLINE_DESTRUCTURING_REST_HELPER_BINDINGS, INLINE_DESTRUCTURING_REST_HELPER_PRETTY,
-    INLINE_DESTRUCTURING_REST_HELPER_RUNTIME, INLINE_DESTRUCTURING_REST_HELPER_RUNTIME_BINDINGS,
-    INLINE_DESTRUCTURING_REST_HELPER_RUNTIME_PRETTY,
+    INLINE_DESTRUCTURING_ITER_HELPER_DESCRIPTOR, INLINE_DESTRUCTURING_LOOSE_REST_HELPER_DESCRIPTOR,
+    INLINE_DESTRUCTURING_OBJECT_HELPER_DESCRIPTOR, INLINE_DESTRUCTURING_REST_HELPER_DESCRIPTOR,
+    INLINE_TO_PROPERTY_KEY_HELPER_DESCRIPTOR,
 };
 use crate::preflight::helpers::CustomHelperRequests;
 
@@ -370,157 +358,52 @@ pub(super) fn prepare_ast(
         helper_names.property_key = reserve("_toPropertyKey", &mut reserved);
         helper_names.property_key_runtime = reserve("_toPropertyKey2", &mut reserved);
     }
-    let mut helper_fragment = String::new();
-    let mut pretty_helper_fragment = String::new();
     let mut helper_requests = CustomHelperRequests::default();
-    let mut emitted_helper_names = Vec::new();
     if helper_usage.iter {
-        helper_requests.request("slicedToArray");
-        helper_requests.request("toArray");
-        let (helper, pretty_helper, bindings) = if inline_helpers {
-            (
-                INLINE_DESTRUCTURING_ITER_HELPER,
-                INLINE_DESTRUCTURING_ITER_HELPER_PRETTY,
-                INLINE_DESTRUCTURING_ITER_HELPER_BINDINGS,
-            )
-        } else {
-            (
-                INLINE_DESTRUCTURING_ITER_HELPER_RUNTIME,
-                INLINE_DESTRUCTURING_ITER_HELPER_RUNTIME_PRETTY,
-                INLINE_DESTRUCTURING_ITER_HELPER_RUNTIME_BINDINGS,
-            )
-        };
-        let rewrite = |source: &str| {
-            source
-                .replace("_toArray2", "__BABEL_TO_ARRAY_RUNTIME__")
-                .replace("_toArray", &helper_names.iter)
-                .replace("__BABEL_TO_ARRAY_RUNTIME__", &helper_names.iter_runtime)
-        };
-        helper_fragment.push_str(&rewrite(helper));
-        pretty_helper_fragment.push_str(&rewrite(pretty_helper));
-        emitted_helper_names.extend(bindings.iter().map(|binding| rewrite(binding)));
+        helper_requests.materialize_generated(
+            &INLINE_DESTRUCTURING_ITER_HELPER_DESCRIPTOR,
+            inline_helpers,
+            &[
+                ("_toArray", &helper_names.iter),
+                ("_toArray2", &helper_names.iter_runtime),
+            ],
+        );
     }
     if helper_usage.object {
-        helper_requests.request("objectDestructuringEmpty");
-        let (helper, pretty_helper, bindings) = if inline_helpers {
-            (
-                INLINE_DESTRUCTURING_OBJECT_HELPER,
-                INLINE_DESTRUCTURING_OBJECT_HELPER_PRETTY,
-                INLINE_DESTRUCTURING_OBJECT_HELPER_BINDINGS,
-            )
-        } else {
-            (
-                INLINE_DESTRUCTURING_OBJECT_HELPER_RUNTIME,
-                INLINE_DESTRUCTURING_OBJECT_HELPER_RUNTIME_PRETTY,
-                INLINE_DESTRUCTURING_OBJECT_HELPER_RUNTIME_BINDINGS,
-            )
-        };
-        let rewrite = |source: &str| {
-            source
-                .replace(
-                    "_objectDestructuringEmpty2",
-                    "__BABEL_OBJECT_DESTRUCTURING_EMPTY_RUNTIME__",
-                )
-                .replace("_objectDestructuringEmpty", &helper_names.object)
-                .replace(
-                    "__BABEL_OBJECT_DESTRUCTURING_EMPTY_RUNTIME__",
-                    &helper_names.object_runtime,
-                )
-        };
-        helper_fragment.push_str(&rewrite(helper));
-        pretty_helper_fragment.push_str(&rewrite(pretty_helper));
-        emitted_helper_names.extend(bindings.iter().map(|binding| rewrite(binding)));
+        helper_requests.materialize_generated(
+            &INLINE_DESTRUCTURING_OBJECT_HELPER_DESCRIPTOR,
+            inline_helpers,
+            &[
+                ("_objectDestructuringEmpty", &helper_names.object),
+                ("_objectDestructuringEmpty2", &helper_names.object_runtime),
+            ],
+        );
     }
     if helper_usage.rest {
-        helper_requests.request("objectDestructuringEmpty");
-        helper_requests.request(if object_rest_loose {
-            "objectWithoutPropertiesLoose"
+        let descriptor = if object_rest_loose {
+            &INLINE_DESTRUCTURING_LOOSE_REST_HELPER_DESCRIPTOR
         } else {
-            "objectWithoutProperties"
-        });
-        let (helper, pretty_helper, bindings) = if object_rest_loose && inline_helpers {
-            (
-                INLINE_DESTRUCTURING_LOOSE_REST_HELPER,
-                INLINE_DESTRUCTURING_LOOSE_REST_HELPER_PRETTY,
-                INLINE_DESTRUCTURING_LOOSE_REST_HELPER_BINDINGS,
-            )
-        } else if object_rest_loose {
-            (
-                INLINE_DESTRUCTURING_LOOSE_REST_HELPER_RUNTIME,
-                INLINE_DESTRUCTURING_LOOSE_REST_HELPER_RUNTIME_PRETTY,
-                INLINE_DESTRUCTURING_LOOSE_REST_HELPER_RUNTIME_BINDINGS,
-            )
-        } else if inline_helpers {
-            (
-                INLINE_DESTRUCTURING_REST_HELPER,
-                INLINE_DESTRUCTURING_REST_HELPER_PRETTY,
-                INLINE_DESTRUCTURING_REST_HELPER_BINDINGS,
-            )
-        } else {
-            (
-                INLINE_DESTRUCTURING_REST_HELPER_RUNTIME,
-                INLINE_DESTRUCTURING_REST_HELPER_RUNTIME_PRETTY,
-                INLINE_DESTRUCTURING_REST_HELPER_RUNTIME_BINDINGS,
-            )
+            &INLINE_DESTRUCTURING_REST_HELPER_DESCRIPTOR
         };
-        let rewrite = |source: &str| {
-            source
-                .replace(
-                    "_objectWithoutProperties2",
-                    "__BABEL_OBJECT_WITHOUT_PROPERTIES_RUNTIME__",
-                )
-                .replace("_objectWithoutProperties", &helper_names.rest)
-                .replace(
-                    "__BABEL_OBJECT_WITHOUT_PROPERTIES_RUNTIME__",
-                    &helper_names.rest_runtime,
-                )
-        };
-        helper_fragment.push_str(&rewrite(helper));
-        pretty_helper_fragment.push_str(&rewrite(pretty_helper));
-        emitted_helper_names.extend(bindings.iter().map(|binding| rewrite(binding)));
+        helper_requests.materialize_generated(
+            descriptor,
+            inline_helpers,
+            &[
+                ("_objectWithoutProperties", &helper_names.rest),
+                ("_objectWithoutProperties2", &helper_names.rest_runtime),
+            ],
+        );
         if helper_usage.property_key {
-            helper_requests.request("toPropertyKey");
-            let (property_key, property_key_pretty) = if inline_helpers {
-                (
-                    format!(
-                        "function {}(t){{var e=typeof t;return(e===\"object\"&&t!==null||e===\"function\")&&(e=t[Symbol.toPrimitive])!==void 0?(t=e.call(t,\"string\"),(typeof t===\"object\"&&t!==null||typeof t===\"function\")?(()=>{{throw new TypeError(\"@@toPrimitive must return a primitive value.\")}})():typeof t===\"symbol\"?t:t+\"\"):typeof t===\"symbol\"?t:String(t)}}",
-                        helper_names.property_key,
-                    ),
-                    format!(
-                        "function {}(value) {{\n  const type = typeof value;\n  if ((type === 'object' && value !== null) || type === 'function') {{\n    const exotic = value[Symbol.toPrimitive];\n    if (exotic !== void 0) {{\n      value = exotic.call(value, 'string');\n      if ((typeof value === 'object' && value !== null) || typeof value === 'function') {{\n        throw new TypeError('@@toPrimitive must return a primitive value.');\n      }}\n      return typeof value === 'symbol' ? value : value + '';\n    }}\n  }}\n  return typeof value === 'symbol' ? value : String(value);\n}}\n",
-                        helper_names.property_key,
-                    ),
-                )
-            } else {
-                (
-                    format!(
-                        "var {}=require(\"@babel/runtime/helpers/toPropertyKey\");function {}(t){{return {}(t)}}",
-                        helper_names.property_key_runtime,
-                        helper_names.property_key,
-                        helper_names.property_key_runtime,
-                    ),
-                    format!(
-                        "var {} = require('@babel/runtime/helpers/toPropertyKey');\nfunction {}(value) {{\n  return {}(value);\n}}\n",
-                        helper_names.property_key_runtime,
-                        helper_names.property_key,
-                        helper_names.property_key_runtime,
-                    ),
-                )
-            };
-            helper_fragment.push_str(&property_key);
-            pretty_helper_fragment.push_str(&property_key_pretty);
-            emitted_helper_names.push(helper_names.property_key.clone());
-            if !inline_helpers {
-                emitted_helper_names.push(helper_names.property_key_runtime.clone());
-            }
+            helper_requests.materialize_generated(
+                &INLINE_TO_PROPERTY_KEY_HELPER_DESCRIPTOR,
+                inline_helpers,
+                &[
+                    ("_toPropertyKey", &helper_names.property_key),
+                    ("_toPropertyKey2", &helper_names.property_key_runtime),
+                ],
+            );
         }
     }
-    if !helper_fragment.is_empty() {
-        helper_requests.push_fragment(helper_fragment, pretty_helper_fragment);
-    }
-    emitted_helper_names.sort_unstable();
-    emitted_helper_names.dedup();
-    helper_requests.reserve_scope_names(emitted_helper_names.iter().cloned());
     let planned_allocations = reserved
         .allocations
         .iter()

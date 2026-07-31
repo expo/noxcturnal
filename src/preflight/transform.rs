@@ -37,7 +37,8 @@ use crate::syntax::classification::source_type;
 
 use super::block_scoping;
 use super::helpers::{
-    CustomHelperRequests, inline_helpers, validate_custom_runtime_helpers, validate_runtime_helpers,
+    CustomHelper, CustomHelperRequests, compatibility_for_request, inline_helpers,
+    validate_custom_runtime_helpers, validate_runtime_helper_specs,
 };
 use super::object_spread;
 use super::optimize;
@@ -237,11 +238,7 @@ fn validate_generated_async_iterator_results<'a>(
         return CustomHelperRequests::default();
     }
     let mut requests = CustomHelperRequests::default();
-    requests.reserve_scope_names([helper.clone()]);
-    requests.push_fragment(
-        format!("function {helper}(value){{if(Object(value)!==value)throw new TypeError('Iterator result is not an object');return value}}\n"),
-        format!("function {helper}(value) {{\n  if (Object(value) !== value) throw new TypeError('Iterator result is not an object');\n  return value;\n}}\n"),
-    );
+    requests.materialize_custom(CustomHelper::IteratorResult, &helper);
     requests
 }
 
@@ -1333,15 +1330,18 @@ fn transform_impl(
             None
         };
         if helper_mode == "runtime"
-            && let Err(reason) = validate_runtime_helpers(
-                helper_requests.iter().map(|(helper, _)| *helper),
+            && let Err(reason) = validate_runtime_helper_specs(
+                helper_requests.iter().map(|(helper, _)| {
+                    compatibility_for_request(*helper, object_rest_loose)
+                        .expect("reachable Oxc helper has compatibility metadata")
+                }),
                 helper_module,
                 options.helpers_version.as_deref(),
             )
         {
             return Ok(unsupported(&reason, [] as [String; 0]));
         }
-        if helper_mode == "runtime"
+        if options.helpers_mode.as_deref() == Some("runtime")
             && let Err(reason) = validate_custom_runtime_helpers(
                 &custom_helper_requests,
                 helper_module,
@@ -1352,13 +1352,12 @@ fn transform_impl(
         }
         if helper_mode == "runtime" {
             for (helper, source) in &helper_requests {
-                if object_rest_loose && helper.name() == "objectWithoutProperties" {
-                    // The completion rewriter deliberately changes this one
-                    // generated import to Babel's loose helper. The module and
-                    // version have already passed validation above.
-                    continue;
-                }
-                let expected = format!("{helper_module}/helpers/{}", helper.name());
+                // Oxc records the loader's pre-completion path. The typed loose
+                // selection above rewrites the synthetic AST literal, while this
+                // check verifies the loader did not supply an unrelated source.
+                let spec = compatibility_for_request(*helper, false)
+                    .expect("reachable Oxc helper has compatibility metadata");
+                let expected = format!("{helper_module}/helpers/{}", spec.babel_path);
                 if source != &expected {
                     return Ok(unsupported(
                         &format!("helper-source-mismatch:{}", helper.name()),
@@ -1370,11 +1369,10 @@ fn transform_impl(
         let mut helpers_used: Vec<String> = helper_requests
             .into_iter()
             .map(|(helper, _)| {
-                if object_rest_loose && helper.name() == "objectWithoutProperties" {
-                    "objectWithoutPropertiesLoose".to_string()
-                } else {
-                    helper.name().to_string()
-                }
+                compatibility_for_request(helper, object_rest_loose)
+                    .expect("reachable Oxc helper has compatibility metadata")
+                    .oxc_name
+                    .to_string()
             })
             .collect();
         helpers_used.extend(custom_helper_requests.into_iter().map(str::to_string));
@@ -2125,26 +2123,10 @@ fn decorator_helpers(
 ) -> CustomHelperRequests {
     let mut requests = CustomHelperRequests::default();
     if decorate {
-        requests.push_fragment(
-            format!(
-                "function {decorate_name}(e,t,r,n){{var o=arguments.length,a=o<3?t:n===null?n=Object.getOwnPropertyDescriptor(t,r):n,l;for(var c=e.length-1;c>=0;c--)if(l=e[c])a=(o<3?l(a):o>3?l(t,r,a):l(t,r))||a;return o>3&&a&&Object.defineProperty(t,r,a),a}}"
-            ),
-            format!(
-                "function {decorate_name}(decorators, target, key, descriptor) {{\n  var argumentCount = arguments.length;\n  var result = argumentCount < 3 ? target : descriptor === null ? descriptor = Object.getOwnPropertyDescriptor(target, key) : descriptor;\n  var decorator;\n  for (var index = decorators.length - 1; index >= 0; index--) {{\n    if (decorator = decorators[index]) result = (argumentCount < 3 ? decorator(result) : argumentCount > 3 ? decorator(target, key, result) : decorator(target, key)) || result;\n  }}\n  if (argumentCount > 3 && result) Object.defineProperty(target, key, result);\n  return result;\n}}"
-            ),
-        );
-        requests.reserve_scope_names([decorate_name.to_owned()]);
+        requests.materialize_custom(CustomHelper::LegacyDecorate, decorate_name);
     }
     if decorate_param {
-        requests.push_fragment(
-            format!(
-                "function {decorate_param_name}(e,t){{return function(r,n){{t(r,n,e)}}}}"
-            ),
-            format!(
-                "function {decorate_param_name}(index, decorator) {{\n  return function (target, key) {{\n    decorator(target, key, index);\n  }};\n}}"
-            ),
-        );
-        requests.reserve_scope_names([decorate_param_name.to_owned()]);
+        requests.materialize_custom(CustomHelper::LegacyDecorateParam, decorate_param_name);
     }
     requests
 }
@@ -2461,6 +2443,55 @@ mod tests {
             );
         }
         statement
+    }
+
+    #[test]
+    fn structural_helper_reporting_is_mode_independent() {
+        for (source, configure) in [
+            (
+                "const value = {...input};",
+                NativePreflightOptions {
+                    object_rest_spread: Some(true),
+                    ..NativePreflightOptions::default()
+                },
+            ),
+            (
+                "const view = <Widget a={1} {...props} />;",
+                NativePreflightOptions {
+                    jsx: Some("classic".into()),
+                    jsx_pragma: Some("React.createElement".into()),
+                    ..NativePreflightOptions::default()
+                },
+            ),
+        ] {
+            let mut inline_options = configure;
+            inline_options.helpers_mode = Some("inline".into());
+            let inline = transform(source.into(), "fixture.jsx".into(), inline_options).unwrap();
+
+            let runtime_options = NativePreflightOptions {
+                object_rest_spread: source.contains("input").then_some(true),
+                jsx: source.contains("Widget").then(|| "classic".into()),
+                jsx_pragma: source
+                    .contains("Widget")
+                    .then(|| "React.createElement".into()),
+                helpers_mode: Some("runtime".into()),
+                helpers_module_name: Some("@babel/runtime".into()),
+                helpers_version: Some("7.29.7".into()),
+                ..NativePreflightOptions::default()
+            };
+            let runtime = transform(source.into(), "fixture.jsx".into(), runtime_options).unwrap();
+            assert_eq!(inline.status, "complete", "{:?}", inline.reason);
+            assert_eq!(runtime.status, "complete", "{:?}", runtime.reason);
+            assert_eq!(inline.helpers_used, runtime.helpers_used);
+            assert!(
+                !inline.helpers_used.is_empty(),
+                "{source}: {:?}",
+                inline.code
+            );
+            if source.contains("Widget") {
+                assert!(inline.helpers_used.iter().any(|name| name == "extends"));
+            }
+        }
     }
 
     #[test]

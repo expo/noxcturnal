@@ -6,6 +6,7 @@ use oxc_ast::{
 use oxc_ast_visit::{VisitMut, walk_mut};
 use oxc_span::{GetSpan, Span};
 
+use crate::generated::inline_helpers::INLINE_EXTENDS_HELPER_DESCRIPTOR;
 use crate::preflight::helpers::{CustomHelperRequests, SourceNameReservations};
 
 pub(super) struct Options {
@@ -41,20 +42,11 @@ pub(super) fn run<'a>(
     if pass.changed
         && let Some(helper_name) = helper_name
     {
-        requests.request("extends");
-        requests.reserve_scope_names([helper_name.clone()]);
-        if options.inline_helpers {
-            requests.push_fragment(
-                format!("function {helper_name}(){{return {helper_name}=Object.assign?Object.assign.bind():function(n){{for(var e=1;e<arguments.length;e++){{var t=arguments[e];for(var r in t)({{}}).hasOwnProperty.call(t,r)&&(n[r]=t[r])}}return n}},{helper_name}.apply(null,arguments)}}\n"),
-                format!("function {helper_name}() {{\n  return {helper_name} = Object.assign ? Object.assign.bind() : function (n) {{\n    for (var e = 1; e < arguments.length; e++) {{\n      var t = arguments[e];\n      for (var r in t) ({{}}).hasOwnProperty.call(t, r) && (n[r] = t[r]);\n    }}\n    return n;\n  }}, {helper_name}.apply(null, arguments);\n}}\n"),
-            );
-        } else {
-            let fragment =
-                format!("var {helper_name}=require('@babel/runtime/helpers/extends');\n");
-            let pretty =
-                format!("var {helper_name} = require('@babel/runtime/helpers/extends');\n");
-            requests.push_fragment(fragment, pretty);
-        }
+        requests.materialize_generated(
+            &INLINE_EXTENDS_HELPER_DESCRIPTOR,
+            options.inline_helpers,
+            &[("_extends", &helper_name)],
+        );
     }
     (pass.changed, requests)
 }
@@ -82,19 +74,11 @@ pub(super) fn run_jsx_props<'a>(
     pass.visit_program(program);
     let mut requests = CustomHelperRequests::default();
     if pass.lowerer.changed {
-        requests.reserve_scope_names([helper_name.clone()]);
-        if inline_helpers {
-            requests.push_fragment(
-                format!("function {helper_name}(){{return {helper_name}=Object.assign?Object.assign.bind():function(n){{for(var e=1;e<arguments.length;e++){{var t=arguments[e];for(var r in t)({{}}).hasOwnProperty.call(t,r)&&(n[r]=t[r])}}return n}},{helper_name}.apply(null,arguments)}}\n"),
-                format!("function {helper_name}() {{\n  return {helper_name} = Object.assign ? Object.assign.bind() : function (n) {{\n    for (var e = 1; e < arguments.length; e++) {{\n      var t = arguments[e];\n      for (var r in t) ({{}}).hasOwnProperty.call(t, r) && (n[r] = t[r]);\n    }}\n    return n;\n  }}, {helper_name}.apply(null, arguments);\n}}\n"),
-            );
-        } else {
-            requests.request("extends");
-            requests.push_fragment(
-                format!("var {helper_name}=require('@babel/runtime/helpers/extends');\n"),
-                format!("var {helper_name} = require('@babel/runtime/helpers/extends');\n"),
-            );
-        }
+        requests.materialize_generated(
+            &INLINE_EXTENDS_HELPER_DESCRIPTOR,
+            inline_helpers,
+            &[("_extends", &helper_name)],
+        );
     }
     (pass.lowerer.changed, requests)
 }

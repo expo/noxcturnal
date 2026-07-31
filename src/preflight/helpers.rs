@@ -11,6 +11,66 @@ use crate::generated::inline_helpers::{
     INLINE_USING_CTX as GENERATED_INLINE_USING_CTX,
 };
 
+/// Generator-owned support code and all metadata needed to materialize it.
+pub(crate) struct GeneratedHelperFragment {
+    pub inline_compact: &'static str,
+    pub inline_pretty: &'static str,
+    pub runtime_compact: &'static str,
+    pub runtime_pretty: &'static str,
+    pub inline_bindings: &'static [&'static str],
+    pub runtime_bindings: &'static [&'static str],
+    pub babel_dependencies: &'static [&'static str],
+}
+
+#[derive(Clone, Copy)]
+pub(super) enum CustomHelper {
+    IteratorResult,
+    LegacyDecorate,
+    LegacyDecorateParam,
+}
+
+pub(super) struct CustomHelperSpec {
+    pub name: &'static str,
+    pub owner: &'static str,
+    pub rationale: &'static str,
+    pub behavioral_tests: &'static [&'static str],
+    compact: &'static str,
+    pretty: &'static str,
+    binding: &'static str,
+}
+
+pub(super) const fn custom_helper_spec(helper: CustomHelper) -> CustomHelperSpec {
+    match helper {
+        CustomHelper::IteratorResult => CustomHelperSpec {
+            name: "_iteratorResult",
+            owner: "async iterator result validation",
+            rationale: "Oxc async-iterator lowering requires object-shape validation; Babel runtime has no equivalent helper",
+            behavioral_tests: &["generated_async_iterator_results_are_validated"],
+            compact: "function _iteratorResult(value){if(Object(value)!==value)throw new TypeError('Iterator result is not an object');return value}\n",
+            pretty: "function _iteratorResult(value) {\n  if (Object(value) !== value) throw new TypeError('Iterator result is not an object');\n  return value;\n}\n",
+            binding: "_iteratorResult",
+        },
+        CustomHelper::LegacyDecorate => CustomHelperSpec {
+            name: "_decorate",
+            owner: "legacy TypeScript decorators",
+            rationale: "Babel runtime decorate implements a different decorators ABI",
+            behavioral_tests: &["legacy_decorators"],
+            compact: "function _decorate(e,t,r,n){var o=arguments.length,a=o<3?t:n===null?n=Object.getOwnPropertyDescriptor(t,r):n,l;for(var c=e.length-1;c>=0;c--)if(l=e[c])a=(o<3?l(a):o>3?l(t,r,a):l(t,r))||a;return o>3&&a&&Object.defineProperty(t,r,a),a}",
+            pretty: "function _decorate(decorators, target, key, descriptor) {\n  var argumentCount = arguments.length;\n  var result = argumentCount < 3 ? target : descriptor === null ? descriptor = Object.getOwnPropertyDescriptor(target, key) : descriptor;\n  var decorator;\n  for (var index = decorators.length - 1; index >= 0; index--) {\n    if (decorator = decorators[index]) result = (argumentCount < 3 ? decorator(result) : argumentCount > 3 ? decorator(target, key, result) : decorator(target, key)) || result;\n  }\n  if (argumentCount > 3 && result) Object.defineProperty(target, key, result);\n  return result;\n}",
+            binding: "_decorate",
+        },
+        CustomHelper::LegacyDecorateParam => CustomHelperSpec {
+            name: "_decorateParam",
+            owner: "legacy TypeScript parameter decorators",
+            rationale: "Babel runtime has no helper for the legacy parameter-decorator adapter ABI",
+            behavioral_tests: &["legacy_parameter_decorators"],
+            compact: "function _decorateParam(e,t){return function(r,n){t(r,n,e)}}",
+            pretty: "function _decorateParam(index, decorator) {\n  return function (target, key) {\n    decorator(target, key, index);\n  };\n}",
+            binding: "_decorateParam",
+        },
+    }
+}
+
 /// Custom (non-Oxc) helpers requested structurally by in-place preflight passes.
 ///
 /// Passes record helper ABI names and generated source at the point where they
@@ -28,12 +88,93 @@ impl CustomHelperRequests {
         self.names.is_empty() && self.fragments.is_empty() && self.scope_names.is_empty()
     }
 
-    pub(super) fn request(&mut self, name: &'static str) {
-        self.names.insert(name);
+    fn push_fragment(&mut self, compact: String, pretty: String) {
+        self.fragments.push((compact, pretty));
     }
 
-    pub(super) fn push_fragment(&mut self, compact: String, pretty: String) {
-        self.fragments.push((compact, pretty));
+    pub(super) fn push_declaration(&mut self, compact: String, pretty: String) {
+        self.push_fragment(compact, pretty);
+    }
+
+    pub(super) fn materialize_custom(&mut self, helper: CustomHelper, binding: &str) {
+        let spec = custom_helper_spec(helper);
+        debug_assert!(!spec.name.is_empty());
+        debug_assert!(!spec.owner.is_empty());
+        debug_assert!(!spec.rationale.is_empty());
+        debug_assert!(!spec.behavioral_tests.is_empty());
+        let renames = [(spec.binding, binding)];
+        self.fragments.push((
+            replace_identifier_tokens(spec.compact, &renames),
+            replace_identifier_tokens(spec.pretty, &renames),
+        ));
+        self.scope_names.insert(binding.to_owned());
+    }
+
+    /// Atomically selects, renames, accounts for, and reserves a generated fragment.
+    pub(super) fn materialize_generated(
+        &mut self,
+        descriptor: &GeneratedHelperFragment,
+        inline: bool,
+        renames: &[(&str, &str)],
+    ) {
+        let (compact, pretty, bindings) = if inline {
+            (
+                descriptor.inline_compact,
+                descriptor.inline_pretty,
+                descriptor.inline_bindings,
+            )
+        } else {
+            (
+                descriptor.runtime_compact,
+                descriptor.runtime_pretty,
+                descriptor.runtime_bindings,
+            )
+        };
+        let keys: FxHashSet<&str> = renames.iter().map(|(from, _)| *from).collect();
+        assert_eq!(
+            keys.len(),
+            renames.len(),
+            "duplicate generated helper rename"
+        );
+        let declared_bindings: FxHashSet<&str> = descriptor
+            .inline_bindings
+            .iter()
+            .chain(descriptor.runtime_bindings)
+            .copied()
+            .collect();
+        assert_eq!(
+            keys, declared_bindings,
+            "generated helper rename map must exactly cover declared bindings"
+        );
+        let values: FxHashSet<&str> = renames.iter().map(|(_, to)| *to).collect();
+        assert_eq!(
+            values.len(),
+            renames.len(),
+            "duplicate generated helper destination"
+        );
+        let rewrite = |source: &str| replace_identifier_tokens(source, renames);
+        let compact = rewrite(compact);
+        let pretty = rewrite(pretty);
+        for binding in bindings.iter().filter(|binding| {
+            renames
+                .iter()
+                .any(|(from, to)| from == *binding && from != to)
+        }) {
+            assert!(
+                !contains_identifier_token(&compact, binding),
+                "unreplaced generated binding {binding}"
+            );
+        }
+        self.names.extend(descriptor.babel_dependencies);
+        self.scope_names
+            .extend(renames.iter().map(|(_, to)| (*to).to_owned()));
+        if !self
+            .fragments
+            .iter()
+            .any(|(existing, _)| existing == &compact)
+        {
+            self.fragments.push((compact, pretty));
+        }
     }
 
     pub(super) fn reserve_scope_names(&mut self, names: impl IntoIterator<Item = String>) {
@@ -74,6 +215,45 @@ impl CustomHelperRequests {
     }
 }
 
+fn is_identifier_byte(byte: u8) -> bool {
+    byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'$')
+}
+
+fn contains_identifier_token(source: &str, identifier: &str) -> bool {
+    source.match_indices(identifier).any(|(start, _)| {
+        (start == 0 || !is_identifier_byte(source.as_bytes()[start - 1]))
+            && (start + identifier.len() == source.len()
+                || !is_identifier_byte(source.as_bytes()[start + identifier.len()]))
+    })
+}
+
+fn replace_identifier_tokens(source: &str, renames: &[(&str, &str)]) -> String {
+    let mut result = String::with_capacity(source.len());
+    let mut cursor = 0;
+    while cursor < source.len() {
+        let byte = source.as_bytes()[cursor];
+        if byte.is_ascii_alphabetic() || matches!(byte, b'_' | b'$') {
+            let start = cursor;
+            cursor += 1;
+            while cursor < source.len() && is_identifier_byte(source.as_bytes()[cursor]) {
+                cursor += 1;
+            }
+            let token = &source[start..cursor];
+            result.push_str(
+                renames
+                    .iter()
+                    .find_map(|(from, to)| (*from == token).then_some(*to))
+                    .unwrap_or(token),
+            );
+        } else {
+            let ch = source[cursor..].chars().next().unwrap();
+            result.push(ch);
+            cursor += ch.len_utf8();
+        }
+    }
+    result
+}
+
 /// The newest minimum below intentionally determines the default Expo runtime
 /// requirement. Older helpers retain their real lower bound so custom pipelines can
 /// make an informed compatibility decision rather than inheriting one global guess.
@@ -86,52 +266,111 @@ pub struct HelperCompatibility {
     pub semantic_note: &'static str,
 }
 
-pub const fn compatibility(helper: Helper) -> Option<HelperCompatibility> {
-    let (minimum_version, semantic_note) = match helper {
-        Helper::AwaitAsyncGenerator
-        | Helper::AsyncGeneratorDelegate
-        | Helper::AsyncIterator
-        | Helper::AsyncToGenerator
-        | Helper::WrapAsyncGenerator => ((7, 0, 0), "Babel async helper ABI"),
-        Helper::Extends
-        | Helper::ObjectDestructuringEmpty
-        | Helper::ObjectWithoutProperties
-        | Helper::DefineProperty
-        | Helper::ReadOnlyError
-        | Helper::WriteOnlyError
-        | Helper::TaggedTemplateLiteral => ((7, 0, 0), "Babel helper ABI"),
-        Helper::ObjectSpread2 => ((7, 5, 0), "Babel object spread evaluation order"),
-        Helper::ClassPrivateFieldInitSpec
-        | Helper::ClassPrivateMethodInitSpec
-        | Helper::ClassPrivateFieldLooseKey
-        | Helper::ClassPrivateFieldLooseBase => ((7, 10, 0), "Babel private-field ABI"),
-        Helper::ToPropertyKey | Helper::CheckInRHS => ((7, 22, 0), "Babel property-key ABI"),
-        Helper::ClassPrivateFieldGet2
-        | Helper::ClassPrivateFieldSet2
-        | Helper::AssertClassBrand
-        | Helper::ToSetter
-        | Helper::SuperPropGet
-        | Helper::SuperPropSet => ((7, 24, 0), "Babel 7.24 class-feature ABI"),
-        Helper::UsingCtx => ((7, 28, 0), "Babel explicit-resource-management ABI"),
-        // NOTE: The decorator prepass materializes collision-safe local helpers,
-        // so decorator helpers must never reach the final runtime loader.
-        Helper::Decorate | Helper::DecorateParam | Helper::DecorateMetadata => return None,
+pub fn babel_helper_spec(name: &str) -> Option<HelperCompatibility> {
+    let canonical = match name {
+        "awaitAsyncGenerator" => "awaitAsyncGenerator",
+        "asyncGeneratorDelegate" => "asyncGeneratorDelegate",
+        "asyncIterator" => "asyncIterator",
+        "asyncToGenerator" => "asyncToGenerator",
+        "wrapAsyncGenerator" => "wrapAsyncGenerator",
+        "extends" => "extends",
+        "defineProperty" => "defineProperty",
+        "objectDestructuringEmpty" => "objectDestructuringEmpty",
+        "objectWithoutProperties" => "objectWithoutProperties",
+        "objectWithoutPropertiesLoose" => "objectWithoutPropertiesLoose",
+        "readOnlyError" => "readOnlyError",
+        "writeOnlyError" => "writeOnlyError",
+        "taggedTemplateLiteral" => "taggedTemplateLiteral",
+        "construct" => "construct",
+        "get" => "get",
+        "slicedToArray" => "slicedToArray",
+        "toArray" => "toArray",
+        "wrapRegExp" => "wrapRegExp",
+        "objectSpread2" => "objectSpread2",
+        "classPrivateFieldInitSpec" => "classPrivateFieldInitSpec",
+        "classPrivateMethodInitSpec" => "classPrivateMethodInitSpec",
+        "classPrivateFieldLooseKey" => "classPrivateFieldLooseKey",
+        "classPrivateFieldLooseBase" => "classPrivateFieldLooseBase",
+        "toPropertyKey" => "toPropertyKey",
+        "checkInRHS" => "checkInRHS",
+        "classPrivateFieldGet2" => "classPrivateFieldGet2",
+        "classPrivateFieldSet2" => "classPrivateFieldSet2",
+        "assertClassBrand" => "assertClassBrand",
+        "toSetter" => "toSetter",
+        "superPropGet" => "superPropGet",
+        "superPropSet" => "superPropSet",
+        "usingCtx" => "usingCtx",
+        _ => return None,
+    };
+    let minimum_version = match canonical {
+        "awaitAsyncGenerator"
+        | "asyncGeneratorDelegate"
+        | "asyncIterator"
+        | "asyncToGenerator"
+        | "wrapAsyncGenerator"
+        | "extends"
+        | "defineProperty"
+        | "objectDestructuringEmpty"
+        | "objectWithoutProperties"
+        | "readOnlyError"
+        | "writeOnlyError"
+        | "taggedTemplateLiteral"
+        | "construct"
+        | "get"
+        | "slicedToArray"
+        | "toArray"
+        | "wrapRegExp"
+        | "objectWithoutPropertiesLoose" => (7, 0, 0),
+        "objectSpread2" => (7, 5, 0),
+        "classPrivateFieldInitSpec"
+        | "classPrivateMethodInitSpec"
+        | "classPrivateFieldLooseKey"
+        | "classPrivateFieldLooseBase" => (7, 10, 0),
+        "toPropertyKey" | "checkInRHS" => (7, 22, 0),
+        "classPrivateFieldGet2"
+        | "classPrivateFieldSet2"
+        | "assertClassBrand"
+        | "toSetter"
+        | "superPropGet"
+        | "superPropSet" => (7, 24, 0),
+        "usingCtx" => (7, 28, 0),
+        _ => unreachable!(),
     };
     Some(HelperCompatibility {
-        oxc_name: helper.name(),
-        babel_path: helper.name(),
+        oxc_name: canonical,
+        babel_path: canonical,
         minimum_version,
         export_shape: "default",
-        semantic_note,
+        semantic_note: "Babel runtime helper ABI",
     })
 }
 
-pub fn validate_runtime_helpers(
-    helpers: impl IntoIterator<Item = Helper>,
+pub fn compatibility(helper: Helper) -> Option<HelperCompatibility> {
+    match helper {
+        // NOTE: The decorator prepass materializes collision-safe local helpers,
+        // so decorator helpers must never reach the final runtime loader.
+        Helper::Decorate | Helper::DecorateParam | Helper::DecorateMetadata => None,
+        _ => babel_helper_spec(helper.name()),
+    }
+}
+
+pub fn compatibility_for_request(
+    helper: Helper,
+    object_rest_loose: bool,
+) -> Option<HelperCompatibility> {
+    if object_rest_loose && helper == Helper::ObjectWithoutProperties {
+        babel_helper_spec("objectWithoutPropertiesLoose")
+    } else {
+        compatibility(helper)
+    }
+}
+
+pub fn validate_runtime_helper_specs(
+    helpers: impl IntoIterator<Item = HelperCompatibility>,
     module_name: &str,
     version: Option<&str>,
 ) -> Result<(), String> {
-    let helpers: Vec<Helper> = helpers.into_iter().collect();
+    let helpers: Vec<_> = helpers.into_iter().collect();
     if helpers.is_empty() {
         return Ok(());
     }
@@ -141,14 +380,12 @@ pub fn validate_runtime_helpers(
     let version = version
         .and_then(parse_version)
         .ok_or_else(|| "helper-runtime-version-required".to_string())?;
-    for helper in helpers {
-        let contract = compatibility(helper)
-            .ok_or_else(|| format!("helper-not-compatible:{}", helper.name()))?;
+    for contract in helpers {
         if version < contract.minimum_version {
             return Err(format!(
                 "helper-runtime-too-old:{}:{} requires {}.{}.{}",
                 module_name,
-                helper.name(),
+                contract.oxc_name,
                 contract.minimum_version.0,
                 contract.minimum_version.1,
                 contract.minimum_version.2,
@@ -156,6 +393,22 @@ pub fn validate_runtime_helpers(
         }
     }
     Ok(())
+}
+
+pub fn validate_runtime_helpers(
+    helpers: impl IntoIterator<Item = Helper>,
+    module_name: &str,
+    version: Option<&str>,
+) -> Result<(), String> {
+    validate_runtime_helper_specs(
+        helpers
+            .into_iter()
+            .map(|helper| compatibility(helper).ok_or(helper))
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|helper| format!("helper-not-compatible:{}", helper.name()))?,
+        module_name,
+        version,
+    )
 }
 
 pub fn validate_custom_runtime_helpers(
@@ -173,22 +426,9 @@ pub fn validate_custom_runtime_helpers(
         .and_then(parse_version)
         .ok_or_else(|| "helper-runtime-version-required".to_string())?;
     for helper in helpers {
-        let minimum = match *helper {
-            "classPrivateFieldLooseBase" => (7, 10, 0),
-            "checkInRHS" => (7, 22, 0),
-            "construct"
-            | "extends"
-            | "get"
-            | "objectDestructuringEmpty"
-            | "objectWithoutProperties"
-            | "objectWithoutPropertiesLoose"
-            | "readOnlyError"
-            | "toPropertyKey"
-            | "slicedToArray"
-            | "toArray"
-            | "wrapRegExp" => (7, 0, 0),
-            _ => return Err(format!("helper-not-compatible:{helper}")),
-        };
+        let minimum = babel_helper_spec(helper)
+            .ok_or_else(|| format!("helper-not-compatible:{helper}"))?
+            .minimum_version;
         if version < minimum {
             return Err(format!(
                 "helper-runtime-too-old:{module_name}:{helper} requires {}.{}.{}",
@@ -443,6 +683,83 @@ mod tests {
             validate_runtime_helpers([Helper::AsyncToGenerator], "custom-runtime", Some("7.29.7")),
             Err("helper-runtime-module-unsupported:custom-runtime".into())
         );
+    }
+
+    #[test]
+    fn structural_helpers_share_central_version_metadata() {
+        for name in [
+            "construct",
+            "extends",
+            "get",
+            "objectDestructuringEmpty",
+            "objectWithoutProperties",
+            "objectWithoutPropertiesLoose",
+            "readOnlyError",
+            "slicedToArray",
+            "toArray",
+            "toPropertyKey",
+            "wrapRegExp",
+        ] {
+            let spec = babel_helper_spec(name).unwrap();
+            let accepted = format!(
+                "{}.{}.{}",
+                spec.minimum_version.0, spec.minimum_version.1, spec.minimum_version.2
+            );
+            assert!(
+                validate_custom_runtime_helpers(&[name], "@babel/runtime", Some(&accepted)).is_ok()
+            );
+            if spec.minimum_version != (7, 0, 0) {
+                let rejected = format!(
+                    "{}.{}.{}",
+                    spec.minimum_version.0,
+                    spec.minimum_version.1 - 1,
+                    spec.minimum_version.2
+                );
+                assert!(
+                    validate_custom_runtime_helpers(&[name], "@babel/runtime", Some(&rejected))
+                        .is_err()
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn generated_materializer_renames_and_reserves_every_binding() {
+        use crate::generated::inline_helpers::INLINE_EXTENDS_HELPER_DESCRIPTOR;
+
+        let mut requests = CustomHelperRequests::default();
+        requests.materialize_generated(
+            &INLINE_EXTENDS_HELPER_DESCRIPTOR,
+            true,
+            &[("_extends", "_extends3")],
+        );
+        assert_eq!(requests.names, FxHashSet::from_iter(["extends"]));
+        assert!(requests.scope_names.contains("_extends3"));
+        assert!(requests.fragments[0].0.contains("_extends3"));
+        assert!(!contains_identifier_token(
+            &requests.fragments[0].0,
+            "_extends"
+        ));
+        requests.materialize_generated(
+            &INLINE_EXTENDS_HELPER_DESCRIPTOR,
+            true,
+            &[("_extends", "_extends3")],
+        );
+        assert_eq!(requests.fragments.len(), 1);
+    }
+
+    #[test]
+    fn every_custom_helper_has_a_rationale_and_behavioral_test() {
+        for helper in [
+            CustomHelper::IteratorResult,
+            CustomHelper::LegacyDecorate,
+            CustomHelper::LegacyDecorateParam,
+        ] {
+            let spec = custom_helper_spec(helper);
+            assert!(!spec.owner.is_empty());
+            assert!(!spec.rationale.is_empty());
+            assert!(!spec.behavioral_tests.is_empty());
+        }
     }
 
     #[test]

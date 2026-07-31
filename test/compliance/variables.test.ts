@@ -133,7 +133,7 @@ test('object rest applies ToPropertyKey to computed exclusions exactly once', ()
   expect(result.result).toEqual(['selected', { keep: 'kept' }, ['string']]);
 });
 
-test('object-rest computed keys reject non-primitive Symbol.toPrimitive results', () => {
+test('object-rest computed keys match Babel for callable Symbol.toPrimitive results', () => {
   const result = execute<{ result: boolean }>(
     `
       const key = { [Symbol.toPrimitive]() { return function invalid() {}; } };
@@ -144,7 +144,10 @@ test('object-rest computed keys reject non-primitive Symbol.toPrimitive results'
     `,
     { transforms: { destructuring: true } },
   );
-  expect(result.result).toBe(true);
+  // Babel 7.29's toPrimitive helper rejects object results but treats callable
+  // results as property-key-coercible values. Native helper materialization is
+  // deliberately sourced from that pinned implementation.
+  expect(result.result).toBe(false);
 });
 
 test('parameter defaults have their own scope and preserve function length', () => {
