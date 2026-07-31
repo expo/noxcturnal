@@ -2513,6 +2513,13 @@ fn lower_simple_class<'a>(
                     let mut value = method.value;
                     value.r#type = FunctionType::FunctionExpression;
                     value.id = None;
+                    if !value.generator
+                        && !value.r#async
+                        && let Some(body) = value.body.as_mut()
+                    {
+                        body.statements
+                            .insert(0, method_construct_guard(&ast, method.span));
+                    }
                     if super_name.is_some()
                         && let Some(body) = value.body.as_mut()
                     {
@@ -2777,6 +2784,31 @@ fn lower_simple_class<'a>(
     wrapper_statements.push(Statement::FunctionDeclaration(constructor));
     let after_constructor = wrapper_statements.len();
     for method in methods {
+        let method_name =
+            match &method.key {
+                PropertyKey::StaticIdentifier(key) if !method.computed => {
+                    let prefix = match method.kind {
+                        MethodDefinitionKind::Get => "get ",
+                        MethodDefinitionKind::Set => "set ",
+                        _ => "",
+                    };
+                    Some(ast.expression_string_literal(
+                        anchor,
+                        allocator.alloc_str(&format!("{prefix}{}", key.name)),
+                        None,
+                    ))
+                }
+                PropertyKey::StaticIdentifier(key) if method.computed => Some(
+                    computed_function_name(&ast, key.name.as_str(), method.kind, anchor),
+                ),
+                PropertyKey::Identifier(key) if method.computed => Some(computed_function_name(
+                    &ast,
+                    key.name.as_str(),
+                    method.kind,
+                    anchor,
+                )),
+                _ => None,
+            };
         let key = match method.key {
             PropertyKey::StaticIdentifier(key) if !method.computed => {
                 ast.expression_string_literal(anchor, key.name, None)
@@ -2789,9 +2821,14 @@ fn lower_simple_class<'a>(
         let mut function = method.value;
         function.r#type = FunctionType::FunctionExpression;
         function.id = None;
+        let needs_construct_guard = !function.generator && !function.r#async;
         let Some(body) = function.body.as_mut() else {
             return Err("classes-direct-method-body-missing");
         };
+        if needs_construct_guard {
+            body.statements
+                .insert(0, method_construct_guard(&ast, method.span));
+        }
         if super_name.is_some() {
             let mut rewriter = SuperAccessRewriter {
                 allocator,
@@ -2820,11 +2857,17 @@ fn lower_simple_class<'a>(
             MethodDefinitionKind::Set => (PropertyKind::Set, "set"),
             MethodDefinitionKind::Constructor => unreachable!(),
         };
+        let function_expression = Expression::FunctionExpression(function);
+        let function_expression = if let Some(function_name) = method_name {
+            set_function_name(&ast, function_expression, function_name, anchor)
+        } else {
+            function_expression
+        };
         descriptor.push(ast.object_property_kind_object_property(
             anchor,
             PropertyKind::Init,
             ast.property_key_static_identifier(anchor, property),
-            Expression::FunctionExpression(function),
+            function_expression,
             false,
             false,
             false,
@@ -3207,17 +3250,11 @@ fn public_field_initializer<'a>(
 }
 
 #[expect(deprecated)]
-fn class_call_guard<'a>(ast: &AstBuilder<'a>, name: &str, anchor: Span) -> Statement<'a> {
-    let instance_of = ast.expression_binary(
-        anchor,
-        ast.expression_this(anchor),
-        oxc_syntax::operator::BinaryOperator::Instanceof,
-        ast.expression_identifier(anchor, ast.allocator.alloc_str(name)),
-    );
+fn class_call_guard<'a>(ast: &AstBuilder<'a>, _name: &str, anchor: Span) -> Statement<'a> {
     let test = ast.expression_unary(
         anchor,
         oxc_syntax::operator::UnaryOperator::LogicalNot,
-        instance_of,
+        ast.expression_new_target(anchor),
     );
     let mut arguments = ArenaVec::new_in(ast);
     arguments.push(Argument::from(ast.expression_string_literal(
@@ -3232,6 +3269,155 @@ fn class_call_guard<'a>(ast: &AstBuilder<'a>, name: &str, anchor: Span) -> State
         arguments,
     );
     ast.statement_if(anchor, test, ast.statement_throw(anchor, error), None)
+}
+
+#[expect(deprecated)]
+fn method_construct_guard<'a>(ast: &AstBuilder<'a>, anchor: Span) -> Statement<'a> {
+    let mut arguments = ArenaVec::new_in(ast);
+    arguments.push(Argument::from(ast.expression_string_literal(
+        anchor,
+        "Class methods cannot be invoked with 'new'",
+        None,
+    )));
+    let error = ast.expression_new(
+        anchor,
+        ast.expression_identifier(anchor, "TypeError"),
+        None::<ArenaBox<'a, TSTypeParameterInstantiation<'a>>>,
+        arguments,
+    );
+    ast.statement_if(
+        anchor,
+        ast.expression_new_target(anchor),
+        ast.statement_throw(anchor, error),
+        None,
+    )
+}
+
+#[expect(deprecated)]
+fn set_function_name<'a>(
+    ast: &AstBuilder<'a>,
+    function: Expression<'a>,
+    name: Expression<'a>,
+    anchor: Span,
+) -> Expression<'a> {
+    let mut descriptor = ArenaVec::new_in(ast);
+    descriptor.push(ast.object_property_kind_object_property(
+        anchor,
+        PropertyKind::Init,
+        ast.property_key_static_identifier(anchor, "value"),
+        name,
+        false,
+        false,
+        false,
+    ));
+    descriptor.push(ast.object_property_kind_object_property(
+        anchor,
+        PropertyKind::Init,
+        ast.property_key_static_identifier(anchor, "configurable"),
+        ast.expression_boolean_literal(anchor, true),
+        false,
+        false,
+        false,
+    ));
+    let mut arguments = ArenaVec::new_in(ast);
+    arguments.push(Argument::from(function));
+    arguments.push(Argument::from(
+        ast.expression_string_literal(anchor, "name", None),
+    ));
+    arguments.push(Argument::from(ast.expression_object(anchor, descriptor)));
+    ast.expression_call(
+        anchor,
+        Expression::from(ast.member_expression_static(
+            anchor,
+            ast.expression_identifier(anchor, "Object"),
+            ast.identifier_name(anchor, "defineProperty"),
+            false,
+        )),
+        None::<ArenaBox<'a, TSTypeParameterInstantiation<'a>>>,
+        arguments,
+        false,
+    )
+}
+
+#[expect(deprecated)]
+fn computed_function_name<'a>(
+    ast: &AstBuilder<'a>,
+    key_name: &str,
+    kind: MethodDefinitionKind,
+    anchor: Span,
+) -> Expression<'a> {
+    let key = || ast.expression_identifier(anchor, ast.allocator.alloc_str(key_name));
+    let description = || {
+        Expression::from(ast.member_expression_static(
+            anchor,
+            key(),
+            ast.identifier_name(anchor, "description"),
+            false,
+        ))
+    };
+    let undefined = || {
+        ast.expression_unary(
+            anchor,
+            oxc_syntax::operator::UnaryOperator::Void,
+            ast.expression_numeric_literal(anchor, 0.0, None, oxc_ast::ast::NumberBase::Decimal),
+        )
+    };
+    let symbol_name = ast.expression_conditional(
+        anchor,
+        ast.expression_binary(
+            anchor,
+            description(),
+            oxc_syntax::operator::BinaryOperator::StrictEquality,
+            undefined(),
+        ),
+        ast.expression_string_literal(anchor, "", None),
+        ast.expression_binary(
+            anchor,
+            ast.expression_binary(
+                anchor,
+                ast.expression_string_literal(anchor, "[", None),
+                oxc_syntax::operator::BinaryOperator::Addition,
+                description(),
+            ),
+            oxc_syntax::operator::BinaryOperator::Addition,
+            ast.expression_string_literal(anchor, "]", None),
+        ),
+    );
+    let mut string_arguments = ArenaVec::new_in(ast);
+    string_arguments.push(Argument::from(key()));
+    let ordinary_name = ast.expression_call(
+        anchor,
+        ast.expression_identifier(anchor, "String"),
+        None::<ArenaBox<'a, TSTypeParameterInstantiation<'a>>>,
+        string_arguments,
+        false,
+    );
+    let base = ast.expression_conditional(
+        anchor,
+        ast.expression_binary(
+            anchor,
+            ast.expression_unary(anchor, oxc_syntax::operator::UnaryOperator::Typeof, key()),
+            oxc_syntax::operator::BinaryOperator::StrictEquality,
+            ast.expression_string_literal(anchor, "symbol", None),
+        ),
+        symbol_name,
+        ordinary_name,
+    );
+    match kind {
+        MethodDefinitionKind::Get => ast.expression_binary(
+            anchor,
+            ast.expression_string_literal(anchor, "get ", None),
+            oxc_syntax::operator::BinaryOperator::Addition,
+            base,
+        ),
+        MethodDefinitionKind::Set => ast.expression_binary(
+            anchor,
+            ast.expression_string_literal(anchor, "set ", None),
+            oxc_syntax::operator::BinaryOperator::Addition,
+            base,
+        ),
+        _ => base,
+    }
 }
 
 fn local_name(base: &str, reserved: &FxHashSet<String>) -> String {
