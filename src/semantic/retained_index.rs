@@ -45,15 +45,21 @@ struct SemanticReference {
 
 const REFERENCE_READ: u32 = 1 << 31;
 const REFERENCE_WRITE: u32 = 1 << 30;
-const REFERENCE_NODE_MASK: u32 = REFERENCE_WRITE - 1;
+const REFERENCE_MEMBER_WRITE: u32 = 1 << 29;
+const REFERENCE_NODE_MASK: u32 = REFERENCE_MEMBER_WRITE - 1;
 
 impl SemanticReference {
-    fn new(node_id: u32, scope_id: u32, read: bool, write: bool) -> Self {
+    fn new(node_id: u32, scope_id: u32, read: bool, write: bool, member_write: bool) -> Self {
         debug_assert_eq!(node_id & !REFERENCE_NODE_MASK, 0);
         Self {
             node_id_and_flags: node_id
                 | if read { REFERENCE_READ } else { 0 }
-                | if write { REFERENCE_WRITE } else { 0 },
+                | if write { REFERENCE_WRITE } else { 0 }
+                | if member_write {
+                    REFERENCE_MEMBER_WRITE
+                } else {
+                    0
+                },
             scope_id,
         }
     }
@@ -68,6 +74,10 @@ impl SemanticReference {
 
     fn write(&self) -> bool {
         self.node_id_and_flags & REFERENCE_WRITE != 0
+    }
+
+    fn member_write(&self) -> bool {
+        self.node_id_and_flags & REFERENCE_MEMBER_WRITE != 0
     }
 }
 
@@ -117,6 +127,7 @@ pub struct NativeSemanticReference {
     pub parent_start: Option<u32>,
     pub read: bool,
     pub write: bool,
+    pub member_write: bool,
 }
 
 #[napi(object)]
@@ -209,6 +220,7 @@ impl RetainedIndex {
         node_id: u32,
         node_scope_id: u32,
         retain_identifiers: bool,
+        member_write: bool,
     ) {
         self.record_constant(kind, node_id);
         if !retain_identifiers {
@@ -241,6 +253,7 @@ impl RetainedIndex {
                     node_scope_id,
                     reference.is_read(),
                     reference.is_write(),
+                    member_write,
                 );
                 let name_id = self.intern_name(identifier.name.as_str());
                 if let Some(symbol_id) = reference.symbol_id() {
@@ -628,6 +641,7 @@ impl RetainedIndex {
                 .map(|parent_id| self.starts[parent_id as usize]),
             read: reference.read(),
             write: reference.write(),
+            member_write: reference.member_write(),
         }
     }
 
@@ -1062,7 +1076,13 @@ mod tests {
             index.ends[reference_id as usize] = start + 2;
             index.scope_ids[reference_id as usize] = scope_id;
             scope_parents.push(0);
-            references.push(SemanticReference::new(reference_id, scope_id, true, false));
+            references.push(SemanticReference::new(
+                reference_id,
+                scope_id,
+                true,
+                false,
+                false,
+            ));
         }
         index.bindings.insert(
             (0, 0),

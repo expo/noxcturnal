@@ -151,10 +151,6 @@ fn assignment_target_name(target: &AssignmentTarget<'_>) -> Option<String> {
     target.get_expression().and_then(expression_name)
 }
 
-/// Propagate mutation-target state from a parent to one child during traversal.
-/// Terminal mutation constructs establish the state; transparent wrappers and
-/// assignment-pattern containers carry it without any ancestor walks.
-
 pub(crate) struct DirectPackedFields {
     pub(crate) words: [u32; 32],
     pub(crate) len: usize,
@@ -163,6 +159,7 @@ pub(crate) struct DirectPackedFields {
 pub(crate) fn packed_fields_direct(
     kind: AstKind<'_>,
     member_write: bool,
+    member_root_write: bool,
     scoping: Option<&Scoping>,
     utf16: Option<&[u32]>,
     requested: FieldMask,
@@ -211,6 +208,10 @@ pub(crate) fn packed_fields_direct(
                     push(
                         field_ids::WRITE,
                         0x8000_0000 | u32::from(reference.is_write()),
+                    );
+                    push(
+                        field_ids::MEMBER_WRITE,
+                        0x8000_0000 | u32::from(member_root_write),
                     );
                     if let Some(symbol_id) = reference.symbol_id() {
                         push(
@@ -673,6 +674,7 @@ pub(crate) fn packed_fields_direct(
 pub(crate) fn fields(
     kind: AstKind<'_>,
     member_write: bool,
+    member_root_write: bool,
     scoping: Option<&Scoping>,
     requested: FieldMask,
 ) -> Vec<NodeField> {
@@ -702,6 +704,11 @@ pub(crate) fn fields(
                 if let Some(reference) = reference {
                     push!(field_ids::READ, "read", reference.is_read().to_string());
                     push!(field_ids::WRITE, "write", reference.is_write().to_string());
+                    push!(
+                        field_ids::MEMBER_WRITE,
+                        "memberWrite",
+                        member_root_write.to_string(),
+                    );
                 }
                 if let Some(reference_id) = identifier.reference_id.get()
                     && let Some(symbol_id) = scoping.get_reference(reference_id).symbol_id()

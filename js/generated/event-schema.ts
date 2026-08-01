@@ -214,6 +214,7 @@ export const FIELD_KEYS = [
   'global',
   'read',
   'write',
+  'memberWrite',
   'bindingScopeId',
   'binding',
   'value',
@@ -262,7 +263,7 @@ export const FIELD_KEY_IDS = new Map<string, number>(
   FIELD_KEYS.map((value, index) => [value, index]),
 );
 export const PREDICATE_FIELDS: Readonly<Record<string, readonly string[]>> = {
-  Identifier: ['name', 'global', 'read', 'write', 'bindingScopeId', 'binding'],
+  Identifier: ['name', 'global', 'read', 'write', 'memberWrite', 'bindingScopeId', 'binding'],
   StringLiteral: ['value', 'constantKind', 'constantValue'],
   NumericLiteral: ['value', 'constantKind', 'constantValue'],
   BooleanLiteral: ['value', 'constantKind', 'constantValue'],
@@ -327,6 +328,7 @@ export const PREDICATE_VALUE_DOMAINS: Readonly<
     global: { kinds: ['boolean'] },
     read: { kinds: ['boolean'] },
     write: { kinds: ['boolean'] },
+    memberWrite: { kinds: ['boolean'] },
     bindingScopeId: { kinds: ['number'] },
     binding: { kinds: ['boolean'] },
   },
@@ -3518,6 +3520,7 @@ export interface NativeNodeFields {
     readonly global?: boolean;
     readonly read?: boolean;
     readonly write?: boolean;
+    readonly memberWrite?: boolean;
     readonly bindingScopeId?: number;
     readonly binding?: boolean;
   };
@@ -3747,6 +3750,7 @@ export interface NativeRouteFields {
     readonly global?: boolean;
     readonly read?: boolean;
     readonly write?: boolean;
+    readonly memberWrite?: boolean;
     readonly bindingScopeId?: number;
     readonly binding?: boolean;
     readonly computed?: true | false;
@@ -3795,6 +3799,7 @@ export interface NativeRouteFields {
     readonly global: boolean;
     readonly read?: boolean;
     readonly write?: boolean;
+    readonly memberWrite: boolean;
     readonly bindingScopeId?: number;
   };
   FunctionDeclaration: {
@@ -3837,6 +3842,7 @@ export interface NativeRouteFields {
     readonly global?: boolean;
     readonly read?: boolean;
     readonly write?: boolean;
+    readonly memberWrite?: boolean;
     readonly bindingScopeId?: number;
     readonly binding?: boolean;
     readonly kind?: PropertyKind | VariableDeclarationKind;
@@ -3912,6 +3918,7 @@ export interface NativeRoutePredicates {
     readonly global: boolean;
     readonly read: boolean;
     readonly write: boolean;
+    readonly memberWrite: boolean;
     readonly bindingScopeId: number;
     readonly binding: boolean;
   };

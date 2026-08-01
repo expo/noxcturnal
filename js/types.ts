@@ -147,6 +147,12 @@ export interface NodeSummary {
   parentType?: string;
   parentStart?: number;
 }
+export interface SemanticReferenceView extends NodeView {
+  readonly type: 'Identifier';
+  readonly read: boolean;
+  readonly write: boolean;
+  readonly memberWrite: boolean;
+}
 export interface SourceLocation {
   start: Position;
   end: Position;
@@ -214,7 +220,7 @@ export interface QueryResult {
     name: string;
     scopeId: ScopeId;
     declaration: NodeSummary | null;
-    references: NodeView[];
+    references: SemanticReferenceView[];
   }[];
 }
 export interface InspectRequest {

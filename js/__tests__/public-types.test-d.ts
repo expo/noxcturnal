@@ -388,6 +388,10 @@ defineVisitor('ReferencedIdentifier', { fields: ['global', 'name'] }, path => {
   // @ts-expect-error `binding` never appears on referenced identifiers.
   path.node.binding;
 });
+defineVisitor('ReferencedIdentifier', { fields: ['memberWrite'] }, path => {
+  const memberWrite: boolean = path.node.memberWrite;
+  void memberWrite;
+});
 // Collapsed function keys narrow nodeKind to their own literal.
 defineVisitor('FunctionDeclaration', { fields: ['nodeKind'] }, path => {
   const nodeKind: 'FunctionDeclaration' = path.node.nodeKind;

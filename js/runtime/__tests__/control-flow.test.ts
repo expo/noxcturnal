@@ -485,6 +485,72 @@ test('resolves the nearest binding and renames only its semantic references', ()
   );
 });
 
+test('classifies member-chain writes on visitor and binding references', () => {
+  const visitorFlags = new Map<string, boolean>();
+  let bindingFlags: boolean[] = [];
+  const plugin = defineNativePlugin({
+    name: 'member-write-references',
+    visitors: [
+      defineVisitor('ReferencedIdentifier', { fields: ['name', 'memberWrite'] }, path => {
+        if (path.node.name === 'binding' || path.node.name === 'key') {
+          visitorFlags.set(`${path.node.name}@${path.node.start}`, path.node.memberWrite);
+        }
+      }),
+      defineVisitor('Program', { scope: true }, path => {
+        bindingFlags = path.scope
+          .getBinding('binding')!
+          .references.map(reference => reference.memberWrite === true);
+      }),
+    ],
+  });
+  const source = `
+    let binding = source, key;
+    use(binding);
+    binding = source;
+    binding.value;
+    binding.value = next;
+    binding[key].value++;
+    ++binding.value;
+    binding.value += next;
+    binding.value ||= next;
+    delete (binding).value;
+    delete binding?.value;
+    ({ value: binding.value } = source);
+    for (binding.value in source) break;
+    for (binding.value of source) break;
+  `;
+  transform(
+    source,
+    'fixture.ts',
+    defineNativePipeline({ phases: [{ name: 'classify', plugins: [plugin] }] }),
+  );
+
+  assert.deepEqual(bindingFlags, [
+    false,
+    false,
+    false,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+  ]);
+  const bindingVisitorFlags = [...visitorFlags]
+    .filter(([key]) => key.startsWith('binding@'))
+    .map(([, value]) => value);
+  assert.deepEqual(bindingVisitorFlags, bindingFlags);
+  assert.ok(
+    [...visitorFlags]
+      .filter(([key]) => key.startsWith('key@'))
+      .every(([, value]) => value === false),
+  );
+});
+
 test('resolves multiple bindings through one scope lookup', () => {
   let observed: unknown;
   const plugin = defineNativePlugin({

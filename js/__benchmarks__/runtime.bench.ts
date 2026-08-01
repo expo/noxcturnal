@@ -1042,6 +1042,41 @@ for (const count of [1_000, 10_000]) {
   });
 }
 
+const inlineRequiresReferencePipeline = defineNativePipeline({
+  phases: [
+    {
+      name: 'inline-requires-reference-classification',
+      plugins: [
+        defineNativePlugin({
+          name: 'inline-requires-reference-classification',
+          visitors: [
+            defineVisitor('Program', { scope: true }, path => {
+              for (const reference of path.scope.getBinding('binding')?.references ?? []) {
+                void (reference.write || reference.memberWrite);
+              }
+            }),
+          ],
+        }),
+      ],
+    },
+  ],
+});
+for (const [count, depth] of [
+  [256, 1],
+  [2_048, 1],
+  [256, 8],
+  [2_048, 8],
+] as const) {
+  const chain = '.value'.repeat(depth);
+  const safeReferences = `const binding=require('dependency');${Array.from(
+    { length: count },
+    () => `consume(binding${chain});`,
+  ).join('')}`;
+  verifiedBench(`inline-requires safe references: ${count} depth ${depth}`, () => {
+    benchmarkTransform(safeReferences, 'inline-requires.js', inlineRequiresReferencePipeline);
+  });
+}
+
 for (const count of [16, 128, 512]) {
   const phases = Array.from({ length: count }, (_, index) => ({
     name: `retained-${index}`,

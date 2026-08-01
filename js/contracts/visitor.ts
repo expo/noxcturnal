@@ -21,6 +21,7 @@ import type {
   QueryResult,
   ScalarPredicate,
   ScalarValue,
+  SemanticReferenceView,
   SourceLocation,
   TransformOptions,
 } from '../types';
@@ -65,7 +66,7 @@ export interface NativeBinding {
   readonly global: boolean;
   readonly scopeId?: number;
   readonly declaration: NodeSummary | null;
-  readonly references: readonly (NodeView | NodeSummary)[];
+  readonly references: readonly SemanticReferenceView[];
   readonly path: NativeNodePath | null;
   readonly scope: NativeScope | null;
 }

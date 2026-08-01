@@ -12,10 +12,10 @@ import type {
   FunctionMap,
   InspectRequest,
   NativeEvent,
-  NodeSummary,
   NodeView,
   QueryRequest,
   QueryResult,
+  SemanticReferenceView,
   SourceLocation,
   TransformOptions,
 } from '../types';
@@ -50,7 +50,7 @@ export class NativeTransformSession {
   #sourceIdentifiers: Set<string> | null = null;
   #eventCache: (NativeEvent | undefined)[] = [];
   #queryCache = new WeakMap<QueryRequest, QueryResult>();
-  #globalReferencesCache = new Map<string, NodeSummary[]>();
+  #globalReferencesCache = new Map<string, SemanticReferenceView[]>();
   #childrenCache = new Map<number, number[]>();
   #childIdsCache = new Map<number, Set<number>>();
   #prefetchedChildTypes = new Set<string>();
@@ -186,9 +186,16 @@ export class NativeTransformSession {
       )) {
         const references = fact.references.map(reference => ({
           id: reference.id,
-          type: 'Identifier',
+          type: 'Identifier' as const,
           start: reference.start,
           end: reference.end,
+          scopeId: reference.scopeId,
+          parentId: reference.parentId,
+          parentType: reference.parentType,
+          parentStart: reference.parentStart,
+          read: reference.read,
+          write: reference.write,
+          memberWrite: reference.memberWrite,
         }));
         globals[fact.name] = { references };
         this.#globalReferencesCache.set(fact.name, references);
@@ -219,7 +226,7 @@ export class NativeTransformSession {
       for (const capture of this.#binding('query.captures').queryCapturesBatch(captureIds)) {
         captures[capture.functionId] = capture.references.map(reference => ({
           id: reference.id,
-          type: 'Identifier',
+          type: 'Identifier' as const,
           start: reference.start,
           end: reference.end,
           scopeId: reference.scopeId,
@@ -489,7 +496,7 @@ export class NativeTransformSession {
       return fact == null ? [] : [fact];
     });
   }
-  globalReferences(name: string): NodeSummary[] {
+  globalReferences(name: string): SemanticReferenceView[] {
     const cached = this.#globalReferencesCache.get(name);
     if (cached) return cached;
     const references =
@@ -497,9 +504,16 @@ export class NativeTransformSession {
         .queryGlobals([name])[0]
         ?.references.map(reference => ({
           id: reference.id,
-          type: 'Identifier',
+          type: 'Identifier' as const,
           start: reference.start,
           end: reference.end,
+          scopeId: reference.scopeId,
+          parentId: reference.parentId,
+          parentType: reference.parentType,
+          parentStart: reference.parentStart,
+          read: reference.read,
+          write: reference.write,
+          memberWrite: reference.memberWrite,
         })) ?? [];
     this.#globalReferencesCache.set(name, references);
     return references;

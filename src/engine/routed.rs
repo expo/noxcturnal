@@ -23,7 +23,9 @@ use super::fields::{
     fields, packed_fields_direct, packed_scalar, predicate_scalar_type, utf16_index,
 };
 
-use super::member::{MemberPathInterner, mutation_target_child, tracks_member_writes};
+use super::member::{
+    MemberPathInterner, member_write_root_child, mutation_target_child, tracks_member_writes,
+};
 use super::{RoutedCounts, decode_route_manifest};
 
 enum PredicateScalar<'a> {
@@ -85,7 +87,10 @@ pub fn materialize_routed_buffer(
         route_scratch: Vec::new(),
         parent_ids: FxHashSet::default(),
         target_stack: Vec::new(),
-        tracks_member_writes: tracks_member_writes(Some(&manifest)),
+        tracks_member_writes: tracks_member_writes(
+            Some(&manifest),
+            manifest.retention_capabilities,
+        ),
         member_paths: MemberPathInterner::default(),
     };
     collector.visit_program(&parsed.program);
@@ -190,7 +195,7 @@ struct RoutedEventCollector<'a> {
     counts: RoutedCounts,
     route_scratch: Vec<u32>,
     parent_ids: FxHashSet<u32>,
-    target_stack: Vec<(AstKind<'a>, bool)>,
+    target_stack: Vec<(AstKind<'a>, bool, bool)>,
     tracks_member_writes: bool,
     member_paths: MemberPathInterner,
 }
@@ -211,6 +216,7 @@ impl RoutedEventCollector<'_> {
         node_fields: &[NodeField],
         kind: AstKind<'_>,
         member_write: bool,
+        member_root_write: bool,
     ) -> bool {
         let field_name = field_key_name(predicate.field_id).expect("validated predicate field");
         if field_name == "memberPath" {
@@ -230,8 +236,13 @@ impl RoutedEventCollector<'_> {
                 actual == self.member_paths.expected(expected)
             });
         }
-        if let Some(actual) = direct_predicate_scalar(kind, self.scoping, field_name, member_write)
-        {
+        if let Some(actual) = direct_predicate_scalar(
+            kind,
+            self.scoping,
+            field_name,
+            member_write,
+            member_root_write,
+        ) {
             return compiled_predicate_matches(predicate, actual);
         }
         let node_type_id = ast_kind_protocol_id(kind);
@@ -267,7 +278,13 @@ impl RoutedEventCollector<'_> {
         })
     }
 
-    fn emit(&mut self, kind: AstKind<'_>, side: VisitSide, member_write: bool) {
+    fn emit(
+        &mut self,
+        kind: AstKind<'_>,
+        side: VisitSide,
+        member_write: bool,
+        member_root_write: bool,
+    ) {
         let sequence = self.sequence;
         self.sequence += 1;
         let protocol_id = ast_kind_protocol_id(kind);
@@ -293,7 +310,13 @@ impl RoutedEventCollector<'_> {
         let mut predicate_fields = if fallback_predicates.is_empty() {
             Vec::new()
         } else {
-            fields(kind, member_write, self.scoping, fallback_predicates)
+            fields(
+                kind,
+                member_write,
+                member_root_write,
+                self.scoping,
+                fallback_predicates,
+            )
         };
         normalize_routed_fields(&mut predicate_fields, self.utf16);
         let mut matched_route_ids = std::mem::take(&mut self.route_scratch);
@@ -308,7 +331,13 @@ impl RoutedEventCollector<'_> {
         {
             debug_assert_eq!(route.node_type_id, protocol_id);
             if route.predicates.iter().all(|predicate| {
-                self.predicate_matches(predicate, &predicate_fields, kind, member_write)
+                self.predicate_matches(
+                    predicate,
+                    &predicate_fields,
+                    kind,
+                    member_write,
+                    member_root_write,
+                )
             }) {
                 if route.side == side {
                     matched_route_ids.push(route.id);
@@ -338,13 +367,20 @@ impl RoutedEventCollector<'_> {
         let direct_payload = packed_fields_direct(
             kind,
             member_write,
+            member_root_write,
             self.scoping,
             self.utf16,
             payload_mask,
             &mut self.string_ids,
         );
         let mut fallback_payload = if direct_payload.is_none() && !payload_mask.is_empty() {
-            fields(kind, member_write, self.scoping, payload_mask)
+            fields(
+                kind,
+                member_write,
+                member_root_write,
+                self.scoping,
+                payload_mask,
+            )
         } else {
             Vec::new()
         };
@@ -432,7 +468,7 @@ pub(crate) fn has_direct_predicate_scalar(node_type_id: u32, field: &str) -> boo
     match node_type_name(node_type_id) {
         Some("Identifier") => matches!(
             field,
-            "name" | "global" | "read" | "write" | "bindingScopeId" | "binding"
+            "name" | "global" | "read" | "write" | "memberWrite" | "bindingScopeId" | "binding"
         ),
         Some("VariableDeclaration") | Some("VariableDeclarator") => field == "kind",
         Some("StaticMemberExpression") => matches!(field, "memberPath" | "write"),
@@ -448,6 +484,7 @@ fn direct_predicate_scalar<'a>(
     scoping: Option<&Scoping>,
     field: &str,
     member_write: bool,
+    member_root_write: bool,
 ) -> Option<PredicateScalar<'a>> {
     match kind {
         AstKind::IdentifierReference(identifier) => {
@@ -470,6 +507,7 @@ fn direct_predicate_scalar<'a>(
                     .map(|id| PredicateScalar::Boolean(scoping.get_reference(id).is_read())),
                 "write" => reference
                     .map(|id| PredicateScalar::Boolean(scoping.get_reference(id).is_write())),
+                "memberWrite" => Some(PredicateScalar::Boolean(member_root_write)),
                 "bindingScopeId" => reference.and_then(|id| {
                     scoping.get_reference(id).symbol_id().map(|symbol_id| {
                         PredicateScalar::Number(scoping.symbol_scope_id(symbol_id).index() as f64)
@@ -541,33 +579,46 @@ impl<'a> Visit<'a> for RoutedEventCollector<'a> {
             && self
                 .target_stack
                 .last()
-                .is_some_and(|(parent, parent_is_target)| {
+                .is_some_and(|(parent, parent_is_target, _)| {
                     mutation_target_child(kind, *parent, *parent_is_target)
                 });
+        let member_root_write = self.tracks_member_writes
+            && self.target_stack.last().is_some_and(
+                |(parent, parent_member_write, parent_is_member_root)| {
+                    member_write_root_child(
+                        kind,
+                        *parent,
+                        *parent_member_write,
+                        *parent_is_member_root,
+                    )
+                },
+            );
         if self.scoping.is_none() {
             kind.set_node_id(NodeId::new(self.node_count as usize));
         }
         self.node_count += 1;
-        self.emit(kind, VisitSide::Enter, member_write);
+        self.emit(kind, VisitSide::Enter, member_write, member_root_write);
         if self.tracks_member_writes {
-            self.target_stack.push((kind, member_write));
+            self.target_stack
+                .push((kind, member_write, member_root_write));
         }
     }
 
     fn leave_node(&mut self, kind: AstKind<'a>) {
-        let member_write = if self.tracks_member_writes {
-            self.target_stack
+        let (member_write, member_root_write) = if self.tracks_member_writes {
+            let (_, member_write, member_root_write) = self
+                .target_stack
                 .pop()
-                .expect("routed target traversal enter/leave balance")
-                .1
+                .expect("routed target traversal enter/leave balance");
+            (member_write, member_root_write)
         } else {
-            false
+            (false, false)
         };
         if self.manifest.routes_by_type[ast_kind_protocol_id(kind) as usize]
             .iter()
             .any(|route| route.side == VisitSide::Exit)
         {
-            self.emit(kind, VisitSide::Exit, member_write);
+            self.emit(kind, VisitSide::Exit, member_write, member_root_write);
         }
     }
 

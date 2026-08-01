@@ -43,6 +43,7 @@ export function adaptBindingFact(
       bindingScopeId: fact.scopeId,
       read: reference.read,
       write: reference.write,
+      memberWrite: reference.memberWrite,
     })),
   };
 }

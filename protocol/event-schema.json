@@ -491,7 +491,7 @@
     "ClassExpression": ["Class"]
   },
   "predicateFields": {
-    "Identifier": ["name", "global", "read", "write", "bindingScopeId", "binding"],
+    "Identifier": ["name", "global", "read", "write", "memberWrite", "bindingScopeId", "binding"],
     "StringLiteral": ["value", "constantKind", "constantValue"],
     "NumericLiteral": ["value", "constantKind", "constantValue"],
     "BooleanLiteral": ["value", "constantKind", "constantValue"],
@@ -556,6 +556,7 @@
     "global",
     "read",
     "write",
+    "memberWrite",
     "bindingScopeId",
     "binding",
     "value",
@@ -605,6 +606,7 @@
       "global?": "boolean",
       "read?": "boolean",
       "write?": "boolean",
+      "memberWrite?": "boolean",
       "bindingScopeId?": "number",
       "binding?": "boolean"
     },

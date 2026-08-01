@@ -16,7 +16,7 @@ use crate::sourcemap::function_map::FunctionMapCollector;
 use crate::syntax::classification::source_type;
 
 use super::fields::{packed_fields_direct, utf16_index};
-use super::member::{mutation_target_child, tracks_member_writes};
+use super::member::{member_write_root_child, mutation_target_child, tracks_member_writes};
 use super::retained::routed_buffer_from_index;
 use super::{
     MaterializedSessionParts, RETAIN_CALLS, RETAIN_CHILDREN, RETAIN_CONSTANTS, RETAIN_IDENTIFIERS,
@@ -29,7 +29,7 @@ struct EventCollector<'a> {
     utf16: Option<&'a [u32]>,
     retained_index: RetainedIndex,
     function_map: Option<FunctionMapCollector<'a>>,
-    target_stack: Vec<(AstKind<'a>, bool)>,
+    target_stack: Vec<(AstKind<'a>, bool, bool)>,
     tracks_member_writes: bool,
     retention_routes: Option<&'a CompiledManifest>,
     retention_capabilities: u32,
@@ -43,7 +43,7 @@ struct SyntaxIndexCollector<'a> {
     retention_capabilities: u32,
     retained_string_ids: FxHashMap<String, u32>,
     parent_stack: Vec<(u32, u32)>,
-    target_stack: Vec<(AstKind<'a>, bool)>,
+    target_stack: Vec<(AstKind<'a>, bool, bool)>,
     tracks_member_writes: bool,
     node_count: u32,
     uid_names: FxHashSet<String>,
@@ -79,9 +79,20 @@ impl<'a> Visit<'a> for SyntaxIndexCollector<'a> {
             && self
                 .target_stack
                 .last()
-                .is_some_and(|(parent, parent_is_target)| {
+                .is_some_and(|(parent, parent_is_target, _)| {
                     mutation_target_child(kind, *parent, *parent_is_target)
                 });
+        let member_root_write = self.tracks_member_writes
+            && self.target_stack.last().is_some_and(
+                |(parent, parent_member_write, parent_is_member_root)| {
+                    member_write_root_child(
+                        kind,
+                        *parent,
+                        *parent_member_write,
+                        *parent_is_member_root,
+                    )
+                },
+            );
         let id = self.node_count;
         self.node_count += 1;
         kind.set_node_id(NodeId::new(id as usize));
@@ -120,6 +131,7 @@ impl<'a> Visit<'a> for SyntaxIndexCollector<'a> {
             let retained_fields = packed_fields_direct(
                 kind,
                 member_write,
+                member_root_write,
                 None,
                 self.utf16,
                 if retain_all_fields || retain_structural_fields {
@@ -136,7 +148,8 @@ impl<'a> Visit<'a> for SyntaxIndexCollector<'a> {
         }
         self.parent_stack.push((id, protocol_id));
         if self.tracks_member_writes {
-            self.target_stack.push((kind, member_write));
+            self.target_stack
+                .push((kind, member_write, member_root_write));
         }
     }
 
@@ -171,7 +184,7 @@ impl<'a> EventCollector<'a> {
             })
     }
 
-    fn record_summary(&mut self, kind: AstKind<'a>, member_write: bool) {
+    fn record_summary(&mut self, kind: AstKind<'a>, member_write: bool, member_root_write: bool) {
         let id = kind.node_id();
         let node = self.nodes.get_node(id);
         let span = kind.span();
@@ -200,6 +213,7 @@ impl<'a> EventCollector<'a> {
             id.index() as u32,
             scope_id.index() as u32,
             self.retention_capabilities & RETAIN_IDENTIFIERS != 0,
+            member_root_write,
         );
         if self.retention_capabilities & RETAIN_CALLS != 0
             && let AstKind::CallExpression(call) = kind
@@ -239,6 +253,7 @@ impl<'a> EventCollector<'a> {
             let retained_fields = packed_fields_direct(
                 kind,
                 member_write,
+                member_root_write,
                 Some(self.scoping),
                 self.utf16,
                 if retain_all_fields || retain_structural_fields {
@@ -264,17 +279,29 @@ impl<'a> Visit<'a> for EventCollector<'a> {
             && self
                 .target_stack
                 .last()
-                .is_some_and(|(parent, parent_is_target)| {
+                .is_some_and(|(parent, parent_is_target, _)| {
                     mutation_target_child(kind, *parent, *parent_is_target)
                 });
+        let member_root_write = self.tracks_member_writes
+            && self.target_stack.last().is_some_and(
+                |(parent, parent_member_write, parent_is_member_root)| {
+                    member_write_root_child(
+                        kind,
+                        *parent,
+                        *parent_member_write,
+                        *parent_is_member_root,
+                    )
+                },
+            );
         self.retained_index
             .record_enter(kind.node_id().index() as u32);
         if let Some(function_map) = &mut self.function_map {
             function_map.enter(kind);
         }
-        self.record_summary(kind, member_write);
+        self.record_summary(kind, member_write, member_root_write);
         if self.tracks_member_writes {
-            self.target_stack.push((kind, member_write));
+            self.target_stack
+                .push((kind, member_write, member_root_write));
         }
     }
     fn leave_node(&mut self, kind: AstKind<'a>) {
@@ -355,7 +382,10 @@ pub(crate) fn materialize_with_scope_parents(
             retained_string_ids: FxHashMap::default(),
             parent_stack: Vec::new(),
             target_stack: Vec::new(),
-            tracks_member_writes: tracks_member_writes(retention_manifest.as_ref()),
+            tracks_member_writes: tracks_member_writes(
+                retention_manifest.as_ref(),
+                retention_capabilities,
+            ),
             node_count: 0,
             uid_names: FxHashSet::default(),
             function_map: collect_function_map.then(|| FunctionMapCollector::new(source, filename)),
@@ -432,7 +462,10 @@ pub(crate) fn materialize_with_scope_parents(
         retention_capabilities,
         retained_string_ids: FxHashMap::default(),
         target_stack: Vec::new(),
-        tracks_member_writes: tracks_member_writes(retention_manifest.as_ref()),
+        tracks_member_writes: tracks_member_writes(
+            retention_manifest.as_ref(),
+            retention_capabilities,
+        ),
     };
     collector.visit_program(&parsed.program);
     collector

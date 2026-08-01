@@ -82,6 +82,7 @@ for (const key of ['ClassDeclaration', 'ClassExpression']) {
   routeRows.ReferencedIdentifier = {
     ...identifier,
     global: { type: 'boolean', optional: false },
+    memberWrite: { type: 'boolean', optional: false },
   };
 }
 

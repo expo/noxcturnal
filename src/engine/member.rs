@@ -8,50 +8,56 @@ use rustc_hash::FxHashMap;
 use crate::generated::event_schema::{NODE_TYPE_COUNT, field_ids, node_type_name};
 use crate::protocol::manifest::CompiledManifest;
 
-use super::RETAIN_MODULE_FACTS;
+use super::{RETAIN_IDENTIFIERS, RETAIN_MODULE_FACTS};
 
-pub(super) fn tracks_member_writes(manifest: Option<&CompiledManifest>) -> bool {
-    manifest.is_some_and(|manifest| {
-        manifest.retention_capabilities & RETAIN_MODULE_FACTS != 0
-            || (0..=NODE_TYPE_COUNT as u32).any(|type_id| {
-                manifest.structural_parent_types.contains(type_id)
-                    && matches!(
-                        node_type_name(type_id),
-                        Some(
-                            "AssignmentExpression"
-                                | "UpdateExpression"
-                                | "UnaryExpression"
-                                | "ForInStatement"
-                                | "ForOfStatement"
-                                | "ParenthesizedExpression"
-                                | "TSAsExpression"
-                                | "TSSatisfiesExpression"
-                                | "TSNonNullExpression"
-                                | "TSTypeAssertion"
-                                | "ChainExpression"
-                                | "AssignmentTargetRest"
-                                | "AssignmentTargetWithDefault"
-                                | "AssignmentTargetPropertyProperty"
-                                | "ArrayAssignmentTarget"
-                                | "ObjectAssignmentTarget"
+pub(super) fn tracks_member_writes(
+    manifest: Option<&CompiledManifest>,
+    retention_capabilities: u32,
+) -> bool {
+    retention_capabilities & RETAIN_IDENTIFIERS != 0
+        || manifest.is_some_and(|manifest| {
+            manifest.retention_capabilities & RETAIN_MODULE_FACTS != 0
+                || (0..=NODE_TYPE_COUNT as u32).any(|type_id| {
+                    manifest.structural_parent_types.contains(type_id)
+                        && matches!(
+                            node_type_name(type_id),
+                            Some(
+                                "AssignmentExpression"
+                                    | "UpdateExpression"
+                                    | "UnaryExpression"
+                                    | "ForInStatement"
+                                    | "ForOfStatement"
+                                    | "ParenthesizedExpression"
+                                    | "TSAsExpression"
+                                    | "TSSatisfiesExpression"
+                                    | "TSNonNullExpression"
+                                    | "TSTypeAssertion"
+                                    | "ChainExpression"
+                                    | "AssignmentTargetRest"
+                                    | "AssignmentTargetWithDefault"
+                                    | "AssignmentTargetPropertyProperty"
+                                    | "ArrayAssignmentTarget"
+                                    | "ObjectAssignmentTarget"
+                            )
                         )
-                    )
-            })
-            || manifest
-                .merged_field_mask_by_type
-                .iter()
-                .enumerate()
-                .any(|(type_id, mask)| {
-                    matches!(
-                        node_type_name(type_id as u32),
-                        Some(
-                            "StaticMemberExpression"
-                                | "ComputedMemberExpression"
-                                | "PrivateFieldExpression"
-                        )
-                    ) && mask.wants(field_ids::WRITE)
                 })
-    })
+                || manifest
+                    .merged_field_mask_by_type
+                    .iter()
+                    .enumerate()
+                    .any(|(type_id, mask)| {
+                        matches!(
+                            node_type_name(type_id as u32),
+                            Some(
+                                "StaticMemberExpression"
+                                    | "ComputedMemberExpression"
+                                    | "PrivateFieldExpression"
+                            )
+                        ) && mask.wants(field_ids::WRITE)
+                            || node_type_name(type_id as u32) == Some("Identifier")
+                                && mask.wants(field_ids::MEMBER_WRITE)
+                    })
+        })
 }
 
 pub(crate) fn static_member_path(expression: &Expression<'_>) -> Option<String> {
@@ -158,6 +164,32 @@ pub(crate) fn mutation_target_child(
             parent_is_target && property.binding.span() == span
         }
         AstKind::ArrayAssignmentTarget(_) | AstKind::ObjectAssignmentTarget(_) => parent_is_target,
+        _ => false,
+    }
+}
+
+/// Carry a writable member chain only through its object side and transparent
+/// wrappers. Computed keys and unrelated descendants never inherit the flag.
+pub(crate) fn member_write_root_child(
+    child: AstKind<'_>,
+    parent: AstKind<'_>,
+    parent_member_write: bool,
+    parent_is_member_root: bool,
+) -> bool {
+    if !parent_member_write && !parent_is_member_root {
+        return false;
+    }
+    let span = child.span();
+    match parent {
+        AstKind::StaticMemberExpression(expression) => expression.object.span() == span,
+        AstKind::ComputedMemberExpression(expression) => expression.object.span() == span,
+        AstKind::PrivateFieldExpression(expression) => expression.object.span() == span,
+        AstKind::ParenthesizedExpression(expression) => expression.expression.span() == span,
+        AstKind::TSAsExpression(expression) => expression.expression.span() == span,
+        AstKind::TSSatisfiesExpression(expression) => expression.expression.span() == span,
+        AstKind::TSNonNullExpression(expression) => expression.expression.span() == span,
+        AstKind::TSTypeAssertion(expression) => expression.expression.span() == span,
+        AstKind::ChainExpression(expression) => expression.expression.span() == span,
         _ => false,
     }
 }
