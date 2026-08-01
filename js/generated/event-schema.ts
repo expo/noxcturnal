@@ -285,8 +285,9 @@ export const PREDICATE_FIELDS: Readonly<Record<string, readonly string[]>> = {
     'staticArgument',
   ],
   NewExpression: ['argumentCount', 'calleeName', 'staticArgument'],
-  StaticMemberExpression: ['computed', 'property', 'memberPath', 'rootName', 'rootGlobal'],
-  ComputedMemberExpression: ['computed', 'property', 'memberPath'],
+  StaticMemberExpression: ['computed', 'property', 'memberPath', 'rootName', 'rootGlobal', 'write'],
+  ComputedMemberExpression: ['computed', 'property', 'memberPath', 'write'],
+  PrivateFieldExpression: ['write'],
   Function: ['nodeKind', 'async', 'generator', 'parameterCount', 'name', 'bodyStart', 'bodyEnd'],
   ArrowFunctionExpression: ['async', 'expression', 'parameterCount', 'bodyStart', 'bodyEnd'],
   Class: ['nodeKind', 'name'],
@@ -456,12 +457,15 @@ export const PREDICATE_VALUE_DOMAINS: Readonly<
     memberPath: { kinds: ['string'] },
     rootName: { kinds: ['string'] },
     rootGlobal: { kinds: ['boolean'] },
+    write: { kinds: ['boolean'] },
   },
   ComputedMemberExpression: {
     computed: { kinds: ['boolean'], values: [true] },
     property: { kinds: ['string'] },
     memberPath: { kinds: ['string'] },
+    write: { kinds: ['boolean'] },
   },
+  PrivateFieldExpression: { write: { kinds: ['boolean'] } },
   Function: {
     nodeKind: {
       kinds: ['string'],
@@ -3598,11 +3602,16 @@ export interface NativeNodeFields {
     readonly memberPath?: string;
     readonly rootName?: string;
     readonly rootGlobal?: boolean;
+    readonly write: boolean;
   };
   ComputedMemberExpression: {
     readonly computed: true;
     readonly property?: string;
     readonly memberPath?: string;
+    readonly write: boolean;
+  };
+  PrivateFieldExpression: {
+    readonly write: boolean;
   };
   Function: {
     readonly nodeKind: FunctionType;
@@ -3773,6 +3782,7 @@ export interface NativeRouteFields {
     readonly computed?: true | false;
     readonly property?: string;
     readonly memberPath?: string;
+    readonly write: boolean;
     readonly rootName?: string;
     readonly rootGlobal?: boolean;
   };
@@ -3889,6 +3899,9 @@ export interface NativeRoutePredicates {
     readonly parameterCount: number;
     readonly bodyStart: number;
     readonly bodyEnd: number;
+  };
+  MemberExpression: {
+    readonly write: boolean;
   };
   MetaProperty: {
     readonly meta: 'import' | 'new';

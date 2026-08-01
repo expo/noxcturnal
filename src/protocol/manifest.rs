@@ -2,7 +2,7 @@ use napi::{Error, Result, Status};
 use rustc_hash::FxHashSet;
 
 use crate::generated::event_schema::{
-    NODE_TYPE_COUNT, field_key_id, field_key_name, predicate_field_supported,
+    NODE_TYPE_COUNT, field_key_id, field_key_name, node_type_name, predicate_field_supported,
 };
 
 use super::constants::{
@@ -458,8 +458,10 @@ pub(crate) fn decode_route_manifest(
                 .fold(FieldMask::none(), |mask, field_id| mask.with(field_id))
         })
         .collect::<Vec<_>>();
+    let write_field_id = field_key_id("write");
     let semantic_mask = semantic_field_keys
         .iter()
+        .filter(|name| **name != "write")
         .filter_map(|name| field_key_id(name))
         .fold(FieldMask::none(), |mask, field_id| mask.with(field_id));
     // Structural ancestry comes from the syntax traversal's parent stack.
@@ -467,7 +469,12 @@ pub(crate) fn decode_route_manifest(
     let needs_semantics = include_scope
         || merged_field_mask_by_type
             .iter()
-            .any(|mask| mask.intersects(semantic_mask));
+            .enumerate()
+            .any(|(type_id, mask)| {
+                mask.intersects(semantic_mask)
+                    || node_type_name(type_id as u32) == Some("Identifier")
+                        && write_field_id.is_some_and(|field_id| mask.wants(field_id))
+            });
     let fallback_predicate_mask_by_type = routes_by_type
         .iter()
         .enumerate()

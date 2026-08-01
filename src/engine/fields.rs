@@ -8,6 +8,7 @@ use oxc_ast::{
     },
 };
 use oxc_semantic::Scoping;
+use oxc_span::GetSpan;
 use rustc_hash::FxHashMap;
 
 use crate::event_types::NodeField;
@@ -214,6 +215,53 @@ fn assignment_target_name(target: &AssignmentTarget<'_>) -> Option<String> {
     target.get_expression().and_then(expression_name)
 }
 
+/// Propagate mutation-target state from a parent to one child during traversal.
+/// Terminal mutation constructs establish the state; transparent wrappers and
+/// assignment-pattern containers carry it without any ancestor walks.
+pub(crate) fn mutation_target_child(
+    child: AstKind<'_>,
+    parent: AstKind<'_>,
+    parent_is_target: bool,
+) -> bool {
+    let span = child.span();
+    match parent {
+        AstKind::AssignmentExpression(expression) => expression.left.span() == span,
+        AstKind::UpdateExpression(expression) => expression.argument.span() == span,
+        AstKind::UnaryExpression(expression) => {
+            expression.operator.as_str() == "delete" && expression.argument.span() == span
+        }
+        AstKind::ForInStatement(statement) => statement.left.span() == span,
+        AstKind::ForOfStatement(statement) => statement.left.span() == span,
+        AstKind::ParenthesizedExpression(expression) => {
+            parent_is_target && expression.expression.span() == span
+        }
+        AstKind::TSAsExpression(expression) => {
+            parent_is_target && expression.expression.span() == span
+        }
+        AstKind::TSSatisfiesExpression(expression) => {
+            parent_is_target && expression.expression.span() == span
+        }
+        AstKind::TSNonNullExpression(expression) => {
+            parent_is_target && expression.expression.span() == span
+        }
+        AstKind::TSTypeAssertion(expression) => {
+            parent_is_target && expression.expression.span() == span
+        }
+        AstKind::ChainExpression(expression) => {
+            parent_is_target && expression.expression.span() == span
+        }
+        AstKind::AssignmentTargetRest(rest) => parent_is_target && rest.target.span() == span,
+        AstKind::AssignmentTargetWithDefault(default) => {
+            parent_is_target && default.binding.span() == span
+        }
+        AstKind::AssignmentTargetPropertyProperty(property) => {
+            parent_is_target && property.binding.span() == span
+        }
+        AstKind::ArrayAssignmentTarget(_) | AstKind::ObjectAssignmentTarget(_) => parent_is_target,
+        _ => false,
+    }
+}
+
 pub(crate) struct DirectPackedFields {
     pub(crate) words: [u32; 32],
     pub(crate) len: usize,
@@ -221,6 +269,7 @@ pub(crate) struct DirectPackedFields {
 
 pub(crate) fn packed_fields_direct(
     kind: AstKind<'_>,
+    member_write: bool,
     scoping: Option<&Scoping>,
     utf16: Option<&[u32]>,
     requested: FieldMask,
@@ -424,6 +473,7 @@ pub(crate) fn packed_fields_direct(
         }
         AstKind::StaticMemberExpression(member) => {
             push(field_ids::COMPUTED, 0x8000_0000);
+            push(field_ids::WRITE, 0x8000_0000 | u32::from(member_write));
             if wants(field_ids::PROPERTY) {
                 let value = intern_packed(strings, &member.property.name);
                 push(field_ids::PROPERTY, value);
@@ -455,6 +505,7 @@ pub(crate) fn packed_fields_direct(
         }
         AstKind::ComputedMemberExpression(member) => {
             push(field_ids::COMPUTED, 0x8000_0001);
+            push(field_ids::WRITE, 0x8000_0000 | u32::from(member_write));
             if let Expression::StringLiteral(property) = &member.expression {
                 if wants(field_ids::PROPERTY) {
                     let value = intern_packed(strings, &property.value);
@@ -468,6 +519,9 @@ pub(crate) fn packed_fields_direct(
                     push(field_ids::MEMBER_PATH, value);
                 }
             }
+        }
+        AstKind::PrivateFieldExpression(_) => {
+            push(field_ids::WRITE, 0x8000_0000 | u32::from(member_write));
         }
         AstKind::Function(function) => {
             if wants(field_ids::NODE_KIND) {
@@ -725,6 +779,7 @@ pub(crate) fn packed_fields_direct(
 
 pub(crate) fn fields(
     kind: AstKind<'_>,
+    member_write: bool,
     scoping: Option<&Scoping>,
     requested: FieldMask,
 ) -> Vec<NodeField> {
@@ -902,6 +957,7 @@ pub(crate) fn fields(
         }
         AstKind::StaticMemberExpression(member) => {
             push!(field_ids::COMPUTED, "computed", "false".into());
+            push!(field_ids::WRITE, "write", member_write.to_string(),);
             push!(
                 field_ids::PROPERTY,
                 "property",
@@ -935,6 +991,7 @@ pub(crate) fn fields(
         }
         AstKind::ComputedMemberExpression(member) => {
             push!(field_ids::COMPUTED, "computed", "true".into());
+            push!(field_ids::WRITE, "write", member_write.to_string(),);
             if let Expression::StringLiteral(property) = &member.expression {
                 push!(field_ids::PROPERTY, "property", property.value.to_string());
                 if let Some(path) = static_member_path(&member.object) {
@@ -945,6 +1002,9 @@ pub(crate) fn fields(
                     );
                 }
             }
+        }
+        AstKind::PrivateFieldExpression(_) => {
+            push!(field_ids::WRITE, "write", member_write.to_string(),);
         }
         AstKind::Function(function) => {
             push!(

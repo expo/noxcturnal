@@ -59,6 +59,10 @@ const SEMANTIC_ROUTE_FIELDS = new Set([
   'rootGlobal',
 ]);
 
+function routeFieldNeedsSemantics(nodeType: string, field: string): boolean {
+  return SEMANTIC_ROUTE_FIELDS.has(field) && (field !== 'write' || nodeType === 'Identifier');
+}
+
 function phaseArtifactDemand(base: ArtifactDemand, prepared: PreparedPhase): ArtifactDemand {
   let demand = base;
   if (prepared.includeParent) demand |= ArtifactDemand.StructuralParents;
@@ -70,8 +74,10 @@ function phaseArtifactDemand(base: ArtifactDemand, prepared: PreparedPhase): Art
     prepared.retentionCapabilities & ((1 << 0) | (1 << 2)) ||
     prepared.compiledRoutes.some(
       route =>
-        route.payloadFields.some(field => SEMANTIC_ROUTE_FIELDS.has(field)) ||
-        Object.keys(route.predicates).some(field => SEMANTIC_ROUTE_FIELDS.has(field)),
+        route.payloadFields.some(field => routeFieldNeedsSemantics(route.nodeType, field)) ||
+        Object.keys(route.predicates).some(field =>
+          routeFieldNeedsSemantics(route.nodeType, field),
+        ),
     )
   )
     demand |= ArtifactDemand.BindingsReferences;

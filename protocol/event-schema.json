@@ -514,8 +514,16 @@
       "staticArgument"
     ],
     "NewExpression": ["argumentCount", "calleeName", "staticArgument"],
-    "StaticMemberExpression": ["computed", "property", "memberPath", "rootName", "rootGlobal"],
-    "ComputedMemberExpression": ["computed", "property", "memberPath"],
+    "StaticMemberExpression": [
+      "computed",
+      "property",
+      "memberPath",
+      "rootName",
+      "rootGlobal",
+      "write"
+    ],
+    "ComputedMemberExpression": ["computed", "property", "memberPath", "write"],
+    "PrivateFieldExpression": ["write"],
     "Function": [
       "nodeKind",
       "async",
@@ -680,12 +688,17 @@
       "property": "string",
       "memberPath?": "string",
       "rootName?": "string",
-      "rootGlobal?": "boolean"
+      "rootGlobal?": "boolean",
+      "write": "boolean"
     },
     "ComputedMemberExpression": {
       "computed": "true",
       "property?": "string",
-      "memberPath?": "string"
+      "memberPath?": "string",
+      "write": "boolean"
+    },
+    "PrivateFieldExpression": {
+      "write": "boolean"
     },
     "Function": {
       "nodeKind": "FunctionType",

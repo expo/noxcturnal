@@ -472,6 +472,196 @@ test('expands Function aliases to arrow functions in nested routed traversal', (
   assert.deepEqual(functions, ['ArrowFunctionExpression']);
 });
 
+test('classifies exact member-expression mutation targets', () => {
+  const visits: Array<[string, string | undefined, boolean]> = [];
+  const plugin = defineNativePlugin({
+    name: 'member-write-fields',
+    visitors: [
+      defineVisitor('MemberExpression', { fields: ['memberPath', 'write'] }, path => {
+        visits.push([path.node.type, path.node.memberPath, path.node.write]);
+      }),
+    ],
+  });
+  const source = `
+    process.env.READ;
+    process.env.A = value;
+    process.env.B += value;
+    process.env.C ||= value;
+    process.env.D++;
+    ++process.env.E;
+    delete (process.env.F);
+    ({ value: process.env.G, [process.env.KEY]: target } = source);
+    [process.env.H] = source;
+    for (process.env.I in source) {}
+    for (process.env.J of source) {}
+    (process.env.K as any) = value;
+    (process.env.L satisfies any) = value;
+    process.env.M! = value;
+    (<any>process.env.N) = value;
+    [process.env.O = fallback, ...process.env.P] = source;
+    process.env['COMPUTED'] = value;
+    delete process?.env.OPTIONAL;
+    delete process?.env['OPTIONAL_COMPUTED'];
+    process?.env.OPTIONAL_READ;
+    process.env.NESTED.value = value;
+    class Example { #value = 0; update() { this.#value++; } }
+  `;
+  const result = transform(
+    source,
+    'fixture.ts',
+    defineNativePipeline({ phases: [{ name: 'main', plugins: [plugin] }] }),
+  );
+  assert.equal(result.status, 'complete');
+
+  const byPath = new Map<string, boolean[]>();
+  for (const [, memberPath, write] of visits) {
+    if (!memberPath) continue;
+    const writes = byPath.get(memberPath);
+    if (writes) writes.push(write);
+    else byPath.set(memberPath, [write]);
+  }
+  assert.deepEqual(byPath.get('process.env.READ'), [false]);
+  for (const name of [
+    'A',
+    'B',
+    'C',
+    'D',
+    'E',
+    'F',
+    'G',
+    'H',
+    'I',
+    'J',
+    'K',
+    'L',
+    'M',
+    'N',
+    'O',
+    'P',
+    'COMPUTED',
+    'OPTIONAL',
+    'OPTIONAL_COMPUTED',
+  ]) {
+    assert.deepEqual(byPath.get(`process.env.${name}`), [true], name);
+  }
+  assert.deepEqual(byPath.get('process.env.KEY'), [false]);
+  assert.deepEqual(byPath.get('process.env.OPTIONAL_READ'), [false]);
+  assert.deepEqual(byPath.get('process.env.NESTED'), [false]);
+  assert.deepEqual(byPath.get('process.env.NESTED.value'), [true]);
+  assert.ok(
+    visits.some(
+      ([type, memberPath, write]) =>
+        type === 'PrivateFieldExpression' && memberPath == null && write,
+    ),
+  );
+});
+
+test('retains correct member writes when broad field retention is enabled', () => {
+  const session = openRetained('process.env.READ; process.env.WRITE = value;', 'fixture.js');
+  const members = session.nodes(['StaticMemberExpression']);
+  const writes = members
+    .filter(
+      member =>
+        member.memberPath === 'process.env.READ' || member.memberPath === 'process.env.WRITE',
+    )
+    .map(member => [member.memberPath, member.write]);
+  session.close();
+  assert.deepEqual(writes, [
+    ['process.env.READ', false],
+    ['process.env.WRITE', true],
+  ]);
+});
+
+test('retains correct member writes for structural child fields', () => {
+  const route = {
+    id: 0,
+    pluginId: 0,
+    nodeType: 'AssignmentExpression',
+    side: 'enter' as const,
+    order: 0,
+    predicates: {},
+    payloadFields: [],
+  };
+  const manifest = packRouteManifest([route], false, false, 0, ['AssignmentExpression']);
+  const session = new NativeTransformSession(
+    'process.env.WRITE = value;',
+    'fixture.js',
+    {},
+    manifest,
+  );
+  const member = session
+    .nodes(['StaticMemberExpression'])
+    .find(node => node.memberPath === 'process.env.WRITE');
+  session.close();
+  assert.equal(member?.write, true);
+});
+
+test('matches member write predicates without delivering the field', () => {
+  const reads: Array<[string, string | undefined]> = [];
+  const plugin = defineNativePlugin({
+    name: 'member-write-predicate',
+    visitors: [
+      defineVisitor(
+        'MemberExpression',
+        { fields: ['memberPath'], where: { write: { equals: false } } },
+        path => reads.push([path.node.type, path.node.memberPath]),
+      ),
+    ],
+  });
+  const result = transform(
+    `
+      process.env.READ;
+      process.env.WRITE = value;
+      process.env['COMPUTED_READ'];
+      process.env['COMPUTED_WRITE'] = value;
+      class Example { #value; read() { return this.#value; } write() { this.#value++; } }
+    `,
+    'fixture.js',
+    defineNativePipeline({ phases: [{ name: 'main', plugins: [plugin] }] }),
+  );
+  assert.equal(result.status, 'complete');
+  assert.ok(reads.some(([, path]) => path === 'process.env.READ'));
+  assert.ok(!reads.some(([, path]) => path === 'process.env.WRITE'));
+  assert.ok(reads.some(([, path]) => path === 'process.env.COMPUTED_READ'));
+  assert.ok(!reads.some(([, path]) => path === 'process.env.COMPUTED_WRITE'));
+  assert.equal(reads.filter(([type]) => type === 'PrivateFieldExpression').length, 1);
+});
+
+test('matches static member paths structurally without materializing predicate strings', () => {
+  const matched: string[] = [];
+  const plugin = defineNativePlugin({
+    name: 'structural-member-path-predicate',
+    visitors: [
+      defineVisitor(
+        'StaticMemberExpression|ComputedMemberExpression',
+        {
+          fields: ['property'],
+          where: {
+            memberPath: {
+              oneOf: ['process.env.STATIC', 'process.env.COMPUTED', 'process.env.DOTTED'],
+            },
+            write: { equals: false },
+          },
+        },
+        path => matched.push(path.node.property ?? ''),
+      ),
+    ],
+  });
+  const result = transform(
+    `
+      process.env.STATIC;
+      process.env['COMPUTED'];
+      process['env.DOTTED'];
+      process.env.OTHER;
+      process.env.STATIC = value;
+    `,
+    'fixture.js',
+    defineNativePipeline({ phases: [{ name: 'main', plugins: [plugin] }] }),
+  );
+  assert.equal(result.status, 'complete');
+  assert.deepEqual(matched, ['STATIC', 'COMPUTED', 'env.DOTTED']);
+});
+
 test('exposes common scalar discriminants without child-tree transfer', () => {
   const session = openRetained('const value = { platform: 1 }; value.total += -2;', 'fixture.js');
   const events = session.nodes(['ObjectProperty', 'AssignmentExpression', 'UnaryExpression']);

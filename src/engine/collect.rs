@@ -22,7 +22,7 @@ use crate::sourcemap::function_map::FunctionMapCollector;
 use crate::syntax::classification::source_type;
 
 use super::fields::{
-    fields, packed_fields_direct, packed_scalar, predicate_scalar_type, static_member_path_with,
+    fields, mutation_target_child, packed_fields_direct, packed_scalar, predicate_scalar_type,
     utf16_index,
 };
 use super::retained::routed_buffer_from_index;
@@ -38,6 +38,8 @@ struct EventCollector<'a> {
     utf16: Option<&'a [u32]>,
     retained_index: RetainedIndex,
     function_map: Option<FunctionMapCollector<'a>>,
+    target_stack: Vec<(AstKind<'a>, bool)>,
+    tracks_member_writes: bool,
     retention_routes: Option<&'a CompiledManifest>,
     retention_capabilities: u32,
     retained_string_ids: FxHashMap<String, u32>,
@@ -50,9 +52,55 @@ struct SyntaxIndexCollector<'a> {
     retention_capabilities: u32,
     retained_string_ids: FxHashMap<String, u32>,
     parent_stack: Vec<(u32, u32)>,
+    target_stack: Vec<(AstKind<'a>, bool)>,
+    tracks_member_writes: bool,
     node_count: u32,
     uid_names: FxHashSet<String>,
     function_map: Option<FunctionMapCollector<'a>>,
+}
+
+fn tracks_member_writes(manifest: Option<&CompiledManifest>) -> bool {
+    manifest.is_some_and(|manifest| {
+        manifest.retention_capabilities & RETAIN_MODULE_FACTS != 0
+            || (0..=crate::generated::event_schema::NODE_TYPE_COUNT as u32).any(|type_id| {
+                manifest.structural_parent_types.contains(type_id)
+                    && matches!(
+                        node_type_name(type_id),
+                        Some(
+                            "AssignmentExpression"
+                                | "UpdateExpression"
+                                | "UnaryExpression"
+                                | "ForInStatement"
+                                | "ForOfStatement"
+                                | "ParenthesizedExpression"
+                                | "TSAsExpression"
+                                | "TSSatisfiesExpression"
+                                | "TSNonNullExpression"
+                                | "TSTypeAssertion"
+                                | "ChainExpression"
+                                | "AssignmentTargetRest"
+                                | "AssignmentTargetWithDefault"
+                                | "AssignmentTargetPropertyProperty"
+                                | "ArrayAssignmentTarget"
+                                | "ObjectAssignmentTarget"
+                        )
+                    )
+            })
+            || manifest
+                .merged_field_mask_by_type
+                .iter()
+                .enumerate()
+                .any(|(type_id, mask)| {
+                    matches!(
+                        node_type_name(type_id as u32),
+                        Some(
+                            "StaticMemberExpression"
+                                | "ComputedMemberExpression"
+                                | "PrivateFieldExpression"
+                        )
+                    ) && mask.wants(crate::generated::event_schema::field_ids::WRITE)
+                })
+    })
 }
 
 impl SyntaxIndexCollector<'_> {
@@ -80,6 +128,13 @@ impl SyntaxIndexCollector<'_> {
 
 impl<'a> Visit<'a> for SyntaxIndexCollector<'a> {
     fn enter_node(&mut self, kind: AstKind<'a>) {
+        let member_write = self.tracks_member_writes
+            && self
+                .target_stack
+                .last()
+                .is_some_and(|(parent, parent_is_target)| {
+                    mutation_target_child(kind, *parent, *parent_is_target)
+                });
         let id = self.node_count;
         self.node_count += 1;
         kind.set_node_id(NodeId::new(id as usize));
@@ -117,6 +172,7 @@ impl<'a> Visit<'a> for SyntaxIndexCollector<'a> {
         if retain_all_fields || retain_structural_fields || !requested.is_empty() {
             let retained_fields = packed_fields_direct(
                 kind,
+                member_write,
                 None,
                 self.utf16,
                 if retain_all_fields || retain_structural_fields {
@@ -132,6 +188,9 @@ impl<'a> Visit<'a> for SyntaxIndexCollector<'a> {
             }
         }
         self.parent_stack.push((id, protocol_id));
+        if self.tracks_member_writes {
+            self.target_stack.push((kind, member_write));
+        }
     }
 
     fn leave_node(&mut self, kind: AstKind<'a>) {
@@ -139,6 +198,11 @@ impl<'a> Visit<'a> for SyntaxIndexCollector<'a> {
             .parent_stack
             .pop()
             .expect("syntax traversal enter/leave balance");
+        if self.tracks_member_writes {
+            self.target_stack
+                .pop()
+                .expect("syntax target traversal enter/leave balance");
+        }
         if self.retains_traversal_kind(kind) {
             self.retained_index.record_exit(id);
         }
@@ -160,7 +224,7 @@ impl<'a> EventCollector<'a> {
             })
     }
 
-    fn record_summary(&mut self, kind: AstKind<'a>) {
+    fn record_summary(&mut self, kind: AstKind<'a>, member_write: bool) {
         let id = kind.node_id();
         let node = self.nodes.get_node(id);
         let span = kind.span();
@@ -227,6 +291,7 @@ impl<'a> EventCollector<'a> {
         if retain_all_fields || retain_structural_fields || !requested.is_empty() {
             let retained_fields = packed_fields_direct(
                 kind,
+                member_write,
                 Some(self.scoping),
                 self.utf16,
                 if retain_all_fields || retain_structural_fields {
@@ -248,14 +313,29 @@ impl<'a> EventCollector<'a> {
 
 impl<'a> Visit<'a> for EventCollector<'a> {
     fn enter_node(&mut self, kind: AstKind<'a>) {
+        let member_write = self.tracks_member_writes
+            && self
+                .target_stack
+                .last()
+                .is_some_and(|(parent, parent_is_target)| {
+                    mutation_target_child(kind, *parent, *parent_is_target)
+                });
         self.retained_index
             .record_enter(kind.node_id().index() as u32);
         if let Some(function_map) = &mut self.function_map {
             function_map.enter(kind);
         }
-        self.record_summary(kind);
+        self.record_summary(kind, member_write);
+        if self.tracks_member_writes {
+            self.target_stack.push((kind, member_write));
+        }
     }
     fn leave_node(&mut self, kind: AstKind<'a>) {
+        if self.tracks_member_writes {
+            self.target_stack
+                .pop()
+                .expect("semantic target traversal enter/leave balance");
+        }
         if self.retains_traversal_kind(kind) {
             self.retained_index
                 .record_exit(kind.node_id().index() as u32);
@@ -327,6 +407,8 @@ pub(crate) fn materialize_with_scope_parents(
             retention_capabilities,
             retained_string_ids: FxHashMap::default(),
             parent_stack: Vec::new(),
+            target_stack: Vec::new(),
+            tracks_member_writes: tracks_member_writes(retention_manifest.as_ref()),
             node_count: 0,
             uid_names: FxHashSet::default(),
             function_map: collect_function_map.then(|| FunctionMapCollector::new(source, filename)),
@@ -402,6 +484,8 @@ pub(crate) fn materialize_with_scope_parents(
         retention_routes: retention_manifest.as_ref(),
         retention_capabilities,
         retained_string_ids: FxHashMap::default(),
+        target_stack: Vec::new(),
+        tracks_member_writes: tracks_member_writes(retention_manifest.as_ref()),
     };
     collector.visit_program(&parsed.program);
     collector
@@ -615,6 +699,9 @@ pub fn materialize_routed_buffer(
         counts: RoutedCounts::default(),
         route_scratch: Vec::new(),
         parent_ids: FxHashSet::default(),
+        target_stack: Vec::new(),
+        tracks_member_writes: tracks_member_writes(Some(&manifest)),
+        member_paths: MemberPathInterner::default(),
     };
     collector.visit_program(&parsed.program);
     let node_count = collector.node_count;
@@ -718,6 +805,117 @@ struct RoutedEventCollector<'a> {
     counts: RoutedCounts,
     route_scratch: Vec<u32>,
     parent_ids: FxHashSet<u32>,
+    target_stack: Vec<(AstKind<'a>, bool)>,
+    tracks_member_writes: bool,
+    member_paths: MemberPathInterner,
+}
+
+#[derive(Default)]
+struct MemberPathInterner {
+    transitions: FxHashMap<(u32, u8), u32>,
+    expressions: FxHashMap<(u32, u32, u8), Option<u32>>,
+    expected: FxHashMap<(usize, usize), u32>,
+}
+
+impl MemberPathInterner {
+    const ROOT: u32 = u32::MAX;
+
+    fn bytes(&mut self, mut state: u32, bytes: &[u8]) -> u32 {
+        for &byte in bytes {
+            let key = (state, byte);
+            state = if let Some(id) = self.transitions.get(&key) {
+                *id
+            } else {
+                let id = self.transitions.len() as u32;
+                self.transitions.insert(key, id);
+                id
+            };
+        }
+        state
+    }
+
+    fn component(&mut self, parent: u32, component: &str) -> u32 {
+        let state = if parent == Self::ROOT {
+            parent
+        } else {
+            self.bytes(parent, b".")
+        };
+        self.bytes(state, component.as_bytes())
+    }
+
+    fn expression(&mut self, expression: &Expression<'_>) -> Option<u32> {
+        let span = expression.span();
+        let tag = match expression {
+            Expression::Identifier(_) => 0,
+            Expression::StaticMemberExpression(_) => 1,
+            Expression::ComputedMemberExpression(_) => 2,
+            _ => return None,
+        };
+        let cache_key = (span.start, span.end, tag);
+        if let Some(state) = self.expressions.get(&cache_key) {
+            return *state;
+        }
+        let state = match expression {
+            Expression::Identifier(identifier) => {
+                Some(self.component(Self::ROOT, &identifier.name))
+            }
+            Expression::StaticMemberExpression(member) => self
+                .expression(&member.object)
+                .map(|parent| self.component(parent, &member.property.name)),
+            Expression::ComputedMemberExpression(member) => {
+                let property = match &member.expression {
+                    Expression::StringLiteral(property) => Some(property.value.as_str()),
+                    _ => None,
+                };
+                property.and_then(|property| {
+                    self.expression(&member.object)
+                        .map(|parent| self.component(parent, property))
+                })
+            }
+            _ => None,
+        };
+        self.expressions.insert(cache_key, state);
+        state
+    }
+
+    fn kind(&mut self, kind: AstKind<'_>) -> Option<u32> {
+        let (span, tag) = match kind {
+            AstKind::StaticMemberExpression(member) => (member.span, 1),
+            AstKind::ComputedMemberExpression(member) => (member.span, 2),
+            _ => return None,
+        };
+        let cache_key = (span.start, span.end, tag);
+        if let Some(state) = self.expressions.get(&cache_key) {
+            return *state;
+        }
+        let state = match kind {
+            AstKind::StaticMemberExpression(member) => self
+                .expression(&member.object)
+                .map(|parent| self.component(parent, &member.property.name)),
+            AstKind::ComputedMemberExpression(member) => {
+                let Expression::StringLiteral(property) = &member.expression else {
+                    return None;
+                };
+                self.expression(&member.object)
+                    .map(|parent| self.component(parent, &property.value))
+            }
+            _ => unreachable!(),
+        };
+        self.expressions.insert(cache_key, state);
+        state
+    }
+
+    fn expected(&mut self, path: &str) -> u32 {
+        // Compiled predicate strings remain at stable addresses for the lifetime
+        // of this collector, so allocation identity is a copy-free cache key.
+        let key = (path.as_ptr() as usize, path.len());
+        if let Some(id) = self.expected.get(&key) {
+            return *id;
+        }
+        let state = self.bytes(Self::ROOT, path.as_bytes());
+        self.expected.insert(key, state);
+        state
+    }
 }
 
 impl RoutedEventCollector<'_> {
@@ -735,9 +933,28 @@ impl RoutedEventCollector<'_> {
         predicate: &CompiledPredicate,
         node_fields: &[NodeField],
         kind: AstKind<'_>,
+        member_write: bool,
     ) -> bool {
         let field_name = field_key_name(predicate.field_id).expect("validated predicate field");
-        if let Some(actual) = direct_predicate_scalar(kind, self.scoping, field_name) {
+        if field_name == "memberPath" {
+            let actual = self.member_paths.kind(kind);
+            if predicate.operation == 2 {
+                let expected = matches!(
+                    predicate.values.first(),
+                    Some(CompiledScalar::Boolean(true))
+                );
+                return actual.is_some() == expected;
+            }
+            let Some(actual) = actual else { return false };
+            return predicate.values.iter().any(|expected| {
+                let CompiledScalar::String(expected) = expected else {
+                    return false;
+                };
+                actual == self.member_paths.expected(expected)
+            });
+        }
+        if let Some(actual) = direct_predicate_scalar(kind, self.scoping, field_name, member_write)
+        {
             return compiled_predicate_matches(predicate, actual);
         }
         let node_type_id = ast_kind_protocol_id(kind);
@@ -773,7 +990,7 @@ impl RoutedEventCollector<'_> {
         })
     }
 
-    fn emit(&mut self, kind: AstKind<'_>, side: VisitSide) {
+    fn emit(&mut self, kind: AstKind<'_>, side: VisitSide, member_write: bool) {
         let sequence = self.sequence;
         self.sequence += 1;
         let protocol_id = ast_kind_protocol_id(kind);
@@ -799,7 +1016,7 @@ impl RoutedEventCollector<'_> {
         let mut predicate_fields = if fallback_predicates.is_empty() {
             Vec::new()
         } else {
-            fields(kind, self.scoping, fallback_predicates)
+            fields(kind, member_write, self.scoping, fallback_predicates)
         };
         normalize_routed_fields(&mut predicate_fields, self.utf16);
         let mut matched_route_ids = std::mem::take(&mut self.route_scratch);
@@ -813,11 +1030,9 @@ impl RoutedEventCollector<'_> {
             .filter(|route| side == VisitSide::Enter || route.side == side)
         {
             debug_assert_eq!(route.node_type_id, protocol_id);
-            if route
-                .predicates
-                .iter()
-                .all(|predicate| self.predicate_matches(predicate, &predicate_fields, kind))
-            {
+            if route.predicates.iter().all(|predicate| {
+                self.predicate_matches(predicate, &predicate_fields, kind, member_write)
+            }) {
                 if route.side == side {
                     matched_route_ids.push(route.id);
                 } else {
@@ -845,13 +1060,14 @@ impl RoutedEventCollector<'_> {
         }
         let direct_payload = packed_fields_direct(
             kind,
+            member_write,
             self.scoping,
             self.utf16,
             payload_mask,
             &mut self.string_ids,
         );
         let mut fallback_payload = if direct_payload.is_none() && !payload_mask.is_empty() {
-            fields(kind, self.scoping, payload_mask)
+            fields(kind, member_write, self.scoping, payload_mask)
         } else {
             Vec::new()
         };
@@ -942,7 +1158,9 @@ pub(crate) fn has_direct_predicate_scalar(node_type_id: u32, field: &str) -> boo
             "name" | "global" | "read" | "write" | "bindingScopeId" | "binding"
         ),
         Some("VariableDeclaration") | Some("VariableDeclarator") => field == "kind",
-        Some("StaticMemberExpression") => field == "memberPath",
+        Some("StaticMemberExpression") => matches!(field, "memberPath" | "write"),
+        Some("ComputedMemberExpression") => matches!(field, "memberPath" | "write"),
+        Some("PrivateFieldExpression") => field == "write",
         Some("Function") | Some("Class") => field == "nodeKind",
         _ => false,
     }
@@ -952,6 +1170,7 @@ fn direct_predicate_scalar<'a>(
     kind: AstKind<'a>,
     scoping: Option<&Scoping>,
     field: &str,
+    member_write: bool,
 ) -> Option<PredicateScalar<'a>> {
     match kind {
         AstKind::IdentifierReference(identifier) => {
@@ -998,9 +1217,12 @@ fn direct_predicate_scalar<'a>(
         AstKind::VariableDeclarator(declarator) if field == "kind" => Some(
             PredicateScalar::String(Cow::Owned(declarator.kind.to_string())),
         ),
-        AstKind::StaticMemberExpression(member) if field == "memberPath" => {
-            static_member_path_with(&member.object, Some(&member.property.name))
-                .map(|path| PredicateScalar::String(Cow::Owned(path)))
+        AstKind::StaticMemberExpression(_)
+        | AstKind::ComputedMemberExpression(_)
+        | AstKind::PrivateFieldExpression(_)
+            if field == "write" =>
+        {
+            Some(PredicateScalar::Boolean(member_write))
         }
         AstKind::Function(function) if field == "nodeKind" => Some(PredicateScalar::String(
             Cow::Owned(format!("{:?}", function.r#type)),
@@ -1038,19 +1260,37 @@ fn compiled_predicate_matches(predicate: &CompiledPredicate, actual: PredicateSc
 
 impl<'a> Visit<'a> for RoutedEventCollector<'a> {
     fn enter_node(&mut self, kind: AstKind<'a>) {
+        let member_write = self.tracks_member_writes
+            && self
+                .target_stack
+                .last()
+                .is_some_and(|(parent, parent_is_target)| {
+                    mutation_target_child(kind, *parent, *parent_is_target)
+                });
         if self.scoping.is_none() {
             kind.set_node_id(NodeId::new(self.node_count as usize));
         }
         self.node_count += 1;
-        self.emit(kind, VisitSide::Enter);
+        self.emit(kind, VisitSide::Enter, member_write);
+        if self.tracks_member_writes {
+            self.target_stack.push((kind, member_write));
+        }
     }
 
     fn leave_node(&mut self, kind: AstKind<'a>) {
+        let member_write = if self.tracks_member_writes {
+            self.target_stack
+                .pop()
+                .expect("routed target traversal enter/leave balance")
+                .1
+        } else {
+            false
+        };
         if self.manifest.routes_by_type[ast_kind_protocol_id(kind) as usize]
             .iter()
             .any(|route| route.side == VisitSide::Exit)
         {
-            self.emit(kind, VisitSide::Exit);
+            self.emit(kind, VisitSide::Exit, member_write);
         }
     }
 
