@@ -1,5 +1,3 @@
-use std::borrow::Cow;
-
 use napi::{Error, Result, Status};
 
 pub use crate::event_types::{NativeCommitResult, NativeDecodedCommit, NativeVlqMap};
@@ -12,10 +10,12 @@ use crate::sourcemap::function_map::FunctionMap;
 
 mod collect;
 mod fields;
+mod member;
 mod pipeline;
 mod retained;
+mod routed;
 mod session;
-pub(crate) use collect::materialize_routed_buffer;
+pub(crate) use routed::materialize_routed_buffer;
 
 struct MaterializedSessionParts {
     pub(crate) program_body_offsets: [u32; 3],
@@ -33,12 +33,6 @@ const RETAIN_CHILDREN: u32 = 1 << 3;
 const RETAIN_INSPECTION: u32 = 1 << 4;
 const RETAIN_MODULE_FACTS: u32 = 1 << 5;
 
-enum PredicateScalar<'a> {
-    String(Cow<'a, str>),
-    Number(f64),
-    Boolean(bool),
-}
-
 /// Field keys whose values come from Oxc's semantic analysis rather than the AST.
 const SEMANTIC_FIELD_KEYS: [&str; 6] = [
     "global",
@@ -52,7 +46,7 @@ const SEMANTIC_FIELD_KEYS: [&str; 6] = [
 fn decode_route_manifest(data: &[u8]) -> Result<CompiledManifest> {
     decode_protocol_manifest(
         data,
-        collect::has_direct_predicate_scalar,
+        routed::has_direct_predicate_scalar,
         &SEMANTIC_FIELD_KEYS,
     )
 }

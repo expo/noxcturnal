@@ -3,18 +3,18 @@ use oxc_ast::{
     AstKind,
     ast::{
         AssignmentTarget, BindingPattern, ClassType, ExportDefaultDeclarationKind, Expression,
-        FunctionType, IdentifierReference, ImportOrExportKind, PropertyKind,
-        VariableDeclarationKind,
+        FunctionType, ImportOrExportKind, PropertyKind, VariableDeclarationKind,
     },
 };
 use oxc_semantic::Scoping;
-use oxc_span::GetSpan;
 use rustc_hash::FxHashMap;
 
 use crate::event_types::NodeField;
 use crate::generated::event_schema::{field_ids, node_type_name};
 use crate::protocol::constants::FieldMask;
 use crate::semantic::constant_eval::constant_for_kind;
+
+use super::member::{static_member_path, static_member_path_with, static_member_root};
 
 /// Byte offset to UTF-16 offset, one entry per byte plus the end of source.
 ///
@@ -125,70 +125,6 @@ fn variable_kind(kind: VariableDeclarationKind) -> &'static str {
     }
 }
 
-pub(crate) fn static_member_path(expression: &Expression<'_>) -> Option<String> {
-    static_member_path_with(expression, None)
-}
-
-/// The dotted path of a static member chain, optionally with one more property
-/// appended. The chain is written into a single buffer, so a chain of depth `n`
-/// costs one allocation rather than one per level.
-pub(crate) fn static_member_path_with(
-    expression: &Expression<'_>,
-    property: Option<&str>,
-) -> Option<String> {
-    let mut path = String::new();
-    if !write_static_member_path(expression, &mut path) {
-        return None;
-    }
-    if let Some(property) = property {
-        path.push('.');
-        path.push_str(property);
-    }
-    Some(path)
-}
-
-fn write_static_member_path(expression: &Expression<'_>, path: &mut String) -> bool {
-    match expression {
-        Expression::Identifier(identifier) => {
-            path.push_str(&identifier.name);
-            true
-        }
-        Expression::StaticMemberExpression(member) => {
-            write_static_member_path(&member.object, path) && {
-                path.push('.');
-                path.push_str(&member.property.name);
-                true
-            }
-        }
-        Expression::ComputedMemberExpression(member) => match &member.expression {
-            Expression::StringLiteral(property) => {
-                write_static_member_path(&member.object, path) && {
-                    path.push('.');
-                    path.push_str(&property.value);
-                    true
-                }
-            }
-            _ => false,
-        },
-        _ => false,
-    }
-}
-
-fn static_member_root<'a, 'b>(
-    expression: &'b Expression<'a>,
-) -> Option<&'b IdentifierReference<'a>> {
-    match expression {
-        Expression::Identifier(identifier) => Some(identifier),
-        Expression::StaticMemberExpression(member) => static_member_root(&member.object),
-        Expression::ComputedMemberExpression(member)
-            if matches!(member.expression, Expression::StringLiteral(_)) =>
-        {
-            static_member_root(&member.object)
-        }
-        _ => None,
-    }
-}
-
 fn assignment_target_name(target: &AssignmentTarget<'_>) -> Option<String> {
     if let Some(name) = target.get_identifier_name() {
         return Some(name.to_owned());
@@ -218,49 +154,6 @@ fn assignment_target_name(target: &AssignmentTarget<'_>) -> Option<String> {
 /// Propagate mutation-target state from a parent to one child during traversal.
 /// Terminal mutation constructs establish the state; transparent wrappers and
 /// assignment-pattern containers carry it without any ancestor walks.
-pub(crate) fn mutation_target_child(
-    child: AstKind<'_>,
-    parent: AstKind<'_>,
-    parent_is_target: bool,
-) -> bool {
-    let span = child.span();
-    match parent {
-        AstKind::AssignmentExpression(expression) => expression.left.span() == span,
-        AstKind::UpdateExpression(expression) => expression.argument.span() == span,
-        AstKind::UnaryExpression(expression) => {
-            expression.operator.as_str() == "delete" && expression.argument.span() == span
-        }
-        AstKind::ForInStatement(statement) => statement.left.span() == span,
-        AstKind::ForOfStatement(statement) => statement.left.span() == span,
-        AstKind::ParenthesizedExpression(expression) => {
-            parent_is_target && expression.expression.span() == span
-        }
-        AstKind::TSAsExpression(expression) => {
-            parent_is_target && expression.expression.span() == span
-        }
-        AstKind::TSSatisfiesExpression(expression) => {
-            parent_is_target && expression.expression.span() == span
-        }
-        AstKind::TSNonNullExpression(expression) => {
-            parent_is_target && expression.expression.span() == span
-        }
-        AstKind::TSTypeAssertion(expression) => {
-            parent_is_target && expression.expression.span() == span
-        }
-        AstKind::ChainExpression(expression) => {
-            parent_is_target && expression.expression.span() == span
-        }
-        AstKind::AssignmentTargetRest(rest) => parent_is_target && rest.target.span() == span,
-        AstKind::AssignmentTargetWithDefault(default) => {
-            parent_is_target && default.binding.span() == span
-        }
-        AstKind::AssignmentTargetPropertyProperty(property) => {
-            parent_is_target && property.binding.span() == span
-        }
-        AstKind::ArrayAssignmentTarget(_) | AstKind::ObjectAssignmentTarget(_) => parent_is_target,
-        _ => false,
-    }
-}
 
 pub(crate) struct DirectPackedFields {
     pub(crate) words: [u32; 32],
