@@ -1662,7 +1662,13 @@ impl<'a> Walk<'a> {
     }
 
     fn finish(&mut self, node: Node, seen: &Seen) -> Result<(), Bail> {
-        if seen.erase_self {
+        let type_only_class_field = matches!(
+            node.kind,
+            kind::CLASS_PROPERTY | kind::CLASS_PRIVATE_PROPERTY
+        ) && self.field_span(node, seen, "typeAnnotation").is_some()
+            && self.field_span(node, seen, "value").is_none();
+
+        if seen.erase_self || type_only_class_field {
             self.edits.truncate(seen.mark);
             self.erase_span(node.start..node.end);
             return Ok(());
@@ -1682,18 +1688,20 @@ impl<'a> Walk<'a> {
         Ok(())
     }
 
+    fn field_span(&self, node: Node, seen: &Seen, name: &str) -> Option<Range<u32>> {
+        NODE_KINDS[node.kind as usize]
+            .fields
+            .iter()
+            .position(|field| field.name == name)
+            .and_then(|index| seen.fields[index].clone())
+    }
+
     /// Where the optional `?` can be. It sits between the end of the name (or
     /// key) and the start of the annotation, and nowhere else. Bounding the
     /// search by the annotation matters: `x?: ?string` has a second `?` inside
     /// the type.
     fn optional_bounds(&self, node: Node, seen: &Seen) -> (u32, u32) {
-        let span_of = |name: &str| {
-            NODE_KINDS[node.kind as usize]
-                .fields
-                .iter()
-                .position(|field| field.name == name)
-                .and_then(|index| seen.fields[index].clone())
-        };
+        let span_of = |name: &str| self.field_span(node, seen, name);
 
         let from = match node.kind {
             // An identifier's name is not a node; its own span starts at it.

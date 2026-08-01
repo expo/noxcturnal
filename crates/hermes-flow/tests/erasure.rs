@@ -154,7 +154,11 @@ fn erases_class_type_syntax() {
     assert_eq!(erased("class A implements C {}\n"), "class A  {}\n");
     assert_eq!(
         erased("class A { +x: number; static -y: string; }\n"),
-        "class A { x; static y; }\n"
+        "class A {   }\n"
+    );
+    assert_eq!(
+        erased("class A { typed: number = 1; runtime; }\n"),
+        "class A { typed = 1; runtime; }\n"
     );
     assert_eq!(
         erased("class A { declare foo: number; }\n"),
