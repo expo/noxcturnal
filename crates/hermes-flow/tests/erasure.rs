@@ -161,6 +161,10 @@ fn erases_class_type_syntax() {
         "class A { typed = 1; runtime; }\n"
     );
     assert_eq!(
+        erased("class A { #value: ?number; read() { return this.#value; } }\n"),
+        "class A { #value; read() { return this.#value; } }\n"
+    );
+    assert_eq!(
         erased("class A { declare foo: number; }\n"),
         "class A {  }\n"
     );

@@ -29,3 +29,20 @@ class StateSafe {
     }"
   `);
 });
+
+flowTest('preserves value-less private fields as runtime private-name declarations', async () => {
+  const source = `// @flow
+class Registry {
+  #value: ?number;
+  read(): ?number { return this.#value; }
+}`;
+  expect(await transformSource(source, 'input.js', {})).toMatchInlineSnapshot(`
+    "// @flow
+    class Registry {
+      #value;
+      read() {
+        return this.#value;
+      }
+    }"
+  `);
+});

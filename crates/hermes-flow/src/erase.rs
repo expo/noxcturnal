@@ -1662,10 +1662,12 @@ impl<'a> Walk<'a> {
     }
 
     fn finish(&mut self, node: Node, seen: &Seen) -> Result<(), Bail> {
-        let type_only_class_field = matches!(
-            node.kind,
-            kind::CLASS_PROPERTY | kind::CLASS_PRIVATE_PROPERTY
-        ) && self.field_span(node, seen, "typeAnnotation").is_some()
+        // An annotated public field without a value is a Flow-only declaration,
+        // but a private field still declares the class-scoped private name used
+        // by `this.#name` and `#name in value`. Preserve the private node and let
+        // the ordinary child erasure below remove only its type annotation.
+        let type_only_class_field = node.kind == kind::CLASS_PROPERTY
+            && self.field_span(node, seen, "typeAnnotation").is_some()
             && self.field_span(node, seen, "value").is_none();
 
         if seen.erase_self || type_only_class_field {
