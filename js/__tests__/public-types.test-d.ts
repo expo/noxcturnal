@@ -2,6 +2,10 @@ import {
   defineNativePipeline,
   defineNativePlugin,
   defineVisitor as defineVisitorTop,
+  isExpression,
+  isNodeType,
+  isStatement,
+  isStatementType,
   type EditEffect,
   type NativeNodePath,
   type NodeOfType,
@@ -119,6 +123,24 @@ path.snapshot({ fields: ['name'], ancestry: 'parent' });
 path.snapshot({ ancestry: 'all' });
 // @ts-expect-error Unknown concrete node types should be rejected by path.is.
 path.is('Identifer');
+
+declare const nodeLike: { readonly type: string; readonly retained: boolean };
+if (isStatement(nodeLike)) {
+  const statementType: import('../generated/event-schema').NativeRouteTypes['Statement'] =
+    nodeLike.type;
+  nodeLike.retained;
+  void statementType;
+}
+if (isExpression(nodeLike)) nodeLike.retained;
+isStatementType(nodeLike.type);
+if (isNodeType(nodeLike, 'Statement')) {
+  const statementType: import('../generated/event-schema').NativeRouteTypes['Statement'] =
+    nodeLike.type;
+  void statementType;
+}
+isNodeType(nodeLike, 'Identifier');
+// @ts-expect-error Predicate-specialized routes cannot be decided from node.type alone.
+isNodeType(nodeLike, 'ReferencedIdentifier');
 
 // ---------------------------------------------------------------------------
 // Typed per-visitor contracts

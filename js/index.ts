@@ -55,6 +55,22 @@ export {
 export { compilePhasePlan } from './pipeline/compile';
 export { pipelineCacheKey, transformClassificationCacheKey } from './pipeline/cache-key';
 export { registerParserAdapter } from './adapters/registry';
+export {
+  isDeclaration,
+  isDeclarationType,
+  isExpression,
+  isExpressionType,
+  isFunction,
+  isFunctionType,
+  isMemberExpression,
+  isMemberExpressionType,
+  isMetaProperty,
+  isMetaPropertyType,
+  isNodeType,
+  isStatement,
+  isStatementType,
+} from './generated/node-predicates';
+export type { NodeTypeForRoute, NodeTypeLike, NodeTypeRoute } from './generated/node-predicates';
 export { transform } from './runtime/transform';
 
 import { native } from './native/binding';
