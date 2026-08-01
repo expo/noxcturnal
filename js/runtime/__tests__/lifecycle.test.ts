@@ -311,6 +311,10 @@ test('indexes source identifiers once for collision-free uid generation', () => 
   assert.equal(retained.generateUid('temp'), '_temp');
   assert.equal(retained.generateUid('temp'), '_temp2');
   retained.close();
+
+  const substring = new NativeTransformSession('const _temporary = 1;', 'fixture.js');
+  assert.equal(substring.generateUid('temp'), '_temp');
+  substring.close();
 });
 
 test('conservatively evaluates side-effect-free constant expressions', () => {

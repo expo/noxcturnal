@@ -23,31 +23,12 @@ import { commitWithDedupe } from './editor';
 import { adaptBindingFact, toNodeView } from './node-utils';
 import { alias, querySubscriptions } from '../pipeline/route-utils';
 
-/** One allocator spans every native parse of a transform. The native side only
- * chooses a namespace once; reparses neither rescan names nor lengthen it. */
-export class TransformUidAllocator {
-  #prefix: string | undefined;
-  #uids = new Set<string>();
-
-  initialize(prefix: string | null): void {
-    if (this.#prefix === undefined) this.#prefix = prefix ?? '_';
-  }
-
-  generate(hint: string): string {
-    const base = `${this.#prefix ?? '_'}${hint}`;
-    let uid = base;
-    let index = 2;
-    while (this.#uids.has(uid)) uid = `${base}${index++}`;
-    this.#uids.add(uid);
-    return uid;
-  }
-}
-
 export class NativeTransformSession {
   #closed = false;
   #batches = 0;
   #uids = new Set<string>();
   #sourceIdentifiers: Set<string> | null = null;
+  #uidSourceScans = 0;
   #eventCache: (NativeEvent | undefined)[] = [];
   #queryCache = new WeakMap<QueryRequest, QueryResult>();
   #globalReferencesCache = new Map<string, SemanticReferenceView[]>();
@@ -69,7 +50,6 @@ export class NativeTransformSession {
     retentionManifest?: Buffer,
     initialManifest?: Buffer,
     buildInitialRoute = true,
-    readonly uidAllocator = new TransformUidAllocator(),
   ) {
     this.#nativeFilename = parserFilename(filename, options.parser);
     // Without a retention plan or function map the native session holds no state, so its
@@ -577,12 +557,25 @@ export class NativeTransformSession {
     // UID spelling is part of output compatibility. Use the same source-based
     // allocator whether this phase happens to own a retained syntax/semantic
     // session or is routed statelessly; artifact selection must not change code.
-    this.#sourceIdentifiers ??= new Set(
-      this.source.match(/[$_\p{ID_Start}][$\u200c\u200d\p{ID_Continue}]*/gu) ?? [],
-    );
     let uid = base;
     let index = 2;
-    while (this.#uids.has(uid) || this.#sourceIdentifiers?.has(uid)) uid = `${base}${index++}`;
+    while (this.#uids.has(uid)) uid = `${base}${index++}`;
+    if (this.#sourceIdentifiers == null) {
+      // Absence from the complete source proves absence from its identifier set.
+      // Preserve exact historical spelling when the candidate occurs as a
+      // substring by falling back to the Unicode identifier index.
+      if (this.#uidSourceScans < 8) {
+        this.#uidSourceScans++;
+        if (!this.source.includes(uid)) {
+          this.#uids.add(uid);
+          return uid;
+        }
+      }
+      this.#sourceIdentifiers = new Set(
+        this.source.match(/[$_\p{ID_Start}][$\u200c\u200d\p{ID_Continue}]*/gu) ?? [],
+      );
+    }
+    while (this.#uids.has(uid) || this.#sourceIdentifiers.has(uid)) uid = `${base}${index++}`;
     this.#uids.add(uid);
     return uid;
   }

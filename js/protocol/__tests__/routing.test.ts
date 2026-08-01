@@ -229,7 +229,6 @@ test('uses syntax-only retained materialization for structural ancestry', () => 
   );
   const syntaxBatch = decodeRoutedEnvelope(syntax.nextRoutedPacked(syntaxManifest));
   const semanticBatch = decodeRoutedEnvelope(semantic.nextRoutedPacked(semanticManifest));
-  assert.equal(syntax.uidPrefix(), '__');
   assert.equal(syntaxBatch.nodeCount, semanticBatch.nodeCount);
   assert.equal(syntaxBatch.nodeRecordCount, semanticBatch.nodeRecordCount);
   const structural = (batch: ReturnType<typeof decodeRoutedEnvelope>) =>

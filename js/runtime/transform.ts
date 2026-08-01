@@ -36,7 +36,7 @@ import {
   TransformDecision,
   NativeTransformError,
 } from '../contracts/visitor';
-import { NativeTransformSession, TransformUidAllocator } from './session';
+import { NativeTransformSession } from './session';
 import { commitWithDedupe } from './editor';
 
 interface RetainedPlan {
@@ -170,7 +170,6 @@ export function transform(
   // program configuration stops and per-file discovery begins.
   closeDefinitionScope();
   const originalSource = source;
-  const uidAllocator = new TransformUidAllocator();
   let parseFilename = parserFilename(filename, options.parser);
   let parser = classifyForTransform(parseFilename, source);
   let adapterMap: NativeVlqMap | null = null;
@@ -526,7 +525,6 @@ export function transform(
           requiresIndex ? retentionManifest : undefined,
           requiresIndex ? manifest : undefined,
           true,
-          uidAllocator,
         );
       reusableSession = null;
       openSession = session;

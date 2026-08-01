@@ -128,7 +128,6 @@ interface NativeBinding {
       }[];
     }[];
     bindingIndexBuffer(): Buffer;
-    uidPrefix(): string | null;
     scopeParentsBuffer(): Buffer;
     scopeMetadataBuffer(): Buffer;
     programBodyOffsets(): [prepend: number, append: number, needsEofLineBoundary: number];

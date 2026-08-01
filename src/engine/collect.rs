@@ -6,7 +6,7 @@ use oxc_parser::Parser;
 use oxc_semantic::{AstNodes, Scoping, SemanticBuilder};
 use oxc_span::GetSpan;
 use oxc_syntax::node::NodeId;
-use rustc_hash::{FxHashMap, FxHashSet};
+use rustc_hash::FxHashMap;
 
 use crate::generated::event_schema::ast_kind_protocol_id;
 use crate::protocol::constants::FieldMask;
@@ -46,7 +46,6 @@ struct SyntaxIndexCollector<'a> {
     target_stack: Vec<(AstKind<'a>, bool, bool)>,
     tracks_member_writes: bool,
     node_count: u32,
-    uid_names: FxHashSet<String>,
     function_map: Option<FunctionMapCollector<'a>>,
 }
 
@@ -56,20 +55,6 @@ impl SyntaxIndexCollector<'_> {
             || self.retention_routes.is_some_and(|manifest| {
                 !manifest.routes_by_type[ast_kind_protocol_id(kind) as usize].is_empty()
             })
-    }
-
-    fn record_uid_name(&mut self, kind: AstKind<'_>) {
-        let name = match kind {
-            AstKind::BindingIdentifier(identifier) => Some(identifier.name.as_str()),
-            AstKind::IdentifierReference(identifier) => Some(identifier.name.as_str()),
-            AstKind::IdentifierName(identifier) => Some(identifier.name.as_str()),
-            AstKind::LabelIdentifier(identifier) => Some(identifier.name.as_str()),
-            AstKind::PrivateIdentifier(identifier) => Some(identifier.name.as_str()),
-            _ => None,
-        };
-        if let Some(name) = name {
-            self.uid_names.insert(name.to_owned());
-        }
     }
 }
 
@@ -113,7 +98,6 @@ impl<'a> Visit<'a> for SyntaxIndexCollector<'a> {
         if self.retention_capabilities & RETAIN_CONSTANTS != 0 {
             self.retained_index.record_constant(kind, id);
         }
-        self.record_uid_name(kind);
         if let Some(function_map) = &mut self.function_map {
             function_map.enter(kind);
         }
@@ -387,7 +371,6 @@ pub(crate) fn materialize_with_scope_parents(
                 retention_capabilities,
             ),
             node_count: 0,
-            uid_names: FxHashSet::default(),
             function_map: collect_function_map.then(|| FunctionMapCollector::new(source, filename)),
         };
         collector.visit_program(&parsed.program);
@@ -415,7 +398,6 @@ pub(crate) fn materialize_with_scope_parents(
             retained_index: collector.retained_index,
             function_map,
             initial_routed_buffer,
-            uid_prefix: Some(shortest_uid_prefix_from_names(&collector.uid_names)),
         });
     }
     let semantic_return = SemanticBuilder::new()
@@ -431,7 +413,6 @@ pub(crate) fn materialize_with_scope_parents(
             ),
         ));
     }
-    let uid_prefix = Some(shortest_uid_prefix(semantic_return.semantic.scoping()));
     let scope_parents = semantic_return
         .semantic
         .scoping()
@@ -492,7 +473,6 @@ pub(crate) fn materialize_with_scope_parents(
         retained_index: collector.retained_index,
         function_map,
         initial_routed_buffer,
-        uid_prefix,
     })
 }
 
@@ -544,84 +524,4 @@ fn program_body_offsets(
         coordinate(append),
         u32::from(needs_eof_line_boundary),
     ]
-}
-
-/// Find the shortest `_`/`$` prefix absent from every bound or unresolved name.
-///
-/// The complete binary prefix tree through depth 12 is an 8191-bit stack bitset.
-/// Marking it is allocation-free and one pass over semantic names; almost every
-/// file resolves at depth one or two. The fallback remains exact for a
-/// deliberately adversarial file that occupies all 4096 depth-12 prefixes.
-fn shortest_uid_prefix(scoping: &Scoping) -> String {
-    const DEPTH: usize = 12;
-    let mut occupied = [0u64; 128];
-    let mut longest_underscore_prefix = DEPTH;
-    // Single-character `_` and `$` namespaces are common conventions and are
-    // disproportionately likely to be introduced by a later transform.
-    occupied[0] = (1 << 1) | (1 << 2);
-    for name in scoping.symbol_names().chain(
-        scoping
-            .root_unresolved_references()
-            .keys()
-            .map(|name| name.as_str()),
-    ) {
-        longest_underscore_prefix =
-            longest_underscore_prefix.max(name.bytes().take_while(|byte| *byte == b'_').count());
-        let mut node = 0usize;
-        for byte in name.bytes().take(DEPTH) {
-            node = match byte {
-                b'_' => node * 2 + 1,
-                b'$' => node * 2 + 2,
-                _ => break,
-            };
-            occupied[node / 64] |= 1 << (node % 64);
-        }
-    }
-    let node = (1..((1usize << (DEPTH + 1)) - 1))
-        .find(|node| occupied[node / 64] & (1 << (node % 64)) == 0);
-    if let Some(mut node) = node {
-        let depth = usize::BITS as usize - (node + 1).leading_zeros() as usize - 1;
-        let mut bytes = [0u8; DEPTH];
-        for index in (0..depth).rev() {
-            bytes[index] = if node % 2 == 1 { b'_' } else { b'$' };
-            node = (node - 1) / 2;
-        }
-        return String::from_utf8(bytes[..depth].to_vec()).expect("ASCII UID prefix");
-    }
-    "_".repeat(longest_underscore_prefix + 1)
-}
-
-/// Syntax-only sessions conservatively reserve against every identifier-like
-/// spelling, including property and label names. Over-reserving is safe and
-/// avoids constructing lexical symbols merely to allocate a collision-free UID.
-fn shortest_uid_prefix_from_names(names: &FxHashSet<String>) -> String {
-    const DEPTH: usize = 12;
-    let mut occupied = [0u64; 128];
-    let mut longest_underscore_prefix = DEPTH;
-    occupied[0] = (1 << 1) | (1 << 2);
-    for name in names {
-        longest_underscore_prefix =
-            longest_underscore_prefix.max(name.bytes().take_while(|byte| *byte == b'_').count());
-        let mut node = 0usize;
-        for byte in name.bytes().take(DEPTH) {
-            node = match byte {
-                b'_' => node * 2 + 1,
-                b'$' => node * 2 + 2,
-                _ => break,
-            };
-            occupied[node / 64] |= 1 << (node % 64);
-        }
-    }
-    let node = (1..((1usize << (DEPTH + 1)) - 1))
-        .find(|node| occupied[node / 64] & (1 << (node % 64)) == 0);
-    if let Some(mut node) = node {
-        let depth = usize::BITS as usize - (node + 1).leading_zeros() as usize - 1;
-        let mut bytes = [0u8; DEPTH];
-        for index in (0..depth).rev() {
-            bytes[index] = if node % 2 == 1 { b'_' } else { b'$' };
-            node = (node - 1) / 2;
-        }
-        return String::from_utf8(bytes[..depth].to_vec()).expect("ASCII UID prefix");
-    }
-    "_".repeat(longest_underscore_prefix + 1)
 }
