@@ -286,6 +286,11 @@ pub(crate) fn materialize_with_scope_parents(
         ));
     }
     let utf16 = (!source.is_ascii()).then(|| utf16_index(source, &allocator));
+    let program_body_offsets = program_body_offsets(
+        &parsed.program,
+        source,
+        utf16.as_deref().map(|offsets| &**offsets),
+    );
     let compiled_manifest = initial_route_manifest
         .map(decode_route_manifest)
         .transpose()?;
@@ -346,6 +351,7 @@ pub(crate) fn materialize_with_scope_parents(
             .take()
             .map(FunctionMapCollector::finish);
         return Ok(MaterializedSessionParts {
+            program_body_offsets,
             scope_parents: Vec::new(),
             retained_index: collector.retained_index,
             function_map,
@@ -417,12 +423,63 @@ pub(crate) fn materialize_with_scope_parents(
         None
     };
     Ok(MaterializedSessionParts {
+        program_body_offsets,
         scope_parents,
         retained_index: collector.retained_index,
         function_map,
         initial_routed_buffer,
         uid_prefix,
     })
+}
+
+pub(crate) fn parse_program_body_offsets(source: &str, filename: &str) -> Result<[u32; 3]> {
+    let allocator = Allocator::default();
+    let parsed = Parser::new(&allocator, source, source_type(filename, source)?).parse();
+    if !parsed.diagnostics.is_empty() {
+        return Err(Error::new(
+            Status::InvalidArg,
+            format!("Oxc parse failed: {:?}", parsed.diagnostics),
+        ));
+    }
+    let utf16 = (!source.is_ascii()).then(|| utf16_index(source, &allocator));
+    Ok(program_body_offsets(
+        &parsed.program,
+        source,
+        utf16.as_deref().map(|offsets| &**offsets),
+    ))
+}
+
+fn program_body_offsets(
+    program: &oxc_ast::ast::Program<'_>,
+    source: &str,
+    utf16: Option<&[u32]>,
+) -> [u32; 3] {
+    let coordinate = |byte: u32| utf16.map_or(byte, |index| index[byte as usize]);
+    let prepend = program
+        .body
+        .first()
+        .map_or(source.len() as u32, |statement| statement.span().start);
+    let append = program
+        .body
+        .last()
+        .map(|statement| statement.span().end)
+        .or_else(|| {
+            program
+                .directives
+                .last()
+                .map(|directive| directive.span.end)
+        })
+        .unwrap_or(source.len() as u32);
+    let needs_eof_line_boundary = program.comments.last().is_some_and(|comment| {
+        append < source.len() as u32
+            && comment.kind == oxc_ast::ast::CommentKind::Line
+            && comment.span.end == source.len() as u32
+    });
+    [
+        coordinate(prepend),
+        coordinate(append),
+        u32::from(needs_eof_line_boundary),
+    ]
 }
 
 /// Find the shortest `_`/`$` prefix absent from every bound or unresolved name.

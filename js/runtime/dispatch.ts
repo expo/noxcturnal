@@ -2,7 +2,6 @@ import { alias, expandSubscriptions } from '../pipeline/route-utils';
 import { createEditor } from './editor';
 import {
   codeFactory,
-  directivePrologueEnd,
   identicalRealizedContent,
   makeSourceFragment,
   realizeContent,
@@ -87,7 +86,11 @@ export function createDispatcher(
   let visitorId = 0;
   let visitorIds: WeakMap<object, number> | undefined;
   let activeTraversals: Set<string> | undefined;
-  let prologueOffset = -1;
+  let programBodyOffsets:
+    | readonly [prepend: number, append: number, needsEofLineBoundary: boolean]
+    | undefined;
+  let programEndBoundaryAdded = false;
+  const programInsertionPoints = new Set<number>();
   const contexts = new Map<NativePlugin<any, any>, DispatcherEntry>();
   const metadataOwners = new Map<string, string>();
   for (const plugin of activePlugins)
@@ -133,6 +136,32 @@ export function createDispatcher(
       intents.set(composite, { owner: plugin.name, realized, phase: phase.name, ...range });
       return null;
     };
+    const pushRealizedProgramInsertion = (
+      kind: 'Prologue' | 'AppendLeft',
+      offset: number,
+      realized: RealizedContent,
+    ): void => {
+      const prefix =
+        !programInsertionPoints.has(offset) && offset > 0 && session.source[offset - 1] !== '\n'
+          ? '\n'
+          : '';
+      programInsertionPoints.add(offset);
+      edits.push({
+        kind,
+        start: offset,
+        end: offset,
+        ...(realized.contentParts
+          ? { contentParts: [...(prefix ? [prefix] : []), ...realized.contentParts, '\n'] }
+          : { content: `${prefix}${realized.content}\n` }),
+        owner: plugin.name,
+        order: order++,
+      });
+    };
+    const pushProgramInsertion = (
+      kind: 'Prologue' | 'AppendLeft',
+      offset: number,
+      code: Code,
+    ): void => pushRealizedProgramInsertion(kind, offset, realizeIntentContent(code));
     const context: PluginContext = {
       filename: session.filename,
       phase: phase.name,
@@ -179,22 +208,30 @@ export function createDispatcher(
           context,
         );
       },
+      prependToProgram: code => {
+        programBodyOffsets ??= session.programBodyOffsets();
+        pushProgramInsertion('Prologue', programBodyOffsets[0], code);
+      },
+      appendToProgram: code => {
+        programBodyOffsets ??= session.programBodyOffsets();
+        pushProgramInsertion('AppendLeft', programBodyOffsets[1], code);
+        if (programBodyOffsets[2] && !programEndBoundaryAdded) {
+          edits.push({
+            kind: 'AppendLeft',
+            start: session.source.length,
+            end: session.source.length,
+            content: '\n',
+            owner: plugin.name,
+            order: order++,
+          });
+          programEndBoundaryAdded = true;
+        }
+      },
       ensureHelper: (key, code) => {
         const realized = realizeIntentContent(code);
         if (ensureIntent('helper', key, `helper ${key}`, realized)) return;
-        if (prologueOffset < 0) prologueOffset = directivePrologueEnd(session.source);
-        const prefix =
-          prologueOffset > 0 && session.source[prologueOffset - 1] !== '\n' ? '\n' : '';
-        edits.push({
-          kind: 'Prologue',
-          start: prologueOffset,
-          end: prologueOffset,
-          ...(realized.contentParts
-            ? { contentParts: [...(prefix ? [prefix] : []), ...realized.contentParts, '\n'] }
-            : { content: `${prefix}${realized.content}\n` }),
-          owner: plugin.name,
-          order: order++,
-        });
+        programBodyOffsets ??= session.programBodyOffsets();
+        pushRealizedProgramInsertion('Prologue', programBodyOffsets[0], realized);
       },
       ensureReplace: (key, start, end, code) => {
         if (!(start >= 0 && end >= start && end <= session.source.length))

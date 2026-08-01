@@ -38,6 +38,190 @@ test('output sections wrap the body: prefix outermost, prologue and body inserts
   );
 });
 
+test('program insertions preserve preamble, call order, comments, and wrappers', () => {
+  const source = '#!/usr/bin/env node\n// lead\n"use strict"\n"use client";\nrun() // trailing';
+  const first = defineNativePlugin({
+    name: 'first-program-inserter',
+    pre(context) {
+      context.editor.prepend('(function () {\n');
+      context.prependToProgram('const first = 1;');
+      context.appendToProgram('finish(first);');
+      context.editor.append('})();\n');
+    },
+  });
+  const second = defineNativePlugin({
+    name: 'second-program-inserter',
+    post(context) {
+      context.prependToProgram('const second = 2;');
+      context.appendToProgram('finish(second);');
+    },
+  });
+  const result = transform(
+    source,
+    'fixture.js',
+    defineNativePipeline({ phases: [{ name: 'program-insertions', plugins: [first, second] }] }),
+  );
+  assert.equal(result.status, 'complete');
+  assert.equal(
+    result.code,
+    '(function () {\n#!/usr/bin/env node\n// lead\n"use strict"\n"use client";\nconst first = 1;\nconst second = 2;\nrun()\nfinish(first);\nfinish(second);\n // trailing\n})();\n',
+  );
+});
+
+test('native Program boundaries do not mistake leading expressions for directives', () => {
+  for (const source of [
+    '"prefix" + value;\nimport item from "item";',
+    '"prefix".value;\nimport item from "item";',
+    '"prefix"();\nimport item from "item";',
+    '("prefix");\nimport item from "item";',
+  ]) {
+    const plugin = defineNativePlugin({
+      name: 'native-program-boundary',
+      pre(context) {
+        context.prependToProgram('const injected = true;');
+      },
+    });
+    const result = transform(
+      source,
+      'fixture.mjs',
+      defineNativePipeline({ phases: [{ name: 'program-boundary', plugins: [plugin] }] }),
+    );
+    assert.equal(result.status, 'complete');
+    assert.equal(result.code, `const injected = true;\n${source}`);
+  }
+});
+
+test('Program insertion handles empty and comment-only files', () => {
+  for (const source of ['', '// only', '#!/usr/bin/env node\n// only']) {
+    const plugin = defineNativePlugin({
+      name: 'empty-program-boundary',
+      pre(context) {
+        context.prependToProgram('const prepended = true;');
+        context.appendToProgram('const appended = true;');
+      },
+    });
+    const result = transform(
+      source,
+      'fixture.js',
+      defineNativePipeline({ phases: [{ name: 'program-boundary', plugins: [plugin] }] }),
+    );
+    assert.equal(result.status, 'complete');
+    assert.equal(
+      result.code,
+      source === ''
+        ? 'const prepended = true;\nconst appended = true;\n'
+        : `${source}\nconst prepended = true;\nconst appended = true;\n`,
+    );
+  }
+});
+
+test('program appends precede trailing block comments', () => {
+  const plugin = defineNativePlugin({
+    name: 'trailing-block-program-boundary',
+    post(context) {
+      context.appendToProgram('finish();');
+    },
+  });
+  const result = transform(
+    'run(); /* trailing */',
+    'fixture.js',
+    defineNativePipeline({ phases: [{ name: 'program-boundary', plugins: [plugin] }] }),
+  );
+  assert.equal(result.status, 'complete');
+  assert.equal(result.code, 'run();\nfinish();\n /* trailing */');
+});
+
+test('program insertions are available throughout the plugin lifecycle', () => {
+  const plugin = defineNativePlugin({
+    name: 'program-insertion-lifecycle',
+    pre(context) {
+      context.prependToProgram('pre();');
+    },
+    analyze(context) {
+      context.prependToProgram('analyze();');
+      return { status: 'supported', analysis: true };
+    },
+    apply(context) {
+      context.prependToProgram('apply();');
+    },
+    visitors: [
+      defineVisitor('ExpressionStatement', {}, path => {
+        path.context.prependToProgram('visit();');
+      }),
+    ],
+    post(context) {
+      context.prependToProgram('post();');
+    },
+  });
+  const result = transform(
+    'run();',
+    'fixture.js',
+    defineNativePipeline({ phases: [{ name: 'program-lifecycle', plugins: [plugin] }] }),
+  );
+  assert.equal(result.status, 'complete');
+  assert.equal(result.code, 'pre();\nanalyze();\napply();\nvisit();\npost();\nrun();');
+});
+
+test('program prepends and helpers share first-call order at the native boundary', () => {
+  const source = '#!/usr/bin/env node\n/* before */\n"use strict";\n/* after */\nrun();';
+  const plugin = defineNativePlugin({
+    name: 'program-helper-order',
+    pre(context) {
+      context.prependToProgram('first();');
+      context.ensureHelper('program-helper-order/helper', 'helper();');
+      context.prependToProgram('last();');
+    },
+  });
+  const result = transform(
+    source,
+    'fixture.js',
+    defineNativePipeline({ phases: [{ name: 'program-helper-order', plugins: [plugin] }] }),
+  );
+  assert.equal(result.status, 'complete');
+  assert.equal(
+    result.code,
+    '#!/usr/bin/env node\n/* before */\n"use strict";\n/* after */\nfirst();\nhelper();\nlast();\nrun();',
+  );
+});
+
+test('program insertions accept provenance-carrying fragments', () => {
+  const source = 'const copied = value;';
+  const plugin = defineNativePlugin({
+    name: 'program-provenance',
+    pre(context) {
+      const copied = context.sourceSlice(source.indexOf('copied'), source.indexOf(' ='));
+      context.prependToProgram(context.code.template`let ${copied};`);
+      context.appendToProgram(context.code.template`consume(${copied});`);
+    },
+  });
+  const result = transform(
+    source,
+    'fixture.js',
+    defineNativePipeline({ phases: [{ name: 'program-provenance', plugins: [plugin] }] }),
+    { sourceMapMode: 'character' },
+  );
+  assert.equal(result.status, 'complete');
+  assert.equal(result.code, 'let copied;\nconst copied = value;\nconsume(copied);\n');
+  const map = new TraceMap({
+    version: 3,
+    sources: ['fixture.js'],
+    names: result.map.names,
+    mappings: result.map.mappings,
+  });
+  assert.deepEqual(originalPositionFor(map, { line: 1, column: 4 }), {
+    source: 'fixture.js',
+    line: 1,
+    column: 6,
+    name: null,
+  });
+  assert.deepEqual(originalPositionFor(map, { line: 3, column: 8 }), {
+    source: 'fixture.js',
+    line: 1,
+    column: 6,
+    name: null,
+  });
+});
+
 test('relocates a range as piece reordering with contained edits composing', () => {
   const source = 'function util() { return value; }\nconst keep = 1;\n';
   const rangeEnd = source.indexOf('\n') + 1;

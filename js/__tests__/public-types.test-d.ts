@@ -12,6 +12,10 @@ const typedVisitor = defineNativePlugin({
   visitors: [
     defineVisitorTop('Identifier', { fields: ['name'] }, path => {
       path.node.name.toUpperCase();
+      path.context.prependToProgram(path.getSource());
+      path.context.appendToProgram(path.context.code.template`consume(${path.getSource()});`);
+      // @ts-expect-error Program insertions require provenance-aware Code.
+      path.context.prependToProgram(1);
       // @ts-expect-error Identifier contracts do not expose literal values.
       path.node.value;
     }),

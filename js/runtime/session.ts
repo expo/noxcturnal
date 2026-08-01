@@ -59,6 +59,7 @@ export class NativeTransformSession {
   #lineStarts: number[] | null = null;
   #scopeParents: Uint32Array | null = null;
   #scopeMetadata: Uint32Array | null = null;
+  #programBodyOffsets: readonly [number, number, boolean] | null = null;
   #bindingIndex: { nameIds: Map<string, number>; keys: Set<number> } | null = null;
   #bindingsByScope = new Map<number, Map<string, QueryResult['bindings'][number]>>();
   constructor(
@@ -525,6 +526,13 @@ export class NativeTransformSession {
       directivePrologueEnd: this.#scopeMetadata[offset + 1],
       hasDirectives: this.#scopeMetadata[offset + 2] === 1,
     };
+  }
+  programBodyOffsets(): readonly [prepend: number, append: number, needsEofLineBoundary: boolean] {
+    if (this.#programBodyOffsets == null) {
+      const offsets = this.#binding('program-body-offsets').programBodyOffsets();
+      this.#programBodyOffsets = [offsets[0], offsets[1], offsets[2] === 1];
+    }
+    return this.#programBodyOffsets;
   }
   #scopeParentTable(): Uint32Array {
     if (this.#scopeParents == null) {

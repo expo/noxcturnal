@@ -4,7 +4,6 @@ import { test } from 'vitest';
 import {
   codeFactory,
   containsProvenance,
-  directivePrologueEnd,
   identicalRealizedContent,
   isFragmentList,
   isProvenanceCode,
@@ -49,9 +48,4 @@ test('recognizes fragment shapes and compares realized content structurally', ()
     ),
     false,
   );
-});
-
-test('finds directive prologues after shebangs and comments', () => {
-  const source = '#!/usr/bin/env node\n/* lead */\n"use strict";\nconst value = 1;';
-  assert.equal(source.slice(directivePrologueEnd(source)), 'const value = 1;');
 });

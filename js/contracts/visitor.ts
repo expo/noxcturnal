@@ -87,6 +87,17 @@ export interface PluginContext {
   /** Revisit the program with stateful visitors; their state is mandatory. */
   revisitProgram<State>(visitors: readonly DefinedVisitor<State>[], state: State): void;
   /**
+   * Insert statements after the Program's shebang, leading comments, and directive
+   * prologue. Insertions join the body stream in first-call order, inside output
+   * wrappers created with `editor.prepend()` and `editor.append()`.
+   */
+  prependToProgram(code: Code): void;
+  /**
+   * Insert statements after the final Program statement and before its trailing
+   * comments and output suffixes created with `editor.append()`.
+   */
+  appendToProgram(code: Code): void;
+  /**
    * Insert a helper at the end of the directive prologue, once per transform.
    *
    * The registry lives on the transform, so re-ensuring a key in a later phase is a

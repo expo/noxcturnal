@@ -118,6 +118,7 @@ interface NativeBinding {
     uidPrefix(): string | null;
     scopeParentsBuffer(): Buffer;
     scopeMetadataBuffer(): Buffer;
+    programBodyOffsets(): [prepend: number, append: number, needsEofLineBoundary: number];
     queryCapturesBatch(functionIds: number[]): {
       functionId: number;
       references: {

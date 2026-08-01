@@ -12,7 +12,7 @@ use crate::semantic::retained_index::{
 };
 use crate::sourcemap::function_map::FunctionMap;
 
-use super::collect::materialize_with_scope_parents;
+use super::collect::{materialize_with_scope_parents, parse_program_body_offsets};
 use super::retained::routed_buffer_from_index;
 use super::{MaterializedSessionParts, decode_route_manifest};
 
@@ -26,6 +26,7 @@ pub struct NativeIndexedSession {
     initial_route_manifest: Option<Vec<u8>>,
     initial_routed_buffer: Option<Vec<u8>>,
     uid_prefix: Option<String>,
+    program_body_offsets: Option<[u32; 3]>,
     initial_routed_served: bool,
     closed: bool,
 }
@@ -46,6 +47,7 @@ impl NativeIndexedSession {
         let has_initial_route = initial_route_manifest.is_some();
         let parts = if !collect_function_map && !has_retention && !has_initial_route {
             MaterializedSessionParts {
+                program_body_offsets: [0, 0, 0],
                 scope_parents: Vec::new(),
                 retained_index: RetainedIndex::default(),
                 function_map: None,
@@ -63,12 +65,15 @@ impl NativeIndexedSession {
             )?
         };
         let MaterializedSessionParts {
+            program_body_offsets,
             scope_parents,
             retained_index,
             function_map,
             initial_routed_buffer,
             uid_prefix,
         } = parts;
+        let program_body_offsets = (has_retention || collect_function_map || has_initial_route)
+            .then_some(program_body_offsets);
         Ok(Self {
             source,
             filename,
@@ -78,9 +83,24 @@ impl NativeIndexedSession {
             initial_route_manifest: initial_route_manifest.map(|manifest| manifest.to_vec()),
             initial_routed_buffer,
             uid_prefix,
+            program_body_offsets,
             initial_routed_served: false,
             closed: false,
         })
+    }
+
+    #[napi]
+    pub fn program_body_offsets(&mut self) -> Result<Vec<u32>> {
+        self.ensure_open()?;
+        let offsets = match self.program_body_offsets {
+            Some(offsets) => offsets,
+            None => {
+                let offsets = parse_program_body_offsets(&self.source, &self.filename)?;
+                self.program_body_offsets = Some(offsets);
+                offsets
+            }
+        };
+        Ok(offsets.to_vec())
     }
 
     #[napi]

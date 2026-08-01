@@ -10,8 +10,6 @@ import { native } from '../native/binding';
 import type { NativeTransformSession } from './session';
 
 const SOURCE_FRAGMENT_SESSIONS = new WeakMap<SourceFragment, NativeTransformSession>();
-const DIRECTIVE_PROLOGUE =
-  /(?:\s|\/\/[^\n]*|\/\*[\s\S]*?\*\/)*(['"])(?:(?!\1)[^\\\r\n]|\\.)*\1[ \t]*(?:;|(?=\r?\n|$))/y;
 
 export type RealizedContent =
   | { content: string; contentParts?: undefined }
@@ -23,19 +21,6 @@ export interface IntentRegistration {
   phase: string;
   start?: number;
   end?: number;
-}
-
-export function directivePrologueEnd(source: string): number {
-  let offset = 0;
-  if (source.startsWith('#!')) {
-    const newline = source.indexOf('\n');
-    offset = newline === -1 ? source.length : newline + 1;
-  }
-  DIRECTIVE_PROLOGUE.lastIndex = offset;
-  while (DIRECTIVE_PROLOGUE.exec(source) != null) offset = DIRECTIVE_PROLOGUE.lastIndex;
-  if (source.charCodeAt(offset) === 13 && source.charCodeAt(offset + 1) === 10) offset += 2;
-  else if (source.charCodeAt(offset) === 10) offset += 1;
-  return offset;
 }
 
 export function identicalRealizedContent(a: RealizedContent, b: RealizedContent): boolean {

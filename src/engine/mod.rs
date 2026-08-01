@@ -18,6 +18,7 @@ mod session;
 pub(crate) use collect::materialize_routed_buffer;
 
 struct MaterializedSessionParts {
+    pub(crate) program_body_offsets: [u32; 3],
     pub(crate) scope_parents: Vec<u32>,
     pub(crate) retained_index: RetainedIndex,
     pub(crate) function_map: Option<FunctionMap>,
