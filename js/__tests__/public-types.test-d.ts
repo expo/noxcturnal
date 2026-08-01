@@ -9,7 +9,19 @@ import {
   type EditEffect,
   type NativeNodePath,
   type NodeOfType,
+  type QueryRequest,
 } from '../index';
+
+const captureQueries: QueryRequest = {
+  captures: [
+    { functionId: 1 },
+    { functionId: 2, programBindings: true },
+    { functionId: 3, programBindings: false },
+    // @ts-expect-error Capture filters accept booleans only.
+    { functionId: 4, programBindings: 'program' },
+  ],
+};
+void captureQueries;
 
 const typedVisitor = defineNativePlugin({
   name: 'typed-visitor',

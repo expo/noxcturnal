@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'vitest';
 
 import { defineNativePipeline, defineNativePlugin, defineVisitor, transform } from '../../index';
+import { native } from '../../native/binding';
 import { packRouteManifest } from '../../protocol/manifest';
 import { NativeTransformSession } from '../../runtime/session';
 
@@ -312,6 +313,85 @@ test('exposes binding reads, writes, and lexical captures', () => {
     facts.captures[fn.id].some(reference => reference.id === facts.bindings[0].references[0].id),
   );
   session.close();
+});
+
+test('filters captures by direct Program binding ownership', () => {
+  const session = openRetained(
+    `const program = 1;
+     { const block = 2; function outer() {
+       const lexical = 3;
+       return function inner() { return program + block + lexical };
+     } }`,
+    'fixture.js',
+  );
+  const functions = session.nodes(['Function']);
+  const inner = functions.find(fn => fn.name === 'inner')!;
+
+  const all = session.query({ captures: [{ functionId: inner.id }] }).captures[inner.id];
+  const program = session.query({
+    captures: [{ functionId: inner.id, programBindings: true }],
+  }).captures[inner.id];
+  const lexical = session.query({
+    captures: [{ functionId: inner.id, programBindings: false }],
+  }).captures[inner.id];
+
+  assert.deepEqual(
+    new Set(all.map(capture => capture.name)),
+    new Set(['program', 'block', 'lexical']),
+  );
+  assert.deepEqual(new Set(program.map(capture => capture.name)), new Set(['program']));
+  assert.deepEqual(new Set(lexical.map(capture => capture.name)), new Set(['block', 'lexical']));
+
+  const raw = new native.NativeIndexedSession(
+    session.source,
+    'fixture.js',
+    false,
+    packRouteManifest([], false, false, ALL_RETAINED_CAPABILITIES),
+  );
+  assert.deepEqual(
+    new Set(raw.queryCapturesBatch([inner.id])[0].references.map(capture => capture.name)),
+    new Set(['program', 'block', 'lexical']),
+  );
+  raw.close();
+  session.close();
+});
+
+test('rejects conflicting duplicate capture filters', () => {
+  const session = openRetained('const outer = 1; function fn() { return outer }', 'fixture.js');
+  const [fn] = session.nodes(['Function']);
+  assert.throws(
+    () =>
+      session.query({
+        captures: [
+          { functionId: fn.id, programBindings: true },
+          { functionId: fn.id, programBindings: false },
+        ],
+      }),
+    /Conflicting programBindings filters/,
+  );
+  session.close();
+});
+
+test('capture filtering performs no binding queries', () => {
+  const prototype = native.NativeIndexedSession.prototype;
+  const queryBindings = prototype.queryBindings;
+  let bindingQueries = 0;
+  prototype.queryBindings = function (...args) {
+    bindingQueries++;
+    return queryBindings.apply(this, args);
+  };
+  try {
+    const session = openRetained(
+      'const program = 1; function outer(local) { return function inner() { return program + local } }',
+      'fixture.js',
+    );
+    const inner = session.nodes(['Function']).find(fn => fn.name === 'inner')!;
+    session.query({ captures: [{ functionId: inner.id, programBindings: false }] });
+    assert.equal(bindingQueries, 0);
+    session.close();
+  } finally {
+    prototype.queryBindings = queryBindings;
+  }
 });
 
 test('batches and deduplicates captures for many functions', () => {

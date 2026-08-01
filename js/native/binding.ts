@@ -132,7 +132,10 @@ interface NativeBinding {
     scopeParentsBuffer(): Buffer;
     scopeMetadataBuffer(): Buffer;
     programBodyOffsets(): [prepend: number, append: number, needsEofLineBoundary: number];
-    queryCapturesBatch(functionIds: number[]): {
+    queryCapturesBatch(
+      functionIds: number[],
+      programBindings?: number[],
+    ): {
       functionId: number;
       references: {
         id: number;

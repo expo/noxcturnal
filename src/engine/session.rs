@@ -268,11 +268,37 @@ impl NativeIndexedSession {
     pub fn query_captures_batch(
         &mut self,
         function_ids: Vec<u32>,
+        program_bindings: Option<Vec<i8>>,
     ) -> Result<Vec<NativeCaptureGroup>> {
         self.ensure_open()?;
-        Ok(self
-            .retained_index
-            .captures_batch(&function_ids, &self.scope_parents))
+        let program_bindings = match program_bindings {
+            Some(filters) => {
+                if function_ids.len() != filters.len() {
+                    return Err(Error::new(
+                        Status::InvalidArg,
+                        "capture function IDs and Program-binding filters must have equal lengths",
+                    ));
+                }
+                filters
+                    .into_iter()
+                    .map(|filter| match filter {
+                        -1 => Ok(None),
+                        0 => Ok(Some(false)),
+                        1 => Ok(Some(true)),
+                        _ => Err(Error::new(
+                            Status::InvalidArg,
+                            "Program-binding filters must be -1, 0, or 1",
+                        )),
+                    })
+                    .collect::<Result<Vec<_>>>()?
+            }
+            None => vec![None; function_ids.len()],
+        };
+        Ok(self.retained_index.captures_batch(
+            &function_ids,
+            &program_bindings,
+            &self.scope_parents,
+        ))
     }
 
     #[napi]

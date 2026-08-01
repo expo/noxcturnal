@@ -3,12 +3,17 @@ use napi_derive::napi;
 use oxc_ast::AstKind;
 use oxc_semantic::Scoping;
 use rustc_hash::FxHashMap;
+#[cfg(test)]
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use super::constant_eval::{EvaluatedConstant, constant_for_kind};
 use crate::generated::event_schema::{node_type_id, node_type_name};
 use crate::protocol::constants::NodeTypeSet;
 
 pub const ABSENT_ID: u32 = u32::MAX;
+
+#[cfg(test)]
+static CAPTURE_RECORDS_MATERIALIZED: AtomicUsize = AtomicUsize::new(0);
 
 /// Compact, session-owned structural facts keyed by Oxc node ID.
 ///
@@ -386,6 +391,7 @@ impl RetainedIndex {
     pub fn captures_batch(
         &self,
         function_ids: &[u32],
+        program_bindings: &[Option<bool>],
         scope_parents: &[u32],
     ) -> Vec<NativeCaptureGroup> {
         if function_ids.is_empty() {
@@ -396,6 +402,8 @@ impl RetainedIndex {
             start: u32,
             end: u32,
             scope_id: u32,
+            program_scope_id: u32,
+            program_bindings: Option<bool>,
             parent: Option<usize>,
             references: Vec<NativeCaptureReference>,
         }
@@ -403,13 +411,24 @@ impl RetainedIndex {
         let mut functions = function_ids
             .iter()
             .copied()
-            .filter_map(|id| {
+            .zip(program_bindings.iter().copied())
+            .filter_map(|(id, program_bindings)| {
                 let index = id as usize;
+                let scope_id = *self.scope_ids.get(index)?;
+                let mut program_scope_id = scope_id;
+                while let Some(&parent) = scope_parents.get(program_scope_id as usize) {
+                    if parent == ABSENT_ID {
+                        break;
+                    }
+                    program_scope_id = parent;
+                }
                 Some(RequestedFunction {
                     id,
                     start: *self.starts.get(index)?,
                     end: *self.ends.get(index)?,
-                    scope_id: *self.scope_ids.get(index)?,
+                    scope_id,
+                    program_scope_id,
+                    program_bindings,
                     parent: None,
                     references: Vec::new(),
                 })
@@ -450,7 +469,15 @@ impl RetainedIndex {
                         && function_scope_id != binding_scope_id
                         && contains_scope(function_scope_id, reference.scope_id)
                         && !contains_scope(function_scope_id, binding_scope_id)
+                        && functions[index]
+                            .program_bindings
+                            .is_none_or(|program_bindings| {
+                                program_bindings
+                                    == (binding_scope_id == functions[index].program_scope_id)
+                            })
                     {
+                        #[cfg(test)]
+                        CAPTURE_RECORDS_MATERIALIZED.fetch_add(1, Ordering::Relaxed);
                         functions[index].references.push(NativeCaptureReference {
                             id: node_id,
                             start,
@@ -1091,9 +1118,22 @@ mod tests {
                 references,
             },
         );
-        let groups = index.captures_batch(&(0..COUNT as u32).collect::<Vec<_>>(), &scope_parents);
+        let groups = index.captures_batch(
+            &(0..COUNT as u32).collect::<Vec<_>>(),
+            &[None; COUNT],
+            &scope_parents,
+        );
         assert_eq!(groups.len(), COUNT);
         assert!(groups.iter().all(|group| group.references.len() == 1));
+
+        CAPTURE_RECORDS_MATERIALIZED.store(0, Ordering::Relaxed);
+        let filtered = index.captures_batch(&[0], &[Some(false)], &scope_parents);
+        assert!(filtered[0].references.is_empty());
+        assert_eq!(CAPTURE_RECORDS_MATERIALIZED.load(Ordering::Relaxed), 0);
+
+        let retained = index.captures_batch(&[0], &[Some(true)], &scope_parents);
+        assert_eq!(retained[0].references.len(), 1);
+        assert_eq!(CAPTURE_RECORDS_MATERIALIZED.load(Ordering::Relaxed), 1);
     }
 
     #[test]

@@ -206,7 +206,7 @@ export interface QueryRequest {
   exports?: boolean;
   constants?: NodeId[];
   calls?: { callee: string; globalOnly?: boolean; staticArguments?: boolean }[];
-  captures?: { functionId: NodeId }[];
+  captures?: { functionId: NodeId; programBindings?: boolean }[];
   bindings?: { name?: string; scopeId?: ScopeId; reads?: boolean; writes?: boolean }[];
 }
 export interface QueryResult {

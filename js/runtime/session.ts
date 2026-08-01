@@ -216,14 +216,30 @@ export class NativeTransformSession {
               ? node.constantValue === true || node.constantValue === 'true'
               : null;
     }
-    const captureIds = request.captures?.length
-      ? [...new Set(request.captures.map(capture => capture.functionId))]
-      : [];
+    const captureRequests = new Map<number, boolean | undefined>();
+    for (const capture of request.captures ?? []) {
+      if (
+        captureRequests.has(capture.functionId) &&
+        captureRequests.get(capture.functionId) !== capture.programBindings
+      ) {
+        throw new Error(
+          `Conflicting programBindings filters for capture function ${capture.functionId}`,
+        );
+      }
+      captureRequests.set(capture.functionId, capture.programBindings);
+    }
+    const captureIds = [...captureRequests.keys()];
     const captures: QueryResult['captures'] = Object.fromEntries(
       captureIds.map(functionId => [functionId, []]),
     );
     if (captureIds.length > 0)
-      for (const capture of this.#binding('query.captures').queryCapturesBatch(captureIds)) {
+      for (const capture of this.#binding('query.captures').queryCapturesBatch(
+        captureIds,
+        captureIds.map(functionId => {
+          const filter = captureRequests.get(functionId);
+          return filter === undefined ? -1 : Number(filter);
+        }),
+      )) {
         captures[capture.functionId] = capture.references.map(reference => ({
           id: reference.id,
           type: 'Identifier' as const,
