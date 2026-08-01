@@ -18,6 +18,9 @@ importers:
       '@babel/generator':
         specifier: 7.29.7
         version: 7.29.7
+      '@babel/helpers':
+        specifier: 7.29.7
+        version: 7.29.7
       '@babel/plugin-proposal-decorators':
         specifier: 7.29.7
         version: 7.29.7(@babel/core@7.29.7)
@@ -94,6 +97,9 @@ importers:
         specifier: 7.29.7
         version: 7.29.7(@babel/core@7.29.7)
       '@babel/plugin-transform-react-pure-annotations':
+        specifier: 7.29.7
+        version: 7.29.7(@babel/core@7.29.7)
+      '@babel/plugin-transform-runtime':
         specifier: 7.29.7
         version: 7.29.7(@babel/core@7.29.7)
       '@babel/plugin-transform-sticky-regex':

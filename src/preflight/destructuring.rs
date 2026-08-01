@@ -1527,7 +1527,9 @@ mod tests {
         assert!(changed);
         let mut names = Vec::new();
         let mut fragments = Vec::new();
-        requests.extend_into(&mut names, &mut fragments, false);
+        let runtime_policy =
+            crate::preflight::helpers::RuntimeHelperPolicy::parse(Some("7.29.7")).unwrap();
+        requests.extend_into(&mut names, &mut fragments, false, Some(&runtime_policy));
         assert!(names.contains(&"slicedToArray"));
         assert!(
             fragments
@@ -1573,7 +1575,9 @@ mod tests {
         assert!(changed);
         let mut names = Vec::new();
         let mut fragments = Vec::new();
-        requests.extend_into(&mut names, &mut fragments, false);
+        let runtime_policy =
+            crate::preflight::helpers::RuntimeHelperPolicy::parse(Some("7.29.7")).unwrap();
+        requests.extend_into(&mut names, &mut fragments, false, Some(&runtime_policy));
         assert!(names.contains(&"objectWithoutPropertiesLoose"));
         assert!(!names.contains(&"objectWithoutProperties"));
         assert!(

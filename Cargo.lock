@@ -427,6 +427,7 @@ dependencies = [
  "regex-syntax",
  "rustc-hash",
  "self_cell",
+ "semver",
 ]
 
 [[package]]

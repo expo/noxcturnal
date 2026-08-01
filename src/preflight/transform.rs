@@ -1,4 +1,5 @@
 use std::collections::VecDeque;
+use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
@@ -37,8 +38,8 @@ use crate::syntax::classification::source_type;
 
 use super::block_scoping;
 use super::helpers::{
-    CustomHelper, CustomHelperRequests, compatibility_for_request, inline_helpers,
-    validate_custom_runtime_helpers, validate_runtime_helper_specs,
+    CustomHelper, CustomHelperRequests, RuntimeAvailability, RuntimeHelperPolicy,
+    SourceNameReservations, compatibility_for_request, inline_helpers,
 };
 use super::object_spread;
 use super::optimize;
@@ -363,7 +364,15 @@ fn transform_impl(
     if conditional_jsx {
         options.jsx = Some("automatic".into());
     }
-    let mut transform_options = compile_options(&options)?;
+    let helper_mode = options.helpers_mode.as_deref().unwrap_or("runtime");
+    let mut runtime_policy = (helper_mode == "runtime")
+        .then(|| RuntimeHelperPolicy::parse(options.helpers_version.as_deref()));
+    let mut transform_options = compile_options(
+        &options,
+        runtime_policy
+            .as_ref()
+            .and_then(|policy| policy.as_ref().ok()),
+    )?;
     let mut rewrite_layers = Vec::new();
     let mut decorator_helper_requests = CustomHelperRequests::default();
     let focused_object_rest = options.object_rest_spread == Some(true)
@@ -1257,6 +1266,11 @@ fn transform_impl(
         }
         #[expect(deprecated)]
         let helper_requests: Vec<_> = transformed.helpers_used.into_iter().collect();
+        let helper_scope_names = transformed
+            .scoping
+            .symbol_names()
+            .map(str::to_owned)
+            .collect::<Vec<_>>();
         let oxc_codegen_only_transform_selected = options.explicit_resource_management
             == Some(true)
             || options.logical_assignment_operators == Some(true)
@@ -1298,11 +1312,33 @@ fn transform_impl(
                 active_source_type.is_jsx(),
             ));
         }
-        let helper_mode = options.helpers_mode.as_deref().unwrap_or("runtime");
         let helper_module = options
             .helpers_module_name
             .as_deref()
             .unwrap_or("@babel/runtime");
+        let runtime_policy = if helper_mode == "runtime" {
+            if helper_module != "@babel/runtime" {
+                return Ok(unsupported(
+                    &format!("helper-runtime-module-unsupported:{helper_module}"),
+                    [] as [String; 0],
+                ));
+            }
+            match runtime_policy.take().expect("runtime policy was prepared") {
+                Ok(policy) => Some(policy),
+                Err(reason) => return Ok(unsupported(&reason, [] as [String; 0])),
+            }
+        } else {
+            None
+        };
+        let output_is_module = program.body.iter().any(|statement| {
+            matches!(
+                statement,
+                Statement::ImportDeclaration(_)
+                    | Statement::ExportAllDeclaration(_)
+                    | Statement::ExportDefaultDeclaration(_)
+                    | Statement::ExportNamedDeclaration(_)
+            )
+        });
         let mut custom_helper_requests = Vec::new();
         let mut custom_helper_fragments = Vec::new();
         let compact = options.compact.unwrap_or(false);
@@ -1310,66 +1346,49 @@ fn transform_impl(
             &mut custom_helper_requests,
             &mut custom_helper_fragments,
             compact,
+            runtime_policy.as_ref(),
         );
         destructuring_custom_helper_requests.extend_into(
             &mut custom_helper_requests,
             &mut custom_helper_fragments,
             compact,
+            runtime_policy.as_ref(),
         );
         classes_custom_helper_requests.extend_into(
             &mut custom_helper_requests,
             &mut custom_helper_fragments,
             compact,
+            runtime_policy.as_ref(),
         );
-        let inline = if helper_mode == "inline" {
-            match inline_helpers(helper_requests.iter().map(|(helper, _)| *helper), source) {
+        let unavailable_helpers = helper_requests
+            .iter()
+            .filter_map(|(helper, _)| {
+                let spec = compatibility_for_request(*helper, object_rest_loose)
+                    .expect("reachable Oxc helper has compatibility metadata");
+                (helper_mode == "inline"
+                    || runtime_policy
+                        .as_ref()
+                        .expect("runtime policy exists")
+                        .availability_for(spec)
+                        == RuntimeAvailability::Inline)
+                    .then_some(*helper)
+            })
+            .collect::<Vec<_>>();
+        let inline = if !unavailable_helpers.is_empty() {
+            match inline_helpers(
+                unavailable_helpers.iter().copied(),
+                helper_mode == "runtime",
+            ) {
                 Ok(inline) => inline,
                 Err(reason) => return Ok(unsupported(&reason, [] as [String; 0])),
             }
         } else {
             None
         };
-        if helper_mode == "runtime"
-            && let Err(reason) = validate_runtime_helper_specs(
-                helper_requests.iter().map(|(helper, _)| {
-                    compatibility_for_request(*helper, object_rest_loose)
-                        .expect("reachable Oxc helper has compatibility metadata")
-                }),
-                helper_module,
-                options.helpers_version.as_deref(),
-            )
-        {
-            return Ok(unsupported(&reason, [] as [String; 0]));
-        }
-        if options.helpers_mode.as_deref() == Some("runtime")
-            && let Err(reason) = validate_custom_runtime_helpers(
-                &custom_helper_requests,
-                helper_module,
-                options.helpers_version.as_deref(),
-            )
-        {
-            return Ok(unsupported(&reason, [] as [String; 0]));
-        }
-        if helper_mode == "runtime" {
-            for (helper, source) in &helper_requests {
-                // Oxc records the loader's pre-completion path. The typed loose
-                // selection above rewrites the synthetic AST literal, while this
-                // check verifies the loader did not supply an unrelated source.
-                let spec = compatibility_for_request(*helper, false)
-                    .expect("reachable Oxc helper has compatibility metadata");
-                let expected = format!("{helper_module}/helpers/{}", spec.babel_path);
-                if source != &expected {
-                    return Ok(unsupported(
-                        &format!("helper-source-mismatch:{}", helper.name()),
-                        [] as [String; 0],
-                    ));
-                }
-            }
-        }
         let mut helpers_used: Vec<String> = helper_requests
-            .into_iter()
+            .iter()
             .map(|(helper, _)| {
-                compatibility_for_request(helper, object_rest_loose)
+                compatibility_for_request(*helper, object_rest_loose)
                     .expect("reachable Oxc helper has compatibility metadata")
                     .oxc_name
                     .to_string()
@@ -1378,13 +1397,102 @@ fn transform_impl(
         helpers_used.extend(custom_helper_requests.into_iter().map(str::to_string));
         helpers_used.sort_unstable();
         helpers_used.dedup();
-        let inline_prefix = inline.map(|inline| {
-            let binding = allocator.alloc_str(&inline.binding);
-            InlineHelperRenamer { binding }.visit_program(&mut program);
-            format!("var {binding}={};\n", inline.prefix)
-        });
+        let oxc_runtime_loader = helper_mode == "runtime"
+            && runtime_policy
+                .as_ref()
+                .is_some_and(RuntimeHelperPolicy::all_generated_available);
+        let mut inline_prefix = None;
+        if (!oxc_runtime_loader && !helper_requests.is_empty())
+            || !custom_helper_fragments.is_empty()
+        {
+            let mut reservations = SourceNameReservations::new(source);
+            reservations.include(helper_scope_names);
+            let unavailable_names = unavailable_helpers
+                .iter()
+                .map(|helper| helper.name())
+                .collect::<rustc_hash::FxHashSet<_>>();
+            let mut declarations = custom_helper_fragments.concat();
+            let mut replacements = Vec::new();
+            let fallback = (helper_mode == "runtime" && !unavailable_helpers.is_empty())
+                .then(|| reservations.reserve("babelHelpersFallback"));
+            for (helper, _) in helper_requests.iter().filter(|_| !oxc_runtime_loader) {
+                let spec = compatibility_for_request(*helper, object_rest_loose)
+                    .expect("reachable Oxc helper has compatibility metadata");
+                if unavailable_names.contains(helper.name()) {
+                    replacements.push((spec.oxc_name, None));
+                } else if output_is_module {
+                    let binding = reservations.reserve(&format!(
+                        "_{}",
+                        helper.name().strip_suffix('2').unwrap_or(helper.name())
+                    ));
+                    let _ = write!(
+                        declarations,
+                        "import {binding} from \"{helper_module}/helpers/{}\";",
+                        spec.babel_path
+                    );
+                    replacements.push((spec.oxc_name, Some(binding)));
+                } else {
+                    let binding = reservations.reserve(&format!(
+                        "_{}",
+                        helper.name().strip_suffix('2').unwrap_or(helper.name())
+                    ));
+                    let _ = write!(
+                        declarations,
+                        "var {binding}=require(\"{helper_module}/helpers/{}\");",
+                        spec.babel_path
+                    );
+                    replacements.push((spec.oxc_name, Some(binding)));
+                }
+            }
+            if let (Some(inline), Some(fallback)) = (&inline, &fallback) {
+                let _ = write!(declarations, "var {fallback}={};", inline.prefix);
+            }
+            let inline_binding =
+                (helper_mode == "inline" && !helper_requests.is_empty() && !oxc_runtime_loader)
+                    .then(|| {
+                        let binding = reservations.reserve("babelHelpers");
+                        inline_prefix = Some(format!(
+                            "var {binding}={};\n",
+                            inline.as_ref().expect("inline helpers exist").prefix
+                        ));
+                        binding
+                    });
+            if !declarations.is_empty() {
+                let bridge_source = allocator.alloc_str(&declarations);
+                let mut parsed_bridge =
+                    Parser::new(allocator, bridge_source, active_source_type).parse();
+                if !parsed_bridge.diagnostics.is_empty() {
+                    return Ok(unsupported(
+                        "helper-bridge-parse-error",
+                        parsed_bridge.diagnostics,
+                    ));
+                }
+                SyntheticSpanZeroer.visit_program(&mut parsed_bridge.program);
+                let insertion = program
+                    .body
+                    .iter()
+                    .take_while(|statement| statement.span().is_empty())
+                    .count();
+                let trailing = program.body.split_off(insertion);
+                program.body.extend(parsed_bridge.program.body);
+                program.body.extend(trailing);
+            }
+            if let Some(binding) = inline_binding {
+                InlineHelperRenamer {
+                    binding: allocator.alloc_str(&binding),
+                }
+                .visit_program(&mut program);
+            } else {
+                MixedHelperReferenceRewriter {
+                    allocator,
+                    fallback: fallback.as_deref(),
+                    replacements: &replacements,
+                }
+                .visit_program(&mut program);
+            }
+        }
         let generated_line_offset = u32::from(inline_prefix.is_some());
-        let (mut generated_code, codegen_layer) = render_program(
+        let (generated_code, codegen_layer) = render_program(
             &program,
             &filename,
             options.compact.unwrap_or(false),
@@ -1392,46 +1500,6 @@ fn transform_impl(
             generated_line_offset,
         )?;
         rewrite_layers.push(codegen_layer);
-        if !custom_helper_fragments.is_empty() {
-            let directive_end = directive_prologue_end(&generated_code, program.directives.len())?;
-            let synthetic_prefix_statements = program
-                .body
-                .iter()
-                .take_while(|statement| {
-                    let span = statement.span();
-                    span.start == 0 && span.end == 0
-                })
-                .count();
-            let insertion = generated_statement_prefix_end(
-                &generated_code,
-                directive_end,
-                synthetic_prefix_statements,
-            )?;
-            let mut helper = custom_helper_fragments.concat();
-            if !compact {
-                let remainder_starts_with_newline =
-                    generated_code.as_bytes().get(insertion) == Some(&b'\n');
-                if helper.ends_with('\n') && remainder_starts_with_newline {
-                    helper.pop();
-                } else if !helper.ends_with('\n') && !remainder_starts_with_newline {
-                    helper.push('\n');
-                }
-            }
-            if !compact
-                && insertion > 0
-                && generated_code.as_bytes().get(insertion - 1) != Some(&b'\n')
-            {
-                helper.insert(0, '\n');
-            }
-            let (line, column) = generated_position(&generated_code, insertion);
-            let codegen_layer = rewrite_layers.last_mut().unwrap();
-            codegen_layer.shift_generated_for_insertion(
-                line + generated_line_offset,
-                column,
-                &helper,
-            );
-            generated_code.insert_str(insertion, &helper);
-        }
         let layer = if rewrite_layers.len() == 1 {
             rewrite_layers.pop().unwrap().pack()
         } else {
@@ -1584,17 +1652,6 @@ fn requires_generic_pipeline(options: &NativePreflightOptions) -> bool {
         .contains(&Some(true))
 }
 
-fn generated_position(source: &str, byte_offset: usize) -> (u32, u32) {
-    let prefix = &source[..byte_offset];
-    let line = prefix.bytes().filter(|byte| *byte == b'\n').count() as u32;
-    let column = prefix
-        .rsplit_once('\n')
-        .map_or(prefix, |(_, tail)| tail)
-        .encode_utf16()
-        .count() as u32;
-    (line, column)
-}
-
 fn reserve_custom_helper_scope_names<'a>(
     scoping: &mut Scoping,
     names: impl IntoIterator<Item = &'a str>,
@@ -1634,167 +1691,6 @@ fn reserve_custom_helper_scope_names<'a>(
             NodeId::DUMMY,
         );
     }
-}
-
-fn directive_prologue_end(code: &str, count: usize) -> Result<usize> {
-    let bytes = code.as_bytes();
-    let mut cursor = 0;
-    for _ in 0..count {
-        loop {
-            while bytes
-                .get(cursor)
-                .is_some_and(|byte| byte.is_ascii_whitespace())
-            {
-                cursor += 1;
-            }
-            if bytes.get(cursor..cursor + 2) == Some(b"//") {
-                cursor += 2;
-                while bytes.get(cursor).is_some_and(|byte| *byte != b'\n') {
-                    cursor += 1;
-                }
-                continue;
-            }
-            if bytes.get(cursor..cursor + 2) == Some(b"/*") {
-                cursor += 2;
-                while bytes.get(cursor..cursor + 2) != Some(b"*/") {
-                    if cursor + 2 > bytes.len() {
-                        return Err(Error::new(
-                            Status::GenericFailure,
-                            "generated directive comment was not terminated",
-                        ));
-                    }
-                    cursor += 1;
-                }
-                cursor += 2;
-                continue;
-            }
-            break;
-        }
-        let Some(quote @ (b'\'' | b'"')) = bytes.get(cursor).copied() else {
-            return Err(Error::new(
-                Status::GenericFailure,
-                "generated directive prologue did not start with a string",
-            ));
-        };
-        cursor += 1;
-        loop {
-            match bytes.get(cursor).copied() {
-                Some(b'\\') => cursor += 2,
-                Some(byte) if byte == quote => {
-                    cursor += 1;
-                    break;
-                }
-                Some(_) => cursor += 1,
-                None => {
-                    return Err(Error::new(
-                        Status::GenericFailure,
-                        "generated directive string was not terminated",
-                    ));
-                }
-            }
-        }
-        while bytes
-            .get(cursor)
-            .is_some_and(|byte| byte.is_ascii_whitespace() && *byte != b'\n')
-        {
-            cursor += 1;
-        }
-        if bytes.get(cursor) == Some(&b';') {
-            cursor += 1;
-        }
-    }
-    Ok(cursor)
-}
-
-fn generated_statement_prefix_end(
-    code: &str,
-    start: usize,
-    statement_count: usize,
-) -> Result<usize> {
-    let bytes = code.as_bytes();
-    let mut cursor = start;
-    for _ in 0..statement_count {
-        let mut parens = 0_u32;
-        let mut brackets = 0_u32;
-        let mut braces = 0_u32;
-        loop {
-            match bytes.get(cursor).copied() {
-                Some(byte) if byte.is_ascii_whitespace() => cursor += 1,
-                Some(b'/') if bytes.get(cursor + 1) == Some(&b'/') => {
-                    cursor += 2;
-                    while bytes.get(cursor).is_some_and(|byte| *byte != b'\n') {
-                        cursor += 1;
-                    }
-                }
-                Some(b'/') if bytes.get(cursor + 1) == Some(&b'*') => {
-                    cursor += 2;
-                    while bytes.get(cursor..cursor + 2) != Some(b"*/") {
-                        if cursor + 2 > bytes.len() {
-                            return Err(Error::new(
-                                Status::GenericFailure,
-                                "generated helper-prefix comment was not terminated",
-                            ));
-                        }
-                        cursor += 1;
-                    }
-                    cursor += 2;
-                }
-                _ => break,
-            }
-        }
-        let mut quote = None;
-        let mut escaped = false;
-        loop {
-            let Some(byte) = bytes.get(cursor).copied() else {
-                return Err(Error::new(
-                    Status::GenericFailure,
-                    "generated helper-prefix statement was not terminated",
-                ));
-            };
-            cursor += 1;
-            if let Some(active_quote) = quote {
-                if escaped {
-                    escaped = false;
-                } else if byte == b'\\' {
-                    escaped = true;
-                } else if byte == active_quote {
-                    quote = None;
-                }
-                continue;
-            }
-            match byte {
-                b'\'' | b'"' | b'`' => quote = Some(byte),
-                b'/' if bytes.get(cursor) == Some(&b'/') => {
-                    cursor += 1;
-                    while bytes.get(cursor).is_some_and(|byte| *byte != b'\n') {
-                        cursor += 1;
-                    }
-                }
-                b'/' if bytes.get(cursor) == Some(&b'*') => {
-                    cursor += 1;
-                    while bytes.get(cursor..cursor + 2) != Some(b"*/") {
-                        if cursor + 2 > bytes.len() {
-                            return Err(Error::new(
-                                Status::GenericFailure,
-                                "generated helper-prefix comment was not terminated",
-                            ));
-                        }
-                        cursor += 1;
-                    }
-                    cursor += 2;
-                }
-                b'(' => parens += 1,
-                b')' => parens = parens.saturating_sub(1),
-                b'[' => brackets += 1,
-                b']' => brackets = brackets.saturating_sub(1),
-                b'{' => braces += 1,
-                b'}' => braces = braces.saturating_sub(1),
-                b';' if parens == 0 && brackets == 0 && braces == 0 => break,
-                _ => {}
-            }
-        }
-    }
-    Ok(cursor)
 }
 
 /// Print a program and pack its map into a decoded layer.
@@ -1856,7 +1752,10 @@ fn render_program(
     ))
 }
 
-fn compile_options(options: &NativePreflightOptions) -> Result<TransformOptions> {
+fn compile_options(
+    options: &NativePreflightOptions,
+    runtime_policy: Option<&RuntimeHelperPolicy>,
+) -> Result<TransformOptions> {
     let mut compiled = TransformOptions {
         jsx: JsxOptions::disable(),
         ..TransformOptions::default()
@@ -2074,10 +1973,15 @@ fn compile_options(options: &NativePreflightOptions) -> Result<TransformOptions>
         }
     }
     match options.helpers_mode.as_deref().unwrap_or("runtime") {
-        "runtime" => compiled.helper_loader.mode = HelperLoaderMode::Runtime,
-        // External mode is used only as the transform-side representation for
-        // future collision-free inline materialization. It is never exposed as a
-        // supported output ABI.
+        "runtime" => {
+            let all_available =
+                runtime_policy.is_some_and(|policy| policy.all_generated_available());
+            compiled.helper_loader.mode = if all_available {
+                HelperLoaderMode::Runtime
+            } else {
+                HelperLoaderMode::External
+            };
+        }
         "inline" => compiled.helper_loader.mode = HelperLoaderMode::External,
         value => {
             return Err(Error::new(
@@ -2377,6 +2281,56 @@ impl<'a> VisitMut<'a> for InlineHelperRenamer<'a> {
             identifier.name = self.binding.into();
         }
         walk_mut::walk_identifier_reference(self, identifier);
+    }
+}
+
+struct MixedHelperReferenceRewriter<'a, 'n> {
+    allocator: &'a Allocator,
+    fallback: Option<&'n str>,
+    replacements: &'n [(&'static str, Option<String>)],
+}
+
+struct SyntheticSpanZeroer;
+
+impl<'a> VisitMut<'a> for SyntheticSpanZeroer {
+    fn visit_span(&mut self, span: &mut Span) {
+        *span = Span::default();
+    }
+}
+
+impl<'a> VisitMut<'a> for MixedHelperReferenceRewriter<'a, '_> {
+    #[expect(deprecated)]
+    fn visit_expression(&mut self, expression: &mut Expression<'a>) {
+        let Expression::StaticMemberExpression(member) = expression else {
+            walk_mut::walk_expression(self, expression);
+            return;
+        };
+        let Expression::Identifier(object) = &member.object else {
+            walk_mut::walk_expression(self, expression);
+            return;
+        };
+        if !object.span.is_empty() || object.name != "babelHelpers" {
+            walk_mut::walk_expression(self, expression);
+            return;
+        }
+        let Some((_, replacement)) = self
+            .replacements
+            .iter()
+            .find(|(name, _)| *name == member.property.name)
+        else {
+            walk_mut::walk_expression(self, expression);
+            return;
+        };
+        if let Some(binding) = replacement {
+            *expression = AstBuilder::new(self.allocator)
+                .expression_identifier(member.span, self.allocator.alloc_str(binding));
+        } else {
+            member.object = AstBuilder::new(self.allocator).expression_identifier(
+                member.object.span(),
+                self.allocator
+                    .alloc_str(self.fallback.expect("fallback binding exists")),
+            );
+        }
     }
 }
 

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 
-import { originalPositionFor, TraceMap } from '@jridgewell/trace-mapping';
+import { generatedPositionFor, originalPositionFor, TraceMap } from '@jridgewell/trace-mapping';
 import { test } from 'vitest';
 
 import type { PreflightTransforms } from '../../index';
@@ -276,7 +276,7 @@ test('asyncFunctions is independently selectable and runs with inline helpers', 
   assert.equal(await load(4), 5);
 });
 
-test('async-generator helper requirements and unavailable block scoping are structured', async () => {
+test('async-generator helper requirements fall back for an old runtime', async () => {
   const oldRuntime = transform(
     'var iterable = { async *values() { yield 1; } };',
     'fixture.js',
@@ -289,8 +289,8 @@ test('async-generator helper requirements and unavailable block scoping are stru
       },
     ),
   );
-  assert.equal(oldRuntime.status, 'bailout');
-  assert.match(oldRuntime.reason, /helper-runtime-too-old/);
+  assert.equal(oldRuntime.status, 'complete');
+  assert.doesNotMatch(oldRuntime.code, /@babel\/runtime\/helpers/);
 
   const inline = transform(
     'var iterable = { async *values(input) { yield await 1; yield* input; for await (var value of input) yield value; } };',
@@ -325,7 +325,13 @@ test('async-generator helper requirements and unavailable block scoping are stru
     names: inline.map.names,
     mappings: inline.map.mappings,
   });
-  assert.deepEqual(originalPositionFor(inlineMap, { line: 2, column: 0 }), {
+  const generated = generatedPositionFor(inlineMap, {
+    source: 'fixture.js',
+    line: 1,
+    column: 0,
+  });
+  assert.notEqual(generated.line, null);
+  assert.deepEqual(originalPositionFor(inlineMap, generated as { line: number; column: number }), {
     source: 'fixture.js',
     line: 1,
     column: 0,
@@ -395,6 +401,6 @@ test('focused runtime adapters expose and validate canonical Babel dependencies'
       },
     ),
   );
-  assert.equal(old.status, 'bailout');
-  assert.match(old.reason, /helper-runtime-too-old/);
+  assert.equal(old.status, 'complete');
+  assert.doesNotMatch(old.code, /@babel\/runtime\/helpers/);
 });

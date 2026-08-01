@@ -17,3 +17,7 @@ declare module 'babel-plugin-syntax-hermes-parser' {
   const plugin: import('@babel/core').PluginTarget;
   export default plugin;
 }
+
+declare module '@babel/helpers' {
+  export const minVersion: (name: string) => string;
+}

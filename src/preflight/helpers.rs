@@ -1,7 +1,10 @@
 //! Compatibility contract between Oxc 0.141 helper requests and Babel runtime.
 
+use std::sync::OnceLock;
+
 use oxc_transformer::Helper;
 use rustc_hash::FxHashSet;
+use semver::Version;
 
 use crate::generated::inline_helpers::{
     INLINE_ASYNC_HELPERS as GENERATED_INLINE_ASYNC_HELPERS,
@@ -10,6 +13,20 @@ use crate::generated::inline_helpers::{
     INLINE_OXC_CLASS_FEATURE_HELPERS as GENERATED_INLINE_CLASS_FEATURE_HELPERS,
     INLINE_USING_CTX as GENERATED_INLINE_USING_CTX,
 };
+
+/// Babel-owned compatibility metadata emitted from the pinned `@babel/helpers`.
+pub(crate) struct GeneratedHelperCompatibility {
+    pub ordinal: u8,
+    pub name: &'static str,
+    pub runtime_path: &'static str,
+    pub min_version: &'static str,
+    pub export_shape: &'static str,
+}
+
+pub(crate) struct GeneratedInlineRoot {
+    pub name: &'static str,
+    pub compact: &'static str,
+}
 
 /// Generator-owned support code and all metadata needed to materialize it.
 pub(crate) struct GeneratedHelperFragment {
@@ -80,12 +97,22 @@ pub(super) const fn custom_helper_spec(helper: CustomHelper) -> CustomHelperSpec
 pub(super) struct CustomHelperRequests {
     names: FxHashSet<&'static str>,
     fragments: Vec<(String, String)>,
+    generated: Vec<GeneratedRequest>,
     scope_names: FxHashSet<String>,
+}
+
+struct GeneratedRequest {
+    descriptor: &'static GeneratedHelperFragment,
+    force_inline: bool,
+    renames: Vec<(String, String)>,
 }
 
 impl CustomHelperRequests {
     pub(super) fn is_empty(&self) -> bool {
-        self.names.is_empty() && self.fragments.is_empty() && self.scope_names.is_empty()
+        self.names.is_empty()
+            && self.fragments.is_empty()
+            && self.generated.is_empty()
+            && self.scope_names.is_empty()
     }
 
     fn push_fragment(&mut self, compact: String, pretty: String) {
@@ -113,23 +140,10 @@ impl CustomHelperRequests {
     /// Atomically selects, renames, accounts for, and reserves a generated fragment.
     pub(super) fn materialize_generated(
         &mut self,
-        descriptor: &GeneratedHelperFragment,
+        descriptor: &'static GeneratedHelperFragment,
         inline: bool,
         renames: &[(&str, &str)],
     ) {
-        let (compact, pretty, bindings) = if inline {
-            (
-                descriptor.inline_compact,
-                descriptor.inline_pretty,
-                descriptor.inline_bindings,
-            )
-        } else {
-            (
-                descriptor.runtime_compact,
-                descriptor.runtime_pretty,
-                descriptor.runtime_bindings,
-            )
-        };
         let keys: FxHashSet<&str> = renames.iter().map(|(from, _)| *from).collect();
         assert_eq!(
             keys.len(),
@@ -152,29 +166,17 @@ impl CustomHelperRequests {
             renames.len(),
             "duplicate generated helper destination"
         );
-        let rewrite = |source: &str| replace_identifier_tokens(source, renames);
-        let compact = rewrite(compact);
-        let pretty = rewrite(pretty);
-        for binding in bindings.iter().filter(|binding| {
-            renames
-                .iter()
-                .any(|(from, to)| from == *binding && from != to)
-        }) {
-            assert!(
-                !contains_identifier_token(&compact, binding),
-                "unreplaced generated binding {binding}"
-            );
-        }
         self.names.extend(descriptor.babel_dependencies);
         self.scope_names
             .extend(renames.iter().map(|(_, to)| (*to).to_owned()));
-        if !self
-            .fragments
-            .iter()
-            .any(|(existing, _)| existing == &compact)
-        {
-            self.fragments.push((compact, pretty));
-        }
+        self.generated.push(GeneratedRequest {
+            descriptor,
+            force_inline: inline,
+            renames: renames
+                .iter()
+                .map(|(from, to)| ((*from).to_owned(), (*to).to_owned()))
+                .collect(),
+        });
     }
 
     pub(super) fn reserve_scope_names(&mut self, names: impl IntoIterator<Item = String>) {
@@ -188,6 +190,8 @@ impl CustomHelperRequests {
     pub(super) fn prepend(&mut self, mut other: Self) {
         self.names.extend(other.names);
         self.scope_names.extend(other.scope_names);
+        other.generated.append(&mut self.generated);
+        self.generated = other.generated;
         other.fragments.append(&mut self.fragments);
         self.fragments = other.fragments;
     }
@@ -197,21 +201,69 @@ impl CustomHelperRequests {
         target: &mut Vec<&'static str>,
         fragments: &mut Vec<String>,
         compact: bool,
+        runtime_policy: Option<&RuntimeHelperPolicy>,
     ) {
         target.extend(self.names);
         target.sort_unstable();
         target.dedup();
-        fragments.extend(
-            self.fragments
-                .into_iter()
-                .map(|(compact_source, pretty_source)| {
-                    if compact {
-                        compact_source
-                    } else {
-                        pretty_source
-                    }
-                }),
-        );
+        let mut selected_fragments = self
+            .fragments
+            .into_iter()
+            .map(|(compact_source, pretty_source)| {
+                if compact {
+                    compact_source
+                } else {
+                    pretty_source
+                }
+            })
+            .collect::<Vec<_>>();
+        for request in self.generated {
+            let inline = request.force_inline
+                || runtime_policy.is_none()
+                || request
+                    .descriptor
+                    .babel_dependencies
+                    .iter()
+                    .any(|dependency| {
+                        runtime_policy.unwrap().availability(dependency)
+                            == RuntimeAvailability::Inline
+                    });
+            let (source, bindings) = if inline {
+                (
+                    request.descriptor.inline_compact,
+                    request.descriptor.inline_bindings,
+                )
+            } else {
+                (
+                    request.descriptor.runtime_compact,
+                    request.descriptor.runtime_bindings,
+                )
+            };
+            let selected_source = if compact {
+                source
+            } else if inline {
+                request.descriptor.inline_pretty
+            } else {
+                request.descriptor.runtime_pretty
+            };
+            let renames = request
+                .renames
+                .iter()
+                .map(|(from, to)| (from.as_str(), to.as_str()))
+                .collect::<Vec<_>>();
+            let selected_source = replace_identifier_tokens(selected_source, &renames);
+            for binding in bindings.iter().filter(|binding| {
+                renames
+                    .iter()
+                    .any(|(from, to)| from == *binding && from != to)
+            }) {
+                assert!(!contains_identifier_token(&selected_source, binding));
+            }
+            if !selected_fragments.contains(&selected_source) {
+                selected_fragments.push(selected_source);
+            }
+        }
+        fragments.extend(selected_fragments);
     }
 }
 
@@ -259,9 +311,10 @@ fn replace_identifier_tokens(source: &str, renames: &[(&str, &str)]) -> String {
 /// make an informed compatibility decision rather than inheriting one global guess.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct HelperCompatibility {
+    pub ordinal: u8,
     pub oxc_name: &'static str,
     pub babel_path: &'static str,
-    pub minimum_version: (u32, u32, u32),
+    pub minimum_version: &'static str,
     pub export_shape: &'static str,
     pub semantic_note: &'static str,
 }
@@ -302,47 +355,104 @@ pub fn babel_helper_spec(name: &str) -> Option<HelperCompatibility> {
         "usingCtx" => "usingCtx",
         _ => return None,
     };
-    let minimum_version = match canonical {
-        "awaitAsyncGenerator"
-        | "asyncGeneratorDelegate"
-        | "asyncIterator"
-        | "asyncToGenerator"
-        | "wrapAsyncGenerator"
-        | "extends"
-        | "defineProperty"
-        | "objectDestructuringEmpty"
-        | "objectWithoutProperties"
-        | "readOnlyError"
-        | "writeOnlyError"
-        | "taggedTemplateLiteral"
-        | "construct"
-        | "get"
-        | "slicedToArray"
-        | "toArray"
-        | "wrapRegExp"
-        | "objectWithoutPropertiesLoose" => (7, 0, 0),
-        "objectSpread2" => (7, 5, 0),
-        "classPrivateFieldInitSpec"
-        | "classPrivateMethodInitSpec"
-        | "classPrivateFieldLooseKey"
-        | "classPrivateFieldLooseBase" => (7, 10, 0),
-        "toPropertyKey" | "checkInRHS" => (7, 22, 0),
-        "classPrivateFieldGet2"
-        | "classPrivateFieldSet2"
-        | "assertClassBrand"
-        | "toSetter"
-        | "superPropGet"
-        | "superPropSet" => (7, 24, 0),
-        "usingCtx" => (7, 28, 0),
-        _ => unreachable!(),
-    };
+    let generated = crate::generated::inline_helpers::BABEL_HELPER_COMPATIBILITY
+        .binary_search_by(|spec| spec.name.cmp(canonical))
+        .ok()
+        .map(|index| &crate::generated::inline_helpers::BABEL_HELPER_COMPATIBILITY[index])?;
     Some(HelperCompatibility {
+        ordinal: generated.ordinal,
         oxc_name: canonical,
-        babel_path: canonical,
-        minimum_version,
-        export_shape: "default",
+        babel_path: generated.runtime_path,
+        minimum_version: generated.min_version,
+        export_shape: generated.export_shape,
         semantic_note: "Babel runtime helper ABI",
     })
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RuntimeAvailability {
+    Runtime,
+    Inline,
+}
+
+pub struct RuntimeHelperPolicy {
+    available: u64,
+}
+
+impl RuntimeHelperPolicy {
+    pub fn parse(version: Option<&str>) -> Result<Self, String> {
+        let version = parse_runtime_version(version)?;
+        let compatibility = crate::generated::inline_helpers::BABEL_HELPER_COMPATIBILITY;
+        assert!(compatibility.len() <= u64::BITS as usize);
+        let mut available = 0_u64;
+        for (generated, minimum) in compatibility.iter().zip(generated_minimum_versions()) {
+            if version.major == 7 && &version >= minimum {
+                available |= 1_u64 << generated.ordinal;
+            }
+        }
+        Ok(Self { available })
+    }
+
+    pub fn availability(&self, helper: &str) -> RuntimeAvailability {
+        let Some(contract) = babel_helper_spec(helper) else {
+            return RuntimeAvailability::Inline;
+        };
+        self.availability_for(contract)
+    }
+
+    pub fn availability_for(&self, contract: HelperCompatibility) -> RuntimeAvailability {
+        if self.available & (1_u64 << contract.ordinal) != 0 {
+            RuntimeAvailability::Runtime
+        } else {
+            RuntimeAvailability::Inline
+        }
+    }
+
+    pub fn all_generated_available(&self) -> bool {
+        let count = crate::generated::inline_helpers::BABEL_HELPER_COMPATIBILITY.len();
+        let all = if count == u64::BITS as usize {
+            u64::MAX
+        } else {
+            (1_u64 << count) - 1
+        };
+        self.available == all
+    }
+}
+
+fn generated_minimum_versions() -> &'static [Version] {
+    static MINIMUMS: OnceLock<Vec<Version>> = OnceLock::new();
+    MINIMUMS.get_or_init(|| {
+        crate::generated::inline_helpers::BABEL_HELPER_COMPATIBILITY
+            .iter()
+            .enumerate()
+            .map(|(ordinal, generated)| {
+                assert_eq!(generated.ordinal as usize, ordinal);
+                Version::parse(generated.min_version)
+                    .expect("generated Babel helper minimum is valid semver")
+            })
+            .collect()
+    })
+}
+
+pub fn runtime_availability(
+    contract: HelperCompatibility,
+    runtime_version: &Version,
+) -> RuntimeAvailability {
+    let minimum = Version::parse(contract.minimum_version)
+        .expect("generated Babel helper minimum is valid semver");
+    if runtime_version.major == 7 && runtime_version >= &minimum {
+        RuntimeAvailability::Runtime
+    } else {
+        RuntimeAvailability::Inline
+    }
+}
+
+pub fn parse_runtime_version(version: Option<&str>) -> Result<Version, String> {
+    let version = version.unwrap_or("7.0.0-beta.0");
+    if version.is_empty() {
+        return Err("helper-runtime-version-invalid:empty".into());
+    }
+    Version::parse(version).map_err(|_| format!("helper-runtime-version-invalid:{version}"))
 }
 
 pub fn compatibility(helper: Helper) -> Option<HelperCompatibility> {
@@ -377,18 +487,12 @@ pub fn validate_runtime_helper_specs(
     if module_name != "@babel/runtime" {
         return Err(format!("helper-runtime-module-unsupported:{module_name}"));
     }
-    let version = version
-        .and_then(parse_version)
-        .ok_or_else(|| "helper-runtime-version-required".to_string())?;
+    let version = parse_runtime_version(version)?;
     for contract in helpers {
-        if version < contract.minimum_version {
+        if runtime_availability(contract, &version) == RuntimeAvailability::Inline {
             return Err(format!(
-                "helper-runtime-too-old:{}:{} requires {}.{}.{}",
-                module_name,
-                contract.oxc_name,
-                contract.minimum_version.0,
-                contract.minimum_version.1,
-                contract.minimum_version.2,
+                "helper-runtime-too-old:{}:{} requires {}",
+                module_name, contract.oxc_name, contract.minimum_version,
             ));
         }
     }
@@ -422,17 +526,15 @@ pub fn validate_custom_runtime_helpers(
     if module_name != "@babel/runtime" {
         return Err(format!("helper-runtime-module-unsupported:{module_name}"));
     }
-    let version = version
-        .and_then(parse_version)
-        .ok_or_else(|| "helper-runtime-version-required".to_string())?;
+    let version = parse_runtime_version(version)?;
     for helper in helpers {
         let minimum = babel_helper_spec(helper)
             .ok_or_else(|| format!("helper-not-compatible:{helper}"))?
             .minimum_version;
-        if version < minimum {
+        let contract = babel_helper_spec(helper).expect("looked up above");
+        if runtime_availability(contract, &version) == RuntimeAvailability::Inline {
             return Err(format!(
-                "helper-runtime-too-old:{module_name}:{helper} requires {}.{}.{}",
-                minimum.0, minimum.1, minimum.2
+                "helper-runtime-too-old:{module_name}:{helper} requires {minimum}",
             ));
         }
     }
@@ -441,63 +543,12 @@ pub fn validate_custom_runtime_helpers(
 
 pub fn inline_helpers(
     helpers: impl IntoIterator<Item = Helper>,
-    source: &str,
+    selective: bool,
 ) -> Result<Option<InlineHelpers>, String> {
     let helpers: Vec<Helper> = helpers.into_iter().collect();
     if helpers.is_empty() {
         return Ok(None);
     }
-    let has_using_ctx = helpers.contains(&Helper::UsingCtx);
-    let has_object_helpers = helpers.iter().any(|helper| {
-        matches!(
-            helper,
-            Helper::DefineProperty
-                | Helper::Extends
-                | Helper::ObjectDestructuringEmpty
-                | Helper::ObjectSpread2
-                | Helper::ObjectWithoutProperties
-                | Helper::ToPropertyKey
-        )
-    });
-    let has_async = helpers.iter().any(|helper| {
-        matches!(
-            helper,
-            Helper::AwaitAsyncGenerator
-                | Helper::AsyncGeneratorDelegate
-                | Helper::AsyncIterator
-                | Helper::WrapAsyncGenerator
-                | Helper::AsyncToGenerator
-        )
-    });
-    let has_class_feature_helpers = helpers.iter().any(|helper| {
-        matches!(
-            helper,
-            Helper::ClassPrivateFieldInitSpec
-                | Helper::ClassPrivateMethodInitSpec
-                | Helper::ClassPrivateFieldGet2
-                | Helper::ClassPrivateFieldSet2
-                | Helper::AssertClassBrand
-                | Helper::ToSetter
-                | Helper::ClassPrivateFieldLooseKey
-                | Helper::ClassPrivateFieldLooseBase
-                | Helper::SuperPropGet
-                | Helper::SuperPropSet
-                | Helper::ReadOnlyError
-                | Helper::WriteOnlyError
-                | Helper::CheckInRHS
-                | Helper::TaggedTemplateLiteral
-        )
-    });
-    let async_to_generator_only = has_async
-        && helpers.iter().all(|helper| {
-            !matches!(
-                helper,
-                Helper::AwaitAsyncGenerator
-                    | Helper::AsyncGeneratorDelegate
-                    | Helper::AsyncIterator
-                    | Helper::WrapAsyncGenerator
-            )
-        });
     for helper in &helpers {
         if *helper != Helper::UsingCtx
             && !matches!(
@@ -538,26 +589,181 @@ pub fn inline_helpers(
             return Err(format!("inline-helper-not-compatible:{}", helper.name()));
         }
     }
-    let binding = SourceNameReservations::new(source).reserve("babelHelpers");
     Ok(Some(InlineHelpers {
-        binding,
         // Kept on one generated line so native source-map adjustment is a single
         // line offset. These implementations follow Babel's helper behavior but
         // are locally scoped and introduce no runtime dependency or global.
-        prefix: {
+        prefix: if !selective {
+            let has_async_generator = helpers.iter().any(|helper| {
+                matches!(
+                    helper,
+                    Helper::AwaitAsyncGenerator
+                        | Helper::AsyncGeneratorDelegate
+                        | Helper::AsyncIterator
+                        | Helper::WrapAsyncGenerator
+                )
+            });
+            let has_async = has_async_generator || helpers.contains(&Helper::AsyncToGenerator);
+            let has_object = helpers.iter().any(|helper| {
+                matches!(
+                    helper,
+                    Helper::DefineProperty
+                        | Helper::Extends
+                        | Helper::ObjectDestructuringEmpty
+                        | Helper::ObjectSpread2
+                        | Helper::ObjectWithoutProperties
+                        | Helper::ToPropertyKey
+                )
+            });
+            let has_class = helpers.iter().any(|helper| {
+                matches!(
+                    helper,
+                    Helper::ClassPrivateFieldInitSpec
+                        | Helper::ClassPrivateMethodInitSpec
+                        | Helper::ClassPrivateFieldGet2
+                        | Helper::ClassPrivateFieldSet2
+                        | Helper::AssertClassBrand
+                        | Helper::ToSetter
+                        | Helper::ClassPrivateFieldLooseKey
+                        | Helper::ClassPrivateFieldLooseBase
+                        | Helper::SuperPropGet
+                        | Helper::SuperPropSet
+                        | Helper::ReadOnlyError
+                        | Helper::WriteOnlyError
+                        | Helper::CheckInRHS
+                        | Helper::TaggedTemplateLiteral
+                )
+            });
             let prefixes = [
-                has_async.then_some(if async_to_generator_only {
-                    GENERATED_INLINE_ASYNC_TO_GENERATOR
-                } else {
+                has_async.then_some(if has_async_generator {
                     GENERATED_INLINE_ASYNC_HELPERS
+                } else {
+                    GENERATED_INLINE_ASYNC_TO_GENERATOR
                 }),
-                has_using_ctx.then_some(GENERATED_INLINE_USING_CTX),
-                has_object_helpers.then_some(GENERATED_INLINE_OBJECT_HELPERS),
-                has_class_feature_helpers.then_some(GENERATED_INLINE_CLASS_FEATURE_HELPERS),
+                helpers
+                    .contains(&Helper::UsingCtx)
+                    .then_some(GENERATED_INLINE_USING_CTX),
+                has_object.then_some(GENERATED_INLINE_OBJECT_HELPERS),
+                has_class.then_some(GENERATED_INLINE_CLASS_FEATURE_HELPERS),
             ]
             .into_iter()
             .flatten()
             .collect::<Vec<_>>();
+            if prefixes.len() == 1 {
+                prefixes[0].into()
+            } else {
+                format!("Object.assign({})", prefixes.join(","))
+            }
+        } else {
+            let mut names = helpers
+                .iter()
+                .map(|helper| helper.name())
+                .collect::<Vec<_>>();
+            names.sort_unstable();
+            names.dedup();
+            let async_group = names.iter().any(|name| {
+                matches!(
+                    *name,
+                    "awaitAsyncGenerator"
+                        | "asyncGeneratorDelegate"
+                        | "asyncIterator"
+                        | "wrapAsyncGenerator"
+                )
+            });
+            let object_group = names
+                .iter()
+                .filter(|name| {
+                    matches!(
+                        **name,
+                        "defineProperty"
+                            | "extends"
+                            | "objectDestructuringEmpty"
+                            | "objectSpread2"
+                            | "objectWithoutProperties"
+                            | "toPropertyKey"
+                    )
+                })
+                .count()
+                > 1;
+            let class_group = names
+                .iter()
+                .filter(|name| {
+                    matches!(
+                        **name,
+                        "classPrivateFieldInitSpec"
+                            | "classPrivateMethodInitSpec"
+                            | "classPrivateFieldGet2"
+                            | "classPrivateFieldSet2"
+                            | "assertClassBrand"
+                            | "toSetter"
+                            | "classPrivateFieldLooseKey"
+                            | "classPrivateFieldLooseBase"
+                            | "superPropGet"
+                            | "superPropSet"
+                            | "readOnlyError"
+                            | "writeOnlyError"
+                            | "checkInRHS"
+                            | "taggedTemplateLiteral"
+                    )
+                })
+                .count()
+                > 1;
+            let mut prefixes = async_group
+                .then_some(GENERATED_INLINE_ASYNC_HELPERS)
+                .into_iter()
+                .collect::<Vec<_>>();
+            prefixes.extend(object_group.then_some(GENERATED_INLINE_OBJECT_HELPERS));
+            prefixes.extend(class_group.then_some(GENERATED_INLINE_CLASS_FEATURE_HELPERS));
+            prefixes.extend(
+                names
+                    .into_iter()
+                    .filter(|name| {
+                        (!async_group
+                            || !matches!(
+                                *name,
+                                "awaitAsyncGenerator"
+                                    | "asyncGeneratorDelegate"
+                                    | "asyncIterator"
+                                    | "wrapAsyncGenerator"
+                                    | "asyncToGenerator"
+                            ))
+                            && (!object_group
+                                || !matches!(
+                                    *name,
+                                    "defineProperty"
+                                        | "extends"
+                                        | "objectDestructuringEmpty"
+                                        | "objectSpread2"
+                                        | "objectWithoutProperties"
+                                        | "toPropertyKey"
+                                ))
+                            && (!class_group
+                                || !matches!(
+                                    *name,
+                                    "classPrivateFieldInitSpec"
+                                        | "classPrivateMethodInitSpec"
+                                        | "classPrivateFieldGet2"
+                                        | "classPrivateFieldSet2"
+                                        | "assertClassBrand"
+                                        | "toSetter"
+                                        | "classPrivateFieldLooseKey"
+                                        | "classPrivateFieldLooseBase"
+                                        | "superPropGet"
+                                        | "superPropSet"
+                                        | "readOnlyError"
+                                        | "writeOnlyError"
+                                        | "checkInRHS"
+                                        | "taggedTemplateLiteral"
+                                ))
+                    })
+                    .map(|name| {
+                        crate::generated::inline_helpers::BABEL_INLINE_ROOTS
+                            .iter()
+                            .find(|root| root.name == name)
+                            .expect("reachable helper has a generated inline root")
+                            .compact
+                    }),
+            );
             if prefixes.len() == 1 {
                 prefixes[0].into()
             } else {
@@ -568,18 +774,7 @@ pub fn inline_helpers(
 }
 
 pub struct InlineHelpers {
-    pub binding: String,
     pub prefix: String,
-}
-
-fn parse_version(value: &str) -> Option<(u32, u32, u32)> {
-    let value = value.strip_prefix('v').unwrap_or(value);
-    let core = value.split_once('-').map_or(value, |(core, _)| core);
-    let mut parts = core.split('.');
-    let major = parts.next()?.parse().ok()?;
-    let minor = parts.next().unwrap_or("0").parse().ok()?;
-    let patch = parts.next().unwrap_or("0").parse().ok()?;
-    Some((major, minor, patch))
 }
 
 pub(super) struct SourceNameReservations {
@@ -610,6 +805,10 @@ impl SourceNameReservations {
             }
         }
         unreachable!()
+    }
+
+    pub(super) fn include(&mut self, names: impl IntoIterator<Item = String>) {
+        self.names.extend(names);
     }
 }
 
@@ -657,13 +856,45 @@ mod tests {
     }
 
     #[test]
+    fn generated_helper_ordinals_are_dense_and_fit_the_policy_mask() {
+        let compatibility = crate::generated::inline_helpers::BABEL_HELPER_COMPATIBILITY;
+        assert!(compatibility.len() <= u64::BITS as usize);
+        for (ordinal, helper) in compatibility.iter().enumerate() {
+            assert_eq!(helper.ordinal as usize, ordinal);
+        }
+        assert!(
+            RuntimeHelperPolicy::parse(Some("7.29.7"))
+                .unwrap()
+                .all_generated_available()
+        );
+    }
+
+    #[test]
     fn ordinary_async_inline_helper_excludes_async_generator_runtime() {
-        let helpers = inline_helpers([Helper::AsyncToGenerator], "")
+        let helpers = inline_helpers([Helper::AsyncToGenerator], false)
             .unwrap()
             .unwrap();
         assert!(helpers.prefix.contains("asyncToGenerator"));
         assert!(!helpers.prefix.contains("wrapAsyncGenerator"));
-        assert!(helpers.prefix.len() < GENERATED_INLINE_ASYNC_HELPERS.len() / 2);
+    }
+
+    #[test]
+    fn selective_helpers_share_category_dependency_graphs() {
+        let class_helpers = inline_helpers(
+            [Helper::ClassPrivateFieldGet2, Helper::ClassPrivateFieldSet2],
+            true,
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(class_helpers.prefix, GENERATED_INLINE_CLASS_FEATURE_HELPERS);
+
+        let object_helpers = inline_helpers(
+            [Helper::ObjectSpread2, Helper::ObjectWithoutProperties],
+            true,
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(object_helpers.prefix, GENERATED_INLINE_OBJECT_HELPERS);
     }
 
     #[test]
@@ -672,12 +903,11 @@ mod tests {
             validate_runtime_helpers([Helper::UsingCtx], "@babel/runtime", Some("7.29.2")).is_ok()
         );
         assert_eq!(
-            validate_runtime_helpers([Helper::UsingCtx], "@babel/runtime", Some("7.27.0")),
-            Err("helper-runtime-too-old:@babel/runtime:usingCtx requires 7.28.0".into())
+            validate_runtime_helpers([Helper::UsingCtx], "@babel/runtime", Some("7.23.8")),
+            Err("helper-runtime-too-old:@babel/runtime:usingCtx requires 7.23.9".into())
         );
-        assert_eq!(
-            validate_runtime_helpers([Helper::AsyncToGenerator], "@babel/runtime", None),
-            Err("helper-runtime-version-required".into())
+        assert!(
+            validate_runtime_helpers([Helper::AsyncToGenerator], "@babel/runtime", None).is_ok()
         );
         assert_eq!(
             validate_runtime_helpers([Helper::AsyncToGenerator], "custom-runtime", Some("7.29.7")),
@@ -701,25 +931,60 @@ mod tests {
             "wrapRegExp",
         ] {
             let spec = babel_helper_spec(name).unwrap();
-            let accepted = format!(
-                "{}.{}.{}",
-                spec.minimum_version.0, spec.minimum_version.1, spec.minimum_version.2
-            );
+            let accepted = spec.minimum_version;
             assert!(
-                validate_custom_runtime_helpers(&[name], "@babel/runtime", Some(&accepted)).is_ok()
+                validate_custom_runtime_helpers(&[name], "@babel/runtime", Some(accepted)).is_ok()
             );
-            if spec.minimum_version != (7, 0, 0) {
-                let rejected = format!(
-                    "{}.{}.{}",
-                    spec.minimum_version.0,
-                    spec.minimum_version.1 - 1,
-                    spec.minimum_version.2
-                );
+            if spec.minimum_version != "7.0.0-beta.0" {
                 assert!(
-                    validate_custom_runtime_helpers(&[name], "@babel/runtime", Some(&rejected))
-                        .is_err()
+                    validate_custom_runtime_helpers(
+                        &[name],
+                        "@babel/runtime",
+                        Some("7.0.0-beta.0")
+                    )
+                    .is_err()
                 );
             }
+        }
+    }
+
+    #[test]
+    fn expo_7_20_fallback_set_matches_pinned_babel_metadata() {
+        let version = Version::parse("7.20.0").unwrap();
+        let unavailable = [
+            "checkInRHS",
+            "usingCtx",
+            "classPrivateFieldGet2",
+            "classPrivateFieldSet2",
+            "assertClassBrand",
+            "toSetter",
+            "superPropGet",
+            "superPropSet",
+        ];
+        for name in unavailable {
+            assert_eq!(
+                runtime_availability(babel_helper_spec(name).unwrap(), &version),
+                RuntimeAvailability::Inline,
+                "{name}"
+            );
+        }
+        assert_eq!(
+            runtime_availability(babel_helper_spec("asyncToGenerator").unwrap(), &version),
+            RuntimeAvailability::Runtime
+        );
+    }
+
+    #[test]
+    fn exact_versions_preserve_prerelease_and_reject_ranges() {
+        assert_eq!(
+            parse_runtime_version(Some("7.23.9-beta.0"))
+                .unwrap()
+                .pre
+                .as_str(),
+            "beta.0"
+        );
+        for invalid in ["", "^7.20.0", "7.20", "v7.20.0", "not-semver"] {
+            assert!(parse_runtime_version(Some(invalid)).is_err(), "{invalid}");
         }
     }
 
@@ -735,17 +1000,17 @@ mod tests {
         );
         assert_eq!(requests.names, FxHashSet::from_iter(["extends"]));
         assert!(requests.scope_names.contains("_extends3"));
-        assert!(requests.fragments[0].0.contains("_extends3"));
-        assert!(!contains_identifier_token(
-            &requests.fragments[0].0,
-            "_extends"
-        ));
         requests.materialize_generated(
             &INLINE_EXTENDS_HELPER_DESCRIPTOR,
             true,
             &[("_extends", "_extends3")],
         );
-        assert_eq!(requests.fragments.len(), 1);
+        let mut names = Vec::new();
+        let mut fragments = Vec::new();
+        requests.extend_into(&mut names, &mut fragments, false, None);
+        assert_eq!(fragments.len(), 1);
+        assert!(fragments[0].contains("_extends3"));
+        assert!(!contains_identifier_token(&fragments[0], "_extends"));
     }
 
     #[test]
@@ -770,11 +1035,10 @@ mod tests {
                 Helper::DefineProperty,
                 Helper::UsingCtx,
             ],
-            "var babelHelpers = 1;",
+            false,
         )
         .unwrap()
         .unwrap();
-        assert_eq!(inline.binding, "babelHelpers2");
         assert!(inline.prefix.starts_with("Object.assign("));
         assert!(inline.prefix.contains("asyncToGenerator"));
         assert!(inline.prefix.contains("defineProperty"));

@@ -231,4 +231,38 @@ The retained session materializes one owned columnar index from the compiled ret
 
 The current Expo/Metro source-transform capability audit is recorded in [FITMENT.md](./FITMENT.md). Babel remains outside this runtime and is selected by Metro only for files that cannot enter the secondary pipeline.
 
+### Babel runtime helper versions
+
+Runtime helper configuration takes the exact semver supplied to Expo's
+`babelRuntimeVersion` option:
+
+```ts
+helpers: {
+  mode: 'runtime',
+  moduleName: '@babel/runtime',
+  version: '7.20.0',
+}
+```
+
+Expo integrations must pass that value unchanged to both Babel and Noxcturnal; npm
+ranges and package discovery are not part of this contract. Noxcturnal derives each
+helper's minimum from the pinned `@babel/helpers`, applies Babel's exact-version caret
+availability boundary, and can emit runtime-backed and generated inline helpers in the
+same file. `helpersUsed` reports canonical identities independently of ownership.
+
+Omitting `version` uses Babel 7's `7.0.0-beta.0` default. An empty value, a range, or
+malformed semver produces `helper-runtime-version-invalid:*`; unsupported runtime
+module names, unknown helpers, and helpers without a generated safe fallback remain
+structured unsupported results. Explicit inline mode never reads the version or emits
+runtime loads. For script runtimes before 7.13, Noxcturnal intentionally uses the
+runtime helper's callable CommonJS self-export rather than Babel's redundant
+`interopRequireDefault(...).default` wrapper; the pinned Babel 7 runtime exposes both
+forms with the same helper ABI.
+
+On the repository's representative compact fixture requesting `asyncToGenerator` and
+`usingCtx` (Apple Silicon, release native build, 2,000 warm iterations), all-runtime
+output was 439 bytes at 0.0116 ms/transform, all-inline was 2,248 bytes at 0.0113 ms,
+and mixed `7.20.0` output was 1,736 bytes at 0.0214 ms. These figures are a regression
+baseline rather than a cross-machine performance guarantee.
+
 The editor surface is a direct contract: every documented operation is supported. The hot transform result always returns encoded `mappings` and `names`; decoded maps are intentionally absent.

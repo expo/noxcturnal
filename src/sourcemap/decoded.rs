@@ -12,43 +12,6 @@ impl DecodedLayer {
     pub(crate) fn pack(&self) -> Vec<u8> {
         pack_decoded_layer(&self.words, &self.names, self.line_count)
     }
-
-    pub(crate) fn shift_generated_for_insertion(
-        &mut self,
-        insertion_line: u32,
-        insertion_column: u32,
-        inserted: &str,
-    ) {
-        let inserted_lines = inserted.bytes().filter(|byte| *byte == b'\n').count() as u32;
-        let last_line_column = inserted
-            .rsplit_once('\n')
-            .map_or(inserted, |(_, tail)| tail)
-            .encode_utf16()
-            .count() as u32;
-        for segment in self.words.chunks_exact_mut(5) {
-            let mut generated_line = segment[0];
-            let mut generated_column = segment[1];
-            if generated_line < insertion_line
-                || (generated_line == insertion_line && generated_column < insertion_column)
-            {
-                continue;
-            }
-            if generated_line == insertion_line {
-                if inserted_lines == 0 {
-                    generated_column += last_line_column;
-                } else {
-                    generated_line += inserted_lines;
-                    generated_column =
-                        last_line_column + generated_column.saturating_sub(insertion_column);
-                }
-            } else {
-                generated_line += inserted_lines;
-            }
-            segment[0] = generated_line;
-            segment[1] = generated_column;
-        }
-        self.line_count += inserted_lines;
-    }
 }
 
 pub(crate) fn pack_decoded_layer<T: AsRef<str>>(
@@ -333,24 +296,4 @@ pub(crate) fn compose_decoded_layers(layers: &[DecodedLayer]) -> Option<Vec<u8>>
         }
     }
     Some(pack_decoded_layer(&words, &names, map.line_count() as u32))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn shifts_generated_segments_around_sourceless_insertions() {
-        let mut layer = DecodedLayer {
-            words: vec![0, 1, 0, 1, 0, 0, 5, 0, 5, 0, 1, 2, 1, 2, 0],
-            names: Vec::new(),
-            line_count: 2,
-        };
-        layer.shift_generated_for_insertion(0, 3, "xy\nz");
-        assert_eq!(
-            layer.words,
-            vec![0, 1, 0, 1, 0, 1, 3, 0, 5, 0, 2, 2, 1, 2, 0]
-        );
-        assert_eq!(layer.line_count, 3);
-    }
 }

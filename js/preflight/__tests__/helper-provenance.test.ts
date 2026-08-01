@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
+import { pathToFileURL } from 'node:url';
 
 import { test } from 'vitest';
 
@@ -30,6 +31,84 @@ test('structural helper dependencies are identical in inline and runtime modes',
     assert.equal(runtime.status, 'complete');
     assert.deepEqual(inline.helpersUsed, runtime.helpersUsed);
   }
+});
+
+test('Expo 7.20 runtime mixes available runtime helpers with inline fallback', async () => {
+  const source = `
+    var disposed = false;
+    var resource = { [Symbol.dispose]() { disposed = true; } };
+    async function increment(value) { return value + 1; }
+    { using current = resource; }
+    globalThis.answer = increment(4).then(value => [value, disposed]);
+  `;
+  const result = native.nativePreflightTransform(source, 'fixture.js', {
+    asyncFunctions: true,
+    explicitResourceManagement: true,
+    helpersMode: 'runtime',
+    helpersModuleName: '@babel/runtime',
+    helpersVersion: '7.20.0',
+  });
+  assert.equal(result.status, 'complete', result.reason);
+  assert.deepEqual(result.helpersUsed, ['asyncToGenerator', 'usingCtx']);
+  assert.match(result.code!, /require\("@babel\/runtime\/helpers\/asyncToGenerator"\)/);
+  assert.doesNotMatch(result.code!, /require\("@babel\/runtime\/helpers\/usingCtx"\)/);
+  assert.match(result.code!, /usingCtx/);
+  const context: { answer?: Promise<unknown> } = {};
+  new Function('globalThis', 'require', result.code!)(context, runtimeRequire);
+  assert.deepEqual(await context.answer, [5, true]);
+});
+
+test('mixed module output uses a structural import, keeps fallback local, and executes', async () => {
+  const result = native.nativePreflightTransform(
+    'export async function read(resource) { using current = resource; return 1; }',
+    'fixture.mjs',
+    {
+      asyncFunctions: true,
+      explicitResourceManagement: true,
+      helpersMode: 'runtime',
+      helpersModuleName: '@babel/runtime',
+      helpersVersion: '7.20.0',
+    },
+  );
+  assert.equal(result.status, 'complete', result.reason);
+  assert.match(
+    result.code!,
+    /import _asyncToGenerator from "@babel\/runtime\/helpers\/asyncToGenerator"/,
+  );
+  assert.doesNotMatch(result.code!, /@babel\/runtime\/helpers\/usingCtx/);
+  assert.match(result.code!, /var babelHelpersFallback/);
+  const runtimeUrl = pathToFileURL(
+    runtimeRequire.resolve('@babel/runtime/helpers/asyncToGenerator'),
+  ).href;
+  const executable = result.code!.replace(
+    '"@babel/runtime/helpers/asyncToGenerator"',
+    JSON.stringify(runtimeUrl),
+  );
+  const fixture = await import(
+    `data:text/javascript;base64,${Buffer.from(executable).toString('base64')}`
+  );
+  let disposed = false;
+  const resource = { [Symbol.dispose]: () => (disposed = true) };
+  assert.equal(await fixture.read(resource), 1);
+  assert.equal(disposed, true);
+});
+
+test('invalid runtime versions are configuration diagnostics and inline ignores versions', () => {
+  const invalid = native.nativePreflightTransform('async function read() {}', 'fixture.js', {
+    asyncFunctions: true,
+    helpersMode: 'runtime',
+    helpersVersion: '^7.20.0',
+  });
+  assert.equal(invalid.status, 'unsupported');
+  assert.equal(invalid.reason, 'helper-runtime-version-invalid:^7.20.0');
+
+  const inline = native.nativePreflightTransform('async function read() {}', 'fixture.js', {
+    asyncFunctions: true,
+    helpersMode: 'inline',
+    helpersVersion: 'not-semver',
+  });
+  assert.equal(inline.status, 'complete', inline.reason);
+  assert.doesNotMatch(inline.code!, /@babel\/runtime|require\(/);
 });
 
 test('legacy decorator registry preserves evaluation, application, descriptor, and parameter ABI', () => {
