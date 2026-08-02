@@ -526,23 +526,43 @@ export function createDispatcher(
       },
     );
   };
-  const routedThunks = dispatchRoutes.map(route => {
-    if (!route.fast) {
-      const { plugin, callbacks, capabilities } = route.members[0];
-      const entry = contexts.get(plugin)!;
-      const runtime = runtimeFor(plugin, entry, entry.context, capabilities);
-      return (event: NativeEvent) =>
-        dispatchOne(
-          event,
-          plugin,
-          entry,
-          entry.context,
-          runtime,
-          capabilities,
-          undefined,
-          undefined,
-          callbacks as Handler<any>[],
-        );
+  const compileCheckedRoute = (route: (typeof dispatchRoutes)[number]) => {
+    const { plugin, callbacks, capabilities } = route.members[0];
+    const entry = contexts.get(plugin)!;
+    const runtime = runtimeFor(plugin, entry, entry.context, capabilities);
+    return (event: NativeEvent) =>
+      dispatchOne(
+        event,
+        plugin,
+        entry,
+        entry.context,
+        runtime,
+        capabilities,
+        undefined,
+        undefined,
+        callbacks as Handler<any>[],
+      );
+  };
+  const compileStaticSingleCallbackRoute = (member: {
+    entry: DispatcherEntry;
+    runtime: PathRuntime;
+    callbacks: readonly Handler<any>[];
+  }) => {
+    const { entry, runtime, callbacks } = member;
+    const callback = callbacks[0];
+    return (event: NativeEvent) => {
+      currentSequence = event.sequence;
+      callback(new NodePathImpl(runtime, event, 0), entry.state);
+    };
+  };
+  const compileStaticRoute = (route: (typeof dispatchRoutes)[number]) => {
+    if (
+      !route.fast ||
+      route.members.some(
+        ({ plugin, capabilities }) => plugin.analyze != null || capabilities.controlFlow.length > 0,
+      )
+    ) {
+      throw new Error('invalid static dispatch route');
     }
     // Fast routes bind their runtimes once at dispatcher creation. Exit groups run
     // members in reverse order to preserve the reverse-exit contract across plugins.
@@ -552,14 +572,8 @@ export function createDispatcher(
       return { entry, runtime, callbacks };
     });
     if (route.side === 'exit') members.reverse();
-    if (members.length === 1 && members[0].callbacks.length === 1) {
-      const { entry, runtime, callbacks } = members[0];
-      const callback = callbacks[0];
-      return (event: NativeEvent) => {
-        currentSequence = event.sequence;
-        callback(new NodePathImpl(runtime, event, 0), entry.state);
-      };
-    }
+    if (members.length === 1 && members[0].callbacks.length === 1)
+      return compileStaticSingleCallbackRoute(members[0]);
     return (event: NativeEvent) => {
       currentSequence = event.sequence;
       for (const member of members) {
@@ -567,7 +581,10 @@ export function createDispatcher(
         for (const callback of member.callbacks) callback(path, member.entry.state);
       }
     };
-  });
+  };
+  const routedThunks = dispatchRoutes.map(route =>
+    route.fast ? compileStaticRoute(route) : compileCheckedRoute(route),
+  );
   return {
     contexts,
     run() {

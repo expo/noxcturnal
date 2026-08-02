@@ -559,14 +559,18 @@ function compilePhaseRoutes(
     plans.get(plugin)?.controlFlow?.includes('stop-all'),
   );
   const routes: CompiledRouteTemplate[] = [];
+  // Fast routes may bypass the checked dispatcher only when no plugin-level
+  // analysis or control-flow decision can change delivery for another route.
+  // Global stop makes every route dynamic, including otherwise static peers.
+  const fastRouteEligible = (plugin: NativePlugin<any, any>, definition: DefinedVisitor<any>) =>
+    !hasGlobalStop && definition.contract.controlFlow.length === 0 && plugin.analyze == null;
   for (let pluginId = 0; pluginId < plugins.length; pluginId++) {
     const plugin = plugins[pluginId];
     // Typed visitors compile directly: one route per (visitor, concrete type,
     // side), with the visitor's own predicates and payload — never lowered into
     // a plugin-wide aggregate.
     for (const { definition, where } of plans.get(plugin)!.resolvedVisitors) {
-      const fast =
-        !hasGlobalStop && definition.contract.controlFlow.length === 0 && plugin.analyze == null;
+      const fast = fastRouteEligible(plugin, definition);
       const capabilities = typedCapabilities(definition);
       for (const { nodeType, predicates } of typedRouteExpansion(definition, where)) {
         for (const side of ['enter', 'exit'] as const) {

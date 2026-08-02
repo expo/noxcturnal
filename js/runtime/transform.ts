@@ -50,6 +50,27 @@ interface RetainedChainNode {
   plan?: RetainedPlan;
 }
 
+type NativePhaseBatchEntry = {
+  phase: NativePipeline['phases'][number];
+  index: number;
+};
+
+/** Select one maximal run of native phases without deciding how it executes. */
+function nativePhaseBatch(
+  pipeline: NativePipeline,
+  start: number,
+): readonly NativePhaseBatchEntry[] {
+  const batch: NativePhaseBatchEntry[] = [];
+  for (
+    let index = start;
+    index < pipeline.phases.length && pipeline.phases[index].native != null;
+    index++
+  ) {
+    batch.push({ phase: pipeline.phases[index], index });
+  }
+  return batch;
+}
+
 const SEMANTIC_ROUTE_FIELDS = new Set([
   'global',
   'read',
@@ -315,9 +336,9 @@ export function transform(
   // Record one native run's per-phase results into diagnostics/metadata and bail
   // on the first phase that did not complete. Shared by the mixed-pipeline loop
   // and the all-native single-call path.
-  const recordNativeResults = (
+  const applyNativeResults = (
     results: readonly NativePreflightResultOutput[],
-    batch: readonly { phase: (typeof pipeline.phases)[number]; index: number }[],
+    batch: readonly NativePhaseBatchEntry[],
   ): void => {
     for (let resultIndex = 0; resultIndex < results.length; resultIndex++) {
       const result = results[resultIndex];
@@ -366,9 +387,10 @@ export function transform(
   };
   try {
     // All-native fast path: one crossing runs every phase and returns the final
-    // { code, map }. No visitor phase means no source text is needed in JS.
+    // products directly. Using NativePipelineSession here would add session
+    // construction and a terminal crossing without providing a JS observer.
     if (allNative) {
-      const batch = pipeline.phases.map((phase, index) => ({ phase, index }));
+      const batch = nativePhaseBatch(pipeline, 0);
       const pipelineResult = native.runNativePipeline(
         parseFilename,
         source,
@@ -377,7 +399,7 @@ export function transform(
         inputMap?.names,
         options.functionMap,
       );
-      recordNativeResults(pipelineResult.results, batch); // throws on any bail
+      applyNativeResults(pipelineResult.results, batch); // throws on any bail
       sourceVersions.cacheRenderedText(currentVersion, pipelineResult.code!);
       if (pipelineResult.functionMap != null) {
         sourceVersions.cacheFunctionMap(currentVersion, pipelineResult.functionMap);
@@ -403,19 +425,14 @@ export function transform(
         // single crossing: native phases hand the source and their map layers
         // along resident, never bouncing back to JS between themselves. The
         // for-loop's `++` resumes at the first non-native phase after the run.
-        const batch: { phase: (typeof pipeline.phases)[number]; index: number }[] = [];
-        while (phaseIndex < pipeline.phases.length && pipeline.phases[phaseIndex].native != null) {
-          const batchPhase = pipeline.phases[phaseIndex];
-          batch.push({ phase: batchPhase, index: phaseIndex });
-          phaseIndex++;
-        }
-        phaseIndex--;
+        const batch = nativePhaseBatch(pipeline, phaseIndex);
+        phaseIndex = batch.at(-1)!.index;
         const results = pipelineSession!.runNativePhases(
           batch.map(({ phase: batchPhase }) => nativePreflightOptions(batchPhase.native!)),
         );
         // The rendered source stays resident; materialized lazily only if a later
         // visitor phase needs its text, or once at the end.
-        recordNativeResults(results, batch);
+        applyNativeResults(results, batch);
         continue;
       }
       // A visitor phase reads source text, so materialize the resident source
