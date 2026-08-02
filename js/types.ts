@@ -180,7 +180,6 @@ export interface Diagnostic {
 export interface ParseClassification {
   syntax: 'js' | 'jsx' | 'ts' | 'tsx' | 'dts' | 'flow' | 'unknown';
   supported: boolean;
-  codegenCandidate: boolean;
   reason: string;
 }
 

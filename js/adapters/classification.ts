@@ -1,12 +1,6 @@
 import type { ParseClassification, TransformOptions } from '../types';
 
-const SOURCE_HINTS = [
-  'process.env',
-  'require',
-  'import',
-  'export',
-  'codegenNativeComponent',
-] as const;
+const SOURCE_HINTS = ['process.env', 'require', 'import', 'export'] as const;
 
 class LazySourceHints implements ReadonlySet<string> {
   #set?: Set<string>;
@@ -84,9 +78,6 @@ export function classifyForTransform(
   return {
     syntax,
     supported,
-    get codegenCandidate() {
-      return source.includes('codegenNativeComponent') || source.includes('codegenNativeCommands');
-    },
     reason: supported
       ? 'oxc-supported'
       : syntax === 'flow'

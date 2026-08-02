@@ -26,8 +26,6 @@ pub(crate) fn classify_source(filename: &str, source: &str) -> ParseClassificati
     ParseClassification {
         syntax: syntax.into(),
         supported,
-        codegen_candidate: source.contains("codegenNativeComponent")
-            || source.contains("codegenNativeCommands"),
         reason: if supported {
             "oxc-supported".into()
         } else if syntax == "flow" {
@@ -97,16 +95,5 @@ mod tests {
             assert_eq!(result.reason, reason);
             assert!(source_type(filename, source).is_err());
         }
-    }
-
-    #[test]
-    fn detects_codegen_candidates_case_insensitively_by_extension() {
-        let result = classify_source(
-            "Component.TSX",
-            "export default codegenNativeComponent('Component');",
-        );
-        assert_eq!(result.syntax, "tsx");
-        assert!(result.supported);
-        assert!(result.codegen_candidate);
     }
 }

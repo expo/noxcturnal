@@ -66,7 +66,6 @@ export function transformClassificationCacheKey(
         classification: {
           syntax: classification.syntax,
           supported: classification.supported,
-          codegenCandidate: classification.codegenCandidate,
           reason: classification.reason,
         },
         parserAdapter: parserAdapterCacheDescriptor(options.parserAdapter, classification),

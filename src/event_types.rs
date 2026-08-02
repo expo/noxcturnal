@@ -11,7 +11,6 @@ pub struct NodeField {
 pub struct ParseClassification {
     pub syntax: String,
     pub supported: bool,
-    pub codegen_candidate: bool,
     pub reason: String,
 }
 

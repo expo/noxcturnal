@@ -16,10 +16,6 @@ test('classifies filenames, parser overrides, and lazy source hints', () => {
   assert.equal(classifyForTransform('fixture.d.ts', '').syntax, 'dts');
   assert.equal(classifyForTransform('fixture.unknown', '').reason, 'unknown-extension');
   assert.equal(classifyForTransform('fixture.js', '', 'jsx').syntax, 'jsx');
-  assert.equal(
-    classifyForTransform('fixture.js', 'codegenNativeCommands()').codegenCandidate,
-    true,
-  );
 
   const hints = sourceHints('import value from "pkg"; process.env.NODE_ENV;');
   assert.equal(hints.has('import'), true);

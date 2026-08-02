@@ -23,6 +23,10 @@ test('keys scheduler classification and phase planning', () => {
   );
   assert.notEqual(js, flow);
   assert.equal(js, transformClassificationCacheKey(pipeline, 'fixture.js', 'const other = 2'));
+  assert.equal(
+    js,
+    transformClassificationCacheKey(pipeline, 'fixture.js', 'codegenNativeComponent("Component")'),
+  );
 });
 
 test('compiles conservative phase boundaries and edit effects', () => {
