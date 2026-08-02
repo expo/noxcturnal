@@ -376,7 +376,10 @@ test('capture filtering performs no binding queries', () => {
   const prototype = native.NativeIndexedSession.prototype;
   const queryBindings = prototype.queryBindings;
   let bindingQueries = 0;
-  prototype.queryBindings = function (...args) {
+  prototype.queryBindings = function (
+    this: typeof prototype,
+    ...args: Parameters<typeof queryBindings>
+  ) {
     bindingQueries++;
     return queryBindings.apply(this, args);
   };
