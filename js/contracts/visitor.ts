@@ -222,8 +222,8 @@ export interface NativeNodePath<T extends NodeView = NodeView> {
   readonly context: PluginContext;
   getSource(): SourceFragment;
   /** Return this anonymous function/class declaration with a generated binding name.
-   * The visitor must request declarationNameAnchor, declarationNamePrefix, and
-   * declarationNamePrefix in its route contract. */
+   * The visitor must request declarationNameAnchor and declarationNamePrefix in its
+   * route contract. */
   withDeclarationName(name: string): CompositeFragment;
   /** The node's source as plain text, without provenance. */
   sourceText(): string;

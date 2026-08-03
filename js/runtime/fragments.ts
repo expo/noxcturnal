@@ -135,9 +135,66 @@ export function isFragmentList(value: Code | readonly Code[]): value is readonly
   return Array.isArray(value);
 }
 
+function isReservedIdentifier(name: string): boolean {
+  switch (name) {
+    case 'await':
+    case 'break':
+    case 'case':
+    case 'catch':
+    case 'class':
+    case 'const':
+    case 'continue':
+    case 'debugger':
+    case 'default':
+    case 'delete':
+    case 'do':
+    case 'else':
+    case 'enum':
+    case 'export':
+    case 'extends':
+    case 'false':
+    case 'finally':
+    case 'for':
+    case 'function':
+    case 'if':
+    case 'implements':
+    case 'import':
+    case 'in':
+    case 'instanceof':
+    case 'interface':
+    case 'let':
+    case 'new':
+    case 'null':
+    case 'package':
+    case 'private':
+    case 'protected':
+    case 'public':
+    case 'return':
+    case 'static':
+    case 'super':
+    case 'switch':
+    case 'this':
+    case 'throw':
+    case 'true':
+    case 'try':
+    case 'typeof':
+    case 'var':
+    case 'void':
+    case 'while':
+    case 'with':
+    case 'yield':
+      return true;
+    default:
+      return false;
+  }
+}
+
 export const codeFactory: CodeFactory = {
   identifier(name) {
-    if (!/^[$_\p{ID_Start}][$\u200c\u200d\p{ID_Continue}]*$/u.test(name))
+    if (
+      isReservedIdentifier(name) ||
+      !/^[$_\p{ID_Start}][$\u200c\u200d\p{ID_Continue}]*$/u.test(name)
+    )
       throw new Error(`Invalid identifier: ${name}`);
     return { code: name, mapping: 'sourceless' };
   },

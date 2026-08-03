@@ -67,6 +67,16 @@ describe('withDeclarationName', () => {
     );
   });
 
+  test.each(['class', 'null', 'await', 'yield', 'let'])('rejects reserved name %s', name => {
+    assert.throws(
+      () => nameDeclarations('export default function() {}', name),
+      error =>
+        error instanceof Error &&
+        error.name === 'NativeTransformError' &&
+        new RegExp(`Invalid declaration identifier: ${name}`).test(error.message),
+    );
+  });
+
   test('rejects named declarations and missing metadata', () => {
     assert.throws(() => nameDeclarations('function named() {}'), /only supports anonymous/);
     const plugin = defineNativePlugin({
