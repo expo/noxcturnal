@@ -266,11 +266,13 @@ function normalizePipelinePhase(phase: PipelinePhase): PipelinePhase {
   if (phase.native != null && phase.plugins != null)
     throw new Error(`${phase.name}: native phases cannot contain visitor plugins`);
   if (phase.native != null) {
-    validateNativePlan(phase.name, phase.native);
-    return internPhase(phase, () =>
+    const native = normalizeNativePlan(phase.native);
+    validateNativePlan(phase.name, native);
+    const normalizedPhase = { ...phase, native };
+    return internPhase(normalizedPhase, () =>
       Object.freeze({
-        ...phase,
-        native: deepFreeze(structuredClone(phase.native)),
+        ...normalizedPhase,
+        native: deepFreeze(structuredClone(native)),
       }),
     );
   }
@@ -280,6 +282,27 @@ function normalizePipelinePhase(phase: PipelinePhase): PipelinePhase {
       plugins: Object.freeze([...(phase.plugins ?? [])]),
     }),
   );
+}
+
+function normalizeNativePlan(plan: PreflightPlan): PreflightPlan {
+  const native = Object.fromEntries(
+    Object.entries(plan).filter(([, value]) => value !== undefined),
+  ) as PreflightPlan;
+
+  for (const key of ['transforms', 'optimize'] as const) {
+    const options = plan[key];
+    if (options == null) continue;
+    const enabled = Object.fromEntries(
+      Object.entries(options).filter(([, value]) => value !== false && value !== undefined),
+    );
+    if (Object.keys(enabled).length === 0) {
+      delete native[key];
+    } else {
+      (native as Record<string, unknown>)[key] = enabled;
+    }
+  }
+
+  return native;
 }
 
 function validateNativePlan(phaseName: string, plan: PreflightPlan): void {

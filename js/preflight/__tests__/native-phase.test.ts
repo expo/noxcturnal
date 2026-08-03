@@ -51,17 +51,60 @@ test('freezes native options and includes them in the pipeline cache key', () =>
     /cannot contain visitor plugins/,
   );
   assert.equal(defineNativePipeline({ phases: [{ name: 'empty', native: {} }] }).phases.length, 0);
-  assert.throws(
-    () =>
-      defineNativePipeline({
-        phases: [
-          {
-            name: 'invalid-transform',
-            native: { transforms: { classStaticBlock: false as never } },
+  const disabled = defineNativePipeline({
+    phases: [
+      {
+        name: 'disabled-transforms',
+        native: {
+          transforms: {
+            blockScoping: false,
+            classStaticBlock: undefined,
+            classProperties: false,
           },
-        ],
-      }),
-    /must be true or absent/,
+          optimize: {
+            constantFolding: false,
+            deadCodeElimination: undefined,
+          },
+        },
+      },
+    ],
+  });
+  assert.equal(disabled.phases.length, 0);
+
+  const mixed = defineNativePipeline({
+    phases: [
+      {
+        name: 'mixed-transforms',
+        native: {
+          transforms: {
+            blockScoping: true,
+            classStaticBlock: false,
+            asyncFunctions: undefined,
+          },
+          optimize: {
+            constantFolding: true,
+            deadCodeElimination: false,
+          },
+        },
+      },
+    ],
+  });
+  assert.deepEqual(mixed.phases[0].native?.transforms, { blockScoping: true });
+  assert.deepEqual(mixed.phases[0].native?.optimize, { constantFolding: true });
+  assert.ok(Object.isFrozen(mixed.phases[0].native?.transforms));
+  assert.equal(
+    mixed,
+    defineNativePipeline({
+      phases: [
+        {
+          name: 'mixed-transforms',
+          native: {
+            transforms: { blockScoping: true },
+            optimize: { constantFolding: true },
+          },
+        },
+      ],
+    }),
   );
   assert.throws(
     () =>

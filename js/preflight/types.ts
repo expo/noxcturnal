@@ -35,8 +35,8 @@ export interface PreflightReactRefresh {
 
 /** Focused Metro-compatible post-processing. Each operation is independently selectable. */
 export interface PreflightOptimize {
-  constantFolding?: true;
-  deadCodeElimination?: true;
+  constantFolding?: boolean | undefined;
+  deadCodeElimination?: boolean | undefined;
 }
 
 /**
@@ -47,37 +47,37 @@ export interface PreflightOptimize {
  * Unicode property escapes.
  */
 export interface PreflightTransforms {
-  blockScoping?: true;
-  classes?: true;
+  blockScoping?: boolean | undefined;
+  classes?: boolean | undefined;
   /** Apply TypeScript-style legacy decorator semantics. */
-  legacyDecorators?: true;
-  destructuring?: true;
-  parameters?: true;
-  forOf?: true;
-  explicitResourceManagement?: true;
-  classStaticBlock?: true;
-  classProperties?: { loose: boolean };
-  logicalAssignmentOperators?: true;
-  optionalChaining?: { loose: boolean };
-  nullishCoalescingOperator?: { loose: boolean };
-  exportNamespaceFrom?: true;
-  optionalCatchBinding?: true;
-  objectRestSpread?: { loose: boolean; useBuiltIns: boolean };
-  asyncGeneratorFunctions?: true;
-  asyncFunctions?: true;
-  exponentiationOperator?: true;
+  legacyDecorators?: boolean | undefined;
+  destructuring?: boolean | undefined;
+  parameters?: boolean | undefined;
+  forOf?: boolean | undefined;
+  explicitResourceManagement?: boolean | undefined;
+  classStaticBlock?: boolean | undefined;
+  classProperties?: { loose: boolean } | false | undefined;
+  logicalAssignmentOperators?: boolean | undefined;
+  optionalChaining?: { loose: boolean } | false | undefined;
+  nullishCoalescingOperator?: { loose: boolean } | false | undefined;
+  exportNamespaceFrom?: boolean | undefined;
+  optionalCatchBinding?: boolean | undefined;
+  objectRestSpread?: { loose: boolean; useBuiltIns: boolean } | false | undefined;
+  asyncGeneratorFunctions?: boolean | undefined;
+  asyncFunctions?: boolean | undefined;
+  exponentiationOperator?: boolean | undefined;
   /** Native private state uses one stable loose representation. */
-  privateMethods?: true;
+  privateMethods?: boolean | undefined;
   /** Native private state uses one stable loose representation. */
-  privatePropertyInObject?: true;
-  regexpSticky?: true;
-  regexpUnicode?: true;
-  regexpUnicodePropertyEscapes?: true;
-  regexpDotAll?: true;
-  regexpNamedCaptureGroups?: true;
-  regexpLookBehind?: true;
-  regexpMatchIndices?: true;
-  regexpUnicodeSets?: true;
+  privatePropertyInObject?: boolean | undefined;
+  regexpSticky?: boolean | undefined;
+  regexpUnicode?: boolean | undefined;
+  regexpUnicodePropertyEscapes?: boolean | undefined;
+  regexpDotAll?: boolean | undefined;
+  regexpNamedCaptureGroups?: boolean | undefined;
+  regexpLookBehind?: boolean | undefined;
+  regexpMatchIndices?: boolean | undefined;
+  regexpUnicodeSets?: boolean | undefined;
 }
 
 /**

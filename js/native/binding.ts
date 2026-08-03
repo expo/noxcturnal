@@ -334,6 +334,10 @@ const nativePreflightOptionsCache = new WeakMap<PreflightPlan, NativePreflightOp
 export function nativePreflightOptions(plan: PreflightPlan): NativePreflightOptionsInput {
   const cached = nativePreflightOptionsCache.get(plan);
   if (cached != null) return cached;
+  const classProperties = plan.transforms?.classProperties || undefined;
+  const optionalChaining = plan.transforms?.optionalChaining || undefined;
+  const nullishCoalescingOperator = plan.transforms?.nullishCoalescingOperator || undefined;
+  const objectRestSpread = plan.transforms?.objectRestSpread || undefined;
   const options: NativePreflightOptionsInput = {
     reactCompiler: plan.reactCompiler != null,
     reactCompilerCompilationMode: plan.reactCompiler?.compilationMode,
@@ -371,18 +375,18 @@ export function nativePreflightOptions(plan: PreflightPlan): NativePreflightOpti
     forOf: plan.transforms?.forOf,
     explicitResourceManagement: plan.transforms?.explicitResourceManagement,
     classStaticBlock: plan.transforms?.classStaticBlock,
-    classProperties: plan.transforms?.classProperties != null,
-    classPropertiesLoose: plan.transforms?.classProperties?.loose,
+    classProperties: classProperties != null,
+    classPropertiesLoose: classProperties?.loose,
     logicalAssignmentOperators: plan.transforms?.logicalAssignmentOperators,
-    optionalChaining: plan.transforms?.optionalChaining != null,
-    optionalChainingLoose: plan.transforms?.optionalChaining?.loose,
-    nullishCoalescingOperator: plan.transforms?.nullishCoalescingOperator != null,
-    nullishCoalescingOperatorLoose: plan.transforms?.nullishCoalescingOperator?.loose,
+    optionalChaining: optionalChaining != null,
+    optionalChainingLoose: optionalChaining?.loose,
+    nullishCoalescingOperator: nullishCoalescingOperator != null,
+    nullishCoalescingOperatorLoose: nullishCoalescingOperator?.loose,
     exportNamespaceFrom: plan.transforms?.exportNamespaceFrom,
     optionalCatchBinding: plan.transforms?.optionalCatchBinding,
-    objectRestSpread: plan.transforms?.objectRestSpread != null,
-    objectRestSpreadLoose: plan.transforms?.objectRestSpread?.loose,
-    objectRestSpreadUseBuiltIns: plan.transforms?.objectRestSpread?.useBuiltIns,
+    objectRestSpread: objectRestSpread != null,
+    objectRestSpreadLoose: objectRestSpread?.loose,
+    objectRestSpreadUseBuiltIns: objectRestSpread?.useBuiltIns,
     asyncGeneratorFunctions: plan.transforms?.asyncGeneratorFunctions,
     asyncFunctions: plan.transforms?.asyncFunctions,
     exponentiationOperator: plan.transforms?.exponentiationOperator,
