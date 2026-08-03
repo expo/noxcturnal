@@ -44,6 +44,27 @@ test('supports infer compilation mode', async () => {
   `);
 });
 
+test('leaves functions with recoverable compiler errors uncompiled when panic threshold is none', async () => {
+  const source = `import { useEffect, useRef } from 'react';
+export function useEventListener(listener) {
+  const listenerRef = useRef(listener);
+  listenerRef.current = listener;
+  useEffect(() => listenerRef.current(), [listenerRef]);
+}`;
+
+  expect(
+    await transformOutcome(source, 'useEvent.js', {
+      reactCompiler: compiler({ panicThreshold: 'none' }),
+      jsx: 'preserve',
+    }),
+  ).toBe(`import { useEffect, useRef } from 'react';
+export function useEventListener(listener) {
+  const listenerRef = useRef(listener);
+  listenerRef.current = listener;
+  useEffect(() => listenerRef.current(), [listenerRef]);
+}`);
+});
+
 test('supports syntax compilation mode', async () => {
   expect(
     await transformOutcome(
@@ -307,6 +328,26 @@ test('honors custom opt-out directives', async () => {
   ).toMatchInlineSnapshot(`
     "export function Greeting() {
       'use no optimize';
+      return <Text />;
+    }"
+  `);
+});
+
+test('merges custom opt-out directives with the compiler defaults', async () => {
+  const source = `export function DefaultOptOut() { 'use no memo'; return <Text />; }
+export function CustomOptOut() { 'widget'; return <Text />; }`;
+  expect(
+    await transformOutcome(source, 'input.jsx', {
+      reactCompiler: compiler({ customOptOutDirectives: ['widget'] }),
+      jsx: 'preserve',
+    }),
+  ).toMatchInlineSnapshot(`
+    "export function DefaultOptOut() {
+      'use no memo';
+      return <Text />;
+    }
+    export function CustomOptOut() {
+      'widget';
       return <Text />;
     }"
   `);
