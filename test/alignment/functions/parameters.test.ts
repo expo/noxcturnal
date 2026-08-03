@@ -1,4 +1,5 @@
 import parameters from '@babel/plugin-transform-parameters';
+import blockScoping from '@babel/plugin-transform-block-scoping';
 import { expect, test } from 'vitest';
 
 import { alignBabelBehavior } from '../transform';
@@ -60,4 +61,25 @@ test('aligns non-simple setters with Babel', async () => {
       output: { mustNotMatch: [/next = 1/] },
     }),
   ).resolves.toBeUndefined();
+});
+
+test('aligns rest parameters followed by captured lexical bindings with Babel', async () => {
+  await expect(
+    alignBabelBehavior({
+      source: `function merge(...refs) {
+  const readCount = () => refs.length;
+  return () => readCount();
+}
+function collect(...values) {
+  const callbacks = [];
+  for (let index = 0; index < values.length; index++) callbacks.push(() => index);
+  return callbacks.map(callback => callback());
+}
+globalThis.__result = [merge('a', 'b')(), collect('a', 'b', 'c')];`,
+      filename: 'input.js',
+      plugins: [parameters, blockScoping],
+      noxcturnal: { transforms: { parameters: true, blockScoping: true } },
+      output: { mustNotMatch: [/\.\.\.refs/, /\b(?:const|let)\b/] },
+    }),
+  ).resolves.toEqual([2, [0, 1, 2]]);
 });

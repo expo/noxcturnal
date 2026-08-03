@@ -29,6 +29,25 @@ test('legacy language transforms compose without changing observable behavior', 
   await expect(result.result).resolves.toEqual([[0, 1, 2], true]);
 });
 
+test('rest parameter loops do not capture later block-scoped bindings', () => {
+  const result = execute<{ result: unknown[] }>(
+    `
+      function merge(...refs) {
+        const readCount = () => refs.length;
+        return () => readCount();
+      }
+      function collect(...values) {
+        const callbacks = [];
+        for (let index = 0; index < values.length; index++) callbacks.push(() => index);
+        return callbacks.map(callback => callback());
+      }
+      globalThis.result = [merge('a', 'b')(), collect('a', 'b', 'c')];
+    `,
+    { transforms: { parameters: true, blockScoping: true } },
+  );
+  expect(result.result).toEqual([2, [0, 1, 2]]);
+});
+
 test('TypeScript, class fields, optional chaining, and nullish coalescing compose', () => {
   const result = execute<{ result: number }>(
     `

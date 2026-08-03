@@ -754,60 +754,17 @@ fn captured_loop_mutations(
     (!roots.is_empty()).then_some(roots)
 }
 
-/// Classify loop declarations and references in semantic preorder. Active loop
-/// and closure-boundary stacks replace the former per-symbol ancestor walks.
+/// Classify loop declarations and references by their semantic AST ancestry.
 fn classify_captured_loops(semantic: &Semantic<'_>) -> FxHashMap<NodeId, CapturedLoop> {
-    #[derive(Clone, Copy)]
-    struct Declaration {
-        loop_id: NodeId,
-        boundary_depth: usize,
-    }
-
     let nodes = semantic.nodes();
     let scoping = semantic.scoping();
-    let mut declarations = vec![None::<Declaration>; scoping.symbols_len()];
+    let mut declarations = vec![None::<NodeId>; scoping.symbols_len()];
     let mut loop_facts = FxHashMap::<NodeId, CapturedLoop>::default();
     let mut captured = FxHashSet::<NodeId>::default();
-    let mut active_loops = Vec::<(NodeId, u32)>::new();
-    let mut active_loop_ids = FxHashSet::<NodeId>::default();
-    let mut active_boundaries = Vec::<u32>::new();
-    let mut pending_field_boundaries = Vec::<(u32, u32)>::new();
 
     for (node_id, node) in nodes.iter_enumerated() {
         let span = node.kind().span();
-        while active_loops
-            .last()
-            .is_some_and(|(_, end)| span.start >= *end)
-        {
-            let (loop_id, _) = active_loops.pop().unwrap();
-            active_loop_ids.remove(&loop_id);
-        }
-        while active_boundaries
-            .last()
-            .is_some_and(|end| span.start >= *end)
-        {
-            active_boundaries.pop();
-        }
-        while pending_field_boundaries
-            .last()
-            .is_some_and(|(start, _)| span.start >= *start)
-        {
-            let (_, end) = pending_field_boundaries.pop().unwrap();
-            active_boundaries.push(end);
-        }
-
-        if node.kind().is_function_like() {
-            active_boundaries.push(span.end);
-        }
-        if let AstKind::PropertyDefinition(property) = node.kind()
-            && !property.r#static
-            && let Some(value) = &property.value
-        {
-            pending_field_boundaries.push((value.span().start, value.span().end));
-        }
         if node.kind().is_iteration_statement() {
-            active_loops.push((node_id, span.end));
-            active_loop_ids.insert(node_id);
             if let Some((loop_span, body_span)) = loop_spans(node.kind()) {
                 loop_facts.insert(
                     node_id,
@@ -832,13 +789,17 @@ fn classify_captured_loops(semantic: &Semantic<'_>) -> FxHashMap<NodeId, Capture
                 {
                     continue;
                 }
-                let Some(&(loop_id, _)) = active_loops.last() else {
+                // Generated parameter-rest loops reuse source anchors whose spans can overlap
+                // later sibling declarations, so AST ancestry must remain authoritative after
+                // mutation. Keep associating declarations in nested functions with an enclosing
+                // loop: Babel conservatively wraps that loop when a deeper closure captures one.
+                let Some(loop_id) = nodes
+                    .ancestor_ids(node_id)
+                    .find(|ancestor| nodes.kind(*ancestor).is_iteration_statement())
+                else {
                     continue;
                 };
-                declarations[symbol_id.index()] = Some(Declaration {
-                    loop_id,
-                    boundary_depth: active_boundaries.len(),
-                });
+                declarations[symbol_id.index()] = Some(loop_id);
                 let loop_fact = loop_facts.get_mut(&loop_id).unwrap();
                 if span.start < loop_fact.body_span.start
                     && !loop_fact
@@ -857,11 +818,23 @@ fn classify_captured_loops(semantic: &Semantic<'_>) -> FxHashMap<NodeId, Capture
                 let Some(symbol_id) = reference.symbol_id() else {
                     continue;
                 };
-                if let Some(declaration) = declarations[symbol_id.index()]
-                    && active_boundaries.len() > declaration.boundary_depth
-                    && active_loop_ids.contains(&declaration.loop_id)
-                {
-                    captured.insert(declaration.loop_id);
+                let Some(loop_id) = declarations[symbol_id.index()] else {
+                    continue;
+                };
+                let mut crossed_boundary = false;
+                for ancestor in nodes.ancestor_ids(node_id) {
+                    if ancestor == loop_id {
+                        if crossed_boundary {
+                            captured.insert(loop_id);
+                        }
+                        break;
+                    }
+                    let kind = nodes.kind(ancestor);
+                    if kind.is_function_like()
+                        || matches!(kind, AstKind::PropertyDefinition(property) if !property.r#static)
+                    {
+                        crossed_boundary = true;
+                    }
                 }
             }
             _ => {}

@@ -14,3 +14,16 @@ test('lowers default and rest parameters', async () => {
       }"
     `);
 });
+
+test('composes rest parameter and block-scoping lowering across closure boundaries', async () => {
+  const source = `function merge(...refs) {
+  const readCount = () => refs.length;
+  return () => readCount();
+}`;
+  const output = await transformSource(source, 'input.js', {
+    transforms: { parameters: true, blockScoping: true },
+  });
+  expect(output).not.toMatch(/\.\.\.refs|\b(?:const|let)\b/);
+  expect(output).toContain('for (var _len = arguments.length');
+  expect(output).toContain('var readCount = () => refs.length;');
+});
