@@ -1,5 +1,5 @@
 import { execFileSync, spawnSync } from 'node:child_process';
-import { copyFileSync, mkdirSync, readdirSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, renameSync, rmSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { nativePackages } from './native-packages.mjs';
@@ -50,10 +50,13 @@ for (const [target] of targets) {
   }
 }
 
+rmSync(artifacts, { recursive: true, force: true });
 mkdirSync(artifacts, { recursive: true });
 rmSync(buildRoot, { recursive: true, force: true });
+for (const [, filename] of targets) rmSync(resolve(root, filename), { force: true });
 
 for (const [target, filename, crossCompile] of targets) {
+  const outputDirectory = resolve(buildRoot, 'output', target);
   const args = [
     'exec',
     'napi',
@@ -64,12 +67,16 @@ for (const [target, filename, crossCompile] of targets) {
     target,
     '--target-dir',
     resolve(buildRoot, target),
+    '--output-dir',
+    outputDirectory,
   ];
   if (crossCompile) args.push('--cross-compile');
 
   console.log(`\nBuilding ${target}`);
   execFileSync('pnpm', args, { cwd: root, stdio: 'inherit' });
-  copyFileSync(resolve(root, filename), resolve(artifacts, filename));
+  const builtBinary = resolve(outputDirectory, filename);
+  if (!existsSync(builtBinary)) throw new Error(`build did not produce ${filename}`);
+  renameSync(builtBinary, resolve(artifacts, filename));
 }
 
 console.log(`\nBuilt ${targets.length} native artifacts in ${artifacts}`);

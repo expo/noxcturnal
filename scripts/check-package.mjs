@@ -35,9 +35,19 @@ try {
       throw new Error(`package archive is missing ${filename}`);
   }
 
-  let binary = fs
+  const packagedBinaries = fs
     .readdirSync(packagedRoot)
-    .find(filename => filename.startsWith('noxcturnal.') && filename.endsWith('.node'));
+    .filter(filename => filename.startsWith('noxcturnal.') && filename.endsWith('.node'));
+  if (packagedBinaries.length > 0)
+    throw new Error(
+      `root package archive contains native binaries: ${packagedBinaries.join(', ')}`,
+    );
+
+  const suffix = platformSuffix();
+  const current = nativePackages.find(([, packageDirectory]) => packageDirectory === suffix);
+  if (!current) throw new Error(`package check does not support ${suffix}`);
+  const [binary, packageDirectory] = current;
+  let binarySource = path.join(root, binary);
   if (release) {
     for (const [filename, packageDirectory, packageName] of nativePackages) {
       const stagedBinary = path.join(root, 'npm', packageDirectory, filename);
@@ -47,14 +57,11 @@ try {
         );
     }
 
-    const suffix = platformSuffix();
-    const current = nativePackages.find(([, packageDirectory]) => packageDirectory === suffix);
-    if (!current) throw new Error(`release package check does not support ${suffix}`);
-    binary = current[0];
-    fs.copyFileSync(path.join(root, 'npm', current[1], binary), path.join(packagedRoot, binary));
-  } else if (!binary) {
-    throw new Error('package archive is missing the native binary');
+    binarySource = path.join(root, 'npm', packageDirectory, binary);
   }
+  if (!fs.existsSync(binarySource))
+    throw new Error(`package smoke test is missing ${path.relative(root, binarySource)}`);
+  fs.copyFileSync(binarySource, path.join(packagedRoot, binary));
 
   const require = createRequire(import.meta.url);
   const api = require(packagedRoot);

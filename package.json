@@ -6,7 +6,6 @@
   "source": "./js/index.ts",
   "files": [
     "dist",
-    "*.node",
     "README.md",
     "FITMENT.md"
   ],
