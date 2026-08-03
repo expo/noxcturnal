@@ -102,6 +102,36 @@ test('supports aliases, enter/exit order, state, skip, and stop', () => {
   assert.deepEqual(order, ['pre', 'enter:1', 'exit', 'post', 'cleanup:complete']);
 });
 
+test('cleans each plugin state at most once when cleanup itself throws', () => {
+  const cleanup: string[] = [];
+  const failing = defineNativePlugin({
+    name: 'failing-cleanup',
+    pre() {},
+    cleanup(reason) {
+      cleanup.push(`failing:${reason}`);
+      throw new Error('cleanup failed');
+    },
+  });
+  const peer = defineNativePlugin({
+    name: 'cleanup-peer',
+    pre() {},
+    cleanup(reason) {
+      cleanup.push(`peer:${reason}`);
+    },
+  });
+
+  assert.throws(
+    () =>
+      transform(
+        'const value = 1;',
+        'fixture.js',
+        defineNativePipeline({ phases: [{ name: 'visit', plugins: [failing, peer] }] }),
+      ),
+    /cleanup failed/,
+  );
+  assert.deepEqual(cleanup, ['failing:complete', 'peer:complete']);
+});
+
 test('routes Babel-compatible semantic and collapsed Oxc visitor keys', () => {
   const seen = {
     references: [] as string[],

@@ -414,7 +414,22 @@ export function transform(
   const diagnostics: Diagnostic[] = [];
   const intents = new Map<string, IntentRegistration>();
   const provenance = { degradations: 0 };
-  const allStates: { plugin: NativePlugin<any, any>; state: any }[] = [];
+  const allStates: { plugin: NativePlugin<any, any>; state: any; cleaned: boolean }[] = [];
+  const cleanupStates = (reason: 'complete' | 'bailout' | 'error'): void => {
+    let firstError: unknown;
+    for (const entry of allStates) {
+      if (entry.cleaned) continue;
+      // Mark the entry before invoking user code. If cleanup throws and control
+      // reaches the outer error path, the same state must not be cleaned twice.
+      entry.cleaned = true;
+      try {
+        entry.plugin.cleanup?.(reason, entry.state);
+      } catch (error) {
+        firstError ??= error;
+      }
+    }
+    if (firstError !== undefined) throw firstError;
+  };
   let openSession: NativeTransformSession | null = null;
   let reusableSession: NativeTransformSession | null = null;
   let reusableRoutedBatch: { manifest: Buffer; batch: RoutedEventBatch } | null = null;
@@ -446,7 +461,7 @@ export function transform(
   // the completed result. The current version/final map are already set by the loop or
   // the all-native path.
   const completeResult = (): TransformResult => {
-    for (const { plugin, state } of allStates) plugin.cleanup?.('complete', state);
+    cleanupStates('complete');
     const cachedFunctionMap = sourceVersions.functionMap(currentVersion);
     const functionMap = options.functionMap
       ? (cachedFunctionMap ?? native.generateFunctionMap(currentSource(), parseFilename))
@@ -697,7 +712,7 @@ export function transform(
           sourceHints: (phaseSourceHints ??= sourceHints(observationSource)),
           pluginData: options.pluginData,
         });
-        allStates.push({ plugin, state });
+        allStates.push({ plugin, state, cleaned: false });
         dispatch.contexts.get(plugin)!.state = state;
         plugin.pre?.(dispatch.contexts.get(plugin)!.context, state);
       }
@@ -827,8 +842,7 @@ export function transform(
   } catch (error) {
     openSession?.close();
     const bailout = error instanceof Bailout;
-    for (const { plugin, state } of allStates)
-      plugin.cleanup?.(bailout ? 'bailout' : 'error', state);
+    cleanupStates(bailout ? 'bailout' : 'error');
     if (bailout) {
       return {
         status: 'bailout',

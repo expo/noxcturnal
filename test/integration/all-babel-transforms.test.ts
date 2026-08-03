@@ -132,6 +132,55 @@ test('matches a Babel preset when language transforms interact in one program', 
   assert.deepEqual(await execute(noxcturnalCode), await execute(babelCode));
 });
 
+test.each([
+  {
+    name: 'short-circuits computed optional and logical assignment keys exactly once',
+    source: `
+      const log = [];
+      const key = label => (log.push(label), 'value');
+      const target = { value: null };
+      target[key('assign-key')] ??= (log.push('assign-value'), 4);
+      const missing = null;
+      const removed = delete missing?.[key('delete-key')];
+      globalThis.__result = [target.value, removed, log];
+    `,
+  },
+  {
+    name: 'preserves per-iteration bindings through destructuring and closures',
+    source: `
+      const readers = [];
+      for (let [index, value] of [[0, 'a'], [1, 'b']]) {
+        readers.push(() => [index, value]);
+      }
+      globalThis.__result = readers.map(read => read());
+    `,
+  },
+  {
+    name: 'orders derived construction, parameter defaults, fields, and private state',
+    source: `
+      const log = [];
+      class Base { constructor() { log.push('super'); } }
+      class Derived extends Base {
+        field = (log.push('field'), 2);
+        #value;
+        constructor({ value = 3 } = {}) {
+          log.push('before-super');
+          super();
+          this.#value = value;
+          log.push('after-private');
+        }
+        read({ multiplier = this.field } = {}) { return this.#value * multiplier; }
+      }
+      const instance = new Derived();
+      globalThis.__result = [instance.read(), log];
+    `,
+  },
+])('adversarially matches Babel: $name', async ({ source }) => {
+  const babelCode = transformWithBabel(source, 'adversarial.js', babelLanguagePreset);
+  const noxcturnalCode = transformWithNoxcturnal(source, 'adversarial.js', nativeLanguagePreset);
+  assert.deepEqual(await execute(noxcturnalCode), await execute(babelCode));
+});
+
 test('matches a Babel preset when TypeScript, JSX, decorators, and class transforms interact', async () => {
   const source = `
     function mark(value: any) { value.marked = true; }

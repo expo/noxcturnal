@@ -67,3 +67,19 @@ test('trims surrounding whitespace and recognizes empty sources', () => {
   );
   assert.equal(editorFixture(' \n\t').editor.isEmpty(), true);
 });
+
+test('preserves String.replace substitution semantics for contextual regular expressions', () => {
+  const { editor, edits } = editorFixture('ab ac');
+  editor.replaceAll(/(?<=a)(b|c)/g, "[$&:$1:$`:$']");
+  assert.deepEqual(
+    edits.map(edit => [edit.start, edit.end, edit.content]),
+    [
+      [1, 2, '[b:b:a: ac]'],
+      [4, 5, '[c:c:ab a:]'],
+    ],
+  );
+
+  const named = editorFixture('value=42');
+  named.editor.replace(/(?<key>\w+)=(?<value>\d+)/, '$<value>:$<key>');
+  assert.equal(named.edits[0]?.content, '42:value');
+});

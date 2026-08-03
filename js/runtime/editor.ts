@@ -212,9 +212,32 @@ function lowerReplacements(
     const content =
       typeof replacement === 'function'
         ? replacement(match[0], ...match.slice(1).map(value => value ?? ''))
-        : match[0].replace(expression, replacement);
+        : expandReplacement(source, replacement, match);
     emit(match.index, match.index + match[0].length, content);
     if (!all || !expression.global) break;
     if (match[0] === '') expression.lastIndex++;
   }
+}
+
+function expandReplacement(source: string, replacement: string, match: RegExpExecArray): string {
+  return replacement.replace(/\$([$&'`]|<[^>]+>|\d{1,2})/g, (token, reference: string) => {
+    if (reference === '$') return '$';
+    if (reference === '&') return match[0];
+    if (reference === '`') return source.slice(0, match.index);
+    if (reference === "'") return source.slice(match.index + match[0].length);
+    if (reference.startsWith('<')) {
+      if (match.groups == null) return token;
+      return match.groups[reference.slice(1, -1)] ?? '';
+    }
+    const index = Number(reference);
+    if (index === 0) return token;
+    if (index < match.length) return match[index] ?? '';
+    // Per String#replace, `$12` falls back to capture 1 followed by "2"
+    // when capture 12 does not exist.
+    if (reference.length === 2) {
+      const first = Number(reference[0]);
+      if (first > 0 && first < match.length) return `${match[first] ?? ''}${reference[1]}`;
+    }
+    return token;
+  });
 }

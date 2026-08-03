@@ -133,3 +133,24 @@ test('aligns Unicode-set string intersection and subtraction with Babel', async 
     }),
   ).resolves.toEqual([true, false, true, false, true, false, false, true]);
 });
+
+test('aligns string alternatives under quantification and case-insensitive set algebra', async () => {
+  await expect(
+    alignBabelBehavior({
+      source: String.raw`
+        const strings = /[\q{ab|a}]+/v;
+        const letters = /[A-Z&&[^Q]]/vi;
+        globalThis.__result = [
+          strings.exec('abab')[0],
+          letters.test('q'),
+          letters.test('k'),
+          letters.test('K'),
+        ];
+      `,
+      filename: 'input.js',
+      plugins: [unicodeSetsRegex],
+      noxcturnal: { transforms: { regexpUnicodeSets: true } },
+      output: { mustNotMatch: [/\/v\b/, /&&/] },
+    }),
+  ).resolves.toEqual(['abab', false, true, true]);
+});

@@ -69,3 +69,44 @@ globalThis.__result = [match[0], match.groups.a, Object.keys(match.groups)];`,
     }),
   ).resolves.toEqual(['xx', 'x', ['a']]);
 });
+
+test('aligns named groups across replace callbacks, matchAll, and indices', async () => {
+  await expect(
+    alignBabelBehavior({
+      source: String.raw`
+        const expression = /(?<required>x)(?<optional>y)?/dg;
+        const matches = [...'x xy'.matchAll(expression)];
+        const stringReplacement = 'xy'.replace(expression, '$<optional>-$<required>');
+        const callbackReplacement = 'xy'.replace(expression, (...args) => {
+          const groups = args.at(-1);
+          return Object.keys(groups).join(',') + ':' + groups.required;
+        });
+        globalThis.__result = [
+          stringReplacement,
+          callbackReplacement,
+          matches.map(match => [
+            match.groups.required,
+            match.groups.optional,
+            match.indices.groups.required,
+            match.indices.groups.optional,
+          ]),
+          expression.source,
+          expression.flags,
+        ];
+      `,
+      filename: 'input.js',
+      plugins: [namedCaptureGroups],
+      noxcturnal: { helpers: { mode: 'inline' }, transforms: { regexpNamedCaptureGroups: true } },
+      output: { mustNotMatch: [/\(\?<required>/, /\(\?<optional>/] },
+    }),
+  ).resolves.toEqual([
+    'y-x',
+    'required,optional:x',
+    [
+      ['x', undefined, [0, 1], undefined],
+      ['x', 'y', [2, 3], [3, 4]],
+    ],
+    '(x)(y)?',
+    'dg',
+  ]);
+});

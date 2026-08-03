@@ -2,9 +2,9 @@ use oxc_allocator::{Allocator, TakeIn};
 use oxc_ast::{
     AstBuilder,
     ast::{
-        CallExpression, Declaration, ExportNamedDeclaration, Expression, Function, FunctionType,
-        IdentifierReference, NumberBase, Program, Statement, VariableDeclaration,
-        VariableDeclarator,
+        CallExpression, Declaration, ExportDefaultDeclaration, ExportDefaultDeclarationKind,
+        ExportNamedDeclaration, Expression, Function, FunctionType, IdentifierReference,
+        NumberBase, Program, Statement, VariableDeclaration, VariableDeclarator,
     },
 };
 use oxc_ast_visit::{Visit, VisitMut, walk, walk_mut};
@@ -243,6 +243,15 @@ struct DeadFunctionCandidateCollector {
 }
 
 impl<'a> Visit<'a> for DeadFunctionCandidateCollector {
+    fn visit_export_default_declaration(&mut self, export: &ExportDefaultDeclaration<'a>) {
+        if let ExportDefaultDeclarationKind::FunctionDeclaration(function) = &export.declaration
+            && let Some(symbol_id) = function.id.as_ref().and_then(|id| id.symbol_id.get())
+        {
+            self.roots.insert(symbol_id);
+        }
+        walk::walk_export_default_declaration(self, export);
+    }
+
     fn visit_export_named_declaration(&mut self, export: &ExportNamedDeclaration<'a>) {
         match export.declaration.as_ref() {
             Some(Declaration::FunctionDeclaration(function)) => {
