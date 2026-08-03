@@ -12,7 +12,7 @@ importers:
         specifier: ^7.20.0
         version: 7.29.7
       '@oxc-project/types':
-        specifier: ^0.141.0
+        specifier: 0.141.0
         version: 0.141.0
     devDependencies:
       '@babel/core':

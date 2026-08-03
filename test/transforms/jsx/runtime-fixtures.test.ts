@@ -76,7 +76,7 @@ const expectedOutputs = [
   "var _reactJsxRuntime = require('react/jsx-runtime');\nvar x = /* @__PURE__ */ _reactJsxRuntime.jsx('div', { children: 'text' });",
   "/* @__PURE__ */ React.createElement('div', null, ...children);",
   "var _reactJsxRuntime = require('react/jsx-runtime');\n/* @__PURE__ */ _reactJsxRuntime.jsx('div', { children: [...children] });",
-  '[bailout] preflight:transform-error',
+  '[error] preflight:transform-error',
   "/* @__PURE__ */ React.createElement('div', { id: 'wôw' });\n/* @__PURE__ */ React.createElement('div', { id: '\\\\w' });\n/* @__PURE__ */ React.createElement('div', { id: 'w < w' });",
   "var _reactJsxRuntime = require('react/jsx-runtime');\n/* @__PURE__ */ _reactJsxRuntime.jsx('div', { id: 'wôw' });\n/* @__PURE__ */ _reactJsxRuntime.jsx('div', { id: '\\\\w' });\n/* @__PURE__ */ _reactJsxRuntime.jsx('div', { id: 'w < w' });",
   "/* @__PURE__ */ React.createElement('div', null, 'wow');\n/* @__PURE__ */ React.createElement('div', null, 'wôw');\n/* @__PURE__ */ React.createElement('div', null, 'w & w');\n/* @__PURE__ */ React.createElement('div', null, 'w & w');\n/* @__PURE__ */ React.createElement('div', null, 'w \\xA0 w');\n/* @__PURE__ */ React.createElement('div', null, 'this should not parse as unicode: \\\\u00a0');\n/* @__PURE__ */ React.createElement('div', null, 'this should parse as nbsp: \\xA0 ');\n/* @__PURE__ */ React.createElement('div', null, 'this should parse as unicode: ', '\\xA0\\xA0');\n/* @__PURE__ */ React.createElement('div', null, 'w < w');",

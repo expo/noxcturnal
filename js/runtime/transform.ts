@@ -79,6 +79,40 @@ function syntaxError(
   );
 }
 
+/** Convert one internal native phase result into its public runtime disposition. */
+export function assertNativePhaseCompleted(
+  result: NativePreflightResultOutput,
+  phase: string,
+  diagnostics: Diagnostic[],
+): void {
+  for (const message of result.diagnostics)
+    diagnostics.push({
+      code:
+        result.status === 'complete'
+          ? 'native-transform'
+          : result.status === 'unsupported'
+            ? 'unsupported'
+            : 'native-transform-error',
+      message,
+      phase,
+    });
+  switch (result.status) {
+    case 'complete':
+      return;
+    case 'unsupported':
+      throw new Bailout(`${phase}:${result.reason ?? 'unsupported'}`);
+    case 'error': {
+      const reason = result.reason ?? 'native-phase-error';
+      throw new NativeTransformError(
+        `Native phase ${phase} failed: ${reason}`,
+        diagnostics,
+        [phase],
+        { phase, reason },
+      );
+    }
+  }
+}
+
 interface RetainedPlan {
   futureSubscriptions: ReadonlySet<string>;
   futureRetentionCapabilities: number;
@@ -383,26 +417,18 @@ export function transform(
     for (let resultIndex = 0; resultIndex < results.length; resultIndex++) {
       const result = results[resultIndex];
       const { phase: batchPhase } = batch[resultIndex];
-      const complete = result.status === 'complete';
-      if (complete && result.changed)
+      if (result.status === 'complete' && result.changed)
         currentVersion = sourceVersions.commit(currentVersion, {
           normalizedEditCount: 1,
           codeChanged: true,
           mapChanged: true,
         });
-      for (const message of result.diagnostics)
-        diagnostics.push({
-          code: complete ? 'native-transform' : 'unsupported',
-          message,
-          phase: batchPhase.name,
-        });
-      if (result.helpersUsed.length > 0)
+      if (result.status === 'complete' && result.helpersUsed.length > 0)
         metadata.nativeHelpers = [
           ...((metadata.nativeHelpers as string[] | undefined) ?? []),
           ...result.helpersUsed,
         ];
-      // A native run stops at the first phase that did not complete.
-      if (!complete) throw new Bailout(`${batchPhase.name}:${result.reason ?? 'unsupported'}`);
+      assertNativePhaseCompleted(result, batchPhase.name, diagnostics);
     }
   };
   // The shared success tail: plugin cleanup, function map, final metadata, and
@@ -804,10 +830,15 @@ export function transform(
     if (parseFailure != null) throw syntaxError(parseFailure, filename, currentSource());
     if (error instanceof NativeTransformError) throw error;
     const message = error instanceof Error ? error.message : String(error);
+    const owners =
+      typeof error === 'object' && error != null && 'owners' in error
+        ? (error as { owners?: readonly string[] }).owners
+        : undefined;
     throw new NativeTransformError(
       message,
       [...diagnostics, { code: 'native-transform-error', message }],
-      (error as Error & { owners?: readonly string[] }).owners,
+      owners,
+      { cause: error },
     );
   }
 }

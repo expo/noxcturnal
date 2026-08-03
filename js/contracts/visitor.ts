@@ -27,15 +27,25 @@ import type {
 } from '../types';
 
 export class NativeTransformError extends Error {
+  readonly code = 'NOXCTURNAL_TRANSFORM_ERROR' as const;
+  readonly cause?: unknown;
+
   constructor(
     message: string,
     readonly diagnostics: Diagnostic[],
     /** Owning plugin names of a conflict, structured for fallback telemetry. */
     readonly owners?: readonly string[],
+    options?: { cause?: unknown; phase?: string; reason?: string },
   ) {
     super(message);
     this.name = 'NativeTransformError';
+    if (options && 'cause' in options) this.cause = options.cause;
+    this.phase = options?.phase;
+    this.reason = options?.reason;
   }
+
+  readonly phase?: string;
+  readonly reason?: string;
 }
 
 export interface PrepareContext {

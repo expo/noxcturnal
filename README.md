@@ -54,6 +54,14 @@ const result = transform(
 
 Within a phase every plugin observes the same immutable source. Mutations become visible after the native commit and optional reparse boundary. A bailout discards attempted edits and returns the pristine input source.
 
+`transform` has a strict three-outcome contract. Successful work returns a
+`NativeTransformResult`; an intentional compatibility boundary returns a
+`NativeBailoutResult`, whose `source` is always the pristine input; invalid source or
+configuration and internal transform failures throw. Fatal native failures use
+`NativeTransformError` with the stable code `NOXCTURNAL_TRANSFORM_ERROR`, while syntax
+failures use `TransformSyntaxError` with `TRANSFORM_SYNTAX_ERROR`. Callers may run a
+compatibility transformer only for a returned bailout—thrown values must propagate.
+
 `defineNativePlugin` returns an immutable reusable definition. Bind per-pipeline options with `plugin.withOptions(options)` and declared predicate values with `plugin.withParameters(values)`. Pipelines always declare explicit phases and snapshot and freeze their phase and plugin arrays so cache identity cannot drift after construction. Every transform phase is compiled to numeric native routes.
 
 ### Configuration scopes

@@ -1,13 +1,15 @@
 import assert from 'node:assert/strict';
-import { test } from 'vitest';
+import { test, vi } from 'vitest';
 
 import {
   defineNativePipeline,
   defineNativePlugin,
   defineVisitor,
+  NativeTransformError,
   pipelineCacheKey,
   transform,
 } from '../../index';
+import { native } from '../../native/binding';
 import { packRouteManifest } from '../../protocol/manifest';
 import { NativeTransformSession } from '../../runtime/session';
 
@@ -406,6 +408,105 @@ test('returns pristine source on explicit bailout and calls cleanup', () => {
   );
   assert.deepEqual(result, { status: 'bailout', reason: 'bail:fixture', source, diagnostics: [] });
   assert.equal(cleanup, 'bailout');
+});
+
+test('converts a native phase error to a typed exception and calls error cleanup', () => {
+  let cleanup: string | undefined;
+  const observer = defineNativePlugin({
+    name: 'observer',
+    pre() {},
+    cleanup(reason) {
+      cleanup = reason;
+    },
+  });
+  const prototype = native.NativePipelineSession.prototype as unknown as {
+    runNativePhases(options: unknown[]): unknown[];
+  };
+  const run = vi.spyOn(prototype, 'runNativePhases').mockReturnValue([
+    {
+      status: 'error',
+      changed: false,
+      normalizedJavascript: false,
+      jsx: false,
+      reason: 'classes-direct-plan-missing',
+      diagnostics: ['planner and application disagreed'],
+      helpersUsed: [],
+    },
+  ]);
+
+  try {
+    let thrown: unknown;
+    try {
+      transform(
+        'const original = 1;',
+        'fixture.js',
+        defineNativePipeline({
+          phases: [
+            { name: 'observe', plugins: [observer] },
+            { name: 'classes', native: { transforms: { classes: true } } },
+          ],
+        }),
+      );
+    } catch (error) {
+      thrown = error;
+    }
+    assert.ok(thrown instanceof NativeTransformError);
+    assert.equal(thrown.code, 'NOXCTURNAL_TRANSFORM_ERROR');
+    assert.equal(thrown.phase, 'classes');
+    assert.equal(thrown.reason, 'classes-direct-plan-missing');
+    assert.deepEqual(thrown.diagnostics, [
+      {
+        code: 'native-transform-error',
+        message: 'planner and application disagreed',
+        phase: 'classes',
+      },
+    ]);
+    assert.equal(cleanup, 'error');
+  } finally {
+    run.mockRestore();
+  }
+});
+
+test('preserves a non-Error native exception as the typed exception cause', () => {
+  let cleanup: string | undefined;
+  const observer = defineNativePlugin({
+    name: 'observer',
+    pre() {},
+    cleanup(reason) {
+      cleanup = reason;
+    },
+  });
+  const prototype = native.NativePipelineSession.prototype as unknown as {
+    runNativePhases(options: unknown[]): unknown[];
+  };
+  const nativeCause = 'native binding failure';
+  const run = vi.spyOn(prototype, 'runNativePhases').mockImplementation(() => {
+    throw nativeCause;
+  });
+
+  try {
+    let thrown: unknown;
+    try {
+      transform(
+        'const original = 1;',
+        'fixture.js',
+        defineNativePipeline({
+          phases: [
+            { name: 'observe', plugins: [observer] },
+            { name: 'classes', native: { transforms: { classes: true } } },
+          ],
+        }),
+      );
+    } catch (error) {
+      thrown = error;
+    }
+    assert.ok(thrown instanceof NativeTransformError);
+    assert.equal(thrown.code, 'NOXCTURNAL_TRANSFORM_ERROR');
+    assert.equal(thrown.cause, nativeCause);
+    assert.equal(cleanup, 'error');
+  } finally {
+    run.mockRestore();
+  }
 });
 
 test('analyzes every plugin before applying edits and bails out pristine', () => {

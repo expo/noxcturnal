@@ -764,18 +764,18 @@ fn classify_captured_loops(semantic: &Semantic<'_>) -> FxHashMap<NodeId, Capture
 
     for (node_id, node) in nodes.iter_enumerated() {
         let span = node.kind().span();
-        if node.kind().is_iteration_statement() {
-            if let Some((loop_span, body_span)) = loop_spans(node.kind()) {
-                loop_facts.insert(
+        if node.kind().is_iteration_statement()
+            && let Some((loop_span, body_span)) = loop_spans(node.kind())
+        {
+            loop_facts.insert(
+                node_id,
+                CapturedLoop {
                     node_id,
-                    CapturedLoop {
-                        node_id,
-                        span: loop_span,
-                        body_span,
-                        header_bindings: Vec::new(),
-                    },
-                );
-            }
+                    span: loop_span,
+                    body_span,
+                    header_bindings: Vec::new(),
+                },
+            );
         }
 
         match node.kind() {

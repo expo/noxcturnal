@@ -1,0 +1,128 @@
+[
+  {
+    "reason": "not-node-modules",
+    "rationale": "Node-module adapter scope gate",
+    "test": "Expo noxcturnal-transformer: falls back for application source",
+    "owner": "expo-metro"
+  },
+  {
+    "reason": "custom-babel-transformer",
+    "rationale": "A custom transformer owns semantics",
+    "test": "Expo noxcturnal-transformer: falls back for custom transformer",
+    "owner": "expo-metro"
+  },
+  {
+    "reason": "non-default-babel-config",
+    "rationale": "Project Babel configuration must run",
+    "test": "Expo noxcturnal-transformer: falls back when the default transformer is extended",
+    "owner": "expo-metro"
+  },
+  {
+    "reason": "asset",
+    "rationale": "Assets are outside the JavaScript transformer",
+    "test": "Expo metro-config input-type tests",
+    "owner": "expo-metro"
+  },
+  {
+    "reason": "unsupported-source-extension",
+    "rationale": "The selected parser does not own this input type",
+    "test": "Expo noxcturnal-transformer source-extension tests",
+    "owner": "expo-metro"
+  },
+  {
+    "reason": "unsupported-input-type",
+    "rationale": "Full Metro supports modules and scripts only",
+    "test": "Expo metro-config input-type tests",
+    "owner": "expo-metro"
+  },
+  {
+    "reason": "script-hashbang",
+    "rationale": "Metro's script compatibility wrapper owns hashbang handling",
+    "test": "Expo noxcturnal-transformer script tests",
+    "owner": "expo-metro"
+  },
+  {
+    "reason": "react-native-codegen",
+    "rationale": "React Native Codegen must receive pristine source",
+    "test": "Expo noxcturnal-transformer Codegen candidate tests",
+    "owner": "react-native-codegen"
+  },
+  {
+    "reason": "worklets",
+    "rationale": "The Worklets Babel plugin owns explicit worklet directives",
+    "test": "Expo noxcturnal-transformer eligibility tests",
+    "owner": "react-native-worklets"
+  },
+  {
+    "reason": "worklets-candidate",
+    "rationale": "The Worklets Babel plugin owns auto-workletized callbacks",
+    "test": "Expo noxcturnal-transformer eligibility tests",
+    "owner": "react-native-worklets"
+  },
+  {
+    "reason": "expo-directive",
+    "rationale": "An Expo directive selects a Babel-owned bundle mode",
+    "test": "Expo noxcturnal-transformer directive boundary tests",
+    "owner": "expo-router"
+  },
+  {
+    "reason": "react-native-web-transform",
+    "rationale": "React Native Web's compatibility transform owns web application source",
+    "test": "Expo noxcturnal-transformer web transform tests",
+    "owner": "expo-web"
+  },
+  {
+    "reason": "non-hermes-target",
+    "rationale": "The native recipe is aligned to the selected Hermes target",
+    "test": "Expo noxcturnal-transformer target eligibility tests",
+    "owner": "expo-metro"
+  },
+  {
+    "reason": "react-compiler-client-only",
+    "rationale": "The React Compiler prepass excludes server environments",
+    "test": "Expo React Compiler boundary tests",
+    "owner": "expo-react-compiler"
+  },
+  {
+    "reason": "react-compiler-flow-source",
+    "rationale": "The optional Oxc compiler parser does not implement Flow",
+    "test": "Expo React Compiler Flow boundary tests",
+    "owner": "expo-react-compiler"
+  },
+  {
+    "reason": "react-compiler-app-source-only",
+    "rationale": "The Compiler prepass applies only to application source",
+    "test": "Expo React Compiler dependency boundary tests",
+    "owner": "expo-react-compiler"
+  },
+  {
+    "reason": "react-compiler-disabled",
+    "rationale": "The Compiler prepass was not selected",
+    "test": "Expo React Compiler configuration tests",
+    "owner": "expo-react-compiler"
+  },
+  {
+    "reason": "react-compiler-module-only",
+    "rationale": "The Compiler prepass does not own scripts or assets",
+    "test": "Expo React Compiler input-type tests",
+    "owner": "expo-react-compiler"
+  },
+  {
+    "reason": "expo-language:parse-error",
+    "rationale": "Babel/Hermes accepts a broader configured language dialect",
+    "test": "Noxcturnal Flow and syntax boundary alignment tests",
+    "owner": "noxcturnal-parser"
+  },
+  {
+    "reason": "expo-language:semantic-error",
+    "rationale": "The configured compatibility parser has intentionally broader semantics",
+    "test": "Noxcturnal Flow boundary alignment tests",
+    "owner": "noxcturnal-parser"
+  },
+  {
+    "reason": "react-compiler:react-compiler-not-built",
+    "rationale": "React Compiler is an optional native build feature",
+    "test": "Noxcturnal React Compiler boundary tests",
+    "owner": "noxcturnal-react-compiler"
+  }
+]

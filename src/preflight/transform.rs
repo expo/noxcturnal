@@ -655,7 +655,16 @@ fn transform_impl(
                 },
             ) {
                 Ok(result) => result,
-                Err(reason) => return Ok(unsupported(reason, [] as [String; 0])),
+                Err(failure) => {
+                    return Ok(match failure.disposition {
+                        super::regexp::FailureDisposition::Unsupported => {
+                            unsupported(failure.reason, [] as [String; 0])
+                        }
+                        super::regexp::FailureDisposition::Fatal => {
+                            fatal(failure.reason, [] as [String; 0])
+                        }
+                    });
+                }
             }
         } else {
             (false, super::helpers::CustomHelperRequests::default())
@@ -712,7 +721,7 @@ fn transform_impl(
             detector.visit_program(&program);
         }
         if let Some(reason) = detector.failure_reason(&options) {
-            return Ok(unsupported(reason, [] as [String; 0]));
+            return Ok(fatal(reason, [] as [String; 0]));
         }
         let semantic = {
             SemanticBuilder::new()
@@ -736,7 +745,7 @@ fn transform_impl(
                 let plan =
                     match block_scoping::prepare_captured_loop_ast(source, &semantic.semantic) {
                         Ok(plan) => plan,
-                        Err(reason) => return Ok(unsupported(reason, [] as [String; 0])),
+                        Err(reason) => return Ok(fatal(reason, [] as [String; 0])),
                     };
                 if plan.is_empty() {
                     break;
@@ -745,12 +754,9 @@ fn transform_impl(
                 match block_scoping::run_captured_loop_ast(allocator, &mut program, plan) {
                     Ok(true) => {}
                     Ok(false) => {
-                        return Ok(unsupported(
-                            "captured-loop-ast-target-missing",
-                            [] as [String; 0],
-                        ));
+                        return Ok(fatal("captured-loop-ast-target-missing", [] as [String; 0]));
                     }
-                    Err(reason) => return Ok(unsupported(reason, [] as [String; 0])),
+                    Err(reason) => return Ok(fatal(reason, [] as [String; 0])),
                 }
                 semantic = {
                     SemanticBuilder::new()
@@ -760,7 +766,7 @@ fn transform_impl(
                         .build(&program)
                 };
                 if !semantic.diagnostics.is_empty() {
-                    return Ok(unsupported(
+                    return Ok(fatal(
                         "captured-loop-post-rewrite-semantic-error",
                         semantic.diagnostics,
                     ));
@@ -809,7 +815,7 @@ fn transform_impl(
                 options.helpers_mode.as_deref() == Some("inline"),
             ) {
                 Ok(plan) => Some(plan),
-                Err(reason) => return Ok(unsupported(reason, [] as [String; 0])),
+                Err(reason) => return Ok(fatal(reason, [] as [String; 0])),
             }
         } else {
             None
@@ -826,10 +832,10 @@ fn transform_impl(
                     classes_ast_plan.unwrap(),
                 ) {
                     Ok(result) => result,
-                    Err(reason) => return Ok(unsupported(reason, [] as [String; 0])),
+                    Err(reason) => return Ok(fatal(reason, [] as [String; 0])),
                 };
                 if !changed {
-                    return Ok(unsupported("classes-ast-target-missing", [] as [String; 0]));
+                    return Ok(fatal("classes-ast-target-missing", [] as [String; 0]));
                 }
                 let rebuilt = {
                     SemanticBuilder::new()
@@ -839,7 +845,7 @@ fn transform_impl(
                         .build(&program)
                 };
                 if !rebuilt.diagnostics.is_empty() {
-                    return Ok(unsupported(
+                    return Ok(fatal(
                         "classes-post-rewrite-semantic-error",
                         rebuilt.diagnostics,
                     ));
@@ -867,10 +873,7 @@ fn transform_impl(
             };
             classes_postcondition.visit_program(&program);
             if classes_postcondition.classes {
-                return Ok(unsupported(
-                    "classes-postcondition-failed",
-                    [] as [String; 0],
-                ));
+                return Ok(fatal("classes-postcondition-failed", [] as [String; 0]));
             }
         }
         let had_block_scoping_syntax =
@@ -889,7 +892,7 @@ fn transform_impl(
                     .chain(classes_custom_helper_requests.scope_names()),
             ) {
                 Ok(plan) => Some(plan),
-                Err(reason) => return Ok(unsupported(reason, [] as [String; 0])),
+                Err(reason) => return Ok(fatal(reason, [] as [String; 0])),
             }
         } else {
             None
@@ -897,7 +900,7 @@ fn transform_impl(
         let parameters_ast_plan = if options.parameters == Some(true) {
             match super::parameters::prepare_ast(source, &semantic.semantic) {
                 Ok(plan) => Some(plan),
-                Err(reason) => return Ok(unsupported(reason, [] as [String; 0])),
+                Err(reason) => return Ok(fatal(reason, [] as [String; 0])),
             }
         } else {
             None
@@ -914,7 +917,7 @@ fn transform_impl(
                 object_rest_loose,
             ) {
                 Ok(plan) => Some(plan),
-                Err(reason) => return Ok(unsupported(reason, [] as [String; 0])),
+                Err(reason) => return Ok(fatal(reason, [] as [String; 0])),
             }
         } else {
             None
@@ -924,7 +927,7 @@ fn transform_impl(
             if let Some(plan) = parameters_ast_plan.filter(|plan| !plan.is_empty()) {
                 match super::parameters::run_ast(allocator, &mut program, plan) {
                     Ok(changed) => changed,
-                    Err(reason) => return Ok(unsupported(reason, [] as [String; 0])),
+                    Err(reason) => return Ok(fatal(reason, [] as [String; 0])),
                 }
             } else {
                 false
@@ -941,10 +944,7 @@ fn transform_impl(
                     .build(&program)
             };
             if !semantic.diagnostics.is_empty() {
-                return Ok(unsupported(
-                    "pre-for-of-semantic-error",
-                    semantic.diagnostics,
-                ));
+                return Ok(fatal("pre-for-of-semantic-error", semantic.diagnostics));
             }
             reserve_custom_helper_scope_names(
                 semantic.semantic.scoping_mut(),
@@ -957,7 +957,7 @@ fn transform_impl(
         let had_for_of_syntax = if let Some(plan) = for_of_plan.filter(|plan| !plan.is_empty()) {
             match super::for_of::run(allocator, &mut program, plan) {
                 Ok(changed) => changed,
-                Err(reason) => return Ok(unsupported(reason, [] as [String; 0])),
+                Err(reason) => return Ok(fatal(reason, [] as [String; 0])),
             }
         } else {
             false
@@ -969,10 +969,7 @@ fn transform_impl(
             };
             for_of_postcondition.visit_program(&program);
             if for_of_postcondition.for_of {
-                return Ok(unsupported(
-                    "for-of-postcondition-failed",
-                    [] as [String; 0],
-                ));
+                return Ok(fatal("for-of-postcondition-failed", [] as [String; 0]));
             }
         }
         let mut destructuring_ast_plan = if early_destructuring_ast_plan.is_some() {
@@ -986,7 +983,7 @@ fn transform_impl(
                     .build(&program)
             };
             if !semantic.diagnostics.is_empty() {
-                return Ok(unsupported(
+                return Ok(fatal(
                     "pre-destructuring-semantic-error",
                     semantic.diagnostics,
                 ));
@@ -1002,7 +999,7 @@ fn transform_impl(
                 object_rest_loose,
             ) {
                 Ok(plan) => plan,
-                Err(reason) => return Ok(unsupported(reason, [] as [String; 0])),
+                Err(reason) => return Ok(fatal(reason, [] as [String; 0])),
             };
             Some(plan)
         } else {
@@ -1018,7 +1015,7 @@ fn transform_impl(
             let (changed, requests) = {
                 match super::destructuring::run_ast(allocator, &mut program, plan) {
                     Ok(result) => result,
-                    Err(reason) => return Ok(unsupported(reason, [] as [String; 0])),
+                    Err(reason) => return Ok(fatal(reason, [] as [String; 0])),
                 }
             };
             if changed {
@@ -1033,10 +1030,7 @@ fn transform_impl(
             };
             parameters_postcondition.visit_program(&program);
             if parameters_postcondition.parameters {
-                return Ok(unsupported(
-                    "parameters-postcondition-failed",
-                    [] as [String; 0],
-                ));
+                return Ok(fatal("parameters-postcondition-failed", [] as [String; 0]));
             }
         }
         if had_block_scoping_syntax {
@@ -1054,7 +1048,7 @@ fn transform_impl(
                         .build(&program)
                 };
                 if !semantic.diagnostics.is_empty() {
-                    return Ok(unsupported(
+                    return Ok(fatal(
                         "pre-block-scoping-semantic-error",
                         semantic.diagnostics,
                     ));
@@ -1067,7 +1061,7 @@ fn transform_impl(
                         .chain(classes_custom_helper_requests.scope_names()),
                 ) {
                     Ok(plan) => plan,
-                    Err(reason) => return Ok(unsupported(reason, [] as [String; 0])),
+                    Err(reason) => return Ok(fatal(reason, [] as [String; 0])),
                 }
             };
             let requests = block_scoping::run(
@@ -1093,10 +1087,7 @@ fn transform_impl(
                     .build(&program)
             };
             if !rebuilt.diagnostics.is_empty() {
-                return Ok(unsupported(
-                    "post-rewrite-semantic-error",
-                    rebuilt.diagnostics,
-                ));
+                return Ok(fatal("post-rewrite-semantic-error", rebuilt.diagnostics));
             }
             scoping = rebuilt.semantic.into_scoping();
         }
@@ -1166,7 +1157,7 @@ fn transform_impl(
             }
         }
         if !transformed.diagnostics.is_empty() {
-            return Ok(unsupported("transform-error", transformed.diagnostics));
+            return Ok(fatal("transform-error", transformed.diagnostics));
         }
         if matches!(
             options.jsx.as_deref(),
@@ -1207,7 +1198,7 @@ fn transform_impl(
             };
             detector.visit_program(&program);
             if detector.has_unsupported_syntax() {
-                return Ok(unsupported(
+                return Ok(fatal(
                     "class-features-postcondition-failed",
                     [] as [String; 0],
                 ));
@@ -1229,7 +1220,7 @@ fn transform_impl(
                     .build(&program)
             };
             if !semantic.diagnostics.is_empty() {
-                return Ok(unsupported(
+                return Ok(fatal(
                     "block-scoping-postcondition-semantic-error",
                     semantic.diagnostics,
                 ));
@@ -1244,10 +1235,10 @@ fn transform_impl(
                     );
                     structural_custom_helper_requests.prepend(requests);
                 }
-                Err(reason) => return Ok(unsupported(reason, [] as [String; 0])),
+                Err(reason) => return Ok(fatal(reason, [] as [String; 0])),
             }
             if block_scoping::has_remaining_syntax(&program) {
-                return Ok(unsupported(
+                return Ok(fatal(
                     "block-scoping-postcondition-failed",
                     [] as [String; 0],
                 ));
@@ -1459,7 +1450,7 @@ fn transform_impl(
                 let mut parsed_bridge =
                     Parser::new(allocator, bridge_source, active_source_type).parse();
                 if !parsed_bridge.diagnostics.is_empty() {
-                    return Ok(unsupported(
+                    return Ok(fatal(
                         "helper-bridge-parse-error",
                         parsed_bridge.diagnostics,
                     ));
@@ -2351,6 +2342,28 @@ fn unsupported(
     }
 }
 
+/// Report an internal transform failure without exposing any partially rewritten
+/// source or source map to the JavaScript boundary.
+fn fatal(
+    reason: &str,
+    diagnostics: impl IntoIterator<Item = impl std::fmt::Display>,
+) -> NativePreflightResult {
+    NativePreflightResult {
+        status: "error".into(),
+        changed: false,
+        normalized_javascript: false,
+        jsx: false,
+        reason: Some(reason.into()),
+        code: None,
+        map: None,
+        diagnostics: diagnostics
+            .into_iter()
+            .map(|diagnostic| diagnostic.to_string())
+            .collect(),
+        helpers_used: Vec::new(),
+    }
+}
+
 fn identity_result(
     source: String,
     include_map: bool,
@@ -2385,6 +2398,28 @@ mod tests {
         edit::{EditCommand, EditKind, MappingPolicy, build},
         sourcemap::{compose, compose_layer_chain, render},
     };
+
+    #[test]
+    fn failure_result_constructors_encode_disposition_without_artifacts() {
+        let unsupported = unsupported("compatibility-boundary", ["detail"]);
+        assert_eq!(unsupported.status, "unsupported");
+        assert_eq!(
+            unsupported.reason.as_deref(),
+            Some("compatibility-boundary")
+        );
+        assert_eq!(unsupported.diagnostics, ["detail"]);
+        assert!(!unsupported.changed);
+        assert!(unsupported.code.is_none());
+        assert!(unsupported.map.is_none());
+
+        let error = fatal("internal-invariant", ["detail"]);
+        assert_eq!(error.status, "error");
+        assert_eq!(error.reason.as_deref(), Some("internal-invariant"));
+        assert_eq!(error.diagnostics, ["detail"]);
+        assert!(!error.changed);
+        assert!(error.code.is_none());
+        assert!(error.map.is_none());
+    }
 
     fn nested_destructuring(depth: usize) -> String {
         let mut statement = "sink(value);".to_owned();

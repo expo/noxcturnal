@@ -38,11 +38,24 @@ export async function transformOutcome(
   filename: string,
   preflight: PreflightPlan,
 ): Promise<string> {
-  const result = transform(
-    source,
-    filename,
-    defineNativePipeline({ phases: [{ name: 'preflight', native: preflight }] }),
-  );
+  let result;
+  try {
+    result = transform(
+      source,
+      filename,
+      defineNativePipeline({ phases: [{ name: 'preflight', native: preflight }] }),
+    );
+  } catch (error) {
+    if (
+      typeof error === 'object' &&
+      error !== null &&
+      (error as { code?: unknown }).code === 'NOXCTURNAL_TRANSFORM_ERROR'
+    ) {
+      const fatal = error as { phase?: string; reason?: string };
+      return `[error] ${fatal.phase ?? 'unknown'}:${fatal.reason ?? 'native-transform-error'}`;
+    }
+    throw error;
+  }
   if (result.status !== 'complete') return `[bailout] ${result.reason}`;
 
   const formatted = await format('output.js', result.code, {

@@ -107,7 +107,7 @@ const expectedOutputs = [
   'let a;\n(function (_a) {\n  let c;\n  (function (_c) {\n    var x;\n  })(c || (c = {}));\n})(a || (a = {}));\nlet WithTypes;\n(function (_WithTypes) {\n  let d;\n  (function (_d) {})(d || (d = {}));\n})(WithTypes || (WithTypes = {}));\nlet WithValues;\n(function (_WithValues) {\n  let a;\n  (function (_a2) {\n    class A {}\n  })(a || (a = {}));\n  let b;\n  (function (_b) {\n    let B = /* @__PURE__ */ (function (B) {\n      return B;\n    })({});\n  })(b || (b = {}));\n  let c;\n  (function (_c2) {\n    function C() {}\n  })(c || (c = {}));\n  let d;\n  (function (_d2) {\n    var D;\n  })(d || (d = {}));\n  let e;\n  (function (_e) {\n    E;\n  })(e || (e = {}));\n})(WithValues || (WithValues = {}));',
   'export let N;\n(function (_N) {\n  var x;\n})(N || (N = {}));',
   'let N;\n(function (_N) {\n  var x;\n})(N || (N = {}));\n(function (_N2) {\n  var y;\n})(N || (N = {}));',
-  '[bailout] preflight:transform-error',
+  '[error] preflight:transform-error',
   'class C {}\nlet N;\n(function (_N) {\n  const { a } = C;\n  _N.a = a;\n  const [b] = C;\n  _N.b = b;\n  const [\n      {\n        a: [{ b: c }],\n      },\n    ] = A,\n    { a: { b: { d = 1 } } = {}, ...e } = C;\n  ((_N.c = c), (_N.d = d), (_N.e = e));\n})(N || (N = {}));',
   "export let A;\n(function (_A) {\n  let G = /* @__PURE__ */ (function (G) {\n    G[(G['H'] = 0)] = 'H';\n    return G;\n  })({});\n  _A.G = G;\n})(A || (A = {}));",
   'export let ui;\n(function (_ui) {\n  let a;\n  (function (_a) {\n    const x = (_a.x = 1);\n  })(a || (a = _ui.a || (_ui.a = {})));\n})(ui || (ui = {}));\n(function (_ui2) {\n  let b;\n  (function (_b) {\n    const y = (_b.y = 2);\n  })(b || (b = _ui2.b || (_ui2.b = {})));\n})(ui || (ui = {}));',

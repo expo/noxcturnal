@@ -3,6 +3,8 @@
 mod block_scoping;
 mod classes;
 mod destructuring;
+#[cfg(test)]
+mod failure_inventory;
 mod for_of;
 pub mod helpers;
 mod logical_assignment;

@@ -64,7 +64,7 @@ interface NativePreflightOptionsInput {
 }
 
 export interface NativePreflightResultOutput {
-  status: 'complete' | 'unsupported';
+  status: 'complete' | 'unsupported' | 'error';
   changed: boolean;
   normalizedJavascript: boolean;
   jsx: boolean;

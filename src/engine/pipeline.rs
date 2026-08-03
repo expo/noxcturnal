@@ -66,8 +66,8 @@ impl NativePipelineSession {
     /// success the held source becomes each phase's rendered code and its map
     /// layer is retained; the returned results carry no `code`/`map` buffer (both
     /// stay resident), only status, diagnostics, helpers, counters, and each
-    /// layer's segment count. A phase that does not complete ends the run: its
-    /// result is the last returned, and the caller bails on it.
+    /// layer's segment count. An unsupported or error phase ends the run: its
+    /// result is the last returned, and JavaScript converts the typed disposition.
     #[napi]
     pub fn run_native_phases(
         &mut self,
@@ -315,6 +315,41 @@ mod tests {
         assert_eq!(result.code.as_deref(), Some("const x = 1;"));
         assert!(result.map.is_none());
         assert!(result.results.is_empty());
+    }
+
+    #[test]
+    fn unsupported_phase_stops_without_committing_source_or_map() {
+        let mut session = NativePipelineSession::new("fixture.js".into(), "const = ;".into());
+        let results = session
+            .run_native_phases(vec![NativePreflightOptions {
+                block_scoping: Some(true),
+                ..NativePreflightOptions::default()
+            }])
+            .unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].status, "unsupported");
+        assert!(results[0].code.is_none());
+        assert!(results[0].map.is_none());
+        assert!(session.current.is_none());
+        assert!(session.layers.is_empty());
+    }
+
+    #[test]
+    fn error_phase_stops_without_committing_source_or_map() {
+        let mut session = NativePipelineSession::new("fixture.jsx".into(), "<div key />;".into());
+        let results = session
+            .run_native_phases(vec![NativePreflightOptions {
+                jsx: Some("automatic".into()),
+                ..NativePreflightOptions::default()
+            }])
+            .unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].status, "error");
+        assert_eq!(results[0].reason.as_deref(), Some("transform-error"));
+        assert!(results[0].code.is_none());
+        assert!(results[0].map.is_none());
+        assert!(session.current.is_none());
+        assert!(session.layers.is_empty());
     }
 
     #[test]

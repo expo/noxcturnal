@@ -41,12 +41,40 @@ pub(super) struct Options {
     pub(super) inline_helpers: bool,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(super) enum FailureDisposition {
+    Unsupported,
+    Fatal,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(super) struct RegexpFailure {
+    pub(super) reason: &'static str,
+    pub(super) disposition: FailureDisposition,
+}
+
+impl RegexpFailure {
+    const fn unsupported(reason: &'static str) -> Self {
+        Self {
+            reason,
+            disposition: FailureDisposition::Unsupported,
+        }
+    }
+
+    const fn fatal(reason: &'static str) -> Self {
+        Self {
+            reason,
+            disposition: FailureDisposition::Fatal,
+        }
+    }
+}
+
 pub(super) fn run<'a>(
     allocator: &'a Allocator,
     program: &mut Program<'a>,
     source: &str,
     options: Options,
-) -> Result<(bool, CustomHelperRequests), &'static str> {
+) -> Result<(bool, CustomHelperRequests), RegexpFailure> {
     let mut source_names = SourceNameReservations::new(source);
     let named_helper = source_names.reserve("_wrapRegExp");
     let named_runtime = source_names.reserve("_wrapRegExp2");
@@ -90,14 +118,14 @@ struct RegexpLowerer<'a> {
     named_helper: &'a str,
     changed: bool,
     needs_named_helper: bool,
-    error: Option<&'static str>,
+    error: Option<RegexpFailure>,
 }
 
 impl<'a> RegexpLowerer<'a> {
     fn lower(
         &mut self,
         expression: &mut Expression<'a>,
-    ) -> Result<Option<FxHashMap<String, Vec<usize>>>, &'static str> {
+    ) -> Result<Option<FxHashMap<String, Vec<usize>>>, RegexpFailure> {
         let Expression::RegExpLiteral(literal) = expression else {
             return Ok(None);
         };
@@ -125,7 +153,7 @@ impl<'a> RegexpLowerer<'a> {
                 // ECMA-262 requires those ranges to be nested. Preserve that
                 // established output through the compatibility lowering.
                 Err(_) if is_unicode_sets && !self.named_groups => {}
-                Err(_) => return Err("regexp-pattern-invalid"),
+                Err(_) => return Err(RegexpFailure::unsupported("regexp-pattern-invalid")),
             }
         }
         let regexp_pattern = literal.regex.pattern.pattern.as_deref();
@@ -154,15 +182,19 @@ impl<'a> RegexpLowerer<'a> {
         let ast_lowered_unicode_sets =
             self.unicode_sets && flags.contains('v') && regexp_pattern.is_some();
         if ast_lowered_unicode_sets {
-            structural_edits.extend(collect_unicode_set_edits(regexp_pattern.unwrap())?);
+            structural_edits.extend(
+                collect_unicode_set_edits(regexp_pattern.unwrap())
+                    .map_err(RegexpFailure::unsupported)?,
+            );
             changed = true;
         }
         if !structural_edits.is_empty() {
-            apply_pattern_edits(&mut pattern, structural_edits)?;
+            apply_pattern_edits(&mut pattern, structural_edits).map_err(RegexpFailure::fatal)?;
         }
         if self.unicode_sets && flags.contains('v') {
             if !ast_lowered_unicode_sets {
-                pattern = lower_babel_range_operand_unicode_sets(&pattern)?;
+                pattern = lower_babel_range_operand_unicode_sets(&pattern)
+                    .map_err(RegexpFailure::unsupported)?;
             }
             flags.retain(|flag| flag != 'v');
             flags.push('u');
@@ -170,7 +202,8 @@ impl<'a> RegexpLowerer<'a> {
         }
         if self.unicode && flags.contains('u') {
             if flags.contains('i') {
-                pattern = expand_unicode_ignore_case_bmp(&pattern)?;
+                pattern =
+                    expand_unicode_ignore_case_bmp(&pattern).map_err(RegexpFailure::unsupported)?;
             }
             pattern = lower_unicode(&pattern, flags.contains('s'))?;
             flags.retain(|flag| flag != 'u');
@@ -191,7 +224,7 @@ impl<'a> RegexpLowerer<'a> {
             .try_fold(oxc_ast::ast::RegExpFlags::empty(), |flags, flag| {
                 oxc_ast::ast::RegExpFlags::try_from(flag).map(|parsed| flags | parsed)
             })
-            .map_err(|_| "regexp-flags-invalid")?;
+            .map_err(|_| RegexpFailure::fatal("regexp-flags-invalid"))?;
         literal.raw = None;
         self.changed = true;
         Ok(groups)
@@ -1590,11 +1623,13 @@ fn class_source_has_astral(class_source: &str) -> bool {
     false
 }
 
-fn lower_unicode(pattern: &str, dot_all: bool) -> Result<String, &'static str> {
+fn lower_unicode(pattern: &str, dot_all: bool) -> Result<String, RegexpFailure> {
     if pattern.contains("\\p{") || pattern.contains("\\P{") {
-        return Err("regexp-unicode-property-prerequisite-postcondition-failed");
+        return Err(RegexpFailure::fatal(
+            "regexp-unicode-property-prerequisite-postcondition-failed",
+        ));
     }
-    let pattern = lower_astral_classes(pattern)?;
+    let pattern = lower_astral_classes(pattern).map_err(RegexpFailure::unsupported)?;
     let mut output = String::with_capacity(pattern.len());
     let mut characters = pattern.char_indices().peekable();
     let mut in_class = false;
@@ -1617,15 +1652,22 @@ fn lower_unicode(pattern: &str, dot_all: bool) -> Result<String, &'static str> {
                         value.push(digit);
                     }
                     if !closed {
-                        return Err("regexp-unicode-code-point-escape-invalid-shape");
+                        return Err(RegexpFailure::unsupported(
+                            "regexp-unicode-code-point-escape-invalid-shape",
+                        ));
                     }
-                    let code_point = u32::from_str_radix(&value, 16)
-                        .map_err(|_| "regexp-unicode-code-point-escape-invalid-shape")?;
+                    let code_point = u32::from_str_radix(&value, 16).map_err(|_| {
+                        RegexpFailure::unsupported("regexp-unicode-code-point-escape-invalid-shape")
+                    })?;
                     if code_point > 0x10_FFFF {
-                        return Err("regexp-unicode-code-point-out-of-range");
+                        return Err(RegexpFailure::unsupported(
+                            "regexp-unicode-code-point-out-of-range",
+                        ));
                     }
                     if in_class && code_point > 0xFFFF {
-                        return Err("regexp-unicode-astral-class-postcondition-failed");
+                        return Err(RegexpFailure::fatal(
+                            "regexp-unicode-astral-class-postcondition-failed",
+                        ));
                     }
                     push_code_point(&mut output, code_point, !in_class);
                 } else {
@@ -1650,7 +1692,9 @@ fn lower_unicode(pattern: &str, dot_all: bool) -> Result<String, &'static str> {
             }
             character if character as u32 > 0xFFFF => {
                 if in_class {
-                    return Err("regexp-unicode-astral-class-postcondition-failed");
+                    return Err(RegexpFailure::fatal(
+                        "regexp-unicode-astral-class-postcondition-failed",
+                    ));
                 }
                 push_code_point(&mut output, character as u32, true);
             }
@@ -1734,7 +1778,7 @@ fn apply_pattern_edits(
 fn collect_named_group_edits(
     source: &str,
     pattern: &Pattern<'_>,
-) -> Result<(Vec<PatternEdit>, NamedGroupMap), &'static str> {
+) -> Result<(Vec<PatternEdit>, NamedGroupMap), RegexpFailure> {
     let mut collector = NamedGroupCollector::new(source, pattern.span.start);
     collector.visit_disjunction(&pattern.body);
     if let Some(error) = collector.error {
@@ -1745,7 +1789,7 @@ fn collect_named_group_edits(
         let indices = collector
             .groups
             .get(&reference.name)
-            .ok_or("regexp-named-reference-invalid-shape")?;
+            .ok_or_else(|| RegexpFailure::fatal("regexp-named-reference-invalid-shape"))?;
         let replacement = indices.iter().map(|index| format!("\\{index}")).collect();
         edits.push((reference.start, reference.end, replacement));
     }
@@ -1765,7 +1809,7 @@ struct NamedGroupCollector<'s> {
     groups: FxHashMap<String, Vec<usize>>,
     references: Vec<NamedReferenceEdit>,
     edits: Vec<PatternEdit>,
-    error: Option<&'static str>,
+    error: Option<RegexpFailure>,
 }
 
 impl<'s> NamedGroupCollector<'s> {
@@ -1781,15 +1825,15 @@ impl<'s> NamedGroupCollector<'s> {
         }
     }
 
-    fn relative_span(&self, span: oxc_span::Span) -> Result<(usize, usize), &'static str> {
+    fn relative_span(&self, span: oxc_span::Span) -> Result<(usize, usize), RegexpFailure> {
         let start = span
             .start
             .checked_sub(self.span_offset)
-            .ok_or("regexp-pattern-span-invalid")?;
+            .ok_or_else(|| RegexpFailure::fatal("regexp-pattern-span-invalid"))?;
         let end = span
             .end
             .checked_sub(self.span_offset)
-            .ok_or("regexp-pattern-span-invalid")?;
+            .ok_or_else(|| RegexpFailure::fatal("regexp-pattern-span-invalid"))?;
         Ok((start as usize, end as usize))
     }
 
@@ -1832,7 +1876,8 @@ impl<'s> NamedGroupCollector<'s> {
                             let prefix_end = start + 3 + offset + 1;
                             self.edits.push((start, prefix_end, "(".to_owned()));
                         } else {
-                            self.error = Some("regexp-named-group-invalid-shape");
+                            self.error =
+                                Some(RegexpFailure::fatal("regexp-named-group-invalid-shape"));
                         }
                     }
                     Err(error) => self.error = Some(error),
@@ -1850,7 +1895,7 @@ impl<'s> NamedGroupCollector<'s> {
                 name: normalize_regexp_group_name(reference.name.as_str()),
             });
         } else {
-            self.error = Some("regexp-pattern-span-invalid");
+            self.error = Some(RegexpFailure::fatal("regexp-pattern-span-invalid"));
         }
     }
 }
@@ -1888,7 +1933,7 @@ fn normalize_regexp_group_name(name: &str) -> String {
 fn collect_unicode_property_edits(
     pattern: &Pattern<'_>,
     surrogate_pairs: bool,
-) -> Result<Vec<PatternEdit>, &'static str> {
+) -> Result<Vec<PatternEdit>, RegexpFailure> {
     let mut collector = UnicodePropertyEditCollector {
         span_offset: pattern.span.start,
         surrogate_pairs,
@@ -1903,19 +1948,19 @@ struct UnicodePropertyEditCollector {
     span_offset: u32,
     surrogate_pairs: bool,
     edits: Vec<PatternEdit>,
-    error: Option<&'static str>,
+    error: Option<RegexpFailure>,
 }
 
 impl UnicodePropertyEditCollector {
-    fn relative_span(&self, span: oxc_span::Span) -> Result<(usize, usize), &'static str> {
+    fn relative_span(&self, span: oxc_span::Span) -> Result<(usize, usize), RegexpFailure> {
         let start = span
             .start
             .checked_sub(self.span_offset)
-            .ok_or("regexp-pattern-span-invalid")?;
+            .ok_or_else(|| RegexpFailure::fatal("regexp-pattern-span-invalid"))?;
         let end = span
             .end
             .checked_sub(self.span_offset)
-            .ok_or("regexp-pattern-span-invalid")?;
+            .ok_or_else(|| RegexpFailure::fatal("regexp-pattern-span-invalid"))?;
         Ok((start as usize, end as usize))
     }
 
@@ -1942,7 +1987,7 @@ impl<'a> RegExpVisit<'a> for UnicodePropertyEditCollector {
                     };
                     self.push_edit(class.span, render_ranges(&ranges, self.surrogate_pairs));
                 }
-                Err(error) => self.error = Some(error),
+                Err(error) => self.error = Some(RegexpFailure::unsupported(error)),
             }
         } else {
             walk::walk_character_class(self, class);
@@ -1957,7 +2002,7 @@ impl<'a> RegExpVisit<'a> for UnicodePropertyEditCollector {
             Ok(ranges) => {
                 self.push_edit(property.span, render_ranges(&ranges, self.surrogate_pairs));
             }
-            Err(error) => self.error = Some(error),
+            Err(error) => self.error = Some(RegexpFailure::unsupported(error)),
         }
     }
 }
@@ -2052,7 +2097,32 @@ fn whitespace_ranges() -> Vec<(u32, u32)> {
 
 #[cfg(test)]
 mod range_operation_tests {
-    use super::{intersect_ranges, subtract_ranges, union};
+    use super::{
+        FailureDisposition, RegexpFailure, apply_pattern_edits, intersect_ranges, lower_unicode,
+        subtract_ranges, union,
+    };
+
+    #[test]
+    fn regexp_failures_encode_reviewed_dispositions_at_the_origin() {
+        let unsupported = lower_unicode("\\u{110000}", false).unwrap_err();
+        assert_eq!(unsupported.disposition, FailureDisposition::Unsupported);
+        assert_eq!(unsupported.reason, "regexp-unicode-code-point-out-of-range");
+
+        let postcondition = lower_unicode("\\p{Script=Greek}", false).unwrap_err();
+        assert_eq!(postcondition.disposition, FailureDisposition::Fatal);
+        assert_eq!(
+            postcondition.reason,
+            "regexp-unicode-property-prerequisite-postcondition-failed"
+        );
+
+        let mut pattern = "abc".to_owned();
+        let overlap =
+            apply_pattern_edits(&mut pattern, vec![(0, 2, "x".into()), (1, 3, "y".into())])
+                .map_err(RegexpFailure::fatal)
+                .unwrap_err();
+        assert_eq!(overlap.disposition, FailureDisposition::Fatal);
+        assert_eq!(overlap.reason, "regexp-pattern-edits-overlap");
+    }
 
     #[test]
     fn intersects_normalized_ranges() {
