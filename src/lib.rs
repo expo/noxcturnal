@@ -3,6 +3,7 @@ mod engine;
 mod event_types;
 mod flow;
 mod generated;
+mod parse_failure;
 pub mod preflight;
 mod protocol;
 mod semantic;

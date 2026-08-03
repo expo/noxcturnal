@@ -50,6 +50,7 @@
     "changeset:publish": "changeset publish"
   },
   "dependencies": {
+    "@babel/code-frame": "7.29.0",
     "@oxc-project/types": "0.141.0"
   },
   "devDependencies": {
@@ -97,6 +98,7 @@
     "@rollup/plugin-commonjs": "^29.0.3",
     "@rollup/plugin-node-resolve": "^16.0.3",
     "@rollup/plugin-terser": "^1.0.0",
+    "@types/babel__code-frame": "^7.0.6",
     "@types/babel__core": "7.20.5",
     "@types/babel__generator": "7.27.0",
     "@types/node": "^22.15.0",

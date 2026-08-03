@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use napi::{Error, Result, Status, bindgen_prelude::Buffer};
+use napi::{Result, bindgen_prelude::Buffer};
 use oxc_allocator::Allocator;
 use oxc_ast::AstKind;
 use oxc_ast_visit::{Visit, walk};
@@ -44,9 +44,10 @@ pub fn materialize_routed_buffer(
     let allocator = Allocator::default();
     let parsed = Parser::new(&allocator, source, source_type(filename, source)?).parse();
     if !parsed.diagnostics.is_empty() {
-        return Err(Error::new(
-            Status::InvalidArg,
-            format!("Oxc parse failed: {:?}", parsed.diagnostics),
+        return Err(crate::parse_failure::error(
+            source,
+            &parsed.diagnostics,
+            "routed-materialization",
         ));
     }
     // Semantic analysis is skipped entirely when no compiled route consumes semantic data.
@@ -60,12 +61,10 @@ pub fn materialize_routed_buffer(
     if let Some(semantic_return) = &semantic_return
         && !semantic_return.diagnostics.is_empty()
     {
-        return Err(Error::new(
-            Status::InvalidArg,
-            format!(
-                "Oxc semantic analysis failed: {:?}",
-                semantic_return.diagnostics
-            ),
+        return Err(crate::parse_failure::error(
+            source,
+            &semantic_return.diagnostics,
+            "routed-materialization",
         ));
     }
     let utf16 = (!source.is_ascii()).then(|| utf16_index(source, &allocator));

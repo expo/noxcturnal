@@ -38,6 +38,46 @@ import {
 } from '../contracts/visitor';
 import { NativeTransformSession } from './session';
 import { commitWithDedupe } from './editor';
+import { TransformSyntaxError } from '../errors';
+
+const NATIVE_PARSE_FAILURE_PREFIX = '__NOXCTURNAL_PARSE_FAILURE__:';
+
+interface NativeParseFailurePayload {
+  message: string;
+  line: number;
+  column: number;
+  operation: 'indexed-session' | 'routed-materialization' | 'function-map' | 'native-phase';
+}
+
+function nativeParseFailure(error: unknown): NativeParseFailurePayload | null {
+  if (!(error instanceof Error) || !error.message.startsWith(NATIVE_PARSE_FAILURE_PREFIX))
+    return null;
+  try {
+    return JSON.parse(error.message.slice(NATIVE_PARSE_FAILURE_PREFIX.length));
+  } catch {
+    return null;
+  }
+}
+
+function syntaxError(
+  payload: NativeParseFailurePayload,
+  filename: string,
+  source: string,
+): TransformSyntaxError {
+  const { codeFrameColumns } = require('@babel/code-frame') as typeof import('@babel/code-frame');
+  const loc = { line: payload.line, column: payload.column };
+  const frame = codeFrameColumns(
+    source,
+    { start: { line: loc.line, column: loc.column + 1 } },
+    { highlightCode: true },
+  );
+  return new TransformSyntaxError(
+    `${filename}: ${payload.message} (${loc.line}:${loc.column + 1})`,
+    filename,
+    loc,
+    frame,
+  );
+}
 
 interface RetainedPlan {
   futureSubscriptions: ReadonlySet<string>;
@@ -760,6 +800,8 @@ export function transform(
         diagnostics,
       } satisfies NativeBailoutResult;
     }
+    const parseFailure = nativeParseFailure(error);
+    if (parseFailure != null) throw syntaxError(parseFailure, filename, currentSource());
     if (error instanceof NativeTransformError) throw error;
     const message = error instanceof Error ? error.message : String(error);
     throw new NativeTransformError(

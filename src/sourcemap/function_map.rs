@@ -1,4 +1,3 @@
-use napi::{Error, Status};
 use napi_derive::napi;
 use oxc_allocator::Allocator;
 use oxc_ast::{AstKind, ast::MethodDefinitionKind};
@@ -37,9 +36,10 @@ pub fn generate(source: &str, filename: &str) -> napi::Result<FunctionMap> {
     )
     .parse();
     if !parsed.diagnostics.is_empty() {
-        return Err(Error::new(
-            Status::InvalidArg,
-            format!("Oxc parse failed: {:?}", parsed.diagnostics),
+        return Err(crate::parse_failure::error(
+            source,
+            &parsed.diagnostics,
+            "function-map",
         ));
     }
     let mut collector = FunctionMapCollector::new(source, filename);

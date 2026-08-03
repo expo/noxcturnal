@@ -45,6 +45,7 @@ export type {
   VisitorContract,
 } from './contracts/visitor';
 export { defineVisitor, NativeTransformError } from './contracts/visitor';
+export { TransformSyntaxError } from './errors';
 export {
   composeNativePipeline,
   defineNativePipeline,

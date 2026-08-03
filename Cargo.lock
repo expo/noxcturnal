@@ -415,6 +415,7 @@ dependencies = [
  "oxc_ast",
  "oxc_ast_visit",
  "oxc_codegen",
+ "oxc_diagnostics",
  "oxc_ecmascript",
  "oxc_parser",
  "oxc_react_compiler",
@@ -428,6 +429,7 @@ dependencies = [
  "rustc-hash",
  "self_cell",
  "semver",
+ "serde_json",
 ]
 
 [[package]]

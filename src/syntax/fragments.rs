@@ -31,7 +31,7 @@ fn validate_fragment(code: &str, parser_mode: Option<&str>, kind: &str) -> Resul
     } else {
         Err(Error::new(
             Status::InvalidArg,
-            format!("invalid {kind} fragment: {:?}", parsed.diagnostics),
+            format!("invalid {kind} fragment: {}", parsed.diagnostics[0]),
         ))
     }
 }

@@ -1,4 +1,4 @@
-use napi::{Error, Result, Status};
+use napi::Result;
 use oxc_allocator::Allocator;
 use oxc_ast::{AstKind, ast::Expression};
 use oxc_ast_visit::{Visit, walk};
@@ -318,9 +318,10 @@ pub(crate) fn materialize_with_scope_parents(
     let allocator = Allocator::default();
     let parsed = Parser::new(&allocator, source, source_type(filename, source)?).parse();
     if !parsed.diagnostics.is_empty() {
-        return Err(Error::new(
-            Status::InvalidArg,
-            format!("Oxc parse failed: {:?}", parsed.diagnostics),
+        return Err(crate::parse_failure::error(
+            source,
+            &parsed.diagnostics,
+            "indexed-session",
         ));
     }
     let utf16 = (!source.is_ascii()).then(|| utf16_index(source, &allocator));
@@ -405,12 +406,10 @@ pub(crate) fn materialize_with_scope_parents(
         .with_check_syntax_error(true)
         .build(&parsed.program);
     if !semantic_return.diagnostics.is_empty() {
-        return Err(Error::new(
-            Status::InvalidArg,
-            format!(
-                "Oxc semantic analysis failed: {:?}",
-                semantic_return.diagnostics
-            ),
+        return Err(crate::parse_failure::error(
+            source,
+            &semantic_return.diagnostics,
+            "indexed-session",
         ));
     }
     let scope_parents = semantic_return
@@ -480,9 +479,10 @@ pub(crate) fn parse_program_body_offsets(source: &str, filename: &str) -> Result
     let allocator = Allocator::default();
     let parsed = Parser::new(&allocator, source, source_type(filename, source)?).parse();
     if !parsed.diagnostics.is_empty() {
-        return Err(Error::new(
-            Status::InvalidArg,
-            format!("Oxc parse failed: {:?}", parsed.diagnostics),
+        return Err(crate::parse_failure::error(
+            source,
+            &parsed.diagnostics,
+            "indexed-session",
         ));
     }
     let utf16 = (!source.is_ascii()).then(|| utf16_index(source, &allocator));

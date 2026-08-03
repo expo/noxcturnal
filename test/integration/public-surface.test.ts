@@ -7,6 +7,7 @@ import { native } from '../../js/native/binding';
 test('preserves the public source and native ABI surfaces', () => {
   assert.deepEqual(Object.keys(api).sort(), [
     'NativeTransformError',
+    'TransformSyntaxError',
     'classify',
     'compilePhasePlan',
     'composeNativePipeline',

@@ -579,10 +579,7 @@ fn transform_impl(
         )
     };
     if final_program.has_diagnostics() {
-        return Ok(unsupported(
-            "parse-error",
-            &final_program.borrow_dependent().diagnostics,
-        ));
+        return Ok(unsupported("parse-error", std::iter::empty::<&str>()));
     }
     if !requires_generic_pipeline(&options) {
         let should_render = options.constant_folding == Some(true)
@@ -2336,7 +2333,7 @@ impl<'a> VisitMut<'a> for MixedHelperReferenceRewriter<'a, '_> {
 
 fn unsupported(
     reason: &str,
-    diagnostics: impl IntoIterator<Item = impl std::fmt::Debug>,
+    diagnostics: impl IntoIterator<Item = impl std::fmt::Display>,
 ) -> NativePreflightResult {
     NativePreflightResult {
         status: "unsupported".into(),
@@ -2348,7 +2345,7 @@ fn unsupported(
         map: None,
         diagnostics: diagnostics
             .into_iter()
-            .map(|diagnostic| format!("{diagnostic:?}"))
+            .map(|diagnostic| diagnostic.to_string())
             .collect(),
         helpers_used: Vec::new(),
     }
