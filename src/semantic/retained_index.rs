@@ -40,6 +40,14 @@ pub struct RetainedIndex {
     scalar_field_ranges: Option<Vec<(u32, u32)>>,
     scalar_fields: Vec<RetainedField>,
     scalar_strings: Vec<String>,
+    comments: Option<Vec<RetainedComment>>,
+}
+
+pub(crate) struct RetainedComment {
+    pub(crate) block: bool,
+    pub(crate) value: String,
+    pub(crate) start: u32,
+    pub(crate) end: u32,
 }
 
 #[derive(Clone)]
@@ -185,6 +193,22 @@ pub struct NativeCallFact {
 }
 
 impl RetainedIndex {
+    pub(crate) fn set_comments(&mut self, comments: Vec<RetainedComment>) {
+        self.comments = Some(comments);
+    }
+
+    pub(crate) fn inner_comments(
+        &self,
+        start: u32,
+        end: u32,
+    ) -> impl Iterator<Item = &RetainedComment> {
+        self.comments
+            .as_deref()
+            .unwrap_or_default()
+            .iter()
+            .skip_while(move |comment| comment.start < start)
+            .take_while(move |comment| comment.end <= end)
+    }
     pub fn has_scalar_fields(&self) -> bool {
         self.scalar_field_ranges.is_some()
     }
@@ -215,6 +239,7 @@ impl RetainedIndex {
             scalar_field_ranges: retain_scalar_fields.then(|| vec![(0, 0); node_count]),
             scalar_fields: Vec::new(),
             scalar_strings: Vec::new(),
+            comments: None,
         }
     }
 

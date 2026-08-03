@@ -253,6 +253,25 @@ pub(crate) fn packed_fields_direct(
                 push(field_ids::VALUE, value);
             }
         }
+        AstKind::RegExpLiteral(literal) => {
+            if wants(field_ids::PATTERN) {
+                let value = intern_packed(strings, &literal.regex.pattern.text);
+                push(field_ids::PATTERN, value);
+            }
+            if wants(field_ids::FLAGS) {
+                // Oxc's flag bitset is canonicalized, but consumers need the lexical
+                // spelling (including its original order). The parser-owned raw literal
+                // retains that spelling; use the parsed pattern boundary to isolate it.
+                let raw = literal.raw.map_or_else(
+                    || &source[literal.span.start as usize..literal.span.end as usize],
+                    |raw| raw.as_str(),
+                );
+                let flags_start = literal.regex.pattern.text.len() + 2;
+                let flags = raw.get(flags_start..).unwrap_or_default();
+                let value = intern_packed(strings, flags);
+                push(field_ids::FLAGS, value);
+            }
+        }
         AstKind::NumericLiteral(literal) => {
             if wants(field_ids::VALUE) {
                 let value = intern_packed(strings, &literal.value.to_string());
@@ -273,6 +292,22 @@ pub(crate) fn packed_fields_direct(
                 0x8000_0000 | u32::from(property.computed),
             );
             push(field_ids::METHOD, 0x8000_0000 | u32::from(property.method));
+            push(
+                field_ids::SHORTHAND,
+                0x8000_0000 | u32::from(property.shorthand),
+            );
+            if wants(field_ids::KEY)
+                && let Some(key) = property.key.static_name()
+            {
+                let key = intern_packed(strings, &key);
+                push(field_ids::KEY, key);
+            }
+        }
+        AstKind::BindingProperty(property) => {
+            push(
+                field_ids::COMPUTED,
+                0x8000_0000 | u32::from(property.computed),
+            );
             push(
                 field_ids::SHORTHAND,
                 0x8000_0000 | u32::from(property.shorthand),
@@ -767,6 +802,7 @@ fn is_identifier_byte(byte: u8) -> bool {
 
 pub(crate) fn fields(
     kind: AstKind<'_>,
+    source: &str,
     member_write: bool,
     member_root_write: bool,
     scoping: Option<&Scoping>,
@@ -825,6 +861,21 @@ pub(crate) fn fields(
         AstKind::StringLiteral(literal) => {
             push!(field_ids::VALUE, "value", literal.value.to_string())
         }
+        AstKind::RegExpLiteral(literal) => {
+            push!(
+                field_ids::PATTERN,
+                "pattern",
+                literal.regex.pattern.text.to_string()
+            );
+            let raw = literal.raw.map_or_else(
+                || &source[literal.span.start as usize..literal.span.end as usize],
+                |raw| raw.as_str(),
+            );
+            let flags = raw
+                .get(literal.regex.pattern.text.len() + 2..)
+                .unwrap_or_default();
+            push!(field_ids::FLAGS, "flags", flags.to_owned());
+        }
         AstKind::NumericLiteral(literal) => {
             push!(field_ids::VALUE, "value", literal.value.to_string())
         }
@@ -843,6 +894,21 @@ pub(crate) fn fields(
                 property.computed.to_string()
             );
             push!(field_ids::METHOD, "method", property.method.to_string());
+            push!(
+                field_ids::SHORTHAND,
+                "shorthand",
+                property.shorthand.to_string()
+            );
+            if let Some(key) = property.key.static_name() {
+                push!(field_ids::KEY, "key", key.to_string());
+            }
+        }
+        AstKind::BindingProperty(property) => {
+            push!(
+                field_ids::COMPUTED,
+                "computed",
+                property.computed.to_string()
+            );
             push!(
                 field_ids::SHORTHAND,
                 "shorthand",

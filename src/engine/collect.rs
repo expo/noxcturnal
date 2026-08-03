@@ -1,6 +1,9 @@
 use napi::Result;
 use oxc_allocator::Allocator;
-use oxc_ast::{AstKind, ast::Expression};
+use oxc_ast::{
+    AstKind,
+    ast::{Comment, Expression},
+};
 use oxc_ast_visit::{Visit, walk};
 use oxc_parser::Parser;
 use oxc_semantic::{AstNodes, Scoping, SemanticBuilder};
@@ -11,7 +14,7 @@ use rustc_hash::FxHashMap;
 use crate::generated::event_schema::ast_kind_protocol_id;
 use crate::protocol::constants::FieldMask;
 use crate::protocol::manifest::CompiledManifest;
-use crate::semantic::retained_index::RetainedIndex;
+use crate::semantic::retained_index::{RetainedComment, RetainedIndex};
 use crate::sourcemap::function_map::FunctionMapCollector;
 use crate::syntax::classification::source_type;
 
@@ -354,6 +357,12 @@ pub(crate) fn materialize_with_scope_parents(
             .is_some_and(|manifest| manifest.needs_semantics)
         || (retention_manifest.is_some() || compiled_manifest.is_some())
             && retention_capabilities & (RETAIN_IDENTIFIERS | RETAIN_CALLS) != 0;
+    let needs_comments = retention_manifest
+        .as_ref()
+        .is_some_and(|manifest| manifest.needs_comments)
+        || compiled_manifest
+            .as_ref()
+            .is_some_and(|manifest| manifest.needs_comments);
     if !needs_semantics {
         let mut collector = SyntaxIndexCollector {
             source,
@@ -383,6 +392,14 @@ pub(crate) fn materialize_with_scope_parents(
         collector
             .retained_index
             .set_scalar_strings(std::mem::take(&mut collector.retained_string_ids));
+        if needs_comments {
+            retain_comments(
+                &mut collector.retained_index,
+                source,
+                &parsed.program.comments,
+                utf16.as_deref().map(|offsets| &**offsets),
+            );
+        }
         let initial_routed_buffer = if build_initial_route {
             compiled_manifest
                 .as_ref()
@@ -457,6 +474,14 @@ pub(crate) fn materialize_with_scope_parents(
     collector
         .retained_index
         .set_scalar_strings(std::mem::take(&mut collector.retained_string_ids));
+    if needs_comments {
+        retain_comments(
+            &mut collector.retained_index,
+            source,
+            &parsed.program.comments,
+            utf16.as_deref().map(|offsets| &**offsets),
+        );
+    }
     let function_map = collector
         .function_map
         .take()
@@ -479,6 +504,32 @@ pub(crate) fn materialize_with_scope_parents(
         function_map,
         initial_routed_buffer,
     })
+}
+
+fn retain_comments(
+    index: &mut RetainedIndex,
+    source: &str,
+    comments: &[Comment],
+    utf16: Option<&[u32]>,
+) {
+    index.set_comments(
+        comments
+            .iter()
+            .map(|comment| {
+                let content = comment.content_span();
+                RetainedComment {
+                    block: comment.is_block(),
+                    value: source[content.start as usize..content.end as usize].to_owned(),
+                    start: utf16.map_or(comment.span.start, |offsets| {
+                        offsets[comment.span.start as usize]
+                    }),
+                    end: utf16.map_or(comment.span.end, |offsets| {
+                        offsets[comment.span.end as usize]
+                    }),
+                }
+            })
+            .collect(),
+    );
 }
 
 pub(crate) fn parse_program_body_offsets(source: &str, filename: &str) -> Result<[u32; 3]> {

@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use napi::{Result, bindgen_prelude::Buffer};
 use oxc_allocator::Allocator;
-use oxc_ast::AstKind;
+use oxc_ast::{AstKind, ast::Comment};
 use oxc_ast_visit::{Visit, walk};
 use oxc_parser::Parser;
 use oxc_semantic::{AstNodes, Scoping, SemanticBuilder};
@@ -92,6 +92,9 @@ pub fn materialize_routed_buffer(
             manifest.retention_capabilities,
         ),
         member_paths: MemberPathInterner::default(),
+        comments: manifest
+            .needs_comments
+            .then_some(parsed.program.comments.as_slice()),
     };
     collector.visit_program(&parsed.program);
     let node_count = collector.node_count;
@@ -199,6 +202,7 @@ struct RoutedEventCollector<'a> {
     target_stack: Vec<(AstKind<'a>, bool, bool)>,
     tracks_member_writes: bool,
     member_paths: MemberPathInterner,
+    comments: Option<&'a [Comment]>,
 }
 
 impl RoutedEventCollector<'_> {
@@ -313,6 +317,7 @@ impl RoutedEventCollector<'_> {
         } else {
             fields(
                 kind,
+                self.source,
                 member_write,
                 member_root_write,
                 self.scoping,
@@ -326,6 +331,7 @@ impl RoutedEventCollector<'_> {
         // their selections is a bitwise or, so coalescing costs nothing.
         let mut payload_mask = FieldMask::none();
         let mut matched_exit_carrier = false;
+        let mut comments_inner = false;
         for route in candidates
             .iter()
             .filter(|route| side == VisitSide::Enter || route.side == side)
@@ -346,6 +352,7 @@ impl RoutedEventCollector<'_> {
                     matched_exit_carrier = true;
                 }
                 payload_mask = payload_mask.union(route.payload_mask);
+                comments_inner |= route.comments_inner;
             }
         }
         if matched_route_ids.is_empty() && !matched_exit_carrier {
@@ -378,6 +385,7 @@ impl RoutedEventCollector<'_> {
         let mut fallback_payload = if direct_payload.is_none() && !payload_mask.is_empty() {
             fields(
                 kind,
+                self.source,
                 member_write,
                 member_root_write,
                 self.scoping,
@@ -443,6 +451,34 @@ impl RoutedEventCollector<'_> {
                 let value = packed_scalar(&field.key, &field.value)
                     .unwrap_or_else(|| self.intern(&field.value));
                 self.words.extend([key, value]);
+            }
+        }
+        if self.manifest.needs_comments {
+            if comments_inner {
+                let comments = self.comments.expect("demanded parser comments");
+                let first = comments.partition_point(|comment| comment.span.start < span.start);
+                let contained = comments[first..]
+                    .iter()
+                    .take_while(|comment| comment.span.end <= span.end)
+                    .copied()
+                    .collect::<Vec<_>>();
+                self.words.push(contained.len() as u32);
+                for comment in contained {
+                    let content = comment.content_span();
+                    let value =
+                        self.intern(&self.source[content.start as usize..content.end as usize]);
+                    self.words.extend([
+                        u32::from(comment.is_block()),
+                        value,
+                        self.utf16.map_or(comment.span.start, |index| {
+                            index[comment.span.start as usize]
+                        }),
+                        self.utf16
+                            .map_or(comment.span.end, |index| index[comment.span.end as usize]),
+                    ]);
+                }
+            } else {
+                self.words.push(0);
             }
         }
         self.words.push(matched_route_ids.len() as u32);

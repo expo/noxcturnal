@@ -172,6 +172,50 @@ test('emits declaration-name metadata only when explicitly requested', () => {
   assert.notDeepEqual(requestedManifest, route([]));
 });
 
+test('joins and encodes parsed comments only for routes that demand them', () => {
+  const source = `/* outside */ import(/* first */ 'pkg' // second\n); /* after */`;
+  const route = (comments?: 'inner') =>
+    packRouteManifest(
+      [
+        {
+          id: 0,
+          pluginId: 0,
+          nodeType: 'ImportExpression',
+          side: 'enter',
+          order: 0,
+          predicates: {},
+          payloadFields: [],
+          comments,
+        },
+      ],
+      false,
+      false,
+    );
+  const read = (manifest: Buffer) => {
+    const batch = decodeRoutedEnvelope(
+      native.materializeRoutedBuffer(source, 'fixture.js', manifest),
+    );
+    let event: Parameters<Parameters<typeof dispatchRoutedEvents>[1][number]>[0] | undefined;
+    dispatchRoutedEvents(batch, [value => (event = value)]);
+    return { batch, event: event! };
+  };
+  const absent = read(route());
+  assert.equal(absent.batch.includeComments, false);
+  assert.equal(absent.event.comments, undefined);
+
+  const requested = read(route('inner'));
+  assert.equal(requested.batch.includeComments, true);
+  assert.deepEqual(
+    requested.event.comments?.map(comment => [comment.kind, comment.value]),
+    [
+      ['block', ' first '],
+      ['line', ' second'],
+    ],
+  );
+  assert.ok(requested.batch.recordBytes > absent.batch.recordBytes);
+  assert.ok(requested.batch.stringSlabBytes > absent.batch.stringSlabBytes);
+});
+
 test('serializes a shared hydrated ancestor once rather than once per routed descendant', () => {
   const callCount = 256;
   const source = `const owner = [${Array.from({ length: callCount }, () => 'create()').join(',')}];`;

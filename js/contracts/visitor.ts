@@ -12,6 +12,7 @@ import type {
   EditEffect,
   InspectRequest,
   NativeFieldKey,
+  NativeComment,
   NativeNodeType,
   NativeVisitorRoute,
   NodeOfType,
@@ -227,6 +228,7 @@ export interface NativeNodePath<T extends NodeView = NodeView> {
   withDeclarationName(name: string): CompositeFragment;
   /** The node's source as plain text, without provenance. */
   sourceText(): string;
+  getComments(relation: 'inner'): readonly NativeComment[];
   snapshot(options?: SnapshotOptions): Readonly<T>;
   getLocation(): SourceLocation;
   is<TType extends NativeNodeType>(type: TType): this is NativeNodePath<NodeOfType<TType>>;
@@ -416,6 +418,8 @@ export interface VisitorContract<
 > {
   /** Scalar payload fields transferred to the callback's `path.node`. */
   fields?: readonly DeclaredFieldKey<Route>[];
+  /** Parsed comment relations transferred with this route. */
+  comments?: 'inner';
   /** Native match predicates. Match-only fields are not callback-visible. */
   where?: RouteWhere<Route>;
   scope?: boolean;
@@ -688,6 +692,9 @@ type ControlPart<Contract> = Contract extends { controlFlow: readonly (infer C e
       ('nested-traverse' extends C ? NestedTraverseAccess : {}) &
       ('dynamic-subscriptions' extends C ? SubscribeAccess : {})
   : {};
+type CommentsPart<Contract> = Contract extends { comments: 'inner' }
+  ? { getComments(relation: 'inner'): readonly NativeComment[] }
+  : {};
 type ChildFieldsOf<C> = C extends { fields: readonly (infer F extends string)[] } ? F : never;
 /** Child paths share the visitor's runtime, so they inherit its scope, ancestry,
  * and control-flow capabilities, and expose their own declared child chains. */
@@ -742,6 +749,7 @@ export type ContractPath<
   ScopePart<Contract> &
   AncestryPart<Contract> &
   ChildrenPart<Route, Contract, Contract> &
+  CommentsPart<Contract> &
   ControlPart<Contract>;
 
 export type TypedVisitorHandler<
@@ -766,6 +774,7 @@ export interface DefinedVisitor<in State = unknown> {
 /** The contract as stored: normalized, frozen, identity-stable per visitor. */
 export interface StoredVisitorContract {
   readonly fields: readonly NativeFieldKey[];
+  readonly comments: 'inner' | undefined;
   readonly where: Readonly<Partial<Record<string, ScalarPredicate>>> | undefined;
   readonly scope: boolean;
   readonly ancestry:
@@ -878,10 +887,13 @@ export function defineVisitor<
   if (typeof route !== 'string' || route.length === 0)
     throw new Error('defineVisitor requires a route name');
   const callable = typeof handler === 'function' ? { enter: handler } : handler;
+  if (contract.comments != null && contract.comments !== 'inner')
+    throw new Error(`defineVisitor(${route}) supports only the inner comment relation`);
   if (callable.enter == null && callable.exit == null)
     throw new Error(`defineVisitor(${route}) requires an enter or exit handler`);
   const stored: StoredVisitorContract = Object.freeze({
     fields: Object.freeze([...((contract.fields as readonly NativeFieldKey[] | undefined) ?? [])]),
+    comments: contract.comments,
     where: contract.where == null ? undefined : Object.freeze({ ...contract.where }),
     scope: contract.scope === true,
     ancestry: freezeAncestry(contract.ancestry as AncestryContract<AncestorRouteMap> | undefined),

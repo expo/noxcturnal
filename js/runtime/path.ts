@@ -232,6 +232,14 @@ export class NodePathImpl implements NativeNodePath {
   sourceText(): string {
     return this.runtime.session.source.slice(this.event.start, this.event.end);
   }
+  getComments(relation: 'inner') {
+    if (relation !== 'inner' || this.runtime.capabilities.comments !== relation) {
+      throw this.#pluginError(
+        `undeclared comment relation ${relation} (declare comments: 'inner' on the visitor contract)`,
+      );
+    }
+    return this.event.comments ?? [];
+  }
   snapshot(options: SnapshotOptions = {}): Readonly<NodeView> {
     const fields = options.fields;
     let source = this.node as NodeView & Record<string, unknown>;
@@ -384,6 +392,10 @@ export class NodePathImpl implements NativeNodePath {
     let glueMapping: EditCommand['mapping'] = 'Sourceless';
     let glueNames: string[] = [];
     const degraded = this.#degraded;
+    // All gap edits lowered from one structured replacement share an order. This
+    // lets deferred source copies distinguish sibling gaps from unrelated edits
+    // while preserving the original ordering against other commands.
+    const order = this.runtime.nextOrder();
     const flush = (gapEnd: number) => {
       if (glue.length > 0 || gapEnd > cursor) {
         const shared = {
@@ -393,7 +405,7 @@ export class NodePathImpl implements NativeNodePath {
           mapping: glue.length === 0 ? ('Sourceless' as const) : glueMapping,
           names: glueNames.length > 0 ? glueNames : undefined,
           owner: this.runtime.owner,
-          order: this.runtime.nextOrder(),
+          order,
         };
         if (glueHasCopy) this.runtime.edits.push({ ...shared, contentParts: glue });
         else this.runtime.edits.push({ ...shared, content: glue.join('') });
@@ -852,6 +864,14 @@ function selectChildRole(
   )
     return at(0);
   if (key === 'init' && type === 'VariableDeclarator') return children.length > 1 ? last() : null;
+  if (
+    type === 'FormalParameter' ||
+    type === 'FormalParameterRest' ||
+    type === 'BindingRestElement'
+  ) {
+    if (key === 'pattern') return at(0);
+    if (key === 'default') return type === 'FormalParameter' && children.length > 1 ? last() : null;
+  }
   if (key === 'expression' && type === 'ExpressionStatement') return at(0);
   if (
     (key === 'key' || key === 'value') &&

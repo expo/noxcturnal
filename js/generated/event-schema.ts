@@ -259,6 +259,8 @@ export const FIELD_KEYS = [
   'targetName',
   'declarationNameAnchor',
   'declarationNamePrefix',
+  'pattern',
+  'flags',
 ] as const;
 export type NativeFieldKey = Exclude<(typeof FIELD_KEYS)[number], ''>;
 export const FIELD_KEY_IDS = new Map<string, number>(
@@ -267,10 +269,12 @@ export const FIELD_KEY_IDS = new Map<string, number>(
 export const PREDICATE_FIELDS: Readonly<Record<string, readonly string[]>> = {
   Identifier: ['name', 'global', 'read', 'write', 'memberWrite', 'bindingScopeId', 'binding'],
   StringLiteral: ['value', 'constantKind', 'constantValue'],
+  RegExpLiteral: ['pattern', 'flags'],
   NumericLiteral: ['value', 'constantKind', 'constantValue'],
   BooleanLiteral: ['value', 'constantKind', 'constantValue'],
   NullLiteral: ['constantKind', 'constantValue'],
   ObjectProperty: ['kind', 'computed', 'method', 'shorthand', 'key'],
+  BindingProperty: ['computed', 'shorthand', 'key'],
   UpdateExpression: ['operator', 'prefix'],
   UnaryExpression: ['operator', 'prefix', 'constantKind', 'constantValue'],
   BinaryExpression: ['operator', 'constantKind', 'constantValue'],
@@ -349,6 +353,7 @@ export const PREDICATE_VALUE_DOMAINS: Readonly<
     constantKind: { kinds: ['string'], values: ['null', 'boolean', 'number', 'string'] },
     constantValue: { kinds: ['string', 'number', 'boolean', 'null'] },
   },
+  RegExpLiteral: { pattern: { kinds: ['string'] }, flags: { kinds: ['string'] } },
   NumericLiteral: {
     value: { kinds: ['number'] },
     constantKind: { kinds: ['string'], values: ['null', 'boolean', 'number', 'string'] },
@@ -367,6 +372,11 @@ export const PREDICATE_VALUE_DOMAINS: Readonly<
     kind: { kinds: ['string'], values: ['init', 'get', 'set'] },
     computed: { kinds: ['boolean'] },
     method: { kinds: ['boolean'] },
+    shorthand: { kinds: ['boolean'] },
+    key: { kinds: ['string'] },
+  },
+  BindingProperty: {
+    computed: { kinds: ['boolean'] },
     shorthand: { kinds: ['boolean'] },
     key: { kinds: ['string'] },
   },
@@ -877,7 +887,10 @@ export const CHILD_ROLES: Readonly<
   },
   ArrowFunctionExpression: {
     body: { types: ['FunctionBody'], list: false },
-    params: { types: ['FormalParameters', 'FormalParameter', 'FormalParameterRest'], list: true },
+    params: {
+      types: ['FormalParameters', 'FormalParameter', 'FormalParameterRest', 'BindingRestElement'],
+      list: true,
+    },
   },
   Class: {
     body: { types: ['ClassBody'], list: false },
@@ -2298,7 +2311,202 @@ export const CHILD_ROLES: Readonly<
       list: false,
     },
   },
-  FormalParameter: { decorators: { types: ['Decorator'], list: true } },
+  FormalParameter: {
+    decorators: { types: ['Decorator'], list: true },
+    pattern: { types: ['Identifier', 'ObjectPattern', 'ArrayPattern'], list: false },
+    default: {
+      types: [
+        'Identifier',
+        'ThisExpression',
+        'ArrayExpression',
+        'ObjectExpression',
+        'TemplateLiteral',
+        'TaggedTemplateExpression',
+        'ComputedMemberExpression',
+        'StaticMemberExpression',
+        'PrivateFieldExpression',
+        'CallExpression',
+        'NewExpression',
+        'UpdateExpression',
+        'UnaryExpression',
+        'BinaryExpression',
+        'PrivateInExpression',
+        'LogicalExpression',
+        'ConditionalExpression',
+        'AssignmentExpression',
+        'SequenceExpression',
+        'AwaitExpression',
+        'ChainExpression',
+        'ParenthesizedExpression',
+        'ArrowFunctionExpression',
+        'YieldExpression',
+        'ImportExpression',
+        'V8IntrinsicExpression',
+        'BooleanLiteral',
+        'NullLiteral',
+        'NumericLiteral',
+        'StringLiteral',
+        'BigIntLiteral',
+        'RegExpLiteral',
+        'JSXMemberExpression',
+        'JSXEmptyExpression',
+        'TSAsExpression',
+        'TSSatisfiesExpression',
+        'TSNonNullExpression',
+        'TSInstantiationExpression',
+      ],
+      list: false,
+    },
+  },
+  FormalParameterRest: {
+    pattern: { types: ['Identifier', 'ObjectPattern', 'ArrayPattern'], list: false },
+    default: {
+      types: [
+        'Identifier',
+        'ThisExpression',
+        'ArrayExpression',
+        'ObjectExpression',
+        'TemplateLiteral',
+        'TaggedTemplateExpression',
+        'ComputedMemberExpression',
+        'StaticMemberExpression',
+        'PrivateFieldExpression',
+        'CallExpression',
+        'NewExpression',
+        'UpdateExpression',
+        'UnaryExpression',
+        'BinaryExpression',
+        'PrivateInExpression',
+        'LogicalExpression',
+        'ConditionalExpression',
+        'AssignmentExpression',
+        'SequenceExpression',
+        'AwaitExpression',
+        'ChainExpression',
+        'ParenthesizedExpression',
+        'ArrowFunctionExpression',
+        'YieldExpression',
+        'ImportExpression',
+        'V8IntrinsicExpression',
+        'BooleanLiteral',
+        'NullLiteral',
+        'NumericLiteral',
+        'StringLiteral',
+        'BigIntLiteral',
+        'RegExpLiteral',
+        'JSXMemberExpression',
+        'JSXEmptyExpression',
+        'TSAsExpression',
+        'TSSatisfiesExpression',
+        'TSNonNullExpression',
+        'TSInstantiationExpression',
+      ],
+      list: false,
+    },
+    argument: {
+      types: ['Identifier', 'ObjectPattern', 'ArrayPattern', 'AssignmentPattern'],
+      list: false,
+    },
+  },
+  BindingRestElement: {
+    pattern: { types: ['Identifier', 'ObjectPattern', 'ArrayPattern'], list: false },
+    default: {
+      types: [
+        'Identifier',
+        'ThisExpression',
+        'ArrayExpression',
+        'ObjectExpression',
+        'TemplateLiteral',
+        'TaggedTemplateExpression',
+        'ComputedMemberExpression',
+        'StaticMemberExpression',
+        'PrivateFieldExpression',
+        'CallExpression',
+        'NewExpression',
+        'UpdateExpression',
+        'UnaryExpression',
+        'BinaryExpression',
+        'PrivateInExpression',
+        'LogicalExpression',
+        'ConditionalExpression',
+        'AssignmentExpression',
+        'SequenceExpression',
+        'AwaitExpression',
+        'ChainExpression',
+        'ParenthesizedExpression',
+        'ArrowFunctionExpression',
+        'YieldExpression',
+        'ImportExpression',
+        'V8IntrinsicExpression',
+        'BooleanLiteral',
+        'NullLiteral',
+        'NumericLiteral',
+        'StringLiteral',
+        'BigIntLiteral',
+        'RegExpLiteral',
+        'JSXMemberExpression',
+        'JSXEmptyExpression',
+        'TSAsExpression',
+        'TSSatisfiesExpression',
+        'TSNonNullExpression',
+        'TSInstantiationExpression',
+      ],
+      list: false,
+    },
+    argument: {
+      types: ['Identifier', 'ObjectPattern', 'ArrayPattern', 'AssignmentPattern'],
+      list: false,
+    },
+  },
+  AssignmentPattern: {
+    left: {
+      types: ['Identifier', 'ObjectPattern', 'ArrayPattern', 'AssignmentPattern'],
+      list: false,
+    },
+    right: {
+      types: [
+        'Identifier',
+        'ThisExpression',
+        'ArrayExpression',
+        'ObjectExpression',
+        'TemplateLiteral',
+        'TaggedTemplateExpression',
+        'ComputedMemberExpression',
+        'StaticMemberExpression',
+        'PrivateFieldExpression',
+        'CallExpression',
+        'NewExpression',
+        'UpdateExpression',
+        'UnaryExpression',
+        'BinaryExpression',
+        'PrivateInExpression',
+        'LogicalExpression',
+        'ConditionalExpression',
+        'AssignmentExpression',
+        'SequenceExpression',
+        'AwaitExpression',
+        'ChainExpression',
+        'ParenthesizedExpression',
+        'ArrowFunctionExpression',
+        'YieldExpression',
+        'ImportExpression',
+        'V8IntrinsicExpression',
+        'BooleanLiteral',
+        'NullLiteral',
+        'NumericLiteral',
+        'StringLiteral',
+        'BigIntLiteral',
+        'RegExpLiteral',
+        'JSXMemberExpression',
+        'JSXEmptyExpression',
+        'TSAsExpression',
+        'TSSatisfiesExpression',
+        'TSNonNullExpression',
+        'TSInstantiationExpression',
+      ],
+      list: false,
+    },
+  },
   StaticMemberExpression: {
     object: {
       types: [
@@ -3545,6 +3753,10 @@ export interface NativeNodeFields {
     readonly constantKind?: 'null' | 'boolean' | 'number' | 'string';
     readonly constantValue?: string | number | boolean | null;
   };
+  RegExpLiteral: {
+    readonly pattern: string;
+    readonly flags: string;
+  };
   NumericLiteral: {
     readonly value: number;
     readonly constantKind?: 'null' | 'boolean' | 'number' | 'string';
@@ -3563,6 +3775,11 @@ export interface NativeNodeFields {
     readonly kind: PropertyKind;
     readonly computed: boolean;
     readonly method: boolean;
+    readonly shorthand: boolean;
+    readonly key?: string;
+  };
+  BindingProperty: {
+    readonly computed: boolean;
     readonly shorthand: boolean;
     readonly key?: string;
   };
@@ -3807,6 +4024,8 @@ export interface NativeRouteFields {
     readonly bodyEnd?: number;
     readonly delegate?: boolean;
     readonly value?: boolean | number | string;
+    readonly pattern?: string;
+    readonly flags?: string;
   };
   MemberExpression: {
     readonly computed?: true | false;
@@ -3929,6 +4148,8 @@ export interface NativeRouteFields {
     readonly exportKind?: ImportOrExportKind;
     readonly declaredName?: string;
     readonly exported?: string;
+    readonly pattern?: string;
+    readonly flags?: string;
   };
 }
 
@@ -4192,14 +4413,22 @@ export interface NativeChildRoles {
   Function: {
     readonly body: { readonly child: 'FunctionBody'; readonly list: false };
     readonly params: {
-      readonly child: 'FormalParameters' | 'FormalParameter' | 'FormalParameterRest';
+      readonly child:
+        | 'FormalParameters'
+        | 'FormalParameter'
+        | 'FormalParameterRest'
+        | 'BindingRestElement';
       readonly list: true;
     };
   };
   ArrowFunctionExpression: {
     readonly body: { readonly child: 'FunctionBody'; readonly list: false };
     readonly params: {
-      readonly child: 'FormalParameters' | 'FormalParameter' | 'FormalParameterRest';
+      readonly child:
+        | 'FormalParameters'
+        | 'FormalParameter'
+        | 'FormalParameterRest'
+        | 'BindingRestElement';
       readonly list: true;
     };
   };
@@ -5615,6 +5844,204 @@ export interface NativeChildRoles {
   };
   FormalParameter: {
     readonly decorators: { readonly child: 'Decorator'; readonly list: true };
+    readonly pattern: {
+      readonly child: 'Identifier' | 'ObjectPattern' | 'ArrayPattern';
+      readonly list: false;
+    };
+    readonly default: {
+      readonly child:
+        | 'Identifier'
+        | 'ThisExpression'
+        | 'ArrayExpression'
+        | 'ObjectExpression'
+        | 'TemplateLiteral'
+        | 'TaggedTemplateExpression'
+        | 'ComputedMemberExpression'
+        | 'StaticMemberExpression'
+        | 'PrivateFieldExpression'
+        | 'CallExpression'
+        | 'NewExpression'
+        | 'UpdateExpression'
+        | 'UnaryExpression'
+        | 'BinaryExpression'
+        | 'PrivateInExpression'
+        | 'LogicalExpression'
+        | 'ConditionalExpression'
+        | 'AssignmentExpression'
+        | 'SequenceExpression'
+        | 'AwaitExpression'
+        | 'ChainExpression'
+        | 'ParenthesizedExpression'
+        | 'ArrowFunctionExpression'
+        | 'YieldExpression'
+        | 'ImportExpression'
+        | 'V8IntrinsicExpression'
+        | 'BooleanLiteral'
+        | 'NullLiteral'
+        | 'NumericLiteral'
+        | 'StringLiteral'
+        | 'BigIntLiteral'
+        | 'RegExpLiteral'
+        | 'JSXMemberExpression'
+        | 'JSXEmptyExpression'
+        | 'TSAsExpression'
+        | 'TSSatisfiesExpression'
+        | 'TSNonNullExpression'
+        | 'TSInstantiationExpression';
+      readonly list: false;
+    };
+  };
+  FormalParameterRest: {
+    readonly pattern: {
+      readonly child: 'Identifier' | 'ObjectPattern' | 'ArrayPattern';
+      readonly list: false;
+    };
+    readonly default: {
+      readonly child:
+        | 'Identifier'
+        | 'ThisExpression'
+        | 'ArrayExpression'
+        | 'ObjectExpression'
+        | 'TemplateLiteral'
+        | 'TaggedTemplateExpression'
+        | 'ComputedMemberExpression'
+        | 'StaticMemberExpression'
+        | 'PrivateFieldExpression'
+        | 'CallExpression'
+        | 'NewExpression'
+        | 'UpdateExpression'
+        | 'UnaryExpression'
+        | 'BinaryExpression'
+        | 'PrivateInExpression'
+        | 'LogicalExpression'
+        | 'ConditionalExpression'
+        | 'AssignmentExpression'
+        | 'SequenceExpression'
+        | 'AwaitExpression'
+        | 'ChainExpression'
+        | 'ParenthesizedExpression'
+        | 'ArrowFunctionExpression'
+        | 'YieldExpression'
+        | 'ImportExpression'
+        | 'V8IntrinsicExpression'
+        | 'BooleanLiteral'
+        | 'NullLiteral'
+        | 'NumericLiteral'
+        | 'StringLiteral'
+        | 'BigIntLiteral'
+        | 'RegExpLiteral'
+        | 'JSXMemberExpression'
+        | 'JSXEmptyExpression'
+        | 'TSAsExpression'
+        | 'TSSatisfiesExpression'
+        | 'TSNonNullExpression'
+        | 'TSInstantiationExpression';
+      readonly list: false;
+    };
+    readonly argument: {
+      readonly child: 'Identifier' | 'ObjectPattern' | 'ArrayPattern' | 'AssignmentPattern';
+      readonly list: false;
+    };
+  };
+  BindingRestElement: {
+    readonly pattern: {
+      readonly child: 'Identifier' | 'ObjectPattern' | 'ArrayPattern';
+      readonly list: false;
+    };
+    readonly default: {
+      readonly child:
+        | 'Identifier'
+        | 'ThisExpression'
+        | 'ArrayExpression'
+        | 'ObjectExpression'
+        | 'TemplateLiteral'
+        | 'TaggedTemplateExpression'
+        | 'ComputedMemberExpression'
+        | 'StaticMemberExpression'
+        | 'PrivateFieldExpression'
+        | 'CallExpression'
+        | 'NewExpression'
+        | 'UpdateExpression'
+        | 'UnaryExpression'
+        | 'BinaryExpression'
+        | 'PrivateInExpression'
+        | 'LogicalExpression'
+        | 'ConditionalExpression'
+        | 'AssignmentExpression'
+        | 'SequenceExpression'
+        | 'AwaitExpression'
+        | 'ChainExpression'
+        | 'ParenthesizedExpression'
+        | 'ArrowFunctionExpression'
+        | 'YieldExpression'
+        | 'ImportExpression'
+        | 'V8IntrinsicExpression'
+        | 'BooleanLiteral'
+        | 'NullLiteral'
+        | 'NumericLiteral'
+        | 'StringLiteral'
+        | 'BigIntLiteral'
+        | 'RegExpLiteral'
+        | 'JSXMemberExpression'
+        | 'JSXEmptyExpression'
+        | 'TSAsExpression'
+        | 'TSSatisfiesExpression'
+        | 'TSNonNullExpression'
+        | 'TSInstantiationExpression';
+      readonly list: false;
+    };
+    readonly argument: {
+      readonly child: 'Identifier' | 'ObjectPattern' | 'ArrayPattern' | 'AssignmentPattern';
+      readonly list: false;
+    };
+  };
+  AssignmentPattern: {
+    readonly left: {
+      readonly child: 'Identifier' | 'ObjectPattern' | 'ArrayPattern' | 'AssignmentPattern';
+      readonly list: false;
+    };
+    readonly right: {
+      readonly child:
+        | 'Identifier'
+        | 'ThisExpression'
+        | 'ArrayExpression'
+        | 'ObjectExpression'
+        | 'TemplateLiteral'
+        | 'TaggedTemplateExpression'
+        | 'ComputedMemberExpression'
+        | 'StaticMemberExpression'
+        | 'PrivateFieldExpression'
+        | 'CallExpression'
+        | 'NewExpression'
+        | 'UpdateExpression'
+        | 'UnaryExpression'
+        | 'BinaryExpression'
+        | 'PrivateInExpression'
+        | 'LogicalExpression'
+        | 'ConditionalExpression'
+        | 'AssignmentExpression'
+        | 'SequenceExpression'
+        | 'AwaitExpression'
+        | 'ChainExpression'
+        | 'ParenthesizedExpression'
+        | 'ArrowFunctionExpression'
+        | 'YieldExpression'
+        | 'ImportExpression'
+        | 'V8IntrinsicExpression'
+        | 'BooleanLiteral'
+        | 'NullLiteral'
+        | 'NumericLiteral'
+        | 'StringLiteral'
+        | 'BigIntLiteral'
+        | 'RegExpLiteral'
+        | 'JSXMemberExpression'
+        | 'JSXEmptyExpression'
+        | 'TSAsExpression'
+        | 'TSSatisfiesExpression'
+        | 'TSNonNullExpression'
+        | 'TSInstantiationExpression';
+      readonly list: false;
+    };
   };
   StaticMemberExpression: {
     readonly object: {

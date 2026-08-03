@@ -493,10 +493,12 @@
   "predicateFields": {
     "Identifier": ["name", "global", "read", "write", "memberWrite", "bindingScopeId", "binding"],
     "StringLiteral": ["value", "constantKind", "constantValue"],
+    "RegExpLiteral": ["pattern", "flags"],
     "NumericLiteral": ["value", "constantKind", "constantValue"],
     "BooleanLiteral": ["value", "constantKind", "constantValue"],
     "NullLiteral": ["constantKind", "constantValue"],
     "ObjectProperty": ["kind", "computed", "method", "shorthand", "key"],
+    "BindingProperty": ["computed", "shorthand", "key"],
     "UpdateExpression": ["operator", "prefix"],
     "UnaryExpression": ["operator", "prefix", "constantKind", "constantValue"],
     "BinaryExpression": ["operator", "constantKind", "constantValue"],
@@ -602,7 +604,9 @@
     "bindingName",
     "targetName",
     "declarationNameAnchor",
-    "declarationNamePrefix"
+    "declarationNamePrefix",
+    "pattern",
+    "flags"
   ],
   "fieldTypes": {
     "Identifier": {
@@ -618,6 +622,10 @@
       "value": "string",
       "constantKind?": "'null' | 'boolean' | 'number' | 'string'",
       "constantValue?": "string | number | boolean | null"
+    },
+    "RegExpLiteral": {
+      "pattern": "string",
+      "flags": "string"
     },
     "NumericLiteral": {
       "value": "number",
@@ -637,6 +645,11 @@
       "kind": "PropertyKind",
       "computed": "boolean",
       "method": "boolean",
+      "shorthand": "boolean",
+      "key?": "string"
+    },
+    "BindingProperty": {
+      "computed": "boolean",
       "shorthand": "boolean",
       "key?": "string"
     },
@@ -861,7 +874,12 @@
         "list": false
       },
       "params": {
-        "routes": ["FormalParameters", "FormalParameter", "FormalParameterRest"],
+        "routes": [
+          "FormalParameters",
+          "FormalParameter",
+          "FormalParameterRest",
+          "BindingRestElement"
+        ],
         "list": true
       }
     },
@@ -1158,6 +1176,52 @@
       "decorators": {
         "routes": ["Decorator"],
         "list": true
+      },
+      "pattern": {
+        "routes": ["Identifier", "ObjectPattern", "ArrayPattern"],
+        "list": false
+      },
+      "default": {
+        "routes": ["Expression"],
+        "list": false
+      }
+    },
+    "FormalParameterRest": {
+      "pattern": {
+        "routes": ["Identifier", "ObjectPattern", "ArrayPattern"],
+        "list": false
+      },
+      "default": {
+        "routes": ["Expression"],
+        "list": false
+      },
+      "argument": {
+        "routes": ["Identifier", "ObjectPattern", "ArrayPattern", "AssignmentPattern"],
+        "list": false
+      }
+    },
+    "BindingRestElement": {
+      "pattern": {
+        "routes": ["Identifier", "ObjectPattern", "ArrayPattern"],
+        "list": false
+      },
+      "default": {
+        "routes": ["Expression"],
+        "list": false
+      },
+      "argument": {
+        "routes": ["Identifier", "ObjectPattern", "ArrayPattern", "AssignmentPattern"],
+        "list": false
+      }
+    },
+    "AssignmentPattern": {
+      "left": {
+        "routes": ["Identifier", "ObjectPattern", "ArrayPattern", "AssignmentPattern"],
+        "list": false
+      },
+      "right": {
+        "routes": ["Expression"],
+        "list": false
       }
     },
     "StaticMemberExpression": {

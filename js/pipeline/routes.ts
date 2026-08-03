@@ -344,6 +344,7 @@ function typedCapabilities(defined: DefinedVisitor<any>): RouteCapabilities {
       childRules,
       controlFlow: contract.controlFlow,
       declaredFields: contract.fields,
+      comments: contract.comments,
     };
     typedCapabilitiesCache.set(defined, capabilities);
   }
@@ -584,6 +585,7 @@ function compilePhaseRoutes(
             order: pluginId,
             predicates,
             payloadFields: definition.contract.fields,
+            comments: definition.contract.comments,
             plugin,
             callbacks: [callback as Handler<any>],
             fast,
@@ -602,7 +604,7 @@ function compilePhaseRoutes(
   const openGroups = new Map<string, DispatchRoute>();
   for (const route of routes) {
     const bucket = `${route.nodeType}:${route.side}`;
-    const contract = `${route.fast}:${stableJson(route.predicates)}:${route.payloadFields.join(',')}`;
+    const contract = `${route.fast}:${stableJson(route.predicates)}:${route.payloadFields.join(',')}:${route.comments ?? ''}`;
     const open = openGroups.get(bucket);
     if (open != null && route.fast && open.contract === contract) {
       open.members.push({
@@ -620,6 +622,7 @@ function compilePhaseRoutes(
       order: route.order,
       predicates: route.predicates,
       payloadFields: route.payloadFields,
+      comments: route.comments,
       fast: route.fast,
       contract,
       members: [
@@ -731,6 +734,7 @@ export function compileNestedVisitor(visitor: NestedVisitor): CompiledNestedRout
     side: 'enter' | 'exit';
     predicates: Record<string, ScalarPredicate>;
     callbacks: readonly Handler<any>[];
+    comments: 'inner' | undefined;
   }[] = [];
   const capabilities: RouteCapabilities[] = [];
   const payloads: (readonly NativeFieldKey[])[] = [];
@@ -765,7 +769,13 @@ export function compileNestedVisitor(visitor: NestedVisitor): CompiledNestedRout
       for (const side of ['enter', 'exit'] as const) {
         const callback = defined[side];
         if (callback == null) continue;
-        variants.push({ nodeType, side, predicates, callbacks: [callback as Handler<any>] });
+        variants.push({
+          nodeType,
+          side,
+          predicates,
+          callbacks: [callback as Handler<any>],
+          comments: defined.contract.comments,
+        });
         capabilities.push(caps);
         payloads.push([...defined.contract.fields]);
       }
@@ -779,6 +789,7 @@ export function compileNestedVisitor(visitor: NestedVisitor): CompiledNestedRout
     order: 0,
     predicates: variant.predicates,
     payloadFields: payloads[id],
+    comments: variant.comments,
   }));
   const compiled: CompiledNestedRoutes = {
     manifest: packRouteManifest(

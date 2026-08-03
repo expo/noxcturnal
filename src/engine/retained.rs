@@ -84,6 +84,7 @@ impl RetainedRouteWriter {
         let mut payload_route: Option<&CompiledRoute> = None;
         let mut payload_union: Vec<u32> = Vec::new();
         let mut matched_exit_carrier = false;
+        let mut comments_inner = false;
         for route in candidates
             .iter()
             .filter(|route| side == VisitSide::Enter || route.side == side)
@@ -112,6 +113,7 @@ impl RetainedRouteWriter {
                         }
                     }
                 }
+                comments_inner |= route.comments_inner;
             }
         }
         if matched_routes.is_empty() && !matched_exit_carrier {
@@ -176,6 +178,24 @@ impl RetainedRouteWriter {
                 }
             };
             self.words.extend([field_id, value]);
+        }
+        if manifest.needs_comments {
+            if comments_inner {
+                let comments = index.inner_comments(start, end).collect::<Vec<_>>();
+                self.words.push(comments.len() as u32);
+                for comment in comments {
+                    let next = self.string_ids.len() as u32;
+                    let value = *self.string_ids.entry(comment.value.clone()).or_insert(next);
+                    self.words.extend([
+                        u32::from(comment.block),
+                        value,
+                        comment.start,
+                        comment.end,
+                    ]);
+                }
+            } else {
+                self.words.push(0);
+            }
         }
         self.words.push(matched_routes.len() as u32);
         self.words.extend_from_slice(&matched_routes);
@@ -330,6 +350,9 @@ impl RetainedRouteWriter {
                     }
                 };
                 hydrated.extend([field_id, value]);
+            }
+            if manifest.needs_comments {
+                hydrated.push(0);
             }
             hydrated.push(0);
             self.counts.node_records += 1;

@@ -41,6 +41,7 @@ function visitorDescriptor(visitor: DefinedVisitor<any>): unknown {
   return {
     route: visitor.route,
     fields: contract.fields,
+    comments: contract.comments,
     where: contract.where ?? null,
     scope: contract.scope,
     ancestry: contract.ancestry ?? null,

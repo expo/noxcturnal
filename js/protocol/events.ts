@@ -1,5 +1,6 @@
 import { FIELD_KEYS, NODE_TYPES } from '../generated/event-schema';
 import type { EventBatch, NativeEvent } from '../types';
+import type { NativeComment } from '../types';
 import {
   DYNAMIC_TAG,
   EXIT_TAG,
@@ -40,6 +41,7 @@ export interface RoutedEventBatch {
   includeParent: boolean;
   includeScope: boolean;
   includeExit: boolean;
+  includeComments: boolean;
 }
 
 export function decodeRoutedEnvelope(buffer: Buffer): RoutedEventBatch {
@@ -82,6 +84,7 @@ export function decodeRoutedEnvelope(buffer: Buffer): RoutedEventBatch {
     includeParent: (flags & 1) !== 0,
     includeScope: (flags & 2) !== 0,
     includeExit: (flags & 4) !== 0,
+    includeComments: (flags & 8) !== 0,
   };
 }
 
@@ -161,6 +164,18 @@ export function dispatchRoutedEvents(
       if (!key) throw new Error('invalid routed field key');
       const value = decodeValue(words[offset++], batch.stringAt);
       node[key] = typeof value === 'string' ? coerceFieldValue(key, type, value) : value;
+    }
+    if (batch.includeComments) {
+      const commentCount = words[offset++];
+      const comments = new Array<NativeComment>(commentCount);
+      for (let comment = 0; comment < commentCount; comment++) {
+        const kind = words[offset++] === 0 ? 'line' : 'block';
+        const value = batch.stringAt(words[offset++]);
+        const commentStart = words[offset++];
+        const commentEnd = words[offset++];
+        comments[comment] = Object.freeze({ kind, value, start: commentStart, end: commentEnd });
+      }
+      event.comments = Object.freeze(comments);
     }
     const routeCount = words[offset++];
     const routeStart = offset;

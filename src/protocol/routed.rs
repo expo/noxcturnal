@@ -19,7 +19,8 @@ pub(crate) fn encode_routed_envelope(
     let records_offset = 32 + strings_size + parent_summaries.len() * 4;
     let shape_flags = u32::from(manifest.include_parent)
         | (u32::from(manifest.include_scope) << 1)
-        | (u32::from(manifest.include_exit) << 2);
+        | (u32::from(manifest.include_exit) << 2)
+        | (u32::from(manifest.needs_comments) << 3);
     let mut output = Vec::with_capacity(records_offset + data.len());
     for word in [
         ROUTED_TAPE_MAGIC,

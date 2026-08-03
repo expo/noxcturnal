@@ -177,9 +177,28 @@ defineVisitor('Identifier', { fields: ['name'] }, path => {
   path.parentPath;
   // @ts-expect-error children require a declaration.
   path.getChildList('declarations');
+  // @ts-expect-error comment reads require an exact relation declaration.
+  path.getComments('inner');
   path.replaceWith('renamed');
   path.getSource();
 });
+
+defineVisitor('ImportExpression', { comments: 'inner' }, path => {
+  const comment = path.getComments('inner')[0];
+  comment.kind satisfies 'line' | 'block';
+  comment.value.toUpperCase();
+  comment.start.toFixed();
+  comment.end.toFixed();
+});
+
+defineVisitor(
+  'ImportExpression',
+  {
+    // @ts-expect-error only range-based inner association is supported.
+    comments: 'leading',
+  },
+  () => {},
+);
 
 // Match-only predicate fields are not callback-visible.
 defineVisitor('VariableDeclaration', { where: { kind: { equals: 'const' } } }, path => {

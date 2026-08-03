@@ -5,6 +5,7 @@ import {
   defineNativePipeline,
   defineNativePlugin,
   defineVisitor,
+  NativeTransformError,
   parameter,
   transform,
 } from '../../index';
@@ -72,6 +73,127 @@ test('typed visitor match-only predicate fields are not callback-visible', () =>
   );
   assert.equal(result.status, 'complete');
   assert.equal(observedKind, undefined);
+});
+
+test('regexp literal fields preserve lexical pattern and flag spelling', () => {
+  const source = String.raw`[/./, /a\/b/i, /[/]/u, /\p{Script=Greek}+/mi, /(?<word>a)/, /[\q{ab}]/v, /\n/]`;
+  const observed: { pattern: string; flags: string }[] = [];
+  const routed = defineVisitor('RegExpLiteral', { fields: ['pattern', 'flags'] }, path => {
+    observed.push({ pattern: path.node.pattern, flags: path.node.flags });
+  });
+  const result = transform(
+    source,
+    'fixture.js',
+    defineNativePipeline({
+      phases: [
+        {
+          name: 'scan',
+          plugins: [defineNativePlugin({ name: 'regexp-fields', visitors: [routed] })],
+        },
+      ],
+    }),
+  );
+  assert.equal(result.status, 'complete');
+  assert.deepEqual(observed, [
+    { pattern: '.', flags: '' },
+    { pattern: String.raw`a\/b`, flags: 'i' },
+    { pattern: '[/]', flags: 'u' },
+    { pattern: String.raw`\p{Script=Greek}+`, flags: 'mi' },
+    { pattern: '(?<word>a)', flags: '' },
+    { pattern: String.raw`[\q{ab}]`, flags: 'v' },
+    { pattern: String.raw`\n`, flags: '' },
+  ]);
+});
+
+test('inner comments are parser-ranged, ordered, immutable, and contract-scoped', () => {
+  const source = `/* before */ import(/* first */ /* webpackIgnore: true */ 'pkg' // last\n); /* after */`;
+  let observed: readonly { kind: string; value: string; start: number; end: number }[] = [];
+  let undeclared: unknown;
+  const declared = defineVisitor('ImportExpression', { comments: 'inner' }, path => {
+    observed = path.getComments('inner');
+  });
+  const missing = defineVisitor('ImportExpression', {}, path => {
+    try {
+      (path as unknown as { getComments(relation: 'inner'): unknown }).getComments('inner');
+    } catch (error) {
+      undeclared = error;
+    }
+  });
+  const result = transform(
+    source,
+    'fixture.js',
+    defineNativePipeline({
+      phases: [
+        {
+          name: 'scan',
+          plugins: [defineNativePlugin({ name: 'comments', visitors: [declared, missing] })],
+        },
+      ],
+    }),
+  );
+  assert.equal(result.status, 'complete');
+  assert.deepEqual(
+    observed.map(comment => [comment.kind, comment.value]),
+    [
+      ['block', ' first '],
+      ['block', ' webpackIgnore: true '],
+      ['line', ' last'],
+    ],
+  );
+  assert.ok(Object.isFrozen(observed));
+  assert.ok(observed.every(Object.isFrozen));
+  assert.ok(
+    observed.every(comment => source.slice(comment.start, comment.end).includes(comment.value)),
+  );
+  assert.ok(undeclared instanceof NativeTransformError);
+});
+
+test('a reparsed phase observes comments committed by an earlier phase', () => {
+  let observed: readonly string[] = [];
+  const insert = defineVisitor('StringLiteral', { fields: ['value'] }, path => {
+    if (path.node.value === 'pkg') path.insertBefore('/* inserted */');
+  });
+  const inspect = defineVisitor('ImportExpression', { comments: 'inner' }, path => {
+    observed = path.getComments('inner').map(comment => comment.value);
+  });
+  const result = transform(
+    `import('pkg')`,
+    'fixture.js',
+    defineNativePipeline({
+      phases: [
+        { name: 'insert', plugins: [defineNativePlugin({ name: 'insert', visitors: [insert] })] },
+        {
+          name: 'inspect',
+          plugins: [defineNativePlugin({ name: 'inspect', visitors: [inspect] })],
+        },
+      ],
+    }),
+  );
+  assert.equal(result.status, 'complete');
+  assert.deepEqual(observed, [' inserted ']);
+});
+
+test('comment inspection is independent from output comment preservation', () => {
+  let observed = false;
+  const inspect = defineVisitor('ImportExpression', { comments: 'inner' }, path => {
+    observed = path.getComments('inner').some(comment => comment.value.includes('@metro-ignore'));
+  });
+  const result = transform(
+    `import(/* @metro-ignore */ 'pkg')`,
+    'fixture.js',
+    defineNativePipeline({
+      phases: [
+        {
+          name: 'inspect',
+          plugins: [defineNativePlugin({ name: 'inspect', visitors: [inspect] })],
+        },
+        { name: 'print', native: { comments: false } },
+      ],
+    }),
+  );
+  assert.equal(result.status, 'complete');
+  assert.equal(observed, true);
+  if (result.status === 'complete') assert.doesNotMatch(result.code, /metro-ignore/);
 });
 
 test('typed visitor capabilities are contract-scoped, not plugin-wide', () => {

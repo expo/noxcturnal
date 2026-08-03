@@ -128,6 +128,7 @@ struct Edit {
     /// Public UTF-16 offsets retained for diagnostics.
     public_start: u32,
     public_end: u32,
+    order: Option<u32>,
 }
 
 /// Sortable position of one command: everything ordering and overlap validation
@@ -184,6 +185,14 @@ pub fn utf16_to_byte(source: &str, offset: u32) -> Result<usize> {
 /// replaced source lower directly into `Original` pieces, and adjacent original
 /// ranges merge.
 pub fn build(source: &str, commands: Vec<EditCommand>) -> Result<Vec<Piece>> {
+    let mut grouped_orders = FxHashMap::<u32, (usize, bool)>::default();
+    for (index, command) in commands.iter().enumerate() {
+        let entry = grouped_orders
+            .entry(command.order.unwrap_or(index as u32))
+            .or_default();
+        entry.0 += 1;
+        entry.1 |= !command.parts.is_empty();
+    }
     let byte_offsets = if source.is_ascii() {
         None
     } else {
@@ -333,7 +342,7 @@ pub fn build(source: &str, commands: Vec<EditCommand>) -> Result<Vec<Piece>> {
             key.index,
         )
     });
-    let mut previous_range: Option<(usize, usize, u32, u32)> = None;
+    let mut previous_range: Option<(usize, usize, u32, u32, u32)> = None;
     // The moved range a `Move` hole spans is not exclusive like a replacement:
     // contained edits are legal (they apply inside the relocated content), while
     // straddlers, covering replacements, other relocations, and relocation targets
@@ -383,9 +392,17 @@ pub fn build(source: &str, commands: Vec<EditCommand>) -> Result<Vec<Piece>> {
             }
             current_hole = None;
         }
-        if let Some((start, end, public_start, public_end)) = previous_range
+        if let Some((start, end, public_start, public_end, order)) = previous_range
             && (key.start < end || (key.start == start && key.end > key.start))
         {
+            let structured_sibling = key.end <= end
+                && key.order != order
+                && grouped_orders
+                    .get(&order)
+                    .is_some_and(|(count, has_parts)| *count > 1 && *has_parts);
+            if structured_sibling {
+                continue;
+            }
             return Err(Error::new(
                 Status::InvalidArg,
                 format!(
@@ -395,7 +412,13 @@ pub fn build(source: &str, commands: Vec<EditCommand>) -> Result<Vec<Piece>> {
             ));
         }
         if key.end > key.start {
-            previous_range = Some((key.start, key.end, key.public_start, key.public_end));
+            previous_range = Some((
+                key.start,
+                key.end,
+                key.public_start,
+                key.public_end,
+                key.order,
+            ));
         }
         if key.role == KeyRole::MoveHole {
             current_hole = Some(key);
@@ -427,6 +450,7 @@ pub fn build(source: &str, commands: Vec<EditCommand>) -> Result<Vec<Piece>> {
                     names: Vec::new(),
                     public_start: key.public_start,
                     public_end: key.public_end,
+                    order: Some(key.order),
                 });
                 continue;
             }
@@ -455,6 +479,7 @@ pub fn build(source: &str, commands: Vec<EditCommand>) -> Result<Vec<Piece>> {
                     names,
                     public_start: key.public_start,
                     public_end: key.public_end,
+                    order: Some(key.order),
                 });
                 continue;
             }
@@ -483,6 +508,7 @@ pub fn build(source: &str, commands: Vec<EditCommand>) -> Result<Vec<Piece>> {
                 names,
                 public_start: key.public_start,
                 public_end: key.public_end,
+                order: Some(key.order),
             });
         }
         let mut expansions = expand_copies(source, &mut edits)?;
@@ -490,10 +516,14 @@ pub fn build(source: &str, commands: Vec<EditCommand>) -> Result<Vec<Piece>> {
         push_section(&mut pieces, &mut slots, &prefix, 0);
         let mut cursor = 0usize;
         let mut hole_end = 0usize;
+        let mut structured_end = 0usize;
         for (index, edit) in edits.iter_mut().enumerate() {
             // Edits inside a moved-away range render inside the relocated content,
             // not in place; bare marks keep their (collapsed) in-place position.
             if edit.start < hole_end && !edit.mark_only {
+                continue;
+            }
+            if edit.start < structured_end && !edit.mark_only {
                 continue;
             }
             push_original(&mut pieces, cursor, edit.start);
@@ -535,6 +565,13 @@ pub fn build(source: &str, commands: Vec<EditCommand>) -> Result<Vec<Piece>> {
                     mapping: edit.mapping,
                     names: std::mem::take(&mut edit.names),
                 });
+            }
+            if edit
+                .order
+                .and_then(|order| grouped_orders.get(&order))
+                .is_some_and(|(count, has_parts)| *count > 1 && *has_parts)
+            {
+                structured_end = structured_end.max(edit.end);
             }
         }
         push_original(&mut pieces, cursor, source.len());
@@ -635,7 +672,6 @@ fn expand_copies(source: &str, edits: &mut [Edit]) -> Result<Vec<Option<Vec<Piec
     // Index of the nearest ranged edit at or before each position: after the binary
     // search skips everything left of a copied range, this is the only edit that can
     // still straddle the range's start boundary.
-    let mut previous_ranged = vec![usize::MAX; edits.len()];
     const TRANSPARENT_INDEX_THRESHOLD: usize = 8;
     let transparent_count = edits
         .iter()
@@ -643,16 +679,13 @@ fn expand_copies(source: &str, edits: &mut [Edit]) -> Result<Vec<Option<Vec<Piec
         .count();
     let index_transparent = transparent_count >= TRANSPARENT_INDEX_THRESHOLD;
     let mut previous_end_conflict = index_transparent.then(|| vec![usize::MAX; edits.len()]);
-    let mut last_ranged = usize::MAX;
     let mut last_end_conflict = usize::MAX;
     for (index, edit) in edits.iter().enumerate() {
         if edit.end > edit.start {
-            last_ranged = index;
             if !edit.mark_only {
                 last_end_conflict = index;
             }
         }
-        previous_ranged[index] = last_ranged;
         if let Some(previous) = &mut previous_end_conflict {
             previous[index] = last_end_conflict;
         }
@@ -672,7 +705,6 @@ fn expand_copies(source: &str, edits: &mut [Edit]) -> Result<Vec<Option<Vec<Piec
     let mut expander = Expander {
         source,
         states: vec![State::Unresolved; edits.len()],
-        previous_ranged,
         previous_end_conflict,
         next_effective,
         cache: FxHashMap::default(),
@@ -693,7 +725,6 @@ enum State {
 struct Expander<'a> {
     source: &'a str,
     states: Vec<State>,
-    previous_ranged: Vec<usize>,
     /// Nearest ranged edit that participates in end-boundary conflicts. Mark-only
     /// edits are transparent at this boundary in the legacy transaction rules.
     previous_end_conflict: Option<Vec<usize>>,
@@ -704,9 +735,9 @@ struct Expander<'a> {
     cache: FxHashMap<(usize, usize), Rc<[Piece]>>,
 }
 
-/// The edit whose content parts are being expanded: its public range and whether
-/// the expansion is a relocation (for conflict wording).
-type Copier = (u32, u32, bool);
+/// The edit whose content parts are being expanded: its public range, whether
+/// the expansion is a relocation, its index, and its structured-edit group.
+type Copier = (u32, u32, bool, usize, Option<u32>);
 
 fn straddle_error(copier: Copier, edit: &Edit) -> Error {
     let what = if copier.2 { "moved" } else { "copied" };
@@ -762,6 +793,8 @@ impl Expander<'_> {
                 edits[index].public_start,
                 edits[index].public_end,
                 edits[index].moved,
+                index,
+                edits[index].order,
             );
             let origin = edits[index].start;
             let mut out = Vec::new();
@@ -798,13 +831,13 @@ impl Expander<'_> {
     ) -> Result<()> {
         // Edits are sorted by start, so the first candidate is a binary search away.
         let first = edits.partition_point(|edit| edit.start < start);
-        if let Some(index) = first
-            .checked_sub(1)
-            .map(|index| self.previous_ranged[index])
-            .filter(|index| *index != usize::MAX)
-            && edits[index].end > start
-        {
-            return Err(straddle_error(copier, &edits[index]));
+        for index in (0..first).rev() {
+            if edits[index].end > edits[index].start
+                && edits[index].end > start
+                && !(index != copier.3 && edits[index].order == copier.4)
+            {
+                return Err(straddle_error(copier, &edits[index]));
+            }
         }
         if let Some(previous_end_conflict) = &self.previous_end_conflict {
             let before_end = edits.partition_point(|edit| edit.start < end);
@@ -813,6 +846,7 @@ impl Expander<'_> {
                 .map(|index| previous_end_conflict[index])
                 .filter(|index| *index != usize::MAX)
                 && edits[index].end > end
+                && !(index != copier.3 && edits[index].order == copier.4)
             {
                 return Err(straddle_error(copier, &edits[index]));
             }
@@ -827,6 +861,10 @@ impl Expander<'_> {
                 (edits[index].start, edits[index].end, edits[index].mark_only);
             if edit_start >= end {
                 break;
+            }
+            if index != copier.3 && edits[index].order == copier.4 {
+                index = self.next_candidate(index);
+                continue;
             }
             if mark_only {
                 index = self.next_candidate(index);
@@ -1096,6 +1134,7 @@ mod tests {
                 names: Vec::new(),
                 public_start: 0,
                 public_end: 0,
+                order: None,
             });
         }
         for index in 0..COUNT {
@@ -1113,6 +1152,7 @@ mod tests {
                 names: Vec::new(),
                 public_start: offset as u32,
                 public_end: offset as u32,
+                order: None,
             });
         }
         let _ = expand_copies(&source, &mut edits).unwrap();
@@ -1140,6 +1180,7 @@ mod tests {
                 names: Vec::new(),
                 public_start: 0,
                 public_end: 0,
+                order: None,
             });
         }
         for index in 0..COUNT {
@@ -1157,6 +1198,7 @@ mod tests {
                 names: Vec::new(),
                 public_start: start as u32,
                 public_end: start as u32 + 1,
+                order: None,
             });
         }
         let _ = expand_copies(&source, &mut edits).unwrap();

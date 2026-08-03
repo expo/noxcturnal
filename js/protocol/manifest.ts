@@ -15,6 +15,7 @@ export interface NativeRouteManifestEntry {
   order: number;
   predicates: Readonly<Record<string, ScalarPredicate>>;
   payloadFields: readonly string[];
+  comments?: 'inner';
 }
 
 export function packRouteManifest(
@@ -99,7 +100,7 @@ export function packRouteManifest(
       route.side === 'exit' ? 1 : 0,
       route.pluginId,
       route.order,
-      0,
+      route.comments === 'inner' ? 1 : 0,
       predicates.length,
       route.payloadFields.length,
     );

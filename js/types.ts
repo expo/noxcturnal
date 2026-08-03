@@ -93,6 +93,15 @@ export interface NativeEvent {
   scopeId: ScopeId;
   scopeParentId?: ScopeId;
   fields: { key: string; value: string | number | boolean }[];
+  comments?: readonly NativeComment[];
+}
+
+/** A parsed input comment. Ranges include delimiters; value omits them. */
+export interface NativeComment {
+  readonly kind: 'line' | 'block';
+  readonly value: string;
+  readonly start: number;
+  readonly end: number;
 }
 
 export interface EventBatch {

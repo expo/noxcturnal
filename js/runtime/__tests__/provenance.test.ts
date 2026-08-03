@@ -272,6 +272,49 @@ test('duplicated template slots reflect same-phase edits', () => {
   assert.equal(result.code, 'const checked = compute2() ?? compute2();\n');
 });
 
+test('out-of-order structured source fragments retain contained edits', () => {
+  const source = 'const value = (input = compute()) => input;\n';
+  const reorder = defineNativePlugin({
+    name: 'reorder-arrow-parts',
+    visitors: [
+      defineVisitor(
+        'ArrowFunctionExpression',
+        {
+          children: { '*': { route: '*', children: { '*': { route: '*' } } } },
+        },
+        path => {
+          const body = path.getChildren().at(-1);
+          assert.ok(body);
+          const initializerStart = source.indexOf('compute()');
+          const initializer = path.context.sourceSlice(
+            initializerStart,
+            initializerStart + 'compute()'.length,
+          );
+          path.replaceWith({
+            kind: 'composite',
+            parts: [body.getSource(), '; ', initializer],
+          });
+        },
+      ),
+    ],
+  });
+  const upgradeCalls = defineNativePlugin({
+    name: 'upgrade-reordered-call',
+    visitors: [
+      defineVisitor('CallExpression', { fields: ['calleeName'] }, path => {
+        if (path.node.calleeName === 'compute') path.replaceWith('compute2()');
+      }),
+    ],
+  });
+  const result = transform(
+    source,
+    'fixture.js',
+    defineNativePipeline({ phases: [{ name: 'transform', plugins: [reorder, upgradeCalls] }] }),
+  );
+  assert.equal(result.status, 'complete');
+  assert.equal(result.code, 'const value = input; compute2();\n');
+});
+
 test('rejects circular source copies', () => {
   const source = 'function loop() { seed(); }\n';
   const selfCopy = defineNativePlugin({

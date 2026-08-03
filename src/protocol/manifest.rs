@@ -35,6 +35,7 @@ pub(crate) struct CompiledRoute {
     /// `payload_field_ids` as a mask, so a matching route's payload selection is one
     /// word and coalescing several matched routes is a bitwise union.
     pub(crate) payload_mask: FieldMask,
+    pub(crate) comments_inner: bool,
 }
 
 pub(crate) struct CompiledManifest {
@@ -57,6 +58,7 @@ pub(crate) struct CompiledManifest {
     /// materialization before matching.
     pub(crate) fallback_predicate_mask_by_type: Vec<FieldMask>,
     pub(crate) needs_semantics: bool,
+    pub(crate) needs_comments: bool,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -190,7 +192,7 @@ pub(crate) fn decode_route_manifest(
                 "duplicate compiled route id",
             ));
         }
-        if route_flags != 0
+        if route_flags & !1 != 0
             || predicate_count > MAX_ROUTE_PREDICATES
             || payload_count > MAX_ROUTE_PAYLOAD_FIELDS
         {
@@ -282,6 +284,7 @@ pub(crate) fn decode_route_manifest(
             predicates,
             payload_field_ids,
             payload_mask,
+            comments_inner: route_flags & 1 != 0,
         });
     }
     if cursor + structural_parent_count > word_limit {
@@ -491,6 +494,10 @@ pub(crate) fn decode_route_manifest(
                 })
         })
         .collect::<Vec<_>>();
+    let needs_comments = routes_by_type
+        .iter()
+        .flatten()
+        .any(|route| route.comments_inner);
     Ok(CompiledManifest {
         routes_by_type,
         include_parent,
@@ -506,5 +513,6 @@ pub(crate) fn decode_route_manifest(
         ancestry_depth,
         fallback_predicate_mask_by_type,
         needs_semantics,
+        needs_comments,
     })
 }
