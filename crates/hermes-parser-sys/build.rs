@@ -20,6 +20,12 @@ fn main() {
         // Hermes refuses to configure without one, and a debug Hermes is both
         // enormous and slow enough to distort any measurement taken against it.
         .profile("Release");
+    // LLVH tests lseek64 with _LARGEFILE64_SOURCE but does not retain that
+    // feature macro when compiling. Musl already gives lseek a 64-bit offset,
+    // so bypass the false-positive probe and use the portable branch.
+    if env::var("TARGET").is_ok_and(|target| target.contains("musl")) {
+        config.define("HAVE_LSEEK64", "0");
+    }
     if let Some(generator) = preferred_generator() {
         config.generator(generator);
     }
@@ -69,7 +75,7 @@ fn link_cxx_runtime(install: &Path) {
             let stem = stem.to_string_lossy();
             let name = stem.strip_prefix("lib").unwrap_or(&stem);
             println!("cargo::rustc-link-search=native={}", parent.display());
-            println!("cargo::rustc-link-lib={name}");
+            println!("cargo::rustc-link-lib=static={name}");
         } else {
             println!("cargo::rustc-link-lib={library}");
         }

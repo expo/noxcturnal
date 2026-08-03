@@ -3,10 +3,14 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    fenix = {
+      url = "github:nix-community/fenix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs =
-    { nixpkgs, ... }:
+    { fenix, nixpkgs, ... }:
     let
       supportedSystems = [
         "aarch64-darwin"
@@ -21,6 +25,23 @@
         system:
         let
           pkgs = import nixpkgs { inherit system; };
+          rustToolchain = fenix.packages.${system}.combine (
+            with fenix.packages.${system};
+            [
+              stable.cargo
+              stable.clippy
+              stable.rustc
+              stable.rustfmt
+              targets.aarch64-apple-darwin.stable.rust-std
+              targets.x86_64-apple-darwin.stable.rust-std
+              targets.aarch64-unknown-linux-gnu.stable.rust-std
+              targets.x86_64-unknown-linux-gnu.stable.rust-std
+              targets.aarch64-unknown-linux-musl.stable.rust-std
+              targets.x86_64-unknown-linux-musl.stable.rust-std
+              targets.aarch64-pc-windows-msvc.stable.rust-std
+              targets.x86_64-pc-windows-msvc.stable.rust-std
+            ]
+          );
           platformPackages =
             pkgs.lib.optionals pkgs.stdenv.isDarwin [ pkgs.libiconv ]
             ++ pkgs.lib.optionals pkgs.stdenv.isLinux [ pkgs.stdenv.cc.cc.lib ];
@@ -30,10 +51,7 @@
             packages =
               with pkgs;
               [
-                cargo
-                rustc
-                rustfmt
-                clippy
+                rustToolchain
                 pkg-config
                 nodejs_22
                 pnpm
@@ -42,9 +60,13 @@
               # CMake, and Hermes' generator scripts are Python.
               ++ [
                 cmake
+                llvmPackages.clang
+                llvmPackages.lld
+                llvmPackages.llvm
                 ninja
                 python3
                 stdenv.cc
+                zig
               ]
               ++ platformPackages;
 
