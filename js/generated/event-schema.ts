@@ -257,6 +257,8 @@ export const FIELD_KEYS = [
   'memberPath',
   'bindingName',
   'targetName',
+  'declarationNameAnchor',
+  'declarationNamePrefix',
 ] as const;
 export type NativeFieldKey = Exclude<(typeof FIELD_KEYS)[number], ''>;
 export const FIELD_KEY_IDS = new Map<string, number>(
@@ -289,9 +291,19 @@ export const PREDICATE_FIELDS: Readonly<Record<string, readonly string[]>> = {
   StaticMemberExpression: ['computed', 'property', 'memberPath', 'rootName', 'rootGlobal', 'write'],
   ComputedMemberExpression: ['computed', 'property', 'memberPath', 'write'],
   PrivateFieldExpression: ['write'],
-  Function: ['nodeKind', 'async', 'generator', 'parameterCount', 'name', 'bodyStart', 'bodyEnd'],
+  Function: [
+    'nodeKind',
+    'async',
+    'generator',
+    'parameterCount',
+    'name',
+    'bodyStart',
+    'bodyEnd',
+    'declarationNameAnchor',
+    'declarationNamePrefix',
+  ],
   ArrowFunctionExpression: ['async', 'expression', 'parameterCount', 'bodyStart', 'bodyEnd'],
-  Class: ['nodeKind', 'name'],
+  Class: ['nodeKind', 'name', 'declarationNameAnchor', 'declarationNamePrefix'],
   ImportDeclaration: ['source', 'importKind', 'specifierCount'],
   ImportSpecifier: ['imported', 'local', 'importKind'],
   ImportDefaultSpecifier: ['imported', 'local'],
@@ -484,6 +496,8 @@ export const PREDICATE_VALUE_DOMAINS: Readonly<
     name: { kinds: ['string'] },
     bodyStart: { kinds: ['number'] },
     bodyEnd: { kinds: ['number'] },
+    declarationNameAnchor: { kinds: ['number'] },
+    declarationNamePrefix: { kinds: ['boolean'] },
   },
   ArrowFunctionExpression: {
     async: { kinds: ['boolean'] },
@@ -495,6 +509,8 @@ export const PREDICATE_VALUE_DOMAINS: Readonly<
   Class: {
     nodeKind: { kinds: ['string'], values: ['ClassDeclaration', 'ClassExpression'] },
     name: { kinds: ['string'] },
+    declarationNameAnchor: { kinds: ['number'] },
+    declarationNamePrefix: { kinds: ['boolean'] },
   },
   ImportDeclaration: {
     source: { kinds: ['string'] },
@@ -3624,6 +3640,8 @@ export interface NativeNodeFields {
     readonly name?: string;
     readonly bodyStart?: number;
     readonly bodyEnd?: number;
+    readonly declarationNameAnchor?: number;
+    readonly declarationNamePrefix?: boolean;
   };
   ArrowFunctionExpression: {
     readonly async: boolean;
@@ -3635,6 +3653,8 @@ export interface NativeNodeFields {
   Class: {
     readonly nodeKind: ClassType;
     readonly name?: string;
+    readonly declarationNameAnchor?: number;
+    readonly declarationNamePrefix?: boolean;
   };
   ImportDeclaration: {
     readonly source: string;
@@ -3709,6 +3729,8 @@ export interface NativeRouteFields {
     readonly name?: string;
     readonly bodyStart?: number;
     readonly bodyEnd?: number;
+    readonly declarationNameAnchor?: number;
+    readonly declarationNamePrefix?: boolean;
     readonly expression?: boolean;
   };
   Statement: {
@@ -3721,6 +3743,8 @@ export interface NativeRouteFields {
     readonly name?: string;
     readonly bodyStart?: number;
     readonly bodyEnd?: number;
+    readonly declarationNameAnchor?: number;
+    readonly declarationNamePrefix?: boolean;
     readonly source?: string;
     readonly importKind?: ImportOrExportKind;
     readonly specifierCount?: number;
@@ -3738,6 +3762,8 @@ export interface NativeRouteFields {
     readonly name?: string;
     readonly bodyStart?: number;
     readonly bodyEnd?: number;
+    readonly declarationNameAnchor?: number;
+    readonly declarationNamePrefix?: boolean;
     readonly source?: string;
     readonly importKind?: ImportOrExportKind;
     readonly specifierCount?: number;
@@ -3810,6 +3836,8 @@ export interface NativeRouteFields {
     readonly name?: string;
     readonly bodyStart?: number;
     readonly bodyEnd?: number;
+    readonly declarationNameAnchor?: number;
+    readonly declarationNamePrefix?: boolean;
   };
   FunctionExpression: {
     readonly nodeKind: 'FunctionExpression';
@@ -3819,6 +3847,8 @@ export interface NativeRouteFields {
     readonly name?: string;
     readonly bodyStart?: number;
     readonly bodyEnd?: number;
+    readonly declarationNameAnchor?: number;
+    readonly declarationNamePrefix?: boolean;
   };
   TSDeclareFunction: {
     readonly nodeKind: 'TSDeclareFunction';
@@ -3828,14 +3858,20 @@ export interface NativeRouteFields {
     readonly name?: string;
     readonly bodyStart?: number;
     readonly bodyEnd?: number;
+    readonly declarationNameAnchor?: number;
+    readonly declarationNamePrefix?: boolean;
   };
   ClassDeclaration: {
     readonly nodeKind: 'ClassDeclaration';
     readonly name?: string;
+    readonly declarationNameAnchor?: number;
+    readonly declarationNamePrefix?: boolean;
   };
   ClassExpression: {
     readonly nodeKind: 'ClassExpression';
     readonly name?: string;
+    readonly declarationNameAnchor?: number;
+    readonly declarationNamePrefix?: boolean;
   };
   '*': {
     readonly name?: string;
@@ -3881,6 +3917,8 @@ export interface NativeRouteFields {
     readonly parameterCount?: number;
     readonly bodyStart?: number;
     readonly bodyEnd?: number;
+    readonly declarationNameAnchor?: number;
+    readonly declarationNamePrefix?: boolean;
     readonly expression?: boolean;
     readonly delegate?: boolean;
     readonly source?: string;
@@ -3930,6 +3968,8 @@ export interface NativeRoutePredicates {
     readonly name: string;
     readonly bodyStart: number;
     readonly bodyEnd: number;
+    readonly declarationNameAnchor: number;
+    readonly declarationNamePrefix: boolean;
   };
   FunctionExpression: {
     readonly nodeKind: 'FunctionExpression';
@@ -3939,6 +3979,8 @@ export interface NativeRoutePredicates {
     readonly name: string;
     readonly bodyStart: number;
     readonly bodyEnd: number;
+    readonly declarationNameAnchor: number;
+    readonly declarationNamePrefix: boolean;
   };
   TSDeclareFunction: {
     readonly nodeKind: 'TSDeclareFunction';
@@ -3948,14 +3990,20 @@ export interface NativeRoutePredicates {
     readonly name: string;
     readonly bodyStart: number;
     readonly bodyEnd: number;
+    readonly declarationNameAnchor: number;
+    readonly declarationNamePrefix: boolean;
   };
   ClassDeclaration: {
     readonly nodeKind: 'ClassDeclaration';
     readonly name: string;
+    readonly declarationNameAnchor: number;
+    readonly declarationNamePrefix: boolean;
   };
   ClassExpression: {
     readonly nodeKind: 'ClassExpression';
     readonly name: string;
+    readonly declarationNameAnchor: number;
+    readonly declarationNamePrefix: boolean;
   };
 }
 

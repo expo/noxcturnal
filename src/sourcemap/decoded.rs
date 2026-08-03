@@ -158,6 +158,10 @@ fn compose_decoded(outer: &DecodedMap, inner: &DecodedMap, outer_name_count: u32
     line_offsets.push(0);
     for line in 0..outer.line_count() {
         for segment in outer.line(line).unwrap_or_default() {
+            if segment.original_line == u32::MAX {
+                segments.push(*segment);
+                continue;
+            }
             let Some(inner_line) = inner.line(segment.original_line as usize) else {
                 continue;
             };
@@ -170,18 +174,30 @@ fn compose_decoded(outer: &DecodedMap, inner: &DecodedMap, outer_name_count: u32
             // gap has nothing before it. Clamping forward to the line's first
             // segment costs the column offset; dropping it, which is what used
             // to happen, costs the line every mapping it had.
-            let (traced, original_column) = match traced_index
+            let (traced, clamped_forward) = match traced_index
                 .checked_sub(1)
                 .and_then(|index| inner_line.get(index))
             {
-                Some(traced) => (
-                    traced,
-                    traced.original_column + segment.original_column - traced.generated_column,
-                ),
+                Some(traced) => (traced, false),
                 None => match inner_line.first() {
-                    Some(traced) => (traced, traced.original_column),
+                    Some(traced) => (traced, true),
                     None => continue,
                 },
+            };
+            if traced.original_line == u32::MAX {
+                segments.push(Segment {
+                    generated_column: segment.generated_column,
+                    source: 0,
+                    original_line: u32::MAX,
+                    original_column: u32::MAX,
+                    name: 0,
+                });
+                continue;
+            }
+            let original_column = if clamped_forward {
+                traced.original_column
+            } else {
+                traced.original_column + segment.original_column - traced.generated_column
             };
             segments.push(Segment {
                 generated_column: segment.generated_column,
@@ -221,6 +237,10 @@ fn encode_decoded(map: &DecodedMap) -> String {
                 i64::from(segment.generated_column) - i64::from(prev_generated),
                 &mut output,
             );
+            if segment.original_line == u32::MAX {
+                prev_generated = segment.generated_column;
+                continue;
+            }
             vlq::encode(
                 i64::from(segment.source) - i64::from(prev_source),
                 &mut output,

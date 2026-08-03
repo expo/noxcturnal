@@ -137,7 +137,8 @@ export function isFragmentList(value: Code | readonly Code[]): value is readonly
 
 export const codeFactory: CodeFactory = {
   identifier(name) {
-    if (!/^[$A-Z_a-z][$\w]*$/.test(name)) throw new Error(`Invalid identifier: ${name}`);
+    if (!/^[$_\p{ID_Start}][$\u200c\u200d\p{ID_Continue}]*$/u.test(name))
+      throw new Error(`Invalid identifier: ${name}`);
     return { code: name, mapping: 'sourceless' };
   },
   stringLiteral: value => ({ code: JSON.stringify(value), mapping: 'sourceless' }),

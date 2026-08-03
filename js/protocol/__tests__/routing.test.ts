@@ -4,7 +4,7 @@ import { test } from 'vitest';
 import { defineNativePipeline, defineNativePlugin, defineVisitor, transform } from '../../index';
 import { native } from '../../native/binding';
 import { packFieldRequests } from '../../protocol/edits';
-import { decodeRoutedEnvelope } from '../../protocol/events';
+import { decodeRoutedEnvelope, dispatchRoutedEvents } from '../../protocol/events';
 import { packRouteManifest } from '../../protocol/manifest';
 import { NativeTransformSession } from '../../runtime/session';
 
@@ -131,6 +131,45 @@ test('constructs the retained index and initial routed tape in one native parse'
   assert.deepEqual(first, expected);
   assert.deepEqual(second, expected);
   session.close();
+});
+
+test('emits declaration-name metadata only when explicitly requested', () => {
+  const source = 'export default async function*/* anchor */() {}';
+  const route = (payloadFields: readonly ('declarationNameAnchor' | 'declarationNamePrefix')[]) =>
+    packRouteManifest(
+      [
+        {
+          id: 0,
+          pluginId: 0,
+          nodeType: 'Function',
+          side: 'enter' as const,
+          order: 0,
+          predicates: {},
+          payloadFields,
+        },
+      ],
+      false,
+      false,
+    );
+  const read = (manifest: Buffer) => {
+    const batch = decodeRoutedEnvelope(
+      native.materializeRoutedBuffer(source, 'fixture.js', manifest),
+    );
+    let event: Record<string, unknown> | undefined;
+    dispatchRoutedEvents(batch, [value => (event = value as unknown as Record<string, unknown>)]);
+    return { batch, event: event! };
+  };
+
+  const absent = read(route([]));
+  assert.equal(absent.event.declarationNameAnchor, undefined);
+  assert.equal(absent.event.declarationNamePrefix, undefined);
+
+  const requestedManifest = route(['declarationNameAnchor', 'declarationNamePrefix']);
+  const requested = read(requestedManifest);
+  assert.equal(requested.event.declarationNameAnchor, source.indexOf('*') + 1);
+  assert.equal(requested.event.declarationNamePrefix, true);
+  assert.ok(requested.batch.recordBytes > absent.batch.recordBytes);
+  assert.notDeepEqual(requestedManifest, route([]));
 });
 
 test('serializes a shared hydrated ancestor once rather than once per routed descendant', () => {

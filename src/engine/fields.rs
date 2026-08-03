@@ -156,8 +156,13 @@ pub(crate) struct DirectPackedFields {
     pub(crate) len: usize,
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "hot-path scalars stay separate to avoid a per-node context wrapper"
+)]
 pub(crate) fn packed_fields_direct(
     kind: AstKind<'_>,
+    source: &str,
     member_write: bool,
     member_root_write: bool,
     scoping: Option<&Scoping>,
@@ -182,6 +187,13 @@ pub(crate) fn packed_fields_direct(
             result.len += 2;
         }
     };
+    if (wants(field_ids::DECLARATION_NAME_ANCHOR) || wants(field_ids::DECLARATION_NAME_PREFIX))
+        && let Some(anchor) = declaration_name_anchor(kind, source)
+    {
+        let anchor = utf16.map_or(anchor, |index| index[anchor as usize]);
+        push(field_ids::DECLARATION_NAME_ANCHOR, 0x4000_0000 | anchor);
+        push(field_ids::DECLARATION_NAME_PREFIX, 0x8000_0001);
+    }
     match kind {
         AstKind::IdentifierReference(identifier) => {
             if wants(field_ids::NAME) {
@@ -669,6 +681,88 @@ pub(crate) fn packed_fields_direct(
         }
     }
     Some(result)
+}
+
+/// Locate the declaration-name token boundary in native code. The AST establishes
+/// that this is a declaration and whether it is anonymous; this small lexer only
+/// walks the declaration header and never asks JavaScript to infer syntax from text.
+fn declaration_name_anchor(kind: AstKind<'_>, source: &str) -> Option<u32> {
+    let (span, keyword, generator) = match kind {
+        AstKind::Function(function)
+            if function.r#type == FunctionType::FunctionDeclaration && function.id.is_none() =>
+        {
+            (function.span, b"function".as_slice(), function.generator)
+        }
+        AstKind::Class(class)
+            if class.r#type == ClassType::ClassDeclaration && class.id.is_none() =>
+        {
+            (class.span, b"class".as_slice(), false)
+        }
+        _ => return None,
+    };
+    let bytes = source.as_bytes();
+    let start = span.start as usize;
+    let end = span.end as usize;
+    let keyword_start = find_header_keyword(bytes, start, end, keyword)?;
+    let keyword_end = keyword_start + keyword.len();
+    if !generator {
+        return Some(keyword_end as u32);
+    }
+    let mut cursor = keyword_end;
+    while cursor < end {
+        cursor = skip_header_trivia(bytes, cursor, end);
+        if bytes.get(cursor) == Some(&b'*') {
+            return Some((cursor + 1) as u32);
+        }
+        cursor += 1;
+    }
+    None
+}
+
+fn find_header_keyword(
+    bytes: &[u8],
+    mut cursor: usize,
+    end: usize,
+    keyword: &[u8],
+) -> Option<usize> {
+    while cursor + keyword.len() <= end {
+        cursor = skip_header_trivia(bytes, cursor, end);
+        if bytes.get(cursor..cursor + keyword.len()) == Some(keyword)
+            && (cursor == 0 || !is_identifier_byte(bytes[cursor - 1]))
+            && (cursor + keyword.len() == bytes.len()
+                || !is_identifier_byte(bytes[cursor + keyword.len()]))
+        {
+            return Some(cursor);
+        }
+        cursor += 1;
+    }
+    None
+}
+
+fn skip_header_trivia(bytes: &[u8], mut cursor: usize, end: usize) -> usize {
+    loop {
+        while cursor < end && bytes[cursor].is_ascii_whitespace() {
+            cursor += 1;
+        }
+        if bytes.get(cursor..cursor + 2) == Some(b"//") {
+            cursor += 2;
+            while cursor < end && !matches!(bytes[cursor], b'\n' | b'\r') {
+                cursor += 1;
+            }
+        } else if bytes.get(cursor..cursor + 2) == Some(b"/*") {
+            cursor += 2;
+            while cursor + 1 < end && bytes.get(cursor..cursor + 2) != Some(b"*/") {
+                cursor += 1;
+            }
+            cursor = (cursor + 2).min(end);
+        } else {
+            return cursor;
+        }
+    }
+}
+
+fn is_identifier_byte(byte: u8) -> bool {
+    byte == b'$' || byte == b'_' || byte.is_ascii_alphanumeric() || byte >= 0x80
 }
 
 pub(crate) fn fields(

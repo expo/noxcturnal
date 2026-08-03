@@ -69,6 +69,7 @@ pub fn materialize_routed_buffer(
     }
     let utf16 = (!source.is_ascii()).then(|| utf16_index(source, &allocator));
     let mut collector = RoutedEventCollector {
+        source,
         manifest: &manifest,
         nodes: semantic_return
             .as_ref()
@@ -182,6 +183,7 @@ fn stateless_parent_summaries(
 }
 
 struct RoutedEventCollector<'a> {
+    source: &'a str,
     manifest: &'a CompiledManifest,
     nodes: Option<&'a AstNodes<'a>>,
     scoping: Option<&'a Scoping>,
@@ -365,6 +367,7 @@ impl RoutedEventCollector<'_> {
         }
         let direct_payload = packed_fields_direct(
             kind,
+            self.source,
             member_write,
             member_root_write,
             self.scoping,

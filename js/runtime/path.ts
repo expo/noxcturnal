@@ -201,6 +201,34 @@ export class NodePathImpl implements NativeNodePath {
   getSource(): SourceFragment {
     return makeSourceFragment(this.runtime.session, this.event.start, this.event.end);
   }
+  withDeclarationName(name: string): CompositeFragment {
+    let identifier: CodeFragment;
+    try {
+      identifier = this.runtime.context.code.identifier(name);
+    } catch (cause) {
+      throw this.#pluginError(`Invalid declaration identifier: ${name}`, cause);
+    }
+    const metadata = this.event as NativeEvent & Record<string, unknown>;
+    const anchor = metadata.declarationNameAnchor;
+    if (
+      (this.event.type !== 'Function' && this.event.type !== 'Class') ||
+      typeof anchor !== 'number' ||
+      anchor < this.event.start ||
+      anchor > this.event.end ||
+      typeof metadata.declarationNamePrefix !== 'boolean'
+    ) {
+      throw this.buildCodeFrameError(
+        'withDeclarationName only supports anonymous function and class declarations with native metadata',
+      );
+    }
+    const parts: (string | CodeFragment | SourceFragment)[] = [
+      makeSourceFragment(this.runtime.session, this.event.start, anchor),
+    ];
+    if (metadata.declarationNamePrefix) parts.push(' ');
+    parts.push(identifier);
+    parts.push(makeSourceFragment(this.runtime.session, anchor, this.event.end));
+    return Object.freeze({ kind: 'composite', parts: Object.freeze(parts) });
+  }
   sourceText(): string {
     return this.runtime.session.source.slice(this.event.start, this.event.end);
   }
@@ -500,9 +528,7 @@ export class NodePathImpl implements NativeNodePath {
     else this.prependToBody(comment);
   }
   buildCodeFrameError(message: string): NativeTransformError {
-    return new NativeTransformError(message, [
-      { code: 'plugin-error', message, start: this.event.start, end: this.event.end },
-    ]);
+    return this.#pluginError(message);
   }
   prependToBody(content: Code): void {
     this.#insert(
@@ -516,6 +542,24 @@ export class NodePathImpl implements NativeNodePath {
       'PrependLeft',
       Number((this.event as NativeEvent & Record<string, unknown>).bodyEnd ?? this.event.end),
       content,
+    );
+  }
+
+  #pluginError(message: string, cause?: unknown): NativeTransformError {
+    return new NativeTransformError(
+      message,
+      [
+        {
+          code: 'plugin-error',
+          message,
+          plugin: this.runtime.owner,
+          phase: this.runtime.context.phase,
+          start: this.event.start,
+          end: this.event.end,
+        },
+      ],
+      undefined,
+      { cause, phase: this.runtime.context.phase },
     );
   }
   skip(): void {

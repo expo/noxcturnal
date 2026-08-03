@@ -531,10 +531,12 @@
       "parameterCount",
       "name",
       "bodyStart",
-      "bodyEnd"
+      "bodyEnd",
+      "declarationNameAnchor",
+      "declarationNamePrefix"
     ],
     "ArrowFunctionExpression": ["async", "expression", "parameterCount", "bodyStart", "bodyEnd"],
-    "Class": ["nodeKind", "name"],
+    "Class": ["nodeKind", "name", "declarationNameAnchor", "declarationNamePrefix"],
     "ImportDeclaration": ["source", "importKind", "specifierCount"],
     "ImportSpecifier": ["imported", "local", "importKind"],
     "ImportDefaultSpecifier": ["imported", "local"],
@@ -598,7 +600,9 @@
     "nodeKind",
     "memberPath",
     "bindingName",
-    "targetName"
+    "targetName",
+    "declarationNameAnchor",
+    "declarationNamePrefix"
   ],
   "fieldTypes": {
     "Identifier": {
@@ -709,7 +713,9 @@
       "parameterCount": "number",
       "name?": "string",
       "bodyStart?": "number",
-      "bodyEnd?": "number"
+      "bodyEnd?": "number",
+      "declarationNameAnchor?": "number",
+      "declarationNamePrefix?": "boolean"
     },
     "ArrowFunctionExpression": {
       "async": "boolean",
@@ -720,7 +726,9 @@
     },
     "Class": {
       "nodeKind": "ClassType",
-      "name?": "string"
+      "name?": "string",
+      "declarationNameAnchor?": "number",
+      "declarationNamePrefix?": "boolean"
     },
     "ImportDeclaration": {
       "source": "string",

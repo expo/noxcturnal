@@ -75,6 +75,7 @@ trait SegmentSink: Default {
         original_column: i64,
         name: Option<i64>,
     );
+    fn unmapped(&mut self, generated_column: i64);
     fn newline(&mut self);
 }
 
@@ -134,6 +135,17 @@ impl SegmentSink for VlqSink {
         self.previous_generated_column = generated_column;
         self.line_has_segment = true;
     }
+    fn unmapped(&mut self, generated_column: i64) {
+        if self.line_has_segment {
+            self.mappings.push(',');
+        }
+        vlq::encode(
+            generated_column - self.previous_generated_column,
+            &mut self.mappings,
+        );
+        self.previous_generated_column = generated_column;
+        self.line_has_segment = true;
+    }
     fn newline(&mut self) {
         self.mappings.push(';');
         self.previous_generated_column = 0;
@@ -167,6 +179,15 @@ impl SegmentSink for DecodedSink {
             name.map_or(0, |name| name as u32 + 1),
         ]);
     }
+    fn unmapped(&mut self, generated_column: i64) {
+        self.words.extend_from_slice(&[
+            self.generated_line,
+            generated_column as u32,
+            u32::MAX,
+            u32::MAX,
+            0,
+        ]);
+    }
     fn newline(&mut self) {
         self.generated_line += 1;
     }
@@ -180,6 +201,7 @@ struct StreamingMap<S: SegmentSink> {
     original_line: i64,
     original_column: i64,
     last_mark: Option<(usize, i64)>,
+    unmapped: bool,
 }
 
 impl<S: SegmentSink> StreamingMap<S> {
@@ -197,13 +219,25 @@ impl<S: SegmentSink> StreamingMap<S> {
             name,
         );
         self.last_mark = Some((self.generated_line, self.generated_column));
+        self.unmapped = false;
     }
     fn newline(&mut self) {
         self.sink.newline();
         self.generated_line += 1;
         self.generated_column = 0;
     }
+    fn unmapped(&mut self) {
+        if self.last_mark == Some((self.generated_line, self.generated_column)) {
+            return;
+        }
+        self.sink.unmapped(self.generated_column);
+        self.last_mark = Some((self.generated_line, self.generated_column));
+        self.unmapped = true;
+    }
     fn copied(&mut self, text: &str, character: bool) {
+        if self.unmapped {
+            self.mark();
+        }
         if text.is_ascii() {
             for byte in text.bytes() {
                 if character || self.generated_column == 0 {
@@ -427,6 +461,12 @@ impl<S: SegmentSink> Renderer<'_, S> {
                     }
                     self.map.removed(&self.source[*start..*end]);
                     self.code.push_str(text);
+                    // An empty generated piece occupies no generated range. Emitting an
+                    // unmapped segment for it can suppress the mapped source piece that
+                    // resumes at the same generated column.
+                    if !self.line && !text.is_empty() && *mapping == MappingPolicy::Sourceless {
+                        self.map.unmapped();
+                    }
                     self.map.generated(text);
                     if !self.line && *mapping == MappingPolicy::AnchorBoundaries {
                         self.map.mark();
@@ -715,6 +755,61 @@ mod tests {
             assert_eq!(mappings, chained_mappings, "mode {mode}");
             assert_eq!(names, chained_names, "mode {mode}");
         }
+    }
+
+    #[test]
+    fn sourceless_insertions_emit_unmapped_segments_in_decoded_layers() {
+        let source = "function() {}";
+        let pieces = build(
+            source,
+            vec![EditCommand {
+                kind: EditKind::AppendLeft,
+                start: 8,
+                end: 8,
+                content: Some(" _ref".into()),
+                parts: Vec::new(),
+                destination: None,
+                mapping: Some(MappingPolicy::Sourceless),
+                order: Some(0),
+                names: None,
+            }],
+        )
+        .unwrap();
+        let (_, direct, _) = render(source, &pieces, "character");
+        let (_, layer) = render_decoded(source, &pieces, "character");
+        let (decoded, _) = compose_layer_chain(&[layer.as_slice()]).unwrap();
+        assert_eq!(decoded, direct);
+        assert!(direct.split(',').any(|segment| segment == "C"));
+
+        let generated = render_code(source, &pieces);
+        let identity = build(&generated, Vec::new()).unwrap();
+        let (_, identity_layer) = render_decoded(&generated, &identity, "character");
+        let (composed, _) =
+            compose_layer_chain(&[layer.as_slice(), identity_layer.as_slice()]).unwrap();
+        assert!(composed.split(',').any(|segment| segment.len() == 1));
+    }
+
+    #[test]
+    fn empty_sourceless_replacements_do_not_mask_resuming_source() {
+        let source = "remove;const retained = 1;";
+        let pieces = build(
+            source,
+            vec![EditCommand {
+                kind: EditKind::Replace,
+                start: 0,
+                end: 7,
+                content: Some(String::new()),
+                parts: Vec::new(),
+                destination: None,
+                mapping: Some(MappingPolicy::Sourceless),
+                order: Some(0),
+                names: None,
+            }],
+        )
+        .unwrap();
+        let (_, mappings, _) = render(source, &pieces, "character");
+        assert!(mappings.starts_with("A"));
+        assert!(mappings.len() > 1, "retained source should remain mapped");
     }
 
     #[test]

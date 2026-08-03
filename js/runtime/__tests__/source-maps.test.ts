@@ -32,6 +32,54 @@ test('produces traceable Unicode-aware VLQ mappings', () => {
   });
 });
 
+test('keeps both declaration source slices mapped and the inserted name sourceless', () => {
+  const source = 'export default function() { return 1; }';
+  const plugin = defineNativePlugin({
+    name: 'declaration-name-map',
+    visitors: [
+      defineVisitor(
+        'FunctionDeclaration',
+        { fields: ['declarationNameAnchor', 'declarationNamePrefix'] },
+        path => path.replaceWith(path.withDeclarationName('_ref')),
+      ),
+    ],
+  });
+  const result = transform(
+    source,
+    'fixture.js',
+    defineNativePipeline({ phases: [{ name: 'edit', plugins: [plugin] }] }),
+    { sourceMapMode: 'character' },
+  );
+  assert.equal(result.status, 'complete');
+  const map = new TraceMap({
+    version: 3,
+    sources: ['fixture.js'],
+    names: result.map.names,
+    mappings: result.map.mappings,
+  });
+  const functionColumn = result.code.indexOf('function');
+  const nameColumn = result.code.indexOf('_ref');
+  const bodyColumn = result.code.indexOf('{');
+  assert.deepEqual(originalPositionFor(map, { line: 1, column: functionColumn }), {
+    source: 'fixture.js',
+    line: 1,
+    column: source.indexOf('function'),
+    name: null,
+  });
+  assert.deepEqual(originalPositionFor(map, { line: 1, column: nameColumn }), {
+    source: null,
+    line: null,
+    column: null,
+    name: null,
+  });
+  assert.deepEqual(originalPositionFor(map, { line: 1, column: bodyColumn }), {
+    source: 'fixture.js',
+    line: 1,
+    column: source.indexOf('{'),
+    name: null,
+  });
+});
+
 test('traces CRLF, directive, wrapper, and explicit-location mappings', () => {
   const plugin = defineNativePlugin({
     name: 'map-boundaries',

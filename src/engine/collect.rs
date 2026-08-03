@@ -24,6 +24,7 @@ use super::{
 };
 
 struct EventCollector<'a> {
+    source: &'a str,
     nodes: &'a AstNodes<'a>,
     scoping: &'a Scoping,
     utf16: Option<&'a [u32]>,
@@ -37,6 +38,7 @@ struct EventCollector<'a> {
 }
 
 struct SyntaxIndexCollector<'a> {
+    source: &'a str,
     utf16: Option<&'a [u32]>,
     retained_index: RetainedIndex,
     retention_routes: Option<&'a CompiledManifest>,
@@ -114,6 +116,7 @@ impl<'a> Visit<'a> for SyntaxIndexCollector<'a> {
         if retain_all_fields || retain_structural_fields || !requested.is_empty() {
             let retained_fields = packed_fields_direct(
                 kind,
+                self.source,
                 member_write,
                 member_root_write,
                 None,
@@ -236,6 +239,7 @@ impl<'a> EventCollector<'a> {
         if retain_all_fields || retain_structural_fields || !requested.is_empty() {
             let retained_fields = packed_fields_direct(
                 kind,
+                self.source,
                 member_write,
                 member_root_write,
                 Some(self.scoping),
@@ -352,6 +356,7 @@ pub(crate) fn materialize_with_scope_parents(
             && retention_capabilities & (RETAIN_IDENTIFIERS | RETAIN_CALLS) != 0;
     if !needs_semantics {
         let mut collector = SyntaxIndexCollector {
+            source,
             utf16: utf16.as_deref().map(|offsets| &**offsets),
             retained_index: RetainedIndex::with_node_count(
                 0,
@@ -425,6 +430,7 @@ pub(crate) fn materialize_with_scope_parents(
         })
         .collect::<Vec<_>>();
     let mut collector = EventCollector {
+        source,
         nodes: semantic_return.semantic.nodes(),
         scoping: semantic_return.semantic.scoping(),
         utf16: utf16.as_deref().map(|offsets| &**offsets),
