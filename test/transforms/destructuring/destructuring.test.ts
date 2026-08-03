@@ -31,3 +31,17 @@ test('lowers destructuring', async () => {
     export { value, first };"
   `);
 });
+
+test('accepts defaults nested in a for-of binding pattern', async () => {
+  const source = `export function entries({ params = {} } = {}) {
+  const result = [];
+  for (const [key, value = ''] of Object.entries(params)) result.push([key, value]);
+  return result;
+}`;
+  const output = await transformSource(source, 'input.js', {
+    helpers: runtimeHelpers,
+    transforms: { blockScoping: true, destructuring: true, parameters: true },
+  });
+  expect(output).toMatch(/value = (_value\d+) === void 0 \? '' : \1/);
+  expect(output).not.toContain('= void 0 of');
+});

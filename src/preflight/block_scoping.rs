@@ -1284,6 +1284,7 @@ fn collect_loop_reset_declarations(semantic: &Semantic<'_>) -> FxHashSet<(u32, u
         let AstKind::VariableDeclarator(declarator) = node.kind() else {
             continue;
         };
+        let declaration_id = nodes.parent_id(node_id);
         if declarator.init.is_none()
             && matches!(
                 nodes.parent_kind(node_id),
@@ -1292,6 +1293,10 @@ fn collect_loop_reset_declarations(semantic: &Semantic<'_>) -> FxHashSet<(u32, u
                         declaration.kind,
                         VariableDeclarationKind::Let | VariableDeclarationKind::Const
                     )
+            )
+            && !matches!(
+                nodes.parent_kind(declaration_id),
+                AstKind::ForInStatement(_) | AstKind::ForOfStatement(_)
             )
             && !pending_loops.last().is_some_and(|(body_start, loop_)| {
                 span.start < *body_start && loop_.boundary_depth == active_boundaries.len()
