@@ -190,6 +190,13 @@ defineVisitor('ImportExpression', { comments: 'inner' }, path => {
   comment.start.toFixed();
   comment.end.toFixed();
 });
+defineVisitor('ImportExpression', { fields: ['staticArgument'] }, path => {
+  path.node.staticArgument?.toUpperCase();
+});
+defineVisitor('ImportExpression', {}, path => {
+  // @ts-expect-error static import spelling is pay-for-play.
+  path.node.staticArgument;
+});
 
 defineVisitor(
   'ImportExpression',
@@ -475,9 +482,77 @@ defineVisitor(
 );
 defineVisitor('VariableDeclarator', { children: { init: { route: 'Expression' } } }, path => {
   path.getChild('init');
+  // @ts-expect-error a named child does not authorize its sibling role.
+  path.getChild('id');
   // @ts-expect-error `init` is a single-node role.
   path.getChildList('init');
 });
+
+// Wildcard enumeration retains the wildcard entry's fields and child contract,
+// including recursively nested wildcards.
+defineVisitor(
+  'VariableDeclaration',
+  {
+    scope: true,
+    comments: 'inner',
+    children: {
+      '*': {
+        route: 'VariableDeclarator',
+        fields: ['kind'],
+        children: {
+          id: { route: 'Identifier|ObjectPattern|ArrayPattern', fields: ['name'] },
+          '*': {
+            route: 'Identifier|ObjectPattern|ArrayPattern|Expression',
+            children: { '*': { route: '*', fields: ['name'] } },
+          },
+        },
+      },
+    },
+  },
+  path => {
+    path.getComments('inner');
+    const declarator = path.getChildren()[0]!;
+    declarator.node.kind;
+    declarator.scope;
+    declarator.getChild('id');
+    declarator.getChildren()[0]?.getChildren()[0]?.node.name;
+    // @ts-expect-error the wildcard child did not declare this sibling role.
+    declarator.getChild('init');
+    // @ts-expect-error child paths never inherit visitor-route comment access.
+    declarator.getComments('inner');
+  },
+);
+defineVisitor('VariableDeclaration', {}, path => {
+  // @ts-expect-error enumeration requires an explicit wildcard entry.
+  path.getChildren();
+});
+defineVisitor('Program', { children: { '*': { route: 'Statement' } } }, path => {
+  const child = path.getChildren()[0]!;
+  // @ts-expect-error child scope requires scope capability on the owner.
+  child.scope;
+  // @ts-expect-error child ancestry requires ancestry capability on the owner.
+  child.parentPath;
+  // @ts-expect-error child control flow requires capability on the owner.
+  child.skip();
+});
+defineVisitor(
+  'Program',
+  {
+    children: {
+      '*': {
+        route: 'VariableDeclaration|Function',
+        children: { body: { route: 'FunctionBody' } },
+      },
+    },
+  },
+  path => {
+    const child = path.getChildren()[0];
+    if (child?.node.type === 'Function') child.getChild('body');
+    if (child?.is('VariableDeclaration')) child.node.type satisfies 'VariableDeclaration';
+    // @ts-expect-error narrowing never grants an undeclared sibling role.
+    child?.getChildList('params');
+  },
+);
 
 // P5 — every composite segment is validated.
 defineVisitor(

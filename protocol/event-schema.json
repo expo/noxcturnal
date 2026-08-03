@@ -516,6 +516,7 @@
       "staticArgument"
     ],
     "NewExpression": ["argumentCount", "calleeName", "staticArgument"],
+    "ImportExpression": ["staticArgument"],
     "StaticMemberExpression": [
       "computed",
       "property",
@@ -702,6 +703,9 @@
       "calleeName?": "string",
       "staticArgument?": "string"
     },
+    "ImportExpression": {
+      "staticArgument?": "string"
+    },
     "StaticMemberExpression": {
       "computed": "false",
       "property": "string",
@@ -870,7 +874,7 @@
     },
     "ArrowFunctionExpression": {
       "body": {
-        "routes": ["FunctionBody"],
+        "routes": ["FunctionBody", "Expression"],
         "list": false
       },
       "params": {
@@ -1187,30 +1191,14 @@
       }
     },
     "FormalParameterRest": {
-      "pattern": {
-        "routes": ["Identifier", "ObjectPattern", "ArrayPattern"],
-        "list": false
-      },
-      "default": {
-        "routes": ["Expression"],
-        "list": false
-      },
       "argument": {
-        "routes": ["Identifier", "ObjectPattern", "ArrayPattern", "AssignmentPattern"],
+        "routes": ["BindingRestElement"],
         "list": false
       }
     },
     "BindingRestElement": {
       "pattern": {
         "routes": ["Identifier", "ObjectPattern", "ArrayPattern"],
-        "list": false
-      },
-      "default": {
-        "routes": ["Expression"],
-        "list": false
-      },
-      "argument": {
-        "routes": ["Identifier", "ObjectPattern", "ArrayPattern", "AssignmentPattern"],
         "list": false
       }
     },

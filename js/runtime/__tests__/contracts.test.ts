@@ -105,6 +105,44 @@ test('regexp literal fields preserve lexical pattern and flag spelling', () => {
   ]);
 });
 
+test('ImportExpression.staticArgument is decoded and pay-for-play', () => {
+  const observed: (string | undefined)[] = [];
+  let absent = false;
+  const requested = defineVisitor('ImportExpression', { fields: ['staticArgument'] }, path =>
+    observed.push(path.node.staticArgument),
+  );
+  const result = transform(
+    String.raw`import('./caf\u00e9.js'); import(dynamic);`,
+    'fixture.js',
+    defineNativePipeline({
+      phases: [
+        {
+          name: 'imports',
+          plugins: [defineNativePlugin({ name: 'import-fields', visitors: [requested] })],
+        },
+      ],
+    }),
+  );
+  assert.equal(result.status, 'complete');
+  assert.deepEqual(observed, ['./café.js', undefined]);
+  const omitted = defineVisitor('ImportExpression', {}, path => {
+    absent = !('staticArgument' in path.node);
+  });
+  transform(
+    `import('./plain.js')`,
+    'fixture.js',
+    defineNativePipeline({
+      phases: [
+        {
+          name: 'omitted',
+          plugins: [defineNativePlugin({ name: 'omitted-import-fields', visitors: [omitted] })],
+        },
+      ],
+    }),
+  );
+  assert.equal(absent, true);
+});
+
 test('inner comments are parser-ranged, ordered, immutable, and contract-scoped', () => {
   const source = `/* before */ import(/* first */ /* webpackIgnore: true */ 'pkg' // last\n); /* after */`;
   let observed: readonly { kind: string; value: string; start: number; end: number }[] = [];
@@ -146,6 +184,37 @@ test('inner comments are parser-ranged, ordered, immutable, and contract-scoped'
     observed.every(comment => source.slice(comment.start, comment.end).includes(comment.value)),
   );
   assert.ok(undeclared instanceof NativeTransformError);
+});
+
+test('comment access is local to the delivered visitor path', () => {
+  let derivedError: unknown;
+  const visitor = defineVisitor(
+    'VariableDeclarator',
+    { comments: 'inner', children: { id: { route: 'Identifier' } } },
+    path => {
+      path.getComments('inner');
+      const child = path.getChild('id');
+      try {
+        (child as unknown as { getComments(relation: 'inner'): unknown }).getComments('inner');
+      } catch (error) {
+        derivedError = error;
+      }
+    },
+  );
+  const result = transform(
+    'const /* inner */ value = 1;',
+    'fixture.js',
+    defineNativePipeline({
+      phases: [
+        {
+          name: 'comments',
+          plugins: [defineNativePlugin({ name: 'local-comments', visitors: [visitor] })],
+        },
+      ],
+    }),
+  );
+  assert.equal(result.status, 'complete');
+  assert.match(String(derivedError), /undeclared comment relation inner/);
 });
 
 test('a reparsed phase observes comments committed by an earlier phase', () => {

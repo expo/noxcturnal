@@ -409,3 +409,103 @@ test('implements a Platform.select-style transform through declared compact role
   assert.equal(result.status, 'complete');
   assert.equal(result.code, "const selected = 'ios';");
 });
+
+test('wildcard enumeration does not authorize arbitrary named child access', () => {
+  let error: unknown;
+  const plugin = defineNativePlugin({
+    name: 'wildcard-is-enumeration-only',
+    visitors: [
+      defineVisitor('VariableDeclarator', { children: { '*': { route: '*' } } }, path => {
+        assert.deepEqual(
+          path.getChildren().map(child => child.node.type),
+          ['Identifier', 'NumericLiteral'],
+        );
+        try {
+          (path as unknown as { getChild(role: string): unknown }).getChild('id');
+        } catch (caught) {
+          error = caught;
+        }
+      }),
+    ],
+  });
+  const result = transform(
+    'const value = 1;',
+    'fixture.js',
+    defineNativePipeline({ phases: [{ name: 'visit', plugins: [plugin] }] }),
+  );
+  assert.equal(result.status, 'complete');
+  assert.match(
+    String(error),
+    /wildcard-is-enumeration-only: undeclared child role VariableDeclarator\.id/,
+  );
+});
+
+test('projects flattened arrow parameters with parser-accurate binding roles', () => {
+  const observed: unknown[] = [];
+  const plugin = defineNativePlugin({
+    name: 'parameter-shape',
+    visitors: [
+      defineVisitor(
+        'ArrowFunctionExpression',
+        {
+          children: {
+            params: {
+              route: 'FormalParameter|FormalParameterRest|BindingRestElement',
+              children: {
+                pattern: { route: 'Identifier|ObjectPattern|ArrayPattern' },
+                default: { route: 'Expression' },
+                argument: { route: 'BindingRestElement' },
+              },
+            },
+          },
+        },
+        path => {
+          observed.push(
+            path.getChildList('params').map(parameter =>
+              parameter.node.type === 'FormalParameterRest'
+                ? {
+                    type: parameter.node.type,
+                    pattern: undefined,
+                    default: undefined,
+                    argument: parameter.getChild('argument')?.node.type,
+                  }
+                : {
+                    type: parameter.node.type,
+                    pattern: parameter.getChild('pattern')?.node.type,
+                    default: parameter.getChild('default')?.node.type,
+                    argument: undefined,
+                  },
+            ),
+          );
+        },
+      ),
+    ],
+  });
+  transform(
+    'const fn = async (value = 1, { item }, ...rest) => value;',
+    'fixture.js',
+    defineNativePipeline({ phases: [{ name: 'parameters', plugins: [plugin] }] }),
+  );
+  assert.deepEqual(observed, [
+    [
+      {
+        type: 'FormalParameter',
+        pattern: 'Identifier',
+        default: 'NumericLiteral',
+        argument: undefined,
+      },
+      {
+        type: 'FormalParameter',
+        pattern: 'ObjectPattern',
+        default: undefined,
+        argument: undefined,
+      },
+      {
+        type: 'FormalParameterRest',
+        pattern: undefined,
+        default: undefined,
+        argument: 'BindingRestElement',
+      },
+    ],
+  ]);
+});

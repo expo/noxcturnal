@@ -36,10 +36,7 @@ import type { RouteCapabilities } from '../pipeline/types';
 export type { RouteCapabilities } from '../pipeline/types';
 
 export function childRoleIsDeclared(roles: readonly string[], requestedRole: string): boolean {
-  for (const role of roles) {
-    if (role === requestedRole || role === '*') return true;
-  }
-  return false;
+  return roles.includes(requestedRole);
 }
 
 export function eventIsSkipped(event: NativeEvent, skipped: SkipState | undefined): boolean {
@@ -136,8 +133,9 @@ export function makePath(
   runtime: PathRuntime,
   event: NativeEvent,
   ancestryDepth = 0,
+  deliveredRoute = false,
 ): NativeNodePath {
-  return new NodePathImpl(runtime, event, ancestryDepth);
+  return new NodePathImpl(runtime, event, ancestryDepth, deliveredRoute);
 }
 
 export class NodePathImpl implements NativeNodePath {
@@ -150,6 +148,7 @@ export class NodePathImpl implements NativeNodePath {
     readonly runtime: PathRuntime,
     readonly event: NativeEvent,
     readonly ancestryDepth: number,
+    readonly deliveredRoute = false,
   ) {}
   get id(): number {
     return this.event.id;
@@ -233,7 +232,11 @@ export class NodePathImpl implements NativeNodePath {
     return this.runtime.session.source.slice(this.event.start, this.event.end);
   }
   getComments(relation: 'inner') {
-    if (relation !== 'inner' || this.runtime.capabilities.comments !== relation) {
+    if (
+      !this.deliveredRoute ||
+      relation !== 'inner' ||
+      this.runtime.capabilities.comments !== relation
+    ) {
       throw this.#pluginError(
         `undeclared comment relation ${relation} (declare comments: 'inner' on the visitor contract)`,
       );
@@ -864,14 +867,11 @@ function selectChildRole(
   )
     return at(0);
   if (key === 'init' && type === 'VariableDeclarator') return children.length > 1 ? last() : null;
-  if (
-    type === 'FormalParameter' ||
-    type === 'FormalParameterRest' ||
-    type === 'BindingRestElement'
-  ) {
+  if (type === 'FormalParameter' || type === 'BindingRestElement') {
     if (key === 'pattern') return at(0);
     if (key === 'default') return type === 'FormalParameter' && children.length > 1 ? last() : null;
   }
+  if (type === 'FormalParameterRest' && key === 'argument') return at(0);
   if (key === 'expression' && type === 'ExpressionStatement') return at(0);
   if (
     (key === 'key' || key === 'value') &&

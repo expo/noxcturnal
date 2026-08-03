@@ -1,4 +1,4 @@
-import { CHILD_ROLES } from '../generated/event-schema';
+import { CHILD_ROLES, NODE_TYPES, PREDICATE_FIELDS } from '../generated/event-schema';
 import { maxEditEffect } from './compile';
 import { stableJson } from './cache-key';
 import {
@@ -129,8 +129,12 @@ function synthesizeVisitorPlan(
     const contract = definition.contract;
     subscriptions.push(definition.route);
     if (contract.fields.length > 0)
-      for (const concrete of concreteRouteTypes(definition.route))
-        mergeFieldRequests(fields, { [concrete]: contract.fields });
+      for (const concrete of concreteRouteTypes(definition.route)) {
+        const applicable = contract.fields.filter(field =>
+          PREDICATE_FIELDS[concrete]?.includes(field),
+        );
+        if (applicable.length > 0) mergeFieldRequests(fields, { [concrete]: applicable });
+      }
     const attachChildren = (
       parentTypes: readonly string[],
       declared: Readonly<Record<string, ChildContract>> | undefined,
@@ -138,13 +142,29 @@ function synthesizeVisitorPlan(
       if (declared == null) return;
       for (const parentType of parentTypes) {
         const roles = (children[parentType] ??= []);
-        for (const role of Object.keys(declared)) if (!roles.includes(role)) roles.push(role);
+        for (const role of Object.keys(declared)) {
+          if ((role === '*' || CHILD_ROLES[parentType]?.[role] != null) && !roles.includes(role))
+            roles.push(role);
+        }
+        // Public function `params` is a flattened list, while Oxc retains an
+        // intervening FormalParameters container. Retain that container's direct
+        // children so selectChildRole can project the stable flattened role.
+        if (
+          Object.hasOwn(declared, 'params') &&
+          (parentType === 'Function' || parentType === 'ArrowFunctionExpression')
+        ) {
+          children.FormalParameters ??= [];
+        }
       }
       for (const child of Object.values(declared)) {
         const childTypes = concreteRouteTypes(child.route);
         if ((child.fields?.length ?? 0) > 0)
-          for (const concrete of childTypes)
-            mergeFieldRequests(fields, { [concrete]: child.fields! });
+          for (const concrete of childTypes) {
+            const applicable = child.fields!.filter(field =>
+              PREDICATE_FIELDS[concrete]?.includes(field),
+            );
+            if (applicable.length > 0) mergeFieldRequests(fields, { [concrete]: applicable });
+          }
         attachChildren(childTypes, child.children);
       }
     };
@@ -157,8 +177,13 @@ function synthesizeVisitorPlan(
         const ancestorTypes = concreteRouteTypes(route);
         for (const type of ancestorTypes) ancestryTypes.add(type as NativeNodeType);
         if ((requirement.fields?.length ?? 0) > 0)
-          for (const concrete of ancestorTypes)
-            mergeFieldRequests(ancestryFields, { [concrete]: requirement.fields! });
+          for (const concrete of ancestorTypes) {
+            const applicable = requirement.fields!.filter(field =>
+              PREDICATE_FIELDS[concrete]?.includes(field),
+            );
+            if (applicable.length > 0)
+              mergeFieldRequests(ancestryFields, { [concrete]: applicable });
+          }
         const attachAncestorChildren = (
           parentTypes: readonly string[],
           declared: Readonly<Record<string, ChildContract>> | undefined,
@@ -166,13 +191,24 @@ function synthesizeVisitorPlan(
           if (declared == null) return;
           for (const parentType of parentTypes) {
             const roles = (ancestryChildren[parentType] ??= []);
-            for (const role of Object.keys(declared)) if (!roles.includes(role)) roles.push(role);
+            for (const role of Object.keys(declared)) {
+              if (
+                (role === '*' || CHILD_ROLES[parentType]?.[role] != null) &&
+                !roles.includes(role)
+              )
+                roles.push(role);
+            }
           }
           for (const child of Object.values(declared)) {
             const childTypes = concreteRouteTypes(child.route);
             if ((child.fields?.length ?? 0) > 0)
-              for (const concrete of childTypes)
-                mergeFieldRequests(ancestryFields, { [concrete]: child.fields! });
+              for (const concrete of childTypes) {
+                const applicable = child.fields!.filter(field =>
+                  PREDICATE_FIELDS[concrete]?.includes(field),
+                );
+                if (applicable.length > 0)
+                  mergeFieldRequests(ancestryFields, { [concrete]: applicable });
+              }
             attachAncestorChildren(childTypes, child.children);
           }
         };
@@ -547,6 +583,37 @@ export function preparePhase(phase: PipelinePhase): PreparedPhase {
   };
   preparedPhases.set(phase, prepared);
   return prepared;
+}
+
+/** Deterministic retention diagnostics for tests and development tooling. This
+ * intentionally derives from the already-prepared plan and adds no native wire
+ * or production serialization cost. */
+export function inspectPreparedPhaseRetention(phase: PipelinePhase) {
+  const prepared = preparePhase(phase);
+  const childRoles: Record<string, string[]> = {};
+  for (const plugin of prepared.activePlugins) {
+    for (const [type, roles] of Object.entries(prepared.plans.get(plugin)?.children ?? {})) {
+      const collected = (childRoles[type] ??= []);
+      for (const role of roles ?? []) if (!collected.includes(role)) collected.push(role);
+    }
+  }
+  for (const roles of Object.values(childRoles)) roles.sort();
+  const concreteTypes = NODE_TYPES.filter(type => type !== '');
+  const structural = new Set(prepared.structuralParentTypes);
+  return Object.freeze({
+    structuralParentTypeCount: structural.size,
+    includesEveryConcreteType: concreteTypes.every(type => structural.has(type)),
+    structuralParentTypes: Object.freeze([...structural].sort()),
+    childRoles: Object.freeze(childRoles),
+    scalarFields: Object.freeze(
+      Object.fromEntries(
+        Object.entries(prepared.fieldRequests).map(([type, fields]) => [
+          type,
+          Object.freeze([...fields].sort()),
+        ]),
+      ),
+    ),
+  });
 }
 
 function compilePhaseRoutes(

@@ -149,6 +149,40 @@ test('supports wildcard child access through getChildren', () => {
   assert.deepEqual(childTypes, ['VariableDeclaration', 'ExpressionStatement']);
 });
 
+test('preserves nested wildcard contracts through runtime enumeration', () => {
+  let binding: string | undefined;
+  const plugin = defineNativePlugin({
+    name: 'nested-wildcard-children',
+    visitors: [
+      defineVisitor(
+        'Program',
+        {
+          children: {
+            '*': {
+              route: 'VariableDeclaration',
+              children: {
+                '*': {
+                  route: 'VariableDeclarator',
+                  children: { id: { route: 'Identifier', fields: ['name'] } },
+                },
+              },
+            },
+          },
+        },
+        path => {
+          binding = path.getChildren()[0]?.getChildren()[0]?.getChild('id')?.node.name;
+        },
+      ),
+    ],
+  });
+  transform(
+    'const value = 1;',
+    'fixture.js',
+    defineNativePipeline({ phases: [{ name: 'children', plugins: [plugin] }] }),
+  );
+  assert.equal(binding, 'value');
+});
+
 test('supports path mutation aliases, insertion, and comments', () => {
   const plugin = defineNativePlugin({
     name: 'path-mutations',

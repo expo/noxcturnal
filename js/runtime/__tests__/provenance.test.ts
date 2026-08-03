@@ -280,10 +280,10 @@ test('out-of-order structured source fragments retain contained edits', () => {
       defineVisitor(
         'ArrowFunctionExpression',
         {
-          children: { '*': { route: '*', children: { '*': { route: '*' } } } },
+          children: { body: { route: 'Expression|FunctionBody' } },
         },
         path => {
-          const body = path.getChildren().at(-1);
+          const body = path.getChild('body');
           assert.ok(body);
           const initializerStart = source.indexOf('compute()');
           const initializer = path.context.sourceSlice(
@@ -656,4 +656,159 @@ test('maps copied content back to its original tokens', () => {
     column: source.indexOf('VALUE'),
     name: 'VALUE',
   });
+});
+
+test('named RNW, UI, and Hermes-shaped fragments compose contained same-phase edits', () => {
+  const cases = [
+    {
+      source: `const dropped = require('react-native'), kept = compute();`,
+      structural: defineNativePlugin({
+        name: 'rnw-shape',
+        visitors: [
+          defineVisitor(
+            'VariableDeclaration',
+            {
+              children: {
+                declarations: { route: 'VariableDeclarator' },
+              },
+            },
+            path => {
+              const kept = path.getChildList('declarations')[1];
+              assert.ok(kept);
+              path.replaceWith(path.context.code.template`const ${kept.getSource()};`);
+            },
+          ),
+        ],
+      }),
+      contained: defineNativePlugin({
+        name: 'rnw-contained',
+        visitors: [
+          defineVisitor('CallExpression', { fields: ['calleeName'] }, path => {
+            if (path.node.calleeName === 'compute') path.replaceWith('compute2()');
+          }),
+        ],
+      }),
+      expected: 'const kept = compute2();',
+      mapped: 'kept',
+      original: 'kept',
+      originalLast: false,
+    },
+    {
+      source: `select({ ios: make('ios'), android: make('android') });`,
+      structural: defineNativePlugin({
+        name: 'ui-shape',
+        visitors: [
+          defineVisitor(
+            'CallExpression',
+            {
+              fields: ['calleeName'],
+              children: {
+                arguments: {
+                  route: 'ObjectExpression',
+                  children: {
+                    properties: {
+                      route: 'ObjectProperty',
+                      fields: ['key'],
+                      children: { value: { route: 'Expression' } },
+                    },
+                  },
+                },
+              },
+            },
+            path => {
+              if (path.node.calleeName !== 'select') return;
+              const object = path.getChildList('arguments')[0];
+              const selected = object
+                ?.getChildList('properties')
+                .find(property => property.node.key === 'ios')
+                ?.getChild('value');
+              assert.ok(selected);
+              path.replaceWith(selected.getSource());
+            },
+          ),
+        ],
+      }),
+      contained: defineNativePlugin({
+        name: 'ui-contained',
+        visitors: [
+          defineVisitor('StringLiteral', { fields: ['value'] }, path => {
+            if (path.node.value === 'ios') path.replaceWith(`'IOS'`);
+          }),
+        ],
+      }),
+      expected: `make('IOS');`,
+      mapped: 'make',
+      original: 'make',
+      originalLast: false,
+    },
+    {
+      source: `const fn = async (value = compute()) => value;`,
+      structural: defineNativePlugin({
+        name: 'hermes-shape',
+        visitors: [
+          defineVisitor(
+            'ArrowFunctionExpression',
+            {
+              children: {
+                params: {
+                  route: 'FormalParameter',
+                  children: { default: { route: 'Expression' } },
+                },
+                body: { route: 'Expression' },
+              },
+            },
+            path => {
+              const initializer = path.getChildList('params')[0]?.getChild('default');
+              const body = path.getChild('body');
+              assert.ok(initializer && body);
+              path.replaceWith(
+                path.context.code
+                  .template`async (temporary) => temporary === undefined ? ${initializer.getSource()} : ${body.getSource()}`,
+              );
+            },
+          ),
+        ],
+      }),
+      contained: defineNativePlugin({
+        name: 'hermes-contained',
+        visitors: [
+          defineVisitor('CallExpression', { fields: ['calleeName'] }, path => {
+            if (path.node.calleeName === 'compute') path.replaceWith('compute2()');
+          }),
+        ],
+      }),
+      expected: 'const fn = async (temporary) => temporary === undefined ? compute2() : value;',
+      mapped: 'value',
+      original: 'value',
+      originalLast: true,
+    },
+  ] as const;
+
+  for (const fixture of cases) {
+    const result = transform(
+      fixture.source,
+      'fixture.js',
+      defineNativePipeline({
+        phases: [{ name: 'structured', plugins: [fixture.structural, fixture.contained] }],
+      }),
+      { sourceMapMode: 'boundary' },
+    );
+    assert.equal(result.status, 'complete');
+    assert.equal(result.code, fixture.expected);
+    const generatedColumn = result.code.indexOf(fixture.mapped);
+    const map = new TraceMap({
+      version: 3,
+      sources: ['fixture.js'],
+      names: result.map.names,
+      mappings: result.map.mappings,
+    });
+    assert.deepEqual(originalPositionFor(map, { line: 1, column: generatedColumn }), {
+      source: 'fixture.js',
+      line: 1,
+      column: fixture.originalLast
+        ? fixture.source.lastIndexOf(fixture.original)
+        : fixture.source.indexOf(fixture.original),
+      name: null,
+    });
+  }
 });

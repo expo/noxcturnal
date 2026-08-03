@@ -412,6 +412,14 @@ pub(crate) fn packed_fields_direct(
                 push(field_ids::STATIC_ARGUMENT, value);
             }
         }
+        AstKind::ImportExpression(import) => {
+            if let Expression::StringLiteral(literal) = &import.source
+                && wants(field_ids::STATIC_ARGUMENT)
+            {
+                let value = intern_packed(strings, &literal.value);
+                push(field_ids::STATIC_ARGUMENT, value);
+            }
+        }
         AstKind::StaticMemberExpression(member) => {
             push(field_ids::COMPUTED, 0x8000_0000);
             push(field_ids::WRITE, 0x8000_0000 | u32::from(member_write));
@@ -1008,6 +1016,15 @@ pub(crate) fn fields(
                 );
             }
             if let Some(oxc_ast::ast::Argument::StringLiteral(literal)) = call.arguments.first() {
+                push!(
+                    field_ids::STATIC_ARGUMENT,
+                    "staticArgument",
+                    literal.value.to_string()
+                );
+            }
+        }
+        AstKind::ImportExpression(import) => {
+            if let Expression::StringLiteral(literal) = &import.source {
                 push!(
                     field_ids::STATIC_ARGUMENT,
                     "staticArgument",

@@ -423,7 +423,7 @@ export function createDispatcher(
     if (entry.stopped || stopAll || eventIsSkipped(event, entry.skipped)) return;
     if (routedCallbacks.length === 0) return;
     const runtime = boundRuntime ?? createPathRuntime(plugin, entry, context, capabilities);
-    const path = makePath(runtime, event);
+    const path = makePath(runtime, event, 0, true);
     currentSequence = event.sequence;
     if (routedCallbacks.length === 1) {
       routedCallbacks[0](path, override ? overrideState : entry.state);
@@ -552,7 +552,7 @@ export function createDispatcher(
     const callback = callbacks[0];
     return (event: NativeEvent) => {
       currentSequence = event.sequence;
-      callback(new NodePathImpl(runtime, event, 0), entry.state);
+      callback(new NodePathImpl(runtime, event, 0, true), entry.state);
     };
   };
   const compileStaticRoute = (route: (typeof dispatchRoutes)[number]) => {
@@ -577,7 +577,7 @@ export function createDispatcher(
     return (event: NativeEvent) => {
       currentSequence = event.sequence;
       for (const member of members) {
-        const path = makePath(member.runtime, event);
+        const path = makePath(member.runtime, event, 0, true);
         for (const callback of member.callbacks) callback(path, member.entry.state);
       }
     };

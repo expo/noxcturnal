@@ -622,6 +622,7 @@ pub(crate) fn predicate_field_supported(node_type_id: u32, field_id: u32) -> boo
             | (16, 13)
             | (16, 14)
             | (16, 17)
+            | (82, 17)
             | (13, 18)
             | (13, 19)
             | (13, 46)

@@ -1233,3 +1233,57 @@ for (const [name, transforms] of [
     benchmarkTransform(postconditionCorpus, 'metro-bundle.js', pipeline),
   );
 }
+
+const retainedIndexCorpus = generateLargeFileSource(256 * 1024, 'functions');
+const retainedIndexContracts = [
+  ['no child routing', defineVisitor('Function', {}, () => {})],
+  [
+    'shallow parameter wildcard',
+    defineVisitor(
+      'FormalParameters',
+      { children: { '*': { route: 'FormalParameter|FormalParameterRest' } } },
+      () => {},
+    ),
+  ],
+  [
+    'named function roles',
+    defineVisitor(
+      'Function',
+      {
+        children: {
+          body: { route: 'FunctionBody' },
+          params: {
+            route: 'FormalParameter|FormalParameterRest|BindingRestElement',
+            children: {
+              pattern: { route: 'Identifier|ObjectPattern|ArrayPattern' },
+              default: { route: 'Expression' },
+              argument: { route: 'BindingRestElement' },
+            },
+          },
+        },
+      },
+      () => {},
+    ),
+  ],
+  [
+    'nested all-node wildcard baseline',
+    defineVisitor(
+      'Function',
+      { children: { '*': { route: '*', children: { '*': { route: '*' } } } } },
+      () => {},
+    ),
+  ],
+] as const;
+for (const [name, visitor] of retainedIndexContracts) {
+  const pipeline = defineNativePipeline({
+    phases: [
+      {
+        name: `retained index ${name}`,
+        plugins: [defineNativePlugin({ name: `retained-index-${name}`, visitors: [visitor] })],
+      },
+    ],
+  });
+  verifiedBench(`retained-index construction: ${name}`, () =>
+    benchmarkTransform(retainedIndexCorpus, 'retained-index.js', pipeline),
+  );
+}

@@ -363,8 +363,11 @@ type SegmentChildRow<Segment extends string> = Segment extends keyof NativeChild
   ? NativeChildRoles[Segment]
   : {};
 type RouteChildRows<Route extends string> = SegmentChildRow<RouteSegments<Route>>;
-/** Child roles declarable for a route: the role must exist on every segment. */
-type RouteChildRoleNames<Route extends string> = keyof RouteChildRows<Route> & string;
+/** Child roles declarable for a composite route are the union of roles on its
+ * compatible variants. Runtime preparation attaches each role only to concrete
+ * parents that actually expose it. */
+type ChildRoleNamesOf<Row> = Row extends object ? keyof Row & string : never;
+type RouteChildRoleNames<Route extends string> = ChildRoleNamesOf<RouteChildRows<Route>>;
 /** The concrete node types a role may deliver across the route's segments. */
 type RouteChildTypes<Route extends string, Role extends string> =
   RouteChildRows<Route> extends infer Row
@@ -391,8 +394,8 @@ type RouteChildIsList<Route extends string, Role extends string> =
 export interface ChildContract {
   route: VisitorRouteSpec;
   fields?: readonly NativeFieldKey[];
-  /** Grandchild declarations for deep structural reads. Only the first level is
-   * statically typed; deeper paths are base-typed and runtime-validated. */
+  /** Nested declarations are preserved recursively on every returned child path.
+   * Named entries authorize named access; `*` authorizes enumeration only. */
   children?: Readonly<Record<string, ChildContract>>;
 }
 
@@ -520,7 +523,7 @@ type NarrowNodeByType<Node, T extends string> = Node extends {
   : never;
 
 /** The always-available path surface: identity, source access, edits, diagnostics. */
-export interface ContractPathBase<Node> {
+export interface ContractPathBase<Node, IsNode = Node> {
   readonly id: number;
   readonly type: PathNodeTypeOf<Node>;
   readonly start: number;
@@ -532,7 +535,7 @@ export interface ContractPathBase<Node> {
   sourceText(): string;
   snapshot(options?: SnapshotOptions): Readonly<Node>;
   getLocation(): SourceLocation;
-  is<TType extends PathIsTypes<Node>>(
+  is<TType extends PathIsTypes<IsNode>>(
     type: TType,
   ): this is this & { readonly type: TType; readonly node: NarrowNodeByType<Node, TType> };
   matchesPattern(pattern: string, allowPartial?: boolean): boolean;
@@ -555,10 +558,9 @@ export interface ContractPathBase<Node> {
 
 /**
  * A path derived from a typed visitor's path — ancestors reached through
- * `parentPath`/`findParent`/`getFunctionParent`/`getProgramParent` and `'*'`-role
- * children. Derived paths share the owning route's runtime, so they carry exactly
- * the owner's declared capabilities and a generic node view rather than the
- * contract's declared payload.
+ * `parentPath`/`findParent`/`getFunctionParent`/`getProgramParent`. Derived paths
+ * share the owning route's runtime, so they carry exactly the owner's declared
+ * capabilities and a generic node view rather than a child contract's payload.
  */
 type AncestryRoutesOf<Owner> = Owner extends {
   ancestry: { routes: infer Routes };
@@ -734,7 +736,11 @@ type ChildrenPart<Route extends string, Contract, Owner> = Contract extends {
         | ChildPathOf<NonNullable<Children[Role]>, Owner>
         | readonly ChildPathOf<NonNullable<Children[Role]>, Owner>[]
         | null;
-    } & ('*' extends keyof Children ? { getChildren(): readonly DerivedNodePath<Owner>[] } : {})
+    } & ('*' extends keyof Children
+      ? {
+          getChildren(): readonly ChildPathOf<NonNullable<Children['*']>, Owner>[];
+        }
+      : {})
   : {};
 
 type ContractFieldsOf<Contract> = Contract extends { fields: readonly (infer F extends string)[] }
