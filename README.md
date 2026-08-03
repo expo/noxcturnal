@@ -162,7 +162,29 @@ metadata, or diagnostics, the consumer must include the relevant values in
 its own transform-result cache key. Parser selection, preflight options, and
 other Noxcturnal-owned transform options remain part of the library key.
 
-Every visitor is a typed contract beside its callback: `defineVisitor(route, contract, handler)` declares the payload `fields`, native `where` predicates, `scope`, `ancestry`, `children`, `controlFlow`, and (when needed) `nested` visitor requirements — and the callback's path type is derived from exactly that contract, so undeclared scalar fields are TypeScript errors while operational capabilities remain runtime-validated. The compiled native route manifest is generated from the same normalized contract object. The plugin `contract` declares context-level requirements (metadata ownership, semantic queries). Predicate values that vary per configuration are declared with `parameter(name)` and bound with `plugin.withParameters(values)`; there is no per-file hook that can change a contract.
+Every visitor is a typed contract beside its callback: `defineVisitor(route, contract, handler)` declares the payload `fields`, parsed `comments`, native `where` predicates, `scope`, `ancestry`, `children`, `controlFlow`, and (when needed) `nested` visitor requirements — and the callback's path type is derived from exactly that contract, so undeclared scalar fields are TypeScript errors while operational capabilities remain runtime-validated. The compiled native route manifest is generated from the same normalized contract object. The plugin `contract` declares context-level requirements (metadata ownership, semantic queries). Predicate values that vary per configuration are declared with `parameter(name)` and bound with `plugin.withParameters(values)`; there is no per-file hook that can change a contract.
+
+Declaring `comments: 'inner'` enables `path.getComments('inner')`. It returns immutable parser records, in source order, whose complete ranges are contained by the node. Comment `start`/`end` coordinates are UTF-16 and half-open, include the `//` or `/* */` delimiters, while `value` omits those delimiters. Comments are input data for the current phase; edits become visible after the next phase reparses. No leading or trailing attachment relation is currently exposed.
+
+Child authorization is exact and recursive. A named entry such as
+`children: { declarations: { route: 'VariableDeclarator' } }` authorizes
+`getChildList('declarations')`. A `'*'` entry authorizes `getChildren()` and each
+enumerated path retains that entry's declared fields and nested children; it does
+not authorize an arbitrary named `getChild()` call. Child paths inherit the
+owning visitor's scope, ancestry, and control-flow capabilities, but comments are
+local to the exact delivered visitor route and never inherited by derived paths.
+Casting a typed callback path to `NativeNodePath` bypasses these compile-time
+checks and should not be necessary.
+
+Use nested wildcards only for genuinely heterogeneous structure. For example,
+`children: { '*': { route: 'Pattern', children: { '*': { route: '*' } } } }`
+preserves useful recursive typing, but the inner `route: '*'` can make every
+concrete node type a retained structural parent. Prefer generated named roles
+when the relationship is stable. `getSource()` is range-based and does not need
+descendant routing, so request descendants only when the callback reads their
+parsed fields or relations. Formal parameters follow Oxc's retained shape:
+`pattern` is the binding and `default` is its separate initializer, rather than
+an assumed Babel `AssignmentPattern` wrapper.
 
 The TypeScript API derives its node and scalar-field names from the generated Oxc protocol schema: per-route declarable fields come from the same generated table the native predicate validator uses. Contracts narrow `path.node` to base identity plus declared fields (including `ReferencedIdentifier` and collapsed function/class routes), invalid route/field/capability literals are rejected, and the generic analysis value returned by `analyze` flows into `apply`. Composite routes such as `'Identifier|StringLiteral'` intentionally receive open field typing; use `path.is(...)` when a branch needs a specific view.
 
@@ -220,7 +242,7 @@ hydrated routes allocate no ancestor-field records.
 - Binding queries include declaration, read/write references, and lexical captures as ready-to-use compact node views. Constant queries conservatively evaluate side-effect-free literal, unary, binary, logical, conditional, parenthesized, and sequence expressions; requested IDs return through a targeted packed buffer rather than transferring every expression. Module events expose import/export specifiers, declaration kinds, directives, and common call/construction summaries needed by source transformers.
 - Scope views are interned for stable identity, use Oxc's complete semantic parent table (including empty intermediate scopes), expose lazy parent/program-owner paths, resolve bindings with lazy declaration paths and owning scopes, can insert generated declarations after directive prologues, and can rename a declaration plus its Oxc-resolved references in one transactional edit batch, including shorthand object and assignment properties. The scope table crosses N-API only as an on-demand packed integer buffer. Path views include Babel-shaped `replaceWithMultiple`, body-container, comment, and code-frame conveniences where those operations map cleanly to immutable source edits.
 - Compact views expose frequently matched scalar discriminants—including property keys/flags, expression operators, function arity, yield delegation, and export-all facts—without transferring recursive child objects.
-- Structural reads are declared with the contract's `children` (one statically-typed level, with runtime-validated deeper chains); direct children for matching parents are prefetched in one packed native batch. Paths expose Babel-shaped `get()` plus typed `getChild()` and `getChildList()` alternatives. Undeclared roles fail instead of causing hidden property-level FFI.
+- Structural reads are declared with the contract's `children`; named and wildcard child contracts remain statically typed through every nested hop, while runtime authorization is checked at the same boundary. Direct children for matching parents are prefetched in one packed native batch. Paths expose Babel-shaped `get()` plus cardinality-steered `getChild()` and `getChildList()` alternatives. Undeclared roles fail instead of causing hidden property-level FFI.
 - Babel-compatible routes used by Expo include `ReferencedIdentifier`, `MetaProperty`, and declaration/expression variants collapsed by Oxc for functions and classes. Static member chains support `path.matchesPattern()` without child traversal.
 - Replacement, removal, all four insertion affinities, append/prepend, move/reset/indent/trim/replace lowering, source-map marks, code fragments, overlap detection, Unicode-safe offsets, and direct encoded VLQ output. The committed document is a piece table: every piece records its source provenance, and rendering and mapping derive from piece structure.
 - Output sections: `editor.prepend` and `editor.append` are prefix/suffix sections assembled around the body — a wrapper's opener always precedes Program body insertions, rather than competing with them in insertion-affinity order. `prependToProgram` and `ensureHelper` use one parser-authoritative boundary after the shebang, leading comments, and directive prologue; `appendToProgram` uses the final AST-statement boundary before trailing comments. All three remain inside output wrappers.

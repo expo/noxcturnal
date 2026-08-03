@@ -807,6 +807,126 @@
       "property": "'target'"
     }
   },
+  "childRoleNative": {
+    "ArrayAssignmentTarget.elements": {
+      "edges": [
+        {
+          "field": "elements",
+          "shape": "listOptionalItems"
+        },
+        {
+          "field": "rest",
+          "shape": "optional"
+        }
+      ]
+    },
+    "ArrayPattern.elements": {
+      "edges": [
+        {
+          "field": "elements",
+          "shape": "listOptionalItems"
+        },
+        {
+          "field": "rest",
+          "shape": "optional"
+        }
+      ]
+    },
+    "ObjectAssignmentTarget.properties": {
+      "edges": [
+        {
+          "field": "properties",
+          "shape": "list"
+        },
+        {
+          "field": "rest",
+          "shape": "optional"
+        }
+      ]
+    },
+    "ObjectPattern.properties": {
+      "edges": [
+        {
+          "field": "properties",
+          "shape": "list"
+        },
+        {
+          "field": "rest",
+          "shape": "optional"
+        }
+      ]
+    },
+    "Program.directives": {
+      "field": "directives",
+      "shape": "list"
+    },
+    "Function.params": {
+      "field": "params",
+      "shape": "single",
+      "projection": "formalParameters"
+    },
+    "ArrowFunctionExpression.params": {
+      "field": "params",
+      "shape": "single",
+      "projection": "formalParameters"
+    },
+    "FunctionBody.body": {
+      "field": "statements",
+      "shape": "list"
+    },
+    "FunctionBody.directives": {
+      "field": "directives",
+      "shape": "list"
+    },
+    "FormalParameter.decorators": {
+      "field": "decorators",
+      "shape": "list"
+    },
+    "FormalParameter.pattern": {
+      "field": "pattern",
+      "shape": "single"
+    },
+    "FormalParameter.default": {
+      "field": "initializer",
+      "shape": "optional"
+    },
+    "FormalParameterRest.argument": {
+      "field": "rest",
+      "shape": "single"
+    },
+    "BindingRestElement.pattern": {
+      "field": "argument",
+      "shape": "single"
+    },
+    "AssignmentTargetPropertyProperty.key": {
+      "field": "name",
+      "shape": "single"
+    },
+    "AssignmentTargetPropertyProperty.value": {
+      "field": "binding",
+      "shape": "single"
+    },
+    "Class.superClass": {
+      "field": "super_class",
+      "shape": "optional"
+    },
+    "ComputedMemberExpression.property": {
+      "field": "expression",
+      "shape": "single"
+    },
+    "PrivateFieldExpression.property": {
+      "field": "field",
+      "shape": "single"
+    },
+    "ImportDeclaration.specifiers": {
+      "field": "specifiers",
+      "shape": "optionalList"
+    },
+    "SwitchStatement.test": {
+      "field": "discriminant",
+      "shape": "single"
+    }
+  },
   "childRoles": {
     "Program": {
       "body": {
@@ -864,7 +984,7 @@
         "list": false
       },
       "params": {
-        "routes": ["FormalParameters", "FormalParameter", "FormalParameterRest"],
+        "routes": ["FormalParameter", "FormalParameterRest"],
         "list": true
       },
       "id": {
@@ -878,12 +998,7 @@
         "list": false
       },
       "params": {
-        "routes": [
-          "FormalParameters",
-          "FormalParameter",
-          "FormalParameterRest",
-          "BindingRestElement"
-        ],
+        "routes": ["FormalParameter", "FormalParameterRest", "BindingRestElement"],
         "list": true
       }
     },

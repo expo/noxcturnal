@@ -16,6 +16,27 @@ use super::collect::{materialize_with_scope_parents, parse_program_body_offsets}
 use super::retained::routed_buffer_from_index;
 use super::{MaterializedSessionParts, decode_route_manifest};
 
+#[napi(object)]
+pub struct NativeChildEdge {
+    pub parent_id: u32,
+    pub child_id: u32,
+    pub role_id: u32,
+}
+
+#[napi(object)]
+pub struct NativeChildBatch {
+    pub edges: Vec<NativeChildEdge>,
+    pub events: Buffer,
+}
+
+#[napi(object)]
+pub struct NativeRetentionDebugSummary {
+    pub retained_edge_count: u32,
+    pub scalar_field_word_count: u32,
+    pub scalar_string_count: u32,
+    pub retained_index_bytes: u32,
+}
+
 #[napi]
 pub struct NativeIndexedSession {
     source: String,
@@ -160,7 +181,7 @@ impl NativeIndexedSession {
         parent_ids: Vec<u32>,
         parent_types: Vec<String>,
         parent_type_ids: Vec<u32>,
-    ) -> Result<Buffer> {
+    ) -> Result<NativeChildBatch> {
         self.ensure_open()?;
         let mut parent_ids = parent_ids.into_iter().collect::<FxHashSet<_>>();
         let mut parent_type_ids = parent_type_ids.into_iter().collect::<FxHashSet<_>>();
@@ -174,15 +195,38 @@ impl NativeIndexedSession {
             }
         }
         parent_ids.extend(self.retained_index.node_ids_of_types(&parent_type_ids));
-        let mut ordered_child_ids = parent_ids
+        let edges = parent_ids
             .iter()
-            .flat_map(|parent_id| self.retained_index.children(*parent_id))
+            .flat_map(|parent_id| {
+                self.retained_index
+                    .child_edges(*parent_id)
+                    .map(|(child_id, role_id)| NativeChildEdge {
+                        parent_id: *parent_id,
+                        child_id,
+                        role_id,
+                    })
+            })
             .collect::<Vec<_>>();
+        let mut ordered_child_ids = edges.iter().map(|edge| edge.child_id).collect::<Vec<_>>();
         ordered_child_ids.sort_unstable();
         ordered_child_ids.dedup();
-        Ok(self
-            .retained_index
-            .packed_events_buffer(&ordered_child_ids, &self.scope_parents))
+        Ok(NativeChildBatch {
+            edges,
+            events: self
+                .retained_index
+                .packed_events_buffer(&ordered_child_ids, &self.scope_parents),
+        })
+    }
+
+    #[napi]
+    pub fn retention_debug_summary(&self) -> Result<NativeRetentionDebugSummary> {
+        self.ensure_open()?;
+        Ok(NativeRetentionDebugSummary {
+            retained_edge_count: self.retained_index.child_edge_count(),
+            scalar_field_word_count: self.retained_index.scalar_field_count() * 2,
+            scalar_string_count: self.retained_index.scalar_string_count(),
+            retained_index_bytes: self.retained_index.memory_usage().min(u32::MAX as usize) as u32,
+        })
     }
 
     #[napi]

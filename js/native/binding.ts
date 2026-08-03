@@ -155,7 +155,16 @@ interface NativeBinding {
       parentIds: number[],
       parentTypes: string[],
       parentTypeIds: number[],
-    ): Buffer;
+    ): {
+      edges: { parentId: number; childId: number; roleId: number }[];
+      events: Buffer;
+    };
+    retentionDebugSummary(): {
+      retainedEdgeCount: number;
+      scalarFieldWordCount: number;
+      scalarStringCount: number;
+      retainedIndexBytes: number;
+    };
     queryConstants(nodeIds: number[]): { id: number; kind: string; value: string }[];
     queryCalls(
       calleeName: string,

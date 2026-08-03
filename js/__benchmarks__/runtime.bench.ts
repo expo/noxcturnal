@@ -1235,8 +1235,56 @@ for (const [name, transforms] of [
 }
 
 const retainedIndexCorpus = generateLargeFileSource(256 * 1024, 'functions');
+const highFanoutBodyPipeline = defineNativePipeline({
+  phases: [
+    {
+      name: 'high-fanout-body-role',
+      plugins: [
+        defineNativePlugin({
+          name: 'high-fanout-body-role',
+          visitors: [
+            defineVisitor('Program', { children: { body: { route: 'Statement' } } }, path =>
+              path.getChildList('body'),
+            ),
+          ],
+        }),
+      ],
+    },
+  ],
+});
+for (const count of [256, 2_048, 8_192]) {
+  const highFanoutBody = Array.from({ length: count }, (_, index) => `consume(${index});`).join(
+    '\n',
+  );
+  verifiedBench(`list child-role attribution scaling: ${count}`, () =>
+    benchmarkTransform(highFanoutBody, 'high-fanout.js', highFanoutBodyPipeline),
+  );
+}
 const retainedIndexContracts = [
   ['no child routing', defineVisitor('Function', {}, () => {})],
+  [
+    'one named role on a low-fanout parent',
+    defineVisitor('VariableDeclarator', { children: { id: { route: 'Identifier' } } }, path =>
+      path.getChild('id'),
+    ),
+  ],
+  [
+    'one named role on a high-fanout parent',
+    defineVisitor('Program', { children: { body: { route: 'Statement' } } }, path =>
+      path.getChildList('body'),
+    ),
+  ],
+  [
+    'several named roles on one parent',
+    defineVisitor(
+      'VariableDeclarator',
+      { children: { id: { route: 'Identifier' }, init: { route: 'Expression' } } },
+      path => {
+        path.getChild('id');
+        path.getChild('init');
+      },
+    ),
+  ],
   [
     'shallow parameter wildcard',
     defineVisitor(

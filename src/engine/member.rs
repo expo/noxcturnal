@@ -5,7 +5,7 @@ use oxc_ast::{
 use oxc_span::GetSpan;
 use rustc_hash::FxHashMap;
 
-use crate::generated::event_schema::{NODE_TYPE_COUNT, field_ids, node_type_name};
+use crate::generated::event_schema::{field_ids, node_type_name};
 use crate::protocol::manifest::CompiledManifest;
 
 use super::{RETAIN_IDENTIFIERS, RETAIN_MODULE_FACTS};
@@ -17,30 +17,6 @@ pub(super) fn tracks_member_writes(
     retention_capabilities & RETAIN_IDENTIFIERS != 0
         || manifest.is_some_and(|manifest| {
             manifest.retention_capabilities & RETAIN_MODULE_FACTS != 0
-                || (0..=NODE_TYPE_COUNT as u32).any(|type_id| {
-                    manifest.structural_parent_types.contains(type_id)
-                        && matches!(
-                            node_type_name(type_id),
-                            Some(
-                                "AssignmentExpression"
-                                    | "UpdateExpression"
-                                    | "UnaryExpression"
-                                    | "ForInStatement"
-                                    | "ForOfStatement"
-                                    | "ParenthesizedExpression"
-                                    | "TSAsExpression"
-                                    | "TSSatisfiesExpression"
-                                    | "TSNonNullExpression"
-                                    | "TSTypeAssertion"
-                                    | "ChainExpression"
-                                    | "AssignmentTargetRest"
-                                    | "AssignmentTargetWithDefault"
-                                    | "AssignmentTargetPropertyProperty"
-                                    | "ArrayAssignmentTarget"
-                                    | "ObjectAssignmentTarget"
-                            )
-                        )
-                })
                 || manifest
                     .merged_field_mask_by_type
                     .iter()

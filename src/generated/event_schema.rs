@@ -2,6 +2,7 @@
 
 pub(crate) const NODE_TYPE_COUNT: usize = 187;
 pub(crate) const FIELD_KEY_COUNT: usize = 52;
+pub(crate) const CHILD_ROLE_COUNT: usize = 105;
 const _: () = assert!(FIELD_KEY_COUNT < 64, "field keys must fit a FieldMask");
 
 pub(crate) fn node_type_id(value: &str) -> Option<u32> {
@@ -560,6 +561,1144 @@ pub(crate) mod field_ids {
     pub(crate) const DECLARATION_NAME_PREFIX: u32 = 50;
     pub(crate) const PATTERN: u32 = 51;
     pub(crate) const FLAGS: u32 = 52;
+}
+
+pub(crate) fn child_role_id(parent_type_id: u32, role: &str) -> Option<u32> {
+    Some(match (parent_type_id, role) {
+        (81, "key") => 1,
+        (81, "value") => 2,
+        (27, "elements") => 3,
+        (5, "elements") => 4,
+        (66, "elements") => 5,
+        (73, "body") => 6,
+        (73, "params") => 7,
+        (26, "left") => 8,
+        (26, "right") => 9,
+        (63, "left") => 10,
+        (63, "right") => 11,
+        (32, "key") => 12,
+        (32, "value") => 13,
+        (35, "argument") => 14,
+        (22, "left") => 15,
+        (22, "right") => 16,
+        (65, "key") => 17,
+        (65, "value") => 18,
+        (67, "pattern") => 19,
+        (40, "body") => 20,
+        (15, "arguments") => 21,
+        (15, "callee") => 22,
+        (60, "body") => 23,
+        (75, "body") => 24,
+        (75, "decorators") => 25,
+        (75, "id") => 26,
+        (75, "superClass") => 27,
+        (76, "body") => 28,
+        (12, "object") => 29,
+        (12, "property") => 30,
+        (25, "alternate") => 31,
+        (25, "consequent") => 32,
+        (25, "test") => 33,
+        (46, "body") => 34,
+        (46, "test") => 35,
+        (91, "source") => 36,
+        (90, "declaration") => 37,
+        (89, "declaration") => 38,
+        (89, "source") => 39,
+        (89, "specifiers") => 40,
+        (44, "expression") => 41,
+        (49, "body") => 42,
+        (50, "body") => 43,
+        (48, "body") => 44,
+        (48, "test") => 45,
+        (70, "decorators") => 46,
+        (70, "default") => 47,
+        (70, "pattern") => 48,
+        (71, "argument") => 49,
+        (68, "body") => 50,
+        (68, "id") => 51,
+        (68, "params") => 52,
+        (72, "body") => 53,
+        (72, "directives") => 54,
+        (45, "alternate") => 55,
+        (45, "consequent") => 56,
+        (45, "test") => 57,
+        (83, "source") => 58,
+        (83, "specifiers") => 59,
+        (82, "source") => 60,
+        (57, "body") => 61,
+        (24, "left") => 62,
+        (24, "right") => 63,
+        (77, "decorators") => 64,
+        (77, "key") => 65,
+        (77, "value") => 66,
+        (16, "arguments") => 67,
+        (16, "callee") => 68,
+        (28, "properties") => 69,
+        (7, "properties") => 70,
+        (64, "properties") => 71,
+        (8, "key") => 72,
+        (8, "value") => 73,
+        (14, "object") => 74,
+        (14, "property") => 75,
+        (23, "left") => 76,
+        (23, "right") => 77,
+        (1, "body") => 78,
+        (1, "directives") => 79,
+        (78, "decorators") => 80,
+        (78, "key") => 81,
+        (78, "value") => 82,
+        (53, "argument") => 83,
+        (19, "argument") => 84,
+        (13, "object") => 85,
+        (13, "property") => 86,
+        (55, "test") => 87,
+        (116, "id") => 88,
+        (153, "id") => 89,
+        (165, "body") => 90,
+        (163, "body") => 91,
+        (151, "id") => 92,
+        (58, "argument") => 93,
+        (59, "block") => 94,
+        (59, "finalizer") => 95,
+        (59, "handler") => 96,
+        (21, "argument") => 97,
+        (20, "argument") => 98,
+        (41, "declarations") => 99,
+        (42, "id") => 100,
+        (42, "init") => 101,
+        (47, "body") => 102,
+        (47, "test") => 103,
+        (54, "body") => 104,
+        (74, "argument") => 105,
+        _ => return None,
+    })
+}
+
+pub(crate) fn child_role_parent_type_id(role_id: u32) -> Option<u32> {
+    Some(match role_id {
+        1 => 81,
+        2 => 81,
+        3 => 27,
+        4 => 5,
+        5 => 66,
+        6 => 73,
+        7 => 73,
+        8 => 26,
+        9 => 26,
+        10 => 63,
+        11 => 63,
+        12 => 32,
+        13 => 32,
+        14 => 35,
+        15 => 22,
+        16 => 22,
+        17 => 65,
+        18 => 65,
+        19 => 67,
+        20 => 40,
+        21 => 15,
+        22 => 15,
+        23 => 60,
+        24 => 75,
+        25 => 75,
+        26 => 75,
+        27 => 75,
+        28 => 76,
+        29 => 12,
+        30 => 12,
+        31 => 25,
+        32 => 25,
+        33 => 25,
+        34 => 46,
+        35 => 46,
+        36 => 91,
+        37 => 90,
+        38 => 89,
+        39 => 89,
+        40 => 89,
+        41 => 44,
+        42 => 49,
+        43 => 50,
+        44 => 48,
+        45 => 48,
+        46 => 70,
+        47 => 70,
+        48 => 70,
+        49 => 71,
+        50 => 68,
+        51 => 68,
+        52 => 68,
+        53 => 72,
+        54 => 72,
+        55 => 45,
+        56 => 45,
+        57 => 45,
+        58 => 83,
+        59 => 83,
+        60 => 82,
+        61 => 57,
+        62 => 24,
+        63 => 24,
+        64 => 77,
+        65 => 77,
+        66 => 77,
+        67 => 16,
+        68 => 16,
+        69 => 28,
+        70 => 7,
+        71 => 64,
+        72 => 8,
+        73 => 8,
+        74 => 14,
+        75 => 14,
+        76 => 23,
+        77 => 23,
+        78 => 1,
+        79 => 1,
+        80 => 78,
+        81 => 78,
+        82 => 78,
+        83 => 53,
+        84 => 19,
+        85 => 13,
+        86 => 13,
+        87 => 55,
+        88 => 116,
+        89 => 153,
+        90 => 165,
+        91 => 163,
+        92 => 151,
+        93 => 58,
+        94 => 59,
+        95 => 59,
+        96 => 59,
+        97 => 21,
+        98 => 20,
+        99 => 41,
+        100 => 42,
+        101 => 42,
+        102 => 47,
+        103 => 47,
+        104 => 54,
+        105 => 74,
+        _ => return None,
+    })
+}
+
+pub(crate) fn child_role_name(role_id: u32) -> Option<&'static str> {
+    Some(match role_id {
+        1 => "key",
+        2 => "value",
+        3 => "elements",
+        4 => "elements",
+        5 => "elements",
+        6 => "body",
+        7 => "params",
+        8 => "left",
+        9 => "right",
+        10 => "left",
+        11 => "right",
+        12 => "key",
+        13 => "value",
+        14 => "argument",
+        15 => "left",
+        16 => "right",
+        17 => "key",
+        18 => "value",
+        19 => "pattern",
+        20 => "body",
+        21 => "arguments",
+        22 => "callee",
+        23 => "body",
+        24 => "body",
+        25 => "decorators",
+        26 => "id",
+        27 => "superClass",
+        28 => "body",
+        29 => "object",
+        30 => "property",
+        31 => "alternate",
+        32 => "consequent",
+        33 => "test",
+        34 => "body",
+        35 => "test",
+        36 => "source",
+        37 => "declaration",
+        38 => "declaration",
+        39 => "source",
+        40 => "specifiers",
+        41 => "expression",
+        42 => "body",
+        43 => "body",
+        44 => "body",
+        45 => "test",
+        46 => "decorators",
+        47 => "default",
+        48 => "pattern",
+        49 => "argument",
+        50 => "body",
+        51 => "id",
+        52 => "params",
+        53 => "body",
+        54 => "directives",
+        55 => "alternate",
+        56 => "consequent",
+        57 => "test",
+        58 => "source",
+        59 => "specifiers",
+        60 => "source",
+        61 => "body",
+        62 => "left",
+        63 => "right",
+        64 => "decorators",
+        65 => "key",
+        66 => "value",
+        67 => "arguments",
+        68 => "callee",
+        69 => "properties",
+        70 => "properties",
+        71 => "properties",
+        72 => "key",
+        73 => "value",
+        74 => "object",
+        75 => "property",
+        76 => "left",
+        77 => "right",
+        78 => "body",
+        79 => "directives",
+        80 => "decorators",
+        81 => "key",
+        82 => "value",
+        83 => "argument",
+        84 => "argument",
+        85 => "object",
+        86 => "property",
+        87 => "test",
+        88 => "id",
+        89 => "id",
+        90 => "body",
+        91 => "body",
+        92 => "id",
+        93 => "argument",
+        94 => "block",
+        95 => "finalizer",
+        96 => "handler",
+        97 => "argument",
+        98 => "argument",
+        99 => "declarations",
+        100 => "id",
+        101 => "init",
+        102 => "body",
+        103 => "test",
+        104 => "body",
+        105 => "argument",
+        _ => return None,
+    })
+}
+
+pub(crate) fn child_role_parent_has_roles(parent_type_id: u32) -> bool {
+    matches!(
+        parent_type_id,
+        81 | 27
+            | 5
+            | 66
+            | 73
+            | 26
+            | 63
+            | 32
+            | 35
+            | 22
+            | 65
+            | 67
+            | 40
+            | 15
+            | 60
+            | 75
+            | 76
+            | 12
+            | 25
+            | 46
+            | 91
+            | 90
+            | 89
+            | 44
+            | 49
+            | 50
+            | 48
+            | 70
+            | 71
+            | 68
+            | 72
+            | 45
+            | 83
+            | 82
+            | 57
+            | 24
+            | 77
+            | 16
+            | 28
+            | 7
+            | 64
+            | 8
+            | 14
+            | 23
+            | 1
+            | 78
+            | 53
+            | 19
+            | 13
+            | 55
+            | 116
+            | 153
+            | 165
+            | 163
+            | 151
+            | 58
+            | 59
+            | 21
+            | 20
+            | 41
+            | 42
+            | 47
+            | 54
+            | 74
+    )
+}
+
+pub(crate) fn child_role_projects_formal_parameters(role_id: u32) -> bool {
+    matches!(role_id, 7 | 52)
+}
+
+pub(crate) fn child_role_cardinality(role_id: u32) -> Option<u8> {
+    Some(match role_id {
+        1 => 0,
+        2 => 1,
+        3 => 2,
+        4 => 2,
+        5 => 2,
+        6 => 0,
+        7 => 2,
+        8 => 0,
+        9 => 0,
+        10 => 0,
+        11 => 0,
+        12 => 0,
+        13 => 0,
+        14 => 0,
+        15 => 0,
+        16 => 0,
+        17 => 0,
+        18 => 0,
+        19 => 0,
+        20 => 2,
+        21 => 2,
+        22 => 0,
+        23 => 0,
+        24 => 0,
+        25 => 2,
+        26 => 1,
+        27 => 1,
+        28 => 2,
+        29 => 0,
+        30 => 0,
+        31 => 0,
+        32 => 0,
+        33 => 0,
+        34 => 0,
+        35 => 0,
+        36 => 0,
+        37 => 0,
+        38 => 1,
+        39 => 1,
+        40 => 2,
+        41 => 0,
+        42 => 0,
+        43 => 0,
+        44 => 0,
+        45 => 1,
+        46 => 2,
+        47 => 1,
+        48 => 0,
+        49 => 0,
+        50 => 1,
+        51 => 1,
+        52 => 2,
+        53 => 2,
+        54 => 2,
+        55 => 1,
+        56 => 0,
+        57 => 0,
+        58 => 0,
+        59 => 2,
+        60 => 0,
+        61 => 0,
+        62 => 0,
+        63 => 0,
+        64 => 2,
+        65 => 0,
+        66 => 0,
+        67 => 2,
+        68 => 0,
+        69 => 2,
+        70 => 2,
+        71 => 2,
+        72 => 0,
+        73 => 0,
+        74 => 0,
+        75 => 0,
+        76 => 0,
+        77 => 0,
+        78 => 2,
+        79 => 2,
+        80 => 2,
+        81 => 0,
+        82 => 1,
+        83 => 1,
+        84 => 0,
+        85 => 0,
+        86 => 0,
+        87 => 0,
+        88 => 0,
+        89 => 0,
+        90 => 2,
+        91 => 1,
+        92 => 0,
+        93 => 0,
+        94 => 0,
+        95 => 1,
+        96 => 1,
+        97 => 0,
+        98 => 0,
+        99 => 2,
+        100 => 0,
+        101 => 1,
+        102 => 0,
+        103 => 0,
+        104 => 0,
+        105 => 1,
+        _ => return None,
+    })
+}
+
+pub(crate) fn child_role_id_for_edge(
+    parent: oxc_ast::AstKind<'_>,
+    child: oxc_ast::AstKind<'_>,
+) -> Option<u32> {
+    let child_id = child.node_id();
+    match parent {
+        oxc_ast::AstKind::AccessorProperty(parent) => {
+            if parent.key.node_id() == child_id {
+                return Some(1);
+            }
+            if parent
+                .value
+                .as_ref()
+                .is_some_and(|edge| edge.node_id() == child_id)
+            {
+                return Some(2);
+            }
+            None
+        }
+        oxc_ast::AstKind::ArrayAssignmentTarget(parent) => {
+            if parent
+                .rest
+                .as_ref()
+                .is_some_and(|edge| edge.node_id() == child_id)
+            {
+                return Some(3);
+            }
+            if matches!(ast_kind_protocol_id(child), 2 | 4..=7 | 9 | 10 | 12..=16 | 20..=30 | 33 | 35..=37 | 73 | 74 | 82 | 93..=99 | 107 | 109 | 175 | 176 | 180 | 184)
+            {
+                return Some(3);
+            }
+            None
+        }
+        oxc_ast::AstKind::ArrayExpression(_parent) => {
+            if matches!(ast_kind_protocol_id(child), 2 | 4..=7 | 9 | 10 | 12..=16 | 19..=26 | 33 | 35..=37 | 73 | 74 | 82 | 93..=99 | 107 | 109 | 175 | 176 | 180 | 184)
+            {
+                return Some(4);
+            }
+            None
+        }
+        oxc_ast::AstKind::ArrayPattern(parent) => {
+            if parent
+                .rest
+                .as_ref()
+                .is_some_and(|edge| edge.node_id() == child_id)
+            {
+                return Some(5);
+            }
+            if matches!(ast_kind_protocol_id(child), 2 | 6 | 63 | 64 | 66 | 67) {
+                return Some(5);
+            }
+            None
+        }
+        oxc_ast::AstKind::ArrowFunctionExpression(parent) => {
+            if parent.body.node_id() == child_id {
+                return Some(6);
+            }
+            if parent.params.node_id() == child_id {
+                return Some(7);
+            }
+            None
+        }
+        oxc_ast::AstKind::AssignmentExpression(parent) => {
+            if parent.left.node_id() == child_id {
+                return Some(8);
+            }
+            if parent.right.node_id() == child_id {
+                return Some(9);
+            }
+            None
+        }
+        oxc_ast::AstKind::AssignmentPattern(parent) => {
+            if parent.left.node_id() == child_id {
+                return Some(10);
+            }
+            if parent.right.node_id() == child_id {
+                return Some(11);
+            }
+            None
+        }
+        oxc_ast::AstKind::AssignmentTargetPropertyProperty(parent) => {
+            if parent.name.node_id() == child_id {
+                return Some(12);
+            }
+            if parent.binding.node_id() == child_id {
+                return Some(13);
+            }
+            None
+        }
+        oxc_ast::AstKind::AwaitExpression(parent) => {
+            if parent.argument.node_id() == child_id {
+                return Some(14);
+            }
+            None
+        }
+        oxc_ast::AstKind::BinaryExpression(parent) => {
+            if parent.left.node_id() == child_id {
+                return Some(15);
+            }
+            if parent.right.node_id() == child_id {
+                return Some(16);
+            }
+            None
+        }
+        oxc_ast::AstKind::BindingProperty(parent) => {
+            if parent.key.node_id() == child_id {
+                return Some(17);
+            }
+            if parent.value.node_id() == child_id {
+                return Some(18);
+            }
+            None
+        }
+        oxc_ast::AstKind::BindingRestElement(parent) => {
+            if parent.argument.node_id() == child_id {
+                return Some(19);
+            }
+            None
+        }
+        oxc_ast::AstKind::BlockStatement(_parent) => {
+            if matches!(ast_kind_protocol_id(child), 40 | 41 | 43..=55 | 57..=59 | 62 | 68 | 75 | 83 | 89..=91 | 116 | 150 | 151 | 153 | 157 | 159 | 163 | 164 | 178 | 183)
+            {
+                return Some(20);
+            }
+            None
+        }
+        oxc_ast::AstKind::CallExpression(parent) => {
+            if parent.callee.node_id() == child_id {
+                return Some(22);
+            }
+            if matches!(ast_kind_protocol_id(child), 2 | 4 | 5 | 7 | 9 | 10 | 12..=16 | 19..=26 | 33 | 35..=37 | 73 | 74 | 82 | 93..=99 | 107 | 109 | 175 | 176 | 180 | 184)
+            {
+                return Some(21);
+            }
+            None
+        }
+        oxc_ast::AstKind::CatchClause(parent) => {
+            if parent.body.node_id() == child_id {
+                return Some(23);
+            }
+            None
+        }
+        oxc_ast::AstKind::Class(parent) => {
+            if parent.body.node_id() == child_id {
+                return Some(24);
+            }
+            if parent
+                .id
+                .as_ref()
+                .is_some_and(|edge| edge.node_id() == child_id)
+            {
+                return Some(26);
+            }
+            if parent
+                .super_class
+                .as_ref()
+                .is_some_and(|edge| edge.node_id() == child_id)
+            {
+                return Some(27);
+            }
+            if matches!(ast_kind_protocol_id(child), 181) {
+                return Some(25);
+            }
+            None
+        }
+        oxc_ast::AstKind::ClassBody(_parent) => {
+            if matches!(ast_kind_protocol_id(child), 77 | 78 | 80 | 81 | 156) {
+                return Some(28);
+            }
+            None
+        }
+        oxc_ast::AstKind::ComputedMemberExpression(parent) => {
+            if parent.object.node_id() == child_id {
+                return Some(29);
+            }
+            if parent.expression.node_id() == child_id {
+                return Some(30);
+            }
+            None
+        }
+        oxc_ast::AstKind::ConditionalExpression(parent) => {
+            if parent.alternate.node_id() == child_id {
+                return Some(31);
+            }
+            if parent.consequent.node_id() == child_id {
+                return Some(32);
+            }
+            if parent.test.node_id() == child_id {
+                return Some(33);
+            }
+            None
+        }
+        oxc_ast::AstKind::DoWhileStatement(parent) => {
+            if parent.body.node_id() == child_id {
+                return Some(34);
+            }
+            if parent.test.node_id() == child_id {
+                return Some(35);
+            }
+            None
+        }
+        oxc_ast::AstKind::ExportAllDeclaration(parent) => {
+            if parent.source.node_id() == child_id {
+                return Some(36);
+            }
+            None
+        }
+        oxc_ast::AstKind::ExportDefaultDeclaration(parent) => {
+            if parent.declaration.node_id() == child_id {
+                return Some(37);
+            }
+            None
+        }
+        oxc_ast::AstKind::ExportNamedDeclaration(parent) => {
+            if parent
+                .declaration
+                .as_ref()
+                .is_some_and(|edge| edge.node_id() == child_id)
+            {
+                return Some(38);
+            }
+            if parent
+                .source
+                .as_ref()
+                .is_some_and(|edge| edge.node_id() == child_id)
+            {
+                return Some(39);
+            }
+            if matches!(ast_kind_protocol_id(child), 92) {
+                return Some(40);
+            }
+            None
+        }
+        oxc_ast::AstKind::ExpressionStatement(parent) => {
+            if parent.expression.node_id() == child_id {
+                return Some(41);
+            }
+            None
+        }
+        oxc_ast::AstKind::ForInStatement(parent) => {
+            if parent.body.node_id() == child_id {
+                return Some(42);
+            }
+            None
+        }
+        oxc_ast::AstKind::ForOfStatement(parent) => {
+            if parent.body.node_id() == child_id {
+                return Some(43);
+            }
+            None
+        }
+        oxc_ast::AstKind::ForStatement(parent) => {
+            if parent.body.node_id() == child_id {
+                return Some(44);
+            }
+            if parent
+                .test
+                .as_ref()
+                .is_some_and(|edge| edge.node_id() == child_id)
+            {
+                return Some(45);
+            }
+            None
+        }
+        oxc_ast::AstKind::FormalParameter(parent) => {
+            if parent
+                .initializer
+                .as_ref()
+                .is_some_and(|edge| edge.node_id() == child_id)
+            {
+                return Some(47);
+            }
+            if parent.pattern.node_id() == child_id {
+                return Some(48);
+            }
+            if matches!(ast_kind_protocol_id(child), 181) {
+                return Some(46);
+            }
+            None
+        }
+        oxc_ast::AstKind::FormalParameterRest(parent) => {
+            if parent.rest.node_id() == child_id {
+                return Some(49);
+            }
+            None
+        }
+        oxc_ast::AstKind::Function(parent) => {
+            if parent
+                .body
+                .as_ref()
+                .is_some_and(|edge| edge.node_id() == child_id)
+            {
+                return Some(50);
+            }
+            if parent
+                .id
+                .as_ref()
+                .is_some_and(|edge| edge.node_id() == child_id)
+            {
+                return Some(51);
+            }
+            if parent.params.node_id() == child_id {
+                return Some(52);
+            }
+            None
+        }
+        oxc_ast::AstKind::FunctionBody(_parent) => {
+            if matches!(ast_kind_protocol_id(child), 40 | 41 | 43..=55 | 57..=59 | 62 | 68 | 75 | 83 | 89..=91 | 116 | 150 | 151 | 153 | 157 | 159 | 163 | 164 | 178 | 183)
+            {
+                return Some(53);
+            }
+            if matches!(ast_kind_protocol_id(child), 38) {
+                return Some(54);
+            }
+            None
+        }
+        oxc_ast::AstKind::IfStatement(parent) => {
+            if parent
+                .alternate
+                .as_ref()
+                .is_some_and(|edge| edge.node_id() == child_id)
+            {
+                return Some(55);
+            }
+            if parent.consequent.node_id() == child_id {
+                return Some(56);
+            }
+            if parent.test.node_id() == child_id {
+                return Some(57);
+            }
+            None
+        }
+        oxc_ast::AstKind::ImportDeclaration(parent) => {
+            if parent.source.node_id() == child_id {
+                return Some(58);
+            }
+            if matches!(ast_kind_protocol_id(child), 84..=86) {
+                return Some(59);
+            }
+            None
+        }
+        oxc_ast::AstKind::ImportExpression(parent) => {
+            if parent.source.node_id() == child_id {
+                return Some(60);
+            }
+            None
+        }
+        oxc_ast::AstKind::LabeledStatement(parent) => {
+            if parent.body.node_id() == child_id {
+                return Some(61);
+            }
+            None
+        }
+        oxc_ast::AstKind::LogicalExpression(parent) => {
+            if parent.left.node_id() == child_id {
+                return Some(62);
+            }
+            if parent.right.node_id() == child_id {
+                return Some(63);
+            }
+            None
+        }
+        oxc_ast::AstKind::MethodDefinition(parent) => {
+            if parent.key.node_id() == child_id {
+                return Some(65);
+            }
+            if parent.value.node_id() == child_id {
+                return Some(66);
+            }
+            if matches!(ast_kind_protocol_id(child), 181) {
+                return Some(64);
+            }
+            None
+        }
+        oxc_ast::AstKind::NewExpression(parent) => {
+            if parent.callee.node_id() == child_id {
+                return Some(68);
+            }
+            if matches!(ast_kind_protocol_id(child), 2 | 4 | 5 | 7 | 9 | 10 | 12..=16 | 19..=26 | 33 | 35..=37 | 73 | 74 | 82 | 93..=99 | 107 | 109 | 175 | 176 | 180 | 184)
+            {
+                return Some(67);
+            }
+            None
+        }
+        oxc_ast::AstKind::ObjectAssignmentTarget(parent) => {
+            if parent
+                .rest
+                .as_ref()
+                .is_some_and(|edge| edge.node_id() == child_id)
+            {
+                return Some(69);
+            }
+            if matches!(ast_kind_protocol_id(child), 29 | 31 | 32) {
+                return Some(69);
+            }
+            None
+        }
+        oxc_ast::AstKind::ObjectExpression(_parent) => {
+            if matches!(ast_kind_protocol_id(child), 8 | 19) {
+                return Some(70);
+            }
+            None
+        }
+        oxc_ast::AstKind::ObjectPattern(parent) => {
+            if parent
+                .rest
+                .as_ref()
+                .is_some_and(|edge| edge.node_id() == child_id)
+            {
+                return Some(71);
+            }
+            if matches!(ast_kind_protocol_id(child), 65 | 67) {
+                return Some(71);
+            }
+            None
+        }
+        oxc_ast::AstKind::ObjectProperty(parent) => {
+            if parent.key.node_id() == child_id {
+                return Some(72);
+            }
+            if parent.value.node_id() == child_id {
+                return Some(73);
+            }
+            None
+        }
+        oxc_ast::AstKind::PrivateFieldExpression(parent) => {
+            if parent.object.node_id() == child_id {
+                return Some(74);
+            }
+            if parent.field.node_id() == child_id {
+                return Some(75);
+            }
+            None
+        }
+        oxc_ast::AstKind::PrivateInExpression(parent) => {
+            if parent.left.node_id() == child_id {
+                return Some(76);
+            }
+            if parent.right.node_id() == child_id {
+                return Some(77);
+            }
+            None
+        }
+        oxc_ast::AstKind::Program(_parent) => {
+            if matches!(ast_kind_protocol_id(child), 40 | 41 | 43..=55 | 57..=59 | 62 | 68 | 75 | 83 | 89..=91 | 116 | 150 | 151 | 153 | 157 | 159 | 163 | 164 | 178 | 183)
+            {
+                return Some(78);
+            }
+            if matches!(ast_kind_protocol_id(child), 38) {
+                return Some(79);
+            }
+            None
+        }
+        oxc_ast::AstKind::PropertyDefinition(parent) => {
+            if parent.key.node_id() == child_id {
+                return Some(81);
+            }
+            if parent
+                .value
+                .as_ref()
+                .is_some_and(|edge| edge.node_id() == child_id)
+            {
+                return Some(82);
+            }
+            if matches!(ast_kind_protocol_id(child), 181) {
+                return Some(80);
+            }
+            None
+        }
+        oxc_ast::AstKind::ReturnStatement(parent) => {
+            if parent
+                .argument
+                .as_ref()
+                .is_some_and(|edge| edge.node_id() == child_id)
+            {
+                return Some(83);
+            }
+            None
+        }
+        oxc_ast::AstKind::SpreadElement(parent) => {
+            if parent.argument.node_id() == child_id {
+                return Some(84);
+            }
+            None
+        }
+        oxc_ast::AstKind::StaticMemberExpression(parent) => {
+            if parent.object.node_id() == child_id {
+                return Some(85);
+            }
+            if parent.property.node_id() == child_id {
+                return Some(86);
+            }
+            None
+        }
+        oxc_ast::AstKind::SwitchStatement(parent) => {
+            if parent.discriminant.node_id() == child_id {
+                return Some(87);
+            }
+            None
+        }
+        oxc_ast::AstKind::TSEnumDeclaration(parent) => {
+            if parent.id.node_id() == child_id {
+                return Some(88);
+            }
+            None
+        }
+        oxc_ast::AstKind::TSInterfaceDeclaration(parent) => {
+            if parent.id.node_id() == child_id {
+                return Some(89);
+            }
+            None
+        }
+        oxc_ast::AstKind::TSModuleBlock(_parent) => {
+            if matches!(ast_kind_protocol_id(child), 40 | 41 | 43..=55 | 57..=59 | 62 | 68 | 75 | 83 | 89..=91 | 116 | 150 | 151 | 153 | 157 | 159 | 163 | 164 | 178 | 183)
+            {
+                return Some(90);
+            }
+            None
+        }
+        oxc_ast::AstKind::TSModuleDeclaration(parent) => {
+            if parent
+                .body
+                .as_ref()
+                .is_some_and(|edge| edge.node_id() == child_id)
+            {
+                return Some(91);
+            }
+            None
+        }
+        oxc_ast::AstKind::TSTypeAliasDeclaration(parent) => {
+            if parent.id.node_id() == child_id {
+                return Some(92);
+            }
+            None
+        }
+        oxc_ast::AstKind::ThrowStatement(parent) => {
+            if parent.argument.node_id() == child_id {
+                return Some(93);
+            }
+            None
+        }
+        oxc_ast::AstKind::TryStatement(parent) => {
+            if parent.block.node_id() == child_id {
+                return Some(94);
+            }
+            if parent
+                .finalizer
+                .as_ref()
+                .is_some_and(|edge| edge.node_id() == child_id)
+            {
+                return Some(95);
+            }
+            if parent
+                .handler
+                .as_ref()
+                .is_some_and(|edge| edge.node_id() == child_id)
+            {
+                return Some(96);
+            }
+            None
+        }
+        oxc_ast::AstKind::UnaryExpression(parent) => {
+            if parent.argument.node_id() == child_id {
+                return Some(97);
+            }
+            None
+        }
+        oxc_ast::AstKind::UpdateExpression(parent) => {
+            if parent.argument.node_id() == child_id {
+                return Some(98);
+            }
+            None
+        }
+        oxc_ast::AstKind::VariableDeclaration(_parent) => {
+            if matches!(ast_kind_protocol_id(child), 42) {
+                return Some(99);
+            }
+            None
+        }
+        oxc_ast::AstKind::VariableDeclarator(parent) => {
+            if parent.id.node_id() == child_id {
+                return Some(100);
+            }
+            if parent
+                .init
+                .as_ref()
+                .is_some_and(|edge| edge.node_id() == child_id)
+            {
+                return Some(101);
+            }
+            None
+        }
+        oxc_ast::AstKind::WhileStatement(parent) => {
+            if parent.body.node_id() == child_id {
+                return Some(102);
+            }
+            if parent.test.node_id() == child_id {
+                return Some(103);
+            }
+            None
+        }
+        oxc_ast::AstKind::WithStatement(parent) => {
+            if parent.body.node_id() == child_id {
+                return Some(104);
+            }
+            None
+        }
+        oxc_ast::AstKind::YieldExpression(parent) => {
+            if parent
+                .argument
+                .as_ref()
+                .is_some_and(|edge| edge.node_id() == child_id)
+            {
+                return Some(105);
+            }
+            None
+        }
+        _ => None,
+    }
 }
 
 pub(crate) fn predicate_field_supported(node_type_id: u32, field_id: u32) -> bool {

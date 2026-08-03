@@ -22,6 +22,7 @@ test('a shallow parameter wildcard indexes only its container parent', () => {
     ),
   );
   assert.deepEqual(diagnostic.structuralParentTypes, ['FormalParameters']);
+  assert.deepEqual(diagnostic.wildcardParents, ['FormalParameters']);
   assert.equal(diagnostic.includesEveryConcreteType, false);
 });
 
@@ -74,6 +75,7 @@ test('named declaration and binding roles retain only their concrete parents', (
     'VariableDeclarator',
   ]);
   assert.deepEqual(diagnostic.childRoles.VariableDeclarator, ['id', 'init']);
+  assert.deepEqual(diagnostic.wildcardParents, []);
   assert.deepEqual(diagnostic.scalarFields.Identifier, ['name']);
   assert.deepEqual(diagnostic.scalarFields.ImportExpression, ['staticArgument']);
   assert.equal(diagnostic.scalarFields.Identifier?.includes('staticArgument'), false);

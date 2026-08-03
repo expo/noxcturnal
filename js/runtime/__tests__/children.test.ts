@@ -55,7 +55,7 @@ test('provides lazy compact structural child roles without recursive ESTree tran
         'Function',
         {
           children: {
-            params: { route: 'FormalParameters', children: { '*': { route: '*' } } },
+            params: { route: 'FormalParameter|FormalParameterRest' },
           },
         },
         path => {
@@ -109,6 +109,32 @@ test('requires structural child roles to be declared before parsing', () => {
       ),
     /undeclared child role CallExpression\.arguments/,
   );
+});
+
+test('keeps same-typed sibling fields under distinct native role ids', () => {
+  const observed: Array<[string | undefined, string | undefined]> = [];
+  const plugin = defineNativePlugin({
+    name: 'same-typed-siblings',
+    visitors: [
+      defineVisitor(
+        'BinaryExpression',
+        {
+          children: {
+            left: { route: 'Identifier', fields: ['name'] },
+            right: { route: 'Identifier', fields: ['name'] },
+          },
+        },
+        path =>
+          observed.push([path.getChild('left')?.node.name, path.getChild('right')?.node.name]),
+      ),
+    ],
+  });
+  transform(
+    'left + right;',
+    'fixture.js',
+    defineNativePipeline({ phases: [{ name: 'siblings', plugins: [plugin] }] }),
+  );
+  assert.deepEqual(observed, [['left', 'right']]);
 });
 
 test('distinguishes control-flow and class child roles needed by structural fixes', () => {
@@ -247,6 +273,47 @@ test('serves every generated child role family through the runtime selector', ()
     argument: ['[first, second]', 'null'],
     elements: ['first', 'second'],
     directives: ["'use strict';"],
+  });
+});
+
+test('preserves trailing rest children in projected public pattern lists', () => {
+  const observed: Record<string, string[]> = {};
+  const collect = (key: string, paths: readonly { sourceText(): string }[]) => {
+    observed[key] = paths.map(path => path.sourceText());
+  };
+  const plugin = defineNativePlugin({
+    name: 'mixed-native-child-edges',
+    visitors: [
+      defineVisitor(
+        'ObjectPattern',
+        {
+          children: {
+            properties: { route: 'BindingProperty|BindingRestElement' },
+          },
+        },
+        path => collect('object', path.getChildList('properties')),
+      ),
+      defineVisitor(
+        'ArrayPattern',
+        {
+          children: {
+            elements: {
+              route: 'Identifier|ObjectPattern|ArrayPattern|AssignmentPattern|BindingRestElement',
+            },
+          },
+        },
+        path => collect('array', path.getChildList('elements')),
+      ),
+    ],
+  });
+  transform(
+    'const { value, ...objectRest } = input; const [first, ...arrayRest] = values;',
+    'fixture.js',
+    defineNativePipeline({ phases: [{ name: 'inspect', plugins: [plugin] }] }),
+  );
+  assert.deepEqual(observed, {
+    object: ['value', '...objectRest'],
+    array: ['first', '...arrayRest'],
   });
 });
 

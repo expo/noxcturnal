@@ -1,4 +1,5 @@
 import { alias, expandSubscriptions } from '../pipeline/route-utils';
+import { CHILD_ROLES } from '../generated/event-schema';
 import { createEditor } from './editor';
 import {
   codeFactory,
@@ -349,8 +350,9 @@ export function createDispatcher(
         if (runtime.pathCache) runtime.pathCache[parentId] = path;
         return path;
       },
-      children(target, ancestryDepth) {
-        return session.children(target.id).map(child => {
+      children(target, ancestryDepth, role) {
+        const roleId = role == null ? undefined : CHILD_ROLES[target.type]?.[role]?.id;
+        return session.children(target.id, roleId).map(child => {
           if (ancestryDepth > 0) {
             const cached = runtime.pathCache?.[child.id];
             if (cached) return cached;

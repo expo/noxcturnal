@@ -107,6 +107,47 @@ test('rejects malformed routed manifests at the native boundary', () => {
   );
 });
 
+test('rejects malformed child-role retention entries', () => {
+  const invalidRole = packRouteManifest([], false, false, 0, {
+    VariableDeclarator: ['id'],
+  });
+  invalidRole.writeUInt32LE(0, 10 * 4);
+  assert.throws(
+    () => new native.NativeIndexedSession('let value;', 'fixture.js', false, invalidRole),
+    /invalid child role id/,
+  );
+
+  const wildcardConflict = packRouteManifest([], false, false, 0, {
+    VariableDeclarator: ['id'],
+  });
+  wildcardConflict.writeUInt32LE(1, 8 * 4);
+  assert.throws(
+    () => new native.NativeIndexedSession('let value;', 'fixture.js', false, wildcardConflict),
+    /invalid child retention plan/,
+  );
+});
+
+test('named roles retain fewer edges and no implicit scalar payload', () => {
+  const source = 'let retained = initializer;';
+  const open = (roles: readonly string[]) =>
+    new NativeTransformSession(
+      source,
+      'fixture.js',
+      {},
+      packRouteManifest([], false, false, 1 << 3, { VariableDeclarator: roles }),
+    );
+  const named = open(['id']);
+  const wildcard = open(['*']);
+  const namedSummary = named.retentionDebugSummary();
+  const wildcardSummary = wildcard.retentionDebugSummary();
+  named.close();
+  wildcard.close();
+  assert.equal(namedSummary.retainedEdgeCount, 1);
+  assert.equal(wildcardSummary.retainedEdgeCount, 2);
+  assert.equal(namedSummary.scalarFieldWordCount, 0);
+  assert.equal(namedSummary.scalarStringCount, 0);
+});
+
 test('constructs the retained index and initial routed tape in one native parse', () => {
   const source = 'const value = source + 1; use(value);';
   const manifest = packRouteManifest(
@@ -234,7 +275,7 @@ test('serializes a shared hydrated ancestor once rather than once per routed des
     true,
     false,
     0,
-    [],
+    {},
     { VariableDeclarator: ['bindingName'] },
     { VariableDeclarator: ['bindingName'] },
     ['VariableDeclarator'],
@@ -262,7 +303,7 @@ test('serializes a shared hydrated ancestor once rather than once per routed des
     true,
     false,
     0,
-    [],
+    {},
     {},
     {},
     [],
@@ -654,7 +695,7 @@ test('retains correct member writes when broad field retention is enabled', () =
   ]);
 });
 
-test('retains correct member writes for structural child fields', () => {
+test('does not retain scalar payload merely because a node is a structural child', () => {
   const route = {
     id: 0,
     pluginId: 0,
@@ -664,7 +705,9 @@ test('retains correct member writes for structural child fields', () => {
     predicates: {},
     payloadFields: [],
   };
-  const manifest = packRouteManifest([route], false, false, 0, ['AssignmentExpression']);
+  const manifest = packRouteManifest([route], false, false, 0, {
+    AssignmentExpression: ['*'],
+  });
   const session = new NativeTransformSession(
     'process.env.WRITE = value;',
     'fixture.js',
@@ -673,9 +716,10 @@ test('retains correct member writes for structural child fields', () => {
   );
   const member = session
     .nodes(['StaticMemberExpression'])
-    .find(node => node.memberPath === 'process.env.WRITE');
+    .find(node => node.type === 'StaticMemberExpression');
   session.close();
-  assert.equal(member?.write, true);
+  assert.equal(member?.memberPath, undefined);
+  assert.equal(member?.write, undefined);
 });
 
 test('matches member write predicates without delivering the field', () => {

@@ -16,7 +16,10 @@ const metroImports = defineNativePlugin<ImportState>({
         scope: true,
         ancestry: { mode: 'parent' },
         children: {
-          specifiers: { route: 'ImportSpecifier', fields: ['local', 'imported'] },
+          specifiers: {
+            route: 'ImportSpecifier|ImportDefaultSpecifier|ImportNamespaceSpecifier',
+            fields: ['local', 'imported'],
+          },
         },
       },
       (path, state: ImportState) => {
@@ -204,8 +207,7 @@ const serverActions = defineNativePlugin<ActionState>({
             children: { directives: { route: 'Directive', fields: ['value'] } },
           },
           params: {
-            route: 'FormalParameters',
-            children: { '*': { route: '*' } },
+            route: 'FormalParameter|FormalParameterRest|BindingRestElement',
           },
         },
       },

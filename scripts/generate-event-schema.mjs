@@ -72,10 +72,16 @@ routeRows['*'] = unionRow(schema.nodeTypes);
 // Collapsed function/class keys and ReferencedIdentifier compile an implicit
 // native predicate (nodeKind equals / global present), so their rows narrow.
 for (const key of ['FunctionDeclaration', 'FunctionExpression', 'TSDeclareFunction']) {
-  routeRows[key] = { ...carrierRows.Function, nodeKind: { type: `'${key}'`, optional: false } };
+  routeRows[key] = {
+    ...carrierRows.Function,
+    nodeKind: { type: `'${key}'`, optional: false },
+  };
 }
 for (const key of ['ClassDeclaration', 'ClassExpression']) {
-  routeRows[key] = { ...carrierRows.Class, nodeKind: { type: `'${key}'`, optional: false } };
+  routeRows[key] = {
+    ...carrierRows.Class,
+    nodeKind: { type: `'${key}'`, optional: false },
+  };
 }
 {
   const { binding: _binding, ...identifier } = carrierRows.Identifier;
@@ -127,6 +133,21 @@ const scalarAliases = new Map(
   oxcTypesSource.statements
     .filter(tsCompiler.isTypeAliasDeclaration)
     .map(declaration => [declaration.name.text, declaration.type]),
+);
+const astInterfaceFields = new Map(
+  oxcTypesSource.statements
+    .filter(tsCompiler.isInterfaceDeclaration)
+    .map(declaration => [
+      declaration.name.text,
+      new Map(
+        declaration.members
+          .filter(member => tsCompiler.isPropertySignature(member) && member.type != null)
+          .map(member => [
+            member.name.getText(oxcTypesSource),
+            member.type.getText(oxcTypesSource),
+          ]),
+      ),
+    ]),
 );
 function scalarDomain(node, seen = new Set()) {
   if (tsCompiler.isUnionTypeNode(node)) {
@@ -180,7 +201,10 @@ const predicateValueDomains = Object.fromEntries(
         const domain = domainForType(spec.type);
         return [
           field,
-          { kinds: domain.kinds, ...(domain.values == null ? {} : { values: domain.values }) },
+          {
+            kinds: domain.kinds,
+            ...(domain.values == null ? {} : { values: domain.values }),
+          },
         ];
       }),
     ),
@@ -211,7 +235,10 @@ function childRow(route) {
       ...new Set(declarations.flatMap(entry => entry.routes.flatMap(expansionOf))),
     ];
     const listFlags = [...new Set(declarations.map(entry => entry.list))];
-    row[role] = { childTypes, list: listFlags.length === 1 ? listFlags[0] : 'mixed' };
+    row[role] = {
+      childTypes,
+      list: listFlags.length === 1 ? listFlags[0] : 'mixed',
+    };
   }
   return row;
 }
@@ -220,6 +247,68 @@ for (const route of [...Object.keys(schema.childRoles), ...Object.keys(ALIASES)]
   const row = childRow(route);
   if (Object.keys(row).length > 0) childRows[route] = row;
 }
+
+// Child-role protocol ids are global, deterministic ids for concrete
+// `(parent type, public role)` pairs. Sorting makes the wire identity independent
+// of JSON object insertion order while keeping the authored schema readable.
+const concreteChildRoleEntries = Object.entries(schema.childRoles)
+  .flatMap(([parentType, roles]) =>
+    Object.entries(roles).map(([role, declaration]) => ({
+      parentType,
+      role,
+      declaration,
+    })),
+  )
+  .sort(
+    (left, right) =>
+      (left.parentType < right.parentType ? -1 : left.parentType > right.parentType ? 1 : 0) ||
+      (left.role < right.role ? -1 : left.role > right.role ? 1 : 0),
+  )
+  .map((entry, index) => ({ ...entry, id: index + 1 }));
+const childRoleIdByPair = new Map(
+  concreteChildRoleEntries.map(entry => [`${entry.parentType}\0${entry.role}`, entry.id]),
+);
+const childRoleNativeEntries = concreteChildRoleEntries.map(entry => {
+  const key = `${entry.parentType}.${entry.role}`;
+  const override = schema.childRoleNative?.[key] ?? {};
+  const edgeOverrides = override.edges ?? [
+    { field: override.field ?? entry.role, shape: override.shape },
+  ];
+  if (edgeOverrides.length === 0)
+    throw new Error(`child role ${key} must declare at least one native edge`);
+  const edges = edgeOverrides.map(edge => {
+    const type = astInterfaceFields.get(entry.parentType)?.get(edge.field);
+    const shape =
+      edge.shape ??
+      (type == null
+        ? null
+        : /\bArray\s*</.test(type) || /\[\]$/.test(type)
+          ? 'list'
+          : /\bnull\b/.test(type)
+            ? 'optional'
+            : 'single');
+    if (shape == null)
+      throw new Error(
+        `child role ${key} native edge ${edge.field} has no field shape; add childRoleNative metadata`,
+      );
+    if (!['single', 'optional', 'list', 'optionalList', 'listOptionalItems'].includes(shape))
+      throw new Error(`child role ${key} has invalid native shape ${JSON.stringify(shape)}`);
+    return { field: edge.field, shape };
+  });
+  return {
+    ...entry,
+    edges,
+    projection: override.projection ?? null,
+    cardinality: entry.declaration.list
+      ? 'list'
+      : edges[0].shape === 'optional'
+        ? 'optional'
+        : 'single',
+  };
+});
+const childRoleNativeByPair = new Map(
+  childRoleNativeEntries.map(entry => [`${entry.parentType}\0${entry.role}`, entry]),
+);
 
 // ---------------------------------------------------------------------------
 // Rust output
@@ -276,7 +365,111 @@ const rustFieldConstants = `/// Protocol ids for every declarable field key, for
   .map((value, index) => `    pub(crate) const ${screamingSnake(value)}: u32 = ${index + 1};`)
   .join('\n')}\n}\n`;
 
-const rust = `// Generated by scripts/generate-event-schema.mjs. Do not edit.\n\npub(crate) const NODE_TYPE_COUNT: usize = ${schema.nodeTypes.length};\npub(crate) const FIELD_KEY_COUNT: usize = ${schema.fieldKeys.length};\nconst _: () = assert!(FIELD_KEY_COUNT < 64, "field keys must fit a FieldMask");\n\n${rustMatch('node_type_id', schema.nodeTypes)}\n${rustReverse}\n${rustMatch('field_key_id', schema.fieldKeys)}\n${rustFieldReverse}\n${rustFieldConstants}\n${rustPredicateFields}\n${rustAliasMatches}\n${rustAstKind}`;
+const rustChildRoleId = `pub(crate) fn child_role_id(parent_type_id: u32, role: &str) -> Option<u32> {\n    Some(match (parent_type_id, role) {\n${concreteChildRoleEntries
+  .map(
+    entry =>
+      `        (${schema.nodeTypes.indexOf(entry.parentType) + 1}, ${JSON.stringify(entry.role)}) => ${entry.id},`,
+  )
+  .join('\n')}\n        _ => return None,\n    })\n}\n`;
+const rustChildRoleParent = `pub(crate) fn child_role_parent_type_id(role_id: u32) -> Option<u32> {\n    Some(match role_id {\n${concreteChildRoleEntries
+  .map(entry => `        ${entry.id} => ${schema.nodeTypes.indexOf(entry.parentType) + 1},`)
+  .join('\n')}\n        _ => return None,\n    })\n}\n`;
+const rustChildRoleName = `pub(crate) fn child_role_name(role_id: u32) -> Option<&'static str> {\n    Some(match role_id {\n${concreteChildRoleEntries
+  .map(entry => `        ${entry.id} => ${JSON.stringify(entry.role)},`)
+  .join('\n')}\n        _ => return None,\n    })\n}\n`;
+const rustChildRoleParentHasRoles = `pub(crate) fn child_role_parent_has_roles(parent_type_id: u32) -> bool {\n    matches!(parent_type_id, ${[
+  ...new Set(concreteChildRoleEntries.map(entry => schema.nodeTypes.indexOf(entry.parentType) + 1)),
+].join(' | ')})\n}\n`;
+const projectedRoleIds = childRoleNativeEntries
+  .filter(entry => entry.projection === 'formalParameters')
+  .map(entry => entry.id);
+const rustChildRoleProjection = `pub(crate) fn child_role_projects_formal_parameters(role_id: u32) -> bool {\n    matches!(role_id, ${projectedRoleIds.join(' | ')})\n}\n`;
+const rustChildRoleCardinality = `pub(crate) fn child_role_cardinality(role_id: u32) -> Option<u8> {\n    Some(match role_id {\n${childRoleNativeEntries
+  .map(
+    entry =>
+      `        ${entry.id} => ${entry.cardinality === 'single' ? 0 : entry.cardinality === 'optional' ? 1 : 2},`,
+  )
+  .join('\n')}\n        _ => return None,\n    })\n}\n`;
+const rustIntegerPattern = values => {
+  const sorted = [...new Set(values)].sort((left, right) => left - right);
+  const parts = [];
+  for (let start = 0; start < sorted.length;) {
+    let end = start;
+    while (end + 1 < sorted.length && sorted[end + 1] === sorted[end] + 1) end++;
+    const length = end - start + 1;
+    if (length >= 3) parts.push(`${sorted[start]}..=${sorted[end]}`);
+    else for (let index = start; index <= end; index++) parts.push(String(sorted[index]));
+    start = end + 1;
+  }
+  return parts.join(' | ');
+};
+const rustChildRoleForEdge = `pub(crate) fn child_role_id_for_edge(parent: oxc_ast::AstKind<'_>, child: oxc_ast::AstKind<'_>) -> Option<u32> {\n    let child_id = child.node_id();\n    match parent {\n${Object.entries(
+  Object.groupBy(childRoleNativeEntries, entry => entry.parentType),
+)
+  .map(([parentType, entries]) => {
+    const variant = Object.entries(schema.astKinds).find(
+      ([, publicType]) => publicType === parentType,
+    )?.[0];
+    if (variant == null) throw new Error(`child role parent ${parentType} has no AstKind variant`);
+    const edgeEntries = entries.flatMap(entry => entry.edges.map(edge => ({ entry, edge })));
+    const listEntries = edgeEntries.filter(({ edge }) =>
+      ['list', 'optionalList', 'listOptionalItems'].includes(edge.shape),
+    );
+    for (let index = 0; index < listEntries.length; index++) {
+      const left = listEntries[index].entry;
+      const leftTypes = new Set(left.declaration.routes.flatMap(expansionOf));
+      for (const { entry: right } of listEntries.slice(index + 1)) {
+        const overlap = right.declaration.routes
+          .flatMap(expansionOf)
+          .filter(type => leftTypes.has(type));
+        if (overlap.length > 0)
+          throw new Error(
+            `child roles ${parentType}.${left.role} and ${parentType}.${right.role} have ambiguous native list child types: ${overlap.join(', ')}`,
+          );
+      }
+    }
+    const checks = edgeEntries
+      // Exact scalar fields must win when their public types overlap a list role,
+      // such as CallExpression.callee and CallExpression.arguments.
+      .sort(
+        (left, right) =>
+          Number(['list', 'optionalList', 'listOptionalItems'].includes(left.edge.shape)) -
+          Number(['list', 'optionalList', 'listOptionalItems'].includes(right.edge.shape)),
+      )
+      .map(({ entry, edge }) => {
+        const access = `parent.${edge.field}`;
+        const listTypeIds = [
+          ...new Set(
+            entry.declaration.routes
+              .flatMap(expansionOf)
+              .map(type => schema.nodeTypes.indexOf(type) + 1)
+              .filter(id => id > 0),
+          ),
+        ];
+        const matches = ['list', 'optionalList', 'listOptionalItems'].includes(edge.shape)
+          ? `matches!(ast_kind_protocol_id(child), ${rustIntegerPattern(listTypeIds)})`
+          : edge.shape === 'optional'
+            ? `${access}.as_ref().is_some_and(|edge| edge.node_id() == child_id)`
+            : `${access}.node_id() == child_id`;
+        return `            if ${matches} { return Some(${entry.id}); }`;
+      })
+      .join('\n');
+    const parentBinding = edgeEntries.some(({ edge }) =>
+      ['single', 'optional'].includes(edge.shape),
+    )
+      ? 'parent'
+      : '_parent';
+    return `        oxc_ast::AstKind::${variant}(${parentBinding}) => {\n${checks}\n            None\n        }`;
+  })
+  .join('\n')}\n        _ => None,\n    }\n}\n`;
+
+const rust = `// Generated by scripts/generate-event-schema.mjs. Do not edit.\n\npub(crate) const NODE_TYPE_COUNT: usize = ${schema.nodeTypes.length};\npub(crate) const FIELD_KEY_COUNT: usize = ${schema.fieldKeys.length};\npub(crate) const CHILD_ROLE_COUNT: usize = ${concreteChildRoleEntries.length};\nconst _: () = assert!(FIELD_KEY_COUNT < 64, "field keys must fit a FieldMask");\n\n${rustMatch('node_type_id', schema.nodeTypes)}\n${rustReverse}\n${rustMatch('field_key_id', schema.fieldKeys)}\n${rustFieldReverse}\n${rustFieldConstants}\n${rustChildRoleId}\n${rustChildRoleParent}\n${rustChildRoleName}\n${rustChildRoleParentHasRoles}\n${rustChildRoleProjection}\n${rustChildRoleCardinality}\n${rustChildRoleForEdge}\n${rustPredicateFields}\n${rustAliasMatches}\n${rustAstKind}`;
+
+const formattedRust = execFileSync('rustfmt', ['--edition', '2024', '--emit', 'stdout'], {
+  cwd: root,
+  encoding: 'utf8',
+  input: rust,
+});
 
 // ---------------------------------------------------------------------------
 // TypeScript output
@@ -345,7 +538,16 @@ const runtimeChildRoles = Object.fromEntries(
     Object.fromEntries(
       Object.entries(roles).map(([role, declaration]) => [
         role,
-        { types: [...new Set(declaration.routes.flatMap(expansionOf))], list: declaration.list },
+        {
+          id: childRoleIdByPair.get(`${type}\0${role}`),
+          cardinality: childRoleNativeByPair.get(`${type}\0${role}`).cardinality,
+          native: {
+            edges: childRoleNativeByPair.get(`${type}\0${role}`).edges,
+            projection: childRoleNativeByPair.get(`${type}\0${role}`).projection,
+          },
+          types: [...new Set(declaration.routes.flatMap(expansionOf))],
+          list: declaration.list,
+        },
       ]),
     ),
   ]),
@@ -376,8 +578,33 @@ export const ALIAS_EXPANSIONS: Readonly<Record<string, readonly string[]>> = ${J
 /** Child roles per concrete node type: the concrete types a declared child
  * contract may claim for the role, and whether the role selects a list. */
 export const CHILD_ROLES: Readonly<
-  Record<string, Readonly<Record<string, { readonly types: readonly string[]; readonly list: boolean }>>>
+  Record<string, Readonly<Record<string, {
+    readonly id: number;
+    readonly cardinality: 'single' | 'optional' | 'list';
+    readonly types: readonly string[];
+    readonly list: boolean;
+    readonly native: {
+      readonly edges: readonly {
+        readonly field: string;
+        readonly shape: 'single' | 'optional' | 'list' | 'optionalList' | 'listOptionalItems';
+      }[];
+      readonly projection: string | null;
+    };
+  }>>>
 > = ${JSON.stringify(runtimeChildRoles)};
+export const CHILD_ROLE_COUNT = ${concreteChildRoleEntries.length};
+export const CHILD_ROLE_BY_ID: ReadonlyArray<
+  | undefined
+  | { readonly parentType: NativeNodeType; readonly role: string; readonly list: boolean; readonly cardinality: 'single' | 'optional' | 'list' }
+> = ${JSON.stringify([
+  '__CHILD_ROLE_SENTINEL__',
+  ...concreteChildRoleEntries.map(entry => ({
+    parentType: entry.parentType,
+    role: entry.role,
+    list: entry.declaration.list,
+    cardinality: childRoleNativeByPair.get(`${entry.parentType}\0${entry.role}`).cardinality,
+  })),
+]).replace('"__CHILD_ROLE_SENTINEL__"', 'undefined')};
 /** Concrete expansions of alias routes as literal unions. Concrete routes expand
  * to themselves and are resolved structurally by consumers. */
 ${tsRouteTypes}
@@ -466,7 +693,7 @@ const predicatesTs = execFileSync(
 );
 
 const outputs = [
-  [path.join(root, 'src/generated/event_schema.rs'), rust],
+  [path.join(root, 'src/generated/event_schema.rs'), formattedRust],
   [path.join(root, 'js/generated/event-schema.ts'), ts],
   [path.join(root, 'js/generated/node-predicates.ts'), predicatesTs],
 ];

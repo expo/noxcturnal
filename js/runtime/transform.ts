@@ -199,7 +199,7 @@ function buildRetainedPlan(
   lookahead: readonly PreparedPhase[],
 ): RetainedPlan {
   const futureSubscriptions = new Set<string>();
-  const structuralParentTypes = new Set<string>();
+  const childRetention: Record<string, string[]> = {};
   const retainedFields: Record<string, string[]> = {};
   const ancestorFields: Record<string, string[]> = {};
   const ancestorTypes = new Set<string>();
@@ -210,8 +210,8 @@ function buildRetainedPlan(
   const collect = (phase: PreparedPhase) => {
     for (const plugin of phase.activePlugins) {
       const plan = phase.plans.get(plugin);
-      for (const type of Object.keys(plan?.children ?? {})) structuralParentTypes.add(type);
-      for (const type of Object.keys(plan?.ancestryChildren ?? {})) structuralParentTypes.add(type);
+      mergeChildRetention(childRetention, plan?.children);
+      mergeChildRetention(childRetention, plan?.ancestryChildren);
       mergeFieldRequests(retainedFields, plan?.fields ?? {});
       mergeFieldRequests(retainedFields, plan?.ancestryFields ?? {});
       mergeFieldRequests(ancestorFields, plan?.ancestryFields ?? {});
@@ -244,7 +244,7 @@ function buildRetainedPlan(
       prepared.includeParent,
       prepared.includeScope,
       prepared.retentionCapabilities | futureRetentionCapabilities,
-      [...structuralParentTypes],
+      childRetention,
       retainedFields,
       ancestorFields,
       [...ancestorTypes],
@@ -252,6 +252,17 @@ function buildRetainedPlan(
       ancestryDepth,
     ),
   };
+}
+
+function mergeChildRetention(
+  target: Record<string, string[]>,
+  source: Readonly<Partial<Record<string, readonly string[]>>> | undefined,
+): void {
+  for (const [type, roles] of Object.entries(source ?? {})) {
+    if (roles == null) continue;
+    const retained = (target[type] ??= []);
+    for (const role of roles) if (!retained.includes(role)) retained.push(role);
+  }
 }
 
 /** Execute a native pipeline synchronously. */
@@ -658,7 +669,7 @@ export function transform(
         session.reserveEventCache(batch.nodeCount);
       if (structuralParentTypes.length > 0) session.prefetchChildren([], structuralParentTypes);
       if (prepared.ancestorChildParentTypes.length > 0)
-        session.seedRetainedChildTypes(prepared.ancestorChildParentTypes);
+        session.prefetchChildren([], prepared.ancestorChildParentTypes, false);
       if (batch.includeParent) session.seedSummaries(batch.parentSummaries);
       const dispatch = createDispatcher(
         session,

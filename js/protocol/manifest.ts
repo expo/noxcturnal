@@ -1,4 +1,5 @@
 import {
+  CHILD_ROLES,
   FIELD_KEY_IDS,
   NODE_TYPE_IDS,
   NODE_TYPES,
@@ -18,12 +19,14 @@ export interface NativeRouteManifestEntry {
   comments?: 'inner';
 }
 
+export type ChildRetentionPlan = Readonly<Record<string, readonly string[]>>;
+
 export function packRouteManifest(
   routes: readonly NativeRouteManifestEntry[],
   includeParent: boolean,
   includeScope: boolean,
   retentionCapabilities = 0,
-  structuralParentTypes: readonly string[] = [],
+  childRetention: ChildRetentionPlan = {},
   retainedFields: Readonly<Record<string, readonly string[]>> = {},
   ancestorFields: Readonly<Record<string, readonly string[]>> = {},
   ancestorTypes: readonly string[] = [],
@@ -31,15 +34,40 @@ export function packRouteManifest(
   ancestryDepth = includeParent ? Number.POSITIVE_INFINITY : 0,
 ): Buffer {
   if (routes.length > 4096) throw new Error('compiled route limit exceeded');
-  const concreteStructuralParentTypes = [
-    ...new Set(
-      structuralParentTypes.flatMap(type =>
-        NODE_TYPE_IDS.has(type)
-          ? [type]
-          : NODE_TYPES.filter(concrete => concrete && aliasType(type, concrete)),
-      ),
-    ),
-  ];
+  const concreteChildRetention = new Map<string, { wildcard: boolean; roleIds: number[] }>();
+  for (const [type, requestedRoles] of Object.entries(childRetention)) {
+    const concreteTypes = NODE_TYPE_IDS.has(type)
+      ? [type]
+      : NODE_TYPES.filter(concrete => concrete && aliasType(type, concrete));
+    for (const concrete of concreteTypes) {
+      const entry = concreteChildRetention.get(concrete) ?? { wildcard: false, roleIds: [] };
+      for (const role of requestedRoles) {
+        if (role === '*') {
+          entry.wildcard = true;
+          entry.roleIds.length = 0;
+          continue;
+        }
+        if (entry.wildcard) continue;
+        const declaration = CHILD_ROLES[concrete]?.[role];
+        // Composite routes use union semantics: an absent role contributes no
+        // request to an incompatible concrete parent variant.
+        if (declaration != null && !entry.roleIds.includes(declaration.id))
+          entry.roleIds.push(declaration.id);
+      }
+      if (entry.wildcard || entry.roleIds.length > 0) concreteChildRetention.set(concrete, entry);
+    }
+  }
+  const concreteChildEntries = [...concreteChildRetention.entries()]
+    .map(([parentType, entry]) => ({
+      parentType,
+      wildcard: entry.wildcard,
+      roleIds: entry.roleIds.sort((left, right) => left - right),
+    }))
+    .sort(
+      (left, right) =>
+        requiredId(NODE_TYPE_IDS, left.parentType, 'child parent type') -
+        requiredId(NODE_TYPE_IDS, right.parentType, 'child parent type'),
+    );
   const concreteRetainedFields: Record<string, string[]> = {};
   for (const [type, fields] of Object.entries(retainedFields)) {
     const concreteTypes = NODE_TYPE_IDS.has(type)
@@ -88,7 +116,7 @@ export function packRouteManifest(
     0,
     0,
     0,
-    concreteStructuralParentTypes.length,
+    concreteChildEntries.length,
   ];
   for (const route of routes) {
     const predicates = Object.entries(route.predicates);
@@ -126,8 +154,14 @@ export function packRouteManifest(
     }
     for (const field of route.payloadFields) words.push(requiredId(FIELD_KEY_IDS, field, 'field'));
   }
-  for (const nodeType of concreteStructuralParentTypes)
-    words.push(requiredId(NODE_TYPE_IDS, nodeType, 'structural parent type'));
+  for (const entry of concreteChildEntries) {
+    words.push(
+      requiredId(NODE_TYPE_IDS, entry.parentType, 'child parent type'),
+      Number(entry.wildcard),
+      entry.roleIds.length,
+      ...entry.roleIds,
+    );
+  }
   const retainedFieldEntries = Object.entries(concreteRetainedFields);
   words.push(retainedFieldEntries.length);
   for (const [nodeType, fields] of retainedFieldEntries) {

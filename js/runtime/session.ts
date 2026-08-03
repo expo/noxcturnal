@@ -34,6 +34,7 @@ export class NativeTransformSession {
   #globalReferencesCache = new Map<string, SemanticReferenceView[]>();
   #childrenCache = new Map<number, number[]>();
   #childIdsCache = new Map<number, Set<number>>();
+  #childRoleCache = new Map<number, Map<number, number[]>>();
   #prefetchedChildTypes = new Set<string>();
   #native: NativeIndexedSessionBinding | null = null;
   #nativeFilename: string;
@@ -76,6 +77,9 @@ export class NativeTransformSession {
   }
   get nativeMemoryBytes(): number {
     return this.#native?.memoryUsage() ?? 0;
+  }
+  retentionDebugSummary(): ReturnType<NativeIndexedSessionBinding['retentionDebugSummary']> {
+    return this.#binding('retention.debug').retentionDebugSummary();
   }
   nextRoutedPacked(
     manifest: Buffer,
@@ -303,19 +307,28 @@ export class NativeTransformSession {
       ];
     });
   }
-  children(parentId: number): NativeEvent[] {
+  children(parentId: number, roleId?: number): NativeEvent[] {
     this.#assertOpen();
     const cached = this.#childrenCache.get(parentId);
-    if (cached) return cached.flatMap(nodeId => this.event(nodeId) ?? []);
+    if (cached) {
+      const selected =
+        roleId == null ? cached : (this.#childRoleCache.get(parentId)?.get(roleId) ?? []);
+      return selected.flatMap(nodeId => this.event(nodeId) ?? []);
+    }
     const parent = this.event(parentId);
     if (parent && this.#isPrefetchedChildType(parent.type)) {
       const empty: number[] = [];
       this.#childrenCache.set(parentId, empty);
       this.#childIdsCache.set(parentId, new Set());
+      this.#childRoleCache.set(parentId, new Map());
       return [];
     }
     this.prefetchChildren([parentId]);
-    return this.#childrenCache.get(parentId)!.flatMap(nodeId => this.event(nodeId) ?? []);
+    const selected =
+      roleId == null
+        ? this.#childrenCache.get(parentId)!
+        : (this.#childRoleCache.get(parentId)?.get(roleId) ?? []);
+    return selected.flatMap(nodeId => this.event(nodeId) ?? []);
   }
   constantNodes(nodeIds: readonly number[]): NodeView[] {
     this.#assertOpen();
@@ -340,14 +353,23 @@ export class NativeTransformSession {
       decodePackedEnvelope(this.#binding('query.nodes').queryNodesPackedBuffer([...nodeTypes])),
     ).events.map(toNodeView);
   }
-  prefetchChildren(parentIds: readonly number[] = [], parentTypes: readonly string[] = []): void {
+  prefetchChildren(
+    parentIds: readonly number[] = [],
+    parentTypes: readonly string[] = [],
+    countFollowUp = true,
+  ): void {
     this.#assertOpen();
     const missing = parentIds.filter(parentId => !this.#childrenCache.has(parentId));
     const missingTypes = parentTypes.filter(type => !this.#prefetchedChildTypes.has(type));
     if (missing.length === 0 && missingTypes.length === 0) return;
-    this.#batches++;
-    if (this.options.maxFollowUpBatches != null && this.#batches > this.options.maxFollowUpBatches)
-      throw new Error('follow-up-batch-budget-exceeded');
+    if (countFollowUp) {
+      this.#batches++;
+      if (
+        this.options.maxFollowUpBatches != null &&
+        this.#batches > this.options.maxFollowUpBatches
+      )
+        throw new Error('follow-up-batch-budget-exceeded');
+    }
     const typeIds: number[] = [];
     const fallbackTypes: string[] = [];
     for (const type of missingTypes) {
@@ -355,27 +377,42 @@ export class NativeTransformSession {
       if (id == null) fallbackTypes.push(type);
       else typeIds.push(id);
     }
-    const batch = decodeEventBatch(
-      decodePackedEnvelope(
-        this.#binding('children.prefetch').childrenPackedBuffer(missing, fallbackTypes, typeIds),
-      ),
+    const nativeBatch = this.#binding('children.prefetch').childrenPackedBuffer(
+      missing,
+      fallbackTypes,
+      typeIds,
     );
+    if (nativeBatch.events == null)
+      throw new Error(`invalid native child batch: ${Object.keys(nativeBatch).join(',')}`);
+    const batch = decodeEventBatch(decodePackedEnvelope(nativeBatch.events));
     for (const parentId of missing) {
       this.#childrenCache.set(parentId, []);
       this.#childIdsCache.set(parentId, new Set());
+      this.#childRoleCache.set(parentId, new Map());
     }
     for (const event of batch.events) {
       this.#eventCache[event.id] = event;
-      let children = this.#childrenCache.get(event.parentId!);
+    }
+    for (const edge of nativeBatch.edges) {
+      let children = this.#childrenCache.get(edge.parentId);
       if (!children) {
         children = [];
-        this.#childrenCache.set(event.parentId!, children);
-        this.#childIdsCache.set(event.parentId!, new Set());
+        this.#childrenCache.set(edge.parentId, children);
+        this.#childIdsCache.set(edge.parentId, new Set());
+        this.#childRoleCache.set(edge.parentId, new Map());
       }
-      const childIds = this.#childIdsCache.get(event.parentId!)!;
-      if (!childIds.has(event.id)) {
-        childIds.add(event.id);
-        children.push(event.id);
+      const childIds = this.#childIdsCache.get(edge.parentId)!;
+      if (!childIds.has(edge.childId)) {
+        childIds.add(edge.childId);
+        children.push(edge.childId);
+      }
+      if (edge.roleId !== 0) {
+        const roles = this.#childRoleCache.get(edge.parentId)!;
+        const roleChildren = roles.get(edge.roleId) ?? [];
+        // Native CSR edges are unique per `(parent, child, role)`; preserving
+        // that invariant avoids an input-sized linear scan for every sibling.
+        roleChildren.push(edge.childId);
+        roles.set(edge.roleId, roleChildren);
       }
     }
     for (const type of missingTypes) this.#prefetchedChildTypes.add(type);

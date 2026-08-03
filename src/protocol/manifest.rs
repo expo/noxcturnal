@@ -2,7 +2,9 @@ use napi::{Error, Result, Status};
 use rustc_hash::FxHashSet;
 
 use crate::generated::event_schema::{
-    NODE_TYPE_COUNT, field_key_id, field_key_name, node_type_name, predicate_field_supported,
+    CHILD_ROLE_COUNT, NODE_TYPE_COUNT, child_role_cardinality, child_role_id, child_role_name,
+    child_role_parent_type_id, field_key_id, field_key_name, node_type_name,
+    predicate_field_supported,
 };
 
 use super::constants::{
@@ -44,7 +46,7 @@ pub(crate) struct CompiledManifest {
     pub(crate) include_scope: bool,
     pub(crate) include_exit: bool,
     pub(crate) retention_capabilities: u32,
-    pub(crate) structural_parent_types: NodeTypeSet,
+    pub(crate) child_role_mask_by_parent_type: Vec<ChildRoleMask>,
     /// Union of route payload/predicate and retained-plan fields per node type,
     /// precomputed so the retained collector performs no per-node selection work.
     pub(crate) merged_field_mask_by_type: Vec<FieldMask>,
@@ -59,6 +61,18 @@ pub(crate) struct CompiledManifest {
     pub(crate) fallback_predicate_mask_by_type: Vec<FieldMask>,
     pub(crate) needs_semantics: bool,
     pub(crate) needs_comments: bool,
+}
+
+#[derive(Clone, Default)]
+pub(crate) struct ChildRoleMask {
+    pub(crate) wildcard: bool,
+    pub(crate) role_ids: Vec<u32>,
+}
+
+impl ChildRoleMask {
+    pub(crate) fn requests_children(&self) -> bool {
+        self.wildcard || !self.role_ids.is_empty()
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -108,7 +122,13 @@ pub(crate) fn decode_route_manifest(
     let string_count = word(3) as usize;
     let strings_offset = word(4) as usize;
     let plugin_count = word(5) as usize;
-    let structural_parent_count = word(6) as usize;
+    let child_parent_count = word(6) as usize;
+    if child_parent_count > NODE_TYPE_COUNT {
+        return Err(Error::new(
+            Status::InvalidArg,
+            "child parent limit exceeded",
+        ));
+    }
     if plugin_count > MAX_COMPILED_ROUTES {
         return Err(Error::new(
             Status::InvalidArg,
@@ -287,24 +307,48 @@ pub(crate) fn decode_route_manifest(
             comments_inner: route_flags & 1 != 0,
         });
     }
-    if cursor + structural_parent_count > word_limit {
-        return Err(Error::new(
-            Status::InvalidArg,
-            "truncated structural parent types",
-        ));
-    }
-    let mut structural_parent_types = NodeTypeSet::default();
-    for _ in 0..structural_parent_count {
+    let mut child_role_mask_by_parent_type = vec![ChildRoleMask::default(); NODE_TYPE_COUNT + 1];
+    for _ in 0..child_parent_count {
+        if cursor + 3 > word_limit {
+            return Err(Error::new(
+                Status::InvalidArg,
+                "truncated child retention plan",
+            ));
+        }
         let type_id = word(cursor);
-        cursor += 1;
+        let wildcard = word(cursor + 1);
+        let role_count = word(cursor + 2) as usize;
+        cursor += 3;
         if type_id == 0
             || type_id as usize > NODE_TYPE_COUNT
-            || !structural_parent_types.insert(type_id)
+            || wildcard > 1
+            || role_count > CHILD_ROLE_COUNT
+            || cursor + role_count > word_limit
+            || child_role_mask_by_parent_type[type_id as usize].requests_children()
+            || wildcard == 1 && role_count != 0
         {
             return Err(Error::new(
                 Status::InvalidArg,
-                "invalid structural parent type",
+                "invalid child retention plan",
             ));
+        }
+        let mask = &mut child_role_mask_by_parent_type[type_id as usize];
+        mask.wildcard = wildcard == 1;
+        for _ in 0..role_count {
+            let role_id = word(cursor);
+            cursor += 1;
+            if child_role_parent_type_id(role_id) != Some(type_id)
+                || child_role_cardinality(role_id).is_none()
+                || child_role_name(role_id).and_then(|role| child_role_id(type_id, role))
+                    != Some(role_id)
+                || mask.role_ids.contains(&role_id)
+            {
+                return Err(Error::new(Status::InvalidArg, "invalid child role id"));
+            }
+            mask.role_ids.push(role_id);
+        }
+        if !mask.wildcard && mask.role_ids.is_empty() {
+            return Err(Error::new(Status::InvalidArg, "empty child retention plan"));
         }
     }
     if cursor >= word_limit {
@@ -504,7 +548,7 @@ pub(crate) fn decode_route_manifest(
         include_scope,
         include_exit,
         retention_capabilities: flags >> 2,
-        structural_parent_types,
+        child_role_mask_by_parent_type,
         merged_field_mask_by_type,
         ancestor_field_mask_by_type,
         ancestor_types,

@@ -159,8 +159,8 @@ function isScalarType(node, seen = new Set()) {
 // ---------------------------------------------------------------------------
 const schemaFile = path.join(root, 'protocol/event-schema.json');
 const previous = JSON.parse(fs.readFileSync(schemaFile, 'utf8'));
-const { predicateFields, fieldKeys, fieldTypes, childRoles } = previous;
-if (fieldTypes == null || childRoles == null)
+const { predicateFields, fieldKeys, fieldTypes, childRoles, childRoleNative } = previous;
+if (fieldTypes == null || childRoles == null || childRoleNative == null)
   throw new Error('protocol/event-schema.json is missing hand-authored fieldTypes/childRoles');
 
 const aliasNames = new Set(Object.keys(aliases));
@@ -257,6 +257,7 @@ const next = `${JSON.stringify(
     predicateFields,
     fieldKeys,
     fieldTypes,
+    childRoleNative,
     childRoles,
   },
   null,

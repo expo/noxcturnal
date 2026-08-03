@@ -696,11 +696,31 @@ export const ALIAS_EXPANSIONS: Readonly<Record<string, readonly string[]>> = {
 export const CHILD_ROLES: Readonly<
   Record<
     string,
-    Readonly<Record<string, { readonly types: readonly string[]; readonly list: boolean }>>
+    Readonly<
+      Record<
+        string,
+        {
+          readonly id: number;
+          readonly cardinality: 'single' | 'optional' | 'list';
+          readonly types: readonly string[];
+          readonly list: boolean;
+          readonly native: {
+            readonly edges: readonly {
+              readonly field: string;
+              readonly shape: 'single' | 'optional' | 'list' | 'optionalList' | 'listOptionalItems';
+            }[];
+            readonly projection: string | null;
+          };
+        }
+      >
+    >
   >
 > = {
   Program: {
     body: {
+      id: 78,
+      cardinality: 'list',
+      native: { edges: [{ field: 'body', shape: 'list' }], projection: null },
       types: [
         'BlockStatement',
         'VariableDeclaration',
@@ -740,10 +760,19 @@ export const CHILD_ROLES: Readonly<
       ],
       list: true,
     },
-    directives: { types: ['Directive'], list: true },
+    directives: {
+      id: 79,
+      cardinality: 'list',
+      native: { edges: [{ field: 'directives', shape: 'list' }], projection: null },
+      types: ['Directive'],
+      list: true,
+    },
   },
   BlockStatement: {
     body: {
+      id: 20,
+      cardinality: 'list',
+      native: { edges: [{ field: 'body', shape: 'list' }], projection: null },
       types: [
         'BlockStatement',
         'VariableDeclaration',
@@ -786,6 +815,9 @@ export const CHILD_ROLES: Readonly<
   },
   FunctionBody: {
     body: {
+      id: 53,
+      cardinality: 'list',
+      native: { edges: [{ field: 'statements', shape: 'list' }], projection: null },
       types: [
         'BlockStatement',
         'VariableDeclaration',
@@ -825,10 +857,19 @@ export const CHILD_ROLES: Readonly<
       ],
       list: true,
     },
-    directives: { types: ['Directive'], list: true },
+    directives: {
+      id: 54,
+      cardinality: 'list',
+      native: { edges: [{ field: 'directives', shape: 'list' }], projection: null },
+      types: ['Directive'],
+      list: true,
+    },
   },
   ClassBody: {
     body: {
+      id: 28,
+      cardinality: 'list',
+      native: { edges: [{ field: 'body', shape: 'list' }], projection: null },
       types: [
         'MethodDefinition',
         'PropertyDefinition',
@@ -841,6 +882,9 @@ export const CHILD_ROLES: Readonly<
   },
   TSModuleBlock: {
     body: {
+      id: 90,
+      cardinality: 'list',
+      native: { edges: [{ field: 'body', shape: 'list' }], projection: null },
       types: [
         'BlockStatement',
         'VariableDeclaration',
@@ -881,14 +925,43 @@ export const CHILD_ROLES: Readonly<
       list: true,
     },
   },
-  TSModuleDeclaration: { body: { types: ['TSModuleBlock'], list: false } },
+  TSModuleDeclaration: {
+    body: {
+      id: 91,
+      cardinality: 'optional',
+      native: { edges: [{ field: 'body', shape: 'optional' }], projection: null },
+      types: ['TSModuleBlock'],
+      list: false,
+    },
+  },
   Function: {
-    body: { types: ['FunctionBody'], list: false },
-    params: { types: ['FormalParameters', 'FormalParameter', 'FormalParameterRest'], list: true },
-    id: { types: ['Identifier'], list: false },
+    body: {
+      id: 50,
+      cardinality: 'optional',
+      native: { edges: [{ field: 'body', shape: 'optional' }], projection: null },
+      types: ['FunctionBody'],
+      list: false,
+    },
+    params: {
+      id: 52,
+      cardinality: 'list',
+      native: { edges: [{ field: 'params', shape: 'single' }], projection: 'formalParameters' },
+      types: ['FormalParameter', 'FormalParameterRest'],
+      list: true,
+    },
+    id: {
+      id: 51,
+      cardinality: 'optional',
+      native: { edges: [{ field: 'id', shape: 'optional' }], projection: null },
+      types: ['Identifier'],
+      list: false,
+    },
   },
   ArrowFunctionExpression: {
     body: {
+      id: 6,
+      cardinality: 'single',
+      native: { edges: [{ field: 'body', shape: 'single' }], projection: null },
       types: [
         'FunctionBody',
         'Identifier',
@@ -933,14 +1006,32 @@ export const CHILD_ROLES: Readonly<
       list: false,
     },
     params: {
-      types: ['FormalParameters', 'FormalParameter', 'FormalParameterRest', 'BindingRestElement'],
+      id: 7,
+      cardinality: 'list',
+      native: { edges: [{ field: 'params', shape: 'single' }], projection: 'formalParameters' },
+      types: ['FormalParameter', 'FormalParameterRest', 'BindingRestElement'],
       list: true,
     },
   },
   Class: {
-    body: { types: ['ClassBody'], list: false },
-    id: { types: ['Identifier'], list: false },
+    body: {
+      id: 24,
+      cardinality: 'single',
+      native: { edges: [{ field: 'body', shape: 'single' }], projection: null },
+      types: ['ClassBody'],
+      list: false,
+    },
+    id: {
+      id: 26,
+      cardinality: 'optional',
+      native: { edges: [{ field: 'id', shape: 'optional' }], projection: null },
+      types: ['Identifier'],
+      list: false,
+    },
     superClass: {
+      id: 27,
+      cardinality: 'optional',
+      native: { edges: [{ field: 'super_class', shape: 'optional' }], projection: null },
       types: [
         'Identifier',
         'ThisExpression',
@@ -983,10 +1074,19 @@ export const CHILD_ROLES: Readonly<
       ],
       list: false,
     },
-    decorators: { types: ['Decorator'], list: true },
+    decorators: {
+      id: 25,
+      cardinality: 'list',
+      native: { edges: [{ field: 'decorators', shape: 'list' }], projection: null },
+      types: ['Decorator'],
+      list: true,
+    },
   },
   WhileStatement: {
     body: {
+      id: 102,
+      cardinality: 'single',
+      native: { edges: [{ field: 'body', shape: 'single' }], projection: null },
       types: [
         'BlockStatement',
         'VariableDeclaration',
@@ -1027,6 +1127,9 @@ export const CHILD_ROLES: Readonly<
       list: false,
     },
     test: {
+      id: 103,
+      cardinality: 'single',
+      native: { edges: [{ field: 'test', shape: 'single' }], projection: null },
       types: [
         'Identifier',
         'ThisExpression',
@@ -1072,6 +1175,9 @@ export const CHILD_ROLES: Readonly<
   },
   DoWhileStatement: {
     body: {
+      id: 34,
+      cardinality: 'single',
+      native: { edges: [{ field: 'body', shape: 'single' }], projection: null },
       types: [
         'BlockStatement',
         'VariableDeclaration',
@@ -1112,6 +1218,9 @@ export const CHILD_ROLES: Readonly<
       list: false,
     },
     test: {
+      id: 35,
+      cardinality: 'single',
+      native: { edges: [{ field: 'test', shape: 'single' }], projection: null },
       types: [
         'Identifier',
         'ThisExpression',
@@ -1157,6 +1266,9 @@ export const CHILD_ROLES: Readonly<
   },
   ForStatement: {
     body: {
+      id: 44,
+      cardinality: 'single',
+      native: { edges: [{ field: 'body', shape: 'single' }], projection: null },
       types: [
         'BlockStatement',
         'VariableDeclaration',
@@ -1197,6 +1309,9 @@ export const CHILD_ROLES: Readonly<
       list: false,
     },
     test: {
+      id: 45,
+      cardinality: 'optional',
+      native: { edges: [{ field: 'test', shape: 'optional' }], projection: null },
       types: [
         'Identifier',
         'ThisExpression',
@@ -1242,6 +1357,9 @@ export const CHILD_ROLES: Readonly<
   },
   ForInStatement: {
     body: {
+      id: 42,
+      cardinality: 'single',
+      native: { edges: [{ field: 'body', shape: 'single' }], projection: null },
       types: [
         'BlockStatement',
         'VariableDeclaration',
@@ -1284,6 +1402,9 @@ export const CHILD_ROLES: Readonly<
   },
   ForOfStatement: {
     body: {
+      id: 43,
+      cardinality: 'single',
+      native: { edges: [{ field: 'body', shape: 'single' }], projection: null },
       types: [
         'BlockStatement',
         'VariableDeclaration',
@@ -1326,6 +1447,9 @@ export const CHILD_ROLES: Readonly<
   },
   LabeledStatement: {
     body: {
+      id: 61,
+      cardinality: 'single',
+      native: { edges: [{ field: 'body', shape: 'single' }], projection: null },
       types: [
         'BlockStatement',
         'VariableDeclaration',
@@ -1368,6 +1492,9 @@ export const CHILD_ROLES: Readonly<
   },
   WithStatement: {
     body: {
+      id: 104,
+      cardinality: 'single',
+      native: { edges: [{ field: 'body', shape: 'single' }], projection: null },
       types: [
         'BlockStatement',
         'VariableDeclaration',
@@ -1408,9 +1535,20 @@ export const CHILD_ROLES: Readonly<
       list: false,
     },
   },
-  CatchClause: { body: { types: ['BlockStatement'], list: false } },
+  CatchClause: {
+    body: {
+      id: 23,
+      cardinality: 'single',
+      native: { edges: [{ field: 'body', shape: 'single' }], projection: null },
+      types: ['BlockStatement'],
+      list: false,
+    },
+  },
   CallExpression: {
     callee: {
+      id: 22,
+      cardinality: 'single',
+      native: { edges: [{ field: 'callee', shape: 'single' }], projection: null },
       types: [
         'Identifier',
         'ThisExpression',
@@ -1454,6 +1592,9 @@ export const CHILD_ROLES: Readonly<
       list: false,
     },
     arguments: {
+      id: 21,
+      cardinality: 'list',
+      native: { edges: [{ field: 'arguments', shape: 'list' }], projection: null },
       types: [
         'Identifier',
         'ThisExpression',
@@ -1500,6 +1641,9 @@ export const CHILD_ROLES: Readonly<
   },
   NewExpression: {
     callee: {
+      id: 68,
+      cardinality: 'single',
+      native: { edges: [{ field: 'callee', shape: 'single' }], projection: null },
       types: [
         'Identifier',
         'ThisExpression',
@@ -1543,6 +1687,9 @@ export const CHILD_ROLES: Readonly<
       list: false,
     },
     arguments: {
+      id: 67,
+      cardinality: 'list',
+      native: { edges: [{ field: 'arguments', shape: 'list' }], projection: null },
       types: [
         'Identifier',
         'ThisExpression',
@@ -1587,10 +1734,27 @@ export const CHILD_ROLES: Readonly<
       list: true,
     },
   },
-  VariableDeclaration: { declarations: { types: ['VariableDeclarator'], list: true } },
+  VariableDeclaration: {
+    declarations: {
+      id: 99,
+      cardinality: 'list',
+      native: { edges: [{ field: 'declarations', shape: 'list' }], projection: null },
+      types: ['VariableDeclarator'],
+      list: true,
+    },
+  },
   VariableDeclarator: {
-    id: { types: ['Identifier', 'ObjectPattern', 'ArrayPattern'], list: false },
+    id: {
+      id: 100,
+      cardinality: 'single',
+      native: { edges: [{ field: 'id', shape: 'single' }], projection: null },
+      types: ['Identifier', 'ObjectPattern', 'ArrayPattern'],
+      list: false,
+    },
     init: {
+      id: 101,
+      cardinality: 'optional',
+      native: { edges: [{ field: 'init', shape: 'optional' }], projection: null },
       types: [
         'Identifier',
         'ThisExpression',
@@ -1636,15 +1800,39 @@ export const CHILD_ROLES: Readonly<
   },
   ImportDeclaration: {
     specifiers: {
+      id: 59,
+      cardinality: 'list',
+      native: { edges: [{ field: 'specifiers', shape: 'optionalList' }], projection: null },
       types: ['ImportSpecifier', 'ImportDefaultSpecifier', 'ImportNamespaceSpecifier'],
       list: true,
     },
-    source: { types: ['StringLiteral'], list: false },
+    source: {
+      id: 58,
+      cardinality: 'single',
+      native: { edges: [{ field: 'source', shape: 'single' }], projection: null },
+      types: ['StringLiteral'],
+      list: false,
+    },
   },
   ExportNamedDeclaration: {
-    specifiers: { types: ['ExportSpecifier'], list: true },
-    source: { types: ['StringLiteral'], list: false },
+    specifiers: {
+      id: 40,
+      cardinality: 'list',
+      native: { edges: [{ field: 'specifiers', shape: 'list' }], projection: null },
+      types: ['ExportSpecifier'],
+      list: true,
+    },
+    source: {
+      id: 39,
+      cardinality: 'optional',
+      native: { edges: [{ field: 'source', shape: 'optional' }], projection: null },
+      types: ['StringLiteral'],
+      list: false,
+    },
     declaration: {
+      id: 38,
+      cardinality: 'optional',
+      native: { edges: [{ field: 'declaration', shape: 'optional' }], projection: null },
       types: [
         'VariableDeclaration',
         'Function',
@@ -1669,6 +1857,9 @@ export const CHILD_ROLES: Readonly<
   },
   ExportDefaultDeclaration: {
     declaration: {
+      id: 37,
+      cardinality: 'single',
+      native: { edges: [{ field: 'declaration', shape: 'single' }], projection: null },
       types: [
         'VariableDeclaration',
         'Function',
@@ -1729,10 +1920,29 @@ export const CHILD_ROLES: Readonly<
       list: false,
     },
   },
-  ExportAllDeclaration: { source: { types: ['StringLiteral'], list: false } },
-  ImportExpression: { source: { types: ['StringLiteral'], list: false } },
+  ExportAllDeclaration: {
+    source: {
+      id: 36,
+      cardinality: 'single',
+      native: { edges: [{ field: 'source', shape: 'single' }], projection: null },
+      types: ['StringLiteral'],
+      list: false,
+    },
+  },
+  ImportExpression: {
+    source: {
+      id: 60,
+      cardinality: 'single',
+      native: { edges: [{ field: 'source', shape: 'single' }], projection: null },
+      types: ['StringLiteral'],
+      list: false,
+    },
+  },
   ExpressionStatement: {
     expression: {
+      id: 41,
+      cardinality: 'single',
+      native: { edges: [{ field: 'expression', shape: 'single' }], projection: null },
       types: [
         'Identifier',
         'ThisExpression',
@@ -1776,10 +1986,41 @@ export const CHILD_ROLES: Readonly<
       list: false,
     },
   },
-  ObjectExpression: { properties: { types: ['ObjectProperty', 'SpreadElement'], list: true } },
-  ObjectPattern: { properties: { types: ['BindingProperty', 'BindingRestElement'], list: true } },
+  ObjectExpression: {
+    properties: {
+      id: 70,
+      cardinality: 'list',
+      native: { edges: [{ field: 'properties', shape: 'list' }], projection: null },
+      types: ['ObjectProperty', 'SpreadElement'],
+      list: true,
+    },
+  },
+  ObjectPattern: {
+    properties: {
+      id: 71,
+      cardinality: 'list',
+      native: {
+        edges: [
+          { field: 'properties', shape: 'list' },
+          { field: 'rest', shape: 'optional' },
+        ],
+        projection: null,
+      },
+      types: ['BindingProperty', 'BindingRestElement'],
+      list: true,
+    },
+  },
   ObjectAssignmentTarget: {
     properties: {
+      id: 69,
+      cardinality: 'list',
+      native: {
+        edges: [
+          { field: 'properties', shape: 'list' },
+          { field: 'rest', shape: 'optional' },
+        ],
+        projection: null,
+      },
       types: [
         'AssignmentTargetPropertyIdentifier',
         'AssignmentTargetPropertyProperty',
@@ -1790,6 +2031,9 @@ export const CHILD_ROLES: Readonly<
   },
   ArrayExpression: {
     elements: {
+      id: 4,
+      cardinality: 'list',
+      native: { edges: [{ field: 'elements', shape: 'list' }], projection: null },
       types: [
         'Identifier',
         'ThisExpression',
@@ -1837,6 +2081,15 @@ export const CHILD_ROLES: Readonly<
   },
   ArrayPattern: {
     elements: {
+      id: 5,
+      cardinality: 'list',
+      native: {
+        edges: [
+          { field: 'elements', shape: 'listOptionalItems' },
+          { field: 'rest', shape: 'optional' },
+        ],
+        projection: null,
+      },
       types: [
         'Identifier',
         'ObjectPattern',
@@ -1850,6 +2103,15 @@ export const CHILD_ROLES: Readonly<
   },
   ArrayAssignmentTarget: {
     elements: {
+      id: 3,
+      cardinality: 'list',
+      native: {
+        edges: [
+          { field: 'elements', shape: 'listOptionalItems' },
+          { field: 'rest', shape: 'optional' },
+        ],
+        projection: null,
+      },
       types: [
         'Identifier',
         'ThisExpression',
@@ -1900,6 +2162,9 @@ export const CHILD_ROLES: Readonly<
   },
   ObjectProperty: {
     key: {
+      id: 72,
+      cardinality: 'single',
+      native: { edges: [{ field: 'key', shape: 'single' }], projection: null },
       types: [
         'Identifier',
         'ThisExpression',
@@ -1944,6 +2209,9 @@ export const CHILD_ROLES: Readonly<
       list: false,
     },
     value: {
+      id: 73,
+      cardinality: 'single',
+      native: { edges: [{ field: 'value', shape: 'single' }], projection: null },
       types: [
         'Identifier',
         'ThisExpression',
@@ -1989,6 +2257,9 @@ export const CHILD_ROLES: Readonly<
   },
   BindingProperty: {
     key: {
+      id: 17,
+      cardinality: 'single',
+      native: { edges: [{ field: 'key', shape: 'single' }], projection: null },
       types: [
         'Identifier',
         'ThisExpression',
@@ -2033,12 +2304,18 @@ export const CHILD_ROLES: Readonly<
       list: false,
     },
     value: {
+      id: 18,
+      cardinality: 'single',
+      native: { edges: [{ field: 'value', shape: 'single' }], projection: null },
       types: ['Identifier', 'ObjectPattern', 'ArrayPattern', 'AssignmentPattern'],
       list: false,
     },
   },
   AssignmentTargetPropertyProperty: {
     key: {
+      id: 12,
+      cardinality: 'single',
+      native: { edges: [{ field: 'name', shape: 'single' }], projection: null },
       types: [
         'Identifier',
         'ThisExpression',
@@ -2083,6 +2360,9 @@ export const CHILD_ROLES: Readonly<
       list: false,
     },
     value: {
+      id: 13,
+      cardinality: 'single',
+      native: { edges: [{ field: 'binding', shape: 'single' }], projection: null },
       types: [
         'Identifier',
         'ThisExpression',
@@ -2131,6 +2411,9 @@ export const CHILD_ROLES: Readonly<
   },
   MethodDefinition: {
     key: {
+      id: 65,
+      cardinality: 'single',
+      native: { edges: [{ field: 'key', shape: 'single' }], projection: null },
       types: [
         'Identifier',
         'ThisExpression',
@@ -2174,11 +2457,26 @@ export const CHILD_ROLES: Readonly<
       ],
       list: false,
     },
-    value: { types: ['Function', 'ArrowFunctionExpression'], list: false },
-    decorators: { types: ['Decorator'], list: true },
+    value: {
+      id: 66,
+      cardinality: 'single',
+      native: { edges: [{ field: 'value', shape: 'single' }], projection: null },
+      types: ['Function', 'ArrowFunctionExpression'],
+      list: false,
+    },
+    decorators: {
+      id: 64,
+      cardinality: 'list',
+      native: { edges: [{ field: 'decorators', shape: 'list' }], projection: null },
+      types: ['Decorator'],
+      list: true,
+    },
   },
   PropertyDefinition: {
     key: {
+      id: 81,
+      cardinality: 'single',
+      native: { edges: [{ field: 'key', shape: 'single' }], projection: null },
       types: [
         'Identifier',
         'ThisExpression',
@@ -2223,6 +2521,9 @@ export const CHILD_ROLES: Readonly<
       list: false,
     },
     value: {
+      id: 82,
+      cardinality: 'optional',
+      native: { edges: [{ field: 'value', shape: 'optional' }], projection: null },
       types: [
         'Identifier',
         'ThisExpression',
@@ -2265,10 +2566,19 @@ export const CHILD_ROLES: Readonly<
       ],
       list: false,
     },
-    decorators: { types: ['Decorator'], list: true },
+    decorators: {
+      id: 80,
+      cardinality: 'list',
+      native: { edges: [{ field: 'decorators', shape: 'list' }], projection: null },
+      types: ['Decorator'],
+      list: true,
+    },
   },
   AccessorProperty: {
     key: {
+      id: 1,
+      cardinality: 'single',
+      native: { edges: [{ field: 'key', shape: 'single' }], projection: null },
       types: [
         'Identifier',
         'ThisExpression',
@@ -2313,6 +2623,9 @@ export const CHILD_ROLES: Readonly<
       list: false,
     },
     value: {
+      id: 2,
+      cardinality: 'optional',
+      native: { edges: [{ field: 'value', shape: 'optional' }], projection: null },
       types: [
         'Identifier',
         'ThisExpression',
@@ -2357,9 +2670,24 @@ export const CHILD_ROLES: Readonly<
     },
   },
   FormalParameter: {
-    decorators: { types: ['Decorator'], list: true },
-    pattern: { types: ['Identifier', 'ObjectPattern', 'ArrayPattern'], list: false },
+    decorators: {
+      id: 46,
+      cardinality: 'list',
+      native: { edges: [{ field: 'decorators', shape: 'list' }], projection: null },
+      types: ['Decorator'],
+      list: true,
+    },
+    pattern: {
+      id: 48,
+      cardinality: 'single',
+      native: { edges: [{ field: 'pattern', shape: 'single' }], projection: null },
+      types: ['Identifier', 'ObjectPattern', 'ArrayPattern'],
+      list: false,
+    },
     default: {
+      id: 47,
+      cardinality: 'optional',
+      native: { edges: [{ field: 'initializer', shape: 'optional' }], projection: null },
       types: [
         'Identifier',
         'ThisExpression',
@@ -2403,16 +2731,36 @@ export const CHILD_ROLES: Readonly<
       list: false,
     },
   },
-  FormalParameterRest: { argument: { types: ['BindingRestElement'], list: false } },
+  FormalParameterRest: {
+    argument: {
+      id: 49,
+      cardinality: 'single',
+      native: { edges: [{ field: 'rest', shape: 'single' }], projection: null },
+      types: ['BindingRestElement'],
+      list: false,
+    },
+  },
   BindingRestElement: {
-    pattern: { types: ['Identifier', 'ObjectPattern', 'ArrayPattern'], list: false },
+    pattern: {
+      id: 19,
+      cardinality: 'single',
+      native: { edges: [{ field: 'argument', shape: 'single' }], projection: null },
+      types: ['Identifier', 'ObjectPattern', 'ArrayPattern'],
+      list: false,
+    },
   },
   AssignmentPattern: {
     left: {
+      id: 10,
+      cardinality: 'single',
+      native: { edges: [{ field: 'left', shape: 'single' }], projection: null },
       types: ['Identifier', 'ObjectPattern', 'ArrayPattern', 'AssignmentPattern'],
       list: false,
     },
     right: {
+      id: 11,
+      cardinality: 'single',
+      native: { edges: [{ field: 'right', shape: 'single' }], projection: null },
       types: [
         'Identifier',
         'ThisExpression',
@@ -2458,53 +2806,9 @@ export const CHILD_ROLES: Readonly<
   },
   StaticMemberExpression: {
     object: {
-      types: [
-        'Identifier',
-        'ThisExpression',
-        'ArrayExpression',
-        'ObjectExpression',
-        'TemplateLiteral',
-        'TaggedTemplateExpression',
-        'ComputedMemberExpression',
-        'StaticMemberExpression',
-        'PrivateFieldExpression',
-        'CallExpression',
-        'NewExpression',
-        'UpdateExpression',
-        'UnaryExpression',
-        'BinaryExpression',
-        'PrivateInExpression',
-        'LogicalExpression',
-        'ConditionalExpression',
-        'AssignmentExpression',
-        'SequenceExpression',
-        'AwaitExpression',
-        'ChainExpression',
-        'ParenthesizedExpression',
-        'ArrowFunctionExpression',
-        'YieldExpression',
-        'ImportExpression',
-        'V8IntrinsicExpression',
-        'BooleanLiteral',
-        'NullLiteral',
-        'NumericLiteral',
-        'StringLiteral',
-        'BigIntLiteral',
-        'RegExpLiteral',
-        'JSXMemberExpression',
-        'JSXEmptyExpression',
-        'TSAsExpression',
-        'TSSatisfiesExpression',
-        'TSNonNullExpression',
-        'TSInstantiationExpression',
-        'Super',
-      ],
-      list: false,
-    },
-    property: { types: ['Identifier'], list: false },
-  },
-  ComputedMemberExpression: {
-    object: {
+      id: 85,
+      cardinality: 'single',
+      native: { edges: [{ field: 'object', shape: 'single' }], projection: null },
       types: [
         'Identifier',
         'ThisExpression',
@@ -2549,6 +2853,65 @@ export const CHILD_ROLES: Readonly<
       list: false,
     },
     property: {
+      id: 86,
+      cardinality: 'single',
+      native: { edges: [{ field: 'property', shape: 'single' }], projection: null },
+      types: ['Identifier'],
+      list: false,
+    },
+  },
+  ComputedMemberExpression: {
+    object: {
+      id: 29,
+      cardinality: 'single',
+      native: { edges: [{ field: 'object', shape: 'single' }], projection: null },
+      types: [
+        'Identifier',
+        'ThisExpression',
+        'ArrayExpression',
+        'ObjectExpression',
+        'TemplateLiteral',
+        'TaggedTemplateExpression',
+        'ComputedMemberExpression',
+        'StaticMemberExpression',
+        'PrivateFieldExpression',
+        'CallExpression',
+        'NewExpression',
+        'UpdateExpression',
+        'UnaryExpression',
+        'BinaryExpression',
+        'PrivateInExpression',
+        'LogicalExpression',
+        'ConditionalExpression',
+        'AssignmentExpression',
+        'SequenceExpression',
+        'AwaitExpression',
+        'ChainExpression',
+        'ParenthesizedExpression',
+        'ArrowFunctionExpression',
+        'YieldExpression',
+        'ImportExpression',
+        'V8IntrinsicExpression',
+        'BooleanLiteral',
+        'NullLiteral',
+        'NumericLiteral',
+        'StringLiteral',
+        'BigIntLiteral',
+        'RegExpLiteral',
+        'JSXMemberExpression',
+        'JSXEmptyExpression',
+        'TSAsExpression',
+        'TSSatisfiesExpression',
+        'TSNonNullExpression',
+        'TSInstantiationExpression',
+        'Super',
+      ],
+      list: false,
+    },
+    property: {
+      id: 30,
+      cardinality: 'single',
+      native: { edges: [{ field: 'expression', shape: 'single' }], projection: null },
       types: [
         'Identifier',
         'ThisExpression',
@@ -2594,6 +2957,9 @@ export const CHILD_ROLES: Readonly<
   },
   PrivateFieldExpression: {
     object: {
+      id: 74,
+      cardinality: 'single',
+      native: { edges: [{ field: 'object', shape: 'single' }], projection: null },
       types: [
         'Identifier',
         'ThisExpression',
@@ -2636,10 +3002,19 @@ export const CHILD_ROLES: Readonly<
       ],
       list: false,
     },
-    property: { types: ['PrivateIdentifier'], list: false },
+    property: {
+      id: 75,
+      cardinality: 'single',
+      native: { edges: [{ field: 'field', shape: 'single' }], projection: null },
+      types: ['PrivateIdentifier'],
+      list: false,
+    },
   },
   BinaryExpression: {
     left: {
+      id: 15,
+      cardinality: 'single',
+      native: { edges: [{ field: 'left', shape: 'single' }], projection: null },
       types: [
         'Identifier',
         'ThisExpression',
@@ -2683,6 +3058,9 @@ export const CHILD_ROLES: Readonly<
       list: false,
     },
     right: {
+      id: 16,
+      cardinality: 'single',
+      native: { edges: [{ field: 'right', shape: 'single' }], projection: null },
       types: [
         'Identifier',
         'ThisExpression',
@@ -2728,6 +3106,9 @@ export const CHILD_ROLES: Readonly<
   },
   LogicalExpression: {
     left: {
+      id: 62,
+      cardinality: 'single',
+      native: { edges: [{ field: 'left', shape: 'single' }], projection: null },
       types: [
         'Identifier',
         'ThisExpression',
@@ -2771,6 +3152,9 @@ export const CHILD_ROLES: Readonly<
       list: false,
     },
     right: {
+      id: 63,
+      cardinality: 'single',
+      native: { edges: [{ field: 'right', shape: 'single' }], projection: null },
       types: [
         'Identifier',
         'ThisExpression',
@@ -2816,6 +3200,9 @@ export const CHILD_ROLES: Readonly<
   },
   AssignmentExpression: {
     left: {
+      id: 8,
+      cardinality: 'single',
+      native: { edges: [{ field: 'left', shape: 'single' }], projection: null },
       types: [
         'Identifier',
         'ThisExpression',
@@ -2861,6 +3248,9 @@ export const CHILD_ROLES: Readonly<
       list: false,
     },
     right: {
+      id: 9,
+      cardinality: 'single',
+      native: { edges: [{ field: 'right', shape: 'single' }], projection: null },
       types: [
         'Identifier',
         'ThisExpression',
@@ -2905,8 +3295,17 @@ export const CHILD_ROLES: Readonly<
     },
   },
   PrivateInExpression: {
-    left: { types: ['PrivateIdentifier'], list: false },
+    left: {
+      id: 76,
+      cardinality: 'single',
+      native: { edges: [{ field: 'left', shape: 'single' }], projection: null },
+      types: ['PrivateIdentifier'],
+      list: false,
+    },
     right: {
+      id: 77,
+      cardinality: 'single',
+      native: { edges: [{ field: 'right', shape: 'single' }], projection: null },
       types: [
         'Identifier',
         'ThisExpression',
@@ -2952,6 +3351,9 @@ export const CHILD_ROLES: Readonly<
   },
   UnaryExpression: {
     argument: {
+      id: 97,
+      cardinality: 'single',
+      native: { edges: [{ field: 'argument', shape: 'single' }], projection: null },
       types: [
         'Identifier',
         'ThisExpression',
@@ -2997,6 +3399,9 @@ export const CHILD_ROLES: Readonly<
   },
   UpdateExpression: {
     argument: {
+      id: 98,
+      cardinality: 'single',
+      native: { edges: [{ field: 'argument', shape: 'single' }], projection: null },
       types: [
         'Identifier',
         'ThisExpression',
@@ -3042,6 +3447,9 @@ export const CHILD_ROLES: Readonly<
   },
   AwaitExpression: {
     argument: {
+      id: 14,
+      cardinality: 'single',
+      native: { edges: [{ field: 'argument', shape: 'single' }], projection: null },
       types: [
         'Identifier',
         'ThisExpression',
@@ -3087,6 +3495,9 @@ export const CHILD_ROLES: Readonly<
   },
   YieldExpression: {
     argument: {
+      id: 105,
+      cardinality: 'optional',
+      native: { edges: [{ field: 'argument', shape: 'optional' }], projection: null },
       types: [
         'Identifier',
         'ThisExpression',
@@ -3132,6 +3543,9 @@ export const CHILD_ROLES: Readonly<
   },
   ReturnStatement: {
     argument: {
+      id: 83,
+      cardinality: 'optional',
+      native: { edges: [{ field: 'argument', shape: 'optional' }], projection: null },
       types: [
         'Identifier',
         'ThisExpression',
@@ -3177,6 +3591,9 @@ export const CHILD_ROLES: Readonly<
   },
   ThrowStatement: {
     argument: {
+      id: 93,
+      cardinality: 'single',
+      native: { edges: [{ field: 'argument', shape: 'single' }], projection: null },
       types: [
         'Identifier',
         'ThisExpression',
@@ -3222,6 +3639,9 @@ export const CHILD_ROLES: Readonly<
   },
   SpreadElement: {
     argument: {
+      id: 84,
+      cardinality: 'single',
+      native: { edges: [{ field: 'argument', shape: 'single' }], projection: null },
       types: [
         'Identifier',
         'ThisExpression',
@@ -3267,6 +3687,9 @@ export const CHILD_ROLES: Readonly<
   },
   IfStatement: {
     test: {
+      id: 57,
+      cardinality: 'single',
+      native: { edges: [{ field: 'test', shape: 'single' }], projection: null },
       types: [
         'Identifier',
         'ThisExpression',
@@ -3310,6 +3733,9 @@ export const CHILD_ROLES: Readonly<
       list: false,
     },
     consequent: {
+      id: 56,
+      cardinality: 'single',
+      native: { edges: [{ field: 'consequent', shape: 'single' }], projection: null },
       types: [
         'BlockStatement',
         'VariableDeclaration',
@@ -3350,6 +3776,9 @@ export const CHILD_ROLES: Readonly<
       list: false,
     },
     alternate: {
+      id: 55,
+      cardinality: 'optional',
+      native: { edges: [{ field: 'alternate', shape: 'optional' }], projection: null },
       types: [
         'BlockStatement',
         'VariableDeclaration',
@@ -3392,6 +3821,9 @@ export const CHILD_ROLES: Readonly<
   },
   ConditionalExpression: {
     test: {
+      id: 33,
+      cardinality: 'single',
+      native: { edges: [{ field: 'test', shape: 'single' }], projection: null },
       types: [
         'Identifier',
         'ThisExpression',
@@ -3435,6 +3867,9 @@ export const CHILD_ROLES: Readonly<
       list: false,
     },
     consequent: {
+      id: 32,
+      cardinality: 'single',
+      native: { edges: [{ field: 'consequent', shape: 'single' }], projection: null },
       types: [
         'Identifier',
         'ThisExpression',
@@ -3478,6 +3913,9 @@ export const CHILD_ROLES: Readonly<
       list: false,
     },
     alternate: {
+      id: 31,
+      cardinality: 'single',
+      native: { edges: [{ field: 'alternate', shape: 'single' }], projection: null },
       types: [
         'Identifier',
         'ThisExpression',
@@ -3523,6 +3961,9 @@ export const CHILD_ROLES: Readonly<
   },
   SwitchStatement: {
     test: {
+      id: 87,
+      cardinality: 'single',
+      native: { edges: [{ field: 'discriminant', shape: 'single' }], projection: null },
       types: [
         'Identifier',
         'ThisExpression',
@@ -3567,14 +4008,193 @@ export const CHILD_ROLES: Readonly<
     },
   },
   TryStatement: {
-    block: { types: ['BlockStatement'], list: false },
-    handler: { types: ['CatchClause'], list: false },
-    finalizer: { types: ['BlockStatement'], list: false },
+    block: {
+      id: 94,
+      cardinality: 'single',
+      native: { edges: [{ field: 'block', shape: 'single' }], projection: null },
+      types: ['BlockStatement'],
+      list: false,
+    },
+    handler: {
+      id: 96,
+      cardinality: 'optional',
+      native: { edges: [{ field: 'handler', shape: 'optional' }], projection: null },
+      types: ['CatchClause'],
+      list: false,
+    },
+    finalizer: {
+      id: 95,
+      cardinality: 'optional',
+      native: { edges: [{ field: 'finalizer', shape: 'optional' }], projection: null },
+      types: ['BlockStatement'],
+      list: false,
+    },
   },
-  TSEnumDeclaration: { id: { types: ['Identifier'], list: false } },
-  TSInterfaceDeclaration: { id: { types: ['Identifier'], list: false } },
-  TSTypeAliasDeclaration: { id: { types: ['Identifier'], list: false } },
+  TSEnumDeclaration: {
+    id: {
+      id: 88,
+      cardinality: 'single',
+      native: { edges: [{ field: 'id', shape: 'single' }], projection: null },
+      types: ['Identifier'],
+      list: false,
+    },
+  },
+  TSInterfaceDeclaration: {
+    id: {
+      id: 89,
+      cardinality: 'single',
+      native: { edges: [{ field: 'id', shape: 'single' }], projection: null },
+      types: ['Identifier'],
+      list: false,
+    },
+  },
+  TSTypeAliasDeclaration: {
+    id: {
+      id: 92,
+      cardinality: 'single',
+      native: { edges: [{ field: 'id', shape: 'single' }], projection: null },
+      types: ['Identifier'],
+      list: false,
+    },
+  },
 };
+export const CHILD_ROLE_COUNT = 105;
+export const CHILD_ROLE_BY_ID: ReadonlyArray<
+  | undefined
+  | {
+      readonly parentType: NativeNodeType;
+      readonly role: string;
+      readonly list: boolean;
+      readonly cardinality: 'single' | 'optional' | 'list';
+    }
+> = [
+  undefined,
+  { parentType: 'AccessorProperty', role: 'key', list: false, cardinality: 'single' },
+  { parentType: 'AccessorProperty', role: 'value', list: false, cardinality: 'optional' },
+  { parentType: 'ArrayAssignmentTarget', role: 'elements', list: true, cardinality: 'list' },
+  { parentType: 'ArrayExpression', role: 'elements', list: true, cardinality: 'list' },
+  { parentType: 'ArrayPattern', role: 'elements', list: true, cardinality: 'list' },
+  { parentType: 'ArrowFunctionExpression', role: 'body', list: false, cardinality: 'single' },
+  { parentType: 'ArrowFunctionExpression', role: 'params', list: true, cardinality: 'list' },
+  { parentType: 'AssignmentExpression', role: 'left', list: false, cardinality: 'single' },
+  { parentType: 'AssignmentExpression', role: 'right', list: false, cardinality: 'single' },
+  { parentType: 'AssignmentPattern', role: 'left', list: false, cardinality: 'single' },
+  { parentType: 'AssignmentPattern', role: 'right', list: false, cardinality: 'single' },
+  {
+    parentType: 'AssignmentTargetPropertyProperty',
+    role: 'key',
+    list: false,
+    cardinality: 'single',
+  },
+  {
+    parentType: 'AssignmentTargetPropertyProperty',
+    role: 'value',
+    list: false,
+    cardinality: 'single',
+  },
+  { parentType: 'AwaitExpression', role: 'argument', list: false, cardinality: 'single' },
+  { parentType: 'BinaryExpression', role: 'left', list: false, cardinality: 'single' },
+  { parentType: 'BinaryExpression', role: 'right', list: false, cardinality: 'single' },
+  { parentType: 'BindingProperty', role: 'key', list: false, cardinality: 'single' },
+  { parentType: 'BindingProperty', role: 'value', list: false, cardinality: 'single' },
+  { parentType: 'BindingRestElement', role: 'pattern', list: false, cardinality: 'single' },
+  { parentType: 'BlockStatement', role: 'body', list: true, cardinality: 'list' },
+  { parentType: 'CallExpression', role: 'arguments', list: true, cardinality: 'list' },
+  { parentType: 'CallExpression', role: 'callee', list: false, cardinality: 'single' },
+  { parentType: 'CatchClause', role: 'body', list: false, cardinality: 'single' },
+  { parentType: 'Class', role: 'body', list: false, cardinality: 'single' },
+  { parentType: 'Class', role: 'decorators', list: true, cardinality: 'list' },
+  { parentType: 'Class', role: 'id', list: false, cardinality: 'optional' },
+  { parentType: 'Class', role: 'superClass', list: false, cardinality: 'optional' },
+  { parentType: 'ClassBody', role: 'body', list: true, cardinality: 'list' },
+  { parentType: 'ComputedMemberExpression', role: 'object', list: false, cardinality: 'single' },
+  { parentType: 'ComputedMemberExpression', role: 'property', list: false, cardinality: 'single' },
+  { parentType: 'ConditionalExpression', role: 'alternate', list: false, cardinality: 'single' },
+  { parentType: 'ConditionalExpression', role: 'consequent', list: false, cardinality: 'single' },
+  { parentType: 'ConditionalExpression', role: 'test', list: false, cardinality: 'single' },
+  { parentType: 'DoWhileStatement', role: 'body', list: false, cardinality: 'single' },
+  { parentType: 'DoWhileStatement', role: 'test', list: false, cardinality: 'single' },
+  { parentType: 'ExportAllDeclaration', role: 'source', list: false, cardinality: 'single' },
+  {
+    parentType: 'ExportDefaultDeclaration',
+    role: 'declaration',
+    list: false,
+    cardinality: 'single',
+  },
+  {
+    parentType: 'ExportNamedDeclaration',
+    role: 'declaration',
+    list: false,
+    cardinality: 'optional',
+  },
+  { parentType: 'ExportNamedDeclaration', role: 'source', list: false, cardinality: 'optional' },
+  { parentType: 'ExportNamedDeclaration', role: 'specifiers', list: true, cardinality: 'list' },
+  { parentType: 'ExpressionStatement', role: 'expression', list: false, cardinality: 'single' },
+  { parentType: 'ForInStatement', role: 'body', list: false, cardinality: 'single' },
+  { parentType: 'ForOfStatement', role: 'body', list: false, cardinality: 'single' },
+  { parentType: 'ForStatement', role: 'body', list: false, cardinality: 'single' },
+  { parentType: 'ForStatement', role: 'test', list: false, cardinality: 'optional' },
+  { parentType: 'FormalParameter', role: 'decorators', list: true, cardinality: 'list' },
+  { parentType: 'FormalParameter', role: 'default', list: false, cardinality: 'optional' },
+  { parentType: 'FormalParameter', role: 'pattern', list: false, cardinality: 'single' },
+  { parentType: 'FormalParameterRest', role: 'argument', list: false, cardinality: 'single' },
+  { parentType: 'Function', role: 'body', list: false, cardinality: 'optional' },
+  { parentType: 'Function', role: 'id', list: false, cardinality: 'optional' },
+  { parentType: 'Function', role: 'params', list: true, cardinality: 'list' },
+  { parentType: 'FunctionBody', role: 'body', list: true, cardinality: 'list' },
+  { parentType: 'FunctionBody', role: 'directives', list: true, cardinality: 'list' },
+  { parentType: 'IfStatement', role: 'alternate', list: false, cardinality: 'optional' },
+  { parentType: 'IfStatement', role: 'consequent', list: false, cardinality: 'single' },
+  { parentType: 'IfStatement', role: 'test', list: false, cardinality: 'single' },
+  { parentType: 'ImportDeclaration', role: 'source', list: false, cardinality: 'single' },
+  { parentType: 'ImportDeclaration', role: 'specifiers', list: true, cardinality: 'list' },
+  { parentType: 'ImportExpression', role: 'source', list: false, cardinality: 'single' },
+  { parentType: 'LabeledStatement', role: 'body', list: false, cardinality: 'single' },
+  { parentType: 'LogicalExpression', role: 'left', list: false, cardinality: 'single' },
+  { parentType: 'LogicalExpression', role: 'right', list: false, cardinality: 'single' },
+  { parentType: 'MethodDefinition', role: 'decorators', list: true, cardinality: 'list' },
+  { parentType: 'MethodDefinition', role: 'key', list: false, cardinality: 'single' },
+  { parentType: 'MethodDefinition', role: 'value', list: false, cardinality: 'single' },
+  { parentType: 'NewExpression', role: 'arguments', list: true, cardinality: 'list' },
+  { parentType: 'NewExpression', role: 'callee', list: false, cardinality: 'single' },
+  { parentType: 'ObjectAssignmentTarget', role: 'properties', list: true, cardinality: 'list' },
+  { parentType: 'ObjectExpression', role: 'properties', list: true, cardinality: 'list' },
+  { parentType: 'ObjectPattern', role: 'properties', list: true, cardinality: 'list' },
+  { parentType: 'ObjectProperty', role: 'key', list: false, cardinality: 'single' },
+  { parentType: 'ObjectProperty', role: 'value', list: false, cardinality: 'single' },
+  { parentType: 'PrivateFieldExpression', role: 'object', list: false, cardinality: 'single' },
+  { parentType: 'PrivateFieldExpression', role: 'property', list: false, cardinality: 'single' },
+  { parentType: 'PrivateInExpression', role: 'left', list: false, cardinality: 'single' },
+  { parentType: 'PrivateInExpression', role: 'right', list: false, cardinality: 'single' },
+  { parentType: 'Program', role: 'body', list: true, cardinality: 'list' },
+  { parentType: 'Program', role: 'directives', list: true, cardinality: 'list' },
+  { parentType: 'PropertyDefinition', role: 'decorators', list: true, cardinality: 'list' },
+  { parentType: 'PropertyDefinition', role: 'key', list: false, cardinality: 'single' },
+  { parentType: 'PropertyDefinition', role: 'value', list: false, cardinality: 'optional' },
+  { parentType: 'ReturnStatement', role: 'argument', list: false, cardinality: 'optional' },
+  { parentType: 'SpreadElement', role: 'argument', list: false, cardinality: 'single' },
+  { parentType: 'StaticMemberExpression', role: 'object', list: false, cardinality: 'single' },
+  { parentType: 'StaticMemberExpression', role: 'property', list: false, cardinality: 'single' },
+  { parentType: 'SwitchStatement', role: 'test', list: false, cardinality: 'single' },
+  { parentType: 'TSEnumDeclaration', role: 'id', list: false, cardinality: 'single' },
+  { parentType: 'TSInterfaceDeclaration', role: 'id', list: false, cardinality: 'single' },
+  { parentType: 'TSModuleBlock', role: 'body', list: true, cardinality: 'list' },
+  { parentType: 'TSModuleDeclaration', role: 'body', list: false, cardinality: 'optional' },
+  { parentType: 'TSTypeAliasDeclaration', role: 'id', list: false, cardinality: 'single' },
+  { parentType: 'ThrowStatement', role: 'argument', list: false, cardinality: 'single' },
+  { parentType: 'TryStatement', role: 'block', list: false, cardinality: 'single' },
+  { parentType: 'TryStatement', role: 'finalizer', list: false, cardinality: 'optional' },
+  { parentType: 'TryStatement', role: 'handler', list: false, cardinality: 'optional' },
+  { parentType: 'UnaryExpression', role: 'argument', list: false, cardinality: 'single' },
+  { parentType: 'UpdateExpression', role: 'argument', list: false, cardinality: 'single' },
+  { parentType: 'VariableDeclaration', role: 'declarations', list: true, cardinality: 'list' },
+  { parentType: 'VariableDeclarator', role: 'id', list: false, cardinality: 'single' },
+  { parentType: 'VariableDeclarator', role: 'init', list: false, cardinality: 'optional' },
+  { parentType: 'WhileStatement', role: 'body', list: false, cardinality: 'single' },
+  { parentType: 'WhileStatement', role: 'test', list: false, cardinality: 'single' },
+  { parentType: 'WithStatement', role: 'body', list: false, cardinality: 'single' },
+  { parentType: 'YieldExpression', role: 'argument', list: false, cardinality: 'optional' },
+];
 /** Concrete expansions of alias routes as literal unions. Concrete routes expand
  * to themselves and are resolved structurally by consumers. */
 export interface NativeRouteTypes {
@@ -4407,11 +5027,7 @@ export interface NativeChildRoles {
       readonly list: false;
     };
     readonly params: {
-      readonly child:
-        | 'FormalParameters'
-        | 'FormalParameter'
-        | 'FormalParameterRest'
-        | 'BindingRestElement';
+      readonly child: 'FormalParameter' | 'FormalParameterRest' | 'BindingRestElement';
       readonly list: true;
     };
   };
@@ -4460,11 +5076,7 @@ export interface NativeChildRoles {
       readonly list: false;
     };
     readonly params: {
-      readonly child:
-        | 'FormalParameters'
-        | 'FormalParameter'
-        | 'FormalParameterRest'
-        | 'BindingRestElement';
+      readonly child: 'FormalParameter' | 'FormalParameterRest' | 'BindingRestElement';
       readonly list: true;
     };
   };
@@ -7174,7 +7786,7 @@ export interface NativeChildRoles {
   FunctionDeclaration: {
     readonly body: { readonly child: 'FunctionBody'; readonly list: false };
     readonly params: {
-      readonly child: 'FormalParameters' | 'FormalParameter' | 'FormalParameterRest';
+      readonly child: 'FormalParameter' | 'FormalParameterRest';
       readonly list: true;
     };
     readonly id: { readonly child: 'Identifier'; readonly list: false };
@@ -7182,7 +7794,7 @@ export interface NativeChildRoles {
   FunctionExpression: {
     readonly body: { readonly child: 'FunctionBody'; readonly list: false };
     readonly params: {
-      readonly child: 'FormalParameters' | 'FormalParameter' | 'FormalParameterRest';
+      readonly child: 'FormalParameter' | 'FormalParameterRest';
       readonly list: true;
     };
     readonly id: { readonly child: 'Identifier'; readonly list: false };
@@ -7190,7 +7802,7 @@ export interface NativeChildRoles {
   TSDeclareFunction: {
     readonly body: { readonly child: 'FunctionBody'; readonly list: false };
     readonly params: {
-      readonly child: 'FormalParameters' | 'FormalParameter' | 'FormalParameterRest';
+      readonly child: 'FormalParameter' | 'FormalParameterRest';
       readonly list: true;
     };
     readonly id: { readonly child: 'Identifier'; readonly list: false };

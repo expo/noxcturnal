@@ -7,8 +7,11 @@ use rustc_hash::FxHashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use super::constant_eval::{EvaluatedConstant, constant_for_kind};
-use crate::generated::event_schema::{node_type_id, node_type_name};
-use crate::protocol::constants::NodeTypeSet;
+use crate::generated::event_schema::{
+    child_role_parent_has_roles, child_role_projects_formal_parameters, node_type_id,
+    node_type_name,
+};
+use crate::protocol::manifest::ChildRoleMask;
 
 pub const ABSENT_ID: u32 = u32::MAX;
 
@@ -27,10 +30,10 @@ pub struct RetainedIndex {
     parent_ids: Vec<u32>,
     scope_ids: Vec<u32>,
     traversal_records: Vec<u32>,
-    first_children: Option<Vec<u32>>,
-    next_siblings: Option<Vec<u32>>,
-    last_children: Option<Vec<u32>>,
-    structural_parent_types: NodeTypeSet,
+    pending_child_edges: Option<Vec<ChildEdge>>,
+    child_offsets: Option<Vec<u32>>,
+    child_edges: Vec<ChildEdge>,
+    child_role_mask_by_parent_type: Vec<ChildRoleMask>,
     names: Vec<Rc<str>>,
     name_ids: FxHashMap<Rc<str>, u32>,
     bindings: FxHashMap<(u32, u32), BindingRecord>,
@@ -41,6 +44,13 @@ pub struct RetainedIndex {
     scalar_fields: Vec<RetainedField>,
     scalar_strings: Vec<String>,
     comments: Option<Vec<RetainedComment>>,
+}
+
+#[derive(Clone, Copy)]
+struct ChildEdge {
+    parent_id: u32,
+    child_id: u32,
+    role_id: u32,
 }
 
 pub(crate) struct RetainedComment {
@@ -215,7 +225,7 @@ impl RetainedIndex {
 
     pub fn with_node_count(
         node_count: usize,
-        structural_parent_types: Option<&NodeTypeSet>,
+        child_role_mask_by_parent_type: Option<&[ChildRoleMask]>,
         retain_constants: bool,
         retain_scalar_fields: bool,
     ) -> Self {
@@ -226,10 +236,12 @@ impl RetainedIndex {
             parent_ids: vec![ABSENT_ID; node_count],
             scope_ids: vec![0; node_count],
             traversal_records: Vec::new(),
-            first_children: structural_parent_types.map(|_| vec![ABSENT_ID; node_count]),
-            next_siblings: structural_parent_types.map(|_| vec![ABSENT_ID; node_count]),
-            last_children: structural_parent_types.map(|_| vec![ABSENT_ID; node_count]),
-            structural_parent_types: structural_parent_types.cloned().unwrap_or_default(),
+            pending_child_edges: child_role_mask_by_parent_type.map(|_| Vec::new()),
+            child_offsets: None,
+            child_edges: Vec::new(),
+            child_role_mask_by_parent_type: child_role_mask_by_parent_type
+                .map(<[ChildRoleMask]>::to_vec)
+                .unwrap_or_default(),
             names: Vec::new(),
             name_ids: FxHashMap::default(),
             bindings: FxHashMap::default(),
@@ -736,15 +748,6 @@ impl RetainedIndex {
             self.ends.resize(new_len, 0);
             self.parent_ids.resize(new_len, ABSENT_ID);
             self.scope_ids.resize(new_len, 0);
-            if let Some(values) = &mut self.first_children {
-                values.resize(new_len, ABSENT_ID);
-            }
-            if let Some(values) = &mut self.next_siblings {
-                values.resize(new_len, ABSENT_ID);
-            }
-            if let Some(values) = &mut self.last_children {
-                values.resize(new_len, ABSENT_ID);
-            }
             if let Some(values) = &mut self.constants {
                 values.resize(new_len, None);
             }
@@ -757,26 +760,90 @@ impl RetainedIndex {
         self.ends[index] = end;
         self.parent_ids[index] = parent_id.unwrap_or(ABSENT_ID);
         self.scope_ids[index] = scope_id;
+    }
 
-        let (Some(parent_id), Some(first_children), Some(next_siblings), Some(last_children)) = (
-            parent_id,
-            &mut self.first_children,
-            &mut self.next_siblings,
-            &mut self.last_children,
-        ) else {
+    pub(crate) fn record_child_edge(
+        &mut self,
+        node_id: u32,
+        parent_id: Option<u32>,
+        child_role_id: Option<u32>,
+    ) {
+        let (Some(parent_id), Some(pending)) = (parent_id, &mut self.pending_child_edges) else {
             return;
         };
         let parent = parent_id as usize;
-        if !self.structural_parent_types.contains(self.type_ids[parent]) {
+        let parent_type_id = self.type_ids[parent];
+        let Some(mask) = self
+            .child_role_mask_by_parent_type
+            .get(parent_type_id as usize)
+        else {
             return;
+        };
+        let retained_role_id = match child_role_id {
+            Some(role_id) if mask.wildcard || mask.role_ids.contains(&role_id) => role_id,
+            None if mask.wildcard && !child_role_parent_has_roles(parent_type_id) => 0,
+            _ => return,
+        };
+        pending.push(ChildEdge {
+            parent_id,
+            child_id: node_id,
+            role_id: retained_role_id,
+        });
+    }
+
+    pub(crate) fn finalize_child_edges(&mut self) {
+        let Some(mut pending) = self.pending_child_edges.take() else {
+            return;
+        };
+        let formal_parameters_type = node_type_id("FormalParameters").expect("generated node type");
+        let parameter_projections = pending
+            .iter()
+            .filter(|edge| {
+                child_role_projects_formal_parameters(edge.role_id)
+                    && self.type_ids[edge.child_id as usize] == formal_parameters_type
+            })
+            .map(|edge| (edge.child_id, (edge.parent_id, edge.role_id)))
+            .collect::<FxHashMap<_, _>>();
+        let mut projected = Vec::new();
+        if !parameter_projections.is_empty() {
+            for child in &pending {
+                if let Some(&(parent_id, role_id)) = parameter_projections.get(&child.parent_id) {
+                    projected.push(ChildEdge {
+                        parent_id,
+                        child_id: child.child_id,
+                        role_id,
+                    });
+                }
+            }
         }
-        let previous = last_children[parent];
-        if previous == ABSENT_ID {
-            first_children[parent] = node_id;
-        } else {
-            next_siblings[previous as usize] = node_id;
+        pending.retain(|edge| {
+            !child_role_projects_formal_parameters(edge.role_id)
+                || self.type_ids[edge.child_id as usize] != formal_parameters_type
+        });
+        pending.extend(projected);
+        let mut offsets = vec![0_u32; self.type_ids.len() + 1];
+        for edge in &pending {
+            offsets[edge.parent_id as usize + 1] += 1;
         }
-        last_children[parent] = node_id;
+        for index in 1..offsets.len() {
+            offsets[index] += offsets[index - 1];
+        }
+        let mut cursors = offsets[..self.type_ids.len()].to_vec();
+        let mut edges = vec![
+            ChildEdge {
+                parent_id: 0,
+                child_id: 0,
+                role_id: 0,
+            };
+            pending.len()
+        ];
+        for edge in pending {
+            let cursor = &mut cursors[edge.parent_id as usize];
+            edges[*cursor as usize] = edge;
+            *cursor += 1;
+        }
+        self.child_offsets = Some(offsets);
+        self.child_edges = edges;
     }
 
     pub fn record_enter(&mut self, node_id: u32) {
@@ -924,15 +991,32 @@ impl RetainedIndex {
     }
 
     pub fn children(&self, parent_id: u32) -> Children<'_> {
+        let edges = self.child_offsets.as_ref().map_or(&[][..], |offsets| {
+            let Some((&start, &end)) = offsets
+                .get(parent_id as usize)
+                .zip(offsets.get(parent_id as usize + 1))
+            else {
+                return &[];
+            };
+            &self.child_edges[start as usize..end as usize]
+        });
         Children {
-            index: self,
-            next: self
-                .first_children
-                .as_ref()
-                .and_then(|children| children.get(parent_id as usize))
-                .copied()
-                .unwrap_or(ABSENT_ID),
+            edges: edges.iter(),
+            role_id: None,
         }
+    }
+
+    pub(crate) fn child_edges(&self, parent_id: u32) -> impl Iterator<Item = (u32, u32)> + '_ {
+        let edges = self.child_offsets.as_ref().map_or(&[][..], |offsets| {
+            let Some((&start, &end)) = offsets
+                .get(parent_id as usize)
+                .zip(offsets.get(parent_id as usize + 1))
+            else {
+                return &[];
+            };
+            &self.child_edges[start as usize..end as usize]
+        });
+        edges.iter().map(|edge| (edge.child_id, edge.role_id))
     }
 
     pub fn node_ids_of_types<'a>(
@@ -981,18 +1065,20 @@ impl RetainedIndex {
             + self.scope_ids.capacity() * size_of::<u32>()
             + self.traversal_records.capacity() * size_of::<u32>()
             + self
-                .first_children
+                .pending_child_edges
                 .as_ref()
-                .map_or(0, |column| column.capacity() * size_of::<u32>())
+                .map_or(0, |edges| edges.capacity() * size_of::<ChildEdge>())
             + self
-                .next_siblings
+                .child_offsets
                 .as_ref()
-                .map_or(0, |column| column.capacity() * size_of::<u32>())
+                .map_or(0, |offsets| offsets.capacity() * size_of::<u32>())
+            + self.child_edges.capacity() * size_of::<ChildEdge>()
+            + self.child_role_mask_by_parent_type.capacity() * size_of::<ChildRoleMask>()
             + self
-                .last_children
-                .as_ref()
-                .map_or(0, |column| column.capacity() * size_of::<u32>())
-            + size_of::<NodeTypeSet>()
+                .child_role_mask_by_parent_type
+                .iter()
+                .map(|mask| mask.role_ids.capacity() * size_of::<u32>())
+                .sum::<usize>()
             + self.names.capacity() * size_of::<Rc<str>>()
             + self.names.iter().map(|name| name.len()).sum::<usize>()
             + self.name_ids.capacity() * size_of::<(Rc<str>, u32)>()
@@ -1039,6 +1125,18 @@ impl RetainedIndex {
             + self.scalar_fields.capacity() * size_of::<RetainedField>()
     }
 
+    pub(crate) fn child_edge_count(&self) -> u32 {
+        self.child_edges.len() as u32
+    }
+
+    pub(crate) fn scalar_field_count(&self) -> u32 {
+        self.scalar_fields.len() as u32
+    }
+
+    pub(crate) fn scalar_string_count(&self) -> u32 {
+        self.scalar_strings.len() as u32
+    }
+
     pub fn clear(&mut self) {
         *self = Self::default();
     }
@@ -1076,24 +1174,17 @@ fn scope_intervals(scope_parents: &[u32]) -> (Vec<u32>, Vec<u32>) {
 }
 
 pub struct Children<'a> {
-    index: &'a RetainedIndex,
-    next: u32,
+    edges: std::slice::Iter<'a, ChildEdge>,
+    role_id: Option<u32>,
 }
 
 impl Iterator for Children<'_> {
     type Item = u32;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.next == ABSENT_ID {
-            return None;
-        }
-        let current = self.next;
-        self.next = self
-            .index
-            .next_siblings
-            .as_ref()
-            .map_or(ABSENT_ID, |siblings| siblings[current as usize]);
-        Some(current)
+        self.edges
+            .find(|edge| self.role_id.is_none_or(|role_id| edge.role_id == role_id))
+            .map(|edge| edge.child_id)
     }
 }
 use std::rc::Rc;

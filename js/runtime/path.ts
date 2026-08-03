@@ -1,4 +1,4 @@
-import { FIELD_KEY_IDS } from '../generated/event-schema';
+import { CHILD_ROLES, FIELD_KEY_IDS } from '../generated/event-schema';
 import { alias, array } from '../pipeline/route-utils';
 import {
   isProvenanceCode,
@@ -117,7 +117,7 @@ export type PathRuntime = {
   nested: (target: NativeEvent, visitor: readonly DefinedVisitor<any>[], value: any) => void;
   widen: (target: NativeEvent, types: string[], scopeOnly: boolean) => void;
   parent: (target: NativeEvent, id: number, ancestryDepth: number) => NativeNodePath | null;
-  children: (target: NativeEvent, ancestryDepth: number) => NativeNodePath[];
+  children: (target: NativeEvent, ancestryDepth: number, role?: string) => NativeNodePath[];
   allowsChild: (type: string, role: string) => boolean;
   allowsAncestry: () => boolean;
   allowsScope: () => boolean;
@@ -289,7 +289,12 @@ export class NodePathImpl implements NativeNodePath {
   }
   get(key: string): NativeNodePath | readonly NativeNodePath[] | null {
     this.#assertChildRole(key);
-    return selectChildRole(this, key, this.childrenUnchecked());
+    if (key === '*') return this.childrenUnchecked();
+    const declaration = CHILD_ROLES[this.node.type]?.[key];
+    if (declaration == null)
+      throw new Error(`${this.node.type} does not expose child role ${JSON.stringify(key)}`);
+    const children = this.runtime.children(this.event, this.ancestryDepth, key);
+    return declaration.list ? children : (children[0] ?? null);
   }
   getChild(key: string): NativeNodePath | null {
     const value = this.get(key);
@@ -302,11 +307,14 @@ export class NodePathImpl implements NativeNodePath {
     return value;
   }
   matchesPattern(pattern: string, allowPartial = false): boolean {
-    const memberPath = this.node.memberPath;
-    return (
-      typeof memberPath === 'string' &&
-      (memberPath === pattern || (allowPartial && memberPath.startsWith(`${pattern}.`)))
-    );
+    const retained = this.node.memberPath;
+    const memberPath =
+      typeof retained === 'string'
+        ? retained
+        : this.getSource()
+            .text()
+            .replace(/\s*(\?\.|\.)\s*/g, '$1');
+    return memberPath === pattern || (allowPartial && memberPath.startsWith(`${pattern}.`));
   }
   #assertChildRole(role: string): void {
     const rules =
@@ -603,9 +611,6 @@ export class NodePathImpl implements NativeNodePath {
 }
 
 type EditKind = EditCommand['kind'];
-function isMemberExpressionType(type: string): boolean {
-  return alias('MemberExpression', type);
-}
 function mappingPolicy(value?: CodeFragment['mapping']): EditCommand['mapping'] {
   return (
     {
@@ -794,165 +799,6 @@ function joinFragments(values: readonly (string | CodeFragment)[]): CodeFragment
   };
 }
 
-const LIST_CHILD_ROLES = new Set([
-  'arguments',
-  'body',
-  'declarations',
-  'decorators',
-  'directives',
-  'elements',
-  'params',
-  'properties',
-  'specifiers',
-]);
-function selectChildRole(
-  path: NodePathImpl,
-  key: string,
-  children: readonly NativeNodePath[],
-): NativeNodePath | readonly NativeNodePath[] | null {
-  const type = path.node.type;
-  const at = (index: number) => children[index] ?? null;
-  const last = () => children.at(-1) ?? null;
-  if (key === 'body') {
-    if (
-      type === 'Program' ||
-      type === 'BlockStatement' ||
-      type === 'FunctionBody' ||
-      type === 'ClassBody' ||
-      type === 'TSModuleBlock'
-    )
-      return children;
-    if (type === 'DoWhileStatement') return at(0);
-    return last();
-  }
-  if (key === 'arguments' && (type === 'CallExpression' || type === 'NewExpression'))
-    return children.slice(1);
-  if (key === 'callee' && (type === 'CallExpression' || type === 'NewExpression')) return at(0);
-  if (key === 'declarations' && type === 'VariableDeclaration')
-    return children.filter(child => child.node.type === 'VariableDeclarator');
-  if (key === 'specifiers' && (type === 'ImportDeclaration' || type === 'ExportNamedDeclaration'))
-    return children.filter(child => child.node.type.endsWith('Specifier'));
-  if (key === 'directives' && (type === 'Program' || type === 'FunctionBody'))
-    return children.filter(child => child.node.type === 'Directive');
-  if (
-    key === 'decorators' &&
-    (type === 'Class' ||
-      type === 'MethodDefinition' ||
-      type === 'PropertyDefinition' ||
-      type === 'FormalParameter')
-  )
-    return children.filter(child => child.node.type === 'Decorator');
-  if (
-    key === 'properties' &&
-    (type === 'ObjectExpression' || type === 'ObjectPattern' || type === 'ObjectAssignmentTarget')
-  )
-    return children;
-  if (
-    key === 'elements' &&
-    (type === 'ArrayExpression' || type === 'ArrayPattern' || type === 'ArrayAssignmentTarget')
-  )
-    return children;
-  if (key === 'params' && alias('Function', type)) {
-    const parameters = children.find(child => child.node.type === 'FormalParameters');
-    return parameters instanceof NodePathImpl ? parameters.childrenUnchecked() : [];
-  }
-  if (
-    key === 'id' &&
-    (type === 'VariableDeclarator' ||
-      type === 'Function' ||
-      type === 'Class' ||
-      type === 'TSEnumDeclaration' ||
-      type === 'TSInterfaceDeclaration' ||
-      type === 'TSTypeAliasDeclaration')
-  )
-    return at(0);
-  if (key === 'init' && type === 'VariableDeclarator') return children.length > 1 ? last() : null;
-  if (type === 'FormalParameter' || type === 'BindingRestElement') {
-    if (key === 'pattern') return at(0);
-    if (key === 'default') return type === 'FormalParameter' && children.length > 1 ? last() : null;
-  }
-  if (type === 'FormalParameterRest' && key === 'argument') return at(0);
-  if (key === 'expression' && type === 'ExpressionStatement') return at(0);
-  if (
-    (key === 'key' || key === 'value') &&
-    (type === 'ObjectProperty' ||
-      type === 'BindingProperty' ||
-      type === 'AssignmentTargetPropertyProperty')
-  )
-    return key === 'key' ? at(0) : last();
-  if ((key === 'object' || key === 'property') && isMemberExpressionType(type))
-    return key === 'object' ? at(0) : last();
-  if (
-    (key === 'left' || key === 'right') &&
-    (type === 'BinaryExpression' ||
-      type === 'LogicalExpression' ||
-      type === 'AssignmentExpression' ||
-      type === 'PrivateInExpression')
-  )
-    return key === 'left' ? at(0) : last();
-  if (
-    key === 'argument' &&
-    (type === 'UnaryExpression' ||
-      type === 'UpdateExpression' ||
-      type === 'AwaitExpression' ||
-      type === 'YieldExpression' ||
-      type === 'ReturnStatement' ||
-      type === 'ThrowStatement' ||
-      type === 'SpreadElement')
-  )
-    return at(0);
-  if (
-    key === 'test' &&
-    (type === 'IfStatement' ||
-      type === 'ConditionalExpression' ||
-      type === 'WhileStatement' ||
-      type === 'DoWhileStatement' ||
-      type === 'ForStatement' ||
-      type === 'SwitchStatement')
-  )
-    return type === 'DoWhileStatement' ? last() : at(0);
-  if (key === 'consequent' && (type === 'IfStatement' || type === 'ConditionalExpression'))
-    return at(1);
-  if (key === 'alternate' && (type === 'IfStatement' || type === 'ConditionalExpression'))
-    return at(2);
-  if (key === 'block' && type === 'TryStatement')
-    return children.find(child => child.node.type === 'BlockStatement') ?? null;
-  if (key === 'handler' && type === 'TryStatement')
-    return children.find(child => child.node.type === 'CatchClause') ?? null;
-  if (key === 'finalizer' && type === 'TryStatement') {
-    const blocks = children.filter(child => child.node.type === 'BlockStatement');
-    return blocks.length > 1 ? blocks[1] : null;
-  }
-  if (key === 'superClass' && type === 'Class') {
-    const candidates = children.filter(
-      child =>
-        child.node.type !== 'Decorator' &&
-        child.node.type !== 'ClassBody' &&
-        !child.node.type.startsWith('TS'),
-    );
-    return typeof path.node.name === 'string' ? (candidates[1] ?? null) : (candidates[0] ?? null);
-  }
-  if (
-    (key === 'key' || key === 'value') &&
-    (type === 'MethodDefinition' || type === 'PropertyDefinition' || type === 'AccessorProperty')
-  )
-    return key === 'key'
-      ? (children.find(child => child.node.type !== 'Decorator') ?? null)
-      : last();
-  if (key === 'source' && (type.startsWith('Import') || type.startsWith('Export')))
-    return children.find(child => child.node.type === 'StringLiteral') ?? null;
-  if (
-    key === 'declaration' &&
-    (type === 'ExportNamedDeclaration' || type === 'ExportDefaultDeclaration')
-  )
-    return (
-      children.find(
-        child => !child.node.type.endsWith('Specifier') && child.node.type !== 'StringLiteral',
-      ) ?? null
-    );
-  if (LIST_CHILD_ROLES.has(key)) return [];
-  throw new Error(`${type} does not expose child role ${JSON.stringify(key)}`);
-}
 function isShorthandPropertyType(type: string | undefined): boolean {
   return (
     type === 'ObjectProperty' ||

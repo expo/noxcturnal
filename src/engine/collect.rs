@@ -11,7 +11,7 @@ use oxc_span::GetSpan;
 use oxc_syntax::node::NodeId;
 use rustc_hash::FxHashMap;
 
-use crate::generated::event_schema::ast_kind_protocol_id;
+use crate::generated::event_schema::{ast_kind_protocol_id, child_role_id_for_edge};
 use crate::protocol::constants::FieldMask;
 use crate::protocol::manifest::CompiledManifest;
 use crate::semantic::retained_index::{RetainedComment, RetainedIndex};
@@ -47,7 +47,7 @@ struct SyntaxIndexCollector<'a> {
     retention_routes: Option<&'a CompiledManifest>,
     retention_capabilities: u32,
     retained_string_ids: FxHashMap<String, u32>,
-    parent_stack: Vec<(u32, u32)>,
+    parent_stack: Vec<(u32, u32, AstKind<'a>)>,
     target_stack: Vec<(AstKind<'a>, bool, bool)>,
     tracks_member_writes: bool,
     node_count: u32,
@@ -87,7 +87,11 @@ impl<'a> Visit<'a> for SyntaxIndexCollector<'a> {
         self.node_count += 1;
         kind.set_node_id(NodeId::new(id as usize));
         let protocol_id = ast_kind_protocol_id(kind);
-        let parent_id = self.parent_stack.last().map(|(id, _)| *id);
+        let parent_id = self.parent_stack.last().map(|(id, _, _)| *id);
+        let child_role_id = self
+            .parent_stack
+            .last()
+            .and_then(|(_, _, parent)| child_role_id_for_edge(*parent, kind));
         let span = kind.span();
         self.retained_index.record_enter(id);
         self.retained_index.record(
@@ -100,6 +104,8 @@ impl<'a> Visit<'a> for SyntaxIndexCollector<'a> {
             parent_id,
             0,
         );
+        self.retained_index
+            .record_child_edge(id, parent_id, child_role_id);
         if self.retention_capabilities & RETAIN_CONSTANTS != 0 {
             self.retained_index.record_constant(kind, id);
         }
@@ -107,16 +113,10 @@ impl<'a> Visit<'a> for SyntaxIndexCollector<'a> {
             function_map.enter(kind);
         }
         let retain_all_fields = self.retention_capabilities & RETAIN_MODULE_FACTS != 0;
-        let retain_structural_fields = self.parent_stack.last().is_some_and(|(_, parent_type)| {
-            self.retention_routes.is_some_and(|manifest| {
-                !manifest.structural_parent_types.is_empty()
-                    && manifest.structural_parent_types.contains(*parent_type)
-            })
-        });
         let requested = self.retention_routes.map_or(FieldMask::none(), |manifest| {
             manifest.merged_field_mask_by_type[protocol_id as usize]
         });
-        if retain_all_fields || retain_structural_fields || !requested.is_empty() {
+        if retain_all_fields || !requested.is_empty() {
             let retained_fields = packed_fields_direct(
                 kind,
                 self.source,
@@ -124,7 +124,7 @@ impl<'a> Visit<'a> for SyntaxIndexCollector<'a> {
                 member_root_write,
                 None,
                 self.utf16,
-                if retain_all_fields || retain_structural_fields {
+                if retain_all_fields {
                     FieldMask::all()
                 } else {
                     requested
@@ -136,7 +136,7 @@ impl<'a> Visit<'a> for SyntaxIndexCollector<'a> {
                     .record_packed_fields(id, &retained_fields.words[..retained_fields.len]);
             }
         }
-        self.parent_stack.push((id, protocol_id));
+        self.parent_stack.push((id, protocol_id, kind));
         if self.tracks_member_writes {
             self.target_stack
                 .push((kind, member_write, member_root_write));
@@ -144,7 +144,7 @@ impl<'a> Visit<'a> for SyntaxIndexCollector<'a> {
     }
 
     fn leave_node(&mut self, kind: AstKind<'a>) {
-        let (id, _) = self
+        let (id, _, _) = self
             .parent_stack
             .pop()
             .expect("syntax traversal enter/leave balance");
@@ -187,6 +187,7 @@ impl<'a> EventCollector<'a> {
         };
         let is_root = id.index() == 0;
         let protocol_id = ast_kind_protocol_id(kind);
+        let parent_kind = (!is_root).then(|| self.nodes.parent_kind(id));
         self.retained_index.record(
             id.index() as u32,
             protocol_id,
@@ -196,6 +197,11 @@ impl<'a> EventCollector<'a> {
                 .map_or(span.end, |index| index[span.end as usize]),
             (!is_root).then(|| self.nodes.parent_id(id).index() as u32),
             scope_id.index() as u32,
+        );
+        self.retained_index.record_child_edge(
+            id.index() as u32,
+            (!is_root).then(|| self.nodes.parent_id(id).index() as u32),
+            parent_kind.and_then(|parent| child_role_id_for_edge(parent, kind)),
         );
         self.retained_index.record_semantics(
             kind,
@@ -227,19 +233,12 @@ impl<'a> EventCollector<'a> {
             );
         }
         let retain_all_fields = self.retention_capabilities & RETAIN_MODULE_FACTS != 0;
-        let retain_structural_fields = self.retention_routes.is_some_and(|manifest| {
-            id.index() != 0
-                && !manifest.structural_parent_types.is_empty()
-                && manifest
-                    .structural_parent_types
-                    .contains(ast_kind_protocol_id(self.nodes.parent_kind(id)))
-        });
         // A node without requested fields records nothing: an absent range and an empty
         // range read back identically.
         let requested = self.retention_routes.map_or(FieldMask::none(), |manifest| {
             manifest.merged_field_mask_by_type[protocol_id as usize]
         });
-        if retain_all_fields || retain_structural_fields || !requested.is_empty() {
+        if retain_all_fields || !requested.is_empty() {
             let retained_fields = packed_fields_direct(
                 kind,
                 self.source,
@@ -247,7 +246,7 @@ impl<'a> EventCollector<'a> {
                 member_root_write,
                 Some(self.scoping),
                 self.utf16,
-                if retain_all_fields || retain_structural_fields {
+                if retain_all_fields {
                     FieldMask::all()
                 } else {
                     requested
@@ -345,10 +344,10 @@ pub(crate) fn materialize_with_scope_parents(
         .as_ref()
         .or(compiled_manifest.as_ref())
         .map_or(u32::MAX, |manifest| manifest.retention_capabilities);
-    let structural_parent_types = retention_manifest
+    let child_role_masks = retention_manifest
         .as_ref()
         .or(compiled_manifest.as_ref())
-        .map(|manifest| &manifest.structural_parent_types);
+        .map(|manifest| manifest.child_role_mask_by_parent_type.as_slice());
     let needs_semantics = retention_manifest
         .as_ref()
         .is_some_and(|manifest| manifest.needs_semantics)
@@ -371,7 +370,7 @@ pub(crate) fn materialize_with_scope_parents(
                 0,
                 (retention_capabilities & RETAIN_CHILDREN != 0)
                     .then_some(())
-                    .and(structural_parent_types),
+                    .and(child_role_masks),
                 retention_capabilities & RETAIN_CONSTANTS != 0,
                 retention_capabilities & (RETAIN_INSPECTION | RETAIN_MODULE_FACTS) != 0
                     || retention_manifest.is_some(),
@@ -389,6 +388,7 @@ pub(crate) fn materialize_with_scope_parents(
             function_map: collect_function_map.then(|| FunctionMapCollector::new(source, filename)),
         };
         collector.visit_program(&parsed.program);
+        collector.retained_index.finalize_child_edges();
         collector
             .retained_index
             .set_scalar_strings(std::mem::take(&mut collector.retained_string_ids));
@@ -455,7 +455,7 @@ pub(crate) fn materialize_with_scope_parents(
             semantic_return.semantic.nodes().len(),
             (retention_capabilities & RETAIN_CHILDREN != 0)
                 .then_some(())
-                .and(structural_parent_types),
+                .and(child_role_masks),
             retention_capabilities & RETAIN_CONSTANTS != 0,
             retention_capabilities & (RETAIN_INSPECTION | RETAIN_MODULE_FACTS) != 0
                 || retention_manifest.is_some(),
@@ -471,6 +471,7 @@ pub(crate) fn materialize_with_scope_parents(
         ),
     };
     collector.visit_program(&parsed.program);
+    collector.retained_index.finalize_child_edges();
     collector
         .retained_index
         .set_scalar_strings(std::mem::take(&mut collector.retained_string_ids));

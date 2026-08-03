@@ -681,10 +681,8 @@ fn expand_copies(source: &str, edits: &mut [Edit]) -> Result<Vec<Option<Vec<Piec
     let mut previous_end_conflict = index_transparent.then(|| vec![usize::MAX; edits.len()]);
     let mut last_end_conflict = usize::MAX;
     for (index, edit) in edits.iter().enumerate() {
-        if edit.end > edit.start {
-            if !edit.mark_only {
-                last_end_conflict = index;
-            }
+        if edit.end > edit.start && !edit.mark_only {
+            last_end_conflict = index;
         }
         if let Some(previous) = &mut previous_end_conflict {
             previous[index] = last_end_conflict;
