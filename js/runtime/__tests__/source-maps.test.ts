@@ -3,6 +3,65 @@ import assert from 'node:assert/strict';
 import { test } from 'vitest';
 
 import { defineNativePipeline, defineNativePlugin, defineVisitor, transform } from '../../index';
+
+test('maps expressions inside JSX attribute callbacks to their original tokens', () => {
+  const source = [
+    'function App(props: { title: string }) {',
+    '  return <BigButton',
+    '    title="throw"',
+    '    onPress={() => {',
+    "      throw new Error('failure');",
+    '    }}',
+    '  />;',
+    '}',
+  ].join('\n');
+  const result = transform(
+    source,
+    'fixture.tsx',
+    defineNativePipeline({
+      phases: [
+        { name: 'jsx', native: { typescript: 'strip', jsx: 'automatic' } },
+        {
+          name: 'wrap',
+          plugins: [
+            defineNativePlugin({
+              name: 'wrap',
+              pre(context) {
+                context.editor.prepend('__d(function () {\n');
+                context.editor.append('\n});');
+              },
+            }),
+          ],
+        },
+      ],
+    }),
+    { sourceMapMode: 'boundary', functionMap: true },
+  );
+  assert.equal(result.status, 'complete');
+  assert.ok(result.functionMap?.names.includes('BigButton.props.onPress'));
+  const generatedOffset = result.code.indexOf('new Error');
+  assert.notEqual(generatedOffset, -1);
+  const generatedBefore = result.code.slice(0, generatedOffset).split('\n');
+  const map = new TraceMap({
+    version: 3,
+    sources: ['fixture.tsx'],
+    names: result.map.names,
+    mappings: result.map.mappings,
+  });
+  assert.deepEqual(
+    originalPositionFor(map, {
+      line: generatedBefore.length,
+      column: generatedBefore.at(-1)!.length,
+    }),
+    {
+      source: 'fixture.tsx',
+      line: 5,
+      column: source.split('\n')[4]!.indexOf('new Error'),
+      name: null,
+    },
+  );
+});
+
 test('produces traceable Unicode-aware VLQ mappings', () => {
   const plugin = defineNativePlugin({
     name: 'map',

@@ -113,7 +113,7 @@ test('rejects malformed child-role retention entries', () => {
   });
   invalidRole.writeUInt32LE(0, 10 * 4);
   assert.throws(
-    () => new native.NativeIndexedSession('let value;', 'fixture.js', false, invalidRole),
+    () => new native.NativeIndexedSession('let value;', 'fixture.js', invalidRole),
     /invalid child role id/,
   );
 
@@ -122,7 +122,7 @@ test('rejects malformed child-role retention entries', () => {
   });
   wildcardConflict.writeUInt32LE(1, 8 * 4);
   assert.throws(
-    () => new native.NativeIndexedSession('let value;', 'fixture.js', false, wildcardConflict),
+    () => new native.NativeIndexedSession('let value;', 'fixture.js', wildcardConflict),
     /invalid child retention plan/,
   );
 });
@@ -166,7 +166,7 @@ test('constructs the retained index and initial routed tape in one native parse'
     true,
   );
   const expected = native.materializeRoutedBuffer(source, 'fixture.js', manifest);
-  const session = new native.NativeIndexedSession(source, 'fixture.js', false, manifest, manifest);
+  const session = new native.NativeIndexedSession(source, 'fixture.js', manifest, manifest);
   const first = session.nextRoutedPacked(manifest);
   const second = session.nextRoutedPacked(manifest);
   assert.deepEqual(first, expected);
@@ -282,7 +282,7 @@ test('serializes a shared hydrated ancestor once rather than once per routed des
     [],
     Number.POSITIVE_INFINITY,
   );
-  const session = new native.NativeIndexedSession(source, 'fixture.js', false, manifest, manifest);
+  const session = new native.NativeIndexedSession(source, 'fixture.js', manifest, manifest);
   const batch = decodeRoutedEnvelope(session.nextRoutedPacked(manifest));
   session.close();
   assert.equal(batch.routeDeliveryCount, callCount);
@@ -313,7 +313,6 @@ test('serializes a shared hydrated ancestor once rather than once per routed des
   const summarySession = new native.NativeIndexedSession(
     source,
     'fixture.js',
-    false,
     summaryManifest,
     summaryManifest,
   );
@@ -338,7 +337,6 @@ test('uses syntax-only retained materialization for structural ancestry', () => 
   const syntax = new native.NativeIndexedSession(
     source,
     'fixture.js',
-    false,
     syntaxManifest,
     syntaxManifest,
     true,
@@ -346,7 +344,6 @@ test('uses syntax-only retained materialization for structural ancestry', () => 
   const semantic = new native.NativeIndexedSession(
     source,
     'fixture.js',
-    false,
     semanticManifest,
     semanticManifest,
     true,
@@ -407,7 +404,6 @@ test('retains only semantic and query sidecars declared by the compiled manifest
     new native.NativeIndexedSession(
       source,
       'fixture.js',
-      false,
       packRouteManifest([], false, false, capabilities),
     );
   const none = open(0);
@@ -425,7 +421,6 @@ test('retains only semantic and query sidecars declared by the compiled manifest
   const constants = new native.NativeIndexedSession(
     source,
     'fixture.js',
-    false,
     packRouteManifest([], false, false, 1 << 1),
     undefined,
     true,
@@ -436,7 +431,6 @@ test('retains only semantic and query sidecars declared by the compiled manifest
   const calls = new native.NativeIndexedSession(
     source,
     'fixture.js',
-    false,
     packRouteManifest([], false, false, 1 << 2),
     undefined,
     true,

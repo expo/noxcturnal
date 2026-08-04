@@ -6,7 +6,6 @@ use crate::protocol::manifest::{
 };
 use crate::semantic::retained_index::RetainedIndex;
 use crate::sourcemap;
-use crate::sourcemap::function_map::FunctionMap;
 
 mod collect;
 mod fields;
@@ -21,7 +20,6 @@ struct MaterializedSessionParts {
     pub(crate) program_body_offsets: [u32; 3],
     pub(crate) scope_parents: Vec<u32>,
     pub(crate) retained_index: RetainedIndex,
-    pub(crate) function_map: Option<FunctionMap>,
     pub(crate) initial_routed_buffer: Option<Vec<u8>>,
 }
 

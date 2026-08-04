@@ -372,6 +372,13 @@ export function transform(
   // no resident session object required.
   const allNative =
     pipeline.phases.length > 0 && pipeline.phases.every(phase => phase.native != null);
+  // Metro consumes function-map positions after source-map symbolication, so
+  // they belong to the transform's input source, not to the final generated
+  // JavaScript. Babel's function-map plugin likewise collects from the input AST
+  // before transformation begins.
+  const initialFunctionMap = options.functionMap
+    ? native.generateFunctionMap(source, parseFilename)
+    : null;
   // The resident source: native phases and visitor commits mutate it in place
   // and accumulate their map layers natively, so the intermediate phase source
   // and per-phase map layers never cross the boundary — only the final composed
@@ -457,22 +464,16 @@ export function transform(
       assertNativePhaseCompleted(result, batchPhase.name, diagnostics);
     }
   };
-  // The shared success tail: plugin cleanup, function map, final metadata, and
-  // the completed result. The current version/final map are already set by the loop or
-  // the all-native path.
+  // The shared success tail: plugin cleanup, final metadata, and the completed
+  // result. The current version/final map are already set by the loop or the
+  // all-native path.
   const completeResult = (): TransformResult => {
     cleanupStates('complete');
-    const cachedFunctionMap = sourceVersions.functionMap(currentVersion);
-    const functionMap = options.functionMap
-      ? (cachedFunctionMap ?? native.generateFunctionMap(currentSource(), parseFilename))
-      : null;
-    if (functionMap != null && cachedFunctionMap == null)
-      sourceVersions.cacheFunctionMap(currentVersion, functionMap);
     return {
       status: 'complete',
       code: currentSource(),
       map: finalMap ?? { mappings: '', names: [] },
-      functionMap,
+      functionMap: initialFunctionMap,
       metadata,
       diagnostics,
     };
@@ -489,13 +490,9 @@ export function transform(
         batch.map(({ phase }) => nativePreflightOptions(phase.native!)),
         inputMap?.mappings,
         inputMap?.names,
-        options.functionMap,
       );
       applyNativeResults(pipelineResult.results, batch); // throws on any bail
       sourceVersions.cacheRenderedText(currentVersion, pipelineResult.code!);
-      if (pipelineResult.functionMap != null) {
-        sourceVersions.cacheFunctionMap(currentVersion, pipelineResult.functionMap);
-      }
       if (pipelineResult.map != null) {
         finalMap = pipelineResult.map;
       } else if (inputMap != null) {
@@ -506,7 +503,6 @@ export function transform(
     for (let phaseIndex = 0; phaseIndex < pipeline.phases.length; phaseIndex++) {
       const phase = pipeline.phases[phaseIndex];
       const executionPlan = phasePlan[phaseIndex];
-      const isFinalPhase = phaseIndex === pipeline.phases.length - 1;
       const observedVersion: SourceVersionId = currentVersion;
       if (phase.native != null) {
         reusableSession?.close();
@@ -598,16 +594,11 @@ export function transform(
         (runtimeEditEffect === 'none' &&
           nextPhase?.native == null &&
           !phasePlan[phaseIndex + 1].requiresPrintedInput);
-      const collectFinalFunctionMap =
-        options.functionMap === true && isFinalPhase && !/\n#!/.test(observationSource);
-      const artifactDemand =
-        phaseArtifactDemand(executionPlan.artifactDemand, prepared) |
-        (collectFinalFunctionMap ? ArtifactDemand.FunctionMap : ArtifactDemand.None);
+      const artifactDemand = phaseArtifactDemand(executionPlan.artifactDemand, prepared);
       const requiresIndex =
         requiresIndexBase ||
         includeParent ||
         includeScope ||
-        collectFinalFunctionMap ||
         futureSubscriptions.size > 0 ||
         hasSemanticDemand(artifactDemand);
       // Parsed/index artifacts live exactly as long as their retained native
@@ -626,10 +617,6 @@ export function transform(
           {
             ...options,
             parser: 'auto',
-            // A map collected while opening the last phase belongs to that
-            // phase's immutable input. A code-changing commit invalidates it;
-            // a no-op or map-only child can reuse it in the success tail.
-            functionMap: collectFinalFunctionMap,
           },
           requiresIndex ? retentionManifest : undefined,
           requiresIndex ? manifest : undefined,
@@ -674,11 +661,6 @@ export function transform(
           }
         }
         reusableRoutedBatch = null;
-      }
-      if (options.functionMap && isFinalPhase) {
-        const phaseFunctionMap = session.takeFunctionMap();
-        if (phaseFunctionMap != null)
-          sourceVersions.cacheFunctionMap(observedVersion, phaseFunctionMap);
       }
       if (requiresIndex || includeParent || includeScope)
         session.reserveEventCache(batch.nodeCount);
@@ -823,15 +805,8 @@ export function transform(
       finalMap = inputMap;
       return completeResult();
     }
-    const finished = pipelineSession.finish(
-      inputMap?.mappings,
-      inputMap?.names,
-      options.functionMap === true && sourceVersions.functionMap(currentVersion) == null,
-    );
+    const finished = pipelineSession.finish(inputMap?.mappings, inputMap?.names);
     sourceVersions.cacheRenderedText(currentVersion, finished.code);
-    if (finished.functionMap != null) {
-      sourceVersions.cacheFunctionMap(currentVersion, finished.functionMap);
-    }
     if (finished.map != null) {
       finalMap = finished.map;
     } else if (inputMap != null) {

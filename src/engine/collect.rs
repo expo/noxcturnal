@@ -15,7 +15,6 @@ use crate::generated::event_schema::{ast_kind_protocol_id, child_role_id_for_edg
 use crate::protocol::constants::FieldMask;
 use crate::protocol::manifest::CompiledManifest;
 use crate::semantic::retained_index::{RetainedComment, RetainedIndex};
-use crate::sourcemap::function_map::FunctionMapCollector;
 use crate::syntax::classification::source_type;
 
 use super::fields::{packed_fields_direct, utf16_index};
@@ -32,7 +31,6 @@ struct EventCollector<'a> {
     scoping: &'a Scoping,
     utf16: Option<&'a [u32]>,
     retained_index: RetainedIndex,
-    function_map: Option<FunctionMapCollector<'a>>,
     target_stack: Vec<(AstKind<'a>, bool, bool)>,
     tracks_member_writes: bool,
     retention_routes: Option<&'a CompiledManifest>,
@@ -51,7 +49,6 @@ struct SyntaxIndexCollector<'a> {
     target_stack: Vec<(AstKind<'a>, bool, bool)>,
     tracks_member_writes: bool,
     node_count: u32,
-    function_map: Option<FunctionMapCollector<'a>>,
 }
 
 impl SyntaxIndexCollector<'_> {
@@ -109,9 +106,6 @@ impl<'a> Visit<'a> for SyntaxIndexCollector<'a> {
         if self.retention_capabilities & RETAIN_CONSTANTS != 0 {
             self.retained_index.record_constant(kind, id);
         }
-        if let Some(function_map) = &mut self.function_map {
-            function_map.enter(kind);
-        }
         let retain_all_fields = self.retention_capabilities & RETAIN_MODULE_FACTS != 0;
         let requested = self.retention_routes.map_or(FieldMask::none(), |manifest| {
             manifest.merged_field_mask_by_type[protocol_id as usize]
@@ -155,9 +149,6 @@ impl<'a> Visit<'a> for SyntaxIndexCollector<'a> {
         }
         if self.retains_traversal_kind(kind) {
             self.retained_index.record_exit(id);
-        }
-        if let Some(function_map) = &mut self.function_map {
-            function_map.leave(kind);
         }
     }
 
@@ -285,9 +276,6 @@ impl<'a> Visit<'a> for EventCollector<'a> {
             );
         self.retained_index
             .record_enter(kind.node_id().index() as u32);
-        if let Some(function_map) = &mut self.function_map {
-            function_map.enter(kind);
-        }
         self.record_summary(kind, member_write, member_root_write);
         if self.tracks_member_writes {
             self.target_stack
@@ -304,9 +292,6 @@ impl<'a> Visit<'a> for EventCollector<'a> {
             self.retained_index
                 .record_exit(kind.node_id().index() as u32);
         }
-        if let Some(function_map) = &mut self.function_map {
-            function_map.leave(kind);
-        }
     }
     fn visit_program(&mut self, program: &oxc_ast::ast::Program<'a>) {
         walk::walk_program(self, program);
@@ -316,7 +301,6 @@ impl<'a> Visit<'a> for EventCollector<'a> {
 pub(crate) fn materialize_with_scope_parents(
     source: &str,
     filename: &str,
-    collect_function_map: bool,
     retention_manifest: Option<&[u8]>,
     initial_route_manifest: Option<&[u8]>,
     build_initial_route: bool,
@@ -385,7 +369,6 @@ pub(crate) fn materialize_with_scope_parents(
                 retention_capabilities,
             ),
             node_count: 0,
-            function_map: collect_function_map.then(|| FunctionMapCollector::new(source, filename)),
         };
         collector.visit_program(&parsed.program);
         collector.retained_index.finalize_child_edges();
@@ -411,15 +394,10 @@ pub(crate) fn materialize_with_scope_parents(
         } else {
             None
         };
-        let function_map = collector
-            .function_map
-            .take()
-            .map(FunctionMapCollector::finish);
         return Ok(MaterializedSessionParts {
             program_body_offsets,
             scope_parents: Vec::new(),
             retained_index: collector.retained_index,
-            function_map,
             initial_routed_buffer,
         });
     }
@@ -460,7 +438,6 @@ pub(crate) fn materialize_with_scope_parents(
             retention_capabilities & (RETAIN_INSPECTION | RETAIN_MODULE_FACTS) != 0
                 || retention_manifest.is_some(),
         ),
-        function_map: collect_function_map.then(|| FunctionMapCollector::new(source, filename)),
         retention_routes: retention_manifest.as_ref(),
         retention_capabilities,
         retained_string_ids: FxHashMap::default(),
@@ -483,10 +460,6 @@ pub(crate) fn materialize_with_scope_parents(
             utf16.as_deref().map(|offsets| &**offsets),
         );
     }
-    let function_map = collector
-        .function_map
-        .take()
-        .map(FunctionMapCollector::finish);
     let initial_routed_buffer = if build_initial_route {
         compiled_manifest
             .as_ref()
@@ -502,7 +475,6 @@ pub(crate) fn materialize_with_scope_parents(
         program_body_offsets,
         scope_parents,
         retained_index: collector.retained_index,
-        function_map,
         initial_routed_buffer,
     })
 }

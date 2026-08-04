@@ -81,7 +81,6 @@ interface NativeBinding {
   NativeIndexedSession: new (
     source: string,
     filename: string,
-    functionMap?: boolean,
     retentionManifest?: Buffer,
     initialRouteManifest?: Buffer,
     buildInitialRoute?: boolean,
@@ -183,7 +182,6 @@ interface NativeBinding {
     scopeParentId(scopeId: number): number | null;
     close(): void;
     memoryUsage(): number;
-    takeFunctionMap(): FunctionMap | null;
     commitPacked(data: Buffer, sourceMapMode?: string): { code: string; map: NativeVlqMap };
     commitDecoded(
       data: Buffer,
@@ -211,11 +209,9 @@ interface NativeBinding {
     finish(
       inputMappings?: string,
       inputNames?: string[],
-      collectFunctionMap?: boolean,
     ): {
       code: string;
       map: NativeVlqMap | null;
-      functionMap: FunctionMap | null;
     };
   };
   classify(filename: string, source: string): ParseClassification;
@@ -235,12 +231,10 @@ interface NativeBinding {
     optionsList: NativePreflightOptionsInput[],
     inputMappings?: string,
     inputNames?: string[],
-    collectFunctionMap?: boolean,
   ): {
     results: NativePreflightResultOutput[];
     code?: string;
     map?: NativeVlqMap | null;
-    functionMap?: FunctionMap | null;
   };
   commitPackedBuffer(
     source: string,

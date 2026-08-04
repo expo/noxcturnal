@@ -194,6 +194,11 @@ impl<'a> FunctionMapCollector<'a> {
 
     fn inferred_name(&self, kind: AstKind<'_>) -> String {
         if let Some(parent) = self.ancestors.last().copied() {
+            if matches!(parent, AstKind::JSXExpressionContainer(_))
+                && let Some(name) = self.jsx_expression_name()
+            {
+                return name;
+            }
             match parent {
                 AstKind::VariableDeclarator(declarator) => {
                     return self.name_from_span(declarator.id.span());
@@ -283,6 +288,33 @@ impl<'a> FunctionMapCollector<'a> {
             }
         }
         "<anonymous>".into()
+    }
+
+    fn jsx_expression_name(&self) -> Option<String> {
+        let mut attribute = None;
+        for ancestor in self.ancestors.iter().rev().skip(1) {
+            match ancestor {
+                AstKind::JSXAttribute(candidate) => attribute = Some(*candidate),
+                AstKind::JSXOpeningElement(opening) => {
+                    let element = self.name_from_span(opening.name.span());
+                    return Some(attribute.map_or_else(
+                        || format!("{element}.props.children"),
+                        |attribute| {
+                            format!(
+                                "{element}.props.{}",
+                                self.name_from_span(attribute.name.span())
+                            )
+                        },
+                    ));
+                }
+                AstKind::JSXElement(element) => {
+                    let name = self.name_from_span(element.opening_element.name.span());
+                    return Some(format!("{name}.props.children"));
+                }
+                _ => {}
+            }
+        }
+        None
     }
 
     fn name_from_span(&self, span: Span) -> String {

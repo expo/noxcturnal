@@ -9,7 +9,6 @@ import {
 } from '../protocol/events';
 import type {
   EditCommand,
-  FunctionMap,
   InspectRequest,
   NativeEvent,
   NodeView,
@@ -53,13 +52,12 @@ export class NativeTransformSession {
     buildInitialRoute = true,
   ) {
     this.#nativeFilename = parserFilename(filename, options.parser);
-    // Without a retention plan or function map the native session holds no state, so its
+    // Without a retention plan the native session holds no state, so its
     // construction (and the source copy it takes) is deferred until something needs it.
-    if (options.functionMap === true || retentionManifest != null || initialManifest != null) {
+    if (retentionManifest != null || initialManifest != null) {
       this.#native = new native.NativeIndexedSession(
         source,
         this.#nativeFilename,
-        options.functionMap,
         retentionManifest,
         initialManifest,
         buildInitialRoute,
@@ -71,9 +69,6 @@ export class NativeTransformSession {
         }
       }
     }
-  }
-  takeFunctionMap(): FunctionMap | null {
-    return this.#native?.takeFunctionMap() ?? null;
   }
   get nativeMemoryBytes(): number {
     return this.#native?.memoryUsage() ?? 0;

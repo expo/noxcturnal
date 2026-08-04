@@ -111,7 +111,7 @@ test('matches Metro function naming and frame positions', () => {
   }
 });
 
-test('generates a function map only from the final committed source version', () => {
+test('generates a function map from the pristine input source', () => {
   const rename = (name: string, from: string, to: string) =>
     defineNativePlugin({
       name,
@@ -136,8 +136,8 @@ test('generates a function map only from the final committed source version', ()
   assert.equal(result.status, 'complete');
   if (result.status !== 'complete') return;
   assert.equal(result.code, 'function gamma() { return 1 }');
-  assert.deepEqual(result.functionMap?.names, ['gamma']);
-  assert.ok(!result.functionMap?.names.includes('alpha'));
+  assert.deepEqual(result.functionMap?.names, ['alpha']);
+  assert.ok(!result.functionMap?.names.includes('gamma'));
   assert.ok(!result.functionMap?.names.includes('beta'));
 });
 

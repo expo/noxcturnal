@@ -695,7 +695,8 @@ pub fn compose(outer: &str, inner: &str, outer_name_count: u32) -> String {
 mod decoded;
 
 pub(crate) use decoded::{
-    DecodedLayer, compose_decoded_layers, compose_layer_chain, pack_decoded_layer,
+    DecodedLayer, compose_decoded_layers, compose_layer_chain, generated_offsets,
+    pack_decoded_layer,
 };
 
 #[cfg(test)]

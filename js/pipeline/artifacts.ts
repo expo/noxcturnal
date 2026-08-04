@@ -14,8 +14,7 @@ export enum ArtifactDemand {
   LexicalScopes = 1 << 5,
   BindingsReferences = 1 << 6,
   ModuleFacts = 1 << 7,
-  FunctionMap = 1 << 8,
-  RealizedMap = 1 << 9,
+  RealizedMap = 1 << 8,
 }
 
 const SYNTAX =
@@ -23,8 +22,7 @@ const SYNTAX =
   ArtifactDemand.StructuralParents |
   ArtifactDemand.StructuralChildren |
   ArtifactDemand.DirectScalarFields |
-  ArtifactDemand.ModuleFacts |
-  ArtifactDemand.FunctionMap;
+  ArtifactDemand.ModuleFacts;
 const SEMANTICS = ArtifactDemand.LexicalScopes | ArtifactDemand.BindingsReferences;
 
 export type ArtifactPlan =

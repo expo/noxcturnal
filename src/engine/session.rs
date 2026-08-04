@@ -10,7 +10,6 @@ use crate::generated::event_schema::{
 use crate::semantic::retained_index::{
     NativeBindingFact, NativeCallFact, NativeCaptureGroup, NativeConstantFact, RetainedIndex,
 };
-use crate::sourcemap::function_map::FunctionMap;
 
 use super::collect::{materialize_with_scope_parents, parse_program_body_offsets};
 use super::retained::routed_buffer_from_index;
@@ -43,7 +42,6 @@ pub struct NativeIndexedSession {
     filename: String,
     retained_index: RetainedIndex,
     scope_parents: Vec<u32>,
-    function_map: Option<FunctionMap>,
     initial_route_manifest: Option<Vec<u8>>,
     initial_routed_buffer: Option<Vec<u8>>,
     program_body_offsets: Option<[u32; 3]>,
@@ -57,27 +55,23 @@ impl NativeIndexedSession {
     pub fn new(
         source: String,
         filename: String,
-        function_map: Option<bool>,
         retention_manifest: Option<Buffer>,
         initial_route_manifest: Option<Buffer>,
         build_initial_route: Option<bool>,
     ) -> Result<Self> {
-        let collect_function_map = function_map.unwrap_or(false);
         let has_retention = retention_manifest.is_some();
         let has_initial_route = initial_route_manifest.is_some();
-        let parts = if !collect_function_map && !has_retention && !has_initial_route {
+        let parts = if !has_retention && !has_initial_route {
             MaterializedSessionParts {
                 program_body_offsets: [0, 0, 0],
                 scope_parents: Vec::new(),
                 retained_index: RetainedIndex::default(),
-                function_map: None,
                 initial_routed_buffer: None,
             }
         } else {
             materialize_with_scope_parents(
                 &source,
                 &filename,
-                collect_function_map,
                 retention_manifest.as_deref(),
                 initial_route_manifest.as_deref(),
                 build_initial_route.unwrap_or(true),
@@ -87,17 +81,15 @@ impl NativeIndexedSession {
             program_body_offsets,
             scope_parents,
             retained_index,
-            function_map,
             initial_routed_buffer,
         } = parts;
-        let program_body_offsets = (has_retention || collect_function_map || has_initial_route)
-            .then_some(program_body_offsets);
+        let program_body_offsets =
+            (has_retention || has_initial_route).then_some(program_body_offsets);
         Ok(Self {
             source,
             filename,
             retained_index,
             scope_parents,
-            function_map,
             initial_route_manifest: initial_route_manifest.map(|manifest| manifest.to_vec()),
             initial_routed_buffer,
             program_body_offsets,
@@ -435,11 +427,6 @@ impl NativeIndexedSession {
                 .map_or(0, Vec::capacity)
             + self.initial_routed_buffer.as_ref().map_or(0, Vec::capacity))
         .min(u32::MAX as usize) as u32
-    }
-
-    #[napi]
-    pub fn take_function_map(&mut self) -> Option<FunctionMap> {
-        self.function_map.take()
     }
 
     fn ensure_open(&self) -> Result<()> {

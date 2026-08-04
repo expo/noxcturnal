@@ -345,7 +345,6 @@ test('filters captures by direct Program binding ownership', () => {
   const raw = new native.NativeIndexedSession(
     session.source,
     'fixture.js',
-    false,
     packRouteManifest([], false, false, ALL_RETAINED_CAPABILITIES),
   );
   assert.deepEqual(

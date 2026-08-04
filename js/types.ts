@@ -253,7 +253,7 @@ export interface TransformOptions {
   allowBroadVisitors?: boolean;
   inputSourceMap?: NativeVlqMap & { sources?: string[]; sourcesContent?: (string | null)[] };
   parserAdapter?: string;
-  /** Generate a Metro-compatible function map for the final transformed code. */
+  /** Collect function ranges from the pristine input for consumers that symbolicate first. */
   functionMap?: boolean;
   /**
    * Consumer-owned, per-transform data exposed to plugin preparation,

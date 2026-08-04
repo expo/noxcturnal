@@ -4,7 +4,7 @@ import {
   planArtifacts,
   type ArtifactPlan,
 } from '../pipeline/artifacts';
-import type { EditCommand, FunctionMap } from '../types';
+import type { EditCommand } from '../types';
 
 export type SourceVersionId = number & { readonly __sourceVersionId: unique symbol };
 
@@ -17,7 +17,6 @@ export interface SourceVersion {
   readonly mapChanged: boolean;
   availableArtifacts: ArtifactDemand;
   renderedText?: string;
-  functionMap?: FunctionMap;
 }
 
 /**
@@ -98,7 +97,6 @@ export class SourceVersionStore {
         ? ArtifactDemand.RenderedText
         : parent.availableArtifacts | ArtifactDemand.RealizedMap,
       renderedText: effect.codeChanged ? undefined : parent.renderedText,
-      functionMap: effect.codeChanged ? undefined : parent.functionMap,
     });
     return id;
   }
@@ -106,15 +104,5 @@ export class SourceVersionStore {
   dropParsedArtifacts(id: SourceVersionId): void {
     const version = this.get(id);
     version.availableArtifacts &= ArtifactDemand.RenderedText | ArtifactDemand.RealizedMap;
-  }
-
-  functionMap(id: SourceVersionId): FunctionMap | undefined {
-    return this.get(id).functionMap;
-  }
-
-  cacheFunctionMap(id: SourceVersionId, functionMap: FunctionMap): void {
-    const version = this.get(id);
-    version.functionMap = functionMap;
-    version.availableArtifacts |= ArtifactDemand.FunctionMap;
   }
 }
