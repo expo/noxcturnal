@@ -6,6 +6,10 @@ use rustc_hash::FxHashMap;
 pub(crate) mod function_map;
 pub(crate) mod vlq;
 
+const ANCHOR_TAIL: u32 = 1 << 31;
+const IDENTITY_TAIL: u32 = 1 << 30;
+const NAME_MASK: u32 = !(ANCHOR_TAIL | IDENTITY_TAIL);
+
 #[derive(Debug, Clone, Copy)]
 struct Segment {
     generated_column: u32,
@@ -74,7 +78,10 @@ trait SegmentSink: Default {
         original_line: i64,
         original_column: i64,
         name: Option<i64>,
+        anchor_tail: bool,
+        identity_tail: bool,
     );
+    fn update_last(&mut self, _name: Option<i64>, _anchor_tail: bool, _identity_tail: bool) {}
     fn unmapped(&mut self, generated_column: i64);
     fn newline(&mut self);
 }
@@ -96,6 +103,8 @@ impl SegmentSink for VlqSink {
         original_line: i64,
         original_column: i64,
         name: Option<i64>,
+        _anchor_tail: bool,
+        _identity_tail: bool,
     ) {
         // Dense identity runs (character mode) repeat the delta (1, 0, 0, 1), which
         // always encodes as ",CAAC"; skipping the arithmetic is worth it there.
@@ -154,9 +163,10 @@ impl SegmentSink for VlqSink {
 }
 
 /// Packed decoded segments: five little-endian u32 words per segment
-/// (generated line, generated column, original line, original column, name id + 1),
-/// preceded by nothing — the envelope around names is added when the buffer crosses
-/// N-API.
+/// (generated line, generated column, original line, original column, name id + 1).
+/// The two high bits of the name word distinguish open-ended anchored and identity
+/// spans; they stay internal to decoded composition and are stripped from final VLQ.
+/// The envelope around names is added when the buffer crosses N-API.
 #[derive(Default)]
 struct DecodedSink {
     words: Vec<u32>,
@@ -170,13 +180,17 @@ impl SegmentSink for DecodedSink {
         original_line: i64,
         original_column: i64,
         name: Option<i64>,
+        anchor_tail: bool,
+        identity_tail: bool,
     ) {
         self.words.extend_from_slice(&[
             self.generated_line,
             generated_column as u32,
             original_line as u32,
             original_column as u32,
-            name.map_or(0, |name| name as u32 + 1),
+            name.map_or(0, |name| name as u32 + 1)
+                | if anchor_tail { ANCHOR_TAIL } else { 0 }
+                | if identity_tail { IDENTITY_TAIL } else { 0 },
         ]);
     }
     fn unmapped(&mut self, generated_column: i64) {
@@ -187,6 +201,19 @@ impl SegmentSink for DecodedSink {
             u32::MAX,
             0,
         ]);
+    }
+    fn update_last(&mut self, name: Option<i64>, anchor_tail: bool, identity_tail: bool) {
+        if let Some(last_word) = self.words.last_mut() {
+            if let Some(name_id) = name {
+                *last_word = (*last_word & !NAME_MASK) | (name_id as u32 + 1);
+            }
+            if anchor_tail {
+                *last_word |= ANCHOR_TAIL;
+            }
+            if identity_tail {
+                *last_word |= IDENTITY_TAIL;
+            }
+        }
     }
     fn newline(&mut self) {
         self.generated_line += 1;
@@ -209,7 +236,17 @@ impl<S: SegmentSink> StreamingMap<S> {
         self.mark_name(None);
     }
     fn mark_name(&mut self, name: Option<i64>) {
+        self.mark_with_tail(name, false, false);
+    }
+    fn mark_anchor(&mut self, name: Option<i64>) {
+        self.mark_with_tail(name, true, false);
+    }
+    fn mark_identity(&mut self, name: Option<i64>) {
+        self.mark_with_tail(name, false, true);
+    }
+    fn mark_with_tail(&mut self, name: Option<i64>, anchor_tail: bool, identity_tail: bool) {
         if self.last_mark == Some((self.generated_line, self.generated_column)) {
+            self.sink.update_last(name, anchor_tail, identity_tail);
             return;
         }
         self.sink.segment(
@@ -217,6 +254,8 @@ impl<S: SegmentSink> StreamingMap<S> {
             self.original_line,
             self.original_column,
             name,
+            anchor_tail,
+            identity_tail,
         );
         self.last_mark = Some((self.generated_line, self.generated_column));
         self.unmapped = false;
@@ -234,14 +273,20 @@ impl<S: SegmentSink> StreamingMap<S> {
         self.last_mark = Some((self.generated_line, self.generated_column));
         self.unmapped = true;
     }
-    fn copied(&mut self, text: &str, character: bool) {
+    fn copied(&mut self, text: &str, character: bool, close_span: bool) {
         if self.unmapped {
-            self.mark();
+            self.mark_identity(None);
         }
         if text.is_ascii() {
-            for byte in text.bytes() {
-                if character || self.generated_column == 0 {
-                    self.mark();
+            let bytes = text.as_bytes();
+            for (index, byte) in bytes.iter().copied().enumerate() {
+                if character
+                    || self.generated_column == 0
+                    || (close_span
+                        && byte != b'\n'
+                        && bytes.get(index + 1).is_none_or(|next| *next == b'\n'))
+                {
+                    self.mark_identity(None);
                 }
                 if byte == b'\n' {
                     self.newline();
@@ -254,16 +299,22 @@ impl<S: SegmentSink> StreamingMap<S> {
             }
             return;
         }
-        for ch in text.chars() {
-            if character || self.generated_column == 0 {
-                self.mark();
+        let mut characters = text.chars().peekable();
+        while let Some(character_value) = characters.next() {
+            if character
+                || self.generated_column == 0
+                || (close_span
+                    && character_value != '\n'
+                    && characters.peek().is_none_or(|next| *next == '\n'))
+            {
+                self.mark_identity(None);
             }
-            if ch == '\n' {
+            if character_value == '\n' {
                 self.newline();
                 self.original_line += 1;
                 self.original_column = 0;
             } else {
-                let width = ch.len_utf16() as i64;
+                let width = character_value.len_utf16() as i64;
                 self.generated_column += width;
                 self.original_column += width;
             }
@@ -306,6 +357,62 @@ impl<S: SegmentSink> StreamingMap<S> {
                 self.newline();
             } else {
                 self.generated_column += ch.len_utf16() as i64;
+            }
+        }
+    }
+    fn generated_anchored(
+        &mut self,
+        text: &str,
+        anchor_line: i64,
+        anchor_column: i64,
+        name: Option<i64>,
+    ) {
+        let resume = (self.original_line, self.original_column);
+        if text.is_ascii() {
+            let bytes = text.as_bytes();
+            for (index, byte) in bytes.iter().copied().enumerate() {
+                if byte == b'\n' {
+                    self.newline();
+                    if bytes.get(index + 1).is_some_and(|next| *next != b'\n') {
+                        self.original_line = anchor_line;
+                        self.original_column = anchor_column;
+                        self.mark_anchor(name);
+                        self.original_line = resume.0;
+                        self.original_column = resume.1;
+                    }
+                } else {
+                    if bytes.get(index + 1).is_none_or(|next| *next == b'\n') {
+                        self.original_line = anchor_line;
+                        self.original_column = anchor_column;
+                        self.mark_anchor(name);
+                        self.original_line = resume.0;
+                        self.original_column = resume.1;
+                    }
+                    self.generated_column += 1;
+                }
+            }
+            return;
+        }
+        let mut characters = text.chars().peekable();
+        while let Some(character) = characters.next() {
+            if character == '\n' {
+                self.newline();
+                if characters.peek().is_some_and(|next| *next != '\n') {
+                    self.original_line = anchor_line;
+                    self.original_column = anchor_column;
+                    self.mark_anchor(name);
+                    self.original_line = resume.0;
+                    self.original_column = resume.1;
+                }
+            } else {
+                if characters.peek().is_none_or(|next| *next == '\n') {
+                    self.original_line = anchor_line;
+                    self.original_column = anchor_column;
+                    self.mark_anchor(name);
+                    self.original_line = resume.0;
+                    self.original_column = resume.1;
+                }
+                self.generated_column += character.len_utf16() as i64;
             }
         }
     }
@@ -392,6 +499,12 @@ struct Renderer<'a, S: SegmentSink> {
     /// to. In-place pieces keep it advancing monotonically; a mismatch means the
     /// previous piece came from elsewhere and the position must be re-derived.
     cursor: usize,
+    /// A generated range was the last code-bearing piece, so the next original
+    /// range must explicitly resume identity mapping even in boundary mode.
+    generated_tail: bool,
+    /// The current generated position follows verbatim original text, so bare
+    /// marks inserted within that run inherit its identity-tail semantics.
+    identity_tail: bool,
 }
 
 impl<S: SegmentSink> Renderer<'_, S> {
@@ -413,8 +526,13 @@ impl<S: SegmentSink> Renderer<'_, S> {
                         self.reposition(*start);
                     }
                     let text = &self.source[*start..*end];
+                    if self.generated_tail && !self.line && !text.is_empty() {
+                        self.map.mark_identity(None);
+                    }
+                    self.generated_tail = false;
                     self.code.push_str(text);
-                    self.map.copied(text, self.character);
+                    self.map.copied(text, self.character, !self.line);
+                    self.identity_tail |= !text.is_empty();
                     self.cursor = *end;
                 }
                 Piece::Mark { origin } => {
@@ -422,7 +540,11 @@ impl<S: SegmentSink> Renderer<'_, S> {
                         self.reposition(*origin);
                         self.cursor = *origin;
                     }
-                    self.map.mark();
+                    if self.identity_tail {
+                        self.map.mark_identity(None);
+                    } else {
+                        self.map.mark();
+                    }
                 }
                 Piece::Anchor { origin, name } => {
                     if !self.line {
@@ -434,6 +556,7 @@ impl<S: SegmentSink> Renderer<'_, S> {
                             .as_ref()
                             .map(|name| intern(&mut self.names, &mut self.name_ids, name));
                         self.map.mark_name(name);
+                        self.identity_tail = false;
                     }
                 }
                 Piece::Generated {
@@ -446,6 +569,14 @@ impl<S: SegmentSink> Renderer<'_, S> {
                     if *start != self.cursor {
                         self.reposition(*start);
                     }
+                    let anchor = (self.map.original_line, self.map.original_column);
+                    let name = (!self.line)
+                        .then(|| {
+                            piece_names
+                                .first()
+                                .map(|name| intern(&mut self.names, &mut self.name_ids, name))
+                        })
+                        .flatten();
                     if !self.line
                         && matches!(
                             mapping,
@@ -454,10 +585,13 @@ impl<S: SegmentSink> Renderer<'_, S> {
                                 | MappingPolicy::Identity
                         )
                     {
-                        let name = piece_names
-                            .first()
-                            .map(|name| intern(&mut self.names, &mut self.name_ids, name));
-                        self.map.mark_name(name);
+                        if *mapping == MappingPolicy::AnchorStart {
+                            self.map.mark_anchor(name);
+                        } else if *mapping == MappingPolicy::Identity {
+                            self.map.mark_identity(name);
+                        } else {
+                            self.map.mark_name(name);
+                        }
                     }
                     self.map.removed(&self.source[*start..*end]);
                     self.code.push_str(text);
@@ -467,7 +601,15 @@ impl<S: SegmentSink> Renderer<'_, S> {
                     if !self.line && !text.is_empty() && *mapping == MappingPolicy::Sourceless {
                         self.map.unmapped();
                     }
-                    self.map.generated(text);
+                    if !self.line && *mapping == MappingPolicy::AnchorStart {
+                        self.map.generated_anchored(text, anchor.0, anchor.1, name);
+                    } else {
+                        self.map.generated(text);
+                    }
+                    self.generated_tail |= !text.is_empty();
+                    if !text.is_empty() {
+                        self.identity_tail = false;
+                    }
                     if !self.line && *mapping == MappingPolicy::AnchorBoundaries {
                         self.map.mark();
                     }
@@ -499,6 +641,8 @@ fn render_into<'a, S: SegmentSink>(
         line_starts: None,
         utf16_offsets: None,
         cursor: 0,
+        generated_tail: false,
+        identity_tail: false,
     };
     renderer.pieces(pieces);
     renderer
@@ -656,12 +800,24 @@ fn compose_lines(
                     let traced_index = inner_line
                         .partition_point(|inner| inner.generated_column <= segment.original_column);
                     let traced = inner_line.get(traced_index.checked_sub(1)?)?;
+                    let delta = segment.original_column - traced.generated_column;
+                    let bounded_by_next = inner_line.get(traced_index).is_some_and(|next| {
+                        next.original_line == traced.original_line
+                            && next.original_column >= traced.original_column
+                            && delta <= next.original_column - traced.original_column
+                    });
+                    let identity_tail = inner_line.get(traced_index).is_none()
+                        && traced.generated_column == traced.original_column;
                     Some(Segment {
                         generated_column: segment.generated_column,
                         source: traced.source,
                         original_line: traced.original_line,
-                        original_column: traced.original_column + segment.original_column
-                            - traced.generated_column,
+                        original_column: traced.original_column
+                            + if bounded_by_next || identity_tail {
+                                delta
+                            } else {
+                                0
+                            },
                         name: if segment.name != 0 {
                             segment.name
                         } else if traced.name != 0 {
@@ -838,6 +994,347 @@ mod tests {
         let mut expected_names = second_names;
         expected_names.extend(first_names);
         assert_eq!(chained_names, expected_names);
+    }
+
+    #[test]
+    fn decoded_composition_preserves_anchor_start_tails() {
+        let source = "value;";
+        let first_pieces = build(
+            source,
+            vec![EditCommand {
+                kind: EditKind::Replace,
+                start: 0,
+                end: 5,
+                content: Some("value.default".into()),
+                parts: Vec::new(),
+                destination: None,
+                mapping: Some(MappingPolicy::AnchorStart),
+                order: Some(0),
+                names: None,
+            }],
+        )
+        .unwrap();
+        let (intermediate, first_layer) = render_decoded(source, &first_pieces, "boundary");
+        let second_pieces = build(
+            &intermediate,
+            vec![EditCommand {
+                kind: EditKind::Replace,
+                start: 6,
+                end: 13,
+                content: Some("default".into()),
+                parts: Vec::new(),
+                destination: None,
+                mapping: Some(MappingPolicy::AnchorStart),
+                order: Some(0),
+                names: None,
+            }],
+        )
+        .unwrap();
+        let (_, second_layer) = render_decoded(&intermediate, &second_pieces, "boundary");
+        let (mappings, _) =
+            compose_layer_chain(&[first_layer.as_slice(), second_layer.as_slice()]).unwrap();
+        let lines = decode(&mappings);
+        let segment = lines[0]
+            .iter()
+            .find(|segment| segment.generated_column == 6)
+            .unwrap();
+        assert_eq!(segment.original_column, 0);
+    }
+
+    #[test]
+    fn decoded_composition_anchors_every_generated_replacement_column() {
+        let source = "xxabcdefgh;";
+        for replacement_len in 1usize..=12 {
+            let replacement = "z".repeat(replacement_len);
+            let first_pieces = build(
+                source,
+                vec![EditCommand {
+                    kind: EditKind::Replace,
+                    start: 2,
+                    end: 10,
+                    content: Some(replacement.clone()),
+                    parts: Vec::new(),
+                    destination: None,
+                    mapping: Some(MappingPolicy::AnchorStart),
+                    order: Some(0),
+                    names: Some(vec!["binding".into()]),
+                }],
+            )
+            .unwrap();
+            let (intermediate, first_layer) = render_decoded(source, &first_pieces, "boundary");
+            for interior in 0..replacement_len {
+                let offset = 2 + interior;
+                let second_pieces = build(
+                    &intermediate,
+                    vec![EditCommand {
+                        kind: EditKind::AddSourceMapLocation,
+                        start: offset as u32,
+                        end: offset as u32,
+                        content: None,
+                        parts: Vec::new(),
+                        destination: None,
+                        mapping: None,
+                        order: Some(0),
+                        names: None,
+                    }],
+                )
+                .unwrap();
+                let (_, second_layer) = render_decoded(&intermediate, &second_pieces, "boundary");
+                let (mappings, names) =
+                    compose_layer_chain(&[first_layer.as_slice(), second_layer.as_slice()])
+                        .unwrap();
+                let lines = decode(&mappings);
+                let segment = lines[0]
+                    .iter()
+                    .find(|segment| segment.generated_column == offset as u32)
+                    .unwrap();
+                assert_eq!(
+                    segment.original_column, 2,
+                    "replacement length {replacement_len}, interior {interior}"
+                );
+                assert_eq!(segment.name, 1);
+                assert_eq!(names, ["binding"]);
+            }
+        }
+    }
+
+    #[test]
+    fn decoded_composition_preserves_anchors_derived_from_sparse_tails() {
+        let inner = pack_decoded_layer(&[0, 2, 0, 0, 0], &[] as &[String], 0);
+        let middle = pack_decoded_layer(&[0, 0, 0, 5, 0], &[] as &[String], 0);
+        let outer = pack_decoded_layer(&[0, 0, 0, 4, 0], &[] as &[String], 0);
+        let (mappings, _) =
+            compose_layer_chain(&[inner.as_slice(), middle.as_slice(), outer.as_slice()]).unwrap();
+        let lines = decode(&mappings);
+        assert_eq!(lines[0][0].original_column, 0);
+    }
+
+    #[test]
+    fn decoded_anchor_start_maps_each_generated_line() {
+        let source = "value;";
+        let pieces = build(
+            source,
+            vec![EditCommand {
+                kind: EditKind::Replace,
+                start: 0,
+                end: 5,
+                content: Some("first\nsecond".into()),
+                parts: Vec::new(),
+                destination: None,
+                mapping: Some(MappingPolicy::AnchorStart),
+                order: Some(0),
+                names: None,
+            }],
+        )
+        .unwrap();
+        let (_, layer) = render_decoded(source, &pieces, "boundary");
+        let (mappings, _) = compose_layer_chain(&[layer.as_slice()]).unwrap();
+        let lines = decode(&mappings);
+        assert_eq!(lines[1][0].generated_column, 0);
+        assert_eq!(lines[1][0].original_line, 0);
+        assert_eq!(lines[1][0].original_column, 0);
+
+        let intermediate = "first\nsecond;";
+        let second_pieces = build(
+            intermediate,
+            vec![EditCommand {
+                kind: EditKind::Replace,
+                start: 6,
+                end: 12,
+                content: Some("second".into()),
+                parts: Vec::new(),
+                destination: None,
+                mapping: Some(MappingPolicy::AnchorStart),
+                order: Some(0),
+                names: None,
+            }],
+        )
+        .unwrap();
+        let (_, second_layer) = render_decoded(intermediate, &second_pieces, "boundary");
+        let (mappings, _) =
+            compose_layer_chain(&[layer.as_slice(), second_layer.as_slice()]).unwrap();
+        let lines = decode(&mappings);
+        assert_eq!(lines[1][0].original_line, 0);
+        assert_eq!(lines[1][0].original_column, 0);
+    }
+
+    #[test]
+    fn decoded_composition_interpolates_shifted_identity_tails() {
+        let source = "value;";
+        let first_pieces = build(
+            source,
+            vec![EditCommand {
+                kind: EditKind::Prefix,
+                start: 0,
+                end: 0,
+                content: Some("prefix".into()),
+                parts: Vec::new(),
+                destination: None,
+                mapping: None,
+                order: Some(0),
+                names: None,
+            }],
+        )
+        .unwrap();
+        let (intermediate, first_layer) = render_decoded(source, &first_pieces, "boundary");
+        let second_pieces = build(
+            &intermediate,
+            vec![
+                EditCommand {
+                    kind: EditKind::AddSourceMapLocation,
+                    start: 0,
+                    end: 0,
+                    content: None,
+                    parts: Vec::new(),
+                    destination: None,
+                    mapping: None,
+                    order: Some(0),
+                    names: None,
+                },
+                EditCommand {
+                    kind: EditKind::AddSourceMapLocation,
+                    start: 6,
+                    end: 6,
+                    content: None,
+                    parts: Vec::new(),
+                    destination: None,
+                    mapping: None,
+                    order: Some(1),
+                    names: None,
+                },
+                EditCommand {
+                    kind: EditKind::Replace,
+                    start: 8,
+                    end: 9,
+                    content: Some("l".into()),
+                    parts: Vec::new(),
+                    destination: None,
+                    mapping: Some(MappingPolicy::AnchorStart),
+                    order: Some(2),
+                    names: None,
+                },
+            ],
+        )
+        .unwrap();
+        let (_, second_layer) = render_decoded(&intermediate, &second_pieces, "boundary");
+        let (mappings, _) =
+            compose_layer_chain(&[first_layer.as_slice(), second_layer.as_slice()]).unwrap();
+        let lines = decode(&mappings);
+        let segment = lines[0]
+            .iter()
+            .find(|segment| segment.generated_column == 8)
+            .unwrap();
+        assert_eq!(segment.original_column, 2);
+    }
+
+    #[test]
+    fn decoded_composition_resumes_identity_after_anchor_start() {
+        let source = "value + keep;";
+        let first_pieces = build(
+            source,
+            vec![EditCommand {
+                kind: EditKind::Replace,
+                start: 0,
+                end: 5,
+                content: Some("_ui.value".into()),
+                parts: Vec::new(),
+                destination: None,
+                mapping: Some(MappingPolicy::AnchorStart),
+                order: Some(0),
+                names: None,
+            }],
+        )
+        .unwrap();
+        let (intermediate, first_layer) = render_decoded(source, &first_pieces, "boundary");
+        let second_pieces = build(
+            &intermediate,
+            vec![EditCommand {
+                kind: EditKind::AddSourceMapLocation,
+                start: 12,
+                end: 12,
+                content: None,
+                parts: Vec::new(),
+                destination: None,
+                mapping: None,
+                order: Some(0),
+                names: None,
+            }],
+        )
+        .unwrap();
+        let (_, second_layer) = render_decoded(&intermediate, &second_pieces, "boundary");
+        let (mappings, _) =
+            compose_layer_chain(&[first_layer.as_slice(), second_layer.as_slice()]).unwrap();
+        let lines = decode(&mappings);
+        let segment = lines[0]
+            .iter()
+            .find(|segment| segment.generated_column == 12)
+            .unwrap();
+        assert_eq!(segment.original_column, 8);
+    }
+
+    #[test]
+    fn decoded_composition_keeps_identity_across_interior_marks() {
+        let source = "value;";
+        let first_pieces = build(
+            source,
+            vec![EditCommand {
+                kind: EditKind::Prefix,
+                start: 0,
+                end: 0,
+                content: Some("prefix".into()),
+                parts: Vec::new(),
+                destination: None,
+                mapping: None,
+                order: Some(0),
+                names: None,
+            }],
+        )
+        .unwrap();
+        let (intermediate, first_layer) = render_decoded(source, &first_pieces, "boundary");
+        let marked = build(
+            &intermediate,
+            vec![EditCommand {
+                kind: EditKind::AddSourceMapLocation,
+                start: 8,
+                end: 8,
+                content: None,
+                parts: Vec::new(),
+                destination: None,
+                mapping: None,
+                order: Some(0),
+                names: None,
+            }],
+        )
+        .unwrap();
+        let (_, middle_layer) = render_decoded(&intermediate, &marked, "boundary");
+        let outer = build(
+            &intermediate,
+            vec![EditCommand {
+                kind: EditKind::AddSourceMapLocation,
+                start: 9,
+                end: 9,
+                content: None,
+                parts: Vec::new(),
+                destination: None,
+                mapping: None,
+                order: Some(0),
+                names: None,
+            }],
+        )
+        .unwrap();
+        let (_, outer_layer) = render_decoded(&intermediate, &outer, "boundary");
+        let (mappings, _) = compose_layer_chain(&[
+            first_layer.as_slice(),
+            middle_layer.as_slice(),
+            outer_layer.as_slice(),
+        ])
+        .unwrap();
+        let lines = decode(&mappings);
+        let segment = lines[0]
+            .iter()
+            .find(|segment| segment.generated_column == 9)
+            .unwrap();
+        assert_eq!(segment.original_column, 3);
     }
 
     #[test]

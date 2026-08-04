@@ -39,7 +39,7 @@ exports[`every public native transform has an explicit ownership fixture 3`] = `
   "code": "function _decorate(e,t,r,n){var o=arguments.length,a=o<3?t:n===null?n=Object.getOwnPropertyDescriptor(t,r):n,l;for(var c=e.length-1;c>=0;c--)if(l=e[c])a=(o<3?l(a):o>3?l(t,r,a):l(t,r))||a;return o>3&&a&&Object.defineProperty(t,r,a),a}let Value=class Value{};Value=_decorate([sealed],Value);",
   "helpers": [],
   "map": {
-    "mappings": "yOAAA,IAAc,MAAd,MAAc,KAAM,CAAC,EAApB,MAAA,UAAA,CAAA,MAAM,EAAG,KAAK;;",
+    "mappings": "yOAAA,IAAc,MAAd,MAAc,KAAM,CAAC,EAApB,MAAA,UAAA,CAAA,MAAA,EAAA,KAAA;;",
     "names": [],
   },
   "name": "legacyDecorators",

@@ -1,6 +1,18 @@
 use std::rc::Rc;
 
-use super::{Segment, vlq};
+use super::{ANCHOR_TAIL, IDENTITY_TAIL, NAME_MASK, Segment, vlq};
+
+fn name_id(segment: &Segment) -> u32 {
+    segment.name & NAME_MASK
+}
+
+fn has_anchor_tail(segment: &Segment) -> bool {
+    segment.name & ANCHOR_TAIL != 0
+}
+
+fn has_identity_tail(segment: &Segment) -> bool {
+    segment.name & IDENTITY_TAIL != 0
+}
 
 pub(crate) struct DecodedLayer {
     pub(crate) words: Vec<u32>,
@@ -177,10 +189,15 @@ pub(crate) fn generated_offsets(data: &[u8], source: &str) -> Option<Vec<usize>>
         let line_start = *line_starts.get(line)?;
         let line_end = line_starts.get(line + 1).copied().unwrap_or(source.len());
         if source[line_start..line_end].is_ascii() {
+            let mut previous_column = None;
             for segment in segments {
+                previous_column
+                    .is_none_or(|previous| previous <= segment.generated_column)
+                    .then_some(())?;
                 let offset = line_start.checked_add(segment.generated_column as usize)?;
                 (offset <= line_end).then_some(())?;
                 offsets.push(offset);
+                previous_column = Some(segment.generated_column);
             }
             continue;
         }
@@ -198,7 +215,6 @@ pub(crate) fn generated_offsets(data: &[u8], source: &str) -> Option<Vec<usize>>
             offsets.push(line_start + relative);
         }
     }
-    offsets.sort_unstable();
     offsets.dedup();
     Some(offsets)
 }
@@ -245,20 +261,46 @@ fn compose_decoded(outer: &DecodedMap, inner: &DecodedMap, outer_name_count: u32
                 });
                 continue;
             }
-            let original_column = if clamped_forward {
-                traced.original_column
+            let delta = segment
+                .original_column
+                .saturating_sub(traced.generated_column);
+            let bounded_by_next = inner_line.get(traced_index).is_some_and(|next| {
+                next.original_line == traced.original_line
+                    && next.original_column >= traced.original_column
+                    && delta <= next.original_column - traced.original_column
+            });
+            let anchor_tail = has_anchor_tail(traced);
+            let identity_tail = !anchor_tail
+                && (has_identity_tail(traced)
+                    || (inner_line.get(traced_index).is_none()
+                        && traced.generated_column == traced.original_column));
+            let interpolates =
+                !clamped_forward && !anchor_tail && (bounded_by_next || identity_tail);
+            // Interpolate within mapped spans and identity tails. Transformed sparse
+            // codegen tails anchor to their last token instead of overshooting it.
+            let original_column = if interpolates {
+                traced.original_column + delta
             } else {
-                traced.original_column + segment.original_column - traced.generated_column
+                traced.original_column
             };
+            let composed_anchor_tail = has_anchor_tail(segment) || anchor_tail || !interpolates;
+            let composed_identity_tail =
+                !composed_anchor_tail && has_identity_tail(segment) && has_identity_tail(traced);
             segments.push(Segment {
                 generated_column: segment.generated_column,
                 source: traced.source,
                 original_line: traced.original_line,
                 original_column,
-                name: if segment.name != 0 {
-                    segment.name
-                } else if traced.name != 0 {
-                    traced.name + outer_name_count
+                name: (if name_id(segment) != 0 {
+                    name_id(segment)
+                } else if name_id(traced) != 0 {
+                    name_id(traced) + outer_name_count
+                } else {
+                    0
+                }) | if composed_anchor_tail {
+                    ANCHOR_TAIL
+                } else if composed_identity_tail {
+                    IDENTITY_TAIL
                 } else {
                     0
                 },
@@ -304,8 +346,9 @@ fn encode_decoded(map: &DecodedMap) -> String {
                 i64::from(segment.original_column) - i64::from(prev_column),
                 &mut output,
             );
-            if segment.name != 0 {
-                let name = i64::from(segment.name - 1);
+            let name_id = name_id(segment);
+            if name_id != 0 {
+                let name = i64::from(name_id - 1);
                 vlq::encode(name - prev_name, &mut output);
                 prev_name = name;
             }
