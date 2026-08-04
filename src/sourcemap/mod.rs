@@ -725,6 +725,12 @@ mod tests {
     }
 
     #[test]
+    fn accepts_trailing_empty_lines_when_collecting_generated_offsets() {
+        let layer = pack_decoded_layer(&[], &[] as &[String], 1);
+        assert_eq!(generated_offsets(&layer, ""), Some(Vec::new()));
+    }
+
+    #[test]
     fn composition_preserves_nonzero_source_ids() {
         assert_eq!(compose("AAAA", "ACAA", 0), "ACAA");
     }

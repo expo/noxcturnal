@@ -144,7 +144,7 @@ export interface NativeEditor {
   appendRight(offset: number, content: string): void;
   prependRight(offset: number, content: string): void;
   update(start: number, end: number, content: string): void;
-  overwrite(start: number, end: number, content: string): void;
+  overwrite(start: number, end: number, content: string, mapping?: CodeFragment['mapping']): void;
   remove(start: number, end: number): void;
   move(start: number, end: number, destination: number): void;
   reset(start: number, end: number): void;

@@ -24,6 +24,7 @@ import { packRouteManifest } from '../protocol/manifest';
 import type {
   Diagnostic,
   EditCommand,
+  FunctionMap,
   NativeBailoutResult,
   NativeTransformResult,
   NativeVlqMap,
@@ -376,9 +377,7 @@ export function transform(
   // they belong to the transform's input source, not to the final generated
   // JavaScript. Babel's function-map plugin likewise collects from the input AST
   // before transformation begins.
-  const initialFunctionMap = options.functionMap
-    ? native.generateFunctionMap(source, parseFilename)
-    : null;
+  let initialFunctionMap: FunctionMap | null | undefined;
   // The resident source: native phases and visitor commits mutate it in place
   // and accumulate their map layers natively, so the intermediate phase source
   // and per-phase map layers never cross the boundary — only the final composed
@@ -469,6 +468,9 @@ export function transform(
   // all-native path.
   const completeResult = (): TransformResult => {
     cleanupStates('complete');
+    initialFunctionMap ??= options.functionMap
+      ? native.generateFunctionMap(source, parseFilename)
+      : null;
     return {
       status: 'complete',
       code: currentSource(),

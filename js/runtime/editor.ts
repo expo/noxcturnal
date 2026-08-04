@@ -47,7 +47,16 @@ export function createEditor(
     appendRight: (offset, content) => push('AppendRight', offset, offset, content),
     prependRight: (offset, content) => push('PrependRight', offset, offset, content),
     update: (start, end, content) => push('Replace', start, end, content),
-    overwrite: (start, end, content) => push('Replace', start, end, content),
+    overwrite: (start, end, content, mapping) =>
+      edits.push({
+        kind: 'Replace',
+        start,
+        end,
+        content,
+        mapping: editorMappingPolicy(mapping),
+        owner,
+        order: nextOrder(),
+      }),
     remove: (start, end) => push('Remove', start, end),
     move(start, end, destination) {
       if (destination > start && destination < end)
@@ -103,6 +112,22 @@ export function createEditor(
     toString: () => session.commit(edits).code,
     isEmpty: () => source.trim().length === 0,
   };
+}
+
+function editorMappingPolicy(
+  value?: 'sourceless' | 'anchor-start' | 'anchor-boundaries' | 'identity',
+): EditCommand['mapping'] {
+  switch (value) {
+    case 'anchor-start':
+      return 'AnchorStart';
+    case 'anchor-boundaries':
+      return 'AnchorBoundaries';
+    case 'identity':
+      return 'Identity';
+    case 'sourceless':
+    default:
+      return 'Sourceless';
+  }
 }
 
 function attributeEditConflict(error: unknown, edits: readonly EditCommand[]): unknown {

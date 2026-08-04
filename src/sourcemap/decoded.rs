@@ -168,9 +168,14 @@ pub(crate) fn generated_offsets(data: &[u8], source: &str) -> Option<Vec<usize>>
     );
     let mut offsets = Vec::with_capacity(map.segments.len());
     for line in 0..map.line_count() {
+        let segments = map.line(line).unwrap_or_default();
+        // A decoded layer can retain trailing empty generated lines after its
+        // output is erased; only mapped lines need a corresponding source line.
+        if segments.is_empty() {
+            continue;
+        }
         let line_start = *line_starts.get(line)?;
         let line_end = line_starts.get(line + 1).copied().unwrap_or(source.len());
-        let segments = map.line(line).unwrap_or_default();
         if source[line_start..line_end].is_ascii() {
             for segment in segments {
                 let offset = line_start.checked_add(segment.generated_column as usize)?;

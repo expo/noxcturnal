@@ -123,6 +123,34 @@ test('produces traceable Unicode-aware VLQ mappings', () => {
   });
 });
 
+test('honors explicit mapping policies on editor overwrites', () => {
+  const source = 'consume(value);';
+  const plugin = defineNativePlugin({
+    name: 'mapped-overwrite',
+    pre(context) {
+      context.editor.overwrite(8, 13, 'value.default', 'anchor-start');
+    },
+  });
+  const result = transform(
+    source,
+    'fixture.js',
+    defineNativePipeline({ phases: [{ name: 'edit', plugins: [plugin] }] }),
+  );
+  assert.equal(result.status, 'complete');
+  const map = new TraceMap({
+    version: 3,
+    sources: ['fixture.js'],
+    names: result.map.names,
+    mappings: result.map.mappings,
+  });
+  assert.deepEqual(originalPositionFor(map, { line: 1, column: 8 }), {
+    source: 'fixture.js',
+    line: 1,
+    column: 8,
+    name: null,
+  });
+});
+
 test('keeps both declaration source slices mapped and the inserted name sourceless', () => {
   const source = 'export default function() { return 1; }';
   const plugin = defineNativePlugin({
