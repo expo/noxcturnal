@@ -201,20 +201,21 @@ impl<'a> FunctionMapCollector<'a> {
             }
             match parent {
                 AstKind::VariableDeclarator(declarator) => {
-                    return self.name_from_span(declarator.id.span());
+                    return self
+                        .name_from_id_span(declarator.id.span())
+                        .unwrap_or_else(|| "<anonymous>".into());
                 }
                 AstKind::AssignmentExpression(assignment) => {
-                    return self.name_from_span(assignment.left.span());
+                    return self
+                        .name_from_id_span(assignment.left.span())
+                        .unwrap_or_else(|| "<anonymous>".into());
                 }
                 AstKind::MethodDefinition(method) => {
-                    let class_name = self.ancestors.iter().rev().find_map(|node| match node {
-                        AstKind::Class(class) => class
-                            .id
-                            .as_ref()
-                            .map(|identifier| identifier.name.to_string()),
-                        _ => None,
-                    });
+                    let class_name = self.stack.last().map(|name| name.to_string());
                     let mut name = self.property_name(&method.key);
+                    if name == "<anonymous>" {
+                        return name;
+                    }
                     match method.kind {
                         MethodDefinitionKind::Get => name = format!("get__{name}"),
                         MethodDefinitionKind::Set => name = format!("set__{name}"),
@@ -229,6 +230,9 @@ impl<'a> FunctionMapCollector<'a> {
                 }
                 AstKind::ObjectProperty(property) => {
                     let property_name = self.property_name(&property.key);
+                    if property_name == "<anonymous>" {
+                        return property_name;
+                    }
                     if let Some(object_name) =
                         self.container_name(&self.ancestors[..self.ancestors.len() - 1])
                     {
@@ -238,13 +242,7 @@ impl<'a> FunctionMapCollector<'a> {
                 }
                 AstKind::PropertyDefinition(property) => {
                     let property_name = self.property_name(&property.key);
-                    let class_name = self.ancestors.iter().rev().find_map(|node| match node {
-                        AstKind::Class(class) => class
-                            .id
-                            .as_ref()
-                            .map(|identifier| identifier.name.to_string()),
-                        _ => None,
-                    });
+                    let class_name = self.stack.last().map(|name| name.to_string());
                     return class_name.map_or(property_name.clone(), |class_name| {
                         format!(
                             "{class_name}{}{property_name}",
@@ -284,6 +282,11 @@ impl<'a> FunctionMapCollector<'a> {
                     }
                 }
                 AstKind::ExportDefaultDeclaration(_) => return "default".into(),
+                AstKind::ParenthesizedExpression(_) => {
+                    return self
+                        .container_name(&self.ancestors)
+                        .unwrap_or_else(|| "<anonymous>".into());
+                }
                 _ => {}
             }
         }
@@ -327,9 +330,14 @@ impl<'a> FunctionMapCollector<'a> {
     }
 
     fn property_name(&self, key: &oxc_ast::ast::PropertyKey<'_>) -> String {
+        if matches!(key, oxc_ast::ast::PropertyKey::PrivateIdentifier(_)) {
+            // TODO: Consider preserving private names (for example `Foo##method`)
+            // if the added stack context outweighs strict Metro compatibility.
+            return "<anonymous>".into();
+        }
         if let Some(name) = key.static_name() {
             return name.strip_prefix("Symbol.").map_or_else(
-                || name.clone().into_owned(),
+                || metro_identifier(&name),
                 |property| format!("@@{property}"),
             );
         }
@@ -337,7 +345,7 @@ impl<'a> FunctionMapCollector<'a> {
         if let Some(property) = source.strip_prefix("Symbol.") {
             format!("@@{property}")
         } else {
-            source
+            metro_name_from_source(&source).unwrap_or_else(|| "<anonymous>".into())
         }
     }
 
@@ -364,11 +372,15 @@ impl<'a> FunctionMapCollector<'a> {
         for ancestor in ancestors.iter().rev() {
             match ancestor {
                 AstKind::VariableDeclarator(declarator) => {
-                    components.push(self.name_from_span(declarator.id.span()));
+                    if let Some(name) = self.name_from_id_span(declarator.id.span()) {
+                        components.push(name);
+                    }
                     break;
                 }
                 AstKind::AssignmentExpression(assignment) => {
-                    components.push(self.name_from_span(assignment.left.span()));
+                    if let Some(name) = self.name_from_id_span(assignment.left.span()) {
+                        components.push(name);
+                    }
                     break;
                 }
                 AstKind::ObjectProperty(property) => {
@@ -383,6 +395,96 @@ impl<'a> FunctionMapCollector<'a> {
         }
         components.reverse();
         (!components.is_empty()).then(|| components.join("."))
+    }
+
+    fn name_from_id_span(&self, span: Span) -> Option<String> {
+        metro_name_from_source(&self.source[span.start as usize..span.end as usize])
+    }
+}
+
+fn metro_name_from_source(source: &str) -> Option<String> {
+    let mut value = source.trim();
+    while value.starts_with('(') && value.ends_with(')') {
+        value = value[1..value.len() - 1].trim();
+    }
+    if value.is_empty() || value.starts_with(['{', '[', '#']) {
+        return None;
+    }
+    let mut parts = Vec::new();
+    for component in value.split('.') {
+        let mut rest = component.trim();
+        let bracket = rest.find('[');
+        if let Some(index) = bracket {
+            let head = &rest[..index];
+            if !head.is_empty() {
+                parts.push(metro_identifier(head));
+            }
+            rest = &rest[index..];
+            while let Some(inner) = rest
+                .strip_prefix('[')
+                .and_then(|tail| tail.find(']').map(|end| &tail[..end]))
+            {
+                let quoted = inner
+                    .trim()
+                    .strip_prefix(['\'', '"'])
+                    .and_then(|text| text.strip_suffix(['\'', '"']));
+                let property = quoted?;
+                parts.push(metro_identifier(property));
+                rest = &rest[inner.len() + 2..];
+            }
+            if !rest.is_empty() {
+                return None;
+            }
+        } else {
+            if rest.contains(|character: char| {
+                !character.is_alphanumeric() && !matches!(character, '_' | '$' | '@')
+            }) {
+                return None;
+            }
+            parts.push(metro_identifier(rest));
+        }
+    }
+    if parts.is_empty() {
+        None
+    } else if parts.len() > 5 {
+        // TODO: Consider retaining complete member paths when metadata size is
+        // less important than the intermediate context Metro intentionally drops.
+        Some(format!(
+            "{}.{}...{}.{}",
+            parts[0],
+            parts[1],
+            parts[parts.len() - 2],
+            parts[parts.len() - 1]
+        ))
+    } else {
+        Some(parts.join("."))
+    }
+}
+
+fn metro_identifier(value: &str) -> String {
+    let mut result = String::new();
+    let mut uppercase_next = false;
+    for character in value.chars() {
+        if character.is_ascii_alphanumeric() || matches!(character, '_' | '$' | '@') {
+            if result.is_empty() && character.is_ascii_digit() {
+                continue;
+            }
+            if uppercase_next {
+                result.extend(character.to_uppercase());
+                uppercase_next = false;
+            } else {
+                result.push(character);
+            }
+        } else {
+            uppercase_next = !result.is_empty();
+        }
+    }
+    // TODO: Consider retaining numeric keys instead of Metro's `_`; the latter
+    // is compatible but can collapse distinct properties to the same name.
+    if result.is_empty() {
+        "_".into()
+    } else {
+        result
     }
 }
 

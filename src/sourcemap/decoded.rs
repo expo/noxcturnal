@@ -170,29 +170,27 @@ pub(crate) fn generated_offsets(data: &[u8], source: &str) -> Option<Vec<usize>>
     for line in 0..map.line_count() {
         let line_start = *line_starts.get(line)?;
         let line_end = line_starts.get(line + 1).copied().unwrap_or(source.len());
-        for segment in map.line(line).unwrap_or_default() {
-            let target_column = segment.generated_column as usize;
-            let mut column = 0usize;
-            let mut offset = line_start;
-            for (relative, character) in source[line_start..line_end].char_indices() {
-                if column == target_column {
-                    offset = line_start + relative;
-                    break;
-                }
+        let segments = map.line(line).unwrap_or_default();
+        if source[line_start..line_end].is_ascii() {
+            for segment in segments {
+                let offset = line_start.checked_add(segment.generated_column as usize)?;
+                (offset <= line_end).then_some(())?;
+                offsets.push(offset);
+            }
+            continue;
+        }
+        let mut characters = source[line_start..line_end].char_indices().peekable();
+        let mut column = 0usize;
+        let mut relative = 0usize;
+        for segment in segments {
+            let target = segment.generated_column as usize;
+            while column < target {
+                let (index, character) = characters.next()?;
+                relative = index + character.len_utf8();
                 column += character.len_utf16();
-                offset = line_start + relative + character.len_utf8();
             }
-            if column != target_column {
-                if column > target_column {
-                    return None;
-                }
-                // The loop leaves `offset` at the line end when the mapping is
-                // exactly after its last character.
-                if target_column != column {
-                    return None;
-                }
-            }
-            offsets.push(offset);
+            (column == target).then_some(())?;
+            offsets.push(line_start + relative);
         }
     }
     offsets.sort_unstable();

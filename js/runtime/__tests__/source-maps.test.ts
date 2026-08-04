@@ -4,6 +4,38 @@ import { test } from 'vitest';
 
 import { defineNativePipeline, defineNativePlugin, defineVisitor, transform } from '../../index';
 
+test.each([
+  ['deep member chains', 'a.b.c.d.e.f.g = () => 1;', ['<global>', 'a.b...f.g']],
+  [
+    'anonymous class methods',
+    'const Foo = class { method() {} };',
+    ['<global>', 'Foo', 'Foo#method'],
+  ],
+  [
+    'anonymous static class methods',
+    'const Foo = class { static method() {} };',
+    ['<global>', 'Foo', 'Foo.method'],
+  ],
+  [
+    'anonymous class fields',
+    'const Foo = class { field = () => 1 };',
+    ['<global>', 'Foo', 'Foo#field'],
+  ],
+  ['destructured containers', 'const {x} = {x: () => 1};', ['<global>', 'x']],
+  ['numeric keys', 'const obj = { 1: () => 1 };', ['<global>', 'obj._']],
+  ['non-identifier keys', 'const obj = { "not valid": () => 1 };', ['<global>', 'obj.notValid']],
+  ['string member assignments', 'obj["foo"] = () => 1;', ['<global>', 'obj.foo']],
+  ['computed member assignments', 'obj[a + b] = () => 1;', ['<global>', '<anonymous>']],
+  ['private methods', 'class Foo { #method() {} }', ['Foo', '<anonymous>']],
+  ['parenthesized functions', 'const x = (((() => 1)));', ['<global>', 'x']],
+] as const)('matches Metro names for %s', (_description, source, names) => {
+  const result = transform(source, 'fixture.js', defineNativePipeline({ phases: [] }), {
+    functionMap: true,
+  });
+  assert.equal(result.status, 'complete');
+  assert.deepEqual(result.functionMap?.names, names);
+});
+
 test('maps expressions inside JSX attribute callbacks to their original tokens', () => {
   const source = [
     'function App(props: { title: string }) {',
