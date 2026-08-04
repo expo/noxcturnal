@@ -56,8 +56,79 @@ struct RoutedCounts {
 
 /// Compose packed decoded phase layers (earliest phase first) into the final
 /// encoded map, in one native call with a single VLQ encode.
+///
+/// A resource limit is a fatal error, not a compatibility bailout: the map is
+/// structurally valid and only its size is refused. The two limits are reported
+/// apart, because the mapping storage a chain needs while composing and the size of
+/// the final `mappings` string are separate policies.
 pub fn compose_decoded_chain(layers: &[&[u8]]) -> Result<NativeVlqMap> {
-    let (mappings, names) = sourcemap::compose_layer_chain(layers)
-        .ok_or_else(|| Error::new(Status::InvalidArg, "invalid decoded map layer chain"))?;
+    let (mappings, names) = sourcemap::compose_layer_chain(layers).map_err(compose_error)?;
     Ok(NativeVlqMap { mappings, names })
+}
+
+fn compose_error(error: sourcemap::DecodedMapError) -> Error {
+    match error {
+        sourcemap::DecodedMapError::Invalid => {
+            Error::new(Status::InvalidArg, "invalid decoded map layer chain")
+        }
+        sourcemap::DecodedMapError::ResidentLimit => Error::new(
+            Status::GenericFailure,
+            "source map composition exceeds its 256 MiB mapping-storage limit",
+        ),
+        sourcemap::DecodedMapError::EncodedLimit => Error::new(
+            Status::GenericFailure,
+            "encoded source map exceeds the 256 MiB mappings limit",
+        ),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::sourcemap::{ResidentBudgetOverride, pack_decoded_layer};
+
+    /// The composed-map failure surface distinguishes a malformed layer from each of
+    /// the two size policies. A resource limit stays fatal: the map is well formed and
+    /// only its size is refused, so it must not read as an invalid argument.
+    #[test]
+    fn reports_malformed_layers_apart_from_each_resource_limit() {
+        let error = |layers: &[&[u8]]| match compose_decoded_chain(layers) {
+            Err(error) => error,
+            Ok(_) => panic!("composition should have failed"),
+        };
+        let malformed = error(&[&[0, 0, 0]]);
+        assert_eq!(malformed.status, Status::InvalidArg);
+        assert!(
+            malformed.reason.contains("invalid decoded map layer chain"),
+            "{}",
+            malformed.reason
+        );
+
+        // A single mapped line with a four-billion-line extent encodes over the
+        // encoded-mappings budget while needing almost no resident storage.
+        let extent = pack_decoded_layer(&[0, 0, 0, 0, 0], &[] as &[String], u32::MAX);
+        let encoded = error(&[extent.as_slice()]);
+        assert_eq!(encoded.status, Status::GenericFailure);
+        assert!(
+            encoded.reason.contains("encoded source map exceeds"),
+            "{}",
+            encoded.reason
+        );
+
+        // The same layer under a tiny resident budget fails for mapping storage, and
+        // must not claim the encoded limit.
+        let _budget = ResidentBudgetOverride::bytes(0);
+        let resident = error(&[extent.as_slice()]);
+        assert_eq!(resident.status, Status::GenericFailure);
+        assert!(
+            resident.reason.contains("mapping-storage limit"),
+            "{}",
+            resident.reason
+        );
+        assert!(
+            !resident.reason.contains("encoded"),
+            "a resident failure must not be reported as encoded size: {}",
+            resident.reason
+        );
+    }
 }

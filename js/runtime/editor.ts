@@ -37,6 +37,18 @@ export function createEditor(
   const source = session.source;
   const push = (kind: EditKind, start: number, end: number, content?: string) =>
     edits.push({ kind, start, end, content, owner, order: nextOrder() });
+  // Replacing a range is an ordinary replacement whichever method asked for it, so
+  // these agree with `overwrite`'s default rather than leaving the text unmapped.
+  const replaceRange = (start: number, end: number, content: string) =>
+    edits.push({
+      kind: 'Replace',
+      start,
+      end,
+      content,
+      mapping: 'AnchorStart',
+      owner,
+      order: nextOrder(),
+    });
   const leading = () => source.length - source.trimStart().length;
   const trailing = () => source.length - source.trimEnd().length;
   return {
@@ -46,7 +58,7 @@ export function createEditor(
     prependLeft: (offset, content) => push('PrependLeft', offset, offset, content),
     appendRight: (offset, content) => push('AppendRight', offset, offset, content),
     prependRight: (offset, content) => push('PrependRight', offset, offset, content),
-    update: (start, end, content) => push('Replace', start, end, content),
+    update: (start, end, content) => replaceRange(start, end, content),
     overwrite: (start, end, content, mapping) =>
       edits.push({
         kind: 'Replace',
@@ -72,6 +84,9 @@ export function createEditor(
       edits.length = write;
     },
     indent(prefix = '  ') {
+      // Re-indenting rewrites every line at once. Anchoring the whole output to
+      // offset zero would be worse than leaving it to the surrounding mapping, so
+      // this stays generated text.
       push(
         'Replace',
         0,
@@ -99,14 +114,10 @@ export function createEditor(
     },
     hasChanged: () => edits.some(edit => edit.owner === owner),
     replace(search, replacement) {
-      lowerReplacements(source, search, replacement, false, (start, end, content) =>
-        push('Replace', start, end, content),
-      );
+      lowerReplacements(source, search, replacement, false, replaceRange);
     },
     replaceAll(search, replacement) {
-      lowerReplacements(source, search, replacement, true, (start, end, content) =>
-        push('Replace', start, end, content),
-      );
+      lowerReplacements(source, search, replacement, true, replaceRange);
     },
     slice: (start, end) => source.slice(start, end),
     toString: () => session.commit(edits).code,
@@ -114,19 +125,22 @@ export function createEditor(
   };
 }
 
+// An ordinary replacement maps to the start of the range it replaced. Output is
+// unmapped only when a caller says the text is generated, so omitting the policy
+// cannot silently drop a mapping.
 function editorMappingPolicy(
   value?: 'sourceless' | 'anchor-start' | 'anchor-boundaries' | 'identity',
 ): EditCommand['mapping'] {
   switch (value) {
-    case 'anchor-start':
-      return 'AnchorStart';
+    case 'sourceless':
+      return 'Sourceless';
     case 'anchor-boundaries':
       return 'AnchorBoundaries';
     case 'identity':
       return 'Identity';
-    case 'sourceless':
+    case 'anchor-start':
     default:
-      return 'Sourceless';
+      return 'AnchorStart';
   }
 }
 

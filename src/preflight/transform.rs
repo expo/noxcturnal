@@ -1508,10 +1508,20 @@ fn transform_impl(
         let layer = if rewrite_layers.len() == 1 {
             rewrite_layers.pop().unwrap().pack()
         } else {
-            compose_decoded_layers(&rewrite_layers).ok_or_else(|| {
+            compose_decoded_layers(&rewrite_layers).map_err(|error| {
                 Error::new(
                     Status::GenericFailure,
-                    "native captured-loop map composition failed",
+                    match error {
+                        crate::sourcemap::DecodedMapError::Invalid => {
+                            "native rewrite map composition failed"
+                        }
+                        crate::sourcemap::DecodedMapError::ResidentLimit => {
+                            "native rewrite map composition exceeds its mapping-storage limit"
+                        }
+                        crate::sourcemap::DecodedMapError::EncodedLimit => {
+                            "native rewrite map composition exceeds its encoded-mappings limit"
+                        }
+                    },
                 )
             })?
         };
@@ -1698,6 +1708,19 @@ fn reserve_custom_helper_scope_names<'a>(
     }
 }
 
+/// Append one codegen segment, replacing the previous one when both describe the
+/// same generated position: codegen order decides which token owns it.
+fn push_codegen_segment(words: &mut Vec<u32>, segment: [u32; 5]) {
+    if words
+        .chunks_exact(5)
+        .next_back()
+        .is_some_and(|previous| previous[0] == segment[0] && previous[1] == segment[1])
+    {
+        words.truncate(words.len() - 5);
+    }
+    words.extend_from_slice(&segment);
+}
+
 /// Print a program and pack its map into a decoded layer.
 ///
 /// `generated_line_offset` accounts for lines the caller prepends to the
@@ -1730,29 +1753,59 @@ fn render_program(
     let names: Vec<Rc<str>> = map.get_names().map(Rc::from).collect();
     let tokens = map.get_tokens();
     let mut words = Vec::with_capacity(tokens.size_hint().0 * 5);
-    let mut line_count = 1 + generated_line_offset;
+    let emitted_last_line =
+        u32::try_from(generated.code.bytes().filter(|byte| *byte == b'\n').count())
+            .ok()
+            .and_then(|line| line.checked_add(generated_line_offset))
+            .ok_or_else(|| {
+                Error::new(
+                    Status::GenericFailure,
+                    "generated output has too many lines",
+                )
+            })?;
+    let mut last_segment_line = None;
     for token in tokens {
-        // The decoded-layer format represents a single input source. Codegen may
-        // produce sourceless tokens for generated punctuation; those must remain
-        // unmapped rather than being falsely anchored to the original.
-        if token.get_source_id().is_none() {
-            continue;
+        let generated_line = token
+            .get_dst_line()
+            .checked_add(generated_line_offset)
+            .ok_or_else(|| {
+                Error::new(Status::GenericFailure, "generated source-map line overflow")
+            })?;
+        let generated_column = token.get_dst_col();
+        // Generated punctuation must close the preceding mapped span instead of
+        // inheriting its source position. For duplicate positions, the later
+        // codegen token is authoritative.
+        if token.get_source_id().is_some() {
+            push_codegen_segment(
+                &mut words,
+                [
+                    generated_line,
+                    generated_column,
+                    token.get_src_line(),
+                    token.get_src_col(),
+                    token.get_name_id().map_or(0, |id| id + 1),
+                ],
+            );
+        } else {
+            push_codegen_segment(
+                &mut words,
+                [generated_line, generated_column, u32::MAX, u32::MAX, 0],
+            );
         }
-        line_count = line_count.max(token.get_dst_line() + generated_line_offset + 1);
-        words.extend_from_slice(&[
-            token.get_dst_line() + generated_line_offset,
-            token.get_dst_col(),
-            token.get_src_line(),
-            token.get_src_col(),
-            token.get_name_id().map_or(0, |id| id + 1),
-        ]);
+        last_segment_line = Some(generated_line);
+    }
+    // Codegen normally terminates output with a newline but has no mapped token
+    // on the resulting empty line. Retain that line explicitly as unmapped so a
+    // later EOF edit cannot interpolate a stale mapping across the boundary.
+    if !generated.code.is_empty() && last_segment_line.is_none_or(|line| line < emitted_last_line) {
+        push_codegen_segment(&mut words, [emitted_last_line, 0, u32::MAX, u32::MAX, 0]);
     }
     Ok((
         generated.code,
         DecodedLayer {
             words,
             names,
-            line_count,
+            last_generated_line: emitted_last_line,
         },
     ))
 }
@@ -2388,12 +2441,12 @@ fn identity_result(
     jsx: bool,
 ) -> NativePreflightResult {
     let map = include_map.then(|| {
-        let line_count = source.bytes().filter(|byte| *byte == b'\n').count() as u32 + 1;
-        let mut words = Vec::with_capacity(line_count as usize * 5);
-        for line in 0..line_count {
+        let last_generated_line = source.bytes().filter(|byte| *byte == b'\n').count() as u32;
+        let mut words = Vec::with_capacity((last_generated_line as usize + 1) * 5);
+        for line in 0..=last_generated_line {
             words.extend_from_slice(&[line, 0, line, 0, 0]);
         }
-        pack_decoded_layer(&words, &[] as &[String], line_count).into()
+        pack_decoded_layer(&words, &[] as &[String], last_generated_line).into()
     });
     NativePreflightResult {
         status: "complete".into(),
@@ -2513,7 +2566,7 @@ mod tests {
     }
 
     #[test]
-    fn native_layer_composed_with_visitor_layer_matches_vlq_reference() {
+    fn native_layer_composed_with_visitor_layer_preserves_native_boundaries() {
         let result = transform(
             "const value: number = 1;".into(),
             "fixture.ts".into(),
@@ -2548,17 +2601,70 @@ mod tests {
         let (composed, names) =
             compose_layer_chain(&[native_layer.as_ref(), visitor_layer.as_slice()]).unwrap();
 
-        assert_eq!(
-            composed,
-            compose(
-                &visitor_mappings,
-                &native_mappings,
-                visitor_names.len() as u32
-            )
+        let legacy = compose(
+            &visitor_mappings,
+            &native_mappings,
+            visitor_names.len() as u32,
         );
+        assert_ne!(composed, legacy);
+        let composed_columns = crate::sourcemap::decoded_generated_columns(&composed);
+        let legacy_columns = crate::sourcemap::decoded_generated_columns(&legacy);
+        assert!(composed_columns[0].contains(&6));
+        assert!(!legacy_columns[0].contains(&6));
         let mut expected_names = visitor_names;
         expected_names.extend(native_names);
         assert_eq!(names, expected_names);
+    }
+
+    #[test]
+    fn codegen_layer_closes_its_trailing_line_before_an_eof_edit() {
+        let result = transform(
+            "const value: number = 1;".into(),
+            "fixture.ts".into(),
+            NativePreflightOptions {
+                typescript: Some("strip".into()),
+                ..NativePreflightOptions::default()
+            },
+        )
+        .unwrap();
+        let code = result.code.unwrap();
+        assert!(code.ends_with('\n'));
+        let native_layer = result.map.unwrap();
+        let eof = code.len() as u32;
+        let pieces = build(
+            &code,
+            vec![EditCommand {
+                kind: EditKind::Replace,
+                start: eof,
+                end: eof,
+                content: Some("tail".into()),
+                parts: Vec::new(),
+                destination: None,
+                mapping: Some(MappingPolicy::AnchorStart),
+                names: None,
+                order: None,
+            }],
+        )
+        .unwrap();
+        let (_, eof_layer) = crate::sourcemap::render_decoded(&code, &pieces, "boundary");
+        let (mappings, _) =
+            compose_layer_chain(&[native_layer.as_ref(), eof_layer.as_slice()]).unwrap();
+
+        assert_eq!(
+            mappings
+                .split(';')
+                .next_back()
+                .and_then(|line| line.split(',').next()),
+            Some("A")
+        );
+    }
+
+    #[test]
+    fn codegen_segments_retain_unmapped_duplicate_boundaries() {
+        let mut words = Vec::new();
+        push_codegen_segment(&mut words, [0, 4, 0, 4, 0]);
+        push_codegen_segment(&mut words, [0, 4, u32::MAX, u32::MAX, 0]);
+        assert_eq!(words, [0, 4, u32::MAX, u32::MAX, 0]);
     }
 
     #[test]

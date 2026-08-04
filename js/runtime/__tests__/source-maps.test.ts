@@ -1,7 +1,8 @@
-import { originalPositionFor, TraceMap } from '@jridgewell/trace-mapping';
+import { decodedMappings, originalPositionFor, TraceMap } from '@jridgewell/trace-mapping';
 import assert from 'node:assert/strict';
 import { test } from 'vitest';
 
+import type { NativeEditor } from '../../contracts/visitor';
 import { defineNativePipeline, defineNativePlugin, defineVisitor, transform } from '../../index';
 
 test.each([
@@ -136,6 +137,155 @@ test('produces traceable Unicode-aware VLQ mappings', () => {
     column: 14,
     name: 'generatedValue',
   });
+});
+
+test('maps an ordinary replacement to the start of the range it replaced', () => {
+  // An omitted mapping policy means anchor-start: replacing source is an ordinary
+  // replacement, and only text a caller calls generated goes unmapped.
+  const source = 'const alpha = compute(alpha);\nconst beta = 2;\n';
+  const cases = [
+    {
+      name: 'update',
+      apply: (editor: NativeEditor, at: number) => editor.update(at, at + 5, 'ALPHA'),
+    },
+    {
+      name: 'overwrite',
+      apply: (editor: NativeEditor, at: number) => editor.overwrite(at, at + 5, 'ALPHA'),
+    },
+    { name: 'replace', apply: (editor: NativeEditor) => editor.replace('compute', 'CALL') },
+    {
+      name: 'multiline',
+      apply: (editor: NativeEditor, at: number) => editor.overwrite(at, at + 5, 'ALPHA\n.first'),
+    },
+  ] as const;
+  for (const { name, apply } of cases) {
+    const at = source.indexOf('alpha');
+    const result = transform(
+      source,
+      'fixture.js',
+      defineNativePipeline({
+        phases: [
+          {
+            name: 'edit',
+            plugins: [
+              defineNativePlugin({
+                name: `edit-${name}`,
+                pre(context) {
+                  apply(context.editor, at);
+                },
+              }),
+            ],
+          },
+        ],
+      }),
+      { sourceMapMode: 'boundary' },
+    );
+    assert.equal(result.status, 'complete', name);
+    const map = new TraceMap({
+      version: 3,
+      sources: ['fixture.js'],
+      names: result.map.names,
+      mappings: result.map.mappings,
+    });
+    const replaced = name === 'replace' ? source.indexOf('compute') : at;
+    const generated = result.code.indexOf(name === 'replace' ? 'CALL' : 'ALPHA');
+    const before = result.code.slice(0, generated).split('\n');
+    assert.deepEqual(
+      originalPositionFor(map, { line: before.length, column: before.at(-1)!.length }),
+      { source: 'fixture.js', line: 1, column: replaced, name: null },
+      name,
+    );
+    // Mapping resumes after the replacement rather than interpolating through it.
+    const resumed = result.code.indexOf('const beta');
+    const beforeResumed = result.code.slice(0, resumed).split('\n');
+    assert.deepEqual(
+      originalPositionFor(map, {
+        line: beforeResumed.length,
+        column: beforeResumed.at(-1)!.length,
+      }),
+      { source: 'fixture.js', line: 2, column: 0, name: null },
+      name,
+    );
+  }
+});
+
+test('leaves an explicitly sourceless replacement unmapped', () => {
+  const source = 'const alpha = 1;\n';
+  const result = transform(
+    source,
+    'fixture.js',
+    defineNativePipeline({
+      phases: [
+        {
+          name: 'edit',
+          plugins: [
+            defineNativePlugin({
+              name: 'generated-text',
+              pre(context) {
+                context.editor.overwrite(14, 15, '/* generated */', 'sourceless');
+              },
+            }),
+          ],
+        },
+      ],
+    }),
+    { sourceMapMode: 'boundary' },
+  );
+  assert.equal(result.status, 'complete');
+  const map = new TraceMap({
+    version: 3,
+    sources: ['fixture.js'],
+    names: result.map.names,
+    mappings: result.map.mappings,
+  });
+  assert.deepEqual(originalPositionFor(map, { line: 1, column: 14 }), {
+    source: null,
+    line: null,
+    column: null,
+    name: null,
+  });
+});
+
+test('keeps a wholly generated module unmapped when it declares itself sourceless', () => {
+  // Replacing a whole module with a synthesized proxy is the shape where the
+  // anchor-start default is wrong: every generated line would claim the input's first
+  // character. Such a replacement has to say it is generated.
+  const source = 'export default function App() {\n  return null;\n}\n';
+  const proxy = 'import React from "react";\nexport default 1;\n';
+  const mappingsFor = (mapping?: 'sourceless') => {
+    const result = transform(
+      source,
+      'fixture.js',
+      defineNativePipeline({
+        phases: [
+          {
+            name: 'proxy',
+            plugins: [
+              defineNativePlugin({
+                name: 'proxy',
+                pre(context) {
+                  context.editor.overwrite(0, context.source.length, proxy, mapping);
+                },
+              }),
+            ],
+          },
+        ],
+      }),
+      { sourceMapMode: 'boundary' },
+    );
+    assert.equal(result.status, 'complete');
+    return result.map.mappings;
+  };
+  const declared = mappingsFor('sourceless');
+  assert.ok(
+    declared
+      .split(';')
+      .every(line => line.split(',').every((segment: string) => segment.length <= 1)),
+    `a sourceless module must stay unmapped: ${declared}`,
+  );
+  // Omitting the policy anchors it instead, which is why the proxy plugins downstream
+  // have to declare themselves.
+  assert.notEqual(mappingsFor(), declared);
 });
 
 test('honors explicit mapping policies on editor overwrites', () => {
@@ -676,6 +826,105 @@ test('traces CRLF, directive, wrapper, and explicit-location mappings', () => {
     source: 'fixture.js',
     line: 2,
     column: 0,
+    name: null,
+  });
+});
+
+test('projects earlier boundaries through a later sparse phase', () => {
+  const source = 'const alpha = one + two + three;';
+  const boundaries = [source.indexOf('one'), source.indexOf('two'), source.indexOf('three')];
+  const markTokens = defineNativePlugin({
+    name: 'mark-tokens',
+    pre(context) {
+      for (const offset of boundaries) context.editor.addSourceMapLocation(offset);
+    },
+  });
+  const sparseRewrite = defineNativePlugin({
+    name: 'sparse-rewrite',
+    pre(context) {
+      const start = source.indexOf('three');
+      // The default mapping is anchor-start, so this regression must not depend on
+      // passing it explicitly.
+      context.editor.overwrite(start, start + 'three'.length, 'final');
+    },
+  });
+  const result = transform(
+    source,
+    'fixture.js',
+    defineNativePipeline({
+      phases: [
+        { name: 'mark', plugins: [markTokens] },
+        { name: 'rewrite', plugins: [sparseRewrite] },
+      ],
+    }),
+    { sourceMapMode: 'boundary' },
+  );
+  assert.equal(result.status, 'complete');
+  const map = new TraceMap({
+    version: 3,
+    sources: ['fixture.js'],
+    names: result.map.names,
+    mappings: result.map.mappings,
+  });
+  const generatedColumns = decodedMappings(map)[0]!.map(segment => segment[0]);
+  for (const offset of boundaries.slice(0, 2)) {
+    assert.ok(generatedColumns.includes(offset), `missing explicit boundary at column ${offset}`);
+    assert.deepEqual(originalPositionFor(map, { line: 1, column: offset }), {
+      source: 'fixture.js',
+      line: 1,
+      column: offset,
+      name: null,
+    });
+  }
+});
+
+test('keeps a removed range out of the columns a later phase still has', () => {
+  // Projection carries earlier boundaries through copied ranges, so a removal has to
+  // close the span it interrupts. Otherwise the removed range's boundaries land on
+  // generated columns the line no longer has.
+  const source = 'const kept = 1; const dropped = 2; const gone = 3;\nconst next = 4;\n';
+  const markTokens = defineNativePlugin({
+    name: 'mark-tokens',
+    pre(context) {
+      for (const needle of ['kept', 'dropped', 'gone', 'next'])
+        context.editor.addSourceMapLocation(source.indexOf(needle));
+    },
+  });
+  const truncate = defineNativePlugin({
+    name: 'truncate',
+    pre(context) {
+      context.editor.remove(source.indexOf(' const dropped'), source.indexOf('\n'));
+    },
+  });
+  const result = transform(
+    source,
+    'fixture.js',
+    defineNativePipeline({
+      phases: [
+        { name: 'mark', plugins: [markTokens] },
+        { name: 'truncate', plugins: [truncate] },
+      ],
+    }),
+    { sourceMapMode: 'boundary' },
+  );
+  assert.equal(result.status, 'complete');
+  const map = new TraceMap({
+    version: 3,
+    sources: ['fixture.js'],
+    names: result.map.names,
+    mappings: result.map.mappings,
+  });
+  const firstLineLength = result.code.split('\n')[0]!.length;
+  const generatedColumns = decodedMappings(map)[0]!.map(segment => segment[0]);
+  assert.ok(
+    generatedColumns.every(column => column <= firstLineLength),
+    `mapped columns ${generatedColumns} exceed the ${firstLineLength}-column line`,
+  );
+  // The boundary the line kept is still traced through the removal.
+  assert.deepEqual(originalPositionFor(map, { line: 1, column: source.indexOf('kept') }), {
+    source: 'fixture.js',
+    line: 1,
+    column: source.indexOf('kept'),
     name: null,
   });
 });

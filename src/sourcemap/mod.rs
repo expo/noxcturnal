@@ -81,7 +81,23 @@ trait SegmentSink: Default {
         anchor_tail: bool,
         identity_tail: bool,
     );
-    fn update_last(&mut self, _name: Option<i64>, _anchor_tail: bool, _identity_tail: bool) {}
+    /// Fold a mark into the segment that already claims this generated column. The
+    /// segment may only take an identity span for the position it stores: a mark
+    /// arriving from somewhere else describes different text, and a span it opened
+    /// would interpolate over text that segment never covered.
+    fn update_last(
+        &mut self,
+        _name: Option<i64>,
+        _anchor_tail: bool,
+        _identity_tail: bool,
+        _original_line: i64,
+        _original_column: i64,
+    ) {
+    }
+    /// End the span the last segment opened, for a transition that lands on a generated
+    /// column that segment already claimed. Only the decoded layer carries span
+    /// behaviour, so this never changes encoded output.
+    fn close_last_span(&mut self) {}
     fn unmapped(&mut self, generated_column: i64);
     fn newline(&mut self);
 }
@@ -202,17 +218,33 @@ impl SegmentSink for DecodedSink {
             0,
         ]);
     }
-    fn update_last(&mut self, name: Option<i64>, anchor_tail: bool, identity_tail: bool) {
+    fn update_last(
+        &mut self,
+        name: Option<i64>,
+        anchor_tail: bool,
+        identity_tail: bool,
+        original_line: i64,
+        original_column: i64,
+    ) {
+        let Some(segment) = self.words.rchunks_exact_mut(5).next() else {
+            return;
+        };
+        if let Some(name_id) = name {
+            segment[4] = (segment[4] & !NAME_MASK) | (name_id as u32 + 1);
+        }
+        if anchor_tail {
+            segment[4] |= ANCHOR_TAIL;
+        }
+        if identity_tail
+            && segment[2] == original_line as u32
+            && segment[3] == original_column as u32
+        {
+            segment[4] |= IDENTITY_TAIL;
+        }
+    }
+    fn close_last_span(&mut self) {
         if let Some(last_word) = self.words.last_mut() {
-            if let Some(name_id) = name {
-                *last_word = (*last_word & !NAME_MASK) | (name_id as u32 + 1);
-            }
-            if anchor_tail {
-                *last_word |= ANCHOR_TAIL;
-            }
-            if identity_tail {
-                *last_word |= IDENTITY_TAIL;
-            }
+            *last_word &= !IDENTITY_TAIL;
         }
     }
     fn newline(&mut self) {
@@ -229,6 +261,9 @@ struct StreamingMap<S: SegmentSink> {
     original_column: i64,
     last_mark: Option<(usize, i64)>,
     unmapped: bool,
+    /// The last segment emitted opened an identity span. Only such a span keeps
+    /// interpolating, and only it makes composition project the input beyond it.
+    open_identity: bool,
 }
 
 impl<S: SegmentSink> StreamingMap<S> {
@@ -244,9 +279,37 @@ impl<S: SegmentSink> StreamingMap<S> {
     fn mark_identity(&mut self, name: Option<i64>) {
         self.mark_with_tail(name, false, true);
     }
+    /// Resume mapping for the text that follows a generated or removed range. A mark
+    /// already at this generated column described the text before it, so that mark
+    /// cannot also describe what comes next: end its span rather than extending it
+    /// over text it never covered.
+    fn mark_resume(&mut self) {
+        if self.last_mark == Some((self.generated_line, self.generated_column)) {
+            self.sink.close_last_span();
+            self.open_identity = false;
+            return;
+        }
+        self.mark_identity(None);
+    }
+    /// End the span the output leaves open where it stops short of its input.
+    fn close_span(&mut self) {
+        if self.last_mark == Some((self.generated_line, self.generated_column)) {
+            self.sink.close_last_span();
+            self.open_identity = false;
+            return;
+        }
+        self.mark();
+    }
     fn mark_with_tail(&mut self, name: Option<i64>, anchor_tail: bool, identity_tail: bool) {
         if self.last_mark == Some((self.generated_line, self.generated_column)) {
-            self.sink.update_last(name, anchor_tail, identity_tail);
+            self.sink.update_last(
+                name,
+                anchor_tail,
+                identity_tail,
+                self.original_line,
+                self.original_column,
+            );
+            self.open_identity |= identity_tail;
             return;
         }
         self.sink.segment(
@@ -259,6 +322,7 @@ impl<S: SegmentSink> StreamingMap<S> {
         );
         self.last_mark = Some((self.generated_line, self.generated_column));
         self.unmapped = false;
+        self.open_identity = identity_tail;
     }
     fn newline(&mut self) {
         self.sink.newline();
@@ -272,21 +336,34 @@ impl<S: SegmentSink> StreamingMap<S> {
         self.sink.unmapped(self.generated_column);
         self.last_mark = Some((self.generated_line, self.generated_column));
         self.unmapped = true;
+        self.open_identity = false;
     }
-    fn copied(&mut self, text: &str, character: bool, close_span: bool) {
-        if self.unmapped {
+    /// Mark a copied position. Line mode wants one point per generated line, so its
+    /// marks stay plain boundaries: an identity span would let composition project
+    /// every boundary an inner layer holds for that line into the output.
+    fn mark_copy(&mut self, spans: bool) {
+        if spans {
             self.mark_identity(None);
+        } else {
+            self.mark();
+        }
+    }
+    /// `spans` is set for every mode but `line`: those modes describe copied text as
+    /// identity spans and close a span at the last column of each generated line.
+    fn copied(&mut self, text: &str, character: bool, spans: bool) {
+        if self.unmapped {
+            self.mark_copy(spans);
         }
         if text.is_ascii() {
             let bytes = text.as_bytes();
             for (index, byte) in bytes.iter().copied().enumerate() {
                 if character
                     || self.generated_column == 0
-                    || (close_span
+                    || (spans
                         && byte != b'\n'
                         && bytes.get(index + 1).is_none_or(|next| *next == b'\n'))
                 {
-                    self.mark_identity(None);
+                    self.mark_copy(spans);
                 }
                 if byte == b'\n' {
                     self.newline();
@@ -303,11 +380,11 @@ impl<S: SegmentSink> StreamingMap<S> {
         while let Some(character_value) = characters.next() {
             if character
                 || self.generated_column == 0
-                || (close_span
+                || (spans
                     && character_value != '\n'
                     && characters.peek().is_none_or(|next| *next == '\n'))
             {
-                self.mark_identity(None);
+                self.mark_copy(spans);
             }
             if character_value == '\n' {
                 self.newline();
@@ -499,12 +576,21 @@ struct Renderer<'a, S: SegmentSink> {
     /// to. In-place pieces keep it advancing monotonically; a mismatch means the
     /// previous piece came from elsewhere and the position must be re-derived.
     cursor: usize,
-    /// A generated range was the last code-bearing piece, so the next original
-    /// range must explicitly resume identity mapping even in boundary mode.
+    /// A generated range or a removed range was the last piece, so the next
+    /// original range must explicitly resume identity mapping even in boundary
+    /// mode. A removal emits no text but still ends the preceding identity span:
+    /// without the resumption the span would interpolate across the removed
+    /// range, and composition would project the removed range's boundaries into
+    /// generated columns the line no longer has.
     generated_tail: bool,
     /// The current generated position follows verbatim original text, so bare
     /// marks inserted within that run inherit its identity-tail semantics.
     identity_tail: bool,
+    /// Input offset the last copied range stopped at. A span left open where the
+    /// output ends only overshoots if its input line continues past this point;
+    /// a copy that reached a line break or the end of the source leaves nothing
+    /// for composition to project.
+    span_end: usize,
 }
 
 impl<S: SegmentSink> Renderer<'_, S> {
@@ -522,25 +608,37 @@ impl<S: SegmentSink> Renderer<'_, S> {
         for piece in pieces {
             match piece {
                 Piece::Original { start, end } => {
-                    if *start != self.cursor {
+                    // A relocated range maps from somewhere else, so the span the
+                    // previous range opened has to end here. Without the boundary the
+                    // span keeps interpolating, and composition projects the skipped
+                    // input's boundaries into this range's generated columns.
+                    let relocated = *start != self.cursor;
+                    if relocated {
                         self.reposition(*start);
                     }
                     let text = &self.source[*start..*end];
-                    if self.generated_tail && !self.line && !text.is_empty() {
-                        self.map.mark_identity(None);
+                    if (self.generated_tail || relocated) && !self.line && !text.is_empty() {
+                        self.map.mark_resume();
                     }
                     self.generated_tail = false;
                     self.code.push_str(text);
                     self.map.copied(text, self.character, !self.line);
                     self.identity_tail |= !text.is_empty();
+                    if !text.is_empty() {
+                        self.span_end = *end;
+                    }
                     self.cursor = *end;
                 }
                 Piece::Mark { origin } => {
-                    if *origin != self.cursor {
+                    // A mark inside a verbatim run shares that run's identity span. A
+                    // relocated mark does not: it points somewhere else, and no text
+                    // follows it from there, so it stays a plain boundary point.
+                    let relocated = *origin != self.cursor;
+                    if relocated {
                         self.reposition(*origin);
                         self.cursor = *origin;
                     }
-                    if self.identity_tail {
+                    if self.identity_tail && !relocated && !self.line {
                         self.map.mark_identity(None);
                     } else {
                         self.map.mark();
@@ -566,7 +664,8 @@ impl<S: SegmentSink> Renderer<'_, S> {
                     mapping,
                     names: piece_names,
                 } => {
-                    if *start != self.cursor {
+                    let relocated = *start != self.cursor;
+                    if relocated {
                         self.reposition(*start);
                     }
                     let anchor = (self.map.original_line, self.map.original_column);
@@ -577,7 +676,13 @@ impl<S: SegmentSink> Renderer<'_, S> {
                                 .map(|name| intern(&mut self.names, &mut self.name_ids, name))
                         })
                         .flatten();
+                    // These policies describe the piece's own text. With no text there
+                    // is nothing to anchor: opening a span at the replaced range's
+                    // start would pin the source that follows the removal to a position
+                    // the output dropped. A removal is mapped by the resumption that
+                    // follows it instead, whichever policy asked for it.
                     if !self.line
+                        && !text.is_empty()
                         && matches!(
                             mapping,
                             MappingPolicy::AnchorStart
@@ -606,12 +711,31 @@ impl<S: SegmentSink> Renderer<'_, S> {
                     } else {
                         self.map.generated(text);
                     }
-                    self.generated_tail |= !text.is_empty();
+                    // Text of its own, a removed range, or a bare reposition: each
+                    // leaves the mapping somewhere other than where the previous range
+                    // ended, so the next original range has to resume explicitly.
+                    self.generated_tail |= !text.is_empty() || *end > *start || relocated;
                     if !text.is_empty() {
                         self.identity_tail = false;
                     }
-                    if !self.line && *mapping == MappingPolicy::AnchorBoundaries {
+                    // The closing boundary belongs to this piece's text. With no text
+                    // there is none to close, and emitting one here would leave the
+                    // removal describing a boundary where every other policy leaves an
+                    // identity span for composition to project through.
+                    // The closing boundary belongs to this piece's text. With no text
+                    // there is none to close, and emitting one here would leave the
+                    // removal describing a boundary where every other policy leaves an
+                    // identity span for composition to project through.
+                    if !self.line && !text.is_empty() && *mapping == MappingPolicy::AnchorBoundaries
+                    {
                         self.map.mark();
+                    }
+                    if *mapping == MappingPolicy::Identity && !text.is_empty() {
+                        // The identity span this piece opens describes its own text, so
+                        // it ends where that text ends rather than where the input does.
+                        // An empty piece opens no span, and must not move the position
+                        // that bounds the one already open.
+                        self.span_end = *start;
                     }
                     self.cursor = *end;
                 }
@@ -643,8 +767,25 @@ fn render_into<'a, S: SegmentSink>(
         cursor: 0,
         generated_tail: false,
         identity_tail: false,
+        span_end: 0,
     };
     renderer.pieces(pieces);
+    // An identity span left open where the output stops keeps interpolating, and
+    // composition projects the rest of its input line into generated columns the
+    // output never reaches. Nothing follows that could carry the boundary, so close
+    // it here. A span that ended at a line break needs nothing: mappings do not
+    // interpolate across generated lines.
+    let input_continues = renderer.source[renderer.span_end..]
+        .chars()
+        .next()
+        .is_some_and(|next| next != '\n');
+    if renderer.map.open_identity
+        && input_continues
+        && !renderer.line
+        && renderer.map.generated_column > 0
+    {
+        renderer.map.close_span();
+    }
     renderer
 }
 
@@ -685,7 +826,7 @@ pub(crate) fn render_decoded_layer(
     let layer = DecodedLayer {
         words: renderer.map.sink.words,
         names: renderer.names,
-        line_count: renderer.map.generated_line as u32,
+        last_generated_line: renderer.map.generated_line as u32,
     };
     (renderer.code, layer)
 }
@@ -781,6 +922,18 @@ fn decode(mappings: &str) -> Vec<Vec<Segment>> {
     lines
 }
 
+#[cfg(test)]
+pub(crate) fn decoded_generated_columns(mappings: &str) -> Vec<Vec<u32>> {
+    decode(mappings)
+        .into_iter()
+        .map(|line| {
+            line.into_iter()
+                .map(|segment| segment.generated_column)
+                .collect()
+        })
+        .collect()
+}
+
 fn compose_lines(
     outer_lines: Vec<Vec<Segment>>,
     inner_lines: &[Vec<Segment>],
@@ -844,16 +997,18 @@ pub fn compose(outer: &str, inner: &str, outer_name_count: u32) -> String {
 /// Pack one phase's decoded mapping (segment words from `render_decoded`, its names,
 /// and the rendered line count) into a single buffer that crosses N-API opaquely.
 ///
-/// Layout (little-endian u32 words): `[name_count, segments_word_offset, line_count,
+/// Layout (little-endian u32 words): `[name_count, segments_word_offset, last_generated_line,
 /// name byte lengths...]`, then the concatenated UTF-8 name slab padded to a word
 /// boundary, then five words per segment (generated line, generated column,
 /// original line, original column, name id + 1).
 mod decoded;
 
 pub(crate) use decoded::{
-    DecodedLayer, compose_decoded_layers, compose_layer_chain, generated_offsets,
-    pack_decoded_layer,
+    DecodedLayer, DecodedMapError, compose_decoded_layers, compose_layer_chain, pack_decoded_layer,
 };
+
+#[cfg(test)]
+pub(crate) use decoded::ResidentBudgetOverride;
 
 #[cfg(test)]
 mod tests {
@@ -878,12 +1033,6 @@ mod tests {
     #[test]
     fn composes_two_maps() {
         assert_eq!(compose("AAAA;AACA", "AAAA;AACA", 0), "AAAA;AACA");
-    }
-
-    #[test]
-    fn accepts_trailing_empty_lines_when_collecting_generated_offsets() {
-        let layer = pack_decoded_layer(&[], &[] as &[String], 1);
-        assert_eq!(generated_offsets(&layer, ""), Some(Vec::new()));
     }
 
     #[test]
@@ -976,7 +1125,7 @@ mod tests {
     }
 
     #[test]
-    fn decoded_chain_composition_matches_vlq_composition() {
+    fn decoded_chain_composition_preserves_boundaries_lost_by_vlq_composition() {
         let source = "const value = 1;\nconst other = value + 2;\n";
         let first_pieces = build(source, vec![named_replace(6, 11, "renamed", "value")]).unwrap();
         let (first_code, first_mappings, first_names) = render(source, &first_pieces, "boundary");
@@ -987,10 +1136,16 @@ mod tests {
         let (_, second_layer) = render_decoded(&first_code, &second_pieces, "boundary");
         let (chained_mappings, chained_names) =
             compose_layer_chain(&[first_layer.as_slice(), second_layer.as_slice()]).unwrap();
-        assert_eq!(
-            chained_mappings,
-            compose(&second_mappings, &first_mappings, second_names.len() as u32)
-        );
+        let legacy = compose(&second_mappings, &first_mappings, second_names.len() as u32);
+        assert_ne!(chained_mappings, legacy);
+        let decoded = decode(&chained_mappings);
+        let preserved_first_name = decoded
+            .iter()
+            .flatten()
+            .find(|segment| segment.name == 2)
+            .expect("the first layer's named boundary should survive");
+        assert_eq!(preserved_first_name.generated_column, 6);
+        assert!(decoded.iter().flatten().any(|segment| segment.name == 1));
         let mut expected_names = second_names;
         expected_names.extend(first_names);
         assert_eq!(chained_names, expected_names);
@@ -1335,6 +1490,430 @@ mod tests {
             .find(|segment| segment.generated_column == 9)
             .unwrap();
         assert_eq!(segment.original_column, 3);
+    }
+
+    fn mark_command(offset: u32, order: u32) -> EditCommand {
+        EditCommand {
+            kind: EditKind::AddSourceMapLocation,
+            start: offset,
+            end: offset,
+            content: None,
+            parts: Vec::new(),
+            destination: None,
+            mapping: None,
+            order: Some(order),
+            names: None,
+        }
+    }
+
+    /// Deterministic xorshift, so the sweep below is reproducible.
+    fn sweep_random(seed: &mut u64, bound: usize) -> usize {
+        *seed ^= *seed << 13;
+        *seed ^= *seed >> 7;
+        *seed ^= *seed << 17;
+        (*seed % bound.max(1) as u64) as usize
+    }
+
+    fn sweep_edit(seed: &mut u64, source: &str, order: u32) -> EditCommand {
+        let start = sweep_random(seed, source.len() + 1);
+        let end = start + sweep_random(seed, source.len() - start + 1);
+        let (start, end) = (
+            (0..=start)
+                .rev()
+                .find(|at| source.is_char_boundary(*at))
+                .unwrap_or(0) as u32,
+            (end..=source.len())
+                .find(|at| source.is_char_boundary(*at))
+                .unwrap_or(source.len()) as u32,
+        );
+        let (kind, content, mapping, destination) = match sweep_random(seed, 10) {
+            // A removal, the shape that leaves an identity span open.
+            0 | 1 => (EditKind::Replace, Some(String::new()), None, None),
+            2 => (
+                EditKind::Replace,
+                Some("rewritten".into()),
+                Some(MappingPolicy::AnchorStart),
+                None,
+            ),
+            3 => (
+                EditKind::AppendLeft,
+                Some("/* added */".into()),
+                Some(MappingPolicy::Sourceless),
+                None,
+            ),
+            4 => (
+                EditKind::PrependRight,
+                Some("inserted\n".into()),
+                Some(MappingPolicy::Sourceless),
+                None,
+            ),
+            5 => (EditKind::AddSourceMapLocation, None, None, None),
+            6 => (
+                EditKind::Replace,
+                Some("kept".into()),
+                Some(MappingPolicy::Identity),
+                None,
+            ),
+            7 => (
+                EditKind::Replace,
+                Some("bounded".into()),
+                Some(MappingPolicy::AnchorBoundaries),
+                None,
+            ),
+            8 => (EditKind::Remove, None, None, None),
+            _ => (
+                EditKind::Move,
+                None,
+                None,
+                Some(sweep_random(seed, source.len() + 1) as u32),
+            ),
+        };
+        EditCommand {
+            kind,
+            start,
+            end: if kind == EditKind::AddSourceMapLocation {
+                start
+            } else {
+                end
+            },
+            content,
+            parts: Vec::new(),
+            destination: destination.map(|at| {
+                (0..=at as usize)
+                    .rev()
+                    .find(|to| source.is_char_boundary(*to))
+                    .unwrap_or(0) as u32
+            }),
+            mapping,
+            order: Some(order),
+            names: None,
+        }
+    }
+
+    /// Every mapping a composed map holds must address a generated column its own
+    /// output reaches. Composition projects an inner layer's boundaries through the
+    /// outer layer's identity spans, so any span the outer layer leaves open past the
+    /// end of its line resurfaces here as a column the line does not have.
+    #[test]
+    fn composed_columns_stay_inside_their_generated_line() {
+        for source in [
+            "const alpha = 1; const beta = 2;\nconst gamma = 3; const delta = 4;\nlet epsilon = alpha + beta + gamma + delta;\n",
+            // A dense single line, the shape a prebundled dependency produces.
+            "const values=[alpha,beta,gamma,delta,epsilon,zeta,eta,theta];",
+            // No trailing newline, and one line that holds nothing.
+            "let first = 1;\n\nlet second = first;",
+        ] {
+            for seed in [
+                0x2545_f491_4f6c_dd1du64,
+                0x9e37_79b9_7f4a_7c15,
+                0xdead_beef_1234_5678,
+            ] {
+                for mode in ["boundary", "character", "line"] {
+                    composed_columns_sweep(source, seed, mode);
+                }
+            }
+        }
+    }
+
+    fn composed_columns_sweep(source: &str, args_seed: u64, mode: &str) {
+        let marks = source
+            .char_indices()
+            .filter(|(offset, character)| {
+                character.is_alphabetic() && !source[..*offset].ends_with(char::is_alphabetic)
+            })
+            .enumerate()
+            .map(|(order, (offset, _))| mark_command(offset as u32, order as u32))
+            .collect();
+        let first_pieces = build(source, marks).unwrap();
+        let (intermediate, first_layer) = render_decoded(source, &first_pieces, mode);
+
+        let mut seed = args_seed;
+        let mut checked = 0;
+        for case in 0..600 {
+            // Two edited phases on top of the marking phase, so the invariant is
+            // checked against an accumulated map rather than a single composition.
+            let mut layers = vec![first_layer.clone()];
+            let mut current = intermediate.clone();
+            for phase in 0..3 {
+                let edits = (0..1 + sweep_random(&mut seed, 3) as u32)
+                    .map(|order| sweep_edit(&mut seed, &current, order))
+                    .collect();
+                // Overlapping or conflicting edits are rejected by construction; the
+                // sweep is only interested in the ones that render.
+                let Ok(pieces) = build(&current, edits) else {
+                    continue;
+                };
+                checked += 1;
+                let (code, layer) = render_decoded(&current, &pieces, mode);
+                // The two sinks must describe one layer identically: only the decoded
+                // one can revisit a segment it already emitted, so a rule that rewrites
+                // one has to leave the encoded form alone.
+                let (_, direct, _) = render(&current, &pieces, mode);
+                let (own, _) = compose_layer_chain(&[layer.as_slice()]).unwrap();
+                assert_eq!(own, direct, "case {case} phase {phase}: {mode} sink parity");
+                current = code;
+                layers.push(layer);
+                let slices: Vec<&[u8]> = layers.iter().map(Vec::as_slice).collect();
+                let (mappings, _) = compose_layer_chain(&slices).unwrap();
+                // Every original position must at least name a line the source has.
+                // The column can still overshoot that line: an identity span
+                // interpolates until an explicit boundary, and the packed layer format
+                // carries no input line extent to stop it at. Bounding that needs the
+                // explicit mapping runs the rearchitecture plan describes.
+                let source_lines = source.split('\n').count() as u32;
+                for segment in decode(&mappings).iter().flatten() {
+                    assert!(
+                        segment.original_line < source_lines,
+                        "case {case} phase {phase} ({mode}): original line {} of {source_lines}\nmappings {mappings}",
+                        segment.original_line,
+                    );
+                }
+                let lines: Vec<&str> = current.split('\n').collect();
+                for (index, columns) in decoded_generated_columns(&mappings).iter().enumerate() {
+                    let length = lines.get(index).map_or(0, |line| {
+                        line.chars().map(char::len_utf16).sum::<usize>() as u32
+                    });
+                    for column in columns {
+                        assert!(
+                            *column <= length,
+                            "case {case} phase {phase} ({mode}): column {column} on line {index} of length {length}\ncode {current:?}\npieces {pieces:?}\nmappings {mappings}"
+                        );
+                    }
+                }
+            }
+        }
+        assert!(checked > 600, "only {checked} phases rendered");
+    }
+
+    /// Mark every identifier start, then remove `range`, and report the composed
+    /// mapping alongside the code it describes.
+    fn removal_case(source: &str, range: std::ops::Range<usize>) -> (String, Vec<Vec<u32>>) {
+        let marks = source
+            .char_indices()
+            .filter(|(offset, character)| {
+                character.is_alphabetic() && !source[..*offset].ends_with(char::is_alphabetic)
+            })
+            .enumerate()
+            .map(|(order, (offset, _))| mark_command(offset as u32, order as u32))
+            .collect();
+        let first_pieces = build(source, marks).unwrap();
+        let (intermediate, first_layer) = render_decoded(source, &first_pieces, "boundary");
+        assert_eq!(intermediate, source, "the marking phase must not edit code");
+        let second_pieces = build(
+            source,
+            vec![EditCommand {
+                kind: EditKind::Remove,
+                start: range.start as u32,
+                end: range.end as u32,
+                content: None,
+                parts: Vec::new(),
+                destination: None,
+                mapping: None,
+                order: Some(0),
+                names: None,
+            }],
+        )
+        .unwrap();
+        let (code, second_layer) = render_decoded(source, &second_pieces, "boundary");
+        let (mappings, _) =
+            compose_layer_chain(&[first_layer.as_slice(), second_layer.as_slice()]).unwrap();
+        (code, decoded_generated_columns(&mappings))
+    }
+
+    #[test]
+    fn a_removal_closes_the_identity_span_it_interrupts() {
+        // An earlier phase leaves explicit boundaries across a line; a later phase
+        // removes a range covering some of them. Composition projects earlier
+        // boundaries through identity spans, so the removal has to end the span it
+        // interrupts. Otherwise the removed range's boundaries land on generated
+        // columns the output no longer has, and a reverse lookup resolves to a source
+        // position that was deleted.
+        //
+        // Every shape of removal has to close it, including the ones with no later
+        // piece to carry the boundary.
+        let source = "const kept = 1; const dropped = 2;\nconst second = 3;\nconst third = 4;\n";
+        let line_end = source.find('\n').unwrap();
+        let last_line = source.rfind("const third").unwrap();
+        for (description, range) in [
+            ("a line tail, with the newline retained", 15..line_end),
+            ("a line tail through its newline", 15..line_end + 1),
+            ("the middle of a line", 6..15),
+            ("a whole final line", last_line..source.len()),
+            ("the middle of a line through EOF", 15..source.len()),
+            ("a retained prefix through EOF", 5..source.len()),
+            ("everything after the first character", 1..source.len()),
+        ] {
+            let (code, columns) = removal_case(source, range.clone());
+            for (index, line) in code.split('\n').enumerate() {
+                let length = line.chars().map(char::len_utf16).sum::<usize>() as u32;
+                let mapped = columns.get(index).map_or(&[][..], Vec::as_slice);
+                assert!(
+                    mapped.iter().all(|column| *column <= length),
+                    "removing {description} ({range:?}) mapped {mapped:?} on line {index} of length {length}\ncode {code:?}"
+                );
+            }
+            // The retained prefix still traces to where it came from.
+            if range.start > 6 {
+                assert!(
+                    columns[0].contains(&6),
+                    "removing {description} lost the boundary at column 6: {:?}",
+                    columns[0]
+                );
+            }
+        }
+    }
+
+    /// Mapped `(generated column, original column)` pairs on the first generated line.
+    fn removal_points(source: &str, range: std::ops::Range<usize>) -> (String, Vec<(u32, u32)>) {
+        let marks = source
+            .char_indices()
+            .filter(|(offset, character)| {
+                character.is_alphabetic() && !source[..*offset].ends_with(char::is_alphabetic)
+            })
+            .enumerate()
+            .map(|(order, (offset, _))| mark_command(offset as u32, order as u32))
+            .collect();
+        let first_pieces = build(source, marks).unwrap();
+        let (_, first_layer) = render_decoded(source, &first_pieces, "boundary");
+        let second_pieces = build(
+            source,
+            vec![EditCommand {
+                kind: EditKind::Remove,
+                start: range.start as u32,
+                end: range.end as u32,
+                content: None,
+                parts: Vec::new(),
+                destination: None,
+                mapping: None,
+                order: Some(0),
+                names: None,
+            }],
+        )
+        .unwrap();
+        let (code, second_layer) = render_decoded(source, &second_pieces, "boundary");
+        let (mappings, _) =
+            compose_layer_chain(&[first_layer.as_slice(), second_layer.as_slice()]).unwrap();
+        let points = decode(&mappings)
+            .first()
+            .map(|line| {
+                line.iter()
+                    .map(|segment| (segment.generated_column, segment.original_column))
+                    .collect()
+            })
+            .unwrap_or_default();
+        (code, points)
+    }
+
+    #[test]
+    fn an_empty_replacement_maps_like_a_removal_whatever_its_policy() {
+        // A replacement whose text is empty removes source and generates nothing, so
+        // every policy has to describe it the same way. Anchoring it would pin the
+        // source that follows to the start of the range that was deleted.
+        let source = "const kept = 1; const gone = 2; const after = 3;\n";
+        let start = source.find(" const gone").unwrap() as u32;
+        let end = source.find(" const after").unwrap() as u32;
+        let removal = |mapping: Option<MappingPolicy>, kind: EditKind| {
+            let pieces = build(
+                source,
+                vec![EditCommand {
+                    kind,
+                    start,
+                    end,
+                    content: Some(String::new()),
+                    parts: Vec::new(),
+                    destination: None,
+                    mapping,
+                    order: Some(0),
+                    names: None,
+                }],
+            )
+            .unwrap();
+            // Compare the packed layer rather than the encoded mappings: the final VLQ
+            // strips span behaviour, so an identity span degraded to a plain boundary
+            // would look identical there and only diverge once composed through.
+            render_decoded(source, &pieces, "boundary").1
+        };
+        let expected = removal(None, EditKind::Remove);
+        for policy in [
+            MappingPolicy::Sourceless,
+            MappingPolicy::AnchorStart,
+            MappingPolicy::AnchorBoundaries,
+            MappingPolicy::Identity,
+        ] {
+            assert_eq!(
+                removal(Some(policy), EditKind::Replace),
+                expected,
+                "{policy:?} described an empty replacement differently from a removal"
+            );
+        }
+    }
+
+    #[test]
+    fn a_removal_at_end_of_output_closes_the_same_span_as_one_followed_by_source() {
+        // Both removals drop the same range. One keeps the following newline, so a later
+        // original piece carries the resumption; the other reaches EOF with nothing
+        // after it. Closing the span cannot depend on that: neither may leave a mapping
+        // that traces into the range it deleted.
+        let source = "const kept = 1; const dropped = 2;\n";
+        let removed = source.find(" const dropped").unwrap() as u32;
+        let (followed_code, followed) = removal_points(source, removed as usize..source.len() - 1);
+        let (eof_code, eof) = removal_points(source, removed as usize..source.len());
+        assert_eq!(followed_code, "const kept = 1;\n");
+        assert_eq!(eof_code, "const kept = 1;");
+        // The retained prefix traces identically either way.
+        let retained = |points: &[(u32, u32)]| -> Vec<(u32, u32)> {
+            points
+                .iter()
+                .copied()
+                .filter(|(generated, _)| *generated < removed)
+                .collect()
+        };
+        assert_eq!(retained(&followed), retained(&eof));
+        assert!(retained(&eof).contains(&(6, 6)));
+        // Nothing maps into the interior of the deleted range. The resumption may name
+        // the position just past it: that is where the retained text resumes.
+        for (case, points, end) in [
+            ("followed", &followed, source.len() as u32 - 1),
+            ("eof", &eof, source.len() as u32),
+        ] {
+            assert!(
+                points
+                    .iter()
+                    .all(|(_, original)| *original <= removed || *original >= end),
+                "{case}: {points:?} traces into the removed range {removed}..{end}"
+            );
+        }
+    }
+
+    #[test]
+    fn line_mode_stays_line_granular_over_a_token_detailed_layer() {
+        // Native codegen layers carry one segment per printed token whatever mode the
+        // caller asked for, so `line` mode must not describe its copies as identity
+        // spans: composition would project every codegen token into the output.
+        let source = "const alpha = 1; const beta = 2;";
+        let codegen = pack_decoded_layer(
+            &[
+                0, 0, 0, 0, 0, 0, 6, 0, 6, 0, 0, 14, 0, 14, 0, 0, 17, 0, 17, 0, 0, 23, 0, 23, 0, 0,
+                30, 0, 30, 0,
+            ],
+            &[] as &[String],
+            0,
+        );
+        let pieces = build(source, vec![mark_command(6, 0)]).unwrap();
+        for (mode, expected) in [
+            // The line start, plus the explicit location the phase asked for.
+            ("line", vec![0, 6]),
+            ("boundary", vec![0, 5, 6, 14, 17, 23, 30, 31]),
+        ] {
+            let (_, layer) = render_decoded(source, &pieces, mode);
+            let (mappings, _) =
+                compose_layer_chain(&[codegen.as_slice(), layer.as_slice()]).unwrap();
+            assert_eq!(
+                decoded_generated_columns(&mappings)[0],
+                expected,
+                "mode {mode}"
+            );
+        }
     }
 
     #[test]

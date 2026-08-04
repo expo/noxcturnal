@@ -18,6 +18,16 @@ pub(crate) fn encode(mut value: i64, output: &mut String) {
     }
 }
 
+pub(crate) fn encoded_len(value: i64) -> usize {
+    let mut encoded = (value.unsigned_abs() << 1) | u64::from(value < 0);
+    let mut len = 1;
+    while encoded >= 32 {
+        encoded >>= 5;
+        len += 1;
+    }
+    len
+}
+
 pub(crate) fn decode(bytes: &[u8], cursor: &mut usize) -> Option<i64> {
     let mut value = 0i64;
     let mut shift = 0;
@@ -56,6 +66,7 @@ mod tests {
         for value in [i32::MIN as i64, -123_456, -1, 0, 1, 31, 32, 123_456] {
             let mut encoded = String::new();
             encode(value, &mut encoded);
+            assert_eq!(encoded.len(), encoded_len(value));
             let mut cursor = 0;
             assert_eq!(decode(encoded.as_bytes(), &mut cursor), Some(value));
             assert_eq!(cursor, encoded.len());

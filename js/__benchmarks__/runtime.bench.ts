@@ -656,30 +656,34 @@ verifiedBench('three-phase reparse transform', () => {
   benchmarkTransform(source, 'benchmark.js', threePhasePipeline);
 });
 
+function changedPhases(count: number, printed: boolean) {
+  return Array.from({ length: count }, (_, index) => ({
+    name: `changed-${index}`,
+    requiresPrintedInput: printed,
+    plugins: [
+      defineNativePlugin({
+        name: `changed-plugin-${index}`,
+        editEffect: 'text-only',
+        visitors: [
+          defineVisitor(
+            'Identifier',
+            {
+              fields: ['name'],
+              where: { name: { oneOf: [`source${index}`] } },
+            },
+            path => {
+              path.replaceWith(`renamed${index}`);
+            },
+          ),
+        ],
+      }),
+    ],
+  }));
+}
+
 function changedPhasePipeline(count: number, printed: boolean) {
   return defineNativePipeline({
-    phases: Array.from({ length: count }, (_, index) => ({
-      name: `changed-${index}`,
-      requiresPrintedInput: printed,
-      plugins: [
-        defineNativePlugin({
-          name: `changed-plugin-${index}`,
-          editEffect: 'text-only',
-          visitors: [
-            defineVisitor(
-              'Identifier',
-              {
-                fields: ['name'],
-                where: { name: { oneOf: [`source${index}`] } },
-              },
-              path => {
-                path.replaceWith(`renamed${index}`);
-              },
-            ),
-          ],
-        }),
-      ],
-    })),
+    phases: changedPhases(count, printed),
   });
 }
 
@@ -1177,6 +1181,59 @@ for (const phaseCount of [8, 32]) {
     benchmarkTransform(source, 'map-chain.js', pipeline, {
       sourceMapMode: 'boundary',
     });
+  });
+  verifiedBench(`line source-map phase-chain scaling: ${phaseCount}`, () => {
+    benchmarkTransform(source, 'map-chain.js', pipeline, {
+      sourceMapMode: 'line',
+    });
+  });
+}
+
+const denseBoundarySource = `const values=[${Array.from({ length: 2_000 }, (_, index) => `source${index}`).join(',')}];`;
+const denseBoundaryPipeline = defineNativePipeline({
+  phases: [
+    {
+      name: 'dense-boundaries',
+      plugins: [
+        defineNativePlugin({
+          name: 'mark-dense-boundaries',
+          pre(context) {
+            for (
+              let offset = denseBoundarySource.indexOf('[') + 1;
+              offset < denseBoundarySource.length;
+              offset++
+            ) {
+              if (
+                denseBoundarySource.charCodeAt(offset) >= 48 &&
+                denseBoundarySource.charCodeAt(offset) <= 57
+              )
+                context.editor.addSourceMapLocation(offset);
+            }
+          },
+        }),
+      ],
+    },
+    ...changedPhases(8, false),
+  ],
+});
+verifiedBench('dense single-line boundaries through 8 sparse phases', () => {
+  benchmarkTransform(denseBoundarySource, 'dense-map-chain.js', denseBoundaryPipeline, {
+    sourceMapMode: 'boundary',
+  });
+});
+
+const unicodeMapChainSource = Array.from(
+  { length: 500 },
+  (_, index) => `const café${index} = source${index} + '😀';`,
+).join('\n');
+for (const phaseCount of [8, 32]) {
+  verifiedBench(`multiline Unicode boundary phase-chain scaling: ${phaseCount}`, () => {
+    benchmarkTransform(
+      unicodeMapChainSource,
+      'unicode-map-chain.js',
+      changedPhasePipeline(phaseCount, false),
+      { sourceMapMode: 'boundary' },
+    );
   });
 }
 

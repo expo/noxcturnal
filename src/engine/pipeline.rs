@@ -1,7 +1,7 @@
 use napi::{Error, Result, Status, bindgen_prelude::Buffer};
 use napi_derive::napi;
 
-use crate::edit::commit::commit_decoded_buffer_preserving;
+use crate::edit::commit::commit_decoded_buffer;
 use crate::event_types::NativeVlqMap;
 use crate::preflight::transform::transform_resident as preflight_transform;
 use crate::preflight::{NativePreflightOptions, NativePreflightResult};
@@ -125,13 +125,8 @@ impl NativePipelineSession {
             .current
             .as_deref()
             .ok_or_else(|| incomplete("pipeline source already consumed"))?;
-        let commit = commit_decoded_buffer_preserving(
-            source,
-            &self.filename,
-            &data,
-            source_map_mode.as_deref(),
-            self.layers.last().map(Vec::as_slice),
-        )?;
+        let commit =
+            commit_decoded_buffer(source, &self.filename, &data, source_map_mode.as_deref())?;
         let code_changed = commit.code_changed;
         let map_changed = commit.map_changed;
         let layer = commit.map.to_vec();

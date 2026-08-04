@@ -136,6 +136,15 @@ export interface PluginContext {
   readonly editor: NativeEditor;
 }
 
+/**
+ * Edits to the current phase's source.
+ *
+ * Replacing a range (`update`, `overwrite`, `replace`, `replaceAll`) maps the new text
+ * to the start of the range it replaced. Inserting text (`append*`, `prepend*`) leaves
+ * it unmapped, because it replaces nothing. Pass `sourceless` to `overwrite` for a
+ * range replacement whose text has no counterpart in the input, such as a module
+ * rewritten into a generated proxy.
+ */
 export interface NativeEditor {
   append(content: string): void;
   prepend(content: string): void;
@@ -144,6 +153,7 @@ export interface NativeEditor {
   appendRight(offset: number, content: string): void;
   prependRight(offset: number, content: string): void;
   update(start: number, end: number, content: string): void;
+  /** Replace a range, choosing how the new text maps. Defaults to `anchor-start`. */
   overwrite(start: number, end: number, content: string, mapping?: CodeFragment['mapping']): void;
   remove(start: number, end: number): void;
   move(start: number, end: number, destination: number): void;

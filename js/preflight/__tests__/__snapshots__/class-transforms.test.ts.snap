@@ -5,7 +5,7 @@ exports[`every public native transform has an explicit ownership fixture 1`] = `
   "code": "var value=1;",
   "helpers": [],
   "map": {
-    "mappings": "AAAA,IAAI,MAAQ;",
+    "mappings": "AAAA,IAAI,MAAQ",
     "names": [],
   },
   "name": "blockScoping",
@@ -21,7 +21,7 @@ exports[`every public native transform has an explicit ownership fixture 2`] = `
   "code": "let Value=(()=>{"use strict";const Value=function Value(){if(!new.target)throw new TypeError(\`Cannot call a class as a function\`)};Object.defineProperty(Value,"prototype",{writable:false});return Value})();",
   "helpers": [],
   "map": {
-    "mappings": "AAAA,IAAM,WAAN,iHAAa,GAAbA,uDAAa,GAAb,YAAa;",
+    "mappings": "AAAA,IAAM,WAAN,iHAAa,GAAbA,uDAAa,GAAb,YAAa",
     "names": [
       "class Value {}",
     ],
@@ -39,7 +39,7 @@ exports[`every public native transform has an explicit ownership fixture 3`] = `
   "code": "function _decorate(e,t,r,n){var o=arguments.length,a=o<3?t:n===null?n=Object.getOwnPropertyDescriptor(t,r):n,l;for(var c=e.length-1;c>=0;c--)if(l=e[c])a=(o<3?l(a):o>3?l(t,r,a):l(t,r))||a;return o>3&&a&&Object.defineProperty(t,r,a),a}let Value=class Value{};Value=_decorate([sealed],Value);",
   "helpers": [],
   "map": {
-    "mappings": "yOAAA,IAAc,MAAd,MAAc,KAAM,CAAC,EAApB,MAAA,UAAA,CAAA,MAAA,EAAA,KAAA;;",
+    "mappings": "yOAAA,IAAc,MAAd,MAAc,KAAM,CAAC,EAApB,MAAA,UAAA,CAAA,MAAA,EAAA,KAAA",
     "names": [],
   },
   "name": "legacyDecorators",
@@ -57,7 +57,7 @@ exports[`every public native transform has an explicit ownership fixture 4`] = `
     "objectDestructuringEmpty",
   ],
   "map": {
-    "mappings": "2NAAA,IAAIA,KAAY,MAAZA,mCAAgB,EAAd,MAAFA;",
+    "mappings": "2NAAA,IAAIA,KAAY,MAAZA,mCAAgB,EAAd,MAAFA",
     "names": [
       "{ value } = input",
     ],
@@ -75,7 +75,7 @@ exports[`every public native transform has an explicit ownership fixture 5`] = `
   "code": "function read(){let value=arguments.length>0&&arguments[0]!==void 0?arguments[0]:1;return value}",
   "helpers": [],
   "map": {
-    "mappings": "AAAA,SAAS,MAAgB,KAAX,MAAWA,uDAAH,EAAK,OAAO,KAAO;",
+    "mappings": "AAAA,SAAS,MAAgB,KAAX,MAAWA,uDAAH,EAAK,OAAO,KAAO",
     "names": [
       "{ return value; }",
     ],
@@ -93,7 +93,7 @@ exports[`every public native transform has an explicit ownership fixture 6`] = `
   "code": "{var _iteratorNormalCompletion=true,_didIteratorError=false,_iteratorError,_iteratorReturnMethod,_iteratorReturn;try{for(var _iterator=values[Symbol.iterator](),_iteratorNext=_iterator.next,_step;_step=_iteratorNext.call(_iterator),!_step.done;_iteratorNormalCompletion=true){if(Object(_step)!==_step)throw new TypeError(\`Iterator result is not an object\`);_iteratorNormalCompletion=false;var value=_step.value;consume(value)}}catch(_iteratorError2){_didIteratorError=true;_iteratorError=_iteratorError2}finally{try{if(!_iteratorNormalCompletion&&(_iteratorReturnMethod=_iterator.return)!=null){_iteratorReturn=_iteratorReturnMethod.call(_iterator);if(Object(_iteratorReturn)!==_iteratorReturn)throw new TypeError(\`Iterator result is not an object\`)}}finally{if(_didIteratorError)throw _iteratorError}}}",
   "helpers": [],
   "map": {
-    "mappings": "AAAA,uIAAkB,OAAlBA,gBAAC,CAAD,sOAAK,IAAI,MAATA,YAA0B,QAAQ,KAAK,CAAvC,yXAAwC;",
+    "mappings": "AAAA,uIAAkB,OAAlBA,gBAAC,CAAD,sOAAK,IAAI,MAATA,YAA0B,QAAQ,KAAK,CAAvC,yXAAwC",
     "names": [
       "f",
     ],
@@ -113,7 +113,7 @@ exports[`every public native transform has an explicit ownership fixture 7`] = `
     "usingCtx",
   ],
   "map": {
-    "mappings": "yFAAA,IAAM,kBAAQ,QAAQ;",
+    "mappings": "yFAAA,IAAM,kBAAQ,QAAQ",
     "names": [],
   },
   "name": "explicitResourceManagement",
@@ -129,7 +129,7 @@ exports[`every public native transform has an explicit ownership fixture 8`] = `
   "code": "class Value{static#_=this.value=1}",
   "helpers": [],
   "map": {
-    "mappings": "AAAA,MAAM,KAAM,CAAE,SAAS,KAAK,MAAQ,CAAK;",
+    "mappings": "AAAA,MAAM,KAAM,CAAE,SAAS,KAAK,MAAQ,CAAK",
     "names": [],
   },
   "name": "classStaticBlock",
@@ -145,7 +145,7 @@ exports[`every public native transform has an explicit ownership fixture 9`] = `
   "code": "class Value{constructor(){this.field=1}}",
   "helpers": [],
   "map": {
-    "mappings": "AAAA,MAAM,KAAM,eAAE,WAAQ,EAAG;",
+    "mappings": "AAAA,MAAM,KAAM,eAAE,WAAQ,EAAG",
     "names": [],
   },
   "name": "classProperties",
@@ -163,7 +163,7 @@ exports[`every public native transform has an explicit ownership fixture 10`] = 
   "code": "value||(value=1);",
   "helpers": [],
   "map": {
-    "mappings": "AAAA,cAAU;",
+    "mappings": "AAAA,cAAU",
     "names": [],
   },
   "name": "logicalAssignmentOperators",
@@ -179,7 +179,7 @@ exports[`every public native transform has an explicit ownership fixture 11`] = 
   "code": "var _value;(_value=value)===null||_value===void 0?void 0:_value.field;",
   "helpers": [],
   "map": {
-    "mappings": "mBAAA,6CAAO;",
+    "mappings": "mBAAA,6CAAO",
     "names": [],
   },
   "name": "optionalChaining",
@@ -197,7 +197,7 @@ exports[`every public native transform has an explicit ownership fixture 12`] = 
   "code": "var _value;(_value=value)!==null&&_value!==void 0?_value:fallback;",
   "helpers": [],
   "map": {
-    "mappings": "mBAAA,sCAAS;",
+    "mappings": "mBAAA,sCAAS",
     "names": [],
   },
   "name": "nullishCoalescingOperator",
@@ -215,7 +215,7 @@ exports[`every public native transform has an explicit ownership fixture 13`] = 
   "code": "import*as _value from"pkg";export{_value as value};",
   "helpers": [],
   "map": {
-    "mappings": "qBAAuB,MAAvB,iBAAY;",
+    "mappings": "qBAAuB,MAAvB,iBAAY",
     "names": [],
   },
   "name": "exportNamespaceFrom",
@@ -231,7 +231,7 @@ exports[`every public native transform has an explicit ownership fixture 14`] = 
   "code": "try{}catch(_unused){}",
   "helpers": [],
   "map": {
-    "mappings": "AAAA,GAAI,CAAC,eAAQ,CAAC;",
+    "mappings": "AAAA,GAAI,CAAC,eAAQ,CAAC",
     "names": [],
   },
   "name": "optionalCatchBinding",
@@ -247,7 +247,7 @@ exports[`every public native transform has an explicit ownership fixture 15`] = 
   "code": "var value=Object.assign({},input);",
   "helpers": [],
   "map": {
-    "mappings": "AAAA,IAAI,MAAQA,eAAW,EAAN,KAAM;",
+    "mappings": "AAAA,IAAI,MAAQA,eAAW,EAAN,KAAM",
     "names": [
       "{ ...input }",
     ],
@@ -270,7 +270,7 @@ exports[`every public native transform has an explicit ownership fixture 16`] = 
     "wrapAsyncGenerator",
   ],
   "map": {
-    "mappings": "6EAAA,SAAgB,wGAAS,CAAE,KAAM,EAAG;",
+    "mappings": "6EAAA,SAAgB,wGAAS,CAAE,KAAM,EAAG",
     "names": [],
   },
   "name": "asyncGeneratorFunctions",
@@ -288,7 +288,7 @@ exports[`every public native transform has an explicit ownership fixture 17`] = 
     "asyncToGenerator",
   ],
   "map": {
-    "mappings": "yEAAA,SAAe,kGAAQ,CAAE,MAAO,EAAG;",
+    "mappings": "yEAAA,SAAe,kGAAQ,CAAE,MAAO,EAAG",
     "names": [],
   },
   "name": "asyncFunctions",
@@ -304,7 +304,7 @@ exports[`every public native transform has an explicit ownership fixture 18`] = 
   "code": "var _value;_value=value,value=Math.pow(_value,2);",
   "helpers": [],
   "map": {
-    "mappings": "wBAAA,sBAAU;",
+    "mappings": "wBAAA,sBAAU",
     "names": [],
   },
   "name": "exponentiationOperator",
@@ -320,7 +320,7 @@ exports[`every public native transform has an explicit ownership fixture 19`] = 
   "code": "let Value=(()=>{"use strict";var _read=\`__private_Value_read\`;const Value=function Value(){if(!new.target)throw new TypeError(\`Cannot call a class as a function\`);Object.defineProperty(this,_read,{value:function(){if(new.target)throw new TypeError(\`Class methods cannot be invoked with 'new'\`)}})};Object.defineProperty(Value,"prototype",{writable:false});return Value})();",
   "helpers": [],
   "map": {
-    "mappings": "AAAA,IAAM,WAAN,kJAAyB,EAAXA,wCAAK,UAAG,CAAR,8EAAS,IAAE,EAAzBC,uDAAyB,GAAzB,YAAyB;",
+    "mappings": "AAAA,IAAM,WAAN,kJAAyB,EAAXA,wCAAK,UAAG,CAAR,8EAAS,IAAE,EAAzBC,uDAAyB,GAAzB,YAAyB",
     "names": [
       "#read() {}",
       "class Value { #read() {} }",
@@ -341,7 +341,7 @@ exports[`every public native transform has an explicit ownership fixture 20`] = 
     "checkInRHS",
   ],
   "map": {
-    "mappings": "+GAAA,IAAM,WAAN,oJAA6D,EAA/CA,6DAAM,EAAyC,EAA7DC,yEAAyB,SAAC,MAAO,CAAX,8EAAqC,EAAxB,OAAOC,iDAAU,KAAI,EAAdC,MAAc,CAAG,EAA3D,qCAA6D,GAA7DF,+BAA6D,GAA7DA,uDAA6D,GAA7D,YAA6D;",
+    "mappings": "+GAAA,IAAM,WAAN,oJAA6D,EAA/CA,6DAAM,EAAyC,EAA7DC,yEAAyB,SAAC,MAAO,CAAX,8EAAqC,EAAxB,OAAOC,iDAAU,KAAI,EAAdC,MAAc,CAAG,EAA3D,qCAA6D,GAA7DF,+BAA6D,GAA7DA,uDAA6D,GAA7D,YAA6D",
     "names": [
       "#field;",
       "class Value { #field; has(input) { return #field in input; } }",
@@ -362,7 +362,7 @@ exports[`every public native transform has an explicit ownership fixture 21`] = 
   "code": "var value=new RegExp(\`a\`,\`y\`);",
   "helpers": [],
   "map": {
-    "mappings": "AAAA,IAAI,MAAQ,kBAAG;",
+    "mappings": "AAAA,IAAI,MAAQ,kBAAG",
     "names": [],
   },
   "name": "regexpSticky",
@@ -378,7 +378,7 @@ exports[`every public native transform has an explicit ownership fixture 22`] = 
   "code": "var value=/(?:\\uD83D\\uDE00)/;",
   "helpers": [],
   "map": {
-    "mappings": "AAAA,IAAI,MAAQ;",
+    "mappings": "AAAA,IAAI,MAAQ",
     "names": [],
   },
   "name": "regexpUnicode",
@@ -394,7 +394,7 @@ exports[`every public native transform has an explicit ownership fixture 23`] = 
   "code": "var value=/[\\u0000-\\u007F]/u;",
   "helpers": [],
   "map": {
-    "mappings": "AAAA,IAAI,MAAQ;",
+    "mappings": "AAAA,IAAI,MAAQ",
     "names": [],
   },
   "name": "regexpUnicodePropertyEscapes",
@@ -410,7 +410,7 @@ exports[`every public native transform has an explicit ownership fixture 24`] = 
   "code": "var value=/a[^]b/;",
   "helpers": [],
   "map": {
-    "mappings": "AAAA,IAAI,MAAQ;",
+    "mappings": "AAAA,IAAI,MAAQ",
     "names": [],
   },
   "name": "regexpDotAll",
@@ -428,7 +428,7 @@ exports[`every public native transform has an explicit ownership fixture 25`] = 
     "wrapRegExp",
   ],
   "map": {
-    "mappings": "+GAAA,IAAI,MAAQA,4BAAY;",
+    "mappings": "+GAAA,IAAI,MAAQA,4BAAY",
     "names": [
       "/(?<value>a)/",
     ],
@@ -446,7 +446,7 @@ exports[`every public native transform has an explicit ownership fixture 26`] = 
   "code": "var value=/(?<=a)b/;",
   "helpers": [],
   "map": {
-    "mappings": "AAAA,IAAI,MAAQ;",
+    "mappings": "AAAA,IAAI,MAAQ",
     "names": [],
   },
   "name": "regexpLookBehind",
@@ -462,7 +462,7 @@ exports[`every public native transform has an explicit ownership fixture 27`] = 
   "code": "var value=/a/d;",
   "helpers": [],
   "map": {
-    "mappings": "AAAA,IAAI,MAAQ;",
+    "mappings": "AAAA,IAAI,MAAQ",
     "names": [],
   },
   "name": "regexpMatchIndices",
@@ -478,7 +478,7 @@ exports[`every public native transform has an explicit ownership fixture 28`] = 
   "code": "var value=/(?!)/u;",
   "helpers": [],
   "map": {
-    "mappings": "AAAA,IAAI,MAAQ;",
+    "mappings": "AAAA,IAAI,MAAQ",
     "names": [],
   },
   "name": "regexpUnicodeSets",
