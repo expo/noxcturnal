@@ -6,8 +6,7 @@
   "source": "./js/index.ts",
   "files": [
     "dist",
-    "README.md",
-    "FITMENT.md"
+    "README.md"
   ],
   "main": "./dist/noxcturnal.js",
   "module": "./dist/noxcturnal.mjs",
@@ -18,7 +17,8 @@
       "types": "./dist/noxcturnal.d.ts",
       "import": "./dist/noxcturnal.mjs",
       "require": "./dist/noxcturnal.js"
-    }
+    },
+    "./package.json": "./package.json"
   },
   "publishConfig": {
     "access": "public",
