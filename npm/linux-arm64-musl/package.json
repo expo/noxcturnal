@@ -17,8 +17,7 @@
   ],
   "main": "noxcturnal.linux-arm64-musl.node",
   "publishConfig": {
-    "access": "public",
-    "provenance": true
+    "access": "public"
   },
   "engines": {
     "node": ">=18"
