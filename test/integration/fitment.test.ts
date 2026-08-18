@@ -188,6 +188,70 @@ test('expresses Metro-style import/export lowering with semantic references and 
   assert.doesNotMatch(result.code, /\b(?:import|export)\s/);
 });
 
+test('feeds Metro-style default-export lowering the public class binding', () => {
+  const exportDefault = defineNativePlugin<{ local?: string }>({
+    name: 'metro-default-class-export-regression',
+    createState: () => ({}),
+    visitors: [
+      defineVisitor(
+        'ExportDefaultDeclaration',
+        {
+          fields: ['declaredName'],
+          children: {
+            declaration: { route: 'Declaration|Expression', fields: ['name'] },
+          },
+        },
+        (path, state) => {
+          const declaration = path.getChild('declaration');
+          assert.ok(declaration);
+          state.local =
+            typeof path.node.declaredName === 'string'
+              ? path.node.declaredName
+              : String(declaration.node.name);
+          path.remove();
+        },
+      ),
+    ],
+    post(context, state) {
+      assert.ok(state.local);
+      context.appendToProgram(`exports.default = ${state.local};`);
+    },
+  });
+  const result = transform(
+    `export default class DOMException extends Error {
+      #name;
+      constructor(message) { super(message); this.#name = 'Error'; }
+      get name() { return this.#name; }
+    }
+    DOMException.code = 1;`,
+    'fixture.js',
+    defineNativePipeline({
+      phases: [
+        {
+          name: 'classes',
+          native: {
+            helpers: { mode: 'inline' },
+            transforms: {
+              classes: true,
+              classProperties: { loose: true },
+              privateMethods: true,
+              privatePropertyInObject: true,
+            },
+          },
+        },
+        { name: 'exports', plugins: [exportDefault] },
+      ],
+    }),
+  );
+  assert.equal(result.status, 'complete');
+  assert.match(result.code, /exports\.default = DOMException/);
+  assert.doesNotMatch(result.code, /exports\.default = _DOMException/);
+
+  const exports: { default?: { code?: number } } = {};
+  new Function('exports', result.code)(exports);
+  assert.equal(exports.default?.code, 1);
+});
+
 type ActionState = { names: string[] };
 
 const serverActions = defineNativePlugin<ActionState>({

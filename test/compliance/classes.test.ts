@@ -1,5 +1,27 @@
 import { expect, test } from 'vitest';
-import { execute } from './runtime';
+import { execute, executeModule } from './runtime';
+
+test('a lowered named default class preserves its exported outer binding', async () => {
+  const module = await executeModule(
+    `export default class DOMException extends Error {
+      #name;
+      constructor(message) { super(message); this.#name = 'Error'; }
+      get name() { return this.#name; }
+    }
+    DOMException.code = 1;`,
+    {
+      transforms: {
+        classes: true,
+        classProperties: { loose: true },
+        privateMethods: true,
+        privatePropertyInObject: true,
+      },
+    },
+  );
+  const DOMException = module.default as { new (message: string): Error; code: number };
+  expect(DOMException.code).toBe(1);
+  expect(new DOMException('message').name).toBe('Error');
+});
 
 test('auto-accessors retain prototype descriptors and per-instance storage', () => {
   const result = execute<{ result: unknown[] }>(

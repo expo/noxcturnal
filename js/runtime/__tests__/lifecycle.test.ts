@@ -198,6 +198,62 @@ test('projects declared names from named default declarations', () => {
   assert.deepEqual(names, ['Value', 'createValue', undefined]);
 });
 
+test('projects the public binding of a lowered named default class', () => {
+  const observations: Array<{ declaredName: string | undefined; declarationName: string }> = [];
+  const plugin = defineNativePlugin({
+    name: 'lowered-default-declaration-name',
+    visitors: [
+      defineVisitor(
+        'ExportDefaultDeclaration',
+        {
+          fields: ['declaredName'],
+          children: {
+            declaration: { route: 'Declaration|Expression', fields: ['name', 'nodeKind'] },
+          },
+        },
+        path => {
+          observations.push({
+            declaredName: path.node.declaredName,
+            declarationName: String(path.getChild('declaration')?.node.name),
+          });
+        },
+      ),
+    ],
+  });
+  const result = transform(
+    `export default class DOMException extends Error {
+      #name;
+      constructor(message) { super(message); this.#name = 'Error'; }
+      get name() { return this.#name; }
+    }
+    DOMException.code = 1;`,
+    'fixture.js',
+    defineNativePipeline({
+      phases: [
+        {
+          name: 'lower',
+          native: {
+            transforms: {
+              classes: true,
+              classProperties: { loose: true },
+              privateMethods: true,
+              privatePropertyInObject: true,
+            },
+          },
+        },
+        { name: 'observe', plugins: [plugin] },
+      ],
+    }),
+  );
+  assert.equal(result.status, 'complete');
+  assert.deepEqual(observations, [
+    {
+      declaredName: undefined,
+      declarationName: 'DOMException',
+    },
+  ]);
+});
+
 test('matches static member chains without traversing child objects', () => {
   const matches: string[] = [];
   const plugin = defineNativePlugin({
