@@ -503,6 +503,9 @@ impl<'a> VisitMut<'a> for ClassAstLowerer<'a> {
                 };
                 let mut class = class.unbox();
                 let binding = class.id.take();
+                let exported_name = binding
+                    .as_ref()
+                    .map_or(plan.name.as_str(), |identifier| identifier.name.as_str());
                 self.visit_class(&mut class);
                 if self.error.is_some() {
                     return;
@@ -512,7 +515,7 @@ impl<'a> VisitMut<'a> for ClassAstLowerer<'a> {
                         declaration.declaration =
                             ExportDefaultDeclarationKind::from(ast.expression_identifier(
                                 class_span,
-                                self.allocator.alloc_str(&plan.name),
+                                self.allocator.alloc_str(&exported_name),
                             ));
                         statements[index] = Statement::VariableDeclaration(direct_class_variable(
                             // Preserve the export statement's start so comments
@@ -3963,6 +3966,40 @@ mod tests {
         let code = Codegen::new().build(&program).code;
         assert!(!code.contains("class Value"));
         assert!(code.contains("let Value"), "{code}");
+    }
+
+    #[test]
+    fn default_class_exports_the_preserved_outer_binding() {
+        let source = "export default class DOMException extends Error { #name; }";
+        let allocator = Allocator::default();
+        let parsed = Parser::new(
+            &allocator,
+            source,
+            SourceType::from_path(Path::new("x.js")).unwrap(),
+        )
+        .parse();
+        let mut program = parsed.program;
+        let semantic = SemanticBuilder::new()
+            .with_build_nodes(true)
+            .build(&program);
+        let mut plan = prepare_ast(
+            &semantic.semantic,
+            true,
+            Some(true),
+            false,
+            Some(true),
+            Some(true),
+            false,
+        )
+        .unwrap();
+        let class = plan.direct.values_mut().next().unwrap();
+        class.name = "_DOMException".to_owned();
+        let (changed, _) = run_ast(&allocator, &mut program, plan).unwrap();
+        assert!(changed);
+        let code = Codegen::new().build(&program).code;
+        assert!(code.contains("let DOMException"), "{code}");
+        assert!(code.contains("export default DOMException"), "{code}");
+        assert!(!code.contains("export default _DOMException"), "{code}");
     }
 
     #[test]
