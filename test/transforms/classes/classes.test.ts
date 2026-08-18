@@ -30,3 +30,23 @@ test('lowers classes', async () => {
       })();"
     `);
 });
+
+test('exports the outer binding of a lowered named default class', async () => {
+  const source = `export default class DOMException extends Error {
+    #name;
+    constructor(message) { super(message); this.#name = 'Error'; }
+    get name() { return this.#name; }
+  }
+  DOMException.code = 1;`;
+  const output = await transformSource(source, 'input.js', {
+    transforms: {
+      classes: true,
+      classProperties: { loose: true },
+      privateMethods: true,
+      privatePropertyInObject: true,
+    },
+  });
+  expect(output).toMatch(/(?:let|var) DOMException =/);
+  expect(output).toMatch(/export default DOMException;/);
+  expect(output).not.toMatch(/export default _DOMException;/);
+});
