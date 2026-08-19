@@ -73,6 +73,10 @@ jobs:
     name: Build native artifacts
     needs: plan
     if: needs.plan.outputs.mode == 'publish'
+    strategy:
+      fail-fast: false
+      matrix:
+        architecture: [aarch64, x86_64]
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     steps:
@@ -85,11 +89,14 @@ jobs:
       - uses: DeterminateSystems/magic-nix-cache-action@565684385bcd71bad329742eefe8d12f2e765b39 # v13
       - run: |
           test "$(uname -m)" = x86_64
-          nix build .#native-artifacts --out-link target/native-artifacts --print-build-logs
+          nix build ".#native-artifacts-${{ matrix.architecture }}" \
+            --out-link target/native-artifacts \
+            --log-lines 100 \
+            --max-jobs 1
           cp -R -L target/native-artifacts target/native-artifacts-upload
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: native-artifacts
+          name: native-artifacts-${{ matrix.architecture }}
           path: target/native-artifacts-upload/*
           if-no-files-found: error
           compression-level: 0
@@ -113,7 +120,8 @@ jobs:
           node-version: 22.23.1
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
-          name: native-artifacts
+          pattern: native-artifacts-*
+          merge-multiple: true
           path: artifacts
       - name: Load ${{ matrix.target }}
         run: node scripts/native.mjs smoke artifacts/${{ matrix.target }} ${{ matrix.target }}
@@ -133,7 +141,8 @@ jobs:
         run: test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
-          name: native-artifacts
+          pattern: native-artifacts-*
+          merge-multiple: true
           path: artifacts
       - name: Load ${{ matrix.target }} in pinned Alpine/Node image
         run: >-
@@ -157,7 +166,8 @@ jobs:
       - uses: DeterminateSystems/magic-nix-cache-action@565684385bcd71bad329742eefe8d12f2e765b39 # v13
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
-          name: native-artifacts
+          pattern: native-artifacts-*
+          merge-multiple: true
           path: artifacts
       - run: node scripts/native.mjs materialize --artifact-root artifacts
       - run: nix develop .#release --command pnpm install --offline --frozen-lockfile --ignore-scripts

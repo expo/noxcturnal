@@ -41,7 +41,7 @@ flow_parser = ["dep:hermes-flow", "hermes-flow/parser"]
 
 [dependencies]
 hermes-flow = { path = "crates/hermes-flow", optional = true }
-napi = { version = "3.4.0", default-features = false, features = ["napi8", "dyn-symbols"] }
+napi = { version = "3.4.0", default-features = false, features = ["napi8"] }
 napi-derive = "3.3.0"
 oxc_allocator = "=0.141.0"
 oxc_ast = "=0.141.0"

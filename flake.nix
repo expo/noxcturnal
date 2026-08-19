@@ -253,13 +253,29 @@
             let
               windowsSdk =
                 if target.rustTarget == "aarch64-pc-windows-msvc" then
-                  releaseSystem.pkgs.windows.sdk
+                  releaseSystem.pkgs.pkgsCross.aarch64-multiplatform.windows.sdk
                 else
                   releaseSystem.pkgs.pkgsCross.mingwW64.windows.sdk;
+              windowsRustArch = if target.rustTarget == "aarch64-pc-windows-msvc" then "aarch64" else "x86_64";
+              windowsSdkArch = if target.rustTarget == "aarch64-pc-windows-msvc" then "arm64" else "x64";
+              cargoXwinSdk = releaseSystem.pkgs.runCommand "noxcturnal-cargo-xwin-sdk-${windowsRustArch}" { } ''
+                mkdir -p "$out/xwin"
+                cp -R ${windowsSdk}/. "$out/xwin"
+                chmod -R u+w "$out/xwin"
+                test -d "$out/xwin/crt/lib/${windowsSdkArch}"
+                test -d "$out/xwin/sdk/lib/um/${windowsSdkArch}"
+                test -d "$out/xwin/sdk/lib/ucrt/${windowsSdkArch}"
+                ln -s ${windowsSdkArch} "$out/xwin/crt/lib/${windowsRustArch}"
+                ln -s ${windowsSdkArch} "$out/xwin/sdk/lib/um/${windowsRustArch}"
+                ln -s ${windowsSdkArch} "$out/xwin/sdk/lib/ucrt/${windowsRustArch}"
+                printf '%s\n' ${windowsRustArch} > "$out/xwin/DONE"
+              '';
               windowsEnvironment = nixpkgs.lib.optionalString (target.os == "win32") ''
                 export XWIN_CACHE_DIR="$TMPDIR/xwin-cache"
-                cp -R ${windowsSdk.src}/. "$XWIN_CACHE_DIR"
+                mkdir -p "$XWIN_CACHE_DIR"
+                cp -R ${cargoXwinSdk}/. "$XWIN_CACHE_DIR"
                 chmod -R u+w "$XWIN_CACHE_DIR"
+                export XWIN_ARCH=${windowsRustArch}
                 export XWIN_VERSION=17
               '';
               darwinEnvironment = nixpkgs.lib.optionalString (target.os == "darwin" && linuxAppleSdk != null) ''
@@ -310,11 +326,33 @@
               value = mkNative target;
             }) targetManifest
           );
-          nativeArtifacts = releaseSystem.pkgs.linkFarm "noxcturnal-native-artifacts" (
-            map (target: {
-              name = target.rustTarget;
-              path = nativePackages."native-${target.rustTarget}";
-            }) targetManifest
+          mkNativeArtifacts =
+            name: targets:
+            releaseSystem.pkgs.linkFarm name (
+              map (target: {
+                name = target.rustTarget;
+                path = nativePackages."native-${target.rustTarget}";
+              }) targets
+            );
+          nativeArtifacts = mkNativeArtifacts "noxcturnal-native-artifacts" targetManifest;
+          nativeArtifactShards = builtins.listToAttrs (
+            map
+              (
+                architecture:
+                let
+                  targets = builtins.filter (
+                    target: nixpkgs.lib.hasPrefix "${architecture}-" target.rustTarget
+                  ) targetManifest;
+                in
+                {
+                  name = "native-artifacts-${architecture}";
+                  value = mkNativeArtifacts "noxcturnal-native-artifacts-${architecture}" targets;
+                }
+              )
+              [
+                "aarch64"
+                "x86_64"
+              ]
           );
           outputsFile = releaseSystem.pkgs.writeText "noxcturnal-native-outputs.json" (
             builtins.toJSON (
@@ -337,7 +375,12 @@
           };
         in
         {
-          inherit nativeArtifacts nativePackages prepareReleaseProgram;
+          inherit
+            nativeArtifacts
+            nativeArtifactShards
+            nativePackages
+            prepareReleaseProgram
+            ;
         };
       releaseGraphs = nixpkgs.lib.genAttrs [ "aarch64-darwin" "x86_64-linux" ] mkRelease;
     in
@@ -356,6 +399,7 @@
             check = perSystem.${system}.verify;
             native-artifacts = release.nativeArtifacts;
           }
+          // release.nativeArtifactShards
           // release.nativePackages
         ) releaseGraphs;
       apps = nixpkgs.lib.mapAttrs (_: release: {
