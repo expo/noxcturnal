@@ -68,6 +68,11 @@ serde_json = "1.0.145"
 [build-dependencies]
 napi-build = "2.2.3"
 
+[dev-dependencies]
+# Rust tests are standalone executables rather than addons loaded by Node, so
+# they need to resolve the Node-API symbols dynamically at runtime.
+napi = { version = "3.4.0", default-features = false, features = ["dyn-symbols"] }
+
 # Keep the native boundary held to the same baseline quality checks as Oxc.
 [lints]
 workspace = true
