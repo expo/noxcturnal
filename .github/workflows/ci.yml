@@ -2,136 +2,24 @@ name: CI
 
 on:
   push:
+    branches:
+      - main
   pull_request:
-  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
 
 jobs:
   verify:
-    runs-on: macos-14
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10.12.1
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          components: clippy, rustfmt
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm build
-      - run: pnpm check
-      - run: pnpm benchmark
-      - run: git diff --check
-
-  native:
-    name: Native ${{ matrix.target }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - target: aarch64-apple-darwin
-            runner: macos-14
-            package: darwin-arm64
-          - target: x86_64-apple-darwin
-            runner: macos-15-intel
-            package: darwin-x64
-          - target: x86_64-unknown-linux-gnu
-            runner: ubuntu-24.04
-            package: linux-x64-gnu
-          - target: aarch64-unknown-linux-gnu
-            runner: ubuntu-24.04-arm
-            package: linux-arm64-gnu
-          - target: x86_64-unknown-linux-musl
-            runner: ubuntu-24.04
-            package: linux-x64-musl
-          - target: aarch64-unknown-linux-musl
-            runner: ubuntu-24.04-arm
-            package: linux-arm64-musl
-          - target: x86_64-pc-windows-msvc
-            runner: windows-2022
-            package: win32-x64-msvc
-          - target: aarch64-pc-windows-msvc
-            runner: windows-11-arm
-            package: win32-arm64-msvc
-    runs-on: ${{ matrix.runner }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10.12.1
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.target }}
-      - name: Install Ninja
-        shell: bash
-        run: |
-          if command -v ninja >/dev/null; then exit 0; fi
-          case "${{ runner.os }}" in
-            Linux) sudo apt-get update && sudo apt-get install -y ninja-build ;;
-            macOS) brew install ninja ;;
-            Windows) choco install ninja --no-progress -y ;;
-          esac
-      - name: Install Zig
-        if: endsWith(matrix.target, '-musl')
-        uses: mlugg/setup-zig@v2
-        with:
-          version: 0.14.1
-      - run: pnpm install --frozen-lockfile
-      - run: git submodule update --init --depth 1 crates/hermes-parser-sys/hermes
-      - name: Build native package
-        shell: bash
-        run: |
-          cross=''
-          case "${{ matrix.target }}" in *-musl) cross='--cross-compile' ;; esac
-          pnpm exec napi build --platform --release --target ${{ matrix.target }} $cross
-      - name: Stage platform binary
-        shell: bash
-        run: cp noxcturnal.*.node npm/${{ matrix.package }}/
-      - uses: actions/upload-artifact@v4
-        with:
-          name: noxcturnal-${{ matrix.package }}
-          path: npm/${{ matrix.package }}/*.node
-          if-no-files-found: error
-
-  # Correctness of the Flow path, separate from whether it builds everywhere.
-  # One runner is enough: the erasure rules are platform-independent.
-  flow-verify:
-    name: Flow erasure
+    name: verify
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10.12.1
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: clippy, rustfmt
-      - run: sudo apt-get update && sudo apt-get install -y ninja-build
-      - run: pnpm install --frozen-lockfile
-      - run: git submodule update --init --depth 1 crates/hermes-parser-sys/hermes
-      - run: pnpm codegen:estree:check
-      - run: cargo test -p hermes-parser-sys -p hermes-flow --features hermes-flow/parser
-      - run: cargo clippy -p hermes-parser-sys -p hermes-flow --all-targets --features hermes-flow/parser -- -D warnings
-      - run: pnpm exec napi build --platform --release
-      # These fixtures run on every ordinary test pass as well. This job repeats
-      # them against the parser-enabled native build used by the Rust checks.
-      - name: Verify Flow transform alignment
-        run: >-
-          pnpm exec vitest run
-          test/alignment/flow
-          js/adapters/__tests__/flow-erasure.test.ts
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: DeterminateSystems/determinate-nix-action@61cbfe2efc2d4e7a8a6d56967c3c1058e846c858 # v3.21.9
+      - uses: DeterminateSystems/magic-nix-cache-action@565684385bcd71bad329742eefe8d12f2e765b39 # v13
+      - run: nix build --no-link path:.#check --print-build-logs

@@ -3,6 +3,10 @@
   "version": "0.1.0",
   "description": "Native-backed JavaScript transform runtime with visitor ergonomics",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/expo/noxcturnal.git"
+  },
   "files": [
     "noxcturnal.darwin-x64.node"
   ],
@@ -15,6 +19,10 @@
   "main": "noxcturnal.darwin-x64.node",
   "publishConfig": {
     "access": "public"
+  },
+  "scripts": {
+    "prepack": "node ../../scripts/check-package.mjs --integrity --package darwin-x64",
+    "prepublishOnly": "node ../../scripts/release.mjs prepublish"
   },
   "engines": {
     "node": ">=18"

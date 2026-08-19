@@ -622,7 +622,8 @@ ${tsRouteFields}
 ${tsRoutePredicates}
 /** Statically declarable child roles per route (intersection across expansions). */
 ${tsChildRoles}`;
-const ts = execFileSync('pnpm', ['exec', 'oxfmt', '--stdin-filepath', 'event-schema.ts'], {
+const oxfmt = path.join(root, 'node_modules', '.bin', 'oxfmt');
+const ts = execFileSync(oxfmt, ['--stdin-filepath', 'event-schema.ts'], {
   cwd: root,
   encoding: 'utf8',
   input: unformattedTs,
@@ -686,11 +687,11 @@ export function ${predicateName(route)}<Node extends NodeTypeLike>(
   )
   .join('\n\n')}
 `;
-const predicatesTs = execFileSync(
-  'pnpm',
-  ['exec', 'oxfmt', '--stdin-filepath', 'node-predicates.ts'],
-  { cwd: root, encoding: 'utf8', input: unformattedPredicatesTs },
-);
+const predicatesTs = execFileSync(oxfmt, ['--stdin-filepath', 'node-predicates.ts'], {
+  cwd: root,
+  encoding: 'utf8',
+  input: unformattedPredicatesTs,
+});
 
 const outputs = [
   [path.join(root, 'src/generated/event_schema.rs'), formattedRust],

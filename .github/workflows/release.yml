@@ -4,136 +4,210 @@ on:
   push:
     branches:
       - main
-  workflow_dispatch:
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: release
   cancel-in-progress: false
 
-permissions: {}
+permissions:
+  contents: read
+
+env:
+  RELEASE_SHA: ${{ github.sha }}
 
 jobs:
-  check:
-    name: Check release state
+  plan:
+    name: Plan release
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
     outputs:
-      has_changesets: ${{ steps.changesets.outputs.has_changesets }}
-      version: ${{ steps.version.outputs.version }}
-      version_changed: ${{ steps.version.outputs.changed || 'false' }}
+      mode: ${{ steps.plan.outputs.mode }}
+      version: ${{ steps.plan.outputs.version }}
+      sha: ${{ steps.plan.outputs.sha }}
+      smoke_matrix: ${{ steps.plan.outputs.smokeMatrix }}
+      musl_smoke_matrix: ${{ steps.plan.outputs.muslSmokeMatrix }}
     steps:
-      - uses: actions/checkout@v4
-      - name: Check for pending changesets
-        id: changesets
-        shell: bash
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          fetch-depth: 0
+          ref: ${{ env.RELEASE_SHA }}
+      - name: Require the release commit to remain at main
         run: |
-          if find .changeset -maxdepth 1 -name '*.md' ! -name README.md | grep -q .; then
-            echo 'has_changesets=true' >> "$GITHUB_OUTPUT"
-          else
-            echo 'has_changesets=false' >> "$GITHUB_OUTPUT"
-          fi
-      - name: Check whether the package version is new
-        if: steps.changesets.outputs.has_changesets != 'true'
-        id: version
-        run: node scripts/check-release-version.mjs
+          git fetch --no-tags origin main
+          test "$(git rev-parse origin/main)" = "$RELEASE_SHA"
+          test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
+      - uses: DeterminateSystems/determinate-nix-action@61cbfe2efc2d4e7a8a6d56967c3c1058e846c858 # v3.21.9
+      - uses: DeterminateSystems/magic-nix-cache-action@565684385bcd71bad329742eefe8d12f2e765b39 # v13
+      - id: plan
+        env:
+          NOXCTURNAL_RELEASE_SHA: ${{ env.RELEASE_SHA }}
+        run: nix develop .#release --command node scripts/release.mjs plan
 
-  native:
-    name: Build ${{ matrix.target }}
-    needs: check
-    if: needs.check.outputs.has_changesets != 'true' && needs.check.outputs.version_changed == 'true'
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - target: aarch64-apple-darwin
-            runner: macos-14
-          - target: x86_64-apple-darwin
-            runner: macos-15-intel
-          - target: x86_64-unknown-linux-gnu
-            runner: ubuntu-24.04
-            build_args: --use-napi-cross
-          - target: aarch64-unknown-linux-gnu
-            runner: ubuntu-24.04-arm
-          - target: x86_64-unknown-linux-musl
-            runner: ubuntu-24.04
-            build_args: -x
-          - target: aarch64-unknown-linux-musl
-            runner: ubuntu-24.04-arm
-            build_args: -x
-          - target: x86_64-pc-windows-msvc
-            runner: windows-2022
-          - target: aarch64-pc-windows-msvc
-            runner: windows-11-arm
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10.12.1
-          run_install: false
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.target }}
-      - name: Setup Zig for musl
-        if: contains(matrix.target, 'musl')
-        uses: goto-bus-stop/setup-zig@v2
-        with:
-          version: 0.13.0
-      - run: pnpm install --frozen-lockfile --prefer-offline
-      - name: Build native binding
-        shell: bash
-        run: pnpm exec napi build --platform --release --target ${{ matrix.target }} ${{ matrix.build_args }}
-      - uses: actions/upload-artifact@v4
-        with:
-          name: binding-${{ matrix.target }}
-          path: noxcturnal.*.node
-          if-no-files-found: error
-
-  release:
-    name: Version or publish
-    needs:
-      - check
-      - native
-    if: always() && needs.check.result == 'success' && (needs.native.result == 'success' || needs.native.result == 'skipped') && (needs.check.outputs.has_changesets == 'true' || needs.check.outputs.version_changed == 'true')
+  version:
+    name: Create release pull request
+    needs: plan
+    if: needs.plan.outputs.mode == 'version'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
       contents: write
-      id-token: write
       pull-requests: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           fetch-depth: 0
-      - uses: pnpm/action-setup@v4
+          ref: ${{ needs.plan.outputs.sha }}
+      - name: Require release checkout
+        run: test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
+      - uses: DeterminateSystems/determinate-nix-action@61cbfe2efc2d4e7a8a6d56967c3c1058e846c858 # v3.21.9
+      - uses: DeterminateSystems/magic-nix-cache-action@565684385bcd71bad329742eefe8d12f2e765b39 # v13
+      - run: nix develop .#release --command pnpm install --offline --frozen-lockfile --ignore-scripts
+      - uses: changesets/action@a45c4d594aa4e2c509dc14a9f2b3b67ba3780d0d # v1.9.0
         with:
-          version: 10.12.1
-          run_install: false
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          registry-url: https://registry.npmjs.org
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile --prefer-offline
-      - run: npm install --global npm@11.6
-      - uses: actions/download-artifact@v4
-        if: needs.check.outputs.version_changed == 'true'
-        with:
-          pattern: binding-*
-          path: artifacts
-          merge-multiple: true
-      - name: Stage native packages
-        if: needs.check.outputs.version_changed == 'true'
-        run: node scripts/stage-native-artifacts.mjs
-      - name: Create release PR or publish packages
-        uses: changesets/action@v1
-        with:
-          version: pnpm changeset:version
-          publish: pnpm changeset:publish
+          version: nix develop .#release --command node scripts/release.mjs version
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NOXCTURNAL_RELEASE_SHA: ${{ needs.plan.outputs.sha }}
+
+  build:
+    name: Build native artifacts
+    needs: plan
+    if: needs.plan.outputs.mode == 'publish'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          ref: ${{ needs.plan.outputs.sha }}
+      - name: Require release checkout
+        run: test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
+      - uses: DeterminateSystems/determinate-nix-action@61cbfe2efc2d4e7a8a6d56967c3c1058e846c858 # v3.21.9
+      - uses: DeterminateSystems/magic-nix-cache-action@565684385bcd71bad329742eefe8d12f2e765b39 # v13
+      - run: |
+          test "$(uname -m)" = x86_64
+          nix build .#native-artifacts --out-link target/native-artifacts --print-build-logs
+          cp -R -L target/native-artifacts target/native-artifacts-upload
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: native-artifacts
+          path: target/native-artifacts-upload/*
+          if-no-files-found: error
+          compression-level: 0
+
+  smoke:
+    needs: [plan, build]
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.smoke_matrix) }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          ref: ${{ needs.plan.outputs.sha }}
+      - name: Require release checkout
+        shell: bash
+        run: test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: 22.23.1
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: native-artifacts
+          path: artifacts
+      - name: Load ${{ matrix.target }}
+        run: node scripts/native.mjs smoke artifacts/${{ matrix.target }} ${{ matrix.target }}
+
+  smoke-musl:
+    needs: [plan, build]
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.musl_smoke_matrix) }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          ref: ${{ needs.plan.outputs.sha }}
+      - name: Require release checkout
+        run: test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: native-artifacts
+          path: artifacts
+      - name: Load ${{ matrix.target }} in pinned Alpine/Node image
+        run: >-
+          docker run --rm --volume "$PWD:/work" --workdir /work
+          node@sha256:c610fcdfb1d5b4740dd70c284ed3cb16bb857e0f7166196e36a5501df7a3aa32
+          node scripts/native.mjs smoke
+          artifacts/${{ matrix.target }} ${{ matrix.target }}
+
+  validate:
+    name: Validate packages
+    needs: [plan, build, smoke, smoke-musl]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          ref: ${{ needs.plan.outputs.sha }}
+      - name: Require release checkout
+        run: test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
+      - uses: DeterminateSystems/determinate-nix-action@61cbfe2efc2d4e7a8a6d56967c3c1058e846c858 # v3.21.9
+      - uses: DeterminateSystems/magic-nix-cache-action@565684385bcd71bad329742eefe8d12f2e765b39 # v13
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: native-artifacts
+          path: artifacts
+      - run: node scripts/native.mjs materialize --artifact-root artifacts
+      - run: nix develop .#release --command pnpm install --offline --frozen-lockfile --ignore-scripts
+      - run: nix develop .#release --command pnpm package:check --release
+      - run: >-
+          nix develop .#release --command pnpm --recursive --include-workspace-root pack
+          --pack-destination target/npm-tarballs
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: validated-packages
+          path: |
+            npm/*/*.node
+            target/native-staging-manifest.json
+          if-no-files-found: error
+
+  publish:
+    name: Publish packages
+    needs: [plan, validate]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment:
+      name: npm
+      url: https://www.npmjs.com/package/noxcturnal
+    permissions:
+      contents: write
+      id-token: write
+    env:
+      # npm provenance cannot reference a private source repository. Trusted
+      # publishing still authenticates this job with short-lived OIDC credentials.
+      NPM_CONFIG_PROVENANCE: 'false'
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          fetch-depth: 0
+          ref: ${{ needs.plan.outputs.sha }}
+      - name: Require release checkout
+        run: test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
+      - uses: DeterminateSystems/determinate-nix-action@61cbfe2efc2d4e7a8a6d56967c3c1058e846c858 # v3.21.9
+      - uses: DeterminateSystems/magic-nix-cache-action@565684385bcd71bad329742eefe8d12f2e765b39 # v13
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: validated-packages
+      - run: nix develop .#release --command pnpm install --offline --frozen-lockfile --ignore-scripts
+      - run: nix develop .#release --command pnpm package:check --release
+      - uses: changesets/action@a45c4d594aa4e2c509dc14a9f2b3b67ba3780d0d # v1.9.0
+        with:
+          publish: nix develop .#release --command node scripts/release.mjs publish
+          createGithubReleases: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NOXCTURNAL_RELEASE: '1'
+          NOXCTURNAL_RELEASE_ENVIRONMENT: npm
+          NOXCTURNAL_RELEASE_SHA: ${{ needs.plan.outputs.sha }}

@@ -11,4 +11,5 @@ any package therefore versions all nine packages together so that optional nativ
 cannot drift from the JavaScript loader.
 
 On `main`, the release workflow maintains a version PR. Merging that PR builds every native target
-and publishes the complete workspace with npm provenance.
+and publishes the complete workspace through npm trusted publishing. Provenance remains disabled
+while the source repository is private.

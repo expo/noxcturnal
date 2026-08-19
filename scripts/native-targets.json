@@ -1,0 +1,90 @@
+[
+  {
+    "rustTarget": "aarch64-apple-darwin",
+    "packageName": "@noxcturnal/noxcturnal-darwin-arm64",
+    "workspace": "npm/darwin-arm64",
+    "binary": "noxcturnal.darwin-arm64.node",
+    "os": "darwin",
+    "cpu": "arm64",
+    "libc": null,
+    "toolchain": "apple-sdk",
+    "smokeRunner": "macos-15"
+  },
+  {
+    "rustTarget": "x86_64-apple-darwin",
+    "packageName": "@noxcturnal/noxcturnal-darwin-x64",
+    "workspace": "npm/darwin-x64",
+    "binary": "noxcturnal.darwin-x64.node",
+    "os": "darwin",
+    "cpu": "x64",
+    "libc": null,
+    "toolchain": "apple-sdk",
+    "smokeRunner": "macos-15-intel"
+  },
+  {
+    "rustTarget": "aarch64-unknown-linux-gnu",
+    "packageName": "@noxcturnal/noxcturnal-linux-arm64-gnu",
+    "workspace": "npm/linux-arm64-gnu",
+    "binary": "noxcturnal.linux-arm64-gnu.node",
+    "os": "linux",
+    "cpu": "arm64",
+    "libc": "glibc",
+    "toolchain": "zig-gnu",
+    "smokeRunner": "ubuntu-24.04-arm"
+  },
+  {
+    "rustTarget": "x86_64-unknown-linux-gnu",
+    "packageName": "@noxcturnal/noxcturnal-linux-x64-gnu",
+    "workspace": "npm/linux-x64-gnu",
+    "binary": "noxcturnal.linux-x64-gnu.node",
+    "os": "linux",
+    "cpu": "x64",
+    "libc": "glibc",
+    "toolchain": "zig-gnu",
+    "smokeRunner": "ubuntu-24.04"
+  },
+  {
+    "rustTarget": "aarch64-unknown-linux-musl",
+    "packageName": "@noxcturnal/noxcturnal-linux-arm64-musl",
+    "workspace": "npm/linux-arm64-musl",
+    "binary": "noxcturnal.linux-arm64-musl.node",
+    "os": "linux",
+    "cpu": "arm64",
+    "libc": "musl",
+    "toolchain": "zig-musl",
+    "smokeRunner": "ubuntu-24.04-arm"
+  },
+  {
+    "rustTarget": "x86_64-unknown-linux-musl",
+    "packageName": "@noxcturnal/noxcturnal-linux-x64-musl",
+    "workspace": "npm/linux-x64-musl",
+    "binary": "noxcturnal.linux-x64-musl.node",
+    "os": "linux",
+    "cpu": "x64",
+    "libc": "musl",
+    "toolchain": "zig-musl",
+    "smokeRunner": "ubuntu-24.04"
+  },
+  {
+    "rustTarget": "aarch64-pc-windows-msvc",
+    "packageName": "@noxcturnal/noxcturnal-win32-arm64-msvc",
+    "workspace": "npm/win32-arm64-msvc",
+    "binary": "noxcturnal.win32-arm64-msvc.node",
+    "os": "win32",
+    "cpu": "arm64",
+    "libc": null,
+    "toolchain": "llvm-msvc",
+    "smokeRunner": "windows-11-arm"
+  },
+  {
+    "rustTarget": "x86_64-pc-windows-msvc",
+    "packageName": "@noxcturnal/noxcturnal-win32-x64-msvc",
+    "workspace": "npm/win32-x64-msvc",
+    "binary": "noxcturnal.win32-x64-msvc.node",
+    "os": "win32",
+    "cpu": "x64",
+    "libc": null,
+    "toolchain": "llvm-msvc",
+    "smokeRunner": "windows-2022"
+  }
+]

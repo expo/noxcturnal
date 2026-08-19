@@ -21,6 +21,23 @@
         "type": "github"
       }
     },
+    "hermes": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1784576103,
+        "narHash": "sha256-OnELE8VDXuFTfVS2kYINKrVgtEgRcUX7CfU1ULqT9Lg=",
+        "owner": "facebook",
+        "repo": "hermes",
+        "rev": "73855a1475e016cec814d67578f860112ef711e1",
+        "type": "github"
+      },
+      "original": {
+        "owner": "facebook",
+        "repo": "hermes",
+        "rev": "73855a1475e016cec814d67578f860112ef711e1",
+        "type": "github"
+      }
+    },
     "nixpkgs": {
       "locked": {
         "lastModified": 1784497964,
@@ -40,6 +57,7 @@
     "root": {
       "inputs": {
         "fenix": "fenix",
+        "hermes": "hermes",
         "nixpkgs": "nixpkgs"
       }
     },

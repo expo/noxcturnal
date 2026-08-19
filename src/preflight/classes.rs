@@ -515,7 +515,7 @@ impl<'a> VisitMut<'a> for ClassAstLowerer<'a> {
                         declaration.declaration =
                             ExportDefaultDeclarationKind::from(ast.expression_identifier(
                                 class_span,
-                                self.allocator.alloc_str(&exported_name),
+                                self.allocator.alloc_str(exported_name),
                             ));
                         statements[index] = Statement::VariableDeclaration(direct_class_variable(
                             // Preserve the export statement's start so comments

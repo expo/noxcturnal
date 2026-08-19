@@ -3,6 +3,10 @@
   "version": "0.1.0",
   "description": "Native-backed JavaScript transform runtime with visitor ergonomics",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/expo/noxcturnal.git"
+  },
   "source": "./js/index.ts",
   "files": [
     "dist",
@@ -26,27 +30,28 @@
   "scripts": {
     "build": "pnpm build:native && pnpm build:js",
     "build:js": "rimraf dist && rollup -c scripts/rollup.config.mjs",
-    "build:native": "napi build --platform --release",
-    "build:native:all": "node scripts/build-native-artifacts.mjs",
-    "check": "pnpm codegen:check && pnpm check:types && pnpm format:check && pnpm lint && pnpm test && cargo test && pnpm package:check",
+    "build:native": "node scripts/native.mjs build",
+    "build:release": "node scripts/native.mjs build --release && pnpm build:js",
+    "check": "node scripts/check.mjs",
     "check:types": "tsc --noEmit && pnpm test:types",
     "codegen": "node scripts/sync-oxc-event-schema.mjs && node scripts/generate-event-schema.mjs && node scripts/generate-inline-helpers.mjs && node scripts/generate-regexp-unicode-properties.mjs",
-    "codegen:check": "node scripts/sync-oxc-event-schema.mjs --check && node scripts/generate-event-schema.mjs --check && node scripts/generate-inline-helpers.mjs --check && node scripts/generate-regexp-unicode-properties.mjs --check",
+    "codegen:check": "node scripts/sync-oxc-event-schema.mjs --check && node scripts/generate-event-schema.mjs --check && node scripts/generate-inline-helpers.mjs --check && node scripts/generate-regexp-unicode-properties.mjs --check && pnpm codegen:estree:check",
     "codegen:estree": "node scripts/generate-estree-schema.mjs",
     "codegen:estree:check": "node scripts/generate-estree-schema.mjs --check",
-    "test": "vitest run",
-    "test:coverage": "vitest run --coverage",
+    "test": "node scripts/native.mjs check && vitest run",
+    "test:watch": "node scripts/native.mjs check && vitest",
+    "test:coverage": "node scripts/native.mjs check && vitest run --coverage",
     "test:types": "vitest run --typecheck.only",
-    "benchmark": "vitest bench --run",
+    "benchmark": "node scripts/native.mjs check && vitest bench --run",
     "format": "oxfmt . && cargo fmt",
     "format:check": "oxfmt --check . && cargo fmt --check",
     "lint": "cargo clippy --all-targets -- -D warnings",
     "package:check": "node scripts/check-package.mjs",
-    "package:release-check": "pnpm package:check --release",
     "prepare": "node scripts/prepare.mjs",
-    "prepublishOnly": "pnpm build:js && pnpm package:release-check",
-    "changeset:version": "changeset version && pnpm install --lockfile-only",
-    "changeset:publish": "changeset publish"
+    "prepack": "pnpm build:js && node scripts/check-package.mjs --integrity",
+    "prepublishOnly": "node scripts/release.mjs prepublish",
+    "changeset": "changeset",
+    "release": "node scripts/release.mjs publish"
   },
   "dependencies": {
     "@babel/code-frame": "^7.20.0",
@@ -109,6 +114,7 @@
     "esbuild": "0.28.1",
     "hermes-parser": "0.36.0",
     "lint-staged": "^17.1.1",
+    "npm": "11.6.2",
     "oxfmt": "^0.60.0",
     "prettier": "^3.9.6",
     "regenerate-unicode-properties": "10.2.2",
@@ -148,6 +154,5 @@
   },
   "engines": {
     "node": ">=18"
-  },
-  "packageManager": "pnpm@10.12.1"
+  }
 }
