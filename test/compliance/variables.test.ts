@@ -13,6 +13,25 @@ test('block-scoped loop bindings are unique per iteration', () => {
   expect(result.result).toEqual([0, 1, 2]);
 });
 
+test.each([false, true])(
+  'iterable function locals stay separate from captured loop bindings (forOf: %s)',
+  forOf => {
+    const result = execute<{ result: unknown[] }>(
+      `
+        const callbacks = [];
+        const r = 'outer';
+        let calls = 0;
+        for (const t of (u => { calls++; const r = u; return r; })([1, 2, 3])) {
+          callbacks.push(() => t);
+        }
+        globalThis.result = [callbacks.map(read => read()), calls, r];
+      `,
+      { transforms: { blockScoping: true, forOf } },
+    );
+    expect(result.result).toEqual([[1, 2, 3], 1, 'outer']);
+  },
+);
+
 test('const assignment evaluates its right side before throwing without changing the binding', () => {
   const result = execute<{ result: unknown[] }>(
     `

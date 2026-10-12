@@ -21,6 +21,7 @@ use crate::preflight::helpers::CustomHelperRequests;
 
 struct CapturedLoop {
     node_id: NodeId,
+    body_node_id: NodeId,
     span: Span,
     body_span: Span,
     header_bindings: Vec<String>,
@@ -763,16 +764,16 @@ fn classify_captured_loops(semantic: &Semantic<'_>) -> FxHashMap<NodeId, Capture
     let mut captured = FxHashSet::<NodeId>::default();
 
     for (node_id, node) in nodes.iter_enumerated() {
-        let span = node.kind().span();
         if node.kind().is_iteration_statement()
-            && let Some((loop_span, body_span)) = loop_spans(node.kind())
+            && let Some(body) = loop_body(node.kind())
         {
             loop_facts.insert(
                 node_id,
                 CapturedLoop {
                     node_id,
-                    span: loop_span,
-                    body_span,
+                    body_node_id: body.node_id(),
+                    span: node.kind().span(),
+                    body_span: body.span(),
                     header_bindings: Vec::new(),
                 },
             );
@@ -793,15 +794,28 @@ fn classify_captured_loops(semantic: &Semantic<'_>) -> FxHashMap<NodeId, Capture
                 // later sibling declarations, so AST ancestry must remain authoritative after
                 // mutation. Keep associating declarations in nested functions with an enclosing
                 // loop: Babel conservatively wraps that loop when a deeper closure captures one.
-                let Some(loop_id) = nodes
-                    .ancestor_ids(node_id)
-                    .find(|ancestor| nodes.kind(*ancestor).is_iteration_statement())
-                else {
+                let mut child_id = node_id;
+                let mut crossed_function = false;
+                let Some(loop_id) = nodes.ancestor_ids(node_id).find(|ancestor| {
+                    let kind = nodes.kind(*ancestor);
+                    if kind.is_iteration_statement() {
+                        return true;
+                    }
+                    crossed_function |= kind.is_function_like();
+                    child_id = *ancestor;
+                    false
+                }) else {
                     continue;
                 };
-                declarations[symbol_id.index()] = Some(loop_id);
                 let loop_fact = loop_facts.get_mut(&loop_id).unwrap();
-                if span.start < loop_fact.body_span.start
+                let in_body = child_id == loop_fact.body_node_id;
+                // A function in the header owns its locals. Moving the loop body
+                // cannot move those declarations or turn them into loop parameters.
+                if !in_body && crossed_function {
+                    continue;
+                }
+                declarations[symbol_id.index()] = Some(loop_id);
+                if !in_body
                     && !loop_fact
                         .header_bindings
                         .iter()
@@ -822,9 +836,13 @@ fn classify_captured_loops(semantic: &Semantic<'_>) -> FxHashMap<NodeId, Capture
                     continue;
                 };
                 let mut crossed_boundary = false;
+                let mut child_id = node_id;
                 for ancestor in nodes.ancestor_ids(node_id) {
                     if ancestor == loop_id {
-                        if crossed_boundary {
+                        // Only body captures can be repaired by wrapping the body.
+                        // Header references survive that rewrite unchanged and would
+                        // otherwise cause the captured-loop pass to repeat forever.
+                        if crossed_boundary && child_id == loop_facts[&loop_id].body_node_id {
                             captured.insert(loop_id);
                         }
                         break;
@@ -835,6 +853,7 @@ fn classify_captured_loops(semantic: &Semantic<'_>) -> FxHashMap<NodeId, Capture
                     {
                         crossed_boundary = true;
                     }
+                    child_id = ancestor;
                 }
             }
             _ => {}
@@ -844,13 +863,13 @@ fn classify_captured_loops(semantic: &Semantic<'_>) -> FxHashMap<NodeId, Capture
     loop_facts
 }
 
-fn loop_spans(kind: AstKind<'_>) -> Option<(Span, Span)> {
+fn loop_body(kind: AstKind<'_>) -> Option<&Statement<'_>> {
     match kind {
-        AstKind::ForStatement(loop_) => Some((loop_.span, loop_.body.span())),
-        AstKind::ForInStatement(loop_) => Some((loop_.span, loop_.body.span())),
-        AstKind::ForOfStatement(loop_) => Some((loop_.span, loop_.body.span())),
-        AstKind::WhileStatement(loop_) => Some((loop_.span, loop_.body.span())),
-        AstKind::DoWhileStatement(loop_) => Some((loop_.span, loop_.body.span())),
+        AstKind::ForStatement(loop_) => Some(&loop_.body),
+        AstKind::ForInStatement(loop_) => Some(&loop_.body),
+        AstKind::ForOfStatement(loop_) => Some(&loop_.body),
+        AstKind::WhileStatement(loop_) => Some(&loop_.body),
+        AstKind::DoWhileStatement(loop_) => Some(&loop_.body),
         _ => None,
     }
 }
@@ -1271,7 +1290,8 @@ fn collect_loop_reset_declarations(semantic: &Semantic<'_>) -> FxHashSet<(u32, u
         if node.kind().is_function_like() {
             active_boundaries.push(span.end);
         }
-        if let Some((_, body_span)) = loop_spans(node.kind()) {
+        if let Some(body) = loop_body(node.kind()) {
+            let body_span = body.span();
             pending_loops.push((
                 body_span.start,
                 ActiveLoop {
@@ -1667,6 +1687,42 @@ mod tests {
             .build(&parsed.program);
         let loops = classify_captured_loops(&semantic.semantic);
         assert_eq!(loops.len(), 128);
+    }
+
+    #[test]
+    fn captured_loop_ignores_header_function_locals_and_references() {
+        for source in [
+            "for (const t of (u => { const r = u; return r; })(o)) void 0;",
+            "for (const t in (() => { const r = o; return r; })()) void 0;",
+            "for (let i = (() => { const r = 0; return r; })(); i < 3; i++) void 0;",
+            "for (let i = 0; (() => i)() < 3; i++) void 0;",
+            "for (let i = 0; i < 3; (() => i++)()) void 0;",
+            "while ((() => { const r = false; return r; })()) void 0;",
+            "do {} while ((() => { const r = false; return r; })());",
+        ] {
+            let allocator = Allocator::default();
+            let parsed = Parser::new(&allocator, source, SourceType::default()).parse();
+            let semantic = SemanticBuilder::new()
+                .with_build_nodes(true)
+                .build(&parsed.program);
+            assert!(
+                classify_captured_loops(&semantic.semantic).is_empty(),
+                "{source}"
+            );
+        }
+    }
+
+    #[test]
+    fn captured_loop_header_parameters_exclude_iterable_function_locals() {
+        let source = "for (const t of (u => { const r = u; return r; })(o)) queue(() => t);";
+        let allocator = Allocator::default();
+        let parsed = Parser::new(&allocator, source, SourceType::default()).parse();
+        let semantic = SemanticBuilder::new()
+            .with_build_nodes(true)
+            .build(&parsed.program);
+        let loops = classify_captured_loops(&semantic.semantic);
+        assert_eq!(loops.len(), 1);
+        assert_eq!(loops.values().next().unwrap().header_bindings, ["t"]);
     }
 
     #[test]
