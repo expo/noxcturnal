@@ -29,7 +29,7 @@ globalThis.__result = [value, calls, typeError];`,
       filename: 'input.js',
       plugins: [blockScoping],
       noxcturnal: { transforms: { blockScoping: true } },
-      output: { mustNotMatch: [/(?:let|const)\b/] },
+      output: { mustNotMatch: [/\b(?:let|const)\b/] },
     }),
   ).resolves.toEqual([1, ['rhs', 'throw'], true]);
 });
@@ -52,7 +52,7 @@ globalThis.__result = calls;`,
       filename: 'input.js',
       plugins: [blockScoping],
       noxcturnal: { transforms: { blockScoping: true } },
-      output: { mustNotMatch: [/(?:let|const)\b/] },
+      output: { mustNotMatch: [/\b(?:let|const)\b/] },
     }),
   ).resolves.toEqual([
     'logical-rhs',
@@ -84,7 +84,7 @@ globalThis.__result = calls;`,
       filename: 'input.js',
       plugins: [blockScoping],
       noxcturnal: { transforms: { blockScoping: true } },
-      output: { mustNotMatch: [/(?:let|const)\b/] },
+      output: { mustNotMatch: [/\b(?:let|const)\b/] },
     }),
   ).resolves.toEqual(['receiver', 'rhs', true]);
 });
@@ -104,7 +104,65 @@ globalThis.__result = [calls, errorName];`,
       filename: 'input.js',
       plugins: [blockScoping],
       noxcturnal: { transforms: { blockScoping: true } },
-      output: { mustNotMatch: [/(?:let|const)\b/] },
+      output: { mustNotMatch: [/\b(?:let|const)\b/] },
     }),
   ).resolves.toEqual([['rhs'], 'TypeError']);
+});
+
+test.each([
+  {
+    name: 'iterable arrow parameter defaults and private locals',
+    source: `
+      const callbacks = []; const local = 'outer';
+      for (const value of (({ values = [3, 4] } = {}) => {
+        const local = values; return local;
+      })()) callbacks.push(() => value);
+      globalThis.__result = [callbacks.map(read => read()), local];
+    `,
+    expected: [[3, 4], 'outer'],
+  },
+  {
+    name: 'loop body bindings shadow the header without changing its closures',
+    source: `
+      const callbacks = [];
+      for (let value = 0; value < 2; value++) {
+        callbacks.push(() => value);
+        { let value = 'body'; callbacks.push(() => value); }
+      }
+      globalThis.__result = callbacks.map(read => read());
+    `,
+    expected: [0, 'body', 1, 'body'],
+  },
+  {
+    name: 'hoisted var bindings remain distinct from lexical declarations',
+    source: `
+      function read() {
+        const values = [typeof value];
+        { let value = 'block'; values.push(value); }
+        var value = 'function';
+        return [...values, value];
+      }
+      globalThis.__result = read();
+    `,
+    expected: ['undefined', 'block', 'function'],
+  },
+  {
+    name: 'default non-TDZ reads before a lexical declaration',
+    source: `
+      let observed;
+      { observed = value; let value = 7; }
+      globalThis.__result = [observed, typeof value];
+    `,
+    expected: [undefined, 'undefined'],
+  },
+])('aligns $name with Babel', async ({ source, expected }) => {
+  await expect(
+    alignBabelBehavior({
+      source,
+      filename: 'input.js',
+      plugins: [blockScoping],
+      noxcturnal: { transforms: { blockScoping: true } },
+      output: { mustNotMatch: [/\b(?:let|const)\b/] },
+    }),
+  ).resolves.toEqual(expected);
 });

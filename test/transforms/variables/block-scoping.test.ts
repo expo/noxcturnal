@@ -37,3 +37,48 @@ test('uses the Babel runtime readOnlyError helper when runtime helpers are selec
   expect(output).toContain("require('@babel/runtime/helpers/readOnlyError')");
   expect(output).toContain("sideEffect(), _readOnlyError('value')");
 });
+
+test.each([
+  {
+    name: 'for-of function expression',
+    source: 'for (let item of (function () { let items = input; return items; })()) use(item);',
+  },
+  {
+    name: 'for-of arrow with destructured default parameters',
+    source:
+      'for (let item of (({ items = [] } = {}) => { let values = items; return values; })(input)) use(item);',
+  },
+  {
+    name: 'for-of generator expression',
+    source: 'for (let item of (function* () { let value = input; yield value; })()) use(item);',
+  },
+  {
+    name: 'for-in object method',
+    source: 'for (let key in ({ read() { let value = input; return value; } }).read()) use(key);',
+  },
+  {
+    name: 'for initializer',
+    source: 'for (let i = (() => { let start = 0; return start; })(); i < 2; i++) use(i);',
+  },
+  {
+    name: 'for test',
+    source: 'for (let i = 0; (() => { let limit = 2; return i < limit; })(); i++) use(i);',
+  },
+  {
+    name: 'for update',
+    source: 'for (let i = 0; i < 2; (() => { let step = 1; i += step; })()) use(i);',
+  },
+  {
+    name: 'while test',
+    source: 'while ((() => { let value = next(); return value; })()) work();',
+  },
+  {
+    name: 'do-while test',
+    source: 'do { work(); } while ((() => { let value = next(); return value; })());',
+  },
+])('lowers header locals without generating a body wrapper: $name', async ({ source }) => {
+  const output = await transformSource(source, 'input.js', { transforms: { blockScoping: true } });
+  expect(output).not.toMatch(/\b(?:let|const)\b/);
+  expect(output).toMatch(/\bvar\b/);
+  expect(output).not.toContain('_loop');
+});
