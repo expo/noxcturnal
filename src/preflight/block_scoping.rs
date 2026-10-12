@@ -19,11 +19,25 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use crate::generated::inline_helpers::INLINE_READ_ONLY_ERROR_HELPER_DESCRIPTOR;
 use crate::preflight::helpers::CustomHelperRequests;
 
+mod body;
+mod header;
+
+struct HeaderBinding {
+    name: String,
+    // Extraction must retain const write errors instead of making this a writable parameter.
+    protect_writes: bool,
+    parameter_alias: Option<String>,
+}
+
 struct CapturedLoop {
     node_id: NodeId,
+    body_node_id: NodeId,
     span: Span,
     body_span: Span,
-    header_bindings: Vec<String>,
+    header_bindings: Vec<HeaderBinding>,
+    body_capture: bool,
+    header_capture: bool,
+    init_capture: bool,
 }
 
 struct PendingCapturedLoop {
@@ -37,6 +51,9 @@ struct PendingCapturedLoop {
     continues: FxHashSet<(u32, u32)>,
     has_await: bool,
     has_yield: bool,
+    has_finally: bool,
+    arguments_references: FxHashSet<(u32, u32)>,
+    local_var_declarations: Vec<NodeId>,
 }
 
 pub(super) struct CapturedLoopAstPlan {
@@ -44,11 +61,12 @@ pub(super) struct CapturedLoopAstPlan {
 }
 
 struct CapturedLoopMutation {
+    extract_body: bool,
     loop_span: Span,
     insertion_anchor: Span,
     anchor: Span,
     dispatch_anchor: Span,
-    bindings: Vec<String>,
+    bindings: Vec<HeaderBinding>,
     helper: String,
     result: String,
     label: Option<String>,
@@ -57,6 +75,11 @@ struct CapturedLoopMutation {
     continues: FxHashSet<(u32, u32)>,
     has_await: bool,
     has_yield: bool,
+    defer_bindings: bool,
+    arguments_alias: Option<String>,
+    arguments_references: FxHashSet<(u32, u32)>,
+    local_var_declarations: Vec<NodeId>,
+    header: Option<header::Plan>,
 }
 
 impl CapturedLoopAstPlan {
@@ -143,6 +166,13 @@ fn mutate_captured_loop<'a>(
 ) -> Result<ArenaVec<'a, Statement<'a>>, &'static str> {
     let ast = AstBuilder::new(allocator);
     let insertion_anchor = mutation.insertion_anchor;
+    let header_expressions = mutation
+        .header
+        .as_ref()
+        .map(|plan| header::prepare(ast, root, mutation.loop_span, &mutation.bindings, plan));
+    if !mutation.extract_body {
+        return Ok(ast.vec());
+    }
     let dispatch = captured_loop_dispatch(&ast, &mutation);
     let mut mover = CapturedLoopBodyMover {
         ast,
@@ -151,22 +181,87 @@ fn mutate_captured_loop<'a>(
         moved: None,
     };
     mover.visit_statement(root);
-    let Some(mut body) = mover.moved else {
+    let Some(body) = mover.moved else {
         return Err("captured-loop-ast-target-missing");
     };
-    CapturedControlRewriter {
-        ast,
-        mutation: &mutation,
-    }
-    .visit_statement(&mut body);
     let mut helper_body = match body {
-        Statement::BlockStatement(block) => block.unbox().body,
+        Statement::BlockStatement(block)
+            if mutation.header.is_none()
+                && !mutation
+                    .bindings
+                    .iter()
+                    .any(|binding| binding.protect_writes) =>
+        {
+            block.unbox().body
+        }
         statement => {
             let mut statements = ArenaVec::new_in(&allocator);
             statements.push(statement);
             statements
         }
     };
+    if let Some((test, update)) = header_expressions {
+        let plan = mutation.header.as_ref().unwrap();
+        if let Some(test) = test {
+            helper_body.insert(
+                0,
+                ast.statement_if(
+                    mutation.anchor,
+                    ast.expression_unary(
+                        mutation.anchor,
+                        oxc_syntax::operator::UnaryOperator::LogicalNot,
+                        test,
+                    ),
+                    ast.statement_return(
+                        mutation.anchor,
+                        Some(captured_loop_result(
+                            &ast,
+                            &mutation,
+                            mutation.anchor,
+                            "break",
+                            None,
+                        )),
+                    ),
+                    None,
+                ),
+            );
+        }
+        if let Some(update) = update {
+            helper_body.insert(
+                0,
+                ast.statement_if(
+                    mutation.anchor,
+                    ast.expression_unary(
+                        mutation.anchor,
+                        oxc_syntax::operator::UnaryOperator::LogicalNot,
+                        ast.expression_identifier(
+                            mutation.anchor,
+                            allocator.alloc_str(plan.first.as_ref().expect("relocated update")),
+                        ),
+                    ),
+                    ast.statement_expression(mutation.anchor, update),
+                    None,
+                ),
+            );
+        }
+    }
+    let hoisted = body::rewrite(ast, &mut helper_body, &mutation);
+    for binding in mutation.bindings.iter().rev() {
+        if let Some(parameter) = &binding.parameter_alias {
+            helper_body.insert(
+                0,
+                binding_declaration(
+                    ast,
+                    mutation.anchor,
+                    VariableDeclarationKind::Const,
+                    &binding.name,
+                    Some(
+                        ast.expression_identifier(mutation.anchor, allocator.alloc_str(parameter)),
+                    ),
+                ),
+            );
+        }
+    }
     helper_body.push(ast.statement_return(
         mutation.anchor,
         Some(captured_loop_result(
@@ -180,11 +275,22 @@ fn mutate_captured_loop<'a>(
     let function_body =
         ast.alloc_function_body(mutation.anchor, ArenaVec::new_in(&allocator), helper_body);
     let mut parameters = ArenaVec::new_in(&allocator);
-    for binding in &mutation.bindings {
+    for alias in mutation
+        .bindings
+        .iter()
+        .map(|binding| binding.parameter_alias.as_ref().unwrap_or(&binding.name))
+        .chain(mutation.arguments_alias.iter())
+        .chain(
+            mutation
+                .header
+                .iter()
+                .filter_map(|plan| plan.first.as_ref()),
+        )
+    {
         parameters.push(ast.formal_parameter(
             mutation.anchor,
-            ArenaVec::new_in(&allocator),
-            ast.binding_pattern_binding_identifier(mutation.anchor, allocator.alloc_str(binding)),
+            ast.vec(),
+            ast.binding_pattern_binding_identifier(mutation.anchor, allocator.alloc_str(alias)),
             None::<ArenaBox<'a, TSTypeAnnotation<'a>>>,
             None::<ArenaBox<'a, Expression<'a>>>,
             false,
@@ -224,46 +330,71 @@ fn mutate_captured_loop<'a>(
             function_body,
         )
     };
-    let result_declaration = ast.variable_declarator(
-        insertion_anchor,
-        VariableDeclarationKind::Var,
-        ast.binding_pattern_binding_identifier(
-            insertion_anchor,
-            allocator.alloc_str(&mutation.result),
-        ),
-        None::<ArenaBox<'a, TSTypeAnnotation<'a>>>,
-        None::<Expression<'a>>,
-        false,
-    );
-    let helper_declaration = ast.variable_declarator(
-        insertion_anchor,
-        VariableDeclarationKind::Var,
-        ast.binding_pattern_binding_identifier(
-            insertion_anchor,
-            allocator.alloc_str(&mutation.helper),
-        ),
-        None::<ArenaBox<'a, TSTypeAnnotation<'a>>>,
-        Some(helper_expression),
-        false,
-    );
     let mut generated = ArenaVec::new_in(&allocator);
-    generated.push(Statement::VariableDeclaration(
-        ast.alloc_variable_declaration(
+    for name in hoisted {
+        generated.push(binding_declaration(
+            ast,
             insertion_anchor,
             VariableDeclarationKind::Var,
-            ast.vec1(result_declaration),
-            false,
-        ),
+            &name,
+            None,
+        ));
+    }
+    generated.push(binding_declaration(
+        ast,
+        insertion_anchor,
+        VariableDeclarationKind::Var,
+        &mutation.result,
+        None,
     ));
-    generated.push(Statement::VariableDeclaration(
-        ast.alloc_variable_declaration(
-            insertion_anchor,
-            VariableDeclarationKind::Var,
-            ast.vec1(helper_declaration),
-            false,
-        ),
+    generated.push(binding_declaration(
+        ast,
+        insertion_anchor,
+        VariableDeclarationKind::Var,
+        &mutation.helper,
+        Some(helper_expression),
     ));
     Ok(generated)
+}
+
+#[expect(deprecated)]
+fn binding_declaration<'a>(
+    ast: AstBuilder<'a>,
+    span: Span,
+    kind: VariableDeclarationKind,
+    name: &str,
+    init: Option<Expression<'a>>,
+) -> Statement<'a> {
+    Statement::VariableDeclaration(ast.alloc_variable_declaration(
+        span,
+        kind,
+        ast.vec1(ast.variable_declarator(
+            span,
+            kind,
+            ast.binding_pattern_binding_identifier(span, ast.allocator.alloc_str(name)),
+            None::<ArenaBox<'a, TSTypeAnnotation<'a>>>,
+            init,
+            false,
+        )),
+        false,
+    ))
+}
+
+struct ArgumentsRewriter<'a, 'p> {
+    alias: &'p str,
+    references: &'p FxHashSet<(u32, u32)>,
+    ast: AstBuilder<'a>,
+}
+
+impl<'a> VisitMut<'a> for ArgumentsRewriter<'a, '_> {
+    fn visit_identifier_reference(&mut self, identifier: &mut IdentifierReference<'a>) {
+        if self
+            .references
+            .contains(&(identifier.span.start, identifier.span.end))
+        {
+            identifier.name = self.ast.allocator.alloc_str(self.alias).into();
+        }
+    }
 }
 
 struct CapturedLoopBodyMover<'a, 'p> {
@@ -293,83 +424,6 @@ impl<'a> VisitMut<'a> for CapturedLoopBodyMover<'a, '_> {
             return;
         }
         walk_mut::walk_statement(self, statement);
-    }
-}
-
-struct CapturedControlRewriter<'a, 'p> {
-    ast: AstBuilder<'a>,
-    mutation: &'p CapturedLoopMutation,
-}
-
-impl<'a> VisitMut<'a> for CapturedControlRewriter<'a, '_> {
-    #[expect(deprecated)]
-    fn visit_statement(&mut self, statement: &mut Statement<'a>) {
-        let span = statement.span();
-        let key = (span.start, span.end);
-        let replacement = if self.mutation.returns.contains(&key) {
-            let Statement::ReturnStatement(return_statement) = statement else {
-                return;
-            };
-            let value = return_statement.argument.take().unwrap_or_else(|| {
-                self.ast.expression_unary(
-                    self.mutation.anchor,
-                    oxc_syntax::operator::UnaryOperator::Void,
-                    self.ast.expression_numeric_literal(
-                        self.mutation.anchor,
-                        0.0,
-                        None,
-                        oxc_ast::ast::NumberBase::Decimal,
-                    ),
-                )
-            });
-            Some(self.ast.statement_return(
-                span,
-                Some(captured_loop_result(
-                    &self.ast,
-                    self.mutation,
-                    span,
-                    "return",
-                    Some(value),
-                )),
-            ))
-        } else if self.mutation.breaks.contains(&key) {
-            Some(self.ast.statement_return(
-                span,
-                Some(captured_loop_result(
-                    &self.ast,
-                    self.mutation,
-                    span,
-                    "break",
-                    None,
-                )),
-            ))
-        } else if self.mutation.continues.contains(&key) {
-            Some(self.ast.statement_return(
-                span,
-                Some(captured_loop_result(
-                    &self.ast,
-                    self.mutation,
-                    span,
-                    "continue",
-                    None,
-                )),
-            ))
-        } else {
-            None
-        };
-        if let Some(replacement) = replacement {
-            *statement = replacement;
-        } else {
-            walk_mut::walk_statement(self, statement);
-        }
-    }
-
-    fn visit_function(&mut self, _function: &mut oxc_ast::ast::Function<'a>, _flags: ScopeFlags) {}
-
-    fn visit_arrow_function_expression(
-        &mut self,
-        _expression: &mut oxc_ast::ast::ArrowFunctionExpression<'a>,
-    ) {
     }
 }
 
@@ -405,14 +459,35 @@ fn captured_loop_result<'a>(
     let mut elements = ArenaVec::new_in(ast);
     for binding in &mutation.bindings {
         elements.push(ArrayExpressionElement::from(
-            ast.expression_identifier(span, ast.allocator.alloc_str(binding)),
+            ast.expression_identifier(span, ast.allocator.alloc_str(&binding.name)),
         ));
+    }
+    let mut vars = ast.expression_array(span, elements);
+    if mutation.defer_bindings {
+        vars = ast.expression_arrow_function(
+            span,
+            true,
+            false,
+            None::<ArenaBox<'a, TSTypeParameterDeclaration<'a>>>,
+            ast.alloc_formal_parameters(
+                span,
+                FormalParameterKind::ArrowFormalParameters,
+                ast.vec(),
+                None::<ArenaBox<'a, FormalParameterRest<'a>>>,
+            ),
+            None::<ArenaBox<'a, TSTypeAnnotation<'a>>>,
+            ast.alloc_function_body(
+                span,
+                ast.vec(),
+                ast.vec1(ast.statement_expression(span, vars)),
+            ),
+        );
     }
     properties.push(ast.object_property_kind_object_property(
         span,
         PropertyKind::Init,
         ast.property_key_static_identifier(span, "vars"),
-        ast.expression_array(span, elements),
+        vars,
         false,
         false,
         false,
@@ -429,15 +504,25 @@ fn captured_loop_dispatch<'a>(
     let mut call_arguments = ArenaVec::new_in(ast);
     for binding in &mutation.bindings {
         call_arguments.push(Argument::from(
-            ast.expression_identifier(anchor, ast.allocator.alloc_str(binding)),
+            ast.expression_identifier(anchor, ast.allocator.alloc_str(&binding.name)),
+        ));
+    }
+    if mutation.arguments_alias.is_some() {
+        call_arguments.push(Argument::from(
+            ast.expression_identifier(anchor, "arguments"),
+        ));
+    }
+    if let Some(first) = mutation
+        .header
+        .as_ref()
+        .and_then(|plan| plan.first.as_ref())
+    {
+        call_arguments.push(Argument::from(
+            ast.expression_identifier(anchor, ast.allocator.alloc_str(first)),
         ));
     }
     let mut call = if mutation.has_yield {
-        if !mutation.bindings.is_empty() {
-            call_arguments.insert(0, Argument::from(ast.expression_this(anchor)));
-        } else {
-            call_arguments.push(Argument::from(ast.expression_this(anchor)));
-        }
+        call_arguments.insert(0, Argument::from(ast.expression_this(anchor)));
         ast.expression_call(
             anchor,
             Expression::from(ast.member_expression_static(
@@ -478,20 +563,42 @@ fn captured_loop_dispatch<'a>(
     );
     let mut body = ArenaVec::new_in(ast);
     body.push(ast.statement_expression(anchor, assignment));
-    for (index, binding) in mutation.bindings.iter().enumerate() {
-        let target = ast.simple_assignment_target_assignment_target_identifier(
-            anchor,
-            ast.allocator.alloc_str(binding),
-        );
-        let vars = Expression::from(ast.member_expression_static(
+    let result_vars = || {
+        ast.member_expression_static(
             anchor,
             ast.expression_identifier(anchor, ast.allocator.alloc_str(&mutation.result)),
             ast.identifier_name(anchor, "vars"),
             false,
+        )
+    };
+    if mutation.defer_bindings {
+        body.push(ast.statement_expression(
+            anchor,
+            ast.expression_assignment(
+                anchor,
+                AssignmentOperator::Assign,
+                AssignmentTarget::from(result_vars()),
+                ast.expression_call(
+                    anchor,
+                    Expression::from(result_vars()),
+                    None::<ArenaBox<'a, TSTypeParameterInstantiation<'a>>>,
+                    ast.vec(),
+                    false,
+                ),
+            ),
         ));
+    }
+    for (index, binding) in mutation.bindings.iter().enumerate() {
+        if binding.protect_writes {
+            continue;
+        }
+        let target = ast.simple_assignment_target_assignment_target_identifier(
+            anchor,
+            ast.allocator.alloc_str(&binding.name),
+        );
         let value = Expression::from(ast.member_expression_computed(
             anchor,
-            vars,
+            Expression::from(result_vars()),
             ast.expression_numeric_literal(
                 anchor,
                 index as f64,
@@ -606,6 +713,11 @@ fn captured_loop_mutations(
                 source.as_bytes().get(captured.body_span.start as usize) == Some(&b'{');
             let content_start = captured.body_span.start + u32::from(body_is_block);
             let content_end = captured.body_span.end - u32::from(body_is_block);
+            let local_var_declarations = if captured.body_capture || captured.header_capture {
+                body::local_declarations(semantic, captured.body_node_id)
+            } else {
+                Vec::new()
+            };
             PendingCapturedLoop {
                 captured,
                 statement_root,
@@ -617,26 +729,51 @@ fn captured_loop_mutations(
                 continues: FxHashSet::default(),
                 has_await: false,
                 has_yield: false,
+                has_finally: false,
+                arguments_references: FxHashSet::default(),
+                local_var_declarations,
             }
         })
         .collect::<Vec<_>>();
     pending.sort_unstable_by_key(|loop_plan| loop_plan.content_start);
-    let mut current = 0;
+    // Initializer-only rewrites leave control flow and lexical arguments in place.
+    let mut bodies = pending
+        .iter_mut()
+        .filter(|plan| plan.captured.body_capture || plan.captured.header_capture);
+    let mut current = bodies.next();
     let mut active_functions = Vec::<u32>::new();
     let mut active_iterations = Vec::<(NodeId, u32)>::new();
     let mut active_breakables = Vec::<(NodeId, u32)>::new();
     for (node_id, node) in nodes.iter_enumerated() {
         let span = node.kind().span();
-        while current < pending.len() && span.start >= pending[current].content_end {
-            current += 1;
+        while current
+            .as_ref()
+            .is_some_and(|plan| span.start >= plan.content_end)
+        {
+            current = bodies.next();
             active_functions.clear();
             active_iterations.clear();
             active_breakables.clear();
         }
-        let Some(loop_plan) = pending.get_mut(current) else {
+        let Some(loop_plan) = current.as_deref_mut() else {
             break;
         };
-        if span.start < loop_plan.content_start || span.end > loop_plan.content_end {
+        let in_header = if loop_plan.captured.header_capture
+            && let AstKind::ForStatement(statement) = nodes.kind(loop_plan.captured.node_id)
+        {
+            statement
+                .test
+                .iter()
+                .chain(statement.update.iter())
+                .any(|expression| {
+                    let header_span = expression.span();
+                    span.start >= header_span.start && span.end <= header_span.end
+                })
+        } else {
+            false
+        };
+        if !in_header && (span.start < loop_plan.content_start || span.end > loop_plan.content_end)
+        {
             continue;
         }
         while active_functions
@@ -672,6 +809,37 @@ fn captured_loop_mutations(
         }
         let belongs_to_body = active_functions.is_empty();
         match node.kind() {
+            AstKind::IdentifierReference(identifier) if identifier.name == "arguments" => {
+                // The range check already limits this to the extracted body/header.
+                // Arrows inherit arguments; functions and static blocks do not.
+                let inherited = nodes
+                    .ancestor_ids(node_id)
+                    .take_while(|id| *id != loop_plan.captured.node_id)
+                    .all(|id| {
+                        !matches!(
+                            nodes.kind(id),
+                            AstKind::Function(_) | AstKind::StaticBlock(_)
+                        )
+                    });
+                let local = identifier
+                    .reference_id
+                    .get()
+                    .and_then(|id| scoping.get_reference(id).symbol_id())
+                    .is_some_and(|id| {
+                        let span = scoping.symbol_span(id);
+                        span.start >= loop_plan.content_start && span.end <= loop_plan.content_end
+                    });
+                if inherited && !local {
+                    loop_plan
+                        .arguments_references
+                        .insert((span.start, span.end));
+                }
+            }
+            AstKind::TryStatement(statement)
+                if belongs_to_body && statement.finalizer.is_some() =>
+            {
+                loop_plan.has_finally = true;
+            }
             AstKind::AwaitExpression(_) if belongs_to_body => {
                 loop_plan.has_await = true;
             }
@@ -717,38 +885,95 @@ fn captured_loop_mutations(
         }
     }
     let mut reserved: FxHashSet<String> = scoping.symbol_names().map(str::to_owned).collect();
+    let reserve_capture = |base: &str, reserved: &mut FxHashSet<String>| loop {
+        let name = reserve_name(base, reserved);
+        if !scoping
+            .root_unresolved_references()
+            .contains_key(name.as_str())
+        {
+            break name;
+        }
+    };
     let mut roots: FxHashMap<(u32, u32), Vec<CapturedLoopMutation>> = FxHashMap::default();
     for loop_plan in pending {
         let PendingCapturedLoop {
-            captured,
+            mut captured,
             statement_root,
             label,
             content_start,
             content_end,
             returns,
-            breaks,
+            mut breaks,
             continues,
             has_await,
             has_yield,
+            has_finally,
+            arguments_references,
+            local_var_declarations,
         } = loop_plan;
+        let arguments_alias = (has_yield && !arguments_references.is_empty())
+            .then(|| reserve_capture("_arguments", &mut reserved));
+        for binding in &mut captured.header_bindings {
+            if binding.protect_writes {
+                binding.parameter_alias = Some(reserve_capture(
+                    &format!("_{}", binding.name),
+                    &mut reserved,
+                ));
+            }
+        }
+        let defer_bindings = has_finally
+            && !(returns.is_empty() && breaks.is_empty() && continues.is_empty())
+            && captured
+                .header_bindings
+                .iter()
+                .any(|binding| !binding.protect_writes);
+        let extract_body = captured.body_capture || captured.header_capture;
+        let header = (captured.header_capture || captured.init_capture).then(|| {
+            // Only relocated tests introduce a synthetic break.
+            if captured.header_capture {
+                breaks.insert((captured.span.start, captured.span.start));
+            }
+            header::Plan {
+                first: captured
+                    .header_capture
+                    .then(|| reserve_capture("_first", &mut reserved)),
+                initial: captured
+                    .init_capture
+                    .then(|| reserve_capture("_initial", &mut reserved)),
+            }
+        });
         let root_span = nodes.kind(statement_root).span();
         roots
             .entry((root_span.start, root_span.end))
             .or_default()
             .push(CapturedLoopMutation {
+                extract_body,
                 loop_span: captured.span,
                 insertion_anchor: Span::new(captured.span.start, captured.span.start),
                 anchor: Span::new(content_start, content_start),
                 dispatch_anchor: Span::new(content_end, content_end),
+                defer_bindings,
                 bindings: captured.header_bindings,
-                helper: reserve_name("_loop", &mut reserved),
-                result: reserve_name("_loopResult", &mut reserved),
+                helper: if extract_body {
+                    reserve_name("_loop", &mut reserved)
+                } else {
+                    String::new()
+                },
+                result: if extract_body {
+                    reserve_name("_loopResult", &mut reserved)
+                } else {
+                    String::new()
+                },
                 label,
                 returns,
                 breaks,
                 continues,
                 has_await,
                 has_yield,
+                arguments_alias,
+                arguments_references,
+                local_var_declarations,
+                header,
             });
     }
     (!roots.is_empty()).then_some(roots)
@@ -758,74 +983,112 @@ fn captured_loop_mutations(
 fn classify_captured_loops(semantic: &Semantic<'_>) -> FxHashMap<NodeId, CapturedLoop> {
     let nodes = semantic.nodes();
     let scoping = semantic.scoping();
-    let mut declarations = vec![None::<NodeId>; scoping.symbols_len()];
     let mut loop_facts = FxHashMap::<NodeId, CapturedLoop>::default();
-    let mut captured = FxHashSet::<NodeId>::default();
 
     for (node_id, node) in nodes.iter_enumerated() {
-        let span = node.kind().span();
         if node.kind().is_iteration_statement()
-            && let Some((loop_span, body_span)) = loop_spans(node.kind())
+            && let Some(body) = loop_body(node.kind())
         {
             loop_facts.insert(
                 node_id,
                 CapturedLoop {
                     node_id,
-                    span: loop_span,
-                    body_span,
+                    body_node_id: body.node_id(),
+                    span: node.kind().span(),
+                    body_span: body.span(),
                     header_bindings: Vec::new(),
+                    body_capture: false,
+                    header_capture: false,
+                    init_capture: false,
                 },
             );
         }
 
-        match node.kind() {
-            AstKind::BindingIdentifier(identifier) => {
-                let Some(symbol_id) = identifier.symbol_id.get() else {
-                    continue;
-                };
-                if !scoping
-                    .symbol_flags(symbol_id)
-                    .contains(SymbolFlags::BlockScopedVariable)
-                {
-                    continue;
-                }
-                // Generated parameter-rest loops reuse source anchors whose spans can overlap
-                // later sibling declarations, so AST ancestry must remain authoritative after
-                // mutation. Keep associating declarations in nested functions with an enclosing
-                // loop: Babel conservatively wraps that loop when a deeper closure captures one.
-                let Some(loop_id) = nodes
-                    .ancestor_ids(node_id)
-                    .find(|ancestor| nodes.kind(*ancestor).is_iteration_statement())
-                else {
-                    continue;
-                };
-                declarations[symbol_id.index()] = Some(loop_id);
-                let loop_fact = loop_facts.get_mut(&loop_id).unwrap();
-                if span.start < loop_fact.body_span.start
-                    && !loop_fact
-                        .header_bindings
-                        .iter()
-                        .any(|name| name == identifier.name.as_str())
-                {
-                    loop_fact.header_bindings.push(identifier.name.to_string());
-                }
+        if let AstKind::BindingIdentifier(identifier) = node.kind() {
+            let Some(symbol_id) = identifier.symbol_id.get() else {
+                continue;
+            };
+            if !scoping
+                .symbol_flags(symbol_id)
+                .contains(SymbolFlags::BlockScopedVariable)
+            {
+                continue;
             }
-            AstKind::IdentifierReference(identifier) => {
-                let Some(reference_id) = identifier.reference_id.get() else {
-                    continue;
-                };
-                let reference = scoping.get_reference(reference_id);
-                let Some(symbol_id) = reference.symbol_id() else {
-                    continue;
-                };
-                let Some(loop_id) = declarations[symbol_id.index()] else {
-                    continue;
-                };
+            // Generated parameter-rest loops reuse source anchors whose spans can overlap
+            // later sibling declarations, so AST ancestry must remain authoritative after
+            // mutation. Keep associating declarations in nested functions with an enclosing
+            // loop: Babel conservatively wraps that loop when a deeper closure captures one.
+            let mut child_id = node_id;
+            let mut crossed_function = false;
+            let Some(loop_id) = nodes.ancestor_ids(node_id).find(|ancestor| {
+                let kind = nodes.kind(*ancestor);
+                if kind.is_iteration_statement() {
+                    return true;
+                }
+                crossed_function |=
+                    kind.is_function_like() || matches!(kind, AstKind::StaticBlock(_));
+                child_id = *ancestor;
+                false
+            }) else {
+                continue;
+            };
+            let loop_fact = loop_facts.get_mut(&loop_id).unwrap();
+            let in_body = child_id == loop_fact.body_node_id;
+            // A function in the header owns its locals. Moving the loop body
+            // cannot move those declarations or turn them into loop parameters.
+            if !in_body && crossed_function {
+                continue;
+            }
+            if !in_body
+                && !loop_fact
+                    .header_bindings
+                    .iter()
+                    .any(|binding| binding.name == identifier.name.as_str())
+            {
+                let protect_writes = scoping
+                    .symbol_flags(symbol_id)
+                    .contains(SymbolFlags::ConstVariable)
+                    && scoping
+                        .get_resolved_reference_ids(symbol_id)
+                        .iter()
+                        .any(|id| scoping.get_reference(*id).is_write());
+                loop_fact.header_bindings.push(HeaderBinding {
+                    name: identifier.name.to_string(),
+                    protect_writes,
+                    parameter_alias: None,
+                });
+            }
+            // Semantic lists include forward references, so each candidate can
+            // be resolved here without scanning every AST node a second time.
+            for reference_id in scoping.get_resolved_reference_ids(symbol_id) {
+                let node_id = scoping.get_reference(*reference_id).node_id();
                 let mut crossed_boundary = false;
+                let mut child_id = node_id;
                 for ancestor in nodes.ancestor_ids(node_id) {
                     if ancestor == loop_id {
+                        // Header captures need the update/test moved into the
+                        // per-iteration helper as well as the body.
                         if crossed_boundary {
-                            captured.insert(loop_id);
+                            let fact = loop_facts.get_mut(&loop_id).unwrap();
+                            if child_id == fact.body_node_id {
+                                fact.body_capture = true;
+                            } else if fact
+                                .header_bindings
+                                .iter()
+                                .any(|binding| binding.name == scoping.symbol_name(symbol_id))
+                                && let AstKind::ForStatement(statement) = nodes.kind(loop_id)
+                                && matches!(&statement.init, Some(oxc_ast::ast::ForStatementInit::VariableDeclaration(declaration)) if declaration.kind == VariableDeclarationKind::Let)
+                            {
+                                if statement
+                                    .init
+                                    .as_ref()
+                                    .is_some_and(|init| init.node_id() == child_id)
+                                {
+                                    fact.init_capture = true;
+                                } else {
+                                    fact.header_capture = true;
+                                }
+                            }
                         }
                         break;
                     }
@@ -835,22 +1098,22 @@ fn classify_captured_loops(semantic: &Semantic<'_>) -> FxHashMap<NodeId, Capture
                     {
                         crossed_boundary = true;
                     }
+                    child_id = ancestor;
                 }
             }
-            _ => {}
         }
     }
-    loop_facts.retain(|loop_id, _| captured.contains(loop_id));
+    loop_facts.retain(|_, fact| fact.body_capture || fact.header_capture || fact.init_capture);
     loop_facts
 }
 
-fn loop_spans(kind: AstKind<'_>) -> Option<(Span, Span)> {
+fn loop_body(kind: AstKind<'_>) -> Option<&Statement<'_>> {
     match kind {
-        AstKind::ForStatement(loop_) => Some((loop_.span, loop_.body.span())),
-        AstKind::ForInStatement(loop_) => Some((loop_.span, loop_.body.span())),
-        AstKind::ForOfStatement(loop_) => Some((loop_.span, loop_.body.span())),
-        AstKind::WhileStatement(loop_) => Some((loop_.span, loop_.body.span())),
-        AstKind::DoWhileStatement(loop_) => Some((loop_.span, loop_.body.span())),
+        AstKind::ForStatement(loop_) => Some(&loop_.body),
+        AstKind::ForInStatement(loop_) => Some(&loop_.body),
+        AstKind::ForOfStatement(loop_) => Some(&loop_.body),
+        AstKind::WhileStatement(loop_) => Some(&loop_.body),
+        AstKind::DoWhileStatement(loop_) => Some(&loop_.body),
         _ => None,
     }
 }
@@ -1271,7 +1534,8 @@ fn collect_loop_reset_declarations(semantic: &Semantic<'_>) -> FxHashSet<(u32, u
         if node.kind().is_function_like() {
             active_boundaries.push(span.end);
         }
-        if let Some((_, body_span)) = loop_spans(node.kind()) {
+        if let Some(body) = loop_body(node.kind()) {
+            let body_span = body.span();
             pending_loops.push((
                 body_span.start,
                 ActiveLoop {
@@ -1667,6 +1931,73 @@ mod tests {
             .build(&parsed.program);
         let loops = classify_captured_loops(&semantic.semantic);
         assert_eq!(loops.len(), 128);
+    }
+
+    #[test]
+    fn captured_loop_distinguishes_header_locals_from_loop_bindings() {
+        for (source, header_capture) in [
+            (
+                "for (const t of (u => { const r = u; return r; })(o)) void 0;",
+                false,
+            ),
+            (
+                "for (const t in (() => { const r = o; return r; })()) void 0;",
+                false,
+            ),
+            (
+                "for (let i = (() => { const r = 0; return r; })(); i < 3; i++) void 0;",
+                false,
+            ),
+            ("for (let i = 0; (() => i)() < 3; i++) void 0;", true),
+            ("for (let i = 0; i < 3; (() => i++)()) void 0;", true),
+            (
+                "while ((() => { const r = false; return r; })()) void 0;",
+                false,
+            ),
+            (
+                "do {} while ((() => { const r = false; return r; })());",
+                false,
+            ),
+            (
+                "for (let read = () => i, i = 0; i < 2; i++) use(read);",
+                true,
+            ),
+        ] {
+            let allocator = Allocator::default();
+            let parsed = Parser::new(&allocator, source, SourceType::default()).parse();
+            let semantic = SemanticBuilder::new()
+                .with_build_nodes(true)
+                .build(&parsed.program);
+            let loops = classify_captured_loops(&semantic.semantic);
+            assert_eq!(loops.len(), usize::from(header_capture), "{source}");
+            if header_capture {
+                let captured = loops.values().next().unwrap();
+                assert!(captured.header_capture || captured.init_capture, "{source}");
+            }
+        }
+    }
+
+    #[test]
+    fn captured_loop_header_parameters_exclude_iterable_function_locals() {
+        let source = "for (const t of (u => { const r = u; return r; })(o)) queue(() => t);";
+        let allocator = Allocator::default();
+        let parsed = Parser::new(&allocator, source, SourceType::default()).parse();
+        let semantic = SemanticBuilder::new()
+            .with_build_nodes(true)
+            .build(&parsed.program);
+        let loops = classify_captured_loops(&semantic.semantic);
+        assert_eq!(loops.len(), 1);
+        assert_eq!(
+            loops
+                .values()
+                .next()
+                .unwrap()
+                .header_bindings
+                .iter()
+                .map(|binding| binding.name.as_str())
+                .collect::<Vec<_>>(),
+            ["t"]
+        );
     }
 
     #[test]
