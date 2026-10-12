@@ -38,6 +38,39 @@ test('uses the Babel runtime readOnlyError helper when runtime helpers are selec
   expect(output).toContain("sideEffect(), _readOnlyError('value')");
 });
 
+test('initializer-only captures do not extract the loop body', async () => {
+  const output = await transformSource(
+    'outer: for (let read = () => i, i = 0; i < 3; i++) { use(read()); continue outer; }',
+    'input.js',
+    { transforms: { blockScoping: true } },
+  );
+  expect(output).not.toContain('_loop');
+  expect(output).not.toContain('_first');
+  expect(output).not.toMatch(/\b(?:let|const)\b/);
+  expect(output).toContain('continue outer');
+});
+
+test('keeps initialized iteration-local vars inside the captured helper', async () => {
+  const output = await transformSource(
+    `function run() {
+      const reads = []; let sum = 0;
+      for (let i = 0; i < 3; i++) {
+        reads.push(() => i);
+        var local = i;
+        var escaped = i;
+        sum += local;
+      }
+      return [sum, escaped, reads];
+    }`,
+    'input.js',
+    { transforms: { blockScoping: true } },
+  );
+  expect(output).toContain('_loop');
+  expect(output).toContain('var local = i;');
+  expect(output).toContain('var escaped;');
+  expect(output).toContain('escaped = i;');
+});
+
 test.each([
   {
     name: 'for-of function expression',
@@ -62,10 +95,12 @@ test.each([
   },
   {
     name: 'for test',
+    capturesHeader: true,
     source: 'for (let i = 0; (() => { let limit = 2; return i < limit; })(); i++) use(i);',
   },
   {
     name: 'for update',
+    capturesHeader: true,
     source: 'for (let i = 0; i < 2; (() => { let step = 1; i += step; })()) use(i);',
   },
   {
@@ -76,9 +111,10 @@ test.each([
     name: 'do-while test',
     source: 'do { work(); } while ((() => { let value = next(); return value; })());',
   },
-])('lowers header locals without generating a body wrapper: $name', async ({ source }) => {
+])('lowers loop headers: $name', async ({ source, capturesHeader }) => {
   const output = await transformSource(source, 'input.js', { transforms: { blockScoping: true } });
   expect(output).not.toMatch(/\b(?:let|const)\b/);
   expect(output).toMatch(/\bvar\b/);
-  expect(output).not.toContain('_loop');
+  if (capturesHeader) expect(output).toContain('_loop');
+  else expect(output).not.toContain('_loop');
 });
