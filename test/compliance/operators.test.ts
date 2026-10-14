@@ -1,5 +1,5 @@
-import { expect, test } from 'vitest';
-import { execute } from './runtime';
+import { beforeAll, describe, expect, test } from 'vitest';
+import { compile, execute } from './runtime';
 
 test('optional chaining short-circuits without evaluating keys or arguments', () => {
   const result = execute<{ result: unknown[] }>(
@@ -485,3 +485,469 @@ test('object rest copies enumerable own properties and excludes selected keys', 
   );
   expect(result.result).toEqual([3, 4, 5, false, false]);
 });
+
+// Native execution establishes the specification result independently of the
+// transform. Compile outside test.fails so transform errors cannot accidentally
+// satisfy these known runtime regressions.
+const additionalComplianceCases: {
+  name: string;
+  source: string;
+  plan: import('../../js').PreflightPlan;
+  expected: unknown;
+  bindings?: Record<string, unknown>;
+  knownFailure: boolean;
+}[] = [
+  {
+    name: 'optional calls retain the receiver when the method getter reassigns it',
+    source: `
+      let receiver;
+      const first = {
+        name: 'first',
+        get method() {
+          receiver = { name: 'second' };
+          return function () {
+            return this.name;
+          };
+        },
+      };
+      receiver = first;
+      globalThis.result = receiver.method?.();
+    `,
+    plan: { transforms: { optionalChaining: { loose: false } } },
+    expected: 'first',
+    knownFailure: true,
+  },
+  {
+    name: 'private logical assignment retains the receiver when its getter reassigns it',
+    source: `
+      let receiver;
+      const writes = [];
+      class Value {
+        constructor(name) {
+          this.name = name;
+        }
+        get #value() {
+          receiver = second;
+          return 0;
+        }
+        set #value(value) {
+          writes.push([this.name, value]);
+        }
+        static write() {
+          return (receiver.#value ||= 3);
+        }
+      }
+      const first = new Value('first');
+      const second = new Value('second');
+      receiver = first;
+      globalThis.result = [Value.write(), writes];
+    `,
+    plan: { transforms: { logicalAssignmentOperators: true } },
+    expected: [3, [['first', 3]]],
+    knownFailure: true,
+  },
+  {
+    name: 'escaped identifiers cannot collide with object spread helpers',
+    source: String.raw`
+    const _ext\u0065nds = 'user';
+    globalThis.result = [_ext\u0065nds, {...{value: 1}}];
+  `,
+    plan: { transforms: { objectRestSpread: { loose: true, useBuiltIns: false } } },
+    expected: ['user', { value: 1 }],
+    knownFailure: true,
+  },
+  {
+    name: 'object rest preserves an own __proto__ data property without changing its prototype',
+    source: `
+      const source = JSON.parse('{"__proto__":{"marker":1},"omit":2,"keep":3}');
+      const { omit, ...rest } = source;
+      globalThis.result = [
+        Object.prototype.hasOwnProperty.call(rest, '__proto__'),
+        Object.getPrototypeOf(rest) === Object.prototype,
+        rest.__proto__.marker,
+        rest.keep,
+      ];
+    `,
+    plan: { transforms: { objectRestSpread: { loose: false, useBuiltIns: false } } },
+    expected: [true, true, 1, 3],
+    knownFailure: true,
+  },
+  {
+    name: 'private logical assignment in defaults isolates receiver temporaries during reentry',
+    source: `
+      let recurse = true;
+      let second;
+      class Value {
+        constructor(name) {
+          this.name = name;
+          this.stored = 0;
+        }
+        self() {
+          return this;
+        }
+        get #value() {
+          if (recurse) {
+            recurse = false;
+            Value.write(second);
+          }
+          return 0;
+        }
+        set #value(value) {
+          this.stored = value;
+        }
+        static write(obj, value = (obj.self().#value ||= 3)) {
+          return value;
+        }
+      }
+      const first = new Value('first');
+      second = new Value('second');
+      Value.write(first);
+      globalThis.result = [first.stored, second.stored];
+    `,
+    plan: { transforms: { logicalAssignmentOperators: true } },
+    expected: [3, 3],
+    knownFailure: true,
+  },
+  {
+    name: 'private assignment field initializer static this',
+    source: `class Value{static #x=0;static read=(()=>this.#x ||= 2)();static get(){return this.#x;}}globalThis.result=[Value.read,Value.get()];`,
+    plan: { transforms: { logicalAssignmentOperators: true } },
+    expected: [2, 2],
+    knownFailure: false,
+  },
+  {
+    name: 'strict spread preserves method and accessor names and nonconstructability',
+    source: `
+      const key = Symbol('key');
+      const object = { ...{}, method() {}, [key]() {}, get value() { return 1; } };
+      const descriptor = Object.getOwnPropertyDescriptor(object, 'value');
+      globalThis.result = [object.method.name, object[key].name, descriptor.get.name,
+        Object.hasOwn(object.method, 'prototype')];
+    `,
+    plan: { transforms: { objectRestSpread: { loose: false, useBuiltIns: false } } },
+    expected: ['method', '[key]', 'get value', false],
+    knownFailure: false,
+  },
+  {
+    name: 'strict spread preserves property initializer names during class initialization',
+    source: `
+      let observed;
+      const object = {
+        ...{},
+        value: class { static { observed = this.name; } },
+        fn: function () {},
+        arrow: () => {},
+      };
+      globalThis.result = [observed, object.value.name, object.fn.name, object.arrow.name];
+    `,
+    plan: { transforms: { objectRestSpread: { loose: false, useBuiltIns: false } } },
+    expected: ['value', 'value', 'fn', 'arrow'],
+    knownFailure: false,
+  },
+  {
+    name: 'strict spread preserves the home object of an initial getter',
+    source: `
+      const object = { __proto__: { value: 1 }, get read() { return super.value; }, ...{ value: 2 } };
+      Object.setPrototypeOf(object, { value: 3 });
+      globalThis.result = object.read;
+    `,
+    plan: { transforms: { objectRestSpread: { loose: false, useBuiltIns: false } } },
+    expected: 3,
+    knownFailure: false,
+  },
+  {
+    name: 'strict spread skips nonenumerable properties without replacing existing accessors',
+    source: `
+      const source = Object.defineProperty({}, 'value', { value: 2, enumerable: false });
+      const object = { get value() { return 1; }, ...source };
+      globalThis.result = [object.value, typeof Object.getOwnPropertyDescriptor(object, 'value').get];
+    `,
+    plan: { transforms: { objectRestSpread: { loose: false, useBuiltIns: false } } },
+    expected: [1, 'function'],
+    knownFailure: false,
+  },
+  {
+    name: 'strict spread copies before later property evaluation',
+    source: `
+   const events = [];
+   const source = { get a() { events.push('get'); return 1; } };
+   const result = { ...source, b: (events.push('later'), 2) };
+   globalThis.result = [result, events];
+     `,
+    plan: { transforms: { objectRestSpread: { loose: false, useBuiltIns: false } } },
+    expected: [{ a: 1, b: 2 }, ['get', 'later']],
+    knownFailure: false,
+  },
+  {
+    name: 'strict spread preserves getter descriptor following spread',
+    source: `
+   const events = [];
+   const result = { ...{}, get a() { events.push('get'); return 1; } };
+   globalThis.result = [typeof Object.getOwnPropertyDescriptor(result,'a').get, events];
+     `,
+    plan: { transforms: { objectRestSpread: { loose: false, useBuiltIns: false } } },
+    expected: ['function', []],
+    knownFailure: false,
+  },
+  {
+    name: 'strict spread methods use final object as home object',
+    source: `
+   const result = { ...{}, read() { return super.value; } };
+   Object.setPrototypeOf(result, {value:3});
+   globalThis.result = result.read();
+     `,
+    plan: { transforms: { objectRestSpread: { loose: false, useBuiltIns: false } } },
+    expected: 3,
+    knownFailure: true,
+  },
+  {
+    name: 'strict spread prototype setter after spread',
+    source: `
+   const proto = {value:3};
+   const result = { ...{}, __proto__: proto };
+   globalThis.result = [Object.getPrototypeOf(result)===proto, result.value];
+     `,
+    plan: { transforms: { objectRestSpread: { loose: false, useBuiltIns: false } } },
+    expected: [true, 3],
+    knownFailure: true,
+  },
+  {
+    name: 'logical assignment preserves native computed-key coercion timing',
+    source: `
+   const events = [];
+   const key = { [Symbol.toPrimitive]() { events.push('key'); return events.length===1 ? 'a' : 'b'; } };
+   const object = { a: 0 };
+   object[key] ||= 2;
+   globalThis.result = [object, events];
+     `,
+    plan: { transforms: { logicalAssignmentOperators: true } },
+    expected: [{ a: 0, b: 2 }, ['key', 'key']],
+    knownFailure: false,
+  },
+  {
+    name: 'exponentiation assignment preserves native computed-key coercion timing',
+    source: `
+   const events = [];
+   const key = { [Symbol.toPrimitive]() { events.push('key'); return events.length===1 ? 'a' : 'b'; } };
+   const object = { a: 3 };
+   object[key] **= 2;
+   globalThis.result = [object, events];
+     `,
+    plan: { transforms: { exponentiationOperator: true } },
+    expected: [{ a: 3, b: 9 }, ['key', 'key']],
+    knownFailure: false,
+  },
+  {
+    name: 'strict spread accessor halves merge across spread',
+    source: `
+   const events = [];
+   const result = { get value() { return 3; }, ...{}, set value(next) { events.push(next); } };
+   result.value = 4;
+   globalThis.result = [result.value, events];
+     `,
+    plan: { transforms: { objectRestSpread: { loose: false, useBuiltIns: false } } },
+    expected: [3, [4]],
+    knownFailure: true,
+  },
+  {
+    name: 'strict spread honors proxy key order across symbols',
+    source: `
+   const events = [];
+   const symbol = Symbol('first');
+   const source = new Proxy({ get a() { events.push('a'); return 1; }, get [symbol]() { events.push('symbol'); return 2; } }, {
+     ownKeys() { events.push('keys'); return [symbol, 'a']; }
+   });
+   const result = {...source};
+   globalThis.result = [result.a, result[symbol], events];
+     `,
+    plan: { transforms: { objectRestSpread: { loose: false, useBuiltIns: false } } },
+    expected: [1, 2, ['keys', 'symbol', 'a']],
+    knownFailure: true,
+  },
+  {
+    name: 'strict spread rechecks descriptors after preceding getters',
+    source: `
+   const source = { get a() { Object.defineProperty(this, 'b', { enumerable: false }); return 1; }, b: 2 };
+   const result = {...source};
+   globalThis.result = [result.a, Object.hasOwn(result, 'b')];
+     `,
+    plan: { transforms: { objectRestSpread: { loose: false, useBuiltIns: false } } },
+    expected: [1, false],
+    knownFailure: true,
+  },
+  {
+    name: 'strict spread does not query inherited property existence',
+    source: `
+   const events = [];
+   const proto = new Proxy({}, { has(target, key) { events.push(String(key)); return false; } });
+   const result = { __proto__: proto, ...{a:1} };
+   globalThis.result = [result.a, events];
+     `,
+    plan: { transforms: { objectRestSpread: { loose: false, useBuiltIns: false } } },
+    expected: [1, []],
+    knownFailure: true,
+  },
+  {
+    name: 'exponentiation preserves dynamic BigInt operands',
+    source: `
+ function power(left,right){return left**right;}globalThis.result=String(power(2n,3n));
+    `,
+    plan: { transforms: { exponentiationOperator: true } },
+    expected: '8',
+    knownFailure: true,
+  },
+  {
+    name: 'exponentiation converts boxed BigInts',
+    source: `
+ globalThis.result=String(Object(2n)**Object(3n));
+    `,
+    plan: { transforms: { exponentiationOperator: true } },
+    expected: '8',
+    knownFailure: true,
+  },
+  {
+    name: 'exponentiation preserves primitive conversion hint and order',
+    source: `
+ const events=[];
+ const left={[Symbol.toPrimitive](hint){events.push('left:'+hint);return 2;}};
+ const right={[Symbol.toPrimitive](hint){events.push('right:'+hint);return 3;}};
+ globalThis.result=[left**right,events];
+    `,
+    plan: { transforms: { exponentiationOperator: true } },
+    expected: [8, ['left:number', 'right:number']],
+    knownFailure: false,
+  },
+  {
+    name: 'exponentiation accepts object conversions yielding BigInts',
+    source: `
+ const events=[];
+ const left={valueOf(){events.push('left');return 2n;}};
+ const right={valueOf(){events.push('right');return 3n;}};
+ globalThis.result=[String(left**right),events];
+    `,
+    plan: { transforms: { exponentiationOperator: true } },
+    expected: ['8', ['left', 'right']],
+    knownFailure: true,
+  },
+  {
+    name: 'exponentiation does not resolve shadowed Math',
+    source: `
+ function power(Math){return 2**3;}globalThis.result=power(null);
+    `,
+    plan: { transforms: { exponentiationOperator: true } },
+    expected: 8,
+    knownFailure: true,
+  },
+  {
+    name: 'exponentiation assignment retains receiver across getter mutation',
+    source: `
+ const writes=[];const second={value:5};let receiver;
+ const first={get value(){receiver=second;return 3;},set value(value){writes.push(value);}};
+ receiver=first;const result=receiver.value**=2;globalThis.result=[result,writes,second.value];
+    `,
+    plan: { transforms: { exponentiationOperator: true } },
+    expected: [9, [9], 5],
+    knownFailure: false,
+  },
+  {
+    name: 'exponentiation assignment retains receiver across RHS mutation',
+    source: `
+ const first={value:3};const second={value:5};let receiver=first;
+ const result=receiver.value**=(receiver=second,2);globalThis.result=[result,first.value,second.value];
+    `,
+    plan: { transforms: { exponentiationOperator: true } },
+    expected: [9, 9, 5],
+    knownFailure: false,
+  },
+  {
+    name: 'exponentiation assignment retains original numeric operand across RHS mutation',
+    source: `
+ let value=3;const result=value**=(value=5,2);globalThis.result=[result,value];
+    `,
+    plan: { transforms: { exponentiationOperator: true } },
+    expected: [9, 9],
+    knownFailure: false,
+  },
+  {
+    name: 'exponentiation assignment preserves RHS before numeric conversion',
+    source: `
+ const events=[];const object={value:{valueOf(){events.push('convert');return 3;}}};
+ const result=object.value**=(events.push('rhs'),2);globalThis.result=[result,events];
+    `,
+    plan: { transforms: { exponentiationOperator: true } },
+    expected: [9, ['rhs', 'convert']],
+    knownFailure: false,
+  },
+  {
+    name: 'optional method calls ignore overridden call properties',
+    source: `
+ const object={value:2,method(){return this.value;}};object.method.call=()=>99;globalThis.result=object.method?.();
+    `,
+    plan: { transforms: { optionalChaining: { loose: false } } },
+    expected: 2,
+    knownFailure: true,
+  },
+  {
+    name: 'optional method calls reject noncallables with call properties',
+    source: `
+ const object={method:{call(){return 99;}}};try{globalThis.result=object.method?.();}catch(error){globalThis.result=error.name;}
+    `,
+    plan: { transforms: { optionalChaining: { loose: false } } },
+    expected: 'TypeError',
+    knownFailure: true,
+  },
+  {
+    name: 'optional plain calls ignore overridden call properties',
+    source: `
+ function method(){return 2;}method.call=()=>99;globalThis.result=method?.();
+    `,
+    plan: { transforms: { optionalChaining: { loose: false } } },
+    expected: 2,
+    knownFailure: false,
+  },
+  {
+    name: 'optional method calls preserve primitive receivers',
+    source: `
+ globalThis.result='abc'.slice?.(1);
+    `,
+    plan: { transforms: { optionalChaining: { loose: false } } },
+    expected: 'bc',
+    knownFailure: false,
+  },
+  {
+    name: 'logical assignments preserve inferred function and class names',
+    source: `
+ let first=null,second=0,third=1;first??=function(){};second||=()=>{};third&&=class{static observed=this.name;};globalThis.result=[first.name,second.name,third.name,third.observed];
+    `,
+    plan: { transforms: { logicalAssignmentOperators: true } },
+    expected: ['first', 'second', 'third', 'third'],
+    knownFailure: false,
+  },
+];
+
+describe.each(additionalComplianceCases)(
+  '$name',
+  ({ source, plan, expected, bindings = {}, knownFailure }) => {
+    let code: string;
+    beforeAll(() => {
+      code = compile(source, plan);
+    });
+
+    const run = (input: string) => {
+      const context: Record<string, unknown> = {};
+      new Function(...Object.keys(bindings), 'globalThis', input)(
+        ...Object.values(bindings),
+        context,
+      );
+      return context.result;
+    };
+
+    test('native execution', () => {
+      expect(run(source)).toEqual(expected);
+    });
+    const transformedTest = knownFailure ? test.fails : test;
+    transformedTest('transformed execution', () => {
+      expect(run(code)).toEqual(expected);
+    });
+  },
+);
