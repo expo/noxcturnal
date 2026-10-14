@@ -912,6 +912,58 @@ mod tests {
     }
 
     #[test]
+    fn named_identity_projects_inner_names_at_later_boundaries() {
+        let inner = single_line(vec![
+            MappingPoint {
+                name: 1,
+                ..mapped(0, 10, MappingBehavior::Boundary)
+            },
+            MappingPoint {
+                name: 2,
+                ..mapped(3, 20, MappingBehavior::Anchor)
+            },
+            unmapped(5),
+            MappingPoint {
+                name: 3,
+                ..mapped(7, 30, MappingBehavior::Boundary)
+            },
+        ]);
+        let outer = single_line(vec![MappingPoint {
+            name: 4,
+            ..mapped(0, 0, MappingBehavior::Identity)
+        }]);
+        let result = compose_decoded(&outer, &inner, &mut MappingBudget::new()).unwrap();
+        let points = result.line(0).unwrap();
+        assert_eq!(points.len(), 4);
+        assert_eq!(
+            (
+                points[0].generated_column,
+                points[0].original_column,
+                points[0].name
+            ),
+            (0, 10, 4)
+        );
+        assert_eq!(
+            (
+                points[1].generated_column,
+                points[1].original_column,
+                points[1].name
+            ),
+            (3, 20, 2)
+        );
+        assert!(points[2].is_unmapped());
+        assert_eq!((points[2].generated_column, points[2].name), (5, 0));
+        assert_eq!(
+            (
+                points[3].generated_column,
+                points[3].original_column,
+                points[3].name
+            ),
+            (7, 30, 3)
+        );
+    }
+
+    #[test]
     fn composition_order_is_observable_for_sparse_layers() {
         let layers = [
             single_line(vec![mapped(8, 8, MappingBehavior::Identity)]),
