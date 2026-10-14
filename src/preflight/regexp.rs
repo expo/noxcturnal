@@ -593,6 +593,13 @@ impl<'a> VisitMut<'a> for RegexpLowerer<'a> {
 }
 
 fn parse_class_ranges(body: &str) -> Result<Vec<(u32, u32)>, &'static str> {
+    parse_class_ranges_with_case(body, false)
+}
+
+fn parse_class_ranges_with_case(
+    body: &str,
+    ignore_case: bool,
+) -> Result<Vec<(u32, u32)>, &'static str> {
     let mut ranges: Vec<(u32, u32)> = Vec::new();
     let mut pending: Option<u32> = None;
     let bytes = body.as_bytes();
@@ -602,7 +609,7 @@ fn parse_class_ranges(body: &str) -> Result<Vec<(u32, u32)>, &'static str> {
     while index < bytes.len() {
         if bytes[index] == b'-' && pending.is_some() && index + 1 < bytes.len() {
             index += 1;
-            let (upper, next) = class_atom(body, index)?;
+            let (upper, next) = class_atom_with_case(body, index, ignore_case)?;
             let ClassAtom::Single(upper) = upper else {
                 return Err("regexp-unicode-property-class-range-invalid");
             };
@@ -619,7 +626,7 @@ fn parse_class_ranges(body: &str) -> Result<Vec<(u32, u32)>, &'static str> {
         if let Some(single) = pending.take() {
             ranges.push((single, single));
         }
-        let (atom, next) = class_atom(body, index)?;
+        let (atom, next) = class_atom_with_case(body, index, ignore_case)?;
         match atom {
             ClassAtom::Single(code_point) => pending = Some(code_point),
             ClassAtom::Ranges(mut property) => ranges.append(&mut property),
@@ -1326,6 +1333,27 @@ enum ClassAtom {
     Ranges(Vec<(u32, u32)>),
 }
 
+fn class_atom_with_case(
+    body: &str,
+    index: usize,
+    ignore_case: bool,
+) -> Result<(ClassAtom, usize), &'static str> {
+    if ignore_case && let Some(escape) = body.get(index..index + 2) {
+        let kind = match escape {
+            "\\w" => Some(CharacterClassEscapeKind::W),
+            "\\W" => Some(CharacterClassEscapeKind::NegativeW),
+            _ => None,
+        };
+        if let Some(kind) = kind {
+            return Ok((
+                ClassAtom::Ranges(word_aware_class_escape_ranges(kind, true)),
+                index + 2,
+            ));
+        }
+    }
+    class_atom(body, index)
+}
+
 /// Reads one item of a character class, returning it and the index after it.
 fn class_atom(body: &str, index: usize) -> Result<(ClassAtom, usize), &'static str> {
     let bytes = body.as_bytes();
@@ -1690,7 +1718,7 @@ fn lower_unicode(pattern: &str, dot_all: bool, ignore_case: bool) -> Result<Stri
                 let (negative, body) = body
                     .strip_prefix('^')
                     .map_or((false, body), |body| (true, body));
-                let ranges = parse_class_ranges(body)?;
+                let ranges = parse_class_ranges_with_case(body, ignore_case)?;
                 let ranges = if negative && ignore_case {
                     fold_ranges(&ranges)
                 } else {
@@ -1709,7 +1737,9 @@ fn lower_unicode(pattern: &str, dot_all: bool, ignore_case: bool) -> Result<Stri
                         },
                         true,
                     ))
-                } else if atom.contains("\\u{") {
+                } else if atom.contains("\\u{")
+                    || ignore_case && (atom.contains("\\w") || atom.contains("\\W"))
+                {
                     Ok(render_ranges(&ranges, true))
                 } else {
                     Ok(atom.to_owned())
@@ -1717,6 +1747,17 @@ fn lower_unicode(pattern: &str, dot_all: bool, ignore_case: bool) -> Result<Stri
             }
             if atom.starts_with("\\p{") || atom.starts_with("\\P{") {
                 return Err("regexp-unicode-property-prerequisite-postcondition-failed");
+            }
+            if ignore_case && matches!(atom, "\\w" | "\\W") {
+                let kind = if atom == "\\w" {
+                    CharacterClassEscapeKind::W
+                } else {
+                    CharacterClassEscapeKind::NegativeW
+                };
+                return Ok(render_ranges(
+                    &word_aware_class_escape_ranges(kind, true),
+                    true,
+                ));
             }
             if atom == "." {
                 let ranges = if dot_all {

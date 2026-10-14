@@ -173,3 +173,30 @@ test('legacy identity escape k is not a named reference without named captures',
   expect(code).not.toMatch(/\/s\b/);
   expect(run(code)).toEqual(run(source));
 });
+
+describe.each([
+  String.raw`\w`,
+  String.raw`\W`,
+  String.raw`[\w]`,
+  String.raw`[\W]`,
+  String.raw`[^\w]`,
+  String.raw`[^\W]`,
+])('Unicode word atom %s', atom => {
+  test('closes Unicode word membership before outer complement', () => {
+    const source = `globalThis.result=['K','k','s','S','K','ſ','1','!','😀'].map(value=>/^${atom}$/iu.test(value));`;
+    const expected = run(source);
+    const reference = transformSync(source, {
+      configFile: false,
+      babelrc: false,
+      plugins: [require('@babel/plugin-transform-unicode-regex')],
+    })!.code!;
+    expect(run(reference)).toEqual(expected);
+    for (const regexpUnicodePropertyEscapes of [false, true]) {
+      const code = compile(source, {
+        transforms: { regexpUnicode: true, regexpUnicodePropertyEscapes },
+      });
+      expect(code).not.toMatch(/\/iu\b/);
+      expect(run(code)).toEqual(expected);
+    }
+  });
+});
