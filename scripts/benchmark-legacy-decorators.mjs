@@ -5,7 +5,7 @@ const require = createRequire(import.meta.url);
 const fixed = require('../dist/noxcturnal.js');
 const baseline = require(process.env.NOXCTURNAL_BENCH_BASELINE);
 const samples = 9;
-const iterations = 40;
+const iterations = 20;
 const median = values => values.sort((a, b) => a - b)[Math.floor(values.length / 2)];
 const sources = {
   members: Array.from(
@@ -27,51 +27,66 @@ const report = {
   transform: {},
   runtime: {},
 };
-for (const [name, source] of Object.entries(sources)) {
-  const results = {};
-  for (const [label, api] of [
-    ['baseline', baseline],
-    ['fixed', fixed],
-  ]) {
-    const pipeline = api.defineNativePipeline({
-      phases: [
-        { name: 'bench', native: { typescript: 'strip', transforms: { legacyDecorators: true } } },
-      ],
-    });
-    for (let i = 0; i < 20; i++) api.transform(source, 'bench.ts', pipeline);
-    const times = [];
-    for (let sample = 0; sample < samples; sample++) {
-      const start = performance.now();
-      for (let i = 0; i < iterations; i++) api.transform(source, 'bench.ts', pipeline);
-      times.push((performance.now() - start) / iterations);
-    }
-    const result = api.transform(source, 'bench.ts', pipeline);
-    if (result.status !== 'complete') throw new Error(result.reason);
-    results[label] = { medianMs: median(times), bytes: result.code.length };
-  }
-  report.transform[name] = results;
-}
-for (const [label, api] of [
+const apis = [
   ['baseline', baseline],
   ['fixed', fixed],
-]) {
-  const pipeline = api.defineNativePipeline({
+];
+function sampleBoth(entries, execute) {
+  for (let sample = 0; sample < samples; sample++) {
+    const ordered = sample % 2 ? [...entries].reverse() : entries;
+    for (const entry of ordered) execute(entry);
+  }
+}
+function pipeline(api) {
+  return api.defineNativePipeline({
     phases: [
-      { name: 'bench', native: { typescript: 'strip', transforms: { legacyDecorators: true } } },
+      {
+        name: 'bench',
+        native: {
+          typescript: 'strip',
+          transforms: { legacyDecorators: true },
+        },
+      },
     ],
   });
-  const source = `function mark(){} class C{@mark static accessor value=0} function run(){C.value++;return C.value}`;
-  const result = api.transform(source, 'bench.ts', pipeline);
+}
+for (const [name, source] of Object.entries(sources)) {
+  const entries = apis.map(([label, api]) => ({ label, api, pipeline: pipeline(api), times: [] }));
+  for (const entry of entries) {
+    for (let i = 0; i < 20; i++) entry.api.transform(source, 'bench.ts', entry.pipeline);
+  }
+  sampleBoth(entries, entry => {
+    const start = performance.now();
+    for (let i = 0; i < iterations; i++) entry.api.transform(source, 'bench.ts', entry.pipeline);
+    entry.times.push((performance.now() - start) / iterations);
+  });
+  report.transform[name] = {};
+  for (const entry of entries) {
+    const result = entry.api.transform(source, 'bench.ts', entry.pipeline);
+    if (result.status !== 'complete') throw new Error(result.reason);
+    report.transform[name][entry.label] = {
+      medianMs: median(entry.times),
+      bytes: result.code.length,
+    };
+  }
+}
+const source = `function mark(){} class C{@mark static accessor value=0} function run(){C.value++;return C.value}`;
+const runtime = apis.map(([label, api]) => {
+  const result = api.transform(source, 'bench.ts', pipeline(api));
   if (result.status !== 'complete') throw new Error(result.reason);
   const run = new Function(result.code + ';return run;')();
   for (let i = 0; i < 10000; i++) run();
-  const times = [];
-  let checksum = 0;
-  for (let sample = 0; sample < samples; sample++) {
-    const start = performance.now();
-    for (let i = 0; i < 1000000; i++) checksum += run();
-    times.push((performance.now() - start) / 1000000);
-  }
-  report.runtime[label] = { medianMicroseconds: median(times) * 1000, checksum };
+  return { label, run, times: [], checksum: 0 };
+});
+sampleBoth(runtime, entry => {
+  const start = performance.now();
+  for (let i = 0; i < 1000000; i++) entry.checksum += entry.run();
+  entry.times.push((performance.now() - start) / 1000000);
+});
+for (const entry of runtime) {
+  report.runtime[entry.label] = {
+    medianMicroseconds: median(entry.times) * 1000,
+    checksum: entry.checksum,
+  };
 }
 console.log(JSON.stringify(report, null, 2));
