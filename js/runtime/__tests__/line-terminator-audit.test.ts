@@ -3,11 +3,11 @@ import { beforeAll, describe, expect, test } from 'vitest';
 import { defineNativePipeline, defineNativePlugin, defineVisitor, transform } from '../../index';
 
 const cases = [
-  { name: 'LF', separator: '\n', fails: false },
-  { name: 'CRLF', separator: '\r\n', fails: false },
-  { name: 'CR', separator: '\r', fails: true },
-  { name: 'line separator', separator: '\u2028', fails: true },
-  { name: 'paragraph separator', separator: '\u2029', fails: true },
+  { name: 'LF', separator: '\n' },
+  { name: 'CRLF', separator: '\r\n' },
+  { name: 'CR', separator: '\r' },
+  { name: 'line separator', separator: '\u2028' },
+  { name: 'paragraph separator', separator: '\u2029' },
 ];
 describe.each(cases)('visitor location after $name', entry => {
   const source = `void '🙂';${entry.separator}3;`;
@@ -40,7 +40,7 @@ describe.each(cases)('visitor location after $name', entry => {
       end: { line: loc.end.line, column: loc.end.column },
     }).toEqual(expected);
   });
-  (entry.fails ? test.fails : test)('public visitor reports line and UTF-16 column', () => {
+  test('public visitor reports line and UTF-16 column', () => {
     expect(actual).toEqual(expected);
   });
 });
@@ -72,7 +72,7 @@ describe.each(cases)('unsupported diagnostic after $name', entry => {
     const diagnostic = result.diagnostics[0]!;
     offsets = [diagnostic.start, diagnostic.end];
   });
-  (entry.fails ? test.fails : test)('line and column map to the requested source range', () => {
+  test('line and column map to the requested source range', () => {
     const start = source.indexOf('3');
     expect(offsets).toEqual([start, start + 1]);
   });

@@ -2,6 +2,7 @@ import { native } from '../native/binding';
 import { CHILD_ROLES, FIELD_KEY_IDS } from '../generated/event-schema';
 import { alias, array } from '../pipeline/route-utils';
 import {
+  isFragmentList,
   isProvenanceCode,
   makeSourceFragment,
   realizeContent,
@@ -498,7 +499,36 @@ export class NodePathImpl implements NativeNodePath {
       this.#replaceStructured({ kind: 'composite', parts });
       return;
     }
-    this.#edit('Replace', joinFragments(code as readonly (string | CodeFragment)[]));
+    const fragments = code as readonly (string | CodeFragment)[];
+    if (fragments.length === 1) {
+      const fragment = fragments[0]!;
+      this.#edit(
+        'Replace',
+        typeof fragment === 'string' ? { code: fragment, mapping: 'anchor-boundaries' } : fragment,
+      );
+      return;
+    }
+    const policies = fragments.map(value =>
+      typeof value === 'string' ? 'anchor-boundaries' : (value.mapping ?? 'sourceless'),
+    );
+    if (
+      new Set(policies).size > 1 ||
+      fragments.some(value => typeof value !== 'string' && value.names?.length)
+    ) {
+      // A single edit has one mapping policy. Keep heterogeneous text runs separate
+      // so an anchored sibling cannot give sourceless text a source location.
+      fragments.forEach((value, index) => {
+        if (index > 0) this.#insert('AppendRight', this.event.start, '\n');
+        this.#insert(
+          'AppendRight',
+          this.event.start,
+          typeof value === 'string' ? { code: value, mapping: 'anchor-boundaries' } : value,
+        );
+      });
+      this.remove();
+      return;
+    }
+    this.#edit('Replace', joinFragments(fragments));
   }
   update(code: Code): void {
     this.replaceWith(code);
@@ -516,11 +546,36 @@ export class NodePathImpl implements NativeNodePath {
     prefix = '',
     suffix = '',
   ): void {
+    if (
+      isFragmentList(content) ||
+      (typeof content !== 'string' && 'kind' in content && content.kind === 'composite')
+    ) {
+      const parts: Code[] = [];
+      if (prefix) parts.push(prefix);
+      if (isFragmentList(content)) {
+        content.forEach((part, index) => {
+          if (index > 0) parts.push('\n');
+          parts.push(part);
+        });
+      } else {
+        parts.push(...content.parts);
+      }
+      if (suffix) parts.push(suffix);
+      if (kind === 'PrependLeft' || kind === 'PrependRight' || kind === 'Prefix') parts.reverse();
+      for (const part of parts) this.#insert(kind, offset, part);
+      return;
+    }
+    const fragment =
+      !isFragmentList(content) && typeof content !== 'string' && !('kind' in content)
+        ? content
+        : undefined;
     this.runtime.edits.push({
       kind,
       start: offset,
       end: offset,
       ...realizeContent(this.runtime.session, content, this.#degraded, prefix, suffix),
+      mapping: fragment ? mappingPolicy(fragment.mapping) : undefined,
+      names: fragment?.names ? [...fragment.names] : undefined,
       owner: this.runtime.owner,
       order: this.runtime.nextOrder(),
     });
@@ -894,9 +949,8 @@ function isBindingOwnerType(type: string): boolean {
 function joinFragments(values: readonly (string | CodeFragment)[]): CodeFragment {
   return {
     code: values.map(value => (typeof value === 'string' ? value : value.code)).join('\n'),
-    mapping: values.some(value => typeof value !== 'string' && value.mapping === 'identity')
-      ? 'identity'
-      : 'anchor-boundaries',
+    mapping:
+      typeof values[0] === 'string' ? 'anchor-boundaries' : (values[0]?.mapping ?? 'sourceless'),
     names: values.flatMap(value => (typeof value === 'string' ? [] : [...(value.names ?? [])])),
   };
 }

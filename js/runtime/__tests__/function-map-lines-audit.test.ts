@@ -39,11 +39,11 @@ function frames(map: FunctionMap) {
 }
 
 const separators = [
-  { name: 'LF', text: '\n', fails: false },
-  { name: 'CRLF', text: '\r\n', fails: false },
-  { name: 'CR', text: '\r', fails: true },
-  { name: 'LS', text: '\u2028', fails: true },
-  { name: 'PS', text: '\u2029', fails: true },
+  { name: 'LF', text: '\n' },
+  { name: 'CRLF', text: '\r\n' },
+  { name: 'CR', text: '\r' },
+  { name: 'LS', text: '\u2028' },
+  { name: 'PS', text: '\u2029' },
 ];
 describe.each(separators)('function frame after $name', entry => {
   let actual: ReturnType<typeof frames>;
@@ -61,16 +61,10 @@ describe.each(separators)('function frame after $name', entry => {
     if (result.status !== 'complete') throw new Error('Unexpected bailout');
     expect(result.functionMap).toEqual(standalone);
     actual = frames(standalone).filter(frame => frame.name === 'named');
-    expect(actual).toEqual([
-      { name: 'named', line: entry.fails ? 1 : 2, column: entry.fails ? 11 : 0 },
-    ]);
   });
-  (entry.fails ? test.fails : test)(
-    'named frame begins at the parsed function location through both APIs',
-    () => {
-      expect(actual).toEqual([{ name: 'named', line: 2, column: 0 }]);
-    },
-  );
+  test('named frame begins at the parsed function location through both APIs', () => {
+    expect(actual).toEqual([{ name: 'named', line: 2, column: 0 }]);
+  });
 });
 
 test('both function-map entry paths preserve blank lines and UTF-16 columns', () => {
