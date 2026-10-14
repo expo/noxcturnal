@@ -581,13 +581,15 @@ fn transform_impl(
     if final_program.has_diagnostics() {
         return Ok(unsupported("parse-error", std::iter::empty::<&str>()));
     }
+    // The parser recognizes HTML-style script comments as well as // and /*.
+    // Reuse its comment list instead of scanning text (which also matches strings).
+    let strip_comments = options.comments == Some(false)
+        && !final_program.borrow_dependent().program.comments.is_empty();
     if !requires_generic_pipeline(&options) {
         let should_render = options.constant_folding == Some(true)
             || options.dead_code_elimination == Some(true)
             || options.compact == Some(true)
-            || (options.comments == Some(false)
-                && (final_program.borrow_owner().source.contains("//")
-                    || final_program.borrow_owner().source.contains("/*")));
+            || strip_comments;
         if !should_render {
             return Ok(identity_result(
                 final_program.into_owner().source,
@@ -1307,8 +1309,7 @@ fn transform_impl(
             && options.constant_folding != Some(true)
             && options.dead_code_elimination != Some(true)
             && options.compact != Some(true)
-            && !(options.comments == Some(false)
-                && (source.contains("//") || source.contains("/*")))
+            && !strip_comments
         {
             return Ok(identity_result(
                 source.to_owned(),
