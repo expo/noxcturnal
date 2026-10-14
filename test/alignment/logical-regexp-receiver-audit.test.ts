@@ -32,7 +32,7 @@ describe.each([false, true])('logical assignment regexp receiver, named=%s', nam
     expect(nox).not.toContain('@babel/runtime');
     actual = observe(nox);
   });
-  (named ? test : test.fails)('reads and writes the same regexp instance', () => {
+  test('reads and writes the same regexp instance', () => {
     expect(actual).toEqual(expected);
   });
 });

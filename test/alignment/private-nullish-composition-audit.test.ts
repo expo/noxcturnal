@@ -55,10 +55,7 @@ describe.each([false, true])('private nullish completion, separate phases=%s', s
     expect(code).not.toContain('??=');
     expect(code).not.toContain('@babel/runtime');
   });
-  (separated ? test : test.fails)(
-    'removes nullish syntax created by private assignment completion',
-    () => {
-      expect(code).not.toContain('??');
-    },
-  );
+  test('removes nullish syntax created by private assignment completion', () => {
+    expect(code).not.toContain('??');
+  });
 });

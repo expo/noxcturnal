@@ -109,7 +109,6 @@ pub fn duplicate_expression_multiple<'a, const N: usize>(
         | Expression::NullLiteral(_)
         | Expression::NumericLiteral(_)
         | Expression::BigIntLiteral(_)
-        | Expression::RegExpLiteral(_)
         | Expression::StringLiteral(_) => {
             let references = array::from_fn(|_| expr.clone_in(ctx.allocator()));
             return (expr, references);
@@ -130,7 +129,8 @@ pub fn duplicate_expression_multiple<'a, const N: usize>(
             });
             return (expr, references);
         }
-        // Anything else requires temp var
+        // Allocations (including regexp literals) and other expressions require a temp var.
+        // Even a side-effect-free allocation cannot be repeated when identity is observable.
         _ => VarDeclarationsStore::create_uid_var_based_on_node(&expr, ctx),
     };
 

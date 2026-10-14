@@ -33,10 +33,7 @@ describe.each([false, true])('private logical temporary, declared binding=%s', d
     expect(nox).not.toContain('@babel/runtime');
     actual = observe(nox);
   });
-  (declared ? test : test.fails)(
-    'does not capture an existing reference with a generated temporary',
-    () => {
-      expect(actual).toEqual([3, true]);
-    },
-  );
+  test('does not capture an existing reference with a generated temporary', () => {
+    expect(actual).toEqual([3, true]);
+  });
 });

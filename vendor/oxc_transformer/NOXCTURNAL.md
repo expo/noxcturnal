@@ -1,5 +1,5 @@
 Vendored from crates.io oxc_transformer 0.141.0. Original MIT license retained.
-Noxcturnal patches the pinned transformer to repair constructor initialization and exponentiation assignment.
+Noxcturnal patches the pinned transformer to repair constructor initialization, exponentiation assignment, and logical assignment.
 
 Original crates.io archive SHA-256: `3481b17ea50d4866901de759f736aa2c63bfca1fb6a20a67faa423f5361429e9`.
 
@@ -15,6 +15,14 @@ Local patches:
 - `es2016/exponentiation_operator.rs`: capture computed receivers and keys while
   constructing assignment references; memoize allocated RegExp keys; isolate
   parameter-initializer temporaries with the existing arrow-IIFE scope builder.
+- `es2021/logical_assignment_operators.rs`: lower private targets in the same
+  traversal as ordinary targets. Semantic receiver duplication reserves unresolved
+  names and captures mutable bindings; the following nullish pass sees generated
+  coalescing expressions when selected. This replaces Noxcturnal's separate
+  post-transform private completion pass.
+- `common/duplicate.rs`: regexp literals are identity-bearing allocations, so
+  repeated uses share a temporary rather than cloning the literal. The shared
+  utility also serves private class operations and legacy decorator computed keys.
 
 Keep Rust and npm Oxc versions pinned together. Reassess these patches against the
 upstream implementation before any upgrade; archived regressions define the repair

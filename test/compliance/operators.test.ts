@@ -544,7 +544,7 @@ const additionalComplianceCases: {
     `,
     plan: { transforms: { logicalAssignmentOperators: true } },
     expected: [3, [['first', 3]]],
-    knownFailure: true,
+    knownFailure: false,
   },
   {
     name: 'escaped identifiers cannot collide with object spread helpers',

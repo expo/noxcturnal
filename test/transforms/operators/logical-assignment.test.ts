@@ -36,7 +36,7 @@ test('lowers all logical assignments to private fields', async () => {
 test('memoizes an effectful private-field receiver with a collision-free binding', async () => {
   const output = await transformSource(
     `
-      const _private = 'user binding';
+      const _this$self = 'user binding';
       class Value {
         #value = 0;
         self() { return this; }
@@ -48,6 +48,6 @@ test('memoizes an effectful private-field receiver with a collision-free binding
   );
 
   expect(output).not.toMatch(/\|\|=/);
-  expect(output).toContain('var _private1;');
-  expect(output).toContain('(_private1 = this.self()).#value || (_private1.#value = 2)');
+  expect(output).toContain('var _this$self2;');
+  expect(output).toContain('(_this$self2 = this.self()).#value || (_this$self2.#value = 2)');
 });

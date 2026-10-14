@@ -98,7 +98,6 @@ impl<'a> LogicalAssignmentOperators {
         //               ^     ^ assign_target
         //               ^ left_expr
 
-        // TODO: Add tests, cover private identifier
         let (left_expr, assign_target) = match &mut assignment_expr.left {
             // `a &&= c` -> `a && (a = c)`
             AssignmentTarget::AssignmentTargetIdentifier(ident) => {
@@ -113,9 +112,9 @@ impl<'a> LogicalAssignmentOperators {
             AssignmentTarget::ComputedMemberExpression(computed_expr) => {
                 self.convert_computed_member_expression(computed_expr, ctx)
             }
-            // TODO
-            #[expect(clippy::match_same_arms)]
-            AssignmentTarget::PrivateFieldExpression(_) => return,
+            AssignmentTarget::PrivateFieldExpression(private_expr) => {
+                self.convert_private_field_expression(private_expr, ctx)
+            }
             // All other are TypeScript syntax.
 
             // It is a Syntax Error if AssignmentTargetType of LeftHandSideExpression is not simple.
@@ -177,6 +176,33 @@ impl<'a> LogicalAssignmentOperators {
         );
         let assign_target = AssignmentTarget::from(assign_expr);
 
+        (left_expr, assign_target)
+    }
+
+    #[expect(clippy::unused_self)]
+    fn convert_private_field_expression(
+        &self,
+        private_expr: &mut PrivateFieldExpression<'a>,
+        ctx: &mut TraverseCtx<'a>,
+    ) -> (Expression<'a>, AssignmentTarget<'a>) {
+        // Preserve the reference across getter/RHS effects, using the same semantic
+        // mutation analysis and collision-safe temporaries as ordinary members.
+        let object = private_expr.object.take_in(ctx);
+        let (object, object_ref) = duplicate_expression(object, true, ctx);
+        let left_expr = Expression::new_private_field_expression(
+            private_expr.span,
+            object,
+            private_expr.field.clone(),
+            false,
+            ctx,
+        );
+        let assign_target = AssignmentTarget::new_private_field_expression(
+            private_expr.span,
+            object_ref,
+            private_expr.field.clone(),
+            false,
+            ctx,
+        );
         (left_expr, assign_target)
     }
 

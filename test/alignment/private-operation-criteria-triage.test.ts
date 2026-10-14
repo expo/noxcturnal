@@ -58,7 +58,7 @@ const cases = [
     name: 'private logical receiver mutation',
     native: ['first', 3],
     babel: ['first', 3],
-    localFailure: true,
+    localFailure: false,
     source: `const events=[];let receiver;class Value{constructor(name){this.name=name}get #value(){receiver=second;return 0}set #value(value){events.push(this.name,value)}static write(){return receiver.#value ||= 3}}const first=new Value('first'),second=new Value('second');receiver=first;Value.write();globalThis.result=events;`,
   },
 ];
