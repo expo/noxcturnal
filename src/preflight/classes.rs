@@ -209,7 +209,7 @@ fn direct_class_candidates(
     reserved: &mut FxHashSet<String>,
 ) -> FxHashMap<(u32, u32), DirectClassPlan> {
     let nodes = semantic.nodes();
-    let mut direct = FxHashMap::default();
+    let mut direct: FxHashMap<(u32, u32), DirectClassPlan> = FxHashMap::default();
     for (node_id, node) in nodes.iter_enumerated() {
         let AstKind::Class(class) = node.kind() else {
             continue;
@@ -244,7 +244,45 @@ fn direct_class_candidates(
         });
         let owned_by_focused_private = (has_private_methods && private_methods_loose.is_some())
             || (has_private_in && private_in_loose.is_some());
-        if !lower_all_classes && !owned_by_focused_private {
+        // Focused private lowering also owns a suspended nested class when its
+        // closures capture the enclosing lowered private environment. Lower it
+        // first so its suspended keys stay in the caller, just as with `classes`.
+        let suspended_private_dependency = if !lower_all_classes && !owned_by_focused_private {
+            let mut suspension = KeySuspension(false);
+            suspension.visit_class(class);
+            let mut enclosing = FxHashSet::default();
+            if suspension.0 {
+                for ancestor in nodes.ancestor_ids(node_id) {
+                    if let AstKind::Class(parent) = nodes.kind(ancestor)
+                        && let Some(plan) = direct.get(&(parent.span.start, parent.span.end))
+                        && parent.body.body.iter().any(|element| {
+                            element.computed()
+                                && element.property_key().is_some_and(|key| {
+                                    let span = key.span();
+                                    span.start <= class.span.start && span.end >= class.span.end
+                                })
+                        })
+                    {
+                        enclosing.extend(plan.private_keys.keys().cloned());
+                    }
+                }
+                for element in &class.body.body {
+                    if let Some(PropertyKey::PrivateIdentifier(identifier)) = element.property_key()
+                    {
+                        enclosing.remove(identifier.name.as_str());
+                    }
+                }
+            }
+            let mut capture = EnclosingPrivateUse {
+                names: enclosing,
+                found: false,
+            };
+            capture.visit_class(class);
+            capture.found
+        } else {
+            false
+        };
+        if !lower_all_classes && !owned_by_focused_private && !suspended_private_dependency {
             continue;
         }
         if !class.decorators.is_empty()
@@ -2720,6 +2758,18 @@ impl<'a> VisitMut<'a> for PrivateKeyClosureCapture<'a, '_> {
                 | Expression::ClassExpression(_)
                 | Expression::ObjectExpression(_)
         );
+        if captures {
+            let mut names = KeyCaptureNames(FxHashSet::default());
+            names.visit_expression(expression);
+            if !self
+                .plan
+                .private_keys
+                .values()
+                .any(|(binding, _)| names.0.contains(binding))
+            {
+                return;
+            }
+        }
         let mut suspension = KeySuspension(false);
         if captures {
             suspension.visit_expression(expression);
@@ -2845,6 +2895,21 @@ impl<'a> VisitMut<'a> for PrivateKeyClosureCapture<'a, '_> {
             arguments,
             false,
         );
+    }
+}
+
+struct EnclosingPrivateUse {
+    names: FxHashSet<String>,
+    found: bool,
+}
+impl<'a> Visit<'a> for EnclosingPrivateUse {
+    fn visit_private_field_expression(&mut self, field: &oxc_ast::ast::PrivateFieldExpression<'a>) {
+        self.found |= self.names.contains(field.field.name.as_str());
+        walk::walk_private_field_expression(self, field);
+    }
+    fn visit_private_in_expression(&mut self, expression: &oxc_ast::ast::PrivateInExpression<'a>) {
+        self.found |= self.names.contains(expression.left.name.as_str());
+        walk::walk_private_in_expression(self, expression);
     }
 }
 

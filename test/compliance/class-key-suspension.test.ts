@@ -134,3 +134,87 @@ for (const mode of ['inline', 'runtime'] as const) {
     expect(await run(code)).toEqual(expected);
   });
 }
+
+for (const mode of ['inline', 'runtime'] as const) {
+  for (const suspendedPart of ['key', 'heritage'] as const) {
+    test(`nested class ${suspendedPart} suspension retains outer private environment (${mode})`, async () => {
+      const nested =
+        suspendedPart === 'key'
+          ? `class { [yield n]() {} read(object) { return object.#value } }`
+          : `class extends (yield n) { read(object) { return object.#value } }`;
+      const source = `
+        function* make() {
+          const pairs = [];
+          for (let n = 0; n < 2; n++) {
+            let Holder;
+            const C = class {
+              #value = n;
+              [(Holder = ${nested}, 'key')]() {}
+            };
+            pairs.push([C, Holder]);
+          }
+          return pairs.map(([C, Holder]) => new Holder().read(new C()));
+        }
+        const iterator = make();
+        iterator.next();
+        iterator.next(${suspendedPart === 'key' ? "'a'" : 'Object'});
+        globalThis.result = iterator.next(${suspendedPart === 'key' ? "'b'" : 'Object'}).value;
+      `;
+      expect(await run(source)).toEqual([0, 1]);
+      const code = compile(source, {
+        transforms: { classes: true },
+        helpers: { mode, moduleName: '@babel/runtime', version: '7.29.7' },
+      });
+      expect(code).not.toMatch(/#value|\bclass\s*\{/);
+      expect(await run(code)).toEqual([0, 1]);
+    });
+  }
+}
+
+for (const mode of ['inline', 'runtime'] as const) {
+  for (const suspension of ['yield', 'await'] as const) {
+    for (const location of ['key', 'heritage'] as const) {
+      for (const capture of [true, false]) {
+        test(`focused private lowering: nested ${suspension}/${location}, capture=${capture} (${mode})`, async () => {
+          const suspend =
+            suspension === 'yield'
+              ? 'yield n'
+              : `await Promise.resolve(${location === 'key' ? 'n' : 'Object'})`;
+          const nested = `class Nested ${location === 'heritage' ? `extends (${suspend})` : ''} {
+            ${location === 'key' ? `[${suspend}]() {}` : ''}
+            read(object) { return ${capture ? 'object.#value()' : '7'} }
+          }`;
+          const body = `
+            const pairs = [];
+            for (let n = 0; n < 2; n++) {
+              let Holder;
+              const C = class Outer {
+                #value() { return n; }
+                [(Holder = ${nested}, 'key')]() {}
+              };
+              pairs.push([C, Holder]);
+            }
+            return pairs.map(([C, Holder]) => new Holder().read(new C()));
+          `;
+          const source =
+            suspension === 'yield'
+              ? `function* make() { ${body} }
+               const iterator = make(); iterator.next();
+               iterator.next(${location === 'key' ? "'a'" : 'Object'});
+               globalThis.result = iterator.next(${location === 'key' ? "'b'" : 'Object'}).value;`
+              : `async function make() { ${body} } globalThis.result = make();`;
+          const expected = capture ? [0, 1] : [7, 7];
+          expect(await run(source)).toEqual(expected);
+          const code = compile(source, {
+            transforms: { privateMethods: true },
+            helpers: { mode, moduleName: '@babel/runtime', version: '7.29.7' },
+          });
+          expect(code).not.toContain('#value');
+          if (capture) expect(code).not.toContain('class Nested');
+          else expect(code).toContain('class Nested');
+          expect(await run(code)).toEqual(expected);
+        });
+      }
+    }
+  }
+}
