@@ -72,7 +72,7 @@ describe.each(cases)('$name', entry => {
     test('Babel loose-private reference', () => {
       expect(run(referenceCode)).toEqual(entry.expected);
     });
-    const check = test.fails;
+    const check = test;
     check('Noxcturnal follows the Babel loose-private baseline', () => {
       expect(run(code)).toEqual(entry.expected);
     });

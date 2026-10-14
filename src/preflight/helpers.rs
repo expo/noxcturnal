@@ -383,6 +383,7 @@ pub fn babel_helper_spec(name: &str) -> Option<HelperCompatibility> {
         "assertThisInitialized" => "assertThisInitialized",
         "createForOfIteratorHelper" => "createForOfIteratorHelper",
         "get" => "get",
+        "set" => "set",
         "slicedToArray" => "slicedToArray",
         "toArray" => "toArray",
         "toConsumableArray" => "toConsumableArray",

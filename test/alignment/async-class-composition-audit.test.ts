@@ -71,14 +71,17 @@ for (const kind of ['instance', 'static'])
             expect(code.includes('@babel/runtime/')).toBe(mode === 'runtime');
             outcomes.set(asyncFunctions, await run(code));
             if (entry.name === 'compound')
-              expect(outcomes.get(asyncFunctions)).toEqual(['rejected', 'ReferenceError']);
+              expect(outcomes.get(asyncFunctions)).toEqual([
+                'fulfilled',
+                entry.selected ?? entry.expected,
+              ]);
           }
         });
-        (entry.broken ? test.fails : test)('preserves selected combined-pass behavior', () => {
+        test('preserves selected combined-pass behavior', () => {
           expect(outcomes.get(true)).toEqual(['fulfilled', entry.selected ?? entry.expected]);
         });
         if (entry.name === 'grouped')
-          test.fails('class lowering alone preserves the grouped call receiver', () => {
+          test('class lowering alone preserves the grouped call receiver', () => {
             expect(outcomes.get(false)).toEqual(['fulfilled', entry.expected]);
           });
       });

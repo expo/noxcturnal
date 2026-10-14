@@ -9,7 +9,6 @@ const cases = [
     name: 'readonly private update coerces before rejecting the write',
     source: `const events=[];class C{#method(){}run(){this.#method.valueOf=()=>{events.push('convert');return 1n};try{this.#method++}catch(e){events.push(e.name)}}}new C().run();globalThis.result=events;`,
     expected: ['convert', 'TypeError'],
-    observed: ['TypeError'],
     // Node 22/24 omit conversion too; the spec and pinned Babel are the oracle here.
     native: ['TypeError'],
   },
@@ -88,12 +87,9 @@ for (const classes of [false, true]) {
         });
         expect(code).not.toMatch(/#(?:fn|value|tag|ctor|method)\b/);
         actual = run(code);
-        if (entry.observed) expect(actual).toEqual(entry.observed);
       });
-      (entry.observed ? test.fails : test)(
-        'preserves native and loose Babel operation behavior',
-        () => expect(actual).toEqual(entry.expected),
-      );
+      test('preserves native and loose Babel operation behavior', () =>
+        expect(actual).toEqual(entry.expected));
     });
   }
 }

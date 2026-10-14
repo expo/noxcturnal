@@ -25,7 +25,7 @@ function run(code: string) {
   new Function('require', 'globalThis', code)(require, context);
   return context.result;
 }
-for (const [index, [name, source, expected]] of cases.entries()) {
+for (const [name, source, expected] of cases) {
   describe(name, () => {
     const actual = new Map<string, unknown>();
     beforeAll(() => {
@@ -66,7 +66,7 @@ for (const [index, [name, source, expected]] of cases.entries()) {
       }
     });
     for (const mode of ['inline', 'runtime'] as const) {
-      (index === 0 ? test : test.fails)(mode, () => expect(actual.get(mode)).toEqual(expected));
+      test(mode, () => expect(actual.get(mode)).toEqual(expected));
     }
   });
 }

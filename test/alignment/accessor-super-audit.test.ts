@@ -53,10 +53,9 @@ for (const isStatic of [false, true]) {
             expect((error as Error).message).toMatch(/super.*unexpected/i);
             actual = { error: 'SyntaxError' };
           }
-          expect(actual).toEqual({ error: 'SyntaxError' });
+          expect(actual).toBe(3);
         });
-        test.fails('preserves super access in the lowered initializer', () =>
-          expect(actual).toBe(3));
+        test('preserves super access in the lowered initializer', () => expect(actual).toBe(3));
       });
     }
   }

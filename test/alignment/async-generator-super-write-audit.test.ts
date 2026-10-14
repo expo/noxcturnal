@@ -71,7 +71,7 @@ for (const mode of ['inline', 'runtime'] as const)
           }
           if (fn) actual = await run(fn);
         });
-        (entry.broken ? test.fails : test)(
+        (entry.broken && !classes ? test.fails : test)(
           'preserves the super operation across suspension',
           () => {
             expect(parseError).toBeUndefined();

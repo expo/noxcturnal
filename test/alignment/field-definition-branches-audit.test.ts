@@ -109,7 +109,6 @@ for (const selection of ['standalone', 'classes', 'private'] as const) {
       });
       describe.each(cases)(`${selection}, loose=${loose}, helpers=${mode}: $name`, entry => {
         const expected = loose ? entry.loose : entry.strict;
-        const fails = loose && selection !== 'standalone' && entry.readonly;
         let actual: unknown;
         beforeAll(() => {
           expect(require('@babel/runtime/package.json').version).toBe('7.29.7');
@@ -165,11 +164,10 @@ for (const selection of ['standalone', 'classes', 'private'] as const) {
             expect((error as Error).message).toMatch(/read only property '(?:name|length)'/);
             actual = { error: 'TypeError' };
           }
-          expect(actual).toEqual(fails ? { error: 'TypeError' } : expected);
+          expect(actual).toEqual(expected);
         });
-        (fails ? test.fails : test)('preserves the selected field definition semantics', () =>
-          expect(actual).toEqual(expected),
-        );
+        test('preserves the selected field definition semantics', () =>
+          expect(actual).toEqual(expected));
       });
     }
   }

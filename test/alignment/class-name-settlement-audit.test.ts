@@ -73,10 +73,10 @@ describe.each(cases)('$name', entry => {
       } else expect(code).not.toContain('require(');
       if (entry.name === 'public string method name') {
         expect(babelValue).toBe('literal');
-        expect(actual).toBe('value');
+        expect(actual).toBe('literal');
       } else if (entry.name === 'symbol description getter effects') {
         expect(babelValue).toEqual(['value', []]);
-        expect(actual).toEqual(['[override]', ['description', 'description']]);
+        expect(actual).toEqual(['[original]', []]);
       } else if (entry.name === 'private newTarget and static accessor construction shapes') {
         expect(babelValue).toEqual(['accepted', [true, true, true]]);
       } else {
@@ -99,10 +99,53 @@ describe.each(cases)('$name', entry => {
         ]);
       });
     } else {
-      test.fails('preserves the compared naming observation', () => {
+      test('preserves the compared naming observation', () => {
         if (entry.name === 'public string method name') expect(actual).toBe('literal');
         else expect((actual as unknown[])[1]).toEqual([]);
       });
     }
   });
 });
+
+test.each(['inline', 'runtime'] as const)(
+  'field function names remain an adopted generated-name boundary (%s)',
+  mode => {
+    const source = `class Value {
+      method = function () { return 1 };
+      arrow = () => 2;
+      static method = function () { return 3 };
+    }
+    const instance = new Value();
+    globalThis.result = [
+      [instance.method.name, instance.arrow.name, Value.method.name],
+      [instance.method(), instance.arrow(), Value.method()],
+    ];`;
+    expect(observe(source)).toEqual([
+      ['method', 'arrow', 'method'],
+      [1, 2, 3],
+    ]);
+    const reference = transformSync(source, {
+      babelrc: false,
+      configFile: false,
+      plugins: [
+        [require('@babel/plugin-transform-class-properties'), { loose: false }],
+        require('@babel/plugin-transform-classes'),
+      ],
+    })!.code!;
+    expect(observe(reference)).toEqual([
+      ['', '', ''],
+      [1, 2, 3],
+    ]);
+    const code = compile(source, {
+      transforms: { classes: true },
+      helpers: { mode, version: '7.29.7' },
+    });
+    expect(code).not.toMatch(/\bclass\s+Value\b/);
+    // Synthetic spellings are observable, but neither transform promises the
+    // source field name. Preserve callable behavior without pinning a temporary.
+    expect(observe(code)).toEqual([
+      [expect.any(String), expect.any(String), expect.any(String)],
+      [1, 2, 3],
+    ]);
+  },
+);

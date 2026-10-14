@@ -110,7 +110,7 @@ describe.each(cases)('$name', entry => {
       if (entry.name === 'private call own apply') {
         expect(run(entry.source)).toBe('method');
         expect(run(referenceCode)).toBe('method');
-        expect(run(code)).toBe('override');
+        expect(run(code)).toBe('method');
       }
       if (entry.name.startsWith('private logical')) {
         expect(referenceCode).not.toContain('||=');
@@ -127,7 +127,7 @@ describe.each(cases)('$name', entry => {
     test('Babel loose-private reference', () => {
       expect(run(referenceCode)).toEqual(entry.babel);
     });
-    const check = entry.localFailure ? test.fails : test;
+    const check = entry.name === 'private logical receiver mutation' ? test.fails : test;
     check('Noxcturnal follows the Babel loose-private baseline', () => {
       expect(run(code)).toEqual(entry.babel);
     });

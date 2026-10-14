@@ -589,7 +589,7 @@ test('native classes evaluate computed field and method keys once in source orde
   assert.equal(result.status, 'complete');
   assert.doesNotMatch(result.code, /\bclass\s+Computed\b/);
   const context: { result?: unknown[] } = {};
-  new Function('globalThis', result.code)(context);
+  new Function('globalThis', 'require', result.code)(context, createRequire(import.meta.url));
   assert.deepEqual(context.result, [
     3,
     4,

@@ -92,11 +92,7 @@ describe.each(cases)('$name', entry => {
       expect(code).not.toMatch(classSyntax);
       if (
         mode === 'runtime' &&
-        ![
-          'base field preserves outer parameter binding',
-          'class key expression preserves strictness',
-          'named class key retains inner TDZ',
-        ].includes(entry.name)
+        !['base field preserves outer parameter binding'].includes(entry.name)
       )
         expect(code).toContain('@babel/runtime/helpers/');
       else expect(code).not.toContain('require(');
@@ -104,7 +100,7 @@ describe.each(cases)('$name', entry => {
     test('Babel strict-class reference', () => {
       expect(run(referenceCode)).toEqual(entry.babel);
     });
-    const check = entry.localFailure ? test.fails : test;
+    const check = test;
     check(
       entry.localFailure
         ? 'Noxcturnal native discrepancy'

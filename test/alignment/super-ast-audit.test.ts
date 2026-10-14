@@ -64,7 +64,7 @@ describe.each(cases)('$name', entry => {
     test('Babel class reference', () => {
       expect(run(referenceCode)).toEqual(entry.expected);
     });
-    test.fails('Noxcturnal preserves the optional super receiver', () => {
+    test('Noxcturnal preserves the optional super receiver', () => {
       expect(run(code)).toEqual(entry.expected);
     });
   });
@@ -104,7 +104,7 @@ globalThis.result = new Value().run();`;
       });
       expect(code).not.toMatch(/\bclass\s+(?:Base|Value)\b/);
     });
-    test.fails('completed class output preserves assignment target behavior', () => {
+    test('completed class output preserves assignment target behavior', () => {
       expect(run(code)).toBe(3);
     });
   });

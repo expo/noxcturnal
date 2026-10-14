@@ -56,28 +56,32 @@ test('composes the native portion of the legacy Hermes language profile in one p
     import _babelHelper from '@babel/runtime/helpers/wrapRegExp';
     import _babelHelper2 from '@babel/runtime/helpers/objectDestructuringEmpty';
     import _babelHelper3 from '@babel/runtime/helpers/classPrivateFieldLooseBase';
-    import _babelHelper4 from '@babel/runtime/helpers/checkInRHS';
+    import _babelHelper4 from '@babel/runtime/helpers/classPrivateFieldLooseKey';
+    import _babelHelper5 from '@babel/runtime/helpers/checkInRHS';
     var _wrapRegExp2 = { wrapRegExp: _babelHelper },
       _wrapRegExp = _wrapRegExp2.wrapRegExp;
     var _objectDestructuringEmpty2 = { objectDestructuringEmpty: _babelHelper2 };
     function _objectDestructuringEmpty(t) {
       return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
     }
-    var _classPrivateFieldLooseBase2 = { classPrivateFieldLooseBase: _babelHelper3 };
-    function _classPrivateFieldLooseBase(e, s) {
-      return _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+    var _classPrivateFieldLooseBase2 = {
+      classPrivateFieldLooseBase: _babelHelper3,
+      classPrivateFieldLooseKey: _babelHelper4,
+    };
+    function _classPrivateFieldLooseBase(e, s, a) {
+      return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
     }
-    function _classPrivateMethodCall(e, s, a) {
-      return _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s)[s].apply(e, a);
-    }
-    var _checkInRHS2 = { checkInRHS: _babelHelper4 },
+    var _checkInRHS2 = { checkInRHS: _babelHelper5 },
       _checkInRHS = _checkInRHS2.checkInRHS;
     export var Reader = (() => {
       'use strict';
-      var _value = \`__private_Reader_value\`;
+      var _value = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey(\`__private_Reader_value\`);
+      function _initialize() {
+        Object.defineProperty(this, _value, { writable: true, value: 1 });
+      }
       var _Reader = function _Reader() {
         if (!new.target) throw new TypeError(\`Cannot call a class as a function\`);
-        Object.defineProperty(this, _value, { writable: true, value: 1 });
+        _initialize.call(this);
       };
       Object.defineProperty(_Reader.prototype, 'has', {
         value: Object.defineProperty(
@@ -94,12 +98,11 @@ test('composes the native portion of the legacy Hermes language profile in one p
       Object.defineProperty(_Reader.prototype, 'read', {
         value: Object.defineProperty(
           _asyncToGenerator(function* () {
-            var _obj = _objectDestructuringEmpty(
-                arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : {},
-              ),
-              _value23 = _obj.value,
+            var _ref = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : {},
+              _obj = _objectDestructuringEmpty(_ref),
+              _value19 = _obj.value,
               value =
-                _value23 === void 0 ? _classPrivateFieldLooseBase(this, _value)[_value] : _value23;
+                _value19 === void 0 ? _classPrivateFieldLooseBase(this, _value)[_value] : _value19;
             return yield value;
           }),
           'name',
@@ -111,7 +114,7 @@ test('composes the native portion of the legacy Hermes language profile in one p
       Object.defineProperty(_Reader.prototype, 'values', {
         value: Object.defineProperty(
           (function () {
-            var _ref = _wrapAsyncGenerator(function* (items) {
+            var _ref2 = _wrapAsyncGenerator(function* (items) {
               var _iteratorAbruptCompletion = false;
               var _didIteratorError = false;
               var _iteratorError;
@@ -141,7 +144,7 @@ test('composes the native portion of the legacy Hermes language profile in one p
               }
             });
             return function (_x) {
-              return _ref.apply(this, arguments);
+              return _ref2.apply(this, arguments);
             };
           })(),
           'name',

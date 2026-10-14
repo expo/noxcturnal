@@ -118,7 +118,7 @@ describe.each(cases)('$name', entry => {
     test('Babel strict-class reference', () => {
       expect(run(referenceCode)).toEqual(entry.babel);
     });
-    const check = entry.localFailure ? test.fails : test;
+    const check = test;
     check(
       entry.localFailure
         ? 'Noxcturnal native discrepancy'
