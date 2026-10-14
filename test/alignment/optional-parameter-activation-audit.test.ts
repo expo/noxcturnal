@@ -41,7 +41,7 @@ describe.each(['direct parameter', 'nested parameter', 'field'])(
       expect(nox).not.toContain('@babel/runtime');
       actual = observe(nox);
     });
-    (kind === 'direct parameter' ? test : test.fails)(
+    (kind === 'field' ? test.fails : test)(
       'keeps the receiver local during recursive initialization',
       () => {
         expect(actual).toBe('first');

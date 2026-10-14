@@ -1,5 +1,5 @@
 Vendored from crates.io oxc_transformer 0.141.0. Original MIT license retained.
-Noxcturnal patches the pinned transformer to repair constructor initialization, exponentiation assignment, and logical assignment.
+Noxcturnal patches the pinned transformer to repair constructor initialization, exponentiation assignment, logical assignment, and optional chaining.
 
 Original crates.io archive SHA-256: `3481b17ea50d4866901de759f736aa2c63bfca1fb6a20a67faa423f5361429e9`.
 
@@ -23,6 +23,11 @@ Local patches:
 - `common/duplicate.rs`: regexp literals are identity-bearing allocations, so
   repeated uses share a temporary rather than cloning the literal. The shared
   utility also serves private class operations and legacy decorator computed keys.
+- `es2020/optional_chaining.rs`: preserve mutable receivers, parameter activation
+  scope, parenthesized delete/call references and mandatory operations between
+  chains. Bind only terminal member references, never an optional call's result.
+- `es2020/mod.rs`: remove the obsolete formal-parameter boolean hooks; parameter
+  ownership is derived from traversal ancestry at optional-chain sites.
 
 Keep Rust and npm Oxc versions pinned together. Reassess these patches against the
 upstream implementation before any upgrade; archived regressions define the repair

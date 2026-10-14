@@ -20,7 +20,7 @@ const cases = [
     name: 'parenthesized deletion',
     expression: 'delete (object?.x)',
     expected: [true, false, []],
-    fails: true,
+    fails: false,
   },
   {
     name: 'single-parenthesized call',
@@ -32,7 +32,7 @@ const cases = [
     name: 'double-parenthesized call',
     expression: '((object?.m))()',
     expected: [true, true, []],
-    fails: true,
+    fails: false,
   },
 ];
 

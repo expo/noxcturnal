@@ -515,7 +515,7 @@ const additionalComplianceCases: {
     `,
     plan: { transforms: { optionalChaining: { loose: false } } },
     expected: 'first',
-    knownFailure: true,
+    knownFailure: false,
   },
   {
     name: 'private logical assignment retains the receiver when its getter reassigns it',

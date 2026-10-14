@@ -34,7 +34,7 @@ describe.each(cases)('optional-chain grouping: $expression', ({ expression, fail
     expect(nox).not.toContain('@babel/runtime');
     actual = observe(nox);
   });
-  (fails ? test.fails : test)('preserves mandatory operations between optional chains', () => {
+  test('preserves mandatory operations between optional chains', () => {
     expect(actual).toEqual(expected);
   });
 });

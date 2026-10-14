@@ -4,12 +4,12 @@ import { beforeAll, describe, expect, test } from 'vitest';
 import { compile } from '../compliance/runtime';
 
 const cases = [
-  { expression: '(fn?.())()', fails: true },
-  { expression: '(object?.m())()', fails: true },
-  { expression: '(object.m?.())()', fails: true },
-  { expression: 'fn?.()()', fails: false },
+  { expression: '(fn?.())()' },
+  { expression: '(object?.m())()' },
+  { expression: '(object.m?.())()' },
+  { expression: 'fn?.()()' },
 ];
-describe.each(cases)('calling an optional result: $expression', ({ expression, fails }) => {
+describe.each(cases)('calling an optional result: $expression', ({ expression }) => {
   let actual: unknown;
   beforeAll(() => {
     const source = `
@@ -36,10 +36,7 @@ describe.each(cases)('calling an optional result: $expression', ({ expression, f
     expect(nox).not.toContain('@babel/runtime');
     actual = observe(nox);
   });
-  (fails ? test.fails : test)(
-    'does not bind the returned function to the original callee or receiver',
-    () => {
-      expect(actual).toBe(true);
-    },
-  );
+  test('does not bind the returned function to the original callee or receiver', () => {
+    expect(actual).toBe(true);
+  });
 });
