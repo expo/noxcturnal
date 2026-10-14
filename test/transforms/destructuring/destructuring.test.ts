@@ -23,11 +23,9 @@ test('lowers destructuring', async () => {
     function _objectDestructuringEmpty(t) {
       return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
     }
-    const _ref = record,
-      _obj = _objectDestructuringEmpty(_ref),
+    const _obj = _objectDestructuringEmpty(record),
       value = _obj.value;
-    const _ref12 = values,
-      _arr = _toArray(_ref12, 1, false),
+    const _arr = _toArray(values, 1, false),
       first = _arr[0];
     export { value, first };"
   `);

@@ -21,8 +21,7 @@ test('preserves top-level await while lowering unrelated syntax', async () => {
     function _objectDestructuringEmpty(t) {
       return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
     }
-    export const _ref = await load(),
-      _obj = _objectDestructuringEmpty(_ref),
+    export const _obj = _objectDestructuringEmpty(await load()),
       value = _obj.value;"
   `);
 });

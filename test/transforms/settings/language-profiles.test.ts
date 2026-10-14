@@ -94,8 +94,9 @@ test('composes the native portion of the legacy Hermes language profile in one p
       Object.defineProperty(_Reader.prototype, 'read', {
         value: Object.defineProperty(
           _asyncToGenerator(function* () {
-            var _ref = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : {},
-              _obj = _objectDestructuringEmpty(_ref),
+            var _obj = _objectDestructuringEmpty(
+                arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : {},
+              ),
               _value23 = _obj.value,
               value =
                 _value23 === void 0 ? _classPrivateFieldLooseBase(this, _value)[_value] : _value23;
@@ -110,7 +111,7 @@ test('composes the native portion of the legacy Hermes language profile in one p
       Object.defineProperty(_Reader.prototype, 'values', {
         value: Object.defineProperty(
           (function () {
-            var _ref2 = _wrapAsyncGenerator(function* (items) {
+            var _ref = _wrapAsyncGenerator(function* (items) {
               var _iteratorAbruptCompletion = false;
               var _didIteratorError = false;
               var _iteratorError;
@@ -140,7 +141,7 @@ test('composes the native portion of the legacy Hermes language profile in one p
               }
             });
             return function (_x) {
-              return _ref2.apply(this, arguments);
+              return _ref.apply(this, arguments);
             };
           })(),
           'name',
@@ -243,8 +244,7 @@ test('composes the non-Hermes object rest and spread profile', async () => {
       );
     }
     export const merge = function () {
-      let _ref = arguments.length > 0 ? arguments[0] : void 0,
-        _obj = _objectDestructuringEmpty(_ref),
+      let _obj = _objectDestructuringEmpty(arguments.length > 0 ? arguments[0] : void 0),
         ignored = _obj.ignored,
         rest = _objectWithoutProperties(_obj, ['ignored']);
       let extra = arguments.length > 1 ? arguments[1] : void 0;

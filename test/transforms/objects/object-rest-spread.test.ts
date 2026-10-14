@@ -32,8 +32,7 @@ test('lowers object rest and spread', async () => {
       );
     }
     export function rename() {
-      let _ref = arguments.length > 0 ? arguments[0] : void 0,
-        _obj = _objectDestructuringEmpty(_ref),
+      let _obj = _objectDestructuringEmpty(arguments.length > 0 ? arguments[0] : void 0),
         id = _obj.id,
         attributes = _objectWithoutProperties(_obj, ['id']);
       let extra = arguments.length > 1 ? arguments[1] : void 0;

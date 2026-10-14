@@ -52,12 +52,12 @@ exports[`every public native transform has an explicit ownership fixture 3`] = `
 
 exports[`every public native transform has an explicit ownership fixture 4`] = `
 {
-  "code": "var _objectDestructuringEmpty2={objectDestructuringEmpty:require("@babel/runtime/helpers/objectDestructuringEmpty")};function _objectDestructuringEmpty(t){return _objectDestructuringEmpty2.objectDestructuringEmpty(t),t}var _ref=input,_obj=_objectDestructuringEmpty(_ref),value=_obj.value;",
+  "code": "var _objectDestructuringEmpty2={objectDestructuringEmpty:require("@babel/runtime/helpers/objectDestructuringEmpty")};function _objectDestructuringEmpty(t){return _objectDestructuringEmpty2.objectDestructuringEmpty(t),t}var _obj=_objectDestructuringEmpty(input),value=_obj.value;",
   "helpers": [
     "objectDestructuringEmpty",
   ],
   "map": {
-    "mappings": "2NAAA,IAAIA,KAAY,MAAZA,mCAAgB,EAAd,MAAFA",
+    "mappings": "2NAAA,IAAIA,+BAAY,KAAI,EAAd,MAAFA",
     "names": [
       "{ value } = input",
     ],

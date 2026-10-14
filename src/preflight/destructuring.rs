@@ -32,7 +32,7 @@ pub(super) struct AstPlan {
     declarations: FxHashMap<(u32, String), VecDeque<AstDeclaratorPlan>>,
     catches: FxHashMap<u32, AstCatchPlan>,
     assignments: FxHashMap<u32, AstAssignmentPlan>,
-    for_of_assignments: FxHashMap<u32, AstAssignmentPlan>,
+    loop_assignments: FxHashMap<u32, AstAssignmentPlan>,
     temporary_declarations: FxHashMap<u32, Vec<String>>,
     helper_requests: CustomHelperRequests,
     helper_names: HelperNames,
@@ -45,7 +45,7 @@ impl AstPlan {
         self.declarations.is_empty()
             && self.catches.is_empty()
             && self.assignments.is_empty()
-            && self.for_of_assignments.is_empty()
+            && self.loop_assignments.is_empty()
             && self.temporary_declarations.is_empty()
     }
 }
@@ -180,7 +180,7 @@ pub(super) fn prepare_ast(
             declarations: FxHashMap::default(),
             catches: FxHashMap::default(),
             assignments: FxHashMap::default(),
-            for_of_assignments: FxHashMap::default(),
+            loop_assignments: FxHashMap::default(),
             temporary_declarations: FxHashMap::default(),
             helper_requests: CustomHelperRequests::default(),
             helper_names: HelperNames::default(),
@@ -215,7 +215,7 @@ pub(super) fn prepare_ast(
         FxHashMap::default();
     let mut catches = FxHashMap::default();
     let mut assignments = FxHashMap::default();
-    let mut for_of_assignments = FxHashMap::default();
+    let mut loop_assignments = FxHashMap::default();
     let mut temporary_declarations: FxHashMap<u32, Vec<String>> = FxHashMap::default();
     let mut helper_usage = HelperUsage::default();
     let mut active_pattern_ends = Vec::<u32>::new();
@@ -328,10 +328,13 @@ pub(super) fn prepare_ast(
                     .or_default()
                     .extend(reserved.allocations[before..].iter().cloned());
             }
-            AstKind::ForOfStatement(statement)
-                if !matches!(statement.left, ForStatementLeft::VariableDeclaration(_)) =>
-            {
-                let Some(target) = statement.left.as_assignment_target() else {
+            kind @ (AstKind::ForOfStatement(_) | AstKind::ForInStatement(_)) => {
+                let (span, left) = match kind {
+                    AstKind::ForOfStatement(statement) => (statement.span, &statement.left),
+                    AstKind::ForInStatement(statement) => (statement.span, &statement.left),
+                    _ => unreachable!(),
+                };
+                let Some(target) = left.as_assignment_target() else {
                     continue;
                 };
                 if !target.is_assignment_target_pattern()
@@ -343,49 +346,11 @@ pub(super) fn prepare_ast(
                 let root = reserve("_ref", &mut reserved);
                 let reservation_checkpoint = reserved.checkpoint();
                 plan_assignment_names(target, &mut reserved, &mut helper_usage);
-                for_of_assignments.insert(
-                    statement.span.start,
+                loop_assignments.insert(
+                    span.start,
                     AstAssignmentPlan {
                         root,
-                        anchor: statement.left.span(),
-                        reservation_checkpoint,
-                    },
-                );
-                let scope_start = semantic
-                    .nodes()
-                    .ancestor_ids(node_id)
-                    .find_map(|ancestor| match semantic.nodes().kind(ancestor) {
-                        AstKind::FunctionBody(body) => Some(body.span.start),
-                        AstKind::StaticBlock(block) => Some(block.span.start),
-                        AstKind::Program(program) => Some(program.span.start),
-                        _ => None,
-                    })
-                    .unwrap_or(0);
-                temporary_declarations
-                    .entry(scope_start)
-                    .or_default()
-                    .extend(reserved.allocations[before..].iter().cloned());
-            }
-            AstKind::ForInStatement(statement)
-                if !matches!(statement.left, ForStatementLeft::VariableDeclaration(_)) =>
-            {
-                let Some(target) = statement.left.as_assignment_target() else {
-                    continue;
-                };
-                if !target.is_assignment_target_pattern()
-                    || (only_object_rest && !assignment_has_object_rest(target))
-                {
-                    continue;
-                }
-                let before = reserved.checkpoint();
-                let root = reserve("_ref", &mut reserved);
-                let reservation_checkpoint = reserved.checkpoint();
-                plan_assignment_names(target, &mut reserved, &mut helper_usage);
-                for_of_assignments.insert(
-                    statement.span.start,
-                    AstAssignmentPlan {
-                        root,
-                        anchor: statement.left.span(),
+                        anchor: left.span(),
                         reservation_checkpoint,
                     },
                 );
@@ -467,7 +432,7 @@ pub(super) fn prepare_ast(
         declarations,
         catches,
         assignments,
-        for_of_assignments,
+        loop_assignments,
         temporary_declarations,
         helper_requests,
         helper_names,
@@ -486,7 +451,7 @@ pub(super) fn run_ast<'a>(
         declarations: plan.declarations,
         catches: plan.catches,
         assignments: plan.assignments,
-        for_of_assignments: plan.for_of_assignments,
+        loop_assignments: plan.loop_assignments,
         temporary_declarations: plan.temporary_declarations,
         helper_names: plan.helper_names,
         base_reserved: plan.base_reserved,
@@ -506,7 +471,7 @@ struct DestructuringDeclaratorLowerer<'a> {
     declarations: FxHashMap<(u32, String), VecDeque<AstDeclaratorPlan>>,
     catches: FxHashMap<u32, AstCatchPlan>,
     assignments: FxHashMap<u32, AstAssignmentPlan>,
-    for_of_assignments: FxHashMap<u32, AstAssignmentPlan>,
+    loop_assignments: FxHashMap<u32, AstAssignmentPlan>,
     temporary_declarations: FxHashMap<u32, Vec<String>>,
     helper_names: HelperNames,
     base_reserved: FxHashSet<String>,
@@ -968,7 +933,7 @@ impl<'a> DestructuringDeclaratorLowerer<'a> {
         left: &mut ForStatementLeft<'a>,
         body: &mut Statement<'a>,
     ) {
-        if let Some(plan) = self.for_of_assignments.remove(&span.start) {
+        if let Some(plan) = self.loop_assignments.remove(&span.start) {
             let ast = self.ast();
             let old_left = (*left).take_in(&ast);
             let target = match AssignmentTarget::try_from(old_left) {
@@ -1139,16 +1104,17 @@ impl<'a> VisitMut<'a> for DestructuringDeclaratorLowerer<'a> {
             };
             clear_leading_pure_annotation(&mut init);
             let mut replacements = ArenaVec::new_in(&ast);
-            replacements.push(self.declarator(plan.anchor, old.kind, &plan.root, Some(init)));
             let mut reserved = SnapshotReservations {
                 base: &self.base_reserved,
                 planned: &self.planned_allocations,
                 checkpoint: plan.reservation_checkpoint,
                 local: FxHashSet::default(),
             };
+            // Pattern lowering consumes its source once and creates its own
+            // object/array temporary; an extra root alias is unnecessary here.
             if let Err(error) = self.lower_binding(
                 old.id,
-                self.id(plan.anchor, &plan.root),
+                init,
                 old.kind,
                 plan.anchor,
                 &mut replacements,
@@ -1628,7 +1594,7 @@ mod tests {
                 .contains("require(\"@babel/runtime/helpers/slicedToArray\")")
         );
         let code = Codegen::new().build(&program).code;
-        assert!(code.contains("let _ref = input"));
+        assert!(code.contains("let _arr = _toArray(input"));
         assert!(code.contains("first = _arr[0]"));
         assert!(code.contains("second = _arr[1]"));
         assert!(!code.contains("[first, second]"));
