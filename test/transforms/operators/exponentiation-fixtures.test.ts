@@ -4,11 +4,11 @@ const expectedOutputs = [
   'var num = 1;\nnum = Math.pow(num, 2);',
   'Math.pow(2, 2);',
   "var _o$p;\nexpect(Math.pow(2, 3)).toBe(8);\nexpect(3 * Math.pow(2, 3)).toBe(24);\nvar x = 2;\nexpect(Math.pow(2, ++x)).toBe(8);\nexpect(Math.pow(2, -1) * 2).toBe(1);\nvar calls = 0;\nvar q = { q: 3 };\nvar o = {\n  get p() {\n    calls++;\n    return q;\n  },\n};\n((_o$p = o.p), (_o$p['q'] = Math.pow(_o$p['q'], 2)));\nexpect(calls).toBe(1);\nexpect(o.p.q).toBe(9);\nexpect(Math.pow(2, Math.pow(3, 2))).toBe(512);\nexpect(Math.pow(2, Math.pow(3, 2))).toBe(512);",
-  "var _a$b;\nfunction fn(a, b = ((_a$b = a.b), (_a$b['c'] = Math.pow(_a$b['c'], 2)))) {}",
+  "function fn(\n  a,\n  b = (() => {\n    var _a$b;\n    return ((_a$b = a.b), (_a$b['c'] = Math.pow(_a$b['c'], 2)));\n  })(),\n) {}",
   "var _reader;\nvar counters = 0;\nObject.defineProperty(global, 'reader', {\n  get: function () {\n    counters += 1;\n    return { x: 2 };\n  },\n  configurable: true,\n});\n((_reader = reader), (_reader['x'] = Math.pow(_reader['x'], 2)));\nexpect(counters).toBe(1);",
   "var _reader;\n((_reader = reader), (_reader['x'] = Math.pow(_reader['x'], 2)));",
   "foo = {\n  bar() {\n    return (super['baz'] = Math.pow(super['baz'], 12));\n  },\n};",
-  'var _ref;\nvar a, b;\n((_ref = `${b++}`), (a[_ref] = Math.pow(a[_ref], 1)));',
+  'var _ref;\nvar a, b;\na[(_ref = `${b++}`)] = Math.pow(a[_ref], 1);',
 ] as const;
 
 export const fixtureCases = [

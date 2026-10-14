@@ -130,9 +130,8 @@ impl<'a> ExponentiationOperator<'a> {
                 ctx.scoping().get_reference(ident.reference_id()).symbol_id().is_none()
             }
             AssignmentTarget::ComputedMemberExpression(member) => {
-                !member.object.is_super()
-                    || !member.expression.is_literal()
-                    || matches!(member.expression, Expression::RegExpLiteral(_))
+                !Self::repeatable_computed_receiver(&member.object, ctx)
+                    || !Self::repeatable_key(&member.expression)
             }
             AssignmentTarget::StaticMemberExpression(member) => {
                 !bound_identifier(&member.object) && !member.object.is_super()
@@ -140,6 +139,22 @@ impl<'a> ExponentiationOperator<'a> {
             AssignmentTarget::PrivateFieldExpression(member) => !bound_identifier(&member.object),
             _ => false,
         }
+    }
+
+    fn repeatable_computed_receiver(expr: &Expression<'a>, ctx: &TraverseCtx<'a>) -> bool {
+        match expr {
+            Expression::Super(_) => true,
+            Expression::Identifier(ident) => ctx
+                .scoping()
+                .get_reference(ident.reference_id())
+                .symbol_id()
+                .is_some_and(|symbol| !ctx.scoping().symbol_is_mutated(symbol)),
+            _ => false,
+        }
+    }
+
+    fn repeatable_key(expr: &Expression<'a>) -> bool {
+        expr.is_literal() && !matches!(expr, Expression::RegExpLiteral(_))
     }
 
     /// Convert `BinaryExpression`.
@@ -338,14 +353,20 @@ impl<'a> ExponentiationOperator<'a> {
         // Construct the assignment reference while evaluating the receiver and key.
         // Sequencing both initializers before the reference lets reentrant keys retarget
         // the write. A bound receiver can also be reassigned by the key expression.
-        let obj = if member_expr.object.is_super() {
-            Expression::new_super(SPAN, ctx)
+        let obj = if Self::repeatable_computed_receiver(&member_expr.object, ctx) {
+            match &member_expr.object {
+                Expression::Identifier(ident) => {
+                    let symbol =
+                        ctx.scoping().get_reference(ident.reference_id()).symbol_id().unwrap();
+                    ctx.create_bound_ident_expr(SPAN, ident.name, symbol, ReferenceFlags::Read)
+                }
+                Expression::Super(super_) => Expression::new_super(super_.span, ctx),
+                _ => unreachable!(),
+            }
         } else {
             Self::memoize_reference_part(&mut member_expr.object, ctx)
         };
-        let prop = if member_expr.expression.is_literal()
-            && !matches!(member_expr.expression, Expression::RegExpLiteral(_))
-        {
+        let prop = if Self::repeatable_key(&member_expr.expression) {
             member_expr.expression.clone_in(ctx.allocator())
         } else {
             Self::memoize_reference_part(&mut member_expr.expression, ctx)

@@ -158,3 +158,24 @@ test('RegExp property keys retain allocated identity during coercion', () => {
   expect(code).not.toContain('**=');
   expect(runInNewContext(code)).toEqual(expected);
 });
+
+// Like Babel, immutable-binding analysis does not model assignments hidden in
+// dynamic eval or writes through the script global object's property surface.
+describe.each(['eval', 'global-property'] as const)('accepted %s mutation boundary', kind => {
+  test('uses the same receiver strategy as Babel', () => {
+    const source = `var first={x:3},second={x:4},receiver=first;
+      function key(){${kind === 'eval' ? "eval('receiver=second')" : 'globalThis.receiver=second'};return 'x'}
+      globalThis.result=[receiver[key()] **= 2,first.x,second.x];`;
+    expect(runInNewContext(source)).toEqual([9, 9, 4]);
+    const babel = transformSync(source, {
+      sourceType: 'script',
+      configFile: false,
+      babelrc: false,
+      plugins: [exponentiation],
+    })!.code!;
+    expect(runInNewContext(babel)).toEqual([16, 16, 4]);
+    const code = compile(source, { transforms: { exponentiationOperator: true } });
+    expect(code).not.toContain('**=');
+    expect(runInNewContext(code)).toEqual([16, 16, 4]);
+  });
+});
