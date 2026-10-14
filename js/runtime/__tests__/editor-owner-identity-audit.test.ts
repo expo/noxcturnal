@@ -66,10 +66,7 @@ describe.each(cases)('$name', entry => {
     expect(visits).toEqual(['edit', 'reset']);
     actual = [changed, result.code];
   });
-  (entry.fails ? test.fails : test)(
-    'reset and hasChanged use the current plugin definition',
-    () => {
-      expect(actual).toEqual([false, '4;']);
-    },
-  );
+  test('reset and hasChanged use the current plugin definition', () => {
+    expect(actual).toEqual([false, '4;']);
+  });
 });

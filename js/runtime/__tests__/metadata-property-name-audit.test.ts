@@ -39,13 +39,10 @@ describe.each([
       metadata = result.metadata;
     });
 
-    (key === '__proto__' ? test.fails : test)(
-      'retains the declared metadata entry across phases',
-      () => {
-        expect(read).toBe(value);
-        expect(Object.hasOwn(metadata, key)).toBe(true);
-        expect(metadata[key]).toBe(value);
-      },
-    );
+    test('retains the declared metadata entry across phases', () => {
+      expect(read).toBe(value);
+      expect(Object.hasOwn(metadata, key)).toBe(true);
+      expect(metadata[key]).toBe(value);
+    });
   });
 });

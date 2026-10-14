@@ -50,10 +50,7 @@ describe.each(cases)('$name', entry => {
       rejected = true;
     }
   });
-  (entry.fails ? test.fails : test)(
-    'applies range equality only within the same phase occurrence',
-    () => {
-      expect(rejected).toBe(entry.rejected);
-    },
-  );
+  test('applies range equality only within the same phase occurrence', () => {
+    expect(rejected).toBe(entry.rejected);
+  });
 });

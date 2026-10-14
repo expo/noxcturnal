@@ -53,12 +53,9 @@ for (const kind of ['helper', 'replacement'] as const) {
           rejected = true;
         }
       });
-      (provenance && changed ? test.fails : test)(
-        'compares content across phase source versions',
-        () => {
-          expect(rejected).toBe(changed);
-        },
-      );
+      test('compares content across phase source versions', () => {
+        expect(rejected).toBe(changed);
+      });
     });
   }
 }
@@ -110,11 +107,8 @@ for (const kind of ['helper', 'replacement'] as const) {
         rejected = true;
       }
     });
-    (provenance ? test.fails : test)(
-      'accepts identical text at changed offsets in later phases',
-      () => {
-        expect(rejected).toBe(false);
-      },
-    );
+    test('accepts identical text at changed offsets in later phases', () => {
+      expect(rejected).toBe(false);
+    });
   });
 }

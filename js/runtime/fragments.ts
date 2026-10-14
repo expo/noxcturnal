@@ -18,9 +18,22 @@ export type RealizedContent =
 export interface IntentRegistration {
   owner: string;
   realized: RealizedContent;
-  phase: string;
+  phase: object;
+  /** Registration-time text for comparison across immutable phase sources.
+   * Same-phase copies retain structural identity and stay deferred at commit. */
+  text: string;
   start?: number;
   end?: number;
+}
+
+/** Resolve only requested fragments against their immutable registration source. */
+export function realizedContentText(value: RealizedContent, source: string): string {
+  return (
+    value.content ??
+    value.contentParts
+      .map(part => (typeof part === 'string' ? part : source.slice(part.start, part.end)))
+      .join('')
+  );
 }
 
 export function identicalRealizedContent(a: RealizedContent, b: RealizedContent): boolean {

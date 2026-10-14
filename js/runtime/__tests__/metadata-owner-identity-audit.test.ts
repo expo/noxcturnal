@@ -32,7 +32,7 @@ describe.each([false, true])('shared plugin name=%s', sharedName => {
       rejected = true;
     }
   });
-  (sharedName ? test.fails : test)('rejects two definitions claiming the same metadata key', () => {
+  test('rejects two definitions claiming the same metadata key', () => {
     expect(rejected).toBe(true);
   });
 });

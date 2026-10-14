@@ -1,11 +1,12 @@
 import { alias, expandSubscriptions } from '../pipeline/route-utils';
 import { CHILD_ROLES } from '../generated/event-schema';
-import { createEditor } from './editor';
+import { createEditor, EDIT_OWNER, type OwnedEdit } from './editor';
 import {
   codeFactory,
   identicalRealizedContent,
   makeSourceFragment,
   realizeContent,
+  realizedContentText,
   type IntentRegistration,
   type RealizedContent,
 } from './fragments';
@@ -35,7 +36,7 @@ import type {
   PipelinePhase,
   PluginContext,
 } from '../contracts/visitor';
-import type { ControlFlowCapability, Diagnostic, EditCommand, NativeEvent } from '../types';
+import type { ControlFlowCapability, Diagnostic, NativeEvent } from '../types';
 import type { NativeTransformSession } from './session';
 
 export class Bailout extends Error {}
@@ -54,6 +55,7 @@ type NestedVisitor = readonly DefinedVisitor<any>[];
 interface DispatcherEntry extends PathState {
   context: PluginContext;
   state: any;
+  ownerIdentity: object;
   delivered?: Map<readonly Handler<any>[], Set<number>>;
   /** Path runtimes keyed by the exact route capabilities they enforce. */
   pathRuntimes?: Map<RouteCapabilities, PathRuntime>;
@@ -71,7 +73,7 @@ export function createDispatcher(
   activePlugins: readonly NativePlugin<any, any>[],
   plans: ReadonlyMap<NativePlugin<any, any>, PreparedPluginPlan>,
   batch: RoutedEventBatch,
-  edits: EditCommand[],
+  edits: OwnedEdit[],
   metadata: Record<string, unknown>,
   diagnostics: Diagnostic[],
   cacheEvents: boolean,
@@ -89,18 +91,18 @@ export function createDispatcher(
   let visitorIds: WeakMap<object, number> | undefined;
   let activeTraversals: Set<string> | undefined;
   let programBodyOffsets: ReturnType<NativeTransformSession['programBodyOffsets']> | undefined;
-  let programEndBoundary: EditCommand | undefined;
+  let programEndBoundary: OwnedEdit | undefined;
   const programInsertions = new WeakMap<
-    EditCommand,
+    OwnedEdit,
     { prefix: string; pending: RealizedContent | undefined }
   >();
-  const programInsertionPoints = new Map<number, EditCommand>();
+  const programInsertionPoints = new Map<number, OwnedEdit>();
   let hasPendingInsertions = false;
   const flushInsertions = (): void => {
     if (!hasPendingInsertions) return;
     const texts: string[] = [];
     const composites: (string | { start: number; end: number })[][] = [];
-    const targets: EditCommand[] = [];
+    const targets: OwnedEdit[] = [];
     // Text indices are nonnegative; composites use -1-based indices so their
     // final position remains correct when later inserts add more text requests.
     const indices: number[] = [];
@@ -135,7 +137,7 @@ export function createDispatcher(
     hasPendingInsertions = false;
   };
   const boundaryPrefixes: [string?, string?] = [];
-  const insertionPrefix = (kind: EditCommand['kind'], offset: number): string => {
+  const insertionPrefix = (kind: OwnedEdit['kind'], offset: number): string => {
     if (programInsertionPoints.has(offset)) return '';
     const index = kind === 'Prologue' ? 0 : 1;
     // Source is immutable in this phase; reset changes edits, not these facts.
@@ -145,7 +147,7 @@ export function createDispatcher(
   };
   const resetProgramBoundaries = (): void => {
     programInsertionPoints.clear();
-    let append: EditCommand | undefined;
+    let append: OwnedEdit | undefined;
     for (const edit of edits) {
       const record = programInsertions.get(edit);
       if (!record) continue;
@@ -170,19 +172,22 @@ export function createDispatcher(
         end: session.source.length,
         content: '\n',
         owner: append.owner,
+        [EDIT_OWNER]: append[EDIT_OWNER],
         order: order++,
       };
       edits.push(programEndBoundary);
     }
   };
+  const phaseIdentity = {};
   const contexts = new Map<NativePlugin<any, any>, DispatcherEntry>();
-  const metadataOwners = new Map<string, string>();
+  const contextOwners = new Map<PluginContext, object>();
+  const metadataOwners = new Map<string, NativePlugin<any, any>>();
   for (const plugin of activePlugins)
     for (const key of plans.get(plugin)?.metadataWrites ?? []) {
       const owner = metadataOwners.get(key);
-      if (owner && owner !== plugin.name)
-        throw new Error(`metadata key ${key} is owned by both ${owner} and ${plugin.name}`);
-      metadataOwners.set(key, plugin.name);
+      if (owner && owner !== plugin)
+        throw new Error(`metadata key ${key} is owned by both ${owner.name} and ${plugin.name}`);
+      metadataOwners.set(key, plugin);
     }
   for (const plugin of activePlugins) {
     const allowedMetadata = new Set(plans.get(plugin)?.metadataWrites ?? []);
@@ -198,6 +203,7 @@ export function createDispatcher(
     }
     const entry: DispatcherEntry = {
       state: undefined,
+      ownerIdentity: {},
       stopped: false,
       skipped: undefined,
       context: undefined as unknown as PluginContext,
@@ -218,7 +224,11 @@ export function createDispatcher(
       const composite = `${kind}\u0000${key}`;
       const existing = intents.get(composite);
       if (existing) {
-        if (!identicalRealizedContent(existing.realized, realized))
+        if (
+          !(existing.phase === phaseIdentity
+            ? identicalRealizedContent(existing.realized, realized)
+            : existing.text === realizedContentText(realized, session.source))
+        )
           throw Object.assign(
             new Error(
               `${describe} realized different content for ${plugin.name} than for its first registrant ${existing.owner}`,
@@ -227,7 +237,13 @@ export function createDispatcher(
           );
         return existing;
       }
-      intents.set(composite, { owner: plugin.name, realized, phase: phase.name, ...range });
+      intents.set(composite, {
+        owner: plugin.name,
+        realized,
+        phase: phaseIdentity,
+        text: realizedContentText(realized, session.source),
+        ...range,
+      });
       return null;
     };
     const pushRealizedProgramInsertion = (
@@ -236,7 +252,7 @@ export function createDispatcher(
       realized: RealizedContent,
     ): void => {
       const prefix = insertionPrefix(kind, offset);
-      const edit: EditCommand = {
+      const edit: OwnedEdit = {
         kind,
         start: offset,
         end: offset,
@@ -244,6 +260,7 @@ export function createDispatcher(
           ? { contentParts: [...(prefix ? [prefix] : []), ...realized.contentParts] }
           : { content: `${prefix}${realized.content}` }),
         owner: plugin.name,
+        [EDIT_OWNER]: entry.ownerIdentity,
         order: order++,
       };
       if (!programInsertionPoints.has(offset)) programInsertionPoints.set(offset, edit);
@@ -265,9 +282,14 @@ export function createDispatcher(
         set(key, value) {
           if (!allowedMetadata.has(key))
             throw new Error(`${plugin.name}: undeclared metadata key ${key}`);
-          metadata[key] = value;
+          Object.defineProperty(metadata, key, {
+            value,
+            writable: true,
+            configurable: true,
+            enumerable: true,
+          });
         },
-        get: key => metadata[key],
+        get: key => (Object.hasOwn(metadata, key) ? metadata[key] : undefined),
       },
       query: request => {
         for (const capability in request) {
@@ -326,6 +348,7 @@ export function createDispatcher(
             end: session.source.length,
             content: '\n',
             owner: plugin.name,
+            [EDIT_OWNER]: entry.ownerIdentity,
             order: order++,
           };
           edits.push(programEndBoundary);
@@ -348,7 +371,10 @@ export function createDispatcher(
         if (existing) {
           // Ranges are phase coordinates: within the registering phase the intent
           // binds one exact range; later phases re-ensure content only.
-          if (existing.phase === phase.name && (existing.start !== start || existing.end !== end))
+          if (
+            existing.phase === phaseIdentity &&
+            (existing.start !== start || existing.end !== end)
+          )
             throw Object.assign(
               new Error(
                 `replacement intent ${key} targets ${start}..${end} for ${plugin.name} but ${existing.start}..${existing.end} for its first registrant ${existing.owner}`,
@@ -365,6 +391,7 @@ export function createDispatcher(
             ? { contentParts: realized.contentParts }
             : { content: realized.content }),
           owner: plugin.name,
+          [EDIT_OWNER]: entry.ownerIdentity,
           order: order++,
         });
       },
@@ -374,15 +401,23 @@ export function createDispatcher(
         return makeSourceFragment(session, start, end);
       },
       code: codeFactory,
-      editor: createEditor(session, edits, plugin.name, () => order++, {
-        affects: edit =>
-          edit === programEndBoundary || programInsertionPoints.get(edit.start) === edit,
-        reconcile: resetProgramBoundaries,
-        beforeCommit: flushInsertions,
-      }),
+      editor: createEditor(
+        session,
+        edits,
+        plugin.name,
+        () => order++,
+        {
+          affects: edit =>
+            edit === programEndBoundary || programInsertionPoints.get(edit.start) === edit,
+          reconcile: resetProgramBoundaries,
+          beforeCommit: flushInsertions,
+        },
+        entry.ownerIdentity,
+      ),
     };
     entry.context = context;
     contexts.set(plugin, entry);
+    contextOwners.set(context, entry.ownerIdentity);
   }
   const runtimeFor = (
     plugin: NativePlugin<any, any>,
@@ -410,6 +445,7 @@ export function createDispatcher(
       context,
       edits,
       owner: plugin.name,
+      ownerIdentity: contextOwners.get(context),
       nextOrder: () => order++,
       state: entry,
       nested(target, nested, state) {
@@ -564,6 +600,7 @@ export function createDispatcher(
     const entry = {
       context,
       state,
+      ownerIdentity: contextOwners.get(context)!,
       stopped: false,
       skipped: undefined,
     };

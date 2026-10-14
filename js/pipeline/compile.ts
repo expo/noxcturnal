@@ -37,6 +37,14 @@ function computePhasePlan(pipeline: NativePipeline): readonly CompiledPhasePlan[
       if (phase.editEffect != null && !EDIT_EFFECTS.has(phase.editEffect))
         throw new Error(`${phase.name}: invalid edit effect ${String(phase.editEffect)}`);
       const plugins = phase.plugins ?? [];
+      const seen = new Set();
+      for (const plugin of plugins) {
+        if (seen.has(plugin))
+          throw new Error(
+            `${phase.name}: plugin ${plugin.name} occurs more than once in one phase; use separate definitions or phases`,
+          );
+        seen.add(plugin);
+      }
       for (const plugin of plugins)
         if (plugin.editEffect != null && !EDIT_EFFECTS.has(plugin.editEffect))
           throw new Error(`${plugin.name}: invalid edit effect ${String(plugin.editEffect)}`);

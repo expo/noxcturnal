@@ -3,6 +3,10 @@ import type { NativeEditor } from '../contracts/visitor';
 import { packEdits } from '../protocol/edits';
 import type { EditCommand } from '../types';
 
+// Host-only ownership; never serialized into the native edit protocol.
+export const EDIT_OWNER = Symbol('edit owner');
+export type OwnedEdit = EditCommand & { [EDIT_OWNER]?: object | string };
+
 type EditKind = EditCommand['kind'];
 
 interface EditorSession {
@@ -32,7 +36,7 @@ export function commitWithDedupe<Committed extends object>(
 
 export function createEditor(
   session: EditorSession,
-  edits: EditCommand[],
+  edits: OwnedEdit[],
   owner: string,
   nextOrder: () => number,
   hooks?: {
@@ -40,10 +44,19 @@ export function createEditor(
     reconcile(): void;
     beforeCommit?(): void;
   },
+  ownerIdentity: object | string = owner,
 ): NativeEditor {
   const source = session.source;
   const push = (kind: EditKind, start: number, end: number, content?: string) =>
-    edits.push({ kind, start, end, content, owner, order: nextOrder() });
+    edits.push({
+      kind,
+      start,
+      end,
+      content,
+      owner,
+      [EDIT_OWNER]: ownerIdentity,
+      order: nextOrder(),
+    });
   // Replacing a range is an ordinary replacement whichever method asked for it, so
   // these agree with `overwrite`'s default rather than leaving the text unmapped.
   const replaceRange = (start: number, end: number, content: string) =>
@@ -54,6 +67,7 @@ export function createEditor(
       content,
       mapping: 'AnchorStart',
       owner,
+      [EDIT_OWNER]: ownerIdentity,
       order: nextOrder(),
     });
   let text: InstanceType<typeof native.NativeSourceText> | undefined;
@@ -103,19 +117,32 @@ export function createEditor(
         content,
         mapping: editorMappingPolicy(mapping),
         owner,
+        [EDIT_OWNER]: ownerIdentity,
         order: nextOrder(),
       }),
     remove: (start, end) => push('Remove', start, end),
     move(start, end, destination) {
       if (destination > start && destination < end)
         throw new Error('move destination cannot be inside moved range');
-      edits.push({ kind: 'Move', start, end, destination, owner, order: nextOrder() });
+      edits.push({
+        kind: 'Move',
+        start,
+        end,
+        destination,
+        owner,
+        [EDIT_OWNER]: ownerIdentity,
+        order: nextOrder(),
+      });
     },
     reset(start, end) {
       let write = 0;
       let reconcile = false;
       for (const edit of edits) {
-        if (edit.owner === owner && edit.start >= start && edit.end <= end) {
+        if (
+          (edit[EDIT_OWNER] ?? edit.owner) === ownerIdentity &&
+          edit.start >= start &&
+          edit.end <= end
+        ) {
           if (hooks?.affects(edit)) reconcile = true;
           continue;
         }
@@ -142,7 +169,7 @@ export function createEditor(
     addSourceMapLocation(offset) {
       push('AddSourceMapLocation', offset, offset);
     },
-    hasChanged: () => edits.some(edit => edit.owner === owner),
+    hasChanged: () => edits.some(edit => (edit[EDIT_OWNER] ?? edit.owner) === ownerIdentity),
     replace(search, replacement) {
       replace(search, replacement, false);
     },

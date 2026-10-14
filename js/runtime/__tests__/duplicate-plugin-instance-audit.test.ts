@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, test } from 'vitest';
+import { expect, test } from 'vitest';
 import { defineNativePipeline, defineNativePlugin, defineVisitor, transform } from '../../index';
 
 interface State {
@@ -61,28 +61,8 @@ function observe(configuration: 'duplicate' | 'distinct' | 'phases') {
   return events;
 }
 
-describe('duplicate plugin identity in one phase', () => {
-  let events: ReturnType<typeof observe>;
-  beforeAll(() => {
-    events = observe('duplicate');
-    expect(events).toEqual({
-      create: [1, 2],
-      pre: [1, 2],
-      analyze: [2, 2],
-      apply: [2, 2],
-      visit: [2, 2],
-      post: [2, 2],
-      cleanup: [1, 2],
-    });
-  });
-  // This asserts state continuity for the accepted occurrences, not a requirement
-  // to accept duplicates. Early rejection or consistent deduplication are also
-  // possible contract repairs and would require updating the setup accordingly.
-  test.fails('accepted lifecycle occurrences retain their prepared state', () => {
-    for (const hook of ['analyze', 'apply', 'visit', 'post']) {
-      expect(events[hook]).toEqual(events.pre);
-    }
-  });
+test('duplicate plugin instances are rejected before any lifecycle effects', () => {
+  expect(() => observe('duplicate')).toThrow(/plugin same-name occurs more than once/);
 });
 
 test.each(['distinct', 'phases'] as const)('%s keeps lifecycle states separate', configuration => {
