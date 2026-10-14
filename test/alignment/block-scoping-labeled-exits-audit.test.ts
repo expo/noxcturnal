@@ -14,7 +14,6 @@ outer: inner: for (let index = 0; index < 2; index++) {
 }
 globalThis.result = out.map(read => read());`,
     expected: [0, 1],
-    knownFailure: true,
   },
   {
     name: 'captured inner loop continues to an ancestor loop label',
@@ -27,7 +26,6 @@ outer: for (var pass = 0; pass < 2; pass++) {
 }
 globalThis.result = out.map(read => read());`,
     expected: [0, 0],
-    knownFailure: true,
   },
   {
     name: 'captured loop breaks to an ancestor block label',
@@ -40,7 +38,6 @@ outer: {
 }
 globalThis.result = out.map(read => read());`,
     expected: [0],
-    knownFailure: true,
   },
 ];
 
@@ -50,7 +47,7 @@ function run(code: string): unknown {
   return context.result;
 }
 
-describe.each(cases)('$name', ({ source, expected, knownFailure }) => {
+describe.each(cases)('$name', ({ source, expected }) => {
   let code: string;
   let babel: string;
   beforeAll(() => {
@@ -72,8 +69,7 @@ describe.each(cases)('$name', ({ source, expected, knownFailure }) => {
   test('Babel control', () => {
     expect(run(babel)).toEqual(expected);
   });
-  const transformedTest = knownFailure ? test.fails : test;
-  transformedTest('transformed execution', () => {
+  test('transformed execution', () => {
     expect(run(code)).toEqual(expected);
   });
 });

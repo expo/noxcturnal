@@ -168,13 +168,18 @@ impl<'a> VisitMut<'a> for BodyRewriter<'a, '_> {
             _ => None,
         };
         if let Some((kind, value)) = completion {
+            let tag = self
+                .mutation
+                .exit_labels
+                .get(&key)
+                .map_or_else(|| kind.to_owned(), |label| format!("{kind}:{label}"));
             *statement = self.ast.statement_return(
                 span,
                 Some(captured_loop_result(
                     &self.ast,
                     self.mutation,
                     span,
-                    kind,
+                    &tag,
                     value,
                 )),
             );

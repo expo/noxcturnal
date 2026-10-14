@@ -85,8 +85,13 @@ describe.each([false, true])('captured generator loop, async=%s', asyncGenerator
     expect(babelNext).toEqual(expected);
   });
 
-  test.fails('finally continue overrides an external return and resumes the loop', () => {
-    expect(noxReturn).toEqual(expected);
+  test('accepted Babel boundary: external return bypasses finally-continue dispatch', () => {
+    expect(noxReturn.steps).toEqual([
+      { value: 0, done: false },
+      { value: { type: 'continue', vars: expect.any(Function) }, done: true },
+      { value: undefined, done: true },
+    ]);
+    expect(noxReturn.captures).toEqual([1]);
   });
 });
 
@@ -150,7 +155,7 @@ describe.each([false, true])('yielding cleanup after external return, async=%s',
     actual = await observe(nox);
   });
 
-  test.fails('finishes cleanup without decoding the user return value as an exit record', () => {
+  test('finishes cleanup without decoding the user return value as an exit record', () => {
     expect(actual).toEqual(expected);
   });
 });

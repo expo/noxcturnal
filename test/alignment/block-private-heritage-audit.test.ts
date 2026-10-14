@@ -36,9 +36,8 @@ describe.each([false, true])('private write in heritage, same-name inner method=
     expect(code).not.toMatch(/\blet\b/);
     expect(code).toContain('#value');
     actual = observe(code);
-    if (collision) expect(actual).toEqual([1, 'TypeError']);
   });
-  (collision ? test.fails : test)('resolves the heritage private name in the outer class', () => {
+  test('resolves the heritage private name in the outer class', () => {
     expect(actual).toEqual([3, 'completed']);
   });
 });

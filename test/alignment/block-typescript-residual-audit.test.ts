@@ -39,9 +39,8 @@ describe.each([false, true])('TypeScript enum residual pass, declared collision=
     expect(code).not.toMatch(/\b(?:let|const|enum)\b/);
     expect(code).not.toContain('@babel/runtime');
     actual = observe(code);
-    if (!declared) expect(actual).toEqual([[1, 2], { 2: 'A', A: 2 }]);
   });
-  (declared ? test : test.fails)('preserves the external replacement-name binding', () => {
+  test('preserves the external replacement-name binding', () => {
     expect(actual).toEqual([[1, 2], 'external']);
   });
 });

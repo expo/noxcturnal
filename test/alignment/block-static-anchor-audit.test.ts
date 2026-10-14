@@ -55,17 +55,8 @@ describe.each(cases)('$name', ({ member, read, method }) => {
     expect(result.code).not.toMatch(/\b(?:let|const)\b/);
     expect(result.code).not.toContain('@babel/runtime');
     outcome = observe(result.code);
-    if (!method)
-      expect(outcome).toEqual(
-        read === 'C.#value'
-          ? {
-              error: 'SyntaxError',
-              message: "Private field '#value' must be declared in an enclosing class",
-            }
-          : { error: 'ReferenceError', message: 'reads is not defined' },
-      );
   });
-  (method ? test : test.fails)('retains the lexical class environment', () => {
+  test('retains the lexical class environment', () => {
     expect(outcome).toEqual({
       value: [
         [0, 3],

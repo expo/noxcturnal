@@ -45,9 +45,8 @@ describe.each(cases)('$name', ({ external, source: body, expected }) => {
       const code = compile(source, { transforms: { blockScoping: true } });
       expect(code).not.toMatch(/\b(?:let|const)\b/);
       actual = observe(code);
-      if (!declared) expect(actual).toEqual([...expected.slice(0, -1), false]);
     });
-    (declared ? test : test.fails)('preserves the supplied external value', () => {
+    test('preserves the supplied external value', () => {
       expect(actual).toEqual(expected);
     });
   });
