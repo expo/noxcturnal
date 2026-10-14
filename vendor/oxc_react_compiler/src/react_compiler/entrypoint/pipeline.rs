@@ -150,6 +150,7 @@ fn run_pipeline<'a>(
     env.instrument_gating_name = context.instrument_gating_name;
     env.hook_guard_name = context.hook_guard_name;
     env.memo_cache_name = context.memo_cache_name;
+    env.source_hash = context.source_hash;
     env.seed_uid_known_names(context.known_referenced_names());
 
     let mut hir = lower(func, scope, &mut env)?;
@@ -167,6 +168,12 @@ fn run_pipeline<'a>(
     // other functions in the file still compile.
     if env.skip_compilation {
         return Ok(Ok(None));
+    }
+
+    // Unsupported lowering can leave placeholder values. Do not send that partial
+    // HIR into inference, where it can turn an ordinary skip into an invariant.
+    if env.has_errors() {
+        return Ok(Err(env.take_errors()));
     }
 
     prune_maybe_throws(&mut hir, &mut env.functions, env.allocator)?;

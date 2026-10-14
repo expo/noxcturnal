@@ -307,15 +307,19 @@ test('composes React Compiler with TypeScript and automatic JSX', async () => {
     "import { c as _c } from 'react/compiler-runtime';
     import { jsx as _jsx } from 'react/jsx-runtime';
     export function App(t0) {
-      const $ = _c(2);
+      const $ = _c(3);
+      if ($[0] !== 'a2fb8f568295d5c5dd8850fe5855257b2bc8db73') {
+        for (let i = 1; i < 3; i++) $[i] = Symbol.for('react.memo_cache_sentinel');
+        $[0] = 'a2fb8f568295d5c5dd8850fe5855257b2bc8db73';
+      }
       const { value } = t0;
       let t1;
-      if ($[0] !== value) {
+      if ($[1] !== value) {
         t1 = /* @__PURE__ */ _jsx(View, { value });
-        $[0] = value;
-        $[1] = t1;
+        $[1] = value;
+        $[2] = t1;
       } else {
-        t1 = $[1];
+        t1 = $[2];
       }
       return t1;
     }"

@@ -1,7 +1,7 @@
 import { createRequire } from 'node:module';
 import { transformSync } from '@babel/core';
 import { beforeAll, describe, expect, test } from 'vitest';
-import { compile } from '../compliance/runtime';
+import { compile, importCode } from '../compliance/runtime';
 
 const require = createRequire(import.meta.url);
 const source = 'function App(){const [value]=useState(3);return value}globalThis.result=App();';
@@ -36,15 +36,13 @@ describe.each([
   {
     name: 'identifiers',
     options: { refreshReg: 'register', refreshSig: 'signature' },
-    fails: false,
   },
   {
     name: 'single member',
     options: { refreshReg: 'runtime.register', refreshSig: 'runtime.signature' },
-    fails: false,
   },
-  { name: 'nested registration', options: { refreshReg: 'runtime.hooks.register' }, fails: true },
-  { name: 'nested signature', options: { refreshSig: 'runtime.hooks.signature' }, fails: true },
+  { name: 'nested registration', options: { refreshReg: 'runtime.hooks.register' } },
+  { name: 'nested signature', options: { refreshSig: 'runtime.hooks.signature' } },
 ])('$name', entry => {
   let actual: unknown;
   let expected: unknown;
@@ -59,15 +57,34 @@ describe.each([
     expect(expected).toEqual([3, ['App'], 1, 2]);
     const nox = compile(source, { reactRefresh: entry.options });
     expect(nox).toContain('_s');
-    try {
-      actual = execute(nox);
-    } catch (error) {
-      expect(error).toBeInstanceOf(TypeError);
-      expect((error as Error).message).toMatch(/runtime\.hooks.*not a function/);
-      actual = { error: 'TypeError' };
-    }
+    actual = execute(nox);
   });
-  (entry.fails ? test.fails : test)('calls the complete configured member path', () => {
+  test('calls the complete configured member path', () => {
     expect(actual).toEqual(expected);
   });
 });
+
+for (const depth of ['runtime.hooks', 'runtime.hooks.callbacks']) {
+  test(`executes import.meta.${depth} callback paths`, async () => {
+    const options = {
+      refreshReg: `import.meta.${depth}.register`,
+      refreshSig: `import.meta.${depth}.signature`,
+    };
+    const input = 'function App(){const [value]=useState(3);return value}export const value=App();';
+    const reference = transformSync(input, {
+      babelrc: false,
+      configFile: false,
+      plugins: [[require('react-refresh/babel'), { ...options, skipEnvCheck: true }]],
+    })!.code!;
+    const actual = compile(input, { reactRefresh: options }, 'input.mjs');
+    const prefix = `const observed={registrations:[],setup:0,calls:0};
+      const callbacks={register(type,id){observed.registrations.push(id)},signature(){observed.setup++;return ()=>{observed.calls++}}};
+      import.meta.runtime={hooks:${depth.endsWith('callbacks') ? '{callbacks}' : 'callbacks'}};
+      const useState=value=>[value];`;
+    for (const code of [reference, actual]) {
+      const result = await importCode(prefix + code + ';export {observed};');
+      expect(result.value).toBe(3);
+      expect(result.observed).toEqual({ registrations: ['App'], setup: 1, calls: 2 });
+    }
+  });
+}

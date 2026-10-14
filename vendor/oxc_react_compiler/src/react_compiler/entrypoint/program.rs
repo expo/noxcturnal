@@ -1175,9 +1175,9 @@ fn process_fn<'a>(
 // -----------------------------------------------------------------------
 
 /// Collect the directive value strings of a function body (for opt-in/opt-out
-/// checks). Matches the Babel-bridge directive values (`d.expression.value`).
+/// checks). Preserve lexical escapes like Babel directive values.
 fn body_directive_values<'a>(body: &FunctionBody<'a>) -> Vec<Str<'a>> {
-    body.directives.iter().map(|d| d.expression.value).collect()
+    body.directives.iter().map(|d| d.directive).collect()
 }
 
 /// Try to create a `CompileSource` from a discovered oxc function node.
@@ -2881,7 +2881,7 @@ pub fn compile_program<'a>(
 
     // Check for module-scope opt-out directive
     let has_module_scope_opt_out = find_directive_disabling_memoization(
-        program.directives.iter().map(|d| d.expression.value.as_str()),
+        program.directives.iter().map(|d| d.directive.as_str()),
         options.custom_opt_out_directives.as_deref(),
     )
     .is_some();

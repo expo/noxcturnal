@@ -110,3 +110,6 @@ result_large_err = "allow"
 bare_urls = "allow"
 broken_intra_doc_links = "allow"
 invalid_html_tags = "allow"
+
+[dependencies.hmac-sha1-compact]
+version = "1.1.7"

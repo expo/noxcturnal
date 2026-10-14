@@ -96,6 +96,7 @@ pub struct Environment<'a> {
     // shape ids, property keys) live here so they can be borrowed from the
     // source AST at lowering and emitted into the output AST without copies.
     pub allocator: &'a Allocator,
+    pub source_hash: Option<Ident<'a>>,
 
     // Counters
     pub next_block_id_counter: u32,
@@ -234,6 +235,7 @@ impl<'a> Environment<'a> {
 
         Self {
             allocator,
+            source_hash: None,
             next_block_id_counter: 0,
             next_scope_id_counter: 0,
             next_mutable_range_id_counter: 0,

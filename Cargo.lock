@@ -679,6 +679,7 @@ name = "oxc_react_compiler"
 version = "0.141.0"
 dependencies = [
  "cow-utils",
+ "hmac-sha1-compact",
  "indexmap",
  "oxc_allocator",
  "oxc_ast",

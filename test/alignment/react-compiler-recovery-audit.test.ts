@@ -80,13 +80,7 @@ for (const mode of ['inline', 'runtime'] as const) {
         expect(code).not.toMatch(/value\s*=\s*7/);
         if (mode === 'inline') {
           expect(code).toContain('babelHelpers.defineProperty');
-          expect(() => observe(code)).toThrow(ReferenceError);
-          try {
-            actual = observe(code).value;
-          } catch (error) {
-            expect(String(error)).toContain('babelHelpers is not defined');
-            actual = 'missing helper';
-          }
+          actual = observe(code).value;
         } else {
           expect(require('@babel/runtime/package.json').version).toBe('7.29.7');
           expect(code).toContain('@babel/runtime/helpers/defineProperty');
@@ -94,10 +88,7 @@ for (const mode of ['inline', 'runtime'] as const) {
           expect(actual).toBe(7);
         }
       });
-      (mode === 'inline' ? test.fails : test)(
-        'preserves helpers requested before warning recovery',
-        () => expect(actual).toBe(7),
-      );
+      test('preserves helpers requested before warning recovery', () => expect(actual).toBe(7));
     });
   }
 }
@@ -119,8 +110,8 @@ for (const emitFullSignatures of [false, true]) {
       ).toEqual(['App']);
       const code = compile(warning, plan, 'input.jsx');
       actual = observe(code).registrations;
-      expect(actual).toEqual(['App', 'App']);
+      expect(actual).toEqual(['App']);
     });
-    test.fails('registers the component once', () => expect(actual).toEqual(['App']));
+    test('registers the component once', () => expect(actual).toEqual(['App']));
   });
 }

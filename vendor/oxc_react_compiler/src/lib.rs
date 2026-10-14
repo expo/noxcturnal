@@ -76,22 +76,36 @@ pub fn compile<'a>(
     allocator: &'a Allocator,
     options: PluginOptions,
 ) -> (Option<CompileOutput<'a>>, Diagnostics) {
+    match compile_with_status(program, semantic, allocator, options) {
+        Ok(result) => result,
+        Err(diagnostics) => (None, diagnostics),
+    }
+}
+
+/// Compile while preserving the selected panic threshold's fatal/nonfatal outcome.
+/// Successful skips may carry diagnostics; integrations must still run later passes.
+pub fn compile_with_status<'a>(
+    program: &Program<'a>,
+    semantic: &Semantic<'_>,
+    allocator: &'a Allocator,
+    options: PluginOptions,
+) -> Result<(Option<CompileOutput<'a>>, Diagnostics), Diagnostics> {
     // Check for existing runtime imports (file already compiled).
     if has_memo_cache_function_import(program, &get_react_compiler_runtime_module(&options.target))
     {
-        return (None, Diagnostics::default());
+        return Ok((None, Diagnostics::default()));
     }
 
     // Blocklisted imports fail the whole file: report and bail without compiling.
     if let Some(diagnostics) =
         validate_restricted_imports(program, &options.environment.validate_blocklisted_imports)
     {
-        return (None, diagnostics);
+        return Err(diagnostics);
     }
 
     match compile_program(allocator, semantic, program, options) {
-        CompileResult::Success { output, diagnostics } => (output.map(|b| *b), diagnostics),
-        CompileResult::Error { diagnostics } => (None, diagnostics),
+        CompileResult::Success { output, diagnostics } => Ok((output.map(|b| *b), diagnostics)),
+        CompileResult::Error { diagnostics } => Err(diagnostics),
     }
 }
 

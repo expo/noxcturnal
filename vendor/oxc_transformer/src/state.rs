@@ -27,6 +27,8 @@ pub struct TransformState<'a> {
 
     pub source_type: SourceType,
 
+    pub refresh_force_reset: bool,
+
     pub source_text: &'a str,
 
     pub module: Module,
@@ -59,6 +61,7 @@ impl Default for TransformState<'_> {
             source_path: PathBuf::new(),
             source_type: SourceType::default(),
             source_text: "",
+            refresh_force_reset: false,
             module: Module::default(),
             assumptions: CompilerAssumptions::default(),
             helper_loader: HelperLoaderStore::new(&HelperLoaderOptions::default()),
@@ -84,6 +87,7 @@ impl TransformState<'_> {
             source_path: source_path.to_path_buf(),
             source_type: SourceType::default(),
             source_text: "",
+            refresh_force_reset: false,
             module: options.env.module,
             assumptions: options.assumptions,
             helper_loader: HelperLoaderStore::new(&options.helper_loader),

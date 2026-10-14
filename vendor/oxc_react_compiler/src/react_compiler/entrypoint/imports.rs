@@ -33,6 +33,7 @@ pub struct NonLocalImportSpecifier<'a> {
 /// Equivalent to ProgramContext class in Imports.ts.
 pub struct ProgramContext<'a> {
     allocator: &'a Allocator,
+    pub source_hash: Option<Ident<'a>>,
     pub source_text: &'a str,
     pub opts: PluginOptions,
     pub react_runtime_module: Cow<'static, str>,
@@ -60,10 +61,22 @@ impl<'a> ProgramContext<'a> {
         suppressions: Vec<SuppressionRange>,
         has_module_scope_opt_out: bool,
     ) -> Self {
+        let source_hash =
+            opts.environment.enable_reset_cache_on_source_file_changes.unwrap_or(false).then(
+                || {
+                    use std::fmt::Write;
+                    let mut text = String::with_capacity(40);
+                    for byte in hmac_sha1_compact::Hash::hash(source_text.as_bytes()) {
+                        write!(&mut text, "{byte:02x}").unwrap();
+                    }
+                    Ident::from_str_in(&text, &allocator)
+                },
+            );
         let react_runtime_module = get_react_compiler_runtime_module(&opts.target);
         Self {
             allocator,
             source_text,
+            source_hash,
             opts,
             react_runtime_module,
             suppressions,

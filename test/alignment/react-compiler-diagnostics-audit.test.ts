@@ -18,8 +18,6 @@ const cases = [
     name: 'noncritical local class instance',
     source: `export function App({value}) {class Box {read(){return value}} return <div>{new Box().read()}</div>}`,
     diagnostic: /Inline.*class.*declarations are not supported/i,
-    nativeDiagnostic:
-      /Invariant.*InferMutationAliasingEffects.*Expected value kind to be initialized/i,
     critical: false,
   },
   {
@@ -63,7 +61,6 @@ for (const entry of cases) {
         const shouldThrow =
           panicThreshold === 'all_errors' ||
           (entry.critical && panicThreshold === 'critical_errors');
-        const defect = !entry.critical && panicThreshold === 'critical_errors';
         let actual: unknown;
         beforeAll(() => {
           const reference = () =>
@@ -115,25 +112,18 @@ for (const entry of cases) {
             expect(error).toBeInstanceOf(NativeTransformError);
             const failure = error as NativeTransformError;
             expect(failure.reason).toBe('transform-error');
-            expect(JSON.stringify(failure.diagnostics)).toMatch(
-              entry.nativeDiagnostic ?? entry.diagnostic,
-            );
+            expect(JSON.stringify(failure.diagnostics)).toMatch(entry.diagnostic);
             actual = 'transform-error';
           }
-          if (defect) expect(actual).toBe('transform-error');
-          else
-            expect(actual).toEqual(
-              shouldThrow ? 'transform-error' : { type: 'div', props: null, value: 7 },
-            );
+          expect(actual).toEqual(
+            shouldThrow ? 'transform-error' : { type: 'div', props: null, value: 7 },
+          );
         });
-        (defect ? test.fails : test)(
-          'honors diagnostic severity and continues selected JSX lowering',
-          () => {
-            expect(actual).toEqual(
-              shouldThrow ? 'transform-error' : { type: 'div', props: null, value: 7 },
-            );
-          },
-        );
+        test('honors diagnostic severity and continues selected JSX lowering', () => {
+          expect(actual).toEqual(
+            shouldThrow ? 'transform-error' : { type: 'div', props: null, value: 7 },
+          );
+        });
       });
     }
   }

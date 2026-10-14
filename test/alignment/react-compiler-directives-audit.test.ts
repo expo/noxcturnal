@@ -16,14 +16,14 @@ const cases = [
   ['escaped memo', String.raw`'use\x20memo';`, ''],
   ['escaped opt out', String.raw`'use\x20no memo';`, ''],
   ['module memo', '', "'use memo';"],
+  ['escaped module opt out', '', String.raw`'use\x20no memo';`],
+  ['unicode escaped memo', String.raw`'use\u0020memo';`, ''],
+  ['escaped custom opt out', String.raw`'skip\x20optimization';`, ''],
   ['module opt out', '', "'use no memo';"],
   ['directive after statement', "void 0;'use no memo';", ''],
 ] as const;
 for (const compilationMode of ['infer', 'syntax', 'annotation', 'all'] as const) {
-  describe.each(cases)(`compiler ${compilationMode}: %s`, (name, body, module) => {
-    const optInMode = compilationMode === 'syntax' || compilationMode === 'annotation';
-    const defect =
-      (name === 'escaped memo' && optInMode) || (name === 'escaped opt out' && !optInMode);
+  describe.each(cases)(`compiler ${compilationMode}: %s`, (_name, body, module) => {
     let actual: boolean;
     let expected: boolean;
     beforeAll(() => {
@@ -55,13 +55,7 @@ for (const compilationMode of ['infer', 'syntax', 'annotation', 'all'] as const)
       expected = reference.includes('react/compiler-runtime');
       actual = code.includes('react/compiler-runtime');
       expect(code).toContain('<div>');
-      if (defect) {
-        expect(expected).toBe(!optInMode);
-        expect(actual).toBe(optInMode);
-      }
     });
-    (defect ? test.fails : test)('matches the pinned directive boundary', () =>
-      expect(actual).toBe(expected),
-    );
+    test('matches the pinned directive boundary', () => expect(actual).toBe(expected));
   });
 }

@@ -18,6 +18,7 @@ const referenceRequire = createRequire(require.resolve('babel-preset-expo/packag
 const forms = [
   'export compiled reset on',
   'export compiled reset off',
+  'export compiled reset comment',
   'export declaration',
   'export variable',
   'export default named',
@@ -43,7 +44,8 @@ function source(form: (typeof forms)[number], label: string, changed = false) {
   switch (form) {
     case 'export compiled reset on':
     case 'export compiled reset off':
-      return `export function App(){const [value,setValue]=React.useState(1);${changed ? 'React.useState(2);' : ''}const text=${JSON.stringify(label)}+value;return React.createElement(Probe,{text,setValue})}`;
+    case 'export compiled reset comment':
+      return `export function App(){${form.endsWith('comment') ? '/* @refresh reset */' : ''}const [value,setValue]=React.useState(1);${changed ? 'React.useState(2);' : ''}const text=${JSON.stringify(label)}+value;return React.createElement(Probe,{text,setValue})}`;
     case 'export declaration':
       return `export function App(){${hooks}${result}}`;
     case 'export variable':
@@ -191,6 +193,7 @@ describe.skipIf(!browser || !reactRoot)('real React Refresh lifecycle', () => {
           'before:1',
           'before:7',
           form === 'reset directive' ||
+          form.endsWith('reset comment') ||
           form === 'local custom hook' ||
           form === 'nested member custom hook'
             ? 'after:1'
@@ -232,12 +235,14 @@ describe.skipIf(!browser || !reactRoot)('real React Refresh lifecycle', () => {
             input: `const native=require(${JSON.stringify(binding)});const result=native.runNativePipeline('input.jsx',${JSON.stringify(input)},[${JSON.stringify(options)}]);process.stdout.write(JSON.stringify(result));`,
           });
           expect(child.error).toBeUndefined();
-          expect(child.status).not.toBe(0);
-          if (process.platform !== 'win32') expect(child.signal).toBe('SIGABRT');
-          expect(child.stderr).toContain('jsx/refresh.rs:395');
-          expect(child.stderr).toContain('assertion `left == right` failed');
-          expect(child.stderr).toMatch(/left: 12\s+right: 10/);
-          actual = { compileAbort: true };
+          expect(child.status, child.stderr).toBe(0);
+          const fused = sources.map(source =>
+            compile(source, {
+              reactCompiler,
+              reactRefresh: { emitFullSignatures },
+            }),
+          );
+          actual = observe(fused, false, true);
           return;
         }
         const output = sources.map(input =>
@@ -248,30 +253,21 @@ describe.skipIf(!browser || !reactRoot)('real React Refresh lifecycle', () => {
         );
         for (const code of output) {
           expect(code).toContain('$RefreshReg$');
-          if (form === 'block hook') expect(code).not.toContain('$RefreshSig$');
-          else expect(code).toContain('$RefreshSig$');
+          expect(code).toContain('$RefreshSig$');
         }
-        actual = observe(
-          output,
-          form === 'builtin-named custom hook' || form === 'block hook',
-          form.startsWith('export '),
-        );
-        if (form === 'block hook') expect(actual).toEqual(['before:1', 'before:7', 'after:7', '']);
-        if (form === 'reset directive')
-          expect(actual).toEqual(['before:1', 'before:7', 'after:7', 'changed:1']);
+        actual = observe(output, form === 'builtin-named custom hook', form.startsWith('export '));
       });
-      (form === 'reset directive' || form === 'block hook' || form.startsWith('export compiled')
-        ? test.fails
-        : test)(
-        `preserves compatible state and resets changed hooks; full signatures=${emitFullSignatures}`,
-        () =>
-          expect(actual).toEqual([
-            'before:1',
-            'before:7',
-            form === 'reset directive' || form === 'local custom hook' ? 'after:1' : 'after:7',
-            form === 'builtin-named custom hook' ? '' : 'changed:1',
-          ]),
-      );
+      test(`preserves compatible state and resets changed hooks; full signatures=${emitFullSignatures}`, () =>
+        expect(actual).toEqual([
+          'before:1',
+          'before:7',
+          form === 'reset directive' ||
+          form.endsWith('reset comment') ||
+          form === 'local custom hook'
+            ? 'after:1'
+            : 'after:7',
+          form === 'builtin-named custom hook' ? '' : 'changed:1',
+        ]));
     });
   }
 });

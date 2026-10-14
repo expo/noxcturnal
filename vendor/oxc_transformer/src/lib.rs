@@ -11,7 +11,7 @@ use oxc_allocator::{Allocator, ArenaVec, ReplaceWith};
 use oxc_ast::{ast::*, builder::AstBuilder};
 use oxc_diagnostics::Diagnostics;
 #[cfg(feature = "react_compiler")]
-use oxc_react_compiler::{PluginOptions, compile as react_compiler_compile};
+use oxc_react_compiler::{PluginOptions, compile_with_status as react_compiler_compile};
 use oxc_semantic::Scoping;
 #[cfg(feature = "react_compiler")]
 use oxc_semantic::SemanticBuilder;
@@ -147,6 +147,12 @@ impl<'a> Transformer<'a> {
         program: &mut Program<'a>,
     ) -> TransformerReturn {
         let allocator = self.allocator;
+        // Compiler output prunes source comments inside rebuilt functions. Capture
+        // Refresh's file directive while the parsed comments still describe input.
+        self.state.refresh_force_reset = self.jsx.refresh.is_some()
+            && program.comments.iter().any(|comment| {
+                comment.span.source_text(program.source_text).contains("@refresh reset")
+            });
 
         // Capture file-level JSX directives before compiler reconstruction can
         // discard comments inside rewritten component bodies.
@@ -187,7 +193,7 @@ impl<'a> Transformer<'a> {
         let react_compiler_diagnostics = Diagnostics::new();
 
         // A React Compiler error is fatal: stop before the rest of the transform runs.
-        if react_compiler_diagnostics.has_errors() {
+        if !react_compiler_diagnostics.is_empty() {
             #[expect(deprecated)]
             return TransformerReturn {
                 generated_async_iterators: Vec::new(),
@@ -254,17 +260,21 @@ impl<'a> Transformer<'a> {
         let Some(options) = self.react_compiler.take() else {
             return (scoping, Diagnostics::new());
         };
-        let (output, diagnostics) = {
+        let result = {
             let semantic = SemanticBuilder::new().with_build_nodes(true).build(program).semantic;
             react_compiler_compile(program, &semantic, self.allocator, options)
         };
+        let output = match result {
+            Ok((output, _recoverable_diagnostics)) => output,
+            Err(diagnostics) => return (scoping, diagnostics),
+        };
         let Some(output) = output else {
-            return (scoping, diagnostics);
+            return (scoping, Diagnostics::new());
         };
         output.transform(program);
         let scoping =
             SemanticBuilder::new().with_enum_eval(true).build(program).semantic.into_scoping();
-        (scoping, diagnostics)
+        (scoping, Diagnostics::new())
     }
 }
 

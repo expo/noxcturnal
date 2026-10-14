@@ -1,5 +1,5 @@
 Vendored from crates.io oxc_transformer 0.141.0. Original MIT license retained.
-Noxcturnal patches the pinned transformer to repair constructor initialization, exponentiation assignment, logical assignment, optional chaining, legacy decorator lowering, async lowering, TypeScript import and enum preservation, and resource-management scope and module ordering.
+Noxcturnal patches the pinned transformer to repair constructor initialization, exponentiation assignment, logical assignment, optional chaining, legacy decorator lowering, async lowering, TypeScript import and enum preservation, resource-management scope and module ordering, and Compiler/Refresh integration.
 
 Original crates.io archive SHA-256: `3481b17ea50d4866901de759f736aa2c63bfca1fb6a20a67faa423f5361429e9`.
 
@@ -51,6 +51,11 @@ Local patches:
 - `typescript/enum.rs` and `typescript/mod.rs`: expose the existing enum lowering
   within the crate for reuse by resource module ordering. Enum semantics and helper
   implementations are unchanged.
+- `lib.rs`: preserve the compiler panic threshold's fatal/nonfatal result and capture
+  Refresh reset comments before compiler reconstruction prunes source comments.
+- `state.rs`: retain that parsed reset directive across compiler reconstruction.
+- `jsx/refresh.rs`: complete callback paths, enclosing-function hook ownership with
+  static-block boundaries, reset comments, and safe synthetic-span signatures.
 
 Keep Rust and npm Oxc versions pinned together. Reassess these patches against the
 upstream implementation before any upgrade; archived regressions define the repair

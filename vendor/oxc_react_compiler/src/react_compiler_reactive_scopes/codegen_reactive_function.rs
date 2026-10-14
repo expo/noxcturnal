@@ -149,6 +149,9 @@ pub fn codegen_function<'a>(
         let body_stmts =
             std::mem::replace(&mut compiled.body.statements, oxc_allocator::ArenaVec::new_in(ast));
         let mut new_body = oxc_allocator::ArenaVec::from_value_in(preface, ast);
+        if let Some(source_hash) = cx.env.source_hash {
+            new_body.push(ox_source_reset(&mut cx, &cache_name, cache_count, source_hash));
+        }
         new_body.extend(body_stmts);
         compiled.body.statements = new_body;
     }
@@ -202,9 +205,15 @@ fn ox_codegen_outlined<'a>(
 
         let identifiers = rename_variables(&mut reactive_function, env);
 
-        let func =
-            codegen_function(ast, &reactive_function, env, identifiers, fbt_operands.clone())?;
-        outlined.push(OxcOutlinedFunction { func, fn_type: entry.fn_type });
+        // Initial outlined emission includes ordinary callbacks, not React hooks.
+        // Match Babel's raw codegen path: do not introduce a cache hook into a
+        // reducer, initializer, or event callback. Any later React compilation
+        // owns its own reset slot.
+        let source_hash = env.source_hash.take();
+        let result =
+            codegen_function(ast, &reactive_function, env, identifiers, fbt_operands.clone());
+        env.source_hash = source_hash;
+        outlined.push(OxcOutlinedFunction { func: result?, fn_type: entry.fn_type });
     }
     Ok(outlined)
 }
@@ -277,10 +286,13 @@ impl<'a, 'env> OxcContext<'a, 'env> {
         unique_identifiers: IdentHashSet<'a>,
         fbt_operands: FxHashSet<IdentifierId>,
     ) -> Self {
+        // Keep the fingerprint at a fixed index across source edits that change
+        // the memo layout, so it can never alias a previously cached user value.
+        let next_cache_index = u32::from(env.source_hash.is_some());
         OxcContext {
             ast,
             env,
-            next_cache_index: 0,
+            next_cache_index,
             declarations: FxHashSet::default(),
             temp: FxHashMap::default(),
             object_methods: FxHashMap::default(),
@@ -432,6 +444,99 @@ fn ox_cache_index<'a>(
         false,
         ast,
     ))
+}
+
+/// Slot zero records the source fingerprint independently of memo layout changes.
+/// Unchanged source only pays a string comparison.
+fn ox_source_reset<'a>(
+    cx: &mut OxcContext<'a, '_>,
+    cache_name: &str,
+    cache_count: u32,
+    source_hash: Ident<'a>,
+) -> oxc::Statement<'a> {
+    let index_name = (cache_count > 1).then(|| cx.synthesize_name("i"));
+    let ast = &cx.ast;
+    let test = oxc::Expression::new_binary_expression(
+        SPAN,
+        ox_cache_index(ast, cache_name, 0),
+        oxc::BinaryOperator::StrictInequality,
+        oxc::Expression::new_string_literal(SPAN, source_hash, None, ast),
+        ast,
+    );
+    let mut reset_body = oxc_allocator::ArenaVec::with_capacity_in(2, ast);
+    if let Some(index_name) = index_name {
+        let init = oxc::ForStatementInit::VariableDeclaration(oxc::VariableDeclaration::boxed(
+            SPAN,
+            oxc::VariableDeclarationKind::Let,
+            [oxc::VariableDeclarator::new(
+                SPAN,
+                oxc::VariableDeclarationKind::Let,
+                oxc::BindingPattern::new_binding_identifier(SPAN, ox_str(ast, &index_name), ast),
+                NONE,
+                Some(ox_number(ast, 1.0)),
+                false,
+                ast,
+            )],
+            false,
+            ast,
+        ));
+        let condition = oxc::Expression::new_binary_expression(
+            SPAN,
+            oxc::Expression::new_identifier(SPAN, ox_str(ast, &index_name), ast),
+            oxc::BinaryOperator::LessThan,
+            ox_number(ast, cache_count as f64),
+            ast,
+        );
+        let update = oxc::Expression::new_update_expression(
+            SPAN,
+            oxc::UpdateOperator::Increment,
+            false,
+            oxc::SimpleAssignmentTarget::AssignmentTargetIdentifier(
+                oxc::IdentifierReference::boxed(SPAN, ox_str(ast, &index_name), ast),
+            ),
+            ast,
+        );
+        let element = oxc::MemberExpression::new_computed_member_expression(
+            SPAN,
+            oxc::Expression::new_identifier(SPAN, ox_str(ast, cache_name), ast),
+            oxc::Expression::new_identifier(SPAN, ox_str(ast, &index_name), ast),
+            false,
+            ast,
+        );
+        let clear = oxc::Expression::new_assignment_expression(
+            SPAN,
+            oxc::AssignmentOperator::Assign,
+            oxc::AssignmentTarget::from(oxc::SimpleAssignmentTarget::from(element)),
+            ox_symbol_for(ast, MEMO_CACHE_SENTINEL),
+            ast,
+        );
+        let clear_loop = oxc::Statement::new_for_statement(
+            SPAN,
+            Some(init),
+            Some(condition),
+            Some(update),
+            oxc::Statement::new_expression_statement(SPAN, clear, ast),
+            ast,
+        );
+        reset_body.push(clear_loop);
+    }
+    let store_hash = oxc::Expression::new_assignment_expression(
+        SPAN,
+        oxc::AssignmentOperator::Assign,
+        oxc::AssignmentTarget::from(oxc::SimpleAssignmentTarget::from(ast_member_target(
+            ast, cache_name, 0,
+        ))),
+        oxc::Expression::new_string_literal(SPAN, source_hash, None, ast),
+        ast,
+    );
+    reset_body.push(oxc::Statement::new_expression_statement(SPAN, store_hash, ast));
+    oxc::Statement::new_if_statement(
+        SPAN,
+        test,
+        oxc::Statement::new_block_statement(SPAN, reset_body, ast),
+        None,
+        ast,
+    )
 }
 
 fn ox_codegen_reactive_function<'a>(

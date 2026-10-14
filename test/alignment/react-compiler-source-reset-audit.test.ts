@@ -20,7 +20,7 @@ const referenceRequire = createRequire(require.resolve('babel-preset-expo/packag
 const sources = ['before', 'after'].map(
   tag => `export function useValue(value) {'use memo';return {value,tag:${JSON.stringify(tag)}}}`,
 );
-function observe(codes: string[], target: keyof typeof roots) {
+function observe(codes: string[], target: keyof typeof roots, siblings = false) {
   const directory = mkdtempSync(join(tmpdir(), 'noxcturnal-source-reset-'));
   try {
     const packages = createRequire(join(roots[target]!, 'audit.cjs'));
@@ -36,17 +36,18 @@ function observe(codes: string[], target: keyof typeof roots) {
  ${target === '17' ? '' : `const {createRoot}=require(${JSON.stringify(packages.resolve('react-dom/client'))});`}
  const runtime=require(${JSON.stringify(packages.resolve(runtime))});
  const errors=[],dom=[],objects=[];
- function load(code){const module={exports:{}};new Function('module','require',code)(module,name=>{if(name!==${JSON.stringify(runtime)})throw Error(name);return runtime});return module.exports.useValue}
- let useValue=load(${JSON.stringify(bodies[0])});
- function App({value}){const result=useValue(value);objects.push(result);return React.createElement('span',null,result.tag+':'+result.value)}
+ function load(code){const module={exports:{}};new Function('module','require','React',code)(module,name=>{if(name!==${JSON.stringify(runtime)})throw Error(name);return runtime},React);return module.exports.useValue}
+ let useValue=load(${JSON.stringify(bodies[0])}); let sourceTag='before';
+ function App({value}){const result=useValue(value);const [tail]=React.useState('tail');if(tail!=='tail')errors.push('caller state changed');objects.push(result);return React.createElement('span',null,typeof result==='object' ? result.tag+':'+result.value : sourceTag+':'+result)}
  const container=document.createElement('div');document.body.append(container);
  const root=${target === '17' ? `{render:element=>ReactDOM.render(element,container),unmount:()=>ReactDOM.unmountComponentAtNode(container)}` : `createRoot(container,{onUncaughtError(error){errors.push(error.message)}})`};
- function render(value){ReactDOM.flushSync(()=>root.render(React.createElement(App,{value})));dom.push(container.textContent)}
+ function render(value){ReactDOM.flushSync(()=>root.render(${siblings ? `[React.createElement(App,{value,key:'a'}),React.createElement(App,{value,key:'b'})]` : `React.createElement(App,{value})`}));dom.push(container.textContent)}
  render(1);render(1);
  // HMR replaces the custom hook implementation while its calling component and
  // hook positions remain stable. No Refresh runtime clears the cache for us.
- useValue=load(${JSON.stringify(bodies[1])});render(1);render(1);render(2);
- const result={dom,reusedBefore:objects[0]===objects[1],reusedAfter:objects[2]===objects[3],changedOnEdit:objects[1]!==objects[2],errors};
+ useValue=load(${JSON.stringify(bodies[1])});sourceTag='after';render(1);render(1);render(2);
+ const stride=${siblings ? 2 : 1};
+ const result={dom,reusedBefore:objects[0]===objects[stride],reusedAfter:objects[2*stride]===objects[3*stride],changedOnEdit:objects[stride]!==objects[2*stride],errors${siblings ? ",independent:(typeof objects[0]!=='object'||objects[0]!==objects[1]) && (typeof objects[4]!=='object'||objects[4]!==objects[5])" : ''}};
  ReactDOM.flushSync(()=>root.unmount());
  const out=document.createElement('pre');out.id='audit-result';out.textContent=JSON.stringify(result);document.body.append(out);
  `;
@@ -133,12 +134,80 @@ for (const target of ['17', '18', '19'] as const) {
               expected(enableResetCacheOnSourceFileChanges),
             );
             actual = observe(code, target);
-            expect(actual).toEqual(expected(false));
+            expect(actual).toEqual(expected(enableResetCacheOnSourceFileChanges));
           });
-          (enableResetCacheOnSourceFileChanges ? test.fails : test)(
-            'resets retained memo values only when requested',
-            () => expect(actual).toEqual(expected(enableResetCacheOnSourceFileChanges)),
+          test('resets retained memo values only when requested', () =>
+            expect(actual).toEqual(expected(enableResetCacheOnSourceFileChanges)));
+        });
+      }
+    },
+  );
+}
+
+for (const target of ['17', '18', '19'] as const) {
+  describe.skipIf(!browser || !roots[target])(
+    `source reset cache boundaries, React ${target}`,
+    () => {
+      for (const change of [
+        'unchanged',
+        'grow',
+        'shrink',
+        'grow from zero',
+        'shrink to zero',
+        'outlined callbacks',
+      ] as const) {
+        test(`${change} cache layout retains two mounted component caches`, () => {
+          const small = (tag: string) =>
+            `export function useValue(value){'use memo';return {value,tag:${JSON.stringify(tag)}}}`;
+          const large = (tag: string) =>
+            `export function useValue(value){'use memo';const extra={value};return {value,tag:${JSON.stringify(tag)},extra}}`;
+          const zero = `export function useValue(value){'use memo';return value}`;
+          const callbacks = (tag: string) => `export function useValue(value){'use memo';
+            React.useReducer((state)=>state,0,()=>0);return {value,tag:${JSON.stringify(tag)}}}`;
+          const inputs =
+            change === 'outlined callbacks'
+              ? [callbacks('before'), callbacks('after')]
+              : change === 'grow from zero'
+                ? [zero, small('after')]
+                : change === 'shrink to zero'
+                  ? [small('before'), zero]
+                  : change === 'unchanged'
+                    ? [small('before'), small('before')]
+                    : change === 'grow'
+                      ? [small('before'), large('after')]
+                      : [large('before'), small('after')];
+          const options = {
+            compilationMode: 'infer' as const,
+            panicThreshold: 'none' as const,
+            target,
+            enableResetCacheOnSourceFileChanges: true,
+          };
+          const code = inputs.map(input => compile(input, { reactCompiler: options }));
+          const slots = code.map(output => Number(output.match(/_c\((\d+)\)/)![1]));
+          if (change.startsWith('grow')) expect(slots[1]).toBeGreaterThan(slots[0]);
+          else if (change.startsWith('shrink')) expect(slots[1]).toBeLessThan(slots[0]);
+          else if (change === 'unchanged') expect(code[1]).toBe(code[0]);
+          if (change === 'outlined callbacks')
+            for (const output of code) expect(output.match(/_c\(/g)).toHaveLength(1);
+          const reference = inputs.map(
+            input =>
+              transformSync(input, {
+                filename: 'input.js',
+                configFile: false,
+                babelrc: false,
+                plugins: [
+                  [
+                    referenceRequire('babel-plugin-react-compiler'),
+                    { ...options, environment: { enableResetCacheOnSourceFileChanges: true } },
+                  ],
+                ],
+              })!.code!,
           );
+          const result = { ...expected(change !== 'unchanged'), independent: true };
+          if (change === 'unchanged') result.dom[4] = 'before:2';
+          result.dom = result.dom.map(value => value + value);
+          expect(observe(reference, target, true)).toEqual(result);
+          expect(observe(code, target, true)).toEqual(result);
         });
       }
     },
