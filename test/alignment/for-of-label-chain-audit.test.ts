@@ -14,7 +14,7 @@ outer: inner: for (const value of [1, 2]) {
 }
 globalThis.result = out;`,
     expected: [1, 2],
-    knownFailure: true,
+    knownFailure: false,
   },
   {
     name: 'continue to innermost label in a for-of label chain',

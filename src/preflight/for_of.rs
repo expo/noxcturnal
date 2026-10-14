@@ -1,4 +1,4 @@
-use std::collections::VecDeque;
+use std::{collections::VecDeque, fmt::Write};
 
 use oxc_allocator::{Allocator, Box as ArenaBox, TakeIn, Vec as ArenaVec};
 use oxc_ast::{
@@ -10,18 +10,22 @@ use oxc_ast::{
     },
 };
 use oxc_ast_visit::{VisitMut, walk_mut};
-use oxc_semantic::Semantic;
-use oxc_span::{GetSpan, Span};
+use oxc_parser::Parser;
+use oxc_semantic::{ReferenceId, Semantic, SymbolId};
+use oxc_span::{GetSpan, SourceType, Span};
 use oxc_syntax::operator::{AssignmentOperator, BinaryOperator, LogicalOperator, UnaryOperator};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 pub(super) struct Plan {
     names: FxHashMap<(u32, u32), VecDeque<ForOfNames>>,
+    symbol_accessor: Option<String>,
+    root_symbol: Option<(SymbolId, String, FxHashSet<ReferenceId>)>,
 }
 
 struct ForOfNames {
     iterator: String,
     next_method: String,
+    call_method: String,
     step: String,
     return_method: String,
     return_result: String,
@@ -38,6 +42,14 @@ pub(super) fn prepare(semantic: &Semantic<'_>) -> Plan {
         .symbol_names()
         .map(str::to_owned)
         .collect::<FxHashSet<_>>();
+    reserved.extend(
+        semantic
+            .scoping()
+            .root_unresolved_references()
+            .keys()
+            .map(|name| name.to_string()),
+    );
+    let mut needs_symbol_accessor = false;
     let mut names = FxHashMap::<(u32, u32), VecDeque<ForOfNames>>::default();
     let mut depth_buckets = Vec::<Vec<&ForOfStatement<'_>>>::new();
     let mut active_loop_ends = Vec::<u32>::new();
@@ -54,6 +66,10 @@ pub(super) fn prepare(semantic: &Semantic<'_>) -> Plan {
         if statement.r#await {
             continue;
         }
+        needs_symbol_accessor |= semantic
+            .scoping()
+            .find_binding(node.scope_id(), "Symbol".into())
+            .is_some();
         let depth = active_loop_ends.len();
         if depth_buckets.len() == depth {
             depth_buckets.push(Vec::new());
@@ -63,8 +79,8 @@ pub(super) fn prepare(semantic: &Semantic<'_>) -> Plan {
     }
     // The text implementation transformed only outermost loops, reparsed, and
     // repeated. Within each round it allocated names in Semantic NodeId order.
-    // Preserve that ABI while the mutator reaches every retained loop in one
-    // walk by planning depth rounds up front.
+    // Retain that allocation order while the mutator reaches every retained
+    // loop in one walk by planning depth rounds up front.
     for bucket in depth_buckets {
         for statement in bucket {
             names
@@ -73,6 +89,7 @@ pub(super) fn prepare(semantic: &Semantic<'_>) -> Plan {
                 .push_back(ForOfNames {
                     iterator: reserve("_iterator", &mut reserved),
                     next_method: reserve("_iteratorNext", &mut reserved),
+                    call_method: reserve("_iteratorCall", &mut reserved),
                     step: reserve("_step", &mut reserved),
                     return_method: reserve("_iteratorReturnMethod", &mut reserved),
                     return_result: reserve("_iteratorReturn", &mut reserved),
@@ -83,7 +100,30 @@ pub(super) fn prepare(semantic: &Semantic<'_>) -> Plan {
                 });
         }
     }
-    Plan { names }
+    let symbol_accessor = needs_symbol_accessor.then(|| reserve("_iteratorSymbol", &mut reserved));
+    let root_symbol = if needs_symbol_accessor {
+        let scoping = semantic.scoping();
+        scoping
+            .get_binding(scoping.root_scope_id(), "Symbol".into())
+            .map(|symbol| {
+                (
+                    symbol,
+                    reserve("_Symbol", &mut reserved),
+                    scoping
+                        .get_resolved_reference_ids(symbol)
+                        .iter()
+                        .copied()
+                        .collect(),
+                )
+            })
+    } else {
+        None
+    };
+    Plan {
+        names,
+        symbol_accessor,
+        root_symbol,
+    }
 }
 
 impl Plan {
@@ -97,13 +137,26 @@ pub(super) fn run<'a>(
     program: &mut Program<'a>,
     plan: Plan,
 ) -> Result<bool, &'static str> {
+    if let Some((symbol, replacement, references)) = &plan.root_symbol {
+        isolate_root_symbol(allocator, program, *symbol, replacement, references);
+    }
     let mut pass = ForOfLowerer {
         ast: AstBuilder::new(allocator),
         names: plan.names,
+        symbol_accessor: plan.symbol_accessor,
         changed: false,
         error: None,
     };
     pass.visit_program(program);
+    if let Some(name) = &pass.symbol_accessor {
+        // Keep the global lookup late and outside source parameter/block scopes.
+        // A function declaration also works for calls preceding the first loop.
+        let source =
+            allocator.alloc_str(&format!("function {name}() {{ return Symbol.iterator; }}"));
+        let mut parsed = Parser::new(allocator, source, SourceType::mjs()).parse();
+        SyntheticSpans.visit_program(&mut parsed.program);
+        program.body.extend(parsed.program.body);
+    }
     match pass.error {
         Some(error) => Err(error),
         None => Ok(pass.changed),
@@ -113,6 +166,7 @@ pub(super) fn run<'a>(
 struct ForOfLowerer<'a> {
     ast: AstBuilder<'a>,
     names: FxHashMap<(u32, u32), VecDeque<ForOfNames>>,
+    symbol_accessor: Option<String>,
     changed: bool,
     error: Option<&'static str>,
 }
@@ -122,7 +176,7 @@ impl<'a> ForOfLowerer<'a> {
     fn lower(
         &mut self,
         statement: ForOfStatement<'a>,
-        label: Option<&str>,
+        labels: Vec<String>,
         enclosing_span: Span,
     ) -> Result<Statement<'a>, &'static str> {
         let key = (statement.span.start, statement.span.end);
@@ -136,6 +190,7 @@ impl<'a> ForOfLowerer<'a> {
         let ForOfNames {
             iterator,
             next_method,
+            call_method,
             step,
             return_method,
             return_result,
@@ -176,7 +231,10 @@ impl<'a> ForOfLowerer<'a> {
                 self.ast.statement_expression(assignment.span(), assignment)
             }
         };
-        let symbol_iterator = self.member(anchor, self.id(anchor, "Symbol"), "iterator");
+        let symbol_iterator = self.symbol_accessor.as_ref().map_or_else(
+            || self.member(anchor, self.id(anchor, "Symbol"), "iterator"),
+            |name| self.call0(anchor, self.id(anchor, name)),
+        );
         let iterator_method = {
             #[expect(deprecated)]
             {
@@ -196,6 +254,34 @@ impl<'a> ForOfLowerer<'a> {
             Some(self.member(anchor, self.id(anchor, &iterator), "next")),
         );
         let step_declaration = self.declarator(anchor, &step, None);
+        // A fresh function supplies the intrinsic call without a capturable
+        // global Function binding or consulting either cached method's own call.
+        let function = self.ast.expression_function(
+            anchor,
+            oxc_ast::ast::FunctionType::FunctionExpression,
+            None,
+            false,
+            false,
+            false,
+            None::<ArenaBox<'a, oxc_ast::ast::TSTypeParameterDeclaration<'a>>>,
+            None::<ArenaBox<'a, oxc_ast::ast::TSThisParameter<'a>>>,
+            self.ast.alloc_formal_parameters(
+                anchor,
+                oxc_ast::ast::FormalParameterKind::FormalParameter,
+                self.ast.vec(),
+                None::<ArenaBox<'a, oxc_ast::ast::FormalParameterRest<'a>>>,
+            ),
+            None::<ArenaBox<'a, TSTypeAnnotation<'a>>>,
+            Some(
+                self.ast
+                    .alloc_function_body(anchor, self.ast.vec(), self.ast.vec()),
+            ),
+        );
+        let call_declaration = self.declarator(
+            anchor,
+            &call_method,
+            Some(self.member(anchor, function, "call")),
+        );
         #[expect(deprecated)]
         let init = self.ast.for_statement_init_variable_declaration(
             anchor,
@@ -203,17 +289,19 @@ impl<'a> ForOfLowerer<'a> {
             self.vec([
                 iterator_declaration,
                 next_method_declaration,
+                call_declaration,
                 step_declaration,
             ]),
             false,
         );
 
         let mut next_arguments = ArenaVec::new_in(&self.ast);
+        next_arguments.push(Argument::from(self.id(anchor, &next_method)));
         next_arguments.push(Argument::from(self.id(anchor, &iterator)));
         #[expect(deprecated)]
         let next = self.ast.expression_call(
             anchor,
-            self.member(anchor, self.id(anchor, &next_method), "call"),
+            self.member(anchor, self.id(anchor, &call_method), "call"),
             None::<ArenaBox<'a, TSTypeParameterInstantiation<'a>>>,
             next_arguments,
             false,
@@ -255,13 +343,13 @@ impl<'a> ForOfLowerer<'a> {
         let mut loop_statement =
             self.ast
                 .statement_for(anchor, Some(init), Some(test), Some(update), loop_body);
-        if let Some(label) = label {
+        for label in labels.into_iter().rev() {
             #[expect(deprecated)]
             {
                 loop_statement = self.ast.statement_labeled(
                     anchor,
                     self.ast
-                        .label_identifier(anchor, self.ast.allocator.alloc_str(label)),
+                        .label_identifier(anchor, self.ast.allocator.alloc_str(&label)),
                     loop_statement,
                 );
             }
@@ -321,11 +409,12 @@ impl<'a> ForOfLowerer<'a> {
             self.ast
                 .expression_logical(anchor, not_normal, LogicalOperator::And, has_return);
         let mut return_arguments = ArenaVec::new_in(&self.ast);
+        return_arguments.push(Argument::from(self.id(anchor, &return_method)));
         return_arguments.push(Argument::from(self.id(anchor, &iterator)));
         #[expect(deprecated)]
         let call_return = self.ast.expression_call(
             anchor,
-            self.member(anchor, self.id(anchor, &return_method), "call"),
+            self.member(anchor, self.id(anchor, &call_method), "call"),
             None::<ArenaBox<'a, TSTypeParameterInstantiation<'a>>>,
             return_arguments,
             false,
@@ -514,37 +603,26 @@ impl<'a> ForOfLowerer<'a> {
     }
 
     fn lower_statement(&mut self, statement: &mut Statement<'a>) -> Result<bool, &'static str> {
-        if let Statement::LabeledStatement(labeled) = statement
-            && matches!(
-                labeled.body,
-                Statement::ForOfStatement(ref for_of) if !for_of.r#await
-            )
-        {
-            let enclosing_span = labeled.span;
-            let label = labeled.label.name.to_string();
-            let old = statement.take_in(&self.ast);
-            let Statement::LabeledStatement(labeled) = old else {
-                unreachable!();
-            };
-            let Statement::ForOfStatement(for_of) = labeled.unbox().body else {
-                unreachable!();
-            };
-            *statement = self.lower(for_of.unbox(), Some(&label), enclosing_span)?;
-            return Ok(true);
+        let mut target = &*statement;
+        while let Statement::LabeledStatement(labeled) = target {
+            target = &labeled.body;
         }
-        if matches!(
-            statement,
-            Statement::ForOfStatement(for_of) if !for_of.r#await
-        ) {
-            let old = statement.take_in(&self.ast);
-            let Statement::ForOfStatement(for_of) = old else {
-                unreachable!();
-            };
-            let span = for_of.span;
-            *statement = self.lower(for_of.unbox(), None, span)?;
-            return Ok(true);
+        if !matches!(target, Statement::ForOfStatement(for_of) if !for_of.r#await) {
+            return Ok(false);
         }
-        Ok(false)
+        let enclosing_span = statement.span();
+        let mut target = statement.take_in(&self.ast);
+        let mut labels = Vec::new();
+        while let Statement::LabeledStatement(labeled) = target {
+            let labeled = labeled.unbox();
+            labels.push(labeled.label.name.to_string());
+            target = labeled.body;
+        }
+        let Statement::ForOfStatement(for_of) = target else {
+            unreachable!()
+        };
+        *statement = self.lower(for_of.unbox(), labels, enclosing_span)?;
+        Ok(true)
     }
 }
 
@@ -564,6 +642,81 @@ impl<'a> VisitMut<'a> for ForOfLowerer<'a> {
             Ok(false) => walk_mut::walk_statement(self, statement),
             Err(error) => self.error = Some(error),
         }
+    }
+}
+
+// Match helper materialization's root-binding isolation: references keep their
+// semantic identity, named exports retain their public names, and nested Symbol
+// bindings (including direct eval) are untouched.
+fn isolate_root_symbol<'a>(
+    allocator: &'a Allocator,
+    program: &mut Program<'a>,
+    symbol: SymbolId,
+    replacement: &str,
+    references: &FxHashSet<ReferenceId>,
+) {
+    let mut exports = String::new();
+    for statement in &mut program.body {
+        if let Statement::ExportNamedDeclaration(export) = statement
+            && let Some(declaration) = &export.declaration
+        {
+            let mut bindings = Vec::new();
+            oxc_ecmascript::BoundNames::bound_names(declaration, &mut |id| {
+                bindings.push((id.name.to_string(), id.symbol_id.get()));
+            });
+            if bindings.iter().any(|(_, id)| *id == Some(symbol)) {
+                for (name, id) in bindings {
+                    let local = if id == Some(symbol) {
+                        replacement
+                    } else {
+                        &name
+                    };
+                    let _ = write!(exports, "export {{{local} as {name}}};");
+                }
+                *statement = export.declaration.take().unwrap().into();
+            }
+        }
+    }
+    struct Renamer<'a, 'r> {
+        name: &'a str,
+        symbol: SymbolId,
+        references: &'r FxHashSet<ReferenceId>,
+    }
+    impl<'a> VisitMut<'a> for Renamer<'a, '_> {
+        fn visit_binding_identifier(&mut self, id: &mut oxc_ast::ast::BindingIdentifier<'a>) {
+            if id.symbol_id.get() == Some(self.symbol) {
+                id.name = self.name.into();
+            }
+        }
+        fn visit_identifier_reference(&mut self, id: &mut oxc_ast::ast::IdentifierReference<'a>) {
+            if id
+                .reference_id
+                .get()
+                .is_some_and(|id| self.references.contains(&id))
+            {
+                id.name = self.name.into();
+            }
+        }
+    }
+    Renamer {
+        name: allocator.alloc_str(replacement),
+        symbol,
+        references,
+    }
+    .visit_program(program);
+    if !exports.is_empty() {
+        let mut parsed =
+            Parser::new(allocator, allocator.alloc_str(&exports), SourceType::mjs()).parse();
+        SyntheticSpans.visit_program(&mut parsed.program);
+        program.body.extend(parsed.program.body);
+    }
+}
+
+struct SyntheticSpans;
+
+impl<'a> VisitMut<'a> for SyntheticSpans {
+    fn visit_span(&mut self, span: &mut Span) {
+        *span = Span::default();
     }
 }
 

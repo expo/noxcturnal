@@ -782,7 +782,7 @@ const additionalComplianceCases: {
     `,
     plan: { transforms: { forOf: true } },
     expected: ['next'],
-    knownFailure: true,
+    knownFailure: false,
   },
   {
     name: 'parameter defaults resolve dollar-prefixed names outside the body',
@@ -836,7 +836,7 @@ const additionalComplianceCases: {
     plan: { transforms: { forOf: true } },
     bindings: { _iterator: 'external' },
     expected: ['external'],
-    knownFailure: true,
+    knownFailure: false,
   },
   {
     name: 'rest parameter temporaries do not shadow external references',
@@ -1206,7 +1206,7 @@ const additionalComplianceCases: {
     source: `function read(Symbol){const values=[];for(const value of [1,2])values.push(value);return values;}globalThis.result=read(null);`,
     plan: { transforms: { forOf: true } },
     expected: [1, 2],
-    knownFailure: true,
+    knownFailure: false,
   },
   {
     name: 'iterator acquisition must reject primitive iterator',
@@ -1927,7 +1927,7 @@ const additionalComplianceCases: {
     `,
     plan: { transforms: { forOf: true } },
     expected: ['close'],
-    knownFailure: true,
+    knownFailure: false,
   },
   {
     name: 'for-of closing rejects noncallable return objects with call properties',
@@ -1936,7 +1936,7 @@ const additionalComplianceCases: {
     `,
     plan: { transforms: { forOf: true } },
     expected: ['TypeError'],
-    knownFailure: true,
+    knownFailure: false,
   },
   {
     name: 'object rest rejects callable results from Symbol.toPrimitive',

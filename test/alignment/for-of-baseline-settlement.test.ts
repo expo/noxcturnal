@@ -17,22 +17,19 @@ const cases = [
     name: 'own next.call override',
     source: `const events=[];function next(){events.push('next');return {done:true};}next.call=()=>{events.push('override');return {done:true};};for(const value of {[Symbol.iterator](){return {next};}}){}globalThis.result=events;`,
     expected: ['next'],
-    actual: ['override'],
   },
   {
     name: 'own return.call override',
     source: `const events=[];function close(){events.push('close');return {};}close.call=()=>{events.push('override');return {};};for(const value of {[Symbol.iterator](){return {next(){return {done:false,value:1};},return:close};}}){break;}globalThis.result=events;`,
     expected: ['close'],
-    actual: ['override'],
   },
   {
     name: 'noncallable return with call property',
     source: `const events=[];try{for(const value of {[Symbol.iterator](){return {next(){return {done:false,value:1};},return:{call(){events.push('override');return {};}}};}}){break;}}catch(error){events.push(error.name);}globalThis.result=events;`,
     expected: ['TypeError'],
-    actual: ['override'],
   },
 ];
-describe.each(cases)('for-of dispatch baseline: $name', ({ source, expected, actual: known }) => {
+describe.each(cases)('for-of dispatch baseline: $name', ({ source, expected }) => {
   let actual: unknown;
   beforeAll(() => {
     expect(observe(source)).toEqual(expected);
@@ -41,9 +38,8 @@ describe.each(cases)('for-of dispatch baseline: $name', ({ source, expected, act
     expect(code).not.toMatch(/for\s*\([^)]*\bof\b/);
     expect(code).not.toContain('@babel/runtime');
     actual = observe(code);
-    expect(actual).toEqual(known);
   });
-  test.fails('preserves the cached method call under the Babel baseline', () =>
+  test('preserves the cached method call under the Babel baseline', () =>
     expect(actual).toEqual(expected));
 });
 
