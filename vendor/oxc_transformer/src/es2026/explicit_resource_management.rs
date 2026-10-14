@@ -246,9 +246,63 @@ impl<'a> Traverse<'a, TransformState<'a>> for ExplicitResourceManagement<'a> {
     /// }
     /// ```
     fn enter_function_body(&mut self, body: &mut FunctionBody<'a>, ctx: &mut TraverseCtx<'a>) {
-        if let Some((new_stmts, needs_await, using_ctx)) =
+        if let Some((mut new_stmts, needs_await, using_ctx)) =
             self.transform_statements(&mut body.statements, ctx.current_hoist_scope_id(), ctx)
         {
+            // A function-body declaration becomes block scoped inside the disposal try.
+            // Redeclarations with `var` (including nested var declarations) or another
+            // function would then be invalid. Initialize only those functions at the
+            // start of the try, retaining access to its resource/lexical bindings.
+            let mut hoisted = ArenaVec::new_in(ctx);
+            new_stmts.retain_mut(|stmt| {
+                let Statement::FunctionDeclaration(function) = stmt else {
+                    return true;
+                };
+                // TypeScript overload signatures are erased, not initialized.
+                if function.body.is_none() {
+                    return true;
+                }
+                let id = function.id.as_ref().expect("function declaration has a name");
+                let symbol_id = id.symbol_id();
+                let scoping = ctx.scoping();
+                let redeclarations = scoping.symbol_redeclarations(symbol_id);
+                let conflicts = !redeclarations.is_empty()
+                    && (scoping.symbol_span(symbol_id).start >= body.span.start
+                        || redeclarations.iter().any(|decl| {
+                            decl.span.start >= body.span.start
+                                && decl.flags.contains(SymbolFlags::FunctionScopedVariable)
+                        }));
+                if !conflicts {
+                    return true;
+                }
+                let Statement::FunctionDeclaration(mut function) = stmt.take_in(ctx) else {
+                    unreachable!()
+                };
+                let id = function.id.take().unwrap();
+                function.r#type = FunctionType::FunctionExpression;
+                *ctx.scoping_mut().symbol_flags_mut(symbol_id) =
+                    SymbolFlags::FunctionScopedVariable;
+                hoisted.push(Statement::new_variable_declaration(
+                    function.span,
+                    VariableDeclarationKind::Var,
+                    [VariableDeclarator::new(
+                        id.span,
+                        VariableDeclarationKind::Var,
+                        BindingPattern::BindingIdentifier(ctx.alloc(id)),
+                        NONE,
+                        Some(Expression::FunctionExpression(function)),
+                        false,
+                        ctx,
+                    )],
+                    false,
+                    ctx,
+                ));
+                false
+            });
+            if !hoisted.is_empty() {
+                hoisted.extend(new_stmts);
+                new_stmts = hoisted;
+            }
             let current_scope_id = ctx.current_scope_id();
             let block_stmt_scope_id =
                 ctx.insert_scope_below_statements(&new_stmts, ScopeFlags::empty());
@@ -377,6 +431,35 @@ impl<'a> Traverse<'a, TransformState<'a>> for ExplicitResourceManagement<'a> {
             return;
         }
 
+        // Enums execute initializers; lower them before partitioning module statements
+        // so they follow the same ordering and exported-var path as other values.
+        // This is the existing enum transform, without another parse/codegen pass.
+        if program.source_type.is_javascript() {
+            for stmt in &mut program.body {
+                let lowered = match stmt {
+                    Statement::TSEnumDeclaration(decl) => {
+                        crate::typescript::TypeScriptEnum::transform_ts_enum(decl, None, ctx)
+                    }
+                    Statement::ExportNamedDeclaration(export) => {
+                        let span = export.span;
+                        match &mut export.declaration {
+                            Some(Declaration::TSEnumDeclaration(decl)) => {
+                                crate::typescript::TypeScriptEnum::transform_ts_enum(
+                                    decl,
+                                    Some(span),
+                                    ctx,
+                                )
+                            }
+                            _ => None,
+                        }
+                    }
+                    _ => None,
+                };
+                if let Some(lowered) = lowered {
+                    *stmt = lowered;
+                }
+            }
+        }
         program.body.replace_with(|program_body| {
             let (mut program_body, inner_block): (
                 ArenaVec<'a, Statement<'a>>,

@@ -429,7 +429,7 @@ const additionalComplianceCases: {
       })();
     `,
     expected: 1,
-    knownFailure: true,
+    knownFailure: false,
   },
   {
     name: 'module using bindings reject reassignment',

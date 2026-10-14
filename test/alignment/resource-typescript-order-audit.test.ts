@@ -83,7 +83,6 @@ for (const kind of ['enum', 'namespace'])
           expect(code).not.toMatch(/\busing\s+resource\b/);
           expect(code.includes('@babel/runtime/')).toBe(mode === 'runtime');
           const outcome = await run(code);
-          if (kind === 'enum' && !parameters) expect(outcome).toEqual(['error', 'TypeError']);
           outcomes.set(`${mode}:${parameters}`, outcome);
         }
       }
@@ -107,11 +106,8 @@ for (const kind of ['enum', 'namespace'])
     });
     for (const mode of ['inline', 'runtime'])
       for (const parameters of [false, true]) {
-        (kind === 'enum' && !parameters ? test.fails : test)(
-          `module order, ${mode}, prepass=${parameters}`,
-          () => {
-            expect(outcomes.get(`${mode}:${parameters}`)).toEqual(['ok', expected]);
-          },
-        );
+        test(`module order, ${mode}, prepass=${parameters}`, () => {
+          expect(outcomes.get(`${mode}:${parameters}`)).toEqual(['ok', expected]);
+        });
       }
   });
