@@ -45,7 +45,6 @@
 
 mod metadata;
 
-use std::borrow::Cow;
 use std::mem;
 
 use oxc_allocator::{
@@ -59,8 +58,8 @@ use oxc_semantic::{ScopeFlags, ScopeId, SymbolFlags};
 use oxc_span::SPAN;
 use oxc_str::static_ident;
 use oxc_syntax::operator::AssignmentOperator;
-use oxc_traverse::{Ancestor, BoundIdentifier, Traverse, ast_operations::get_var_name_from_node};
-use rustc_hash::FxHashMap;
+use oxc_traverse::{Ancestor, BoundIdentifier, Traverse};
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::{
     Helper,
@@ -91,12 +90,15 @@ struct ClassDecorations<'a> {
     /// Decoration statements accumulated for the current class.
     /// These will be applied when the class processing is complete.
     decoration_stmts: Vec<Statement<'a>>,
+    static_decoration_stmts: Vec<Statement<'a>>,
+    private_names: FxHashSet<String>,
+    original_class_binding: Option<BoundIdentifier<'a>>,
     /// Binding for the current class being processed.
     /// Generated on-demand when the first decorator needs it.
     class_binding: Option<BoundIdentifier<'a>>,
-    /// Flag indicating whether the current class has a private `in` expression in any decorator.
+    /// Whether a decorator references a private name owned by this class.
     /// This affects where decorations are placed (in static block vs after class).
-    class_has_private_in_expression_in_decorator: bool,
+    decorators_need_private_environment: bool,
 }
 
 impl ClassDecorations<'_> {
@@ -163,13 +165,23 @@ impl<'a> Traverse<'a, TransformState<'a>> for LegacyDecorator<'a> {
         // Lower `accessor` properties to private backing fields + get/set pairs.
         // Must run before `enter_class_body` so that es2022 class-properties can
         // transform the newly created private backing fields.
-        Self::lower_accessor_properties(class, ctx);
+        let original_class_binding = Self::lower_accessor_properties(class, ctx);
 
+        self.combine_accessor_decorators(class, ctx);
+        let private_names = class
+            .body
+            .body
+            .iter()
+            .filter_map(|element| element.property_key().and_then(|key| key.private_name()))
+            .map(|name| name.to_string())
+            .collect();
         self.class_decorations_stack.push(
             ClassDecorations::default()
                 .with_should_transform(!(class.is_expression() || class.declare)),
         );
 
+        self.class_decorations_stack.last_mut().private_names = private_names;
+        self.class_decorations_stack.last_mut().original_class_binding = original_class_binding;
         if self.emit_decorator_metadata {
             self.metadata.enter_class(class, ctx);
         }
@@ -301,16 +313,54 @@ impl<'a> Traverse<'a, TransformState<'a>> for LegacyDecorator<'a> {
 
     fn enter_decorator(&mut self, node: &mut Decorator<'a>, _ctx: &mut TraverseCtx<'a>) {
         let current_class = self.class_decorations_stack.last_mut();
-        if current_class.should_transform
-            && !current_class.class_has_private_in_expression_in_decorator
-        {
-            current_class.class_has_private_in_expression_in_decorator =
-                PrivateInExpressionDetector::has_private_in_expression(&node.expression);
+        if current_class.should_transform && !current_class.decorators_need_private_environment {
+            current_class.decorators_need_private_environment =
+                PrivateEnvironmentDetector::references_class_private_name(
+                    &node.expression,
+                    &current_class.private_names,
+                );
         }
     }
 }
 
 impl<'a> LegacyDecorator<'a> {
+    fn combine_accessor_decorators(&self, class: &mut Class<'a>, ctx: &mut TraverseCtx<'a>) {
+        let mut first_accessors = FxHashMap::default();
+        for index in 0..class.body.body.len() {
+            let ClassElement::MethodDefinition(method) = &class.body.body[index] else {
+                continue;
+            };
+            if !matches!(method.kind, MethodDefinitionKind::Get | MethodDefinitionKind::Set) {
+                continue;
+            }
+            // Only statically known keys form an accessor pair. Dynamic computed
+            // keys can change between evaluations and retain separate operations.
+            let Some(name) = method.key.static_name() else {
+                continue;
+            };
+            let key = (method.r#static, name.into_owned());
+            let Some(first_index) = first_accessors.get(&key).copied() else {
+                first_accessors.insert(key, index);
+                continue;
+            };
+            let (before, after) = class.body.body.split_at_mut(index);
+            let ClassElement::MethodDefinition(first) = &mut before[first_index] else {
+                unreachable!()
+            };
+            let ClassElement::MethodDefinition(second) = &mut after[0] else { unreachable!() };
+            if first.kind == second.kind {
+                continue;
+            }
+            first.decorators.extend(second.decorators.drain(..));
+            let mut params = ArenaVec::new_in(ctx);
+            self.transform_decorators_of_parameters(&mut params, &mut first.value.params, ctx);
+            self.transform_decorators_of_parameters(&mut params, &mut second.value.params, ctx);
+            first.decorators.extend(
+                params.into_iter().map(|param| Decorator::new(SPAN, param.into_expression(), ctx)),
+            );
+        }
+    }
+
     /// Lower `accessor` properties to private backing fields + get/set pairs.
     ///
     /// `accessor prop: T = val` becomes:
@@ -319,14 +369,17 @@ impl<'a> LegacyDecorator<'a> {
     /// get prop() { return this.#prop_accessor_storage; }
     /// set prop(value) { this.#prop_accessor_storage = value; }
     /// ```
-    fn lower_accessor_properties(class: &mut Class<'a>, ctx: &mut TraverseCtx<'a>) {
+    fn lower_accessor_properties(
+        class: &mut Class<'a>,
+        ctx: &mut TraverseCtx<'a>,
+    ) -> Option<BoundIdentifier<'a>> {
         if !class
             .body
             .body
             .iter()
             .any(|e| matches!(e, ClassElement::AccessorProperty(p) if !p.r#type.is_abstract()))
         {
-            return;
+            return None;
         }
 
         // For static accessors, use the class name instead of `this` to ensure
@@ -335,15 +388,34 @@ impl<'a> LegacyDecorator<'a> {
         let has_static_accessor = class.body.body.iter().any(|e| {
             matches!(e, ClassElement::AccessorProperty(p) if p.r#static && !p.r#type.is_abstract())
         });
-        let static_class_binding = if has_static_accessor {
-            Some(if let Some(ident) = class.id.as_ref() {
-                BoundIdentifier::from_binding_ident(ident)
+        let has_class_decoration = Self::check_class_has_decorated(class);
+        let static_class_binding = has_static_accessor.then(|| {
+            if class.id.is_none() {
+                let binding = ctx.generate_uid("class", class.scope_id(), SymbolFlags::Class);
+                class.id = Some(binding.create_binding_identifier(ctx));
+            }
+            let ident = class.id.as_ref().unwrap();
+            if has_class_decoration {
+                // Decoration replaces the outer binding. Accessor storage must use
+                // the immutable inner class binding, fresh for every evaluation.
+                ctx.generate_spanned_binding(
+                    ident.name,
+                    ident.span,
+                    class.scope_id(),
+                    SymbolFlags::Class,
+                )
             } else {
-                ctx.generate_uid("class", class.scope_id(), SymbolFlags::Class)
-            })
-        } else {
-            None
-        };
+                BoundIdentifier::from_binding_ident(ident)
+            }
+        });
+        let mut private_names: FxHashSet<String> = class
+            .body
+            .body
+            .iter()
+            .filter_map(|element| element.property_key().and_then(|key| key.private_name()))
+            .map(|name| name.to_string())
+            .collect();
+        let mut storage_index = 0;
 
         let class_scope_id = class.scope_id();
         let mut new_body = ArenaVec::with_capacity_in(class.body.body.len() * 3, ctx);
@@ -375,33 +447,22 @@ impl<'a> LegacyDecorator<'a> {
             //   `get [_expr = expr]() { ... } set [expr](value) { ... }`
             // Note: Legacy decorators do not support private identifiers,
             // so we only handle static identifiers and computed keys.
-            let (storage_name, getter_key, setter_key) = if accessor.computed {
-                let key_expr = accessor.key.into_expression();
-                let (assignment, reference) = duplicate_expression(key_expr, true, ctx);
-
-                // Use raw identifier name when possible to avoid collisions from
-                // `get_var_name_from_node` stripping leading underscores.
-                let key_name: Cow<'_, str> = match &reference {
-                    Expression::Identifier(ident) => Cow::Borrowed(ident.name.as_str()),
-                    _ => Cow::Owned(get_var_name_from_node(&reference)),
-                };
-                let getter_key = PropertyKey::from(assignment);
-                let setter_key = PropertyKey::from(reference);
-                let storage_name =
-                    Str::from_strs_array_in(["_", &key_name, "_computed_accessor_storage"], ctx);
-                (storage_name, getter_key, setter_key)
+            let (getter_key, setter_key) = if accessor.computed {
+                let (assignment, reference) =
+                    duplicate_expression(accessor.key.into_expression(), true, ctx);
+                (PropertyKey::from(assignment), PropertyKey::from(reference))
             } else {
-                // Use `name()` to get the raw property name, avoiding `get_var_name_from_node`
-                // which strips leading underscores (e.g. `prop` and `_prop` both become "prop").
-                let key_name = accessor
-                    .key
-                    .name()
-                    .unwrap_or_else(|| Cow::Owned(get_var_name_from_node(&accessor.key)));
-                let storage_name =
-                    Str::from_strs_array_in(["_", &key_name, "_accessor_storage"], ctx);
-                let getter_key = accessor.key.clone_in(ctx.ast.allocator());
-                let setter_key = accessor.key.clone_in(ctx.ast.allocator());
-                (storage_name, getter_key, setter_key)
+                (
+                    accessor.key.clone_in(ctx.ast.allocator()),
+                    accessor.key.clone_in(ctx.ast.allocator()),
+                )
+            };
+            let storage_name = loop {
+                let name = format!("_accessor_storage{storage_index}");
+                storage_index += 1;
+                if private_names.insert(name.clone()) {
+                    break Str::from_str_in(&name, ctx);
+                }
             };
 
             // For static accessors, use class name reference; for instance accessors, use `this`.
@@ -455,15 +516,8 @@ impl<'a> LegacyDecorator<'a> {
             ));
         }
 
-        // For anonymous class expressions with static accessors, assign the class
-        // to the generated binding: `var _class; const c = _class = class { ... }`
-        if let Some(binding) = &static_class_binding
-            && class.id.is_none()
-        {
-            class.id = Some(binding.create_binding_identifier(ctx));
-        }
-
         class.body.body = new_body;
+        if has_class_decoration { static_class_binding } else { None }
     }
 
     /// Create a getter or setter method that accesses a private backing field.
@@ -600,7 +654,12 @@ impl<'a> LegacyDecorator<'a> {
         let decorator_stmt = self.create_decorator(decorations, prefix, name, descriptor, ctx);
 
         // Push to current decoration stack
-        self.class_decorations_stack.last_mut().decoration_stmts.push(decorator_stmt);
+        let current = self.class_decorations_stack.last_mut();
+        if is_static {
+            current.static_decoration_stmts.push(decorator_stmt);
+        } else {
+            current.decoration_stmts.push(decorator_stmt);
+        }
     }
     /// Transforms a statement that is a class declaration
     ///
@@ -749,7 +808,10 @@ impl<'a> LegacyDecorator<'a> {
     }
 
     fn transform_class(&mut self, class: &mut Class<'a>, ctx: &mut TraverseCtx<'a>) {
-        let current_class_decorations = self.class_decorations_stack.pop();
+        let mut current_class_decorations = self.class_decorations_stack.pop();
+        current_class_decorations
+            .decoration_stmts
+            .append(&mut current_class_decorations.static_decoration_stmts);
 
         // Legacy decorator does not allow in class expression.
         if current_class_decorations.should_transform {
@@ -885,12 +947,15 @@ impl<'a> LegacyDecorator<'a> {
         // After: `class C {}` -> `let C = class {}`
         let class_binding = class.id.as_ref().map(|ident| {
             let binding_span = ident.span;
-            let new_class_binding = ctx.generate_spanned_binding(
-                ident.name,
-                binding_span,
-                class.scope_id(),
-                SymbolFlags::Class,
-            );
+            let new_class_binding =
+                current_class_decorations.original_class_binding.clone().unwrap_or_else(|| {
+                    ctx.generate_spanned_binding(
+                        ident.name,
+                        binding_span,
+                        class.scope_id(),
+                        SymbolFlags::Class,
+                    )
+                });
             let old_class_symbol_id = ident.symbol_id.replace(Some(new_class_binding.symbol_id));
             let old_class_symbol_id = old_class_symbol_id.expect("class always has a symbol id");
 
@@ -906,8 +971,11 @@ impl<'a> LegacyDecorator<'a> {
         let ClassDecorations {
             class_binding: class_binding_tmp,
             mut decoration_stmts,
-            class_has_private_in_expression_in_decorator,
+            decorators_need_private_environment,
             should_transform: _,
+            static_decoration_stmts: _,
+            private_names: _,
+            original_class_binding: _,
         } = current_class_decorations;
 
         let class_binding = class_binding.unwrap_or_else(|| {
@@ -960,10 +1028,11 @@ impl<'a> LegacyDecorator<'a> {
             })
         };
 
-        if class_has_private_in_expression_in_decorator {
+        if decorators_need_private_environment {
             let decorations = mem::take(&mut decoration_stmts);
             Self::insert_decorations_into_class_static_block(class, decorations, ctx);
-        } else {
+        }
+        {
             let address = match ctx.parent() {
                 parent @ (Ancestor::ExportDefaultDeclarationDeclaration(_)
                 | Ancestor::ExportNamedDeclarationDeclaration(_)) => parent.address(),
@@ -1042,8 +1111,11 @@ impl<'a> LegacyDecorator<'a> {
         let ClassDecorations {
             class_binding,
             mut decoration_stmts,
-            class_has_private_in_expression_in_decorator,
+            decorators_need_private_environment,
             should_transform: _,
+            static_decoration_stmts: _,
+            private_names: _,
+            original_class_binding: _,
         } = current_class_decorations;
 
         let Some(class_binding) = class_binding else {
@@ -1058,7 +1130,7 @@ impl<'a> LegacyDecorator<'a> {
             class.id = Some(class_binding.create_binding_identifier(ctx));
         }
 
-        if class_has_private_in_expression_in_decorator {
+        if decorators_need_private_environment {
             Self::insert_decorations_into_class_static_block(class, decoration_stmts, ctx);
         } else {
             let stmt_address = match ctx.parent() {
@@ -1136,7 +1208,7 @@ impl<'a> LegacyDecorator<'a> {
     }
 
     /// Insert all decorations into a static block of a class because there is a
-    /// private-in expression in the decorator.
+    /// private member reference in the decorator.
     ///
     /// Input:
     /// ```ts
@@ -1179,11 +1251,17 @@ impl<'a> LegacyDecorator<'a> {
         params: &mut FormalParameters<'a>,
         ctx: &mut TraverseCtx<'a>,
     ) {
-        for (index, param) in &mut params.items.iter_mut().enumerate() {
-            if param.decorators.is_empty() {
+        for (index, decorators) in params
+            .items
+            .iter_mut()
+            .map(|param| &mut param.decorators)
+            .chain(params.rest.iter_mut().map(|rest| &mut rest.decorators))
+            .enumerate()
+        {
+            if decorators.is_empty() {
                 continue;
             }
-            decorations.extend(param.decorators.drain(..).map(|decorator| {
+            decorations.extend(decorators.drain(..).map(|decorator| {
                 // (index, decorator)
                 let index = Expression::new_numeric_literal(
                     SPAN,
@@ -1249,7 +1327,8 @@ impl<'a> LegacyDecorator<'a> {
     ) -> Option<Expression<'a>> {
         let params = &mut method.value.params;
         let param_decoration_count =
-            params.items.iter().fold(0, |acc, param| acc + param.decorators.len());
+            params.items.iter().fold(0, |acc, param| acc + param.decorators.len())
+                + params.rest.as_ref().map_or(0, |rest| rest.decorators.len());
         let method_decoration_count = method.decorators.len() + param_decoration_count;
 
         if method_decoration_count == 0 {
@@ -1335,6 +1414,7 @@ impl<'a> LegacyDecorator<'a> {
     /// Check if a class method parameter is decorated.
     fn class_method_parameter_is_decorated(func: &Function<'a>) -> bool {
         func.params.items.iter().any(|param| !param.decorators.is_empty())
+            || func.params.rest.as_ref().is_some_and(|rest| !rest.decorators.is_empty())
     }
 
     /// * is_static is `true`: `Class`
@@ -1469,33 +1549,46 @@ impl<'a> LegacyDecorator<'a> {
     }
 }
 
-/// Visitor to detect if a private-in expression is present in a decorator
-#[derive(Default)]
-struct PrivateInExpressionDetector {
-    has_private_in_expression: bool,
+/// Detect references owned by this class, excluding private names shadowed by nested classes.
+struct PrivateEnvironmentDetector {
+    names: FxHashSet<String>,
+    found: bool,
 }
-
-impl VisitJs<'_> for PrivateInExpressionDetector {
-    fn visit_private_in_expression(&mut self, _it: &PrivateInExpression<'_>) {
-        self.has_private_in_expression = true;
-    }
-
-    fn visit_decorators(&mut self, decorators: &ArenaVec<'_, Decorator<'_>>) {
-        for decorator in decorators {
-            self.visit_expression(&decorator.expression);
-            // Early exit if a private-in expression is found
-            if self.has_private_in_expression {
-                break;
-            }
+impl<'a> VisitJs<'a> for PrivateEnvironmentDetector {
+    fn visit_expression(&mut self, expression: &Expression<'a>) {
+        if !self.found {
+            oxc_ast_visit::walk_js::walk_expression(self, expression);
         }
     }
+    fn visit_private_identifier(&mut self, ident: &PrivateIdentifier<'a>) {
+        self.found |= self.names.contains(ident.name.as_str());
+    }
+    fn visit_class(&mut self, class: &Class<'a>) {
+        self.visit_decorators(&class.decorators);
+        if let Some(super_class) = &class.super_class {
+            self.visit_expression(super_class);
+        }
+        let names = self.names.clone();
+        for element in &class.body.body {
+            if let Some(name) = element.property_key().and_then(|key| key.private_name()) {
+                self.names.remove(name.as_str());
+            }
+        }
+        self.visit_class_body(&class.body);
+        self.names = names;
+    }
 }
-
-impl PrivateInExpressionDetector {
-    fn has_private_in_expression(expression: &Expression<'_>) -> bool {
-        let mut detector = Self::default();
+impl PrivateEnvironmentDetector {
+    fn references_class_private_name(
+        expression: &Expression<'_>,
+        names: &FxHashSet<String>,
+    ) -> bool {
+        if names.is_empty() {
+            return false;
+        }
+        let mut detector = Self { names: names.clone(), found: false };
         detector.visit_expression(expression);
-        detector.has_private_in_expression
+        detector.found
     }
 }
 

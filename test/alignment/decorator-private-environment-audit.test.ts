@@ -72,11 +72,9 @@ for (const constructorDecorator of [false, true])
               expect(code).not.toMatch(/@capture|@mark|@inject/);
               if (classes) expect(code).not.toMatch(/class\s+C\b/);
               actual = observe(code);
-              expect(actual).toEqual([true, false, 3, 1]);
+              expect(actual).toEqual(expected);
             });
-            (classDecorator || constructorDecorator ? test.fails : test)(
-              'preserves every decorator callback in private scope',
-              () => expect(actual).toEqual(expected),
-            );
+            test('preserves every decorator callback in private scope', () =>
+              expect(actual).toEqual(expected));
           });
     });

@@ -74,26 +74,9 @@ for (const replacement of [false, true])
                 );
                 expect(code).not.toMatch(/@wrap|@replace|\baccessor\s/);
                 if (classes) expect(code).not.toMatch(/class\s+[CD]\b/);
-                if (replacement && isStatic) {
-                  try {
-                    actual = observe(code);
-                  } catch (error) {
-                    expect(error).toBeInstanceOf(TypeError);
-                    expect((error as Error).message).toMatch(
-                      classes
-                        ? /attempted to use private field on non-instance/
-                        : /Cannot read private member .* from an object whose class did not declare it/,
-                    );
-                    actual = 'TypeError';
-                  }
-                  expect(actual).toBe('TypeError');
-                } else {
-                  actual = observe(code);
-                  expect(actual).toEqual(expected);
-                }
+                actual = observe(code);
+                expect(actual).toEqual(expected);
               });
-              (replacement && isStatic ? test.fails : test)('preserves decorated accessors', () =>
-                expect(actual).toEqual(expected),
-              );
+              test('preserves decorated accessors', () => expect(actual).toEqual(expected));
             });
       });

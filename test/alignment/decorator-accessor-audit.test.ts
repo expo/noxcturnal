@@ -75,12 +75,10 @@ for (const isStatic of [false, true]) {
               expect(code).not.toContain(' as any');
               if (classes) expect(code).not.toMatch(/class\s+C\b/);
               actual = observe(code);
-              expect(actual).toEqual(getterFirst ? [['get', 'parameter:0'], 4] : expected);
+              expect(actual).toEqual(expected);
             });
-            (getterFirst ? test.fails : test)(
-              'applies setter-parameter metadata before replacing the accessor descriptor',
-              () => expect(actual).toEqual(expected),
-            );
+            test('applies setter-parameter metadata before replacing the accessor descriptor', () =>
+              expect(actual).toEqual(expected));
           });
         }
       }

@@ -1,5 +1,5 @@
 Vendored from crates.io oxc_transformer 0.141.0. Original MIT license retained.
-Noxcturnal patches the pinned transformer to repair constructor initialization, exponentiation assignment, logical assignment, and optional chaining.
+Noxcturnal patches the pinned transformer to repair constructor initialization, exponentiation assignment, logical assignment, optional chaining, and legacy decorator lowering.
 
 Original crates.io archive SHA-256: `3481b17ea50d4866901de759f736aa2c63bfca1fb6a20a67faa423f5361429e9`.
 
@@ -28,6 +28,11 @@ Local patches:
   chains. Bind only terminal member references, never an optional call's result.
 - `es2020/mod.rs`: remove the obsolete formal-parameter boolean hooks; parameter
   ownership is derived from traversal ancestry at optional-chain sites.
+- `decorator/legacy/mod.rs`: preserve TypeScript legacy member grouping, setter
+  parameter metadata, rest parameter adapters, private-environment placement and
+  class/constructor callbacks. Allocate legal unique auto-accessor storage names
+  and bind static accessors to the immutable original class rather than its
+  decorator replacement. Custom decorator helper ABIs are unchanged.
 
 Keep Rust and npm Oxc versions pinned together. Reassess these patches against the
 upstream implementation before any upgrade; archived regressions define the repair

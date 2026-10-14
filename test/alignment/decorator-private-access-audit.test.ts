@@ -79,20 +79,10 @@ for (const brandGuard of [false, true])
               );
               expect(code).not.toContain('@capture');
               if (classes) expect(code).not.toMatch(/class\s+C\b/);
-              if (brandGuard) {
-                actual = observe(code);
-                expect(actual).toEqual(entry.expected);
-              } else {
-                expect(() => new Function(code)).toThrow(SyntaxError);
-                expect(() => new Function(code)).toThrow(
-                  "Private field '#value' must be declared in an enclosing class",
-                );
-                actual = 'SyntaxError';
-              }
+              actual = observe(code);
+              expect(actual).toEqual(entry.expected);
             });
-            (brandGuard ? test : test.fails)(
-              'keeps private accesses in their declaring environment',
-              () => expect(actual).toEqual(entry.expected),
-            );
+            test('keeps private accesses in their declaring environment', () =>
+              expect(actual).toEqual(entry.expected));
           });
     });

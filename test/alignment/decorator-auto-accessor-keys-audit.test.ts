@@ -84,34 +84,13 @@ for (const entry of cases)
               ],
             }),
           );
-          if (entry.name === 'quoted non-identifier key') {
-            expect(result).toEqual({
-              status: 'bailout',
-              reason: 'audit:parse-error',
-              source,
-              diagnostics: [],
-            });
-            actual = 'bailout';
-          } else {
-            expect(result.status).toBe('complete');
-            if (result.status !== 'complete') throw new Error(result.reason);
-            expect(result.code).not.toMatch(/@mark|\baccessor\s/);
-            expect(result.code).not.toContain('@babel/runtime');
-            if (entry.name === 'backing name collision') {
-              expect(() => new Function(result.code)).toThrow(SyntaxError);
-              expect(() => new Function(result.code)).toThrow(
-                "Identifier '#_value_accessor_storage' has already been declared",
-              );
-              actual = 'SyntaxError';
-            } else {
-              actual = observe(result.code);
-              expect(actual).toEqual(entry.expected);
-            }
-          }
+          expect(result.status).toBe('complete');
+          if (result.status !== 'complete') throw new Error(result.reason);
+          expect(result.code).not.toMatch(/@mark|\baccessor\s/);
+          expect(result.code).not.toContain('@babel/runtime');
+          actual = observe(result.code);
         });
-        (entry.name === 'computed key getter' ? test : test.fails)(
-          'preserves valid accessor names and private storage',
-          () => expect(actual).toEqual(entry.expected),
-        );
+        test('preserves valid accessor names and private storage', () =>
+          expect(actual).toEqual(entry.expected));
       });
   });

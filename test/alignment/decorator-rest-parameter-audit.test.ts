@@ -82,15 +82,13 @@ for (const entry of cases) {
             'input.ts',
             defineNativePipeline({ phases: [{ name: 'audit', native: plan }] }),
           );
-          expect(result.status).toBe('bailout');
-          if (result.status !== 'bailout')
-            throw Error('expected the guarded residual-syntax bailout');
-          expect(result.reason).toBe('audit:parse-error');
-          expect(result.source).toBe(source);
-          expect(result.diagnostics).toEqual([]);
+          expect(result.status).toBe('complete');
+          if (result.status !== 'complete') throw Error(result.reason);
+          expect(result.code).not.toContain('@dec');
+          expect(observe(result.code)).toEqual(entry.expected);
           status = result.status;
         });
-        test.fails('lowers the supported rest-parameter decorator', () =>
+        test('lowers the supported rest-parameter decorator', () =>
           expect(status).toBe('complete'));
       });
     }

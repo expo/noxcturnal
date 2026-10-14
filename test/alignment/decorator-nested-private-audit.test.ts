@@ -89,10 +89,9 @@ for (const entry of cases)
             expect(code).not.toMatch(/@capture|@mark/);
             if (classes) expect(code).not.toMatch(/class\s+(?:C|Outer|Inner)\b/);
             actual = observe(code);
-            expect(actual).toEqual(entry.broken ? [7, [entry.value, 'member']] : expected);
+            expect(actual).toEqual(expected);
           });
-          (entry.broken ? test.fails : test)('respects ownership of nested private names', () =>
-            expect(actual).toEqual(expected),
-          );
+          test('respects ownership of nested private names', () =>
+            expect(actual).toEqual(expected));
         });
   });

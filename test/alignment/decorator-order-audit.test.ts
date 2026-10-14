@@ -39,13 +39,6 @@ const constructor = [
   'apply:class:undefined:1',
 ];
 const expected = [...instance, ...statics, ...constructor];
-const current = [
-  ...statics.slice(0, 4),
-  ...instance.slice(0, 4),
-  ...statics.slice(4),
-  ...instance.slice(4),
-  ...constructor,
-];
 function observe(code: string) {
   const context: { result?: unknown } = {};
   new Function('globalThis', 'require', code)(context, require);
@@ -105,9 +98,9 @@ for (const mode of ['inline', 'runtime'] as const) {
         expect(code).not.toContain(' as any');
         if (classes) expect(code).not.toMatch(/class\s+C\b/);
         actual = observe(code);
-        expect(actual).toEqual(current);
+        expect(actual).toEqual(expected);
       });
-      test.fails('groups instance decorators before static decorators and constructor decorators', () =>
+      test('groups instance decorators before static decorators and constructor decorators', () =>
         expect(actual).toEqual(reference));
     });
   }
