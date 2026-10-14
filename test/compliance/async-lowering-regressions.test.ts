@@ -157,4 +157,71 @@ describe.each(['inline', 'runtime'] as const)('%s async lowering', mode => {
     );
     expect(await run(code)).toEqual(await run(nativeSource));
   });
+  test('keeps class initializer new.target separate from the enclosing constructor', async () => {
+    const source = `function Factory() {
+      return class Inner {
+        field = async () => new.target;
+        static field = async () => new.target;
+        static { this.block = async () => new.target; }
+        nested = new (function Nested() { this.read = async () => new.target; })();
+      };
+    }
+    const C = new Factory(); const instance = new C();
+    globalThis.result = Promise.all([instance.field(), C.field(), C.block(), instance.nested.read()]).then(values => values.map(value => value?.name));`;
+    expect(await run(source)).toEqual([undefined, undefined, undefined, 'Nested']);
+    expect(await run(compile(source, { helpers, transforms: { asyncFunctions: true } }))).toEqual(
+      await run(source),
+    );
+  });
+
+  test('keeps new.target in class computed keys and heritage in the outer environment', async () => {
+    const source = `function Factory() {
+      const reads = [];
+      class Inner extends (reads.push(async () => new.target), Object) {
+        [(reads.push(async () => new.target), 'field')] = 1;
+        [(reads.push(async () => new.target), 'method')]() {}
+        static [(reads.push(async () => new.target), 'staticField')] = 2;
+      }
+      this.reads = reads;
+    }
+    globalThis.result = Promise.all(new Factory().reads.map(read => read())).then(values => values.map(value => value === Factory));`;
+    expect(await run(source)).toEqual([true, true, true, true]);
+    expect(await run(compile(source, { helpers, transforms: { asyncFunctions: true } }))).toEqual(
+      await run(source),
+    );
+  });
+
+  test('keeps auto-accessor initializer new.target at its class boundary', async () => {
+    const source = `function Factory() { return class Inner {
+      accessor field = async () => new.target;
+      static accessor field = async () => new.target;
+    }; }
+    const C = new Factory(); globalThis.result = Promise.all([new C().field(), C.field()]);`;
+    // Auto-accessors have no native syntax oracle in Node 22. A second compilation
+    // lowers only the remaining class syntax after async conversion has completed.
+    const code = compile(source, { helpers, transforms: { asyncFunctions: true } });
+    const lowered = compile(code, { helpers, transforms: { classes: true } });
+    expect(await run(lowered)).toEqual([undefined, undefined]);
+  });
+  test('keeps top-level class new.target captures defined', async () => {
+    const source = `class C { field = async () => new.target; static field = async () => new.target; static { this.block = async () => new.target; } }
+      globalThis.result = Promise.all([new C().field(), C.field(), C.block()]);`;
+    expect(await run(source)).toEqual([undefined, undefined, undefined]);
+    expect(await run(compile(source, { helpers, transforms: { asyncFunctions: true } }))).toEqual(
+      await run(source),
+    );
+  });
+
+  test('retains nested class receiver captures inside a derived constructor', async () => {
+    const source = `class B {} class C extends B { constructor() {
+      class Inner { field = async () => [this, new.target]; static field = async () => [this, new.target]; }
+      super(); this.Inner = Inner;
+    } }
+    const Inner = new C().Inner; const instance = new Inner();
+    globalThis.result = Promise.all([instance.field(), Inner.field()]).then(([a,b]) => [a[0] === instance, a[1], b[0] === Inner, b[1]]);`;
+    expect(await run(source)).toEqual([true, undefined, true, undefined]);
+    expect(await run(compile(source, { helpers, transforms: { asyncFunctions: true } }))).toEqual(
+      await run(source),
+    );
+  });
 });

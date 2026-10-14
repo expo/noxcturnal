@@ -449,6 +449,20 @@ impl<'a> Traverse<'a, TransformState<'a>> for ArrowFunctionConverter<'a> {
                 self.get_this_identifier(this.span, ctx).map(Expression::Identifier)
             }
             Expression::NewTarget(_) if self.get_scope_id_from_this_affected_block(ctx).is_some() => {
+                // Class initializers and static blocks own a new.target binding whose
+                // value is undefined. Computed keys and heritage instead evaluate in
+                // the enclosing environment, so they must not stop this search.
+                let class_initializer = ctx.ancestors().find_map(|ancestor| match ancestor {
+                    Ancestor::PropertyDefinitionValue(_)
+                    | Ancestor::AccessorPropertyValue(_)
+                    | Ancestor::StaticBlockBody(_) => Some(true),
+                    Ancestor::FunctionBody(_) | Ancestor::FunctionParams(_) => Some(false),
+                    _ => None,
+                }).unwrap_or(false);
+                if class_initializer {
+                    *expr = Expression::new_void_0(expr.span(), ctx);
+                    return;
+                }
                 let value = expr.take_in(ctx);
                 let (binding, _) = self.new_target_var_stack.last_or_init(|| {
                     (ctx.generate_uid("newtarget", ctx.scoping().root_scope_id(), SymbolFlags::FunctionScopedVariable), value)
