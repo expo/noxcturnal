@@ -57,7 +57,7 @@ beforeAll(() => {
   outer = trace(replaced.map, 9);
 });
 test('sourceless edit initially has no original location', () => expect(initial).toEqual(unmapped));
-test.fails('input-map unmapped segment remains unmapped after composition', () =>
+test('input-map unmapped segment remains unmapped after composition', () =>
   expect(inner).toEqual(unmapped));
-test.fails('outer-map unmapped segment remains unmapped after composition', () =>
+test('outer-map unmapped segment remains unmapped after composition', () =>
   expect(outer).toEqual(unmapped));

@@ -118,7 +118,7 @@ describe('named identity replacement', () => {
     expect(result.code).toBe('1; 2;');
     const map = new TraceMap({ version: 3, sources: ['input.js'], ...result.map });
     actual = originalPositionFor(map, { line: 1, column: 0 });
-    expect(actual).toEqual({ source: 'input.js', line: 1, column: 0, name: 'first' });
+    expect(actual).toEqual({ source: 'input.js', line: 1, column: 0, name: 'span' });
     expect(originalPositionFor(map, { line: 1, column: 3 })).toEqual({
       source: 'input.js',
       line: 1,
@@ -126,7 +126,7 @@ describe('named identity replacement', () => {
       name: 'second',
     });
   });
-  test.fails('unchanged identity text preserves its explicitly supplied label', () => {
+  test('unchanged identity text preserves its explicitly supplied label', () => {
     expect(actual).toEqual({ source: 'input.js', line: 1, column: 0, name: 'span' });
   });
 });

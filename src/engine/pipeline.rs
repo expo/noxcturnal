@@ -6,8 +6,6 @@ use crate::event_types::NativeVlqMap;
 use crate::preflight::transform::transform_resident as preflight_transform;
 use crate::preflight::{NativePreflightOptions, NativePreflightResult};
 
-use super::compose_decoded_chain;
-
 /// A transform pipeline's resident source, held natively across every phase so
 /// the intermediate `phaseSource` and each phase's map layer never cross the
 /// N-API boundary. Native phases and visitor commits mutate the held source in
@@ -185,26 +183,14 @@ impl NativePipelineSession {
             return Ok(NativePipelineFinish { code, map: None });
         }
         let slices: Vec<&[u8]> = self.layers.iter().map(Vec::as_slice).collect();
-        let NativeVlqMap {
-            mappings,
-            mut names,
-        } = compose_decoded_chain(&slices)?;
-        let map = if let Some(input_mappings) = input_mappings {
-            // Input maps compose as the inner layer: pipeline (generated → phase
-            // source) then input (phase source → original), matching the JS
-            // `composeMappings(finalMap, inputMap)` boundary this replaces.
-            let composed =
-                crate::sourcemap::compose(&mappings, &input_mappings, names.len() as u32);
-            if let Some(input_names) = input_names {
-                names.extend(input_names);
-            }
-            NativeVlqMap {
-                mappings: composed,
-                names,
-            }
-        } else {
-            NativeVlqMap { mappings, names }
-        };
+        let (mappings, names) = crate::sourcemap::compose_layer_chain_with_input(
+            &slices,
+            input_mappings
+                .as_deref()
+                .map(|mappings| (mappings, input_names.as_deref().unwrap_or_default())),
+        )
+        .map_err(super::compose_error)?;
+        let map = NativeVlqMap { mappings, names };
         Ok(NativePipelineFinish {
             code,
             map: Some(map),

@@ -55,18 +55,11 @@ for (const outerNamed of [false, true])
           new TraceMap({ version: 3, sources: ['original.js'], ...result.map }),
           { line: 1, column: 0 },
         );
-        expect(actual).toEqual({
-          ...expected,
-          name: outerNamed ? 'intermediateName' : expected.name,
-        });
       } finally {
         unregister();
       }
     });
-    (outerNamed && innerNamed ? test.fails : test)(
-      'composition traces names to the original named segment',
-      () => {
-        expect(actual).toEqual(expected);
-      },
-    );
+    test('composition traces names to the original named segment', () => {
+      expect(actual).toEqual(expected);
+    });
   });

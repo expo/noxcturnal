@@ -554,6 +554,7 @@ pub fn build(source: &str, commands: Vec<EditCommand>) -> Result<Vec<Piece>> {
                     });
                 }
             } else if edit.mapping == MappingPolicy::Identity
+                && edit.names.is_empty()
                 && edit.content == source[edit.start..edit.end]
             {
                 push_original(&mut pieces, edit.start, edit.end);
@@ -587,7 +588,10 @@ pub fn build(source: &str, commands: Vec<EditCommand>) -> Result<Vec<Piece>> {
         let (content, mapping, names, mark_only, _) = take_command(&mut slots[key.index as usize]);
         if mark_only {
             pieces.push(Piece::Mark { origin: key.start });
-        } else if mapping == MappingPolicy::Identity && content == source[key.start..key.end] {
+        } else if mapping == MappingPolicy::Identity
+            && names.is_empty()
+            && content == source[key.start..key.end]
+        {
             push_original(&mut pieces, key.start, key.end);
         } else {
             pieces.push(Piece::Generated {

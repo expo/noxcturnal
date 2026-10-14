@@ -63,6 +63,5 @@ describe.each([false, true])('serialized input-map anchors with compact=%s', com
   test('lowering retains the source anchor', () => expect(first).toEqual(expected));
   test('resident phases retain the source anchor', () => expect(combined).toEqual(expected));
   test('character composition retains the input anchor', () => expect(character).toEqual(expected));
-  test.fails('boundary composition retains the input anchor', () =>
-    expect(boundary).toEqual(expected));
+  test('boundary composition retains the input anchor', () => expect(boundary).toEqual(expected));
 });
