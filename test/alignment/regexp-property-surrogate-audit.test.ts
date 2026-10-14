@@ -6,12 +6,12 @@ import { defineNativePipeline, transform } from '../../js';
 const require = createRequire(import.meta.url);
 const inputs = ['\uD800', '\uDFFF', '😀', 'a'];
 const cases = [
-  { property: 'Assigned', escape: 'p', expected: [true, true, true, true], broken: true },
-  { property: 'Assigned', escape: 'P', expected: [false, false, false, false], broken: true },
-  { property: 'Other', escape: 'P', expected: [false, false, true, true], broken: true },
-  { property: 'Other', escape: 'p', expected: [true, true, false, false], broken: false },
-  { property: 'Any', escape: 'p', expected: [true, true, true, true], broken: false },
-  { property: 'Surrogate', escape: 'p', expected: [true, true, false, false], broken: false },
+  { property: 'Assigned', escape: 'p', expected: [true, true, true, true] },
+  { property: 'Assigned', escape: 'P', expected: [false, false, false, false] },
+  { property: 'Other', escape: 'P', expected: [false, false, true, true] },
+  { property: 'Other', escape: 'p', expected: [true, true, false, false] },
+  { property: 'Any', escape: 'p', expected: [true, true, true, true] },
+  { property: 'Surrogate', escape: 'p', expected: [true, true, false, false] },
 ];
 function run(code: string): unknown {
   const context: Record<string, unknown> = {};
@@ -37,7 +37,7 @@ for (const entry of cases) {
       expect(code).not.toMatch(/\\[pP]\{/);
       actual = run(code);
     });
-    (entry.broken ? test.fails : test)('preserves surrogate membership', () => {
+    test('preserves surrogate membership', () => {
       expect(actual).toEqual(entry.expected);
     });
   });

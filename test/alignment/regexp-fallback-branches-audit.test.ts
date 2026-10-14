@@ -11,42 +11,36 @@ const cases = [
     tail: String.raw`\p{RGI_Emoji_Flag_Sequence}`,
     inputs: ['a🇬🇧', 'a🇺🇸', 'az'],
     expected: [true, true, false],
-    broken: false,
   },
   {
     name: 'sole string property inside a class',
     tail: String.raw`[\p{RGI_Emoji_Flag_Sequence}]`,
     inputs: ['a🇬🇧', 'az'],
     expected: [true, false],
-    broken: false,
   },
   {
     name: 'string property and character union',
     tail: String.raw`[\p{RGI_Emoji_Flag_Sequence}z]`,
     inputs: ['a🇬🇧', 'az', 'ay'],
     expected: [true, true, false],
-    broken: false,
   },
   {
     name: 'sole string retains its quantified atom',
     tail: String.raw`[\q{ab}]+`,
     inputs: ['aab', 'aabab', 'aabb'],
     expected: [true, true, false],
-    broken: true,
   },
   {
     name: 'empty sole string remains an empty atom',
     tail: String.raw`[\q{}]`,
     inputs: ['a', 'aa'],
     expected: [true, false],
-    broken: false,
   },
   {
     name: 'empty member follows longer alternatives',
     tail: String.raw`[\q{|b}]`,
     inputs: ['a', 'ab', 'abb'],
     expected: [true, true, false],
-    broken: false,
   },
 ];
 function run(code: string): unknown {
@@ -75,7 +69,7 @@ for (const entry of cases)
       expect(code).not.toContain('\\p{RGI_Emoji_Flag_Sequence}');
       actual = run(code);
     });
-    (entry.broken ? test.fails : test)('preserves membership through the textual fallback', () => {
+    test('preserves membership through the textual fallback', () => {
       expect(actual).toEqual(entry.expected);
     });
   });

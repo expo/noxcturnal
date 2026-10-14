@@ -1,3 +1,5 @@
+import { transformSync } from '@babel/core';
+import { compile } from '../compliance/runtime';
 import unicodeRegex from '@babel/plugin-transform-unicode-regex';
 import stickyRegex from '@babel/plugin-transform-sticky-regex';
 import namedGroups from '@babel/plugin-transform-named-capturing-groups-regex';
@@ -53,14 +55,21 @@ test('sticky constructor references the shadowed RegExp binding like Babel', asy
   ).resolves.toEqual('TypeError');
 });
 
-test('named backreference adjacent to a digit shares Babel numeric-token rewriting', async () => {
-  await expect(
-    alignBabelBehavior({
-      source: String.raw`globalThis.__result = [/^(?<x>a)\k<x>2$/.test('aa2'), /^(?<x>a)\k<x>2$/.test('a\n')];`,
-      filename: 'input.js',
-      plugins: [namedGroups],
-      noxcturnal: { transforms: { regexpNamedCaptureGroups: true }, helpers: { mode: 'inline' } },
-      output: { mustNotMatch: [/\(\?<x>/, /\\k<x>/] },
-    }),
-  ).resolves.toEqual([false, true]);
+test('named backreference adjacent to a digit preserves the token boundary', () => {
+  const source = String.raw`globalThis.result = [/^(?<x>a)\k<x>2$/.test('aa2'), /^(?<x>a)\k<x>2$/.test('a\n')];`;
+  const run = (code: string) => {
+    const context: Record<string, unknown> = {};
+    new Function('globalThis', code)(context);
+    return context.result;
+  };
+  const code = compile(source, { transforms: { regexpNamedCaptureGroups: true } });
+  expect(code).not.toMatch(/\(\?<x>|\\k<x>/);
+  expect(run(source)).toEqual([true, false]);
+  expect(run(code)).toEqual([true, false]);
+  // The local token fix also improves Babel's accepted non-Unicode limitation.
+  expect(
+    run(
+      transformSync(source, { babelrc: false, configFile: false, plugins: [namedGroups] })!.code!,
+    ),
+  ).toEqual([false, true]);
 });

@@ -70,12 +70,12 @@ export const cases = [
   [
     'Unicode code point escapes (\\u{XXXXX}) > \\u{} in character class',
     "() => {\n  const re = /[\\u{1F600}\\u{1F601}\\u{1F602}]/u;\n  expect(re.test('\\u{1F600}')).toBe(true); // 😀\n  expect(re.test('\\u{1F601}')).toBe(true); // 😁\n  expect(re.test('\\u{1F602}')).toBe(true); // 😂\n  expect(re.test('\\u{1F603}')).toBe(false);\n}",
-    "() => {\n  const re = /\\uD83D[\\uDE00-\\uDE02]/;\n  expect(re.test('😀')).toBe(true);\n  expect(re.test('😁')).toBe(true);\n  expect(re.test('😂')).toBe(true);\n  expect(re.test('😃')).toBe(false);\n};",
+    "() => {\n  const re = /(?:\\uD83D[\\uDE00-\\uDE02])/;\n  expect(re.test('😀')).toBe(true);\n  expect(re.test('😁')).toBe(true);\n  expect(re.test('😂')).toBe(true);\n  expect(re.test('😃')).toBe(false);\n};",
   ],
   [
     'Unicode code point escapes (\\u{XXXXX}) > \\u{} range in character class',
     "() => {\n  const re = /[\\u{1F600}-\\u{1F602}]/u;\n  expect(re.test('\\u{1F600}')).toBe(true);\n  expect(re.test('\\u{1F601}')).toBe(true);\n  expect(re.test('\\u{1F602}')).toBe(true);\n  expect(re.test('\\u{1F603}')).toBe(false);\n  expect(re.test('\\u{1F5FF}')).toBe(false);\n}",
-    "() => {\n  const re = /\\uD83D[\\uDE00-\\uDE02]/;\n  expect(re.test('😀')).toBe(true);\n  expect(re.test('😁')).toBe(true);\n  expect(re.test('😂')).toBe(true);\n  expect(re.test('😃')).toBe(false);\n  expect(re.test('🗿')).toBe(false);\n};",
+    "() => {\n  const re = /(?:\\uD83D[\\uDE00-\\uDE02])/;\n  expect(re.test('😀')).toBe(true);\n  expect(re.test('😁')).toBe(true);\n  expect(re.test('😂')).toBe(true);\n  expect(re.test('😃')).toBe(false);\n  expect(re.test('🗿')).toBe(false);\n};",
   ],
   [
     'Unicode code point escapes (\\u{XXXXX}) > \\u{} with zero-padded code point',
@@ -100,7 +100,7 @@ export const cases = [
   [
     'astral plane character matching > astral character is one code point, not two code units',
     "() => {\n  // Without /u, emoji is two code units (surrogate pair) and . matches one unit\n  // With /u, emoji is one code point and . matches the full character\n  const re = /^.$/u;\n  expect(re.test('😀')).toBe(true);\n  expect(re.test('A')).toBe(true);\n}",
-    "() => {\n  // Without /u, emoji is two code units (surrogate pair) and . matches one unit\n  // With /u, emoji is one code point and . matches the full character\n  const re =\n    /^(?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF])$/;\n  expect(re.test('😀')).toBe(true);\n  expect(re.test('A')).toBe(true);\n};",
+    "() => {\n  // Without /u, emoji is two code units (surrogate pair) and . matches one unit\n  // With /u, emoji is one code point and . matches the full character\n  const re =\n    /^(?:[\\u0000-\\u0009\\u000B-\\u000C\\u000E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF])$/;\n  expect(re.test('😀')).toBe(true);\n  expect(re.test('A')).toBe(true);\n};",
   ],
   [
     'astral plane character matching > without /u, astral character is two code units',
@@ -110,12 +110,12 @@ export const cases = [
   [
     'astral plane character matching > string of astral characters matches with /u',
     "() => {\n  const re = /^.{3}$/u;\n  expect(re.test('😀😁😂')).toBe(true);\n}",
-    "() => {\n  const re =\n    /^(?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF]){3}$/;\n  expect(re.test('😀😁😂')).toBe(true);\n};",
+    "() => {\n  const re =\n    /^(?:[\\u0000-\\u0009\\u000B-\\u000C\\u000E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF]){3}$/;\n  expect(re.test('😀😁😂')).toBe(true);\n};",
   ],
   [
     'astral plane character matching > astral characters in character class range',
     "() => {\n  // U+1D306 to U+1D308\n  const re = /[\\u{1D306}-\\u{1D308}]/u;\n  expect(re.test('\\u{1D306}')).toBe(true);\n  expect(re.test('\\u{1D307}')).toBe(true);\n  expect(re.test('\\u{1D308}')).toBe(true);\n  expect(re.test('\\u{1D305}')).toBe(false);\n  expect(re.test('\\u{1D309}')).toBe(false);\n}",
-    "() => {\n  // U+1D306 to U+1D308\n  const re = /\\uD834[\\uDF06-\\uDF08]/;\n  expect(re.test('𝌆')).toBe(true);\n  expect(re.test('𝌇')).toBe(true);\n  expect(re.test('𝌈')).toBe(true);\n  expect(re.test('𝌅')).toBe(false);\n  expect(re.test('𝌉')).toBe(false);\n};",
+    "() => {\n  // U+1D306 to U+1D308\n  const re = /(?:\\uD834[\\uDF06-\\uDF08])/;\n  expect(re.test('𝌆')).toBe(true);\n  expect(re.test('𝌇')).toBe(true);\n  expect(re.test('𝌈')).toBe(true);\n  expect(re.test('𝌅')).toBe(false);\n  expect(re.test('𝌉')).toBe(false);\n};",
   ],
   [
     'astral plane character matching > mixed BMP and astral in character class',
@@ -125,47 +125,47 @@ export const cases = [
   [
     'astral plane character matching > exec returns full code point, not surrogate halves',
     "() => {\n  const re = /(.)/u;\n  const match = re.exec('😀');\n  expect(match[0]).toBe('😀');\n  expect(match[1]).toBe('😀');\n  expect(match[0].length).toBe(2); // Still 2 UTF-16 code units\n}",
-    "() => {\n  const re =\n    /((?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF]))/;\n  const match = re.exec('😀');\n  expect(match[0]).toBe('😀');\n  expect(match[1]).toBe('😀');\n  expect(match[0].length).toBe(2);\n};",
+    "() => {\n  const re =\n    /((?:[\\u0000-\\u0009\\u000B-\\u000C\\u000E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF]))/;\n  const match = re.exec('😀');\n  expect(match[0]).toBe('😀');\n  expect(match[1]).toBe('😀');\n  expect(match[0].length).toBe(2);\n};",
   ],
   [
     'astral plane character matching > quantifier applies to full code point',
     "() => {\n  const re = /^(.)\\1$/u;\n  expect(re.test('😀😀')).toBe(true);\n  expect(re.test('😀😁')).toBe(false);\n}",
-    "() => {\n  const re =\n    /^((?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF]))\\1$/;\n  expect(re.test('😀😀')).toBe(true);\n  expect(re.test('😀😁')).toBe(false);\n};",
+    "() => {\n  const re =\n    /^((?:[\\u0000-\\u0009\\u000B-\\u000C\\u000E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF]))\\1$/;\n  expect(re.test('😀😀')).toBe(true);\n  expect(re.test('😀😁')).toBe(false);\n};",
   ],
   [
     'dot matching with /u > dot matches BMP character with /u',
     "() => {\n  const re = /^.$/u;\n  expect(re.test('A')).toBe(true);\n  expect(re.test('\\u00E9')).toBe(true); // é\n  expect(re.test('\\u4E16')).toBe(true); // 世\n}",
-    "() => {\n  const re =\n    /^(?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF])$/;\n  expect(re.test('A')).toBe(true);\n  expect(re.test('é')).toBe(true);\n  expect(re.test('世')).toBe(true);\n};",
+    "() => {\n  const re =\n    /^(?:[\\u0000-\\u0009\\u000B-\\u000C\\u000E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF])$/;\n  expect(re.test('A')).toBe(true);\n  expect(re.test('é')).toBe(true);\n  expect(re.test('世')).toBe(true);\n};",
   ],
   [
     'dot matching with /u > dot matches astral plane character with /u',
     "() => {\n  const re = /^.$/u;\n  expect(re.test('😀')).toBe(true);\n  expect(re.test('𝌆')).toBe(true);\n  expect(re.test('\\u{1F4A9}')).toBe(true); // 💩\n}",
-    "() => {\n  const re =\n    /^(?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF])$/;\n  expect(re.test('😀')).toBe(true);\n  expect(re.test('𝌆')).toBe(true);\n  expect(re.test('💩')).toBe(true);\n};",
+    "() => {\n  const re =\n    /^(?:[\\u0000-\\u0009\\u000B-\\u000C\\u000E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF])$/;\n  expect(re.test('😀')).toBe(true);\n  expect(re.test('𝌆')).toBe(true);\n  expect(re.test('💩')).toBe(true);\n};",
   ],
   [
     'dot matching with /u > dot does not match newline with /u',
     "() => {\n  const re = /^.$/u;\n  expect(re.test('\\n')).toBe(false);\n  expect(re.test('\\r')).toBe(false);\n  expect(re.test('\\u2028')).toBe(false); // Line separator\n  expect(re.test('\\u2029')).toBe(false); // Paragraph separator\n}",
-    "() => {\n  const re =\n    /^(?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF])$/;\n  expect(re.test('\\n')).toBe(false);\n  expect(re.test('\\r')).toBe(false);\n  expect(re.test('\\u2028')).toBe(false);\n  expect(re.test('\\u2029')).toBe(false);\n};",
+    "() => {\n  const re =\n    /^(?:[\\u0000-\\u0009\\u000B-\\u000C\\u000E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF])$/;\n  expect(re.test('\\n')).toBe(false);\n  expect(re.test('\\r')).toBe(false);\n  expect(re.test('\\u2028')).toBe(false);\n  expect(re.test('\\u2029')).toBe(false);\n};",
   ],
   [
     'dot matching with /u > dot matches newline with /su',
     "() => {\n  const re = /^.$/su;\n  expect(re.test('\\n')).toBe(true);\n  expect(re.test('\\r')).toBe(true);\n  expect(re.test('\\u2028')).toBe(true);\n  expect(re.test('\\u2029')).toBe(true);\n}",
-    "() => {\n  const re = /^(?:[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\s\\S])$/s;\n  expect(re.test('\\n')).toBe(true);\n  expect(re.test('\\r')).toBe(true);\n  expect(re.test('\\u2028')).toBe(true);\n  expect(re.test('\\u2029')).toBe(true);\n};",
+    "() => {\n  const re =\n    /^(?:[\\u0000-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF])$/s;\n  expect(re.test('\\n')).toBe(true);\n  expect(re.test('\\r')).toBe(true);\n  expect(re.test('\\u2028')).toBe(true);\n  expect(re.test('\\u2029')).toBe(true);\n};",
   ],
   [
     'dot matching with /u > dot with /su matches astral characters',
     "() => {\n  const re = /^.$/su;\n  expect(re.test('😀')).toBe(true);\n  expect(re.test('A')).toBe(true);\n}",
-    "() => {\n  const re = /^(?:[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\s\\S])$/s;\n  expect(re.test('😀')).toBe(true);\n  expect(re.test('A')).toBe(true);\n};",
+    "() => {\n  const re =\n    /^(?:[\\u0000-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF])$/s;\n  expect(re.test('😀')).toBe(true);\n  expect(re.test('A')).toBe(true);\n};",
   ],
   [
     'dot matching with /u > multiple dots match multiple code points',
     "() => {\n  const re = /^..$/u;\n  expect(re.test('AB')).toBe(true);\n  expect(re.test('😀😁')).toBe(true);\n  expect(re.test('A😀')).toBe(true);\n  expect(re.test('ABC')).toBe(false);\n}",
-    "() => {\n  const re =\n    /^(?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF])(?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF])$/;\n  expect(re.test('AB')).toBe(true);\n  expect(re.test('😀😁')).toBe(true);\n  expect(re.test('A😀')).toBe(true);\n  expect(re.test('ABC')).toBe(false);\n};",
+    "() => {\n  const re =\n    /^(?:[\\u0000-\\u0009\\u000B-\\u000C\\u000E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF])(?:[\\u0000-\\u0009\\u000B-\\u000C\\u000E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF])$/;\n  expect(re.test('AB')).toBe(true);\n  expect(re.test('😀😁')).toBe(true);\n  expect(re.test('A😀')).toBe(true);\n  expect(re.test('ABC')).toBe(false);\n};",
   ],
   [
     'dot matching with /u > dot with quantifier counts code points',
     "() => {\n  const re = /^.{2}$/u;\n  expect(re.test('AB')).toBe(true);\n  expect(re.test('😀😁')).toBe(true);\n  expect(re.test('😀')).toBe(false);\n}",
-    "() => {\n  const re =\n    /^(?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF]){2}$/;\n  expect(re.test('AB')).toBe(true);\n  expect(re.test('😀😁')).toBe(true);\n  expect(re.test('😀')).toBe(false);\n};",
+    "() => {\n  const re =\n    /^(?:[\\u0000-\\u0009\\u000B-\\u000C\\u000E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF]){2}$/;\n  expect(re.test('AB')).toBe(true);\n  expect(re.test('😀😁')).toBe(true);\n  expect(re.test('😀')).toBe(false);\n};",
   ],
   [
     'character class escapes with /u > \\d matches digits with /u',
@@ -205,12 +205,12 @@ export const cases = [
   [
     'negated character classes with /u > negated class [^...] with BMP characters',
     "() => {\n  const re = /^[^abc]$/u;\n  expect(re.test('d')).toBe(true);\n  expect(re.test('a')).toBe(false);\n}",
-    "() => {\n  const re =\n    /^(?:[\\u0000-\\u0060\\u0064-\\uD7FF\\uE000-\\uFFFF]|\\uD800[\\uDC00-\\uDFFF]|[\\uD801-\\uDBFE][\\uDC00-\\uDFFF]|\\uDBFF[\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF])$/;\n  expect(re.test('d')).toBe(true);\n  expect(re.test('a')).toBe(false);\n};",
+    "() => {\n  const re =\n    /^(?:[\\u0000-\\u0060\\u0064-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF])$/;\n  expect(re.test('d')).toBe(true);\n  expect(re.test('a')).toBe(false);\n};",
   ],
   [
     'negated character classes with /u > negated class matches astral characters',
     "() => {\n  const re = /^[^abc]$/u;\n  expect(re.test('😀')).toBe(true);\n}",
-    "() => {\n  const re =\n    /^(?:[\\u0000-\\u0060\\u0064-\\uD7FF\\uE000-\\uFFFF]|\\uD800[\\uDC00-\\uDFFF]|[\\uD801-\\uDBFE][\\uDC00-\\uDFFF]|\\uDBFF[\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF])$/;\n  expect(re.test('😀')).toBe(true);\n};",
+    "() => {\n  const re =\n    /^(?:[\\u0000-\\u0060\\u0064-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF])$/;\n  expect(re.test('😀')).toBe(true);\n};",
   ],
   [
     'negated character classes with /u > negated class with astral character',
@@ -265,7 +265,7 @@ export const cases = [
   [
     'surrogate pair handling > /u treats surrogate pair as single code point',
     "() => {\n  // 😀 is U+1F600, stored as surrogate pair \\uD83D\\uDE00\n  const str = '\\uD83D\\uDE00';\n  const re = /^.$/u;\n  expect(re.test(str)).toBe(true); // One code point\n}",
-    "() => {\n  // 😀 is U+1F600, stored as surrogate pair \\uD83D\\uDE00\n  const str = '😀';\n  const re =\n    /^(?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF])$/;\n  expect(re.test(str)).toBe(true);\n};",
+    "() => {\n  // 😀 is U+1F600, stored as surrogate pair \\uD83D\\uDE00\n  const str = '😀';\n  const re =\n    /^(?:[\\u0000-\\u0009\\u000B-\\u000C\\u000E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF])$/;\n  expect(re.test(str)).toBe(true);\n};",
   ],
   [
     'surrogate pair handling > without /u, surrogate pair is two code units',
@@ -275,7 +275,7 @@ export const cases = [
   [
     'surrogate pair handling > lone high surrogate does not match . with /u',
     "() => {\n  // A lone high surrogate is not a valid code point sequence\n  const re = /^.$/u;\n  expect(re.test('\\uD83D')).toBe(true);\n}",
-    "() => {\n  // A lone high surrogate is not a valid code point sequence\n  const re =\n    /^(?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF])$/;\n  expect(re.test('\\ud83d')).toBe(true);\n};",
+    "() => {\n  // A lone high surrogate is not a valid code point sequence\n  const re =\n    /^(?:[\\u0000-\\u0009\\u000B-\\u000C\\u000E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF])$/;\n  expect(re.test('\\ud83d')).toBe(true);\n};",
   ],
   [
     'surrogate pair handling > astral range boundary correctness',
@@ -285,7 +285,7 @@ export const cases = [
   [
     'surrogate pair handling > consecutive astral characters',
     "() => {\n  const re = /^(.)(.)$/u;\n  const match = re.exec('😀😁');\n  expect(match[1]).toBe('😀');\n  expect(match[2]).toBe('😁');\n}",
-    "() => {\n  const re =\n    /^((?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF]))((?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF]))$/;\n  const match = re.exec('😀😁');\n  expect(match[1]).toBe('😀');\n  expect(match[2]).toBe('😁');\n};",
+    "() => {\n  const re =\n    /^((?:[\\u0000-\\u0009\\u000B-\\u000C\\u000E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF]))((?:[\\u0000-\\u0009\\u000B-\\u000C\\u000E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF]))$/;\n  const match = re.exec('😀😁');\n  expect(match[1]).toBe('😀');\n  expect(match[2]).toBe('😁');\n};",
   ],
   [
     'quantifiers with /u > + quantifier applies to full code point',
@@ -300,12 +300,12 @@ export const cases = [
   [
     'quantifiers with /u > {n} quantifier counts code points',
     "() => {\n  const re = /^.{3}$/u;\n  expect(re.test('abc')).toBe(true);\n  expect(re.test('😀😁😂')).toBe(true);\n  expect(re.test('a😀b')).toBe(true);\n  expect(re.test('abcd')).toBe(false);\n}",
-    "() => {\n  const re =\n    /^(?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF]){3}$/;\n  expect(re.test('abc')).toBe(true);\n  expect(re.test('😀😁😂')).toBe(true);\n  expect(re.test('a😀b')).toBe(true);\n  expect(re.test('abcd')).toBe(false);\n};",
+    "() => {\n  const re =\n    /^(?:[\\u0000-\\u0009\\u000B-\\u000C\\u000E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF]){3}$/;\n  expect(re.test('abc')).toBe(true);\n  expect(re.test('😀😁😂')).toBe(true);\n  expect(re.test('a😀b')).toBe(true);\n  expect(re.test('abcd')).toBe(false);\n};",
   ],
   [
     'quantifiers with /u > {n,m} range quantifier with code points',
     "() => {\n  const re = /^.{2,4}$/u;\n  expect(re.test('ab')).toBe(true);\n  expect(re.test('😀😁')).toBe(true);\n  expect(re.test('😀😁😂😃')).toBe(true);\n  expect(re.test('a')).toBe(false);\n  expect(re.test('abcde')).toBe(false);\n}",
-    "() => {\n  const re =\n    /^(?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF]){2,4}$/;\n  expect(re.test('ab')).toBe(true);\n  expect(re.test('😀😁')).toBe(true);\n  expect(re.test('😀😁😂😃')).toBe(true);\n  expect(re.test('a')).toBe(false);\n  expect(re.test('abcde')).toBe(false);\n};",
+    "() => {\n  const re =\n    /^(?:[\\u0000-\\u0009\\u000B-\\u000C\\u000E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF]){2,4}$/;\n  expect(re.test('ab')).toBe(true);\n  expect(re.test('😀😁')).toBe(true);\n  expect(re.test('😀😁😂😃')).toBe(true);\n  expect(re.test('a')).toBe(false);\n  expect(re.test('abcde')).toBe(false);\n};",
   ],
   [
     'quantifiers with /u > ? quantifier on astral character',
@@ -315,27 +315,27 @@ export const cases = [
   [
     'capturing groups with /u > capturing group captures full code point',
     "() => {\n  const re = /^(.)$/u;\n  const match = re.exec('😀');\n  expect(match[1]).toBe('😀');\n}",
-    "() => {\n  const re =\n    /^((?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF]))$/;\n  const match = re.exec('😀');\n  expect(match[1]).toBe('😀');\n};",
+    "() => {\n  const re =\n    /^((?:[\\u0000-\\u0009\\u000B-\\u000C\\u000E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF]))$/;\n  const match = re.exec('😀');\n  expect(match[1]).toBe('😀');\n};",
   ],
   [
     'capturing groups with /u > multiple groups with astral characters',
     "() => {\n  const re = /^(.)(.)(.)$/u;\n  const match = re.exec('a😀b');\n  expect(match[1]).toBe('a');\n  expect(match[2]).toBe('😀');\n  expect(match[3]).toBe('b');\n}",
-    "() => {\n  const re =\n    /^((?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF]))((?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF]))((?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF]))$/;\n  const match = re.exec('a😀b');\n  expect(match[1]).toBe('a');\n  expect(match[2]).toBe('😀');\n  expect(match[3]).toBe('b');\n};",
+    "() => {\n  const re =\n    /^((?:[\\u0000-\\u0009\\u000B-\\u000C\\u000E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF]))((?:[\\u0000-\\u0009\\u000B-\\u000C\\u000E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF]))((?:[\\u0000-\\u0009\\u000B-\\u000C\\u000E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF]))$/;\n  const match = re.exec('a😀b');\n  expect(match[1]).toBe('a');\n  expect(match[2]).toBe('😀');\n  expect(match[3]).toBe('b');\n};",
   ],
   [
     'capturing groups with /u > backreference matches same code point',
     "() => {\n  const re = /^(.)\\1$/u;\n  expect(re.test('aa')).toBe(true);\n  expect(re.test('😀😀')).toBe(true);\n  expect(re.test('😀😁')).toBe(false);\n}",
-    "() => {\n  const re =\n    /^((?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF]))\\1$/;\n  expect(re.test('aa')).toBe(true);\n  expect(re.test('😀😀')).toBe(true);\n  expect(re.test('😀😁')).toBe(false);\n};",
+    "() => {\n  const re =\n    /^((?:[\\u0000-\\u0009\\u000B-\\u000C\\u000E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF]))\\1$/;\n  expect(re.test('aa')).toBe(true);\n  expect(re.test('😀😀')).toBe(true);\n  expect(re.test('😀😁')).toBe(false);\n};",
   ],
   [
     'capturing groups with /u > named group with /u',
     "() => {\n  const re = /(?<emoji>.)/u;\n  const match = re.exec('😀');\n  expect(match.groups.emoji).toBe('😀');\n}",
-    "() => {\n  const re =\n    /(?<emoji>(?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF]))/;\n  const match = re.exec('😀');\n  expect(match.groups.emoji).toBe('😀');\n};",
+    "() => {\n  const re =\n    /(?<emoji>(?:[\\u0000-\\u0009\\u000B-\\u000C\\u000E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF]))/;\n  const match = re.exec('😀');\n  expect(match.groups.emoji).toBe('😀');\n};",
   ],
   [
     'capturing groups with /u > non-capturing group with /u',
     "() => {\n  const re = /^(?:.)$/u;\n  expect(re.test('😀')).toBe(true);\n  expect(re.test('A')).toBe(true);\n}",
-    "() => {\n  const re =\n    /^(?:(?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF]))$/;\n  expect(re.test('😀')).toBe(true);\n  expect(re.test('A')).toBe(true);\n};",
+    "() => {\n  const re =\n    /^(?:(?:[\\u0000-\\u0009\\u000B-\\u000C\\u000E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF]))$/;\n  expect(re.test('😀')).toBe(true);\n  expect(re.test('A')).toBe(true);\n};",
   ],
   [
     'anchors and boundaries with /u > ^ and $ work with astral characters',
@@ -345,7 +345,7 @@ export const cases = [
   [
     'anchors and boundaries with /u > multiline anchors with /u',
     "() => {\n  const re = /^.$/gmu;\n  const matches = 'a\\n😀\\nb'.match(re);\n  expect(matches.length).toBe(3);\n  expect(matches[0]).toBe('a');\n  expect(matches[1]).toBe('😀');\n  expect(matches[2]).toBe('b');\n}",
-    "() => {\n  const re =\n    /^(?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF])$/gm;\n  const matches = 'a\\n😀\\nb'.match(re);\n  expect(matches.length).toBe(3);\n  expect(matches[0]).toBe('a');\n  expect(matches[1]).toBe('😀');\n  expect(matches[2]).toBe('b');\n};",
+    "() => {\n  const re =\n    /^(?:[\\u0000-\\u0009\\u000B-\\u000C\\u000E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF])$/gm;\n  const matches = 'a\\n😀\\nb'.match(re);\n  expect(matches.length).toBe(3);\n  expect(matches[0]).toBe('a');\n  expect(matches[1]).toBe('😀');\n  expect(matches[2]).toBe('b');\n};",
   ],
   [
     'anchors and boundaries with /u > \\b boundary with /u before astral character',
@@ -405,7 +405,7 @@ export const cases = [
   [
     'replace and split with /u > replace dot-matched astral character',
     "() => {\n  const result = 'a😀b'.replace(/(.)/gu, '[$1]');\n  expect(result).toBe('[a][😀][b]');\n}",
-    "() => {\n  const result = 'a😀b'.replace(\n    /((?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF]))/g,\n    '[$1]',\n  );\n  expect(result).toBe('[a][😀][b]');\n};",
+    "() => {\n  const result = 'a😀b'.replace(\n    /((?:[\\u0000-\\u0009\\u000B-\\u000C\\u000E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF]))/g,\n    '[$1]',\n  );\n  expect(result).toBe('[a][😀][b]');\n};",
   ],
   [
     'replace and split with /u > search for astral character',
@@ -415,7 +415,7 @@ export const cases = [
   [
     'combined flags > /gu global unicode',
     "() => {\n  const re = /./gu;\n  const matches = '😀😁😂'.match(re);\n  expect(matches.length).toBe(3);\n  expect(matches[0]).toBe('😀');\n  expect(matches[1]).toBe('😁');\n  expect(matches[2]).toBe('😂');\n}",
-    "() => {\n  const re =\n    /(?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF])/g;\n  const matches = '😀😁😂'.match(re);\n  expect(matches.length).toBe(3);\n  expect(matches[0]).toBe('😀');\n  expect(matches[1]).toBe('😁');\n  expect(matches[2]).toBe('😂');\n};",
+    "() => {\n  const re =\n    /(?:[\\u0000-\\u0009\\u000B-\\u000C\\u000E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF])/g;\n  const matches = '😀😁😂'.match(re);\n  expect(matches.length).toBe(3);\n  expect(matches[0]).toBe('😀');\n  expect(matches[1]).toBe('😁');\n  expect(matches[2]).toBe('😂');\n};",
   ],
   [
     'combined flags > /giu global case-insensitive unicode',
@@ -425,17 +425,17 @@ export const cases = [
   [
     'combined flags > /mu multiline unicode',
     "() => {\n  const re = /^.$/mu;\n  expect(re.test('😀')).toBe(true);\n}",
-    "() => {\n  const re =\n    /^(?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF])$/m;\n  expect(re.test('😀')).toBe(true);\n};",
+    "() => {\n  const re =\n    /^(?:[\\u0000-\\u0009\\u000B-\\u000C\\u000E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF])$/m;\n  expect(re.test('😀')).toBe(true);\n};",
   ],
   [
     'combined flags > /siu dotAll case-insensitive unicode',
     "() => {\n  const re = /^.$/isu;\n  expect(re.test('\\n')).toBe(true);\n  expect(re.test('😀')).toBe(true);\n}",
-    "() => {\n  const re = /^(?:[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\s\\S])$/is;\n  expect(re.test('\\n')).toBe(true);\n  expect(re.test('😀')).toBe(true);\n};",
+    "() => {\n  const re =\n    /^(?:[\\u0000-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF])$/is;\n  expect(re.test('\\n')).toBe(true);\n  expect(re.test('😀')).toBe(true);\n};",
   ],
   [
     'combined flags > /yu sticky unicode',
     "() => {\n  const re = /./uy;\n  re.lastIndex = 0;\n  const match = re.exec('😀A');\n  expect(match[0]).toBe('😀');\n  expect(re.lastIndex).toBe(2); // 2 code units for the surrogate pair\n}",
-    "() => {\n  const re =\n    /(?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF])/y;\n  re.lastIndex = 0;\n  const match = re.exec('😀A');\n  expect(match[0]).toBe('😀');\n  expect(re.lastIndex).toBe(2);\n};",
+    "() => {\n  const re =\n    /(?:[\\u0000-\\u0009\\u000B-\\u000C\\u000E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF])/y;\n  re.lastIndex = 0;\n  const match = re.exec('😀A');\n  expect(match[0]).toBe('😀');\n  expect(re.lastIndex).toBe(2);\n};",
   ],
   [
     'escapes with /u > \\t \\n \\r work with /u',
@@ -470,12 +470,12 @@ export const cases = [
   [
     'edge cases > empty character class complement matches astral',
     "() => {\n  // [^] without /u matches any character including newlines\n  // With /u we use [\\s\\S] to match any character\n  const re = /^[\\s\\S]$/u;\n  expect(re.test('😀')).toBe(true);\n  expect(re.test('\\n')).toBe(true);\n}",
-    "() => {\n  // [^] without /u matches any character including newlines\n  // With /u we use [\\s\\S] to match any character\n  const re = /^[\\s\\S]$/;\n  expect(re.test('😀')).toBe(true);\n  expect(re.test('\\n')).toBe(true);\n};",
+    "() => {\n  // [^] without /u matches any character including newlines\n  // With /u we use [\\s\\S] to match any character\n  const re =\n    /^(?:[\\u0000-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF])$/;\n  expect(re.test('😀')).toBe(true);\n  expect(re.test('\\n')).toBe(true);\n};",
   ],
   [
     'edge cases > consecutive astral characters in class',
     "() => {\n  const re = /^[😀😁😂]+$/u;\n  expect(re.test('😀😁😂😀')).toBe(true);\n  expect(re.test('😃')).toBe(false);\n}",
-    "() => {\n  const re = /^\\uD83D[\\uDE00-\\uDE02]+$/;\n  expect(re.test('😀😁😂😀')).toBe(true);\n  expect(re.test('😃')).toBe(false);\n};",
+    "() => {\n  const re = /^(?:\\uD83D[\\uDE00-\\uDE02])+$/;\n  expect(re.test('😀😁😂😀')).toBe(true);\n  expect(re.test('😃')).toBe(false);\n};",
   ],
   [
     'edge cases > astral character at string boundaries',
@@ -490,7 +490,7 @@ export const cases = [
   [
     'edge cases > mixed BMP and astral string',
     "() => {\n  const re = /^[a-z😀]+$/u;\n  expect(re.test('hello😀world')).toBe(true);\n  expect(re.test('hello😀world!')).toBe(false);\n}",
-    "() => {\n  const re = /^(?:[\\u0061-\\u007A]|\\uD83D[\\uDE00-\\uDE00])+$/;\n  expect(re.test('hello😀world')).toBe(true);\n  expect(re.test('hello😀world!')).toBe(false);\n};",
+    "() => {\n  const re = /^(?:[\\u0061-\\u007A]|\\uD83D\\uDE00)+$/;\n  expect(re.test('hello😀world')).toBe(true);\n  expect(re.test('hello😀world!')).toBe(false);\n};",
   ],
   [
     'edge cases > new RegExp with /u flag',
@@ -505,22 +505,22 @@ export const cases = [
   [
     'edge cases > lastIndex advances by code units, not code points',
     "() => {\n  const re = /./gu;\n  const str = '😀a';\n  const m1 = re.exec(str);\n  expect(m1[0]).toBe('😀');\n  expect(re.lastIndex).toBe(2); // 2 code units\n  const m2 = re.exec(str);\n  expect(m2[0]).toBe('a');\n  expect(re.lastIndex).toBe(3); // 3 code units total\n}",
-    "() => {\n  const re =\n    /(?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF])/g;\n  const str = '😀a';\n  const m1 = re.exec(str);\n  expect(m1[0]).toBe('😀');\n  expect(re.lastIndex).toBe(2);\n  const m2 = re.exec(str);\n  expect(m2[0]).toBe('a');\n  expect(re.lastIndex).toBe(3);\n};",
+    "() => {\n  const re =\n    /(?:[\\u0000-\\u0009\\u000B-\\u000C\\u000E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF])/g;\n  const str = '😀a';\n  const m1 = re.exec(str);\n  expect(m1[0]).toBe('😀');\n  expect(re.lastIndex).toBe(2);\n  const m2 = re.exec(str);\n  expect(m2[0]).toBe('a');\n  expect(re.lastIndex).toBe(3);\n};",
   ],
   [
     'practical patterns > match any emoji in range',
     "() => {\n  const re = /[\\u{1F600}-\\u{1F64F}]/u;\n  expect(re.test('😀')).toBe(true); // U+1F600\n  expect(re.test('🙏')).toBe(true); // U+1F64F\n  expect(re.test('A')).toBe(false);\n}",
-    "() => {\n  const re = /\\uD83D[\\uDE00-\\uDE4F]/;\n  expect(re.test('😀')).toBe(true);\n  expect(re.test('🙏')).toBe(true);\n  expect(re.test('A')).toBe(false);\n};",
+    "() => {\n  const re = /(?:\\uD83D[\\uDE00-\\uDE4F])/;\n  expect(re.test('😀')).toBe(true);\n  expect(re.test('🙏')).toBe(true);\n  expect(re.test('A')).toBe(false);\n};",
   ],
   [
     'practical patterns > extract emoji from text',
     "() => {\n  const re = /[\\u{1F600}-\\u{1F64F}]/gu;\n  const matches = 'Hello 😀 World 😂!'.match(re);\n  expect(matches.length).toBe(2);\n  expect(matches[0]).toBe('😀');\n  expect(matches[1]).toBe('😂');\n}",
-    "() => {\n  const re = /\\uD83D[\\uDE00-\\uDE4F]/g;\n  const matches = 'Hello 😀 World 😂!'.match(re);\n  expect(matches.length).toBe(2);\n  expect(matches[0]).toBe('😀');\n  expect(matches[1]).toBe('😂');\n};",
+    "() => {\n  const re = /(?:\\uD83D[\\uDE00-\\uDE4F])/g;\n  const matches = 'Hello 😀 World 😂!'.match(re);\n  expect(matches.length).toBe(2);\n  expect(matches[0]).toBe('😀');\n  expect(matches[1]).toBe('😂');\n};",
   ],
   [
     'practical patterns > count code points in string',
     "() => {\n  const re = /./gsu;\n  const str = 'a😀b😁c';\n  const count = str.match(re).length;\n  expect(count).toBe(5); // 5 code points\n  expect(str.length).toBe(7); // 7 code units\n}",
-    "() => {\n  const re = /(?:[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\s\\S])/gs;\n  const str = 'a😀b😁c';\n  const count = str.match(re).length;\n  expect(count).toBe(5);\n  expect(str.length).toBe(7);\n};",
+    "() => {\n  const re =\n    /(?:[\\u0000-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF])/gs;\n  const str = 'a😀b😁c';\n  const count = str.match(re).length;\n  expect(count).toBe(5);\n  expect(str.length).toBe(7);\n};",
   ],
   [
     'practical patterns > validate hex color with /u',
@@ -535,7 +535,7 @@ export const cases = [
   [
     'practical patterns > match mathematical symbols (astral plane)',
     "() => {\n  // U+1D400-U+1D7FF: Mathematical Alphanumeric Symbols\n  const re = /[\\u{1D400}-\\u{1D7FF}]/u;\n  expect(re.test('\\u{1D400}')).toBe(true); // 𝐀 (Math bold A)\n  expect(re.test('\\u{1D7FF}')).toBe(true); // 𝟿 (Math monospace 9)\n  expect(re.test('A')).toBe(false);\n}",
-    "() => {\n  // U+1D400-U+1D7FF: Mathematical Alphanumeric Symbols\n  const re = /\\uD835[\\uDC00-\\uDFFF]/;\n  expect(re.test('𝐀')).toBe(true);\n  expect(re.test('𝟿')).toBe(true);\n  expect(re.test('A')).toBe(false);\n};",
+    "() => {\n  // U+1D400-U+1D7FF: Mathematical Alphanumeric Symbols\n  const re = /(?:[\\uD835][\\uDC00-\\uDFFF])/;\n  expect(re.test('𝐀')).toBe(true);\n  expect(re.test('𝟿')).toBe(true);\n  expect(re.test('A')).toBe(false);\n};",
   ],
   [
     'practical patterns > split text preserving emoji',
@@ -545,7 +545,7 @@ export const cases = [
   [
     'practical patterns > replace each code point individually',
     "() => {\n  const result = 'a😀b'.replace(/./gu, (ch) => `[${ch}]`);\n  expect(result).toBe('[a][😀][b]');\n}",
-    "() => {\n  const result = 'a😀b'.replace(\n    /(?:[\\0-\\t\\x0B\\f\\x0E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF])/g,\n    ch => `[${ch}]`,\n  );\n  expect(result).toBe('[a][😀][b]');\n};",
+    "() => {\n  const result = 'a😀b'.replace(\n    /(?:[\\u0000-\\u0009\\u000B-\\u000C\\u000E-\\u2027\\u202A-\\uD7FF\\uE000-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?:[\\u0000-\\uD7FF\\uDC00-\\uFFFF]|^)[\\uDC00-\\uDFFF])/g,\n    ch => `[${ch}]`,\n  );\n  expect(result).toBe('[a][😀][b]');\n};",
   ],
 ] as const satisfies readonly CorpusCase[];
 

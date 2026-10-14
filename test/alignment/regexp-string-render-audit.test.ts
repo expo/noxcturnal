@@ -5,16 +5,15 @@ import { compile } from '../compliance/runtime';
 
 const require = createRequire(import.meta.url);
 const cases = [
-  { name: 'line feed', escape: String.raw`\n`, value: '\n', broken: true },
-  { name: 'carriage return', escape: String.raw`\r`, value: '\r', broken: true },
-  { name: 'line separator', escape: String.raw`\u2028`, value: '\u2028', broken: true },
-  { name: 'paragraph separator', escape: String.raw`\u2029`, value: '\u2029', broken: true },
-  { name: 'NUL', escape: String.raw`\x00`, value: '\0', broken: false },
+  { name: 'line feed', escape: String.raw`\n`, value: '\n' },
+  { name: 'carriage return', escape: String.raw`\r`, value: '\r' },
+  { name: 'line separator', escape: String.raw`\u2028`, value: '\u2028' },
+  { name: 'paragraph separator', escape: String.raw`\u2029`, value: '\u2029' },
+  { name: 'NUL', escape: String.raw`\x00`, value: '\0' },
   {
     name: 'escaped slash and metacharacters',
     escape: String.raw`\/\.\*`,
     value: '/.*',
-    broken: false,
   },
 ];
 function execute(fn: Function): unknown {
@@ -50,7 +49,7 @@ for (const entry of cases) {
       }
       if (fn) actual = execute(fn);
     });
-    (entry.broken ? test.fails : test)('emits a valid literal with equivalent membership', () => {
+    test('emits a valid literal with equivalent membership', () => {
       expect(parseError).toBeUndefined();
       expect(actual).toEqual([true, true, false, false]);
     });

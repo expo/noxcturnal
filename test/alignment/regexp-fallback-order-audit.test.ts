@@ -8,15 +8,13 @@ const cases = [
   {
     name: 'paired escape before code-point escape',
     members: String.raw`\uD83D\uDE00|\u{1F600}a`,
-    broken: true,
   },
   {
     name: 'paired escape before literal string',
     members: String.raw`\uD83D\uDE00|😀a`,
-    broken: true,
   },
-  { name: 'code-point escape ordering', members: String.raw`\u{1F600}|😀a`, broken: false },
-  { name: 'literal ordering', members: '😀|😀a', broken: false },
+  { name: 'code-point escape ordering', members: String.raw`\u{1F600}|😀a` },
+  { name: 'literal ordering', members: '😀|😀a' },
 ];
 function run(code: string): unknown {
   const context: Record<string, unknown> = {};
@@ -48,7 +46,7 @@ for (const entry of cases) {
       expect(code).not.toContain('\\q{');
       actual = run(code);
     });
-    (entry.broken ? test.fails : test)('preserves longest string alternative', () => {
+    test('preserves longest string alternative', () => {
       expect(actual).toBe('a😀a');
     });
   });

@@ -1,6 +1,6 @@
-import { expect, test } from 'vitest';
+import { beforeAll, describe, expect, test } from 'vitest';
 import type { PreflightTransforms } from '../../js';
-import { execute } from './runtime';
+import { compile, execute } from './runtime';
 
 function match(regexp: string, transforms: PreflightTransforms, inputs: string[]): unknown[] {
   return execute<{ result: unknown[] }>(
@@ -589,3 +589,296 @@ test('Unicode property escapes support negation and case-insensitive matching', 
     ]),
   ).toEqual([['Text', 0], ['λ', 0], null]);
 });
+
+// Compile outside expected failures so only emitted-code behavior satisfies them.
+const additionalComplianceCases: {
+  name: string;
+  source: string;
+  nativeSource?: string;
+  plan: import('../../js').PreflightPlan;
+  expected: unknown;
+  knownFailure: boolean;
+}[] = [
+  {
+    name: 'named regexp groups preserve a capture named __proto__',
+    source: `
+      const match = /(?<__proto__>a)/.exec('a');
+      globalThis.result = [
+        match.groups.__proto__,
+        Object.getPrototypeOf(match.groups) === null,
+      ];
+    `,
+    plan: { transforms: { regexpNamedCaptureGroups: true } },
+    expected: ['a', true],
+    knownFailure: false,
+  },
+  {
+    name: 'lowered Unicode regexps advance empty matchAll results by code point',
+    source: `
+      globalThis.result = Array.from('😀'.matchAll(/(?:)/gu), (match) => match.index);
+    `,
+    plan: { transforms: { regexpUnicode: true } },
+    expected: [0, 2],
+    knownFailure: true,
+  },
+  {
+    name: 'lowered Unicode regexps preserve exec starting inside a surrogate pair',
+    source: `
+      const regexp = /./gu;
+      regexp.lastIndex = 1;
+      const match = regexp.exec('😀');
+      globalThis.result = [match && match[0], match && match.index, regexp.lastIndex];
+    `,
+    plan: { transforms: { regexpUnicode: true } },
+    expected: ['😀', 0, 2],
+    knownFailure: true,
+  },
+  {
+    name: 'lowered Unicode ignore-case regexps preserve non-ASCII word boundaries',
+    source: String.raw`globalThis.result=[/\bſ\b/iu.test('ſ'),/\bK\b/iu.test('K')];`,
+    plan: { transforms: { regexpUnicode: true } },
+    expected: [true, true],
+    knownFailure: true,
+  },
+  {
+    name: 'sticky literal ignores shadowed RegExp',
+    source: `function read(RegExp){return /a/y.test('a');}globalThis.result=read(null);`,
+    plan: { transforms: { regexpSticky: true } },
+    expected: true,
+    knownFailure: true,
+  },
+  {
+    name: 'duplicate named quantified backreference',
+    source: String.raw`globalThis.result=[/^(?:(?<x>a)|(?<x>b))\k<x>+$/.test('aaa'),/^(?:(?<x>a)|(?<x>b))\k<x>+$/.test('bbb')];`,
+    plan: { transforms: { regexpNamedCaptureGroups: true } },
+    expected: [true, true],
+    knownFailure: false,
+    nativeSource: String.raw`globalThis.result=[/^(?:(a)|(b))(?:\1\2)+$/.test('aaa'),/^(?:(a)|(b))(?:\1\2)+$/.test('bbb')];`,
+  },
+  {
+    name: 'named backreference before digit',
+    source: String.raw`globalThis.result=[/^(?<x>a)\k<x>2$/.test('aa2'),/^(?<x>a)\k<x>2$/.test('a\n')];`,
+    plan: { transforms: { regexpNamedCaptureGroups: true } },
+    expected: [true, false],
+    knownFailure: false,
+  },
+  {
+    name: 'named backreference before digit unicode',
+    source: String.raw`globalThis.result=/^(?<x>a)\k<x>2$/u.test('aa2');`,
+    plan: { transforms: { regexpNamedCaptureGroups: true } },
+    expected: true,
+    knownFailure: false,
+  },
+  {
+    name: 'named capture dollar replacement absent unmatched',
+    source: `globalThis.result='b'.replace(/(?<x>a)?b/,'[$<x>]');`,
+    plan: { transforms: { regexpNamedCaptureGroups: true } },
+    expected: '[]',
+    knownFailure: false,
+  },
+  {
+    name: 'named captures null prototype replacement groups',
+    source: `globalThis.result='a'.replace(/(?<constructor>a)/, (...args)=>String(Object.getPrototypeOf(args.at(-1))===null)+':'+args.at(-1).constructor);`,
+    plan: { transforms: { regexpNamedCaptureGroups: true } },
+    expected: 'true:a',
+    knownFailure: false,
+  },
+  {
+    name: 'named captures preserve backwards matching inside lookbehind',
+    source: String.raw`
+ const match=/(?<=(?<left>[ab]+)(?<right>[bc]+))$/.exec('abc');
+ globalThis.result=[match.groups.left,match.groups.right];
+    `,
+    plan: { transforms: { regexpNamedCaptureGroups: true } },
+    expected: ['a', 'bc'],
+    knownFailure: false,
+  },
+  {
+    name: 'named captures decode surrogate-pair escapes in names',
+    source: String.raw`
+ const match=/(?<\uD835\uDC9C>a)/u.exec('a');
+ globalThis.result=[Object.keys(match.groups),match.groups['𝒜']];
+    `,
+    plan: { transforms: { regexpNamedCaptureGroups: true } },
+    expected: [['𝒜'], 'a'],
+    knownFailure: false,
+  },
+  {
+    name: 'named capture groups preserve source declaration order',
+    source: String.raw`
+ const match=/(?<z>a)(?<a>b)(?<m>c)/.exec('abc');
+ globalThis.result=Object.keys(match.groups);
+    `,
+    plan: { transforms: { regexpNamedCaptureGroups: true } },
+    expected: ['z', 'a', 'm'],
+    knownFailure: false,
+  },
+  {
+    name: 'Unicode ignore-case backreferences fold Kelvin sign',
+    source: String.raw`
+ globalThis.result=[/^(k)\1$/iu.test('kK'),/^(K)\1$/iu.test('Kk')];
+    `,
+    plan: { transforms: { regexpUnicode: true } },
+    expected: [true, true],
+    knownFailure: true,
+  },
+  {
+    name: 'Unicode ignore-case backreferences fold long s',
+    source: String.raw`
+ globalThis.result=[/^(s)\1$/iu.test('sſ'),/^(ſ)\1$/iu.test('ſs')];
+    `,
+    plan: { transforms: { regexpUnicode: true } },
+    expected: [true, true],
+    knownFailure: true,
+  },
+  {
+    name: 'Unicode ignore-case literals fold Kelvin sign',
+    source: String.raw`
+ globalThis.result=[/^k$/iu.test('K'),/^K$/iu.test('k')];
+    `,
+    plan: { transforms: { regexpUnicode: true } },
+    expected: [true, true],
+    knownFailure: false,
+  },
+  {
+    name: 'Unicode backreferences retain astral capture boundaries',
+    source: String.raw`
+ const match=/^(.)\1$/u.exec('😀😀');globalThis.result=match&&[match[0],match[1]];
+    `,
+    plan: { transforms: { regexpUnicode: true } },
+    expected: ['😀😀', '😀'],
+    knownFailure: false,
+  },
+  {
+    name: 'named replacement expansion preserves a following decimal digit',
+    source: `
+ globalThis.result='abcdefghij'.replace(/(?<x>a)(b)(c)(d)(e)(f)(g)(h)(i)(j)/,'$<x>0');
+    `,
+    plan: { transforms: { regexpNamedCaptureGroups: true } },
+    expected: 'a0',
+    knownFailure: true,
+  },
+  {
+    name: 'named replacement expansion respects escaped dollar signs',
+    source: `
+ globalThis.result='a'.replace(/(?<x>a)/,'$$<x>');
+    `,
+    plan: { transforms: { regexpNamedCaptureGroups: true } },
+    expected: '$<x>',
+    knownFailure: true,
+  },
+  {
+    name: 'named capture replacement calls ignore own apply properties',
+    source: `
+ function replace(){return 'correct';}replace.apply=()=> 'wrong';globalThis.result='a'.replace(/(?<x>a)/,replace);
+    `,
+    plan: { transforms: { regexpNamedCaptureGroups: true } },
+    expected: 'correct',
+    knownFailure: true,
+  },
+  {
+    name: 'named replacement strings preserve unknown capture expansion',
+    source: `
+ globalThis.result='a'.replace(/(?<x>a)/,'$<missing>:$<x>');
+    `,
+    plan: { transforms: { regexpNamedCaptureGroups: true } },
+    expected: ':a',
+    knownFailure: false,
+  },
+  {
+    name: 'named string replacement uses groups returned by custom exec',
+    source: `
+ const pattern=/(?<x>a)/;pattern.exec=function(){const match=['a','positional'];match.index=0;match.input='a';match.groups={x:'custom'};return match;};globalThis.result='a'.replace(pattern,'$<x>');
+    `,
+    plan: { transforms: { regexpNamedCaptureGroups: true } },
+    expected: 'custom',
+    knownFailure: true,
+  },
+  {
+    name: 'named replacement callback uses groups returned by custom exec',
+    source: `
+ const pattern=/(?<x>a)/;pattern.exec=function(){const match=['a','positional'];match.index=0;match.input='a';match.groups={x:'custom'};return match;};globalThis.result='a'.replace(pattern,(...args)=>args.at(-1).x);
+    `,
+    plan: { transforms: { regexpNamedCaptureGroups: true } },
+    expected: 'custom',
+    knownFailure: false,
+  },
+  {
+    name: 'regexp constructor cloning preserves named capture groups',
+    source: `
+ const pattern=/(?<x>a)/;const clone=new RegExp(pattern);const match=clone.exec('a');globalThis.result=match.groups?.x;
+    `,
+    plan: { transforms: { regexpNamedCaptureGroups: true } },
+    expected: 'a',
+    knownFailure: true,
+  },
+  {
+    name: 'named string replacement respects absent groups from custom exec',
+    source: `
+ const pattern=/(?<x>a)/;pattern.exec=function(){const match=['a','positional'];match.index=0;match.input='a';return match;};globalThis.result='a'.replace(pattern,'$<x>');
+    `,
+    plan: { transforms: { regexpNamedCaptureGroups: true } },
+    expected: '$<x>',
+    knownFailure: true,
+  },
+  {
+    name: 'RegExp function preserves named regexp identity without flags',
+    source: `
+ const pattern=/(?<x>a)/;pattern.lastIndex=2;globalThis.result=[RegExp(pattern)===pattern,RegExp(pattern).lastIndex];
+    `,
+    plan: { transforms: { regexpNamedCaptureGroups: true } },
+    expected: [true, 2],
+    knownFailure: true,
+  },
+  {
+    name: 'named replacement callbacks omit groups when custom exec omits them',
+    source: `
+ const pattern=/(?<x>a)/;pattern.exec=function(){const match=['a','positional'];match.index=0;match.input='a';return match;};globalThis.result='a'.replace(pattern,(...args)=>args.length+':'+typeof args.at(-1));
+    `,
+    plan: { transforms: { regexpNamedCaptureGroups: true } },
+    expected: '4:string',
+    knownFailure: true,
+  },
+  {
+    name: 'named capture global exec resets lastIndex after failure',
+    source: `
+ const pattern=/(?<x>a)/g;pattern.lastIndex=1;const match=pattern.exec('ba');const first=pattern.lastIndex;const missing=pattern.exec('ba');globalThis.result=[match.groups.x,first,missing,pattern.lastIndex];
+    `,
+    plan: { transforms: { regexpNamedCaptureGroups: true } },
+    expected: ['a', 2, null, 0],
+    knownFailure: false,
+  },
+  {
+    name: 'native replacement entry point reads wrapper supplied named groups',
+    source: `
+ const pattern=/(?<x>a)/;globalThis.result=RegExp.prototype[Symbol.replace].call(pattern,'a','$<x>');
+    `,
+    plan: { transforms: { regexpNamedCaptureGroups: true } },
+    expected: 'a',
+    knownFailure: false,
+  },
+];
+
+describe.each(additionalComplianceCases)(
+  '$name',
+  ({ source, nativeSource, plan, expected, knownFailure }) => {
+    let code: string;
+    beforeAll(() => {
+      code = compile(source, plan);
+    });
+
+    const run = (input: string) => {
+      const context: Record<string, unknown> = {};
+      new Function('globalThis', input)(context);
+      return context.result;
+    };
+
+    test('native execution', () => {
+      expect(run(nativeSource ?? source)).toEqual(expected);
+    });
+    const transformedTest = knownFailure ? test.fails : test;
+    transformedTest('transformed execution', () => {
+      expect(run(code)).toEqual(expected);
+    });
+  },
+);

@@ -10,31 +10,26 @@ const cases = [
     name: 'negative word escape with hex property',
     pattern: String.raw`/^[\W\p{ASCII_Hex_Digit}]$/iu`,
     expected: [false, false, false, false, true, true],
-    broken: true,
   },
   {
     name: 'negative word escape with decimal property',
     pattern: String.raw`/^[\W\p{Decimal_Number}]$/iu`,
     expected: [false, false, false, false, true, true],
-    broken: true,
   },
   {
     name: 'outer complement of word and property union',
     pattern: String.raw`/^[^\w\p{ASCII_Hex_Digit}]$/iu`,
     expected: [false, false, false, false, false, true],
-    broken: true,
   },
   {
     name: 'negative word escape without case folding',
     pattern: String.raw`/^[\W\p{ASCII_Hex_Digit}]$/u`,
     expected: [true, true, false, false, true, true],
-    broken: false,
   },
   {
     name: 'positive word escape with case folding',
     pattern: String.raw`/^[\w\p{ASCII_Hex_Digit}]$/iu`,
     expected: [true, true, true, true, true, false],
-    broken: false,
   },
 ];
 function run(code: string): unknown {
@@ -59,7 +54,7 @@ for (const entry of cases) {
       expect(code).not.toMatch(/\\[pP]\{/);
       actual = run(code);
     });
-    (entry.broken ? test.fails : test)('preserves Unicode word membership', () => {
+    test('preserves Unicode word membership', () => {
       expect(actual).toEqual(entry.expected);
     });
   });

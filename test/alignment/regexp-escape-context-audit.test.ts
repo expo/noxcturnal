@@ -48,7 +48,7 @@ describe.each(cases)('$name', entry => {
   test('native semantics', () => expect(run(entry.source)).toEqual(entry.expected));
   test('Babel preserves native semantics', () =>
     expect(run(codes.get('babel')!)).toEqual(entry.expected));
-  test.fails.each(['inline', 'runtime'])('%s lowering preserves native semantics', mode => {
+  test.each(['inline', 'runtime'])('%s lowering preserves native semantics', mode => {
     expect(run(codes.get(mode)!)).toEqual(entry.expected);
   });
 });

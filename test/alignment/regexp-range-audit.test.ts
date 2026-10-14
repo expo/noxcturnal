@@ -43,7 +43,7 @@ describe.each(cases)('$name', entry => {
   test('native matching', () => expect(run(entry.source)).toEqual(entry.expected));
   test('Babel lowering matches native', () =>
     expect(run(codes.get('babel')!)).toEqual(entry.expected));
-  test.fails.each(['inline', 'runtime'])('%s lowering matches native', mode => {
+  test.each(['inline', 'runtime'])('%s lowering matches native', mode => {
     expect(run(codes.get(mode)!)).toEqual(entry.expected);
   });
 });

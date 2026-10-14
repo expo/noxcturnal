@@ -55,8 +55,8 @@ test('lowers astral Unicode ignore-case atoms with and without case variants', a
   ).toMatchInlineSnapshot(
     `
     "export const emoji = /(?:\\uD83D\\uDE00)/i;
-    export const deseret = /(?:\\uD801[\\uDC00\\uDC28])/i;
-    export const deseretClass = /(?:\\uD801[\\uDC00-\\uDC00]|\\uD801[\\uDC28-\\uDC28])/i;"
+    export const deseret = /(?:\\uD801\\uDC00|\\uD801\\uDC28)/i;
+    export const deseretClass = /(?:\\uD801\\uDC00|\\uD801\\uDC28)/i;"
   `,
   );
 });

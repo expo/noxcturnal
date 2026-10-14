@@ -81,7 +81,10 @@ describe.each(cases)('$name', entry => {
     expect(reference).not.toMatch(/\(\?<x>|\\q\{|\/[uv]\b/);
     expect(run(reference)).toEqual(entry.expected);
   });
-  test.fails.each(['inline', 'runtime'])('%s lowering accepts supported input', mode => {
+  test.each(['inline', 'runtime'])('%s lowering accepts supported input', mode => {
     expect(outcomes.get(mode)?.status).toBe('complete');
+    const code = outcomes.get(mode)!.code!;
+    expect(code).not.toMatch(/\(\?<x>|\\q\{|\/[uv]\b/);
+    expect(run(code)).toEqual(entry.expected);
   });
 });

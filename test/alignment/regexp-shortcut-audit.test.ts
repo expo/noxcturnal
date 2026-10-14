@@ -67,7 +67,7 @@ describe.each(cases)('$name', entry => {
   babelTest('Babel preserves native behavior', () =>
     expect(run(codes.get('babel')!)).toEqual(entry.expected),
   );
-  test.fails.each(['inline', 'runtime'])('%s lowering preserves native behavior', mode => {
+  test.each(['inline', 'runtime'])('%s lowering preserves native behavior', mode => {
     expect(failedCompilation.has(mode)).toBe(false);
     expect(run(codes.get(mode)!)).toEqual(entry.expected);
   });

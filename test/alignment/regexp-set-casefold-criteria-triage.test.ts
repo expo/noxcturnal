@@ -55,7 +55,7 @@ describe.each(cases)('$name', entry => {
   test('Babel set semantics', () => {
     expect(run(outputs.get('babel')!)).toEqual(entry.expected);
   });
-  test.fails.each(['inline', 'runtime'])('%s transform preserves set semantics', mode => {
+  test.each(['inline', 'runtime'])('%s transform preserves set semantics', mode => {
     expect(run(outputs.get(mode)!)).toEqual(entry.expected);
   });
 });

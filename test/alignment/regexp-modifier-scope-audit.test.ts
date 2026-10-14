@@ -82,7 +82,7 @@ describe.skipIf(!supportsModifiers).each(cases)('$name', entry => {
   test('native preserves the scoped flag', () => expect(run(entry.source)).toEqual(entry.expected));
   test('Babel preserves the scoped flag', () =>
     expect(run(codes.get('babel')!)).toEqual(entry.expected));
-  test.fails.each(['inline', 'runtime'])('%s lowering preserves the scoped flag', mode => {
+  test.each(['inline', 'runtime'])('%s lowering preserves the scoped flag', mode => {
     expect(run(codes.get(mode)!)).toEqual(entry.expected);
   });
 });

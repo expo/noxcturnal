@@ -36,7 +36,7 @@ for (const [name, pattern] of [
       }
       if (fn) actual = run(fn);
     });
-    test.fails('Unicode-only lowering preserves valid capture names', () => {
+    test('Unicode-only lowering preserves valid capture names', () => {
       expect(parseError).toBeUndefined();
       expect(actual).toBe('a');
     });

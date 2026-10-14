@@ -9,21 +9,18 @@ const cases = [
     pattern: String.raw`/^[[a].]$/sv`,
     inputs: ['a', '.', 'b', '\n'],
     expected: [true, true, false, false],
-    broken: true,
   },
   {
     name: 'escaped dot after nested class remains literal',
     pattern: String.raw`/^[[a]\.]$/sv`,
     inputs: ['a', '.', 'b', '\n'],
     expected: [true, true, false, false],
-    broken: false,
   },
   {
     name: 'class dot differs from following wildcard',
     pattern: String.raw`/^[[a].].$/sv`,
     inputs: ['a\n', '.\n', 'b\n'],
     expected: [true, true, false],
-    broken: true,
   },
 ];
 function run(code: string) {
@@ -56,10 +53,7 @@ for (const entry of cases)
       }
     });
     for (const unicodeSets of [false, true])
-      (entry.broken && !unicodeSets ? test.fails : test)(
-        `preserves class membership, Unicode sets=${unicodeSets}`,
-        () => {
-          expect(outcomes.get(unicodeSets)).toEqual(entry.expected);
-        },
-      );
+      test(`preserves class membership, Unicode sets=${unicodeSets}`, () => {
+        expect(outcomes.get(unicodeSets)).toEqual(entry.expected);
+      });
   });

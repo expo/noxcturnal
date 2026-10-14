@@ -86,7 +86,7 @@ describe('duplicate named quantified reference', () => {
     expect(babelError).toBeInstanceOf(Error);
     expect((babelError as Error).message).toContain('Invalid node type: alternative');
   });
-  test.fails.each(['inline', 'runtime'])('%s repeats the selected capture', mode =>
+  test.each(['inline', 'runtime'])('%s repeats the selected capture', mode =>
     expect(run(codes.get(mode)!)).toEqual([true, true]),
   );
 });

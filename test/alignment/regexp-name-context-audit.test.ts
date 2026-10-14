@@ -36,7 +36,7 @@ test('native preserves a supplementary capture identifier', () => {
 test('Babel Unicode lowering preserves a supplementary capture identifier', () => {
   expect(run(codes.get('babel')!)).toBe('a');
 });
-test.fails.each(['inline', 'runtime'])(
+test.each(['inline', 'runtime'])(
   '%s Unicode lowering preserves a supplementary capture identifier',
   mode => {
     expect(run(codes.get(mode)!)).toBe('a');

@@ -4,15 +4,14 @@ import { beforeAll, describe, expect, test } from 'vitest';
 import { compile } from '../compliance/runtime';
 const require = createRequire(import.meta.url);
 const cases = [
-  { name: 'two dots', pattern: '/^..$/su', expected: null, broken: true },
-  { name: 'bounded dot repetition', pattern: '/^.{2}$/su', expected: null, broken: true },
+  { name: 'two dots', pattern: '/^..$/su', expected: null },
+  { name: 'bounded dot repetition', pattern: '/^.{2}$/su', expected: null },
   {
     name: 'greedy capture backtracking',
     pattern: '/^(.*)(.)$/su',
     expected: ['😀', '', '😀'],
-    broken: true,
   },
-  { name: 'non-dot-all control', pattern: '/^..$/u', expected: null, broken: false },
+  { name: 'non-dot-all control', pattern: '/^..$/u', expected: null },
 ];
 function run(code: string): unknown {
   const context: Record<string, unknown> = {};
@@ -40,12 +39,9 @@ for (const dotAll of [false, true]) {
         if (dotAll) expect(code).not.toMatch(/\/[dgimsuvy]*s[dgimsuvy]*\b/);
         actual = run(code);
       });
-      (entry.broken ? test.fails : test)(
-        'preserves complete Unicode characters during backtracking',
-        () => {
-          expect(actual).toEqual(entry.expected);
-        },
-      );
+      test('preserves complete Unicode characters during backtracking', () => {
+        expect(actual).toEqual(entry.expected);
+      });
     });
   }
 }
