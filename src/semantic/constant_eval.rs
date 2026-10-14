@@ -1,6 +1,9 @@
 use oxc_ast::{AstKind, ast::Expression};
 use oxc_ecmascript::StringToNumber;
-use oxc_syntax::operator::{BinaryOperator, LogicalOperator, UnaryOperator};
+use oxc_syntax::{
+    number::ToJsString,
+    operator::{BinaryOperator, LogicalOperator, UnaryOperator},
+};
 
 #[derive(Clone, Debug)]
 pub(crate) enum EvaluatedConstant {
@@ -98,12 +101,19 @@ fn is_ecmascript_whitespace(character: char) -> bool {
     )
 }
 
+// Oxc stores isolated UTF-16 surrogates as an encoded marker in a UTF-8
+// string. Our evaluator stores ordinary Unicode strings, so leave those
+// expressions to the runtime rather than interpret the marker as user text.
+fn string_literal(value: &oxc_ast::ast::StringLiteral<'_>) -> Option<EvaluatedConstant> {
+    (!value.lone_surrogates).then(|| EvaluatedConstant::String(value.value.to_string()))
+}
+
 pub(crate) fn constant_for_kind(kind: AstKind<'_>) -> Option<EvaluatedConstant> {
     match kind {
         AstKind::NullLiteral(_) => Some(EvaluatedConstant::Null),
         AstKind::BooleanLiteral(value) => Some(EvaluatedConstant::Boolean(value.value)),
         AstKind::NumericLiteral(value) => Some(EvaluatedConstant::Number(value.value)),
-        AstKind::StringLiteral(value) => Some(EvaluatedConstant::String(value.value.to_string())),
+        AstKind::StringLiteral(value) => string_literal(value),
         AstKind::UnaryExpression(value) => evaluate_expression(&value.argument)
             .and_then(|argument| evaluate_unary(value.operator, argument)),
         AstKind::BinaryExpression(value) if value.operator == BinaryOperator::Addition => {
@@ -135,9 +145,7 @@ pub(crate) fn evaluate_expression(expression: &Expression<'_>) -> Option<Evaluat
         Expression::NullLiteral(_) => Some(EvaluatedConstant::Null),
         Expression::BooleanLiteral(value) => Some(EvaluatedConstant::Boolean(value.value)),
         Expression::NumericLiteral(value) => Some(EvaluatedConstant::Number(value.value)),
-        Expression::StringLiteral(value) => {
-            Some(EvaluatedConstant::String(value.value.to_string()))
-        }
+        Expression::StringLiteral(value) => string_literal(value),
         Expression::UnaryExpression(value) => evaluate_expression(&value.argument)
             .and_then(|argument| evaluate_unary(value.operator, argument)),
         Expression::BinaryExpression(value) if value.operator == BinaryOperator::Addition => {
@@ -343,7 +351,13 @@ fn evaluate_binary(
         Op::Multiplication => EvaluatedConstant::Number(left * right),
         Op::Division => EvaluatedConstant::Number(left / right),
         Op::Remainder => EvaluatedConstant::Number(left % right),
-        Op::Exponential => EvaluatedConstant::Number(left.powf(right)),
+        Op::Exponential => EvaluatedConstant::Number(
+            if right.is_nan() || (left.abs() == 1.0 && right.is_infinite()) {
+                f64::NAN
+            } else {
+                left.powf(right)
+            },
+        ),
         Op::LessThan => EvaluatedConstant::Boolean(left < right),
         Op::LessEqualThan => EvaluatedConstant::Boolean(left <= right),
         Op::GreaterThan => EvaluatedConstant::Boolean(left > right),
@@ -406,13 +420,7 @@ fn constant_string(value: &EvaluatedConstant) -> Option<String> {
     match value {
         EvaluatedConstant::Null => Some("null".into()),
         EvaluatedConstant::Boolean(value) => Some(value.to_string()),
-        EvaluatedConstant::Number(value)
-            if *value == 0.0
-                || (value.is_finite() && value.abs() >= 1e-6 && value.abs() < 1e21) =>
-        {
-            Some(js_number_string(*value))
-        }
-        EvaluatedConstant::Number(_) => None,
+        EvaluatedConstant::Number(value) => Some(js_number_string(*value)),
         EvaluatedConstant::String(value) => Some(value.clone()),
     }
 }
@@ -427,6 +435,6 @@ fn js_number_string(value: f64) -> String {
     } else if value == 0.0 {
         "0".into()
     } else {
-        value.to_string()
+        value.to_js_string()
     }
 }

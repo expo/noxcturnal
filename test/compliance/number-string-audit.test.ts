@@ -17,5 +17,5 @@ describe.each([
     expect(code).not.toContain(' + ');
   });
   test('native decimal string control', () => expect(run(source)).toBe(expected));
-  test.fails('folding uses JavaScript number formatting', () => expect(run(code)).toBe(expected));
+  test('folding uses JavaScript number formatting', () => expect(run(code)).toBe(expected));
 });
