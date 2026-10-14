@@ -277,10 +277,13 @@ impl CustomHelperRequests {
                 .map(|(from, to)| (from.as_str(), to.as_str()))
                 .collect::<Vec<_>>();
             let selected_source = replace_identifier_tokens(selected_source, &renames);
+            // Simultaneous renames may reuse an old spelling as another binding's
+            // destination. Only stale names outside that destination set are invalid.
             for binding in bindings.iter().filter(|binding| {
                 renames
                     .iter()
                     .any(|(from, to)| from == *binding && from != to)
+                    && !renames.iter().any(|(_, to)| to == *binding)
             }) {
                 assert!(!contains_identifier_token(&selected_source, binding));
             }
@@ -807,12 +810,45 @@ pub(super) struct SourceNameReservations {
     names: FxHashSet<String>,
 }
 
+// This conservative reservation scan may include strings and comments. Decode
+// identifier escapes before scanning so spellings cannot evade reservations.
+fn decode_identifier_escapes(source: &str) -> String {
+    let mut out = String::with_capacity(source.len());
+    let mut rest = source;
+    while !rest.is_empty() {
+        if let Some(escape) = rest.strip_prefix("\\u") {
+            let digits = if let Some(braced) = escape.strip_prefix('{') {
+                braced.find('}').map(|end| (&braced[..end], end + 4))
+            } else {
+                escape.get(..4).map(|digits| (digits, 6))
+            };
+            if let Some((digits, len)) = digits
+                && let Ok(value) = u32::from_str_radix(digits, 16)
+                && let Some(character) = char::from_u32(value)
+            {
+                out.push(character);
+                rest = &rest[len..];
+                continue;
+            }
+        }
+        let character = rest.chars().next().unwrap();
+        out.push(character);
+        rest = &rest[character.len_utf8()..];
+    }
+    out
+}
+
 impl SourceNameReservations {
     pub(super) fn new(source: &str) -> Self {
+        let decoded;
+        let source = if source.contains("\\u") {
+            decoded = decode_identifier_escapes(source);
+            &decoded
+        } else {
+            source
+        };
         let names = source
-            .split(|character: char| {
-                !(character.is_ascii_alphanumeric() || matches!(character, '_' | '$'))
-            })
+            .split(|character: char| !oxc_syntax::identifier::is_identifier_part(character))
             .filter(|name| !name.is_empty())
             .map(str::to_owned)
             .collect();

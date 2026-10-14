@@ -78,7 +78,7 @@ describe.each(cases)('$name preserves native module loading', ({ name, source })
   test('inline adapter executes as a native module', async () => {
     expect((await importCode(inline)).default).toBe(1);
   });
-  test.fails('runtime adapter executes as a native module', async () => {
+  test('runtime adapter executes as a native module', async () => {
     expect((await importCode(resolveHelperImports(runtime))).default).toBe(1);
   });
 });

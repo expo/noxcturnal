@@ -53,7 +53,7 @@ describe.each(cases)('$external external reference', entry => {
       // Legacy helpers are the documented custom ABI exception in either mode.
       expect(output).not.toContain('@babel/runtime');
     });
-    test.fails('generated helpers preserve the external value', () => {
+    test('generated helpers preserve the external value', () => {
       expect(run(output, entry.external)).toBe('external');
     });
   });

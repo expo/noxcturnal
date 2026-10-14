@@ -96,7 +96,7 @@ describe.each(cases)('$name', entry => {
     });
     test('Babel preserves intrinsic resolution', () =>
       expect(run(reference)).toEqual(entry.expected));
-    const check = entry.bothFail || mode === 'inline' ? test.fails : test;
+    const check = entry.bothFail ? test.fails : test;
     check('Noxcturnal preserves intrinsic resolution', () =>
       expect(run(code)).toEqual(entry.expected),
     );

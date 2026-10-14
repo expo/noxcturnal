@@ -10,7 +10,7 @@ const configs = [
   { loose: true, useBuiltIns: false },
   { loose: true, useBuiltIns: true },
 ];
-function observe(code: string, module: boolean, missingRequire = false): unknown {
+function observe(code: string, module: boolean): unknown {
   const child = spawnSync(
     process.execPath,
     [
@@ -22,11 +22,7 @@ function observe(code: string, module: boolean, missingRequire = false): unknown
   );
   expect(child.error).toBeUndefined();
   expect(child.signal).toBeNull();
-  if (missingRequire) {
-    expect(child.status).toBe(1);
-    expect(child.stderr).toContain('ReferenceError: require is not defined in ES module scope');
-    return { error: 'ReferenceError' };
-  }
+
   expect(child.status, child.stderr).toBe(0);
   return JSON.parse(child.stdout);
 }
@@ -36,7 +32,6 @@ describe.each(configs)('rest helper fallback loose=$loose builtins=$useBuiltIns'
     describe.each(['7.0.0-beta.0', '7.1.4', '7.1.5', '7.4.0', '7.5.0', '7.29.7', '8.0.0'])(
       'declared runtime %s with installed 7.29.7',
       version => {
-        const fails = module && (config.loose || config.useBuiltIns) && version !== '8.0.0';
         const expected = [['key'], 1, { b: 2 }, { b: 2, c: 3 }];
         let actual: unknown;
         beforeAll(() => {
@@ -67,9 +62,9 @@ describe.each(configs)('rest helper fallback loose=$loose builtins=$useBuiltIns'
           );
           if (version === '8.0.0') expect(code).not.toContain('@babel/runtime');
           else expect(code).toContain('@babel/runtime/helpers/');
-          actual = observe(code, module, fails);
+          actual = observe(code, module);
         });
-        (fails ? test.fails : test)('executes the selected helper path', () => {
+        test('executes the selected helper path', () => {
           expect(actual).toEqual(expected);
         });
       },

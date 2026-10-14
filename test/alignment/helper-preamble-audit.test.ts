@@ -12,6 +12,22 @@ function run(source: string): unknown {
 }
 const cases = [
   {
+    name: 'async functions',
+    body: 'async function read(){return 3}const x=3;',
+    result: 'x',
+    syntax: /async\s+function/,
+    plugin: 'async-to-generator',
+    transforms: { asyncFunctions: true },
+  },
+  {
+    name: 'async generators',
+    body: 'async function* read(){yield 3}const x=3;',
+    result: 'x',
+    syntax: /async\s+function\*/,
+    plugin: 'async-generator-functions',
+    transforms: { asyncGeneratorFunctions: true },
+  },
+  {
     name: 'object spread',
     body: 'const x={...{a:3}};',
     result: 'x.a',
@@ -84,9 +100,7 @@ describe.each(cases)('$name', entry => {
         test('native script preserves its header semantics', () =>
           expect(run(source)).toEqual([3, true]));
         test('Babel preserves its header semantics', () => expect(run(babel)).toEqual([3, true]));
-        (mode === 'inline' ? test.fails : test)('Noxcturnal preserves its header semantics', () =>
-          expect(actual).toEqual([3, true]),
-        );
+        test('Noxcturnal preserves its header semantics', () => expect(actual).toEqual([3, true]));
       });
     });
   });

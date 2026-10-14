@@ -97,7 +97,7 @@ describe('validator helper preserves external references', () => {
   test.each(['inline', 'runtime'])('%s Babel preserves the external reference', async mode => {
     expect(await runExternal(outputs.get('babel:' + mode)!)).toBe('external');
   });
-  test.fails.each(['inline', 'runtime'])(
+  test.each(['inline', 'runtime'])(
     '%s validator helper avoids external-name capture',
     async mode => {
       expect(await runExternal(outputs.get(mode)!)).toBe('external');

@@ -40,7 +40,7 @@ describe.each(['decorate', 'decorateParam'])('user babelHelpers.%s references', 
   test('Babel legacy decoration preserves the user property', () => {
     expect(run(codes.get('babel')!)).toBe('user');
   });
-  test.fails.each(['inline', 'runtime'])('%s decoration preserves the user property', mode => {
+  test.each(['inline', 'runtime'])('%s decoration preserves the user property', mode => {
     expect(run(codes.get(mode)!)).toBe('user');
   });
 });

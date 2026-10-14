@@ -18,7 +18,7 @@ const cases = [
   },
 ];
 
-function observe(code: string, module: boolean, missingRequire = false) {
+function observe(code: string, module: boolean) {
   const child = spawnSync(
     process.execPath,
     [
@@ -30,11 +30,7 @@ function observe(code: string, module: boolean, missingRequire = false) {
   );
   expect(child.error).toBeUndefined();
   expect(child.signal).toBeNull();
-  if (missingRequire) {
-    expect(child.status).toBe(1);
-    expect(child.stderr).toContain('ReferenceError: require is not defined in ES module scope');
-    return { error: 'ReferenceError' };
-  }
+
   expect(child.status, child.stderr).toBe(0);
   return JSON.parse(child.stdout);
 }
@@ -43,7 +39,6 @@ describe.each(cases)('$name', entry => {
   for (const module of [false, true]) {
     for (const version of ['inline', '7.0.0-beta.0', '7.24.0', '7.29.7', '8.0.0']) {
       describe(`native ESM=${module}, declared helper version=${version}`, () => {
-        const fails = module && version !== 'inline' && version !== '8.0.0';
         let actual: unknown;
         beforeAll(() => {
           expect(require('@babel/runtime/package.json').version).toBe('7.29.7');
@@ -76,11 +71,10 @@ describe.each(cases)('$name', entry => {
           if (version === 'inline' || version === '8.0.0')
             expect(code).not.toContain('@babel/runtime/');
           else expect(code).toContain('@babel/runtime/helpers/');
-          actual = observe(code, module, fails);
+          actual = observe(code, module);
         });
-        (fails ? test.fails : test)('executes class helpers in the selected module format', () =>
-          expect(actual).toEqual(entry.expected),
-        );
+        test('executes class helpers in the selected module format', () =>
+          expect(actual).toEqual(entry.expected));
       });
     }
   }

@@ -19,7 +19,8 @@ test('lowers inherited private brands referenced from a static block', async () 
       },
     }),
   ).toMatchInlineSnapshot(`
-    "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+    "import _babelHelper from '@babel/runtime/helpers/checkInRHS';
+    var _checkInRHS2 = { checkInRHS: _babelHelper },
       _checkInRHS = _checkInRHS2.checkInRHS;
     export let Base = (() => {
       'use strict';

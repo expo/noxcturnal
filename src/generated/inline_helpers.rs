@@ -3,6 +3,22 @@
 use crate::preflight::helpers::GeneratedHelperCompatibility;
 use crate::preflight::helpers::GeneratedHelperFragment;
 use crate::preflight::helpers::GeneratedInlineRoot;
+pub static INLINE_HELPER_GLOBALS: &[&str] = &[
+    "Array",
+    "Boolean",
+    "Error",
+    "Number",
+    "Object",
+    "Promise",
+    "Reflect",
+    "RegExp",
+    "String",
+    "SuppressedError",
+    "Symbol",
+    "TypeError",
+    "WeakMap",
+    "arguments",
+];
 pub static BABEL_HELPER_COMPATIBILITY: &[GeneratedHelperCompatibility] = &[
     GeneratedHelperCompatibility {
         ordinal: 0,
