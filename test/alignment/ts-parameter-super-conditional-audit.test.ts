@@ -66,9 +66,9 @@ beforeAll(() => {
   expect(nox).not.toMatch(/\bpublic\b/);
   expect(nox).not.toContain('@babel/runtime');
   actual = observe(nox);
-  expect(actual).toEqual({ error: 'ReferenceError' });
+  expect(actual).toEqual([3, 0]);
 });
-test.fails('initializes a parameter property after the selected super branch', () => {
+test('initializes a parameter property after the selected super branch', () => {
   expect(actual).toEqual([3, 0]);
 });
 test('excludes the deferred-arrow candidate rejected by TypeScript checking', () => {

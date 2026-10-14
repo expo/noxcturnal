@@ -2,10 +2,11 @@ use rustc_hash::FxHashSet;
 
 use oxc_allocator::{ArenaVec, ReplaceWith, TakeIn};
 use oxc_ast::{ast::*, builder::NONE};
+use oxc_ast_visit::{VisitMut, walk_mut};
 use oxc_semantic::{ScopeFlags, ScopeId};
 use oxc_span::SPAN;
 use oxc_str::Ident;
-use oxc_syntax::operator::AssignmentOperator;
+use oxc_syntax::{operator::AssignmentOperator, symbol::SymbolFlags};
 use oxc_traverse::BoundIdentifier;
 
 use crate::{
@@ -204,12 +205,14 @@ impl<'a> TypeScript<'a> {
             }
 
             // `constructor {}` is guaranteed that it is `Some`.
+            let constructor_scope = constructor.scope_id();
             let constructor_body_statements = &mut constructor.body.as_mut().unwrap().statements;
-            let super_call_position = Self::get_super_call_position(constructor_body_statements);
-
-            // Insert the assignments after the `super()` call
-            constructor_body_statements
-                .splice(super_call_position..super_call_position, property_assignments);
+            Self::insert_constructor_assignments(
+                constructor_body_statements,
+                property_assignments,
+                constructor_scope,
+                ctx,
+            );
 
             // Insert the static block after the constructor if there is a constructor
             if let Some(element) = computed_key_assignment_static_block {
@@ -414,11 +417,14 @@ impl<'a> TypeScript<'a> {
         let params = &constructor.value.params.items;
         let assignments = Self::convert_constructor_params(params, ctx).collect::<Vec<_>>();
 
+        let constructor_scope = constructor.value.scope_id();
         let constructor_body_statements = &mut constructor.value.body.as_mut().unwrap().statements;
-        let super_call_position = Self::get_super_call_position(constructor_body_statements);
-
-        // Insert the assignments after the `super()` call
-        constructor_body_statements.splice(super_call_position..super_call_position, assignments);
+        Self::insert_constructor_assignments(
+            constructor_body_statements,
+            assignments,
+            constructor_scope,
+            ctx,
+        );
     }
 
     /// Convert property definition to `this` assignment in constructor.
@@ -477,6 +483,85 @@ impl<'a> TypeScript<'a> {
         };
         let target = AssignmentTarget::from(member);
         Self::create_assignment(target, value, ctx)
+    }
+
+    fn insert_constructor_assignments(
+        statements: &mut ArenaVec<'a, Statement<'a>>,
+        assignments: Vec<Statement<'a>>,
+        constructor_scope: ScopeId,
+        ctx: &mut TraverseCtx<'a>,
+    ) {
+        if assignments.is_empty() {
+            return;
+        }
+        let position = Self::get_super_call_position(statements);
+        if position != 0 {
+            statements.splice(position..position, assignments);
+            return;
+        }
+        // Move the initialization into one arrow rather than cloning its scopes
+        // and reference IDs into each successful nested super branch.
+        let mut rewriter = ConstructorAssignments { ctx, binding: None, constructor_scope };
+        for statement in statements.iter_mut() {
+            rewriter.visit_statement(statement);
+        }
+        let Some(binding) = rewriter.binding else {
+            statements.splice(0..0, assignments);
+            return;
+        };
+        let mut expressions = ArenaVec::new_in(ctx);
+        for statement in assignments {
+            let Statement::ExpressionStatement(statement) = statement else { unreachable!() };
+            expressions.push(statement.unbox().expression);
+        }
+        expressions.push(Expression::new_this_expression(SPAN, ctx));
+        let body = Statement::new_expression_statement(
+            SPAN,
+            Expression::new_sequence_expression(SPAN, expressions, ctx),
+            ctx,
+        );
+        let scope = ctx.scoping.insert_scope_below_statement_from_scope_id(
+            &body,
+            constructor_scope,
+            ScopeFlags::Function | ScopeFlags::Arrow,
+        );
+        let initializer = Expression::new_arrow_function_expression_with_scope_id_and_pure_and_pife(
+            SPAN,
+            true,
+            false,
+            NONE,
+            FormalParameters::boxed(
+                SPAN,
+                FormalParameterKind::ArrowFormalParameters,
+                [],
+                NONE,
+                ctx,
+            ),
+            NONE,
+            FunctionBody::boxed(SPAN, [], [body], ctx),
+            scope,
+            false,
+            false,
+            ctx,
+        );
+        statements.insert(
+            0,
+            Statement::new_variable_declaration(
+                SPAN,
+                VariableDeclarationKind::Var,
+                [VariableDeclarator::new(
+                    SPAN,
+                    VariableDeclarationKind::Var,
+                    binding.create_binding_pattern(ctx),
+                    NONE,
+                    Some(initializer),
+                    false,
+                    ctx,
+                )],
+                false,
+                ctx,
+            ),
+        );
     }
 
     /// Find the position of the `super()` call in the constructor body, otherwise return 0.
@@ -602,4 +687,38 @@ impl<'a> TypeScript<'a> {
 
         ClassElement::new_static_block_with_scope_id(SPAN, body, scope_id, ctx)
     }
+}
+
+struct ConstructorAssignments<'a, 'c> {
+    ctx: &'c mut TraverseCtx<'a>,
+    binding: Option<BoundIdentifier<'a>>,
+    constructor_scope: ScopeId,
+}
+
+impl<'a> VisitMut<'a> for ConstructorAssignments<'a, '_> {
+    fn visit_expression(&mut self, expression: &mut Expression<'a>) {
+        if expression.is_super_call_expression() {
+            walk_mut::walk_expression(self, expression);
+            let binding = self.binding.get_or_insert_with(|| {
+                self.ctx.generate_uid(
+                    "initialize",
+                    self.constructor_scope,
+                    SymbolFlags::FunctionScopedVariable,
+                )
+            });
+            *expression = Expression::new_call_expression(
+                SPAN,
+                binding.create_read_expression(self.ctx),
+                NONE,
+                [Argument::from(expression.take_in(self.ctx))],
+                false,
+                self.ctx,
+            );
+        } else {
+            walk_mut::walk_expression(self, expression);
+        }
+    }
+    fn visit_function(&mut self, _: &mut Function<'a>, _: ScopeFlags) {}
+    fn visit_arrow_function_expression(&mut self, _: &mut ArrowFunctionExpression<'a>) {}
+    fn visit_class(&mut self, _: &mut Class<'a>) {}
 }

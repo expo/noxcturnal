@@ -80,7 +80,7 @@ describe.each(['inline', 'runtime'] as const)('%s', mode => {
         actual = { error: (error as Error).name };
       }
     });
-    test.fails('parameter property initializes after successful nested super', () => {
+    test('parameter property initializes after successful nested super', () => {
       expect(actual).toEqual(expected);
     });
   });
