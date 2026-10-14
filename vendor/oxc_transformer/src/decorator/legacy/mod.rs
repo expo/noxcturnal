@@ -165,9 +165,10 @@ impl<'a> Traverse<'a, TransformState<'a>> for LegacyDecorator<'a> {
         // Lower `accessor` properties to private backing fields + get/set pairs.
         // Must run before `enter_class_body` so that es2022 class-properties can
         // transform the newly created private backing fields.
-        let original_class_binding = Self::lower_accessor_properties(class, ctx);
-
+        // Pair source accessors before generating auto-accessor get/set pairs:
+        // generated pairs already have all decorators on their getter.
         self.combine_accessor_decorators(class, ctx);
+        let original_class_binding = Self::lower_accessor_properties(class, ctx);
         let private_names = class
             .body
             .body
@@ -408,13 +409,11 @@ impl<'a> LegacyDecorator<'a> {
                 BoundIdentifier::from_binding_ident(ident)
             }
         });
-        let mut private_names: FxHashSet<String> = class
-            .body
-            .body
-            .iter()
-            .filter_map(|element| element.property_key().and_then(|key| key.private_name()))
-            .map(|name| name.to_string())
-            .collect();
+        // A fresh declaration must not capture a reference to an enclosing class's
+        // private name, including references in nested closures or classes.
+        let mut collector = PrivateNameCollector::default();
+        collector.visit_class_body(&class.body);
+        let mut private_names = collector.names;
         let mut storage_index = 0;
 
         let class_scope_id = class.scope_id();
@@ -1546,6 +1545,16 @@ impl<'a> LegacyDecorator<'a> {
             SPAN, None, specifiers, None, kind, NONE, ctx,
         );
         Statement::from(export_class_reference)
+    }
+}
+
+#[derive(Default)]
+struct PrivateNameCollector {
+    names: FxHashSet<String>,
+}
+impl<'a> VisitJs<'a> for PrivateNameCollector {
+    fn visit_private_identifier(&mut self, ident: &PrivateIdentifier<'a>) {
+        self.names.insert(ident.name.to_string());
     }
 }
 

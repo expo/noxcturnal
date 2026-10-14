@@ -39,6 +39,11 @@ function reference(source: string, diagnostics: string[] = []) {
 }
 const cases = [
   {
+    name: 'backing storage does not capture enclosing private references',
+    source: `function mark(target:any,key:any,descriptor:any){} class Outer{#_accessor_storage0=7;make(){class Inner{@mark accessor value=3;read(value:Outer){return value.#_accessor_storage0}}return [new Inner().value,new Inner().read(this)]}}globalThis.result=new Outer().make();`,
+    expected: [3, 7],
+  },
+  {
     name: 'literal computed accessors combine setter parameter metadata',
     source: `const calls=[]; function mark(t:any,k:any,d:any){calls.push('method')}function parameter(t:any,k:any,i:number){calls.push('parameter:'+i)}
       class C{@mark get ['value'](){return 3}set ['value'](@parameter value:number){}}
