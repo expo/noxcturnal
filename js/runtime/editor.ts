@@ -248,22 +248,43 @@ function dedupeConvergentEdits(edits: readonly EditCommand[]): {
   edits: EditCommand[];
   dropped: number;
 } {
+  // Structured operations can consist of several commands with one order. A
+  // matching ranged tail does not prove their prefixes/copies are equivalent.
+  const groups = new Map<string, EditCommand[]>();
+  const keys = new Map<EditCommand, string>();
+  edits.forEach((edit, index) => {
+    const key = `${edit.owner ?? ''}:${edit.order ?? index}`;
+    keys.set(edit, key);
+    const group = groups.get(key);
+    if (group) group.push(edit);
+    else groups.set(key, [edit]);
+  });
+  const identicalGroup = (a: string, b: string): boolean => {
+    const left = groups.get(a)!;
+    const right = groups.get(b)!;
+    return (
+      left.length === right.length &&
+      left.every((edit, index) => {
+        const other = right[index]!;
+        return (
+          Math.min(edit.start, edit.end) === Math.min(other.start, other.end) &&
+          Math.max(edit.start, edit.end) === Math.max(other.start, other.end) &&
+          identicalConvergentEdit(edit, other)
+        );
+      })
+    );
+  };
   const byRange = new Map<string, EditCommand>();
-  const kept: EditCommand[] = [];
-  let dropped = 0;
+  const droppedGroups = new Set<string>();
   for (const edit of edits) {
-    if (edit.end === edit.start) {
-      kept.push(edit);
-      continue;
-    }
+    if (edit.end === edit.start) continue;
     const key = `${Math.min(edit.start, edit.end)}:${Math.max(edit.start, edit.end)}`;
     const first = byRange.get(key);
-    if (first && identicalConvergentEdit(first, edit)) {
-      dropped++;
-      continue;
-    }
-    if (!first) byRange.set(key, edit);
-    kept.push(edit);
+    const group = keys.get(edit)!;
+    if (first && keys.get(first) !== group && identicalGroup(keys.get(first)!, group)) {
+      droppedGroups.add(group);
+    } else if (!first) byRange.set(key, edit);
   }
-  return { edits: kept, dropped };
+  const kept = edits.filter(edit => !droppedGroups.has(keys.get(edit)!));
+  return { edits: kept, dropped: edits.length - kept.length };
 }

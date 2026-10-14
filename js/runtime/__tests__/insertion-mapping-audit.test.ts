@@ -101,3 +101,41 @@ test.each(['unshiftContainer', 'pushContainer'] as const)(
     });
   },
 );
+
+test('composite insertion preserves deferred source provenance and same-phase named edits', () => {
+  const result = transform(
+    'old();',
+    'input.js',
+    defineNativePipeline({
+      phases: [
+        {
+          name: 'copy',
+          plugins: [
+            defineNativePlugin({
+              name: 'copy',
+              visitors: [
+                defineVisitor('ExpressionStatement', {}, path =>
+                  path.insertAfter(path.context.code.template`\n${path.getSource()}`),
+                ),
+                defineVisitor('CallExpression', {}, path =>
+                  path.replaceWith({ code: 'updated()', mapping: 'anchor-start', names: ['call'] }),
+                ),
+              ],
+            }),
+          ],
+        },
+      ],
+    }),
+  );
+  expect(result.status).toBe('complete');
+  if (result.status !== 'complete') throw new Error(result.reason);
+  expect(result.code).toBe('updated();\nupdated();');
+  const map = new TraceMap({ version: 3, sources: ['input.js'], ...result.map });
+  for (const line of [1, 2])
+    expect(originalPositionFor(map, { line, column: 0 })).toEqual({
+      source: 'input.js',
+      line: 1,
+      column: 0,
+      name: 'call',
+    });
+});

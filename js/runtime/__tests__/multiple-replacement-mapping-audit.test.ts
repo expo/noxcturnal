@@ -91,3 +91,153 @@ test.each(['boundary', 'character'] as const)(
     });
   },
 );
+
+const mixedReplacement = (name: string, first = 'first();') =>
+  defineNativePlugin({
+    name,
+    visitors: [
+      defineVisitor('ExpressionStatement', {}, path =>
+        path.replaceWithMultiple([
+          { code: first, mapping: 'sourceless' },
+          { code: 'last();', mapping: 'anchor-start' },
+        ]),
+      ),
+    ],
+  });
+
+test.each([false, true])(
+  'mixed replacement retains insertion affinity, external edit first=%s',
+  externalFirst => {
+    const insertion = defineNativePlugin({
+      name: 'insert',
+      visitors: [
+        defineVisitor('ExpressionStatement', {}, path => {
+          path.context.editor.appendRight(0, 'prefix();');
+        }),
+      ],
+    });
+    const replacement = mixedReplacement('replace');
+    const result = transform(
+      'old();',
+      'input.js',
+      defineNativePipeline({
+        phases: [
+          {
+            name: 'order',
+            plugins: externalFirst ? [insertion, replacement] : [replacement, insertion],
+          },
+        ],
+      }),
+    );
+    expect(result.status).toBe('complete');
+    if (result.status !== 'complete') throw new Error(result.reason);
+    expect(result.code).toBe('prefix();first();\nlast();');
+  },
+);
+
+test.each(['remove', 'replace', 'different-prefix'] as const)(
+  'mixed replacement conflicts with %s on the original range',
+  action => {
+    const other =
+      action === 'different-prefix'
+        ? mixedReplacement('other', 'different();')
+        : defineNativePlugin({
+            name: 'other',
+            visitors: [
+              defineVisitor('ExpressionStatement', {}, path => {
+                if (action === 'remove') path.remove();
+                else path.replaceWith('other();');
+              }),
+            ],
+          });
+    expect(() =>
+      transform(
+        'old();',
+        'input.js',
+        defineNativePipeline({
+          phases: [{ name: 'conflict', plugins: [mixedReplacement('mixed'), other] }],
+        }),
+      ),
+    ).toThrow(/overlapping edits.*owners: mixed, other/);
+  },
+);
+
+test('identical mixed replacement operations deduplicate as a whole', () => {
+  const result = transform(
+    'old();',
+    'input.js',
+    defineNativePipeline({
+      phases: [{ name: 'converge', plugins: [mixedReplacement('one'), mixedReplacement('two')] }],
+    }),
+  );
+  expect(result.status).toBe('complete');
+  if (result.status !== 'complete') throw new Error(result.reason);
+  expect(result.code).toBe('first();\nlast();');
+});
+
+test('deferred copies include every run of a mixed replacement at the copied boundary', () => {
+  const copy = defineNativePlugin({
+    name: 'copy',
+    visitors: [
+      defineVisitor('ExpressionStatement', {}, path => path.insertAfter(path.getSource())),
+    ],
+  });
+  const result = transform(
+    'old();',
+    'input.js',
+    defineNativePipeline({
+      phases: [{ name: 'copy', plugins: [mixedReplacement('mixed'), copy] }],
+    }),
+  );
+  expect(result.status).toBe('complete');
+  if (result.status !== 'complete') throw new Error(result.reason);
+  expect(result.code).toBe('first();\nlast();first();\nlast();');
+});
+
+test('a moved containing range carries all mixed replacement runs at its boundary', () => {
+  const source = 'old(); tail();';
+  const move = defineNativePlugin({
+    name: 'move',
+    pre(context) {
+      context.editor.move(0, 7, source.length);
+    },
+  });
+  const mixed = defineNativePlugin({
+    name: 'mixed',
+    visitors: [
+      defineVisitor('ExpressionStatement', {}, path => {
+        if (path.start === 0)
+          path.replaceWithMultiple([
+            { code: 'first();', mapping: 'sourceless' },
+            { code: 'last();', mapping: 'anchor-start' },
+          ]);
+      }),
+    ],
+  });
+  const result = transform(
+    source,
+    'input.js',
+    defineNativePipeline({ phases: [{ name: 'move', plugins: [move, mixed] }] }),
+  );
+  expect(result.status).toBe('complete');
+  if (result.status !== 'complete') throw new Error(result.reason);
+  expect(result.code).toBe('tail();first();\nlast(); ');
+});
+
+test('a mixed replacement still conflicts with an exact covering move', () => {
+  const move = defineNativePlugin({
+    name: 'move',
+    pre(context) {
+      context.editor.move(0, 6, 14);
+    },
+  });
+  expect(() =>
+    transform(
+      'old(); tail();',
+      'input.js',
+      defineNativePipeline({
+        phases: [{ name: 'move', plugins: [move, mixedReplacement('mixed')] }],
+      }),
+    ),
+  ).toThrow(/moved range.*conflicts with covering edit/);
+});

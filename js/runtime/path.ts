@@ -515,17 +515,22 @@ export class NodePathImpl implements NativeNodePath {
       new Set(policies).size > 1 ||
       fragments.some(value => typeof value !== 'string' && value.names?.length)
     ) {
-      // A single edit has one mapping policy. Keep heterogeneous text runs separate
-      // so an anchored sibling cannot give sourceless text a source location.
+      // Keep one ranged replacement for conflicts, with preceding zero-width
+      // replacement runs at the same affinity. They form one deduplication unit.
+      const firstEdit = this.runtime.edits.length;
+      const order = this.runtime.nextOrder();
       fragments.forEach((value, index) => {
-        if (index > 0) this.#insert('AppendRight', this.event.start, '\n');
-        this.#insert(
-          'AppendRight',
-          this.event.start,
-          typeof value === 'string' ? { code: value, mapping: 'anchor-boundaries' } : value,
-        );
+        if (index > 0) this.#insert('Replace', this.event.start, '\n');
+        const fragment =
+          typeof value === 'string'
+            ? { code: value, mapping: 'anchor-boundaries' as const }
+            : value;
+        if (index === fragments.length - 1) this.#edit('Replace', fragment);
+        else this.#insert('Replace', this.event.start, fragment);
       });
-      this.remove();
+      for (let index = firstEdit; index < this.runtime.edits.length; index++) {
+        this.runtime.edits[index]!.order = order;
+      }
       return;
     }
     this.#edit('Replace', joinFragments(fragments));
