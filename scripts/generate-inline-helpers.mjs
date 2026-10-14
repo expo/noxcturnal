@@ -179,9 +179,10 @@ const adapterBundles = {
       'function _objectWithoutProperties(value,excluded){_objectWithoutProperties2.objectDestructuringEmpty(value);return excluded.length?_objectWithoutProperties2.objectWithoutPropertiesLoose(value,excluded):_objectWithoutProperties2.extends({},value)}',
   },
   INLINE_CLASS_CONSTRUCT_HELPER: {
-    roots: ['construct'],
+    roots: ['construct', 'assertThisInitialized'],
     binding: '_construct2',
-    adapter: 'function _construct(S,args,D){return _construct2.construct(S,args,D)}',
+    adapter:
+      'function _construct(S,args,D){return _construct2.construct(S,args,D)}_construct.assert=_construct2.assertThisInitialized;',
   },
   INLINE_CLASS_SUPER_GET_HELPER: {
     roots: ['get'],

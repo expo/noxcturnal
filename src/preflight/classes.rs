@@ -924,6 +924,14 @@ fn lower_leading_super_constructor_body<'a>(
     };
     let mut after = body.statements.split_off(index);
     let mut rewritten = ArenaVec::new_in(ast);
+    let mut leading_this_rewriter = LeadingThisRewriter {
+        allocator: ast.allocator,
+        receiver_name: ast.allocator.alloc_str(receiver_name),
+        construct_name: ast.allocator.alloc_str(construct_name),
+    };
+    for statement in &mut body.statements {
+        leading_this_rewriter.visit_statement(statement);
+    }
     rewritten.append(&mut body.statements);
     if let Some(new_target_name) = new_target_name {
         rewritten.push(Statement::VariableDeclaration(direct_class_variable(
@@ -1504,6 +1512,39 @@ impl<'a> VisitMut<'a> for SuperThunkCallRewriter<'a> {
     }
 
     fn visit_function(&mut self, _function: &mut Function<'a>, _flags: ScopeFlags) {}
+}
+
+// Closures created before super must read the initialized receiver when called.
+struct LeadingThisRewriter<'a> {
+    allocator: &'a Allocator,
+    receiver_name: &'a str,
+    construct_name: &'a str,
+}
+impl<'a> VisitMut<'a> for LeadingThisRewriter<'a> {
+    #[expect(deprecated)]
+    fn visit_expression(&mut self, expression: &mut Expression<'a>) {
+        if matches!(expression, Expression::ThisExpression(_)) {
+            let ast = AstBuilder::new(self.allocator);
+            let span = expression.span();
+            *expression = ast.expression_call(
+                span,
+                Expression::from(ast.member_expression_static(
+                    span,
+                    ast.expression_identifier(span, self.construct_name),
+                    ast.identifier_name(span, "assert"),
+                    false,
+                )),
+                None::<ArenaBox<'a, TSTypeParameterInstantiation<'a>>>,
+                ast.vec1(Argument::from(
+                    ast.expression_identifier(span, self.receiver_name),
+                )),
+                false,
+            );
+        } else {
+            walk_mut::walk_expression(self, expression);
+        }
+    }
+    fn visit_function(&mut self, _: &mut Function<'a>, _: ScopeFlags) {}
 }
 
 struct DerivedThisRewriter<'a> {

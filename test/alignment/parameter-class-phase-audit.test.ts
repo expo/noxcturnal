@@ -83,7 +83,7 @@ describe.each(['inline', 'runtime'] as const)('parameters before classes with %s
   test('Babel separate passes preserve the initialized receiver', () => {
     expect(run(babel)).toBe(true);
   });
-  test.fails('Noxcturnal phases preserve the initialized receiver', () => {
+  test('Noxcturnal phases preserve the initialized receiver', () => {
     expect(run(code)).toBe(true);
   });
 });

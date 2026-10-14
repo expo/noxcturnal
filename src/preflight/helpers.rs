@@ -380,6 +380,7 @@ pub fn babel_helper_spec(name: &str) -> Option<HelperCompatibility> {
         "writeOnlyError" => "writeOnlyError",
         "taggedTemplateLiteral" => "taggedTemplateLiteral",
         "construct" => "construct",
+        "assertThisInitialized" => "assertThisInitialized",
         "createForOfIteratorHelper" => "createForOfIteratorHelper",
         "get" => "get",
         "slicedToArray" => "slicedToArray",

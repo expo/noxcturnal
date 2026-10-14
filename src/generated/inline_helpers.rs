@@ -13,230 +13,237 @@ pub static BABEL_HELPER_COMPATIBILITY: &[GeneratedHelperCompatibility] = &[
     },
     GeneratedHelperCompatibility {
         ordinal: 1,
+        name: "assertThisInitialized",
+        runtime_path: "assertThisInitialized",
+        min_version: "7.0.0-beta.0",
+        export_shape: "default",
+    },
+    GeneratedHelperCompatibility {
+        ordinal: 2,
         name: "asyncGeneratorDelegate",
         runtime_path: "asyncGeneratorDelegate",
         min_version: "7.0.0-beta.0",
         export_shape: "default",
     },
     GeneratedHelperCompatibility {
-        ordinal: 2,
+        ordinal: 3,
         name: "asyncIterator",
         runtime_path: "asyncIterator",
         min_version: "7.15.9",
         export_shape: "default",
     },
     GeneratedHelperCompatibility {
-        ordinal: 3,
+        ordinal: 4,
         name: "asyncToGenerator",
         runtime_path: "asyncToGenerator",
         min_version: "7.0.0-beta.0",
         export_shape: "default",
     },
     GeneratedHelperCompatibility {
-        ordinal: 4,
+        ordinal: 5,
         name: "awaitAsyncGenerator",
         runtime_path: "awaitAsyncGenerator",
         min_version: "7.0.0-beta.0",
         export_shape: "default",
     },
     GeneratedHelperCompatibility {
-        ordinal: 5,
+        ordinal: 6,
         name: "checkInRHS",
         runtime_path: "checkInRHS",
         min_version: "7.20.5",
         export_shape: "default",
     },
     GeneratedHelperCompatibility {
-        ordinal: 6,
+        ordinal: 7,
         name: "classPrivateFieldGet2",
         runtime_path: "classPrivateFieldGet2",
         min_version: "7.24.0",
         export_shape: "default",
     },
     GeneratedHelperCompatibility {
-        ordinal: 7,
+        ordinal: 8,
         name: "classPrivateFieldInitSpec",
         runtime_path: "classPrivateFieldInitSpec",
         min_version: "7.14.1",
         export_shape: "default",
     },
     GeneratedHelperCompatibility {
-        ordinal: 8,
+        ordinal: 9,
         name: "classPrivateFieldLooseBase",
         runtime_path: "classPrivateFieldLooseBase",
         min_version: "7.0.0-beta.0",
         export_shape: "default",
     },
     GeneratedHelperCompatibility {
-        ordinal: 9,
+        ordinal: 10,
         name: "classPrivateFieldLooseKey",
         runtime_path: "classPrivateFieldLooseKey",
         min_version: "7.0.0-beta.0",
         export_shape: "default",
     },
     GeneratedHelperCompatibility {
-        ordinal: 10,
+        ordinal: 11,
         name: "classPrivateFieldSet2",
         runtime_path: "classPrivateFieldSet2",
         min_version: "7.24.0",
         export_shape: "default",
     },
     GeneratedHelperCompatibility {
-        ordinal: 11,
+        ordinal: 12,
         name: "classPrivateMethodInitSpec",
         runtime_path: "classPrivateMethodInitSpec",
         min_version: "7.14.1",
         export_shape: "default",
     },
     GeneratedHelperCompatibility {
-        ordinal: 12,
+        ordinal: 13,
         name: "construct",
         runtime_path: "construct",
         min_version: "7.0.0-beta.0",
         export_shape: "default",
     },
     GeneratedHelperCompatibility {
-        ordinal: 13,
+        ordinal: 14,
         name: "createForOfIteratorHelper",
         runtime_path: "createForOfIteratorHelper",
         min_version: "7.9.0",
         export_shape: "default",
     },
     GeneratedHelperCompatibility {
-        ordinal: 14,
+        ordinal: 15,
         name: "defineProperty",
         runtime_path: "defineProperty",
         min_version: "7.0.0-beta.0",
         export_shape: "default",
     },
     GeneratedHelperCompatibility {
-        ordinal: 15,
+        ordinal: 16,
         name: "extends",
         runtime_path: "extends",
         min_version: "7.0.0-beta.0",
         export_shape: "default",
     },
     GeneratedHelperCompatibility {
-        ordinal: 16,
+        ordinal: 17,
         name: "get",
         runtime_path: "get",
         min_version: "7.0.0-beta.0",
         export_shape: "default",
     },
     GeneratedHelperCompatibility {
-        ordinal: 17,
+        ordinal: 18,
         name: "objectDestructuringEmpty",
         runtime_path: "objectDestructuringEmpty",
         min_version: "7.0.0-beta.0",
         export_shape: "default",
     },
     GeneratedHelperCompatibility {
-        ordinal: 18,
+        ordinal: 19,
         name: "objectSpread2",
         runtime_path: "objectSpread2",
         min_version: "7.5.0",
         export_shape: "default",
     },
     GeneratedHelperCompatibility {
-        ordinal: 19,
+        ordinal: 20,
         name: "objectWithoutProperties",
         runtime_path: "objectWithoutProperties",
         min_version: "7.0.0-beta.0",
         export_shape: "default",
     },
     GeneratedHelperCompatibility {
-        ordinal: 20,
+        ordinal: 21,
         name: "objectWithoutPropertiesLoose",
         runtime_path: "objectWithoutPropertiesLoose",
         min_version: "7.0.0-beta.0",
         export_shape: "default",
     },
     GeneratedHelperCompatibility {
-        ordinal: 21,
+        ordinal: 22,
         name: "readOnlyError",
         runtime_path: "readOnlyError",
         min_version: "7.0.0-beta.0",
         export_shape: "default",
     },
     GeneratedHelperCompatibility {
-        ordinal: 22,
+        ordinal: 23,
         name: "slicedToArray",
         runtime_path: "slicedToArray",
         min_version: "7.0.0-beta.0",
         export_shape: "default",
     },
     GeneratedHelperCompatibility {
-        ordinal: 23,
+        ordinal: 24,
         name: "superPropGet",
         runtime_path: "superPropGet",
         min_version: "7.25.0",
         export_shape: "default",
     },
     GeneratedHelperCompatibility {
-        ordinal: 24,
+        ordinal: 25,
         name: "superPropSet",
         runtime_path: "superPropSet",
         min_version: "7.25.0",
         export_shape: "default",
     },
     GeneratedHelperCompatibility {
-        ordinal: 25,
+        ordinal: 26,
         name: "taggedTemplateLiteral",
         runtime_path: "taggedTemplateLiteral",
         min_version: "7.0.0-beta.0",
         export_shape: "default",
     },
     GeneratedHelperCompatibility {
-        ordinal: 26,
+        ordinal: 27,
         name: "toArray",
         runtime_path: "toArray",
         min_version: "7.0.0-beta.0",
         export_shape: "default",
     },
     GeneratedHelperCompatibility {
-        ordinal: 27,
+        ordinal: 28,
         name: "toConsumableArray",
         runtime_path: "toConsumableArray",
         min_version: "7.0.0-beta.0",
         export_shape: "default",
     },
     GeneratedHelperCompatibility {
-        ordinal: 28,
+        ordinal: 29,
         name: "toPropertyKey",
         runtime_path: "toPropertyKey",
         min_version: "7.1.5",
         export_shape: "default",
     },
     GeneratedHelperCompatibility {
-        ordinal: 29,
+        ordinal: 30,
         name: "toSetter",
         runtime_path: "toSetter",
         min_version: "7.24.0",
         export_shape: "default",
     },
     GeneratedHelperCompatibility {
-        ordinal: 30,
+        ordinal: 31,
         name: "usingCtx",
         runtime_path: "usingCtx",
         min_version: "7.23.9",
         export_shape: "default",
     },
     GeneratedHelperCompatibility {
-        ordinal: 31,
+        ordinal: 32,
         name: "wrapAsyncGenerator",
         runtime_path: "wrapAsyncGenerator",
         min_version: "7.0.0-beta.0",
         export_shape: "default",
     },
     GeneratedHelperCompatibility {
-        ordinal: 32,
+        ordinal: 33,
         name: "wrapRegExp",
         runtime_path: "wrapRegExp",
         min_version: "7.19.0",
         export_shape: "default",
     },
     GeneratedHelperCompatibility {
-        ordinal: 33,
+        ordinal: 34,
         name: "writeOnlyError",
         runtime_path: "writeOnlyError",
         min_version: "7.12.13",
@@ -248,6 +255,11 @@ pub static BABEL_INLINE_ROOTS: &[GeneratedInlineRoot] = &[
         name: "assertClassBrand",
         compact: r#"(()=>{var o={assertClassBrand:function(r,t){function i(e,n,p){if(typeof e=="function"?e===n:e.has(n))return arguments.length<3?n:p;throw new TypeError("Private element is not present on this object")}r.exports=i,r.exports.__esModule=!0,r.exports.default=r.exports}},s={};function a(r){if(s[r])return s[r].exports;var t=s[r]={exports:{}};return o[r](t,a),t.exports}return{assertClassBrand:a("assertClassBrand")}})()"#,
         globals: &["TypeError", "arguments"],
+    },
+    GeneratedInlineRoot {
+        name: "assertThisInitialized",
+        compact: r#"(()=>{var n={assertThisInitialized:function(e,r){function a(s){if(s===void 0)throw new ReferenceError("this hasn't been initialised - super() hasn't been called");return s}e.exports=a,e.exports.__esModule=!0,e.exports.default=e.exports}},t={};function i(e){if(t[e])return t[e].exports;var r=t[e]={exports:{}};return n[e](r,i),r.exports}return{assertThisInitialized:i("assertThisInitialized")}})()"#,
+        globals: &["ReferenceError"],
     },
     GeneratedInlineRoot {
         name: "asyncGeneratorDelegate",
@@ -941,63 +953,84 @@ pub const INLINE_DESTRUCTURING_LOOSE_REST_HELPER_RUNTIME_DEPENDENCIES: &[&str] =
     "objectWithoutPropertiesLoose",
     "extends",
 ];
-pub const INLINE_CLASS_CONSTRUCT_HELPER: &str = r#"var _construct2=(()=>{var p={isNativeReflectConstruct:function(e,r){function t(){try{var n=!Boolean.prototype.valueOf.call(Reflect.construct(Boolean,[],function(){}))}catch(c){}return(e.exports=t=function(){return!!n},e.exports.__esModule=!0,e.exports.default=e.exports)()}e.exports=t,e.exports.__esModule=!0,e.exports.default=e.exports},setPrototypeOf:function(e,r){function t(n,c){return e.exports=t=Object.setPrototypeOf?Object.setPrototypeOf.bind():function(s,f){return s.__proto__=f,s},e.exports.__esModule=!0,e.exports.default=e.exports,t(n,c)}e.exports=t,e.exports.__esModule=!0,e.exports.default=e.exports},construct:function(e,r){var t=r("isNativeReflectConstruct"),n=r("setPrototypeOf");function c(s,f,x){if(t())return Reflect.construct.apply(null,arguments);var l=[null];l.push.apply(l,f);var a=new(s.bind.apply(s,l));return x&&n(a,x.prototype),a}e.exports=c,e.exports.__esModule=!0,e.exports.default=e.exports}},o={};function u(e){if(o[e])return o[e].exports;var r=o[e]={exports:{}};return p[e](r,u),r.exports}return{construct:u("construct")}})();function _construct(p,o,u){return _construct2.construct(p,o,u)}"#;
-pub const INLINE_CLASS_CONSTRUCT_HELPER_GLOBALS: &[&str] =
-    &["Boolean", "Object", "Reflect", "arguments"];
+pub const INLINE_CLASS_CONSTRUCT_HELPER: &str = r#"var _construct2=(()=>{var p={isNativeReflectConstruct:function(e,r){function t(){try{var o=!Boolean.prototype.valueOf.call(Reflect.construct(Boolean,[],function(){}))}catch(i){}return(e.exports=t=function(){return!!o},e.exports.__esModule=!0,e.exports.default=e.exports)()}e.exports=t,e.exports.__esModule=!0,e.exports.default=e.exports},setPrototypeOf:function(e,r){function t(o,i){return e.exports=t=Object.setPrototypeOf?Object.setPrototypeOf.bind():function(u,c){return u.__proto__=c,u},e.exports.__esModule=!0,e.exports.default=e.exports,t(o,i)}e.exports=t,e.exports.__esModule=!0,e.exports.default=e.exports},construct:function(e,r){var t=r("isNativeReflectConstruct"),o=r("setPrototypeOf");function i(u,c,l){if(t())return Reflect.construct.apply(null,arguments);var a=[null];a.push.apply(a,c);var f=new(u.bind.apply(u,a));return l&&o(f,l.prototype),f}e.exports=i,e.exports.__esModule=!0,e.exports.default=e.exports},assertThisInitialized:function(e,r){function t(o){if(o===void 0)throw new ReferenceError("this hasn't been initialised - super() hasn't been called");return o}e.exports=t,e.exports.__esModule=!0,e.exports.default=e.exports}},s={};function n(e){if(s[e])return s[e].exports;var r=s[e]={exports:{}};return p[e](r,n),r.exports}return{construct:n("construct"),assertThisInitialized:n("assertThisInitialized")}})();function _construct(p,s,n){return _construct2.construct(p,s,n)}_construct.assert=_construct2.assertThisInitialized;"#;
+pub const INLINE_CLASS_CONSTRUCT_HELPER_GLOBALS: &[&str] = &[
+    "Boolean",
+    "Object",
+    "ReferenceError",
+    "Reflect",
+    "arguments",
+];
 pub const INLINE_CLASS_CONSTRUCT_HELPER_PRETTY: &str = r#"var _construct2 = (() => {
 	var p = {
 		isNativeReflectConstruct: function(e, r) {
 			function t() {
 				try {
-					var n = !Boolean.prototype.valueOf.call(Reflect.construct(Boolean, [], function() {}));
-				} catch (c) {}
+					var o = !Boolean.prototype.valueOf.call(Reflect.construct(Boolean, [], function() {}));
+				} catch (i) {}
 				return (e.exports = t = function() {
-					return !!n;
+					return !!o;
 				}, e.exports.__esModule = !0, e.exports.default = e.exports)();
 			}
 			e.exports = t, e.exports.__esModule = !0, e.exports.default = e.exports;
 		},
 		setPrototypeOf: function(e, r) {
-			function t(n, c) {
-				return e.exports = t = Object.setPrototypeOf ? Object.setPrototypeOf.bind() : function(s, f) {
-					return s.__proto__ = f, s;
-				}, e.exports.__esModule = !0, e.exports.default = e.exports, t(n, c);
+			function t(o, i) {
+				return e.exports = t = Object.setPrototypeOf ? Object.setPrototypeOf.bind() : function(u, c) {
+					return u.__proto__ = c, u;
+				}, e.exports.__esModule = !0, e.exports.default = e.exports, t(o, i);
 			}
 			e.exports = t, e.exports.__esModule = !0, e.exports.default = e.exports;
 		},
 		construct: function(e, r) {
-			var t = r("isNativeReflectConstruct"), n = r("setPrototypeOf");
-			function c(s, f, x) {
+			var t = r("isNativeReflectConstruct"), o = r("setPrototypeOf");
+			function i(u, c, l) {
 				if (t()) return Reflect.construct.apply(null, arguments);
-				var l = [null];
-				l.push.apply(l, f);
-				var a = new (s.bind.apply(s, l))();
-				return x && n(a, x.prototype), a;
+				var a = [null];
+				a.push.apply(a, c);
+				var f = new (u.bind.apply(u, a))();
+				return l && o(f, l.prototype), f;
 			}
-			e.exports = c, e.exports.__esModule = !0, e.exports.default = e.exports;
+			e.exports = i, e.exports.__esModule = !0, e.exports.default = e.exports;
+		},
+		assertThisInitialized: function(e, r) {
+			function t(o) {
+				if (o === void 0) throw new ReferenceError("this hasn't been initialised - super() hasn't been called");
+				return o;
+			}
+			e.exports = t, e.exports.__esModule = !0, e.exports.default = e.exports;
 		}
-	}, o = {};
-	function u(e) {
-		if (o[e]) return o[e].exports;
-		var r = o[e] = { exports: {} };
-		return p[e](r, u), r.exports;
+	}, s = {};
+	function n(e) {
+		if (s[e]) return s[e].exports;
+		var r = s[e] = { exports: {} };
+		return p[e](r, n), r.exports;
 	}
-	return { construct: u("construct") };
+	return {
+		construct: n("construct"),
+		assertThisInitialized: n("assertThisInitialized")
+	};
 })();
-function _construct(p, o, u) {
-	return _construct2.construct(p, o, u);
+function _construct(p, s, n) {
+	return _construct2.construct(p, s, n);
 }
+_construct.assert = _construct2.assertThisInitialized;
 "#;
 pub const INLINE_CLASS_CONSTRUCT_HELPER_BINDINGS: &[&str] = &["_construct", "_construct2"];
-pub const INLINE_CLASS_CONSTRUCT_HELPER_RUNTIME: &str = r#"var _construct2={construct:require("@babel/runtime/helpers/construct")};function _construct(t,r,c){return _construct2.construct(t,r,c)}"#;
+pub const INLINE_CLASS_CONSTRUCT_HELPER_RUNTIME: &str = r#"var _construct2={construct:require("@babel/runtime/helpers/construct"),assertThisInitialized:require("@babel/runtime/helpers/assertThisInitialized")};function _construct(t,e,r){return _construct2.construct(t,e,r)}_construct.assert=_construct2.assertThisInitialized;"#;
 pub const INLINE_CLASS_CONSTRUCT_HELPER_RUNTIME_GLOBALS: &[&str] = &[];
-pub const INLINE_CLASS_CONSTRUCT_HELPER_RUNTIME_PRETTY: &str = r#"var _construct2 = { construct: require("@babel/runtime/helpers/construct") };
-function _construct(t, r, c) {
-	return _construct2.construct(t, r, c);
+pub const INLINE_CLASS_CONSTRUCT_HELPER_RUNTIME_PRETTY: &str = r#"var _construct2 = {
+	construct: require("@babel/runtime/helpers/construct"),
+	assertThisInitialized: require("@babel/runtime/helpers/assertThisInitialized")
+};
+function _construct(t, e, r) {
+	return _construct2.construct(t, e, r);
 }
+_construct.assert = _construct2.assertThisInitialized;
 "#;
 pub const INLINE_CLASS_CONSTRUCT_HELPER_RUNTIME_BINDINGS: &[&str] = &["_construct", "_construct2"];
-pub const INLINE_CLASS_CONSTRUCT_HELPER_RUNTIME_DEPENDENCIES: &[&str] = &["construct"];
+pub const INLINE_CLASS_CONSTRUCT_HELPER_RUNTIME_DEPENDENCIES: &[&str] =
+    &["construct", "assertThisInitialized"];
 pub const INLINE_CLASS_SUPER_GET_HELPER: &str = r#"var _get2=(()=>{var f={getPrototypeOf:function(e,t){function o(n){return e.exports=o=Object.setPrototypeOf?Object.getPrototypeOf.bind():function(r){return r.__proto__||Object.getPrototypeOf(r)},e.exports.__esModule=!0,e.exports.default=e.exports,o(n)}e.exports=o,e.exports.__esModule=!0,e.exports.default=e.exports},superPropBase:function(e,t){var o=t("getPrototypeOf");function n(r,s){for(;!{}.hasOwnProperty.call(r,s)&&(r=o(r))!==null;);return r}e.exports=n,e.exports.__esModule=!0,e.exports.default=e.exports},get:function(e,t){var o=t("superPropBase");function n(){return e.exports=n=typeof Reflect!="undefined"&&Reflect.get?Reflect.get.bind():function(r,s,a){var x=o(r,s);if(x){var l=Object.getOwnPropertyDescriptor(x,s);return l.get?l.get.call(arguments.length<3?r:a):l.value}},e.exports.__esModule=!0,e.exports.default=e.exports,n.apply(null,arguments)}e.exports=n,e.exports.__esModule=!0,e.exports.default=e.exports}},p={};function u(e){if(p[e])return p[e].exports;var t=p[e]={exports:{}};return f[e](t,u),t.exports}return{get:u("get")}})();function _get(f,p,u){return _get2.get(f,p,u)}"#;
 pub const INLINE_CLASS_SUPER_GET_HELPER_GLOBALS: &[&str] = &["Object", "Reflect", "arguments"];
 pub const INLINE_CLASS_SUPER_GET_HELPER_PRETTY: &str = r#"var _get2 = (() => {
