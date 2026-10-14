@@ -127,7 +127,8 @@ describe.each(cases)('$name', entry => {
     test('Babel loose-private reference', () => {
       expect(run(referenceCode)).toEqual(entry.babel);
     });
-    const check = entry.name === 'private logical receiver mutation' ? test.fails : test;
+    const check =
+      entry.name === 'private logical receiver mutation' && entry.localFailure ? test.fails : test;
     check('Noxcturnal follows the Babel loose-private baseline', () => {
       expect(run(code)).toEqual(entry.babel);
     });
