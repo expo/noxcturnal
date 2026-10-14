@@ -195,41 +195,48 @@ pub static BABEL_HELPER_COMPATIBILITY: &[GeneratedHelperCompatibility] = &[
     },
     GeneratedHelperCompatibility {
         ordinal: 27,
+        name: "toConsumableArray",
+        runtime_path: "toConsumableArray",
+        min_version: "7.0.0-beta.0",
+        export_shape: "default",
+    },
+    GeneratedHelperCompatibility {
+        ordinal: 28,
         name: "toPropertyKey",
         runtime_path: "toPropertyKey",
         min_version: "7.1.5",
         export_shape: "default",
     },
     GeneratedHelperCompatibility {
-        ordinal: 28,
+        ordinal: 29,
         name: "toSetter",
         runtime_path: "toSetter",
         min_version: "7.24.0",
         export_shape: "default",
     },
     GeneratedHelperCompatibility {
-        ordinal: 29,
+        ordinal: 30,
         name: "usingCtx",
         runtime_path: "usingCtx",
         min_version: "7.23.9",
         export_shape: "default",
     },
     GeneratedHelperCompatibility {
-        ordinal: 30,
+        ordinal: 31,
         name: "wrapAsyncGenerator",
         runtime_path: "wrapAsyncGenerator",
         min_version: "7.0.0-beta.0",
         export_shape: "default",
     },
     GeneratedHelperCompatibility {
-        ordinal: 31,
+        ordinal: 32,
         name: "wrapRegExp",
         runtime_path: "wrapRegExp",
         min_version: "7.19.0",
         export_shape: "default",
     },
     GeneratedHelperCompatibility {
-        ordinal: 32,
+        ordinal: 33,
         name: "writeOnlyError",
         runtime_path: "writeOnlyError",
         min_version: "7.12.13",
@@ -387,6 +394,12 @@ In order to be iterable, non-array objects must have a [Symbol.iterator]() metho
         name: "toArray",
         compact: r#"(()=>{var y={arrayWithHoles:function(r,o){function a(e){if(Array.isArray(e))return e}r.exports=a,r.exports.__esModule=!0,r.exports.default=r.exports},iterableToArray:function(r,o){function a(e){if(typeof Symbol!="undefined"&&e[Symbol.iterator]!=null||e["@@iterator"]!=null)return Array.from(e)}r.exports=a,r.exports.__esModule=!0,r.exports.default=r.exports},arrayLikeToArray:function(r,o){function a(e,t){(t==null||t>e.length)&&(t=e.length);for(var s=0,n=Array(t);s<t;s++)n[s]=e[s];return n}r.exports=a,r.exports.__esModule=!0,r.exports.default=r.exports},unsupportedIterableToArray:function(r,o){var a=o("arrayLikeToArray");function e(t,s){if(t){if(typeof t=="string")return a(t,s);var n={}.toString.call(t).slice(8,-1);return n==="Object"&&t.constructor&&(n=t.constructor.name),n==="Map"||n==="Set"?Array.from(t):n==="Arguments"||/^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(n)?a(t,s):void 0}}r.exports=e,r.exports.__esModule=!0,r.exports.default=r.exports},nonIterableRest:function(r,o){function a(){throw new TypeError(`Invalid attempt to destructure non-iterable instance.
 In order to be iterable, non-array objects must have a [Symbol.iterator]() method.`)}r.exports=a,r.exports.__esModule=!0,r.exports.default=r.exports},toArray:function(r,o){var a=o("arrayWithHoles"),e=o("iterableToArray"),t=o("unsupportedIterableToArray"),s=o("nonIterableRest");function n(p){return a(p)||e(p)||t(p)||s()}r.exports=n,r.exports.__esModule=!0,r.exports.default=r.exports}},i={};function u(r){if(i[r])return i[r].exports;var o=i[r]={exports:{}};return y[r](o,u),o.exports}return{toArray:u("toArray")}})()"#,
+        globals: &["Array", "Symbol", "TypeError"],
+    },
+    GeneratedInlineRoot {
+        name: "toConsumableArray",
+        compact: r#"(()=>{var y={arrayLikeToArray:function(r,e){function a(o,t){(t==null||t>o.length)&&(t=o.length);for(var s=0,n=Array(t);s<t;s++)n[s]=o[s];return n}r.exports=a,r.exports.__esModule=!0,r.exports.default=r.exports},arrayWithoutHoles:function(r,e){var a=e("arrayLikeToArray");function o(t){if(Array.isArray(t))return a(t)}r.exports=o,r.exports.__esModule=!0,r.exports.default=r.exports},iterableToArray:function(r,e){function a(o){if(typeof Symbol!="undefined"&&o[Symbol.iterator]!=null||o["@@iterator"]!=null)return Array.from(o)}r.exports=a,r.exports.__esModule=!0,r.exports.default=r.exports},unsupportedIterableToArray:function(r,e){var a=e("arrayLikeToArray");function o(t,s){if(t){if(typeof t=="string")return a(t,s);var n={}.toString.call(t).slice(8,-1);return n==="Object"&&t.constructor&&(n=t.constructor.name),n==="Map"||n==="Set"?Array.from(t):n==="Arguments"||/^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(n)?a(t,s):void 0}}r.exports=o,r.exports.__esModule=!0,r.exports.default=r.exports},nonIterableSpread:function(r,e){function a(){throw new TypeError(`Invalid attempt to spread non-iterable instance.
+In order to be iterable, non-array objects must have a [Symbol.iterator]() method.`)}r.exports=a,r.exports.__esModule=!0,r.exports.default=r.exports},toConsumableArray:function(r,e){var a=e("arrayWithoutHoles"),o=e("iterableToArray"),t=e("unsupportedIterableToArray"),s=e("nonIterableSpread");function n(u){return a(u)||o(u)||t(u)||s()}r.exports=n,r.exports.__esModule=!0,r.exports.default=r.exports}},i={};function p(r){if(i[r])return i[r].exports;var e=i[r]={exports:{}};return y[r](e,p),e.exports}return{toConsumableArray:p("toConsumableArray")}})()"#,
         globals: &["Array", "Symbol", "TypeError"],
     },
     GeneratedInlineRoot {
@@ -632,35 +645,36 @@ function _toPropertyKey(value) {
 pub const INLINE_TO_PROPERTY_KEY_HELPER_RUNTIME_BINDINGS: &[&str] =
     &["_toPropertyKey", "_toPropertyKey2"];
 pub const INLINE_TO_PROPERTY_KEY_HELPER_RUNTIME_DEPENDENCIES: &[&str] = &["toPropertyKey"];
-pub const INLINE_DESTRUCTURING_ITER_HELPER: &str = r#"var _toArray2=(()=>{var f={arrayWithHoles:function(r,n){function a(t){if(Array.isArray(t))return t}r.exports=a,r.exports.__esModule=!0,r.exports.default=r.exports},iterableToArrayLimit:function(r,n){function a(t,e){var o=t==null?null:typeof Symbol!="undefined"&&t[Symbol.iterator]||t["@@iterator"];if(o!=null){var l,u,p,c,x=[],y=!0,d=!1;try{if(p=(o=o.call(t)).next,e===0){if(Object(o)!==o)return;y=!1}else for(;!(y=(l=p.call(o)).done)&&(x.push(l.value),x.length!==e);y=!0);}catch(A){d=!0,u=A}finally{try{if(!y&&o.return!=null&&(c=o.return(),Object(c)!==c))return}finally{if(d)throw u}}return x}}r.exports=a,r.exports.__esModule=!0,r.exports.default=r.exports},arrayLikeToArray:function(r,n){function a(t,e){(e==null||e>t.length)&&(e=t.length);for(var o=0,l=Array(e);o<e;o++)l[o]=t[o];return l}r.exports=a,r.exports.__esModule=!0,r.exports.default=r.exports},unsupportedIterableToArray:function(r,n){var a=n("arrayLikeToArray");function t(e,o){if(e){if(typeof e=="string")return a(e,o);var l={}.toString.call(e).slice(8,-1);return l==="Object"&&e.constructor&&(l=e.constructor.name),l==="Map"||l==="Set"?Array.from(e):l==="Arguments"||/^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(l)?a(e,o):void 0}}r.exports=t,r.exports.__esModule=!0,r.exports.default=r.exports},nonIterableRest:function(r,n){function a(){throw new TypeError(`Invalid attempt to destructure non-iterable instance.
-In order to be iterable, non-array objects must have a [Symbol.iterator]() method.`)}r.exports=a,r.exports.__esModule=!0,r.exports.default=r.exports},slicedToArray:function(r,n){var a=n("arrayWithHoles"),t=n("iterableToArrayLimit"),e=n("unsupportedIterableToArray"),o=n("nonIterableRest");function l(u,p){return a(u)||t(u,p)||e(u,p)||o()}r.exports=l,r.exports.__esModule=!0,r.exports.default=r.exports},iterableToArray:function(r,n){function a(t){if(typeof Symbol!="undefined"&&t[Symbol.iterator]!=null||t["@@iterator"]!=null)return Array.from(t)}r.exports=a,r.exports.__esModule=!0,r.exports.default=r.exports},toArray:function(r,n){var a=n("arrayWithHoles"),t=n("iterableToArray"),e=n("unsupportedIterableToArray"),o=n("nonIterableRest");function l(u){return a(u)||t(u)||e(u)||o()}r.exports=l,r.exports.__esModule=!0,r.exports.default=r.exports}},s={};function i(r){if(s[r])return s[r].exports;var n=s[r]={exports:{}};return f[r](n,i),n.exports}return{slicedToArray:i("slicedToArray"),toArray:i("toArray")}})();function _toArray(f,s,i){return i?_toArray2.toArray(f):_toArray2.slicedToArray(f,s)}"#;
+pub const INLINE_DESTRUCTURING_ITER_HELPER: &str = r#"var _toArray2=(()=>{var y={arrayWithHoles:function(r,o){function a(t){if(Array.isArray(t))return t}r.exports=a,r.exports.__esModule=!0,r.exports.default=r.exports},iterableToArrayLimit:function(r,o){function a(t,e){var n=t==null?null:typeof Symbol!="undefined"&&t[Symbol.iterator]||t["@@iterator"];if(n!=null){var u,s,p,d,x=[],f=!0,c=!1;try{if(p=(n=n.call(t)).next,e===0){if(Object(n)!==n)return;f=!1}else for(;!(f=(u=p.call(n)).done)&&(x.push(u.value),x.length!==e);f=!0);}catch(b){c=!0,s=b}finally{try{if(!f&&n.return!=null&&(d=n.return(),Object(d)!==d))return}finally{if(c)throw s}}return x}}r.exports=a,r.exports.__esModule=!0,r.exports.default=r.exports},arrayLikeToArray:function(r,o){function a(t,e){(e==null||e>t.length)&&(e=t.length);for(var n=0,u=Array(e);n<e;n++)u[n]=t[n];return u}r.exports=a,r.exports.__esModule=!0,r.exports.default=r.exports},unsupportedIterableToArray:function(r,o){var a=o("arrayLikeToArray");function t(e,n){if(e){if(typeof e=="string")return a(e,n);var u={}.toString.call(e).slice(8,-1);return u==="Object"&&e.constructor&&(u=e.constructor.name),u==="Map"||u==="Set"?Array.from(e):u==="Arguments"||/^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(u)?a(e,n):void 0}}r.exports=t,r.exports.__esModule=!0,r.exports.default=r.exports},nonIterableRest:function(r,o){function a(){throw new TypeError(`Invalid attempt to destructure non-iterable instance.
+In order to be iterable, non-array objects must have a [Symbol.iterator]() method.`)}r.exports=a,r.exports.__esModule=!0,r.exports.default=r.exports},slicedToArray:function(r,o){var a=o("arrayWithHoles"),t=o("iterableToArrayLimit"),e=o("unsupportedIterableToArray"),n=o("nonIterableRest");function u(s,p){return a(s)||t(s,p)||e(s,p)||n()}r.exports=u,r.exports.__esModule=!0,r.exports.default=r.exports},arrayWithoutHoles:function(r,o){var a=o("arrayLikeToArray");function t(e){if(Array.isArray(e))return a(e)}r.exports=t,r.exports.__esModule=!0,r.exports.default=r.exports},iterableToArray:function(r,o){function a(t){if(typeof Symbol!="undefined"&&t[Symbol.iterator]!=null||t["@@iterator"]!=null)return Array.from(t)}r.exports=a,r.exports.__esModule=!0,r.exports.default=r.exports},nonIterableSpread:function(r,o){function a(){throw new TypeError(`Invalid attempt to spread non-iterable instance.
+In order to be iterable, non-array objects must have a [Symbol.iterator]() method.`)}r.exports=a,r.exports.__esModule=!0,r.exports.default=r.exports},toConsumableArray:function(r,o){var a=o("arrayWithoutHoles"),t=o("iterableToArray"),e=o("unsupportedIterableToArray"),n=o("nonIterableSpread");function u(s){return a(s)||t(s)||e(s)||n()}r.exports=u,r.exports.__esModule=!0,r.exports.default=r.exports}},l={};function i(r){if(l[r])return l[r].exports;var o=l[r]={exports:{}};return y[r](o,i),o.exports}return{slicedToArray:i("slicedToArray"),toConsumableArray:i("toConsumableArray")}})();function _toArray(y,l,i){return i?_toArray2.toConsumableArray(y):_toArray2.slicedToArray(y,l)}"#;
 pub const INLINE_DESTRUCTURING_ITER_HELPER_GLOBALS: &[&str] =
     &["Array", "Object", "Symbol", "TypeError"];
 pub const INLINE_DESTRUCTURING_ITER_HELPER_PRETTY: &str = r#"var _toArray2 = (() => {
-	var f = {
-		arrayWithHoles: function(r, n) {
+	var y = {
+		arrayWithHoles: function(r, o) {
 			function a(t) {
 				if (Array.isArray(t)) return t;
 			}
 			r.exports = a, r.exports.__esModule = !0, r.exports.default = r.exports;
 		},
-		iterableToArrayLimit: function(r, n) {
+		iterableToArrayLimit: function(r, o) {
 			function a(t, e) {
-				var o = t == null ? null : typeof Symbol != "undefined" && t[Symbol.iterator] || t["@@iterator"];
-				if (o != null) {
-					var l, u, p, c, x = [], y = !0, d = !1;
+				var n = t == null ? null : typeof Symbol != "undefined" && t[Symbol.iterator] || t["@@iterator"];
+				if (n != null) {
+					var u, s, p, d, x = [], f = !0, c = !1;
 					try {
-						if (p = (o = o.call(t)).next, e === 0) {
-							if (Object(o) !== o) return;
-							y = !1;
-						} else for (; !(y = (l = p.call(o)).done) && (x.push(l.value), x.length !== e); y = !0);
-					} catch (A) {
-						d = !0, u = A;
+						if (p = (n = n.call(t)).next, e === 0) {
+							if (Object(n) !== n) return;
+							f = !1;
+						} else for (; !(f = (u = p.call(n)).done) && (x.push(u.value), x.length !== e); f = !0);
+					} catch (b) {
+						c = !0, s = b;
 					} finally {
 						try {
-							if (!y && o.return != null && (c = o.return(), Object(c) !== c)) return;
+							if (!f && n.return != null && (d = n.return(), Object(d) !== d)) return;
 						} finally {
-							if (d) throw u;
+							if (c) throw s;
 						}
 					}
 					return x;
@@ -668,81 +682,95 @@ pub const INLINE_DESTRUCTURING_ITER_HELPER_PRETTY: &str = r#"var _toArray2 = (()
 			}
 			r.exports = a, r.exports.__esModule = !0, r.exports.default = r.exports;
 		},
-		arrayLikeToArray: function(r, n) {
+		arrayLikeToArray: function(r, o) {
 			function a(t, e) {
 				(e == null || e > t.length) && (e = t.length);
-				for (var o = 0, l = Array(e); o < e; o++) l[o] = t[o];
-				return l;
+				for (var n = 0, u = Array(e); n < e; n++) u[n] = t[n];
+				return u;
 			}
 			r.exports = a, r.exports.__esModule = !0, r.exports.default = r.exports;
 		},
-		unsupportedIterableToArray: function(r, n) {
-			var a = n("arrayLikeToArray");
-			function t(e, o) {
+		unsupportedIterableToArray: function(r, o) {
+			var a = o("arrayLikeToArray");
+			function t(e, n) {
 				if (e) {
-					if (typeof e == "string") return a(e, o);
-					var l = {}.toString.call(e).slice(8, -1);
-					return l === "Object" && e.constructor && (l = e.constructor.name), l === "Map" || l === "Set" ? Array.from(e) : l === "Arguments" || /^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(l) ? a(e, o) : void 0;
+					if (typeof e == "string") return a(e, n);
+					var u = {}.toString.call(e).slice(8, -1);
+					return u === "Object" && e.constructor && (u = e.constructor.name), u === "Map" || u === "Set" ? Array.from(e) : u === "Arguments" || /^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(u) ? a(e, n) : void 0;
 				}
 			}
 			r.exports = t, r.exports.__esModule = !0, r.exports.default = r.exports;
 		},
-		nonIterableRest: function(r, n) {
+		nonIterableRest: function(r, o) {
 			function a() {
 				throw new TypeError(`Invalid attempt to destructure non-iterable instance.
 In order to be iterable, non-array objects must have a [Symbol.iterator]() method.`);
 			}
 			r.exports = a, r.exports.__esModule = !0, r.exports.default = r.exports;
 		},
-		slicedToArray: function(r, n) {
-			var a = n("arrayWithHoles"), t = n("iterableToArrayLimit"), e = n("unsupportedIterableToArray"), o = n("nonIterableRest");
-			function l(u, p) {
-				return a(u) || t(u, p) || e(u, p) || o();
+		slicedToArray: function(r, o) {
+			var a = o("arrayWithHoles"), t = o("iterableToArrayLimit"), e = o("unsupportedIterableToArray"), n = o("nonIterableRest");
+			function u(s, p) {
+				return a(s) || t(s, p) || e(s, p) || n();
 			}
-			r.exports = l, r.exports.__esModule = !0, r.exports.default = r.exports;
+			r.exports = u, r.exports.__esModule = !0, r.exports.default = r.exports;
 		},
-		iterableToArray: function(r, n) {
+		arrayWithoutHoles: function(r, o) {
+			var a = o("arrayLikeToArray");
+			function t(e) {
+				if (Array.isArray(e)) return a(e);
+			}
+			r.exports = t, r.exports.__esModule = !0, r.exports.default = r.exports;
+		},
+		iterableToArray: function(r, o) {
 			function a(t) {
 				if (typeof Symbol != "undefined" && t[Symbol.iterator] != null || t["@@iterator"] != null) return Array.from(t);
 			}
 			r.exports = a, r.exports.__esModule = !0, r.exports.default = r.exports;
 		},
-		toArray: function(r, n) {
-			var a = n("arrayWithHoles"), t = n("iterableToArray"), e = n("unsupportedIterableToArray"), o = n("nonIterableRest");
-			function l(u) {
-				return a(u) || t(u) || e(u) || o();
+		nonIterableSpread: function(r, o) {
+			function a() {
+				throw new TypeError(`Invalid attempt to spread non-iterable instance.
+In order to be iterable, non-array objects must have a [Symbol.iterator]() method.`);
 			}
-			r.exports = l, r.exports.__esModule = !0, r.exports.default = r.exports;
+			r.exports = a, r.exports.__esModule = !0, r.exports.default = r.exports;
+		},
+		toConsumableArray: function(r, o) {
+			var a = o("arrayWithoutHoles"), t = o("iterableToArray"), e = o("unsupportedIterableToArray"), n = o("nonIterableSpread");
+			function u(s) {
+				return a(s) || t(s) || e(s) || n();
+			}
+			r.exports = u, r.exports.__esModule = !0, r.exports.default = r.exports;
 		}
-	}, s = {};
+	}, l = {};
 	function i(r) {
-		if (s[r]) return s[r].exports;
-		var n = s[r] = { exports: {} };
-		return f[r](n, i), n.exports;
+		if (l[r]) return l[r].exports;
+		var o = l[r] = { exports: {} };
+		return y[r](o, i), o.exports;
 	}
 	return {
 		slicedToArray: i("slicedToArray"),
-		toArray: i("toArray")
+		toConsumableArray: i("toConsumableArray")
 	};
 })();
-function _toArray(f, s, i) {
-	return i ? _toArray2.toArray(f) : _toArray2.slicedToArray(f, s);
+function _toArray(y, l, i) {
+	return i ? _toArray2.toConsumableArray(y) : _toArray2.slicedToArray(y, l);
 }
 "#;
 pub const INLINE_DESTRUCTURING_ITER_HELPER_BINDINGS: &[&str] = &["_toArray", "_toArray2"];
-pub const INLINE_DESTRUCTURING_ITER_HELPER_RUNTIME: &str = r#"var _toArray2={slicedToArray:require("@babel/runtime/helpers/slicedToArray"),toArray:require("@babel/runtime/helpers/toArray")};function _toArray(r,e,a){return a?_toArray2.toArray(r):_toArray2.slicedToArray(r,e)}"#;
+pub const INLINE_DESTRUCTURING_ITER_HELPER_RUNTIME: &str = r#"var _toArray2={slicedToArray:require("@babel/runtime/helpers/slicedToArray"),toConsumableArray:require("@babel/runtime/helpers/toConsumableArray")};function _toArray(r,e,a){return a?_toArray2.toConsumableArray(r):_toArray2.slicedToArray(r,e)}"#;
 pub const INLINE_DESTRUCTURING_ITER_HELPER_RUNTIME_GLOBALS: &[&str] = &[];
 pub const INLINE_DESTRUCTURING_ITER_HELPER_RUNTIME_PRETTY: &str = r#"var _toArray2 = {
 	slicedToArray: require("@babel/runtime/helpers/slicedToArray"),
-	toArray: require("@babel/runtime/helpers/toArray")
+	toConsumableArray: require("@babel/runtime/helpers/toConsumableArray")
 };
 function _toArray(r, e, a) {
-	return a ? _toArray2.toArray(r) : _toArray2.slicedToArray(r, e);
+	return a ? _toArray2.toConsumableArray(r) : _toArray2.slicedToArray(r, e);
 }
 "#;
 pub const INLINE_DESTRUCTURING_ITER_HELPER_RUNTIME_BINDINGS: &[&str] = &["_toArray", "_toArray2"];
 pub const INLINE_DESTRUCTURING_ITER_HELPER_RUNTIME_DEPENDENCIES: &[&str] =
-    &["slicedToArray", "toArray"];
+    &["slicedToArray", "toConsumableArray"];
 pub const INLINE_DESTRUCTURING_OBJECT_HELPER: &str = r#"var _objectDestructuringEmpty2=(()=>{var r={objectDestructuringEmpty:function(t,n){function c(o){if(o==null)throw new TypeError("Cannot destructure "+o)}t.exports=c,t.exports.__esModule=!0,t.exports.default=t.exports}},e={};function u(t){if(e[t])return e[t].exports;var n=e[t]={exports:{}};return r[t](n,u),n.exports}return{objectDestructuringEmpty:u("objectDestructuringEmpty")}})();function _objectDestructuringEmpty(r){return _objectDestructuringEmpty2.objectDestructuringEmpty(r),r}"#;
 pub const INLINE_DESTRUCTURING_OBJECT_HELPER_GLOBALS: &[&str] = &["TypeError"];
 pub const INLINE_DESTRUCTURING_OBJECT_HELPER_PRETTY: &str = r#"var _objectDestructuringEmpty2 = (() => {
@@ -842,59 +870,77 @@ pub const INLINE_DESTRUCTURING_REST_HELPER_RUNTIME_BINDINGS: &[&str] =
     &["_objectWithoutProperties", "_objectWithoutProperties2"];
 pub const INLINE_DESTRUCTURING_REST_HELPER_RUNTIME_DEPENDENCIES: &[&str] =
     &["objectDestructuringEmpty", "objectWithoutProperties"];
-pub const INLINE_DESTRUCTURING_LOOSE_REST_HELPER: &str = r#"var _objectWithoutProperties2=(()=>{var o={objectDestructuringEmpty:function(e,u){function s(t){if(t==null)throw new TypeError("Cannot destructure "+t)}e.exports=s,e.exports.__esModule=!0,e.exports.default=e.exports},objectWithoutPropertiesLoose:function(e,u){function s(t,p){if(t==null)return{};var c={};for(var n in t)if({}.hasOwnProperty.call(t,n)){if(p.indexOf(n)!==-1)continue;c[n]=t[n]}return c}e.exports=s,e.exports.__esModule=!0,e.exports.default=e.exports}},r={};function i(e){if(r[e])return r[e].exports;var u=r[e]={exports:{}};return o[e](u,i),u.exports}return{objectDestructuringEmpty:i("objectDestructuringEmpty"),objectWithoutPropertiesLoose:i("objectWithoutPropertiesLoose")}})();function _objectWithoutProperties(o,r){return _objectWithoutProperties2.objectDestructuringEmpty(o),_objectWithoutProperties2.objectWithoutPropertiesLoose(o,r)}"#;
-pub const INLINE_DESTRUCTURING_LOOSE_REST_HELPER_GLOBALS: &[&str] = &["TypeError"];
+pub const INLINE_DESTRUCTURING_LOOSE_REST_HELPER: &str = r#"var _objectWithoutProperties2=(()=>{var u={objectDestructuringEmpty:function(e,i){function r(t){if(t==null)throw new TypeError("Cannot destructure "+t)}e.exports=r,e.exports.__esModule=!0,e.exports.default=e.exports},objectWithoutPropertiesLoose:function(e,i){function r(t,p){if(t==null)return{};var s={};for(var o in t)if({}.hasOwnProperty.call(t,o)){if(p.indexOf(o)!==-1)continue;s[o]=t[o]}return s}e.exports=r,e.exports.__esModule=!0,e.exports.default=e.exports},extends:function(e,i){function r(){return e.exports=r=Object.assign?Object.assign.bind():function(t){for(var p=1;p<arguments.length;p++){var s=arguments[p];for(var o in s)({}).hasOwnProperty.call(s,o)&&(t[o]=s[o])}return t},e.exports.__esModule=!0,e.exports.default=e.exports,r.apply(null,arguments)}e.exports=r,e.exports.__esModule=!0,e.exports.default=e.exports}},n={};function c(e){if(n[e])return n[e].exports;var i=n[e]={exports:{}};return u[e](i,c),i.exports}return{objectDestructuringEmpty:c("objectDestructuringEmpty"),objectWithoutPropertiesLoose:c("objectWithoutPropertiesLoose"),extends:c("extends")}})();function _objectWithoutProperties(u,n){return _objectWithoutProperties2.objectDestructuringEmpty(u),n.length?_objectWithoutProperties2.objectWithoutPropertiesLoose(u,n):_objectWithoutProperties2.extends({},u)}"#;
+pub const INLINE_DESTRUCTURING_LOOSE_REST_HELPER_GLOBALS: &[&str] =
+    &["Object", "TypeError", "arguments"];
 pub const INLINE_DESTRUCTURING_LOOSE_REST_HELPER_PRETTY: &str = r#"var _objectWithoutProperties2 = (() => {
-	var o = {
-		objectDestructuringEmpty: function(e, u) {
-			function s(t) {
+	var u = {
+		objectDestructuringEmpty: function(e, i) {
+			function r(t) {
 				if (t == null) throw new TypeError("Cannot destructure " + t);
 			}
-			e.exports = s, e.exports.__esModule = !0, e.exports.default = e.exports;
+			e.exports = r, e.exports.__esModule = !0, e.exports.default = e.exports;
 		},
-		objectWithoutPropertiesLoose: function(e, u) {
-			function s(t, p) {
+		objectWithoutPropertiesLoose: function(e, i) {
+			function r(t, p) {
 				if (t == null) return {};
-				var c = {};
-				for (var n in t) if ({}.hasOwnProperty.call(t, n)) {
-					if (p.indexOf(n) !== -1) continue;
-					c[n] = t[n];
+				var s = {};
+				for (var o in t) if ({}.hasOwnProperty.call(t, o)) {
+					if (p.indexOf(o) !== -1) continue;
+					s[o] = t[o];
 				}
-				return c;
+				return s;
 			}
-			e.exports = s, e.exports.__esModule = !0, e.exports.default = e.exports;
+			e.exports = r, e.exports.__esModule = !0, e.exports.default = e.exports;
+		},
+		extends: function(e, i) {
+			function r() {
+				return e.exports = r = Object.assign ? Object.assign.bind() : function(t) {
+					for (var p = 1; p < arguments.length; p++) {
+						var s = arguments[p];
+						for (var o in s) ({}).hasOwnProperty.call(s, o) && (t[o] = s[o]);
+					}
+					return t;
+				}, e.exports.__esModule = !0, e.exports.default = e.exports, r.apply(null, arguments);
+			}
+			e.exports = r, e.exports.__esModule = !0, e.exports.default = e.exports;
 		}
-	}, r = {};
-	function i(e) {
-		if (r[e]) return r[e].exports;
-		var u = r[e] = { exports: {} };
-		return o[e](u, i), u.exports;
+	}, n = {};
+	function c(e) {
+		if (n[e]) return n[e].exports;
+		var i = n[e] = { exports: {} };
+		return u[e](i, c), i.exports;
 	}
 	return {
-		objectDestructuringEmpty: i("objectDestructuringEmpty"),
-		objectWithoutPropertiesLoose: i("objectWithoutPropertiesLoose")
+		objectDestructuringEmpty: c("objectDestructuringEmpty"),
+		objectWithoutPropertiesLoose: c("objectWithoutPropertiesLoose"),
+		extends: c("extends")
 	};
 })();
-function _objectWithoutProperties(o, r) {
-	return _objectWithoutProperties2.objectDestructuringEmpty(o), _objectWithoutProperties2.objectWithoutPropertiesLoose(o, r);
+function _objectWithoutProperties(u, n) {
+	return _objectWithoutProperties2.objectDestructuringEmpty(u), n.length ? _objectWithoutProperties2.objectWithoutPropertiesLoose(u, n) : _objectWithoutProperties2.extends({}, u);
 }
 "#;
 pub const INLINE_DESTRUCTURING_LOOSE_REST_HELPER_BINDINGS: &[&str] =
     &["_objectWithoutProperties", "_objectWithoutProperties2"];
-pub const INLINE_DESTRUCTURING_LOOSE_REST_HELPER_RUNTIME: &str = r#"var _objectWithoutProperties2={objectDestructuringEmpty:require("@babel/runtime/helpers/objectDestructuringEmpty"),objectWithoutPropertiesLoose:require("@babel/runtime/helpers/objectWithoutPropertiesLoose")};function _objectWithoutProperties(e,t){return _objectWithoutProperties2.objectDestructuringEmpty(e),_objectWithoutProperties2.objectWithoutPropertiesLoose(e,t)}"#;
+pub const INLINE_DESTRUCTURING_LOOSE_REST_HELPER_RUNTIME: &str = r#"var _objectWithoutProperties2={objectDestructuringEmpty:require("@babel/runtime/helpers/objectDestructuringEmpty"),objectWithoutPropertiesLoose:require("@babel/runtime/helpers/objectWithoutPropertiesLoose"),extends:require("@babel/runtime/helpers/extends")};function _objectWithoutProperties(e,t){return _objectWithoutProperties2.objectDestructuringEmpty(e),t.length?_objectWithoutProperties2.objectWithoutPropertiesLoose(e,t):_objectWithoutProperties2.extends({},e)}"#;
 pub const INLINE_DESTRUCTURING_LOOSE_REST_HELPER_RUNTIME_GLOBALS: &[&str] = &[];
 pub const INLINE_DESTRUCTURING_LOOSE_REST_HELPER_RUNTIME_PRETTY: &str = r#"var _objectWithoutProperties2 = {
 	objectDestructuringEmpty: require("@babel/runtime/helpers/objectDestructuringEmpty"),
-	objectWithoutPropertiesLoose: require("@babel/runtime/helpers/objectWithoutPropertiesLoose")
+	objectWithoutPropertiesLoose: require("@babel/runtime/helpers/objectWithoutPropertiesLoose"),
+	extends: require("@babel/runtime/helpers/extends")
 };
 function _objectWithoutProperties(e, t) {
-	return _objectWithoutProperties2.objectDestructuringEmpty(e), _objectWithoutProperties2.objectWithoutPropertiesLoose(e, t);
+	return _objectWithoutProperties2.objectDestructuringEmpty(e), t.length ? _objectWithoutProperties2.objectWithoutPropertiesLoose(e, t) : _objectWithoutProperties2.extends({}, e);
 }
 "#;
 pub const INLINE_DESTRUCTURING_LOOSE_REST_HELPER_RUNTIME_BINDINGS: &[&str] =
     &["_objectWithoutProperties", "_objectWithoutProperties2"];
-pub const INLINE_DESTRUCTURING_LOOSE_REST_HELPER_RUNTIME_DEPENDENCIES: &[&str] =
-    &["objectDestructuringEmpty", "objectWithoutPropertiesLoose"];
+pub const INLINE_DESTRUCTURING_LOOSE_REST_HELPER_RUNTIME_DEPENDENCIES: &[&str] = &[
+    "objectDestructuringEmpty",
+    "objectWithoutPropertiesLoose",
+    "extends",
+];
 pub const INLINE_CLASS_CONSTRUCT_HELPER: &str = r#"var _construct2=(()=>{var p={isNativeReflectConstruct:function(e,r){function t(){try{var n=!Boolean.prototype.valueOf.call(Reflect.construct(Boolean,[],function(){}))}catch(c){}return(e.exports=t=function(){return!!n},e.exports.__esModule=!0,e.exports.default=e.exports)()}e.exports=t,e.exports.__esModule=!0,e.exports.default=e.exports},setPrototypeOf:function(e,r){function t(n,c){return e.exports=t=Object.setPrototypeOf?Object.setPrototypeOf.bind():function(s,f){return s.__proto__=f,s},e.exports.__esModule=!0,e.exports.default=e.exports,t(n,c)}e.exports=t,e.exports.__esModule=!0,e.exports.default=e.exports},construct:function(e,r){var t=r("isNativeReflectConstruct"),n=r("setPrototypeOf");function c(s,f,x){if(t())return Reflect.construct.apply(null,arguments);var l=[null];l.push.apply(l,f);var a=new(s.bind.apply(s,l));return x&&n(a,x.prototype),a}e.exports=c,e.exports.__esModule=!0,e.exports.default=e.exports}},o={};function u(e){if(o[e])return o[e].exports;var r=o[e]={exports:{}};return p[e](r,u),r.exports}return{construct:u("construct")}})();function _construct(p,o,u){return _construct2.construct(p,o,u)}"#;
 pub const INLINE_CLASS_CONSTRUCT_HELPER_GLOBALS: &[&str] =
     &["Boolean", "Object", "Reflect", "arguments"];

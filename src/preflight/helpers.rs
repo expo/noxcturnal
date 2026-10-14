@@ -384,6 +384,7 @@ pub fn babel_helper_spec(name: &str) -> Option<HelperCompatibility> {
         "get" => "get",
         "slicedToArray" => "slicedToArray",
         "toArray" => "toArray",
+        "toConsumableArray" => "toConsumableArray",
         "wrapRegExp" => "wrapRegExp",
         "objectSpread2" => "objectSpread2",
         "classPrivateFieldInitSpec" => "classPrivateFieldInitSpec",
@@ -1036,6 +1037,7 @@ mod tests {
             "readOnlyError",
             "slicedToArray",
             "toArray",
+            "toConsumableArray",
             "toPropertyKey",
             "wrapRegExp",
         ] {

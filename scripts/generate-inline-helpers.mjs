@@ -130,7 +130,7 @@ async function buildBundle(roots) {
 const generated = {};
 for (const [name, roots] of Object.entries(bundles)) generated[name] = await buildBundle(roots);
 
-const compatibilityRoots = new Set(Object.values(bundles).flat());
+const compatibilityRoots = new Set([...Object.values(bundles).flat(), 'toArray']);
 
 const adapterBundles = {
   INLINE_FOR_OF_HELPER: {
@@ -155,10 +155,10 @@ const adapterBundles = {
     adapter: 'function _toPropertyKey(value){return _toPropertyKey2.toPropertyKey(value)}',
   },
   INLINE_DESTRUCTURING_ITER_HELPER: {
-    roots: ['slicedToArray', 'toArray'],
+    roots: ['slicedToArray', 'toConsumableArray'],
     binding: '_toArray2',
     adapter:
-      'function _toArray(value,count,all){return all?_toArray2.toArray(value):_toArray2.slicedToArray(value,count)}',
+      'function _toArray(value,count,all){return all?_toArray2.toConsumableArray(value):_toArray2.slicedToArray(value,count)}',
   },
   INLINE_DESTRUCTURING_OBJECT_HELPER: {
     roots: ['objectDestructuringEmpty'],
@@ -173,10 +173,10 @@ const adapterBundles = {
       'function _objectWithoutProperties(value,excluded){_objectWithoutProperties2.objectDestructuringEmpty(value);return _objectWithoutProperties2.objectWithoutProperties(value,excluded)}',
   },
   INLINE_DESTRUCTURING_LOOSE_REST_HELPER: {
-    roots: ['objectDestructuringEmpty', 'objectWithoutPropertiesLoose'],
+    roots: ['objectDestructuringEmpty', 'objectWithoutPropertiesLoose', 'extends'],
     binding: '_objectWithoutProperties2',
     adapter:
-      'function _objectWithoutProperties(value,excluded){_objectWithoutProperties2.objectDestructuringEmpty(value);return _objectWithoutProperties2.objectWithoutPropertiesLoose(value,excluded)}',
+      'function _objectWithoutProperties(value,excluded){_objectWithoutProperties2.objectDestructuringEmpty(value);return excluded.length?_objectWithoutProperties2.objectWithoutPropertiesLoose(value,excluded):_objectWithoutProperties2.extends({},value)}',
   },
   INLINE_CLASS_CONSTRUCT_HELPER: {
     roots: ['construct'],

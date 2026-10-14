@@ -381,9 +381,7 @@ fn transform_impl(
     )?;
     let mut rewrite_layers = Vec::new();
     let mut decorator_helper_requests = CustomHelperRequests::default();
-    let focused_object_rest = options.object_rest_spread == Some(true)
-        && (options.object_rest_spread_loose == Some(true)
-            || options.object_rest_spread_use_built_ins == Some(true));
+    let focused_object_rest = options.object_rest_spread == Some(true);
     let object_rest_loose = options.object_rest_spread_loose == Some(true);
     let focused_class_features = options.class_properties == Some(true)
         || options.private_methods == Some(true)
@@ -918,12 +916,19 @@ fn transform_impl(
                 Ok(plan) => Some(plan),
                 Err(reason) => return Ok(fatal(reason, [] as [String; 0])),
             }
+        } else if focused_object_rest {
+            match super::parameters::prepare_object_rest(source, &semantic.semantic) {
+                Ok(plan) => Some(plan),
+                Err(reason) => return Ok(fatal(reason, [] as [String; 0])),
+            }
         } else {
             None
         };
         let early_destructuring_ast_plan = if (options.destructuring == Some(true)
             || focused_object_rest)
-            && options.parameters != Some(true)
+            && parameters_ast_plan
+                .as_ref()
+                .is_none_or(super::parameters::AstPlan::is_empty)
             && options.for_of != Some(true)
         {
             match super::destructuring::prepare_ast(

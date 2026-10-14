@@ -167,6 +167,12 @@ pub(super) fn prepare_ast(
                     && (!only_object_rest || assignment_has_object_rest(target))
             })
         }
+        AstKind::ForInStatement(statement) => {
+            statement.left.as_assignment_target().is_some_and(|target| {
+                target.is_assignment_target_pattern()
+                    && (!only_object_rest || assignment_has_object_rest(target))
+            })
+        }
         _ => false,
     });
     if !has_candidate {
@@ -185,6 +191,13 @@ pub(super) fn prepare_ast(
     let base_reserved: FxHashSet<String> = semantic
         .scoping()
         .symbol_names()
+        .chain(
+            semantic
+                .scoping()
+                .root_unresolved_references()
+                .keys()
+                .map(|name| name.as_str()),
+        )
         .map(str::to_owned)
         .collect();
     let mut reserved = PlanningReservations::new(base_reserved);
@@ -305,6 +318,7 @@ pub(super) fn prepare_ast(
                     .ancestor_ids(node_id)
                     .find_map(|ancestor| match semantic.nodes().kind(ancestor) {
                         AstKind::FunctionBody(body) => Some(body.span.start),
+                        AstKind::StaticBlock(block) => Some(block.span.start),
                         AstKind::Program(program) => Some(program.span.start),
                         _ => None,
                     })
@@ -342,6 +356,45 @@ pub(super) fn prepare_ast(
                     .ancestor_ids(node_id)
                     .find_map(|ancestor| match semantic.nodes().kind(ancestor) {
                         AstKind::FunctionBody(body) => Some(body.span.start),
+                        AstKind::StaticBlock(block) => Some(block.span.start),
+                        AstKind::Program(program) => Some(program.span.start),
+                        _ => None,
+                    })
+                    .unwrap_or(0);
+                temporary_declarations
+                    .entry(scope_start)
+                    .or_default()
+                    .extend(reserved.allocations[before..].iter().cloned());
+            }
+            AstKind::ForInStatement(statement)
+                if !matches!(statement.left, ForStatementLeft::VariableDeclaration(_)) =>
+            {
+                let Some(target) = statement.left.as_assignment_target() else {
+                    continue;
+                };
+                if !target.is_assignment_target_pattern()
+                    || (only_object_rest && !assignment_has_object_rest(target))
+                {
+                    continue;
+                }
+                let before = reserved.checkpoint();
+                let root = reserve("_ref", &mut reserved);
+                let reservation_checkpoint = reserved.checkpoint();
+                plan_assignment_names(target, &mut reserved, &mut helper_usage);
+                for_of_assignments.insert(
+                    statement.span.start,
+                    AstAssignmentPlan {
+                        root,
+                        anchor: statement.left.span(),
+                        reservation_checkpoint,
+                    },
+                );
+                let scope_start = semantic
+                    .nodes()
+                    .ancestor_ids(node_id)
+                    .find_map(|ancestor| match semantic.nodes().kind(ancestor) {
+                        AstKind::FunctionBody(body) => Some(body.span.start),
+                        AstKind::StaticBlock(block) => Some(block.span.start),
                         AstKind::Program(program) => Some(program.span.start),
                         _ => None,
                     })
@@ -887,13 +940,147 @@ impl<'a> DestructuringDeclaratorLowerer<'a> {
             key => {
                 let expression = Expression::try_from(key)
                     .map_err(|_| "destructuring-property-key-not-expression")?;
-                let exclusion = expression.clone_in(self.allocator);
+                let exclusion = match &expression {
+                    Expression::NumericLiteral(_) | Expression::BigIntLiteral(_) => {
+                        self.ast().expression_binary(
+                            span,
+                            self.ast().expression_string_literal(span, "", None),
+                            BinaryOperator::Addition,
+                            expression.clone_in(self.allocator),
+                        )
+                    }
+                    _ => expression.clone_in(self.allocator),
+                };
                 Ok((
                     self.computed(span, self.id(span, object), expression),
                     exclusion,
                 ))
             }
         }
+    }
+}
+
+impl<'a> DestructuringDeclaratorLowerer<'a> {
+    #[expect(deprecated)]
+    fn lower_loop_head(
+        &mut self,
+        span: Span,
+        left: &mut ForStatementLeft<'a>,
+        body: &mut Statement<'a>,
+    ) {
+        if let Some(plan) = self.for_of_assignments.remove(&span.start) {
+            let ast = self.ast();
+            let old_left = (*left).take_in(&ast);
+            let target = match AssignmentTarget::try_from(old_left) {
+                Ok(target) => target,
+                Err(_) => {
+                    self.error = Some("destructuring-loop-target-missing");
+                    return;
+                }
+            };
+            (*left) = ast
+                .simple_assignment_target_assignment_target_identifier(
+                    plan.anchor,
+                    self.allocator.alloc_str(&plan.root),
+                )
+                .into();
+            let mut expressions = ArenaVec::new_in(&ast);
+            let mut reserved = SnapshotReservations {
+                base: &self.base_reserved,
+                planned: &self.planned_allocations,
+                checkpoint: plan.reservation_checkpoint,
+                local: FxHashSet::default(),
+            };
+            if let Err(error) = self.lower_assignment(
+                target,
+                self.id(plan.anchor, &plan.root),
+                plan.anchor,
+                &mut expressions,
+                &mut reserved,
+            ) {
+                self.error = Some(error);
+                return;
+            }
+            #[expect(deprecated)]
+            let binding = ast.statement_expression(
+                plan.anchor,
+                ast.expression_sequence(plan.anchor, expressions),
+            );
+            let old_body = body.take_in(&ast);
+            #[expect(deprecated)]
+            {
+                *body = ast.statement_block(plan.anchor, ast.vec_from_array([binding, old_body]));
+            }
+            self.changed = true;
+            return;
+        }
+
+        let ForStatementLeft::VariableDeclaration(declaration) = &mut (*left) else {
+            return;
+        };
+        let Some(declarator) = declaration.declarations.first_mut() else {
+            return;
+        };
+        if declarator.id.is_binding_identifier() {
+            return;
+        }
+
+        let start = declarator.span.start;
+        let pattern = binding_pattern_fingerprint(&declarator.id);
+        let key = (start, pattern);
+        let Some(plans) = self.declarations.get_mut(&key) else {
+            return;
+        };
+        let plan = plans
+            .pop_front()
+            .expect("nonempty destructuring plan bucket");
+        if plans.is_empty() {
+            self.declarations.remove(&key);
+        }
+
+        let ast = self.ast();
+        let old = declarator.take_in(&ast);
+        debug_assert!(
+            old.init.is_none(),
+            "loop-head declarators have no initializer"
+        );
+        *declarator = self.declarator(plan.anchor, old.kind, &plan.root, None);
+
+        let mut lowered = ArenaVec::new_in(&ast);
+        let mut reserved = SnapshotReservations {
+            base: &self.base_reserved,
+            planned: &self.planned_allocations,
+            checkpoint: plan.reservation_checkpoint,
+            local: FxHashSet::default(),
+        };
+        if let Err(error) = self.lower_binding(
+            old.id,
+            self.id(plan.anchor, &plan.root),
+            old.kind,
+            plan.anchor,
+            &mut lowered,
+            &mut reserved,
+        ) {
+            self.error = Some(error);
+            return;
+        }
+        #[expect(deprecated)]
+        let binding = Statement::VariableDeclaration(ast.alloc_variable_declaration(
+            plan.anchor,
+            old.kind,
+            lowered,
+            false,
+        ));
+        let old_body = body.take_in(&ast);
+        #[expect(deprecated)]
+        {
+            // Keep an existing block nested. Its lexical environment is the
+            // original loop-body environment; destructuring computed keys are
+            // evaluated before entering it and therefore must not observe the
+            // TDZ of same-named `let`/`const` declarations in that body.
+            *body = ast.statement_block(plan.anchor, ast.vec_from_array([binding, old_body]));
+        }
+        self.changed = true;
     }
 }
 
@@ -909,6 +1096,19 @@ impl<'a> VisitMut<'a> for DestructuringDeclaratorLowerer<'a> {
             }
         }
         walk_mut::walk_program(self, program);
+    }
+
+    fn visit_static_block(&mut self, block: &mut oxc_ast::ast::StaticBlock<'a>) {
+        if let Some(names) = self.temporary_declarations.remove(&block.span.start) {
+            match parse_var_declaration(self.allocator, &names, block.span) {
+                Ok(declaration) => block.body.insert(0, declaration),
+                Err(error) => {
+                    self.error = Some(error);
+                    return;
+                }
+            }
+        }
+        walk_mut::walk_static_block(self, block);
     }
 
     fn visit_variable_declaration(&mut self, declaration: &mut VariableDeclaration<'a>) {
@@ -965,126 +1165,14 @@ impl<'a> VisitMut<'a> for DestructuringDeclaratorLowerer<'a> {
         walk_mut::walk_variable_declaration(self, declaration);
     }
 
-    #[expect(deprecated)]
     fn visit_for_of_statement(&mut self, statement: &mut oxc_ast::ast::ForOfStatement<'a>) {
-        if let Some(plan) = self.for_of_assignments.remove(&statement.span.start) {
-            let ast = self.ast();
-            let old_left = statement.left.take_in(&ast);
-            let target = match AssignmentTarget::try_from(old_left) {
-                Ok(target) => target,
-                Err(_) => {
-                    self.error = Some("destructuring-for-of-target-missing");
-                    return;
-                }
-            };
-            statement.left = ast
-                .simple_assignment_target_assignment_target_identifier(
-                    plan.anchor,
-                    self.allocator.alloc_str(&plan.root),
-                )
-                .into();
-            let mut expressions = ArenaVec::new_in(&ast);
-            let mut reserved = SnapshotReservations {
-                base: &self.base_reserved,
-                planned: &self.planned_allocations,
-                checkpoint: plan.reservation_checkpoint,
-                local: FxHashSet::default(),
-            };
-            if let Err(error) = self.lower_assignment(
-                target,
-                self.id(plan.anchor, &plan.root),
-                plan.anchor,
-                &mut expressions,
-                &mut reserved,
-            ) {
-                self.error = Some(error);
-                return;
-            }
-            #[expect(deprecated)]
-            let binding = ast.statement_expression(
-                plan.anchor,
-                ast.expression_sequence(plan.anchor, expressions),
-            );
-            let body = &mut statement.body;
-            let old_body = body.take_in(&ast);
-            #[expect(deprecated)]
-            {
-                *body = ast.statement_block(plan.anchor, ast.vec_from_array([binding, old_body]));
-            }
-            self.changed = true;
-            walk_mut::walk_for_of_statement(self, statement);
-            return;
-        }
-
-        let ForStatementLeft::VariableDeclaration(declaration) = &mut statement.left else {
-            walk_mut::walk_for_of_statement(self, statement);
-            return;
-        };
-        let Some(declarator) = declaration.declarations.first_mut() else {
-            walk_mut::walk_for_of_statement(self, statement);
-            return;
-        };
-        if declarator.id.is_binding_identifier() {
-            walk_mut::walk_for_of_statement(self, statement);
-            return;
-        }
-
-        let start = declarator.span.start;
-        let pattern = binding_pattern_fingerprint(&declarator.id);
-        let key = (start, pattern);
-        let Some(plans) = self.declarations.get_mut(&key) else {
-            walk_mut::walk_for_of_statement(self, statement);
-            return;
-        };
-        let plan = plans
-            .pop_front()
-            .expect("nonempty destructuring plan bucket");
-        if plans.is_empty() {
-            self.declarations.remove(&key);
-        }
-
-        let ast = self.ast();
-        let old = declarator.take_in(&ast);
-        debug_assert!(old.init.is_none(), "for-of declarators have no initializer");
-        *declarator = self.declarator(plan.anchor, old.kind, &plan.root, None);
-
-        let mut lowered = ArenaVec::new_in(&ast);
-        let mut reserved = SnapshotReservations {
-            base: &self.base_reserved,
-            planned: &self.planned_allocations,
-            checkpoint: plan.reservation_checkpoint,
-            local: FxHashSet::default(),
-        };
-        if let Err(error) = self.lower_binding(
-            old.id,
-            self.id(plan.anchor, &plan.root),
-            old.kind,
-            plan.anchor,
-            &mut lowered,
-            &mut reserved,
-        ) {
-            self.error = Some(error);
-            return;
-        }
-        #[expect(deprecated)]
-        let binding = Statement::VariableDeclaration(ast.alloc_variable_declaration(
-            plan.anchor,
-            old.kind,
-            lowered,
-            false,
-        ));
-        let body = &mut statement.body;
-        let old_body = body.take_in(&ast);
-        #[expect(deprecated)]
-        {
-            // Keep an existing block nested. Its lexical environment is the
-            // original loop-body environment; destructuring computed keys are
-            // evaluated before entering it and therefore must not observe the
-            // TDZ of same-named `let`/`const` declarations in that body.
-            *body = ast.statement_block(plan.anchor, ast.vec_from_array([binding, old_body]));
-        }
-        self.changed = true;
+        self.lower_loop_head(statement.span, &mut statement.left, &mut statement.body);
         walk_mut::walk_for_of_statement(self, statement);
+    }
+
+    fn visit_for_in_statement(&mut self, statement: &mut oxc_ast::ast::ForInStatement<'a>) {
+        self.lower_loop_head(statement.span, &mut statement.left, &mut statement.body);
+        walk_mut::walk_for_in_statement(self, statement);
     }
 
     fn visit_catch_clause(&mut self, clause: &mut oxc_ast::ast::CatchClause<'a>) {
@@ -1234,9 +1322,12 @@ fn ast_eligible_declarator(
 ) -> bool {
     !declarator.id.is_binding_identifier()
         && (declarator.init.is_some()
-            || nodes
-                .ancestor_ids(node_id)
-                .any(|ancestor| matches!(nodes.kind(ancestor), AstKind::ForOfStatement(_))))
+            || nodes.ancestor_ids(node_id).any(|ancestor| {
+                matches!(
+                    nodes.kind(ancestor),
+                    AstKind::ForOfStatement(_) | AstKind::ForInStatement(_)
+                )
+            }))
 }
 
 fn binding_pattern_fingerprint(pattern: &BindingPattern<'_>) -> String {
