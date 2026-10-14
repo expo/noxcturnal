@@ -38,8 +38,8 @@ macro_rules! fatal {
 
 const REVIEWED: &[Entry] = &[
     unsupported!("react-compiler-not-built", "feature-selection"),
-    unsupported!("parse-error", "initial-parse"),
-    unsupported!("semantic-error", "initial-semantics"),
+    unsupported!("parse-error", "escaped-regexp-name-parser-boundary"),
+    unsupported!("mutable-namespace-export", "typescript-compatibility"),
     unsupported!("for-of-inline-helper-shadowed-global", "helper-selection"),
     unsupported!("helper-not-compatible:{helper}", "helper-selection"),
     unsupported!("helper-not-compatible:{}", "helper-selection"),
@@ -296,7 +296,7 @@ fn looks_like_failure_reason(value: &str) -> bool {
         "pre-",
         "react-compiler-",
         "regexp-",
-        "semantic-error",
+        "mutable-namespace-export",
         "transform-error",
     ];
     PREFIXES.iter().any(|prefix| value.starts_with(prefix))

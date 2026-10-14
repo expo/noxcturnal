@@ -58,8 +58,6 @@ for (const mode of ['empty', 'visitor', 'scope', 'native'] as const)
         unregister();
       }
     });
-    (syntax === 'js' && mode !== 'empty' ? test.fails : test)(
-      'honors the adapter output syntax when the pipeline parses its output',
-      () => expect(actual).toEqual(['complete', mode === 'visitor' || mode === 'scope' ? 1 : 0]),
-    );
+    test('honors the adapter output syntax when the pipeline parses its output', () =>
+      expect(actual).toEqual(['complete', mode === 'visitor' || mode === 'scope' ? 1 : 0]));
   });

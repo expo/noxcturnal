@@ -11,11 +11,10 @@ const cases = [
     name: 'extra statements through wrapper boundary',
     source: '0); extra(); (0',
     valid: false,
-    fails: true,
   },
-  { name: 'trailing line comment', source: '3 // note', valid: true, fails: true },
-  { name: 'ordinary expression', source: '3 + 4', valid: true, fails: false },
-  { name: 'incomplete expression', source: '3 +', valid: false, fails: false },
+  { name: 'trailing line comment', source: '3 // note', valid: true },
+  { name: 'ordinary expression', source: '3 + 4', valid: true },
+  { name: 'incomplete expression', source: '3 +', valid: false },
 ];
 function accepts(parse: () => unknown, native = false) {
   try {
@@ -34,7 +33,6 @@ describe.each(cases)('$name', entry => {
   });
   test('Babel expression parser control', () =>
     expect(accepts(() => parseExpression(entry.source))).toBe(entry.valid));
-  (entry.fails ? test.fails : test)('expression factory validates exactly one expression', () =>
-    expect(accepted).toBe(entry.valid),
-  );
+  test('expression factory validates exactly one expression', () =>
+    expect(accepted).toBe(entry.valid));
 });

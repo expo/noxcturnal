@@ -29,26 +29,22 @@ for (const observer of [false, true]) {
           defineNativePipeline({ phases: [{ name: 'visit', plugins: [plugin] }] }),
         ),
       ).toThrow(TransformSyntaxError);
-      const result = transform(
-        source,
-        'input.js',
-        defineNativePipeline({
-          phases: [
-            { name: 'native', native: { transforms: { parameters: true } } },
-            ...(observer ? [{ name: 'visit', plugins: [plugin] }] : []),
-          ],
-        }),
-      );
-      expect(result).toEqual({
-        status: 'bailout',
-        reason: 'native:parse-error',
-        source,
-        diagnostics: [],
-      });
+      expect(() =>
+        transform(
+          source,
+          'input.js',
+          defineNativePipeline({
+            phases: [
+              { name: 'native', native: { transforms: { parameters: true } } },
+              ...(observer ? [{ name: 'visit', plugins: [plugin] }] : []),
+            ],
+          }),
+        ),
+      ).toThrow(TransformSyntaxError);
       expect(visits).toBe(0);
-      outcome = result.status;
+      outcome = 'throw';
     });
-    test.fails('invalid input throws rather than becoming a compatibility bailout', () =>
+    test('invalid input throws rather than becoming a compatibility bailout', () =>
       expect(outcome).toBe('throw'));
   });
 }

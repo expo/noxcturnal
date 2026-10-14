@@ -103,3 +103,8 @@ pub fn validate_expression(code: String, parser_mode: Option<String>) -> napi::R
 pub fn validate_statements(code: String, parser_mode: Option<String>) -> napi::Result<()> {
     syntax::fragments::validate_statements(&code, parser_mode.as_deref())
 }
+
+#[napi]
+pub fn validate_program(source: String, filename: String) -> napi::Result<()> {
+    syntax::validation::validate_source(&source, &filename)
+}

@@ -2,7 +2,7 @@ import { format } from 'oxfmt';
 import { expect, test } from 'vitest';
 
 import type { PreflightPlan } from '../../js/index';
-import { defineNativePipeline, transform } from '../../js/index';
+import { defineNativePipeline, transform, TransformSyntaxError } from '../../js/index';
 import { nativeFlowErasureBuilt } from '../../js/native/binding';
 
 export { nativeFlowErasureBuilt };
@@ -46,6 +46,7 @@ export async function transformOutcome(
       defineNativePipeline({ phases: [{ name: 'preflight', native: preflight }] }),
     );
   } catch (error) {
+    if (error instanceof TransformSyntaxError) return '[syntax-error] invalid-input';
     if (
       typeof error === 'object' &&
       error !== null &&

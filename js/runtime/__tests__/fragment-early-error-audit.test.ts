@@ -6,15 +6,13 @@ const cases = [
     name: 'duplicate strict parameters',
     source: 'function f(value,value){"use strict";}',
     valid: false,
-    fails: true,
   },
-  { name: 'duplicate private field', source: 'class C{#x;#x;}', valid: false, fails: true },
-  { name: 'missing const initializer', source: 'const value;', valid: false, fails: false },
+  { name: 'duplicate private field', source: 'class C{#x;#x;}', valid: false },
+  { name: 'missing const initializer', source: 'const value;', valid: false },
   {
     name: 'valid closed declaration',
     source: 'function f(value){"use strict";return value}',
     valid: true,
-    fails: false,
   },
 ];
 function syntaxAccepted(parse: () => unknown) {
@@ -43,7 +41,6 @@ describe.each(cases)('$name', entry => {
     expect(
       syntaxAccepted(() => parseSync(entry.source, { configFile: false, babelrc: false })),
     ).toBe(entry.valid));
-  (entry.fails ? test.fails : test)('statement validation rejects internal early errors', () =>
-    expect(accepted).toBe(entry.valid),
-  );
+  test('statement validation rejects internal early errors', () =>
+    expect(accepted).toBe(entry.valid));
 });

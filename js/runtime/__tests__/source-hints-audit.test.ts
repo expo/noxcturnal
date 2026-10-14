@@ -32,7 +32,7 @@ for (const name of ['marker', 'import', 'absent'])
       expect(calls).toBe(1);
       if (name !== 'marker') expect(before).toBe(name === 'import');
     });
-    (name === 'marker' ? test.fails : test)('read-only observation preserves membership', () => {
+    test('read-only observation preserves membership', () => {
       expect(after).toBe(before);
     });
   });

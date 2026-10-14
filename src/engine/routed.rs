@@ -50,8 +50,11 @@ pub fn materialize_routed_buffer(
             "routed-materialization",
         ));
     }
-    // Semantic analysis is skipped entirely when no compiled route consumes semantic data.
-    // The collector then assigns preorder node IDs itself during its single traversal.
+    // Scope-free routes validate early errors without retaining semantic data or AstNodes.
+    // The collector still assigns preorder node IDs during its own traversal.
+    if !manifest.needs_semantics {
+        crate::syntax::validation::validate_program(&parsed.program, "routed-materialization")?;
+    }
     let semantic_return = manifest.needs_semantics.then(|| {
         SemanticBuilder::new()
             .with_build_nodes(true)

@@ -10,19 +10,17 @@ import {
 } from '../../index';
 
 const cases = [
-  { name: 'duplicate lexical binding', source: 'let x; let x;', invalid: true, native: 'bailout' },
+  { name: 'duplicate lexical binding', source: 'let x; let x;', invalid: true },
   {
     name: 'duplicate strict parameter',
     source: 'function f(a,a){"use strict";}',
     invalid: true,
-    native: 'bailout',
   },
-  { name: 'break without loop', source: 'break;', invalid: true, native: 'complete' },
+  { name: 'break without loop', source: 'break;', invalid: true },
   {
     name: 'const assignment is a runtime error',
     source: 'const x=1; x=2;',
     invalid: false,
-    native: 'complete',
   },
 ] as const;
 
@@ -54,8 +52,7 @@ for (const mode of ['native', 'visitor', 'scope', 'optimize'] as const) {
           : mode === 'optimize'
             ? { name: mode, native: { optimize: { constantFolding: true } } }
             : { name: mode, plugins: [plugin] };
-      const expected =
-        entry.invalid && mode === 'scope' ? 'throw' : mode === 'native' ? entry.native : 'complete';
+      const expected = entry.invalid ? 'throw' : 'complete';
       try {
         const result = transform(
           entry.source,
@@ -78,13 +75,10 @@ for (const mode of ['native', 'visitor', 'scope', 'optimize'] as const) {
         outcome = 'throw';
       }
       expect(outcome).toBe(expected);
-      expect(visits).toBe(mode === 'visitor' || (mode === 'scope' && !entry.invalid) ? 1 : 0);
+      expect(visits).toBe((mode === 'visitor' || mode === 'scope') && !entry.invalid ? 1 : 0);
     });
-    (entry.invalid && mode !== 'scope' ? test.fails : test)(
-      'separates invalid input from valid syntax',
-      () => {
-        expect(outcome).toBe(entry.invalid ? 'throw' : 'complete');
-      },
-    );
+    test('separates invalid input from valid syntax', () => {
+      expect(outcome).toBe(entry.invalid ? 'throw' : 'complete');
+    });
   });
 }

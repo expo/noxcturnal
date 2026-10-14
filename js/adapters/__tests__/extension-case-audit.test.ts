@@ -45,12 +45,9 @@ describe.each(['js', 'jsx', 'ts', 'tsx', 'mjs', 'cjs'])('%s', extension => {
           expect(completed).toBe(true);
         }
       });
-      (uppercase ? test.fails : test)(
-        'classification agrees with parsing valid plain source',
-        () => {
-          expect(completed).toBe(supported);
-        },
-      );
+      test('classification agrees with parsing valid plain source', () => {
+        expect(completed).toBe(supported);
+      });
     });
   }
 });

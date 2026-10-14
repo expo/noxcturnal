@@ -12,7 +12,10 @@ class LazySourceHints implements ReadonlySet<string> {
   }
 
   has(value: string): boolean {
-    return this.#set?.has(value) ?? this.source.includes(value);
+    return (
+      this.#set?.has(value) ??
+      (SOURCE_HINTS.some(hint => hint === value) && this.source.includes(value))
+    );
   }
 
   entries(): SetIterator<[string, string]> {
@@ -61,7 +64,7 @@ export function classifyForTransform(
   const lower = filename.toLowerCase();
   const syntax =
     syntaxOverride ??
-    (lower.endsWith('.d.ts')
+    (/\.d\.(?:ts|mts|cts)$/.test(lower)
       ? 'dts'
       : lower.endsWith('.tsx')
         ? 'tsx'
@@ -70,7 +73,7 @@ export function classifyForTransform(
           : lower.endsWith('.jsx')
             ? 'jsx'
             : lower.endsWith('.js') || lower.endsWith('.mjs') || lower.endsWith('.cjs')
-              ? source.includes('@flow')
+              ? hasFlowDirective(source)
                 ? 'flow'
                 : 'js'
               : 'unknown');
@@ -84,4 +87,25 @@ export function classifyForTransform(
         ? 'flow-requires-parser-adapter'
         : 'unknown-extension',
   };
+}
+
+// Flow's pragma belongs to the leading comment header. Stop at the first token:
+// quotes, templates and regular expressions are never directive comments.
+function hasFlowDirective(source: string): boolean {
+  let remaining = source;
+  if (remaining.startsWith('#!')) remaining = remaining.replace(/^[^\r\n\u2028\u2029]*/, '');
+  while (true) {
+    remaining = remaining.trimStart();
+    let end: number;
+    if (remaining.startsWith('//')) {
+      end = remaining.search(/[\r\n\u2028\u2029]/);
+      if (end < 0) end = remaining.length;
+    } else if (remaining.startsWith('/*')) {
+      end = remaining.indexOf('*/', 2);
+      if (end < 0) return false;
+      end += 2;
+    } else return false;
+    if (/(?:^|[^\w])@flow(?:$|[^\w])/.test(remaining.slice(2, end))) return true;
+    remaining = remaining.slice(end);
+  }
 }

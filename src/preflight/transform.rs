@@ -441,7 +441,7 @@ fn transform_impl(
             };
             if active_source_type.is_typescript() || has_decorators {
                 let built = {
-                    SemanticBuilder::new()
+                    SemanticBuilder::new_compiler()
                         .with_excess_capacity(2.0)
                         .with_enum_eval(true)
                         .build(&program)
@@ -572,13 +572,29 @@ fn transform_impl(
         )
     };
     if final_program.has_diagnostics() {
-        return Ok(unsupported("parse-error", std::iter::empty::<&str>()));
+        let parsed = final_program.borrow_dependent();
+        if crate::syntax::validation::escaped_regexp_name_boundary(
+            &parsed.program,
+            &parsed.diagnostics,
+        ) {
+            crate::syntax::validation::validate_program(&parsed.program, "native-phase")?;
+            return Ok(unsupported("parse-error", &parsed.diagnostics));
+        }
+        return Err(crate::parse_failure::error(
+            &final_program.borrow_owner().source,
+            &final_program.borrow_dependent().diagnostics,
+            "native-phase",
+        ));
     }
     // The parser recognizes HTML-style script comments as well as // and /*.
     // Reuse its comment list instead of scanning text (which also matches strings).
     let strip_comments = options.comments == Some(false)
         && !final_program.borrow_dependent().program.comments.is_empty();
     if !requires_generic_pipeline(&options) {
+        crate::syntax::validation::validate_program(
+            &final_program.borrow_dependent().program,
+            "native-phase",
+        )?;
         let should_render = options.constant_folding == Some(true)
             || options.dead_code_elimination == Some(true)
             || options.compact == Some(true)
@@ -674,6 +690,7 @@ fn transform_impl(
             // without printing. A fused source rewrite still has work even
             // when this particular file contains no JSX.
             if !detector.0 && !selects_source_rewrite {
+                crate::syntax::validation::validate_program(&program, "native-phase")?;
                 return Ok(identity_result(
                     source.to_owned(),
                     standalone_identity_map,
@@ -720,7 +737,7 @@ fn transform_impl(
             return Ok(fatal(reason, [] as [String; 0]));
         }
         let semantic = {
-            SemanticBuilder::new()
+            SemanticBuilder::new_compiler()
                 .with_build_nodes(
                     options.block_scoping == Some(true)
                         || options.parameters == Some(true)
@@ -733,7 +750,7 @@ fn transform_impl(
                 .build(&program)
         };
         if !semantic.diagnostics.is_empty() {
-            return Ok(unsupported("semantic-error", semantic.diagnostics));
+            return Err(crate::parse_failure::error(source, &semantic.diagnostics, "native-phase"));
         }
         let mut semantic = semantic;
         if options.block_scoping == Some(true) {
@@ -1200,6 +1217,11 @@ fn transform_impl(
             }
         }
         if !transformed.diagnostics.is_empty() {
+            // This pinned Oxc diagnostic is an explicit compatibility boundary,
+            // not malformed TypeScript. Do not hide any accompanying fatal error.
+            if transformed.diagnostics.iter().all(|diagnostic| diagnostic.message == "Namespaces exporting non-const are not supported by Oxc. Change to const or see: https://oxc.rs/docs/guide/usage/transformer/typescript.html#partial-namespace-support") {
+                return Ok(unsupported("mutable-namespace-export", transformed.diagnostics));
+            }
             return Ok(fatal("transform-error", transformed.diagnostics));
         }
         if transform_options.jsx.jsx_plugin && transformed.jsx_runtime == JsxRuntime::Classic {

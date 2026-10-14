@@ -3,11 +3,11 @@ import { classify } from '../../index';
 import { classifyForTransform } from '../classification';
 
 const cases = [
-  { name: 'string literal', source: 'const marker = "@flow";', syntax: 'js', fails: true },
-  { name: 'template literal', source: 'const marker = `@flow`;', syntax: 'js', fails: true },
-  { name: 'regexp literal', source: 'const marker = /@flow/;', syntax: 'js', fails: true },
-  { name: 'ordinary JavaScript', source: 'const marker = "flow";', syntax: 'js', fails: false },
-  { name: 'Flow comment', source: '// @flow\nconst marker = 3;', syntax: 'flow', fails: false },
+  { name: 'string literal', source: 'const marker = "@flow";', syntax: 'js' },
+  { name: 'template literal', source: 'const marker = `@flow`;', syntax: 'js' },
+  { name: 'regexp literal', source: 'const marker = /@flow/;', syntax: 'js' },
+  { name: 'ordinary JavaScript', source: 'const marker = "flow";', syntax: 'js' },
+  { name: 'Flow comment', source: '// @flow\nconst marker = 3;', syntax: 'flow' },
 ];
 describe.each(cases)('$name', entry => {
   let actual: unknown;
@@ -19,7 +19,7 @@ describe.each(cases)('$name', entry => {
       classifyForTransform('input.js', entry.source),
     ].map(result => [result.syntax, result.supported]);
   });
-  (entry.fails ? test.fails : test)('recognizes a Flow marker only in a directive context', () => {
+  test('recognizes a Flow marker only in a directive context', () => {
     const expected = [entry.syntax, entry.syntax === 'js'];
     expect(actual).toEqual([expected, expected]);
   });

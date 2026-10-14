@@ -7,35 +7,30 @@ const cases = [
     filename: 'input.txt',
     source: '3;',
     selector: 'missing',
-    fails: true,
   },
   {
     name: 'missing adapter for Flow',
     filename: 'input.js',
     source: '// @flow\nconst value: number=3;',
     selector: 'missing',
-    fails: true,
   },
   {
     name: 'registered adapter declines unknown extension',
     filename: 'input.txt',
     source: '3;',
     selector: 'registered',
-    fails: false,
   },
   {
     name: 'registered adapter declines Flow',
     filename: 'input.js',
     source: '// @flow\nconst value: number=3;',
     selector: 'registered',
-    fails: false,
   },
   {
     name: 'no selected adapter for unknown extension',
     filename: 'input.txt',
     source: '3;',
     selector: 'none',
-    fails: false,
   },
 ];
 describe.each(cases)('$name', entry => {
@@ -89,10 +84,7 @@ describe.each(cases)('$name', entry => {
       unregister();
     }
   });
-  (entry.fails ? test.fails : test)(
-    'distinguishes missing configuration from an intentional bailout',
-    () => {
-      expect(outcome).toBe(entry.selector === 'missing' ? 'throw' : 'bailout');
-    },
-  );
+  test('distinguishes missing configuration from an intentional bailout', () => {
+    expect(outcome).toBe(entry.selector === 'missing' ? 'throw' : 'bailout');
+  });
 });

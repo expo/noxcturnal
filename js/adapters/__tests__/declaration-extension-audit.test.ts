@@ -48,9 +48,7 @@ describe.each(['d.ts', 'd.mts', 'd.cts', 'ts', 'mts', 'cts'])(
       expect(prepared).toBeDefined();
       actual = [publicRoute.syntax, internalRoute.syntax, prepared!];
     });
-    (extension === 'd.mts' || extension === 'd.cts' ? test.fails : test)(
-      'distinguishes declaration files from implementation files',
-      () => expect(actual).toEqual(Array(3).fill(declaration ? 'dts' : 'ts')),
-    );
+    test('distinguishes declaration files from implementation files', () =>
+      expect(actual).toEqual(Array(3).fill(declaration ? 'dts' : 'ts')));
   },
 );

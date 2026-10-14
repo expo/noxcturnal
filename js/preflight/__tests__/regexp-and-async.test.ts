@@ -180,7 +180,7 @@ test('regexp semantic boundaries only reject syntax owned by the selected toggle
 
 test('explicit resource management exposes its helper contract independently', () => {
   const result = transform(
-    'using resource = make();',
+    '{ using resource = make(); }',
     'fixture.js',
     pipeline({ explicitResourceManagement: true }),
   );

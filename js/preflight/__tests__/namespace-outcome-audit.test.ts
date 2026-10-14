@@ -24,7 +24,7 @@ beforeAll(() => {
     failure = error;
   }
   if (failure !== undefined) {
-    // An unrelated compilation failure must not satisfy the expected failure.
+    // Retain precise failure attribution if this regression returns.
     expect(failure).toBeInstanceOf(NativeTransformError);
     expect((failure as NativeTransformError).code).toBe('NOXCTURNAL_TRANSFORM_ERROR');
     expect((failure as Error).message).toBe('Native phase typescript failed: transform-error');
@@ -65,7 +65,7 @@ test('Babel identifies the same partial namespace support boundary', () => {
   ).toThrow('Namespaces exporting non-const are not supported by Babel');
 });
 
-test.fails('unsupported mutable namespace returns a pristine bailout', () => {
+test('unsupported mutable namespace returns a pristine bailout', () => {
   expect(failure).toBeUndefined();
   expect(outcome).toMatchObject({ status: 'bailout', source });
 });
