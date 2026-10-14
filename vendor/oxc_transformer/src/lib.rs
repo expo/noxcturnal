@@ -148,23 +148,8 @@ impl<'a> Transformer<'a> {
     ) -> TransformerReturn {
         let allocator = self.allocator;
 
-        #[cfg(feature = "react_compiler")]
-        let (scoping, react_compiler_diagnostics) = self.run_react_compiler(scoping, program);
-        #[cfg(not(feature = "react_compiler"))]
-        let react_compiler_diagnostics = Diagnostics::new();
-
-        // A React Compiler error is fatal: stop before the rest of the transform runs.
-        if react_compiler_diagnostics.has_errors() {
-            #[expect(deprecated)]
-            return TransformerReturn {
-                generated_async_iterators: Vec::new(),
-                diagnostics: react_compiler_diagnostics,
-                jsx_runtime: self.jsx.runtime,
-                scoping,
-                helpers_used: FxHashMap::default(),
-            };
-        }
-
+        // Capture file-level JSX directives before compiler reconstruction can
+        // discard comments inside rewritten component bodies.
         let ast_builder = AstBuilder::new(allocator);
 
         self.state.source_type = program.source_type;
@@ -180,6 +165,37 @@ impl<'a> Transformer<'a> {
         }
         if self.jsx.jsx_plugin || self.jsx.development {
             jsx::validate_options(&self.jsx, &ast_builder, &mut self.state);
+        }
+
+        let option_errors = self.state.take_errors();
+        if !option_errors.is_empty() {
+            let mut diagnostics = Diagnostics::new();
+            diagnostics.extend(option_errors);
+            #[expect(deprecated)]
+            return TransformerReturn {
+                generated_async_iterators: Vec::new(),
+                diagnostics,
+                jsx_runtime: self.jsx.runtime,
+                scoping,
+                helpers_used: FxHashMap::default(),
+            };
+        }
+
+        #[cfg(feature = "react_compiler")]
+        let (scoping, react_compiler_diagnostics) = self.run_react_compiler(scoping, program);
+        #[cfg(not(feature = "react_compiler"))]
+        let react_compiler_diagnostics = Diagnostics::new();
+
+        // A React Compiler error is fatal: stop before the rest of the transform runs.
+        if react_compiler_diagnostics.has_errors() {
+            #[expect(deprecated)]
+            return TransformerReturn {
+                generated_async_iterators: Vec::new(),
+                diagnostics: react_compiler_diagnostics,
+                jsx_runtime: self.jsx.runtime,
+                scoping,
+                helpers_used: FxHashMap::default(),
+            };
         }
 
         let jsx_runtime = self.jsx.runtime;

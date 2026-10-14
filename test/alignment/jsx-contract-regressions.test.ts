@@ -199,3 +199,58 @@ test.each([false, true])(
     }
   },
 );
+
+test.each(['classic', 'automatic'] as const)(
+  'retains JSX directives inside compiler-rebuilt components from selected %s runtime',
+  selected => {
+    const source = `function View() {
+      /** @jsxRuntime classic */
+      /** @jsx factory */
+      return <div/>;
+    } globalThis.result=View();`;
+    const code = compile(
+      source,
+      {
+        jsx: selected,
+        reactCompiler: {
+          compilationMode: 'infer',
+          panicThreshold: 'none',
+          target: '19',
+          enableResetCacheOnSourceFileChanges: false,
+        },
+      },
+      'input.jsx',
+    );
+    expect(code).not.toContain('<div');
+    expect(code).toContain('react/compiler-runtime');
+    const result: { result?: unknown } = {};
+    new Function('globalThis', 'React', 'factory', 'require', code)(
+      result,
+      { createElement: () => 'fallback' },
+      () => 'configured',
+      (path: string) => {
+        expect(path).toBe('react/compiler-runtime');
+        return { c: (size: number) => Array(size).fill(Symbol.for('react.memo_cache_sentinel')) };
+      },
+    );
+    expect(result.result).toBe('configured');
+  },
+);
+
+test('rejects invalid JSX directives inside compiler-rebuilt components', () => {
+  expect(() =>
+    compile(
+      'function View(){/** @jsxRuntime typo */ return <div/>;}',
+      {
+        jsx: 'classic',
+        reactCompiler: {
+          compilationMode: 'infer',
+          panicThreshold: 'none',
+          target: '19',
+          enableResetCacheOnSourceFileChanges: false,
+        },
+      },
+      'input.jsx',
+    ),
+  ).toThrow(/transform-error/);
+});
