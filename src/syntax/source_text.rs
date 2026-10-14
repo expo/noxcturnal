@@ -133,6 +133,7 @@ impl NativeSourceText {
         flags: Option<String>,
         all: bool,
         replacement: Option<Utf16String>,
+        start: Option<u32>,
     ) -> Result<Vec<SourceMatch>> {
         let text: &[u16] = &self.source;
         let mut output = Vec::new();
@@ -168,7 +169,10 @@ impl NativeSourceText {
         let flags = flags.unwrap_or_default();
         let expression = regress::Regex::from_unicode(pattern.into_iter(), flags.as_str())
             .map_err(|error| Error::new(Status::InvalidArg, error.to_string()))?;
-        let mut offset = 0;
+        let mut offset = usize::try_from(start.unwrap_or(0)).unwrap_or(usize::MAX);
+        if offset > text.len() {
+            return Ok(output);
+        }
         while offset <= text.len() {
             let found = if unicode {
                 expression.find_from_utf16(text, offset).next()

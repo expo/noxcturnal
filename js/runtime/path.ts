@@ -563,7 +563,18 @@ export class NodePathImpl implements NativeNodePath {
     this.#insert('PrependLeft', this.#bodyOffset(false), code);
   }
   addComment(position: 'leading' | 'trailing' | 'inner', content: string, line = false): void {
-    const comment = line ? `//${content}\n` : `/*${content}*/`;
+    // New line terminators can change return/yield/throw and postfix grammar.
+    // Inline comments use a single-line block, without requiring hidden ancestry.
+    let safeLine = false;
+    if (line && position === 'leading') {
+      let offset = this.event.start - 1;
+      const source = this.runtime.session.source;
+      while (offset >= 0 && /\s/.test(source[offset]) && !/[\r\n\u2028\u2029]/.test(source[offset]))
+        offset--;
+      safeLine = offset < 0 || /[\r\n\u2028\u2029]/.test(source[offset]);
+    }
+    const escaped = content.replace(/\*\//g, '* /').replace(/[\r\n\u2028\u2029]/g, ' ');
+    const comment = safeLine ? `//${escaped}\n` : `/*${escaped}*/`;
     if (position === 'leading') this.insertBefore(comment);
     else if (position === 'trailing') this.insertAfter(comment);
     else this.prependToBody(comment);

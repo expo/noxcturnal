@@ -61,11 +61,16 @@ export function createEditor(
     replacement: string | ((match: string, ...groups: string[]) => string),
     all: boolean,
   ) => {
+    const flags = typeof search === 'string' ? undefined : search.flags;
+    // `String#replace` replaces every match of a global expression, and a sticky
+    // expression resumes at `lastIndex`. Global search still starts at zero.
+    const sticky = flags?.includes('y') === true && flags.includes('g') === false;
     const matches = operations().matches(
       typeof search === 'string' ? search : search.source,
-      typeof search === 'string' ? undefined : search.flags,
-      all,
+      flags,
+      all || flags?.includes('g') === true,
       typeof replacement === 'string' ? replacement : undefined,
+      sticky ? search.lastIndex : undefined,
     );
     for (const match of matches)
       replaceRange(

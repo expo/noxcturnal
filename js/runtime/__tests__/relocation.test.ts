@@ -64,7 +64,7 @@ test('program insertions preserve preamble, call order, comments, and wrappers',
   assert.equal(result.status, 'complete');
   assert.equal(
     result.code,
-    '(function () {\n#!/usr/bin/env node\n// lead\n"use strict"\n"use client";\nconst first = 1;\nconst second = 2;\nrun()\nfinish(first);\nfinish(second);\n // trailing\n})();\n',
+    '(function () {\n#!/usr/bin/env node\n// lead\n"use strict"\n"use client";\nconst first = 1;\nconst second = 2;\nrun()\n;\nfinish(first);\nfinish(second);\n // trailing\n})();\n',
   );
 });
 

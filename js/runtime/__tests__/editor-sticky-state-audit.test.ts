@@ -36,7 +36,7 @@ describe.each(cases)('$name', entry => {
       session.close();
     }
   });
-  (entry.fails ? test.fails : test)('matching respects sticky search position', () => {
+  test('matching respects sticky search position', () => {
     expect(actual).toBe(expected);
   });
 });

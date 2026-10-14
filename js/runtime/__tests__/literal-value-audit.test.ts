@@ -16,7 +16,16 @@ describe.each([
     // Compile and execute before expected-failure value assertions.
     actual = new Function('NaN', 'Infinity', `return (${fragment.code});`)(7, 9);
   });
-  (entry.fails ? test.fails : test)('generated expression preserves the supplied value', () => {
+  test('generated expression preserves the supplied value', () => {
     expect(Object.is(actual, entry.value)).toBe(true);
   });
 });
+
+test.each([-0, NaN, Infinity, -Infinity])(
+  'special number %s is an atomic member receiver',
+  value => {
+    const code = codeFactory.literal(value).code;
+    const actual = new Function('NaN', 'Infinity', `return ${code}.valueOf();`)(7, 9);
+    expect(Object.is(actual, value)).toBe(true);
+  },
+);

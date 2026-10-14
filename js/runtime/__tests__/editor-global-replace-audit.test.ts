@@ -27,7 +27,7 @@ describe.each(cases)('$name', entry => {
       session.close();
     }
   });
-  (entry.fails ? test.fails : test)('respects the selected replacement scope', () => {
+  test('respects the selected replacement scope', () => {
     expect(actual).toBe(expected);
   });
 });

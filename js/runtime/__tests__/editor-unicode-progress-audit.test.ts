@@ -3,6 +3,8 @@ import type { EditCommand } from '../../types';
 import { createEditor } from '../editor';
 
 const cases = [
+  { name: 'Unicode sets empty matches', source: '😀x\ud800', expression: new RegExp('(?:)', 'gv') },
+  { name: 'BMP and lone surrogate matches', source: 'x\ud800', expression: /(?:)/gu },
   { name: 'empty Unicode matches', source: '😀', expression: /(?:)/gu },
   { name: 'Unicode lookahead matches', source: '😀x', expression: /(?=.)/gu },
 ];
@@ -41,7 +43,7 @@ describe.each(cases)('$name', ({ source, expression }) => {
     offsets = edits.map(edit => edit.start);
   });
 
-  test.fails('replacement advances across a complete Unicode code point', () => {
+  test('replacement advances across a complete Unicode code point', () => {
     expect({ stopped, offsets }).toEqual({ stopped: false, offsets: expected });
   });
 });

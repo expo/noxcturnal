@@ -24,7 +24,19 @@ const EDIT_MAPPINGS: Record<NonNullable<EditCommand['mapping']>, number> = {
 };
 
 export function packEdits(edits: readonly EditCommand[]): Buffer {
+  const offset = (value: number): void => {
+    if (!Number.isInteger(value) || value < 0 || value > 0xffffffff)
+      throw new Error(`invalid edit offset ${value}: expected an unsigned 32-bit integer`);
+  };
   for (const edit of edits) {
+    offset(edit.start);
+    offset(edit.end);
+    if (edit.kind === 'Move' && edit.destination != null) offset(edit.destination);
+    for (const part of edit.contentParts ?? [])
+      if (typeof part !== 'string') {
+        offset(part.start);
+        offset(part.end);
+      }
     if (edit.coordinateSpace != null && edit.coordinateSpace !== 'original')
       throw new Error(
         `edit coordinate space ${edit.coordinateSpace} requires explicit translation before commit`,
@@ -81,7 +93,8 @@ export function packEdits(edits: readonly EditCommand[]): Buffer {
   for (let index = 0; index < strings.length; index++)
     data.writeUInt32LE(stringLengths[index], 8 + index * 4);
   const slabOffset = 8 + strings.length * 4;
-  data.write(strings.join(''), slabOffset, slabBytes, 'utf8');
+  let stringOffset = slabOffset;
+  for (const value of strings) stringOffset += data.write(value, stringOffset, 'utf8');
   data.fill(0, slabOffset + slabBytes, wordsOffset);
   let wordIndex = 0;
   let nameCursor = 0;

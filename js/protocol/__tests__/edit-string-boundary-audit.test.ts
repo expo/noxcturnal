@@ -41,13 +41,10 @@ describe.each(cases)('$name', entry => {
       decoded = null;
     }
   });
-  (entry.fails ? test.fails : test)(
-    'each length-prefixed entry is independently valid UTF-8',
-    () => {
-      expect(decoded).toBe(Buffer.from(entry.strings[0], 'utf8').toString('utf8'));
-    },
-  );
-  (entry.fails ? test.fails : test)('native commit accepts the serialized strings', () => {
+  test('each length-prefixed entry is independently valid UTF-8', () => {
+    expect(decoded).toBe(Buffer.from(entry.strings[0], 'utf8').toString('utf8'));
+  });
+  test('native commit accepts the serialized strings', () => {
     expect(committed).toBe(true);
   });
 });

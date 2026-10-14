@@ -79,7 +79,5 @@ describe.each(cases)('$name', entry => {
       session.close();
     }
   });
-  (entry.fails ? test.fails : test)('replacement expansion matches native substitution', () =>
-    expect(actual).toBe(expected),
-  );
+  test('replacement expansion matches native substitution', () => expect(actual).toBe(expected));
 });

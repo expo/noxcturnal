@@ -150,7 +150,17 @@ export const codeFactory: CodeFactory = {
             ? 'null'
             : typeof value === 'string'
               ? JSON.stringify(value)
-              : String(value),
+              : typeof value === 'number'
+                ? Object.is(value, -0)
+                  ? '(-0)'
+                  : Number.isNaN(value)
+                    ? '(0/0)'
+                    : value === Infinity
+                      ? '(1/0)'
+                      : value === -Infinity
+                        ? '(-1/0)'
+                        : String(value)
+                : String(value),
       mapping: 'sourceless',
     };
   },
@@ -170,11 +180,16 @@ export const codeFactory: CodeFactory = {
       return { kind: 'composite', parts: composite };
     }
     const chunks: string[] = [];
+    const append = (fragment: Code): void => {
+      if (typeof fragment === 'string') chunks.push(fragment);
+      else if ('kind' in fragment && fragment.kind === 'composite') fragment.parts.forEach(append);
+      else chunks.push((fragment as CodeFragment).code);
+    };
     parts.forEach((part, index) => {
       chunks.push(part);
       if (index >= values.length) return;
       const value = values[index]!;
-      chunks.push(typeof value === 'string' ? value : (value as CodeFragment).code);
+      append(value as Code);
     });
     return {
       code: chunks.join(''),

@@ -41,7 +41,7 @@ describe.each(values)('$name', entry => {
     actual = compile(true);
   });
   test('direct replacement accepts the same fragment', () => expect(direct).toBe(3));
-  (entry.fails ? test.fails : test)('template preserves all supported fragment content', () => {
+  test('template preserves all supported fragment content', () => {
     expect(actual).toEqual([3]);
   });
 });

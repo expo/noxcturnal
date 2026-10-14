@@ -38,7 +38,7 @@ export class NativeTransformSession {
   #scopeParents: Uint32Array | null = null;
   #scopeMetadata: Uint32Array | null = null;
   #ownedScopes = new Map<number, number>();
-  #programBodyOffsets: readonly [number, number, boolean] | null = null;
+  #programBodyOffsets: readonly [number, number, boolean, boolean, boolean] | null = null;
   #bindingIndex: { nameIds: Map<string, number>; keys: Set<number> } | null = null;
   #bindingsByScope = new Map<number, Map<string, QueryResult['bindings'][number]>>();
   constructor(
@@ -577,10 +577,22 @@ export class NativeTransformSession {
       kind: words[offset + 3],
     };
   }
-  programBodyOffsets(): readonly [prepend: number, append: number, needsEofLineBoundary: boolean] {
+  programBodyOffsets(): readonly [
+    prepend: number,
+    append: number,
+    needsEofLineBoundary: boolean,
+    prependSeparator: boolean,
+    appendSeparator: boolean,
+  ] {
     if (this.#programBodyOffsets == null) {
       const offsets = this.#binding('program-body-offsets').programBodyOffsets();
-      this.#programBodyOffsets = [offsets[0], offsets[1], offsets[2] === 1];
+      this.#programBodyOffsets = [
+        offsets[0],
+        offsets[1],
+        offsets[2] === 1,
+        offsets[3] === 1,
+        offsets[4] === 1,
+      ];
     }
     return this.#programBodyOffsets;
   }

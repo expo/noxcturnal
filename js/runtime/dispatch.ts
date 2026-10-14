@@ -87,9 +87,7 @@ export function createDispatcher(
   let visitorId = 0;
   let visitorIds: WeakMap<object, number> | undefined;
   let activeTraversals: Set<string> | undefined;
-  let programBodyOffsets:
-    | readonly [prepend: number, append: number, needsEofLineBoundary: boolean]
-    | undefined;
+  let programBodyOffsets: ReturnType<NativeTransformSession['programBodyOffsets']> | undefined;
   let programEndBoundaryAdded = false;
   const programInsertionPoints = new Set<number>();
   const contexts = new Map<NativePlugin<any, any>, DispatcherEntry>();
@@ -152,19 +150,34 @@ export function createDispatcher(
       offset: number,
       realized: RealizedContent,
     ): void => {
+      const first = !programInsertionPoints.has(offset);
+      const needsSeparator = first && programBodyOffsets?.[kind === 'Prologue' ? 3 : 4];
       const prefix =
-        !programInsertionPoints.has(offset) &&
-        session.sourceTextOperations.needsLineBoundary(offset)
-          ? '\n'
-          : '';
+        (first && session.sourceTextOperations.needsLineBoundary(offset) ? '\n' : '') +
+        (needsSeparator ? ';\n' : '');
+      // A trailing semicolon is trivially safe when there is no possible comment.
+      // Otherwise put the separator on its own line so // cannot swallow it.
+      const tail = realized.content ?? realized.contentParts?.at(-1);
+      const commentFree =
+        realized.content != null
+          ? !realized.content.includes('/')
+          : realized.contentParts.every(part => {
+              if (typeof part === 'string') return !part.includes('/');
+              for (let offset = part.start; offset < part.end; offset++) {
+                if (session.source[offset] === '/') return false;
+              }
+              return true;
+            });
+      const suffix =
+        typeof tail === 'string' && commentFree && tail.trimEnd().endsWith(';') ? '\n' : '\n;\n';
       programInsertionPoints.add(offset);
       edits.push({
         kind,
         start: offset,
         end: offset,
         ...(realized.contentParts
-          ? { contentParts: [...(prefix ? [prefix] : []), ...realized.contentParts, '\n'] }
-          : { content: `${prefix}${realized.content}\n` }),
+          ? { contentParts: [...(prefix ? [prefix] : []), ...realized.contentParts, suffix] }
+          : { content: `${prefix}${realized.content}${suffix}` }),
         owner: plugin.name,
         order: order++,
       });

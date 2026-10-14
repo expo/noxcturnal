@@ -36,7 +36,7 @@ describe.each(cases)('$name', entry => {
       session.close();
     }
   });
-  (entry.fails ? test.fails : test)('rejects offsets outside the original source', () => {
+  test('rejects offsets outside the original source', () => {
     expect(accepted).toBe(entry.valid);
   });
 });
@@ -102,7 +102,7 @@ describe.each(coordinateCases)('$name', entry => {
       session.close();
     }
   });
-  (entry.fails ? test.fails : test)('validates finite integer coordinates before packing', () => {
+  test('validates finite integer coordinates before packing', () => {
     expect(accepted).toBe(entry.valid);
   });
 });

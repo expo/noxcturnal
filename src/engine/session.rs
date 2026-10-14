@@ -45,7 +45,7 @@ pub struct NativeIndexedSession {
     scope_parents: Vec<u32>,
     initial_route_manifest: Option<Vec<u8>>,
     initial_routed_buffer: Option<Vec<u8>>,
-    program_body_offsets: Option<[u32; 3]>,
+    program_body_offsets: Option<[u32; 5]>,
     initial_routed_served: bool,
     closed: bool,
 }
@@ -64,7 +64,7 @@ impl NativeIndexedSession {
         let has_initial_route = initial_route_manifest.is_some();
         let parts = if !has_retention && !has_initial_route {
             MaterializedSessionParts {
-                program_body_offsets: [0, 0, 0],
+                program_body_offsets: [0, 0, 0, 0, 0],
                 scope_parents: Vec::new(),
                 retained_index: RetainedIndex::default(),
                 initial_routed_buffer: None,
