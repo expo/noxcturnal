@@ -83,28 +83,65 @@ for (const length of [2, 3]) {
             );
             expect(code).not.toMatch(/import\s+[ABC]\s*=/);
             expect(code).not.toContain('@babel/runtime');
-            if (forwardReference) {
-              expect(code).toContain('dependency.js');
-              await expect(observe(code)).rejects.toThrow('dependency evaluated');
-              try {
-                actual = await observe(code);
-              } catch (error) {
-                expect(error).toBeInstanceOf(Error);
-                expect((error as Error).message).toBe('dependency evaluated');
-                actual = 'dependency evaluated';
-              }
-            } else {
-              expect(code).not.toContain('dependency.js');
-              actual = await observe(code);
-              expect(actual).toBe(1);
-            }
+            expect(code).not.toContain('dependency.js');
+            actual = await observe(code);
           });
-          (forwardReference ? test.fails : test)(
-            'removes aliases and dependencies used only by removed aliases',
-            () => expect(actual).toBe(1),
-          );
+          test('removes aliases and dependencies used only by removed aliases', () =>
+            expect(actual).toBe(1));
         });
       }
     });
   }
+}
+
+for (const mode of ['inline', 'runtime'] as const) {
+  test(`${mode} removes a branching, reordered alias dependency graph`, async () => {
+    const source = `import * as N from './dependency.js';
+import A = B.Y; import D = B.Y; import C = N; import B = C;
+type T = typeof A;
+export const value = 1;`;
+    expect(await observe(reference(source))).toBe(1);
+    const code = compile(
+      source,
+      { typescript: 'strip', helpers: { mode, version: '7.29.7' } },
+      'input.ts',
+    );
+    expect(code).not.toContain('dependency.js');
+    expect(await observe(code)).toBe(1);
+  });
+
+  test(`${mode} retains an alias shared with an executed binding and side-effect imports`, async () => {
+    const dependency =
+      'data:text/javascript;base64,' +
+      Buffer.from('export const Y = { value: 7 };').toString('base64');
+    const source = `import * as N from '${dependency}';
+import B = N; import A = B.Y; import Unused = B.Y;
+export const value = A.value;`;
+    const code = compile(
+      source,
+      { typescript: 'strip', helpers: { mode, version: '7.29.7' } },
+      'input.ts',
+    );
+    expect(code).not.toMatch(/import\s+\w+\s*=/);
+    expect((await importCode(code)).value).toBe(7);
+    const effect = 'data:text/javascript,throw%20new%20Error("side-effect")';
+    const sideEffect = compile(
+      `import '${effect}'; import * as N from '${dependency}'; import A=B.Y; import B=N; export const value=1;`,
+      { typescript: 'strip' },
+      'input.ts',
+    );
+    await expect(importCode(sideEffect)).rejects.toThrow('side-effect');
+  });
+
+  test(`${mode} retains an exported alias without local uses`, async () => {
+    const dependency =
+      'data:text/javascript;base64,' +
+      Buffer.from('export const Y = { value: 7 };').toString('base64');
+    const code = compile(
+      `import * as N from '${dependency}'; import B=N; export import A=B.Y;`,
+      { typescript: 'strip', helpers: { mode, version: '7.29.7' } },
+      'input.ts',
+    );
+    expect((await importCode(code)).A).toEqual({ value: 7 });
+  });
 }

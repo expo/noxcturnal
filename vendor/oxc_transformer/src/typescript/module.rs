@@ -5,6 +5,7 @@ use oxc_span::SPAN;
 use oxc_str::static_ident;
 use oxc_syntax::reference::ReferenceFlags;
 use oxc_traverse::Traverse;
+use rustc_hash::FxHashMap;
 
 use super::diagnostics;
 
@@ -219,13 +220,9 @@ impl<'a> TypeScriptModule {
     /// `bar` (which might come from another `import bar = ...`) would appear to have a value
     /// reference and wouldn't be removed.
     ///
-    /// We process in reverse order to handle chains correctly:
-    /// ```ts
-    /// import x = foo.x  // reference to foo
-    /// import y = x.y    // reference to x
-    /// import z = y.z    // reference to y (unused)
-    /// ```
-    /// Processing `z` first marks `y`'s reference as Type, then `y` marks `x`, then `x` marks `foo`.
+    /// Propagate unused bindings through their dependencies with a worklist.
+    /// Source order cannot resolve forward alias chains; repeatedly scanning all
+    /// statements would make those chains quadratic.
     ///
     /// Note: `TSImportEqualsDeclaration` can appear at the top-level and inside namespaces.
     /// We only need to process top-level `Program` here because `TypeScriptNamespace`
@@ -241,47 +238,45 @@ impl<'a> TypeScriptModule {
             return;
         }
 
-        for stmt in stmts.iter().rev() {
-            if let Statement::TSImportEqualsDeclaration(import_equals) = stmt {
-                Self::mark_module_reference_as_type_if_binding_unused(import_equals, ctx);
+        let mut aliases = FxHashMap::default();
+        let mut unused = Vec::new();
+        for stmt in stmts {
+            let Statement::TSImportEqualsDeclaration(decl) = stmt else { continue };
+            let ident = match &decl.module_reference {
+                TSModuleReference::IdentifierReference(ident) => Some(ident.as_ref()),
+                TSModuleReference::QualifiedName(qualified) => {
+                    qualified.left.get_identifier_reference()
+                }
+                TSModuleReference::ExternalModuleReference(_) => None,
+            };
+            let Some(ident) = ident else { continue };
+            let symbol_id = decl.id.symbol_id();
+            let value_references = ctx
+                .scoping()
+                .get_resolved_references(symbol_id)
+                .filter(|reference| !reference.is_type())
+                .count();
+            aliases.insert(symbol_id, (ident.reference_id(), value_references));
+            if value_references == 0 {
+                unused.push(symbol_id);
             }
         }
-    }
 
-    /// If the binding of a `TSImportEqualsDeclaration` has no value references,
-    /// mark the identifier reference in its module reference as a type reference.
-    ///
-    /// This is needed because when `import foo = bar.baz` is unused and will be removed,
-    /// the reference to `bar` should not count as a value reference.
-    fn mark_module_reference_as_type_if_binding_unused(
-        decl: &TSImportEqualsDeclaration<'a>,
-        ctx: &mut TraverseCtx<'a>,
-    ) {
-        // If the binding has any value reference, don't change the module reference flag.
-        // We only change it when all references are type (meaning the binding is unused as a value).
-        if !ctx.scoping().get_resolved_references(decl.id.symbol_id()).all(Reference::is_type) {
-            return;
-        }
-
-        // For `import foo = bar.baz`, change the reference to `bar` from Read to Type.
-        // For `import foo = require('module')`, there's no identifier reference to change.
-        let ident = match &decl.module_reference {
-            TSModuleReference::IdentifierReference(ident) => Some(ident.as_ref()),
-            TSModuleReference::QualifiedName(qualified) => {
-                qualified.left.get_identifier_reference()
+        while let Some(symbol_id) = unused.pop() {
+            let reference_id = aliases[&symbol_id].0;
+            let reference = ctx.scoping_mut().get_reference_mut(reference_id);
+            if reference.is_type() {
+                continue;
             }
-            TSModuleReference::ExternalModuleReference(_) => None,
-        };
-        if let Some(ident) = ident {
-            let reference = ctx.scoping_mut().get_reference_mut(ident.reference_id());
-            // The binding of TSImportEqualsDeclaration will be treated as unused
-            // because there is no value reference, so it will be removed.
-            // Therefore its module reference should also be treated as a type reference.
-            // Example: `import Unused = X.Y.Z`
-            //                           ^ `X` was marked as Read reference but should be Type.
-            let flags = reference.flags_mut();
-            debug_assert!(flags.is_read());
-            *flags = ReferenceFlags::Type;
+            *reference.flags_mut() = ReferenceFlags::Type;
+            if let Some(dependency) = reference.symbol_id()
+                && let Some((_, count)) = aliases.get_mut(&dependency)
+            {
+                *count -= 1;
+                if *count == 0 {
+                    unused.push(dependency);
+                }
+            }
         }
     }
 }
