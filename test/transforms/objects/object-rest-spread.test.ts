@@ -12,11 +12,31 @@ test('lowers object rest and spread', async () => {
       },
     }),
   ).toMatchInlineSnapshot(`
-    "const _excluded = ['id'];
-    import _objectWithoutProperties from '@babel/runtime/helpers/objectWithoutPropertiesLoose';
-    export function rename(_ref, extra) {
-      let { id } = _ref,
-        attributes = _objectWithoutProperties(_ref, _excluded);
+    "var _objectDestructuringEmpty2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+    };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
+      objectWithoutPropertiesLoose: require('@babel/runtime/helpers/objectWithoutPropertiesLoose'),
+      extends: require('@babel/runtime/helpers/extends'),
+    };
+    function _objectWithoutProperties(e, t) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(e),
+        t.length
+          ? _objectWithoutProperties2.objectWithoutPropertiesLoose(e, t)
+          : _objectWithoutProperties2.extends({}, e)
+      );
+    }
+    export function rename() {
+      let _ref = arguments.length > 0 ? arguments[0] : void 0,
+        _obj = _objectDestructuringEmpty(_ref),
+        id = _obj.id,
+        attributes = _objectWithoutProperties(_obj, ['id']);
+      let extra = arguments.length > 1 ? arguments[1] : void 0;
       return Object.assign({}, attributes, { identifier: id }, extra);
     }"
   `);
