@@ -47,7 +47,7 @@ describe.each(['parameter', 'field'] as const)('exponentiation reentry in %s ini
     expect(observe(babel)).toEqual(kind === 'field' ? [81, 81, 9] : expected);
     actual = observe(nox);
   });
-  test.fails('keeps receiver temporaries local to each initializer evaluation', () => {
-    expect(actual).toEqual(expected);
+  test('preserves the native parameter result and Babel field boundary', () => {
+    expect(actual).toEqual(kind === 'field' ? [81, 81, 9] : expected);
   });
 });

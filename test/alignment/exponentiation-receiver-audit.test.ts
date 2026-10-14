@@ -33,6 +33,6 @@ beforeAll(() => {
   actual = observe(nox);
 });
 
-test.fails('exponentiation retains the receiver before evaluating a computed key', () => {
+test('exponentiation retains the receiver before evaluating a computed key', () => {
   expect(actual).toEqual(expected);
 });

@@ -42,6 +42,7 @@ use oxc_traverse::{BoundIdentifier, Traverse};
 
 use crate::{
     common::var_declarations::VarDeclarationsStore, context::TraverseCtx, state::TransformState,
+    utils::ast_builder::wrap_expression_in_arrow_function_iife,
 };
 
 pub struct ExponentiationOperator<'a> {
@@ -77,6 +78,20 @@ impl<'a> Traverse<'a, TransformState<'a>> for ExponentiationOperator<'a> {
                     return;
                 }
 
+                // Parameter initializers execute before the function body's var scope exists.
+                // Give temporary bindings their own activation, including recursive defaults.
+                if Self::assignment_needs_temporaries(assign_expr, ctx)
+                    && ctx
+                        .ancestors()
+                        .find(|ancestor| {
+                            ancestor.is_formal_parameters() || ancestor.is_function_body()
+                        })
+                        .is_some_and(|ancestor| ancestor.is_formal_parameters())
+                {
+                    *expr = wrap_expression_in_arrow_function_iife(expr.take_in(ctx), ctx);
+                    return;
+                }
+
                 match &assign_expr.left {
                     AssignmentTarget::AssignmentTargetIdentifier(_) => {
                         self.convert_identifier_assignment(expr, ctx);
@@ -85,7 +100,7 @@ impl<'a> Traverse<'a, TransformState<'a>> for ExponentiationOperator<'a> {
                         self.convert_static_member_expression_assignment(expr, ctx);
                     }
                     AssignmentTarget::ComputedMemberExpression(_) => {
-                        self.convert_computed_member_expression_assignment(expr, ctx);
+                        Self::convert_computed_member_expression_assignment(expr, ctx);
                     }
                     // Babel refuses to transform this: "We can't generate property ref for private name,
                     // please install `@babel/plugin-transform-class-properties`".
@@ -102,6 +117,31 @@ impl<'a> Traverse<'a, TransformState<'a>> for ExponentiationOperator<'a> {
 }
 
 impl<'a> ExponentiationOperator<'a> {
+    fn assignment_needs_temporaries(
+        assign: &AssignmentExpression<'a>,
+        ctx: &TraverseCtx<'a>,
+    ) -> bool {
+        let bound_identifier = |expr: &Expression<'a>| {
+            matches!(expr, Expression::Identifier(ident)
+            if ctx.scoping().get_reference(ident.reference_id()).symbol_id().is_some())
+        };
+        match &assign.left {
+            AssignmentTarget::AssignmentTargetIdentifier(ident) => {
+                ctx.scoping().get_reference(ident.reference_id()).symbol_id().is_none()
+            }
+            AssignmentTarget::ComputedMemberExpression(member) => {
+                !member.object.is_super()
+                    || !member.expression.is_literal()
+                    || matches!(member.expression, Expression::RegExpLiteral(_))
+            }
+            AssignmentTarget::StaticMemberExpression(member) => {
+                !bound_identifier(&member.object) && !member.object.is_super()
+            }
+            AssignmentTarget::PrivateFieldExpression(member) => !bound_identifier(&member.object),
+            _ => false,
+        }
+    }
+
     /// Convert `BinaryExpression`.
     ///
     /// `left ** right` -> `Math.pow(left, right)`
@@ -273,92 +313,59 @@ impl<'a> ExponentiationOperator<'a> {
         (replacement_left, pow_left, temp_var_inits)
     }
 
-    /// Convert `AssignmentExpression` where assignee is a computed member expression.
-    ///
-    /// `obj[prop] **= right` transformed to:
-    /// * If `obj` is a bound symbol:
-    ///   -> `var _prop; _prop = prop, obj[_prop] = Math.pow(obj[_prop], 2)`
-    /// * If `obj` is unbound:
-    ///   -> `var _obj, _prop; _obj = obj, _prop = prop, _obj[_prop] = Math.pow(_obj[_prop], 2)`
-    ///
-    /// `obj.foo.bar[qux] **= right` transformed to:
-    /// ```js
-    /// var _obj$foo$bar, _qux;
-    /// _obj$foo$bar = obj.foo.bar, _qux = qux, _obj$foo$bar[_qux] = Math.pow(_obj$foo$bar[_qux], right)
-    /// ```
-    ///
-    /// Temporary variables are to avoid side-effects of getting `obj` / `obj.foo.bar` or `prop` being run twice.
-    ///
-    /// TODO(improve-on-babel):
-    /// 1. If `prop` is bound, it doesn't need a temp variable `_prop`.
-    /// 2. Temp var initializations could be inlined:
-    ///    * Current: `(_obj = obj, _prop = prop, _obj[_prop] = Math.pow(_obj[_prop], 2))`
-    ///    * Could be: `(_obj = obj)[_prop = prop] = Math.pow(_obj[_prop], 2)`
-    //
-    // `#[inline]` so compiler knows `expr` is an `AssignmentExpression` with `ComputedMemberExpression` on left
+    /// Capture the receiver and computed key as part of the assignment reference:
+    /// `obj[key()] **= right` -> `(_obj = obj)[_key = key()] = Math.pow(_obj[_key], right)`.
+    /// The write reference must exist before the getter or RHS can reenter.
     #[inline]
     fn convert_computed_member_expression_assignment(
-        &self,
         expr: &mut Expression<'a>,
         ctx: &mut TraverseCtx<'a>,
     ) {
         let Expression::AssignmentExpression(assign_expr) = expr else { unreachable!() };
-        let span = assign_expr.span;
         let AssignmentTarget::ComputedMemberExpression(member_expr) = &mut assign_expr.left else {
             unreachable!()
         };
 
-        let (pow_left, temp_var_inits) = self.get_pow_left_computed_member(member_expr, ctx);
+        let pow_left = Self::get_pow_left_computed_member(member_expr, ctx);
         Self::convert_assignment(assign_expr, pow_left, ctx);
-        Self::revise_expression(expr, temp_var_inits, span, ctx);
     }
 
     /// Get left side of `Math.pow(pow_left, ...)` for computed member expression
     fn get_pow_left_computed_member(
-        &self,
         member_expr: &mut ComputedMemberExpression<'a>,
         ctx: &mut TraverseCtx<'a>,
-    ) -> (
-        // Left side of `Math.pow(pow_left, ...)`
-        Expression<'a>,
-        // Temporary var initializations
-        ArenaVec<'a, Expression<'a>>,
-    ) {
-        // Object part of 2nd member expression
-        // ```
-        // obj[_prop] = Math.pow(obj[_prop], right)
-        //                       ^^^
-        // ```
-        let mut temp_var_inits = ArenaVec::new_in(ctx);
-        let obj = self.get_second_member_expression_object(
-            &mut member_expr.object,
-            &mut temp_var_inits,
+    ) -> Expression<'a> {
+        // Construct the assignment reference while evaluating the receiver and key.
+        // Sequencing both initializers before the reference lets reentrant keys retarget
+        // the write. A bound receiver can also be reassigned by the key expression.
+        let obj = if member_expr.object.is_super() {
+            Expression::new_super(SPAN, ctx)
+        } else {
+            Self::memoize_reference_part(&mut member_expr.object, ctx)
+        };
+        let prop = if member_expr.expression.is_literal()
+            && !matches!(member_expr.expression, Expression::RegExpLiteral(_))
+        {
+            member_expr.expression.clone_in(ctx.allocator())
+        } else {
+            Self::memoize_reference_part(&mut member_expr.expression, ctx)
+        };
+        Expression::new_computed_member_expression(SPAN, obj, prop, false, ctx)
+    }
+
+    fn memoize_reference_part(
+        expr: &mut Expression<'a>,
+        ctx: &mut TraverseCtx<'a>,
+    ) -> Expression<'a> {
+        let binding = VarDeclarationsStore::create_uid_var_based_on_node(expr, ctx);
+        *expr = Expression::new_assignment_expression(
+            SPAN,
+            AssignmentOperator::Assign,
+            binding.create_write_target(ctx),
+            expr.take_in(ctx),
             ctx,
         );
-
-        // Property part of 2nd member expression
-        // ```
-        // obj[_prop] = Math.pow(obj[_prop], right)
-        //     ^^^^^ replaced        ^^^^^ prop
-        // ```
-        let prop = &mut member_expr.expression;
-        let prop = if prop.is_literal() {
-            prop.clone_in(ctx.allocator())
-        } else {
-            let owned_prop = prop.take_in(ctx);
-            let binding = self.create_temp_var(owned_prop, &mut temp_var_inits, ctx);
-            *prop = binding.create_read_expression(ctx);
-            binding.create_read_expression(ctx)
-        };
-
-        // Complete 2nd member expression
-        // ```
-        // obj[_prop] = Math.pow(obj[_prop], right)
-        //                       ^^^^^^^^^^
-        // ```
-        let pow_left = Expression::new_computed_member_expression(SPAN, obj, prop, false, ctx);
-
-        (pow_left, temp_var_inits)
+        binding.create_read_expression(ctx)
     }
 
     /// Convert `AssignmentExpression` where assignee is a private field member expression.
