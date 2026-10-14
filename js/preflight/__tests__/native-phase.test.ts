@@ -270,11 +270,13 @@ test('validates React Fast Refresh options', () => {
 test('runs Metro-compatible constant folding and DCE as one native postflight', () => {
   const result = transform(
     [
+      '(function(module) {',
       'function leaf() { return 1 + 2 * 3; }',
       'function dead() { return leaf(); }',
       'const unusedArrow = () => 42;',
       'const liveArrow = () => (false ? 1 : 2);',
       'if (0) { sideEffect(); } else { module.exports = liveArrow(); }',
+      '})(module);',
     ].join('\n'),
     'fixture.js',
     defineNativePipeline({
@@ -300,6 +302,7 @@ test('runs Metro-compatible constant folding and DCE as one native postflight', 
 test('computes chained dead functions to a fixed point while retaining referenced cycles', () => {
   const result = transform(
     [
+      '(function(module) {',
       'function dead0() { return 0; }',
       ...Array.from(
         { length: 99 },
@@ -307,6 +310,7 @@ test('computes chained dead functions to a fixed point while retaining reference
       ),
       'function cycleA() { return cycleB(); }',
       'function cycleB() { return cycleA(); }',
+      '})(module);',
     ].join('\n'),
     'fixture.js',
     defineNativePipeline({
@@ -376,7 +380,8 @@ test('keeps a native legacy no-op byte-identical without an identity map', () =>
 });
 
 test('keeps Metro postflight operations independently selectable', () => {
-  const source = 'function dead() { return 1 + 2; } module.exports = 0;';
+  const source =
+    '(function(module) { function dead() { return 1 + 2; } module.exports = 0; })(module);';
   const foldOnly = transform(
     source,
     'fixture.js',

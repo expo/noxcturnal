@@ -36,7 +36,7 @@ describe.each(cases)('$name', ({ source }) => {
   test('native script control', () => {
     expect(run(source)).toBe(3);
   });
-  test.fails('transformed script preserves the global binding', () => {
+  test('transformed script preserves the global binding', () => {
     expect(run(code)).toBe(3);
   });
 });

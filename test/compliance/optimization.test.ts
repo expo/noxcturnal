@@ -168,7 +168,7 @@ describe('escaped direct eval preserves dynamically referenced functions', () =>
   test('native execution', () => {
     expect(run(source)).toBe(42);
   });
-  test.fails('transformed execution', () => {
+  test('transformed execution', () => {
     expect(run(code)).toBe(42);
   });
 });
@@ -188,7 +188,6 @@ const foldingComplianceCases = [
       globalThis.result = result;
     `,
     expected: 'ReferenceError',
-    knownFailure: true,
   },
   {
     name: 'folded eval callee stays indirect',
@@ -200,7 +199,6 @@ const foldingComplianceCases = [
       globalThis.result = read();
     `,
     expected: 'undefined',
-    knownFailure: true,
   },
   {
     name: 'folding does not create a strict directive',
@@ -212,19 +210,16 @@ const foldingComplianceCases = [
       globalThis.result = read();
     `,
     expected: false,
-    knownFailure: false,
   },
   {
     name: 'string folding preserves isolated surrogates',
     source: String.raw`const value='\uD800' + 'x';globalThis.result=[value.length,value.charCodeAt(0),value.charCodeAt(1)];`,
     expected: [2, 0xd800, 120],
-    knownFailure: true,
   },
   {
     name: 'surrogate comparison uses UTF16',
     source: String.raw`globalThis.result=['\uD800' < '\uE000','\uD800'==='\uFFFD'];`,
     expected: [true, false],
-    knownFailure: true,
   },
   {
     name: 'unreachable var binding survives',
@@ -242,7 +237,6 @@ const foldingComplianceCases = [
       globalThis.result = read();
     `,
     expected: undefined,
-    knownFailure: true,
   },
   {
     name: 'unreachable block function binding survives',
@@ -260,7 +254,6 @@ const foldingComplianceCases = [
       globalThis.result = read();
     `,
     expected: undefined,
-    knownFailure: true,
   },
   {
     name: 'conditional callee remains unbound',
@@ -274,7 +267,6 @@ const foldingComplianceCases = [
       globalThis.result = (true ? obj.method : null)();
     `,
     expected: false,
-    knownFailure: true,
   },
   {
     name: 'logical callee remains unbound',
@@ -288,7 +280,6 @@ const foldingComplianceCases = [
       globalThis.result = (false || obj.method)();
     `,
     expected: false,
-    knownFailure: true,
   },
   {
     name: 'delete conditional does not delete selected property',
@@ -297,7 +288,6 @@ const foldingComplianceCases = [
       globalThis.result = [delete (true ? obj.value : 0), obj.value];
     `,
     expected: [true, 1],
-    knownFailure: true,
   },
   {
     name: 'folded anonymous function stays unnamed',
@@ -306,7 +296,6 @@ const foldingComplianceCases = [
       globalThis.result = value.name;
     `,
     expected: '',
-    knownFailure: true,
   },
   {
     name: 'exponentiation preserves NaN for unit bases with NaN or infinite exponents',
@@ -325,7 +314,6 @@ const foldingComplianceCases = [
       ];
     `,
     expected: Array(10).fill(NaN),
-    knownFailure: true,
   },
   {
     name: 'folding a leading string expression does not create strict directive',
@@ -334,7 +322,6 @@ const foldingComplianceCases = [
  globalThis.result=read();
     `,
     expected: false,
-    knownFailure: false,
   },
   {
     name: 'folding a conditional tag preserves value invocation',
@@ -343,7 +330,6 @@ const foldingComplianceCases = [
  globalThis.result=(true?object.tag:null)\`text\`;
     `,
     expected: true,
-    knownFailure: true,
   },
   {
     name: 'folding a conditional optional call preserves value invocation',
@@ -352,7 +338,6 @@ const foldingComplianceCases = [
  globalThis.result=(true?object.method:null)?.();
     `,
     expected: true,
-    knownFailure: true,
   },
   {
     name: 'typeof class expressions retain static initializer effects',
@@ -360,7 +345,6 @@ const foldingComplianceCases = [
  const events=[];globalThis.result=[typeof class{static{events.push('static');}},events];
     `,
     expected: ['function', ['static']],
-    knownFailure: false,
   },
   {
     name: 'constant folding retains object numeric coercion',
@@ -368,7 +352,6 @@ const foldingComplianceCases = [
  const events=[];globalThis.result=[+{valueOf(){events.push('valueOf');return 2;}},events];
     `,
     expected: [2, ['valueOf']],
-    knownFailure: false,
   },
   {
     name: 'constant folding retains computed class key coercion',
@@ -376,11 +359,10 @@ const foldingComplianceCases = [
  const events=[];const key={toString(){events.push('key');return 'value';}};globalThis.result=[typeof class{[key](){}},events];
     `,
     expected: ['function', ['key']],
-    knownFailure: false,
   },
 ];
 
-describe.each(foldingComplianceCases)('$name', ({ source, expected, knownFailure }) => {
+describe.each(foldingComplianceCases)('$name', ({ source, expected }) => {
   let code: string;
   beforeAll(() => {
     code = compile(source, { optimize: { constantFolding: true } });
@@ -393,8 +375,7 @@ describe.each(foldingComplianceCases)('$name', ({ source, expected, knownFailure
   test('native execution', () => {
     expect(run(source)).toEqual(expected);
   });
-  const transformedTest = knownFailure ? test.fails : test;
-  transformedTest('transformed execution', () => {
+  test('transformed execution', () => {
     expect(run(code)).toEqual(expected);
   });
 });
@@ -536,7 +517,6 @@ const eliminationComplianceCases = [
  function run(){var value=0;{function value(){return 2;}}return typeof value;}globalThis.result=run();
     `,
     expected: 'function',
-    knownFailure: true,
   },
   {
     name: 'dead function elimination preserves Annex B outer bindings',
@@ -544,7 +524,6 @@ const eliminationComplianceCases = [
  function run(){{function value(){return 2;}}return value();}globalThis.result=run();
     `,
     expected: 2,
-    knownFailure: false,
   },
   {
     name: 'dead function elimination preserves with environment setter effects',
@@ -552,7 +531,6 @@ const eliminationComplianceCases = [
  const events=[];const object={set value(value){events.push(typeof value);}};with(object){var value=function(){};}globalThis.result=events;
     `,
     expected: ['function'],
-    knownFailure: true,
   },
   {
     name: 'dead function elimination retains unused class static initialization',
@@ -560,7 +538,6 @@ const eliminationComplianceCases = [
  const events=[];const Unused=class{static{events.push('static');}};globalThis.result=events;
     `,
     expected: ['static'],
-    knownFailure: false,
   },
   {
     name: 'dead function elimination preserves assignments to matching catch parameters',
@@ -568,7 +545,6 @@ const eliminationComplianceCases = [
  try{throw 1;}catch(value){var value=function(){return 2;};globalThis.result=typeof value;}
     `,
     expected: 'function',
-    knownFailure: false,
   },
   {
     name: 'dead function elimination preserves arrow assignments to matching catch parameters',
@@ -576,7 +552,6 @@ const eliminationComplianceCases = [
  try{throw 1;}catch(value){var value=()=>2;globalThis.result=value();}
     `,
     expected: 2,
-    knownFailure: false,
   },
   {
     name: 'dead function elimination preserves ordinary catch-local function uses',
@@ -584,11 +559,10 @@ const eliminationComplianceCases = [
  try{throw 1;}catch(error){const value=()=>2;globalThis.result=value()+error;}
     `,
     expected: 3,
-    knownFailure: false,
   },
 ];
 
-describe.each(eliminationComplianceCases)('$name', ({ source, expected, knownFailure }) => {
+describe.each(eliminationComplianceCases)('$name', ({ source, expected }) => {
   let code: string;
   beforeAll(() => {
     code = compile(source, { optimize: { deadCodeElimination: true } });
@@ -601,8 +575,7 @@ describe.each(eliminationComplianceCases)('$name', ({ source, expected, knownFai
   test('native execution', () => {
     expect(run(source)).toEqual(expected);
   });
-  const transformedTest = knownFailure ? test.fails : test;
-  transformedTest('transformed execution', () => {
+  test('transformed execution', () => {
     expect(run(code)).toEqual(expected);
   });
 });

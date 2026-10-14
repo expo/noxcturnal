@@ -2,9 +2,9 @@ use oxc_allocator::{Allocator, TakeIn};
 use oxc_ast::{
     AstBuilder,
     ast::{
-        CallExpression, Declaration, ExportDefaultDeclaration, ExportDefaultDeclarationKind,
+        CallExpression, Class, Declaration, ExportDefaultDeclaration, ExportDefaultDeclarationKind,
         ExportNamedDeclaration, Expression, Function, FunctionType, IdentifierReference,
-        NumberBase, Program, Statement, VariableDeclaration, VariableDeclarator,
+        NumberBase, Program, Statement, VariableDeclaration, VariableDeclarator, WithStatement,
     },
 };
 use oxc_ast_visit::{Visit, VisitMut, walk, walk_mut};
@@ -44,6 +44,36 @@ struct ConstantFolder<'a> {
 }
 
 impl<'a> ConstantFolder<'a> {
+    // Conditional/logical evaluation performs GetValue and does not trigger
+    // anonymous-function named evaluation. Preserve that context when selecting
+    // an operand; plain references would change calls, delete, typeof, and names.
+    #[expect(deprecated)]
+    fn value(&self, expression: Expression<'a>) -> Expression<'a> {
+        if matches!(
+            expression.get_inner_expression(),
+            Expression::Identifier(_)
+                | Expression::StaticMemberExpression(_)
+                | Expression::ComputedMemberExpression(_)
+                | Expression::PrivateFieldExpression(_)
+                | Expression::FunctionExpression(_)
+                | Expression::ArrowFunctionExpression(_)
+                | Expression::ClassExpression(_)
+                | Expression::ChainExpression(_)
+        ) {
+            let span = expression.span();
+            self.ast.expression_sequence(
+                span,
+                self.ast.vec_from_array([
+                    self.ast
+                        .expression_numeric_literal(span, 0.0, None, NumberBase::Decimal),
+                    expression,
+                ]),
+            )
+        } else {
+            expression
+        }
+    }
+
     #[expect(deprecated)]
     fn literal(&self, span: oxc_span::Span, value: EvaluatedConstant) -> Option<Expression<'a>> {
         Some(match value {
@@ -103,11 +133,12 @@ impl<'a> VisitMut<'a> for ConstantFolder<'a> {
                         matches!(left, EvaluatedConstant::Null)
                     }
                 };
-                *expression = if use_right {
+                let selected = if use_right {
                     logical.right.take_in(&self.ast)
                 } else {
                     logical.left.take_in(&self.ast)
                 };
+                *expression = self.value(selected);
             }
             Expression::ConditionalExpression(conditional) => {
                 let test_span = conditional.test.span();
@@ -119,11 +150,12 @@ impl<'a> VisitMut<'a> for ConstantFolder<'a> {
                     self.failed.insert((span.start, span.end));
                     return;
                 };
-                *expression = if test.truthy() {
+                let selected = if test.truthy() {
                     conditional.consequent.take_in(&self.ast)
                 } else {
                     conditional.alternate.take_in(&self.ast)
                 };
+                *expression = self.value(selected);
             }
             _ => {
                 if expression_has_failed_operand(expression, &self.failed)
@@ -146,14 +178,23 @@ impl<'a> VisitMut<'a> for ConstantFolder<'a> {
                 Some(Statement::FunctionDeclaration(_))
             )
         {
-            // Sloppy-mode Annex B creates an outer var binding even for an
-            // unreachable function declaration. Removing the branch would
-            // make reads of that binding throw instead of producing undefined.
             return;
         }
         let Some(test) = evaluate_expression(&if_statement.test) else {
             return;
         };
+        let discarded = if test.truthy() {
+            if_statement.alternate.as_ref()
+        } else {
+            Some(&if_statement.consequent)
+        };
+        if let Some(discarded) = discarded {
+            let mut bindings = HoistedBindingDetector(false);
+            bindings.visit_statement(discarded);
+            if bindings.0 {
+                return;
+            }
+        }
         *statement = if test.truthy() {
             if_statement.consequent.take_in(&self.ast)
         } else if let Some(alternate) = &mut if_statement.alternate {
@@ -163,6 +204,31 @@ impl<'a> VisitMut<'a> for ConstantFolder<'a> {
             self.ast.statement_empty(if_statement.span)
         };
     }
+}
+
+// Discarding a branch must not discard declaration instantiation. Keeping
+// the branch is cheaper and less error-prone than synthesizing Annex B vars.
+struct HoistedBindingDetector(bool);
+
+impl<'a> Visit<'a> for HoistedBindingDetector {
+    fn visit_statement(&mut self, statement: &Statement<'a>) {
+        if !self.0 {
+            walk::walk_statement(self, statement);
+        }
+    }
+
+    // Expressions cannot declare a var in the surrounding branch's scope.
+    fn visit_expression(&mut self, _expression: &Expression<'a>) {}
+
+    fn visit_variable_declaration(&mut self, declaration: &VariableDeclaration<'a>) {
+        self.0 |= declaration.kind.is_var();
+    }
+
+    fn visit_function(&mut self, function: &Function<'a>, _flags: ScopeFlags) {
+        self.0 |= function.r#type == FunctionType::FunctionDeclaration;
+    }
+
+    fn visit_class(&mut self, _class: &Class<'a>) {}
 }
 
 fn expression_has_failed_operand(
@@ -187,16 +253,6 @@ fn expression_has_failed_operand(
 }
 
 fn eliminate_dead_functions(program: &mut Program<'_>) {
-    if program.source_text.contains("eval") {
-        let mut direct_eval = DirectEvalDetector(false);
-        direct_eval.visit_program(program);
-        if direct_eval.0 {
-            // A direct eval can resolve any binding in its lexical environment.
-            // Without parsing and linking the runtime string, static reference
-            // counts cannot prove a function binding dead.
-            return;
-        }
-    }
     // Metro's Babel pass repeatedly removes unreferenced function bindings and
     // recrawls scope until reaching a fixed point. Rebuilding the complete
     // semantic graph on every layer makes a dead chain quadratic. Compute the
@@ -212,9 +268,16 @@ fn eliminate_dead_functions(program: &mut Program<'_>) {
     // SemanticBuilder refreshes the symbol cells after preceding transforms
     // have changed the program. Collect only after that rebuild; IDs retained
     // from an older transformed graph may now refer to a different binding.
-    let mut collector = DeadFunctionCandidateCollector::default();
+    let mut collector = DeadFunctionCandidateCollector {
+        scoping: &scoping,
+        script: program.source_type.is_script(),
+        candidates: FxHashSet::default(),
+        roots: FxHashSet::default(),
+        with_depth: 0,
+        direct_eval: false,
+    };
     collector.visit_program(program);
-    if collector.candidates.is_empty() {
+    if collector.direct_eval || collector.candidates.is_empty() {
         return;
     }
     let mut analysis =
@@ -224,25 +287,52 @@ fn eliminate_dead_functions(program: &mut Program<'_>) {
     DeadFunctionRemover { unused }.visit_program(program);
 }
 
-struct DirectEvalDetector(bool);
+struct DeadFunctionCandidateCollector<'s> {
+    scoping: &'s Scoping,
+    script: bool,
+    candidates: FxHashSet<SymbolId>,
+    roots: FxHashSet<SymbolId>,
+    with_depth: usize,
+    direct_eval: bool,
+}
 
-impl<'a> Visit<'a> for DirectEvalDetector {
-    fn visit_call_expression(&mut self, call: &CallExpression<'a>) {
-        if matches!(&call.callee, Expression::Identifier(identifier) if identifier.name == "eval") {
-            self.0 = true;
-            return;
+impl DeadFunctionCandidateCollector<'_> {
+    fn candidate(&mut self, symbol_id: SymbolId, function_declaration: bool) {
+        self.candidates.insert(symbol_id);
+        let scope = self.scoping.symbol_scope_id(symbol_id);
+        let flags = self.scoping.scope_flags(scope);
+        // Script globals are externally observable, including lexical bindings
+        // read by indirect eval. Sloppy block functions can implicitly write an
+        // outer Annex B binding, and with makes initialization targets dynamic.
+        if (self.script && scope == self.scoping.root_scope_id())
+            || self.with_depth > 0
+            || (function_declaration
+                && !flags.is_strict_mode()
+                && !flags.intersects(ScopeFlags::Var))
+        {
+            self.roots.insert(symbol_id);
         }
-        walk::walk_call_expression(self, call);
     }
 }
 
-#[derive(Default)]
-struct DeadFunctionCandidateCollector {
-    candidates: FxHashSet<SymbolId>,
-    roots: FxHashSet<SymbolId>,
-}
+impl<'a> Visit<'a> for DeadFunctionCandidateCollector<'_> {
+    fn visit_call_expression(&mut self, call: &CallExpression<'a>) {
+        if !call.optional
+            && matches!(call.callee.get_inner_expression(), Expression::Identifier(identifier) if identifier.name == "eval")
+        {
+            // Inspect parsed identifiers, including escaped and parenthesized
+            // spellings. Runtime strings can reference any lexical binding.
+            self.direct_eval = true;
+        }
+        walk::walk_call_expression(self, call);
+    }
 
-impl<'a> Visit<'a> for DeadFunctionCandidateCollector {
+    fn visit_with_statement(&mut self, statement: &WithStatement<'a>) {
+        self.with_depth += 1;
+        walk::walk_with_statement(self, statement);
+        self.with_depth -= 1;
+    }
+
     fn visit_export_default_declaration(&mut self, export: &ExportDefaultDeclaration<'a>) {
         if let ExportDefaultDeclarationKind::FunctionDeclaration(function) = &export.declaration
             && let Some(symbol_id) = function.id.as_ref().and_then(|id| id.symbol_id.get())
@@ -285,7 +375,7 @@ impl<'a> Visit<'a> for DeadFunctionCandidateCollector {
         if function.r#type == FunctionType::FunctionDeclaration
             && let Some(symbol_id) = function.id.as_ref().and_then(|id| id.symbol_id.get())
         {
-            self.candidates.insert(symbol_id);
+            self.candidate(symbol_id, true);
         }
         walk::walk_function(self, function, flags);
     }
@@ -299,7 +389,7 @@ impl<'a> Visit<'a> for DeadFunctionCandidateCollector {
             .get_binding_identifier()
             .and_then(|id| id.symbol_id.get())
         {
-            self.candidates.insert(symbol_id);
+            self.candidate(symbol_id, false);
         }
         walk::walk_variable_declarator(self, declaration);
     }

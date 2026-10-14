@@ -8,7 +8,6 @@ function observe(code: string): unknown {
 describe.each([false, true])('parenthesized eval with constant folding=%s', constantFolding => {
   describe.each(['eval', '(eval)', '((eval))', '(0,eval)'])('callee %s', callee => {
     const indirect = callee === '(0,eval)';
-    const fails = callee === '(eval)' || callee === '((eval))';
     let actual: unknown;
     beforeAll(() => {
       const source = `function inspect(){const auditHidden=()=>42;try{return ${callee}('auditHidden()')}catch(error){return error.name}}globalThis.result=inspect();`;
@@ -16,11 +15,11 @@ describe.each([false, true])('parenthesized eval with constant folding=%s', cons
       expect(observe(source)).toBe(expected);
       const code = compile(source, { optimize: { deadCodeElimination: true, constantFolding } });
       actual = observe(code);
-      expect(actual).toBe(callee === 'eval' ? 42 : 'ReferenceError');
-      if (callee === 'eval') expect(code).toMatch(/const\s+auditHidden\s*=/);
+      expect(actual).toBe(expected);
+      if (!indirect) expect(code).toMatch(/const\s+auditHidden\s*=/);
       else expect(code).not.toMatch(/const\s+auditHidden\s*=/);
     });
-    (fails ? test.fails : test)('preserves functions observable through direct eval', () => {
+    test('preserves functions observable through direct eval', () => {
       expect(actual).toBe(indirect ? 'ReferenceError' : 42);
     });
   });
