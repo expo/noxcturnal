@@ -62,7 +62,6 @@ describe.each([
                 visitors: [
                   defineVisitor(
                     'VariableDeclarator',
-                    // @ts-expect-error The incomplete alias also rejects valid concrete child types.
                     { children: { init: { route: type } } },
                     () => {},
                   ),
@@ -83,11 +82,11 @@ describe.each([
     }
   });
 
-  test.fails('delivers the expression through the alias visitor', () => {
+  test('delivers the expression through the alias visitor', () => {
     expect(alias).toContain(type);
   });
 
-  test.fails('recognizes the expression through public predicates', () => {
+  test('recognizes the expression through public predicates', () => {
     expect(predicates).toEqual([true, true, true]);
   });
 
@@ -95,7 +94,7 @@ describe.each([
     expect(expressionChildren).toEqual([type]);
   });
 
-  test.fails('accepts the concrete initializer child contract', () => {
+  test('accepts the concrete initializer child contract', () => {
     expect(concreteContractError).toBeUndefined();
   });
 });

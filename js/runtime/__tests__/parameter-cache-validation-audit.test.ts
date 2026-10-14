@@ -40,12 +40,9 @@ describe.each([NaN, Infinity, -Infinity])('predicate parameter %s', value => {
           rejected = true;
         }
       });
-      (warmed ? test.fails : test)(
-        'rejects nonfinite predicates regardless of prior bindings',
-        () => {
-          expect(rejected).toBe(true);
-        },
-      );
+      test('rejects nonfinite predicates regardless of prior bindings', () => {
+        expect(rejected).toBe(true);
+      });
     });
   }
 });
@@ -78,7 +75,6 @@ describe.each([false, true])('sparse predicate list, warmed=%s', warmed => {
       rejected = true;
     }
   });
-  (warmed ? test.fails : test)('rejects missing list entries regardless of earlier bindings', () =>
-    expect(rejected).toBe(true),
-  );
+  test('rejects missing list entries regardless of earlier bindings', () =>
+    expect(rejected).toBe(true));
 });

@@ -31,10 +31,10 @@ beforeAll(() => {
     return result.code;
   }
   expect(run(defined)).toBe('"original:base"');
-  expect(rebound.pre).toBe(replacement);
+  expect(rebound.pre).toBe(original);
   actual = run(rebound);
-  expect(actual).toBe('"replacement:bound"');
+  expect(actual).toBe('"original:bound"');
 });
-test.fails('withOptions preserves the frozen definition callbacks', () => {
+test('withOptions preserves the frozen definition callbacks', () => {
   expect(actual).toBe('"original:bound"');
 });

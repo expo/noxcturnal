@@ -43,9 +43,7 @@ for (const retained of [false, true])
           ).toBe('complete');
           expect(visits).toBe(1);
         });
-        (!explicitFields && ancestry === 'none' ? test.fails : test)(
-          'honors ancestry selection independently of scalar selection',
-          () => expect(hasParent).toBe(ancestry === 'parent'),
-        );
+        test('honors ancestry selection independently of scalar selection', () =>
+          expect(hasParent).toBe(ancestry === 'parent'));
       },
     );

@@ -46,7 +46,7 @@ for (const guarded of [false, true])
       expect(triggers).toBe(1);
       expect(peerSeen).toEqual([3, 4]);
     });
-    (guarded ? test : test.fails)('honors plugin control state on routes that only observe', () => {
+    test('honors plugin control state on routes that only observe', () => {
       expect(seen).toEqual(action === 'stop' ? [] : [4]);
     });
   });

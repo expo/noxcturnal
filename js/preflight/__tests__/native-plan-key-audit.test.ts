@@ -48,10 +48,7 @@ describe.each(cases)('$name', entry => {
       rejected = true;
     }
   });
-  (entry.fails ? test.fails : test)(
-    'rejects invalid enabled configuration rather than ignoring it',
-    () => {
-      expect(rejected).toBe(entry.reject);
-    },
-  );
+  test('rejects invalid enabled configuration rather than ignoring it', () => {
+    expect(rejected).toBe(entry.reject);
+  });
 });

@@ -151,6 +151,8 @@ export function isExpressionType(type: string): type is NativeRouteTypes['Expres
     case 'PrivateFieldExpression':
     case 'CallExpression':
     case 'NewExpression':
+    case 'ImportMeta':
+    case 'NewTarget':
     case 'UpdateExpression':
     case 'UnaryExpression':
     case 'BinaryExpression':
@@ -162,8 +164,10 @@ export function isExpressionType(type: string): type is NativeRouteTypes['Expres
     case 'AwaitExpression':
     case 'ChainExpression':
     case 'ParenthesizedExpression':
+    case 'Function':
     case 'ArrowFunctionExpression':
     case 'YieldExpression':
+    case 'Class':
     case 'ImportExpression':
     case 'V8IntrinsicExpression':
     case 'BooleanLiteral':
@@ -172,6 +176,8 @@ export function isExpressionType(type: string): type is NativeRouteTypes['Expres
     case 'StringLiteral':
     case 'BigIntLiteral':
     case 'RegExpLiteral':
+    case 'JSXElement':
+    case 'JSXFragment':
     case 'JSXMemberExpression':
     case 'JSXEmptyExpression':
     case 'TSAsExpression':

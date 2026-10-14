@@ -53,13 +53,33 @@ pub(crate) fn static_member_path_with(
     }
     if let Some(property) = property {
         path.push('.');
-        path.push_str(property);
+        write_component(&mut path, property);
     }
     Some(path)
 }
 
+fn member_expression<'a, 'b>(mut expression: &'b Expression<'a>) -> &'b Expression<'a> {
+    while let Expression::ParenthesizedExpression(parenthesized) = expression {
+        expression = &parenthesized.expression;
+    }
+    expression
+}
+
+fn write_component(path: &mut String, component: &str) {
+    if !component.contains('.') && !component.contains('\\') {
+        path.push_str(component);
+        return;
+    }
+    for ch in component.chars() {
+        if ch == '.' || ch == '\\' {
+            path.push('\\');
+        }
+        path.push(ch);
+    }
+}
+
 fn write_static_member_path(expression: &Expression<'_>, path: &mut String) -> bool {
-    match expression {
+    match member_expression(expression) {
         Expression::Identifier(identifier) => {
             path.push_str(&identifier.name);
             true
@@ -75,7 +95,7 @@ fn write_static_member_path(expression: &Expression<'_>, path: &mut String) -> b
             Expression::StringLiteral(property) => {
                 write_static_member_path(&member.object, path) && {
                     path.push('.');
-                    path.push_str(&property.value);
+                    write_component(path, &property.value);
                     true
                 }
             }
@@ -200,10 +220,21 @@ impl MemberPathInterner {
         } else {
             self.bytes(parent, b".")
         };
-        self.bytes(state, component.as_bytes())
+        if !component.contains('.') && !component.contains('\\') {
+            return self.bytes(state, component.as_bytes());
+        }
+        let mut state = state;
+        for byte in component.bytes() {
+            if byte == b'.' || byte == b'\\' {
+                state = self.bytes(state, b"\\");
+            }
+            state = self.bytes(state, &[byte]);
+        }
+        state
     }
 
     fn expression(&mut self, expression: &Expression<'_>) -> Option<u32> {
+        let expression = member_expression(expression);
         let span = expression.span();
         let tag = match expression {
             Expression::Identifier(_) => 0,

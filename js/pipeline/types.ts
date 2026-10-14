@@ -32,6 +32,7 @@ export type PreparedPluginPlan = {
   controlFlow?: readonly ControlFlowCapability[];
   scope?: boolean;
   queries?: readonly QueryRequest[];
+  retainComments?: boolean;
   metadataWrites?: readonly string[];
   ancestry?: StoredVisitorContract['ancestry'];
   ancestryFields?: Readonly<Partial<Record<NativeNodeType, readonly NativeFieldKey[]>>>;

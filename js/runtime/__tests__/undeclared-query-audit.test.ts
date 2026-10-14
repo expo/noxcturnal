@@ -44,32 +44,44 @@ for (const declared of [false, true])
           count = entry.count(context.query(entry.request));
         },
       });
-      const result = transform(
-        entry.source,
-        'input.js',
-        defineNativePipeline({ phases: [{ name: 'query', plugins: [plugin] }] }),
-      );
-      expect(result.status).toBe('complete');
-      expect(count).toBe(declared ? 1 : 0);
-      outcome = 'complete';
-      if (!declared) {
-        const peer = defineNativePlugin({
-          name: 'passive-query-peer',
-          contract: { queries: [entry.request] },
-        });
-        const peerResult = transform(
+      const run = (peer = false) =>
+        transform(
           entry.source,
           'input.js',
-          defineNativePipeline({ phases: [{ name: 'query', plugins: [plugin, peer] }] }),
+          defineNativePipeline({
+            phases: [
+              {
+                name: 'query',
+                plugins: [
+                  plugin,
+                  ...(peer
+                    ? [
+                        defineNativePlugin({
+                          name: 'passive-query-peer',
+                          contract: { queries: [entry.request] },
+                        }),
+                      ]
+                    : []),
+                ],
+              },
+            ],
+          }),
         );
-        expect(peerResult.status).toBe('complete');
+      if (declared) {
+        expect(run().status).toBe('complete');
         expect(count).toBe(1);
+        outcome = 'complete';
+      } else {
+        expect(() => run()).toThrow(
+          `query-contract-audit: undeclared query capability ${entry.name}`,
+        );
+        expect(() => run(true)).toThrow(
+          `query-contract-audit: undeclared query capability ${entry.name}`,
+        );
+        outcome = 'throw';
       }
     });
-    (declared ? test : test.fails)(
-      'requires a declared query capability instead of silently returning missing facts',
-      () => {
-        expect(outcome).toBe(declared ? 'complete' : 'throw');
-      },
-    );
+    test('requires a declared query capability instead of silently returning missing facts', () => {
+      expect(outcome).toBe(declared ? 'complete' : 'throw');
+    });
   });

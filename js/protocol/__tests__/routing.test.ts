@@ -779,7 +779,7 @@ test('matches static member paths structurally without materializing predicate s
     defineNativePipeline({ phases: [{ name: 'main', plugins: [plugin] }] }),
   );
   assert.equal(result.status, 'complete');
-  assert.deepEqual(matched, ['STATIC', 'COMPUTED', 'env.DOTTED']);
+  assert.deepEqual(matched, ['STATIC', 'COMPUTED']);
 });
 
 test('exposes common scalar discriminants without child-tree transfer', () => {

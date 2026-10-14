@@ -69,14 +69,11 @@ describe.each([false, true])('nested traversal: %s', nested => {
       expect(result.status).toBe('complete');
       expect(skipped).toBe(true);
     });
-    (entry.fails ? test.fails : test)('skips all descendants while preserving siblings', () => {
+    test('skips all descendants while preserving siblings', () => {
       expect(visited).toEqual(['trailing']);
     });
-    (entry.fails ? test.fails : test)(
-      'skips descendant exit handlers while preserving siblings',
-      () => {
-        expect(exited).toEqual(['trailing']);
-      },
-    );
+    test('skips descendant exit handlers while preserving siblings', () => {
+      expect(exited).toEqual(['trailing']);
+    });
   });
 });

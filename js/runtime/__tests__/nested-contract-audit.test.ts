@@ -70,7 +70,7 @@ describe.each([
       );
     }
   });
-  test.fails('retains the field required by the specialized route without a manual payload request', () => {
+  test('retains the field required by the specialized route without a manual payload request', () => {
     expect(error).toBeUndefined();
     expect(actual).toEqual([expected]);
   });
@@ -98,7 +98,7 @@ describe('nested child projection', () => {
     run(source, [visitor(actual)], true);
     expect(actual).toHaveLength(1);
   });
-  test.fails('retains declared children and their fields for a nested visitor', () => {
+  test('retains declared children and their fields for a nested visitor', () => {
     expect(actual).toEqual([['NumericLiteral', 3]]);
   });
 });
@@ -141,7 +141,7 @@ describe('nested traversal retains its owning phase plan', () => {
       );
     }
   });
-  test.fails('serves an explicitly retained field through a second nested traversal', () => {
+  test('serves an explicitly retained field through a second nested traversal', () => {
     expect(error).toBeUndefined();
     expect(actual).toContain('external');
   });
@@ -172,7 +172,7 @@ describe('nested comment retention', () => {
     );
     expect(callbacks).toBe(1);
   });
-  test.fails('retains comments declared only by a nested visitor', () => {
+  test('retains comments declared only by a nested visitor', () => {
     expect(actual).toEqual(['mark']);
   });
 });
@@ -224,7 +224,7 @@ describe('nested edit ownership', () => {
     expect(conflict(false)).toEqual(['first', 'second']);
     actual = conflict(true);
   });
-  test.fails('attributes overlapping edits to their owning plugins', () => {
+  test('attributes overlapping edits to their owning plugins', () => {
     expect(actual).toEqual(['first', 'second']);
   });
 });

@@ -28,7 +28,7 @@ export class NativeTransformSession {
   #sourceIdentifiers: Set<string> | null = null;
   #uidSourceScans = 0;
   #eventCache: (NativeEvent | undefined)[] = [];
-  #queryCache = new WeakMap<QueryRequest, QueryResult>();
+  #queryCache = new WeakMap<QueryRequest, { request: QueryRequest; result: QueryResult }>();
   #globalReferencesCache = new Map<string, SemanticReferenceView[]>();
   #childrenCache = new Map<number, number[]>();
   #childIdsCache = new Map<number, Set<number>>();
@@ -132,7 +132,7 @@ export class NativeTransformSession {
   query(request: QueryRequest): QueryResult {
     this.#assertOpen();
     const cached = this.#queryCache.get(request);
-    if (cached) return cached;
+    if (cached && sameQuery(request, cached.request)) return cached.result;
     const types = querySubscriptions(request);
     const nodes = types.length
       ? decodeEventBatch(
@@ -243,7 +243,7 @@ export class NativeTransformSession {
           .map(adaptBindingFact),
       ),
     };
-    this.#queryCache.set(request, result);
+    this.#queryCache.set(request, { request: snapshotQuery(request), result });
     return result;
   }
   inspect(requests: readonly InspectRequest[]): NodeView[] {
@@ -639,4 +639,62 @@ export class NativeTransformSession {
     }
     return this.#native;
   }
+}
+
+// Requests are mutable: compare only the small descriptor, never the source or facts.
+// Copies are made on misses, so warm queries allocate nothing for cache validation.
+function sameList<T>(
+  left: readonly T[] | undefined,
+  right: readonly T[] | undefined,
+  same: (left: T, right: T) => boolean,
+): boolean {
+  if (left === undefined || right === undefined) return left === right;
+  if (left.length !== right.length) return false;
+  for (let index = 0; index < left.length; index++)
+    if (!same(left[index], right[index])) return false;
+  return true;
+}
+function sameQuery(left: QueryRequest, right: QueryRequest): boolean {
+  return (
+    left.imports === right.imports &&
+    left.exports === right.exports &&
+    sameList(left.constants, right.constants, Object.is) &&
+    sameList(
+      left.globals,
+      right.globals,
+      (a, b) => a?.name === b?.name && a?.references === b?.references,
+    ) &&
+    sameList(
+      left.calls,
+      right.calls,
+      (a, b) =>
+        a?.callee === b?.callee &&
+        a?.globalOnly === b?.globalOnly &&
+        a?.staticArguments === b?.staticArguments,
+    ) &&
+    sameList(
+      left.captures,
+      right.captures,
+      (a, b) => a?.functionId === b?.functionId && a?.programBindings === b?.programBindings,
+    ) &&
+    sameList(
+      left.bindings,
+      right.bindings,
+      (a, b) =>
+        a?.name === b?.name &&
+        a?.scopeId === b?.scopeId &&
+        a?.reads === b?.reads &&
+        a?.writes === b?.writes,
+    )
+  );
+}
+function snapshotQuery(request: QueryRequest): QueryRequest {
+  return {
+    ...request,
+    constants: request.constants?.slice(),
+    globals: request.globals?.map(entry => ({ ...entry })),
+    calls: request.calls?.map(entry => ({ ...entry })),
+    captures: request.captures?.map(entry => ({ ...entry })),
+    bindings: request.bindings?.map(entry => ({ ...entry })),
+  };
 }

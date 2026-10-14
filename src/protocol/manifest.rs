@@ -538,10 +538,11 @@ pub(crate) fn decode_route_manifest(
                 })
         })
         .collect::<Vec<_>>();
-    let needs_comments = routes_by_type
-        .iter()
-        .flatten()
-        .any(|route| route.comments_inner);
+    let needs_comments = flags & (1 << 8) != 0
+        || routes_by_type
+            .iter()
+            .flatten()
+            .any(|route| route.comments_inner);
     Ok(CompiledManifest {
         routes_by_type,
         include_parent,

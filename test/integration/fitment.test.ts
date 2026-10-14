@@ -256,7 +256,10 @@ type ActionState = { names: string[] };
 
 const serverActions = defineNativePlugin<ActionState>({
   name: 'server-actions-fitment',
-  contract: { metadata: { writes: ['reactServerActions'] } },
+  contract: {
+    metadata: { writes: ['reactServerActions'] },
+    queries: [{ captures: [{ functionId: 0 }] }],
+  },
   createState: () => ({ names: [] }),
   visitors: [
     defineVisitor(

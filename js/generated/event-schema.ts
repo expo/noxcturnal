@@ -650,6 +650,8 @@ export const ALIAS_EXPANSIONS: Readonly<Record<string, readonly string[]>> = {
     'PrivateFieldExpression',
     'CallExpression',
     'NewExpression',
+    'ImportMeta',
+    'NewTarget',
     'UpdateExpression',
     'UnaryExpression',
     'BinaryExpression',
@@ -661,8 +663,10 @@ export const ALIAS_EXPANSIONS: Readonly<Record<string, readonly string[]>> = {
     'AwaitExpression',
     'ChainExpression',
     'ParenthesizedExpression',
+    'Function',
     'ArrowFunctionExpression',
     'YieldExpression',
+    'Class',
     'ImportExpression',
     'V8IntrinsicExpression',
     'BooleanLiteral',
@@ -671,6 +675,8 @@ export const ALIAS_EXPANSIONS: Readonly<Record<string, readonly string[]>> = {
     'StringLiteral',
     'BigIntLiteral',
     'RegExpLiteral',
+    'JSXElement',
+    'JSXFragment',
     'JSXMemberExpression',
     'JSXEmptyExpression',
     'TSAsExpression',
@@ -975,6 +981,8 @@ export const CHILD_ROLES: Readonly<
         'PrivateFieldExpression',
         'CallExpression',
         'NewExpression',
+        'ImportMeta',
+        'NewTarget',
         'UpdateExpression',
         'UnaryExpression',
         'BinaryExpression',
@@ -986,8 +994,10 @@ export const CHILD_ROLES: Readonly<
         'AwaitExpression',
         'ChainExpression',
         'ParenthesizedExpression',
+        'Function',
         'ArrowFunctionExpression',
         'YieldExpression',
+        'Class',
         'ImportExpression',
         'V8IntrinsicExpression',
         'BooleanLiteral',
@@ -996,6 +1006,8 @@ export const CHILD_ROLES: Readonly<
         'StringLiteral',
         'BigIntLiteral',
         'RegExpLiteral',
+        'JSXElement',
+        'JSXFragment',
         'JSXMemberExpression',
         'JSXEmptyExpression',
         'TSAsExpression',
@@ -1044,6 +1056,8 @@ export const CHILD_ROLES: Readonly<
         'PrivateFieldExpression',
         'CallExpression',
         'NewExpression',
+        'ImportMeta',
+        'NewTarget',
         'UpdateExpression',
         'UnaryExpression',
         'BinaryExpression',
@@ -1055,8 +1069,10 @@ export const CHILD_ROLES: Readonly<
         'AwaitExpression',
         'ChainExpression',
         'ParenthesizedExpression',
+        'Function',
         'ArrowFunctionExpression',
         'YieldExpression',
+        'Class',
         'ImportExpression',
         'V8IntrinsicExpression',
         'BooleanLiteral',
@@ -1065,6 +1081,8 @@ export const CHILD_ROLES: Readonly<
         'StringLiteral',
         'BigIntLiteral',
         'RegExpLiteral',
+        'JSXElement',
+        'JSXFragment',
         'JSXMemberExpression',
         'JSXEmptyExpression',
         'TSAsExpression',
@@ -1142,6 +1160,8 @@ export const CHILD_ROLES: Readonly<
         'PrivateFieldExpression',
         'CallExpression',
         'NewExpression',
+        'ImportMeta',
+        'NewTarget',
         'UpdateExpression',
         'UnaryExpression',
         'BinaryExpression',
@@ -1153,8 +1173,10 @@ export const CHILD_ROLES: Readonly<
         'AwaitExpression',
         'ChainExpression',
         'ParenthesizedExpression',
+        'Function',
         'ArrowFunctionExpression',
         'YieldExpression',
+        'Class',
         'ImportExpression',
         'V8IntrinsicExpression',
         'BooleanLiteral',
@@ -1163,6 +1185,8 @@ export const CHILD_ROLES: Readonly<
         'StringLiteral',
         'BigIntLiteral',
         'RegExpLiteral',
+        'JSXElement',
+        'JSXFragment',
         'JSXMemberExpression',
         'JSXEmptyExpression',
         'TSAsExpression',
@@ -1233,6 +1257,8 @@ export const CHILD_ROLES: Readonly<
         'PrivateFieldExpression',
         'CallExpression',
         'NewExpression',
+        'ImportMeta',
+        'NewTarget',
         'UpdateExpression',
         'UnaryExpression',
         'BinaryExpression',
@@ -1244,8 +1270,10 @@ export const CHILD_ROLES: Readonly<
         'AwaitExpression',
         'ChainExpression',
         'ParenthesizedExpression',
+        'Function',
         'ArrowFunctionExpression',
         'YieldExpression',
+        'Class',
         'ImportExpression',
         'V8IntrinsicExpression',
         'BooleanLiteral',
@@ -1254,6 +1282,8 @@ export const CHILD_ROLES: Readonly<
         'StringLiteral',
         'BigIntLiteral',
         'RegExpLiteral',
+        'JSXElement',
+        'JSXFragment',
         'JSXMemberExpression',
         'JSXEmptyExpression',
         'TSAsExpression',
@@ -1324,6 +1354,8 @@ export const CHILD_ROLES: Readonly<
         'PrivateFieldExpression',
         'CallExpression',
         'NewExpression',
+        'ImportMeta',
+        'NewTarget',
         'UpdateExpression',
         'UnaryExpression',
         'BinaryExpression',
@@ -1335,8 +1367,10 @@ export const CHILD_ROLES: Readonly<
         'AwaitExpression',
         'ChainExpression',
         'ParenthesizedExpression',
+        'Function',
         'ArrowFunctionExpression',
         'YieldExpression',
+        'Class',
         'ImportExpression',
         'V8IntrinsicExpression',
         'BooleanLiteral',
@@ -1345,6 +1379,8 @@ export const CHILD_ROLES: Readonly<
         'StringLiteral',
         'BigIntLiteral',
         'RegExpLiteral',
+        'JSXElement',
+        'JSXFragment',
         'JSXMemberExpression',
         'JSXEmptyExpression',
         'TSAsExpression',
@@ -1561,6 +1597,8 @@ export const CHILD_ROLES: Readonly<
         'PrivateFieldExpression',
         'CallExpression',
         'NewExpression',
+        'ImportMeta',
+        'NewTarget',
         'UpdateExpression',
         'UnaryExpression',
         'BinaryExpression',
@@ -1572,8 +1610,10 @@ export const CHILD_ROLES: Readonly<
         'AwaitExpression',
         'ChainExpression',
         'ParenthesizedExpression',
+        'Function',
         'ArrowFunctionExpression',
         'YieldExpression',
+        'Class',
         'ImportExpression',
         'V8IntrinsicExpression',
         'BooleanLiteral',
@@ -1582,6 +1622,8 @@ export const CHILD_ROLES: Readonly<
         'StringLiteral',
         'BigIntLiteral',
         'RegExpLiteral',
+        'JSXElement',
+        'JSXFragment',
         'JSXMemberExpression',
         'JSXEmptyExpression',
         'TSAsExpression',
@@ -1607,6 +1649,8 @@ export const CHILD_ROLES: Readonly<
         'PrivateFieldExpression',
         'CallExpression',
         'NewExpression',
+        'ImportMeta',
+        'NewTarget',
         'UpdateExpression',
         'UnaryExpression',
         'BinaryExpression',
@@ -1618,8 +1662,10 @@ export const CHILD_ROLES: Readonly<
         'AwaitExpression',
         'ChainExpression',
         'ParenthesizedExpression',
+        'Function',
         'ArrowFunctionExpression',
         'YieldExpression',
+        'Class',
         'ImportExpression',
         'V8IntrinsicExpression',
         'BooleanLiteral',
@@ -1628,6 +1674,8 @@ export const CHILD_ROLES: Readonly<
         'StringLiteral',
         'BigIntLiteral',
         'RegExpLiteral',
+        'JSXElement',
+        'JSXFragment',
         'JSXMemberExpression',
         'JSXEmptyExpression',
         'TSAsExpression',
@@ -1656,6 +1704,8 @@ export const CHILD_ROLES: Readonly<
         'PrivateFieldExpression',
         'CallExpression',
         'NewExpression',
+        'ImportMeta',
+        'NewTarget',
         'UpdateExpression',
         'UnaryExpression',
         'BinaryExpression',
@@ -1667,8 +1717,10 @@ export const CHILD_ROLES: Readonly<
         'AwaitExpression',
         'ChainExpression',
         'ParenthesizedExpression',
+        'Function',
         'ArrowFunctionExpression',
         'YieldExpression',
+        'Class',
         'ImportExpression',
         'V8IntrinsicExpression',
         'BooleanLiteral',
@@ -1677,6 +1729,8 @@ export const CHILD_ROLES: Readonly<
         'StringLiteral',
         'BigIntLiteral',
         'RegExpLiteral',
+        'JSXElement',
+        'JSXFragment',
         'JSXMemberExpression',
         'JSXEmptyExpression',
         'TSAsExpression',
@@ -1702,6 +1756,8 @@ export const CHILD_ROLES: Readonly<
         'PrivateFieldExpression',
         'CallExpression',
         'NewExpression',
+        'ImportMeta',
+        'NewTarget',
         'UpdateExpression',
         'UnaryExpression',
         'BinaryExpression',
@@ -1713,8 +1769,10 @@ export const CHILD_ROLES: Readonly<
         'AwaitExpression',
         'ChainExpression',
         'ParenthesizedExpression',
+        'Function',
         'ArrowFunctionExpression',
         'YieldExpression',
+        'Class',
         'ImportExpression',
         'V8IntrinsicExpression',
         'BooleanLiteral',
@@ -1723,6 +1781,8 @@ export const CHILD_ROLES: Readonly<
         'StringLiteral',
         'BigIntLiteral',
         'RegExpLiteral',
+        'JSXElement',
+        'JSXFragment',
         'JSXMemberExpression',
         'JSXEmptyExpression',
         'TSAsExpression',
@@ -1767,6 +1827,8 @@ export const CHILD_ROLES: Readonly<
         'PrivateFieldExpression',
         'CallExpression',
         'NewExpression',
+        'ImportMeta',
+        'NewTarget',
         'UpdateExpression',
         'UnaryExpression',
         'BinaryExpression',
@@ -1778,8 +1840,10 @@ export const CHILD_ROLES: Readonly<
         'AwaitExpression',
         'ChainExpression',
         'ParenthesizedExpression',
+        'Function',
         'ArrowFunctionExpression',
         'YieldExpression',
+        'Class',
         'ImportExpression',
         'V8IntrinsicExpression',
         'BooleanLiteral',
@@ -1788,6 +1852,8 @@ export const CHILD_ROLES: Readonly<
         'StringLiteral',
         'BigIntLiteral',
         'RegExpLiteral',
+        'JSXElement',
+        'JSXFragment',
         'JSXMemberExpression',
         'JSXEmptyExpression',
         'TSAsExpression',
@@ -1889,6 +1955,8 @@ export const CHILD_ROLES: Readonly<
         'PrivateFieldExpression',
         'CallExpression',
         'NewExpression',
+        'ImportMeta',
+        'NewTarget',
         'UpdateExpression',
         'UnaryExpression',
         'BinaryExpression',
@@ -1910,6 +1978,8 @@ export const CHILD_ROLES: Readonly<
         'StringLiteral',
         'BigIntLiteral',
         'RegExpLiteral',
+        'JSXElement',
+        'JSXFragment',
         'JSXMemberExpression',
         'JSXEmptyExpression',
         'TSAsExpression',
@@ -1955,6 +2025,8 @@ export const CHILD_ROLES: Readonly<
         'PrivateFieldExpression',
         'CallExpression',
         'NewExpression',
+        'ImportMeta',
+        'NewTarget',
         'UpdateExpression',
         'UnaryExpression',
         'BinaryExpression',
@@ -1966,8 +2038,10 @@ export const CHILD_ROLES: Readonly<
         'AwaitExpression',
         'ChainExpression',
         'ParenthesizedExpression',
+        'Function',
         'ArrowFunctionExpression',
         'YieldExpression',
+        'Class',
         'ImportExpression',
         'V8IntrinsicExpression',
         'BooleanLiteral',
@@ -1976,6 +2050,8 @@ export const CHILD_ROLES: Readonly<
         'StringLiteral',
         'BigIntLiteral',
         'RegExpLiteral',
+        'JSXElement',
+        'JSXFragment',
         'JSXMemberExpression',
         'JSXEmptyExpression',
         'TSAsExpression',
@@ -2046,6 +2122,8 @@ export const CHILD_ROLES: Readonly<
         'PrivateFieldExpression',
         'CallExpression',
         'NewExpression',
+        'ImportMeta',
+        'NewTarget',
         'UpdateExpression',
         'UnaryExpression',
         'BinaryExpression',
@@ -2057,8 +2135,10 @@ export const CHILD_ROLES: Readonly<
         'AwaitExpression',
         'ChainExpression',
         'ParenthesizedExpression',
+        'Function',
         'ArrowFunctionExpression',
         'YieldExpression',
+        'Class',
         'ImportExpression',
         'V8IntrinsicExpression',
         'BooleanLiteral',
@@ -2067,6 +2147,8 @@ export const CHILD_ROLES: Readonly<
         'StringLiteral',
         'BigIntLiteral',
         'RegExpLiteral',
+        'JSXElement',
+        'JSXFragment',
         'JSXMemberExpression',
         'JSXEmptyExpression',
         'TSAsExpression',
@@ -2124,6 +2206,8 @@ export const CHILD_ROLES: Readonly<
         'PrivateFieldExpression',
         'CallExpression',
         'NewExpression',
+        'ImportMeta',
+        'NewTarget',
         'UpdateExpression',
         'UnaryExpression',
         'BinaryExpression',
@@ -2135,8 +2219,10 @@ export const CHILD_ROLES: Readonly<
         'AwaitExpression',
         'ChainExpression',
         'ParenthesizedExpression',
+        'Function',
         'ArrowFunctionExpression',
         'YieldExpression',
+        'Class',
         'ImportExpression',
         'V8IntrinsicExpression',
         'BooleanLiteral',
@@ -2145,6 +2231,8 @@ export const CHILD_ROLES: Readonly<
         'StringLiteral',
         'BigIntLiteral',
         'RegExpLiteral',
+        'JSXElement',
+        'JSXFragment',
         'JSXMemberExpression',
         'JSXEmptyExpression',
         'TSAsExpression',
@@ -2177,6 +2265,8 @@ export const CHILD_ROLES: Readonly<
         'PrivateFieldExpression',
         'CallExpression',
         'NewExpression',
+        'ImportMeta',
+        'NewTarget',
         'UpdateExpression',
         'UnaryExpression',
         'BinaryExpression',
@@ -2188,8 +2278,10 @@ export const CHILD_ROLES: Readonly<
         'AwaitExpression',
         'ChainExpression',
         'ParenthesizedExpression',
+        'Function',
         'ArrowFunctionExpression',
         'YieldExpression',
+        'Class',
         'ImportExpression',
         'V8IntrinsicExpression',
         'BooleanLiteral',
@@ -2198,6 +2290,8 @@ export const CHILD_ROLES: Readonly<
         'StringLiteral',
         'BigIntLiteral',
         'RegExpLiteral',
+        'JSXElement',
+        'JSXFragment',
         'JSXMemberExpression',
         'JSXEmptyExpression',
         'TSAsExpression',
@@ -2224,6 +2318,8 @@ export const CHILD_ROLES: Readonly<
         'PrivateFieldExpression',
         'CallExpression',
         'NewExpression',
+        'ImportMeta',
+        'NewTarget',
         'UpdateExpression',
         'UnaryExpression',
         'BinaryExpression',
@@ -2235,8 +2331,10 @@ export const CHILD_ROLES: Readonly<
         'AwaitExpression',
         'ChainExpression',
         'ParenthesizedExpression',
+        'Function',
         'ArrowFunctionExpression',
         'YieldExpression',
+        'Class',
         'ImportExpression',
         'V8IntrinsicExpression',
         'BooleanLiteral',
@@ -2245,6 +2343,8 @@ export const CHILD_ROLES: Readonly<
         'StringLiteral',
         'BigIntLiteral',
         'RegExpLiteral',
+        'JSXElement',
+        'JSXFragment',
         'JSXMemberExpression',
         'JSXEmptyExpression',
         'TSAsExpression',
@@ -2272,6 +2372,8 @@ export const CHILD_ROLES: Readonly<
         'PrivateFieldExpression',
         'CallExpression',
         'NewExpression',
+        'ImportMeta',
+        'NewTarget',
         'UpdateExpression',
         'UnaryExpression',
         'BinaryExpression',
@@ -2283,8 +2385,10 @@ export const CHILD_ROLES: Readonly<
         'AwaitExpression',
         'ChainExpression',
         'ParenthesizedExpression',
+        'Function',
         'ArrowFunctionExpression',
         'YieldExpression',
+        'Class',
         'ImportExpression',
         'V8IntrinsicExpression',
         'BooleanLiteral',
@@ -2293,6 +2397,8 @@ export const CHILD_ROLES: Readonly<
         'StringLiteral',
         'BigIntLiteral',
         'RegExpLiteral',
+        'JSXElement',
+        'JSXFragment',
         'JSXMemberExpression',
         'JSXEmptyExpression',
         'TSAsExpression',
@@ -2328,6 +2434,8 @@ export const CHILD_ROLES: Readonly<
         'PrivateFieldExpression',
         'CallExpression',
         'NewExpression',
+        'ImportMeta',
+        'NewTarget',
         'UpdateExpression',
         'UnaryExpression',
         'BinaryExpression',
@@ -2339,8 +2447,10 @@ export const CHILD_ROLES: Readonly<
         'AwaitExpression',
         'ChainExpression',
         'ParenthesizedExpression',
+        'Function',
         'ArrowFunctionExpression',
         'YieldExpression',
+        'Class',
         'ImportExpression',
         'V8IntrinsicExpression',
         'BooleanLiteral',
@@ -2349,6 +2459,8 @@ export const CHILD_ROLES: Readonly<
         'StringLiteral',
         'BigIntLiteral',
         'RegExpLiteral',
+        'JSXElement',
+        'JSXFragment',
         'JSXMemberExpression',
         'JSXEmptyExpression',
         'TSAsExpression',
@@ -2375,6 +2487,8 @@ export const CHILD_ROLES: Readonly<
         'PrivateFieldExpression',
         'CallExpression',
         'NewExpression',
+        'ImportMeta',
+        'NewTarget',
         'UpdateExpression',
         'UnaryExpression',
         'BinaryExpression',
@@ -2386,8 +2500,10 @@ export const CHILD_ROLES: Readonly<
         'AwaitExpression',
         'ChainExpression',
         'ParenthesizedExpression',
+        'Function',
         'ArrowFunctionExpression',
         'YieldExpression',
+        'Class',
         'ImportExpression',
         'V8IntrinsicExpression',
         'BooleanLiteral',
@@ -2396,6 +2512,8 @@ export const CHILD_ROLES: Readonly<
         'StringLiteral',
         'BigIntLiteral',
         'RegExpLiteral',
+        'JSXElement',
+        'JSXFragment',
         'JSXMemberExpression',
         'JSXEmptyExpression',
         'TSAsExpression',
@@ -2426,6 +2544,8 @@ export const CHILD_ROLES: Readonly<
         'PrivateFieldExpression',
         'CallExpression',
         'NewExpression',
+        'ImportMeta',
+        'NewTarget',
         'UpdateExpression',
         'UnaryExpression',
         'BinaryExpression',
@@ -2437,8 +2557,10 @@ export const CHILD_ROLES: Readonly<
         'AwaitExpression',
         'ChainExpression',
         'ParenthesizedExpression',
+        'Function',
         'ArrowFunctionExpression',
         'YieldExpression',
+        'Class',
         'ImportExpression',
         'V8IntrinsicExpression',
         'BooleanLiteral',
@@ -2447,6 +2569,8 @@ export const CHILD_ROLES: Readonly<
         'StringLiteral',
         'BigIntLiteral',
         'RegExpLiteral',
+        'JSXElement',
+        'JSXFragment',
         'JSXMemberExpression',
         'JSXEmptyExpression',
         'TSAsExpression',
@@ -2489,6 +2613,8 @@ export const CHILD_ROLES: Readonly<
         'PrivateFieldExpression',
         'CallExpression',
         'NewExpression',
+        'ImportMeta',
+        'NewTarget',
         'UpdateExpression',
         'UnaryExpression',
         'BinaryExpression',
@@ -2500,8 +2626,10 @@ export const CHILD_ROLES: Readonly<
         'AwaitExpression',
         'ChainExpression',
         'ParenthesizedExpression',
+        'Function',
         'ArrowFunctionExpression',
         'YieldExpression',
+        'Class',
         'ImportExpression',
         'V8IntrinsicExpression',
         'BooleanLiteral',
@@ -2510,6 +2638,8 @@ export const CHILD_ROLES: Readonly<
         'StringLiteral',
         'BigIntLiteral',
         'RegExpLiteral',
+        'JSXElement',
+        'JSXFragment',
         'JSXMemberExpression',
         'JSXEmptyExpression',
         'TSAsExpression',
@@ -2536,6 +2666,8 @@ export const CHILD_ROLES: Readonly<
         'PrivateFieldExpression',
         'CallExpression',
         'NewExpression',
+        'ImportMeta',
+        'NewTarget',
         'UpdateExpression',
         'UnaryExpression',
         'BinaryExpression',
@@ -2547,8 +2679,10 @@ export const CHILD_ROLES: Readonly<
         'AwaitExpression',
         'ChainExpression',
         'ParenthesizedExpression',
+        'Function',
         'ArrowFunctionExpression',
         'YieldExpression',
+        'Class',
         'ImportExpression',
         'V8IntrinsicExpression',
         'BooleanLiteral',
@@ -2557,6 +2691,8 @@ export const CHILD_ROLES: Readonly<
         'StringLiteral',
         'BigIntLiteral',
         'RegExpLiteral',
+        'JSXElement',
+        'JSXFragment',
         'JSXMemberExpression',
         'JSXEmptyExpression',
         'TSAsExpression',
@@ -2591,6 +2727,8 @@ export const CHILD_ROLES: Readonly<
         'PrivateFieldExpression',
         'CallExpression',
         'NewExpression',
+        'ImportMeta',
+        'NewTarget',
         'UpdateExpression',
         'UnaryExpression',
         'BinaryExpression',
@@ -2602,8 +2740,10 @@ export const CHILD_ROLES: Readonly<
         'AwaitExpression',
         'ChainExpression',
         'ParenthesizedExpression',
+        'Function',
         'ArrowFunctionExpression',
         'YieldExpression',
+        'Class',
         'ImportExpression',
         'V8IntrinsicExpression',
         'BooleanLiteral',
@@ -2612,6 +2752,8 @@ export const CHILD_ROLES: Readonly<
         'StringLiteral',
         'BigIntLiteral',
         'RegExpLiteral',
+        'JSXElement',
+        'JSXFragment',
         'JSXMemberExpression',
         'JSXEmptyExpression',
         'TSAsExpression',
@@ -2638,6 +2780,8 @@ export const CHILD_ROLES: Readonly<
         'PrivateFieldExpression',
         'CallExpression',
         'NewExpression',
+        'ImportMeta',
+        'NewTarget',
         'UpdateExpression',
         'UnaryExpression',
         'BinaryExpression',
@@ -2649,8 +2793,10 @@ export const CHILD_ROLES: Readonly<
         'AwaitExpression',
         'ChainExpression',
         'ParenthesizedExpression',
+        'Function',
         'ArrowFunctionExpression',
         'YieldExpression',
+        'Class',
         'ImportExpression',
         'V8IntrinsicExpression',
         'BooleanLiteral',
@@ -2659,6 +2805,8 @@ export const CHILD_ROLES: Readonly<
         'StringLiteral',
         'BigIntLiteral',
         'RegExpLiteral',
+        'JSXElement',
+        'JSXFragment',
         'JSXMemberExpression',
         'JSXEmptyExpression',
         'TSAsExpression',
@@ -2700,6 +2848,8 @@ export const CHILD_ROLES: Readonly<
         'PrivateFieldExpression',
         'CallExpression',
         'NewExpression',
+        'ImportMeta',
+        'NewTarget',
         'UpdateExpression',
         'UnaryExpression',
         'BinaryExpression',
@@ -2711,8 +2861,10 @@ export const CHILD_ROLES: Readonly<
         'AwaitExpression',
         'ChainExpression',
         'ParenthesizedExpression',
+        'Function',
         'ArrowFunctionExpression',
         'YieldExpression',
+        'Class',
         'ImportExpression',
         'V8IntrinsicExpression',
         'BooleanLiteral',
@@ -2721,6 +2873,8 @@ export const CHILD_ROLES: Readonly<
         'StringLiteral',
         'BigIntLiteral',
         'RegExpLiteral',
+        'JSXElement',
+        'JSXFragment',
         'JSXMemberExpression',
         'JSXEmptyExpression',
         'TSAsExpression',
@@ -2773,6 +2927,8 @@ export const CHILD_ROLES: Readonly<
         'PrivateFieldExpression',
         'CallExpression',
         'NewExpression',
+        'ImportMeta',
+        'NewTarget',
         'UpdateExpression',
         'UnaryExpression',
         'BinaryExpression',
@@ -2784,8 +2940,10 @@ export const CHILD_ROLES: Readonly<
         'AwaitExpression',
         'ChainExpression',
         'ParenthesizedExpression',
+        'Function',
         'ArrowFunctionExpression',
         'YieldExpression',
+        'Class',
         'ImportExpression',
         'V8IntrinsicExpression',
         'BooleanLiteral',
@@ -2794,6 +2952,8 @@ export const CHILD_ROLES: Readonly<
         'StringLiteral',
         'BigIntLiteral',
         'RegExpLiteral',
+        'JSXElement',
+        'JSXFragment',
         'JSXMemberExpression',
         'JSXEmptyExpression',
         'TSAsExpression',
@@ -2821,6 +2981,8 @@ export const CHILD_ROLES: Readonly<
         'PrivateFieldExpression',
         'CallExpression',
         'NewExpression',
+        'ImportMeta',
+        'NewTarget',
         'UpdateExpression',
         'UnaryExpression',
         'BinaryExpression',
@@ -2832,8 +2994,10 @@ export const CHILD_ROLES: Readonly<
         'AwaitExpression',
         'ChainExpression',
         'ParenthesizedExpression',
+        'Function',
         'ArrowFunctionExpression',
         'YieldExpression',
+        'Class',
         'ImportExpression',
         'V8IntrinsicExpression',
         'BooleanLiteral',
@@ -2842,6 +3006,8 @@ export const CHILD_ROLES: Readonly<
         'StringLiteral',
         'BigIntLiteral',
         'RegExpLiteral',
+        'JSXElement',
+        'JSXFragment',
         'JSXMemberExpression',
         'JSXEmptyExpression',
         'TSAsExpression',
@@ -2877,6 +3043,8 @@ export const CHILD_ROLES: Readonly<
         'PrivateFieldExpression',
         'CallExpression',
         'NewExpression',
+        'ImportMeta',
+        'NewTarget',
         'UpdateExpression',
         'UnaryExpression',
         'BinaryExpression',
@@ -2888,8 +3056,10 @@ export const CHILD_ROLES: Readonly<
         'AwaitExpression',
         'ChainExpression',
         'ParenthesizedExpression',
+        'Function',
         'ArrowFunctionExpression',
         'YieldExpression',
+        'Class',
         'ImportExpression',
         'V8IntrinsicExpression',
         'BooleanLiteral',
@@ -2898,6 +3068,8 @@ export const CHILD_ROLES: Readonly<
         'StringLiteral',
         'BigIntLiteral',
         'RegExpLiteral',
+        'JSXElement',
+        'JSXFragment',
         'JSXMemberExpression',
         'JSXEmptyExpression',
         'TSAsExpression',
@@ -2924,6 +3096,8 @@ export const CHILD_ROLES: Readonly<
         'PrivateFieldExpression',
         'CallExpression',
         'NewExpression',
+        'ImportMeta',
+        'NewTarget',
         'UpdateExpression',
         'UnaryExpression',
         'BinaryExpression',
@@ -2935,8 +3109,10 @@ export const CHILD_ROLES: Readonly<
         'AwaitExpression',
         'ChainExpression',
         'ParenthesizedExpression',
+        'Function',
         'ArrowFunctionExpression',
         'YieldExpression',
+        'Class',
         'ImportExpression',
         'V8IntrinsicExpression',
         'BooleanLiteral',
@@ -2945,6 +3121,8 @@ export const CHILD_ROLES: Readonly<
         'StringLiteral',
         'BigIntLiteral',
         'RegExpLiteral',
+        'JSXElement',
+        'JSXFragment',
         'JSXMemberExpression',
         'JSXEmptyExpression',
         'TSAsExpression',
@@ -2972,6 +3150,8 @@ export const CHILD_ROLES: Readonly<
         'PrivateFieldExpression',
         'CallExpression',
         'NewExpression',
+        'ImportMeta',
+        'NewTarget',
         'UpdateExpression',
         'UnaryExpression',
         'BinaryExpression',
@@ -2983,8 +3163,10 @@ export const CHILD_ROLES: Readonly<
         'AwaitExpression',
         'ChainExpression',
         'ParenthesizedExpression',
+        'Function',
         'ArrowFunctionExpression',
         'YieldExpression',
+        'Class',
         'ImportExpression',
         'V8IntrinsicExpression',
         'BooleanLiteral',
@@ -2993,6 +3175,8 @@ export const CHILD_ROLES: Readonly<
         'StringLiteral',
         'BigIntLiteral',
         'RegExpLiteral',
+        'JSXElement',
+        'JSXFragment',
         'JSXMemberExpression',
         'JSXEmptyExpression',
         'TSAsExpression',
@@ -3027,6 +3211,8 @@ export const CHILD_ROLES: Readonly<
         'PrivateFieldExpression',
         'CallExpression',
         'NewExpression',
+        'ImportMeta',
+        'NewTarget',
         'UpdateExpression',
         'UnaryExpression',
         'BinaryExpression',
@@ -3038,8 +3224,10 @@ export const CHILD_ROLES: Readonly<
         'AwaitExpression',
         'ChainExpression',
         'ParenthesizedExpression',
+        'Function',
         'ArrowFunctionExpression',
         'YieldExpression',
+        'Class',
         'ImportExpression',
         'V8IntrinsicExpression',
         'BooleanLiteral',
@@ -3048,6 +3236,8 @@ export const CHILD_ROLES: Readonly<
         'StringLiteral',
         'BigIntLiteral',
         'RegExpLiteral',
+        'JSXElement',
+        'JSXFragment',
         'JSXMemberExpression',
         'JSXEmptyExpression',
         'TSAsExpression',
@@ -3073,6 +3263,8 @@ export const CHILD_ROLES: Readonly<
         'PrivateFieldExpression',
         'CallExpression',
         'NewExpression',
+        'ImportMeta',
+        'NewTarget',
         'UpdateExpression',
         'UnaryExpression',
         'BinaryExpression',
@@ -3084,8 +3276,10 @@ export const CHILD_ROLES: Readonly<
         'AwaitExpression',
         'ChainExpression',
         'ParenthesizedExpression',
+        'Function',
         'ArrowFunctionExpression',
         'YieldExpression',
+        'Class',
         'ImportExpression',
         'V8IntrinsicExpression',
         'BooleanLiteral',
@@ -3094,6 +3288,8 @@ export const CHILD_ROLES: Readonly<
         'StringLiteral',
         'BigIntLiteral',
         'RegExpLiteral',
+        'JSXElement',
+        'JSXFragment',
         'JSXMemberExpression',
         'JSXEmptyExpression',
         'TSAsExpression',
@@ -3121,6 +3317,8 @@ export const CHILD_ROLES: Readonly<
         'PrivateFieldExpression',
         'CallExpression',
         'NewExpression',
+        'ImportMeta',
+        'NewTarget',
         'UpdateExpression',
         'UnaryExpression',
         'BinaryExpression',
@@ -3132,8 +3330,10 @@ export const CHILD_ROLES: Readonly<
         'AwaitExpression',
         'ChainExpression',
         'ParenthesizedExpression',
+        'Function',
         'ArrowFunctionExpression',
         'YieldExpression',
+        'Class',
         'ImportExpression',
         'V8IntrinsicExpression',
         'BooleanLiteral',
@@ -3142,6 +3342,8 @@ export const CHILD_ROLES: Readonly<
         'StringLiteral',
         'BigIntLiteral',
         'RegExpLiteral',
+        'JSXElement',
+        'JSXFragment',
         'JSXMemberExpression',
         'JSXEmptyExpression',
         'TSAsExpression',
@@ -3167,6 +3369,8 @@ export const CHILD_ROLES: Readonly<
         'PrivateFieldExpression',
         'CallExpression',
         'NewExpression',
+        'ImportMeta',
+        'NewTarget',
         'UpdateExpression',
         'UnaryExpression',
         'BinaryExpression',
@@ -3178,8 +3382,10 @@ export const CHILD_ROLES: Readonly<
         'AwaitExpression',
         'ChainExpression',
         'ParenthesizedExpression',
+        'Function',
         'ArrowFunctionExpression',
         'YieldExpression',
+        'Class',
         'ImportExpression',
         'V8IntrinsicExpression',
         'BooleanLiteral',
@@ -3188,6 +3394,8 @@ export const CHILD_ROLES: Readonly<
         'StringLiteral',
         'BigIntLiteral',
         'RegExpLiteral',
+        'JSXElement',
+        'JSXFragment',
         'JSXMemberExpression',
         'JSXEmptyExpression',
         'TSAsExpression',
@@ -3215,6 +3423,8 @@ export const CHILD_ROLES: Readonly<
         'PrivateFieldExpression',
         'CallExpression',
         'NewExpression',
+        'ImportMeta',
+        'NewTarget',
         'UpdateExpression',
         'UnaryExpression',
         'BinaryExpression',
@@ -3226,8 +3436,10 @@ export const CHILD_ROLES: Readonly<
         'AwaitExpression',
         'ChainExpression',
         'ParenthesizedExpression',
+        'Function',
         'ArrowFunctionExpression',
         'YieldExpression',
+        'Class',
         'ImportExpression',
         'V8IntrinsicExpression',
         'BooleanLiteral',
@@ -3236,6 +3448,8 @@ export const CHILD_ROLES: Readonly<
         'StringLiteral',
         'BigIntLiteral',
         'RegExpLiteral',
+        'JSXElement',
+        'JSXFragment',
         'JSXMemberExpression',
         'JSXEmptyExpression',
         'TSAsExpression',
@@ -3263,6 +3477,8 @@ export const CHILD_ROLES: Readonly<
         'PrivateFieldExpression',
         'CallExpression',
         'NewExpression',
+        'ImportMeta',
+        'NewTarget',
         'UpdateExpression',
         'UnaryExpression',
         'BinaryExpression',
@@ -3274,8 +3490,10 @@ export const CHILD_ROLES: Readonly<
         'AwaitExpression',
         'ChainExpression',
         'ParenthesizedExpression',
+        'Function',
         'ArrowFunctionExpression',
         'YieldExpression',
+        'Class',
         'ImportExpression',
         'V8IntrinsicExpression',
         'BooleanLiteral',
@@ -3284,6 +3502,8 @@ export const CHILD_ROLES: Readonly<
         'StringLiteral',
         'BigIntLiteral',
         'RegExpLiteral',
+        'JSXElement',
+        'JSXFragment',
         'JSXMemberExpression',
         'JSXEmptyExpression',
         'TSAsExpression',
@@ -3318,6 +3538,8 @@ export const CHILD_ROLES: Readonly<
         'PrivateFieldExpression',
         'CallExpression',
         'NewExpression',
+        'ImportMeta',
+        'NewTarget',
         'UpdateExpression',
         'UnaryExpression',
         'BinaryExpression',
@@ -3329,8 +3551,10 @@ export const CHILD_ROLES: Readonly<
         'AwaitExpression',
         'ChainExpression',
         'ParenthesizedExpression',
+        'Function',
         'ArrowFunctionExpression',
         'YieldExpression',
+        'Class',
         'ImportExpression',
         'V8IntrinsicExpression',
         'BooleanLiteral',
@@ -3339,6 +3563,8 @@ export const CHILD_ROLES: Readonly<
         'StringLiteral',
         'BigIntLiteral',
         'RegExpLiteral',
+        'JSXElement',
+        'JSXFragment',
         'JSXMemberExpression',
         'JSXEmptyExpression',
         'TSAsExpression',
@@ -3366,6 +3592,8 @@ export const CHILD_ROLES: Readonly<
         'PrivateFieldExpression',
         'CallExpression',
         'NewExpression',
+        'ImportMeta',
+        'NewTarget',
         'UpdateExpression',
         'UnaryExpression',
         'BinaryExpression',
@@ -3377,8 +3605,10 @@ export const CHILD_ROLES: Readonly<
         'AwaitExpression',
         'ChainExpression',
         'ParenthesizedExpression',
+        'Function',
         'ArrowFunctionExpression',
         'YieldExpression',
+        'Class',
         'ImportExpression',
         'V8IntrinsicExpression',
         'BooleanLiteral',
@@ -3387,6 +3617,8 @@ export const CHILD_ROLES: Readonly<
         'StringLiteral',
         'BigIntLiteral',
         'RegExpLiteral',
+        'JSXElement',
+        'JSXFragment',
         'JSXMemberExpression',
         'JSXEmptyExpression',
         'TSAsExpression',
@@ -3414,6 +3646,8 @@ export const CHILD_ROLES: Readonly<
         'PrivateFieldExpression',
         'CallExpression',
         'NewExpression',
+        'ImportMeta',
+        'NewTarget',
         'UpdateExpression',
         'UnaryExpression',
         'BinaryExpression',
@@ -3425,8 +3659,10 @@ export const CHILD_ROLES: Readonly<
         'AwaitExpression',
         'ChainExpression',
         'ParenthesizedExpression',
+        'Function',
         'ArrowFunctionExpression',
         'YieldExpression',
+        'Class',
         'ImportExpression',
         'V8IntrinsicExpression',
         'BooleanLiteral',
@@ -3435,6 +3671,8 @@ export const CHILD_ROLES: Readonly<
         'StringLiteral',
         'BigIntLiteral',
         'RegExpLiteral',
+        'JSXElement',
+        'JSXFragment',
         'JSXMemberExpression',
         'JSXEmptyExpression',
         'TSAsExpression',
@@ -3462,6 +3700,8 @@ export const CHILD_ROLES: Readonly<
         'PrivateFieldExpression',
         'CallExpression',
         'NewExpression',
+        'ImportMeta',
+        'NewTarget',
         'UpdateExpression',
         'UnaryExpression',
         'BinaryExpression',
@@ -3473,8 +3713,10 @@ export const CHILD_ROLES: Readonly<
         'AwaitExpression',
         'ChainExpression',
         'ParenthesizedExpression',
+        'Function',
         'ArrowFunctionExpression',
         'YieldExpression',
+        'Class',
         'ImportExpression',
         'V8IntrinsicExpression',
         'BooleanLiteral',
@@ -3483,6 +3725,8 @@ export const CHILD_ROLES: Readonly<
         'StringLiteral',
         'BigIntLiteral',
         'RegExpLiteral',
+        'JSXElement',
+        'JSXFragment',
         'JSXMemberExpression',
         'JSXEmptyExpression',
         'TSAsExpression',
@@ -3510,6 +3754,8 @@ export const CHILD_ROLES: Readonly<
         'PrivateFieldExpression',
         'CallExpression',
         'NewExpression',
+        'ImportMeta',
+        'NewTarget',
         'UpdateExpression',
         'UnaryExpression',
         'BinaryExpression',
@@ -3521,8 +3767,10 @@ export const CHILD_ROLES: Readonly<
         'AwaitExpression',
         'ChainExpression',
         'ParenthesizedExpression',
+        'Function',
         'ArrowFunctionExpression',
         'YieldExpression',
+        'Class',
         'ImportExpression',
         'V8IntrinsicExpression',
         'BooleanLiteral',
@@ -3531,6 +3779,8 @@ export const CHILD_ROLES: Readonly<
         'StringLiteral',
         'BigIntLiteral',
         'RegExpLiteral',
+        'JSXElement',
+        'JSXFragment',
         'JSXMemberExpression',
         'JSXEmptyExpression',
         'TSAsExpression',
@@ -3558,6 +3808,8 @@ export const CHILD_ROLES: Readonly<
         'PrivateFieldExpression',
         'CallExpression',
         'NewExpression',
+        'ImportMeta',
+        'NewTarget',
         'UpdateExpression',
         'UnaryExpression',
         'BinaryExpression',
@@ -3569,8 +3821,10 @@ export const CHILD_ROLES: Readonly<
         'AwaitExpression',
         'ChainExpression',
         'ParenthesizedExpression',
+        'Function',
         'ArrowFunctionExpression',
         'YieldExpression',
+        'Class',
         'ImportExpression',
         'V8IntrinsicExpression',
         'BooleanLiteral',
@@ -3579,6 +3833,8 @@ export const CHILD_ROLES: Readonly<
         'StringLiteral',
         'BigIntLiteral',
         'RegExpLiteral',
+        'JSXElement',
+        'JSXFragment',
         'JSXMemberExpression',
         'JSXEmptyExpression',
         'TSAsExpression',
@@ -3606,6 +3862,8 @@ export const CHILD_ROLES: Readonly<
         'PrivateFieldExpression',
         'CallExpression',
         'NewExpression',
+        'ImportMeta',
+        'NewTarget',
         'UpdateExpression',
         'UnaryExpression',
         'BinaryExpression',
@@ -3617,8 +3875,10 @@ export const CHILD_ROLES: Readonly<
         'AwaitExpression',
         'ChainExpression',
         'ParenthesizedExpression',
+        'Function',
         'ArrowFunctionExpression',
         'YieldExpression',
+        'Class',
         'ImportExpression',
         'V8IntrinsicExpression',
         'BooleanLiteral',
@@ -3627,6 +3887,8 @@ export const CHILD_ROLES: Readonly<
         'StringLiteral',
         'BigIntLiteral',
         'RegExpLiteral',
+        'JSXElement',
+        'JSXFragment',
         'JSXMemberExpression',
         'JSXEmptyExpression',
         'TSAsExpression',
@@ -3654,6 +3916,8 @@ export const CHILD_ROLES: Readonly<
         'PrivateFieldExpression',
         'CallExpression',
         'NewExpression',
+        'ImportMeta',
+        'NewTarget',
         'UpdateExpression',
         'UnaryExpression',
         'BinaryExpression',
@@ -3665,8 +3929,10 @@ export const CHILD_ROLES: Readonly<
         'AwaitExpression',
         'ChainExpression',
         'ParenthesizedExpression',
+        'Function',
         'ArrowFunctionExpression',
         'YieldExpression',
+        'Class',
         'ImportExpression',
         'V8IntrinsicExpression',
         'BooleanLiteral',
@@ -3675,6 +3941,8 @@ export const CHILD_ROLES: Readonly<
         'StringLiteral',
         'BigIntLiteral',
         'RegExpLiteral',
+        'JSXElement',
+        'JSXFragment',
         'JSXMemberExpression',
         'JSXEmptyExpression',
         'TSAsExpression',
@@ -3702,6 +3970,8 @@ export const CHILD_ROLES: Readonly<
         'PrivateFieldExpression',
         'CallExpression',
         'NewExpression',
+        'ImportMeta',
+        'NewTarget',
         'UpdateExpression',
         'UnaryExpression',
         'BinaryExpression',
@@ -3713,8 +3983,10 @@ export const CHILD_ROLES: Readonly<
         'AwaitExpression',
         'ChainExpression',
         'ParenthesizedExpression',
+        'Function',
         'ArrowFunctionExpression',
         'YieldExpression',
+        'Class',
         'ImportExpression',
         'V8IntrinsicExpression',
         'BooleanLiteral',
@@ -3723,6 +3995,8 @@ export const CHILD_ROLES: Readonly<
         'StringLiteral',
         'BigIntLiteral',
         'RegExpLiteral',
+        'JSXElement',
+        'JSXFragment',
         'JSXMemberExpression',
         'JSXEmptyExpression',
         'TSAsExpression',
@@ -3836,6 +4110,8 @@ export const CHILD_ROLES: Readonly<
         'PrivateFieldExpression',
         'CallExpression',
         'NewExpression',
+        'ImportMeta',
+        'NewTarget',
         'UpdateExpression',
         'UnaryExpression',
         'BinaryExpression',
@@ -3847,8 +4123,10 @@ export const CHILD_ROLES: Readonly<
         'AwaitExpression',
         'ChainExpression',
         'ParenthesizedExpression',
+        'Function',
         'ArrowFunctionExpression',
         'YieldExpression',
+        'Class',
         'ImportExpression',
         'V8IntrinsicExpression',
         'BooleanLiteral',
@@ -3857,6 +4135,8 @@ export const CHILD_ROLES: Readonly<
         'StringLiteral',
         'BigIntLiteral',
         'RegExpLiteral',
+        'JSXElement',
+        'JSXFragment',
         'JSXMemberExpression',
         'JSXEmptyExpression',
         'TSAsExpression',
@@ -3882,6 +4162,8 @@ export const CHILD_ROLES: Readonly<
         'PrivateFieldExpression',
         'CallExpression',
         'NewExpression',
+        'ImportMeta',
+        'NewTarget',
         'UpdateExpression',
         'UnaryExpression',
         'BinaryExpression',
@@ -3893,8 +4175,10 @@ export const CHILD_ROLES: Readonly<
         'AwaitExpression',
         'ChainExpression',
         'ParenthesizedExpression',
+        'Function',
         'ArrowFunctionExpression',
         'YieldExpression',
+        'Class',
         'ImportExpression',
         'V8IntrinsicExpression',
         'BooleanLiteral',
@@ -3903,6 +4187,8 @@ export const CHILD_ROLES: Readonly<
         'StringLiteral',
         'BigIntLiteral',
         'RegExpLiteral',
+        'JSXElement',
+        'JSXFragment',
         'JSXMemberExpression',
         'JSXEmptyExpression',
         'TSAsExpression',
@@ -3928,6 +4214,8 @@ export const CHILD_ROLES: Readonly<
         'PrivateFieldExpression',
         'CallExpression',
         'NewExpression',
+        'ImportMeta',
+        'NewTarget',
         'UpdateExpression',
         'UnaryExpression',
         'BinaryExpression',
@@ -3939,8 +4227,10 @@ export const CHILD_ROLES: Readonly<
         'AwaitExpression',
         'ChainExpression',
         'ParenthesizedExpression',
+        'Function',
         'ArrowFunctionExpression',
         'YieldExpression',
+        'Class',
         'ImportExpression',
         'V8IntrinsicExpression',
         'BooleanLiteral',
@@ -3949,6 +4239,8 @@ export const CHILD_ROLES: Readonly<
         'StringLiteral',
         'BigIntLiteral',
         'RegExpLiteral',
+        'JSXElement',
+        'JSXFragment',
         'JSXMemberExpression',
         'JSXEmptyExpression',
         'TSAsExpression',
@@ -3976,6 +4268,8 @@ export const CHILD_ROLES: Readonly<
         'PrivateFieldExpression',
         'CallExpression',
         'NewExpression',
+        'ImportMeta',
+        'NewTarget',
         'UpdateExpression',
         'UnaryExpression',
         'BinaryExpression',
@@ -3987,8 +4281,10 @@ export const CHILD_ROLES: Readonly<
         'AwaitExpression',
         'ChainExpression',
         'ParenthesizedExpression',
+        'Function',
         'ArrowFunctionExpression',
         'YieldExpression',
+        'Class',
         'ImportExpression',
         'V8IntrinsicExpression',
         'BooleanLiteral',
@@ -3997,6 +4293,8 @@ export const CHILD_ROLES: Readonly<
         'StringLiteral',
         'BigIntLiteral',
         'RegExpLiteral',
+        'JSXElement',
+        'JSXFragment',
         'JSXMemberExpression',
         'JSXEmptyExpression',
         'TSAsExpression',
@@ -4265,6 +4563,8 @@ export interface NativeRouteTypes {
     | 'PrivateFieldExpression'
     | 'CallExpression'
     | 'NewExpression'
+    | 'ImportMeta'
+    | 'NewTarget'
     | 'UpdateExpression'
     | 'UnaryExpression'
     | 'BinaryExpression'
@@ -4276,8 +4576,10 @@ export interface NativeRouteTypes {
     | 'AwaitExpression'
     | 'ChainExpression'
     | 'ParenthesizedExpression'
+    | 'Function'
     | 'ArrowFunctionExpression'
     | 'YieldExpression'
+    | 'Class'
     | 'ImportExpression'
     | 'V8IntrinsicExpression'
     | 'BooleanLiteral'
@@ -4286,6 +4588,8 @@ export interface NativeRouteTypes {
     | 'StringLiteral'
     | 'BigIntLiteral'
     | 'RegExpLiteral'
+    | 'JSXElement'
+    | 'JSXFragment'
     | 'JSXMemberExpression'
     | 'JSXEmptyExpression'
     | 'TSAsExpression'
@@ -4569,7 +4873,7 @@ export interface NativeRouteFields {
     readonly bindingScopeId?: number;
     readonly binding?: boolean;
     readonly computed?: true | false;
-    readonly property?: string;
+    readonly property?: string | 'meta' | 'target';
     readonly memberPath?: string;
     readonly rootName?: string;
     readonly rootGlobal?: boolean;
@@ -4579,6 +4883,7 @@ export interface NativeRouteFields {
     readonly calleePath?: string;
     readonly calleeGlobal?: boolean;
     readonly staticArgument?: string;
+    readonly meta?: 'import' | 'new';
     readonly operator?:
       | UpdateOperator
       | UnaryOperator
@@ -4589,11 +4894,15 @@ export interface NativeRouteFields {
     readonly constantKind?: 'null' | 'boolean' | 'number' | 'string';
     readonly constantValue?: string | number | boolean | null;
     readonly targetName?: string;
+    readonly nodeKind?: FunctionType | ClassType;
     readonly async?: boolean;
-    readonly expression?: boolean;
+    readonly generator?: boolean;
     readonly parameterCount?: number;
     readonly bodyStart?: number;
     readonly bodyEnd?: number;
+    readonly declarationNameAnchor?: number;
+    readonly declarationNamePrefix?: boolean;
+    readonly expression?: boolean;
     readonly delegate?: boolean;
     readonly value?: boolean | number | string;
     readonly pattern?: string;
@@ -4997,6 +5306,8 @@ export interface NativeChildRoles {
         | 'PrivateFieldExpression'
         | 'CallExpression'
         | 'NewExpression'
+        | 'ImportMeta'
+        | 'NewTarget'
         | 'UpdateExpression'
         | 'UnaryExpression'
         | 'BinaryExpression'
@@ -5008,8 +5319,10 @@ export interface NativeChildRoles {
         | 'AwaitExpression'
         | 'ChainExpression'
         | 'ParenthesizedExpression'
+        | 'Function'
         | 'ArrowFunctionExpression'
         | 'YieldExpression'
+        | 'Class'
         | 'ImportExpression'
         | 'V8IntrinsicExpression'
         | 'BooleanLiteral'
@@ -5018,6 +5331,8 @@ export interface NativeChildRoles {
         | 'StringLiteral'
         | 'BigIntLiteral'
         | 'RegExpLiteral'
+        | 'JSXElement'
+        | 'JSXFragment'
         | 'JSXMemberExpression'
         | 'JSXEmptyExpression'
         | 'TSAsExpression'
@@ -5046,6 +5361,8 @@ export interface NativeChildRoles {
         | 'PrivateFieldExpression'
         | 'CallExpression'
         | 'NewExpression'
+        | 'ImportMeta'
+        | 'NewTarget'
         | 'UpdateExpression'
         | 'UnaryExpression'
         | 'BinaryExpression'
@@ -5057,8 +5374,10 @@ export interface NativeChildRoles {
         | 'AwaitExpression'
         | 'ChainExpression'
         | 'ParenthesizedExpression'
+        | 'Function'
         | 'ArrowFunctionExpression'
         | 'YieldExpression'
+        | 'Class'
         | 'ImportExpression'
         | 'V8IntrinsicExpression'
         | 'BooleanLiteral'
@@ -5067,6 +5386,8 @@ export interface NativeChildRoles {
         | 'StringLiteral'
         | 'BigIntLiteral'
         | 'RegExpLiteral'
+        | 'JSXElement'
+        | 'JSXFragment'
         | 'JSXMemberExpression'
         | 'JSXEmptyExpression'
         | 'TSAsExpression'
@@ -5096,6 +5417,8 @@ export interface NativeChildRoles {
         | 'PrivateFieldExpression'
         | 'CallExpression'
         | 'NewExpression'
+        | 'ImportMeta'
+        | 'NewTarget'
         | 'UpdateExpression'
         | 'UnaryExpression'
         | 'BinaryExpression'
@@ -5107,8 +5430,10 @@ export interface NativeChildRoles {
         | 'AwaitExpression'
         | 'ChainExpression'
         | 'ParenthesizedExpression'
+        | 'Function'
         | 'ArrowFunctionExpression'
         | 'YieldExpression'
+        | 'Class'
         | 'ImportExpression'
         | 'V8IntrinsicExpression'
         | 'BooleanLiteral'
@@ -5117,6 +5442,8 @@ export interface NativeChildRoles {
         | 'StringLiteral'
         | 'BigIntLiteral'
         | 'RegExpLiteral'
+        | 'JSXElement'
+        | 'JSXFragment'
         | 'JSXMemberExpression'
         | 'JSXEmptyExpression'
         | 'TSAsExpression'
@@ -5180,6 +5507,8 @@ export interface NativeChildRoles {
         | 'PrivateFieldExpression'
         | 'CallExpression'
         | 'NewExpression'
+        | 'ImportMeta'
+        | 'NewTarget'
         | 'UpdateExpression'
         | 'UnaryExpression'
         | 'BinaryExpression'
@@ -5191,8 +5520,10 @@ export interface NativeChildRoles {
         | 'AwaitExpression'
         | 'ChainExpression'
         | 'ParenthesizedExpression'
+        | 'Function'
         | 'ArrowFunctionExpression'
         | 'YieldExpression'
+        | 'Class'
         | 'ImportExpression'
         | 'V8IntrinsicExpression'
         | 'BooleanLiteral'
@@ -5201,6 +5532,8 @@ export interface NativeChildRoles {
         | 'StringLiteral'
         | 'BigIntLiteral'
         | 'RegExpLiteral'
+        | 'JSXElement'
+        | 'JSXFragment'
         | 'JSXMemberExpression'
         | 'JSXEmptyExpression'
         | 'TSAsExpression'
@@ -5263,6 +5596,8 @@ export interface NativeChildRoles {
         | 'PrivateFieldExpression'
         | 'CallExpression'
         | 'NewExpression'
+        | 'ImportMeta'
+        | 'NewTarget'
         | 'UpdateExpression'
         | 'UnaryExpression'
         | 'BinaryExpression'
@@ -5274,8 +5609,10 @@ export interface NativeChildRoles {
         | 'AwaitExpression'
         | 'ChainExpression'
         | 'ParenthesizedExpression'
+        | 'Function'
         | 'ArrowFunctionExpression'
         | 'YieldExpression'
+        | 'Class'
         | 'ImportExpression'
         | 'V8IntrinsicExpression'
         | 'BooleanLiteral'
@@ -5284,6 +5621,8 @@ export interface NativeChildRoles {
         | 'StringLiteral'
         | 'BigIntLiteral'
         | 'RegExpLiteral'
+        | 'JSXElement'
+        | 'JSXFragment'
         | 'JSXMemberExpression'
         | 'JSXEmptyExpression'
         | 'TSAsExpression'
@@ -5346,6 +5685,8 @@ export interface NativeChildRoles {
         | 'PrivateFieldExpression'
         | 'CallExpression'
         | 'NewExpression'
+        | 'ImportMeta'
+        | 'NewTarget'
         | 'UpdateExpression'
         | 'UnaryExpression'
         | 'BinaryExpression'
@@ -5357,8 +5698,10 @@ export interface NativeChildRoles {
         | 'AwaitExpression'
         | 'ChainExpression'
         | 'ParenthesizedExpression'
+        | 'Function'
         | 'ArrowFunctionExpression'
         | 'YieldExpression'
+        | 'Class'
         | 'ImportExpression'
         | 'V8IntrinsicExpression'
         | 'BooleanLiteral'
@@ -5367,6 +5710,8 @@ export interface NativeChildRoles {
         | 'StringLiteral'
         | 'BigIntLiteral'
         | 'RegExpLiteral'
+        | 'JSXElement'
+        | 'JSXFragment'
         | 'JSXMemberExpression'
         | 'JSXEmptyExpression'
         | 'TSAsExpression'
@@ -5557,6 +5902,8 @@ export interface NativeChildRoles {
         | 'PrivateFieldExpression'
         | 'CallExpression'
         | 'NewExpression'
+        | 'ImportMeta'
+        | 'NewTarget'
         | 'UpdateExpression'
         | 'UnaryExpression'
         | 'BinaryExpression'
@@ -5568,8 +5915,10 @@ export interface NativeChildRoles {
         | 'AwaitExpression'
         | 'ChainExpression'
         | 'ParenthesizedExpression'
+        | 'Function'
         | 'ArrowFunctionExpression'
         | 'YieldExpression'
+        | 'Class'
         | 'ImportExpression'
         | 'V8IntrinsicExpression'
         | 'BooleanLiteral'
@@ -5578,6 +5927,8 @@ export interface NativeChildRoles {
         | 'StringLiteral'
         | 'BigIntLiteral'
         | 'RegExpLiteral'
+        | 'JSXElement'
+        | 'JSXFragment'
         | 'JSXMemberExpression'
         | 'JSXEmptyExpression'
         | 'TSAsExpression'
@@ -5599,6 +5950,8 @@ export interface NativeChildRoles {
         | 'PrivateFieldExpression'
         | 'CallExpression'
         | 'NewExpression'
+        | 'ImportMeta'
+        | 'NewTarget'
         | 'UpdateExpression'
         | 'UnaryExpression'
         | 'BinaryExpression'
@@ -5610,8 +5963,10 @@ export interface NativeChildRoles {
         | 'AwaitExpression'
         | 'ChainExpression'
         | 'ParenthesizedExpression'
+        | 'Function'
         | 'ArrowFunctionExpression'
         | 'YieldExpression'
+        | 'Class'
         | 'ImportExpression'
         | 'V8IntrinsicExpression'
         | 'BooleanLiteral'
@@ -5620,6 +5975,8 @@ export interface NativeChildRoles {
         | 'StringLiteral'
         | 'BigIntLiteral'
         | 'RegExpLiteral'
+        | 'JSXElement'
+        | 'JSXFragment'
         | 'JSXMemberExpression'
         | 'JSXEmptyExpression'
         | 'TSAsExpression'
@@ -5644,6 +6001,8 @@ export interface NativeChildRoles {
         | 'PrivateFieldExpression'
         | 'CallExpression'
         | 'NewExpression'
+        | 'ImportMeta'
+        | 'NewTarget'
         | 'UpdateExpression'
         | 'UnaryExpression'
         | 'BinaryExpression'
@@ -5655,8 +6014,10 @@ export interface NativeChildRoles {
         | 'AwaitExpression'
         | 'ChainExpression'
         | 'ParenthesizedExpression'
+        | 'Function'
         | 'ArrowFunctionExpression'
         | 'YieldExpression'
+        | 'Class'
         | 'ImportExpression'
         | 'V8IntrinsicExpression'
         | 'BooleanLiteral'
@@ -5665,6 +6026,8 @@ export interface NativeChildRoles {
         | 'StringLiteral'
         | 'BigIntLiteral'
         | 'RegExpLiteral'
+        | 'JSXElement'
+        | 'JSXFragment'
         | 'JSXMemberExpression'
         | 'JSXEmptyExpression'
         | 'TSAsExpression'
@@ -5686,6 +6049,8 @@ export interface NativeChildRoles {
         | 'PrivateFieldExpression'
         | 'CallExpression'
         | 'NewExpression'
+        | 'ImportMeta'
+        | 'NewTarget'
         | 'UpdateExpression'
         | 'UnaryExpression'
         | 'BinaryExpression'
@@ -5697,8 +6062,10 @@ export interface NativeChildRoles {
         | 'AwaitExpression'
         | 'ChainExpression'
         | 'ParenthesizedExpression'
+        | 'Function'
         | 'ArrowFunctionExpression'
         | 'YieldExpression'
+        | 'Class'
         | 'ImportExpression'
         | 'V8IntrinsicExpression'
         | 'BooleanLiteral'
@@ -5707,6 +6074,8 @@ export interface NativeChildRoles {
         | 'StringLiteral'
         | 'BigIntLiteral'
         | 'RegExpLiteral'
+        | 'JSXElement'
+        | 'JSXFragment'
         | 'JSXMemberExpression'
         | 'JSXEmptyExpression'
         | 'TSAsExpression'
@@ -5738,6 +6107,8 @@ export interface NativeChildRoles {
         | 'PrivateFieldExpression'
         | 'CallExpression'
         | 'NewExpression'
+        | 'ImportMeta'
+        | 'NewTarget'
         | 'UpdateExpression'
         | 'UnaryExpression'
         | 'BinaryExpression'
@@ -5749,8 +6120,10 @@ export interface NativeChildRoles {
         | 'AwaitExpression'
         | 'ChainExpression'
         | 'ParenthesizedExpression'
+        | 'Function'
         | 'ArrowFunctionExpression'
         | 'YieldExpression'
+        | 'Class'
         | 'ImportExpression'
         | 'V8IntrinsicExpression'
         | 'BooleanLiteral'
@@ -5759,6 +6132,8 @@ export interface NativeChildRoles {
         | 'StringLiteral'
         | 'BigIntLiteral'
         | 'RegExpLiteral'
+        | 'JSXElement'
+        | 'JSXFragment'
         | 'JSXMemberExpression'
         | 'JSXEmptyExpression'
         | 'TSAsExpression'
@@ -5831,6 +6206,8 @@ export interface NativeChildRoles {
         | 'PrivateFieldExpression'
         | 'CallExpression'
         | 'NewExpression'
+        | 'ImportMeta'
+        | 'NewTarget'
         | 'UpdateExpression'
         | 'UnaryExpression'
         | 'BinaryExpression'
@@ -5852,6 +6229,8 @@ export interface NativeChildRoles {
         | 'StringLiteral'
         | 'BigIntLiteral'
         | 'RegExpLiteral'
+        | 'JSXElement'
+        | 'JSXFragment'
         | 'JSXMemberExpression'
         | 'JSXEmptyExpression'
         | 'TSAsExpression'
@@ -5881,6 +6260,8 @@ export interface NativeChildRoles {
         | 'PrivateFieldExpression'
         | 'CallExpression'
         | 'NewExpression'
+        | 'ImportMeta'
+        | 'NewTarget'
         | 'UpdateExpression'
         | 'UnaryExpression'
         | 'BinaryExpression'
@@ -5892,8 +6273,10 @@ export interface NativeChildRoles {
         | 'AwaitExpression'
         | 'ChainExpression'
         | 'ParenthesizedExpression'
+        | 'Function'
         | 'ArrowFunctionExpression'
         | 'YieldExpression'
+        | 'Class'
         | 'ImportExpression'
         | 'V8IntrinsicExpression'
         | 'BooleanLiteral'
@@ -5902,6 +6285,8 @@ export interface NativeChildRoles {
         | 'StringLiteral'
         | 'BigIntLiteral'
         | 'RegExpLiteral'
+        | 'JSXElement'
+        | 'JSXFragment'
         | 'JSXMemberExpression'
         | 'JSXEmptyExpression'
         | 'TSAsExpression'
@@ -5946,6 +6331,8 @@ export interface NativeChildRoles {
         | 'PrivateFieldExpression'
         | 'CallExpression'
         | 'NewExpression'
+        | 'ImportMeta'
+        | 'NewTarget'
         | 'UpdateExpression'
         | 'UnaryExpression'
         | 'BinaryExpression'
@@ -5957,8 +6344,10 @@ export interface NativeChildRoles {
         | 'AwaitExpression'
         | 'ChainExpression'
         | 'ParenthesizedExpression'
+        | 'Function'
         | 'ArrowFunctionExpression'
         | 'YieldExpression'
+        | 'Class'
         | 'ImportExpression'
         | 'V8IntrinsicExpression'
         | 'BooleanLiteral'
@@ -5967,6 +6356,8 @@ export interface NativeChildRoles {
         | 'StringLiteral'
         | 'BigIntLiteral'
         | 'RegExpLiteral'
+        | 'JSXElement'
+        | 'JSXFragment'
         | 'JSXMemberExpression'
         | 'JSXEmptyExpression'
         | 'TSAsExpression'
@@ -6004,6 +6395,8 @@ export interface NativeChildRoles {
         | 'PrivateFieldExpression'
         | 'CallExpression'
         | 'NewExpression'
+        | 'ImportMeta'
+        | 'NewTarget'
         | 'UpdateExpression'
         | 'UnaryExpression'
         | 'BinaryExpression'
@@ -6015,8 +6408,10 @@ export interface NativeChildRoles {
         | 'AwaitExpression'
         | 'ChainExpression'
         | 'ParenthesizedExpression'
+        | 'Function'
         | 'ArrowFunctionExpression'
         | 'YieldExpression'
+        | 'Class'
         | 'ImportExpression'
         | 'V8IntrinsicExpression'
         | 'BooleanLiteral'
@@ -6025,6 +6420,8 @@ export interface NativeChildRoles {
         | 'StringLiteral'
         | 'BigIntLiteral'
         | 'RegExpLiteral'
+        | 'JSXElement'
+        | 'JSXFragment'
         | 'JSXMemberExpression'
         | 'JSXEmptyExpression'
         | 'TSAsExpression'
@@ -6053,6 +6450,8 @@ export interface NativeChildRoles {
         | 'PrivateFieldExpression'
         | 'CallExpression'
         | 'NewExpression'
+        | 'ImportMeta'
+        | 'NewTarget'
         | 'UpdateExpression'
         | 'UnaryExpression'
         | 'BinaryExpression'
@@ -6064,8 +6463,10 @@ export interface NativeChildRoles {
         | 'AwaitExpression'
         | 'ChainExpression'
         | 'ParenthesizedExpression'
+        | 'Function'
         | 'ArrowFunctionExpression'
         | 'YieldExpression'
+        | 'Class'
         | 'ImportExpression'
         | 'V8IntrinsicExpression'
         | 'BooleanLiteral'
@@ -6074,6 +6475,8 @@ export interface NativeChildRoles {
         | 'StringLiteral'
         | 'BigIntLiteral'
         | 'RegExpLiteral'
+        | 'JSXElement'
+        | 'JSXFragment'
         | 'JSXMemberExpression'
         | 'JSXEmptyExpression'
         | 'TSAsExpression'
@@ -6096,6 +6499,8 @@ export interface NativeChildRoles {
         | 'PrivateFieldExpression'
         | 'CallExpression'
         | 'NewExpression'
+        | 'ImportMeta'
+        | 'NewTarget'
         | 'UpdateExpression'
         | 'UnaryExpression'
         | 'BinaryExpression'
@@ -6107,8 +6512,10 @@ export interface NativeChildRoles {
         | 'AwaitExpression'
         | 'ChainExpression'
         | 'ParenthesizedExpression'
+        | 'Function'
         | 'ArrowFunctionExpression'
         | 'YieldExpression'
+        | 'Class'
         | 'ImportExpression'
         | 'V8IntrinsicExpression'
         | 'BooleanLiteral'
@@ -6117,6 +6524,8 @@ export interface NativeChildRoles {
         | 'StringLiteral'
         | 'BigIntLiteral'
         | 'RegExpLiteral'
+        | 'JSXElement'
+        | 'JSXFragment'
         | 'JSXMemberExpression'
         | 'JSXEmptyExpression'
         | 'TSAsExpression'
@@ -6140,6 +6549,8 @@ export interface NativeChildRoles {
         | 'PrivateFieldExpression'
         | 'CallExpression'
         | 'NewExpression'
+        | 'ImportMeta'
+        | 'NewTarget'
         | 'UpdateExpression'
         | 'UnaryExpression'
         | 'BinaryExpression'
@@ -6151,8 +6562,10 @@ export interface NativeChildRoles {
         | 'AwaitExpression'
         | 'ChainExpression'
         | 'ParenthesizedExpression'
+        | 'Function'
         | 'ArrowFunctionExpression'
         | 'YieldExpression'
+        | 'Class'
         | 'ImportExpression'
         | 'V8IntrinsicExpression'
         | 'BooleanLiteral'
@@ -6161,6 +6574,8 @@ export interface NativeChildRoles {
         | 'StringLiteral'
         | 'BigIntLiteral'
         | 'RegExpLiteral'
+        | 'JSXElement'
+        | 'JSXFragment'
         | 'JSXMemberExpression'
         | 'JSXEmptyExpression'
         | 'TSAsExpression'
@@ -6189,6 +6604,8 @@ export interface NativeChildRoles {
         | 'PrivateFieldExpression'
         | 'CallExpression'
         | 'NewExpression'
+        | 'ImportMeta'
+        | 'NewTarget'
         | 'UpdateExpression'
         | 'UnaryExpression'
         | 'BinaryExpression'
@@ -6200,8 +6617,10 @@ export interface NativeChildRoles {
         | 'AwaitExpression'
         | 'ChainExpression'
         | 'ParenthesizedExpression'
+        | 'Function'
         | 'ArrowFunctionExpression'
         | 'YieldExpression'
+        | 'Class'
         | 'ImportExpression'
         | 'V8IntrinsicExpression'
         | 'BooleanLiteral'
@@ -6210,6 +6629,8 @@ export interface NativeChildRoles {
         | 'StringLiteral'
         | 'BigIntLiteral'
         | 'RegExpLiteral'
+        | 'JSXElement'
+        | 'JSXFragment'
         | 'JSXMemberExpression'
         | 'JSXEmptyExpression'
         | 'TSAsExpression'
@@ -6232,6 +6653,8 @@ export interface NativeChildRoles {
         | 'PrivateFieldExpression'
         | 'CallExpression'
         | 'NewExpression'
+        | 'ImportMeta'
+        | 'NewTarget'
         | 'UpdateExpression'
         | 'UnaryExpression'
         | 'BinaryExpression'
@@ -6243,8 +6666,10 @@ export interface NativeChildRoles {
         | 'AwaitExpression'
         | 'ChainExpression'
         | 'ParenthesizedExpression'
+        | 'Function'
         | 'ArrowFunctionExpression'
         | 'YieldExpression'
+        | 'Class'
         | 'ImportExpression'
         | 'V8IntrinsicExpression'
         | 'BooleanLiteral'
@@ -6253,6 +6678,8 @@ export interface NativeChildRoles {
         | 'StringLiteral'
         | 'BigIntLiteral'
         | 'RegExpLiteral'
+        | 'JSXElement'
+        | 'JSXFragment'
         | 'JSXMemberExpression'
         | 'JSXEmptyExpression'
         | 'TSAsExpression'
@@ -6279,6 +6706,8 @@ export interface NativeChildRoles {
         | 'PrivateFieldExpression'
         | 'CallExpression'
         | 'NewExpression'
+        | 'ImportMeta'
+        | 'NewTarget'
         | 'UpdateExpression'
         | 'UnaryExpression'
         | 'BinaryExpression'
@@ -6290,8 +6719,10 @@ export interface NativeChildRoles {
         | 'AwaitExpression'
         | 'ChainExpression'
         | 'ParenthesizedExpression'
+        | 'Function'
         | 'ArrowFunctionExpression'
         | 'YieldExpression'
+        | 'Class'
         | 'ImportExpression'
         | 'V8IntrinsicExpression'
         | 'BooleanLiteral'
@@ -6300,6 +6731,8 @@ export interface NativeChildRoles {
         | 'StringLiteral'
         | 'BigIntLiteral'
         | 'RegExpLiteral'
+        | 'JSXElement'
+        | 'JSXFragment'
         | 'JSXMemberExpression'
         | 'JSXEmptyExpression'
         | 'TSAsExpression'
@@ -6329,6 +6762,8 @@ export interface NativeChildRoles {
         | 'PrivateFieldExpression'
         | 'CallExpression'
         | 'NewExpression'
+        | 'ImportMeta'
+        | 'NewTarget'
         | 'UpdateExpression'
         | 'UnaryExpression'
         | 'BinaryExpression'
@@ -6340,8 +6775,10 @@ export interface NativeChildRoles {
         | 'AwaitExpression'
         | 'ChainExpression'
         | 'ParenthesizedExpression'
+        | 'Function'
         | 'ArrowFunctionExpression'
         | 'YieldExpression'
+        | 'Class'
         | 'ImportExpression'
         | 'V8IntrinsicExpression'
         | 'BooleanLiteral'
@@ -6350,6 +6787,8 @@ export interface NativeChildRoles {
         | 'StringLiteral'
         | 'BigIntLiteral'
         | 'RegExpLiteral'
+        | 'JSXElement'
+        | 'JSXFragment'
         | 'JSXMemberExpression'
         | 'JSXEmptyExpression'
         | 'TSAsExpression'
@@ -6372,6 +6811,8 @@ export interface NativeChildRoles {
         | 'PrivateFieldExpression'
         | 'CallExpression'
         | 'NewExpression'
+        | 'ImportMeta'
+        | 'NewTarget'
         | 'UpdateExpression'
         | 'UnaryExpression'
         | 'BinaryExpression'
@@ -6383,8 +6824,10 @@ export interface NativeChildRoles {
         | 'AwaitExpression'
         | 'ChainExpression'
         | 'ParenthesizedExpression'
+        | 'Function'
         | 'ArrowFunctionExpression'
         | 'YieldExpression'
+        | 'Class'
         | 'ImportExpression'
         | 'V8IntrinsicExpression'
         | 'BooleanLiteral'
@@ -6393,6 +6836,8 @@ export interface NativeChildRoles {
         | 'StringLiteral'
         | 'BigIntLiteral'
         | 'RegExpLiteral'
+        | 'JSXElement'
+        | 'JSXFragment'
         | 'JSXMemberExpression'
         | 'JSXEmptyExpression'
         | 'TSAsExpression'
@@ -6417,6 +6862,8 @@ export interface NativeChildRoles {
         | 'PrivateFieldExpression'
         | 'CallExpression'
         | 'NewExpression'
+        | 'ImportMeta'
+        | 'NewTarget'
         | 'UpdateExpression'
         | 'UnaryExpression'
         | 'BinaryExpression'
@@ -6428,8 +6875,10 @@ export interface NativeChildRoles {
         | 'AwaitExpression'
         | 'ChainExpression'
         | 'ParenthesizedExpression'
+        | 'Function'
         | 'ArrowFunctionExpression'
         | 'YieldExpression'
+        | 'Class'
         | 'ImportExpression'
         | 'V8IntrinsicExpression'
         | 'BooleanLiteral'
@@ -6438,6 +6887,8 @@ export interface NativeChildRoles {
         | 'StringLiteral'
         | 'BigIntLiteral'
         | 'RegExpLiteral'
+        | 'JSXElement'
+        | 'JSXFragment'
         | 'JSXMemberExpression'
         | 'JSXEmptyExpression'
         | 'TSAsExpression'
@@ -6460,6 +6911,8 @@ export interface NativeChildRoles {
         | 'PrivateFieldExpression'
         | 'CallExpression'
         | 'NewExpression'
+        | 'ImportMeta'
+        | 'NewTarget'
         | 'UpdateExpression'
         | 'UnaryExpression'
         | 'BinaryExpression'
@@ -6471,8 +6924,10 @@ export interface NativeChildRoles {
         | 'AwaitExpression'
         | 'ChainExpression'
         | 'ParenthesizedExpression'
+        | 'Function'
         | 'ArrowFunctionExpression'
         | 'YieldExpression'
+        | 'Class'
         | 'ImportExpression'
         | 'V8IntrinsicExpression'
         | 'BooleanLiteral'
@@ -6481,6 +6936,8 @@ export interface NativeChildRoles {
         | 'StringLiteral'
         | 'BigIntLiteral'
         | 'RegExpLiteral'
+        | 'JSXElement'
+        | 'JSXFragment'
         | 'JSXMemberExpression'
         | 'JSXEmptyExpression'
         | 'TSAsExpression'
@@ -6509,6 +6966,8 @@ export interface NativeChildRoles {
         | 'PrivateFieldExpression'
         | 'CallExpression'
         | 'NewExpression'
+        | 'ImportMeta'
+        | 'NewTarget'
         | 'UpdateExpression'
         | 'UnaryExpression'
         | 'BinaryExpression'
@@ -6520,8 +6979,10 @@ export interface NativeChildRoles {
         | 'AwaitExpression'
         | 'ChainExpression'
         | 'ParenthesizedExpression'
+        | 'Function'
         | 'ArrowFunctionExpression'
         | 'YieldExpression'
+        | 'Class'
         | 'ImportExpression'
         | 'V8IntrinsicExpression'
         | 'BooleanLiteral'
@@ -6530,6 +6991,8 @@ export interface NativeChildRoles {
         | 'StringLiteral'
         | 'BigIntLiteral'
         | 'RegExpLiteral'
+        | 'JSXElement'
+        | 'JSXFragment'
         | 'JSXMemberExpression'
         | 'JSXEmptyExpression'
         | 'TSAsExpression'
@@ -6566,6 +7029,8 @@ export interface NativeChildRoles {
         | 'PrivateFieldExpression'
         | 'CallExpression'
         | 'NewExpression'
+        | 'ImportMeta'
+        | 'NewTarget'
         | 'UpdateExpression'
         | 'UnaryExpression'
         | 'BinaryExpression'
@@ -6577,8 +7042,10 @@ export interface NativeChildRoles {
         | 'AwaitExpression'
         | 'ChainExpression'
         | 'ParenthesizedExpression'
+        | 'Function'
         | 'ArrowFunctionExpression'
         | 'YieldExpression'
+        | 'Class'
         | 'ImportExpression'
         | 'V8IntrinsicExpression'
         | 'BooleanLiteral'
@@ -6587,6 +7054,8 @@ export interface NativeChildRoles {
         | 'StringLiteral'
         | 'BigIntLiteral'
         | 'RegExpLiteral'
+        | 'JSXElement'
+        | 'JSXFragment'
         | 'JSXMemberExpression'
         | 'JSXEmptyExpression'
         | 'TSAsExpression'
@@ -6610,6 +7079,8 @@ export interface NativeChildRoles {
         | 'PrivateFieldExpression'
         | 'CallExpression'
         | 'NewExpression'
+        | 'ImportMeta'
+        | 'NewTarget'
         | 'UpdateExpression'
         | 'UnaryExpression'
         | 'BinaryExpression'
@@ -6621,8 +7092,10 @@ export interface NativeChildRoles {
         | 'AwaitExpression'
         | 'ChainExpression'
         | 'ParenthesizedExpression'
+        | 'Function'
         | 'ArrowFunctionExpression'
         | 'YieldExpression'
+        | 'Class'
         | 'ImportExpression'
         | 'V8IntrinsicExpression'
         | 'BooleanLiteral'
@@ -6631,6 +7104,8 @@ export interface NativeChildRoles {
         | 'StringLiteral'
         | 'BigIntLiteral'
         | 'RegExpLiteral'
+        | 'JSXElement'
+        | 'JSXFragment'
         | 'JSXMemberExpression'
         | 'JSXEmptyExpression'
         | 'TSAsExpression'
@@ -6656,6 +7131,8 @@ export interface NativeChildRoles {
         | 'PrivateFieldExpression'
         | 'CallExpression'
         | 'NewExpression'
+        | 'ImportMeta'
+        | 'NewTarget'
         | 'UpdateExpression'
         | 'UnaryExpression'
         | 'BinaryExpression'
@@ -6667,8 +7144,10 @@ export interface NativeChildRoles {
         | 'AwaitExpression'
         | 'ChainExpression'
         | 'ParenthesizedExpression'
+        | 'Function'
         | 'ArrowFunctionExpression'
         | 'YieldExpression'
+        | 'Class'
         | 'ImportExpression'
         | 'V8IntrinsicExpression'
         | 'BooleanLiteral'
@@ -6677,6 +7156,8 @@ export interface NativeChildRoles {
         | 'StringLiteral'
         | 'BigIntLiteral'
         | 'RegExpLiteral'
+        | 'JSXElement'
+        | 'JSXFragment'
         | 'JSXMemberExpression'
         | 'JSXEmptyExpression'
         | 'TSAsExpression'
@@ -6699,6 +7180,8 @@ export interface NativeChildRoles {
         | 'PrivateFieldExpression'
         | 'CallExpression'
         | 'NewExpression'
+        | 'ImportMeta'
+        | 'NewTarget'
         | 'UpdateExpression'
         | 'UnaryExpression'
         | 'BinaryExpression'
@@ -6710,8 +7193,10 @@ export interface NativeChildRoles {
         | 'AwaitExpression'
         | 'ChainExpression'
         | 'ParenthesizedExpression'
+        | 'Function'
         | 'ArrowFunctionExpression'
         | 'YieldExpression'
+        | 'Class'
         | 'ImportExpression'
         | 'V8IntrinsicExpression'
         | 'BooleanLiteral'
@@ -6720,6 +7205,8 @@ export interface NativeChildRoles {
         | 'StringLiteral'
         | 'BigIntLiteral'
         | 'RegExpLiteral'
+        | 'JSXElement'
+        | 'JSXFragment'
         | 'JSXMemberExpression'
         | 'JSXEmptyExpression'
         | 'TSAsExpression'
@@ -6743,6 +7230,8 @@ export interface NativeChildRoles {
         | 'PrivateFieldExpression'
         | 'CallExpression'
         | 'NewExpression'
+        | 'ImportMeta'
+        | 'NewTarget'
         | 'UpdateExpression'
         | 'UnaryExpression'
         | 'BinaryExpression'
@@ -6754,8 +7243,10 @@ export interface NativeChildRoles {
         | 'AwaitExpression'
         | 'ChainExpression'
         | 'ParenthesizedExpression'
+        | 'Function'
         | 'ArrowFunctionExpression'
         | 'YieldExpression'
+        | 'Class'
         | 'ImportExpression'
         | 'V8IntrinsicExpression'
         | 'BooleanLiteral'
@@ -6764,6 +7255,8 @@ export interface NativeChildRoles {
         | 'StringLiteral'
         | 'BigIntLiteral'
         | 'RegExpLiteral'
+        | 'JSXElement'
+        | 'JSXFragment'
         | 'JSXMemberExpression'
         | 'JSXEmptyExpression'
         | 'TSAsExpression'
@@ -6788,6 +7281,8 @@ export interface NativeChildRoles {
         | 'PrivateFieldExpression'
         | 'CallExpression'
         | 'NewExpression'
+        | 'ImportMeta'
+        | 'NewTarget'
         | 'UpdateExpression'
         | 'UnaryExpression'
         | 'BinaryExpression'
@@ -6799,8 +7294,10 @@ export interface NativeChildRoles {
         | 'AwaitExpression'
         | 'ChainExpression'
         | 'ParenthesizedExpression'
+        | 'Function'
         | 'ArrowFunctionExpression'
         | 'YieldExpression'
+        | 'Class'
         | 'ImportExpression'
         | 'V8IntrinsicExpression'
         | 'BooleanLiteral'
@@ -6809,6 +7306,8 @@ export interface NativeChildRoles {
         | 'StringLiteral'
         | 'BigIntLiteral'
         | 'RegExpLiteral'
+        | 'JSXElement'
+        | 'JSXFragment'
         | 'JSXMemberExpression'
         | 'JSXEmptyExpression'
         | 'TSAsExpression'
@@ -6830,6 +7329,8 @@ export interface NativeChildRoles {
         | 'PrivateFieldExpression'
         | 'CallExpression'
         | 'NewExpression'
+        | 'ImportMeta'
+        | 'NewTarget'
         | 'UpdateExpression'
         | 'UnaryExpression'
         | 'BinaryExpression'
@@ -6841,8 +7342,10 @@ export interface NativeChildRoles {
         | 'AwaitExpression'
         | 'ChainExpression'
         | 'ParenthesizedExpression'
+        | 'Function'
         | 'ArrowFunctionExpression'
         | 'YieldExpression'
+        | 'Class'
         | 'ImportExpression'
         | 'V8IntrinsicExpression'
         | 'BooleanLiteral'
@@ -6851,6 +7354,8 @@ export interface NativeChildRoles {
         | 'StringLiteral'
         | 'BigIntLiteral'
         | 'RegExpLiteral'
+        | 'JSXElement'
+        | 'JSXFragment'
         | 'JSXMemberExpression'
         | 'JSXEmptyExpression'
         | 'TSAsExpression'
@@ -6874,6 +7379,8 @@ export interface NativeChildRoles {
         | 'PrivateFieldExpression'
         | 'CallExpression'
         | 'NewExpression'
+        | 'ImportMeta'
+        | 'NewTarget'
         | 'UpdateExpression'
         | 'UnaryExpression'
         | 'BinaryExpression'
@@ -6885,8 +7392,10 @@ export interface NativeChildRoles {
         | 'AwaitExpression'
         | 'ChainExpression'
         | 'ParenthesizedExpression'
+        | 'Function'
         | 'ArrowFunctionExpression'
         | 'YieldExpression'
+        | 'Class'
         | 'ImportExpression'
         | 'V8IntrinsicExpression'
         | 'BooleanLiteral'
@@ -6895,6 +7404,8 @@ export interface NativeChildRoles {
         | 'StringLiteral'
         | 'BigIntLiteral'
         | 'RegExpLiteral'
+        | 'JSXElement'
+        | 'JSXFragment'
         | 'JSXMemberExpression'
         | 'JSXEmptyExpression'
         | 'TSAsExpression'
@@ -6916,6 +7427,8 @@ export interface NativeChildRoles {
         | 'PrivateFieldExpression'
         | 'CallExpression'
         | 'NewExpression'
+        | 'ImportMeta'
+        | 'NewTarget'
         | 'UpdateExpression'
         | 'UnaryExpression'
         | 'BinaryExpression'
@@ -6927,8 +7440,10 @@ export interface NativeChildRoles {
         | 'AwaitExpression'
         | 'ChainExpression'
         | 'ParenthesizedExpression'
+        | 'Function'
         | 'ArrowFunctionExpression'
         | 'YieldExpression'
+        | 'Class'
         | 'ImportExpression'
         | 'V8IntrinsicExpression'
         | 'BooleanLiteral'
@@ -6937,6 +7452,8 @@ export interface NativeChildRoles {
         | 'StringLiteral'
         | 'BigIntLiteral'
         | 'RegExpLiteral'
+        | 'JSXElement'
+        | 'JSXFragment'
         | 'JSXMemberExpression'
         | 'JSXEmptyExpression'
         | 'TSAsExpression'
@@ -6960,6 +7477,8 @@ export interface NativeChildRoles {
         | 'PrivateFieldExpression'
         | 'CallExpression'
         | 'NewExpression'
+        | 'ImportMeta'
+        | 'NewTarget'
         | 'UpdateExpression'
         | 'UnaryExpression'
         | 'BinaryExpression'
@@ -6971,8 +7490,10 @@ export interface NativeChildRoles {
         | 'AwaitExpression'
         | 'ChainExpression'
         | 'ParenthesizedExpression'
+        | 'Function'
         | 'ArrowFunctionExpression'
         | 'YieldExpression'
+        | 'Class'
         | 'ImportExpression'
         | 'V8IntrinsicExpression'
         | 'BooleanLiteral'
@@ -6981,6 +7502,8 @@ export interface NativeChildRoles {
         | 'StringLiteral'
         | 'BigIntLiteral'
         | 'RegExpLiteral'
+        | 'JSXElement'
+        | 'JSXFragment'
         | 'JSXMemberExpression'
         | 'JSXEmptyExpression'
         | 'TSAsExpression'
@@ -7004,6 +7527,8 @@ export interface NativeChildRoles {
         | 'PrivateFieldExpression'
         | 'CallExpression'
         | 'NewExpression'
+        | 'ImportMeta'
+        | 'NewTarget'
         | 'UpdateExpression'
         | 'UnaryExpression'
         | 'BinaryExpression'
@@ -7015,8 +7540,10 @@ export interface NativeChildRoles {
         | 'AwaitExpression'
         | 'ChainExpression'
         | 'ParenthesizedExpression'
+        | 'Function'
         | 'ArrowFunctionExpression'
         | 'YieldExpression'
+        | 'Class'
         | 'ImportExpression'
         | 'V8IntrinsicExpression'
         | 'BooleanLiteral'
@@ -7025,6 +7552,8 @@ export interface NativeChildRoles {
         | 'StringLiteral'
         | 'BigIntLiteral'
         | 'RegExpLiteral'
+        | 'JSXElement'
+        | 'JSXFragment'
         | 'JSXMemberExpression'
         | 'JSXEmptyExpression'
         | 'TSAsExpression'
@@ -7049,6 +7578,8 @@ export interface NativeChildRoles {
         | 'PrivateFieldExpression'
         | 'CallExpression'
         | 'NewExpression'
+        | 'ImportMeta'
+        | 'NewTarget'
         | 'UpdateExpression'
         | 'UnaryExpression'
         | 'BinaryExpression'
@@ -7060,8 +7591,10 @@ export interface NativeChildRoles {
         | 'AwaitExpression'
         | 'ChainExpression'
         | 'ParenthesizedExpression'
+        | 'Function'
         | 'ArrowFunctionExpression'
         | 'YieldExpression'
+        | 'Class'
         | 'ImportExpression'
         | 'V8IntrinsicExpression'
         | 'BooleanLiteral'
@@ -7070,6 +7603,8 @@ export interface NativeChildRoles {
         | 'StringLiteral'
         | 'BigIntLiteral'
         | 'RegExpLiteral'
+        | 'JSXElement'
+        | 'JSXFragment'
         | 'JSXMemberExpression'
         | 'JSXEmptyExpression'
         | 'TSAsExpression'
@@ -7093,6 +7628,8 @@ export interface NativeChildRoles {
         | 'PrivateFieldExpression'
         | 'CallExpression'
         | 'NewExpression'
+        | 'ImportMeta'
+        | 'NewTarget'
         | 'UpdateExpression'
         | 'UnaryExpression'
         | 'BinaryExpression'
@@ -7104,8 +7641,10 @@ export interface NativeChildRoles {
         | 'AwaitExpression'
         | 'ChainExpression'
         | 'ParenthesizedExpression'
+        | 'Function'
         | 'ArrowFunctionExpression'
         | 'YieldExpression'
+        | 'Class'
         | 'ImportExpression'
         | 'V8IntrinsicExpression'
         | 'BooleanLiteral'
@@ -7114,6 +7653,8 @@ export interface NativeChildRoles {
         | 'StringLiteral'
         | 'BigIntLiteral'
         | 'RegExpLiteral'
+        | 'JSXElement'
+        | 'JSXFragment'
         | 'JSXMemberExpression'
         | 'JSXEmptyExpression'
         | 'TSAsExpression'
@@ -7137,6 +7678,8 @@ export interface NativeChildRoles {
         | 'PrivateFieldExpression'
         | 'CallExpression'
         | 'NewExpression'
+        | 'ImportMeta'
+        | 'NewTarget'
         | 'UpdateExpression'
         | 'UnaryExpression'
         | 'BinaryExpression'
@@ -7148,8 +7691,10 @@ export interface NativeChildRoles {
         | 'AwaitExpression'
         | 'ChainExpression'
         | 'ParenthesizedExpression'
+        | 'Function'
         | 'ArrowFunctionExpression'
         | 'YieldExpression'
+        | 'Class'
         | 'ImportExpression'
         | 'V8IntrinsicExpression'
         | 'BooleanLiteral'
@@ -7158,6 +7703,8 @@ export interface NativeChildRoles {
         | 'StringLiteral'
         | 'BigIntLiteral'
         | 'RegExpLiteral'
+        | 'JSXElement'
+        | 'JSXFragment'
         | 'JSXMemberExpression'
         | 'JSXEmptyExpression'
         | 'TSAsExpression'
@@ -7181,6 +7728,8 @@ export interface NativeChildRoles {
         | 'PrivateFieldExpression'
         | 'CallExpression'
         | 'NewExpression'
+        | 'ImportMeta'
+        | 'NewTarget'
         | 'UpdateExpression'
         | 'UnaryExpression'
         | 'BinaryExpression'
@@ -7192,8 +7741,10 @@ export interface NativeChildRoles {
         | 'AwaitExpression'
         | 'ChainExpression'
         | 'ParenthesizedExpression'
+        | 'Function'
         | 'ArrowFunctionExpression'
         | 'YieldExpression'
+        | 'Class'
         | 'ImportExpression'
         | 'V8IntrinsicExpression'
         | 'BooleanLiteral'
@@ -7202,6 +7753,8 @@ export interface NativeChildRoles {
         | 'StringLiteral'
         | 'BigIntLiteral'
         | 'RegExpLiteral'
+        | 'JSXElement'
+        | 'JSXFragment'
         | 'JSXMemberExpression'
         | 'JSXEmptyExpression'
         | 'TSAsExpression'
@@ -7225,6 +7778,8 @@ export interface NativeChildRoles {
         | 'PrivateFieldExpression'
         | 'CallExpression'
         | 'NewExpression'
+        | 'ImportMeta'
+        | 'NewTarget'
         | 'UpdateExpression'
         | 'UnaryExpression'
         | 'BinaryExpression'
@@ -7236,8 +7791,10 @@ export interface NativeChildRoles {
         | 'AwaitExpression'
         | 'ChainExpression'
         | 'ParenthesizedExpression'
+        | 'Function'
         | 'ArrowFunctionExpression'
         | 'YieldExpression'
+        | 'Class'
         | 'ImportExpression'
         | 'V8IntrinsicExpression'
         | 'BooleanLiteral'
@@ -7246,6 +7803,8 @@ export interface NativeChildRoles {
         | 'StringLiteral'
         | 'BigIntLiteral'
         | 'RegExpLiteral'
+        | 'JSXElement'
+        | 'JSXFragment'
         | 'JSXMemberExpression'
         | 'JSXEmptyExpression'
         | 'TSAsExpression'
@@ -7269,6 +7828,8 @@ export interface NativeChildRoles {
         | 'PrivateFieldExpression'
         | 'CallExpression'
         | 'NewExpression'
+        | 'ImportMeta'
+        | 'NewTarget'
         | 'UpdateExpression'
         | 'UnaryExpression'
         | 'BinaryExpression'
@@ -7280,8 +7841,10 @@ export interface NativeChildRoles {
         | 'AwaitExpression'
         | 'ChainExpression'
         | 'ParenthesizedExpression'
+        | 'Function'
         | 'ArrowFunctionExpression'
         | 'YieldExpression'
+        | 'Class'
         | 'ImportExpression'
         | 'V8IntrinsicExpression'
         | 'BooleanLiteral'
@@ -7290,6 +7853,8 @@ export interface NativeChildRoles {
         | 'StringLiteral'
         | 'BigIntLiteral'
         | 'RegExpLiteral'
+        | 'JSXElement'
+        | 'JSXFragment'
         | 'JSXMemberExpression'
         | 'JSXEmptyExpression'
         | 'TSAsExpression'
@@ -7313,6 +7878,8 @@ export interface NativeChildRoles {
         | 'PrivateFieldExpression'
         | 'CallExpression'
         | 'NewExpression'
+        | 'ImportMeta'
+        | 'NewTarget'
         | 'UpdateExpression'
         | 'UnaryExpression'
         | 'BinaryExpression'
@@ -7324,8 +7891,10 @@ export interface NativeChildRoles {
         | 'AwaitExpression'
         | 'ChainExpression'
         | 'ParenthesizedExpression'
+        | 'Function'
         | 'ArrowFunctionExpression'
         | 'YieldExpression'
+        | 'Class'
         | 'ImportExpression'
         | 'V8IntrinsicExpression'
         | 'BooleanLiteral'
@@ -7334,6 +7903,8 @@ export interface NativeChildRoles {
         | 'StringLiteral'
         | 'BigIntLiteral'
         | 'RegExpLiteral'
+        | 'JSXElement'
+        | 'JSXFragment'
         | 'JSXMemberExpression'
         | 'JSXEmptyExpression'
         | 'TSAsExpression'
@@ -7357,6 +7928,8 @@ export interface NativeChildRoles {
         | 'PrivateFieldExpression'
         | 'CallExpression'
         | 'NewExpression'
+        | 'ImportMeta'
+        | 'NewTarget'
         | 'UpdateExpression'
         | 'UnaryExpression'
         | 'BinaryExpression'
@@ -7368,8 +7941,10 @@ export interface NativeChildRoles {
         | 'AwaitExpression'
         | 'ChainExpression'
         | 'ParenthesizedExpression'
+        | 'Function'
         | 'ArrowFunctionExpression'
         | 'YieldExpression'
+        | 'Class'
         | 'ImportExpression'
         | 'V8IntrinsicExpression'
         | 'BooleanLiteral'
@@ -7378,6 +7953,8 @@ export interface NativeChildRoles {
         | 'StringLiteral'
         | 'BigIntLiteral'
         | 'RegExpLiteral'
+        | 'JSXElement'
+        | 'JSXFragment'
         | 'JSXMemberExpression'
         | 'JSXEmptyExpression'
         | 'TSAsExpression'
@@ -7401,6 +7978,8 @@ export interface NativeChildRoles {
         | 'PrivateFieldExpression'
         | 'CallExpression'
         | 'NewExpression'
+        | 'ImportMeta'
+        | 'NewTarget'
         | 'UpdateExpression'
         | 'UnaryExpression'
         | 'BinaryExpression'
@@ -7412,8 +7991,10 @@ export interface NativeChildRoles {
         | 'AwaitExpression'
         | 'ChainExpression'
         | 'ParenthesizedExpression'
+        | 'Function'
         | 'ArrowFunctionExpression'
         | 'YieldExpression'
+        | 'Class'
         | 'ImportExpression'
         | 'V8IntrinsicExpression'
         | 'BooleanLiteral'
@@ -7422,6 +8003,8 @@ export interface NativeChildRoles {
         | 'StringLiteral'
         | 'BigIntLiteral'
         | 'RegExpLiteral'
+        | 'JSXElement'
+        | 'JSXFragment'
         | 'JSXMemberExpression'
         | 'JSXEmptyExpression'
         | 'TSAsExpression'
@@ -7523,6 +8106,8 @@ export interface NativeChildRoles {
         | 'PrivateFieldExpression'
         | 'CallExpression'
         | 'NewExpression'
+        | 'ImportMeta'
+        | 'NewTarget'
         | 'UpdateExpression'
         | 'UnaryExpression'
         | 'BinaryExpression'
@@ -7534,8 +8119,10 @@ export interface NativeChildRoles {
         | 'AwaitExpression'
         | 'ChainExpression'
         | 'ParenthesizedExpression'
+        | 'Function'
         | 'ArrowFunctionExpression'
         | 'YieldExpression'
+        | 'Class'
         | 'ImportExpression'
         | 'V8IntrinsicExpression'
         | 'BooleanLiteral'
@@ -7544,6 +8131,8 @@ export interface NativeChildRoles {
         | 'StringLiteral'
         | 'BigIntLiteral'
         | 'RegExpLiteral'
+        | 'JSXElement'
+        | 'JSXFragment'
         | 'JSXMemberExpression'
         | 'JSXEmptyExpression'
         | 'TSAsExpression'
@@ -7565,6 +8154,8 @@ export interface NativeChildRoles {
         | 'PrivateFieldExpression'
         | 'CallExpression'
         | 'NewExpression'
+        | 'ImportMeta'
+        | 'NewTarget'
         | 'UpdateExpression'
         | 'UnaryExpression'
         | 'BinaryExpression'
@@ -7576,8 +8167,10 @@ export interface NativeChildRoles {
         | 'AwaitExpression'
         | 'ChainExpression'
         | 'ParenthesizedExpression'
+        | 'Function'
         | 'ArrowFunctionExpression'
         | 'YieldExpression'
+        | 'Class'
         | 'ImportExpression'
         | 'V8IntrinsicExpression'
         | 'BooleanLiteral'
@@ -7586,6 +8179,8 @@ export interface NativeChildRoles {
         | 'StringLiteral'
         | 'BigIntLiteral'
         | 'RegExpLiteral'
+        | 'JSXElement'
+        | 'JSXFragment'
         | 'JSXMemberExpression'
         | 'JSXEmptyExpression'
         | 'TSAsExpression'
@@ -7607,6 +8202,8 @@ export interface NativeChildRoles {
         | 'PrivateFieldExpression'
         | 'CallExpression'
         | 'NewExpression'
+        | 'ImportMeta'
+        | 'NewTarget'
         | 'UpdateExpression'
         | 'UnaryExpression'
         | 'BinaryExpression'
@@ -7618,8 +8215,10 @@ export interface NativeChildRoles {
         | 'AwaitExpression'
         | 'ChainExpression'
         | 'ParenthesizedExpression'
+        | 'Function'
         | 'ArrowFunctionExpression'
         | 'YieldExpression'
+        | 'Class'
         | 'ImportExpression'
         | 'V8IntrinsicExpression'
         | 'BooleanLiteral'
@@ -7628,6 +8227,8 @@ export interface NativeChildRoles {
         | 'StringLiteral'
         | 'BigIntLiteral'
         | 'RegExpLiteral'
+        | 'JSXElement'
+        | 'JSXFragment'
         | 'JSXMemberExpression'
         | 'JSXEmptyExpression'
         | 'TSAsExpression'
@@ -7651,6 +8252,8 @@ export interface NativeChildRoles {
         | 'PrivateFieldExpression'
         | 'CallExpression'
         | 'NewExpression'
+        | 'ImportMeta'
+        | 'NewTarget'
         | 'UpdateExpression'
         | 'UnaryExpression'
         | 'BinaryExpression'
@@ -7662,8 +8265,10 @@ export interface NativeChildRoles {
         | 'AwaitExpression'
         | 'ChainExpression'
         | 'ParenthesizedExpression'
+        | 'Function'
         | 'ArrowFunctionExpression'
         | 'YieldExpression'
+        | 'Class'
         | 'ImportExpression'
         | 'V8IntrinsicExpression'
         | 'BooleanLiteral'
@@ -7672,6 +8277,8 @@ export interface NativeChildRoles {
         | 'StringLiteral'
         | 'BigIntLiteral'
         | 'RegExpLiteral'
+        | 'JSXElement'
+        | 'JSXFragment'
         | 'JSXMemberExpression'
         | 'JSXEmptyExpression'
         | 'TSAsExpression'
@@ -7709,6 +8316,8 @@ export interface NativeChildRoles {
         | 'PrivateFieldExpression'
         | 'CallExpression'
         | 'NewExpression'
+        | 'ImportMeta'
+        | 'NewTarget'
         | 'UpdateExpression'
         | 'UnaryExpression'
         | 'BinaryExpression'
@@ -7720,8 +8329,10 @@ export interface NativeChildRoles {
         | 'AwaitExpression'
         | 'ChainExpression'
         | 'ParenthesizedExpression'
+        | 'Function'
         | 'ArrowFunctionExpression'
         | 'YieldExpression'
+        | 'Class'
         | 'ImportExpression'
         | 'V8IntrinsicExpression'
         | 'BooleanLiteral'
@@ -7730,6 +8341,8 @@ export interface NativeChildRoles {
         | 'StringLiteral'
         | 'BigIntLiteral'
         | 'RegExpLiteral'
+        | 'JSXElement'
+        | 'JSXFragment'
         | 'JSXMemberExpression'
         | 'JSXEmptyExpression'
         | 'TSAsExpression'
@@ -7752,6 +8365,8 @@ export interface NativeChildRoles {
         | 'PrivateFieldExpression'
         | 'CallExpression'
         | 'NewExpression'
+        | 'ImportMeta'
+        | 'NewTarget'
         | 'UpdateExpression'
         | 'UnaryExpression'
         | 'BinaryExpression'
@@ -7763,8 +8378,10 @@ export interface NativeChildRoles {
         | 'AwaitExpression'
         | 'ChainExpression'
         | 'ParenthesizedExpression'
+        | 'Function'
         | 'ArrowFunctionExpression'
         | 'YieldExpression'
+        | 'Class'
         | 'ImportExpression'
         | 'V8IntrinsicExpression'
         | 'BooleanLiteral'
@@ -7773,6 +8390,8 @@ export interface NativeChildRoles {
         | 'StringLiteral'
         | 'BigIntLiteral'
         | 'RegExpLiteral'
+        | 'JSXElement'
+        | 'JSXFragment'
         | 'JSXMemberExpression'
         | 'JSXEmptyExpression'
         | 'TSAsExpression'
@@ -7823,6 +8442,8 @@ export interface NativeChildRoles {
         | 'PrivateFieldExpression'
         | 'CallExpression'
         | 'NewExpression'
+        | 'ImportMeta'
+        | 'NewTarget'
         | 'UpdateExpression'
         | 'UnaryExpression'
         | 'BinaryExpression'
@@ -7834,8 +8455,10 @@ export interface NativeChildRoles {
         | 'AwaitExpression'
         | 'ChainExpression'
         | 'ParenthesizedExpression'
+        | 'Function'
         | 'ArrowFunctionExpression'
         | 'YieldExpression'
+        | 'Class'
         | 'ImportExpression'
         | 'V8IntrinsicExpression'
         | 'BooleanLiteral'
@@ -7844,6 +8467,8 @@ export interface NativeChildRoles {
         | 'StringLiteral'
         | 'BigIntLiteral'
         | 'RegExpLiteral'
+        | 'JSXElement'
+        | 'JSXFragment'
         | 'JSXMemberExpression'
         | 'JSXEmptyExpression'
         | 'TSAsExpression'
@@ -7870,6 +8495,8 @@ export interface NativeChildRoles {
         | 'PrivateFieldExpression'
         | 'CallExpression'
         | 'NewExpression'
+        | 'ImportMeta'
+        | 'NewTarget'
         | 'UpdateExpression'
         | 'UnaryExpression'
         | 'BinaryExpression'
@@ -7881,8 +8508,10 @@ export interface NativeChildRoles {
         | 'AwaitExpression'
         | 'ChainExpression'
         | 'ParenthesizedExpression'
+        | 'Function'
         | 'ArrowFunctionExpression'
         | 'YieldExpression'
+        | 'Class'
         | 'ImportExpression'
         | 'V8IntrinsicExpression'
         | 'BooleanLiteral'
@@ -7891,6 +8520,8 @@ export interface NativeChildRoles {
         | 'StringLiteral'
         | 'BigIntLiteral'
         | 'RegExpLiteral'
+        | 'JSXElement'
+        | 'JSXFragment'
         | 'JSXMemberExpression'
         | 'JSXEmptyExpression'
         | 'TSAsExpression'

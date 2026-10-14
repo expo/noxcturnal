@@ -1040,12 +1040,9 @@ pub(crate) fn fields(
                 "property",
                 member.property.name.to_string()
             );
-            if let Some(path) = static_member_path(&member.object) {
-                push!(
-                    field_ids::MEMBER_PATH,
-                    "memberPath",
-                    format!("{path}.{}", member.property.name)
-                );
+            if let Some(path) = static_member_path_with(&member.object, Some(&member.property.name))
+            {
+                push!(field_ids::MEMBER_PATH, "memberPath", path);
             }
             let mut object = &member.object;
             while let Expression::StaticMemberExpression(parent) = object {
@@ -1071,12 +1068,8 @@ pub(crate) fn fields(
             push!(field_ids::WRITE, "write", member_write.to_string(),);
             if let Expression::StringLiteral(property) = &member.expression {
                 push!(field_ids::PROPERTY, "property", property.value.to_string());
-                if let Some(path) = static_member_path(&member.object) {
-                    push!(
-                        field_ids::MEMBER_PATH,
-                        "memberPath",
-                        format!("{path}.{}", property.value)
-                    );
+                if let Some(path) = static_member_path_with(&member.object, Some(&property.value)) {
+                    push!(field_ids::MEMBER_PATH, "memberPath", path);
                 }
             }
         }

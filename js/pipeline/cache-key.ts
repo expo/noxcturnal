@@ -29,6 +29,7 @@ export function pipelineCacheKey(
         name: plugin.name,
         editEffect: plugin.editEffect,
         options: plugin.options ?? null,
+        contract: plugin.contract ?? null,
         visitors: (plugin.visitors ?? []).map(visitorDescriptor),
       })),
     })),
@@ -79,12 +80,17 @@ export function transformClassificationCacheKey(
     .digest('hex');
 }
 
+/** Canonical, type-tagged configuration encoding; unlike JSON it preserves JS scalars. */
 export function stableJson(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`;
+  if (Array.isArray(value))
+    return `a[${Array.from({ length: value.length }, (_, index) =>
+      Object.hasOwn(value, index) ? stableJson(value[index]) : 'hole',
+    ).join(',')}]`;
   if (value && typeof value === 'object')
-    return `{${Object.entries(value)
+    return `o{${Object.entries(value)
       .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
       .map(([key, item]) => `${JSON.stringify(key)}:${stableJson(item)}`)
       .join(',')}}`;
-  return JSON.stringify(value);
+  if (typeof value === 'number') return `n:${Object.is(value, -0) ? '-0' : String(value)}`;
+  return `${typeof value}:${JSON.stringify(value)}`;
 }

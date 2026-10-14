@@ -57,7 +57,7 @@ describe.each(cases)('$route distinguishes declaration and expression instances'
     if (result.status !== 'complete') throw new Error(result.reason);
     expect(result.code).toBe(source);
   });
-  (entry.fails ? test.fails : test)('delivers the semantic category selected by the route', () => {
+  test('delivers the semantic category selected by the route', () => {
     expect(actual).toEqual(entry.expected);
   });
 });

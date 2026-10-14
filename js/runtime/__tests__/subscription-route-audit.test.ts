@@ -49,7 +49,7 @@ for (const reversed of [false, true])
         expect(calls).toBe(1);
         expect(seen.filter(value => value === 'all:within')).toHaveLength(1);
       });
-      (mode === 'none' ? test : test.fails)('delivers each matching visitor exactly once', () => {
+      test('delivers each matching visitor exactly once', () => {
         expect(seen.filter(value => value === 'all:inner')).toHaveLength(1);
         expect(seen.filter(value => value === 'filtered:inner')).toHaveLength(1);
       });

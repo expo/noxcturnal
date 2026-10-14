@@ -41,10 +41,10 @@ beforeAll(() => {
   );
 });
 
-test.fails('pipeline cache keys distinguish signed zero plugin options', () => {
+test('pipeline cache keys distinguish signed zero plugin options', () => {
   expect(keys[0]).not.toBe(keys[1]);
 });
 
-test.fails('classification cache keys distinguish signed zero plugin options', () => {
+test('classification cache keys distinguish signed zero plugin options', () => {
   expect(classificationKeys[0]).not.toBe(classificationKeys[1]);
 });

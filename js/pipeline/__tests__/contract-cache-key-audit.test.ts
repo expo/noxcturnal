@@ -55,9 +55,9 @@ beforeAll(() => {
     transformClassificationCacheKey(pipeline, filename, source),
   );
 });
-test.fails('pipeline keys distinguish declared plugin queries', () => {
+test('pipeline keys distinguish declared plugin queries', () => {
   expect(keys[0]).not.toBe(keys[1]);
 });
-test.fails('classification keys retain declared plugin query differences', () => {
+test('classification keys retain declared plugin query differences', () => {
   expect(classificationKeys[0]).not.toBe(classificationKeys[1]);
 });

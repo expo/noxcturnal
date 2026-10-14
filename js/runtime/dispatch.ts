@@ -54,7 +54,7 @@ type NestedVisitor = readonly DefinedVisitor<any>[];
 interface DispatcherEntry extends PathState {
   context: PluginContext;
   state: any;
-  delivered?: Set<number>;
+  delivered?: Map<readonly Handler<any>[], Set<number>>;
   /** Path runtimes keyed by the exact route capabilities they enforce. */
   pathRuntimes?: Map<RouteCapabilities, PathRuntime>;
 }
@@ -103,6 +103,13 @@ export function createDispatcher(
     }
   for (const plugin of activePlugins) {
     const allowedMetadata = new Set(plans.get(plugin)?.metadataWrites ?? []);
+    const allowedQueries = new Set(
+      (plans.get(plugin)?.queries ?? []).flatMap(request =>
+        Object.entries(request)
+          .filter(([, value]) => (Array.isArray(value) ? value.length > 0 : value === true))
+          .map(([key]) => key),
+      ),
+    );
     const entry: DispatcherEntry = {
       state: undefined,
       stopped: false,
@@ -176,7 +183,15 @@ export function createDispatcher(
         },
         get: key => metadata[key],
       },
-      query: request => session.query(request),
+      query: request => {
+        for (const [capability, value] of Object.entries(request)) {
+          if (value === false || value == null || (Array.isArray(value) && value.length === 0))
+            continue;
+          if (!allowedQueries.has(capability))
+            throw new Error(`${plugin.name}: undeclared query capability ${capability}`);
+        }
+        return session.query(request);
+      },
       inspect: requests => session.inspect(requests),
       diagnostic: diagnostic =>
         diagnostics.push({ ...diagnostic, plugin: plugin.name, phase: phase.name }),
@@ -189,7 +204,7 @@ export function createDispatcher(
       },
       subscribeRemaining: (...types) => {
         assertDeclaredControl(plugin, plans.get(plugin), 'dynamic-subscriptions');
-        entry.delivered ??= new Set();
+        entry.delivered ??= new Map();
         replayRoutedFollowup(
           plugin,
           entry,
@@ -205,6 +220,7 @@ export function createDispatcher(
         replayCustomRouted(
           session.nextRoutedPacked(services.nestedManifest(plugin, plans.get(plugin), compiled)),
           visitors,
+          plugin,
           state,
           context,
         );
@@ -325,6 +341,7 @@ export function createDispatcher(
               end: target.end,
             }),
             nested,
+            plugin,
             state,
             context,
           );
@@ -333,7 +350,7 @@ export function createDispatcher(
         }
       },
       widen(target, types, scopeOnly) {
-        entry.delivered ??= new Set();
+        entry.delivered ??= new Map();
         const expanded = expandSubscriptions(types);
         const root = scopeOnly ? undefined : { start: target.start, end: target.end };
         const filter = (candidate: NativeEvent) =>
@@ -419,7 +436,12 @@ export function createDispatcher(
     overrideState?: any,
     routedCallbacks: readonly Handler<any>[] = [],
   ) => {
-    const delivered = override ? undefined : entry.delivered;
+    const deliveryRoutes = override ? undefined : entry.delivered;
+    let delivered = deliveryRoutes?.get(routedCallbacks);
+    if (deliveryRoutes && !delivered) {
+      delivered = new Set();
+      deliveryRoutes.set(routedCallbacks, delivered);
+    }
     const deliveryKey = delivered ? event.id * 2 + Number(event.side === 'exit') : 0;
     if (delivered?.has(deliveryKey)) return;
     if (entry.stopped || stopAll || eventIsSkipped(event, entry.skipped)) return;
@@ -427,26 +449,26 @@ export function createDispatcher(
     const runtime = boundRuntime ?? createPathRuntime(plugin, entry, context, capabilities);
     const path = makePath(runtime, event, 0, true);
     currentSequence = event.sequence;
+    delivered?.add(deliveryKey);
     if (routedCallbacks.length === 1) {
       routedCallbacks[0](path, override ? overrideState : entry.state);
-      delivered?.add(deliveryKey);
       return;
     }
     for (const callback of routedCallbacks) {
       callback(path, override ? overrideState : entry.state);
-      delivered?.add(deliveryKey);
     }
   };
   const replayCustomRouted = (
     routedBatch: RoutedEventBatch,
     visitor: NestedVisitor,
+    plugin: NativePlugin<any, any>,
     state: any,
     context: PluginContext,
   ) => {
     const compiled = services.compileNestedVisitor(visitor);
     session.reserveEventCache(routedBatch.nodeCount);
     if (routedBatch.includeParent) session.seedSummaries(routedBatch.parentSummaries);
-    const synthetic = { name: 'nested' };
+
     const entry = {
       context,
       state,
@@ -459,7 +481,7 @@ export function createDispatcher(
         (callbacks, index) => (event: NativeEvent) =>
           dispatchOne(
             event,
-            synthetic,
+            plugin,
             entry,
             context,
             null,

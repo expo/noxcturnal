@@ -7,7 +7,7 @@ const cases = [
   ['escaped identifier', String.raw`process.\u0065nv.NODE_ENV;`, true],
   ['computed string', `process['env'].NODE_ENV;`, true],
 ] as const;
-describe.each(cases)('%s', (_name, source, fails) => {
+describe.each(cases)('%s', (_name, source, _fails) => {
   let plain: unknown, retained: unknown, babel: unknown;
   beforeAll(() => {
     transformSync(source, {
@@ -49,7 +49,6 @@ describe.each(cases)('%s', (_name, source, fails) => {
   });
   test('Babel pattern control', () => expect(babel).toBe(true));
   test('retained member path control', () => expect(retained).toBe(true));
-  (fails ? test.fails : test)('pattern matching is independent of optional field retention', () =>
-    expect(plain).toBe(true),
-  );
+  test('pattern matching is independent of optional field retention', () =>
+    expect(plain).toBe(true));
 });

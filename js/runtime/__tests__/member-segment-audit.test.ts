@@ -71,10 +71,7 @@ describe.each([
   test('original property control', () => expect(run(entry.source)).toBe(entry.original));
   test('Babel matching preserves property boundaries', () =>
     expect(run(babel)).toBe(entry.expected));
-  (entry.fails ? test.fails : test).each(['retained match', 'native predicate'])(
-    '%s preserves property boundaries',
-    route => {
-      expect(run(codes.get(route)!)).toBe(entry.expected);
-    },
-  );
+  test.each(['retained match', 'native predicate'])('%s preserves property boundaries', route => {
+    expect(run(codes.get(route)!)).toBe(entry.expected);
+  });
 });
