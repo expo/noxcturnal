@@ -116,9 +116,8 @@ describe('automatic development fragment before super in a nested class key', ()
       expect(error).toBeInstanceOf(ReferenceError);
       actual = { error: 'ReferenceError' };
     }
-    expect(actual).toEqual({ error: 'ReferenceError' });
   });
-  test.fails('does not introduce an enclosing receiver read for a fragment', () => {
+  test('does not introduce an enclosing receiver read for a fragment', () => {
     expect(actual).toBe(true);
   });
 });

@@ -111,16 +111,13 @@ for (const [index, entry] of cases.entries()) {
         actual = 'rejected';
       }
     });
-    (index === 3 || index === 4 || index === 6 ? test.fails : test)(
-      'honors the selected JSX configuration',
-      () => {
-        expect(actual).toBe(
-          index < 3
-            ? ['comment factory', 'comment fragment', 'comment-runtime/jsx-runtime'][index]
-            : 'rejected',
-        );
-      },
-    );
+    test('honors the selected JSX configuration', () => {
+      expect(actual).toBe(
+        index < 3
+          ? ['comment factory', 'comment fragment', 'comment-runtime/jsx-runtime'][index]
+          : 'rejected',
+      );
+    });
   });
 }
 

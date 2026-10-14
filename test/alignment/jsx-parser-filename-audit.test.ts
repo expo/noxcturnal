@@ -54,10 +54,7 @@ describe.each([
     actual = execute(result.code);
     expect([entry.filename, entry.emitted]).toContain(actual);
   });
-  (entry.fails ? test.fails : test)(
-    'reports the original filename in JSX development metadata',
-    () => {
-      expect(actual).toBe(entry.filename);
-    },
-  );
+  test('reports the original filename in JSX development metadata', () => {
+    expect(actual).toBe(entry.filename);
+  });
 });

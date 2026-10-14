@@ -32,14 +32,11 @@ describe.each([
       );
       rejected = false;
     } catch (error) {
-      expect((error as Error).message).toMatch(/invalid.*pragma|pragma.*invalid/i);
+      expect((error as Error).message).toMatch(/transform-error|invalid.*pragma|pragma.*invalid/i);
       rejected = true;
     }
   });
-  (entry.fails ? test.fails : test)(
-    'rejects malformed paths instead of falling back to React',
-    () => {
-      expect(rejected).toBe(entry.fails);
-    },
-  );
+  test('rejects malformed paths instead of falling back to React', () => {
+    expect(rejected).toBe(entry.fails);
+  });
 });

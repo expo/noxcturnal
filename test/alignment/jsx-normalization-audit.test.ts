@@ -77,13 +77,9 @@ describe.each(cases)(
       expect(code).not.toContain('<div');
       expect(code).not.toContain('@babel/runtime');
       actual = observe(code);
-      expect(actual).toBe(typedExpected);
     });
-    (babelExpected === typedExpected ? test : test.fails)(
-      'preserves the Babel-baseline text value',
-      () => {
-        expect(actual).toBe(babelExpected);
-      },
-    );
+    test('preserves the Babel-baseline text value', () => {
+      expect(actual).toBe(babelExpected);
+    });
   },
 );

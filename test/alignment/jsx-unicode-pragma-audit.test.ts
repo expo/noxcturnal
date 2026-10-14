@@ -30,7 +30,7 @@ describe.each([false, true])('classic JSX pragma, escaped identifier=%s', escape
     expect(code).not.toContain('@babel/runtime');
     actual = observe(code);
   });
-  (escaped ? test.fails : test)('honors equivalent Unicode identifier spellings', () => {
+  test('honors equivalent Unicode identifier spellings', () => {
     expect(actual).toBe('expected');
   });
 });

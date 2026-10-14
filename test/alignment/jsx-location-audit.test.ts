@@ -11,36 +11,30 @@ const cases = [
   { name: 'line separator control', character: '\u2028', line: 2, column: 21, fails: false },
   { name: 'CRLF control', character: '\r\n', line: 2, column: 21, fails: false },
 ];
-describe.each(cases)(
-  'JSX development location after $name',
-  ({ character, line, column, fails }) => {
-    let actual: unknown;
-    const expected = { fileName: '/audit/input.jsx', lineNumber: line, columnNumber: column };
-    beforeAll(() => {
-      const source = `const React={createElement(_,props){return props.__source;}};/*${character}*/globalThis.result=<div/>;`;
-      const observe = (code: string) => {
-        const context: Record<string, unknown> = {};
-        new Function('globalThis', code)(context);
-        return context.result;
-      };
-      const babel = transformSync(source, {
-        filename: '/audit/input.jsx',
-        configFile: false,
-        babelrc: false,
-        plugins: [[development, { runtime: 'classic' }]],
-      })!.code!;
-      expect(observe(babel)).toEqual(expected);
-      const code = compile(source, { jsx: 'classic-development' }, '/audit/input.jsx');
-      expect(code).not.toContain('<div');
-      expect(code).toContain('__source');
-      expect(code).not.toContain('@babel/runtime');
-      actual = observe(code);
-    });
-    (fails ? test.fails : test)(
-      'counts only JavaScript line terminators in source metadata',
-      () => {
-        expect(actual).toEqual(expected);
-      },
-    );
-  },
-);
+describe.each(cases)('JSX development location after $name', ({ character, line, column }) => {
+  let actual: unknown;
+  const expected = { fileName: '/audit/input.jsx', lineNumber: line, columnNumber: column };
+  beforeAll(() => {
+    const source = `const React={createElement(_,props){return props.__source;}};/*${character}*/globalThis.result=<div/>;`;
+    const observe = (code: string) => {
+      const context: Record<string, unknown> = {};
+      new Function('globalThis', code)(context);
+      return context.result;
+    };
+    const babel = transformSync(source, {
+      filename: '/audit/input.jsx',
+      configFile: false,
+      babelrc: false,
+      plugins: [[development, { runtime: 'classic' }]],
+    })!.code!;
+    expect(observe(babel)).toEqual(expected);
+    const code = compile(source, { jsx: 'classic-development' }, '/audit/input.jsx');
+    expect(code).not.toContain('<div');
+    expect(code).toContain('__source');
+    expect(code).not.toContain('@babel/runtime');
+    actual = observe(code);
+  });
+  test('counts only JavaScript line terminators in source metadata', () => {
+    expect(actual).toEqual(expected);
+  });
+});

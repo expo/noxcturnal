@@ -489,7 +489,10 @@ export function transform(
       const pipelineResult = native.runNativePipeline(
         parseFilename,
         source,
-        batch.map(({ phase }) => nativePreflightOptions(phase.native!)),
+        batch.map(({ phase }) => ({
+          ...nativePreflightOptions(phase.native!),
+          sourceFilename: filename,
+        })),
         inputMap?.mappings,
         inputMap?.names,
       );
@@ -518,7 +521,10 @@ export function transform(
         const batch = nativePhaseBatch(pipeline, phaseIndex);
         phaseIndex = batch.at(-1)!.index;
         const results = pipelineSession!.runNativePhases(
-          batch.map(({ phase: batchPhase }) => nativePreflightOptions(batchPhase.native!)),
+          batch.map(({ phase: batchPhase }) => ({
+            ...nativePreflightOptions(batchPhase.native!),
+            sourceFilename: filename,
+          })),
         );
         // The rendered source stays resident; materialized lazily only if a later
         // visitor phase needs its text, or once at the end.

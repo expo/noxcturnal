@@ -23,7 +23,7 @@ describe.each([
   { name: 'line break', separator: '\n', fails: true },
   { name: 'nonbreaking prefix', separator: ' ', prefix: '\u00a0', fails: true },
   { name: 'nonbreaking suffix', separator: ' ', suffix: '\u00a0', fails: true },
-])('JSX pragma comment separator: $name', ({ separator, prefix, suffix, fails }) => {
+])('JSX pragma comment separator: $name', ({ separator, prefix, suffix }) => {
   let actual: unknown;
   beforeAll(() => {
     const source = `/**${prefix ?? ' '}@jsx${separator}factory${suffix ?? ' '}*/
@@ -37,7 +37,7 @@ describe.each([
     expect(code).not.toContain('@babel/runtime');
     actual = observe(code);
   });
-  (fails ? test.fails : test)('honors the configured factory', () => {
+  test('honors the configured factory', () => {
     expect(actual).toBe('expected');
   });
 });
@@ -57,7 +57,7 @@ describe('invalid JSX runtime comment', () => {
       expect((error as Error).message).toMatch(/transform-error|runtime/i);
     }
   });
-  test.fails('rejects an invalid runtime directive', () => {
+  test('rejects an invalid runtime directive', () => {
     expect(accepted).toBe(false);
   });
 });
@@ -91,7 +91,7 @@ test.each([
     babelValue: 'expected',
     noxValue: 'fallback',
   },
-])('JSX comment parser boundary: $name', ({ header, late, babelValue, noxValue }) => {
+])('JSX comment parser boundary: $name', ({ header, late, babelValue }) => {
   const source = `${header}
     const React = { createElement() { return 'fallback'; } };
     function factory() { return 'expected'; }
@@ -102,5 +102,5 @@ test.each([
   const code = compile(source, { jsx: 'classic' }, 'input.jsx');
   expect(code).not.toContain('<div');
   expect(code).not.toContain('@babel/runtime');
-  expect(observe(code)).toBe(noxValue);
+  expect(observe(code)).toBe(babelValue);
 });

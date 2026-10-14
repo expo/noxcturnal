@@ -62,11 +62,8 @@ describe.each(cases)('$name', entry => {
     const code = compile(source, { jsx: 'classic' }, 'input.jsx');
     expect(code).not.toMatch(/<div|<>/);
     actual = observe(code);
-    if (entry.observed) expect(actual).toBe(entry.observed);
   });
-  (entry.observed ? test.fails : test)('uses the final valid directive', () =>
-    expect(actual).toBe(entry.expected),
-  );
+  test('uses the final valid directive', () => expect(actual).toBe(entry.expected));
 });
 
 for (const automatic of [false, true]) {

@@ -55,7 +55,7 @@ const cases = [
     fails: false,
   },
 ];
-describe.each(cases)('JSX display-name branch: $name', ({ filename, body, expected, fails }) => {
+describe.each(cases)('JSX display-name branch: $name', ({ filename, body, expected }) => {
   let actual: unknown;
   beforeAll(async () => {
     const source = `${preamble} ${body}`;
@@ -74,7 +74,7 @@ describe.each(cases)('JSX display-name branch: $name', ({ filename, body, expect
     expect(code).not.toContain('@babel/runtime');
     actual = ((await importCode(code)).default as { displayName?: string }).displayName;
   });
-  (fails ? test.fails : test)('selects the Babel-baseline display name', () => {
+  test('selects the Babel-baseline display name', () => {
     expect(actual).toBe(expected);
   });
 });

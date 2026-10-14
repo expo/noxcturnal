@@ -44,9 +44,8 @@ describe.each([
     expect(code).not.toContain('<div');
     expect(code).not.toContain('@babel/runtime');
     actual = observe(code);
-    expect(actual).toBe(entry.current);
   });
-  test.fails('selects the factory under the adopted Babel directive grammar', () => {
+  test('selects the factory under the adopted Babel directive grammar', () => {
     expect(actual).toBe(entry.expected);
   });
 });

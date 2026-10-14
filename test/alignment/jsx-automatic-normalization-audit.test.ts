@@ -24,7 +24,7 @@ const cases = [
   },
 ];
 describe.each([false, true])('automatic JSX ESM execution, development=%s', dev => {
-  describe.each(cases)('$name', ({ input, expected, fails }) => {
+  describe.each(cases)('$name', ({ input, expected }) => {
     let actual: unknown;
     beforeAll(async () => {
       const source = `export const result = ${input};`;
@@ -48,11 +48,8 @@ describe.each([false, true])('automatic JSX ESM execution, development=%s', dev 
       expect(code).not.toContain('@babel/runtime');
       actual = (await importCode(code)).result;
     });
-    (fails ? test.fails : test)(
-      'passes Babel-baseline attribute and child values to the runtime',
-      () => {
-        expect(actual).toEqual(expected);
-      },
-    );
+    test('passes Babel-baseline attribute and child values to the runtime', () => {
+      expect(actual).toEqual(expected);
+    });
   });
 });

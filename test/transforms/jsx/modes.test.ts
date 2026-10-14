@@ -58,37 +58,31 @@ test('uses the automatic runtime', async () => {
 test('uses the automatic development runtime', async () => {
   expect(await transformSource(jsx, 'input.jsx', { jsx: 'automatic-development' }))
     .toMatchInlineSnapshot(`
-    "var _jsxFileName = 'input.jsx';
-    import { jsxDEV as _jsxDEV, Fragment as _Fragment } from 'react/jsx-dev-runtime';
-    export const view = _jsxDEV(
-      _Fragment,
-      {
-        children: [
-          _jsxDEV(
-            Widget,
-            { value: 'ok' },
-            void 0,
-            false,
-            {
-              fileName: _jsxFileName,
-              lineNumber: 1,
-              columnNumber: 23,
-            },
-            this,
-          ),
-          'text',
-        ],
-      },
-      void 0,
-      true,
-      {
-        fileName: _jsxFileName,
-        lineNumber: 1,
-        columnNumber: 21,
-      },
-      this,
-    );"
-  `);
+      "var _jsxFileName = 'input.jsx';
+      import { jsxDEV as _jsxDEV, Fragment as _Fragment } from 'react/jsx-dev-runtime';
+      export const view = _jsxDEV(
+        _Fragment,
+        {
+          children: [
+            _jsxDEV(
+              Widget,
+              { value: 'ok' },
+              void 0,
+              false,
+              {
+                fileName: _jsxFileName,
+                lineNumber: 1,
+                columnNumber: 23,
+              },
+              this,
+            ),
+            'text',
+          ],
+        },
+        void 0,
+        true,
+      );"
+    `);
 });
 
 test('conditionally uses the automatic runtime when JSX is present', async () => {

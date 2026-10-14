@@ -87,12 +87,12 @@ for (const [index, entry] of cases.entries()) {
             'input.jsx',
           );
           expect(nox).not.toContain('<div');
-          if (usesHelper && mode === 'runtime')
+          if (usesHelper && index !== 2 && mode === 'runtime')
             expect(nox).toContain('@babel/runtime/helpers/extends');
           else expect(nox).not.toContain('@babel/runtime');
           actual = run(nox);
         });
-        (index === 2 ? test.fails : test)(mode, () => expect(actual).toEqual(expected));
+        test(mode, () => expect(actual).toEqual(expected));
       }
     });
   }
