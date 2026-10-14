@@ -81,12 +81,9 @@ globalThis.result = observe();`;
           }
         });
         for (const mode of ['inline', 'runtime']) {
-          ((entry.method || awaited) && !generators ? test.fails : test)(
-            `${mode} retains the async iterator contract`,
-            () => {
-              expect(outcomes.get(mode)).toEqual(expected);
-            },
-          );
+          test(`${mode} retains the async iterator contract`, () => {
+            expect(outcomes.get(mode)).toEqual(expected);
+          });
         }
       });
     }

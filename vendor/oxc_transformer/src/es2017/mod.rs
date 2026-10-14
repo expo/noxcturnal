@@ -34,6 +34,12 @@ impl<'a> Traverse<'a, TransformState<'a>> for ES2017<'a> {
         }
     }
 
+    fn enter_statement(&mut self, stmt: &mut Statement<'a>, ctx: &mut TraverseCtx<'a>) {
+        if self.options.async_to_generator && AsyncToGenerator::is_inside_async_function(ctx) {
+            crate::es2018::AsyncGeneratorFunctions::new().transform_statement(stmt, ctx);
+        }
+    }
+
     fn exit_statement(&mut self, stmt: &mut Statement<'a>, ctx: &mut TraverseCtx<'a>) {
         if self.options.async_to_generator {
             self.async_to_generator.exit_statement(stmt, ctx);

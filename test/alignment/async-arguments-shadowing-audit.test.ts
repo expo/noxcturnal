@@ -78,7 +78,7 @@ for (const form of ['arrow', 'method'])
         }
       });
       for (const mode of ['inline', 'runtime']) {
-        (entry.broken ? test.fails : test)(`${mode} preserves distinct arguments bindings`, () => {
+        test(`${mode} preserves distinct arguments bindings`, () => {
           expect(outcomes.get(mode)).toEqual(entry.expected);
         });
       }

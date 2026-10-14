@@ -99,7 +99,7 @@ const instance = new C(); ${entry.after}`;
       }
     });
     for (const mode of ['inline', 'runtime']) {
-      (entry.broken ? test.fails : test)(`${mode} preserves receiver initialization timing`, () => {
+      test(`${mode} preserves receiver initialization timing`, () => {
         expect(outcomes.get(mode)).toEqual(entry.selected);
       });
     }

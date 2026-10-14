@@ -104,7 +104,7 @@ globalThis.result = owner.read();`;
         }
       });
       for (const mode of ['inline', 'runtime']) {
-        (entry.broken ? test.fails : test)(`${mode} preserves operation and effects`, () => {
+        test(`${mode} preserves operation and effects`, () => {
           expect(outcomes.get(mode)).toEqual(entry.expected);
         });
       }

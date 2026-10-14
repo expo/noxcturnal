@@ -62,12 +62,9 @@ globalThis.result = globalThis.read().then(value => [value === instance, instanc
       }
     });
     for (const mode of ['inline', 'runtime']) {
-      (entry.broken ? test.fails : test)(
-        `${mode} retains the initialized receiver after abrupt completion`,
-        () => {
-          expect(outcomes.get(mode)).toEqual([true, 1, 2, true]);
-        },
-      );
+      test(`${mode} retains the initialized receiver after abrupt completion`, () => {
+        expect(outcomes.get(mode)).toEqual([true, 1, 2, true]);
+      });
     }
   });
 }

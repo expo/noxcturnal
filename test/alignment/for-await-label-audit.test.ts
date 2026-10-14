@@ -60,7 +60,7 @@ for (const mode of ['inline', 'runtime'] as const) {
         parseError = parsed.error;
         if (parsed.fn) actual = await run(parsed.fn);
       });
-      (entry.broken ? test.fails : test)('preserves the label target', () => {
+      test('preserves the label target', () => {
         expect(parseError).toBeUndefined();
         expect(actual).toEqual(entry.expected);
       });

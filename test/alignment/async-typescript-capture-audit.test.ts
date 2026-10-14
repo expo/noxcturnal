@@ -65,7 +65,7 @@ globalThis.result=read().then(value=>${argumentsCase ? 'value[0]===7' : 'value==
           outcomes.set(parameters, await run(code));
         }
       });
-      (argumentsCase ? test : test.fails)('retains lexical capture with fused type erasure', () => {
+      test('retains lexical capture with fused type erasure', () => {
         expect(outcomes.get(false)).toBe(true);
       });
       test('retains lexical capture with the separate language prepass', () => {

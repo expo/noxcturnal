@@ -66,12 +66,9 @@ globalThis.result = object[${JSON.stringify(key.value)}](${form === 'default-exp
         }
       });
       for (const mode of ['inline', 'runtime']) {
-        (key.broken && form !== 'default-expression' ? test.fails : test)(
-          `${mode} emits executable output`,
-          () => {
-            expect(outcomes.get(mode)).toBe(3);
-          },
-        );
+        test(`${mode} emits executable output`, () => {
+          expect(outcomes.get(mode)).toBe(3);
+        });
       }
     });
   }

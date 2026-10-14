@@ -49,9 +49,6 @@ test('native async arrow inherits constructor new.target', async () => {
 test.each(['inline', 'runtime'])('%s Babel captures lexical new.target', async mode => {
   expect(await run(codes.get(`babel:${mode}`)!)).toBe(true);
 });
-test.fails.each(['inline', 'runtime'])(
-  '%s async lowering preserves lexical new.target',
-  async mode => {
-    expect(await run(codes.get(mode)!)).toBe(true);
-  },
-);
+test.each(['inline', 'runtime'])('%s async lowering preserves lexical new.target', async mode => {
+  expect(await run(codes.get(mode)!)).toBe(true);
+});

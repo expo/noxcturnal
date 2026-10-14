@@ -66,7 +66,7 @@ for (const call of ['super.read!()', '(super.read as ()=>B)()'])
         }
         if (fn) actual = await run(fn);
       });
-      test.fails('preserves valid super syntax and its receiver', () => {
+      test('preserves valid super syntax and its receiver', () => {
         expect(parseError).toBeUndefined();
         expect(actual).toEqual({ value: true, done: false });
       });

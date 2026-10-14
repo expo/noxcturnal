@@ -67,11 +67,8 @@ for (const mode of ['inline', 'runtime'] as const)
           expect(code).not.toMatch(/async\s+(?:function\s*)?\*/);
           actual = await run(code);
         });
-        (entry.method && !parameters ? test.fails : test)(
-          'preserves parameter value copied into the body binding',
-          () => {
-            expect(actual).toEqual({ value: 1, done: false });
-          },
-        );
+        test('preserves parameter value copied into the body binding', () => {
+          expect(actual).toEqual({ value: 1, done: false });
+        });
       });
     }

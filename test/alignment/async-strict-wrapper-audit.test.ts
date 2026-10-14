@@ -102,7 +102,7 @@ for (const entry of cases) {
       }
     });
     for (const mode of ['inline', 'runtime']) {
-      (entry.broken || (entry.brokenInline && mode === 'inline') ? test.fails : test)(
+      (entry.brokenInline && mode === 'inline' ? test.fails : test)(
         `${mode} preserves the selected contract`,
         () => {
           expect(outcomes.get(mode)).toEqual(entry.selected);

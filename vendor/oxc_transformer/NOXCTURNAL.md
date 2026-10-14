@@ -1,5 +1,5 @@
 Vendored from crates.io oxc_transformer 0.141.0. Original MIT license retained.
-Noxcturnal patches the pinned transformer to repair constructor initialization, exponentiation assignment, logical assignment, optional chaining, and legacy decorator lowering.
+Noxcturnal patches the pinned transformer to repair constructor initialization, exponentiation assignment, logical assignment, optional chaining, legacy decorator lowering, and async lowering.
 
 Original crates.io archive SHA-256: `3481b17ea50d4866901de759f736aa2c63bfca1fb6a20a67faa423f5361429e9`.
 
@@ -33,6 +33,14 @@ Local patches:
   class/constructor callbacks. Allocate legal unique auto-accessor storage names
   and bind static accessors to the immutable original class rather than its
   decorator replacement. Custom decorator helper ABIs are unchanged.
+- `es2017/async_to_generator.rs`: method parameter/directive preservation, legal
+  noncapturing inferred names, ordinary async selection and for-await prerequisites.
+- `es2018/async_generator_functions/for_await.rs`: retain all loop labels and expose
+  generated iterator binding identities for downstream validation.
+- `common/arrow_function_converter.rs`: lexical capture, deferred derived receiver
+  initialization, super operators, updates, calls and destructuring references.
+- `lib.rs`, `state.rs`, and pass wiring: erase transparent TypeScript wrappers before
+  capture conversion; pass iterator provenance to the host runtime.
 
 Keep Rust and npm Oxc versions pinned together. Reassess these patches against the
 upstream implementation before any upgrade; archived regressions define the repair

@@ -10,10 +10,10 @@ use oxc_ast::{
     AstBuilder, AstKind,
     ast::{
         Argument, AssignmentTargetPattern, CatchClause, Class, Decorator, Expression,
-        ForOfStatement, ForStatement, ForStatementInit, FormalParameters, IdentifierReference,
-        ImportDeclarationSpecifier, MethodDefinition, PrivateInExpression, Program, PropertyKey,
-        RegExpFlags, RegExpLiteral, Statement, StaticMemberExpression, StringLiteral,
-        TSTypeParameterInstantiation, VariableDeclarator, WithClause,
+        ForOfStatement, FormalParameters, IdentifierReference, ImportDeclarationSpecifier,
+        MethodDefinition, PrivateInExpression, Program, PropertyKey, RegExpFlags, RegExpLiteral,
+        Statement, StaticMemberExpression, StringLiteral, TSTypeParameterInstantiation,
+        VariableDeclarator, WithClause,
     },
 };
 use oxc_ast_visit::{Visit, VisitMut, walk, walk_mut};
@@ -125,46 +125,15 @@ fn restore_export_namespace_attributes<'a>(
     }
 }
 
-#[derive(Default)]
-struct GeneratedAsyncIteratorCollector {
-    names: rustc_hash::FxHashSet<String>,
-}
-
-impl<'a> Visit<'a> for GeneratedAsyncIteratorCollector {
-    fn visit_for_statement(&mut self, statement: &ForStatement<'a>) {
-        if let Some(ForStatementInit::VariableDeclaration(declaration)) = &statement.init
-            && declaration.declarations.iter().any(|declarator| {
-                declarator
-                    .id
-                    .get_binding_identifier()
-                    .is_some_and(|identifier| identifier.name.starts_with("_step"))
-            })
-        {
-            for declarator in &declaration.declarations {
-                let Some(identifier) = declarator.id.get_binding_identifier() else {
-                    continue;
-                };
-                if declarator.init.is_some()
-                    && identifier.name.starts_with("_iterator")
-                    && !identifier.name.starts_with("_iteratorAbruptCompletion")
-                {
-                    self.names.insert(identifier.name.to_string());
-                    break;
-                }
-            }
-        }
-        walk::walk_for_statement(self, statement);
-    }
-}
-
-struct AsyncIteratorResultValidator<'a> {
+struct AsyncIteratorResultValidator<'a, 's> {
     ast: oxc_ast::AstBuilder<'a>,
-    iterators: rustc_hash::FxHashSet<String>,
+    iterators: rustc_hash::FxHashSet<oxc_semantic::SymbolId>,
+    scoping: &'s Scoping,
     helper: String,
     changed: bool,
 }
 
-impl AsyncIteratorResultValidator<'_> {
+impl AsyncIteratorResultValidator<'_, '_> {
     fn is_iterator_call(&self, expression: &Expression<'_>) -> bool {
         let Expression::CallExpression(call) = expression else {
             return false;
@@ -173,11 +142,11 @@ impl AsyncIteratorResultValidator<'_> {
             return false;
         };
         matches!(member.property.name.as_str(), "next" | "return")
-            && matches!(&member.object, Expression::Identifier(identifier) if self.iterators.contains(identifier.name.as_str()))
+            && matches!(&member.object, Expression::Identifier(identifier) if identifier.reference_id.get().and_then(|id| self.scoping.get_reference(id).symbol_id()).is_some_and(|id| self.iterators.contains(&id)))
     }
 }
 
-impl<'a> VisitMut<'a> for AsyncIteratorResultValidator<'a> {
+impl<'a> VisitMut<'a> for AsyncIteratorResultValidator<'a, '_> {
     #[expect(deprecated)]
     fn visit_expression(&mut self, expression: &mut Expression<'a>) {
         walk_mut::walk_expression(self, expression);
@@ -212,10 +181,9 @@ fn validate_generated_async_iterator_results<'a>(
     allocator: &'a Allocator,
     program: &mut Program<'a>,
     scoping: &Scoping,
+    generated_iterators: &[oxc_semantic::SymbolId],
 ) -> CustomHelperRequests {
-    let mut collector = GeneratedAsyncIteratorCollector::default();
-    collector.visit_program(program);
-    if collector.names.is_empty() {
+    if generated_iterators.is_empty() {
         return CustomHelperRequests::default();
     }
     let used = scoping
@@ -230,13 +198,18 @@ fn validate_generated_async_iterator_results<'a>(
         .collect::<rustc_hash::FxHashSet<_>>();
     let mut helper = "_iteratorResult".to_owned();
     let mut suffix = 2;
-    while used.contains(&helper) {
+    while used.contains(&helper)
+        || scoping
+            .root_unresolved_references()
+            .contains_key(helper.as_str())
+    {
         helper = format!("_iteratorResult{suffix}");
         suffix += 1;
     }
     let mut validator = AsyncIteratorResultValidator {
         ast: oxc_ast::AstBuilder::new(allocator),
-        iterators: collector.names,
+        iterators: generated_iterators.iter().copied().collect(),
+        scoping,
         helper: helper.clone(),
         changed: false,
     };
@@ -1208,16 +1181,20 @@ fn transform_impl(
         {
             let async_pass = Transformer::new(allocator, Path::new(&filename), &deferred)
                 .build_with_scoping(transformed.scoping, &mut program);
+            transformed
+                .generated_async_iterators
+                .extend(async_pass.generated_async_iterators);
             transformed.diagnostics = async_pass.diagnostics;
             transformed.scoping = async_pass.scoping;
             #[expect(deprecated)]
             transformed.helpers_used.extend(async_pass.helpers_used);
         }
-        if options.async_generator_functions == Some(true) && transformed.diagnostics.is_empty() {
+        if !transformed.generated_async_iterators.is_empty() && transformed.diagnostics.is_empty() {
             let requests = validate_generated_async_iterator_results(
                 allocator,
                 &mut program,
                 &transformed.scoping,
+                &transformed.generated_async_iterators,
             );
             if !requests.is_empty() {
                 structural_custom_helper_requests.prepend(requests);

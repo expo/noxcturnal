@@ -116,7 +116,7 @@ globalThis.result = owner.run();`;
         }
       });
       for (const mode of ['inline', 'runtime']) {
-        (entry.broken ? test.fails : test)(`${mode} preserves the selected contract`, () => {
+        test(`${mode} preserves the selected contract`, () => {
           expect(outcomes.get(mode)).toEqual(entry.selected);
         });
       }

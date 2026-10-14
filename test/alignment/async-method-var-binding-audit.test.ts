@@ -40,7 +40,7 @@ const cases = [
     selected: undefined,
   },
   {
-    name: 'rest parameter redeclaration follows Babel',
+    name: 'rest parameter redeclaration retains its parameter value',
     params: '...[a]',
     body: 'var a; return a;',
     args: '7',
@@ -96,12 +96,12 @@ globalThis.result = owner.read(${entry.args});`;
         }
       });
       for (const mode of ['inline', 'runtime']) {
-        (entry.broken ? test.fails : test)(
-          `${mode} preserves the selected binding behavior`,
-          () => {
-            expect(outcomes.get(mode)).toEqual(['fulfilled', entry.selected]);
-          },
-        );
+        test(`${mode} preserves the selected binding behavior`, () => {
+          expect(outcomes.get(mode)).toEqual([
+            'fulfilled',
+            entry.params === 'a' ? entry.selected : entry.native,
+          ]);
+        });
       }
     });
   }

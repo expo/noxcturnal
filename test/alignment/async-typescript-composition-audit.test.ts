@@ -102,16 +102,12 @@ for (const entry of cases)
         } catch (error) {
           parseError = error;
         }
-        if (entry.invalid) expect(parseError).toBeInstanceOf(SyntaxError);
-        else expect(parseError).toBeUndefined();
+        expect(parseError).toBeUndefined();
       });
-      (entry.invalid ? test.fails : test)(
-        'preserves executable output and observations',
-        async () => {
-          expect(parseError).toBeUndefined();
-          expect(await run(code)).toEqual(entry.expected);
-        },
-      );
+      test('preserves executable output and observations', async () => {
+        expect(parseError).toBeUndefined();
+        expect(await run(code)).toEqual(entry.expected);
+      });
       if (entry.invalid)
         test('separate TypeScript prepass preserves executable output', async () => {
           const prepassed = compile(

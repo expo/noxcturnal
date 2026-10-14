@@ -48,7 +48,7 @@ test('native user method returns a primitive', async () => expect(await run(sour
 test.each(['inline', 'runtime'])('%s Babel preserves the user loop', async mode =>
   expect(await run(outputs.get('babel:' + mode)!)).toBe(3),
 );
-test.fails.each(['inline', 'runtime'])('%s only validates generated iterator calls', async mode =>
+test.each(['inline', 'runtime'])('%s only validates generated iterator calls', async mode =>
   expect(await run(outputs.get(mode)!)).toBe(3),
 );
 

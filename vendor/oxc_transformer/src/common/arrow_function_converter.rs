@@ -89,7 +89,7 @@
 
 use compact_str::CompactString;
 use indexmap::IndexMap;
-use rustc_hash::{FxBuildHasher, FxHashSet};
+use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
 
 use oxc_allocator::{ArenaBox, ArenaVec, ReplaceWith, TakeIn};
 use oxc_ast::{ast::*, builder::NONE};
@@ -140,8 +140,11 @@ struct SuperMethodInfo<'a> {
 
 pub struct ArrowFunctionConverter<'a> {
     mode: ArrowFunctionConverterMode,
+    async_functions: bool,
+    async_generators: bool,
     this_var_stack: SparseStack<BoundIdentifier<'a>>,
     arguments_var_stack: SparseStack<BoundIdentifier<'a>>,
+    new_target_var_stack: SparseStack<(BoundIdentifier<'a>, Expression<'a>)>,
     constructor_super_stack: NonEmptyStack<bool>,
     arguments_needs_transform_stack: NonEmptyStack<bool>,
     renamed_arguments_symbol_ids: FxHashSet<SymbolId>,
@@ -163,8 +166,11 @@ impl ArrowFunctionConverter<'_> {
         // `SparseStack`s are created with 1 empty entry, for `Program`
         Self {
             mode,
+            async_functions: env.es2017.async_to_generator,
+            async_generators: env.es2018.async_generator_functions,
             this_var_stack: SparseStack::new(),
             arguments_var_stack: SparseStack::new(),
+            new_target_var_stack: SparseStack::new(),
             constructor_super_stack: NonEmptyStack::new(false),
             arguments_needs_transform_stack: NonEmptyStack::new(false),
             renamed_arguments_symbol_ids: FxHashSet::default(),
@@ -182,6 +188,16 @@ impl<'a> Traverse<'a, TransformState<'a>> for ArrowFunctionConverter<'a> {
     fn exit_program(&mut self, program: &mut Program<'a>, ctx: &mut TraverseCtx<'a>) {
         if self.is_disabled() {
             return;
+        }
+
+        if !self.renamed_arguments_symbol_ids.is_empty() {
+            let names = self
+                .renamed_arguments_symbol_ids
+                .iter()
+                .map(|&id| (id, Ident::from_str_in(ctx.scoping().symbol_name(id), ctx)))
+                .collect();
+            ArgumentsRenamer { names, scoping: ctx.scoping(), functions: Vec::new() }
+                .visit_program(program);
         }
 
         let this_var = self.this_var_stack.take_last();
@@ -218,11 +234,26 @@ impl<'a> Traverse<'a, TransformState<'a>> for ArrowFunctionConverter<'a> {
 
         self.this_var_stack.push(None);
         self.arguments_var_stack.push(None);
-        self.constructor_super_stack.push(false);
+        self.new_target_var_stack.push(None);
+        let derived = ctx.scoping().scope_flags(func.scope_id()).is_constructor()
+            && ctx
+                .ancestors()
+                .find_map(|ancestor| {
+                    if let Ancestor::ClassBody(class) = ancestor {
+                        Some(class.super_class().is_some())
+                    } else {
+                        None
+                    }
+                })
+                .unwrap_or(false);
+        self.constructor_super_stack.push(derived);
 
         if Self::is_class_method_like_ancestor(ctx.parent()) {
             self.super_methods_stack.push(FxIndexMap::default());
-            self.super_needs_transform_stack.push(func.r#async);
+            self.super_needs_transform_stack.push(
+                func.r#async
+                    && if func.generator { self.async_generators } else { self.async_functions },
+            );
         }
     }
 
@@ -248,6 +279,27 @@ impl<'a> Traverse<'a, TransformState<'a>> for ArrowFunctionConverter<'a> {
         };
         let this_var = self.this_var_stack.pop();
         let arguments_var = self.arguments_var_stack.pop();
+        if let Some((binding, init)) = self.new_target_var_stack.pop() {
+            Self::adjust_binding_scope(scope_id, &binding, ctx);
+            body.statements.insert(
+                0,
+                Statement::new_variable_declaration(
+                    SPAN,
+                    VariableDeclarationKind::Var,
+                    [VariableDeclarator::new(
+                        SPAN,
+                        VariableDeclarationKind::Var,
+                        binding.create_binding_pattern(ctx),
+                        NONE,
+                        Some(init),
+                        false,
+                        ctx,
+                    )],
+                    false,
+                    ctx,
+                ),
+            );
+        }
         let super_methods = Self::is_class_method_like_ancestor(ctx.parent()).then(|| {
             self.super_needs_transform_stack.pop();
             self.super_methods_stack.pop()
@@ -309,8 +361,13 @@ impl<'a> Traverse<'a, TransformState<'a>> for ArrowFunctionConverter<'a> {
         if self.is_async_only() {
             // Ignore arrow functions
             if let Ancestor::FunctionBody(func) = ctx.parent() {
-                let is_async_method =
-                    *func.r#async() && Self::is_class_method_like_ancestor(ctx.ancestor(1));
+                let is_async_method = *func.r#async()
+                    && (if *func.generator() {
+                        self.async_generators
+                    } else {
+                        self.async_functions
+                    })
+                    && Self::is_class_method_like_ancestor(ctx.ancestor(1));
                 self.arguments_needs_transform_stack.push(is_async_method);
             }
         }
@@ -391,11 +448,30 @@ impl<'a> Traverse<'a, TransformState<'a>> for ArrowFunctionConverter<'a> {
             Expression::ThisExpression(this) => {
                 self.get_this_identifier(this.span, ctx).map(Expression::Identifier)
             }
+            Expression::NewTarget(_) if self.get_scope_id_from_this_affected_block(ctx).is_some() => {
+                let value = expr.take_in(ctx);
+                let (binding, _) = self.new_target_var_stack.last_or_init(|| {
+                    (ctx.generate_uid("newtarget", ctx.scoping().root_scope_id(), SymbolFlags::FunctionScopedVariable), value)
+                });
+                Some(binding.create_read_expression(ctx))
+            }
             Expression::Super(_) => {
                 *self.constructor_super_stack.last_mut() = true;
                 return;
             }
+            Expression::TaggedTemplateExpression(tagged) => {
+                if tagged.tag.get_inner_expression().is_member_expression() {
+                    tagged.tag = tagged.tag.take_in(ctx).into_inner_expression();
+                    if let Some(object) = self.transform_member_expression_for_super(&mut tagged.tag, None, ctx) {
+                        tagged.tag = Expression::new_call_expression(SPAN,
+                            Expression::new_static_member_expression(SPAN, object, IdentifierName::new(SPAN, "bind", ctx), false, ctx),
+                            NONE, [Argument::new_this_expression(SPAN, ctx)], false, ctx);
+                    }
+                }
+                None
+            }
             Expression::CallExpression(call) => self.transform_call_expression_for_super(call, ctx),
+            Expression::UpdateExpression(update) => self.transform_update_for_super(update, ctx),
             Expression::AssignmentExpression(assignment) => {
                 self.transform_assignment_expression_for_super(assignment, ctx)
             }
@@ -447,6 +523,54 @@ impl<'a> Traverse<'a, TransformState<'a>> for ArrowFunctionConverter<'a> {
 
             Self::transform_arrow_function_expression_on_exit(expr, ctx);
         }
+    }
+
+    fn enter_simple_assignment_target(
+        &mut self,
+        target: &mut SimpleAssignmentTarget<'a>,
+        ctx: &mut TraverseCtx<'a>,
+    ) {
+        if !*self.super_needs_transform_stack.last()
+            || !target.as_member_expression().is_some_and(|member| member.object().is_super())
+        {
+            return;
+        }
+        // Destructuring writes need an assignable reference. Reuse Babel's setter
+        // adapter; the generated super closure retains the method home object.
+        let mut member = Expression::from(target.take_in(ctx).into_member_expression());
+        let mut dummy = Expression::new_null_literal(SPAN, ctx);
+        let Expression::CallExpression(mut call) =
+            self.transform_member_expression_for_super(&mut member, Some(&mut dummy), ctx).unwrap()
+        else {
+            unreachable!()
+        };
+        call.arguments.pop();
+        let args = Expression::new_array_expression(
+            SPAN,
+            ArenaVec::from_iter_in(
+                call.arguments
+                    .take_in(ctx)
+                    .into_iter()
+                    .map(|arg| ArrayExpressionElement::from(arg.into_expression())),
+                ctx,
+            ),
+            ctx,
+        );
+        let adapter = super::helper_loader::helper_call_expr(
+            super::helper_loader::Helper::ToSetter,
+            ArenaVec::from_array_in(
+                [Argument::from(call.callee.take_in(ctx)), Argument::from(args)],
+                ctx,
+            ),
+            ctx,
+        );
+        *target = SimpleAssignmentTarget::new_static_member_expression(
+            SPAN,
+            adapter,
+            IdentifierName::new(SPAN, "_", ctx),
+            false,
+            ctx,
+        );
     }
 
     // `#[inline]` because this is a hot path
@@ -622,6 +746,7 @@ impl<'a> ArrowFunctionConverter<'a> {
                     // to how we handle arrow functions. Therefore, we return the `ScopeId` of the function.
                     return if self.is_async_only()
                     && *func.r#async()
+                    && (if *func.generator() { self.async_generators } else { self.async_functions })
                     && Self::is_class_method_like_ancestor(
                         ancestors.next().unwrap()
                     ) {
@@ -824,6 +949,11 @@ impl<'a> ArrowFunctionConverter<'a> {
         call: &mut CallExpression<'a>,
         ctx: &mut TraverseCtx<'a>,
     ) -> Option<Expression<'a>> {
+        if *self.super_needs_transform_stack.last()
+            && call.callee.get_inner_expression().is_member_expression()
+        {
+            call.callee = call.callee.take_in(ctx).into_inner_expression();
+        }
         if !*self.super_needs_transform_stack.last() || !call.callee.is_member_expression() {
             return None;
         }
@@ -870,13 +1000,139 @@ impl<'a> ArrowFunctionConverter<'a> {
             return None;
         }
 
-        let assignment_target = assignment.left.take_in(ctx);
-        let mut assignment_expr = Expression::from(assignment_target.into_member_expression());
-        self.transform_member_expression_for_super(
-            &mut assignment_expr,
-            Some(&mut assignment.right),
+        let mut member = Expression::from(assignment.left.take_in(ctx).into_member_expression());
+        if assignment.operator == AssignmentOperator::Assign {
+            return self.transform_member_expression_for_super(
+                &mut member,
+                Some(&mut assignment.right),
+                ctx,
+            );
+        }
+        let (mut first, mut second) = Self::duplicate_super_member(member, ctx);
+        if let Some(operator) = assignment.operator.to_binary_operator() {
+            let get = self.transform_member_expression_for_super(&mut second, None, ctx).unwrap();
+            let mut value = Expression::new_binary_expression(
+                SPAN,
+                get,
+                operator,
+                assignment.right.take_in(ctx),
+                ctx,
+            );
+            self.transform_member_expression_for_super(&mut first, Some(&mut value), ctx)
+        } else {
+            let get = self.transform_member_expression_for_super(&mut first, None, ctx).unwrap();
+            let set = self
+                .transform_member_expression_for_super(
+                    &mut second,
+                    Some(&mut assignment.right),
+                    ctx,
+                )
+                .unwrap();
+            Some(Expression::new_logical_expression(
+                assignment.span,
+                get,
+                assignment.operator.to_logical_operator().unwrap(),
+                set,
+                ctx,
+            ))
+        }
+    }
+
+    fn duplicate_super_member(
+        mut member: Expression<'a>,
+        ctx: &mut TraverseCtx<'a>,
+    ) -> (Expression<'a>, Expression<'a>) {
+        let second = match &mut member {
+            Expression::ComputedMemberExpression(computed) => {
+                let (first, second) = super::duplicate::duplicate_expression(
+                    computed.expression.take_in(ctx),
+                    true,
+                    ctx,
+                );
+                computed.expression = first;
+                Expression::new_computed_member_expression(
+                    SPAN,
+                    Expression::new_super(SPAN, ctx),
+                    second,
+                    false,
+                    ctx,
+                )
+            }
+            Expression::StaticMemberExpression(static_member) => {
+                Expression::new_static_member_expression(
+                    SPAN,
+                    Expression::new_super(SPAN, ctx),
+                    static_member.property.clone(),
+                    false,
+                    ctx,
+                )
+            }
+            _ => unreachable!(),
+        };
+        (member, second)
+    }
+
+    fn transform_update_for_super(
+        &mut self,
+        update: &mut UpdateExpression<'a>,
+        ctx: &mut TraverseCtx<'a>,
+    ) -> Option<Expression<'a>> {
+        if !*self.super_needs_transform_stack.last()
+            || !update
+                .argument
+                .as_member_expression()
+                .is_some_and(|member| member.object().is_super())
+        {
+            return None;
+        }
+        let member = Expression::from(update.argument.take_in(ctx).into_member_expression());
+        let (mut setter, mut getter) = Self::duplicate_super_member(member, ctx);
+        let get = self.transform_member_expression_for_super(&mut getter, None, ctx).unwrap();
+        let value =
+            super::var_declarations::VarDeclarationsStore::create_uid_var("superValue", ctx);
+        let assign = Expression::new_assignment_expression(
+            SPAN,
+            AssignmentOperator::Assign,
+            value.create_write_target(ctx),
+            get,
             ctx,
-        )
+        );
+        let operation = Expression::new_update_expression(
+            SPAN,
+            update.operator,
+            update.prefix,
+            value.create_read_write_simple_target(ctx),
+            ctx,
+        );
+        let mut elements = ArenaVec::from_value_in(assign, ctx);
+        let old = if update.prefix {
+            elements.push(operation);
+            None
+        } else {
+            let old =
+                super::var_declarations::VarDeclarationsStore::create_uid_var("superOld", ctx);
+            elements.push(Expression::new_assignment_expression(
+                SPAN,
+                AssignmentOperator::Assign,
+                old.create_write_target(ctx),
+                operation,
+                ctx,
+            ));
+            elements.push(value.create_read_expression(ctx));
+            Some(old)
+        };
+        let mut rhs = Expression::new_sequence_expression(SPAN, elements, ctx);
+        let set =
+            self.transform_member_expression_for_super(&mut setter, Some(&mut rhs), ctx).unwrap();
+        Some(if let Some(old) = old {
+            Expression::new_sequence_expression(
+                update.span,
+                [set, old.create_read_expression(ctx)],
+                ctx,
+            )
+        } else {
+            set
+        })
     }
 
     /// Adjust the scope of the binding.
@@ -1067,20 +1323,17 @@ impl<'a> ArrowFunctionConverter<'a> {
         let reference_id = ident.reference_id();
         let symbol_id = ctx.scoping().get_reference(reference_id).symbol_id();
 
-        let binding = self.arguments_var_stack.last_or_init(|| {
-            if let Some(symbol_id) = symbol_id {
-                let arguments_name = ctx.generate_uid_name("arguments");
-                Self::rename_arguments_symbol(symbol_id, arguments_name, ctx);
-                // Record the symbol ID as a renamed `arguments` variable.
-                self.renamed_arguments_symbol_ids.insert(symbol_id);
-                BoundIdentifier::new(arguments_name, symbol_id)
-            } else {
-                // We cannot determine the final scope ID of the `arguments` variable insertion,
-                // because the `arguments` variable will be inserted to a new scope which haven't been created yet,
-                // so we temporary use root scope id as the fake target scope ID.
-                let target_scope_id = ctx.scoping().root_scope_id();
-                ctx.generate_uid("arguments", target_scope_id, SymbolFlags::FunctionScopedVariable)
+        if let Some(symbol_id) = symbol_id {
+            if self.renamed_arguments_symbol_ids.insert(symbol_id) {
+                let name = ctx.generate_uid_name("arguments");
+                Self::rename_arguments_symbol(symbol_id, name, ctx);
             }
+            ident.name = Ident::from_str_in(ctx.scoping().symbol_name(symbol_id), ctx);
+            return;
+        }
+        let binding = self.arguments_var_stack.last_or_init(|| {
+            let target_scope_id = ctx.scoping().root_scope_id();
+            ctx.generate_uid("arguments", target_scope_id, SymbolFlags::FunctionScopedVariable)
         });
 
         // If no symbol ID, it means there is no variable named `arguments` in the scope.
@@ -1109,15 +1362,12 @@ impl<'a> ArrowFunctionConverter<'a> {
             return;
         }
 
-        self.arguments_var_stack.last_or_init(|| {
-            let arguments_name = ctx.generate_uid_name("arguments");
-            ident.name = arguments_name;
-            let symbol_id = ident.symbol_id();
-            Self::rename_arguments_symbol(symbol_id, arguments_name, ctx);
-            // Record the symbol ID as a renamed `arguments` variable.
-            self.renamed_arguments_symbol_ids.insert(symbol_id);
-            BoundIdentifier::new(arguments_name, symbol_id)
-        });
+        let symbol_id = ident.symbol_id();
+        if self.renamed_arguments_symbol_ids.insert(symbol_id) {
+            let name = ctx.generate_uid_name("arguments");
+            Self::rename_arguments_symbol(symbol_id, name, ctx);
+        }
+        ident.name = Ident::from_str_in(ctx.scoping().symbol_name(symbol_id), ctx);
     }
 
     /// Create a variable declarator looks like `_arguments = arguments;`.
@@ -1319,6 +1569,19 @@ impl<'a> VisitMut<'a> for ConstructorBodyThisAfterSuperInserter<'a, '_> {
         // `super()` can't appear in a nested function
     }
 
+    fn visit_arrow_function_expression(&mut self, arrow: &mut ArrowFunctionExpression<'a>) {
+        self.visit_formal_parameters(&mut arrow.params);
+        if arrow.expression {
+            if let Some(Statement::ExpressionStatement(statement)) =
+                arrow.body.statements.first_mut()
+            {
+                self.visit_expression(&mut statement.expression);
+            }
+        } else {
+            self.visit_function_body(&mut arrow.body);
+        }
+    }
+
     /// `super();` -> `super(); _this = this;`
     fn visit_statements(&mut self, statements: &mut ArenaVec<'a, Statement<'a>>) {
         for (index, stmt) in statements.iter_mut().enumerate() {
@@ -1353,6 +1616,9 @@ impl<'a> VisitMut<'a> for ConstructorBodyThisAfterSuperInserter<'a, '_> {
     #[inline]
     fn visit_expression(&mut self, expr: &mut Expression<'a>) {
         if expr.is_super_call_expression() {
+            if let Expression::CallExpression(call) = expr {
+                self.visit_arguments(&mut call.arguments);
+            }
             self.transform_super_call_expression(expr);
         } else {
             walk_expression(self, expr);
@@ -1379,5 +1645,48 @@ impl<'a> ConstructorBodyThisAfterSuperInserter<'a, '_> {
             Expression::new_this_expression(SPAN, self.ctx),
             self.ctx,
         )
+    }
+}
+
+/// Synchronize references that were visited before a captured binding, including
+/// references inside nested ordinary functions that do not themselves capture arguments.
+struct ArgumentsRenamer<'a, 's> {
+    names: FxHashMap<SymbolId, Ident<'a>>,
+    scoping: &'s oxc_semantic::Scoping,
+    functions: Vec<ScopeId>,
+}
+impl<'a> VisitMut<'a> for ArgumentsRenamer<'a, '_> {
+    fn visit_function(&mut self, function: &mut Function<'a>, flags: ScopeFlags) {
+        self.functions.push(function.scope_id());
+        oxc_ast_visit::walk_mut::walk_function(self, function, flags);
+        self.functions.pop();
+    }
+    fn visit_binding_identifier(&mut self, ident: &mut BindingIdentifier<'a>) {
+        if let Some(name) = self.names.get(&ident.symbol_id()) {
+            ident.name = *name;
+        }
+    }
+    fn visit_identifier_reference(&mut self, ident: &mut IdentifierReference<'a>) {
+        if let Some(id) = ident
+            .reference_id
+            .get()
+            .and_then(|reference| self.scoping.get_reference(reference).symbol_id())
+            && let Some(name) = self.names.get(&id)
+        {
+            // The semantic table does not materialize implicit arguments bindings.
+            // A normal nested function shadows an outer arguments variable even
+            // when that reference is recorded against the outer symbol.
+            if ident.name == "arguments"
+                && self.functions.last().is_some_and(|scope| {
+                    !self
+                        .scoping
+                        .scope_ancestors(self.scoping.symbol_scope_id(id))
+                        .any(|ancestor| ancestor == *scope)
+                })
+            {
+                return;
+            }
+            ident.name = *name;
+        }
     }
 }

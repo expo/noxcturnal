@@ -5,6 +5,14 @@ import { compile } from '../compliance/runtime';
 const require = createRequire(import.meta.url);
 const cases = [
   {
+    name: 'default new.target capture follows Babel parameter-scope limitation',
+    source:
+      'function C(read = async () => new.target) { this.read = read; } globalThis.result = new C().read().then(value => value === C);',
+    native: true,
+    babel: 'ReferenceError',
+    selected: 'ReferenceError',
+  },
+  {
     name: 'default receiver capture follows Babel limitation',
     source:
       'function f(a = async () => this) { return a(); } globalThis.result = f.call({x: 3}).then(v => v.x);',

@@ -440,12 +440,12 @@ export const cases = [
   [
     'destructuring + state lifting (generators) > class async generator method with destructured param',
     'async () => {\n  class C {\n    async *gen({ b }) {\n      yield b;\n      return b + 1;\n    }\n  }\n  const g = new C().gen({ b: 41 });\n  expect(await g.next()).toEqual({ value: 41, done: false });\n  expect(await g.next()).toEqual({ value: 42, done: true });\n}',
-    "var _wrapAsyncGenerator = require('@babel/runtime/helpers/wrapAsyncGenerator');\nasync () => {\n  class C {\n    gen({ b }) {\n      return _wrapAsyncGenerator(function* () {\n        yield b;\n        return b + 1;\n      })();\n    }\n  }\n  const g = new C().gen({ b: 41 });\n  expect(await g.next()).toEqual({\n    value: 41,\n    done: false,\n  });\n  expect(await g.next()).toEqual({\n    value: 42,\n    done: true,\n  });\n};",
+    "var _wrapAsyncGenerator = require('@babel/runtime/helpers/wrapAsyncGenerator');\nasync () => {\n  class C {\n    gen(_x) {\n      return _wrapAsyncGenerator(function* ({ b }) {\n        yield b;\n        return b + 1;\n      }).apply(this, arguments);\n    }\n  }\n  const g = new C().gen({ b: 41 });\n  expect(await g.next()).toEqual({\n    value: 41,\n    done: false,\n  });\n  expect(await g.next()).toEqual({\n    value: 42,\n    done: true,\n  });\n};",
   ],
   [
     'destructuring + state lifting (generators) > object shorthand async generator method with destructured param',
     'async () => {\n  const o = {\n    async *gen({ b }) {\n      yield b;\n      return b + 1;\n    },\n  };\n  const g = o.gen({ b: 41 });\n  expect(await g.next()).toEqual({ value: 41, done: false });\n  expect(await g.next()).toEqual({ value: 42, done: true });\n}',
-    "var _wrapAsyncGenerator = require('@babel/runtime/helpers/wrapAsyncGenerator');\nasync () => {\n  const o = {\n    gen({ b }) {\n      return _wrapAsyncGenerator(function* () {\n        yield b;\n        return b + 1;\n      })();\n    },\n  };\n  const g = o.gen({ b: 41 });\n  expect(await g.next()).toEqual({\n    value: 41,\n    done: false,\n  });\n  expect(await g.next()).toEqual({\n    value: 42,\n    done: true,\n  });\n};",
+    "var _wrapAsyncGenerator = require('@babel/runtime/helpers/wrapAsyncGenerator');\nasync () => {\n  const o = {\n    gen(_x) {\n      return _wrapAsyncGenerator(function* ({ b }) {\n        yield b;\n        return b + 1;\n      }).apply(this, arguments);\n    },\n  };\n  const g = o.gen({ b: 41 });\n  expect(await g.next()).toEqual({\n    value: 41,\n    done: false,\n  });\n  expect(await g.next()).toEqual({\n    value: 42,\n    done: true,\n  });\n};",
   ],
   [
     'destructuring + state lifting (generators) > sync generator with destructured object param yields binding',

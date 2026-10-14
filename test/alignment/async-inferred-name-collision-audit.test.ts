@@ -67,12 +67,9 @@ globalThis.result = object[${JSON.stringify(entry.key)}](3);`;
         }
       });
       for (const mode of ['inline', 'runtime']) {
-        (entry.broken ? test.fails : test)(
-          `${mode} invokes the delegate without self-recursion`,
-          () => {
-            expect(outcomes.get(mode)).toEqual(['fulfilled', 3]);
-          },
-        );
+        test(`${mode} invokes the delegate without self-recursion`, () => {
+          expect(outcomes.get(mode)).toEqual(['fulfilled', 3]);
+        });
       }
     });
   }

@@ -56,6 +56,6 @@ test.fails.each(['inline', 'runtime'])(
     expect(await run(codes.get(`babel:${mode}`)!)).toBe(1);
   },
 );
-test.fails.each(['inline', 'runtime'])('%s async-only output remains executable', async mode => {
+test.each(['inline', 'runtime'])('%s async-only output remains executable', async mode => {
   expect(await run(codes.get(`${mode}:false`)!)).toBe(1);
 });

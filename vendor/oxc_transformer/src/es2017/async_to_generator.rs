@@ -53,7 +53,9 @@
 
 use std::{borrow::Cow, mem};
 
-use oxc_allocator::{ArenaBox, ArenaStringBuilder, ArenaVec, GetAllocator, ReplaceWith, TakeIn};
+use oxc_allocator::{
+    ArenaBox, ArenaStringBuilder, ArenaVec, CloneIn, GetAllocator, ReplaceWith, TakeIn,
+};
 use oxc_ast::{ast::*, builder::NONE};
 use oxc_ast_visit::VisitJs;
 use oxc_semantic::{ReferenceFlags, ScopeFlags, ScopeId, SymbolFlags};
@@ -144,6 +146,7 @@ impl<'a> Traverse<'a, TransformState<'a>> for AsyncToGenerator<'a> {
 
     fn exit_function(&mut self, func: &mut Function<'a>, ctx: &mut TraverseCtx<'a>) {
         if func.r#async
+            && !func.generator
             && !func.is_typescript_syntax()
             && AsyncGeneratorExecutor::is_class_method_like_ancestor(ctx.parent())
         {
@@ -154,7 +157,7 @@ impl<'a> Traverse<'a, TransformState<'a>> for AsyncToGenerator<'a> {
 
 impl<'a> AsyncToGenerator<'a> {
     /// Check whether the current node is inside an async function.
-    fn is_inside_async_function(ctx: &TraverseCtx<'a>) -> bool {
+    pub(crate) fn is_inside_async_function(ctx: &TraverseCtx<'a>) -> bool {
         // Early return if current scope is top because we don't need to transform top-level await expression.
         if ctx.current_scope_flags().is_top() {
             return false;
@@ -162,7 +165,7 @@ impl<'a> AsyncToGenerator<'a> {
 
         for ancestor in ctx.ancestors() {
             match ancestor {
-                Ancestor::FunctionBody(func) => return *func.r#async(),
+                Ancestor::FunctionBody(func) => return *func.r#async() && !*func.generator(),
                 Ancestor::ArrowFunctionExpressionBody(func) => {
                     return *func.r#async();
                 }
@@ -229,11 +232,15 @@ impl<'a> AsyncGeneratorExecutor<'a> {
             return;
         };
 
-        // If parameters could throw errors, we need to move them to the inner function,
-        // because it is an async function, which should return a rejecting promise if
-        // there is an error.
-        let needs_move_parameters_to_inner_function =
-            Self::could_throw_errors_parameters(&func.params);
+        // Keep non-simple parameters with the body: destructuring must reject via
+        // asyncToGenerator, and defaults must share their original body-var environment.
+        // Simple parameters stay outside to preserve mapped arguments aliasing.
+        let needs_move_parameters_to_inner_function = func.params.rest.is_some()
+            || func.params.items.iter().any(|param| {
+                param.initializer.is_some()
+                    || !matches!(param.pattern, BindingPattern::BindingIdentifier(_))
+            });
+        let directives = body.directives.clone_in(ctx.allocator());
 
         let (generator_scope_id, wrapper_scope_id) = {
             let new_scope_id = ctx.create_child_scope(ctx.current_scope_id(), ScopeFlags::Function);
@@ -298,7 +305,7 @@ impl<'a> AsyncGeneratorExecutor<'a> {
         // Modify the wrapper function
         func.r#async = false;
         func.generator = false;
-        func.body = Some(FunctionBody::boxed(SPAN, [], [statement], ctx));
+        func.body = Some(FunctionBody::boxed(SPAN, directives, [statement], ctx));
         func.scope_id.set(Some(wrapper_scope_id));
         sync_function_symbol_flags(func, ctx);
     }
@@ -342,6 +349,13 @@ impl<'a> AsyncGeneratorExecutor<'a> {
             (scope_id, wrapper_scope_id)
         };
 
+        if id.is_none() {
+            if let Some(name) = Self::infer_function_name_from_parent_node(ctx)
+                && name.starts_with('_')
+            {
+                ctx.generate_uid_name(name.as_str());
+            }
+        }
         let bound_ident = Self::create_bound_identifier(
             id.as_ref(),
             wrapper_scope_id,
@@ -554,6 +568,11 @@ impl<'a> AsyncGeneratorExecutor<'a> {
         // to change the parent scope of the generator function to the wrapper function.
         Self::change_scope_parent_id(generator_function_id, wrapper_scope_id, ctx);
 
+        if let Some(name) = function_name
+            && name.starts_with('_')
+        {
+            ctx.generate_uid_name(name.as_str());
+        }
         let bound_ident = Self::create_bound_identifier(
             None,
             wrapper_scope_id,
@@ -648,7 +667,10 @@ impl<'a> AsyncGeneratorExecutor<'a> {
     /// * `arguments` -> `_arguments`
     fn normalize_function_name(input: &Cow<'a, str>, ctx: &TraverseCtx<'a>) -> Ident<'a> {
         let input_str = input.as_ref();
-        if !is_reserved_keyword(input_str) && is_identifier_name(input_str) {
+        if !is_reserved_keyword(input_str)
+            && !matches!(input_str, "arguments" | "eval" | "await" | "yield")
+            && is_identifier_name(input_str)
+        {
             return Ident::from_cow_in(input, ctx);
         }
 
@@ -679,7 +701,10 @@ impl<'a> AsyncGeneratorExecutor<'a> {
             return static_ident!("_");
         }
 
-        if is_reserved_keyword(name.as_str()) {
+        if is_reserved_keyword(name.as_str())
+            || matches!(name.as_str(), "arguments" | "eval" | "await" | "yield")
+            || !name.as_str().chars().next().is_some_and(is_identifier_start)
+        {
             name.push_ascii_byte_start(b'_');
         }
 
@@ -912,32 +937,6 @@ impl<'a> AsyncGeneratorExecutor<'a> {
     #[inline]
     fn is_function_length_affected(params: &FormalParameters<'_>) -> bool {
         params.items.first().is_some_and(|param| param.initializer.is_none())
-    }
-
-    /// Check whether the function parameters could throw errors.
-    #[inline]
-    fn could_throw_errors_parameters(params: &FormalParameters<'a>) -> bool {
-        params.items.iter().any(|param| {
-            param
-                .initializer
-                .as_ref()
-                .is_some_and(|init| Self::could_potentially_throw_error_expression(init))
-        })
-    }
-
-    /// Check whether the expression could potentially throw an error.
-    #[inline]
-    fn could_potentially_throw_error_expression(expr: &Expression<'a>) -> bool {
-        !(matches!(
-            expr,
-            Expression::NullLiteral(_)
-                | Expression::BooleanLiteral(_)
-                | Expression::NumericLiteral(_)
-                | Expression::StringLiteral(_)
-                | Expression::BigIntLiteral(_)
-                | Expression::ArrowFunctionExpression(_)
-                | Expression::FunctionExpression(_)
-        ) || expr.is_undefined())
     }
 
     #[inline]

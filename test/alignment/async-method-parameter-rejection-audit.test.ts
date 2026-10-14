@@ -73,14 +73,14 @@ describe.each(cases)('$name', ({ source }) => {
       expect(reference.includes('@babel/runtime/')).toBe(mode === 'runtime');
       expect(await execute(reference)).toEqual(['rejected', 'TypeError']);
       const result = await execute(nox(source, mode));
-      // Compilation and unrelated runtime errors cannot satisfy test.fails.
+      // Compilation and unrelated runtime errors cannot satisfy test.
       expect(result[1]).toBe('TypeError');
       expect(['sync', 'rejected']).toContain(result[0]);
       outcomes.set(mode, result);
     }
   });
   for (const mode of modes) {
-    test.fails(`${mode} returns a rejected promise for binding initialization failure`, () => {
+    test(`${mode} returns a rejected promise for binding initialization failure`, () => {
       expect(outcomes.get(mode)).toEqual(['rejected', 'TypeError']);
     });
   }
