@@ -38,18 +38,22 @@ for (const length of [0, 1, 100]) {
       },
     ],
   ] as const) {
-    describe(`for-of runtime: ${scenario}, ${length} elements`, () => {
+    describe(`for-of runtime: ${scenario}, ${length} elements (100 calls/sample)`, () => {
       for (const [label, binding] of bindings) {
         const result = binding.nativePreflightTransform(
-          'globalThis.sum = function(values) { let sum = 0; for (const value of values) sum += value; return sum; };',
+          `globalThis.sum = function sum_${scenario}_${length}_${label}(values) { let sum = 0; for (const value of values) sum += value; return sum; };`,
           'input.js',
           options,
         );
         if (result.status !== 'complete') throw new Error(JSON.stringify(result));
         const context: { sum?: (values: Iterable<number>) => number } = {};
         new Function('globalThis', result.code!)(context);
+        // Batch calls so timer/sample bookkeeping does not dominate empty loops.
+        // Unique source names above isolate V8 feedback across iterable shapes.
         bench(label, () => {
-          if (context.sum!(values) !== (length * (length - 1)) / 2) throw new Error('wrong sum');
+          for (let iteration = 0; iteration < 100; iteration++) {
+            if (context.sum!(values) !== (length * (length - 1)) / 2) throw new Error('wrong sum');
+          }
         });
       }
     });
