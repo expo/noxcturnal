@@ -266,12 +266,6 @@ fn direct_class_candidates(
                         enclosing.extend(plan.private_keys.keys().cloned());
                     }
                 }
-                for element in &class.body.body {
-                    if let Some(PropertyKey::PrivateIdentifier(identifier)) = element.property_key()
-                    {
-                        enclosing.remove(identifier.name.as_str());
-                    }
-                }
             }
             let mut capture = EnclosingPrivateUse {
                 names: enclosing,
@@ -1941,6 +1935,25 @@ impl<'a> PrivateLooseRewriter<'a, '_> {
 }
 
 impl<'a> VisitMut<'a> for PrivateLooseRewriter<'a, '_> {
+    fn visit_class(&mut self, class: &mut Class<'a>) {
+        if let Some(heritage) = &mut class.super_class {
+            self.visit_expression(heritage);
+        }
+        let mut keys = self.keys.clone();
+        for element in &class.body.body {
+            if let Some(PropertyKey::PrivateIdentifier(identifier)) = element.property_key() {
+                keys.remove(identifier.name.as_str());
+            }
+        }
+        PrivateLooseRewriter {
+            allocator: self.allocator,
+            keys: &keys,
+            base_name: self.base_name,
+            check_in_rhs_name: self.check_in_rhs_name,
+        }
+        .visit_class_body(&mut class.body);
+    }
+
     fn visit_chain_element(&mut self, element: &mut ChainElement<'a>) {
         let ast = AstBuilder::new(self.allocator);
         let mut expression = match element.take_in(&ast) {
@@ -2903,6 +2916,20 @@ struct EnclosingPrivateUse {
     found: bool,
 }
 impl<'a> Visit<'a> for EnclosingPrivateUse {
+    fn visit_class(&mut self, class: &Class<'a>) {
+        if let Some(heritage) = &class.super_class {
+            self.visit_expression(heritage);
+        }
+        let outer = self.names.clone();
+        for element in &class.body.body {
+            if let Some(PropertyKey::PrivateIdentifier(identifier)) = element.property_key() {
+                self.names.remove(identifier.name.as_str());
+            }
+        }
+        self.visit_class_body(&class.body);
+        self.names = outer;
+    }
+
     fn visit_private_field_expression(&mut self, field: &oxc_ast::ast::PrivateFieldExpression<'a>) {
         self.found |= self.names.contains(field.field.name.as_str());
         walk::walk_private_field_expression(self, field);
@@ -2967,7 +2994,7 @@ fn lower_simple_class<'a>(
             base_name: allocator.alloc_str(&plan.helper_names.private_base),
             check_in_rhs_name: allocator.alloc_str(&plan.helper_names.check_in_rhs),
         }
-        .visit_class(&mut class);
+        .visit_class_body(&mut class.body);
     }
     let mut private_method_definitions = ArenaVec::new_in(&ast);
     let mut constructor = None;

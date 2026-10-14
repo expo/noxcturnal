@@ -218,3 +218,61 @@ for (const mode of ['inline', 'runtime'] as const) {
     }
   }
 }
+
+for (const mode of ['inline', 'runtime'] as const) {
+  for (const suspension of ['yield', 'await'] as const) {
+    test(`nested private shadowing starts after suspended heritage (${suspension}, ${mode})`, async () => {
+      const source = `
+        ${suspension === 'yield' ? 'function*' : 'async function'} make() {
+          let read, Holder;
+          const C = class Outer {
+            #value() { return 3; }
+            [(Holder = class Nested extends (
+              read = object => object.#value(),
+              ${suspension === 'yield' ? 'yield Object' : 'await Promise.resolve(Object)'}
+            ) {
+              #value = 7;
+              readOwn() { return this.#value; }
+            }, 'key')]() {}
+          };
+          return [read(new C()), new Holder().readOwn()];
+        }
+        ${
+          suspension === 'yield'
+            ? 'const iterator = make(); iterator.next(); globalThis.result = iterator.next(Object).value;'
+            : 'globalThis.result = make();'
+        }
+      `;
+      expect(await run(source)).toEqual([3, 7]);
+      const code = compile(source, {
+        transforms: { privateMethods: true },
+        helpers: { mode, moduleName: '@babel/runtime', version: '7.29.7' },
+      });
+      expect(code).not.toContain('class Nested');
+      expect(await run(code)).toEqual([3, 7]);
+    });
+  }
+
+  test(`nested own private names do not create a lowering dependency (${mode})`, async () => {
+    const source = `function* make() {
+      let Holder;
+      class Outer {
+        #value() { return 3; }
+        [(Holder = class Nested {
+          #value = 7;
+          [yield 'pause']() {}
+          readOwn() { return this.#value; }
+        }, 'key')]() {}
+      }
+      return new Holder().readOwn();
+    }
+    const iterator = make(); iterator.next(); globalThis.result = iterator.next('key').value;`;
+    expect(await run(source)).toBe(7);
+    const code = compile(source, {
+      transforms: { privateMethods: true },
+      helpers: { mode, moduleName: '@babel/runtime', version: '7.29.7' },
+    });
+    expect(code).toContain('class Nested');
+    expect(await run(code)).toBe(7);
+  });
+}
