@@ -10,13 +10,12 @@ const dependency =
     `export const h=(tag)=>tag;export const Fragment='fragment';export const React={createElement:h,Fragment};`,
   ).toString('base64');
 const cases = [
-  { name: 'custom factory element', fragment: false, pragma: 'h', missing: 'h' },
-  { name: 'custom factory fragment', fragment: true, pragma: 'h', missing: 'h' },
+  { name: 'custom factory element', fragment: false, pragma: 'h' },
+  { name: 'custom factory fragment', fragment: true, pragma: 'h' },
   {
     name: 'custom fragment with standard factory',
     fragment: true,
     pragma: 'React.createElement',
-    missing: 'Fragment',
   },
 ];
 for (const directive of [false, true])
@@ -26,8 +25,6 @@ for (const directive of [false, true])
         describe(`${entry.name}, directive=${directive}, prepass=${prepass}, ${mode}`, () => {
           const source = `${directive ? `/** @jsx ${entry.pragma} */\n/** @jsxFrag Fragment */\n` : ''}import {h,Fragment,React} from '${dependency}';function identity(value:number=1){return value}export const defaultValue=identity();export const result=${entry.fragment ? '<>text</>' : '<div/>'};`;
           const expected = entry.fragment ? 'fragment' : 'div';
-          const broken = prepass && (!directive || entry.fragment);
-          const missing = directive ? (entry.pragma === 'h' ? 'h' : 'React') : entry.missing;
           let actual: unknown;
           beforeAll(async () => {
             const babel = transformSync(source, {
@@ -84,30 +81,58 @@ for (const directive of [false, true])
             expect(code).not.toMatch(/<div|<>/);
             expect(code).not.toContain('@babel/runtime');
             if (prepass) expect(code).not.toMatch(/identity\(value\s*=/);
-            if (broken) {
-              try {
-                actual = (await importCode(code)).result;
-              } catch (error) {
-                expect(error).toBeInstanceOf(ReferenceError);
-                expect((error as Error).message).toBe(`${missing} is not defined`);
-                actual = 'ReferenceError';
-              }
-              expect(actual).toBe('ReferenceError');
-              // Reintroducing the erased binding isolates import liveness from JSX and parameter execution.
-              const repaired = await importCode(
-                `import {${directive ? missing : entry.pragma === 'h' ? 'h,Fragment' : 'Fragment'}} from '${dependency}';\n${code}`,
-              );
-              expect(repaired.result).toBe(expected);
-              expect(repaired.defaultValue).toBe(1);
-            } else {
-              const output = await importCode(code);
-              expect(output.defaultValue).toBe(1);
-              actual = output.result;
-              expect(actual).toBe(expected);
-            }
+            const output = await importCode(code);
+            expect(output.defaultValue).toBe(1);
+            actual = output.result;
           });
-          (broken ? test.fails : test)(
-            'retains the factory and fragment imports needed by emitted JSX',
-            () => expect(actual).toBe(expected),
-          );
+          test('retains the factory and fragment imports needed by emitted JSX', () =>
+            expect(actual).toBe(expected));
         });
+
+for (const mode of ['inline', 'runtime'] as const) {
+  test(`${mode} applies directive precedence and drops unrelated imports in the prepass`, async () => {
+    const unused = 'data:text/javascript,throw%20new%20Error("unused%20factory")';
+    const source = `/** @jsx h */
+/** @jsxFrag Fragment */
+import {h, Fragment} from '${dependency}';
+import {wrong, WrongFragment} from '${unused}';
+function identity(value:number=1){ return value; }
+export const result = <>text</>;
+export const defaultValue = identity();`;
+    const code = compile(
+      source,
+      {
+        typescript: 'strip',
+        jsx: 'classic',
+        jsxPragma: 'wrong',
+        jsxPragmaFrag: 'WrongFragment',
+        transforms: { parameters: true },
+        helpers: { mode, version: '7.29.7' },
+      },
+      'input.tsx',
+    );
+    expect(code).not.toContain(unused);
+    expect(await importCode(code)).toMatchObject({ result: 'fragment', defaultValue: 1 });
+  });
+
+  test(`${mode} erases an unused fragment import for element-only JSX`, async () => {
+    const unused = 'data:text/javascript,throw%20new%20Error("unused%20fragment")';
+    const source = `import {h} from '${dependency}'; import {Fragment} from '${unused}';
+function identity(value:number=1){return value;}
+export const result=<div/>;`;
+    const code = compile(
+      source,
+      {
+        typescript: 'strip',
+        jsx: 'classic',
+        jsxPragma: 'h',
+        jsxPragmaFrag: 'Fragment',
+        transforms: { parameters: true },
+        helpers: { mode, version: '7.29.7' },
+      },
+      'input.tsx',
+    );
+    expect(code).not.toContain(unused);
+    expect((await importCode(code)).result).toBe('div');
+  });
+}
