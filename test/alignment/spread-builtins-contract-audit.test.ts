@@ -13,35 +13,36 @@ function observe(code: string): unknown {
 }
 const cases = [
   {
-    regression: true,
+    name: 'spread defines an own __proto__ data property',
+    source: `const proto={marker:1};const source={['__proto__']:proto};const value={...source};globalThis.result=[Object.getPrototypeOf(value)===Object.prototype,Object.hasOwn(value,'__proto__'),value.__proto__===proto];`,
+    strict: [true, true, true],
+    loose: [false, false, true],
+  },
+  {
     name: 'spread getter before later property evaluation',
     source: `const events=[];const value={...{get a(){events.push('get');return 1}},b:(events.push('later'),2)};globalThis.result=[events,value.a,value.b];`,
     strict: [['get', 'later'], 1, 2],
     loose: [['later', 'get'], 1, 2],
   },
   {
-    regression: true,
     name: 'getter after spread remains an accessor',
     source: `const events=[];const value={...{},get a(){events.push('get');return 1}};globalThis.result=[events,typeof Object.getOwnPropertyDescriptor(value,'a').get];`,
     strict: [[], 'function'],
     loose: [['get'], 'undefined'],
   },
   {
-    regression: true,
     name: 'consecutive spreads observe an earlier getter replacing the later source',
     source: `let second={b:2};const value={...{get a(){second={b:3};return 1}},...second};globalThis.result=[value.a,value.b];`,
     strict: [1, 3],
     loose: [1, 2],
   },
   {
-    regression: false,
     name: 'nested spread expressions',
     source: `const value={a:{...{b:2}},...{c:3}};globalThis.result=[value.a.b,value.c];`,
     strict: [2, 3],
     loose: [2, 3],
   },
   {
-    regression: false,
     name: 'ordinary literal without spread',
     source: `const events=[];const value={get a(){events.push('get');return 1}};globalThis.result=[events,typeof Object.getOwnPropertyDescriptor(value,'a').get];`,
     strict: [[], 'function'],
@@ -56,7 +57,6 @@ describe.each([
 ])('spread contract loose=$loose builtins=$useBuiltIns', config => {
   describe.each(['inline', 'runtime'] as const)('%s helpers', mode => {
     describe.each(cases)('$name', fixture => {
-      const fails = fixture.regression && !config.loose && config.useBuiltIns;
       let actual: unknown;
       beforeAll(() => {
         expect(require('@babel/runtime/package.json').version).toBe('7.29.7');
@@ -76,12 +76,16 @@ describe.each([
           helpers: { mode, moduleName: '@babel/runtime', version: '7.29.7' },
         });
         expect(code).not.toContain('...');
-        if (config.useBuiltIns && fixture.source.includes('...'))
+        if (config.loose && config.useBuiltIns && fixture.source.includes('...'))
           expect(code).toContain('Object.assign');
+        if (!config.loose && fixture.source.includes('...')) {
+          expect(code).not.toMatch(/Object\.assign\(/);
+          expect(code).toContain('objectSpread2');
+        }
         actual = observe(code);
-        expect(actual).toEqual(config.loose || config.useBuiltIns ? fixture.loose : fixture.strict);
+        expect(actual).toEqual(config.loose ? fixture.loose : fixture.strict);
       });
-      (fails ? test.fails : test)('preserves the selected strict or loose spread contract', () => {
+      test('preserves the selected strict or loose spread contract', () => {
         expect(actual).toEqual(config.loose ? fixture.loose : fixture.strict);
       });
     });

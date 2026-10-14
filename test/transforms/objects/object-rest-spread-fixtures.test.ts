@@ -842,7 +842,7 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[23],
+        output: expectedOutputs[22],
       },
       {
         title: 'loose, helpers',
@@ -917,7 +917,7 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[26],
+        output: expectedOutputs[25],
       },
       {
         title: 'loose, helpers',
@@ -992,7 +992,7 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[29],
+        output: expectedOutputs[28],
       },
       {
         title: 'loose, helpers',
@@ -1068,7 +1068,7 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[32],
+        output: expectedOutputs[31],
       },
       {
         title: 'loose, helpers',
@@ -1144,7 +1144,7 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[35],
+        output: expectedOutputs[34],
       },
       {
         title: 'loose, helpers',
@@ -1220,7 +1220,7 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[38],
+        output: expectedOutputs[37],
       },
       {
         title: 'loose, helpers',
@@ -1296,7 +1296,7 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[41],
+        output: expectedOutputs[40],
       },
       {
         title: 'loose, helpers',
@@ -1371,7 +1371,7 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[44],
+        output: expectedOutputs[43],
       },
       {
         title: 'loose, helpers',
@@ -4710,7 +4710,7 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[161],
+        output: expectedOutputs[160],
       },
       {
         title: 'loose, helpers',
@@ -4786,7 +4786,7 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[164],
+        output: expectedOutputs[163],
       },
       {
         title: 'loose, helpers',
@@ -4937,7 +4937,7 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[168],
+        output: expectedOutputs[167],
       },
       {
         title: 'loose, helpers',
@@ -5013,7 +5013,7 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[171],
+        output: expectedOutputs[170],
       },
       {
         title: 'loose, helpers',
@@ -5089,7 +5089,7 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[174],
+        output: expectedOutputs[173],
       },
       {
         title: 'loose, helpers',
@@ -5165,7 +5165,7 @@ export const fixtureCases = [
             version: '7.29.7',
           },
         },
-        output: expectedOutputs[177],
+        output: expectedOutputs[176],
       },
       {
         title: 'loose, helpers',

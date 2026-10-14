@@ -624,18 +624,19 @@ fn transform_impl(
         });
     }
     final_program.with_program_mut(|source, allocator, mut program| {
-        let (had_object_spread_syntax, object_spread_helper_requests) = if focused_object_rest {
-            object_spread::run(
-                allocator,
-                &mut program,
-                object_spread::Options {
-                    use_built_ins: options.object_rest_spread_use_built_ins == Some(true),
-                    inline_helpers: options.helpers_mode.as_deref() == Some("inline"),
-                },
-            )
-        } else {
-            (false, super::helpers::CustomHelperRequests::default())
-        };
+        let (had_object_spread_syntax, object_spread_helper_requests) =
+            if options.object_rest_spread == Some(true) && object_rest_loose {
+                object_spread::run(
+                    allocator,
+                    &mut program,
+                    object_spread::Options {
+                        use_built_ins: options.object_rest_spread_use_built_ins == Some(true),
+                        inline_helpers: options.helpers_mode.as_deref() == Some("inline"),
+                    },
+                )
+            } else {
+                (false, super::helpers::CustomHelperRequests::default())
+            };
         let (had_regexp_syntax, mut structural_custom_helper_requests) = if regexp_rewrite_selected
         {
             match super::regexp::run(
@@ -1133,6 +1134,13 @@ fn transform_impl(
         } else {
             Vec::new()
         };
+        // Oxc preserves the complete JSX element span on its generated factory
+        // call. Fragments have no props to spread; nested elements are collected.
+        let jsx_origins = matches!(
+            options.jsx.as_deref(),
+            Some("classic" | "classic-development")
+        )
+        .then(|| object_spread::JsxOrigins::collect(&program));
         let mut transformed = Transformer::new(allocator, Path::new(&filename), &transform_options)
             .build_with_scoping(scoping, &mut program);
         if !transformed.diagnostics.is_empty()
@@ -1176,14 +1184,12 @@ fn transform_impl(
         if !transformed.diagnostics.is_empty() {
             return Ok(fatal("transform-error", transformed.diagnostics));
         }
-        if matches!(
-            options.jsx.as_deref(),
-            Some("classic" | "classic-development")
-        ) {
+        if let Some(origins) = jsx_origins {
             let (changed, jsx_helper_requests) = object_spread::run_jsx_props(
                 allocator,
                 &mut program,
                 options.helpers_mode.as_deref() != Some("runtime"),
+                &origins,
             );
             if changed {
                 structural_custom_helper_requests.prepend(jsx_helper_requests);

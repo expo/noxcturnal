@@ -50,7 +50,7 @@ describe.each(['inline', 'runtime'] as const)('classic JSX provenance with %s he
       expect(nox).toContain('Math.pow');
       actual = observe(nox);
     });
-    (parenthesized ? test : test.fails)('preserves ordinary object-spread evaluation order', () => {
+    test('preserves ordinary object-spread evaluation order', () => {
       expect(actual).toEqual(expected);
     });
   });

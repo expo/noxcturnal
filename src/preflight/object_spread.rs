@@ -1,10 +1,14 @@
 use oxc_allocator::{Allocator, Box as ArenaBox, TakeIn, Vec as ArenaVec};
 use oxc_ast::{
     AstBuilder,
-    ast::{Argument, Expression, ObjectPropertyKind, Program, TSTypeParameterInstantiation},
+    ast::{
+        Argument, Expression, JSXAttributeItem, JSXElement, ObjectPropertyKind, Program,
+        TSTypeParameterInstantiation,
+    },
 };
-use oxc_ast_visit::{VisitMut, walk_mut};
+use oxc_ast_visit::{Visit, VisitMut, walk, walk_mut};
 use oxc_span::{GetSpan, Span};
+use rustc_hash::FxHashSet;
 
 use crate::generated::inline_helpers::INLINE_EXTENDS_HELPER_DESCRIPTOR;
 use crate::preflight::helpers::{CustomHelperRequests, SourceNameReservations};
@@ -51,6 +55,33 @@ pub(super) fn run<'a>(
     (pass.changed, requests)
 }
 
+/// Exact AST origins, rather than a source-text prefix: other transforms can
+/// generate calls whose larger spans start at the same JSX element.
+#[derive(Default)]
+pub(super) struct JsxOrigins(FxHashSet<Span>);
+
+impl JsxOrigins {
+    pub(super) fn collect(program: &Program<'_>) -> Self {
+        let mut origins = Self::default();
+        origins.visit_program(program);
+        origins
+    }
+}
+
+impl<'a> Visit<'a> for JsxOrigins {
+    fn visit_jsx_element(&mut self, element: &JSXElement<'a>) {
+        if element
+            .opening_element
+            .attributes
+            .iter()
+            .any(|attribute| matches!(attribute, JSXAttributeItem::SpreadAttribute(_)))
+        {
+            self.0.insert(element.span);
+        }
+        walk::walk_jsx_element(self, element);
+    }
+}
+
 /// Lower only object-spread expressions generated as the props argument of a
 /// JSX `createElement` call. Oxc intentionally ignores Babel's deprecated
 /// `useSpread` option and otherwise leaves these object literals intact, while
@@ -59,12 +90,15 @@ pub(super) fn run_jsx_props<'a>(
     allocator: &'a Allocator,
     program: &mut Program<'a>,
     inline_helpers: bool,
+    origins: &JsxOrigins,
 ) -> (bool, CustomHelperRequests) {
+    if origins.0.is_empty() {
+        return (false, CustomHelperRequests::default());
+    }
     let helper_name = reserve_helper_name(program, "_extends");
     let helper_binding = allocator.alloc_str(&helper_name);
-    let source = program.source_text;
     let mut pass = JsxPropsSpreadLowerer {
-        source,
+        origins,
         lowerer: ObjectSpreadLowerer {
             ast: AstBuilder::new(allocator),
             changed: false,
@@ -194,15 +228,15 @@ impl<'a> VisitMut<'a> for ObjectSpreadLowerer<'a> {
     }
 }
 
-struct JsxPropsSpreadLowerer<'a> {
-    source: &'a str,
+struct JsxPropsSpreadLowerer<'a, 'o> {
+    origins: &'o JsxOrigins,
     lowerer: ObjectSpreadLowerer<'a>,
 }
 
-impl<'a> VisitMut<'a> for JsxPropsSpreadLowerer<'a> {
+impl<'a> VisitMut<'a> for JsxPropsSpreadLowerer<'a, '_> {
     fn visit_call_expression(&mut self, call: &mut oxc_ast::ast::CallExpression<'a>) {
         walk_mut::walk_call_expression(self, call);
-        if self.source.as_bytes().get(call.span.start as usize) != Some(&b'<') {
+        if !self.origins.0.contains(&call.span) {
             return;
         }
         let Some(props) = call
