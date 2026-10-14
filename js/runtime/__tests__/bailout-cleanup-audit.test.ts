@@ -41,7 +41,7 @@ describe.each([
     if (entry.throwing >= 0) expect((caught as Error)?.message).toMatch(/cleanup sentinel/);
     else expect(caught).toBeUndefined();
   });
-  (entry.fails ? test.fails : test)('cleans every prepared state exactly once', () => {
+  test('cleans every prepared state exactly once', () => {
     expect(counts).toEqual([1, 1, 1]);
   });
 });

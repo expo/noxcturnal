@@ -51,12 +51,12 @@ beforeAll(() => {
   }
 });
 
-test.fails('cleanup throwing undefined remains a fatal transform error', () => {
+test('cleanup throwing undefined remains a fatal transform error', () => {
   expect(undefinedObservation.failure).toBeInstanceOf(NativeTransformError);
   expect((undefinedObservation.failure as NativeTransformError).cause).toBeUndefined();
 });
 
-test.fails('cleanup retains a first null exception when a peer also throws', () => {
+test('cleanup retains a first null exception when a peer also throws', () => {
   expect(nullObservation.failure).toBeInstanceOf(NativeTransformError);
   expect((nullObservation.failure as NativeTransformError).cause).toBeNull();
 });

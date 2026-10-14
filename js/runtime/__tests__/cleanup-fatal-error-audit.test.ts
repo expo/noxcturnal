@@ -66,7 +66,11 @@ beforeAll(() => {
   expect(control).toBeInstanceOf(NativeTransformError);
   expect((control as NativeTransformError).cause).toBe(cleanupFailure);
   observed = observe(true);
-  expect(observed).toBe(cleanupFailure);
+  expect(observed).toBeInstanceOf(NativeTransformError);
+  expect((observed as Error).message).toMatch(/classes-direct-plan-missing/);
+  expect((observed as NativeTransformError).diagnostics).toContainEqual(
+    expect.objectContaining({ message: 'planner and application disagreed' }),
+  );
 });
 
 test('cleanup failure after successful native work uses the typed failure contract', () => {
@@ -74,7 +78,7 @@ test('cleanup failure after successful native work uses the typed failure contra
   expect((control as NativeTransformError).code).toBe('NOXCTURNAL_TRANSFORM_ERROR');
 });
 
-test.fails('cleanup failure during fatal native error handling retains a typed transform failure', () => {
+test('cleanup failure during fatal native error handling retains a typed transform failure', () => {
   expect(observed).toBeInstanceOf(NativeTransformError);
   expect((observed as NativeTransformError).code).toBe('NOXCTURNAL_TRANSFORM_ERROR');
 });

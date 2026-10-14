@@ -268,6 +268,47 @@ function mergeChildRetention(
   }
 }
 
+interface PreparedState {
+  plugin: NativePlugin<any, any>;
+  state: any;
+  cleaned?: boolean;
+}
+
+/** Complete every prepared cleanup, even when JavaScript throws a nullish value. */
+function cleanupStates(
+  states: readonly PreparedState[],
+  reason: 'complete' | 'bailout' | 'error',
+): void {
+  let failed = false;
+  let firstError: unknown;
+  for (const entry of states) {
+    if (entry.cleaned) continue;
+    entry.cleaned = true;
+    try {
+      entry.plugin.cleanup?.(reason, entry.state);
+    } catch (error) {
+      if (!failed) firstError = error;
+      failed = true;
+    }
+  }
+  if (failed) throw firstError;
+}
+
+function transformFailure(error: unknown, diagnostics: Diagnostic[]): NativeTransformError {
+  if (error instanceof NativeTransformError) return error;
+  const message = error instanceof Error ? error.message : String(error);
+  const owners =
+    typeof error === 'object' && error != null && 'owners' in error
+      ? (error as { owners?: readonly string[] }).owners
+      : undefined;
+  return new NativeTransformError(
+    message,
+    [...diagnostics, { code: 'native-transform-error', message }],
+    owners,
+    { cause: error },
+  );
+}
+
 /** Execute a native pipeline synchronously. */
 export function transform(
   source: string,
@@ -278,6 +319,7 @@ export function transform(
   // Any pipeline reaching a transform was defined before it, so this is where
   // program configuration stops and per-file discovery begins.
   closeDefinitionScope();
+  const phasePlan = compilePhasePlan(pipeline);
   const originalSource = source;
   let parseFilename = parserFilename(filename, options.parser);
   let parser = classifyForTransform(parseFilename, source);
@@ -329,8 +371,9 @@ export function transform(
     }
   }
   if (!parser.supported) {
-    const prepared: { plugin: NativePlugin<any, any>; state: any }[] = [];
+    const prepared: PreparedState[] = [];
     let hints: ReadonlySet<string> | undefined;
+    let preparationComplete = false;
     try {
       for (const phase of pipeline.phases)
         for (const plugin of phase.plugins ?? []) {
@@ -343,19 +386,22 @@ export function transform(
           };
           prepared.push({ plugin, state: plugin.createState?.(prepareContext) });
         }
-      for (const { plugin, state } of prepared) plugin.cleanup?.('bailout', state);
+      preparationComplete = true;
+      cleanupStates(prepared, 'bailout');
       return {
         status: 'bailout',
         reason: parser.reason,
-        source,
+        source: originalSource,
         diagnostics: [],
       };
     } catch (error) {
-      for (const { plugin, state } of prepared) plugin.cleanup?.('error', state);
-      throw error;
+      // A preparation failure remains primary; cleanup still visits every peer.
+      try {
+        cleanupStates(prepared, 'error');
+      } catch {}
+      throw preparationComplete ? transformFailure(error, []) : error;
     }
   }
-  const phasePlan = compilePhasePlan(pipeline);
   if (adapterMap != null && pipeline.phases.some(phase => phase.native?.reactCompiler != null)) {
     return {
       status: 'bailout',
@@ -426,22 +472,7 @@ export function transform(
   const diagnostics: Diagnostic[] = [];
   const intents = new Map<string, IntentRegistration>();
   const provenance = { degradations: 0 };
-  const allStates: { plugin: NativePlugin<any, any>; state: any; cleaned: boolean }[] = [];
-  const cleanupStates = (reason: 'complete' | 'bailout' | 'error'): void => {
-    let firstError: unknown;
-    for (const entry of allStates) {
-      if (entry.cleaned) continue;
-      // Mark the entry before invoking user code. If cleanup throws and control
-      // reaches the outer error path, the same state must not be cleaned twice.
-      entry.cleaned = true;
-      try {
-        entry.plugin.cleanup?.(reason, entry.state);
-      } catch (error) {
-        firstError ??= error;
-      }
-    }
-    if (firstError !== undefined) throw firstError;
-  };
+  const allStates: PreparedState[] = [];
   let openSession: NativeTransformSession | null = null;
   let reusableSession: NativeTransformSession | null = null;
   let reusableRoutedBatch: { manifest: Buffer; batch: RoutedEventBatch } | null = null;
@@ -473,7 +504,7 @@ export function transform(
   // result. The current version/final map are already set by the loop or the
   // all-native path.
   const completeResult = (): TransformResult => {
-    cleanupStates('complete');
+    cleanupStates(allStates, 'complete');
     initialFunctionMap ??= options.functionMap
       ? native.generateFunctionMap(source, parseFilename)
       : null;
@@ -816,16 +847,27 @@ export function transform(
     return completeResult();
   } catch (error) {
     openSession?.close();
-    const parseFailure = nativeParseFailure(error);
+    let parseFailure = nativeParseFailure(error);
     // Hermes accepted the original Flow grammar, but its eraser can leave an
     // unsupported predicate behind. This exception belongs only to that adapter,
     // never to a caller's declared JavaScript output or arbitrary parse failures.
-    const flowBoundary =
+    let flowBoundary =
       nativeFlowErased &&
       parseFailure?.message === 'Flow is not supported' &&
       parseFailure.source === source;
-    const bailout = error instanceof Bailout;
-    cleanupStates(bailout || flowBoundary ? 'bailout' : 'error');
+    let bailout = error instanceof Bailout;
+    try {
+      cleanupStates(allStates, bailout || flowBoundary ? 'bailout' : 'error');
+    } catch (cleanupError) {
+      // Fatal work remains primary. Failed cleanup turns a compatibility bailout
+      // into a fatal result, rather than hiding a resource-release failure.
+      if (bailout || flowBoundary) {
+        error = cleanupError;
+        bailout = false;
+        flowBoundary = false;
+        parseFailure = nativeParseFailure(error);
+      }
+    }
     if (flowBoundary)
       return {
         status: 'bailout',
@@ -836,24 +878,13 @@ export function transform(
     if (bailout) {
       return {
         status: 'bailout',
-        reason: error.message,
+        reason: (error as Bailout).message,
         source: originalSource,
         diagnostics,
       } satisfies NativeBailoutResult;
     }
     if (parseFailure != null)
       throw syntaxError(parseFailure, filename, parseFailure.source ?? currentSource());
-    if (error instanceof NativeTransformError) throw error;
-    const message = error instanceof Error ? error.message : String(error);
-    const owners =
-      typeof error === 'object' && error != null && 'owners' in error
-        ? (error as { owners?: readonly string[] }).owners
-        : undefined;
-    throw new NativeTransformError(
-      message,
-      [...diagnostics, { code: 'native-transform-error', message }],
-      owners,
-      { cause: error },
-    );
+    throw transformFailure(error, diagnostics);
   }
 }
