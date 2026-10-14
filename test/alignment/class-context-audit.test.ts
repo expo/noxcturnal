@@ -10,6 +10,16 @@ const cases = [
     expected: true,
     source: `class Base{constructor(){return {value:3}}}class Value extends Base{constructor(){const read=()=>this;super();this.same=read()===this}}globalThis.result=new Value().same;`,
   },
+  {
+    name: 'nested class owns field and static receivers before outer super',
+    expected: true,
+    source: `class Base{}class Value extends Base{constructor(){class Inner{static owner=this;owner=this}super();this.same=Inner.owner===Inner&&new Inner().owner instanceof Inner}}globalThis.result=new Value().same;`,
+  },
+  {
+    name: 'nested computed keys retain the deferred outer receiver',
+    expected: true,
+    source: `class Base{}class Value extends Base{constructor(){let read;class Inner{[(read=()=>this,'key')](){}}super();this.same=read()===this}}globalThis.result=new Value().same;`,
+  },
 ];
 
 function run(code: string) {
@@ -36,6 +46,7 @@ describe.each(cases)('$name', entry => {
         babelrc: false,
         sourceType: 'script',
         plugins: [
+          [require('@babel/plugin-transform-class-properties'), { loose: false }],
           [require('@babel/plugin-transform-classes'), {}],
           ...(mode === 'runtime'
             ? [

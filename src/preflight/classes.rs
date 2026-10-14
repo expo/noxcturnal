@@ -1544,6 +1544,26 @@ impl<'a> VisitMut<'a> for LeadingThisRewriter<'a> {
             walk_mut::walk_expression(self, expression);
         }
     }
+    fn visit_class(&mut self, class: &mut Class<'a>) {
+        if let Some(super_class) = &mut class.super_class {
+            self.visit_expression(super_class);
+        }
+        for element in &mut class.body.body {
+            match element {
+                ClassElement::MethodDefinition(method) if method.computed => {
+                    self.visit_property_key(&mut method.key)
+                }
+                ClassElement::PropertyDefinition(property) if property.computed => {
+                    self.visit_property_key(&mut property.key)
+                }
+                ClassElement::AccessorProperty(accessor) if accessor.computed => {
+                    self.visit_property_key(&mut accessor.key)
+                }
+                _ => {}
+            }
+        }
+    }
+
     fn visit_function(&mut self, _: &mut Function<'a>, _: ScopeFlags) {}
 }
 
