@@ -866,20 +866,25 @@ pub fn render_code(source: &str, pieces: &[Piece]) -> String {
 
 fn decode(mappings: &str) -> Vec<Vec<Segment>> {
     let mut lines = Vec::new();
-    let _: Result<(), std::convert::Infallible> = visit_decoded(mappings, |line, segment| {
-        lines.resize_with(line as usize + 1, Vec::new);
-        lines[line as usize].push(segment);
-        Ok(())
-    });
+    let count: Result<usize, std::convert::Infallible> =
+        visit_decoded(mappings, |line, segment| {
+            lines.resize_with(line as usize + 1, Vec::new);
+            lines[line as usize].push(segment);
+            Ok(())
+        });
+    let Ok(count) = count;
+    lines.resize_with(count, Vec::new);
     lines
 }
 
 fn visit_decoded<E>(
     mappings: &str,
     mut visit: impl FnMut(u32, Segment) -> Result<(), E>,
-) -> Result<(), E> {
+) -> Result<usize, E> {
     let (mut source, mut original_line, mut original_column, mut name) = (0, 0, 0, 0);
+    let mut line_count = 0;
     for (generated_line, encoded_line) in mappings.split(';').enumerate() {
+        line_count = generated_line + 1;
         let mut generated_column = 0;
         for encoded in encoded_line
             .split(',')
@@ -951,7 +956,7 @@ fn visit_decoded<E>(
             )?;
         }
     }
-    Ok(())
+    Ok(line_count)
 }
 
 #[cfg(test)]
@@ -1086,6 +1091,7 @@ mod tests {
 
     #[test]
     fn composes_two_maps() {
+        assert_eq!(compose("AAAA;;", "AAAA", 0), "AAAA;;");
         assert_eq!(compose("AAAA;AACA", "AAAA;AACA", 0), "AAAA;AACA");
     }
 
