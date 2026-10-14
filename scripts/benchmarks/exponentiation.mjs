@@ -18,6 +18,8 @@ const cases = {
   binary: 'function f(obj,key){return obj.x ** 2}',
   static: 'function f(obj,key){return obj.x **= 2}',
   computed: 'function f(obj,key){return obj[key] **= 2}',
+  mutable:
+    'function f(obj,key){let receiver=obj;const read=()=>{receiver=obj;return key};return receiver[read()] **= 2}',
   effectful: 'function f(obj,key){return (()=>obj)()[key] **= 2}',
   default: 'function f(obj,key,value=obj[key] **= 2){return value}',
 };
