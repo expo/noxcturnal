@@ -14,6 +14,7 @@ mod refresh;
 pub use comments::update_options_with_comments;
 use display_name::ReactDisplayName;
 use jsx_impl::JsxImpl;
+pub(crate) use jsx_impl::validate_options;
 use jsx_self::JsxSelf;
 pub use options::{JsxOptions, JsxRuntime, ReactRefreshOptions};
 use refresh::ReactRefresh;

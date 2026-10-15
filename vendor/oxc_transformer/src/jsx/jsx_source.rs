@@ -34,7 +34,6 @@
 //! * Babel plugin implementation: <https://github.com/babel/babel/blob/v7.26.2/packages/babel-plugin-transform-react-jsx-source/src/index.ts>
 
 use oxc_ast::{ast::*, builder::NONE};
-use oxc_data_structures::rope::{Rope, get_line_column};
 use oxc_span::SPAN;
 use oxc_syntax::{number::NumberBase, symbol::SymbolFlags};
 use oxc_traverse::{BoundIdentifier, Traverse};
@@ -46,12 +45,12 @@ const FILE_NAME_VAR: &str = "jsxFileName";
 
 pub struct JsxSource<'a> {
     filename_var: Option<BoundIdentifier<'a>>,
-    source_rope: Option<Rope>,
+    positions: Option<Vec<(u32, u32, u32)>>,
 }
 
 impl JsxSource<'_> {
     pub fn new() -> Self {
-        Self { filename_var: None, source_rope: None }
+        Self { filename_var: None, positions: None }
     }
 }
 
@@ -79,11 +78,39 @@ impl<'a> JsxSource<'a> {
     ///
     /// This matches Babel's output.
     pub fn get_line_column(&mut self, offset: u32, ctx: &TraverseCtx<'a>) -> (u32, u32) {
-        let source_rope =
-            self.source_rope.get_or_insert_with(|| Rope::from_str(ctx.state.source_text));
-        let (line, column) = get_line_column(source_rope, offset, ctx.state.source_text);
-        // line and column are zero-indexed, but we want 1-indexed
-        (line + 1, column + 1)
+        let source = ctx.state.source_text;
+        // Generated nodes have zero spans. Invalid synthetic spans must never
+        // panic while emitting optional development metadata.
+        if offset as usize > source.len() || !source.is_char_boundary(offset as usize) {
+            return (1, 1);
+        }
+        let positions = self.positions.get_or_insert_with(|| {
+            // Sparse UTF-16 checkpoints bound each lookup to 256 UTF-8 bytes,
+            // even for minified files containing thousands of JSX nodes on one line.
+            let mut positions = vec![(0, 1, 1)];
+            let (mut line, mut column) = (1, 1);
+            let mut previous_cr = false;
+            for (i, c) in source.char_indices() {
+                if i - positions.last().unwrap().0 as usize >= 256 {
+                    positions.push((i as u32, line, column));
+                }
+                if matches!(c, '\r' | '\n' | '\u{2028}' | '\u{2029}') {
+                    if c != '\n' || !previous_cr {
+                        line += 1;
+                    }
+                    column = 1;
+                    positions.push(((i + c.len_utf8()) as u32, line, column));
+                } else {
+                    column += c.len_utf16() as u32;
+                }
+                previous_cr = c == '\r';
+            }
+            positions
+        });
+        let index = positions.partition_point(|(start, _, _)| *start <= offset) - 1;
+        let (start, line, column) = positions[index];
+        let extra = source[start as usize..offset as usize].encode_utf16().count() as u32;
+        (line, column + extra)
     }
 
     pub fn get_object_property_kind_for_jsx_plugin(
@@ -119,9 +146,6 @@ impl<'a> JsxSource<'a> {
         }
 
         let key = JSXAttributeName::new_identifier(SPAN, SOURCE, ctx);
-        // TODO: We shouldn't calculate line + column from scratch each time as it's expensive.
-        // Build a table of byte indexes of each line's start on first usage, and save it.
-        // Then calculate line and column from that.
         let (line, column) = self.get_line_column(elem.span.start, ctx);
         let object = self.get_source_object(line, column, ctx);
         let value =

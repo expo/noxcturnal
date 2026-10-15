@@ -4,6 +4,7 @@ import type { FunctionMap, NativeVlqMap, ParseClassification } from '../types';
 import type { PreflightPlan } from '../preflight/types';
 
 interface NativePreflightOptionsInput {
+  sourceFilename?: string;
   reactCompiler?: boolean;
   reactCompilerCompilationMode?: string;
   reactCompilerPanicThreshold?: string;

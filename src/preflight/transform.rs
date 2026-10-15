@@ -1160,13 +1160,16 @@ fn transform_impl(
         };
         // Oxc preserves the complete JSX element span on its generated factory
         // call. Fragments have no props to spread; nested elements are collected.
-        let jsx_origins = matches!(
-            options.jsx.as_deref(),
-            Some("classic" | "classic-development")
+        // Comment directives can select the classic runtime after options are
+        // parsed, so record origins before the transform and apply them only when
+        // the returned runtime is classic.
+        let origins = object_spread::JsxOrigins::collect(&program);
+        let mut transformed = Transformer::new(
+            allocator,
+            Path::new(options.source_filename.as_deref().unwrap_or(&filename)),
+            &transform_options,
         )
-        .then(|| object_spread::JsxOrigins::collect(&program));
-        let mut transformed = Transformer::new(allocator, Path::new(&filename), &transform_options)
-            .build_with_scoping(scoping, &mut program);
+        .build_with_scoping(scoping, &mut program);
         if !transformed.diagnostics.is_empty()
             && options.react_compiler == Some(true)
             && options
@@ -1181,15 +1184,23 @@ fn transform_impl(
             // severity, so run the transforms it skipped without invoking the
             // compiler a second time.
             transform_options.react_compiler = None;
-            transformed = Transformer::new(allocator, Path::new(&filename), &transform_options)
-                .build_with_scoping(transformed.scoping, &mut program);
+            transformed = Transformer::new(
+                allocator,
+                Path::new(options.source_filename.as_deref().unwrap_or(&filename)),
+                &transform_options,
+            )
+            .build_with_scoping(transformed.scoping, &mut program);
         }
         restore_export_namespace_attributes(&mut program, &mut export_namespace_attributes);
         if let Some(deferred) = deferred_async
             && transformed.diagnostics.is_empty()
         {
-            let async_pass = Transformer::new(allocator, Path::new(&filename), &deferred)
-                .build_with_scoping(transformed.scoping, &mut program);
+            let async_pass = Transformer::new(
+                allocator,
+                Path::new(options.source_filename.as_deref().unwrap_or(&filename)),
+                &deferred,
+            )
+            .build_with_scoping(transformed.scoping, &mut program);
             transformed
                 .generated_async_iterators
                 .extend(async_pass.generated_async_iterators);
@@ -1212,7 +1223,7 @@ fn transform_impl(
         if !transformed.diagnostics.is_empty() {
             return Ok(fatal("transform-error", transformed.diagnostics));
         }
-        if let Some(origins) = jsx_origins {
+        if transform_options.jsx.jsx_plugin && transformed.jsx_runtime == JsxRuntime::Classic {
             let (changed, jsx_helper_requests) = object_spread::run_jsx_props(
                 allocator,
                 &mut program,
@@ -2159,16 +2170,7 @@ fn compile_options(
                 "classic-development" | "automatic-development"
             ));
             compiled.jsx.throw_if_namespace = options.jsx_throw_if_namespace.unwrap_or(true);
-            compiled.jsx.import_source = if compiled.jsx.runtime == JsxRuntime::Automatic {
-                Some(
-                    options
-                        .jsx_import_source
-                        .clone()
-                        .unwrap_or_else(|| "react".into()),
-                )
-            } else {
-                None
-            };
+            compiled.jsx.import_source = options.jsx_import_source.clone();
             compiled.jsx.pragma = options.jsx_pragma.clone();
             compiled.jsx.pragma_frag = options.jsx_pragma_frag.clone();
             compiled.jsx.conform();

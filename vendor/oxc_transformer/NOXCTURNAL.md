@@ -55,3 +55,11 @@ Local patches:
 Keep Rust and npm Oxc versions pinned together. Reassess these patches against the
 upstream implementation before any upgrade; archived regressions define the repair
 contracts and accepted Babel compatibility boundaries.
+
+JSX contract patches validate effective options after Babel-compatible parsed
+comment directives, decode escaped pragma identifiers, normalize text/entities,
+preserve classic literal spread prototypes, reject namespace attributes, and
+infer index-file display names. Development fragments omit optional receiver
+metadata; source locations use sparse JavaScript/UTF-16 checkpoints. The transform
+result exposes its effective JSX runtime so local classic props completion honors
+runtime directives without implementing a second directive parser.

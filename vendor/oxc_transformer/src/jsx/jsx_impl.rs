@@ -97,12 +97,8 @@ use oxc_ecmascript::PropName;
 use oxc_span::{SPAN, Span};
 use oxc_str::{Ident, Str};
 use oxc_syntax::{
-    identifier::{is_identifier_name, is_white_space_single_line},
-    keyword::is_reserved_keyword,
-    line_terminator::is_line_terminator,
-    reference::ReferenceFlags,
-    symbol::SymbolFlags,
-    xml_entities::decode_entities,
+    identifier::is_identifier_name, keyword::is_reserved_keyword, reference::ReferenceFlags,
+    symbol::SymbolFlags, xml_entities::decode_entities,
 };
 use oxc_traverse::{BoundIdentifier, Traverse};
 
@@ -335,6 +331,72 @@ enum Pragma<'a> {
     ImportMeta(Vec<Str<'a>>),
 }
 
+fn decode_pragma(input: &str) -> Option<std::borrow::Cow<'_, str>> {
+    if !input.contains('\\') {
+        return Some(std::borrow::Cow::Borrowed(input));
+    }
+    let mut output = String::with_capacity(input.len());
+    let mut chars = input.chars();
+    while let Some(c) = chars.next() {
+        if c != '\\' {
+            output.push(c);
+            continue;
+        }
+        if chars.next()? != 'u' {
+            return None;
+        }
+        let first = chars.next()?;
+        let value = if first == '{' {
+            let mut value = 0u32;
+            let mut count = 0;
+            loop {
+                let c = chars.next()?;
+                if c == '}' {
+                    break;
+                }
+                value = value.checked_mul(16)?.checked_add(c.to_digit(16)?)?;
+                count += 1;
+            }
+            if count == 0 {
+                return None;
+            }
+            value
+        } else {
+            let mut value = first.to_digit(16)?;
+            for _ in 0..3 {
+                value = value * 16 + chars.next()?.to_digit(16)?;
+            }
+            value
+        };
+        let c = char::from_u32(value)?;
+        // Escapes can spell identifier characters, never grammar punctuation.
+        if !oxc_syntax::identifier::is_identifier_part(c) {
+            return None;
+        }
+        output.push(c);
+    }
+    Some(std::borrow::Cow::Owned(output))
+}
+
+pub(crate) fn validate_options(
+    options: &JsxOptions,
+    ast: &AstBuilder<'_>,
+    ctx: &mut TransformState<'_>,
+) {
+    if options.runtime == JsxRuntime::Classic {
+        if options.import_source.is_some() {
+            ctx.error(diagnostics::import_source_cannot_be_set());
+        }
+        for pragma in [&options.pragma, &options.pragma_frag].into_iter().flatten() {
+            if Pragma::parse_impl(pragma, ast).is_none() {
+                ctx.error(diagnostics::invalid_pragma());
+            }
+        }
+    } else if options.pragma.is_some() || options.pragma_frag.is_some() {
+        ctx.error(diagnostics::pragma_and_pragma_frag_cannot_be_set());
+    }
+}
+
 impl<'a> Pragma<'a> {
     /// Parse `options.pragma` or `options.pragma_frag`.
     ///
@@ -380,7 +442,8 @@ impl<'a> Pragma<'a> {
         let strs_to_arena_strs =
             |parts: &[&str]| parts.iter().map(|part| Str::from_str_in(part, ast)).collect();
 
-        let parts = pragma.split('.').collect::<Vec<_>>();
+        let decoded = decode_pragma(pragma)?;
+        let parts = decoded.split('.').collect::<Vec<_>>();
         let [root, tail @ ..] = &parts[..] else {
             unreachable!();
         };
@@ -468,7 +531,10 @@ impl<'a> JsxImpl<'a> {
         source_type: oxc_span::SourceType,
     ) -> Self {
         // Only add `pure` when `pure` is explicitly set to `true` or all JSX options are default.
-        let pure = options.pure || (options.import_source.is_none() && options.pragma.is_none());
+        let pure = options.pure
+            || (options.runtime == JsxRuntime::Classic
+                && options.import_source.is_none()
+                && options.pragma.is_none());
         let bindings = match options.runtime {
             JsxRuntime::Classic => {
                 let pragma = Pragma::parse_no_ctx(options.pragma.as_deref(), "createElement", ast);
@@ -650,7 +716,7 @@ impl<'a> JsxImpl<'a> {
 
                         // Add attribute to prop object
                         let kind = PropertyKind::Init;
-                        let key = Self::get_attribute_name(name, ctx);
+                        let key = self.get_attribute_name(name, ctx);
                         let value = self.transform_jsx_attribute_value(value, ctx);
                         let object_property = ObjectPropertyKind::new_object_property(
                             span, kind, key, value, false, false, false, ctx,
@@ -666,17 +732,15 @@ impl<'a> JsxImpl<'a> {
                             // to merge with injected `__self` and `__source` props
                             && !(self.options.jsx_self_plugin || self.options.jsx_source_plugin)
                         {
-                            // deopt if spreading an object with `__proto__` key
-                            if !matches!(&argument, Expression::ObjectExpression(o) if has_proto(o))
-                            {
-                                arguments.push(Argument::from(argument));
-                                continue;
-                            }
+                            arguments.push(Argument::from(argument));
+                            continue;
                         }
 
                         // Add attribute to prop object
                         match argument {
-                            Expression::ObjectExpression(expr) if !has_proto(&expr) => {
+                            Expression::ObjectExpression(expr)
+                                if is_classic || !has_proto(&expr) =>
+                            {
                                 properties.extend(expr.unbox().properties);
                             }
                             argument => {
@@ -743,14 +807,14 @@ impl<'a> JsxImpl<'a> {
             }
 
             // { __source: { fileName, lineNumber, columnNumber } }
-            if self.options.jsx_source_plugin {
+            if is_element && self.options.jsx_source_plugin {
                 let (line, column) = self.jsx_source.get_line_column(span.start, ctx);
                 let expr = self.jsx_source.get_source_object(line, column, ctx);
                 arguments.push(Argument::from(expr));
             }
 
             // this
-            if self.options.jsx_self_plugin && JsxSelf::can_add_self_attribute(ctx) {
+            if is_element && self.options.jsx_self_plugin && JsxSelf::can_add_self_attribute(ctx) {
                 arguments.push(Argument::new_this_expression(SPAN, ctx));
             }
         } else {
@@ -924,6 +988,24 @@ impl<'a> JsxImpl<'a> {
                     // No HTML entities needed to be decoded. Use the original `Str` without copying.
                     s.value
                 };
+                // Babel collapses LF followed by ASCII indentation in attributes.
+                let jsx_text = if jsx_text.contains('\n') {
+                    let mut normalized = String::with_capacity(jsx_text.len());
+                    let mut chars = jsx_text.chars().peekable();
+                    while let Some(c) = chars.next() {
+                        if c == '\n' {
+                            normalized.push(' ');
+                            while chars.peek().is_some_and(|c| matches!(c, ' ' | '\t')) {
+                                chars.next();
+                            }
+                        } else {
+                            normalized.push(c);
+                        }
+                    }
+                    Str::from_str_in(&normalized, ctx)
+                } else {
+                    jsx_text
+                };
                 Expression::new_string_literal(s.span, jsx_text, None, ctx)
             }
             Some(JSXAttributeValue::Element(e)) => self.transform_jsx_element(e, ctx),
@@ -991,7 +1073,11 @@ impl<'a> JsxImpl<'a> {
         }
     }
 
-    fn get_attribute_name(name: JSXAttributeName<'a>, ctx: &TraverseCtx<'a>) -> PropertyKey<'a> {
+    fn get_attribute_name(
+        &self,
+        name: JSXAttributeName<'a>,
+        ctx: &mut TraverseCtx<'a>,
+    ) -> PropertyKey<'a> {
         match name {
             JSXAttributeName::Identifier(ident) => {
                 let name = ident.name;
@@ -1002,6 +1088,9 @@ impl<'a> JsxImpl<'a> {
                 }
             }
             JSXAttributeName::NamespacedName(namespaced) => {
+                if self.options.throw_if_namespace {
+                    ctx.state.error(diagnostics::namespace_does_not_support(namespaced.span));
+                }
                 let name = Str::from_str_in(&namespaced.to_string(), ctx);
                 PropertyKey::new_string_literal(namespaced.span, name, None, ctx)
             }
@@ -1013,117 +1102,42 @@ impl<'a> JsxImpl<'a> {
             .map(|value| Expression::new_string_literal(text.span, value, None, ctx))
     }
 
-    /// JSX trims whitespace at the end and beginning of lines, except that the
-    /// start/end of a tag is considered a start/end of a line only if that line is
-    /// on the same line as the closing tag. See examples in
-    /// tests/cases/conformance/jsx/tsxReactEmitWhitespace.tsx
-    /// See also <https://www.w3.org/TR/html4/struct/text.html#h-9.1> and <https://www.w3.org/TR/CSS2/text.html#white-space-model>
-    ///
-    /// An equivalent algorithm would be:
-    /// - If there is only one line, return it.
-    /// - If there is only whitespace (but multiple lines), return `undefined`.
-    /// - Split the text into lines.
-    /// - 'trimRight' the first line, 'trimLeft' the last line, 'trim' middle lines.
-    /// - Decode entities on each line (individually).
-    /// - Remove empty lines and join the rest with " ".
-    ///
-    /// <https://github.com/microsoft/TypeScript/blob/f0374ce2a9c465e27a15b7fa4a347e2bd9079450/src/compiler/transformers/jsx.ts#L557-L608>
+    /// Babel decodes entities before normalizing text, replaces tabs with spaces,
+    /// and trims only ASCII spaces around CR/LF lines (not Unicode separators).
     fn fixup_whitespace_and_decode_entities(
         text: Str<'a>,
         ctx: &TraverseCtx<'a>,
     ) -> Option<Str<'a>> {
-        // Avoid copying strings in the common case where there's only 1 line of text,
-        // and it contains no HTML entities that need decoding.
-        //
-        // Where we do have to decode HTML entities, or concatenate multiple lines, assemble the
-        // concatenated text directly in arena, in an `ArenaString` (the accumulator `acc`),
-        // to avoid allocations. Initialize that `ArenaString` with capacity equal to length of
-        // the original text. This may be a bit more capacity than is required, once whitespace
-        // is removed, but it's highly unlikely to be insufficient capacity, so the `ArenaString`
-        // shouldn't need to reallocate while it's being constructed.
-        //
-        // When first line containing some text is found:
-        // * If it contains HTML entities, decode them and write decoded text to accumulator `acc`.
-        // * Otherwise, store trimmed text in `only_line` as a `Str<'a>`.
-        //
-        // When another line containing some text is found:
-        // * If accumulator isn't already initialized, initialize it, starting with `only_line`.
-        // * Push a space to the accumulator.
-        // * Decode current line into the accumulator.
-        //
-        // At the end:
-        // * If accumulator is initialized, convert the `ArenaString` to a `Str` and return it.
-        // * If `only_line` contains a string, that means only 1 line contained text, and that line
-        //   didn't contain any HTML entities which needed decoding.
-        //   So we can just return the `Str` that's in `only_line` (without any copying).
-
-        let mut acc: Option<ArenaStringBuilder> = None;
-        let mut only_line: Option<Str<'a>> = None;
-        let mut first_non_whitespace: Option<usize> = Some(0);
-        let mut last_non_whitespace: Option<usize> = None;
-        for (index, c) in text.char_indices() {
-            if is_line_terminator(c) {
-                if let (Some(first), Some(last)) = (first_non_whitespace, last_non_whitespace) {
-                    Self::add_line_of_jsx_text(
-                        Str::from(&text.as_str()[first..last]),
-                        &mut acc,
-                        &mut only_line,
-                        text.len(),
-                        ctx,
-                    );
+        let mut decoded = None;
+        decode_entities(text.as_str(), &mut decoded, text.len(), ctx.allocator());
+        let text = decoded.map_or(text, Str::from);
+        if !text.contains(['\r', '\n', '\t']) {
+            return (!text.is_empty()).then_some(text);
+        }
+        // A CRLF's intervening empty line contributes nothing after trimming,
+        // so splitting on either character avoids allocating normalized copies.
+        let lines = text.split(['\r', '\n']);
+        let (mut count, mut last_nonempty) = (0, 0);
+        for (i, line) in lines.clone().enumerate() {
+            count = i + 1;
+            if line.chars().any(|c| !matches!(c, ' ' | '\t')) {
+                last_nonempty = i;
+            }
+        }
+        let mut output = ArenaStringBuilder::with_capacity_in(text.len(), ctx.allocator());
+        for (i, line) in lines.enumerate() {
+            let line = if i != 0 { line.trim_start_matches([' ', '\t']) } else { line };
+            let line = if i + 1 != count { line.trim_end_matches([' ', '\t']) } else { line };
+            if !line.is_empty() {
+                for c in line.chars() {
+                    output.push(if c == '\t' { ' ' } else { c });
                 }
-                first_non_whitespace = None;
-            } else if !is_white_space_single_line(c) {
-                last_non_whitespace = Some(index + c.len_utf8());
-                if first_non_whitespace.is_none() {
-                    first_non_whitespace.replace(index);
+                if i != last_nonempty {
+                    output.push(' ');
                 }
             }
         }
-
-        if let Some(first) = first_non_whitespace {
-            Self::add_line_of_jsx_text(
-                Str::from(&text.as_str()[first..]),
-                &mut acc,
-                &mut only_line,
-                text.len(),
-                ctx,
-            );
-        }
-
-        if let Some(acc) = acc { Some(Str::from(acc)) } else { only_line }
-    }
-
-    fn add_line_of_jsx_text(
-        trimmed_line: Str<'a>,
-        acc: &mut Option<ArenaStringBuilder<'a>>,
-        only_line: &mut Option<Str<'a>>,
-        text_len: usize,
-        ctx: &TraverseCtx<'a>,
-    ) {
-        if let Some(buffer) = acc.as_mut() {
-            // Already some text in accumulator. Push a space before this line is added to `acc`.
-            buffer.push(' ');
-        } else if let Some(only_line) = only_line.take() {
-            // This is the 2nd line containing text. Previous line did not contain any HTML entities.
-            // Generate an accumulator containing previous line and a trailing space.
-            // Current line will be added to the accumulator after it.
-            let mut buffer = ArenaStringBuilder::with_capacity_in(text_len, ctx.allocator());
-            buffer.push_str(only_line.as_str());
-            buffer.push(' ');
-            *acc = Some(buffer);
-        }
-
-        // Decode any HTML entities in this line
-        decode_entities(trimmed_line.as_str(), acc, text_len, ctx.allocator());
-
-        if acc.is_none() {
-            // This is the first line containing text, and there are no HTML entities in this line.
-            // Record this line in `only_line`.
-            // If this turns out to be the only line, we won't need to construct an `ArenaString`,
-            // so avoid all copying.
-            *only_line = Some(trimmed_line);
-        }
+        (!output.is_empty()).then(|| Str::from(output))
     }
 
     /// The react jsx/jsxs transform falls back to `createElement` when an explicit `key` argument comes after a spread
