@@ -482,12 +482,12 @@ export const cases = [
   [
     'edge cases > chained optional calls',
     '() => {\n  const fn = () => () => () => 42;\n  expect(fn?.()?.()?.()).toBe(42);\n}',
-    '() => {\n  var _fn, _fn$call;\n  const fn = () => () => () => 42;\n  expect(\n    fn === null ||\n      fn === void 0 ||\n      (_fn = fn()) === null ||\n      _fn === void 0 ||\n      (_fn$call = _fn.call(fn)) === null ||\n      _fn$call === void 0\n      ? void 0\n      : _fn$call.call(_fn),\n  ).toBe(42);\n};',
+    '() => {\n  var _fn, _fn2;\n  const fn = () => () => () => 42;\n  expect(\n    fn === null ||\n      fn === void 0 ||\n      (_fn = fn()) === null ||\n      _fn === void 0 ||\n      (_fn2 = _fn()) === null ||\n      _fn2 === void 0\n      ? void 0\n      : _fn2(),\n  ).toBe(42);\n};',
   ],
   [
     'edge cases > chained optional calls with null',
     '() => {\n  const fn = () => () => null;\n  expect(fn?.()?.()?.()).toBe(undefined);\n}',
-    '() => {\n  var _fn, _fn$call;\n  const fn = () => () => null;\n  expect(\n    fn === null ||\n      fn === void 0 ||\n      (_fn = fn()) === null ||\n      _fn === void 0 ||\n      (_fn$call = _fn.call(fn)) === null ||\n      _fn$call === void 0\n      ? void 0\n      : _fn$call.call(_fn),\n  ).toBe(undefined);\n};',
+    '() => {\n  var _fn, _fn2;\n  const fn = () => () => null;\n  expect(\n    fn === null ||\n      fn === void 0 ||\n      (_fn = fn()) === null ||\n      _fn === void 0 ||\n      (_fn2 = _fn()) === null ||\n      _fn2 === void 0\n      ? void 0\n      : _fn2(),\n  ).toBe(undefined);\n};',
   ],
   [
     'edge cases > optional on Map.prototype.get result',

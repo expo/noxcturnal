@@ -55,7 +55,9 @@ use oxc_span::{GetSpan, SPAN, Span};
 use oxc_traverse::{Ancestor, BoundIdentifier, MaybeBoundIdentifier, Traverse};
 
 use crate::{
-    common::var_declarations::VarDeclarationsStore, context::TraverseCtx, state::TransformState,
+    common::{duplicate::duplicate_expression, var_declarations::VarDeclarationsStore},
+    context::TraverseCtx,
+    state::TransformState,
     utils::ast_builder::wrap_expression_in_arrow_function_iife,
 };
 
@@ -71,7 +73,6 @@ enum CallContext<'a> {
 
 pub struct OptionalChaining<'a> {
     // states
-    is_inside_function_parameter: bool,
     temp_binding: Option<BoundIdentifier<'a>>,
     /// .call(context)
     ///       ^^^^^^^
@@ -80,11 +81,7 @@ pub struct OptionalChaining<'a> {
 
 impl OptionalChaining<'_> {
     pub fn new() -> Self {
-        Self {
-            is_inside_function_parameter: false,
-            temp_binding: None,
-            call_context: CallContext::None,
-        }
+        Self { temp_binding: None, call_context: CallContext::None }
     }
 }
 
@@ -96,32 +93,34 @@ impl<'a> Traverse<'a, TransformState<'a>> for OptionalChaining<'a> {
             Expression::ChainExpression(_) => self.transform_chain_expression(expr, ctx),
             Expression::UnaryExpression(unary_expr)
                 if unary_expr.operator == UnaryOperator::Delete
-                    && matches!(unary_expr.argument, Expression::ChainExpression(_)) =>
+                    && matches!(
+                        unary_expr.argument.get_inner_expression(),
+                        Expression::ChainExpression(_)
+                    ) =>
             {
                 self.transform_update_expression(expr, ctx);
             }
             _ => {}
         }
     }
-
-    // `#[inline]` because this is a hot path
-    #[inline]
-    fn enter_formal_parameters(&mut self, _: &mut FormalParameters<'a>, _: &mut TraverseCtx<'a>) {
-        self.is_inside_function_parameter = true;
-    }
-
-    // `#[inline]` because this is a hot path
-    #[inline]
-    fn exit_formal_parameters(
-        &mut self,
-        _node: &mut FormalParameters<'a>,
-        _ctx: &mut TraverseCtx<'a>,
-    ) {
-        self.is_inside_function_parameter = false;
-    }
 }
 
 impl<'a> OptionalChaining<'a> {
+    // Inspect only chains, not every expression. Stop at the nearest function
+    // body so nested functions and generated activation wrappers own their temps.
+    fn is_inside_function_parameter(ctx: &TraverseCtx<'a>) -> bool {
+        ctx.ancestors()
+            .find(|ancestor| ancestor.is_formal_parameters() || ancestor.is_function_body())
+            .is_some_and(|ancestor| ancestor.is_formal_parameters())
+    }
+
+    fn is_call_callee(ctx: &TraverseCtx<'a>) -> bool {
+        matches!(
+            ctx.ancestors().find(|ancestor| !ancestor.is_parenthesized_expression()),
+            Some(Ancestor::CallExpressionCallee(_))
+        )
+    }
+
     fn set_temp_binding(&mut self, binding: BoundIdentifier<'a>) {
         self.temp_binding.replace(binding);
     }
@@ -292,13 +291,13 @@ impl<'a> OptionalChaining<'a> {
 
     /// Transform chain expression
     fn transform_chain_expression(&mut self, expr: &mut Expression<'a>, ctx: &mut TraverseCtx<'a>) {
-        *expr = if self.is_inside_function_parameter {
+        *expr = if Self::is_inside_function_parameter(ctx) {
             // To insert the temp binding in the correct scope, we wrap the expression with
             // an arrow function. During the chain expression transformation, the temp binding
             // will be inserted into the arrow function's body.
             wrap_expression_in_arrow_function_iife(expr.take_in(ctx), ctx)
         } else {
-            self.transform_chain_expression_impl(false, expr, ctx)
+            self.transform_chain_expression_impl(false, expr, Self::is_call_callee(ctx), ctx)
         }
     }
 
@@ -308,14 +307,19 @@ impl<'a> OptionalChaining<'a> {
         expr: &mut Expression<'a>,
         ctx: &mut TraverseCtx<'a>,
     ) {
-        *expr = if self.is_inside_function_parameter {
+        *expr = if Self::is_inside_function_parameter(ctx) {
             // Same as the above `transform_chain_expression` explanation
             wrap_expression_in_arrow_function_iife(expr.take_in(ctx), ctx)
         } else {
             // Unfortunately no way to get compiler to see that this branch is provably unreachable.
             // We don't want to inline this function, to keep `enter_expression` as small as possible.
             let Expression::UnaryExpression(unary_expr) = expr else { unreachable!() };
-            self.transform_chain_expression_impl(true, &mut unary_expr.argument, ctx)
+            self.transform_chain_expression_impl(
+                true,
+                unary_expr.argument.get_inner_expression_mut(),
+                false,
+                ctx,
+            )
         }
     }
 
@@ -328,6 +332,7 @@ impl<'a> OptionalChaining<'a> {
         &mut self,
         is_delete: bool,
         chain_expr: &mut Expression<'a>,
+        bind_context: bool,
         ctx: &mut TraverseCtx<'a>,
     ) -> Expression<'a> {
         let span = chain_expr.span();
@@ -335,8 +340,9 @@ impl<'a> OptionalChaining<'a> {
         //      ^^^^^^^^^^ After the recursive transformation, the chain_expr will be transformed into
         //                 a pure non-optional expression and it's the last part of the chain expression.
 
-        let left =
-            self.transform_chain_element_recursion(&mut chain_expr, ctx).unwrap_or_else(|| {
+        let left = self
+            .transform_chain_element_recursion(&mut chain_expr, true, false, ctx)
+            .unwrap_or_else(|| {
                 unreachable!(
                     "Given chain expression certainly contains at least one optional expression,
                  so it must return a transformed expression"
@@ -355,9 +361,7 @@ impl<'a> OptionalChaining<'a> {
         // If this chain expression is a callee of a CallExpression, we need to transform it to accept a proper context
         // `(Foo?.["m"])();` -> `(...  _Foo["m"].bind(_Foo))();`
         //                                       ^^^^^^^^^^^ Here we will handle the `right` part to bind a proper context
-        if ctx.parent().is_parenthesized_expression()
-            && matches!(ctx.ancestor(1), Ancestor::CallExpressionCallee(_))
-        {
+        if bind_context && chain_expr.is_member_expression() {
             chain_expr = self.transform_expression_to_bind_context(chain_expr, ctx);
         }
         // Clear states
@@ -381,17 +385,10 @@ impl<'a> OptionalChaining<'a> {
             let context = if ctx.state.assumptions.pure_getters {
                 // TODO: `clone_in` causes reference loss of reference id
                 object.clone_in(ctx.allocator())
-            } else if let Expression::Identifier(ident) = object {
-                MaybeBoundIdentifier::from_identifier_reference(ident, ctx)
-                    .create_read_expression(ctx)
             } else {
-                // `foo.bar` -> `_foo$bar = foo.bar`
-                let binding = VarDeclarationsStore::create_uid_var_based_on_node(object, ctx);
-                let write_target = binding.create_write_target(ctx);
-                object.replace_with(|object| {
-                    Self::create_assignment_expression(write_target, object, ctx)
-                });
-                binding.create_read_expression(ctx)
+                let (receiver, context) = duplicate_expression(object.take_in(ctx), true, ctx);
+                *object = receiver;
+                context
             };
             Argument::from(context)
         } else {
@@ -447,6 +444,8 @@ impl<'a> OptionalChaining<'a> {
     fn transform_chain_element_recursion(
         &mut self,
         expr: &mut Expression<'a>,
+        optional_parent: bool,
+        call_parent: bool,
         ctx: &mut TraverseCtx<'a>,
     ) -> Option<Expression<'a>> {
         // Skip parenthesized expression or other TS-syntax expressions
@@ -455,12 +454,25 @@ impl<'a> OptionalChaining<'a> {
             // `(foo?.bar)?.baz`
             //  ^^^^^^^^^^ The nested chain expression is always under the ParenthesizedExpression
             Expression::ChainExpression(_) => {
-                *expr = Self::convert_chain_expression_to_expression(expr, ctx);
-                self.transform_chain_element_recursion(expr, ctx)
+                if optional_parent {
+                    *expr = Self::convert_chain_expression_to_expression(expr, ctx);
+                    self.transform_chain_element_recursion(expr, true, false, ctx)
+                } else {
+                    // Grouping ends the inner short circuit. A mandatory access/call
+                    // must still execute on its result, even when that result is undefined.
+                    *expr = self.transform_chain_expression_impl(false, expr, call_parent, ctx);
+                    None
+                }
             }
             // `foo?.bar?.baz`
             Expression::StaticMemberExpression(member) => {
-                let left = self.transform_chain_element_recursion(&mut member.object, ctx);
+                let optional = member.optional;
+                let left = self.transform_chain_element_recursion(
+                    &mut member.object,
+                    optional,
+                    false,
+                    ctx,
+                );
                 if member.optional {
                     member.optional = false;
                     Some(self.transform_optional_expression(false, left, &mut member.object, ctx))
@@ -470,7 +482,13 @@ impl<'a> OptionalChaining<'a> {
             }
             // `foo?.[bar]?.[baz]`
             Expression::ComputedMemberExpression(member) => {
-                let left = self.transform_chain_element_recursion(&mut member.object, ctx);
+                let optional = member.optional;
+                let left = self.transform_chain_element_recursion(
+                    &mut member.object,
+                    optional,
+                    false,
+                    ctx,
+                );
                 if member.optional {
                     member.optional = false;
                     Some(self.transform_optional_expression(false, left, &mut member.object, ctx))
@@ -480,7 +498,13 @@ impl<'a> OptionalChaining<'a> {
             }
             // `this?.#foo?.bar`
             Expression::PrivateFieldExpression(member) => {
-                let left = self.transform_chain_element_recursion(&mut member.object, ctx);
+                let optional = member.optional;
+                let left = self.transform_chain_element_recursion(
+                    &mut member.object,
+                    optional,
+                    false,
+                    ctx,
+                );
                 if member.optional {
                     member.optional = false;
                     Some(self.transform_optional_expression(false, left, &mut member.object, ctx))
@@ -490,7 +514,9 @@ impl<'a> OptionalChaining<'a> {
             }
             // `foo?.bar?.bar?.()`
             Expression::CallExpression(call) => {
-                let left = self.transform_chain_element_recursion(&mut call.callee, ctx);
+                let optional = call.optional;
+                let left =
+                    self.transform_chain_element_recursion(&mut call.callee, optional, true, ctx);
                 if call.optional {
                     call.optional = false;
                     let callee = call.callee.get_inner_expression_mut();
@@ -571,7 +597,7 @@ impl<'a> OptionalChaining<'a> {
         // We should generate a temp binding for the expression first to avoid the next step changing the expression.
         let temp_binding = VarDeclarationsStore::create_uid_var_based_on_node(expr, ctx);
         if is_call && !ctx.state.assumptions.pure_getters {
-            self.set_chain_call_context(expr, ctx);
+            self.set_chain_call_context(expr, None, ctx);
         }
 
         // Replace the expression with the temp binding and assign the original expression to the temp binding
@@ -608,15 +634,9 @@ impl<'a> OptionalChaining<'a> {
         ctx: &mut TraverseCtx<'a>,
     ) -> Expression<'a> {
         if is_call {
-            // We cannot reuse the temp binding for calls because we need to
-            // store both the method and the receiver.
-            // And because we will create a new temp binding for the callee and the original temp binding
-            // will become the call context, we take the current temp binding and set it
-            // as the call context.
-            if let Some(temp_binding) = self.temp_binding.take() {
-                self.set_binding_context(temp_binding.to_maybe_bound_identifier());
-            }
-            self.set_chain_call_context(expr, ctx);
+            // Keep a captured receiver separate from the new callee temporary.
+            let captured_receiver = self.temp_binding.take();
+            self.set_chain_call_context(expr, captured_receiver, ctx);
         }
 
         let temp_binding = {
@@ -649,17 +669,34 @@ impl<'a> OptionalChaining<'a> {
         }
     }
 
-    fn set_chain_call_context(&mut self, expr: &mut Expression<'a>, ctx: &mut TraverseCtx<'a>) {
+    fn set_chain_call_context(
+        &mut self,
+        expr: &mut Expression<'a>,
+        captured_receiver: Option<BoundIdentifier<'a>>,
+        ctx: &mut TraverseCtx<'a>,
+    ) {
         if let Some(member) = expr.as_member_expression_mut() {
             let object = member.object_mut();
-            // If the [`MemberExpression::object`] is a global reference, we need to assign it to a temp binding.
+            // Capture effectful receivers and mutable bindings before property lookup.
+            // A getter or computed key can reassign a local receiver as well as a global.
             // i.e `foo` -> `(_foo = foo)`
             if matches!(object, Expression::Super(_) | Expression::ThisExpression(_)) {
                 self.set_this_context();
             } else {
                 let binding = object
                     .get_identifier_reference()
-                    .and_then(|ident| self.get_existing_binding_for_identifier(ident, ctx))
+                    .and_then(|ident| {
+                        let binding = MaybeBoundIdentifier::from_identifier_reference(ident, ctx);
+                        binding
+                            .symbol_id
+                            .filter(|id| {
+                                captured_receiver
+                                    .as_ref()
+                                    .is_some_and(|captured| captured.symbol_id == *id)
+                                    || !ctx.scoping().symbol_is_mutated(*id)
+                            })
+                            .map(|_| binding)
+                    })
                     .unwrap_or_else(|| {
                         let binding =
                             VarDeclarationsStore::create_uid_var_based_on_node(object, ctx);
@@ -672,6 +709,10 @@ impl<'a> OptionalChaining<'a> {
                     });
                 self.set_binding_context(binding);
             }
+        } else {
+            // A call (or other value expression) has no member receiver. Do not
+            // carry a prior link's receiver into `object?.method()?.()`.
+            self.call_context = CallContext::None;
         }
     }
 }

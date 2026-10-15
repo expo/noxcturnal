@@ -50,26 +50,6 @@ impl<'a> Traverse<'a, TransformState<'a>> for ES2020<'a> {
         }
     }
 
-    fn enter_formal_parameters(
-        &mut self,
-        node: &mut FormalParameters<'a>,
-        ctx: &mut TraverseCtx<'a>,
-    ) {
-        if self.options.optional_chaining {
-            self.optional_chaining.enter_formal_parameters(node, ctx);
-        }
-    }
-
-    fn exit_formal_parameters(
-        &mut self,
-        node: &mut FormalParameters<'a>,
-        ctx: &mut TraverseCtx<'a>,
-    ) {
-        if self.options.optional_chaining {
-            self.optional_chaining.exit_formal_parameters(node, ctx);
-        }
-    }
-
     fn enter_big_int_literal(&mut self, node: &mut BigIntLiteral<'a>, ctx: &mut TraverseCtx<'a>) {
         if self.options.big_int {
             let warning = OxcDiagnostic::warn(
