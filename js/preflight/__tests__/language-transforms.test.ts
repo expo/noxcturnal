@@ -425,7 +425,6 @@ test('inline object and class helpers preserve symbols, getters, and field defin
   assert.doesNotMatch(result.code, /require\(|@babel\/runtime/);
   assert.deepEqual(result.metadata.nativeHelpers, [
     'defineProperty',
-    'objectDestructuringEmpty',
     'objectSpread2',
     'objectWithoutProperties',
   ]);

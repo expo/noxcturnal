@@ -28,8 +28,10 @@ use crate::generated::inline_helpers::{
 };
 use crate::preflight::helpers::CustomHelperRequests;
 
+#[derive(Default)]
 pub(super) struct AstPlan {
     declarations: FxHashMap<Address, AstDeclaratorPlan>,
+    oxc_declarations: FxHashSet<Address>,
     catches: FxHashMap<u32, AstCatchPlan>,
     assignments: FxHashMap<u32, AstAssignmentPlan>,
     loop_assignments: FxHashMap<u32, AstAssignmentPlan>,
@@ -43,6 +45,7 @@ pub(super) struct AstPlan {
 impl AstPlan {
     pub(super) fn is_empty(&self) -> bool {
         self.declarations.is_empty()
+            && self.oxc_declarations.is_empty()
             && self.catches.is_empty()
             && self.assignments.is_empty()
             && self.loop_assignments.is_empty()
@@ -142,50 +145,122 @@ impl NameReservations for SnapshotReservations<'_> {
     }
 }
 
+pub(super) fn is_simple_object_rest(pattern: &BindingPattern<'_>) -> bool {
+    matches!(pattern, BindingPattern::ObjectPattern(pattern)
+        if pattern.rest.as_ref().is_some_and(|rest| rest.argument.is_binding_identifier())
+            && pattern.properties.iter().all(|property| !property.computed && property.value.is_binding_identifier()))
+}
+
 pub(super) fn prepare_ast(
     semantic: &Semantic<'_>,
     inline_helpers: bool,
     only_object_rest: bool,
     object_rest_loose: bool,
 ) -> Result<AstPlan, &'static str> {
-    let has_candidate = semantic.nodes().iter().any(|node| match node.kind() {
-        AstKind::VariableDeclarator(declarator) => {
-            !declarator.id.is_binding_identifier()
-                && (!only_object_rest || binding_has_object_rest(&declarator.id))
-        }
-        AstKind::CatchClause(clause) => clause.param.as_ref().is_some_and(|param| {
-            !param.pattern.is_binding_identifier()
-                && (!only_object_rest || binding_has_object_rest(&param.pattern))
-        }),
-        AstKind::AssignmentExpression(assignment) => {
-            assignment.left.is_assignment_target_pattern()
-                && (!only_object_rest || assignment_has_object_rest(&assignment.left))
-        }
-        AstKind::ForOfStatement(statement) => {
-            statement.left.as_assignment_target().is_some_and(|target| {
-                target.is_assignment_target_pattern()
-                    && (!only_object_rest || assignment_has_object_rest(target))
+    let candidates = semantic
+        .nodes()
+        .iter_enumerated()
+        .filter_map(|(node_id, node)| {
+            let selected = match node.kind() {
+                AstKind::VariableDeclarator(declarator) => {
+                    !declarator.id.is_binding_identifier()
+                        && (!only_object_rest || binding_has_object_rest(&declarator.id))
+                }
+                AstKind::CatchClause(clause) => clause.param.as_ref().is_some_and(|param| {
+                    !param.pattern.is_binding_identifier()
+                        && (!only_object_rest || binding_has_object_rest(&param.pattern))
+                }),
+                AstKind::AssignmentExpression(assignment) => {
+                    assignment.left.is_assignment_target_pattern()
+                        && (!only_object_rest || assignment_has_object_rest(&assignment.left))
+                }
+                AstKind::ForOfStatement(statement) => {
+                    statement.left.as_assignment_target().is_some_and(|target| {
+                        target.is_assignment_target_pattern()
+                            && (!only_object_rest || assignment_has_object_rest(target))
+                    })
+                }
+                AstKind::ForInStatement(statement) => {
+                    statement.left.as_assignment_target().is_some_and(|target| {
+                        target.is_assignment_target_pattern()
+                            && (!only_object_rest || assignment_has_object_rest(target))
+                    })
+                }
+                _ => false,
+            };
+            selected.then_some(node_id)
+        })
+        .collect::<Vec<_>>();
+    if candidates.is_empty() {
+        return Ok(AstPlan::default());
+    }
+    let oxc_declarations: FxHashSet<Address> = if only_object_rest && !object_rest_loose {
+        candidates
+            .iter()
+            .filter_map(|&id| {
+                let AstKind::VariableDeclarator(declarator) = semantic.nodes().kind(id) else {
+                    return None;
+                };
+                let AstKind::VariableDeclaration(declaration) = semantic.nodes().parent_kind(id)
+                else {
+                    return None;
+                };
+                // Keep ordered, nested, exported, and loop patterns on the focused path.
+                let parent = semantic.nodes().parent_kind(semantic.nodes().parent_id(id));
+                (declaration.declarations.len() == 1
+                    && declarator.init.is_some()
+                    && !matches!(
+                        parent,
+                        AstKind::ExportNamedDeclaration(_)
+                            | AstKind::ForStatement(_)
+                            | AstKind::ForOfStatement(_)
+                            | AstKind::ForInStatement(_)
+                    )
+                    && is_simple_object_rest(&declarator.id))
+                .then(|| declarator.id.address())
             })
-        }
-        AstKind::ForInStatement(statement) => {
-            statement.left.as_assignment_target().is_some_and(|target| {
-                target.is_assignment_target_pattern()
-                    && (!only_object_rest || assignment_has_object_rest(target))
-            })
-        }
-        _ => false,
-    });
-    if !has_candidate {
+            .collect()
+    } else {
+        FxHashSet::default()
+    };
+    let oxc_assignments: FxHashSet<Address> = if only_object_rest && !object_rest_loose {
+        candidates.iter().filter_map(|&id| {
+            let AstKind::AssignmentExpression(assignment) = semantic.nodes().kind(id) else { return None; };
+            let AssignmentTarget::ObjectAssignmentTarget(pattern) = &assignment.left else { return None; };
+            if !pattern.rest.as_ref().is_some_and(|rest| matches!(rest.target, AssignmentTarget::AssignmentTargetIdentifier(_)))
+                || !pattern.properties.iter().all(|property| match property {
+                    AssignmentTargetProperty::AssignmentTargetPropertyIdentifier(property) => property.init.is_none(),
+                    AssignmentTargetProperty::AssignmentTargetPropertyProperty(property) => !property.computed
+                        && matches!(property.binding, AssignmentTargetMaybeDefault::AssignmentTargetIdentifier(_)),
+                }) { return None; }
+            // Oxc inserts temporaries into the containing statement. Parameter,
+            // field, and concise-arrow expressions require the focused planner.
+            semantic.nodes().ancestor_ids(id).find_map(|ancestor| match semantic.nodes().kind(ancestor) {
+                AstKind::FunctionBody(_) => Some(!matches!(semantic.nodes().parent_kind(ancestor), AstKind::ArrowFunctionExpression(arrow) if arrow.expression)),
+                AstKind::StaticBlock(_) | AstKind::Program(_) => Some(true),
+                AstKind::FormalParameters(_) | AstKind::Function(_) | AstKind::ArrowFunctionExpression(_)
+                    | AstKind::PropertyDefinition(_) | AstKind::AccessorProperty(_) => Some(false),
+                _ => None,
+            }).unwrap_or(false).then(|| assignment.left.address())
+        }).collect()
+    } else {
+        FxHashSet::default()
+    };
+    let has_focused_candidate = candidates
+        .iter()
+        .any(|&id| match semantic.nodes().kind(id) {
+            AstKind::VariableDeclarator(declarator) => {
+                !oxc_declarations.contains(&declarator.id.address())
+            }
+            AstKind::AssignmentExpression(assignment) => {
+                !oxc_assignments.contains(&assignment.left.address())
+            }
+            _ => true,
+        });
+    if !has_focused_candidate {
         return Ok(AstPlan {
-            declarations: FxHashMap::default(),
-            catches: FxHashMap::default(),
-            assignments: FxHashMap::default(),
-            loop_assignments: FxHashMap::default(),
-            temporary_declarations: FxHashMap::default(),
-            helper_requests: CustomHelperRequests::default(),
-            helper_names: HelperNames::default(),
-            base_reserved: FxHashSet::default(),
-            planned_allocations: FxHashMap::default(),
+            oxc_declarations,
+            ..AstPlan::default()
         });
     }
     let base_reserved: FxHashSet<String> = semantic
@@ -218,30 +293,13 @@ pub(super) fn prepare_ast(
     let mut loop_assignments = FxHashMap::default();
     let mut temporary_declarations: FxHashMap<u32, Vec<String>> = FxHashMap::default();
     let mut helper_usage = HelperUsage::default();
-    let mut active_pattern_ends = Vec::<u32>::new();
-    // One semantic-node walk plans every destructuring shape against a shared
-    // temporary-name set.
-    for (node_id, node) in semantic.nodes().iter_enumerated() {
-        let node_span = node.kind().span();
-        while active_pattern_ends
-            .last()
-            .is_some_and(|end| node_span.start >= *end)
-        {
-            active_pattern_ends.pop();
-        }
-        match node.kind() {
+    // Preserve source order while planning only selected patterns against one
+    // temporary-name set; unrelated semantic nodes need no further visits.
+    for node_id in candidates {
+        match semantic.nodes().kind(node_id) {
             AstKind::VariableDeclarator(declarator) => {
-                let selected_pattern = !declarator.id.is_binding_identifier()
-                    && (!only_object_rest || binding_has_object_rest(&declarator.id));
-                if selected_pattern {
-                    active_pattern_ends.push(declarator.id.span().end);
-                }
-                if !ast_eligible_declarator(semantic.nodes(), node_id, declarator)
-                    || (only_object_rest && !binding_has_object_rest(&declarator.id))
-                // Parameters relocates default expressions into a generated body.
-                // Keep declarations nested in those expressions on the temporary
-                // compatibility path until destructuring planning moves after the
-                // parameter mutation.
+                if oxc_declarations.contains(&declarator.id.address())
+                    || !ast_eligible_declarator(semantic.nodes(), node_id, declarator)
                 {
                     continue;
                 }
@@ -268,16 +326,6 @@ pub(super) fn prepare_ast(
                 let Some(param) = &clause.param else {
                     continue;
                 };
-                let selected_pattern = !param.pattern.is_binding_identifier()
-                    && (!only_object_rest || binding_has_object_rest(&param.pattern));
-                if selected_pattern {
-                    active_pattern_ends.push(param.pattern.span().end);
-                }
-                if param.pattern.is_binding_identifier()
-                    || (only_object_rest && !binding_has_object_rest(&param.pattern))
-                {
-                    continue;
-                }
                 let caught = reserve("_caught", &mut reserved);
                 let reservation_checkpoint = reserved.checkpoint();
                 plan_binding_names(&param.pattern, &mut reserved, &mut helper_usage);
@@ -291,14 +339,7 @@ pub(super) fn prepare_ast(
                 );
             }
             AstKind::AssignmentExpression(assignment) => {
-                let selected_pattern = assignment.left.is_assignment_target_pattern()
-                    && (!only_object_rest || assignment_has_object_rest(&assignment.left));
-                if selected_pattern {
-                    active_pattern_ends.push(assignment.left.span().end);
-                }
-                if !assignment.left.is_assignment_target_pattern()
-                    || (only_object_rest && !assignment_has_object_rest(&assignment.left))
-                {
+                if oxc_assignments.contains(&assignment.left.address()) {
                     continue;
                 }
                 let before = reserved.checkpoint();
@@ -337,11 +378,6 @@ pub(super) fn prepare_ast(
                 let Some(target) = left.as_assignment_target() else {
                     continue;
                 };
-                if !target.is_assignment_target_pattern()
-                    || (only_object_rest && !assignment_has_object_rest(target))
-                {
-                    continue;
-                }
                 let before = reserved.checkpoint();
                 let root = reserve("_ref", &mut reserved);
                 let reservation_checkpoint = reserved.checkpoint();
@@ -438,6 +474,7 @@ pub(super) fn prepare_ast(
         .collect();
     Ok(AstPlan {
         declarations,
+        oxc_declarations,
         catches,
         assignments,
         loop_assignments,
@@ -457,6 +494,7 @@ pub(super) fn run_ast<'a>(
     let mut pass = DestructuringDeclaratorLowerer {
         allocator,
         declarations: plan.declarations,
+        oxc_declarations: plan.oxc_declarations,
         catches: plan.catches,
         assignments: plan.assignments,
         loop_assignments: plan.loop_assignments,
@@ -477,6 +515,7 @@ pub(super) fn run_ast<'a>(
 struct DestructuringDeclaratorLowerer<'a> {
     allocator: &'a Allocator,
     declarations: FxHashMap<Address, AstDeclaratorPlan>,
+    oxc_declarations: FxHashSet<Address>,
     catches: FxHashMap<u32, AstCatchPlan>,
     assignments: FxHashMap<u32, AstAssignmentPlan>,
     loop_assignments: FxHashMap<u32, AstAssignmentPlan>,
@@ -1101,10 +1140,32 @@ impl<'a> VisitMut<'a> for DestructuringDeclaratorLowerer<'a> {
         walk_mut::walk_static_block(self, block);
     }
 
+    #[expect(deprecated)]
     fn visit_variable_declaration(&mut self, declaration: &mut VariableDeclaration<'a>) {
         let mut index = 0;
         while index < declaration.declarations.len() {
             if declaration.declarations[index].id.is_binding_identifier() {
+                index += 1;
+                continue;
+            }
+            if self
+                .oxc_declarations
+                .remove(&declaration.declarations[index].id.address())
+            {
+                let ast = self.ast();
+                let init = declaration.declarations[index]
+                    .init
+                    .as_mut()
+                    .expect("initialized Oxc rest declaration");
+                // Oxc reuses identifier sources. Force a snapshot so getters
+                // cannot redirect the rest copy by reassigning that identifier.
+                if matches!(init, Expression::Identifier(_)) {
+                    let original = init.take_in(&ast);
+                    let mut expressions = ArenaVec::new_in(&ast);
+                    expressions.push(self.number(declaration.span, 0));
+                    expressions.push(original);
+                    *init = ast.expression_sequence(declaration.span, expressions);
+                }
                 index += 1;
                 continue;
             }

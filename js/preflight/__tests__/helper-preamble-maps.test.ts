@@ -68,7 +68,7 @@ for (const [compact, spread] of [
   [true, true],
 ] as const) {
   test(`custom inline helpers preserve mappings compact=${compact} with Oxc helpers=${spread}`, () => {
-    const source = `#!/usr/bin/env node\n"use strict";\nconst {a,...markerValue}=${spread ? '{...input}' : 'input'};`;
+    const source = `#!/usr/bin/env node\n"use strict";\nconst {['a']:a,...markerValue}=${spread ? '{...input}' : 'input'};`;
     const result = transform(
       source,
       'input.js',
@@ -101,7 +101,7 @@ for (const [compact, spread] of [
     expect(originalPositionFor(map, position(result.code.indexOf('markerValue')))).toMatchObject({
       source: 'input.js',
       line: 3,
-      column: 12,
+      column: 18,
     });
     for (const helper of [
       ...(spread ? ['var babelHelpers'] : []),

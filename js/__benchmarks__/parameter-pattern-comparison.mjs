@@ -255,6 +255,13 @@ const runtimeCases = [
     4,
   ],
   [
+    'object rest parameters',
+    'function run({a,...rest}){return rest.b+rest.c}',
+    { objectRestSpread: true, objectRestSpreadLoose: false },
+    () => [{ a: 0, b: 1, c: 2 }],
+    3,
+  ],
+  [
     'strict rest excluded key',
     'function run(input){const {a,...rest}=input;return rest.b+rest.c}',
     { objectRestSpread: true, objectRestSpreadLoose: false },

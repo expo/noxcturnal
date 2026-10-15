@@ -86,20 +86,22 @@ impl CaptureAliases {
 }
 
 pub(super) fn prepare_ast(source: &str, semantic: &Semantic<'_>) -> Result<AstPlan, &'static str> {
-    prepare_selected(source, semantic, false)
+    prepare_selected(source, semantic, false, false)
 }
 
 pub(super) fn prepare_object_rest(
     source: &str,
     semantic: &Semantic<'_>,
+    object_rest_loose: bool,
 ) -> Result<AstPlan, &'static str> {
-    prepare_selected(source, semantic, true)
+    prepare_selected(source, semantic, true, object_rest_loose)
 }
 
 fn prepare_selected(
     source: &str,
     semantic: &Semantic<'_>,
     only_object_rest: bool,
+    object_rest_loose: bool,
 ) -> Result<AstPlan, &'static str> {
     if !semantic.nodes().iter().any(|node| match node.kind() {
         AstKind::Function(function) => {
@@ -142,8 +144,37 @@ fn prepare_selected(
         )
         .map(str::to_owned)
         .collect();
-    let (arrow_facts, function_facts, planning_nodes) =
-        collect_lexical_facts_selected(semantic, &symbols, only_object_rest);
+    let mut planning_nodes = Vec::new();
+    let mut needs_lexical_facts = false;
+    for (node_id, node) in semantic.nodes().iter_enumerated() {
+        match node.kind() {
+            AstKind::Function(function)
+                if function.body.is_some()
+                    && non_simple(&function.params).is_some()
+                    && (!only_object_rest || parameters_have_object_rest(&function.params)) =>
+            {
+                planning_nodes.push(node_id);
+                needs_lexical_facts |= function.generator;
+            }
+            AstKind::ArrowFunctionExpression(arrow)
+                if non_simple(&arrow.params).is_some()
+                    && (!only_object_rest || parameters_have_object_rest(&arrow.params)) =>
+            {
+                needs_lexical_facts = true;
+            }
+            _ => {}
+        }
+        if needs_lexical_facts {
+            break;
+        }
+    }
+    // Only lowered arrows and generator wrappers consume capture facts. Ordinary
+    // functions need their parameter/body binding analysis, but no capture walk.
+    let (arrow_facts, function_facts, planning_nodes) = if needs_lexical_facts {
+        collect_lexical_facts_selected(semantic, &symbols, only_object_rest)
+    } else {
+        (FxHashMap::default(), FxHashMap::default(), planning_nodes)
+    };
     // Plan functions and arrows in one traversal, sharing one collision set for
     // every generated capture and rest binding.
     for node_id in planning_nodes {
@@ -171,6 +202,23 @@ fn prepare_selected(
                     body,
                     &param_bindings,
                 );
+                // Oxc can lower a single flat rest parameter without moving
+                // initializers across parameter/body environments. Keep scope
+                // collisions, eval, generators, and ordered parameter lists here.
+                if only_object_rest
+                    && !object_rest_loose
+                    && !wrapper
+                    && !function.generator
+                    && function.params.rest.is_none()
+                    && function.params.items.len() == 1
+                    && !param_bindings.contains("arguments")
+                    && !reserved.contains("eval")
+                    && super::destructuring::is_simple_object_rest(
+                        &function.params.items[0].pattern,
+                    )
+                {
+                    continue;
+                }
                 let wrapper = wrapper || function.generator;
                 let captures = if wrapper && function.generator {
                     plan_function_capture(&function_facts[&node_id], &mut reserved)

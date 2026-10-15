@@ -917,7 +917,11 @@ fn transform_impl(
                 Err(reason) => return Ok(fatal(reason, [] as [String; 0])),
             }
         } else if focused_object_rest {
-            match super::parameters::prepare_object_rest(source, &semantic.semantic) {
+            match super::parameters::prepare_object_rest(
+                source,
+                &semantic.semantic,
+                object_rest_loose,
+            ) {
                 Ok(plan) => Some(plan),
                 Err(reason) => return Ok(fatal(reason, [] as [String; 0])),
             }
@@ -1417,7 +1421,16 @@ fn transform_impl(
         let inline = if !unavailable_helpers.is_empty() {
             match inline_helpers(
                 unavailable_helpers.iter().copied(),
-                helper_mode == "runtime",
+                helper_mode == "runtime"
+                    || (!object_rest_loose
+                        && unavailable_helpers.iter().all(|helper| {
+                            matches!(
+                                helper,
+                                oxc_transformer::Helper::ObjectWithoutProperties
+                                    | oxc_transformer::Helper::ObjectDestructuringEmpty
+                                    | oxc_transformer::Helper::Extends
+                            )
+                        })),
             ) {
                 Ok(inline) => inline,
                 Err(reason) => return Ok(unsupported(&reason, [] as [String; 0])),
@@ -2065,10 +2078,10 @@ fn compile_options(
     compiled.env.es2017.async_to_generator = options.async_functions == Some(true);
     compiled.env.es2016.exponentiation_operator = options.exponentiation_operator == Some(true);
     if options.object_rest_spread == Some(true) {
-        // Focused passes consume declarations, assignments, catches, loops,
-        // and object expressions. Oxc's default/spec pass remains as the
-        // completion pass for object rest in formal parameters. Never forward
-        // `loose` or `useBuiltIns`: Oxc rejects both at construction time.
+        // Focused passes own ordered patterns and object expressions. Oxc's
+        // default/spec pass completes flat rest declarations, assignments, and
+        // parameters. Oxc rejects `loose` and `useBuiltIns` at construction time,
+        // so keep its options at defaults.
         compiled.env.es2018.object_rest_spread = Some(Default::default());
     }
     // NOTE: Public fields use spec semantics while private fields use the loose
