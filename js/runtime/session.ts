@@ -138,9 +138,9 @@ export class NativeTransformSession {
       : [];
     const globals: QueryResult['globals'] = {};
     if (request.globals?.length) {
-      for (const fact of this.#binding('query.globals').queryGlobals(
-        request.globals.map(query => query.name),
-      )) {
+      for (const fact of this.#binding('query.globals').queryGlobals([
+        ...new Set(request.globals.map(query => query.name)),
+      ])) {
         const references = fact.references.map(reference => ({
           id: reference.id,
           type: 'Identifier' as const,

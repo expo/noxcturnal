@@ -189,12 +189,11 @@ export function createDispatcher(
       },
       query: request => {
         for (const capability in request) {
-          if (!Object.hasOwn(request, capability)) continue;
+          if (!Object.hasOwn(request, capability) || allowedQueries?.has(capability)) continue;
           const value = request[capability as keyof typeof request];
           if (value === false || value == null || (Array.isArray(value) && value.length === 0))
             continue;
-          if (!allowedQueries?.has(capability))
-            throw new Error(`${plugin.name}: undeclared query capability ${capability}`);
+          throw new Error(`${plugin.name}: undeclared query capability ${capability}`);
         }
         return session.query(request);
       },

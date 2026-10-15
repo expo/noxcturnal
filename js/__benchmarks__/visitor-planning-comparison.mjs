@@ -50,25 +50,38 @@ const visitorPipeline = (scope, route = 'Program', controlFlow = []) =>
       ],
     }),
   );
-if (process.argv[3] === 'memory') {
-  const source = Array.from(
-    { length: 10_000 },
-    (_, i) => `function f${i}(value) { const local = value + ${i}; return local; }`,
-  ).join('\n');
+if (process.argv[3]?.startsWith('memory')) {
+  const source =
+    process.argv[3] === 'memory-literal'
+      ? 'const text="' + '\\u0061'.repeat(2_000_000) + '";'
+      : Array.from(
+          { length: 10_000 },
+          (_, i) => `function f${i}(value) { const local = value + ${i}; return local; }`,
+        ).join('\n');
   let visits = 0;
-  const plan = pipeline(
-    api.defineNativePlugin({
-      name: 'retained-fields',
-      visitors: [
-        api.defineVisitor('Identifier', { fields: ['name'] }, () => {
-          visits++;
-        }),
-      ],
-    }),
-  );
+  const plan =
+    process.argv[3] !== 'memory'
+      ? api.defineNativePipeline({ phases: [] })
+      : pipeline(
+          api.defineNativePlugin({
+            name: 'retained-fields',
+            visitors: [
+              api.defineVisitor('Identifier', { fields: ['name'] }, () => {
+                visits++;
+              }),
+            ],
+          }),
+        );
+  const start = performance.now();
   assert.equal(api.transform(source, 'bench.js', plan).status, 'complete');
+  const first_transform_us = (performance.now() - start) * 1000;
   process.stdout.write(
-    JSON.stringify({ root, visits, max_rss_kib: process.resourceUsage().maxRSS }) + '\n',
+    JSON.stringify({
+      root,
+      visits,
+      first_transform_us,
+      max_rss_kib: process.resourceUsage().maxRSS,
+    }) + '\n',
   );
   process.exit(0);
 }
@@ -269,6 +282,41 @@ for (const count of [100, 1000]) {
       }),
     ),
   );
+}
+// Vary syntax density independently of source bytes to expose sizing overhead.
+for (const [shape, source] of [
+  ['one function', 'function f(value){const local=value+1;return local;}'],
+  [
+    '10000 functions',
+    Array.from(
+      { length: 10000 },
+      (_, i) => `function f${i}(value){const local=value+${i};return local;}`,
+    ).join('\n'),
+  ],
+  ['escaped literal', 'const text="' + '\\u0061'.repeat(64000) + '";'],
+  ['escaped template', 'const text=`' + '\\u0061'.repeat(64000) + '`;'],
+  ['dense bindings', Array.from({ length: 1000 }, (_, i) => `let v${i}=${i};`).join('')],
+  [
+    'dense references',
+    'consume(' + Array.from({ length: 2000 }, (_, i) => `v${i}`).join(',') + ');',
+  ],
+  ['nested scopes', '{let value=1;'.repeat(100) + 'consume(value);' + '}'.repeat(100)],
+  ['large comment', '/*' + 'comment '.repeat(8000) + '*/ function f(value){return value;}'],
+]) {
+  for (const [label, plan] of [
+    ['identity', empty],
+    ['visitor', visit],
+    ['scope', scoped],
+    ['folding', folding],
+  ]) {
+    const inputs = Array.from({ length: 64 }, (_, i) => `${source}\n// input ${i}`);
+    let index = 0;
+    assert.equal(api.transform(inputs[0], 'bench.js', plan).status, 'complete');
+    cases.push([
+      `validation shapes / ${label} / ${shape}`,
+      () => api.transform(inputs[index++ % inputs.length], 'bench.js', plan),
+    ]);
+  }
 }
 const results = {};
 for (const [name, run] of cases) {

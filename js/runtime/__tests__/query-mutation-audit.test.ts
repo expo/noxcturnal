@@ -15,10 +15,14 @@ test('large warm query requests still detect mutation of the final descriptor', 
       globals: Array.from({ length: 512 }, () => ({ name: 'first' })),
     };
     const initial = session.query(request);
+    expect(Object.keys(initial.globals)).toEqual(['first']);
+    expect(initial.globals.first.references).toHaveLength(1);
     expect(session.query(request)).toBe(initial);
     request.globals![511].name = 'second';
     const refreshed = session.query(request);
     expect(refreshed).not.toBe(initial);
+    expect(Object.keys(refreshed.globals)).toEqual(['first', 'second']);
+    expect(refreshed.globals.first).toEqual(initial.globals.first);
     expect(refreshed.globals.second.references).toHaveLength(1);
     expect(session.query(request)).toBe(refreshed);
   } finally {

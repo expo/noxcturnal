@@ -267,12 +267,7 @@ impl NativeIndexedSession {
                 references: self
                     .retained_index
                     .global_references(&name)
-                    .into_iter()
-                    .map(|reference| GlobalReference {
-                        id: reference.id,
-                        start: reference.start,
-                        end: reference.end,
-                    })
+                    .map(|(id, start, end)| GlobalReference { id, start, end })
                     .collect(),
                 name,
             })
