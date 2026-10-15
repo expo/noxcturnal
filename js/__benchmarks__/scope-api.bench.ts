@@ -177,6 +177,34 @@ for (const count of [100, 1000, 10000])
       });
     }
   });
+for (const count of [100, 1000])
+  describe(`rename one binding with ${count} redeclarations`, () => {
+    const source = `var value=3;${'var value;'.repeat(count)}consume(value);`;
+    for (const [label, api] of implementations) {
+      const plan = api.defineNativePipeline({
+        phases: [
+          {
+            name: 'rename',
+            plugins: [
+              api.defineNativePlugin({
+                name: 'rename-redeclarations',
+                visitors: [
+                  api.defineVisitor('Program', { scope: true }, (path: any) =>
+                    path.scope.rename('value', 'renamed'),
+                  ),
+                ],
+              }),
+            ],
+          },
+        ],
+      });
+      bench(label, () => {
+        const result = api.transform(source, 'input.js', plan);
+        if (result.status !== 'complete') throw new Error('Unexpected benchmark bailout');
+        return result;
+      });
+    }
+  });
 const constructors = [
   ...(baselineRoot
     ? [

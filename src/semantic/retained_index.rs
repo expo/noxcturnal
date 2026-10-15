@@ -39,6 +39,7 @@ pub struct RetainedIndex {
     names: Vec<Rc<str>>,
     name_ids: FxHashMap<Rc<str>, u32>,
     bindings: FxHashMap<(u32, u32), BindingRecord>,
+    redeclarations: Vec<Vec<u32>>,
     globals: FxHashMap<u32, Vec<SemanticReference>>,
     constants: Option<Vec<Option<EvaluatedConstant>>>,
     calls: Vec<CallRecord>,
@@ -111,7 +112,9 @@ impl SemanticReference {
 }
 
 struct BindingRecord {
-    declaration_ids: Vec<u32>,
+    // Latest declaration and optional side-table index, both using ABSENT_ID.
+    declaration_id: u32,
+    redeclarations_id: u32,
     references: Vec<SemanticReference>,
 }
 
@@ -268,6 +271,7 @@ impl RetainedIndex {
             names: Vec::new(),
             name_ids: FxHashMap::default(),
             bindings: FxHashMap::default(),
+            redeclarations: Vec::new(),
             globals: FxHashMap::default(),
             constants: retain_constants.then(|| vec![None; node_count]),
             calls: Vec::new(),
@@ -304,14 +308,23 @@ impl RetainedIndex {
                     .map_or(node_scope_id, |symbol_id| {
                         scoping.symbol_scope_id(symbol_id).index() as u32
                     });
-                self.bindings
-                    .entry((scope_id, name_id))
-                    .or_insert_with(|| BindingRecord {
-                        declaration_ids: Vec::new(),
-                        references: Vec::new(),
-                    })
-                    .declaration_ids
-                    .push(node_id);
+                let binding =
+                    self.bindings
+                        .entry((scope_id, name_id))
+                        .or_insert_with(|| BindingRecord {
+                            declaration_id: ABSENT_ID,
+                            redeclarations_id: ABSENT_ID,
+                            references: Vec::new(),
+                        });
+                if binding.declaration_id != ABSENT_ID {
+                    if binding.redeclarations_id == ABSENT_ID {
+                        binding.redeclarations_id = self.redeclarations.len() as u32;
+                        self.redeclarations.push(Vec::new());
+                    }
+                    self.redeclarations[binding.redeclarations_id as usize]
+                        .push(binding.declaration_id);
+                }
+                binding.declaration_id = node_id;
             }
             AstKind::IdentifierReference(identifier) => {
                 let Some(reference_id) = identifier.reference_id.get() else {
@@ -331,7 +344,8 @@ impl RetainedIndex {
                     self.bindings
                         .entry((binding_scope_id, name_id))
                         .or_insert_with(|| BindingRecord {
-                            declaration_ids: Vec::new(),
+                            declaration_id: ABSENT_ID,
+                            redeclarations_id: ABSENT_ID,
                             references: Vec::new(),
                         })
                         .references
@@ -395,6 +409,21 @@ impl RetainedIndex {
         }
     }
 
+    fn binding_declarations<'a>(
+        &'a self,
+        binding: &'a BindingRecord,
+    ) -> impl Iterator<Item = u32> + 'a {
+        // The representative stays inline. Allocate extra storage only for
+        // actual redeclarations, preserving source order and the latest public
+        // declaration without a vector allocation for every binding.
+        self.redeclarations
+            .get(binding.redeclarations_id as usize)
+            .map_or(&[][..], Vec::as_slice)
+            .iter()
+            .copied()
+            .chain((binding.declaration_id != ABSENT_ID).then_some(binding.declaration_id))
+    }
+
     pub fn rename_plan(&self, name: &str, scope_id: u32) -> NativeRenamePlan {
         let Some(binding) = self
             .name_ids
@@ -406,10 +435,8 @@ impl RetainedIndex {
                 exports: Vec::new(),
             };
         };
-        let targets = binding
-            .declaration_ids
-            .iter()
-            .copied()
+        let targets = self
+            .binding_declarations(binding)
             .chain(binding.references.iter().map(SemanticReference::node_id))
             .map(|id| NativeRenameTarget {
                 start: self.starts[id as usize],
@@ -417,10 +444,9 @@ impl RetainedIndex {
                 kind: self.rename_kinds.get(&id).copied().unwrap_or(0),
             })
             .collect();
-        let mut exports = binding
-            .declaration_ids
-            .iter()
-            .filter_map(|id| self.export_for_declaration(scope_id, *id))
+        let mut exports = self
+            .binding_declarations(binding)
+            .filter_map(|id| self.export_for_declaration(scope_id, id))
             .map(|id| NativeRenameExport {
                 start: self.starts[id as usize],
                 end: self.ends[id as usize],
@@ -451,7 +477,7 @@ impl RetainedIndex {
                 let mut exports: FxHashMap<u32, Vec<u32>> = FxHashMap::default();
                 for (&(scope, name), binding) in &self.bindings {
                     let mut previous = None;
-                    for &declaration in &binding.declaration_ids {
+                    for declaration in self.binding_declarations(binding) {
                         let Some(id) = self.export_for_declaration(scope, declaration) else {
                             continue;
                         };
@@ -549,7 +575,8 @@ impl RetainedIndex {
         reads: bool,
         writes: bool,
     ) -> NativeBindingFact {
-        let declaration = binding.declaration_ids.last().copied().map(|node_id| {
+        let declaration = (binding.declaration_id != ABSENT_ID).then(|| {
+            let node_id = binding.declaration_id;
             (
                 node_id,
                 self.starts[node_id as usize],
@@ -1400,9 +1427,14 @@ impl RetainedIndex {
                 .values()
                 .map(|binding| {
                     size_of::<((u32, u32), BindingRecord)>()
-                        + binding.declaration_ids.capacity() * size_of::<u32>()
                         + binding.references.capacity() * size_of::<SemanticReference>()
                 })
+                .sum::<usize>()
+            + self.redeclarations.capacity() * size_of::<Vec<u32>>()
+            + self
+                .redeclarations
+                .iter()
+                .map(|ids| ids.capacity() * size_of::<u32>())
                 .sum::<usize>()
             + self
                 .globals
@@ -1579,7 +1611,8 @@ mod tests {
         index.bindings.insert(
             (0, 0),
             BindingRecord {
-                declaration_ids: Vec::new(),
+                declaration_id: ABSENT_ID,
+                redeclarations_id: ABSENT_ID,
                 references,
             },
         );
