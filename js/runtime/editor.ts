@@ -35,6 +35,7 @@ export function createEditor(
   edits: EditCommand[],
   owner: string,
   nextOrder: () => number,
+  onReset?: () => void,
 ): NativeEditor {
   const source = session.source;
   const push = (kind: EditKind, start: number, end: number, content?: string) =>
@@ -113,6 +114,7 @@ export function createEditor(
         edits[write++] = edit;
       }
       edits.length = write;
+      onReset?.();
     },
     indent(prefix = '  ') {
       push('Replace', 0, source.length, operations().indent(prefix));

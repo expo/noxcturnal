@@ -166,3 +166,106 @@ for (const source of [
     expect(run(result.code.replace(/^#![^\n]*\n/, ''))).toBe(7);
   });
 }
+
+for (const source of ['globalThis.result=1', 'globalThis.result=1 // tail']) {
+  test(`append restores boundaries after reset: ${source}`, () => {
+    const result = transform(
+      source,
+      'input.js',
+      defineNativePipeline({
+        phases: [
+          {
+            name: 'reset',
+            plugins: [
+              defineNativePlugin({
+                name: 'reset-append',
+                pre(context) {
+                  context.appendToProgram('void 0;');
+                  context.editor.reset(0, source.length);
+                  context.appendToProgram('[2].forEach(x=>globalThis.result+=x);');
+                },
+              }),
+            ],
+          },
+        ],
+      }),
+    );
+    expect(result.status).toBe('complete');
+    if (result.status !== 'complete') throw new Error(result.reason);
+    expect(run(result.code)).toBe(3);
+  });
+
+  test.each([false, true])(
+    `reset restores boundaries on a surviving peer insertion (composite=%s): ${source}`,
+    composite => {
+      const first = defineNativePlugin({
+        name: 'removed-append',
+        pre(context) {
+          context.appendToProgram('globalThis.result=100;');
+        },
+        post(context) {
+          context.editor.reset(0, source.length);
+          context.editor.reset(0, source.length);
+        },
+      });
+      const second = defineNativePlugin({
+        name: 'surviving-append',
+        pre(context) {
+          const name = context.sourceSlice(source.indexOf('result'), source.indexOf('result') + 6);
+          context.appendToProgram(
+            composite
+              ? context.code.template`[2].forEach(x=>globalThis.${name}+=x);`
+              : '[2].forEach(x=>globalThis.result+=x);',
+          );
+        },
+      });
+      const result = transform(
+        source,
+        'input.js',
+        defineNativePipeline({
+          phases: [
+            {
+              name: 'reset-peer',
+              plugins: [first, second],
+            },
+          ],
+        }),
+      );
+      expect(result.status).toBe('complete');
+      if (result.status !== 'complete') throw new Error(result.reason);
+      expect(run(result.code)).toBe(3);
+      expect(result.code).not.toContain('100');
+      if (source.endsWith('// tail')) expect(result.code.endsWith('// tail\n')).toBe(true);
+    },
+  );
+}
+
+test('prepend restores the directive boundary after reset', () => {
+  const source = '"use strict"\nglobalThis.result=1';
+  const result = transform(
+    source,
+    'input.js',
+    defineNativePipeline({
+      phases: [
+        {
+          name: 'reset-prepend',
+          plugins: [
+            defineNativePlugin({
+              name: 'reset-prepend',
+              pre(context) {
+                context.prependToProgram('void 0;');
+                context.editor.reset(0, source.length);
+                context.prependToProgram(
+                  '(globalThis.strict=(function(){return this===undefined})());',
+                );
+              },
+            }),
+          ],
+        },
+      ],
+    }),
+  );
+  expect(result.status).toBe('complete');
+  if (result.status !== 'complete') throw new Error(result.reason);
+  expect(execute(result.code)).toEqual({ strict: true, result: 1 });
+});

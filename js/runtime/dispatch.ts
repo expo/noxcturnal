@@ -88,8 +88,49 @@ export function createDispatcher(
   let visitorIds: WeakMap<object, number> | undefined;
   let activeTraversals: Set<string> | undefined;
   let programBodyOffsets: ReturnType<NativeTransformSession['programBodyOffsets']> | undefined;
-  let programEndBoundaryAdded = false;
+  let programEndBoundary: EditCommand | undefined;
+  const programInsertions = new WeakMap<EditCommand, { prefix: string }>();
   const programInsertionPoints = new Set<number>();
+  const insertionPrefix = (kind: EditCommand['kind'], offset: number): string => {
+    const first = !programInsertionPoints.has(offset);
+    const separator = first && programBodyOffsets?.[kind === 'Prologue' ? 3 : 4];
+    return (
+      (first && session.sourceTextOperations.needsLineBoundary(offset) ? '\n' : '') +
+      (separator ? ';\n' : '')
+    );
+  };
+  const resetProgramBoundaries = (): void => {
+    programInsertionPoints.clear();
+    let append: EditCommand | undefined;
+    for (const edit of edits) {
+      const record = programInsertions.get(edit);
+      if (!record) continue;
+      const prefix = insertionPrefix(edit.kind, edit.start);
+      if (edit.contentParts) {
+        edit.contentParts = [
+          ...(prefix ? [prefix] : []),
+          ...edit.contentParts.slice(record.prefix ? 1 : 0),
+        ];
+      } else {
+        edit.content = prefix + edit.content!.slice(record.prefix.length);
+      }
+      record.prefix = prefix;
+      programInsertionPoints.add(edit.start);
+      if (edit.kind === 'AppendLeft') append = edit;
+    }
+    if (programEndBoundary && !edits.includes(programEndBoundary)) programEndBoundary = undefined;
+    if (append && programBodyOffsets?.[2] && !programEndBoundary) {
+      programEndBoundary = {
+        kind: 'AppendLeft',
+        start: session.source.length,
+        end: session.source.length,
+        content: '\n',
+        owner: append.owner,
+        order: order++,
+      };
+      edits.push(programEndBoundary);
+    }
+  };
   const contexts = new Map<NativePlugin<any, any>, DispatcherEntry>();
   const metadataOwners = new Map<string, string>();
   for (const plugin of activePlugins)
@@ -150,16 +191,12 @@ export function createDispatcher(
       offset: number,
       realized: RealizedContent,
     ): void => {
-      const first = !programInsertionPoints.has(offset);
-      const needsSeparator = first && programBodyOffsets?.[kind === 'Prologue' ? 3 : 4];
-      const prefix =
-        (first && session.sourceTextOperations.needsLineBoundary(offset) ? '\n' : '') +
-        (needsSeparator ? ';\n' : '');
+      const prefix = insertionPrefix(kind, offset);
       const suffix = session.sourceTextOperations.insertionSuffix(
         realized.contentParts ?? [realized.content!],
       );
       programInsertionPoints.add(offset);
-      edits.push({
+      const edit: EditCommand = {
         kind,
         start: offset,
         end: offset,
@@ -168,7 +205,9 @@ export function createDispatcher(
           : { content: `${prefix}${realized.content}${suffix}` }),
         owner: plugin.name,
         order: order++,
-      });
+      };
+      programInsertions.set(edit, { prefix });
+      edits.push(edit);
     };
     const pushProgramInsertion = (
       kind: 'Prologue' | 'AppendLeft',
@@ -238,16 +277,16 @@ export function createDispatcher(
       appendToProgram: code => {
         programBodyOffsets ??= session.programBodyOffsets();
         pushProgramInsertion('AppendLeft', programBodyOffsets[1], code);
-        if (programBodyOffsets[2] && !programEndBoundaryAdded) {
-          edits.push({
+        if (programBodyOffsets[2] && !programEndBoundary) {
+          programEndBoundary = {
             kind: 'AppendLeft',
             start: session.source.length,
             end: session.source.length,
             content: '\n',
             owner: plugin.name,
             order: order++,
-          });
-          programEndBoundaryAdded = true;
+          };
+          edits.push(programEndBoundary);
         }
       },
       ensureHelper: (key, code) => {
@@ -293,7 +332,7 @@ export function createDispatcher(
         return makeSourceFragment(session, start, end);
       },
       code: codeFactory,
-      editor: createEditor(session, edits, plugin.name, () => order++),
+      editor: createEditor(session, edits, plugin.name, () => order++, resetProgramBoundaries),
     };
     entry.context = context;
     contexts.set(plugin, entry);
