@@ -35,7 +35,11 @@ export function createEditor(
   edits: EditCommand[],
   owner: string,
   nextOrder: () => number,
-  onReset?: () => void,
+  hooks?: {
+    affects(edit: EditCommand): boolean;
+    reconcile(): void;
+    beforeCommit?(): void;
+  },
 ): NativeEditor {
   const source = session.source;
   const push = (kind: EditKind, start: number, end: number, content?: string) =>
@@ -109,12 +113,16 @@ export function createEditor(
     },
     reset(start, end) {
       let write = 0;
+      let reconcile = false;
       for (const edit of edits) {
-        if (edit.owner === owner && edit.start >= start && edit.end <= end) continue;
+        if (edit.owner === owner && edit.start >= start && edit.end <= end) {
+          if (hooks?.affects(edit)) reconcile = true;
+          continue;
+        }
         edits[write++] = edit;
       }
       edits.length = write;
-      onReset?.();
+      if (reconcile) hooks!.reconcile();
     },
     indent(prefix = '  ') {
       push('Replace', 0, source.length, operations().indent(prefix));
@@ -142,7 +150,10 @@ export function createEditor(
       replace(search, replacement, true);
     },
     slice: (start, end) => source.slice(start, end),
-    toString: () => session.commit(edits).code,
+    toString: () => {
+      hooks?.beforeCommit?.();
+      return session.commit(edits).code;
+    },
     isEmpty: () => margins()[0] === source.length,
   };
 }

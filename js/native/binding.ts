@@ -85,7 +85,10 @@ interface NativeBinding {
     indent(prefix: string): string;
     needsLineBoundary(offset: number): boolean;
     startsLine(offset: number): boolean;
-    insertionSuffix(parts: readonly (string | { start: number; end: number })[]): string;
+    linePrefixIntervals(start: number, end: number): Buffer;
+    insertionSuffixes(
+      contents: readonly (string | readonly (string | { start: number; end: number })[])[],
+    ): Buffer;
     locations(start: number, end: number): number[];
     locationOffset(line: number, column: number): number;
     matches(

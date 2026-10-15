@@ -566,9 +566,7 @@ export class NodePathImpl implements NativeNodePath {
     // New line terminators can change return/yield/throw and postfix grammar.
     // Inline comments use a single-line block, without requiring hidden ancestry.
     const safeLine =
-      line &&
-      position === 'leading' &&
-      this.runtime.session.sourceTextOperations.startsLine(this.event.start);
+      line && position === 'leading' && this.runtime.session.startsLine(this.event.start);
     const escaped = content.replace(/\*\//g, '* /').replace(/[\r\n\u2028\u2029]/g, ' ');
     const comment = safeLine ? `//${escaped}\n` : `/*${escaped}*/`;
     if (position === 'leading') this.insertBefore(comment);

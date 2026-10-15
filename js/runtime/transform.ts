@@ -736,6 +736,7 @@ export function transform(
       }
       if (runtimeEditEffect === 'none' && edits.length > 0)
         throw new Error(`${phase.name}: phase declared edit effect none but emitted edits`);
+      dispatch.flushInsertions();
       const effectiveEdits: EditCommand[] = edits;
       if (effectiveEdits.length === 0) {
         if (observedVersion === currentVersion && canReuseForNextPhase) {

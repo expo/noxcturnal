@@ -106,3 +106,22 @@ describe.each(coordinateCases)('$name', entry => {
     expect(accepted).toBe(entry.valid);
   });
 });
+
+test('Move rejects invalid copied offsets even when its destination supplies the payload', () => {
+  const session = new NativeTransformSession('abc', 'input.js');
+  try {
+    expect(() =>
+      session.commit([
+        {
+          kind: 'Move',
+          start: 0,
+          end: 1,
+          destination: 3,
+          contentParts: [{ start: 2 ** 32, end: 2 ** 32 + 1 }],
+        },
+      ]),
+    ).toThrow(/invalid edit offset/);
+  } finally {
+    session.close();
+  }
+});

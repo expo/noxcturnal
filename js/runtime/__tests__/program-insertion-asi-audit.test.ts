@@ -269,3 +269,99 @@ test('prepend restores the directive boundary after reset', () => {
   if (result.status !== 'complete') throw new Error(result.reason);
   expect(execute(result.code)).toEqual({ strict: true, result: 1 });
 });
+
+test('changing a reused fragment recomputes its statement boundary', () => {
+  const result = transform(
+    'void 0;',
+    'input.js',
+    defineNativePipeline({
+      phases: [
+        {
+          name: 'mutable',
+          plugins: [
+            defineNativePlugin({
+              name: 'mutable',
+              pre(context) {
+                const code = { code: 'globalThis.result=1;', mapping: 'sourceless' as const };
+                context.appendToProgram(code);
+                code.code = 'globalThis.result=2';
+                context.appendToProgram(code);
+                context.appendToProgram('[3].forEach(x=>globalThis.result+=x);');
+              },
+            }),
+          ],
+        },
+      ],
+    }),
+  );
+  expect(result.status).toBe('complete');
+  if (result.status !== 'complete') throw new Error(result.reason);
+  expect(run(result.code)).toBe(5);
+});
+
+test('program insertion previews flush once and respect subsequent append and reset', () => {
+  const source = 'globalThis.result=1 // tail';
+  const previews: unknown[] = [];
+  const result = transform(
+    source,
+    'input.js',
+    defineNativePipeline({
+      phases: [
+        {
+          name: 'preview',
+          plugins: [
+            defineNativePlugin({
+              name: 'preview',
+              pre(context) {
+                context.appendToProgram('[2].forEach(x=>globalThis.result+=x);');
+                const first = context.editor.toString();
+                expect(context.editor.toString()).toBe(first);
+                previews.push(run(first));
+                context.appendToProgram('[4].forEach(x=>globalThis.result+=x);');
+                previews.push(run(context.editor.toString()));
+                context.editor.reset(0, source.length);
+                context.appendToProgram('[8].forEach(x=>globalThis.result+=x);');
+                previews.push(run(context.editor.toString()));
+              },
+            }),
+          ],
+        },
+      ],
+    }),
+  );
+  expect(result.status).toBe('complete');
+  if (result.status !== 'complete') throw new Error(result.reason);
+  expect(previews).toEqual([3, 7, 9]);
+  expect(run(result.code)).toBe(9);
+});
+
+test('preview includes pending peer inserts before their owner resets them', () => {
+  const source = 'globalThis.result=1';
+  let preview: unknown;
+  const first = defineNativePlugin({
+    name: 'first-preview',
+    pre(context) {
+      context.appendToProgram('[2].forEach(x=>globalThis.result+=x);');
+    },
+    post(context) {
+      context.editor.reset(0, source.length);
+    },
+  });
+  const second = defineNativePlugin({
+    name: 'second-preview',
+    pre(context) {
+      preview = run(context.editor.toString());
+      const name = context.sourceSlice(11, 17);
+      context.appendToProgram(context.code.template`[4].forEach(x=>globalThis.${name}+=x);`);
+    },
+  });
+  const result = transform(
+    source,
+    'input.js',
+    defineNativePipeline({ phases: [{ name: 'peer-preview', plugins: [first, second] }] }),
+  );
+  expect(preview).toBe(3);
+  expect(result.status).toBe('complete');
+  if (result.status !== 'complete') throw new Error(result.reason);
+  expect(run(result.code)).toBe(5);
+});

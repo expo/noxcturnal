@@ -57,7 +57,7 @@ for (const surface of surfaces) {
     );
     // Same comment count with a short and a long prefix: placement must not scan the prefix.
     for (const prefix of [0, 100_000]) {
-      for (const count of [100, 1000]) {
+      for (const count of [1, 100, 1000]) {
         const source = `/*${'x'.repeat(prefix)}*/\n` + 'void 1;\n'.repeat(count);
         const pipeline = surface.api.defineNativePipeline({
           phases: [
@@ -85,6 +85,83 @@ for (const surface of surfaces) {
           sample,
         );
       }
+    }
+    for (const mode of [
+      'text',
+      'unique text',
+      'mutated fragment',
+      'composite',
+      'Unicode',
+    ] as const) {
+      const source = 'globalThis.result=1;';
+      const pipeline = surface.api.defineNativePipeline({
+        phases: [
+          {
+            name: 'bulk-insertion',
+            plugins: [
+              surface.api.defineNativePlugin({
+                name: 'bulk-insertion',
+                pre(context) {
+                  const fragment = { code: 'void 1;', mapping: 'sourceless' as const };
+                  const copied = context.sourceSlice(18, 19);
+                  for (let index = 0; index < 1000; index++) {
+                    fragment.code = `void ${index};`;
+                    context.appendToProgram(
+                      mode === 'text'
+                        ? 'void 1;'
+                        : mode === 'unique text'
+                          ? `void ${index};`
+                          : mode === 'mutated fragment'
+                            ? fragment
+                            : mode === 'composite'
+                              ? context.code.template`void ${copied};`
+                              : `void "é😀${index}";`,
+                    );
+                  }
+                },
+              }),
+            ],
+          },
+        ],
+      });
+      bench(
+        `1000 program insertions / ${mode}`,
+        () => {
+          const result = surface.api.transform(source, 'bench.js', pipeline);
+          if (result.status !== 'complete') throw new Error(result.reason);
+        },
+        sample,
+      );
+    }
+    for (const live of [0, 100, 1000]) {
+      const source = 'globalThis.result=1;';
+      const pipeline = surface.api.defineNativePipeline({
+        phases: [
+          {
+            name: 'reset',
+            plugins: [
+              surface.api.defineNativePlugin({
+                name: 'reset',
+                pre(context) {
+                  for (let index = 0; index < live; index++) context.appendToProgram('void 0;');
+                  for (let index = 0; index < 100; index++) {
+                    context.editor.appendLeft(0, '/*temporary*/');
+                    context.editor.reset(0, 0);
+                  }
+                },
+              }),
+            ],
+          },
+        ],
+      });
+      bench(
+        `100 partial resets / ${live} live program insertions`,
+        () => {
+          const result = surface.api.transform(source, 'bench.js', pipeline);
+          if (result.status !== 'complete') throw new Error(result.reason);
+        },
+        sample,
+      );
     }
     const directiveSource = `"use strict"\n${'globalThis.seen=1\n'.repeat(20)}`;
     const insertion = surface.api.defineNativePipeline({

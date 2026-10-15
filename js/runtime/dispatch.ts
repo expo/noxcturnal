@@ -62,6 +62,7 @@ interface DispatcherEntry extends PathState {
 interface Dispatcher {
   contexts: Map<NativePlugin<any, any>, DispatcherEntry>;
   run(): void;
+  flushInsertions(): void;
 }
 
 export function createDispatcher(
@@ -89,15 +90,51 @@ export function createDispatcher(
   let activeTraversals: Set<string> | undefined;
   let programBodyOffsets: ReturnType<NativeTransformSession['programBodyOffsets']> | undefined;
   let programEndBoundary: EditCommand | undefined;
-  const programInsertions = new WeakMap<EditCommand, { prefix: string }>();
-  const programInsertionPoints = new Set<number>();
+  const programInsertions = new WeakMap<
+    EditCommand,
+    { prefix: string; pending: RealizedContent | undefined }
+  >();
+  const programInsertionPoints = new Map<number, EditCommand>();
+  let hasPendingInsertions = false;
+  const flushInsertions = (): void => {
+    if (!hasPendingInsertions) return;
+    const contents: (string | (string | { start: number; end: number })[])[] = [];
+    const targets: EditCommand[] = [];
+    const indices: number[] = [];
+    let previous: RealizedContent | undefined;
+    for (const edit of edits) {
+      const realized = programInsertions.get(edit)?.pending;
+      if (!realized) continue;
+      if (!previous || !identicalRealizedContent(previous, realized)) {
+        contents.push(realized.contentParts ?? realized.content!);
+        previous = realized;
+      }
+      targets.push(edit);
+      indices.push(contents.length - 1);
+    }
+    // Reset may have removed every pending insertion. Native facts are needed
+    // only for live edits; previews and the final commit use this same path.
+    if (targets.length) {
+      const separators = session.sourceTextOperations.insertionSuffixes(contents);
+      if (separators.length !== contents.length) throw new Error('invalid insertion suffix batch');
+      for (let index = 0; index < targets.length; index++) {
+        const edit = targets[index];
+        const suffix = separators[indices[index]] ? '\n;\n' : '\n';
+        if (edit.contentParts) edit.contentParts = [...edit.contentParts, suffix];
+        else edit.content += suffix;
+        programInsertions.get(edit)!.pending = undefined;
+      }
+    }
+    hasPendingInsertions = false;
+  };
+  const boundaryPrefixes: [string?, string?] = [];
   const insertionPrefix = (kind: EditCommand['kind'], offset: number): string => {
-    const first = !programInsertionPoints.has(offset);
-    const separator = first && programBodyOffsets?.[kind === 'Prologue' ? 3 : 4];
-    return (
-      (first && session.sourceTextOperations.needsLineBoundary(offset) ? '\n' : '') +
-      (separator ? ';\n' : '')
-    );
+    if (programInsertionPoints.has(offset)) return '';
+    const index = kind === 'Prologue' ? 0 : 1;
+    // Source is immutable in this phase; reset changes edits, not these facts.
+    return (boundaryPrefixes[index] ??=
+      (session.sourceTextOperations.needsLineBoundary(offset) ? '\n' : '') +
+      (programBodyOffsets?.[index + 3] ? ';\n' : ''));
   };
   const resetProgramBoundaries = (): void => {
     programInsertionPoints.clear();
@@ -106,16 +143,16 @@ export function createDispatcher(
       const record = programInsertions.get(edit);
       if (!record) continue;
       const prefix = insertionPrefix(edit.kind, edit.start);
-      if (edit.contentParts) {
+      if (prefix !== record.prefix && edit.contentParts) {
         edit.contentParts = [
           ...(prefix ? [prefix] : []),
           ...edit.contentParts.slice(record.prefix ? 1 : 0),
         ];
-      } else {
+      } else if (prefix !== record.prefix) {
         edit.content = prefix + edit.content!.slice(record.prefix.length);
       }
       record.prefix = prefix;
-      programInsertionPoints.add(edit.start);
+      if (!programInsertionPoints.has(edit.start)) programInsertionPoints.set(edit.start, edit);
       if (edit.kind === 'AppendLeft') append = edit;
     }
     if (programEndBoundary && !edits.includes(programEndBoundary)) programEndBoundary = undefined;
@@ -192,21 +229,19 @@ export function createDispatcher(
       realized: RealizedContent,
     ): void => {
       const prefix = insertionPrefix(kind, offset);
-      const suffix = session.sourceTextOperations.insertionSuffix(
-        realized.contentParts ?? [realized.content!],
-      );
-      programInsertionPoints.add(offset);
       const edit: EditCommand = {
         kind,
         start: offset,
         end: offset,
         ...(realized.contentParts
-          ? { contentParts: [...(prefix ? [prefix] : []), ...realized.contentParts, suffix] }
-          : { content: `${prefix}${realized.content}${suffix}` }),
+          ? { contentParts: [...(prefix ? [prefix] : []), ...realized.contentParts] }
+          : { content: `${prefix}${realized.content}` }),
         owner: plugin.name,
         order: order++,
       };
-      programInsertions.set(edit, { prefix });
+      if (!programInsertionPoints.has(offset)) programInsertionPoints.set(offset, edit);
+      programInsertions.set(edit, { prefix, pending: realized });
+      hasPendingInsertions = true;
       edits.push(edit);
     };
     const pushProgramInsertion = (
@@ -332,7 +367,12 @@ export function createDispatcher(
         return makeSourceFragment(session, start, end);
       },
       code: codeFactory,
-      editor: createEditor(session, edits, plugin.name, () => order++, resetProgramBoundaries),
+      editor: createEditor(session, edits, plugin.name, () => order++, {
+        affects: edit =>
+          edit === programEndBoundary || programInsertionPoints.get(edit.start) === edit,
+        reconcile: resetProgramBoundaries,
+        beforeCommit: flushInsertions,
+      }),
     };
     entry.context = context;
     contexts.set(plugin, entry);
@@ -656,6 +696,7 @@ export function createDispatcher(
   );
   return {
     contexts,
+    flushInsertions,
     run() {
       for (const entry of contexts.values()) resetSkippedTraversal(entry.skipped);
       dispatchRoutedEvents(
