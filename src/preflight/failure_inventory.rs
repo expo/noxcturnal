@@ -64,10 +64,6 @@ const REVIEWED: &[Entry] = &[
     unsupported!("regexp-pattern-invalid", "regexp-source-parse"),
     unsupported!("regexp-class-invalid-shape", "regexp-source-shape"),
     unsupported!(
-        "regexp-unicode-code-point-escape-invalid-shape",
-        "regexp-source-shape"
-    ),
-    unsupported!(
         "regexp-unicode-code-point-out-of-range",
         "regexp-source-shape"
     ),
@@ -87,10 +83,6 @@ const REVIEWED: &[Entry] = &[
     unsupported!("regexp-unicode-property-invalid", "regexp-source-shape"),
     unsupported!(
         "regexp-unicode-property-invalid-shape",
-        "regexp-source-shape"
-    ),
-    unsupported!(
-        "regexp-unicode-sets-class-invalid-shape",
         "regexp-source-shape"
     ),
     unsupported!(
@@ -264,11 +256,6 @@ const REVIEWED: &[Entry] = &[
     fatal!(
         "regexp-pattern-span-invalid",
         "regexp-ast-application",
-        true
-    ),
-    fatal!(
-        "regexp-unicode-astral-class-postcondition-failed",
-        "regexp-postcondition",
         true
     ),
     fatal!(

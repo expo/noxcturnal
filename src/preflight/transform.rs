@@ -2371,7 +2371,7 @@ impl<'a> Visit<'a> for PostconditionDetector {
         self.dot_all |= literal.regex.flags.contains(RegExpFlags::S);
         self.unicode_sets |= literal.regex.flags.contains(RegExpFlags::V);
         let remainder = literal.regex.pattern.text.as_str();
-        self.unicode_property |= remainder.contains("\\p{") || remainder.contains("\\P{");
+        self.unicode_property |= super::regexp::pattern_has_unicode_property(remainder);
         self.named_capture_groups |= literal
             .regex
             .pattern
