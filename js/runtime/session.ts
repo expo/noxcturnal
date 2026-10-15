@@ -481,9 +481,28 @@ export class NativeTransformSession {
     if (cached) return cached;
     // Semantic facts describe immutable session input, including across plugins.
     // Keep them separate from the coarse globals-query cache.
-    const references = this.#binding('binding.globals')
-      .globalBindingReferences(name)
-      .map(reference => ({ ...reference, type: 'Identifier' }));
+    const buffer = this.#binding('binding.globals').globalBindingReferencesBuffer(name);
+    const references: SemanticReferenceView[] = [];
+    // Match the native eight-word record without allocating intermediate views.
+    for (let offset = 0; offset < buffer.length; offset += 32) {
+      const parentId = buffer.readUInt32LE(offset + 16);
+      const parentType = buffer.readUInt32LE(offset + 20);
+      const parentStart = buffer.readUInt32LE(offset + 24);
+      const flags = buffer.readUInt32LE(offset + 28);
+      references.push({
+        id: buffer.readUInt32LE(offset),
+        type: 'Identifier',
+        start: buffer.readUInt32LE(offset + 4),
+        end: buffer.readUInt32LE(offset + 8),
+        scopeId: buffer.readUInt32LE(offset + 12),
+        parentId: parentId === 0xffffffff ? undefined : parentId,
+        parentType: NODE_TYPES[parentType] || undefined,
+        parentStart: parentStart === 0xffffffff ? undefined : parentStart,
+        read: (flags & 1) !== 0,
+        write: (flags & 2) !== 0,
+        memberWrite: (flags & 4) !== 0,
+      });
+    }
     this.#globalBindingReferencesCache.set(name, references);
     return references;
   }

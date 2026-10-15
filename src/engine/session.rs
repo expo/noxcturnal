@@ -9,7 +9,7 @@ use crate::generated::event_schema::{
 };
 use crate::semantic::retained_index::{
     NativeBindingFact, NativeCallFact, NativeCaptureGroup, NativeConstantFact, NativeRenamePlan,
-    NativeSemanticReference, RetainedIndex,
+    RetainedIndex,
 };
 
 use super::collect::{materialize_with_scope_parents, parse_program_body_offsets};
@@ -283,9 +283,9 @@ impl NativeIndexedSession {
     }
 
     #[napi]
-    pub fn global_binding_references(&self, name: String) -> Result<Vec<NativeSemanticReference>> {
+    pub fn global_binding_references_buffer(&self, name: String) -> Result<Buffer> {
         self.ensure_open()?;
-        Ok(self.retained_index.global_binding_references(&name))
+        Ok(self.retained_index.global_binding_references_buffer(&name))
     }
 
     #[napi]

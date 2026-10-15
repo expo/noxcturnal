@@ -47,7 +47,7 @@ for (const global of [false, true])
   });
 
 test('binding facts stay semantic when coarse global queries are cached first', () => {
-  const source = 'function f(){external+=1;external.value=2}';
+  const source = '/*😀*/function f(){external+=1;external.value=2}';
   const session = new NativeTransformSession(
     source,
     'input.js',
@@ -69,6 +69,10 @@ test('binding facts stay semantic when coarse global queries are cached first', 
     for (const reference of references) {
       expect(reference.scopeId).toBeGreaterThan(0);
       expect(source.slice(reference.start, reference.end)).toBe('external');
+      expect(reference.parentId).toBeTypeOf('number');
+      const parent = session.inspect([{ nodeId: reference.parentId!, fields: [] }])[0];
+      expect(reference.parentType).toBe(parent.type);
+      expect(reference.parentStart).toBe(parent.start);
     }
     const missing = session.globalBindingReferences('missing');
     expect(missing).toEqual([]);

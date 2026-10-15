@@ -557,14 +557,33 @@ impl RetainedIndex {
             })
     }
 
-    pub fn global_binding_references(&self, name: &str) -> Vec<NativeSemanticReference> {
-        self.name_ids
+    pub fn global_binding_references_buffer(&self, name: &str) -> Buffer {
+        let references = self
+            .name_ids
             .get(name)
             .and_then(|name_id| self.globals.get(name_id))
-            .map_or(&[][..], Vec::as_slice)
-            .iter()
-            .map(|reference| self.native_reference(reference))
-            .collect()
+            .map_or(&[][..], Vec::as_slice);
+        // Eight little-endian u32 words per reference. Parent type uses the
+        // generated node type id; absent parent fields use ABSENT_ID.
+        let mut words = crate::protocol::routed::PackedWords::with_capacity(references.len() * 32);
+        for reference in references {
+            let id = reference.node_id();
+            let parent = self.parent_id(id);
+            let flags = u32::from(reference.read())
+                | (u32::from(reference.write()) << 1)
+                | (u32::from(reference.member_write()) << 2);
+            words.extend([
+                id,
+                self.starts[id as usize],
+                self.ends[id as usize],
+                reference.scope_id,
+                parent.unwrap_or(ABSENT_ID),
+                parent.map_or(ABSENT_ID, |id| self.type_ids[id as usize]),
+                parent.map_or(ABSENT_ID, |id| self.starts[id as usize]),
+                flags,
+            ]);
+        }
+        words.into_bytes().into()
     }
 
     pub fn captures_batch(
