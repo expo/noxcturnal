@@ -4,7 +4,7 @@ use oxc_allocator::{Allocator, Box as ArenaBox, TakeIn, Vec as ArenaVec};
 use oxc_ast::{
     AstBuilder, AstKind,
     ast::{
-        Argument, AssignmentTarget, CatchClause, Expression, ForOfStatement, ForStatementLeft,
+        Argument, AssignmentTarget, Expression, ForOfStatement, ForStatementInit, ForStatementLeft,
         Program, Statement, TSTypeAnnotation, TSTypeParameterInstantiation,
         VariableDeclarationKind, VariableDeclarator,
     },
@@ -12,22 +12,21 @@ use oxc_ast::{
 use oxc_ast_visit::{VisitMut, walk_mut};
 use oxc_semantic::Semantic;
 use oxc_span::{GetSpan, Span};
-use oxc_syntax::operator::{AssignmentOperator, BinaryOperator, LogicalOperator, UnaryOperator};
+use oxc_syntax::operator::{AssignmentOperator, UnaryOperator};
 use rustc_hash::{FxHashMap, FxHashSet};
+
+use super::helpers::CustomHelperRequests;
+use crate::generated::inline_helpers::INLINE_FOR_OF_HELPER_DESCRIPTOR;
 
 pub(super) struct Plan {
     names: FxHashMap<(u32, u32), VecDeque<ForOfNames>>,
+    helper: String,
+    shadowed_global: bool,
 }
 
 struct ForOfNames {
     iterator: String,
-    next_method: String,
     step: String,
-    return_method: String,
-    return_result: String,
-    normal: String,
-    failed: String,
-    error: String,
     caught: String,
 }
 
@@ -38,6 +37,20 @@ pub(super) fn prepare(semantic: &Semantic<'_>) -> Plan {
         .symbol_names()
         .map(str::to_owned)
         .collect::<FxHashSet<_>>();
+    reserved.extend(
+        semantic
+            .scoping()
+            .root_unresolved_references()
+            .keys()
+            .map(|name| name.to_string()),
+    );
+    let shadowed_global = ["Symbol", "Array", "TypeError"].iter().any(|name| {
+        semantic
+            .scoping()
+            .get_binding(semantic.scoping().root_scope_id(), (*name).into())
+            .is_some()
+    });
+    let helper = reserve("_createForOfIteratorHelper", &mut reserved);
     let mut names = FxHashMap::<(u32, u32), VecDeque<ForOfNames>>::default();
     let mut depth_buckets = Vec::<Vec<&ForOfStatement<'_>>>::new();
     let mut active_loop_ends = Vec::<u32>::new();
@@ -63,8 +76,8 @@ pub(super) fn prepare(semantic: &Semantic<'_>) -> Plan {
     }
     // The text implementation transformed only outermost loops, reparsed, and
     // repeated. Within each round it allocated names in Semantic NodeId order.
-    // Preserve that ABI while the mutator reaches every retained loop in one
-    // walk by planning depth rounds up front.
+    // Retain that allocation order while the mutator reaches every retained
+    // loop in one walk by planning depth rounds up front.
     for bucket in depth_buckets {
         for statement in bucket {
             names
@@ -72,21 +85,23 @@ pub(super) fn prepare(semantic: &Semantic<'_>) -> Plan {
                 .or_default()
                 .push_back(ForOfNames {
                     iterator: reserve("_iterator", &mut reserved),
-                    next_method: reserve("_iteratorNext", &mut reserved),
                     step: reserve("_step", &mut reserved),
-                    return_method: reserve("_iteratorReturnMethod", &mut reserved),
-                    return_result: reserve("_iteratorReturn", &mut reserved),
-                    normal: reserve("_iteratorNormalCompletion", &mut reserved),
-                    failed: reserve("_didIteratorError", &mut reserved),
-                    error: reserve("_iteratorError", &mut reserved),
                     caught: reserve("_iteratorError2", &mut reserved),
                 });
         }
     }
-    Plan { names }
+    Plan {
+        names,
+        helper,
+        shadowed_global,
+    }
 }
 
 impl Plan {
+    pub(super) fn shadows_helper_globals(&self) -> bool {
+        self.shadowed_global
+    }
+
     pub(super) fn is_empty(&self) -> bool {
         self.names.is_empty()
     }
@@ -96,23 +111,45 @@ pub(super) fn run<'a>(
     allocator: &'a Allocator,
     program: &mut Program<'a>,
     plan: Plan,
-) -> Result<bool, &'static str> {
+    inline_helpers: bool,
+) -> Result<(bool, CustomHelperRequests), &'static str> {
+    let mut requests = CustomHelperRequests::default();
+    if inline_helpers {
+        requests.materialize_generated(
+            &INLINE_FOR_OF_HELPER_DESCRIPTOR,
+            true,
+            &[("_createForOfIteratorHelper", &plan.helper)],
+        );
+    } else {
+        let module = program.body.iter().any(|statement| {
+            matches!(
+                statement,
+                Statement::ImportDeclaration(_)
+                    | Statement::ExportNamedDeclaration(_)
+                    | Statement::ExportDefaultDeclaration(_)
+                    | Statement::ExportAllDeclaration(_)
+            )
+        });
+        requests.materialize_runtime("createForOfIteratorHelper", &plan.helper, module);
+    }
     let mut pass = ForOfLowerer {
         ast: AstBuilder::new(allocator),
         names: plan.names,
+        helper: plan.helper,
         changed: false,
         error: None,
     };
     pass.visit_program(program);
     match pass.error {
         Some(error) => Err(error),
-        None => Ok(pass.changed),
+        None => Ok((pass.changed, requests)),
     }
 }
 
 struct ForOfLowerer<'a> {
     ast: AstBuilder<'a>,
     names: FxHashMap<(u32, u32), VecDeque<ForOfNames>>,
+    helper: String,
     changed: bool,
     error: Option<&'static str>,
 }
@@ -122,7 +159,7 @@ impl<'a> ForOfLowerer<'a> {
     fn lower(
         &mut self,
         statement: ForOfStatement<'a>,
-        label: Option<&str>,
+        labels: Vec<String>,
         enclosing_span: Span,
     ) -> Result<Statement<'a>, &'static str> {
         let key = (statement.span.start, statement.span.end);
@@ -135,13 +172,7 @@ impl<'a> ForOfLowerer<'a> {
         }
         let ForOfNames {
             iterator,
-            next_method,
             step,
-            return_method,
-            return_result,
-            normal,
-            failed,
-            error,
             caught,
         } = names;
         let anchor = Span::new(
@@ -176,48 +207,19 @@ impl<'a> ForOfLowerer<'a> {
                 self.ast.statement_expression(assignment.span(), assignment)
             }
         };
-        let symbol_iterator = self.member(anchor, self.id(anchor, "Symbol"), "iterator");
-        let iterator_method = {
-            #[expect(deprecated)]
-            {
-                Expression::from(self.ast.member_expression_computed(
-                    anchor,
-                    right,
-                    symbol_iterator,
-                    false,
-                ))
-            }
-        };
-        let iterator_init = self.call0(anchor, iterator_method);
-        let iterator_declaration = self.declarator(anchor, &iterator, Some(iterator_init));
-        let next_method_declaration = self.declarator(
+        let helper_call = self.ast.expression_call(
             anchor,
-            &next_method,
-            Some(self.member(anchor, self.id(anchor, &iterator), "next")),
-        );
-        let step_declaration = self.declarator(anchor, &step, None);
-        #[expect(deprecated)]
-        let init = self.ast.for_statement_init_variable_declaration(
-            anchor,
-            VariableDeclarationKind::Var,
-            self.vec([
-                iterator_declaration,
-                next_method_declaration,
-                step_declaration,
-            ]),
-            false,
-        );
-
-        let mut next_arguments = ArenaVec::new_in(&self.ast);
-        next_arguments.push(Argument::from(self.id(anchor, &iterator)));
-        #[expect(deprecated)]
-        let next = self.ast.expression_call(
-            anchor,
-            self.member(anchor, self.id(anchor, &next_method), "call"),
+            self.id(anchor, &self.helper),
             None::<ArenaBox<'a, TSTypeParameterInstantiation<'a>>>,
-            next_arguments,
+            self.vec([Argument::from(right)]),
             false,
         );
+        let iterator_declaration = self.declarator(anchor, &iterator, Some(helper_call));
+        let step_declaration = self.declarator(anchor, &step, None);
+        let init = ForStatementInit::from(
+            self.call0(anchor, self.member(anchor, self.id(anchor, &iterator), "s")),
+        );
+        let next = self.call0(anchor, self.member(anchor, self.id(anchor, &iterator), "n"));
         let assign_step = self.assign_name(anchor, &step, next);
         let done = self.member(anchor, self.id(anchor, &step), "done");
         #[expect(deprecated)]
@@ -228,40 +230,23 @@ impl<'a> ForOfLowerer<'a> {
         let test = self
             .ast
             .expression_sequence(anchor, self.vec([assign_step, not_done]));
-        let update = self.assign_name(
-            anchor,
-            &normal,
-            self.ast.expression_boolean_literal(anchor, true),
-        );
-        // IteratorNext and IteratorComplete both happen before the loop is in
-        // an abruptly-closeable state. Validate the result before flipping
-        // `normal`; otherwise this TypeError would incorrectly call return().
-        let validate_step = self.validate_iterator_result(anchor, &step);
-        let mark_abrupt = self.expression_statement(
-            anchor,
-            self.assign_name(
-                anchor,
-                &normal,
-                self.ast.expression_boolean_literal(anchor, false),
-            ),
-        );
         // The loop-head binding and the source body have distinct lexical
         // environments. Keep an existing body block nested so declarations in
         // it may legally shadow the per-iteration binding.
-        let body = self.vec([validate_step, mark_abrupt, binding, statement.body]);
+        let body = self.vec([binding, statement.body]);
         #[expect(deprecated)]
         let loop_body = self.ast.statement_block(anchor, body);
         #[expect(deprecated)]
         let mut loop_statement =
             self.ast
-                .statement_for(anchor, Some(init), Some(test), Some(update), loop_body);
-        if let Some(label) = label {
+                .statement_for(anchor, Some(init), Some(test), None, loop_body);
+        for label in labels.into_iter().rev() {
             #[expect(deprecated)]
             {
                 loop_statement = self.ast.statement_labeled(
                     anchor,
                     self.ast
-                        .label_identifier(anchor, self.ast.allocator.alloc_str(label)),
+                        .label_identifier(anchor, self.ast.allocator.alloc_str(&label)),
                     loop_statement,
                 );
             }
@@ -270,22 +255,16 @@ impl<'a> ForOfLowerer<'a> {
         let try_block = self
             .ast
             .alloc_block_statement(anchor, self.vec([loop_statement]));
+        let report_error = self.ast.expression_call(
+            anchor,
+            self.member(anchor, self.id(anchor, &iterator), "e"),
+            None::<ArenaBox<'a, TSTypeParameterInstantiation<'a>>>,
+            self.vec([Argument::from(self.id(anchor, &caught))]),
+            false,
+        );
         let catch_body = self.ast.alloc_block_statement(
             anchor,
-            self.vec([
-                self.expression_statement(
-                    anchor,
-                    self.assign_name(
-                        anchor,
-                        &failed,
-                        self.ast.expression_boolean_literal(anchor, true),
-                    ),
-                ),
-                self.expression_statement(
-                    anchor,
-                    self.assign_name(anchor, &error, self.id(anchor, &caught)),
-                ),
-            ]),
+            self.vec([self.expression_statement(anchor, report_error)]),
         );
         #[expect(deprecated)]
         let catch = self.ast.alloc_catch_clause(
@@ -301,90 +280,14 @@ impl<'a> ForOfLowerer<'a> {
             catch_body,
         );
 
-        #[expect(deprecated)]
-        let not_normal =
-            self.ast
-                .expression_unary(anchor, UnaryOperator::LogicalNot, self.id(anchor, &normal));
-        #[expect(deprecated)]
-        let has_return = self.ast.expression_binary(
-            anchor,
-            self.assign_name(
-                anchor,
-                &return_method,
-                self.member(anchor, self.id(anchor, &iterator), "return"),
-            ),
-            BinaryOperator::Inequality,
-            self.ast.expression_null_literal(anchor),
-        );
-        #[expect(deprecated)]
-        let should_return =
-            self.ast
-                .expression_logical(anchor, not_normal, LogicalOperator::And, has_return);
-        let mut return_arguments = ArenaVec::new_in(&self.ast);
-        return_arguments.push(Argument::from(self.id(anchor, &iterator)));
-        #[expect(deprecated)]
-        let call_return = self.ast.expression_call(
-            anchor,
-            self.member(anchor, self.id(anchor, &return_method), "call"),
-            None::<ArenaBox<'a, TSTypeParameterInstantiation<'a>>>,
-            return_arguments,
-            false,
-        );
-        let assign_return = self.assign_name(anchor, &return_result, call_return);
-        let validate_return = self.validate_iterator_result(anchor, &return_result);
-        #[expect(deprecated)]
-        let return_body = self.ast.statement_block(
-            anchor,
-            self.vec([
-                self.expression_statement(anchor, assign_return),
-                validate_return,
-            ]),
-        );
-        #[expect(deprecated)]
-        let return_if = self
-            .ast
-            .statement_if(anchor, should_return, return_body, None);
-        let inner_try_block = self
-            .ast
-            .alloc_block_statement(anchor, self.vec([return_if]));
-        #[expect(deprecated)]
-        let throw_if = self.ast.statement_if(
-            anchor,
-            self.id(anchor, &failed),
-            self.ast.statement_throw(anchor, self.id(anchor, &error)),
-            None,
-        );
-        let inner_finally = self.ast.alloc_block_statement(anchor, self.vec([throw_if]));
-        #[expect(deprecated)]
-        let inner_try = self.ast.statement_try(
-            anchor,
-            inner_try_block,
-            None::<ArenaBox<'a, CatchClause<'a>>>,
-            Some(inner_finally),
-        );
+        let close = self.call0(anchor, self.member(anchor, self.id(anchor, &iterator), "f"));
         let outer_finally = self
             .ast
-            .alloc_block_statement(anchor, self.vec([inner_try]));
-        #[expect(deprecated)]
+            .alloc_block_statement(anchor, self.vec([self.expression_statement(anchor, close)]));
         let try_statement =
             self.ast
                 .statement_try(anchor, try_block, Some(catch), Some(outer_finally));
-
-        let declarations = self.vec([
-            self.declarator(
-                anchor,
-                &normal,
-                Some(self.ast.expression_boolean_literal(anchor, true)),
-            ),
-            self.declarator(
-                anchor,
-                &failed,
-                Some(self.ast.expression_boolean_literal(anchor, false)),
-            ),
-            self.declarator(anchor, &error, None),
-            self.declarator(anchor, &return_method, None),
-            self.declarator(anchor, &return_result, None),
-        ]);
+        let declarations = self.vec([iterator_declaration, step_declaration]);
         let variables = Statement::VariableDeclaration(self.ast.alloc_variable_declaration(
             anchor,
             VariableDeclarationKind::Var,
@@ -452,41 +355,6 @@ impl<'a> ForOfLowerer<'a> {
         }
     }
 
-    fn validate_iterator_result(&self, span: Span, name: &str) -> Statement<'a> {
-        let mut object_arguments = ArenaVec::new_in(&self.ast);
-        object_arguments.push(Argument::from(self.id(span, name)));
-        #[expect(deprecated)]
-        let object_result = self.ast.expression_call(
-            span,
-            self.id(span, "Object"),
-            None::<ArenaBox<'a, TSTypeParameterInstantiation<'a>>>,
-            object_arguments,
-            false,
-        );
-        #[expect(deprecated)]
-        let invalid = self.ast.expression_binary(
-            span,
-            object_result,
-            BinaryOperator::StrictInequality,
-            self.id(span, name),
-        );
-        let mut error_arguments = ArenaVec::new_in(&self.ast);
-        error_arguments.push(Argument::from(self.ast.expression_string_literal(
-            span,
-            "Iterator result is not an object",
-            None,
-        )));
-        let error = self.ast.expression_new(
-            span,
-            self.id(span, "TypeError"),
-            None::<ArenaBox<'a, TSTypeParameterInstantiation<'a>>>,
-            error_arguments,
-        );
-        #[expect(deprecated)]
-        self.ast
-            .statement_if(span, invalid, self.ast.statement_throw(span, error), None)
-    }
-
     fn declarator(
         &self,
         span: Span,
@@ -514,37 +382,26 @@ impl<'a> ForOfLowerer<'a> {
     }
 
     fn lower_statement(&mut self, statement: &mut Statement<'a>) -> Result<bool, &'static str> {
-        if let Statement::LabeledStatement(labeled) = statement
-            && matches!(
-                labeled.body,
-                Statement::ForOfStatement(ref for_of) if !for_of.r#await
-            )
-        {
-            let enclosing_span = labeled.span;
-            let label = labeled.label.name.to_string();
-            let old = statement.take_in(&self.ast);
-            let Statement::LabeledStatement(labeled) = old else {
-                unreachable!();
-            };
-            let Statement::ForOfStatement(for_of) = labeled.unbox().body else {
-                unreachable!();
-            };
-            *statement = self.lower(for_of.unbox(), Some(&label), enclosing_span)?;
-            return Ok(true);
+        let mut target = &*statement;
+        while let Statement::LabeledStatement(labeled) = target {
+            target = &labeled.body;
         }
-        if matches!(
-            statement,
-            Statement::ForOfStatement(for_of) if !for_of.r#await
-        ) {
-            let old = statement.take_in(&self.ast);
-            let Statement::ForOfStatement(for_of) = old else {
-                unreachable!();
-            };
-            let span = for_of.span;
-            *statement = self.lower(for_of.unbox(), None, span)?;
-            return Ok(true);
+        if !matches!(target, Statement::ForOfStatement(for_of) if !for_of.r#await) {
+            return Ok(false);
         }
-        Ok(false)
+        let enclosing_span = statement.span();
+        let mut target = statement.take_in(&self.ast);
+        let mut labels = Vec::new();
+        while let Statement::LabeledStatement(labeled) = target {
+            let labeled = labeled.unbox();
+            labels.push(labeled.label.name.to_string());
+            target = labeled.body;
+        }
+        let Statement::ForOfStatement(for_of) = target else {
+            unreachable!()
+        };
+        *statement = self.lower(for_of.unbox(), labels, enclosing_span)?;
+        Ok(true)
     }
 }
 

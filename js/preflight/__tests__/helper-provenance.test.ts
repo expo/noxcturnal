@@ -11,6 +11,7 @@ const runtimeRequire = createRequire(import.meta.url);
 test('structural helper dependencies are identical in inline and runtime modes', () => {
   for (const [source, filename, transforms] of [
     ['const value = { ...input };', 'fixture.js', { objectRestSpread: true }],
+    ['for (const value of input) consume(value);', 'fixture.js', { forOf: true }],
     [
       'const view = <Widget label="value" {...props} />;',
       'fixture.jsx',
@@ -169,4 +170,38 @@ test('async iterator result registry rejects non-object results', () => {
       message: 'Iterator result is not an object',
     },
   );
+});
+
+test('for-of shares one standard helper across loops and reserves external helper names', () => {
+  const source = `const out=[];
+    for(const value of [1])out.push(value, _createForOfIteratorHelper);
+    for(const value of new Set([2]))out.push(value);
+    globalThis.result=out;`;
+  for (const [helpersMode, helpersVersion] of [
+    ['inline', '7.29.7'],
+    ['runtime', '7.29.7'],
+    ['runtime', '7.0.0'],
+  ] as const) {
+    const result = native.nativePreflightTransform(source, 'fixture.js', {
+      forOf: true,
+      helpersMode,
+      helpersVersion,
+    });
+    assert.equal(result.status, 'complete', result.reason);
+    assert.deepEqual(result.helpersUsed, ['createForOfIteratorHelper']);
+    assert.doesNotMatch(
+      result.code!,
+      /_iteratorSymbol|_iteratorCall|_iteratorNext|_iteratorReturnMethod|Iterator result is not an object/,
+    );
+    const imports =
+      result.code!.match(/require\("@babel\/runtime\/helpers\/createForOfIteratorHelper"\)/g) ?? [];
+    assert.equal(imports.length, helpersMode === 'runtime' && helpersVersion === '7.29.7' ? 1 : 0);
+    const context: { result?: unknown } = {};
+    new Function('require', 'globalThis', '_createForOfIteratorHelper', result.code!)(
+      runtimeRequire,
+      context,
+      'external',
+    );
+    assert.deepEqual(context.result, [1, 'external', 2]);
+  }
 });

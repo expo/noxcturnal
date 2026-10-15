@@ -133,6 +133,12 @@ for (const [name, roots] of Object.entries(bundles)) generated[name] = await bui
 const compatibilityRoots = new Set(Object.values(bundles).flat());
 
 const adapterBundles = {
+  INLINE_FOR_OF_HELPER: {
+    roots: ['createForOfIteratorHelper'],
+    binding: '_createForOfIteratorHelper2',
+    adapter:
+      'var _createForOfIteratorHelper=_createForOfIteratorHelper2.createForOfIteratorHelper;',
+  },
   INLINE_EXTENDS_HELPER: {
     roots: ['extends'],
     binding: '_extends2',
@@ -262,6 +268,26 @@ function generatedDirectFragment(source, helpers) {
   };
 }
 
+// Keep the for-of inline closure small: use the runtime functions directly,
+// with their dependency bindings local to the initializer (no module loader).
+const forOfDependencies = ['arrayLikeToArray', 'unsupportedIterableToArray'];
+assert.deepEqual(moduleDependencies.get('createForOfIteratorHelper'), [
+  'unsupportedIterableToArray',
+]);
+assert.deepEqual(moduleDependencies.get('unsupportedIterableToArray'), ['arrayLikeToArray']);
+assert.deepEqual(moduleDependencies.get('arrayLikeToArray'), []);
+const forOfDeclarations = forOfDependencies
+  .map(name => `var ${name}=${require(`@babel/runtime/helpers/${name}`).toString()};`)
+  .join('');
+generated.INLINE_FOR_OF_HELPER = generatedDirectFragment(
+  `var _createForOfIteratorHelper=(function(){${forOfDeclarations}return ${require('@babel/runtime/helpers/createForOfIteratorHelper').toString()};})();`,
+  [...forOfDependencies, 'createForOfIteratorHelper'],
+);
+generated.INLINE_FOR_OF_HELPER_RUNTIME = generatedDirectFragment(
+  'var _createForOfIteratorHelper=require("@babel/runtime/helpers/createForOfIteratorHelper");',
+  ['createForOfIteratorHelper'],
+);
+
 // Direct callable roots do not need an object adapter. These implementations
 // are still read from the installed runtime; only Babel's CommonJS self-export
 // bookkeeping is removed from the inline declaration.
@@ -338,6 +364,7 @@ function materializeGeneratedFunction(name, binding) {
 
 for (const [name, value] of Object.entries(generated)) {
   if (
+    !name.startsWith('INLINE_FOR_OF_') &&
     !name.startsWith('INLINE_EXTENDS_') &&
     !name.startsWith('INLINE_READ_ONLY_ERROR_') &&
     !name.startsWith('INLINE_TO_PROPERTY_KEY_') &&

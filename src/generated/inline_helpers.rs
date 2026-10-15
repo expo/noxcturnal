@@ -97,132 +97,139 @@ pub static BABEL_HELPER_COMPATIBILITY: &[GeneratedHelperCompatibility] = &[
     },
     GeneratedHelperCompatibility {
         ordinal: 13,
+        name: "createForOfIteratorHelper",
+        runtime_path: "createForOfIteratorHelper",
+        min_version: "7.9.0",
+        export_shape: "default",
+    },
+    GeneratedHelperCompatibility {
+        ordinal: 14,
         name: "defineProperty",
         runtime_path: "defineProperty",
         min_version: "7.0.0-beta.0",
         export_shape: "default",
     },
     GeneratedHelperCompatibility {
-        ordinal: 14,
+        ordinal: 15,
         name: "extends",
         runtime_path: "extends",
         min_version: "7.0.0-beta.0",
         export_shape: "default",
     },
     GeneratedHelperCompatibility {
-        ordinal: 15,
+        ordinal: 16,
         name: "get",
         runtime_path: "get",
         min_version: "7.0.0-beta.0",
         export_shape: "default",
     },
     GeneratedHelperCompatibility {
-        ordinal: 16,
+        ordinal: 17,
         name: "objectDestructuringEmpty",
         runtime_path: "objectDestructuringEmpty",
         min_version: "7.0.0-beta.0",
         export_shape: "default",
     },
     GeneratedHelperCompatibility {
-        ordinal: 17,
+        ordinal: 18,
         name: "objectSpread2",
         runtime_path: "objectSpread2",
         min_version: "7.5.0",
         export_shape: "default",
     },
     GeneratedHelperCompatibility {
-        ordinal: 18,
+        ordinal: 19,
         name: "objectWithoutProperties",
         runtime_path: "objectWithoutProperties",
         min_version: "7.0.0-beta.0",
         export_shape: "default",
     },
     GeneratedHelperCompatibility {
-        ordinal: 19,
+        ordinal: 20,
         name: "objectWithoutPropertiesLoose",
         runtime_path: "objectWithoutPropertiesLoose",
         min_version: "7.0.0-beta.0",
         export_shape: "default",
     },
     GeneratedHelperCompatibility {
-        ordinal: 20,
+        ordinal: 21,
         name: "readOnlyError",
         runtime_path: "readOnlyError",
         min_version: "7.0.0-beta.0",
         export_shape: "default",
     },
     GeneratedHelperCompatibility {
-        ordinal: 21,
+        ordinal: 22,
         name: "slicedToArray",
         runtime_path: "slicedToArray",
         min_version: "7.0.0-beta.0",
         export_shape: "default",
     },
     GeneratedHelperCompatibility {
-        ordinal: 22,
+        ordinal: 23,
         name: "superPropGet",
         runtime_path: "superPropGet",
         min_version: "7.25.0",
         export_shape: "default",
     },
     GeneratedHelperCompatibility {
-        ordinal: 23,
+        ordinal: 24,
         name: "superPropSet",
         runtime_path: "superPropSet",
         min_version: "7.25.0",
         export_shape: "default",
     },
     GeneratedHelperCompatibility {
-        ordinal: 24,
+        ordinal: 25,
         name: "taggedTemplateLiteral",
         runtime_path: "taggedTemplateLiteral",
         min_version: "7.0.0-beta.0",
         export_shape: "default",
     },
     GeneratedHelperCompatibility {
-        ordinal: 25,
+        ordinal: 26,
         name: "toArray",
         runtime_path: "toArray",
         min_version: "7.0.0-beta.0",
         export_shape: "default",
     },
     GeneratedHelperCompatibility {
-        ordinal: 26,
+        ordinal: 27,
         name: "toPropertyKey",
         runtime_path: "toPropertyKey",
         min_version: "7.1.5",
         export_shape: "default",
     },
     GeneratedHelperCompatibility {
-        ordinal: 27,
+        ordinal: 28,
         name: "toSetter",
         runtime_path: "toSetter",
         min_version: "7.24.0",
         export_shape: "default",
     },
     GeneratedHelperCompatibility {
-        ordinal: 28,
+        ordinal: 29,
         name: "usingCtx",
         runtime_path: "usingCtx",
         min_version: "7.23.9",
         export_shape: "default",
     },
     GeneratedHelperCompatibility {
-        ordinal: 29,
+        ordinal: 30,
         name: "wrapAsyncGenerator",
         runtime_path: "wrapAsyncGenerator",
         min_version: "7.0.0-beta.0",
         export_shape: "default",
     },
     GeneratedHelperCompatibility {
-        ordinal: 30,
+        ordinal: 31,
         name: "wrapRegExp",
         runtime_path: "wrapRegExp",
         min_version: "7.19.0",
         export_shape: "default",
     },
     GeneratedHelperCompatibility {
-        ordinal: 31,
+        ordinal: 32,
         name: "writeOnlyError",
         runtime_path: "writeOnlyError",
         min_version: "7.12.13",
@@ -281,6 +288,11 @@ pub static BABEL_INLINE_ROOTS: &[GeneratedInlineRoot] = &[
     GeneratedInlineRoot {
         name: "construct",
         compact: r#"(()=>{var x={isNativeReflectConstruct:function(t,r){function e(){try{var o=!Boolean.prototype.valueOf.call(Reflect.construct(Boolean,[],function(){}))}catch(s){}return(t.exports=e=function(){return!!o},t.exports.__esModule=!0,t.exports.default=t.exports)()}t.exports=e,t.exports.__esModule=!0,t.exports.default=t.exports},setPrototypeOf:function(t,r){function e(o,s){return t.exports=e=Object.setPrototypeOf?Object.setPrototypeOf.bind():function(n,p){return n.__proto__=p,n},t.exports.__esModule=!0,t.exports.default=t.exports,e(o,s)}t.exports=e,t.exports.__esModule=!0,t.exports.default=t.exports},construct:function(t,r){var e=r("isNativeReflectConstruct"),o=r("setPrototypeOf");function s(n,p,a){if(e())return Reflect.construct.apply(null,arguments);var u=[null];u.push.apply(u,p);var i=new(n.bind.apply(n,u));return a&&o(i,a.prototype),i}t.exports=s,t.exports.__esModule=!0,t.exports.default=t.exports}},c={};function f(t){if(c[t])return c[t].exports;var r=c[t]={exports:{}};return x[t](r,f),r.exports}return{construct:f("construct")}})()"#,
+    },
+    GeneratedInlineRoot {
+        name: "createForOfIteratorHelper",
+        compact: r#"(()=>{var v={arrayLikeToArray:function(t,n){function u(a,r){(r==null||r>a.length)&&(r=a.length);for(var o=0,e=Array(r);o<r;o++)e[o]=a[o];return e}t.exports=u,t.exports.__esModule=!0,t.exports.default=t.exports},unsupportedIterableToArray:function(t,n){var u=n("arrayLikeToArray");function a(r,o){if(r){if(typeof r=="string")return u(r,o);var e={}.toString.call(r).slice(8,-1);return e==="Object"&&r.constructor&&(e=r.constructor.name),e==="Map"||e==="Set"?Array.from(r):e==="Arguments"||/^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(e)?u(r,o):void 0}}t.exports=a,t.exports.__esModule=!0,t.exports.default=t.exports},createForOfIteratorHelper:function(t,n){var u=n("unsupportedIterableToArray");function a(r,o){var e=typeof Symbol!="undefined"&&r[Symbol.iterator]||r["@@iterator"];if(!e){if(Array.isArray(r)||(e=u(r))||o&&r&&typeof r.length=="number"){e&&(r=e);var c=0,l=function(){};return{s:l,n:function(){return c>=r.length?{done:!0}:{done:!1,value:r[c++]}},e:function(f){throw f},f:l}}throw new TypeError(`Invalid attempt to iterate non-iterable instance.
+In order to be iterable, non-array objects must have a [Symbol.iterator]() method.`)}var y,x=!0,d=!1;return{s:function(){e=e.call(r)},n:function(){var f=e.next();return x=f.done,f},e:function(f){d=!0,y=f},f:function(){try{x||e.return==null||e.return()}finally{if(d)throw y}}}}t.exports=a,t.exports.__esModule=!0,t.exports.default=t.exports}},s={};function p(t){if(s[t])return s[t].exports;var n=s[t]={exports:{}};return v[t](n,p),n.exports}return{createForOfIteratorHelper:p("createForOfIteratorHelper")}})()"#,
     },
     GeneratedInlineRoot {
         name: "defineProperty",
@@ -366,6 +378,72 @@ pub const INLINE_ASYNC_TO_GENERATOR: &str = r#"(()=>{var y={asyncToGenerator:fun
 pub const INLINE_USING_CTX: &str = r#"(()=>{var y={usingCtx:function(n,l){function v(){var b=typeof SuppressedError=="function"?SuppressedError:function(t,r){var e=Error();return e.name="SuppressedError",e.error=t,e.suppressed=r,e},i={},u=[];function d(t,r){if(r!=null){if(Object(r)!==r)throw new TypeError("using declarations can only be used with objects, functions, null, or undefined.");if(t)var e=r[Symbol.asyncDispose||Symbol.for("Symbol.asyncDispose")];if(e===void 0&&(e=r[Symbol.dispose||Symbol.for("Symbol.dispose")],t))var o=e;if(typeof e!="function")throw new TypeError("Object is not disposable.");o&&(e=function(){try{o.call(r)}catch(f){return Promise.reject(f)}}),u.push({v:r,d:e,a:t})}else t&&u.push({d:r,a:t});return r}return{e:i,u:d.bind(null,!1),a:d.bind(null,!0),d:function(){var r,e=this.e,o=0;function s(){for(;r=u.pop();)try{if(!r.a&&o===1)return o=0,u.push(r),Promise.resolve().then(s);if(r.d){var c=r.d.call(r.v);if(r.a)return o|=2,Promise.resolve(c).then(s,f)}else o|=1}catch(h){return f(h)}if(o===1)return e!==i?Promise.reject(e):Promise.resolve();if(e!==i)throw e}function f(c){return e=e!==i?new b(c,e):c,s()}return s()}}}n.exports=v,n.exports.__esModule=!0,n.exports.default=n.exports}},p={};function a(n){if(p[n])return p[n].exports;var l=p[n]={exports:{}};return y[n](l,a),l.exports}return{usingCtx:a("usingCtx")}})()"#;
 pub const INLINE_OBJECT_HELPERS: &str = r#"(()=>{var y={typeof:function(t,s){function p(n){"@babel/helpers - typeof";return t.exports=p=typeof Symbol=="function"&&typeof Symbol.iterator=="symbol"?function(e){return typeof e}:function(e){return e&&typeof Symbol=="function"&&e.constructor===Symbol&&e!==Symbol.prototype?"symbol":typeof e},t.exports.__esModule=!0,t.exports.default=t.exports,p(n)}t.exports=p,t.exports.__esModule=!0,t.exports.default=t.exports},toPrimitive:function(t,s){var p=s("typeof").default;function n(e,o){if(p(e)!="object"||!e)return e;var r=e[Symbol.toPrimitive];if(r!==void 0){var i=r.call(e,o||"default");if(p(i)!="object")return i;throw new TypeError("@@toPrimitive must return a primitive value.")}return(o==="string"?String:Number)(e)}t.exports=n,t.exports.__esModule=!0,t.exports.default=t.exports},toPropertyKey:function(t,s){var p=s("typeof").default,n=s("toPrimitive");function e(o){var r=n(o,"string");return p(r)=="symbol"?r:r+""}t.exports=e,t.exports.__esModule=!0,t.exports.default=t.exports},defineProperty:function(t,s){var p=s("toPropertyKey");function n(e,o,r){return(o=p(o))in e?Object.defineProperty(e,o,{value:r,enumerable:!0,configurable:!0,writable:!0}):e[o]=r,e}t.exports=n,t.exports.__esModule=!0,t.exports.default=t.exports},extends:function(t,s){function p(){return t.exports=p=Object.assign?Object.assign.bind():function(n){for(var e=1;e<arguments.length;e++){var o=arguments[e];for(var r in o)({}).hasOwnProperty.call(o,r)&&(n[r]=o[r])}return n},t.exports.__esModule=!0,t.exports.default=t.exports,p.apply(null,arguments)}t.exports=p,t.exports.__esModule=!0,t.exports.default=t.exports},objectDestructuringEmpty:function(t,s){function p(n){if(n==null)throw new TypeError("Cannot destructure "+n)}t.exports=p,t.exports.__esModule=!0,t.exports.default=t.exports},objectSpread2:function(t,s){var p=s("defineProperty");function n(o,r){var i=Object.keys(o);if(Object.getOwnPropertySymbols){var u=Object.getOwnPropertySymbols(o);r&&(u=u.filter(function(f){return Object.getOwnPropertyDescriptor(o,f).enumerable})),i.push.apply(i,u)}return i}function e(o){for(var r=1;r<arguments.length;r++){var i=arguments[r]!=null?arguments[r]:{};r%2?n(Object(i),!0).forEach(function(u){p(o,u,i[u])}):Object.getOwnPropertyDescriptors?Object.defineProperties(o,Object.getOwnPropertyDescriptors(i)):n(Object(i)).forEach(function(u){Object.defineProperty(o,u,Object.getOwnPropertyDescriptor(i,u))})}return o}t.exports=e,t.exports.__esModule=!0,t.exports.default=t.exports},objectWithoutPropertiesLoose:function(t,s){function p(n,e){if(n==null)return{};var o={};for(var r in n)if({}.hasOwnProperty.call(n,r)){if(e.indexOf(r)!==-1)continue;o[r]=n[r]}return o}t.exports=p,t.exports.__esModule=!0,t.exports.default=t.exports},objectWithoutProperties:function(t,s){var p=s("objectWithoutPropertiesLoose");function n(e,o){if(e==null)return{};var r,i,u=p(e,o);if(Object.getOwnPropertySymbols){var f=Object.getOwnPropertySymbols(e);for(i=0;i<f.length;i++)r=f[i],o.indexOf(r)===-1&&{}.propertyIsEnumerable.call(e,r)&&(u[r]=e[r])}return u}t.exports=n,t.exports.__esModule=!0,t.exports.default=t.exports}},a={};function c(t){if(a[t])return a[t].exports;var s=a[t]={exports:{}};return y[t](s,c),s.exports}return{defineProperty:c("defineProperty"),extends:c("extends"),objectDestructuringEmpty:c("objectDestructuringEmpty"),objectSpread2:c("objectSpread2"),objectWithoutProperties:c("objectWithoutProperties"),objectWithoutPropertiesLoose:c("objectWithoutPropertiesLoose"),toPropertyKey:c("toPropertyKey")}})()"#;
 pub const INLINE_OXC_CLASS_FEATURE_HELPERS: &str = r#"(()=>{var d={checkPrivateRedeclaration:function(e,s){function o(r,t){if(t.has(r))throw new TypeError("Cannot initialize the same private elements twice on an object")}e.exports=o,e.exports.__esModule=!0,e.exports.default=e.exports},classPrivateFieldInitSpec:function(e,s){var o=s("checkPrivateRedeclaration");function r(t,n,p){o(t,n),n.set(t,p)}e.exports=r,e.exports.__esModule=!0,e.exports.default=e.exports},classPrivateMethodInitSpec:function(e,s){var o=s("checkPrivateRedeclaration");function r(t,n){o(t,n),n.add(t)}e.exports=r,e.exports.__esModule=!0,e.exports.default=e.exports},assertClassBrand:function(e,s){function o(r,t,n){if(typeof r=="function"?r===t:r.has(t))return arguments.length<3?t:n;throw new TypeError("Private element is not present on this object")}e.exports=o,e.exports.__esModule=!0,e.exports.default=e.exports},classPrivateFieldGet2:function(e,s){var o=s("assertClassBrand");function r(t,n){return t.get(o(t,n))}e.exports=r,e.exports.__esModule=!0,e.exports.default=e.exports},classPrivateFieldSet2:function(e,s){var o=s("assertClassBrand");function r(t,n,p){return t.set(o(t,n),p),p}e.exports=r,e.exports.__esModule=!0,e.exports.default=e.exports},toSetter:function(e,s){function o(r,t,n){t||(t=[]);var p=t.length++;return Object.defineProperty({},"_",{set:function(c){t[p]=c,r.apply(n,t)}})}e.exports=o,e.exports.__esModule=!0,e.exports.default=e.exports},classPrivateFieldLooseKey:function(e,s){var o=0;function r(t){return"__private_"+o+++"_"+t}e.exports=r,e.exports.__esModule=!0,e.exports.default=e.exports},classPrivateFieldLooseBase:function(e,s){function o(r,t){if(!{}.hasOwnProperty.call(r,t))throw new TypeError("attempted to use private field on non-instance");return r}e.exports=o,e.exports.__esModule=!0,e.exports.default=e.exports},getPrototypeOf:function(e,s){function o(r){return e.exports=o=Object.setPrototypeOf?Object.getPrototypeOf.bind():function(t){return t.__proto__||Object.getPrototypeOf(t)},e.exports.__esModule=!0,e.exports.default=e.exports,o(r)}e.exports=o,e.exports.__esModule=!0,e.exports.default=e.exports},superPropBase:function(e,s){var o=s("getPrototypeOf");function r(t,n){for(;!{}.hasOwnProperty.call(t,n)&&(t=o(t))!==null;);return t}e.exports=r,e.exports.__esModule=!0,e.exports.default=e.exports},get:function(e,s){var o=s("superPropBase");function r(){return e.exports=r=typeof Reflect!="undefined"&&Reflect.get?Reflect.get.bind():function(t,n,p){var i=o(t,n);if(i){var c=Object.getOwnPropertyDescriptor(i,n);return c.get?c.get.call(arguments.length<3?t:p):c.value}},e.exports.__esModule=!0,e.exports.default=e.exports,r.apply(null,arguments)}e.exports=r,e.exports.__esModule=!0,e.exports.default=e.exports},superPropGet:function(e,s){var o=s("get"),r=s("getPrototypeOf");function t(n,p,i,c){var f=o(r(1&c?n.prototype:n),p,i);return 2&c&&typeof f=="function"?function(u){return f.apply(i,u)}:f}e.exports=t,e.exports.__esModule=!0,e.exports.default=e.exports},typeof:function(e,s){function o(r){"@babel/helpers - typeof";return e.exports=o=typeof Symbol=="function"&&typeof Symbol.iterator=="symbol"?function(t){return typeof t}:function(t){return t&&typeof Symbol=="function"&&t.constructor===Symbol&&t!==Symbol.prototype?"symbol":typeof t},e.exports.__esModule=!0,e.exports.default=e.exports,o(r)}e.exports=o,e.exports.__esModule=!0,e.exports.default=e.exports},toPrimitive:function(e,s){var o=s("typeof").default;function r(t,n){if(o(t)!="object"||!t)return t;var p=t[Symbol.toPrimitive];if(p!==void 0){var i=p.call(t,n||"default");if(o(i)!="object")return i;throw new TypeError("@@toPrimitive must return a primitive value.")}return(n==="string"?String:Number)(t)}e.exports=r,e.exports.__esModule=!0,e.exports.default=e.exports},toPropertyKey:function(e,s){var o=s("typeof").default,r=s("toPrimitive");function t(n){var p=r(n,"string");return o(p)=="symbol"?p:p+""}e.exports=t,e.exports.__esModule=!0,e.exports.default=e.exports},defineProperty:function(e,s){var o=s("toPropertyKey");function r(t,n,p){return(n=o(n))in t?Object.defineProperty(t,n,{value:p,enumerable:!0,configurable:!0,writable:!0}):t[n]=p,t}e.exports=r,e.exports.__esModule=!0,e.exports.default=e.exports},set:function(e,s){var o=s("superPropBase"),r=s("defineProperty");function t(p,i,c,f){return t=typeof Reflect!="undefined"&&Reflect.set?Reflect.set:function(u,x,P,y){var l,v=o(u,x);if(v){if((l=Object.getOwnPropertyDescriptor(v,x)).set)return l.set.call(y,P),!0;if(!l.writable)return!1}if(l=Object.getOwnPropertyDescriptor(y,x)){if(!l.writable)return!1;l.value=P,Object.defineProperty(y,x,l)}else r(y,x,P);return!0},t(p,i,c,f)}function n(p,i,c,f,u){if(!t(p,i,c,f||p)&&u)throw new TypeError("failed to set property");return c}e.exports=n,e.exports.__esModule=!0,e.exports.default=e.exports},superPropSet:function(e,s){var o=s("set"),r=s("getPrototypeOf");function t(n,p,i,c,f,u){return o(r(u?n.prototype:n),p,i,c,f)}e.exports=t,e.exports.__esModule=!0,e.exports.default=e.exports},readOnlyError:function(e,s){function o(r){throw new TypeError('"'+r+'" is read-only')}e.exports=o,e.exports.__esModule=!0,e.exports.default=e.exports},writeOnlyError:function(e,s){function o(r){throw new TypeError('"'+r+'" is write-only')}e.exports=o,e.exports.__esModule=!0,e.exports.default=e.exports},checkInRHS:function(e,s){var o=s("typeof").default;function r(t){if(Object(t)!==t)throw TypeError("right-hand side of 'in' should be an object, got "+(t!==null?o(t):"null"));return t}e.exports=r,e.exports.__esModule=!0,e.exports.default=e.exports},taggedTemplateLiteral:function(e,s){function o(r,t){return t||(t=r.slice(0)),Object.freeze(Object.defineProperties(r,{raw:{value:Object.freeze(t)}}))}e.exports=o,e.exports.__esModule=!0,e.exports.default=e.exports}},_={};function a(e){if(_[e])return _[e].exports;var s=_[e]={exports:{}};return d[e](s,a),s.exports}return{classPrivateFieldInitSpec:a("classPrivateFieldInitSpec"),classPrivateMethodInitSpec:a("classPrivateMethodInitSpec"),classPrivateFieldGet2:a("classPrivateFieldGet2"),classPrivateFieldSet2:a("classPrivateFieldSet2"),assertClassBrand:a("assertClassBrand"),toSetter:a("toSetter"),classPrivateFieldLooseKey:a("classPrivateFieldLooseKey"),classPrivateFieldLooseBase:a("classPrivateFieldLooseBase"),superPropGet:a("superPropGet"),superPropSet:a("superPropSet"),readOnlyError:a("readOnlyError"),writeOnlyError:a("writeOnlyError"),checkInRHS:a("checkInRHS"),taggedTemplateLiteral:a("taggedTemplateLiteral")}})()"#;
+pub const INLINE_FOR_OF_HELPER: &str = r#"var _createForOfIteratorHelper=(function(){var arrayLikeToArray=function(r,a){(a==null||a>r.length)&&(a=r.length);for(var e=0,n=Array(a);e<a;e++)n[e]=r[e];return n},unsupportedIterableToArray=function(r,a){if(r){if(typeof r=="string")return arrayLikeToArray(r,a);var t={}.toString.call(r).slice(8,-1);return t==="Object"&&r.constructor&&(t=r.constructor.name),t==="Map"||t==="Set"?Array.from(r):t==="Arguments"||/^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(t)?arrayLikeToArray(r,a):void 0}};return function(r,e){var t=typeof Symbol!="undefined"&&r[Symbol.iterator]||r["@@iterator"];if(!t){if(Array.isArray(r)||(t=unsupportedIterableToArray(r))||e&&r&&typeof r.length=="number"){t&&(r=t);var _n=0,F=function(){};return{s:F,n:function(){return _n>=r.length?{done:!0}:{done:!1,value:r[_n++]}},e:function(r2){throw r2},f:F}}throw new TypeError(`Invalid attempt to iterate non-iterable instance.
+In order to be iterable, non-array objects must have a [Symbol.iterator]() method.`)}var o,a=!0,u=!1;return{s:function(){t=t.call(r)},n:function(){var r2=t.next();return a=r2.done,r2},e:function(r2){u=!0,o=r2},f:function(){try{a||t.return==null||t.return()}finally{if(u)throw o}}}}})();"#;
+pub const INLINE_FOR_OF_HELPER_PRETTY: &str = r#"var _createForOfIteratorHelper = (function() {
+	var arrayLikeToArray = function(r, a) {
+		(a == null || a > r.length) && (a = r.length);
+		for (var e = 0, n = Array(a); e < a; e++) n[e] = r[e];
+		return n;
+	}, unsupportedIterableToArray = function(r, a) {
+		if (r) {
+			if (typeof r == "string") return arrayLikeToArray(r, a);
+			var t = {}.toString.call(r).slice(8, -1);
+			return t === "Object" && r.constructor && (t = r.constructor.name), t === "Map" || t === "Set" ? Array.from(r) : t === "Arguments" || /^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(t) ? arrayLikeToArray(r, a) : void 0;
+		}
+	};
+	return function(r, e) {
+		var t = typeof Symbol != "undefined" && r[Symbol.iterator] || r["@@iterator"];
+		if (!t) {
+			if (Array.isArray(r) || (t = unsupportedIterableToArray(r)) || e && r && typeof r.length == "number") {
+				t && (r = t);
+				var _n = 0, F = function() {};
+				return {
+					s: F,
+					n: function() {
+						return _n >= r.length ? { done: !0 } : {
+							done: !1,
+							value: r[_n++]
+						};
+					},
+					e: function(r2) {
+						throw r2;
+					},
+					f: F
+				};
+			}
+			throw new TypeError(`Invalid attempt to iterate non-iterable instance.
+In order to be iterable, non-array objects must have a [Symbol.iterator]() method.`);
+		}
+		var o, a = !0, u = !1;
+		return {
+			s: function() {
+				t = t.call(r);
+			},
+			n: function() {
+				var r2 = t.next();
+				return a = r2.done, r2;
+			},
+			e: function(r2) {
+				u = !0, o = r2;
+			},
+			f: function() {
+				try {
+					a || t.return == null || t.return();
+				} finally {
+					if (u) throw o;
+				}
+			}
+		};
+	};
+})();
+"#;
+pub const INLINE_FOR_OF_HELPER_BINDINGS: &[&str] = &["_createForOfIteratorHelper"];
+pub const INLINE_FOR_OF_HELPER_RUNTIME: &str = r#"var _createForOfIteratorHelper=require("@babel/runtime/helpers/createForOfIteratorHelper");"#;
+pub const INLINE_FOR_OF_HELPER_RUNTIME_PRETTY: &str = r#"var _createForOfIteratorHelper = require("@babel/runtime/helpers/createForOfIteratorHelper");
+"#;
+pub const INLINE_FOR_OF_HELPER_RUNTIME_BINDINGS: &[&str] = &["_createForOfIteratorHelper"];
+pub const INLINE_FOR_OF_HELPER_RUNTIME_DEPENDENCIES: &[&str] = &["createForOfIteratorHelper"];
 pub const INLINE_EXTENDS_HELPER: &str = r#"function _extends(){return _extends=Object.assign?Object.assign.bind():function(n){for(var e=1;e<arguments.length;e++){var t=arguments[e];for(var r in t)({}).hasOwnProperty.call(t,r)&&(n[r]=t[r])}return n},_extends.apply(null,arguments)}"#;
 pub const INLINE_EXTENDS_HELPER_PRETTY: &str = r#"function _extends() {
 	return _extends = Object.assign ? Object.assign.bind() : function(n) {
@@ -1000,6 +1078,15 @@ pub const INLINE_REGEXP_NAMED_CAPTURE_HELPER_RUNTIME_PRETTY: &str = r#"var _wrap
 pub const INLINE_REGEXP_NAMED_CAPTURE_HELPER_RUNTIME_BINDINGS: &[&str] =
     &["_wrapRegExp", "_wrapRegExp2"];
 pub const INLINE_REGEXP_NAMED_CAPTURE_HELPER_RUNTIME_DEPENDENCIES: &[&str] = &["wrapRegExp"];
+pub static INLINE_FOR_OF_HELPER_DESCRIPTOR: GeneratedHelperFragment = GeneratedHelperFragment {
+    inline_compact: INLINE_FOR_OF_HELPER,
+    inline_pretty: INLINE_FOR_OF_HELPER_PRETTY,
+    runtime_compact: INLINE_FOR_OF_HELPER_RUNTIME,
+    runtime_pretty: INLINE_FOR_OF_HELPER_RUNTIME_PRETTY,
+    inline_bindings: INLINE_FOR_OF_HELPER_BINDINGS,
+    runtime_bindings: INLINE_FOR_OF_HELPER_RUNTIME_BINDINGS,
+    babel_dependencies: INLINE_FOR_OF_HELPER_RUNTIME_DEPENDENCIES,
+};
 pub static INLINE_EXTENDS_HELPER_DESCRIPTOR: GeneratedHelperFragment = GeneratedHelperFragment {
     inline_compact: INLINE_EXTENDS_HELPER,
     inline_pretty: INLINE_EXTENDS_HELPER_PRETTY,
