@@ -3,6 +3,29 @@ import { packRouteManifest } from '../../protocol/manifest';
 import { NativeTransformSession } from '../session';
 import type { QueryRequest } from '../../index';
 
+test('large warm query requests still detect mutation of the final descriptor', () => {
+  const session = new NativeTransformSession(
+    'first; second;',
+    'input.js',
+    {},
+    packRouteManifest([], false, false, (1 << 6) - 1),
+  );
+  try {
+    const request: QueryRequest = {
+      globals: Array.from({ length: 512 }, () => ({ name: 'first' })),
+    };
+    const initial = session.query(request);
+    expect(session.query(request)).toBe(initial);
+    request.globals![511].name = 'second';
+    const refreshed = session.query(request);
+    expect(refreshed).not.toBe(initial);
+    expect(refreshed.globals.second.references).toHaveLength(1);
+    expect(session.query(request)).toBe(refreshed);
+  } finally {
+    session.close();
+  }
+});
+
 describe('query request mutation after identity caching', () => {
   let currentNames: string[];
   let rejectsConflict: boolean;

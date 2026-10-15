@@ -591,7 +591,7 @@ fn transform_impl(
     let strip_comments = options.comments == Some(false)
         && !final_program.borrow_dependent().program.comments.is_empty();
     if !requires_generic_pipeline(&options) {
-        crate::syntax::validation::validate_program(
+        let checked_scoping = crate::syntax::validation::validate_program(
             &final_program.borrow_dependent().program,
             "native-phase",
         )?;
@@ -613,6 +613,7 @@ fn transform_impl(
                 &mut program,
                 options.constant_folding == Some(true),
                 options.dead_code_elimination == Some(true),
+                (options.constant_folding != Some(true)).then_some(checked_scoping),
             );
             let (code, layer) = render_program(
                 &program,
@@ -1305,6 +1306,7 @@ fn transform_impl(
                 &mut program,
                 options.constant_folding == Some(true),
                 options.dead_code_elimination == Some(true),
+                None,
             );
         }
         #[expect(deprecated)]

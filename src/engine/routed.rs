@@ -1,13 +1,17 @@
-use std::borrow::Cow;
+use std::{borrow::Cow, cell::Cell};
 
 use napi::{Result, bindgen_prelude::Buffer};
 use oxc_allocator::Allocator;
-use oxc_ast::{AstKind, ast::Comment};
+use oxc_ast::{
+    AstKind,
+    ast::{Comment, TSEnumMemberName},
+};
 use oxc_ast_visit::{Visit, walk};
 use oxc_parser::Parser;
-use oxc_semantic::{AstNodes, Scoping, SemanticBuilder};
+use oxc_semantic::{AstNodes, Scoping, SemanticBuilder, Stats};
 use oxc_span::GetSpan;
 use oxc_syntax::node::NodeId;
+use oxc_syntax::scope::{ScopeFlags, ScopeId};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::event_types::NodeField;
@@ -50,11 +54,6 @@ pub fn materialize_routed_buffer(
             "routed-materialization",
         ));
     }
-    // Scope-free routes validate early errors without retaining semantic data or AstNodes.
-    // The collector still assigns preorder node IDs during its own traversal.
-    if !manifest.needs_semantics {
-        crate::syntax::validation::validate_program(&parsed.program, "routed-materialization")?;
-    }
     let semantic_return = manifest.needs_semantics.then(|| {
         SemanticBuilder::new()
             .with_build_nodes(true)
@@ -83,6 +82,7 @@ pub fn materialize_routed_buffer(
         utf16: utf16.as_deref().map(|offsets| &**offsets),
         root: root_start.zip(root_end),
         node_count: 0,
+        validation_stats: Stats::default(),
         sequence: 0,
         words: PackedWords::with_capacity(source.len().saturating_mul(2)),
         string_ids: FxHashMap::default(),
@@ -100,6 +100,14 @@ pub fn materialize_routed_buffer(
             .then_some(parsed.program.comments.as_slice()),
     };
     collector.visit_program(&parsed.program);
+    if !manifest.needs_semantics {
+        collector.validation_stats.nodes = collector.node_count;
+        crate::syntax::validation::validate_program_with_stats(
+            &parsed.program,
+            "routed-materialization",
+            collector.validation_stats,
+        )?;
+    }
     let node_count = collector.node_count;
     let parents = stateless_parent_summaries(
         &collector.parent_ids,
@@ -196,6 +204,7 @@ struct RoutedEventCollector<'a> {
     utf16: Option<&'a [u32]>,
     root: Option<(u32, u32)>,
     node_count: u32,
+    validation_stats: Stats,
     sequence: u32,
     words: PackedWords,
     string_ids: FxHashMap<String, u32>,
@@ -615,6 +624,19 @@ fn compiled_predicate_matches(predicate: &CompiledPredicate, actual: PredicateSc
 }
 
 impl<'a> Visit<'a> for RoutedEventCollector<'a> {
+    fn enter_scope(&mut self, _: ScopeFlags, _: &Cell<Option<ScopeId>>) {
+        if self.scoping.is_none() {
+            self.validation_stats.scopes += 1;
+        }
+    }
+
+    fn visit_ts_enum_member_name(&mut self, name: &TSEnumMemberName<'a>) {
+        if self.scoping.is_none() {
+            self.validation_stats.symbols += 1;
+        }
+        walk::walk_ts_enum_member_name(self, name);
+    }
+
     fn enter_node(&mut self, kind: AstKind<'a>) {
         let member_write = self.tracks_member_writes
             && self
@@ -635,6 +657,11 @@ impl<'a> Visit<'a> for RoutedEventCollector<'a> {
                 },
             );
         if self.scoping.is_none() {
+            match kind {
+                AstKind::BindingIdentifier(_) => self.validation_stats.symbols += 1,
+                AstKind::IdentifierReference(_) => self.validation_stats.references += 1,
+                _ => {}
+            }
             kind.set_node_id(NodeId::new(self.node_count as usize));
         }
         self.node_count += 1;

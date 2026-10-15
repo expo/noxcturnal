@@ -12,20 +12,44 @@ export function memberSegment(value: string): string {
   return value.replace(/\\/g, '\\\\').replace(/\./g, '\\.');
 }
 
-/** Recognize only static member syntax; no evaluation or native lookups. */
-export function staticMemberPath(source: string): string | null {
+/** Recognize static member syntax in one forward scan, without evaluation. */
+export interface MemberPathScan {
+  prefix(start: number, end: number, path: string): void;
+  knownPrefix(start: number): { end: number; path: string } | null | undefined;
+  nonstatic(openings: readonly number[], start: number, after: number): void;
+}
+
+export function staticMemberPath(source: string, scan?: MemberPathScan): string | null {
+  if (!scan && plainMember.test(source)) return source;
   let offset = 0;
-  const space = () => {
-    while (offset < source.length) {
-      const match = /^(?:\s+|\/\*[\s\S]*?\*\/|\/\/[^\r\n\u2028\u2029]*)/.exec(source.slice(offset));
-      if (!match) break;
-      offset += match[0].length;
-    }
+  let start = 0;
+  let prefixEnd = 0;
+  const openings: number[] = [];
+  const fail = (): null => {
+    scan?.nonstatic(openings, start, prefixEnd + 1);
+    return null;
   };
-  const consume = (token: string) => {
-    space();
-    if (!source.startsWith(token, offset)) return false;
-    offset += token.length;
+  const space = (): boolean => {
+    while (offset < source.length) {
+      const code = source.charCodeAt(offset);
+      if (code === 32 || (code >= 9 && code <= 13) || (code > 127 && /\s/u.test(source[offset]))) {
+        offset++;
+      } else if (code === 47 && source[offset + 1] === '*') {
+        // A single-character search is much faster on long comment bodies.
+        // Fall back when that slash is inside the comment, preserving the first
+        // closing delimiter without a loop over arbitrary slashes or stars.
+        const slash = source.indexOf('/', offset + 2);
+        const end =
+          slash > offset + 2 && source.charCodeAt(slash - 1) === 42
+            ? slash - 1
+            : source.indexOf('*/', offset + 2);
+        if (end < 0) return false;
+        offset = end + 2;
+      } else if (code === 47 && source[offset + 1] === '/') {
+        offset += 2;
+        while (offset < source.length && !lineEnd(source.charCodeAt(offset))) offset++;
+      } else break;
+    }
     return true;
   };
   const escape = (): string | null => {
@@ -33,95 +57,150 @@ export function staticMemberPath(source: string): string | null {
     if (char === 'u' || char === 'x') {
       const braced = char === 'u' && source[offset] === '{';
       if (braced) offset++;
-      const digits = braced
-        ? /^[\da-fA-F]+/.exec(source.slice(offset))?.[0]
-        : source.slice(offset, offset + (char === 'u' ? 4 : 2));
-      if (
-        !digits ||
-        !/^[\da-fA-F]+$/.test(digits) ||
-        (!braced && digits.length !== (char === 'u' ? 4 : 2))
-      )
-        return null;
-      offset += digits.length;
+      const start = offset;
+      const limit = braced ? source.length : offset + (char === 'u' ? 4 : 2);
+      let value = 0;
+      while (offset < limit) {
+        const digit = hexDigit(source.charCodeAt(offset));
+        if (digit < 0) break;
+        value = value * 16 + digit;
+        offset++;
+      }
+      if (offset === start || (!braced && offset !== limit) || value > 0x10ffff) return null;
       if (braced && source[offset++] !== '}') return null;
-      const value = parseInt(digits, 16);
-      return value <= 0x10ffff ? String.fromCodePoint(value) : null;
+      return String.fromCodePoint(value);
     }
     if (char === '\r') {
       if (source[offset] === '\n') offset++;
       return '';
     }
     if (char === '\n' || char === '\u2028' || char === '\u2029') return '';
-    const simple: Record<string, string> = { n: '\n', r: '\r', t: '\t', b: '\b', f: '\f', v: '\v' };
-    if (/[0-7]/.test(char ?? '')) {
-      let digits = char;
-      const limit = char <= '3' ? 3 : 2;
-      while (digits.length < limit && /[0-7]/.test(source[offset] ?? ''))
-        digits += source[offset++];
-      return String.fromCharCode(parseInt(digits, 8));
+    if (char >= '0' && char <= '7') {
+      let value = char.charCodeAt(0) - 48;
+      const limit = offset + (char <= '3' ? 2 : 1);
+      while (offset < limit && source[offset] >= '0' && source[offset] <= '7')
+        value = value * 8 + source.charCodeAt(offset++) - 48;
+      return String.fromCharCode(value);
     }
-    return simple[char] ?? char ?? null;
+    return simpleEscapes[char] ?? char ?? null;
   };
   const identifier = (): string | null => {
-    space();
+    let start = offset;
     let value = '';
+    let first = true;
     while (offset < source.length) {
-      const char = String.fromCodePoint(source.codePointAt(offset)!);
-      if (char === '\\') {
-        offset++;
+      const code = source.charCodeAt(offset);
+      if (code === 92) {
+        value += source.slice(start, offset++);
         if (source[offset] !== 'u') return null;
         const decoded = escape();
-        if (
-          decoded === null ||
-          !(value ? /^[$\u200c\u200d\p{ID_Continue}]$/u : /^[$_\p{ID_Start}]$/u).test(decoded)
-        )
+        if (decoded === null || !(first ? identifierStart : identifierContinue).test(decoded))
           return null;
         value += decoded;
-      } else if ((value ? /^[$\u200c\u200d\p{ID_Continue}]$/u : /^[$_\p{ID_Start}]$/u).test(char)) {
-        value += char;
+        start = offset;
+      } else if (
+        code === 36 ||
+        code === 95 ||
+        (code >= 65 && code <= 90) ||
+        (code >= 97 && code <= 122) ||
+        (!first && code >= 48 && code <= 57)
+      ) {
+        offset++;
+      } else if (code > 127) {
+        const char = String.fromCodePoint(source.codePointAt(offset)!);
+        if (!(first ? identifierStart : identifierContinue).test(char)) break;
         offset += char.length;
       } else break;
+      first = false;
     }
-    return value || null;
+    return first ? null : value + source.slice(start, offset);
   };
   const string = (): string | null => {
-    space();
     const quote = source[offset++];
     if (quote !== '"' && quote !== "'") return null;
+    let start = offset;
     let value = '';
     while (offset < source.length) {
       const char = source[offset++];
-      if (char === quote) return value;
+      if (char === quote) return value + source.slice(start, offset - 1);
       if (char === '\\') {
+        value += source.slice(start, offset - 1);
         const decoded = escape();
         if (decoded === null) return null;
         value += decoded;
-      } else value += char;
+        start = offset;
+      }
     }
     return null;
   };
-  const chain = (): string | null => {
-    let path: string | null;
-    if (consume('(')) {
-      path = chain();
-      if (!consume(')')) return null;
-    } else path = identifier();
-    if (path === null) return null;
-    while (true) {
-      const optional = consume('?.');
-      if (consume('[')) {
-        const property = string();
-        if (property === null || !consume(']')) return null;
-        path += `.${memberSegment(property)}`;
-      } else if (optional || consume('.')) {
-        const property = identifier();
-        if (property === null) return null;
-        path += `.${memberSegment(property)}`;
-      } else break;
+  if (!space()) return fail();
+  let known: ReturnType<MemberPathScan['knownPrefix']>;
+  while (true) {
+    start = offset;
+    known = scan?.knownPrefix(offset);
+    if (known === null) return fail();
+    if (known || source[offset] !== '(') break;
+    openings.push(offset);
+    offset++;
+    if (!space()) return fail();
+  }
+  let path = known ? known.path : identifier();
+  if (known) offset = known.end;
+  if (path === null) return fail();
+  prefixEnd = offset;
+  scan?.prefix(start, offset, path);
+  while (true) {
+    if (!space()) return fail();
+    if (source[offset] === ')') {
+      const opening = openings.pop();
+      if (opening === undefined) return fail();
+      start = opening;
+      offset++;
+      prefixEnd = offset;
+      scan?.prefix(start, offset, path);
+      continue;
     }
-    return path;
-  };
-  const path = chain();
-  space();
-  return offset === source.length ? path : null;
+    const optional = source.startsWith('?.', offset);
+    if (optional) {
+      offset += 2;
+      if (!space()) return fail();
+    }
+    if (source[offset] === '[') {
+      offset++;
+      if (!space()) return fail();
+      const property = string();
+      if (property === null || !space() || source[offset++] !== ']') return fail();
+      path += `.${memberSegment(property)}`;
+    } else if (optional || source[offset] === '.') {
+      if (!optional) offset++;
+      if (!space()) return fail();
+      const property = identifier();
+      if (property === null) return fail();
+      path += `.${property}`;
+    } else break;
+    prefixEnd = offset;
+    scan?.prefix(start, offset, path);
+  }
+  return openings.length === 0 && offset === source.length ? path : fail();
+}
+
+const plainMember = /^[$A-Z_a-z][$\w]*(?:\.[$A-Z_a-z][$\w]*)*(?![\s\S])/;
+const identifierStart = /^[$_\p{ID_Start}]$/u;
+const identifierContinue = /^[$\u200c\u200d\p{ID_Continue}]$/u;
+const simpleEscapes: Record<string, string> = {
+  n: '\n',
+  r: '\r',
+  t: '\t',
+  b: '\b',
+  f: '\f',
+  v: '\v',
+};
+function lineEnd(code: number): boolean {
+  return code === 10 || code === 13 || code === 0x2028 || code === 0x2029;
+}
+function hexDigit(code: number): number {
+  if (code >= 48 && code <= 57) return code - 48;
+  if (code >= 65 && code <= 70) return code - 55;
+  if (code >= 97 && code <= 102) return code - 87;
+  return -1;
 }

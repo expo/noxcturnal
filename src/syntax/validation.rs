@@ -2,14 +2,28 @@ use napi::Result;
 use oxc_allocator::Allocator;
 use oxc_ast::ast::Program;
 use oxc_parser::Parser;
-use oxc_semantic::SemanticBuilder;
+use oxc_semantic::{Scoping, SemanticBuilder, Stats};
 
 /// Validate early errors without retaining an AST-node index. Routes that already
 /// build semantic data perform these checks in their existing build instead.
-pub(crate) fn validate_program(program: &Program<'_>, operation: &'static str) -> Result<()> {
-    let checked = SemanticBuilder::new_compiler().build(program);
+pub(crate) fn validate_program(program: &Program<'_>, operation: &'static str) -> Result<Scoping> {
+    validate_program_with_stats(program, operation, Stats::count(program))
+}
+
+/// Collection can count allocations in its existing traversal, avoiding Oxc's
+/// separate counting pass without omitting any semantic or early-error checks.
+pub(crate) fn validate_program_with_stats(
+    program: &Program<'_>,
+    operation: &'static str,
+    stats: Stats,
+) -> Result<Scoping> {
+    let checked = SemanticBuilder::new_compiler()
+        .with_stats(stats)
+        .build(program);
+    #[cfg(debug_assertions)]
+    stats.assert_accurate(checked.semantic.stats());
     if checked.diagnostics.is_empty() {
-        Ok(())
+        Ok(checked.semantic.into_scoping())
     } else {
         Err(crate::parse_failure::error(
             program.source_text,
@@ -34,7 +48,7 @@ pub(crate) fn validate_source(source: &str, filename: &str) -> Result<()> {
             "native-phase",
         ));
     }
-    validate_program(&parsed.program, "native-phase")
+    validate_program(&parsed.program, "native-phase").map(|_| ())
 }
 
 /// Oxc 0.141 compares an escaped surrogate-pair group name differently from the

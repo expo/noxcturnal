@@ -318,8 +318,15 @@ export class NodePathImpl implements NativeNodePath {
   matchesPattern(pattern: string, allowPartial = false): boolean {
     if (!validMemberPattern(pattern)) return false;
     const retained = this.node.memberPath;
+    if (typeof retained !== 'string' && this.event.end - this.event.start >= 256)
+      return this.runtime.session.matchesMemberPattern(
+        this.event.start,
+        this.event.end,
+        pattern,
+        allowPartial,
+      );
     const memberPath =
-      typeof retained === 'string' ? retained : staticMemberPath(this.getSource().text());
+      typeof retained === 'string' ? retained : staticMemberPath(this.sourceText());
     return (
       memberPath === pattern || (allowPartial && memberPath?.startsWith(`${pattern}.`) === true)
     );

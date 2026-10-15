@@ -82,15 +82,24 @@ export function transformClassificationCacheKey(
 
 /** Canonical, type-tagged configuration encoding; unlike JSON it preserves JS scalars. */
 export function stableJson(value: unknown): string {
-  if (Array.isArray(value))
-    return `a[${Array.from({ length: value.length }, (_, index) =>
-      Object.hasOwn(value, index) ? stableJson(value[index]) : 'hole',
-    ).join(',')}]`;
-  if (value && typeof value === 'object')
-    return `o{${Object.entries(value)
-      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
-      .map(([key, item]) => `${JSON.stringify(key)}:${stableJson(item)}`)
-      .join(',')}}`;
+  if (Array.isArray(value)) {
+    let encoded = 'a[';
+    for (let index = 0; index < value.length; index++) {
+      if (index > 0) encoded += ',';
+      encoded += Object.hasOwn(value, index) ? stableJson(value[index]) : 'hole';
+    }
+    return encoded + ']';
+  }
+  if (value && typeof value === 'object') {
+    let encoded = 'o{';
+    const keys = Object.keys(value).sort();
+    for (let index = 0; index < keys.length; index++) {
+      if (index > 0) encoded += ',';
+      const key = keys[index];
+      encoded += `${JSON.stringify(key)}:${stableJson((value as Record<string, unknown>)[key])}`;
+    }
+    return encoded + '}';
+  }
   if (typeof value === 'number') return `n:${Object.is(value, -0) ? '-0' : String(value)}`;
   return `${typeof value}:${JSON.stringify(value)}`;
 }

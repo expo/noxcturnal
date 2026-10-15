@@ -23,7 +23,12 @@ pub(super) fn run<'a>(
     program: &mut Program<'a>,
     constant_folding: bool,
     dead_code_elimination: bool,
+    checked_scoping: Option<Scoping>,
 ) {
+    debug_assert!(
+        !constant_folding || checked_scoping.is_none(),
+        "folding invalidates checked scoping"
+    );
     if constant_folding {
         ConstantFolder {
             ast: AstBuilder::new(allocator),
@@ -33,7 +38,7 @@ pub(super) fn run<'a>(
         .visit_program(program);
     }
     if dead_code_elimination {
-        eliminate_dead_functions(program);
+        eliminate_dead_functions(program, checked_scoping);
     }
 }
 
@@ -252,7 +257,7 @@ fn expression_has_failed_operand(
     }
 }
 
-fn eliminate_dead_functions(program: &mut Program<'_>) {
+fn eliminate_dead_functions(program: &mut Program<'_>, checked_scoping: Option<Scoping>) {
     // Metro's Babel pass repeatedly removes unreferenced function bindings and
     // recrawls scope until reaching a fixed point. Rebuilding the complete
     // semantic graph on every layer makes a dead chain quadratic. Compute the
@@ -260,14 +265,19 @@ fn eliminate_dead_functions(program: &mut Program<'_>) {
     // unreferenced candidate subtracts all references originating in its body,
     // which may make the functions it called removable next. Cycles retain an
     // incoming reference exactly as they do in Metro's binding-based pass.
-    let semantic = SemanticBuilder::new().build(program);
-    if !semantic.diagnostics.is_empty() {
-        return;
-    }
-    let scoping = semantic.semantic.into_scoping();
-    // SemanticBuilder refreshes the symbol cells after preceding transforms
-    // have changed the program. Collect only after that rebuild; IDs retained
-    // from an older transformed graph may now refer to a different binding.
+    // Validation's graph is reusable only when no AST pass has run since it.
+    let scoping = if let Some(scoping) = checked_scoping {
+        scoping
+    } else {
+        let semantic = SemanticBuilder::new().build(program);
+        if !semantic.diagnostics.is_empty() {
+            return;
+        }
+        semantic.semantic.into_scoping()
+    };
+    // Use the checked graph only for an unchanged program. Otherwise the rebuild
+    // refreshes symbol cells after preceding transforms; older IDs can refer to
+    // a different binding.
     let mut collector = DeadFunctionCandidateCollector {
         scoping: &scoping,
         script: program.source_type.is_script(),

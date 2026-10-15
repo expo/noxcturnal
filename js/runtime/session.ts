@@ -21,6 +21,7 @@ import type {
 import { commitWithDedupe } from './editor';
 import { adaptBindingFact, toNodeView } from './node-utils';
 import { alias, querySubscriptions } from '../pipeline/route-utils';
+import { staticMemberPath } from './member-pattern';
 
 export class NativeTransformSession {
   #closed = false;
@@ -29,6 +30,11 @@ export class NativeTransformSession {
   #uidSourceScans = 0;
   #eventCache: (NativeEvent | undefined)[] = [];
   #queryCache = new WeakMap<QueryRequest, { request: QueryRequest; result: QueryResult }>();
+  #memberPaths?: Map<
+    number,
+    { ends: Map<number, { prefixes: Map<number, string>; length: number }>; longest: number }
+  >;
+  #nonstaticMemberAfter?: Map<number, number>;
   #globalReferencesCache = new Map<string, SemanticReferenceView[]>();
   #childrenCache = new Map<number, number[]>();
   #childIdsCache = new Map<number, Set<number>>();
@@ -128,6 +134,66 @@ export class NativeTransformSession {
   }
   nodeView(event: NativeEvent): NodeView {
     return toNodeView(event);
+  }
+  /** Share one long-chain scan across its overlapping member subtrees. This is
+   * derived solely from this session's immutable source, never native lookups. */
+  matchesMemberPattern(
+    start: number,
+    end: number,
+    pattern: string,
+    allowPartial: boolean,
+  ): boolean {
+    const cached = this.#memberPaths?.get(start)?.ends.get(end);
+    if (cached)
+      return (
+        (allowPartial ? pattern.length <= cached.length : pattern.length === cached.length) &&
+        cached.prefixes.get(pattern.length) === pattern
+      );
+    const invalidAfter = this.#nonstaticMemberAfter?.get(start);
+    if (invalidAfter !== undefined && end >= invalidAfter) return false;
+    const ranges = (this.#memberPaths ??= new Map());
+    let prefixes = new Map<number, string>();
+    let knownFailureAfter = 0;
+    const path = staticMemberPath(this.source.slice(start, end), {
+      prefix: (localStart, localEnd, path) => {
+        prefixes.set(path.length, path);
+        const prefixStart = start + localStart;
+        const prefixEnd = start + localEnd;
+        let range = ranges.get(prefixStart);
+        if (!range) ranges.set(prefixStart, (range = { ends: new Map(), longest: prefixEnd }));
+        range.ends.set(prefixEnd, { prefixes, length: path.length });
+        range.longest = Math.max(range.longest, prefixEnd);
+      },
+      knownPrefix: localStart => {
+        const prefixStart = start + localStart;
+        const invalidAfter = this.#nonstaticMemberAfter?.get(prefixStart);
+        if (invalidAfter !== undefined && end >= invalidAfter) {
+          knownFailureAfter = invalidAfter - start;
+          return null;
+        }
+        const range = ranges.get(prefixStart);
+        if (!range || range.longest > end) return undefined;
+        const known = range.ends.get(range.longest)!;
+        prefixes = known.prefixes;
+        return { end: range.longest - start, path: prefixes.get(known.length)! };
+      },
+      nonstatic: (openings, localStart, after) => {
+        // These are complete native node spans, so an unsupported suffix stays
+        // nonstatic in any larger member. Open wrappers share that failure;
+        // unrelated starts (e.g. members inside [key]) stay independent.
+        const failures = (this.#nonstaticMemberAfter ??= new Map());
+        for (const local of [0, ...openings, localStart]) {
+          const key = start + local;
+          const cutoff = start + Math.max(local + 1, after, knownFailureAfter);
+          failures.set(key, Math.min(failures.get(key) ?? cutoff, cutoff));
+        }
+      },
+    });
+    if (path === null) return false;
+    return (
+      (allowPartial ? pattern.length <= path.length : pattern.length === path.length) &&
+      prefixes.get(pattern.length) === pattern
+    );
   }
   query(request: QueryRequest): QueryResult {
     this.#assertOpen();
@@ -624,6 +690,8 @@ export class NativeTransformSession {
     );
   }
   close(): void {
+    this.#memberPaths = undefined;
+    this.#nonstaticMemberAfter = undefined;
     if (!this.#closed && this.#native) {
       this.#native.close();
     }
@@ -648,44 +716,46 @@ function sameList<T>(
   right: readonly T[] | undefined,
   same: (left: T, right: T) => boolean,
 ): boolean {
-  if (left === undefined || right === undefined) return left === right;
+  if (left === right) return true;
+  if (left === undefined || right === undefined) return false;
   if (left.length !== right.length) return false;
   for (let index = 0; index < left.length; index++)
     if (!same(left[index], right[index])) return false;
   return true;
 }
+const sameGlobal: (
+  a: NonNullable<QueryRequest['globals']>[number],
+  b: NonNullable<QueryRequest['globals']>[number],
+) => boolean = (a, b) => a?.name === b?.name && a?.references === b?.references;
+const sameCall: (
+  a: NonNullable<QueryRequest['calls']>[number],
+  b: NonNullable<QueryRequest['calls']>[number],
+) => boolean = (a, b) =>
+  a?.callee === b?.callee &&
+  a?.globalOnly === b?.globalOnly &&
+  a?.staticArguments === b?.staticArguments;
+const sameCapture: (
+  a: NonNullable<QueryRequest['captures']>[number],
+  b: NonNullable<QueryRequest['captures']>[number],
+) => boolean = (a, b) =>
+  a?.functionId === b?.functionId && a?.programBindings === b?.programBindings;
+const sameBinding: (
+  a: NonNullable<QueryRequest['bindings']>[number],
+  b: NonNullable<QueryRequest['bindings']>[number],
+) => boolean = (a, b) =>
+  a?.name === b?.name &&
+  a?.scopeId === b?.scopeId &&
+  a?.reads === b?.reads &&
+  a?.writes === b?.writes;
 function sameQuery(left: QueryRequest, right: QueryRequest): boolean {
   return (
     left.imports === right.imports &&
     left.exports === right.exports &&
     sameList(left.constants, right.constants, Object.is) &&
-    sameList(
-      left.globals,
-      right.globals,
-      (a, b) => a?.name === b?.name && a?.references === b?.references,
-    ) &&
-    sameList(
-      left.calls,
-      right.calls,
-      (a, b) =>
-        a?.callee === b?.callee &&
-        a?.globalOnly === b?.globalOnly &&
-        a?.staticArguments === b?.staticArguments,
-    ) &&
-    sameList(
-      left.captures,
-      right.captures,
-      (a, b) => a?.functionId === b?.functionId && a?.programBindings === b?.programBindings,
-    ) &&
-    sameList(
-      left.bindings,
-      right.bindings,
-      (a, b) =>
-        a?.name === b?.name &&
-        a?.scopeId === b?.scopeId &&
-        a?.reads === b?.reads &&
-        a?.writes === b?.writes,
-    )
+    sameList(left.globals, right.globals, sameGlobal) &&
+    sameList(left.calls, right.calls, sameCall) &&
+    sameList(left.captures, right.captures, sameCapture) &&
+    sameList(left.bindings, right.bindings, sameBinding)
   );
 }
 function snapshotQuery(request: QueryRequest): QueryRequest {

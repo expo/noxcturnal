@@ -32,6 +32,32 @@ const cases: {
     count: result => result.imports.length,
   },
 ];
+
+test('warming a request does not authorize newly added query capabilities', () => {
+  const request: QueryRequest & { unknown?: boolean } = { globals: [{ name: 'external' }] };
+  const plugin = defineNativePlugin({
+    name: 'mutable-query-permissions',
+    contract: { queries: [{ globals: [{ name: 'external' }] }] },
+    pre(context) {
+      const initial = context.query(request);
+      expect(context.query(request)).toBe(initial);
+      request.exports = true;
+      expect(() => context.query(request)).toThrow('undeclared query capability exports');
+      delete request.exports;
+      request.unknown = true;
+      expect(() => context.query(request)).toThrow('undeclared query capability unknown');
+      request.unknown = false;
+      expect(context.query(request)).toBe(initial);
+    },
+  });
+  expect(
+    transform(
+      'external;',
+      'input.js',
+      defineNativePipeline({ phases: [{ name: 'query', plugins: [plugin] }] }),
+    ).status,
+  ).toBe('complete');
+});
 for (const declared of [false, true])
   describe.each(cases)(`$name query declared=${declared}`, entry => {
     let outcome: string;

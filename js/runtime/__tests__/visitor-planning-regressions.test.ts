@@ -5,11 +5,65 @@ import {
   defineVisitor,
   transform,
   type QueryRequest,
+  type NativeNodePath,
 } from '../../index';
 import { stableJson } from '../../pipeline/cache-key';
 import { staticMemberPath } from '../member-pattern';
 
+test('member matching handles deeply nested parentheses without recursion', () => {
+  const depth = 20_000;
+  expect(staticMemberPath('('.repeat(depth) + 'process["env"]' + ')'.repeat(depth))).toBe(
+    'process.env',
+  );
+  expect(staticMemberPath('('.repeat(depth) + 'process.env' + ')'.repeat(depth - 1))).toBeNull();
+});
+
+for (const side of ['enter', 'exit'] as const)
+  test.each([
+    'root' + '["a.b"]'.repeat(80),
+    '('.repeat(64) + 'root' + '["value"])'.repeat(64),
+    String.raw`\u0072oot` + String.raw` /*comment*/ ?. ["a\u002eb"]`.repeat(64),
+    'root' + '["value"]'.repeat(64) + '[other.member]' + '.tail'.repeat(64),
+    '('.repeat(64) + 'root[other.member]' + '["value"])'.repeat(64),
+  ])(`${side}: shared long-chain matches agree with uncached matching: %s`, expression => {
+    let visits = 0;
+    const observe = (path: Pick<NativeNodePath, 'start' | 'end' | 'matchesPattern'>) => {
+      visits++;
+      const encoded = staticMemberPath(expression.slice(path.start, path.end));
+      for (const pattern of [
+        'root',
+        'root.value',
+        String.raw`root.a\.b`,
+        'root.a.b',
+        'other.member',
+        encoded ?? 'missing',
+      ]) {
+        for (const partial of [false, true]) {
+          const expected =
+            encoded === pattern || (partial && encoded?.startsWith(pattern + '.') === true);
+          expect(path.matchesPattern(pattern, partial)).toBe(expected);
+        }
+      }
+    };
+    const plugin = defineNativePlugin({
+      name: 'shared-members',
+      visitors: [
+        defineVisitor('MemberExpression', {}, side === 'enter' ? observe : { exit: observe }),
+      ],
+    });
+    expect(
+      transform(
+        expression + ';',
+        'input.js',
+        defineNativePipeline({ phases: [{ name: 'members', plugins: [plugin] }] }),
+      ).status,
+    ).toBe('complete');
+    expect(visits).toBeGreaterThan(60);
+  });
+
 const memberCases = [
+  ['process.env.NODE_ENV', 'process.env.NODE_ENV'],
+  ["process /*a*/ ['env'] /*b*/ .NODE_ENV", 'process.env.NODE_ENV'],
   ['process /*a*/ . /*b*/ env /*c*/ [ /*d*/ "NODE_ENV" /*e*/ ]', 'process.env.NODE_ENV'],
   [String.raw`pr\u006fcess.\u{65}nv['NODE_\x45NV']`, 'process.env.NODE_ENV'],
   [String.raw`process['env.NODE_ENV']`, String.raw`process.env\.NODE_ENV`],
@@ -20,6 +74,15 @@ const memberCases = [
   ['process[""].value', 'process..value'],
   ['process["😀"].value', 'process.😀.value'],
 ] as const;
+test.each([
+  ' process // comment\n . env /* trailing */ \n',
+  'process.env\n',
+  'process/**/.env',
+  'process/*/ still inside / **/.env',
+  'process/* a / b */.env',
+])('member matching ignores surrounding trivia: %s', source => {
+  expect(staticMemberPath(source)).toBe('process.env');
+});
 for (const [expression, encoded] of memberCases) {
   test(`static member representation: ${expression}`, () => {
     expect(staticMemberPath(expression)).toBe(encoded);
@@ -78,6 +141,12 @@ test.each([
   'factory().env',
   'process[1]',
   'process.#private',
+  'process /* not a property separator */ env',
+  'process.env + other',
+  'process /* first */ + other /* second */ .env',
+  '// process.env',
+  'process/*/',
+  'process/* missing terminator / .env',
 ])('member fallback refuses dynamic or unsupported input: %s', source => {
   expect(staticMemberPath(source)).toBeNull();
 });

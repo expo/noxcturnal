@@ -1,14 +1,17 @@
+use std::cell::Cell;
+
 use napi::Result;
 use oxc_allocator::Allocator;
 use oxc_ast::{
     AstKind,
-    ast::{Comment, Expression},
+    ast::{Comment, Expression, TSEnumMemberName},
 };
 use oxc_ast_visit::{Visit, walk};
 use oxc_parser::Parser;
-use oxc_semantic::{AstNodes, Scoping, SemanticBuilder};
+use oxc_semantic::{AstNodes, Scoping, SemanticBuilder, Stats};
 use oxc_span::GetSpan;
 use oxc_syntax::node::NodeId;
+use oxc_syntax::scope::{ScopeFlags, ScopeId};
 use rustc_hash::FxHashMap;
 
 use crate::generated::event_schema::{ast_kind_protocol_id, child_role_id_for_edge};
@@ -49,6 +52,7 @@ struct SyntaxIndexCollector<'a> {
     target_stack: Vec<(AstKind<'a>, bool, bool)>,
     tracks_member_writes: bool,
     node_count: u32,
+    validation_stats: Stats,
 }
 
 impl SyntaxIndexCollector<'_> {
@@ -61,7 +65,21 @@ impl SyntaxIndexCollector<'_> {
 }
 
 impl<'a> Visit<'a> for SyntaxIndexCollector<'a> {
+    fn enter_scope(&mut self, _: ScopeFlags, _: &Cell<Option<ScopeId>>) {
+        self.validation_stats.scopes += 1;
+    }
+
+    fn visit_ts_enum_member_name(&mut self, name: &TSEnumMemberName<'a>) {
+        self.validation_stats.symbols += 1;
+        walk::walk_ts_enum_member_name(self, name);
+    }
+
     fn enter_node(&mut self, kind: AstKind<'a>) {
+        match kind {
+            AstKind::BindingIdentifier(_) => self.validation_stats.symbols += 1,
+            AstKind::IdentifierReference(_) => self.validation_stats.references += 1,
+            _ => {}
+        }
         let member_write = self.tracks_member_writes
             && self
                 .target_stack
@@ -347,7 +365,6 @@ pub(crate) fn materialize_with_scope_parents(
             .as_ref()
             .is_some_and(|manifest| manifest.needs_comments);
     if !needs_semantics {
-        crate::syntax::validation::validate_program(&parsed.program, "indexed-session")?;
         let mut collector = SyntaxIndexCollector {
             source,
             utf16: utf16.as_deref().map(|offsets| &**offsets),
@@ -370,8 +387,15 @@ pub(crate) fn materialize_with_scope_parents(
                 retention_capabilities,
             ),
             node_count: 0,
+            validation_stats: Stats::default(),
         };
         collector.visit_program(&parsed.program);
+        collector.validation_stats.nodes = collector.node_count;
+        crate::syntax::validation::validate_program_with_stats(
+            &parsed.program,
+            "indexed-session",
+            collector.validation_stats,
+        )?;
         collector.retained_index.finalize_child_edges();
         collector
             .retained_index

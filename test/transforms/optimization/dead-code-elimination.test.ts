@@ -1,7 +1,14 @@
 import { expect, test } from 'vitest';
 import { transformSource } from '../transform';
+import { TransformSyntaxError } from '../../../js/index';
 
 const options = { optimize: { deadCodeElimination: true } } as const;
+
+test('checks invalid bindings before removing an unused function', async () => {
+  await expect(
+    transformSource('function unused() { let value; let value; } export {};', 'input.js', options),
+  ).rejects.toBeInstanceOf(TransformSyntaxError);
+});
 
 test('removes unreferenced function declarations and function-valued bindings', async () => {
   const source = `

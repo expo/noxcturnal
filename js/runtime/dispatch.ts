@@ -103,13 +103,16 @@ export function createDispatcher(
     }
   for (const plugin of activePlugins) {
     const allowedMetadata = new Set(plans.get(plugin)?.metadataWrites ?? []);
-    const allowedQueries = new Set(
-      (plans.get(plugin)?.queries ?? []).flatMap(request =>
-        Object.entries(request)
-          .filter(([, value]) => (Array.isArray(value) ? value.length > 0 : value === true))
-          .map(([key]) => key),
-      ),
-    );
+    const declaredQueries = plans.get(plugin)?.queries;
+    const allowedQueries = declaredQueries?.length ? new Set<string>() : undefined;
+    for (const request of declaredQueries ?? []) {
+      for (const capability in request) {
+        if (!Object.hasOwn(request, capability)) continue;
+        const value = request[capability as keyof typeof request];
+        if (Array.isArray(value) ? value.length > 0 : value === true)
+          allowedQueries!.add(capability);
+      }
+    }
     const entry: DispatcherEntry = {
       state: undefined,
       stopped: false,
@@ -184,10 +187,12 @@ export function createDispatcher(
         get: key => metadata[key],
       },
       query: request => {
-        for (const [capability, value] of Object.entries(request)) {
+        for (const capability in request) {
+          if (!Object.hasOwn(request, capability)) continue;
+          const value = request[capability as keyof typeof request];
           if (value === false || value == null || (Array.isArray(value) && value.length === 0))
             continue;
-          if (!allowedQueries.has(capability))
+          if (!allowedQueries?.has(capability))
             throw new Error(`${plugin.name}: undeclared query capability ${capability}`);
         }
         return session.query(request);
