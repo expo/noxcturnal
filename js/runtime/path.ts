@@ -5,6 +5,7 @@ import {
   isProvenanceCode,
   makeSourceFragment,
   realizeContent,
+  type RealizedContent,
   sourceFragmentBelongsTo,
 } from './fragments';
 import type {
@@ -632,8 +633,7 @@ function mappingPolicy(value?: CodeFragment['mapping']): EditCommand['mapping'] 
 
 type ScopeEdits = {
   exports: Map<number, { names: Map<string, string>; edit: EditCommand }>;
-  contents: Code[];
-  push?: EditCommand;
+  push?: EditCommand & { contentParts?: NonNullable<RealizedContent['contentParts']> };
 };
 // One phase shares an edit list across plugins and route runtimes. Structural
 // wrappers and export clauses are keyed by that list so separate plugins cannot
@@ -643,7 +643,7 @@ function scopeEdits(runtime: PathRuntime, id: number): ScopeEdits {
   let transactions = scopeEditTransactions.get(runtime.edits);
   if (!transactions) scopeEditTransactions.set(runtime.edits, (transactions = new Map()));
   let edits = transactions.get(id);
-  if (!edits) transactions.set(id, (edits = { exports: new Map(), contents: [] }));
+  if (!edits) transactions.set(id, (edits = { exports: new Map() }));
   return edits;
 }
 function insertionTarget(
@@ -712,14 +712,13 @@ function makeScope(runtime: PathRuntime, id: number, parentId: number | null): N
       const { metadata } = target;
       const wrapping = metadata.kind === 1 || metadata.kind === 2;
       const edits = scopeEdits(runtime, target.id);
-      const pushedContents = edits.contents;
-      if (pushedContents.length) pushedContents.push('\n;\n');
-      pushedContents.push(content);
+      const suffix = metadata.kind === 1 ? '\n;\nreturn (' : '\n;\n';
       if (!edits.push) {
         edits.push = {
           kind: 'AppendLeft',
           start: metadata.start,
           end: metadata.start,
+          ...realizeContent(session, content, undefined, wrapping ? '{\n' : '\n;\n', suffix),
           owner: runtime.owner,
           order: runtime.nextOrder(),
         };
@@ -733,17 +732,25 @@ function makeScope(runtime: PathRuntime, id: number, parentId: number | null): N
             owner: runtime.owner,
             order: runtime.nextOrder(),
           });
+        return;
       }
-      Object.assign(
-        edits.push,
-        realizeContent(
-          session,
-          pushedContents,
-          undefined,
-          wrapping ? '{\n' : '\n;\n',
-          metadata.kind === 1 ? '\n;\nreturn (' : '\n;\n',
-        ),
-      );
+      // Keep a single push in its compact form. On repetition, append to parts
+      // without realizing or copying contributions already queued by this phase.
+      let parts = edits.push.contentParts;
+      if (parts == null) {
+        parts = [edits.push.content!.slice(0, -suffix.length)];
+        edits.push.content = undefined;
+        edits.push.contentParts = parts;
+      } else {
+        const tail = parts.pop() as string;
+        const preceding = tail.slice(0, -suffix.length);
+        if (preceding) parts.push(preceding);
+      }
+      parts.push('\n\n;\n\n');
+      const realized = realizeContent(session, content);
+      if (realized.content != null) parts.push(realized.content);
+      else for (const part of realized.contentParts) parts.push(part);
+      parts.push(suffix);
     },
     generateUid: name => session.generateUid(name),
     rename(name, replacement = session.generateUid(name)) {

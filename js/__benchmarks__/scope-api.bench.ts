@@ -50,6 +50,33 @@ for (const operation of ['route', 'scope', 'rename', 'push'] as const)
     }
   });
 const manifest = packRouteManifest([], true, true, 1);
+for (const count of [10, 100, 1000, 5000])
+  describe(`push ${count} declarations into one scope`, () => {
+    for (const [label, api] of implementations) {
+      const plan = api.defineNativePipeline({
+        phases: [
+          {
+            name: 'push',
+            plugins: [
+              api.defineNativePlugin({
+                name: 'push-many',
+                visitors: [
+                  api.defineVisitor('Program', { scope: true }, (path: any) => {
+                    for (let i = 0; i < count; i++) path.scope.push(`var injected${i}=${i};`);
+                  }),
+                ],
+              }),
+            ],
+          },
+        ],
+      });
+      bench(label, () => {
+        const result = api.transform('globalThis.result=1;', 'input.js', plan);
+        if (result.status !== 'complete') throw new Error('Unexpected benchmark bailout');
+        return result;
+      });
+    }
+  });
 for (const [label, addon] of [
   ...(baselineRoot
     ? [['baseline', createRequire(import.meta.url)(`${baselineRoot}/noxcturnal.darwin-arm64.node`)]]
