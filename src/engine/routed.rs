@@ -393,6 +393,7 @@ impl RoutedEventCollector<'_> {
             self.utf16,
             payload_mask,
             &mut self.string_ids,
+            &mut self.member_paths,
         );
         let mut fallback_payload = if direct_payload.is_none() && !payload_mask.is_empty() {
             fields(

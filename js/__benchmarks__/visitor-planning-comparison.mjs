@@ -150,16 +150,18 @@ for (const retained of [false, true]) {
       comments ? 'process /*comment*/ .env.NODE_ENV;' : 'process.env.NODE_ENV;',
     ).join('\n');
     addTransform(
-      `${retained ? 'retained' : 'source'} member / ${comments ? 'commented' : 'plain'} / 400 members`,
+      `${retained ? 'retained' : 'native predicate'} member / ${comments ? 'commented' : 'plain'} / 400 members`,
       source,
       pipeline(
         api.defineNativePlugin({
           name: 'member',
           visitors: [
             api.defineVisitor(
-              'MemberExpression',
-              retained ? { fields: ['memberPath'] } : {},
-              path => path.matchesPattern('process.env.NODE_ENV'),
+              retained ? 'MemberExpression' : 'StaticMemberExpression|ComputedMemberExpression',
+              retained
+                ? { fields: ['memberPath'] }
+                : { where: { memberPath: { equals: 'process.env.NODE_ENV' } } },
+              path => (retained ? path.matchesPattern('process.env.NODE_ENV') : undefined),
             ),
           ],
         }),
@@ -171,6 +173,8 @@ for (const side of ['enter', 'exit']) {
   for (const size of [32, 128, 512]) {
     for (const [shape, source, pattern, partial] of [
       ['computed prefixes', 'root' + '["a.b"]'.repeat(size), String.raw`root.a\.b`, false],
+      ['dynamic root suffixes', 'root[key]' + '.tail'.repeat(size), 'root.tail', true],
+      ['call root suffixes', 'factory()' + '.tail'.repeat(size), 'factory.tail', true],
       [
         'static prefix then dynamic suffixes',
         'root' + '["value"]'.repeat(size) + '[dynamic]' + '.tail'.repeat(size),
@@ -184,6 +188,23 @@ for (const side of ['enter', 'exit']) {
         true,
       ],
     ]) {
+      if (side === 'enter')
+        addTransform(
+          `native predicate ${shape} / ${size}`,
+          source + ';',
+          pipeline(
+            api.defineNativePlugin({
+              name: 'native-prefixes',
+              visitors: [
+                api.defineVisitor(
+                  'StaticMemberExpression|ComputedMemberExpression',
+                  { where: { memberPath: { equals: pattern } } },
+                  () => {},
+                ),
+              ],
+            }),
+          ),
+        );
       const match = path => path.matchesPattern(pattern, partial);
       addTransform(
         `${side} ${shape} / ${size}`,
@@ -192,7 +213,11 @@ for (const side of ['enter', 'exit']) {
           api.defineNativePlugin({
             name: 'overlapping-prefixes',
             visitors: [
-              api.defineVisitor('MemberExpression', {}, side === 'enter' ? match : { exit: match }),
+              api.defineVisitor(
+                'MemberExpression',
+                { fields: ['memberPath'] },
+                side === 'enter' ? match : { exit: match },
+              ),
             ],
           }),
         ),
@@ -247,6 +272,8 @@ for (const count of [100, 1000]) {
 }
 const results = {};
 for (const [name, run] of cases) {
+  if (process.env.NOXCTURNAL_BENCH_ONLY && !name.includes(process.env.NOXCTURNAL_BENCH_ONLY))
+    continue;
   results[name] = measure(run);
   process.stderr.write(`${name}: ${results[name].median_us.toFixed(3)} us\n`);
 }

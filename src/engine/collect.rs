@@ -21,6 +21,7 @@ use crate::semantic::retained_index::{RetainedComment, RetainedIndex};
 use crate::syntax::classification::source_type;
 
 use super::fields::{packed_fields_direct, utf16_index};
+use super::member::MemberPathInterner;
 use super::member::{member_write_root_child, mutation_target_child, tracks_member_writes};
 use super::retained::routed_buffer_from_index;
 use super::{
@@ -39,6 +40,7 @@ struct EventCollector<'a> {
     retention_routes: Option<&'a CompiledManifest>,
     retention_capabilities: u32,
     retained_string_ids: FxHashMap<String, u32>,
+    member_paths: MemberPathInterner,
 }
 
 struct SyntaxIndexCollector<'a> {
@@ -48,6 +50,7 @@ struct SyntaxIndexCollector<'a> {
     retention_routes: Option<&'a CompiledManifest>,
     retention_capabilities: u32,
     retained_string_ids: FxHashMap<String, u32>,
+    member_paths: MemberPathInterner,
     parent_stack: Vec<(u32, u32, AstKind<'a>)>,
     target_stack: Vec<(AstKind<'a>, bool, bool)>,
     tracks_member_writes: bool,
@@ -142,6 +145,7 @@ impl<'a> Visit<'a> for SyntaxIndexCollector<'a> {
                     requested
                 },
                 &mut self.retained_string_ids,
+                &mut self.member_paths,
             );
             if let Some(retained_fields) = retained_fields {
                 self.retained_index
@@ -261,6 +265,7 @@ impl<'a> EventCollector<'a> {
                     requested
                 },
                 &mut self.retained_string_ids,
+                &mut self.member_paths,
             );
             if let Some(retained_fields) = retained_fields {
                 self.retained_index.record_packed_fields(
@@ -380,6 +385,7 @@ pub(crate) fn materialize_with_scope_parents(
             retention_routes: retention_manifest.as_ref(),
             retention_capabilities,
             retained_string_ids: FxHashMap::default(),
+            member_paths: MemberPathInterner::default(),
             parent_stack: Vec::new(),
             target_stack: Vec::new(),
             tracks_member_writes: tracks_member_writes(
@@ -466,6 +472,7 @@ pub(crate) fn materialize_with_scope_parents(
         retention_routes: retention_manifest.as_ref(),
         retention_capabilities,
         retained_string_ids: FxHashMap::default(),
+        member_paths: MemberPathInterner::default(),
         target_stack: Vec::new(),
         tracks_member_writes: tracks_member_writes(
             retention_manifest.as_ref(),

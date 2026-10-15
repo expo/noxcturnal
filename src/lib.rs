@@ -23,6 +23,27 @@ pub fn classify(filename: String, source: String) -> ParseClassification {
 }
 
 #[napi]
+pub fn source_hints(source: String) -> Vec<String> {
+    ["process.env", "require", "import", "export"]
+        .into_iter()
+        .filter(|hint| source.contains(hint))
+        .map(str::to_owned)
+        .collect()
+}
+
+#[napi]
+pub fn validate_identifier(name: String) -> napi::Result<()> {
+    use oxc_syntax::{identifier::is_identifier_name, keyword::is_reserved_keyword};
+    if !is_identifier_name(&name) || is_reserved_keyword(&name) {
+        return Err(napi::Error::new(
+            napi::Status::InvalidArg,
+            format!("Invalid identifier: {name}"),
+        ));
+    }
+    Ok(())
+}
+
+#[napi]
 pub fn native_preflight_transform(
     source: String,
     filename: String,

@@ -63,6 +63,15 @@ Every plugin in a phase observes the same immutable input. Its edits become visi
 phase boundary, after validation and an optional reparse. Split dependent transforms into separate
 phases when a later transform must observe an earlier transform's output.
 
+`path.matchesPattern()` uses native AST facts. Declare `fields: ['memberPath']` for member
+expressions or `fields: ['name']` for identifiers, including in child contracts. Missing declarations
+throw; matching never reparses source in JavaScript. For fixed patterns, prefer a native
+`where: { memberPath: { equals: 'process.env.NODE_ENV' } }` predicate. Predicates share chain
+prefixes without transferring full paths for every nested member.
+
+Generated UIDs avoid decoded AST identifier names and names already reserved in the phase. Text
+inside comments and string literals does not reserve names.
+
 ### Configuration and per-file data
 
 Pipeline definitions describe reusable program configuration:

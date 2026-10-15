@@ -41,21 +41,23 @@ for (const [label, api] of implementations) {
         name: 'member',
         visitors: [
           api.defineVisitor(
-            'MemberExpression',
-            retained ? { fields: ['memberPath'] } : {},
+            retained ? 'MemberExpression' : 'StaticMemberExpression|ComputedMemberExpression',
+            retained
+              ? { fields: ['memberPath'] }
+              : { where: { memberPath: { equals: 'process.env.NODE_ENV' } } },
             path => {
-              path.matchesPattern('process.env.NODE_ENV');
+              if (retained) path.matchesPattern('process.env.NODE_ENV');
             },
           ),
         ],
       }),
     );
-  const fallback = members(false);
+  const predicate = members(false);
   const retained = members(true);
   // Verify semantics outside timing. The original baseline did not recognize
-  // comments in source-only matching, so require the corrected result here.
+  // comments in native predicate matching, so require the corrected result here.
   if (label === 'fixed') {
-    for (const fields of [false, true]) {
+    for (const fields of [true]) {
       for (const source of [memberSource, plainMemberSource]) {
         let matches = 0;
         const result = api.transform(
@@ -65,13 +67,9 @@ for (const [label, api] of implementations) {
             api.defineNativePlugin({
               name: 'verify-member-matching',
               visitors: [
-                api.defineVisitor(
-                  'MemberExpression',
-                  fields ? { fields: ['memberPath'] } : {},
-                  path => {
-                    if (path.matchesPattern('process.env.NODE_ENV')) matches++;
-                  },
-                ),
+                api.defineVisitor('MemberExpression', { fields: ['memberPath'] }, path => {
+                  if (path.matchesPattern('process.env.NODE_ENV')) matches++;
+                }),
               ],
             }),
           ),
@@ -138,8 +136,8 @@ for (const [label, api] of implementations) {
       ['static dispatch / 400 identifiers', plainSource, plain],
       ['checked dispatch / 400 identifiers', plainSource, checked],
       ['nested replay / 400 identifiers', plainSource, nested],
-      ['source member matching / 400 members', memberSource, fallback],
-      ['plain source member matching / 400 members', plainMemberSource, fallback],
+      ['source member matching / 400 members', memberSource, predicate],
+      ['plain source member matching / 400 members', plainMemberSource, predicate],
       ['retained member matching / 400 members', memberSource, retained],
       ['1000 warm query calls', 'external;', queries],
     ] as const)

@@ -153,7 +153,8 @@ export function createDispatcher(
       realized: RealizedContent,
     ): void => {
       const prefix =
-        !programInsertionPoints.has(offset) && offset > 0 && session.source[offset - 1] !== '\n'
+        !programInsertionPoints.has(offset) &&
+        session.sourceTextOperations.needsLineBoundary(offset)
           ? '\n'
           : '';
       programInsertionPoints.add(offset);

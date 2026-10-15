@@ -22,6 +22,7 @@ export interface RouteCapabilities {
   childRules: Readonly<Partial<Record<string, readonly string[]>>> | null;
   controlFlow: readonly ControlFlowCapability[];
   declaredFields: readonly NativeFieldKey[];
+  childFields?: Readonly<Partial<Record<string, readonly NativeFieldKey[]>>>;
   comments: 'inner' | undefined;
 }
 

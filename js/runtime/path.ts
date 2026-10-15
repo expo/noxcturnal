@@ -1,4 +1,4 @@
-import { validMemberPattern, staticMemberPath } from './member-pattern';
+import { native } from '../native/binding';
 import { CHILD_ROLES, FIELD_KEY_IDS } from '../generated/event-schema';
 import { alias, array } from '../pipeline/route-utils';
 import {
@@ -316,20 +316,23 @@ export class NodePathImpl implements NativeNodePath {
     return value;
   }
   matchesPattern(pattern: string, allowPartial = false): boolean {
-    if (!validMemberPattern(pattern)) return false;
-    const retained = this.node.memberPath;
-    if (typeof retained !== 'string' && this.event.end - this.event.start >= 256)
-      return this.runtime.session.matchesMemberPattern(
-        this.event.start,
-        this.event.end,
-        pattern,
-        allowPartial,
-      );
-    const memberPath =
-      typeof retained === 'string' ? retained : staticMemberPath(this.sourceText());
-    return (
-      memberPath === pattern || (allowPartial && memberPath?.startsWith(`${pattern}.`) === true)
-    );
+    const field = this.type === 'Identifier' ? 'name' : 'memberPath';
+    const capabilities = this.runtime.capabilities;
+    const fields =
+      this.ancestryDepth > 0
+        ? capabilities.ancestorFields?.[this.type]
+        : this.deliveredRoute
+          ? capabilities.declaredFields
+          : capabilities.childFields?.[this.type];
+    if (!fields?.includes(field))
+      throw this.#pluginError(`matchesPattern requires declared field ${field}`);
+    const memberPath = this.node[field];
+    // This validates the small pattern contract, never JavaScript source.
+    if (pattern.includes('\\'))
+      for (let i = 0; i < pattern.length; i++)
+        if (pattern[i] === '\\' && pattern[++i] !== '.' && pattern[i] !== '\\') return false;
+    if (!pattern.length || typeof memberPath !== 'string') return false;
+    return memberPath === pattern || (allowPartial && memberPath.startsWith(`${pattern}.`));
   }
   #assertChildRole(role: string): void {
     const rules =
@@ -701,8 +704,7 @@ function makeScope(runtime: PathRuntime, id: number, parentId: number | null): N
     rename(name, replacement = session.generateUid(name)) {
       const binding = resolve(name);
       if (!binding) throw new Error(`Cannot rename unbound identifier ${name}`);
-      if (!/^[$A-Z_a-z][$\w]*$/.test(replacement))
-        throw new Error(`Invalid identifier: ${replacement}`);
+      native.validateIdentifier(replacement);
       const nodes = [binding.declaration, ...binding.references].filter(
         (node): node is NodeSummary | NodeView => node != null,
       );
@@ -820,10 +822,4 @@ function isShorthandPropertyType(type: string | undefined): boolean {
     type === 'BindingProperty' ||
     type === 'AssignmentTargetPropertyIdentifier'
   );
-}
-export function locationOffset(source: string, position: SourceLocation['start']): number {
-  const lines = source.split('\n');
-  let offset = 0;
-  for (let line = 1; line < position.line; line++) offset += (lines[line - 1]?.length ?? 0) + 1;
-  return offset + position.column;
 }

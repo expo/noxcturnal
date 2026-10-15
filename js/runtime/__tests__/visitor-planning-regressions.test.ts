@@ -5,18 +5,8 @@ import {
   defineVisitor,
   transform,
   type QueryRequest,
-  type NativeNodePath,
 } from '../../index';
 import { stableJson } from '../../pipeline/cache-key';
-import { staticMemberPath } from '../member-pattern';
-
-test('member matching handles deeply nested parentheses without recursion', () => {
-  const depth = 20_000;
-  expect(staticMemberPath('('.repeat(depth) + 'process["env"]' + ')'.repeat(depth))).toBe(
-    'process.env',
-  );
-  expect(staticMemberPath('('.repeat(depth) + 'process.env' + ')'.repeat(depth - 1))).toBeNull();
-});
 
 for (const side of ['enter', 'exit'] as const)
   test.each([
@@ -25,11 +15,14 @@ for (const side of ['enter', 'exit'] as const)
     String.raw`\u0072oot` + String.raw` /*comment*/ ?. ["a\u002eb"]`.repeat(64),
     'root' + '["value"]'.repeat(64) + '[other.member]' + '.tail'.repeat(64),
     '('.repeat(64) + 'root[other.member]' + '["value"])'.repeat(64),
-  ])(`${side}: shared long-chain matches agree with uncached matching: %s`, expression => {
+  ])(`${side}: native long-chain matches agree with declared member facts: %s`, expression => {
     let visits = 0;
-    const observe = (path: Pick<NativeNodePath, 'start' | 'end' | 'matchesPattern'>) => {
+    const observe = (path: {
+      readonly node: { readonly memberPath?: string };
+      matchesPattern(pattern: string, partial?: boolean): boolean;
+    }) => {
       visits++;
-      const encoded = staticMemberPath(expression.slice(path.start, path.end));
+      const encoded = path.node.memberPath;
       for (const pattern of [
         'root',
         'root.value',
@@ -48,7 +41,11 @@ for (const side of ['enter', 'exit'] as const)
     const plugin = defineNativePlugin({
       name: 'shared-members',
       visitors: [
-        defineVisitor('MemberExpression', {}, side === 'enter' ? observe : { exit: observe }),
+        defineVisitor(
+          'MemberExpression',
+          { fields: ['memberPath'] },
+          side === 'enter' ? observe : { exit: observe },
+        ),
       ],
     });
     expect(
@@ -62,6 +59,7 @@ for (const side of ['enter', 'exit'] as const)
   });
 
 const memberCases = [
+  ['process.a.b.c.d.e.f.g.h.i.j', 'process.a.b.c.d.e.f.g.h.i.j'],
   ['process.env.NODE_ENV', 'process.env.NODE_ENV'],
   ["process /*a*/ ['env'] /*b*/ .NODE_ENV", 'process.env.NODE_ENV'],
   ['process /*a*/ . /*b*/ env /*c*/ [ /*d*/ "NODE_ENV" /*e*/ ]', 'process.env.NODE_ENV'],
@@ -74,24 +72,14 @@ const memberCases = [
   ['process[""].value', 'process..value'],
   ['process["😀"].value', 'process.😀.value'],
 ] as const;
-test.each([
-  ' process // comment\n . env /* trailing */ \n',
-  'process.env\n',
-  'process/**/.env',
-  'process/*/ still inside / **/.env',
-  'process/* a / b */.env',
-])('member matching ignores surrounding trivia: %s', source => {
-  expect(staticMemberPath(source)).toBe('process.env');
-});
 for (const [expression, encoded] of memberCases) {
   test(`static member representation: ${expression}`, () => {
-    expect(staticMemberPath(expression)).toBe(encoded);
-    for (const fields of [false, true]) {
+    {
       const observations: unknown[] = [];
       const plugin = defineNativePlugin({
         name: 'members',
         visitors: [
-          defineVisitor('MemberExpression', fields ? { fields: ['memberPath'] } : {}, path => {
+          defineVisitor('MemberExpression', { fields: ['memberPath'] }, path => {
             if (path.end === expression.length)
               observations.push([
                 path.matchesPattern(encoded),
@@ -135,20 +123,68 @@ for (const [expression, encoded] of memberCases) {
   });
 }
 
-test.each([
-  'process[key]',
-  'process["env" + "x"]',
-  'factory().env',
-  'process[1]',
-  'process.#private',
-  'process /* not a property separator */ env',
-  'process.env + other',
-  'process /* first */ + other /* second */ .env',
-  '// process.env',
-  'process/*/',
-  'process/* missing terminator / .env',
-])('member fallback refuses dynamic or unsupported input: %s', source => {
-  expect(staticMemberPath(source)).toBeNull();
+test.each(['process[key]', 'process["env" + "x"]', 'factory().env', 'process[1]'])(
+  'native member facts reject dynamic chains: %s',
+  expression => {
+    const seen: boolean[] = [];
+    const plugin = defineNativePlugin({
+      name: 'dynamic-members',
+      visitors: [
+        defineVisitor('MemberExpression', { fields: ['memberPath'] }, path => {
+          if (path.end === expression.length) seen.push(path.matchesPattern('process.env'));
+        }),
+      ],
+    });
+    expect(
+      transform(
+        expression + ';',
+        'input.js',
+        defineNativePipeline({ phases: [{ name: 'scan', plugins: [plugin] }] }),
+      ).status,
+    ).toBe('complete');
+    expect(seen).toEqual([false]);
+  },
+);
+
+test('member matching requires its own declared facts even when another route retains them', () => {
+  const plugin = defineNativePlugin({
+    name: 'undeclared-member',
+    visitors: [
+      defineVisitor('MemberExpression', {}, path => path.matchesPattern('process.env')),
+      defineVisitor('MemberExpression', { fields: ['memberPath'] }, () => {}),
+    ],
+  });
+  expect(() =>
+    transform(
+      'process.env;',
+      'input.js',
+      defineNativePipeline({ phases: [{ name: 'scan', plugins: [plugin] }] }),
+    ),
+  ).toThrow('matchesPattern requires declared field memberPath');
+});
+
+test.each([false, true])('dynamic-root fields remain absent with scope retention %s', scope => {
+  for (const root of ['root[key]', 'factory()']) {
+    const seen: unknown[] = [];
+    const plugin = defineNativePlugin({
+      name: 'nonstatic-fields',
+      visitors: [
+        defineVisitor('MemberExpression', { fields: ['memberPath'], scope }, path => {
+          seen.push(path.node.memberPath);
+          expect(path.matchesPattern('root.tail', true)).toBe(false);
+        }),
+      ],
+    });
+    expect(
+      transform(
+        root + '.tail'.repeat(128) + ';',
+        'input.js',
+        defineNativePipeline({ phases: [{ name: 'scan', plugins: [plugin] }] }),
+      ).status,
+    ).toBe('complete');
+    expect(seen.length).toBeGreaterThanOrEqual(128);
+    expect(seen.every(value => value === undefined)).toBe(true);
+  }
 });
 
 test('configuration encoding distinguishes scalar values, holes, and tag-looking strings', () => {
@@ -244,13 +280,13 @@ test.each([
   '((process as any).env).NODE_ENV',
   '(process!).env.NODE_ENV',
   '(process satisfies object).env.NODE_ENV',
-])('unsupported TS wrappers do not depend on retained fields: %s', expression => {
-  for (const fields of [false, true]) {
+])('native matching refuses unsupported TS wrappers: %s', expression => {
+  {
     const seen: boolean[] = [];
     const plugin = defineNativePlugin({
       name: 'ts-members',
       visitors: [
-        defineVisitor('MemberExpression', fields ? { fields: ['memberPath'] } : {}, path => {
+        defineVisitor('MemberExpression', { fields: ['memberPath'] }, path => {
           if (path.end === expression.length)
             seen.push(path.matchesPattern('process.env.NODE_ENV'));
         }),

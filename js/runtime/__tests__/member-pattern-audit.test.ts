@@ -8,7 +8,7 @@ const cases = [
   ['computed string', `process['env'].NODE_ENV;`, true],
 ] as const;
 describe.each(cases)('%s', (_name, source, _fails) => {
-  let plain: unknown, retained: unknown, babel: unknown;
+  let retained: unknown, babel: unknown;
   beforeAll(() => {
     transformSync(source, {
       configFile: false,
@@ -24,15 +24,14 @@ describe.each(cases)('%s', (_name, source, _fails) => {
         }),
       ],
     });
-    for (const fields of [false, true]) {
+    {
       const plugin = defineNativePlugin({
         name: 'pattern-audit',
         visitors: [
-          defineVisitor('MemberExpression', fields ? { fields: ['memberPath'] } : {}, path => {
+          defineVisitor('MemberExpression', { fields: ['memberPath'] }, path => {
             if (path.end === source.length - 1) {
               const result = path.matchesPattern('process.env.NODE_ENV');
-              if (fields) retained = result;
-              else plain = result;
+              retained = result;
             }
           }),
         ],
@@ -44,11 +43,8 @@ describe.each(cases)('%s', (_name, source, _fails) => {
       );
       expect(result.status).toBe('complete');
     }
-    expect(typeof plain).toBe('boolean');
     expect(typeof retained).toBe('boolean');
   });
   test('Babel pattern control', () => expect(babel).toBe(true));
   test('retained member path control', () => expect(retained).toBe(true));
-  test('pattern matching is independent of optional field retention', () =>
-    expect(plain).toBe(true));
 });

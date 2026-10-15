@@ -78,45 +78,62 @@ fn write_component(path: &mut String, component: &str) {
     }
 }
 
-fn write_static_member_path(expression: &Expression<'_>, path: &mut String) -> bool {
-    match member_expression(expression) {
-        Expression::Identifier(identifier) => {
-            path.push_str(&identifier.name);
-            true
-        }
-        Expression::StaticMemberExpression(member) => {
-            write_static_member_path(&member.object, path) && {
-                path.push('.');
-                path.push_str(&member.property.name);
-                true
+fn write_static_member_path(mut expression: &Expression<'_>, path: &mut String) -> bool {
+    let mut properties = [""; 8];
+    let mut depth = 0;
+    let mut overflow = Vec::new();
+    loop {
+        let property = match member_expression(expression) {
+            Expression::Identifier(identifier) => {
+                path.push_str(&identifier.name);
+                break;
             }
-        }
-        Expression::ComputedMemberExpression(member) => match &member.expression {
-            Expression::StringLiteral(property) => {
-                write_static_member_path(&member.object, path) && {
-                    path.push('.');
-                    write_component(path, &property.value);
-                    true
-                }
+            Expression::StaticMemberExpression(member) => {
+                expression = &member.object;
+                member.property.name.as_str()
             }
-            _ => false,
-        },
-        _ => false,
+            Expression::ComputedMemberExpression(member) => {
+                let Expression::StringLiteral(property) = &member.expression else {
+                    return false;
+                };
+                expression = &member.object;
+                property.value.as_str()
+            }
+            _ => return false,
+        };
+        if depth < properties.len() {
+            properties[depth] = property;
+        } else {
+            overflow.push(property);
+        }
+        depth += 1;
     }
+    for property in overflow.into_iter().rev().chain(
+        properties[..depth.min(properties.len())]
+            .iter()
+            .rev()
+            .copied(),
+    ) {
+        path.push('.');
+        write_component(path, property);
+    }
+    true
 }
 
 pub(crate) fn static_member_root<'a, 'b>(
-    expression: &'b Expression<'a>,
+    mut expression: &'b Expression<'a>,
 ) -> Option<&'b IdentifierReference<'a>> {
-    match expression {
-        Expression::Identifier(identifier) => Some(identifier),
-        Expression::StaticMemberExpression(member) => static_member_root(&member.object),
-        Expression::ComputedMemberExpression(member)
-            if matches!(member.expression, Expression::StringLiteral(_)) =>
-        {
-            static_member_root(&member.object)
+    loop {
+        match expression {
+            Expression::Identifier(identifier) => return Some(identifier),
+            Expression::StaticMemberExpression(member) => expression = &member.object,
+            Expression::ComputedMemberExpression(member)
+                if matches!(member.expression, Expression::StringLiteral(_)) =>
+            {
+                expression = &member.object
+            }
+            _ => return None,
         }
-        _ => None,
     }
 }
 
@@ -200,6 +217,33 @@ pub(crate) struct MemberPathInterner {
 impl MemberPathInterner {
     const ROOT: u32 = u32::MAX;
 
+    /// Short chains need no interning allocations. Bound this walk so long or
+    /// overlapping invalid prefixes still use the shared, linear-size cache.
+    pub(crate) fn is_static(&mut self, kind: AstKind<'_>) -> bool {
+        let mut object = match kind {
+            AstKind::StaticMemberExpression(member) => &member.object,
+            AstKind::ComputedMemberExpression(member)
+                if matches!(member.expression, Expression::StringLiteral(_)) =>
+            {
+                &member.object
+            }
+            _ => return false,
+        };
+        for _ in 0..4 {
+            object = match member_expression(object) {
+                Expression::Identifier(_) => return true,
+                Expression::StaticMemberExpression(member) => &member.object,
+                Expression::ComputedMemberExpression(member)
+                    if matches!(member.expression, Expression::StringLiteral(_)) =>
+                {
+                    &member.object
+                }
+                _ => return false,
+            };
+        }
+        self.kind(kind).is_some()
+    }
+
     fn bytes(&mut self, mut state: u32, bytes: &[u8]) -> u32 {
         for &byte in bytes {
             let key = (state, byte);
@@ -233,39 +277,46 @@ impl MemberPathInterner {
         state
     }
 
-    fn expression(&mut self, expression: &Expression<'_>) -> Option<u32> {
-        let expression = member_expression(expression);
-        let span = expression.span();
-        let tag = match expression {
-            Expression::Identifier(_) => 0,
-            Expression::StaticMemberExpression(_) => 1,
-            Expression::ComputedMemberExpression(_) => 2,
-            _ => return None,
+    fn expression(&mut self, mut expression: &Expression<'_>) -> Option<u32> {
+        let mut pending = Vec::new();
+        let mut state = loop {
+            expression = member_expression(expression);
+            let span = expression.span();
+            let tag = match expression {
+                Expression::Identifier(_) => 0,
+                Expression::StaticMemberExpression(_) => 1,
+                Expression::ComputedMemberExpression(_) => 2,
+                _ => break None,
+            };
+            let key = (span.start, span.end, tag);
+            if let Some(state) = self.expressions.get(&key) {
+                break *state;
+            }
+            match expression {
+                Expression::Identifier(identifier) => {
+                    let state = self.component(Self::ROOT, &identifier.name);
+                    self.expressions.insert(key, Some(state));
+                    break Some(state);
+                }
+                Expression::StaticMemberExpression(member) => {
+                    pending.push((key, member.property.name.as_str()));
+                    expression = &member.object;
+                }
+                Expression::ComputedMemberExpression(member) => {
+                    let Expression::StringLiteral(property) = &member.expression else {
+                        self.expressions.insert(key, None);
+                        break None;
+                    };
+                    pending.push((key, property.value.as_str()));
+                    expression = &member.object;
+                }
+                _ => unreachable!(),
+            }
         };
-        let cache_key = (span.start, span.end, tag);
-        if let Some(state) = self.expressions.get(&cache_key) {
-            return *state;
+        for (key, property) in pending.into_iter().rev() {
+            state = state.map(|parent| self.component(parent, property));
+            self.expressions.insert(key, state);
         }
-        let state = match expression {
-            Expression::Identifier(identifier) => {
-                Some(self.component(Self::ROOT, &identifier.name))
-            }
-            Expression::StaticMemberExpression(member) => self
-                .expression(&member.object)
-                .map(|parent| self.component(parent, &member.property.name)),
-            Expression::ComputedMemberExpression(member) => {
-                let property = match &member.expression {
-                    Expression::StringLiteral(property) => Some(property.value.as_str()),
-                    _ => None,
-                };
-                property.and_then(|property| {
-                    self.expression(&member.object)
-                        .map(|parent| self.component(parent, property))
-                })
-            }
-            _ => None,
-        };
-        self.expressions.insert(cache_key, state);
         state
     }
 

@@ -83,3 +83,84 @@ test('preserves String.replace substitution semantics for contextual regular exp
   named.editor.replace(/(?<key>\w+)=(?<value>\d+)/, '$<value>:$<key>');
   assert.equal(named.edits[0]?.content, '42:value');
 });
+
+test('native replacement facts preserve UTF-16 offsets, sticky searches and callbacks', () => {
+  const unicode = editorFixture('😀ab 😀ac');
+  unicode.editor.replaceAll(/(?<=a)(b|c)/gu, (match, group) => `${group}:${match}`);
+  assert.deepEqual(
+    unicode.edits.map(edit => [edit.start, edit.end, edit.content]),
+    [
+      [3, 4, 'b:b'],
+      [8, 9, 'c:c'],
+    ],
+  );
+  const empty = editorFixture('😀');
+  empty.editor.replaceAll(/(?:)/gu, '|');
+  assert.deepEqual(
+    empty.edits.map(edit => edit.start),
+    [0, 2],
+  );
+  const sticky = editorFixture('aba');
+  sticky.editor.replaceAll(/a/y, 'x');
+  assert.deepEqual(
+    sticky.edits.map(edit => edit.start),
+    [0],
+  );
+  const literal = editorFixture('a.b a.b');
+  literal.editor.replaceAll('a.b', '[$&:$0:$$]');
+  assert.deepEqual(
+    literal.edits.map(edit => edit.content),
+    ['[a.b:$0:$]', '[a.b:$0:$]'],
+  );
+});
+
+test('native replacements preserve unmatched and numbered capture substitutions', () => {
+  const fixture = editorFixture('a');
+  fixture.editor.replace(/(?<missing>b)?(a)/, '$<missing>:$1:$2:$02:$12:$99');
+  assert.equal(fixture.edits[0]?.content, '::a:a:2:$99');
+});
+
+test('native captures preserve individual UTF-16 units in non-Unicode regexes', () => {
+  const fixture = editorFixture('😀');
+  fixture.editor.replaceAll(/./g, match => {
+    assert.equal(match.length, 1);
+    return match;
+  });
+  assert.deepEqual(
+    fixture.edits.map(edit => [edit.start, edit.end, edit.content]),
+    [
+      [0, 1, '\ud83d'],
+      [1, 2, '\ude00'],
+    ],
+  );
+  const substitution = editorFixture('😀');
+  substitution.editor.replace(/./, '$&');
+  assert.equal(substitution.edits[0]?.content, '\ud83d');
+  const replacement = editorFixture('x');
+  replacement.editor.replace('x', '\ud800$&\udfff');
+  assert.equal(replacement.edits[0]?.content, '\ud800x\udfff');
+});
+
+test('native Unicode regex patterns decode literal astral characters', () => {
+  for (const search of [/😀/u, /[😀]/u, /😀/gu, new RegExp('[😀]', 'gv')]) {
+    const fixture = editorFixture('😀');
+    fixture.editor.replaceAll(search, 'X');
+    assert.deepEqual(
+      fixture.edits.map(edit => [edit.start, edit.end, edit.content]),
+      [[0, 2, 'X']],
+    );
+  }
+});
+
+test('native source transport preserves unpaired UTF-16 units', () => {
+  const source = '\ud800x\udfff';
+  const fixture = editorFixture(source);
+  fixture.editor.replaceAll(/./g, '$&');
+  assert.deepEqual(
+    fixture.edits.map(edit => edit.content),
+    ['\ud800', 'x', '\udfff'],
+  );
+  const indented = editorFixture(source);
+  indented.editor.indent('\udfff');
+  assert.equal(indented.edits[0]?.content, '\udfff' + source);
+});

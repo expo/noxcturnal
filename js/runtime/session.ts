@@ -21,20 +21,12 @@ import type {
 import { commitWithDedupe } from './editor';
 import { adaptBindingFact, toNodeView } from './node-utils';
 import { alias, querySubscriptions } from '../pipeline/route-utils';
-import { staticMemberPath } from './member-pattern';
 
 export class NativeTransformSession {
   #closed = false;
-  #uids = new Set<string>();
-  #sourceIdentifiers: Set<string> | null = null;
-  #uidSourceScans = 0;
+  #sourceText: InstanceType<typeof native.NativeSourceText> | null = null;
   #eventCache: (NativeEvent | undefined)[] = [];
   #queryCache = new WeakMap<QueryRequest, { request: QueryRequest; result: QueryResult }>();
-  #memberPaths?: Map<
-    number,
-    { ends: Map<number, { prefixes: Map<number, string>; length: number }>; longest: number }
-  >;
-  #nonstaticMemberAfter?: Map<number, number>;
   #globalReferencesCache = new Map<string, SemanticReferenceView[]>();
   #childrenCache = new Map<number, number[]>();
   #childIdsCache = new Map<number, Set<number>>();
@@ -42,7 +34,6 @@ export class NativeTransformSession {
   #prefetchedChildTypes = new Set<string>();
   #native: NativeIndexedSessionBinding | null = null;
   #nativeFilename: string;
-  #lineStarts: number[] | null = null;
   #scopeParents: Uint32Array | null = null;
   #scopeMetadata: Uint32Array | null = null;
   #programBodyOffsets: readonly [number, number, boolean] | null = null;
@@ -134,66 +125,6 @@ export class NativeTransformSession {
   }
   nodeView(event: NativeEvent): NodeView {
     return toNodeView(event);
-  }
-  /** Share one long-chain scan across its overlapping member subtrees. This is
-   * derived solely from this session's immutable source, never native lookups. */
-  matchesMemberPattern(
-    start: number,
-    end: number,
-    pattern: string,
-    allowPartial: boolean,
-  ): boolean {
-    const cached = this.#memberPaths?.get(start)?.ends.get(end);
-    if (cached)
-      return (
-        (allowPartial ? pattern.length <= cached.length : pattern.length === cached.length) &&
-        cached.prefixes.get(pattern.length) === pattern
-      );
-    const invalidAfter = this.#nonstaticMemberAfter?.get(start);
-    if (invalidAfter !== undefined && end >= invalidAfter) return false;
-    const ranges = (this.#memberPaths ??= new Map());
-    let prefixes = new Map<number, string>();
-    let knownFailureAfter = 0;
-    const path = staticMemberPath(this.source.slice(start, end), {
-      prefix: (localStart, localEnd, path) => {
-        prefixes.set(path.length, path);
-        const prefixStart = start + localStart;
-        const prefixEnd = start + localEnd;
-        let range = ranges.get(prefixStart);
-        if (!range) ranges.set(prefixStart, (range = { ends: new Map(), longest: prefixEnd }));
-        range.ends.set(prefixEnd, { prefixes, length: path.length });
-        range.longest = Math.max(range.longest, prefixEnd);
-      },
-      knownPrefix: localStart => {
-        const prefixStart = start + localStart;
-        const invalidAfter = this.#nonstaticMemberAfter?.get(prefixStart);
-        if (invalidAfter !== undefined && end >= invalidAfter) {
-          knownFailureAfter = invalidAfter - start;
-          return null;
-        }
-        const range = ranges.get(prefixStart);
-        if (!range || range.longest > end) return undefined;
-        const known = range.ends.get(range.longest)!;
-        prefixes = known.prefixes;
-        return { end: range.longest - start, path: prefixes.get(known.length)! };
-      },
-      nonstatic: (openings, localStart, after) => {
-        // These are complete native node spans, so an unsupported suffix stays
-        // nonstatic in any larger member. Open wrappers share that failure;
-        // unrelated starts (e.g. members inside [key]) stay independent.
-        const failures = (this.#nonstaticMemberAfter ??= new Map());
-        for (const local of [0, ...openings, localStart]) {
-          const key = start + local;
-          const cutoff = start + Math.max(local + 1, after, knownFailureAfter);
-          failures.set(key, Math.min(failures.get(key) ?? cutoff, cutoff));
-        }
-      },
-    });
-    if (path === null) return false;
-    return (
-      (allowPartial ? pattern.length <= path.length : pattern.length === path.length) &&
-      prefixes.get(pattern.length) === pattern
-    );
   }
   query(request: QueryRequest): QueryResult {
     this.#assertOpen();
@@ -613,59 +544,25 @@ export class NativeTransformSession {
     }
     return this.#scopeParents;
   }
+  get sourceTextOperations(): InstanceType<typeof native.NativeSourceText> {
+    this.#assertOpen();
+    return (this.#sourceText ??= new native.NativeSourceText(this.source));
+  }
   generateUid(name = 'temp'): string {
-    const hint = name.replace(/[^A-Za-z0-9_$]/g, '') || 'temp';
-    const base = `_${hint}`;
-    // UID spelling is part of output compatibility. Use the same source-based
-    // allocator whether this phase happens to own a retained syntax/semantic
-    // session or is routed statelessly; artifact selection must not change code.
-    let uid = base;
-    let index = 2;
-    while (this.#uids.has(uid)) uid = `${base}${index++}`;
-    if (this.#sourceIdentifiers == null) {
-      // Absence from the complete source proves absence from its identifier set.
-      // Preserve exact historical spelling when the candidate occurs as a
-      // substring by falling back to the Unicode identifier index.
-      if (this.#uidSourceScans < 8) {
-        this.#uidSourceScans++;
-        if (!this.source.includes(uid)) {
-          this.#uids.add(uid);
-          return uid;
-        }
-      }
-      this.#sourceIdentifiers = new Set(
-        this.source.match(/[$_\p{ID_Start}][$\u200c\u200d\p{ID_Continue}]*/gu) ?? [],
-      );
-    }
-    while (this.#uids.has(uid) || this.#sourceIdentifiers.has(uid)) uid = `${base}${index++}`;
-    this.#uids.add(uid);
-    return uid;
+    return this.sourceTextOperations.generateUid(name, this.#nativeFilename);
   }
   sourceLocation(start: number, end: number): SourceLocation {
-    if (this.#lineStarts == null) {
-      const starts = [0];
-      for (
-        let offset = this.source.indexOf('\n');
-        offset !== -1;
-        offset = this.source.indexOf('\n', offset + 1)
-      ) {
-        starts.push(offset + 1);
-      }
-      this.#lineStarts = starts;
-    }
-    const at = (offset: number) => {
-      const starts = this.#lineStarts!;
-      let low = 0;
-      let high = starts.length;
-      while (low < high) {
-        const middle = (low + high) >>> 1;
-        if (starts[middle]! <= offset) low = middle + 1;
-        else high = middle;
-      }
-      const lineIndex = low - 1;
-      return { line: low, column: offset - starts[lineIndex]! };
+    const [startLine, startColumn, endLine, endColumn] = this.sourceTextOperations.locations(
+      start,
+      end,
+    );
+    return {
+      start: { line: startLine!, column: startColumn! },
+      end: { line: endLine!, column: endColumn! },
     };
-    return { start: at(start), end: at(end) };
+  }
+  locationOffset(position: SourceLocation['start']): number {
+    return this.sourceTextOperations.locationOffset(position.line, position.column);
   }
   commit(edits: EditCommand[], mode?: string) {
     this.#assertOpen();
@@ -690,8 +587,7 @@ export class NativeTransformSession {
     );
   }
   close(): void {
-    this.#memberPaths = undefined;
-    this.#nonstaticMemberAfter = undefined;
+    this.#sourceText = null;
     if (!this.#closed && this.#native) {
       this.#native.close();
     }

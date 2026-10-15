@@ -37,7 +37,12 @@ test('provides lazy compact structural child roles without recursive ESTree tran
       ),
       defineVisitor(
         'CallExpression',
-        { children: { callee: { route: 'Expression' }, arguments: { route: 'Expression' } } },
+        {
+          children: {
+            callee: { route: 'Expression', fields: ['name', 'memberPath'] },
+            arguments: { route: 'Expression' },
+          },
+        },
         path => {
           observed.callee = sources(path.get('callee'));
           observed.arguments = sources(path.get('arguments'));
@@ -430,7 +435,7 @@ test('implements a Platform.select-style transform through declared compact role
         'CallExpression',
         {
           children: {
-            callee: { route: 'Expression' },
+            callee: { route: 'Expression', fields: ['name', 'memberPath'] },
             arguments: {
               route: 'ObjectExpression',
               children: {

@@ -328,6 +328,7 @@ function typedCapabilities(defined: DefinedVisitor<any>): RouteCapabilities {
   if (!capabilities) {
     const contract = defined.contract;
     let childRules: Record<string, string[]> | null = null;
+    const childFields: Record<string, NativeFieldKey[]> = {};
     if (contract.children != null) {
       const rules: Record<string, string[]> = {};
       const attach = (
@@ -338,8 +339,14 @@ function typedCapabilities(defined: DefinedVisitor<any>): RouteCapabilities {
           const roles = (rules[parentType] ??= []);
           for (const role of Object.keys(children)) if (!roles.includes(role)) roles.push(role);
         }
-        for (const child of Object.values(children))
-          if (child.children != null) attach(concreteRouteTypes(child.route), child.children);
+        for (const child of Object.values(children)) {
+          const types = concreteRouteTypes(child.route);
+          for (const type of types)
+            childFields[type] = [
+              ...new Set([...(childFields[type] ?? []), ...(child.fields ?? [])]),
+            ];
+          if (child.children != null) attach(types, child.children);
+        }
       };
       attach(concreteRouteTypes(defined.route), contract.children);
       childRules = rules;
@@ -355,6 +362,7 @@ function typedCapabilities(defined: DefinedVisitor<any>): RouteCapabilities {
       childRules,
       controlFlow: contract.controlFlow,
       declaredFields: contract.fields,
+      childFields,
       comments: contract.comments,
     };
     typedCapabilitiesCache.set(defined, capabilities);

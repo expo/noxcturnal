@@ -146,7 +146,7 @@
           cargoDeps = pkgs.rustPlatform.fetchCargoVendor {
             name = "noxcturnal-cargo-deps";
             src = nativeSource;
-            hash = "sha256-SIFc+vYClNxwzVHgr7BSHVlga9QCGwSiqxZ8V6Zd7es=";
+            hash = "sha256-jhe2Pom4PeE6hm2YezpM6IntnkwDahPkz4Da7NKk0To=";
           };
           pnpmStoreKey = builtins.hashString "sha256" (toString pnpmDeps);
           pnpmStoreShellHook = ''
@@ -309,7 +309,7 @@
                 export NOXCTURNAL_TARGET_DIR="$TMPDIR/native-target"
                 export NOXCTURNAL_SOURCE_HASH=${nixpkgs.lib.escapeShellArg sourceHash}
                 export NOXCTURNAL_NATIVE_INPUT_HASH="$(cat ${nativeInputFingerprint})"
-                export NOXCTURNAL_CARGO_VENDOR_HASH=sha256-SIFc+vYClNxwzVHgr7BSHVlga9QCGwSiqxZ8V6Zd7es=
+                export NOXCTURNAL_CARGO_VENDOR_HASH=sha256-jhe2Pom4PeE6hm2YezpM6IntnkwDahPkz4Da7NKk0To=
                 export NOXCTURNAL_PNPM_STORE_HASH=sha256-mdQ0bnjrNLeyRZLqsfGMu4bWaMwmHa89WipUXDjOkZQ=
                 export RUSTFLAGS="''${RUSTFLAGS:+$RUSTFLAGS }--remap-path-prefix=$NIX_BUILD_TOP=/build"
                 export CFLAGS="''${CFLAGS:+$CFLAGS }-ffile-prefix-map=$NIX_BUILD_TOP=/build -fdebug-prefix-map=$NIX_BUILD_TOP=/build"
