@@ -4,6 +4,7 @@ import type { NativeNodeType, NativeRouteTypes } from './event-schema';
 
 export interface NodeTypeLike {
   readonly type: string;
+  readonly nodeKind?: string;
 }
 
 export type NodeTypeRoute =
@@ -26,17 +27,17 @@ export function isNodeType<Node extends NodeTypeLike, Route extends NodeTypeRout
 ): node is Node & { readonly type: NodeTypeForRoute<Route> } {
   switch (route) {
     case 'Function':
-      return isFunctionType(node.type);
+      return isFunction(node);
     case 'Statement':
-      return isStatementType(node.type);
+      return isStatement(node);
     case 'Declaration':
-      return isDeclarationType(node.type);
+      return isDeclaration(node);
     case 'Expression':
-      return isExpressionType(node.type);
+      return isExpression(node);
     case 'MemberExpression':
-      return isMemberExpressionType(node.type);
+      return isMemberExpression(node);
     case 'MetaProperty':
-      return isMetaPropertyType(node.type);
+      return isMetaProperty(node);
     default:
       return node.type === route;
   }
@@ -101,9 +102,15 @@ export function isStatementType(type: string): type is NativeRouteTypes['Stateme
   }
 }
 
+/** Collapsed Function/Class nodes require a retained nodeKind to identify their category. */
 export function isStatement<Node extends NodeTypeLike>(
   node: Node,
 ): node is Node & { readonly type: NativeRouteTypes['Statement'] } {
+  if (node.type === 'Function' || node.type === 'Class')
+    return (
+      (node.type === 'Function' && node.nodeKind === 'TSDeclareFunction') ||
+      node.nodeKind === `${node.type}Declaration`
+    );
   return isStatementType(node.type);
 }
 
@@ -132,9 +139,15 @@ export function isDeclarationType(type: string): type is NativeRouteTypes['Decla
   }
 }
 
+/** Collapsed Function/Class nodes require a retained nodeKind to identify their category. */
 export function isDeclaration<Node extends NodeTypeLike>(
   node: Node,
 ): node is Node & { readonly type: NativeRouteTypes['Declaration'] } {
+  if (node.type === 'Function' || node.type === 'Class')
+    return (
+      (node.type === 'Function' && node.nodeKind === 'TSDeclareFunction') ||
+      node.nodeKind === `${node.type}Declaration`
+    );
   return isDeclarationType(node.type);
 }
 
@@ -190,9 +203,12 @@ export function isExpressionType(type: string): type is NativeRouteTypes['Expres
   }
 }
 
+/** Collapsed Function/Class nodes require a retained nodeKind to identify their category. */
 export function isExpression<Node extends NodeTypeLike>(
   node: Node,
 ): node is Node & { readonly type: NativeRouteTypes['Expression'] } {
+  if (node.type === 'Function' || node.type === 'Class')
+    return node.nodeKind === `${node.type}Expression`;
   return isExpressionType(node.type);
 }
 
