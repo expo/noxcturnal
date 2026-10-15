@@ -1,0 +1,112 @@
+//! React JSX Self
+//!
+//! This plugin adds `__self` attribute to JSX elements.
+//!
+//! > This plugin is included in `preset-react`.
+//!
+//! ## Example
+//!
+//! Input:
+//! ```js
+//! <div>foo</div>;
+//! <Bar>foo</Bar>;
+//! <>foo</>;
+//! ```
+//!
+//! Output:
+//! ```js
+//! <div __self={this}>foo</div>;
+//! <Bar __self={this}>foo</Bar>;
+//! <>foo</>;
+//! ```
+//!
+//! ## Implementation
+//!
+//! Implementation based on [@babel/plugin-transform-react-jsx-self](https://babeljs.io/docs/babel-plugin-transform-react-jsx-self).
+//!
+//! ## References:
+//!
+//! * Babel plugin implementation: <https://github.com/babel/babel/blob/v7.26.2/packages/babel-plugin-transform-react-jsx-self/src/index.ts>
+
+use oxc_ast::ast::*;
+use oxc_span::SPAN;
+use oxc_str::{Ident, static_ident};
+use oxc_traverse::{Ancestor, Traverse};
+
+use crate::{context::TraverseCtx, state::TransformState};
+
+const SELF: Ident<'static> = static_ident!("__self");
+
+pub struct JsxSelf;
+
+impl JsxSelf {
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+impl<'a> Traverse<'a, TransformState<'a>> for JsxSelf {
+    fn enter_jsx_opening_element(
+        &mut self,
+        elem: &mut JSXOpeningElement<'a>,
+        ctx: &mut TraverseCtx<'a>,
+    ) {
+        self.add_self_this_attribute(elem, ctx);
+    }
+}
+
+impl<'a> JsxSelf {
+    fn is_inside_constructor(ctx: &TraverseCtx<'a>) -> bool {
+        for scope_id in ctx.ancestor_scopes() {
+            let flags = ctx.scoping().scope_flags(scope_id);
+            if flags.is_block() || flags.is_arrow() {
+                continue;
+            }
+            return flags.is_constructor();
+        }
+        unreachable!(); // Always hit `Program` and exit before loop ends
+    }
+
+    fn has_no_super_class(ctx: &TraverseCtx<'a>) -> bool {
+        for ancestor in ctx.ancestors() {
+            if let Ancestor::ClassBody(class) = ancestor {
+                return class.super_class().is_none();
+            }
+        }
+        true
+    }
+
+    pub fn get_object_property_kind_for_jsx_plugin(
+        ctx: &TraverseCtx<'a>,
+    ) -> ObjectPropertyKind<'a> {
+        let kind = PropertyKind::Init;
+        let key = PropertyKey::new_static_identifier(SPAN, SELF, ctx);
+        let value = Expression::new_this_expression(SPAN, ctx);
+        ObjectPropertyKind::new_object_property(SPAN, kind, key, value, false, false, false, ctx)
+    }
+
+    pub fn can_add_self_attribute(ctx: &TraverseCtx<'a>) -> bool {
+        !Self::is_inside_constructor(ctx) || Self::has_no_super_class(ctx)
+    }
+
+    /// `<div __self={this} />`
+    ///       ^^^^^^^^^^^^^
+    #[expect(clippy::unused_self, clippy::needless_pass_by_ref_mut)]
+    fn add_self_this_attribute(&self, elem: &mut JSXOpeningElement<'a>, ctx: &mut TraverseCtx<'a>) {
+        // Don't add `__self` if it already exists
+        if elem.attributes.iter().any(|item| {
+            matches!(item, JSXAttributeItem::Attribute(attribute)
+                if matches!(&attribute.name, JSXAttributeName::Identifier(ident) if ident.name == SELF))
+        }) {
+            return;
+        }
+
+        let name = JSXAttributeName::new_identifier(SPAN, SELF, ctx);
+        let value = {
+            let jsx_expr = JSXExpression::new_this_expression(SPAN, ctx);
+            JSXAttributeValue::new_expression_container(SPAN, jsx_expr, ctx)
+        };
+        let attribute = JSXAttributeItem::new_attribute(SPAN, name, Some(value), ctx);
+        elem.attributes.push(attribute);
+    }
+}

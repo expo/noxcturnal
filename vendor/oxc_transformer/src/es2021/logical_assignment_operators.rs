@@ -1,0 +1,213 @@
+//! ES2021: Logical Assignment Operators
+//!
+//! This plugin transforms logical assignment operators (`&&=`, `||=`, `??=`)
+//! to a series of logical expressions.
+//!
+//! > This plugin is included in `preset-env`, in ES2021
+//!
+//! ## Example
+//!
+//! Input:
+//! ```js
+//! a ||= b;
+//! obj.a.b ||= c;
+//!
+//! a &&= b;
+//! obj.a.b &&= c;
+//! ```
+//!
+//! Output:
+//! ```js
+//! var _obj$a, _obj$a2;
+//!
+//! a || (a = b);
+//! (_obj$a = obj.a).b || (_obj$a.b = c);
+//!
+//! a && (a = b);
+//! (_obj$a2 = obj.a).b && (_obj$a2.b = c);
+//! ```
+//!
+//! ### With Nullish Coalescing
+//!
+//! > While using the [nullish-coalescing-operator](https://github.com/oxc-project/oxc/blob/main/crates/oxc_transformer/src/es2020/nullish_coalescing_operator.rs) plugin (included in `preset-env``)
+//!
+//! Input:
+//! ```js
+//! a ??= b;
+//! obj.a.b ??= c;
+//! ```
+//!
+//! Output:
+//! ```js
+//! var _a, _obj$a, _obj$a$b;
+//!
+//! (_a = a) !== null && _a !== void 0 ? _a : (a = b);
+//! (_obj$a$b = (_obj$a = obj.a).b) !== null && _obj$a$b !== void 0
+//! ? _obj$a$b
+//! : (_obj$a.b = c);
+//! ```
+//! ## Implementation
+//!
+//! Implementation based on [@babel/plugin-transform-logical-assignment-operators](https://babel.dev/docs/babel-plugin-transform-logical-assignment-operators).
+//!
+//! ## References:
+//! * Babel plugin implementation: <https://github.com/babel/babel/tree/v7.26.2/packages/babel-plugin-transform-logical-assignment-operators>
+//! * Logical Assignment TC39 proposal: <https://github.com/tc39/proposal-logical-assignment>
+
+use oxc_allocator::TakeIn;
+use oxc_ast::ast::*;
+use oxc_semantic::ReferenceFlags;
+use oxc_span::SPAN;
+use oxc_traverse::Traverse;
+
+use crate::{common::duplicate::duplicate_expression, context::TraverseCtx, state::TransformState};
+
+pub struct LogicalAssignmentOperators;
+
+impl LogicalAssignmentOperators {
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+impl<'a> Traverse<'a, TransformState<'a>> for LogicalAssignmentOperators {
+    // `#[inline]` because this is a hot path, and most `Expression`s are not `AssignmentExpression`s
+    // with a logical operator. So we want to bail out as fast as possible for everything else,
+    // without the cost of a function call.
+    #[inline]
+    fn enter_expression(&mut self, expr: &mut Expression<'a>, ctx: &mut TraverseCtx<'a>) {
+        let Expression::AssignmentExpression(assignment_expr) = expr else { return };
+
+        // `&&=` `||=` `??=`
+        let Some(operator) = assignment_expr.operator.to_logical_operator() else { return };
+
+        self.transform_logical_assignment(expr, operator, ctx);
+    }
+}
+
+impl<'a> LogicalAssignmentOperators {
+    fn transform_logical_assignment(
+        &self,
+        expr: &mut Expression<'a>,
+        operator: LogicalOperator,
+        ctx: &mut TraverseCtx<'a>,
+    ) {
+        let Expression::AssignmentExpression(assignment_expr) = expr else { unreachable!() };
+
+        // `a &&= c` -> `a && (a = c);`
+        //               ^     ^ assign_target
+        //               ^ left_expr
+
+        // TODO: Add tests, cover private identifier
+        let (left_expr, assign_target) = match &mut assignment_expr.left {
+            // `a &&= c` -> `a && (a = c)`
+            AssignmentTarget::AssignmentTargetIdentifier(ident) => {
+                Self::convert_identifier(ident, ctx)
+            }
+            // `a.b &&= c` -> `var _a; (_a = a).b && (_a.b = c)`
+            AssignmentTarget::StaticMemberExpression(static_expr) => {
+                self.convert_static_member_expression(static_expr, ctx)
+            }
+            // `a[b.y] &&= c;` ->
+            // `var _a, _b$y; (_a = a)[_b$y = b.y] && (_a[_b$y] = c);`
+            AssignmentTarget::ComputedMemberExpression(computed_expr) => {
+                self.convert_computed_member_expression(computed_expr, ctx)
+            }
+            // TODO
+            #[expect(clippy::match_same_arms)]
+            AssignmentTarget::PrivateFieldExpression(_) => return,
+            // All other are TypeScript syntax.
+
+            // It is a Syntax Error if AssignmentTargetType of LeftHandSideExpression is not simple.
+            // So safe to return here.
+            _ => return,
+        };
+
+        let span = assignment_expr.span;
+        let assign_op = AssignmentOperator::Assign;
+        let right = assignment_expr.right.take_in(ctx);
+        let right =
+            Expression::new_assignment_expression(SPAN, assign_op, assign_target, right, ctx);
+
+        let logical_expr =
+            Expression::new_logical_expression(span, left_expr, operator, right, ctx);
+
+        *expr = logical_expr;
+    }
+
+    fn convert_identifier(
+        ident: &IdentifierReference<'a>,
+        ctx: &mut TraverseCtx<'a>,
+    ) -> (Expression<'a>, AssignmentTarget<'a>) {
+        let reference_id = ident.reference_id();
+        let reference = ctx.scoping_mut().get_reference_mut(reference_id);
+        *reference.flags_mut() = ReferenceFlags::Read;
+        let symbol_id = reference.symbol_id();
+        let left_expr =
+            Expression::new_identifier_with_reference_id(ident.span, ident.name, reference_id, ctx);
+
+        let ident = ctx.create_ident_reference(SPAN, ident.name, symbol_id, ReferenceFlags::Write);
+        let assign_target = AssignmentTarget::AssignmentTargetIdentifier(ctx.alloc(ident));
+        (left_expr, assign_target)
+    }
+
+    #[expect(clippy::unused_self)]
+    fn convert_static_member_expression(
+        &self,
+        static_expr: &mut StaticMemberExpression<'a>,
+        ctx: &mut TraverseCtx<'a>,
+    ) -> (Expression<'a>, AssignmentTarget<'a>) {
+        let object = static_expr.object.take_in(ctx);
+        let (object, object_ref) = duplicate_expression(object, true, ctx);
+
+        let left_expr = Expression::new_static_member_expression(
+            static_expr.span,
+            object,
+            static_expr.property.clone(),
+            false,
+            ctx,
+        );
+
+        let assign_expr = MemberExpression::new_static_member_expression(
+            static_expr.span,
+            object_ref,
+            static_expr.property.clone(),
+            false,
+            ctx,
+        );
+        let assign_target = AssignmentTarget::from(assign_expr);
+
+        (left_expr, assign_target)
+    }
+
+    #[expect(clippy::unused_self)]
+    fn convert_computed_member_expression(
+        &self,
+        computed_expr: &mut ComputedMemberExpression<'a>,
+        ctx: &mut TraverseCtx<'a>,
+    ) -> (Expression<'a>, AssignmentTarget<'a>) {
+        let object = computed_expr.object.take_in(ctx);
+        let (object, object_ref) = duplicate_expression(object, true, ctx);
+
+        let expression = computed_expr.expression.take_in(ctx);
+        let (expression, expression_ref) = duplicate_expression(expression, true, ctx);
+
+        let left_expr = Expression::new_computed_member_expression(
+            computed_expr.span,
+            object,
+            expression,
+            false,
+            ctx,
+        );
+
+        let assign_target = AssignmentTarget::new_computed_member_expression(
+            computed_expr.span,
+            object_ref,
+            expression_ref,
+            false,
+            ctx,
+        );
+
+        (left_expr, assign_target)
+    }
+}

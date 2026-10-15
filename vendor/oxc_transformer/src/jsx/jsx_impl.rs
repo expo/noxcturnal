@@ -1,0 +1,1344 @@
+//! React JSX
+//!
+//! This plugin transforms React JSX to JS.
+//!
+//! > This plugin is included in `preset-react`.
+//!
+//! Has two modes which create different output:
+//! 1. Automatic
+//! 2. Classic
+//!
+//! And also prod/dev modes:
+//! 1. Production
+//! 2. Development
+//!
+//! ## Example
+//!
+//! ### Automatic
+//!
+//! Input:
+//! ```js
+//! <div>foo</div>;
+//! <Bar>foo</Bar>;
+//! <>foo</>;
+//! ```
+//!
+//! Output:
+//! ```js
+//! // Production mode
+//! import { jsx as _jsx, Fragment as _Fragment } from "react/jsx-runtime";
+//! _jsx("div", { children: "foo" });
+//! _jsx(Bar, { children: "foo" });
+//! _jsx(_Fragment, { children: "foo" });
+//! ```
+//!
+//! ```js
+//! // Development mode
+//! var _jsxFileName = "<CWD>/test.js";
+//! import { jsxDEV as _jsxDEV, Fragment as _Fragment } from "react/jsx-dev-runtime";
+//! _jsxDEV(
+//!     "div", { children: "foo" }, void 0, false,
+//!     { fileName: _jsxFileName, lineNumber: 1, columnNumber: 1 },
+//!     this
+//! );
+//! _jsxDEV(
+//!     Bar, { children: "foo" }, void 0, false,
+//!     { fileName: _jsxFileName, lineNumber: 2, columnNumber: 1 },
+//!     this
+//! );
+//! _jsxDEV(_Fragment, { children: "foo" }, void 0, false);
+//! ```
+//!
+//! ### Classic
+//!
+//! Input:
+//! ```js
+//! <div>foo</div>;
+//! <Bar>foo</Bar>;
+//! <>foo</>;
+//! ```
+//!
+//! Output:
+//! ```js
+//! // Production mode
+//! React.createElement("div", null, "foo");
+//! React.createElement(Bar, null, "foo");
+//! React.createElement(React.Fragment, null, "foo");
+//! ```
+//!
+//! ```js
+//! // Development mode
+//! var _jsxFileName = "<CWD>/test.js";
+//! React.createElement("div", {
+//!     __self: this,
+//!     __source: { fileName: _jsxFileName, lineNumber: 1, columnNumber: 1 }
+//! }, "foo");
+//! React.createElement(Bar, {
+//!     __self: this,
+//!     __source: { fileName: _jsxFileName, lineNumber: 2, columnNumber: 1 }
+//! }, "foo");
+//! React.createElement(React.Fragment, null, "foo");
+//! ```
+//!
+//! ## Implementation
+//!
+//! Implementation based on [@babel/plugin-transform-react-jsx](https://babeljs.io/docs/babel-plugin-transform-react-jsx).
+//!
+//! ## References:
+//!
+//! * Babel plugin implementation: <https://github.com/babel/babel/tree/v7.26.2/packages/babel-helper-builder-react-jsx>
+
+use oxc_allocator::{ArenaBox, ArenaStringBuilder, ArenaVec, GetAllocator, ReplaceWith};
+use oxc_ast::{
+    ast::*,
+    builder::{AstBuilder, NONE},
+};
+use oxc_ecmascript::PropName;
+use oxc_span::{SPAN, Span};
+use oxc_str::{Ident, Str};
+use oxc_syntax::{
+    identifier::{is_identifier_name, is_white_space_single_line},
+    keyword::is_reserved_keyword,
+    line_terminator::is_line_terminator,
+    reference::ReferenceFlags,
+    symbol::SymbolFlags,
+    xml_entities::decode_entities,
+};
+use oxc_traverse::{BoundIdentifier, Traverse};
+
+use crate::{
+    context::TraverseCtx,
+    es2018::{ObjectRestSpread, ObjectRestSpreadOptions},
+    state::TransformState,
+};
+
+use super::{
+    diagnostics,
+    jsx_self::JsxSelf,
+    jsx_source::JsxSource,
+    options::{JsxOptions, JsxRuntime},
+};
+
+pub struct JsxImpl<'a> {
+    pure: bool,
+    options: JsxOptions,
+    object_rest_spread_options: Option<ObjectRestSpreadOptions>,
+
+    pub(super) jsx_self: JsxSelf,
+    pub(super) jsx_source: JsxSource<'a>,
+
+    // States
+    bindings: Bindings<'a>,
+}
+
+/// Bindings for different import options
+enum Bindings<'a> {
+    Classic(ClassicBindings<'a>),
+    AutomaticScript(AutomaticScriptBindings<'a>),
+    AutomaticModule(AutomaticModuleBindings<'a>),
+}
+
+impl Bindings<'_> {
+    #[inline]
+    fn is_classic(&self) -> bool {
+        matches!(self, Self::Classic(_))
+    }
+}
+
+struct ClassicBindings<'a> {
+    pragma: Pragma<'a>,
+    pragma_frag: Pragma<'a>,
+}
+
+struct AutomaticScriptBindings<'a> {
+    jsx_runtime_importer: Str<'a>,
+    react_importer_len: u32,
+    require_create_element: Option<BoundIdentifier<'a>>,
+    require_jsx: Option<BoundIdentifier<'a>>,
+    is_development: bool,
+}
+
+impl<'a> AutomaticScriptBindings<'a> {
+    fn new(jsx_runtime_importer: Str<'a>, react_importer_len: u32, is_development: bool) -> Self {
+        Self {
+            jsx_runtime_importer,
+            react_importer_len,
+            require_create_element: None,
+            require_jsx: None,
+            is_development,
+        }
+    }
+
+    fn require_create_element(
+        &mut self,
+        ctx: &mut TraverseCtx<'a>,
+    ) -> ArenaBox<'a, IdentifierReference<'a>> {
+        if self.require_create_element.is_none() {
+            let source =
+                get_import_source(self.jsx_runtime_importer.as_str(), self.react_importer_len);
+            // We have to insert this `require` above `require("react/jsx-runtime")`
+            // just to pass one of Babel's tests, but the order doesn't actually matter.
+            // TODO(improve-on-babel): Remove this once we don't need our output to match Babel exactly.
+            let id = self.add_require_statement("react", source, true, ctx);
+            self.require_create_element = Some(id);
+        }
+        let ident = self.require_create_element.as_ref().unwrap().create_read_reference(ctx);
+        ctx.alloc(ident)
+    }
+
+    fn require_jsx(&mut self, ctx: &mut TraverseCtx<'a>) -> ArenaBox<'a, IdentifierReference<'a>> {
+        if self.require_jsx.is_none() {
+            let var_name =
+                if self.is_development { "reactJsxDevRuntime" } else { "reactJsxRuntime" };
+            let id = self.add_require_statement(var_name, self.jsx_runtime_importer, false, ctx);
+            self.require_jsx = Some(id);
+        }
+        let ident = self.require_jsx.as_ref().unwrap().create_read_reference(ctx);
+        ctx.alloc(ident)
+    }
+
+    #[expect(clippy::unused_self)]
+    fn add_require_statement(
+        &self,
+        variable_name: &str,
+        source: Str<'a>,
+        front: bool,
+        ctx: &mut TraverseCtx<'a>,
+    ) -> BoundIdentifier<'a> {
+        let binding =
+            ctx.generate_uid_in_root_scope(variable_name, SymbolFlags::FunctionScopedVariable);
+        ctx.state.module_imports.add_default_import(source, binding.clone(), front);
+        binding
+    }
+}
+
+struct AutomaticModuleBindings<'a> {
+    jsx_runtime_importer: Str<'a>,
+    react_importer_len: u32,
+    import_create_element: Option<BoundIdentifier<'a>>,
+    import_fragment: Option<BoundIdentifier<'a>>,
+    import_jsx: Option<BoundIdentifier<'a>>,
+    import_jsxs: Option<BoundIdentifier<'a>>,
+    is_development: bool,
+}
+
+impl<'a> AutomaticModuleBindings<'a> {
+    fn new(jsx_runtime_importer: Str<'a>, react_importer_len: u32, is_development: bool) -> Self {
+        Self {
+            jsx_runtime_importer,
+            react_importer_len,
+            import_create_element: None,
+            import_fragment: None,
+            import_jsx: None,
+            import_jsxs: None,
+            is_development,
+        }
+    }
+
+    fn import_create_element(
+        &mut self,
+        ctx: &mut TraverseCtx<'a>,
+    ) -> ArenaBox<'a, IdentifierReference<'a>> {
+        if self.import_create_element.is_none() {
+            let source =
+                get_import_source(self.jsx_runtime_importer.as_str(), self.react_importer_len);
+            let id = self.add_import_statement("createElement", source, ctx);
+            self.import_create_element = Some(id);
+        }
+        let ident = self.import_create_element.as_ref().unwrap().create_read_reference(ctx);
+        ctx.alloc(ident)
+    }
+
+    fn import_fragment(
+        &mut self,
+        ctx: &mut TraverseCtx<'a>,
+    ) -> ArenaBox<'a, IdentifierReference<'a>> {
+        if self.import_fragment.is_none() {
+            self.import_fragment = Some(self.add_jsx_import_statement("Fragment", ctx));
+        }
+        let ident = self.import_fragment.as_ref().unwrap().create_read_reference(ctx);
+        ctx.alloc(ident)
+    }
+
+    fn import_jsx(&mut self, ctx: &mut TraverseCtx<'a>) -> ArenaBox<'a, IdentifierReference<'a>> {
+        if self.import_jsx.is_none() {
+            if self.is_development {
+                self.add_import_jsx_dev(ctx);
+            } else {
+                self.import_jsx = Some(self.add_jsx_import_statement("jsx", ctx));
+            }
+        }
+        let ident = self.import_jsx.as_ref().unwrap().create_read_reference(ctx);
+        ctx.alloc(ident)
+    }
+
+    fn import_jsxs(&mut self, ctx: &mut TraverseCtx<'a>) -> ArenaBox<'a, IdentifierReference<'a>> {
+        if self.import_jsxs.is_none() {
+            if self.is_development {
+                self.add_import_jsx_dev(ctx);
+            } else {
+                self.import_jsxs = Some(self.add_jsx_import_statement("jsxs", ctx));
+            }
+        }
+        let ident = self.import_jsxs.as_ref().unwrap().create_read_reference(ctx);
+        ctx.alloc(ident)
+    }
+
+    // Inline so that compiler can see in `import_jsx` and `import_jsxs` that fields
+    // are always `Some` after calling this function, and can elide the `unwrap()`s
+    #[inline]
+    fn add_import_jsx_dev(&mut self, ctx: &mut TraverseCtx<'a>) {
+        let id = self.add_jsx_import_statement("jsxDEV", ctx);
+        self.import_jsx = Some(id.clone());
+        self.import_jsxs = Some(id);
+    }
+
+    fn add_jsx_import_statement(
+        &self,
+        name: &'static str,
+        ctx: &mut TraverseCtx<'a>,
+    ) -> BoundIdentifier<'a> {
+        self.add_import_statement(name, self.jsx_runtime_importer, ctx)
+    }
+
+    #[expect(clippy::unused_self)]
+    fn add_import_statement(
+        &self,
+        name: &'static str,
+        source: Str<'a>,
+        ctx: &mut TraverseCtx<'a>,
+    ) -> BoundIdentifier<'a> {
+        let binding = ctx.generate_uid_in_root_scope(name, SymbolFlags::Import);
+        ctx.state.module_imports.add_named_import(source, Str::from(name), binding.clone(), false);
+        binding
+    }
+}
+
+#[inline]
+fn get_import_source(jsx_runtime_importer: &str, react_importer_len: u32) -> Str<'_> {
+    Str::from(&jsx_runtime_importer[..react_importer_len as usize])
+}
+
+/// Pragma used in classic mode.
+///
+/// `Double` is first as it's most common.
+enum Pragma<'a> {
+    /// `React.createElement`
+    Double(Str<'a>, Str<'a>),
+    /// `createElement`
+    Single(Str<'a>),
+    /// `foo.bar.qux`
+    Multiple(Vec<Str<'a>>),
+    /// `this`, `this.foo`, `this.foo.bar.qux`
+    This(Vec<Str<'a>>),
+    /// `import.meta`, `import.meta.foo`, `import.meta.foo.bar.qux`
+    ImportMeta(Vec<Str<'a>>),
+}
+
+impl<'a> Pragma<'a> {
+    /// Parse `options.pragma` or `options.pragma_frag`.
+    ///
+    /// If provided option is invalid, raise an error and use default.
+    #[cfg(test)]
+    fn parse(
+        pragma: Option<&str>,
+        default_property_name: &'static str,
+        ast: &AstBuilder<'a>,
+        ctx: &mut TransformState<'a>,
+    ) -> Self {
+        if let Some(pragma) = pragma {
+            if pragma.is_empty() {
+                ctx.error(diagnostics::invalid_pragma());
+            } else if let Some(pragma) = Self::parse_impl(pragma, ast) {
+                return pragma;
+            } else {
+                ctx.error(diagnostics::invalid_pragma());
+            }
+        }
+
+        Self::Double(Str::from("React"), Str::from(default_property_name))
+    }
+
+    /// Parse without `TransformCtx` - skips error reporting for invalid pragma.
+    /// Empty pragma silently falls through to default.
+    fn parse_no_ctx(
+        pragma: Option<&str>,
+        default_property_name: &'static str,
+        ast: &AstBuilder<'a>,
+    ) -> Self {
+        if let Some(pragma) = pragma
+            && !pragma.is_empty()
+            && let Some(pragma) = Self::parse_impl(pragma, ast)
+        {
+            return pragma;
+        }
+
+        Self::Double(Str::from("React"), Str::from(default_property_name))
+    }
+
+    fn parse_impl(pragma: &str, ast: &AstBuilder<'a>) -> Option<Self> {
+        let strs_to_arena_strs =
+            |parts: &[&str]| parts.iter().map(|part| Str::from_str_in(part, ast)).collect();
+
+        let parts = pragma.split('.').collect::<Vec<_>>();
+        let [root, tail @ ..] = &parts[..] else {
+            unreachable!();
+        };
+
+        match *root {
+            "this" => {
+                if !tail.iter().all(|part| is_identifier_name(part)) {
+                    return None;
+                }
+                return Some(Self::This(strs_to_arena_strs(tail)));
+            }
+            "import" => {
+                let ["meta", rest @ ..] = tail else {
+                    return None;
+                };
+                if !rest.iter().all(|part| is_identifier_name(part)) {
+                    return None;
+                }
+                return Some(Self::ImportMeta(strs_to_arena_strs(rest)));
+            }
+            _ => {
+                if is_reserved_keyword(root) || !is_identifier_name(root) {
+                    return None;
+                }
+                if !tail.iter().all(|part| is_identifier_name(part)) {
+                    return None;
+                }
+            }
+        }
+
+        Some(match &parts[..] {
+            [first, second] => {
+                Self::Double(Str::from_str_in(first, ast), Str::from_str_in(second, ast))
+            }
+            [only] => Self::Single(Str::from_str_in(only, ast)),
+            parts => Self::Multiple(strs_to_arena_strs(parts)),
+        })
+    }
+    fn create_expression(&self, ctx: &mut TraverseCtx<'a>) -> Expression<'a> {
+        let (object, parts) = match self {
+            Self::Double(first, second) => {
+                let object = get_read_identifier_reference(SPAN, *first, ctx);
+                return Expression::new_static_member_expression(
+                    SPAN,
+                    object,
+                    IdentifierName::new(SPAN, *second, ctx),
+                    false,
+                    ctx,
+                );
+            }
+            Self::Single(single) => {
+                return get_read_identifier_reference(SPAN, *single, ctx);
+            }
+            Self::Multiple(parts) => {
+                let mut parts = parts.iter();
+                let first = *parts.next().unwrap();
+                let object = get_read_identifier_reference(SPAN, first, ctx);
+                (object, parts)
+            }
+            Self::This(parts) => {
+                let object = Expression::new_this_expression(SPAN, ctx);
+                (object, parts.iter())
+            }
+            Self::ImportMeta(parts) => {
+                let object = Expression::new_import_meta(SPAN, ctx);
+                (object, parts.iter())
+            }
+        };
+
+        let mut expr = object;
+        for &item in parts {
+            let name = IdentifierName::new(SPAN, item, ctx);
+            expr =
+                MemberExpression::new_static_member_expression(SPAN, expr, name, false, ctx).into();
+        }
+        expr
+    }
+}
+
+impl<'a> JsxImpl<'a> {
+    pub fn new(
+        options: JsxOptions,
+        object_rest_spread_options: Option<ObjectRestSpreadOptions>,
+        ast: &AstBuilder<'a>,
+        source_type: oxc_span::SourceType,
+    ) -> Self {
+        // Only add `pure` when `pure` is explicitly set to `true` or all JSX options are default.
+        let pure = options.pure || (options.import_source.is_none() && options.pragma.is_none());
+        let bindings = match options.runtime {
+            JsxRuntime::Classic => {
+                let pragma = Pragma::parse_no_ctx(options.pragma.as_deref(), "createElement", ast);
+                let pragma_frag =
+                    Pragma::parse_no_ctx(options.pragma_frag.as_deref(), "Fragment", ast);
+                Bindings::Classic(ClassicBindings { pragma, pragma_frag })
+            }
+            JsxRuntime::Automatic => {
+                let is_development = options.development;
+                #[expect(clippy::single_match_else, clippy::cast_possible_truncation)]
+                let (jsx_runtime_importer, source_len) = match options.import_source.as_ref() {
+                    Some(import_source) => {
+                        let mut import_source = &**import_source;
+                        let source_len = match u32::try_from(import_source.len()) {
+                            Ok(0) | Err(_) => {
+                                import_source = "react";
+                                import_source.len() as u32
+                            }
+                            Ok(source_len) => source_len,
+                        };
+                        let jsx_runtime_importer = Str::from_str_in(
+                            &format!(
+                                "{}/jsx-{}runtime",
+                                import_source,
+                                if is_development { "dev-" } else { "" }
+                            ),
+                            ast,
+                        );
+                        (jsx_runtime_importer, source_len)
+                    }
+                    None => {
+                        let jsx_runtime_importer = if is_development {
+                            Str::from("react/jsx-dev-runtime")
+                        } else {
+                            Str::from("react/jsx-runtime")
+                        };
+                        (jsx_runtime_importer, "react".len() as u32)
+                    }
+                };
+
+                if source_type.is_module() {
+                    Bindings::AutomaticModule(AutomaticModuleBindings::new(
+                        jsx_runtime_importer,
+                        source_len,
+                        is_development,
+                    ))
+                } else {
+                    Bindings::AutomaticScript(AutomaticScriptBindings::new(
+                        jsx_runtime_importer,
+                        source_len,
+                        is_development,
+                    ))
+                }
+            }
+        };
+
+        Self {
+            pure,
+            options,
+            object_rest_spread_options,
+            jsx_self: JsxSelf::new(),
+            jsx_source: JsxSource::new(),
+            bindings,
+        }
+    }
+}
+
+impl<'a> Traverse<'a, TransformState<'a>> for JsxImpl<'a> {
+    fn exit_program(&mut self, _program: &mut Program<'a>, ctx: &mut TraverseCtx<'a>) {
+        self.insert_filename_var_statement(ctx);
+    }
+
+    #[inline]
+    fn exit_expression(&mut self, expr: &mut Expression<'a>, ctx: &mut TraverseCtx<'a>) {
+        if !expr.is_jsx() {
+            return;
+        }
+        self.transform_jsx_expression(expr, ctx);
+    }
+}
+
+impl<'a> JsxImpl<'a> {
+    #[inline(never)]
+    fn transform_jsx_expression(&mut self, expr: &mut Expression<'a>, ctx: &mut TraverseCtx<'a>) {
+        expr.replace_with(|expr| match expr {
+            Expression::JSXElement(e) => self.transform_jsx_element(e, ctx),
+            Expression::JSXFragment(e) => self.transform_jsx(e.span, None, e.unbox().children, ctx),
+            _ => unreachable!(),
+        });
+    }
+    fn insert_filename_var_statement(&self, ctx: &mut TraverseCtx<'a>) {
+        let Some(declarator) = self.jsx_source.get_filename_var_declarator(ctx) else { return };
+
+        // If is a module, add filename statements before `import`s. If script, then after `require`s.
+        // This is the same behavior as Babel.
+        // If in classic mode, then there are no import statements, so it doesn't matter either way.
+        // TODO(improve-on-babel): Simplify this once we don't need to follow Babel exactly.
+        if self.bindings.is_classic() || ctx.state.source_type.is_module() {
+            // Insert before imports - add to `top_level_statements` immediately
+            let stmt = Statement::new_variable_declaration(
+                SPAN,
+                VariableDeclarationKind::Var,
+                [declarator],
+                false,
+                ctx,
+            );
+            ctx.state.top_level_statements.insert_statement(stmt);
+        } else {
+            // Insert after imports - add to `var_declarations`, which are inserted after `require` statements
+            ctx.state.var_declarations.insert_var_declarator(declarator, &ctx.ast);
+        }
+    }
+
+    fn transform_jsx_element(
+        &mut self,
+        element: ArenaBox<'a, JSXElement<'a>>,
+        ctx: &mut TraverseCtx<'a>,
+    ) -> Expression<'a> {
+        let JSXElement { span, opening_element, closing_element, children, .. } = element.unbox();
+        Self::delete_reference_for_closing_element(closing_element.as_deref(), ctx);
+        self.transform_jsx(span, Some(opening_element), children, ctx)
+    }
+
+    fn transform_jsx(
+        &mut self,
+        span: Span,
+        opening_element: Option<ArenaBox<'a, JSXOpeningElement<'a>>>,
+        children: ArenaVec<'a, JSXChild<'a>>,
+        ctx: &mut TraverseCtx<'a>,
+    ) -> Expression<'a> {
+        let has_key_after_props_spread =
+            opening_element.as_ref().is_some_and(|e| Self::has_key_after_props_spread(e));
+        // If has_key_after_props_spread is true, we need to fallback to `createElement` same behavior as classic runtime
+        let is_classic = self.bindings.is_classic() || has_key_after_props_spread;
+        let is_automatic = !is_classic;
+        let is_development = self.options.development;
+        let is_element = opening_element.is_some();
+
+        // The maximum capacity length of arguments allowed.
+        let capacity = if is_classic { 3 + children.len() } else { 6 };
+        let mut arguments = ArenaVec::with_capacity_in(capacity, ctx);
+
+        // The key prop in `<div key={true} />`
+        let mut key_prop = None;
+
+        // The object properties for the second argument of `React.createElement`.
+        // Pre-size to the attribute count (one property per attribute in the common case) to avoid
+        // regrowing the arena vec, mirroring `arguments` above.
+        let mut properties = ArenaVec::with_capacity_in(
+            opening_element.as_ref().map_or(0, |e| e.attributes.len()),
+            ctx,
+        );
+        let (element_name, attributes) = opening_element
+            .map(|e| {
+                let e = e.unbox();
+                (Some(e.name), Some(e.attributes))
+            })
+            .unwrap_or_default();
+
+        if let Some(attributes) = attributes {
+            let attributes_len = attributes.len();
+            for attribute in attributes {
+                match attribute {
+                    JSXAttributeItem::Attribute(attr) => {
+                        let JSXAttribute { span, name, value, .. } = attr.unbox();
+                        match &name {
+                            JSXAttributeName::Identifier(ident) if ident.name == "key" => {
+                                if value.is_none() {
+                                    ctx.state.error(diagnostics::valueless_key(ident.span));
+                                } else if is_automatic {
+                                    // In automatic mode, extract the key before spread prop,
+                                    // and add it to the third argument later.
+                                    key_prop = value;
+                                    continue;
+                                }
+                            }
+                            _ => {}
+                        }
+
+                        // Add attribute to prop object
+                        let kind = PropertyKind::Init;
+                        let key = Self::get_attribute_name(name, ctx);
+                        let value = self.transform_jsx_attribute_value(value, ctx);
+                        let object_property = ObjectPropertyKind::new_object_property(
+                            span, kind, key, value, false, false, false, ctx,
+                        );
+                        properties.push(object_property);
+                    }
+                    // optimize `{...prop}` to `prop` in static mode
+                    JSXAttributeItem::SpreadAttribute(spread) => {
+                        let JSXSpreadAttribute { argument, span, .. } = spread.unbox();
+                        if is_classic
+                            && attributes_len == 1
+                            // Don't optimize when dev plugins are enabled - spread must be preserved
+                            // to merge with injected `__self` and `__source` props
+                            && !(self.options.jsx_self_plugin || self.options.jsx_source_plugin)
+                        {
+                            // deopt if spreading an object with `__proto__` key
+                            if !matches!(&argument, Expression::ObjectExpression(o) if has_proto(o))
+                            {
+                                arguments.push(Argument::from(argument));
+                                continue;
+                            }
+                        }
+
+                        // Add attribute to prop object
+                        match argument {
+                            Expression::ObjectExpression(expr) if !has_proto(&expr) => {
+                                properties.extend(expr.unbox().properties);
+                            }
+                            argument => {
+                                let object_property =
+                                    ObjectPropertyKind::new_spread_property(span, argument, ctx);
+                                properties.push(object_property);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        let mut need_jsxs = false;
+
+        // Append children to object properties in automatic mode
+        if is_automatic {
+            let allocator = ctx.allocator();
+            let mut children = ArenaVec::from_iter_in(
+                children
+                    .into_iter()
+                    .filter_map(|child| self.transform_jsx_child_automatic(child, ctx)),
+                &allocator,
+            );
+            let children_len = children.len();
+            if children_len != 0 {
+                // A single non-spread child is passed directly: `jsx("div", { children: child })`.
+                // Spread children must remain in an array: `jsx("div", { children: [...foo] })`,
+                // and multiple children are combined into one: `jsxs("div", { children: [...a, b, ...c] })`.
+                let value = if children_len == 1
+                    && !matches!(children[0], ArrayExpressionElement::SpreadElement(_))
+                {
+                    Expression::try_from(children.pop().unwrap()).unwrap()
+                } else {
+                    need_jsxs = children_len > 1;
+                    Expression::new_array_expression(span, children, ctx)
+                };
+                let children = PropertyKey::new_static_identifier(SPAN, "children", ctx);
+                let kind = PropertyKind::Init;
+                let property = ObjectPropertyKind::new_object_property(
+                    SPAN, kind, children, value, false, false, false, ctx,
+                );
+                properties.push(property);
+            }
+
+            // If runtime is automatic that means we always to add `{ .. }` as the second argument even if it's empty
+            let mut object_expression = Expression::new_object_expression(span, properties, ctx);
+            if let Some(options) = self.object_rest_spread_options {
+                ObjectRestSpread::transform_object_expression(options, &mut object_expression, ctx);
+            }
+            arguments.push(Argument::from(object_expression));
+
+            // Only jsx and jsxDev will have more than 2 arguments
+            // key
+            if key_prop.is_some() {
+                arguments.push(Argument::from(self.transform_jsx_attribute_value(key_prop, ctx)));
+            } else if is_development {
+                arguments.push(Argument::from(Expression::new_void_0(SPAN, ctx)));
+            }
+
+            // isStaticChildren
+            if is_development {
+                arguments.push(Argument::new_boolean_literal(SPAN, children_len > 1, ctx));
+            }
+
+            // { __source: { fileName, lineNumber, columnNumber } }
+            if self.options.jsx_source_plugin {
+                let (line, column) = self.jsx_source.get_line_column(span.start, ctx);
+                let expr = self.jsx_source.get_source_object(line, column, ctx);
+                arguments.push(Argument::from(expr));
+            }
+
+            // this
+            if self.options.jsx_self_plugin && JsxSelf::can_add_self_attribute(ctx) {
+                arguments.push(Argument::new_this_expression(SPAN, ctx));
+            }
+        } else {
+            // React.createElement's second argument
+            if is_element {
+                if self.options.jsx_self_plugin && JsxSelf::can_add_self_attribute(ctx) {
+                    properties.push(JsxSelf::get_object_property_kind_for_jsx_plugin(ctx));
+                }
+
+                if self.options.jsx_source_plugin {
+                    let (line, column) = self.jsx_source.get_line_column(span.start, ctx);
+                    properties.push(
+                        self.jsx_source.get_object_property_kind_for_jsx_plugin(line, column, ctx),
+                    );
+                }
+            }
+
+            if !properties.is_empty() {
+                let mut object_expression =
+                    Expression::new_object_expression(span, properties, ctx);
+                if let Some(options) = self.object_rest_spread_options {
+                    ObjectRestSpread::transform_object_expression(
+                        options,
+                        &mut object_expression,
+                        ctx,
+                    );
+                }
+                arguments.push(Argument::from(object_expression));
+            } else if arguments.is_empty() {
+                // If not and second argument doesn't exist, we should add `null` as the second argument
+                let null_expr = Expression::new_null_literal(SPAN, ctx);
+                arguments.push(Argument::from(null_expr));
+            }
+
+            // React.createElement(type, arguments, ...children)
+            //                                      ^^^^^^^^^^^
+            arguments.extend(
+                children
+                    .into_iter()
+                    .filter_map(|child| self.transform_jsx_child_classic(child, ctx)),
+            );
+        }
+
+        // It would be better to push to `arguments` earlier, rather than use `insert`.
+        // But we have to do it here to replicate the same import order as Babel, in order to pass
+        // Babel's conformance tests.
+        // TODO(improve-on-babel): Change this if we can handle differing output in tests.
+        let argument_expr = if let Some(element_name) = element_name {
+            self.transform_element_name(element_name, ctx)
+        } else {
+            self.get_fragment(ctx)
+        };
+        arguments.insert(0, Argument::from(argument_expr));
+        debug_assert!(arguments.len() <= capacity);
+
+        let callee = self.get_create_element(has_key_after_props_spread, need_jsxs, ctx);
+        Expression::new_call_expression_with_pure(
+            span, callee, NONE, arguments, false, self.pure, ctx,
+        )
+    }
+
+    fn transform_element_name(
+        &self,
+        name: JSXElementName<'a>,
+        ctx: &mut TraverseCtx<'a>,
+    ) -> Expression<'a> {
+        match name {
+            JSXElementName::Identifier(ident) => {
+                Expression::new_string_literal(ident.span, ident.name, None, ctx)
+            }
+            JSXElementName::IdentifierReference(ident) => Expression::Identifier(ident),
+            JSXElementName::MemberExpression(member_expr) => {
+                Self::transform_jsx_member_expression(member_expr, ctx)
+            }
+            JSXElementName::NamespacedName(namespaced) => {
+                if self.options.throw_if_namespace {
+                    ctx.state.error(diagnostics::namespace_does_not_support(namespaced.span));
+                }
+                let namespace_name = Str::from_strs_array_in(
+                    [&namespaced.namespace.name, ":", &namespaced.name.name],
+                    ctx,
+                );
+                Expression::new_string_literal(namespaced.span, namespace_name, None, ctx)
+            }
+            JSXElementName::ThisExpression(expr) => Expression::new_this_expression(expr.span, ctx),
+        }
+    }
+
+    fn get_fragment(&mut self, ctx: &mut TraverseCtx<'a>) -> Expression<'a> {
+        match &mut self.bindings {
+            Bindings::Classic(bindings) => bindings.pragma_frag.create_expression(ctx),
+            Bindings::AutomaticScript(bindings) => {
+                let object_ident = bindings.require_jsx(ctx);
+                let property_name = Str::from("Fragment");
+                create_static_member_expression(object_ident, property_name, ctx)
+            }
+            Bindings::AutomaticModule(bindings) => {
+                Expression::Identifier(bindings.import_fragment(ctx))
+            }
+        }
+    }
+
+    fn get_create_element(
+        &mut self,
+        has_key_after_props_spread: bool,
+        jsxs: bool,
+        ctx: &mut TraverseCtx<'a>,
+    ) -> Expression<'a> {
+        match &mut self.bindings {
+            Bindings::Classic(bindings) => bindings.pragma.create_expression(ctx),
+            Bindings::AutomaticScript(bindings) => {
+                let (ident, property_name) = if has_key_after_props_spread {
+                    (bindings.require_create_element(ctx), Str::from("createElement"))
+                } else {
+                    let property_name = if bindings.is_development {
+                        Str::from("jsxDEV")
+                    } else if jsxs {
+                        Str::from("jsxs")
+                    } else {
+                        Str::from("jsx")
+                    };
+                    (bindings.require_jsx(ctx), property_name)
+                };
+                create_static_member_expression(ident, property_name, ctx)
+            }
+            Bindings::AutomaticModule(bindings) => {
+                let ident = if has_key_after_props_spread {
+                    bindings.import_create_element(ctx)
+                } else if jsxs {
+                    bindings.import_jsxs(ctx)
+                } else {
+                    bindings.import_jsx(ctx)
+                };
+                Expression::Identifier(ident)
+            }
+        }
+    }
+
+    fn transform_jsx_member_expression(
+        expr: ArenaBox<'a, JSXMemberExpression<'a>>,
+        ctx: &TraverseCtx<'a>,
+    ) -> Expression<'a> {
+        let JSXMemberExpression { span, object, property, .. } = expr.unbox();
+        let object = match object {
+            JSXMemberExpressionObject::IdentifierReference(ident) => Expression::Identifier(ident),
+            JSXMemberExpressionObject::MemberExpression(expr) => {
+                Self::transform_jsx_member_expression(expr, ctx)
+            }
+            JSXMemberExpressionObject::ThisExpression(expr) => {
+                Expression::new_this_expression(expr.span, ctx)
+            }
+        };
+        let property = IdentifierName::new(property.span, property.name, ctx);
+        MemberExpression::new_static_member_expression(span, object, property, false, ctx).into()
+    }
+
+    fn transform_jsx_attribute_value(
+        &mut self,
+        value: Option<JSXAttributeValue<'a>>,
+        ctx: &mut TraverseCtx<'a>,
+    ) -> Expression<'a> {
+        match value {
+            Some(JSXAttributeValue::StringLiteral(s)) => {
+                let mut decoded = None;
+                decode_entities(s.value.as_str(), &mut decoded, s.value.len(), ctx.allocator());
+                let jsx_text = if let Some(decoded) = decoded {
+                    // Text contains HTML entities which were decoded.
+                    // `decoded` contains the decoded string as an `ArenaString`. Convert it to `Str`.
+                    Str::from(decoded)
+                } else {
+                    // No HTML entities needed to be decoded. Use the original `Str` without copying.
+                    s.value
+                };
+                Expression::new_string_literal(s.span, jsx_text, None, ctx)
+            }
+            Some(JSXAttributeValue::Element(e)) => self.transform_jsx_element(e, ctx),
+            Some(JSXAttributeValue::Fragment(e)) => {
+                self.transform_jsx(e.span, None, e.unbox().children, ctx)
+            }
+            Some(JSXAttributeValue::ExpressionContainer(c)) => match c.unbox().expression {
+                jsx_expr @ match_expression!(JSXExpression) => jsx_expr.into_expression(),
+                JSXExpression::EmptyExpression(e) => {
+                    Expression::new_boolean_literal(e.span, true, ctx)
+                }
+            },
+            None => Expression::new_boolean_literal(SPAN, true, ctx),
+        }
+    }
+
+    fn transform_jsx_child_automatic(
+        &mut self,
+        child: JSXChild<'a>,
+        ctx: &mut TraverseCtx<'a>,
+    ) -> Option<ArrayExpressionElement<'a>> {
+        // Align spread child behavior with esbuild.
+        // Instead of Babel throwing `Spread children are not supported in React.`
+        // `<>{...foo}</>` -> `jsxs(Fragment, { children: [ ...foo ] })`
+        if let JSXChild::Spread(e) = child {
+            let JSXSpreadChild { span, expression, .. } = e.unbox();
+            Some(ArrayExpressionElement::new_spread_element(span, expression, ctx))
+        } else {
+            self.transform_jsx_child(child, ctx).map(ArrayExpressionElement::from)
+        }
+    }
+
+    fn transform_jsx_child_classic(
+        &mut self,
+        child: JSXChild<'a>,
+        ctx: &mut TraverseCtx<'a>,
+    ) -> Option<Argument<'a>> {
+        // Align spread child behavior with esbuild.
+        // Instead of Babel throwing `Spread children are not supported in React.`
+        // `<>{...foo}</>` -> `React.createElement(React.Fragment, null, ...foo)`
+        if let JSXChild::Spread(e) = child {
+            let JSXSpreadChild { span, expression, .. } = e.unbox();
+            Some(Argument::new_spread_element(span, expression, ctx))
+        } else {
+            self.transform_jsx_child(child, ctx).map(Argument::from)
+        }
+    }
+
+    fn transform_jsx_child(
+        &mut self,
+        child: JSXChild<'a>,
+        ctx: &mut TraverseCtx<'a>,
+    ) -> Option<Expression<'a>> {
+        match child {
+            JSXChild::Text(text) => Self::transform_jsx_text(&text, ctx),
+            JSXChild::ExpressionContainer(e) => match e.unbox().expression {
+                jsx_expr @ match_expression!(JSXExpression) => Some(jsx_expr.into_expression()),
+                JSXExpression::EmptyExpression(_) => None,
+            },
+            JSXChild::Element(e) => Some(self.transform_jsx_element(e, ctx)),
+            JSXChild::Fragment(e) => {
+                Some(self.transform_jsx(e.span, None, e.unbox().children, ctx))
+            }
+            JSXChild::Spread(_) => unreachable!(),
+        }
+    }
+
+    fn get_attribute_name(name: JSXAttributeName<'a>, ctx: &TraverseCtx<'a>) -> PropertyKey<'a> {
+        match name {
+            JSXAttributeName::Identifier(ident) => {
+                let name = ident.name;
+                if ident.name.contains('-') {
+                    PropertyKey::new_string_literal(ident.span, name, None, ctx)
+                } else {
+                    PropertyKey::new_static_identifier(ident.span, name, ctx)
+                }
+            }
+            JSXAttributeName::NamespacedName(namespaced) => {
+                let name = Str::from_str_in(&namespaced.to_string(), ctx);
+                PropertyKey::new_string_literal(namespaced.span, name, None, ctx)
+            }
+        }
+    }
+
+    fn transform_jsx_text(text: &JSXText<'a>, ctx: &TraverseCtx<'a>) -> Option<Expression<'a>> {
+        Self::fixup_whitespace_and_decode_entities(text.value, ctx)
+            .map(|value| Expression::new_string_literal(text.span, value, None, ctx))
+    }
+
+    /// JSX trims whitespace at the end and beginning of lines, except that the
+    /// start/end of a tag is considered a start/end of a line only if that line is
+    /// on the same line as the closing tag. See examples in
+    /// tests/cases/conformance/jsx/tsxReactEmitWhitespace.tsx
+    /// See also <https://www.w3.org/TR/html4/struct/text.html#h-9.1> and <https://www.w3.org/TR/CSS2/text.html#white-space-model>
+    ///
+    /// An equivalent algorithm would be:
+    /// - If there is only one line, return it.
+    /// - If there is only whitespace (but multiple lines), return `undefined`.
+    /// - Split the text into lines.
+    /// - 'trimRight' the first line, 'trimLeft' the last line, 'trim' middle lines.
+    /// - Decode entities on each line (individually).
+    /// - Remove empty lines and join the rest with " ".
+    ///
+    /// <https://github.com/microsoft/TypeScript/blob/f0374ce2a9c465e27a15b7fa4a347e2bd9079450/src/compiler/transformers/jsx.ts#L557-L608>
+    fn fixup_whitespace_and_decode_entities(
+        text: Str<'a>,
+        ctx: &TraverseCtx<'a>,
+    ) -> Option<Str<'a>> {
+        // Avoid copying strings in the common case where there's only 1 line of text,
+        // and it contains no HTML entities that need decoding.
+        //
+        // Where we do have to decode HTML entities, or concatenate multiple lines, assemble the
+        // concatenated text directly in arena, in an `ArenaString` (the accumulator `acc`),
+        // to avoid allocations. Initialize that `ArenaString` with capacity equal to length of
+        // the original text. This may be a bit more capacity than is required, once whitespace
+        // is removed, but it's highly unlikely to be insufficient capacity, so the `ArenaString`
+        // shouldn't need to reallocate while it's being constructed.
+        //
+        // When first line containing some text is found:
+        // * If it contains HTML entities, decode them and write decoded text to accumulator `acc`.
+        // * Otherwise, store trimmed text in `only_line` as a `Str<'a>`.
+        //
+        // When another line containing some text is found:
+        // * If accumulator isn't already initialized, initialize it, starting with `only_line`.
+        // * Push a space to the accumulator.
+        // * Decode current line into the accumulator.
+        //
+        // At the end:
+        // * If accumulator is initialized, convert the `ArenaString` to a `Str` and return it.
+        // * If `only_line` contains a string, that means only 1 line contained text, and that line
+        //   didn't contain any HTML entities which needed decoding.
+        //   So we can just return the `Str` that's in `only_line` (without any copying).
+
+        let mut acc: Option<ArenaStringBuilder> = None;
+        let mut only_line: Option<Str<'a>> = None;
+        let mut first_non_whitespace: Option<usize> = Some(0);
+        let mut last_non_whitespace: Option<usize> = None;
+        for (index, c) in text.char_indices() {
+            if is_line_terminator(c) {
+                if let (Some(first), Some(last)) = (first_non_whitespace, last_non_whitespace) {
+                    Self::add_line_of_jsx_text(
+                        Str::from(&text.as_str()[first..last]),
+                        &mut acc,
+                        &mut only_line,
+                        text.len(),
+                        ctx,
+                    );
+                }
+                first_non_whitespace = None;
+            } else if !is_white_space_single_line(c) {
+                last_non_whitespace = Some(index + c.len_utf8());
+                if first_non_whitespace.is_none() {
+                    first_non_whitespace.replace(index);
+                }
+            }
+        }
+
+        if let Some(first) = first_non_whitespace {
+            Self::add_line_of_jsx_text(
+                Str::from(&text.as_str()[first..]),
+                &mut acc,
+                &mut only_line,
+                text.len(),
+                ctx,
+            );
+        }
+
+        if let Some(acc) = acc { Some(Str::from(acc)) } else { only_line }
+    }
+
+    fn add_line_of_jsx_text(
+        trimmed_line: Str<'a>,
+        acc: &mut Option<ArenaStringBuilder<'a>>,
+        only_line: &mut Option<Str<'a>>,
+        text_len: usize,
+        ctx: &TraverseCtx<'a>,
+    ) {
+        if let Some(buffer) = acc.as_mut() {
+            // Already some text in accumulator. Push a space before this line is added to `acc`.
+            buffer.push(' ');
+        } else if let Some(only_line) = only_line.take() {
+            // This is the 2nd line containing text. Previous line did not contain any HTML entities.
+            // Generate an accumulator containing previous line and a trailing space.
+            // Current line will be added to the accumulator after it.
+            let mut buffer = ArenaStringBuilder::with_capacity_in(text_len, ctx.allocator());
+            buffer.push_str(only_line.as_str());
+            buffer.push(' ');
+            *acc = Some(buffer);
+        }
+
+        // Decode any HTML entities in this line
+        decode_entities(trimmed_line.as_str(), acc, text_len, ctx.allocator());
+
+        if acc.is_none() {
+            // This is the first line containing text, and there are no HTML entities in this line.
+            // Record this line in `only_line`.
+            // If this turns out to be the only line, we won't need to construct an `ArenaString`,
+            // so avoid all copying.
+            *only_line = Some(trimmed_line);
+        }
+    }
+
+    /// The react jsx/jsxs transform falls back to `createElement` when an explicit `key` argument comes after a spread
+    /// <https://github.com/microsoft/TypeScript/blob/6134091642f57c32f50e7b5604635e4d37dd19e8/src/compiler/transformers/jsx.ts#L264-L278>
+    fn has_key_after_props_spread(opening_element: &JSXOpeningElement<'a>) -> bool {
+        let mut spread = false;
+        for attr in &opening_element.attributes {
+            if matches!(attr, JSXAttributeItem::SpreadAttribute(_)) {
+                spread = true;
+            } else if spread && matches!(attr, JSXAttributeItem::Attribute(a) if a.is_key()) {
+                return true;
+            }
+        }
+        false
+    }
+
+    fn delete_reference_for_closing_element(
+        element: Option<&JSXClosingElement<'a>>,
+        ctx: &mut TraverseCtx<'a>,
+    ) {
+        if let Some(element) = &element
+            && let Some(ident) = element.name.get_identifier()
+        {
+            ctx.delete_reference_for_identifier(ident);
+        }
+    }
+}
+
+/// Create `IdentifierReference` for var name in current scope which is read from
+fn get_read_identifier_reference<'a>(
+    span: Span,
+    name: Str<'a>,
+    ctx: &mut TraverseCtx<'a>,
+) -> Expression<'a> {
+    let name = Ident::from(name);
+    let reference_id = ctx.create_reference_in_current_scope(name, ReferenceFlags::Read);
+    let ident = IdentifierReference::boxed_with_reference_id(span, name, reference_id, ctx);
+    Expression::Identifier(ident)
+}
+
+fn create_static_member_expression<'a>(
+    object_ident: ArenaBox<'a, IdentifierReference<'a>>,
+    property_name: Str<'a>,
+    ctx: &TraverseCtx<'a>,
+) -> Expression<'a> {
+    let object = Expression::Identifier(object_ident);
+    let property = IdentifierName::new(SPAN, property_name, ctx);
+    MemberExpression::new_static_member_expression(SPAN, object, property, false, ctx).into()
+}
+
+/// Check if an `ObjectExpression` has a property called `__proto__`.
+///
+/// Returns `true` for any of:
+/// * `{ __proto__: ... }`
+/// * `{ "__proto__": ... }`
+/// * `{ ["__proto__"]: ... }`
+///
+/// Also currently returns `true` for `{ [__proto__]: ... }`, but that's probably not correct.
+/// TODO: Fix that.
+fn has_proto(e: &ObjectExpression<'_>) -> bool {
+    e.properties.iter().any(|p| p.prop_name().is_some_and(|(name, _)| name == "__proto__"))
+}
+
+#[cfg(test)]
+mod test {
+    use std::path::Path;
+
+    use oxc_allocator::Allocator;
+    use oxc_ast::ast::Expression;
+    use oxc_semantic::Scoping;
+    use oxc_syntax::{node::NodeId, scope::ScopeFlags};
+    use oxc_traverse::ReusableTraverseCtx;
+
+    use super::Pragma;
+    use crate::{TransformCtx, TransformOptions, state::TransformState};
+
+    macro_rules! setup {
+        ($traverse_ctx:ident, $transform_ctx:ident) => {
+            let allocator = Allocator::default();
+
+            let mut scoping = Scoping::default();
+            scoping.add_scope(None, NodeId::DUMMY, ScopeFlags::Top);
+
+            let state = TransformState::default();
+            let traverse_ctx = ReusableTraverseCtx::new(state, scoping, &allocator);
+            // SAFETY: Macro user only gets a `&mut TransCtx`, which cannot be abused
+            let mut traverse_ctx = unsafe { traverse_ctx.unwrap() };
+            let $traverse_ctx = &mut traverse_ctx;
+
+            let mut $transform_ctx =
+                TransformCtx::new(Path::new("test.jsx"), &TransformOptions::default());
+        };
+    }
+
+    #[test]
+    fn default_pragma() {
+        setup!(traverse_ctx, transform_ctx);
+
+        let pragma = None;
+        let pragma = Pragma::parse(pragma, "createElement", &traverse_ctx.ast, &mut transform_ctx);
+        let expr = pragma.create_expression(traverse_ctx);
+
+        let Expression::StaticMemberExpression(member) = &expr else { panic!() };
+        let Expression::Identifier(object) = &member.object else { panic!() };
+        assert_eq!(object.name, "React");
+        assert_eq!(member.property.name, "createElement");
+    }
+
+    #[test]
+    fn single_part_pragma() {
+        setup!(traverse_ctx, transform_ctx);
+
+        let pragma = Some("single");
+        let pragma = Pragma::parse(pragma, "createElement", &traverse_ctx.ast, &mut transform_ctx);
+        let expr = pragma.create_expression(traverse_ctx);
+
+        let Expression::Identifier(ident) = &expr else { panic!() };
+        assert_eq!(ident.name, "single");
+    }
+
+    #[test]
+    fn two_part_pragma() {
+        setup!(traverse_ctx, transform_ctx);
+
+        let pragma = Some("first.second");
+        let pragma = Pragma::parse(pragma, "createElement", &traverse_ctx.ast, &mut transform_ctx);
+        let expr = pragma.create_expression(traverse_ctx);
+
+        let Expression::StaticMemberExpression(member) = &expr else { panic!() };
+        let Expression::Identifier(object) = &member.object else { panic!() };
+        assert_eq!(object.name, "first");
+        assert_eq!(member.property.name, "second");
+    }
+
+    #[test]
+    fn multi_part_pragma() {
+        setup!(traverse_ctx, transform_ctx);
+
+        let pragma = Some("first.second.third");
+        let pragma = Pragma::parse(pragma, "createElement", &traverse_ctx.ast, &mut transform_ctx);
+        let expr = pragma.create_expression(traverse_ctx);
+
+        let Expression::StaticMemberExpression(outer_member) = &expr else { panic!() };
+        let Expression::StaticMemberExpression(inner_member) = &outer_member.object else {
+            panic!()
+        };
+        let Expression::Identifier(object) = &inner_member.object else { panic!() };
+        assert_eq!(object.name, "first");
+        assert_eq!(inner_member.property.name, "second");
+        assert_eq!(outer_member.property.name, "third");
+    }
+
+    #[test]
+    fn this_pragma() {
+        setup!(traverse_ctx, transform_ctx);
+
+        let pragma = Some("this");
+        let pragma = Pragma::parse(pragma, "createElement", &traverse_ctx.ast, &mut transform_ctx);
+        let expr = pragma.create_expression(traverse_ctx);
+
+        assert!(matches!(&expr, Expression::ThisExpression(_)));
+    }
+
+    #[test]
+    fn this_prop_pragma() {
+        setup!(traverse_ctx, transform_ctx);
+
+        let pragma = Some("this.a.b");
+        let pragma = Pragma::parse(pragma, "createElement", &traverse_ctx.ast, &mut transform_ctx);
+        let expr = pragma.create_expression(traverse_ctx);
+
+        let Expression::StaticMemberExpression(outer_member) = &expr else { panic!() };
+        let Expression::StaticMemberExpression(inner_member) = &outer_member.object else {
+            panic!()
+        };
+        assert!(matches!(&inner_member.object, Expression::ThisExpression(_)));
+        assert_eq!(inner_member.property.name, "a");
+        assert_eq!(outer_member.property.name, "b");
+    }
+
+    #[test]
+    fn import_meta_pragma() {
+        setup!(traverse_ctx, transform_ctx);
+
+        let pragma = Some("import.meta");
+        let pragma = Pragma::parse(pragma, "createElement", &traverse_ctx.ast, &mut transform_ctx);
+        let expr = pragma.create_expression(traverse_ctx);
+
+        assert!(matches!(expr, Expression::ImportMeta(_)));
+    }
+
+    #[test]
+    fn import_meta_prop_pragma() {
+        setup!(traverse_ctx, transform_ctx);
+
+        let pragma = Some("import.meta.prop");
+        let pragma = Pragma::parse(pragma, "createElement", &traverse_ctx.ast, &mut transform_ctx);
+        let expr = pragma.create_expression(traverse_ctx);
+
+        let Expression::StaticMemberExpression(member) = &expr else { panic!() };
+        assert!(matches!(&member.object, Expression::ImportMeta(_)));
+        assert_eq!(member.property.name, "prop");
+    }
+
+    #[test]
+    fn invalid_pragma_falls_back_to_default() {
+        setup!(traverse_ctx, _transform_ctx);
+
+        let pragma = Some("`");
+        let pragma = Pragma::parse_no_ctx(pragma, "Fragment", &traverse_ctx.ast);
+        let expr = pragma.create_expression(traverse_ctx);
+
+        let Expression::StaticMemberExpression(member) = &expr else { panic!() };
+        let Expression::Identifier(object) = &member.object else { panic!() };
+        assert_eq!(object.name, "React");
+        assert_eq!(member.property.name, "Fragment");
+    }
+}

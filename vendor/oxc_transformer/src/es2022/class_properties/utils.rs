@@ -1,0 +1,62 @@
+//! ES2022: Class Properties
+//! Utility functions.
+
+use std::path::Path;
+
+use oxc_ast::{ast::*, builder::AstBuilder, builder::NONE};
+use oxc_span::SPAN;
+use oxc_traverse::BoundIdentifier;
+
+use crate::context::TraverseCtx;
+
+/// Create `var` declaration.
+pub(super) fn create_variable_declaration<'a>(
+    binding: &BoundIdentifier<'a>,
+    init: Expression<'a>,
+    ctx: &TraverseCtx<'a>,
+) -> Statement<'a> {
+    let kind = VariableDeclarationKind::Var;
+    let declarator = VariableDeclarator::new(
+        SPAN,
+        kind,
+        binding.create_binding_pattern(ctx),
+        NONE,
+        Some(init),
+        false,
+        ctx,
+    );
+    Statement::new_variable_declaration(SPAN, kind, [declarator], false, ctx)
+}
+
+/// Convert an iterator of `Expression`s into an iterator of `Statement::ExpressionStatement`s.
+pub(super) fn exprs_into_stmts<'a, E>(
+    exprs: E,
+    ast: &AstBuilder<'a>,
+) -> impl Iterator<Item = Statement<'a>>
+where
+    E: IntoIterator<Item = Expression<'a>>,
+{
+    exprs.into_iter().map(move |expr| Statement::new_expression_statement(SPAN, expr, ast))
+}
+
+/// Create `IdentifierName` for `_`.
+pub(super) fn create_underscore_ident_name<'a>(ctx: &TraverseCtx<'a>) -> IdentifierName<'a> {
+    IdentifierName::new(SPAN, "_", ctx)
+}
+
+/// Debug assert that an `Expression` is not `ParenthesizedExpression` or TS syntax
+/// (e.g. `TSAsExpression`).
+//
+// `#[inline(always)]` because this is a no-op in release mode
+#[expect(clippy::inline_always)]
+#[inline(always)]
+pub(super) fn debug_assert_expr_is_not_parenthesis_or_typescript_syntax(
+    expr: &Expression,
+    path: &Path,
+) {
+    debug_assert!(
+        !(matches!(expr, Expression::ParenthesizedExpression(_)) || expr.is_typescript_syntax()),
+        "Should not be: {expr:?} in {}",
+        path.display()
+    );
+}

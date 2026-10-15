@@ -1,5 +1,6 @@
 [workspace]
 members = ["crates/*"]
+exclude = ["vendor/oxc_transformer"]
 
 # Shared by every crate in the workspace through `[lints] workspace = true`, so
 # the sub-crates are held to the same baseline as the napi boundary.
@@ -81,3 +82,6 @@ workspace = true
 lto = true
 strip = "symbols"
 codegen-units = 1
+
+[patch.crates-io]
+oxc_transformer = { path = "vendor/oxc_transformer" }

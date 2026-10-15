@@ -1,0 +1,215 @@
+//! ES2022: Class Properties
+//! Transform of private method uses e.g. `this.#method()`.
+
+use std::cell::Cell;
+
+use oxc_allocator::{ArenaVec, TakeIn};
+use oxc_ast::ast::*;
+use oxc_ast_visit::{VisitMut, walk_mut};
+use oxc_semantic::{ScopeFlags, ScopeId};
+use oxc_span::SPAN;
+use oxc_traverse::Ancestor;
+
+use crate::{
+    Helper, common::helper_loader::helper_call_expr, context::TraverseCtx,
+    utils::sync_function_symbol_flags,
+};
+
+use super::{
+    ClassProperties,
+    super_converter::{ClassPropertiesSuperConverter, ClassPropertiesSuperConverterMode},
+};
+
+impl<'a> ClassProperties<'a> {
+    /// Convert method definition where the key is a private identifier and
+    /// insert it after the class.
+    ///
+    /// ```js
+    /// class C {
+    ///    #method() {}
+    ///    set #prop(value) {}
+    ///    get #prop() { return 0; }
+    /// }
+    /// ```
+    ///
+    /// ->
+    ///
+    /// ```js
+    /// class C {}
+    /// function _method() {}
+    /// function _set_prop(value) {}
+    /// function _get_prop() { return 0; }
+    /// ```
+    ///
+    /// Returns `true` if the method was converted.
+    pub(super) fn convert_private_method(
+        &mut self,
+        method: &mut MethodDefinition<'a>,
+        ctx: &mut TraverseCtx<'a>,
+    ) -> Option<Statement<'a>> {
+        let MethodDefinition { key, value, span, kind, r#static, .. } = method;
+        let PropertyKey::PrivateIdentifier(ident) = &key else {
+            return None;
+        };
+
+        let mut function = value.take_in_box(ctx);
+
+        let resolved_private_prop = if *kind == MethodDefinitionKind::Set {
+            self.classes_stack.find_writable_private_prop(ident)
+        } else {
+            self.classes_stack.find_readable_private_prop(ident)
+        };
+        let temp_binding = resolved_private_prop.unwrap().prop_binding;
+
+        function.span = *span;
+        function.id = Some(temp_binding.create_binding_identifier(ctx));
+        function.r#type = FunctionType::FunctionDeclaration;
+        sync_function_symbol_flags(&function, ctx);
+
+        // Change parent scope of function to current scope id and remove
+        // strict mode flag if parent scope is not strict mode.
+        let scope_id = function.scope_id();
+        let new_parent_id = if Self::is_inside_static_property_initializer(ctx) {
+            ctx.current_hoist_scope_id()
+        } else {
+            ctx.current_scope_id()
+        };
+        ctx.scoping_mut().change_scope_parent_id(scope_id, Some(new_parent_id));
+        let make_sloppy_mode = !ctx.scoping().scope_flags(new_parent_id).is_strict_mode();
+        let flags = ctx.scoping_mut().scope_flags_mut(scope_id);
+        *flags -= ScopeFlags::GetAccessor | ScopeFlags::SetAccessor;
+
+        PrivateMethodVisitor::new(*r#static, make_sloppy_mode, self, ctx)
+            .visit_function(&mut function, ScopeFlags::Function);
+
+        Some(Statement::FunctionDeclaration(function))
+    }
+
+    fn is_inside_static_property_initializer(ctx: &TraverseCtx<'a>) -> bool {
+        ctx.ancestors().any(|ancestor| {
+            matches!(ancestor, Ancestor::PropertyDefinitionValue(property) if *property.r#static())
+        })
+    }
+
+    // `_classPrivateMethodInitSpec(this, brand)`
+    pub(super) fn create_class_private_method_init_spec(
+        &self,
+        ctx: &mut TraverseCtx<'a>,
+    ) -> Expression<'a> {
+        let brand = self.classes_stack.last().bindings.brand.as_ref().unwrap();
+        let arguments = ArenaVec::from_array_in(
+            [
+                Argument::new_this_expression(SPAN, ctx),
+                Argument::from(brand.create_read_expression(ctx)),
+            ],
+            ctx,
+        );
+        helper_call_expr(Helper::ClassPrivateMethodInitSpec, arguments, ctx)
+    }
+}
+
+/// Visitor to transform private methods.
+///
+/// Almost the same as `super::static_block_and_prop_init::StaticVisitor`,
+/// but only does following:
+///
+/// 1. Reference to class name to class temp var.
+/// 2. Transform `super` expressions.
+struct PrivateMethodVisitor<'a, 'v> {
+    super_converter: ClassPropertiesSuperConverter<'a, 'v>,
+    make_sloppy_mode: bool,
+    strict_scope_depth: u32,
+    /// `TransCtx` object.
+    ctx: &'v mut TraverseCtx<'a>,
+}
+
+impl<'a, 'v> PrivateMethodVisitor<'a, 'v> {
+    fn new(
+        is_static: bool,
+        make_sloppy_mode: bool,
+        class_properties: &'v mut ClassProperties<'a>,
+        ctx: &'v mut TraverseCtx<'a>,
+    ) -> Self {
+        let mode = if is_static {
+            ClassPropertiesSuperConverterMode::StaticPrivateMethod
+        } else {
+            ClassPropertiesSuperConverterMode::PrivateMethod
+        };
+        Self {
+            super_converter: ClassPropertiesSuperConverter::new(mode, class_properties),
+            make_sloppy_mode,
+            strict_scope_depth: 0,
+            ctx,
+        }
+    }
+}
+
+impl<'a> VisitMut<'a> for PrivateMethodVisitor<'a, '_> {
+    #[inline]
+    fn visit_expression(&mut self, expr: &mut Expression<'a>) {
+        match expr {
+            // `super.prop`
+            Expression::StaticMemberExpression(_) => {
+                self.super_converter.transform_static_member_expression(expr, self.ctx);
+            }
+            // `super[prop]`
+            Expression::ComputedMemberExpression(_) => {
+                self.super_converter.transform_computed_member_expression(expr, self.ctx);
+            }
+            // `super.prop()`
+            Expression::CallExpression(call_expr) => {
+                self.super_converter
+                    .transform_call_expression_for_super_member_expr(call_expr, self.ctx);
+            }
+            // `super.prop = value`, `super.prop += value`, `super.prop ??= value`
+            Expression::AssignmentExpression(_) => {
+                self.super_converter
+                    .transform_assignment_expression_for_super_assignment_target(expr, self.ctx);
+            }
+            // `super.prop++`, `--super.prop`
+            Expression::UpdateExpression(_) => {
+                self.super_converter
+                    .transform_update_expression_for_super_assignment_target(expr, self.ctx);
+            }
+            _ => {}
+        }
+        walk_mut::walk_expression(self, expr);
+    }
+
+    /// Transform reference to class name to temp var
+    fn visit_identifier_reference(&mut self, ident: &mut IdentifierReference<'a>) {
+        self.super_converter.class_properties.replace_class_name_with_temp_var(ident, self.ctx);
+    }
+
+    #[inline]
+    fn visit_class(&mut self, _class: &mut Class<'a>) {
+        // Ignore because we don't need to transform `super` for other classes.
+        // Nested classes are strict mode, so keep their scopes' strict flags.
+
+        // TODO: Actually we do need to transform `super` in:
+        // 1. Class decorators
+        // 2. Class `extends` clause
+        // 3. Class property/method/accessor computed keys
+        // 4. Class property/method/accessor decorators
+        //    (or does `super` in a decorator refer to inner class?)
+    }
+
+    #[inline]
+    fn enter_scope(&mut self, flags: ScopeFlags, scope_id: &Cell<Option<ScopeId>>) {
+        if !self.make_sloppy_mode {
+            return;
+        }
+
+        if self.strict_scope_depth > 0 || flags.is_strict_mode() {
+            self.strict_scope_depth += 1;
+        } else {
+            *self.ctx.scoping_mut().scope_flags_mut(scope_id.get().unwrap()) -=
+                ScopeFlags::StrictMode;
+        }
+    }
+
+    #[inline]
+    fn leave_scope(&mut self) {
+        self.strict_scope_depth = self.strict_scope_depth.saturating_sub(1);
+    }
+}
