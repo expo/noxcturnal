@@ -43,7 +43,7 @@ struct CapturedLoop {
 struct PendingCapturedLoop {
     captured: CapturedLoop,
     statement_root: NodeId,
-    label: Option<String>,
+    exit_labels: FxHashMap<(u32, u32), String>,
     content_start: u32,
     content_end: u32,
     returns: FxHashSet<(u32, u32)>,
@@ -52,6 +52,7 @@ struct PendingCapturedLoop {
     has_await: bool,
     has_yield: bool,
     has_finally: bool,
+    has_yielding_finally: bool,
     arguments_references: FxHashSet<(u32, u32)>,
     local_var_declarations: Vec<NodeId>,
 }
@@ -69,7 +70,8 @@ struct CapturedLoopMutation {
     bindings: Vec<HeaderBinding>,
     helper: String,
     result: String,
-    label: Option<String>,
+    record: Option<String>,
+    exit_labels: FxHashMap<(u32, u32), String>,
     returns: FxHashSet<(u32, u32)>,
     breaks: FxHashSet<(u32, u32)>,
     continues: FxHashSet<(u32, u32)>,
@@ -340,6 +342,15 @@ fn mutate_captured_loop<'a>(
             None,
         ));
     }
+    if let Some(record) = &mutation.record {
+        generated.push(binding_declaration(
+            ast,
+            insertion_anchor,
+            VariableDeclarationKind::Var,
+            record,
+            None,
+        ));
+    }
     generated.push(binding_declaration(
         ast,
         insertion_anchor,
@@ -492,7 +503,21 @@ fn captured_loop_result<'a>(
         false,
         false,
     ));
-    ast.expression_object(span, properties)
+    let record = ast.expression_object(span, properties);
+    if let Some(name) = &mutation.record {
+        ast.expression_assignment(
+            span,
+            AssignmentOperator::Assign,
+            ast.simple_assignment_target_assignment_target_identifier(
+                span,
+                ast.allocator.alloc_str(name),
+            )
+            .into(),
+            record,
+        )
+    } else {
+        record
+    }
 }
 
 #[expect(deprecated)]
@@ -562,7 +587,53 @@ fn captured_loop_dispatch<'a>(
         call,
     );
     let mut body = ArenaVec::new_in(ast);
+    if let Some(record) = &mutation.record {
+        // A delegated external return can complete after yielding in finally.
+        // Only records created by this helper may be decoded; caller values can
+        // be null, primitives, or proxies with arbitrary property traps.
+        body.push(
+            ast.statement_expression(
+                anchor,
+                ast.expression_assignment(
+                    anchor,
+                    AssignmentOperator::Assign,
+                    ast.simple_assignment_target_assignment_target_identifier(
+                        anchor,
+                        ast.allocator.alloc_str(record),
+                    )
+                    .into(),
+                    ast.expression_null_literal(anchor),
+                ),
+            ),
+        );
+    }
     body.push(ast.statement_expression(anchor, assignment));
+    if let Some(record) = &mutation.record {
+        let record_ref = || ast.expression_identifier(anchor, ast.allocator.alloc_str(record));
+        let result_ref =
+            || ast.expression_identifier(anchor, ast.allocator.alloc_str(&mutation.result));
+        let test = ast.expression_logical(
+            anchor,
+            ast.expression_unary(
+                anchor,
+                oxc_syntax::operator::UnaryOperator::LogicalNot,
+                record_ref(),
+            ),
+            oxc_syntax::operator::LogicalOperator::Or,
+            ast.expression_binary(
+                anchor,
+                result_ref(),
+                oxc_syntax::operator::BinaryOperator::StrictInequality,
+                record_ref(),
+            ),
+        );
+        body.push(ast.statement_if(
+            anchor,
+            test,
+            ast.statement_return(anchor, Some(result_ref())),
+            None,
+        ));
+    }
     let result_vars = || {
         ast.member_expression_static(
             anchor,
@@ -617,14 +688,24 @@ fn captured_loop_dispatch<'a>(
             ),
         ));
     }
-    for (kind, enabled) in [
-        ("return", !mutation.returns.is_empty()),
-        ("break", !mutation.breaks.is_empty()),
-        ("continue", !mutation.continues.is_empty()),
+    let mut exits = Vec::new();
+    if !mutation.returns.is_empty() {
+        exits.push(("return", None));
+    }
+    for (kind, spans) in [
+        ("break", &mutation.breaks),
+        ("continue", &mutation.continues),
     ] {
-        if !enabled {
-            continue;
-        }
+        let mut labels = spans
+            .iter()
+            .map(|span| mutation.exit_labels.get(span).map(String::as_str))
+            .collect::<Vec<_>>();
+        labels.sort_unstable();
+        labels.dedup();
+        exits.extend(labels.into_iter().map(|label| (kind, label)));
+    }
+    for (kind, label) in exits {
+        let tag = label.map_or_else(|| kind.to_owned(), |label| format!("{kind}:{label}"));
         let result_type = Expression::from(ast.member_expression_static(
             anchor,
             ast.expression_identifier(anchor, ast.allocator.alloc_str(&mutation.result)),
@@ -635,7 +716,7 @@ fn captured_loop_dispatch<'a>(
             anchor,
             result_type,
             oxc_syntax::operator::BinaryOperator::StrictEquality,
-            ast.expression_string_literal(anchor, ast.allocator.alloc_str(kind), None),
+            ast.expression_string_literal(anchor, ast.allocator.alloc_str(&tag), None),
         );
         let consequent = match kind {
             "return" => ast.statement_return(
@@ -649,17 +730,11 @@ fn captured_loop_dispatch<'a>(
             ),
             "break" => ast.statement_break(
                 anchor,
-                mutation
-                    .label
-                    .as_ref()
-                    .map(|label| ast.label_identifier(anchor, ast.allocator.alloc_str(label))),
+                label.map(|label| ast.label_identifier(anchor, ast.allocator.alloc_str(label))),
             ),
             _ => ast.statement_continue(
                 anchor,
-                mutation
-                    .label
-                    .as_ref()
-                    .map(|label| ast.label_identifier(anchor, ast.allocator.alloc_str(label))),
+                label.map(|label| ast.label_identifier(anchor, ast.allocator.alloc_str(label))),
             ),
         };
         body.push(ast.statement_if(anchor, test, consequent, None));
@@ -694,21 +769,12 @@ fn captured_loop_mutations(
                         | AstKind::BlockStatement(_)
                         | AstKind::FunctionBody(_)
                         | AstKind::SwitchCase(_)
+                        | AstKind::StaticBlock(_)
                 ) {
                     break;
                 }
                 statement_root = ancestor;
             }
-            let label =
-                nodes
-                    .ancestor_ids(captured.node_id)
-                    .next()
-                    .and_then(|parent_id| match nodes.kind(parent_id) {
-                        AstKind::LabeledStatement(statement) => {
-                            Some(statement.label.name.to_string())
-                        }
-                        _ => None,
-                    });
             let body_is_block =
                 source.as_bytes().get(captured.body_span.start as usize) == Some(&b'{');
             let content_start = captured.body_span.start + u32::from(body_is_block);
@@ -721,7 +787,7 @@ fn captured_loop_mutations(
             PendingCapturedLoop {
                 captured,
                 statement_root,
-                label,
+                exit_labels: FxHashMap::default(),
                 content_start,
                 content_end,
                 returns: FxHashSet::default(),
@@ -730,6 +796,7 @@ fn captured_loop_mutations(
                 has_await: false,
                 has_yield: false,
                 has_finally: false,
+                has_yielding_finally: false,
                 arguments_references: FxHashSet::default(),
                 local_var_declarations,
             }
@@ -808,6 +875,17 @@ fn captured_loop_mutations(
             continue;
         }
         let belongs_to_body = active_functions.is_empty();
+        // A label is local only when its target moves into the same helper.
+        // Include a labeled statement that is itself the loop body.
+        let label_leaves_body = |name: &str| {
+            nodes
+                .ancestor_ids(node_id)
+                .take_while(|id| *id != loop_plan.captured.node_id)
+                .all(|id| {
+                    !matches!(nodes.kind(id), AstKind::LabeledStatement(target)
+                    if target.label.name == name)
+                })
+        };
         match node.kind() {
             AstKind::IdentifierReference(identifier) if identifier.name == "arguments" => {
                 // The range check already limits this to the extracted body/header.
@@ -845,6 +923,14 @@ fn captured_loop_mutations(
             }
             AstKind::YieldExpression(_) if belongs_to_body => {
                 loop_plan.has_yield = true;
+                loop_plan.has_yielding_finally |= nodes
+                    .ancestor_ids(node_id)
+                    .take_while(|id| *id != loop_plan.captured.node_id)
+                    .any(|id| {
+                        matches!(nodes.kind(id), AstKind::TryStatement(statement)
+                        if statement.finalizer.as_ref().is_some_and(|finalizer|
+                            finalizer.span.start <= span.start && span.end <= finalizer.span.end))
+                    });
             }
             AstKind::ReturnStatement(statement) if belongs_to_body => {
                 loop_plan
@@ -859,12 +945,17 @@ fn captured_loop_mutations(
                                 .last()
                                 .is_none_or(|(target, _)| *target == loop_plan.captured.node_id)
                         },
-                        |label| loop_plan.label.as_deref() == Some(label.name.as_str()),
+                        |label| label_leaves_body(label.name.as_str()),
                     ) =>
             {
                 loop_plan
                     .breaks
                     .insert((statement.span.start, statement.span.end));
+                if let Some(label) = &statement.label {
+                    loop_plan
+                        .exit_labels
+                        .insert((span.start, span.end), label.name.to_string());
+                }
             }
             AstKind::ContinueStatement(statement)
                 if belongs_to_body
@@ -874,32 +965,34 @@ fn captured_loop_mutations(
                                 .last()
                                 .is_none_or(|(target, _)| *target == loop_plan.captured.node_id)
                         },
-                        |label| loop_plan.label.as_deref() == Some(label.name.as_str()),
+                        |label| label_leaves_body(label.name.as_str()),
                     ) =>
             {
                 loop_plan
                     .continues
                     .insert((statement.span.start, statement.span.end));
+                if let Some(label) = &statement.label {
+                    loop_plan
+                        .exit_labels
+                        .insert((span.start, span.end), label.name.to_string());
+                }
             }
             _ => {}
         }
     }
     let mut reserved: FxHashSet<String> = scoping.symbol_names().map(str::to_owned).collect();
-    let reserve_capture = |base: &str, reserved: &mut FxHashSet<String>| loop {
-        let name = reserve_name(base, reserved);
-        if !scoping
+    reserved.extend(
+        scoping
             .root_unresolved_references()
-            .contains_key(name.as_str())
-        {
-            break name;
-        }
-    };
+            .keys()
+            .map(ToString::to_string),
+    );
     let mut roots: FxHashMap<(u32, u32), Vec<CapturedLoopMutation>> = FxHashMap::default();
     for loop_plan in pending {
         let PendingCapturedLoop {
             mut captured,
             statement_root,
-            label,
+            exit_labels,
             content_start,
             content_end,
             returns,
@@ -908,17 +1001,16 @@ fn captured_loop_mutations(
             has_await,
             has_yield,
             has_finally,
+            has_yielding_finally,
             arguments_references,
             local_var_declarations,
         } = loop_plan;
         let arguments_alias = (has_yield && !arguments_references.is_empty())
-            .then(|| reserve_capture("_arguments", &mut reserved));
+            .then(|| reserve_name("_arguments", &mut reserved));
         for binding in &mut captured.header_bindings {
             if binding.protect_writes {
-                binding.parameter_alias = Some(reserve_capture(
-                    &format!("_{}", binding.name),
-                    &mut reserved,
-                ));
+                binding.parameter_alias =
+                    Some(reserve_name(&format!("_{}", binding.name), &mut reserved));
             }
         }
         let defer_bindings = has_finally
@@ -936,10 +1028,10 @@ fn captured_loop_mutations(
             header::Plan {
                 first: captured
                     .header_capture
-                    .then(|| reserve_capture("_first", &mut reserved)),
+                    .then(|| reserve_name("_first", &mut reserved)),
                 initial: captured
                     .init_capture
-                    .then(|| reserve_capture("_initial", &mut reserved)),
+                    .then(|| reserve_name("_initial", &mut reserved)),
             }
         });
         let root_span = nodes.kind(statement_root).span();
@@ -964,7 +1056,8 @@ fn captured_loop_mutations(
                 } else {
                     String::new()
                 },
-                label,
+                record: has_yielding_finally.then(|| reserve_name("_loopRecord", &mut reserved)),
+                exit_labels,
                 returns,
                 breaks,
                 continues,
@@ -1156,6 +1249,7 @@ pub(super) fn prepare_with_reserved<'a>(
         .keys()
         .map(|name| name.to_string())
         .collect::<FxHashSet<_>>();
+    used_names.extend(unresolved_names.iter().cloned());
     let scope_preorder = scoping.scope_descendants_from_root().collect::<Vec<_>>();
     let mut scope_index = FxHashMap::default();
     let mut scope_end = FxHashMap::default();
@@ -1400,7 +1494,7 @@ pub(super) fn prepare_with_reserved<'a>(
 fn collect_read_only_private_writes(semantic: &Semantic<'_>) -> FxHashMap<(u32, u32), String> {
     struct PrivateClass {
         end: u32,
-        read_only: FxHashSet<String>,
+        names: FxHashMap<String, bool>,
     }
 
     let nodes = semantic.nodes();
@@ -1411,9 +1505,10 @@ fn collect_read_only_private_writes(semantic: &Semantic<'_>) -> FxHashMap<(u32, 
         while classes.last().is_some_and(|class| span.start >= class.end) {
             classes.pop();
         }
-        if let AstKind::Class(class) = node.kind() {
+        // Heritage runs in the enclosing private environment. Activate the new
+        // declarations only at the body, retaining writable names for shadowing.
+        if let AstKind::ClassBody(class) = node.kind() {
             let setters = class
-                .body
                 .body
                 .iter()
                 .filter_map(|element| match element {
@@ -1428,27 +1523,27 @@ fn collect_read_only_private_writes(semantic: &Semantic<'_>) -> FxHashMap<(u32, 
                     _ => None,
                 })
                 .collect::<FxHashSet<_>>();
-            let read_only = class
-                .body
+            let names = class
                 .body
                 .iter()
-                .filter_map(|element| match element {
-                    ClassElement::MethodDefinition(method)
-                        if method.kind != MethodDefinitionKind::Set =>
-                    {
-                        let PropertyKey::PrivateIdentifier(key) = &method.key else {
-                            return None;
-                        };
-                        (method.kind != MethodDefinitionKind::Get
-                            || !setters.contains(key.name.as_str()))
-                        .then(|| key.name.to_string())
-                    }
-                    _ => None,
+                .filter_map(|element| {
+                    let Some(PropertyKey::PrivateIdentifier(key)) = element.property_key() else {
+                        return None;
+                    };
+                    let read_only = match element {
+                        ClassElement::MethodDefinition(method) => {
+                            method.kind != MethodDefinitionKind::Set
+                                && (method.kind != MethodDefinitionKind::Get
+                                    || !setters.contains(key.name.as_str()))
+                        }
+                        _ => false,
+                    };
+                    Some((key.name.to_string(), read_only))
                 })
                 .collect();
             classes.push(PrivateClass {
                 end: class.span.end,
-                read_only,
+                names,
             });
             continue;
         }
@@ -1456,8 +1551,11 @@ fn collect_read_only_private_writes(semantic: &Semantic<'_>) -> FxHashMap<(u32, 
             continue;
         };
         if !classes
-            .last()
-            .is_some_and(|class| class.read_only.contains(field.field.name.as_str()))
+            .iter()
+            .rev()
+            .find_map(|class| class.names.get(field.field.name.as_str()))
+            .copied()
+            .unwrap_or(false)
         {
             continue;
         }
