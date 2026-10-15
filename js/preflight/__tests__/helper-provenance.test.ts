@@ -205,3 +205,92 @@ test('for-of shares one standard helper across loops and reserves external helpe
     assert.deepEqual(context.result, [1, 'external', 2]);
   }
 });
+
+for (const [helpersMode, helpersVersion] of [
+  ['inline', '7.29.7'],
+  ['runtime', '7.29.7'],
+  ['runtime', '8.0.0'],
+] as const) {
+  for (const [name, source, expectedHelpers] of [
+    [
+      'default constructor',
+      'class Base{}class Value extends Base{}globalThis.answer=new Value() instanceof Base;',
+      ['construct'],
+    ],
+    [
+      'ordinary pre-super function',
+      'class Base{}class Value extends Base{constructor(){const read=function(){return this};super();this.ok=read.call(this)===this}}globalThis.answer=new Value().ok;',
+      ['construct'],
+    ],
+    [
+      'deferred receiver',
+      'class Base{}class Value extends Base{constructor(){const read=()=>this;super();this.ok=read()===this}}globalThis.answer=new Value().ok;',
+      ['assertThisInitialized', 'construct'],
+    ],
+    [
+      'receiver read before super throws',
+      'class Base{}class Value extends Base{constructor(){const read=()=>this;let threw=false;try{read()}catch(error){threw=error instanceof ReferenceError}super();this.ok=threw&&read()===this}}globalThis.answer=new Value().ok;',
+      ['assertThisInitialized', 'construct'],
+    ],
+    [
+      'nested class receiver',
+      'class Base{}class Value extends Base{constructor(){class Inner{static owner=this}super();this.ok=Inner.owner===Inner}}globalThis.answer=new Value().ok;',
+      ['construct'],
+    ],
+  ] as const) {
+    test(`class helper selection: ${name}, ${helpersMode} ${helpersVersion}`, () => {
+      const result = native.nativePreflightTransform(source, 'fixture.js', {
+        classes: true,
+        helpersMode,
+        helpersVersion,
+      });
+      assert.equal(result.status, 'complete', result.reason);
+      assert.deepEqual(result.helpersUsed, expectedHelpers);
+      assert.doesNotMatch(result.code!, /\bclass\s+(Base|Value)\b/);
+      const context: { answer?: unknown } = {};
+      new Function('require', 'globalThis', result.code!)(runtimeRequire, context);
+      assert.equal(context.answer, true);
+    });
+  }
+  for (const [name, source, loose, expectedHelpers] of [
+    [
+      'strict empty exclusions',
+      'const {...rest}={a:1};globalThis.answer=rest.a;',
+      false,
+      ['extends', 'objectDestructuringEmpty'],
+    ],
+    [
+      'loose empty exclusions',
+      'const {...rest}={a:1};globalThis.answer=rest.a;',
+      true,
+      ['extends', 'objectDestructuringEmpty'],
+    ],
+    [
+      'loose excluded key',
+      'const {a,...rest}={a:0,b:1};globalThis.answer=rest.b;',
+      true,
+      ['objectDestructuringEmpty', 'objectWithoutPropertiesLoose'],
+    ],
+    [
+      'mixed rest patterns',
+      'const {...copy}={b:1};const {a,...rest}={a:0,...copy};globalThis.answer=rest.b;',
+      true,
+      ['extends', 'objectDestructuringEmpty', 'objectWithoutPropertiesLoose'],
+    ],
+  ] as const) {
+    test(`rest helper selection: ${name}, ${helpersMode} ${helpersVersion}`, () => {
+      const result = native.nativePreflightTransform(source, 'fixture.js', {
+        objectRestSpread: true,
+        objectRestSpreadLoose: loose,
+        helpersMode,
+        helpersVersion,
+      });
+      assert.equal(result.status, 'complete', result.reason);
+      assert.deepEqual(result.helpersUsed, expectedHelpers);
+      assert.doesNotMatch(result.code!, /\.\.\./);
+      const context: { answer?: unknown } = {};
+      new Function('require', 'globalThis', result.code!)(runtimeRequire, context);
+      assert.equal(context.answer, 1);
+    });
+  }
+}

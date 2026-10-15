@@ -130,7 +130,7 @@ async function buildBundle(roots) {
 const generated = {};
 for (const [name, roots] of Object.entries(bundles)) generated[name] = await buildBundle(roots);
 
-const compatibilityRoots = new Set(Object.values(bundles).flat());
+const compatibilityRoots = new Set([...Object.values(bundles).flat(), 'toArray']);
 
 const adapterBundles = {
   INLINE_FOR_OF_HELPER: {
@@ -155,10 +155,10 @@ const adapterBundles = {
     adapter: 'function _toPropertyKey(value){return _toPropertyKey2.toPropertyKey(value)}',
   },
   INLINE_DESTRUCTURING_ITER_HELPER: {
-    roots: ['slicedToArray', 'toArray'],
+    roots: ['slicedToArray', 'toConsumableArray'],
     binding: '_toArray2',
     adapter:
-      'function _toArray(value,count,all){return all?_toArray2.toArray(value):_toArray2.slicedToArray(value,count)}',
+      'function _toArray(value,count,all){return all?_toArray2.toConsumableArray(value):_toArray2.slicedToArray(value,count)}',
   },
   INLINE_DESTRUCTURING_OBJECT_HELPER: {
     roots: ['objectDestructuringEmpty'],
@@ -182,6 +182,12 @@ const adapterBundles = {
     roots: ['construct'],
     binding: '_construct2',
     adapter: 'function _construct(S,args,D){return _construct2.construct(S,args,D)}',
+  },
+  INLINE_CLASS_CONSTRUCT_ASSERT_HELPER: {
+    roots: ['construct', 'assertThisInitialized'],
+    binding: '_construct2',
+    adapter:
+      'function _construct(S,args,D){return _construct2.construct(S,args,D)}_construct.assert=_construct2.assertThisInitialized;',
   },
   INLINE_CLASS_SUPER_GET_HELPER: {
     roots: ['get'],

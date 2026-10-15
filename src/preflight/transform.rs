@@ -381,9 +381,7 @@ fn transform_impl(
     )?;
     let mut rewrite_layers = Vec::new();
     let mut decorator_helper_requests = CustomHelperRequests::default();
-    let focused_object_rest = options.object_rest_spread == Some(true)
-        && (options.object_rest_spread_loose == Some(true)
-            || options.object_rest_spread_use_built_ins == Some(true));
+    let focused_object_rest = options.object_rest_spread == Some(true);
     let object_rest_loose = options.object_rest_spread_loose == Some(true);
     let focused_class_features = options.class_properties == Some(true)
         || options.private_methods == Some(true)
@@ -918,12 +916,23 @@ fn transform_impl(
                 Ok(plan) => Some(plan),
                 Err(reason) => return Ok(fatal(reason, [] as [String; 0])),
             }
+        } else if focused_object_rest {
+            match super::parameters::prepare_object_rest(
+                source,
+                &semantic.semantic,
+                object_rest_loose,
+            ) {
+                Ok(plan) => Some(plan),
+                Err(reason) => return Ok(fatal(reason, [] as [String; 0])),
+            }
         } else {
             None
         };
         let early_destructuring_ast_plan = if (options.destructuring == Some(true)
             || focused_object_rest)
-            && options.parameters != Some(true)
+            && parameters_ast_plan
+                .as_ref()
+                .is_none_or(super::parameters::AstPlan::is_empty)
             && options.for_of != Some(true)
         {
             match super::destructuring::prepare_ast(
@@ -1412,7 +1421,16 @@ fn transform_impl(
         let inline = if !unavailable_helpers.is_empty() {
             match inline_helpers(
                 unavailable_helpers.iter().copied(),
-                helper_mode == "runtime",
+                helper_mode == "runtime"
+                    || (!object_rest_loose
+                        && unavailable_helpers.iter().all(|helper| {
+                            matches!(
+                                helper,
+                                oxc_transformer::Helper::ObjectWithoutProperties
+                                    | oxc_transformer::Helper::ObjectDestructuringEmpty
+                                    | oxc_transformer::Helper::Extends
+                            )
+                        })),
             ) {
                 Ok(inline) => inline,
                 Err(reason) => return Ok(unsupported(&reason, [] as [String; 0])),
@@ -1449,7 +1467,22 @@ fn transform_impl(
                 .iter()
                 .map(|helper| helper.name())
                 .collect::<rustc_hash::FxHashSet<_>>();
-            let mut declarations = custom_helper_fragments.concat();
+            // Generated fragments are already formatted by our code generator.
+            // Keep them opaque, as with Oxc's inline bundle. Runtime module
+            // fragments still need parsing to convert requires into imports.
+            let custom_inline_prefix = (!compact
+                && (helper_mode == "inline" || !output_is_module)
+                && helper_requests.is_empty()
+                && program
+                    .body
+                    .first()
+                    .is_none_or(|statement| !statement.span().is_empty()))
+            .then(|| custom_helper_fragments.concat());
+            let mut declarations = if custom_inline_prefix.is_some() {
+                String::new()
+            } else {
+                custom_helper_fragments.concat()
+            };
             let mut replacements = Vec::new();
             let fallback = (helper_mode == "runtime" && !unavailable_helpers.is_empty())
                 .then(|| reservations.reserve("babelHelpersFallback"));
@@ -1495,6 +1528,13 @@ fn transform_impl(
                         ));
                         binding
                     });
+            if let Some(custom_prefix) = custom_inline_prefix.filter(|source| !source.is_empty()) {
+                let prefix = inline_prefix.get_or_insert_with(String::new);
+                prefix.push_str(&custom_prefix);
+                if !prefix.ends_with('\n') {
+                    prefix.push('\n');
+                }
+            }
             protect_helper_globals(
                 allocator,
                 &mut program,
@@ -1793,12 +1833,7 @@ fn render_program(
     comments: bool,
     prefix: Option<&str>,
 ) -> Result<(String, DecodedLayer)> {
-    debug_assert!(prefix.is_none_or(|prefix| {
-        prefix.ends_with('\n')
-            && !prefix[..prefix.len() - 1]
-                .chars()
-                .any(|c| matches!(c, '\n' | '\r' | '\u{2028}' | '\u{2029}'))
-    }));
+    debug_assert!(prefix.is_none_or(|prefix| prefix.ends_with('\n')));
     let options = CodegenOptions {
         minify,
         comments: if comments {
@@ -1850,7 +1885,9 @@ fn render_program(
         .unwrap_or("")
         .encode_utf16()
         .count() as u32;
-    let generated_line_offset = u32::from(prefix.is_some());
+    let generated_line_offset = prefix.map_or(0, |prefix| {
+        prefix.bytes().filter(|byte| *byte == b'\n').count() as u32
+    });
     let map = generated.map.ok_or_else(|| {
         Error::new(
             Status::GenericFailure,
@@ -1880,6 +1917,12 @@ fn render_program(
                 &mut words,
                 [insertion_line, insertion_column, u32::MAX, u32::MAX, 0],
             );
+            for line in 1..generated_line_offset {
+                push_codegen_segment(
+                    &mut words,
+                    [insertion_line + line, 0, u32::MAX, u32::MAX, 0],
+                );
+            }
             prefix_unmapped = true;
         }
         let generated_line = token
@@ -2035,10 +2078,10 @@ fn compile_options(
     compiled.env.es2017.async_to_generator = options.async_functions == Some(true);
     compiled.env.es2016.exponentiation_operator = options.exponentiation_operator == Some(true);
     if options.object_rest_spread == Some(true) {
-        // Focused passes consume declarations, assignments, catches, loops,
-        // and object expressions. Oxc's default/spec pass remains as the
-        // completion pass for object rest in formal parameters. Never forward
-        // `loose` or `useBuiltIns`: Oxc rejects both at construction time.
+        // Focused passes own ordered patterns and object expressions. Oxc's
+        // default/spec pass completes flat rest declarations, assignments, and
+        // parameters. Oxc rejects `loose` and `useBuiltIns` at construction time,
+        // so keep its options at defaults.
         compiled.env.es2018.object_rest_spread = Some(Default::default());
     }
     // NOTE: Public fields use spec semantics while private fields use the loose

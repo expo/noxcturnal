@@ -554,7 +554,7 @@ const additionalComplianceCases: {
   `,
     plan: { transforms: { objectRestSpread: { loose: true, useBuiltIns: false } } },
     expected: ['user', { value: 1 }],
-    knownFailure: true,
+    knownFailure: false,
   },
   {
     name: 'object rest preserves an own __proto__ data property without changing its prototype',

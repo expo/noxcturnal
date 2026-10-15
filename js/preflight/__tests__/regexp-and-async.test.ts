@@ -386,8 +386,8 @@ test('focused runtime adapters expose and validate canonical Babel dependencies'
   );
   assert.equal(current.status, 'complete');
   assert.match(current.code, /require\("@babel\/runtime\/helpers\/slicedToArray"\)/);
-  assert.match(current.code, /require\("@babel\/runtime\/helpers\/toArray"\)/);
-  assert.deepEqual(current.metadata.nativeHelpers, ['slicedToArray', 'toArray']);
+  assert.match(current.code, /require\("@babel\/runtime\/helpers\/toConsumableArray"\)/);
+  assert.deepEqual(current.metadata.nativeHelpers, ['slicedToArray', 'toConsumableArray']);
 
   const old = transform(
     'var [value] = input;',

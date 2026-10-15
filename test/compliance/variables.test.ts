@@ -797,7 +797,7 @@ const additionalComplianceCases: {
     `,
     plan: { transforms: { parameters: true } },
     expected: 2,
-    knownFailure: true,
+    knownFailure: false,
   },
   {
     name: 'destructured parameter defaults resolve names outside the body',
@@ -811,7 +811,7 @@ const additionalComplianceCases: {
     `,
     plan: { transforms: { parameters: true } },
     expected: 2,
-    knownFailure: true,
+    knownFailure: false,
   },
   {
     name: 'parameter defaults resolve escaped identifiers outside the body',
@@ -825,7 +825,7 @@ const additionalComplianceCases: {
     `,
     plan: { transforms: { parameters: true } },
     expected: 2,
-    knownFailure: true,
+    knownFailure: false,
   },
   {
     name: 'for-of generated iterator names do not shadow external references',
@@ -850,7 +850,7 @@ const additionalComplianceCases: {
     plan: { transforms: { parameters: true } },
     bindings: { _len: 'external' },
     expected: ['external', [1, 2]],
-    knownFailure: true,
+    knownFailure: false,
   },
   {
     name: 'for-of validates next results before reading inherited done getters',
@@ -898,7 +898,7 @@ const additionalComplianceCases: {
   `,
     plan: { transforms: { parameters: true } },
     expected: 2,
-    knownFailure: true,
+    knownFailure: false,
   },
 
   {
@@ -910,7 +910,7 @@ const additionalComplianceCases: {
   `,
     plan: { transforms: { parameters: true } },
     expected: 2,
-    knownFailure: true,
+    knownFailure: false,
   },
   {
     name: 'parameter defaults preserve anonymous function names',
@@ -970,7 +970,7 @@ const additionalComplianceCases: {
     `,
     plan: { transforms: { parameters: true } },
     expected: true,
-    knownFailure: true,
+    knownFailure: false,
   },
   {
     name: 'destructuring defaults preserve anonymous function names in bindings and assignments',
@@ -996,7 +996,7 @@ const additionalComplianceCases: {
     `,
     plan: { transforms: { parameters: true } },
     expected: [1, 1, 1],
-    knownFailure: true,
+    knownFailure: false,
   },
   {
     name: 'generator parameter scope wrappers delegate body yields and return values',
@@ -1183,7 +1183,7 @@ const additionalComplianceCases: {
     `,
     plan: { transforms: { parameters: true } },
     expected: 3,
-    knownFailure: true,
+    knownFailure: false,
   },
   {
     name: 'parameter body-scope wrappers preserve super constructor calls',
@@ -1200,7 +1200,7 @@ const additionalComplianceCases: {
     `,
     plan: { transforms: { parameters: true } },
     expected: 1,
-    knownFailure: true,
+    knownFailure: false,
   },
   {
     name: 'for-of ignores shadowed Symbol',
@@ -1239,7 +1239,7 @@ const additionalComplianceCases: {
       `,
     plan: { transforms: { destructuring: true } },
     expected: [2, true, true],
-    knownFailure: true,
+    knownFailure: false,
   },
   {
     name: 'array rest does not call user slice',
@@ -1250,7 +1250,7 @@ const additionalComplianceCases: {
       `,
     plan: { transforms: { destructuring: true } },
     expected: [1, [2]],
-    knownFailure: true,
+    knownFailure: false,
   },
   {
     name: 'array rest ignores species',
@@ -1262,7 +1262,7 @@ const additionalComplianceCases: {
       `,
     plan: { transforms: { destructuring: true } },
     expected: [[1, 2], []],
-    knownFailure: true,
+    knownFailure: false,
   },
   {
     name: 'object rest uses a single ownKeys snapshot',
@@ -1432,7 +1432,7 @@ const additionalComplianceCases: {
     `,
     plan: { transforms: { parameters: true } },
     expected: [true],
-    knownFailure: true,
+    knownFailure: false,
   },
   {
     name: 'parameter body wrappers preserve arguments identity in direct eval',
@@ -1442,7 +1442,7 @@ const additionalComplianceCases: {
     `,
     plan: { transforms: { parameters: true } },
     expected: true,
-    knownFailure: true,
+    knownFailure: false,
   },
   {
     name: 'parameter arrows preserve lexical this in direct eval',
@@ -1564,7 +1564,7 @@ const additionalComplianceCases: {
     `,
     plan: { transforms: { destructuring: true } },
     expected: ['one', { other: 'other' }],
-    knownFailure: true,
+    knownFailure: false,
   },
   {
     name: 'object rest excludes bigint literal binding keys',
@@ -1573,7 +1573,7 @@ const additionalComplianceCases: {
     `,
     plan: { transforms: { destructuring: true } },
     expected: ['one', { other: 'other' }],
-    knownFailure: true,
+    knownFailure: false,
   },
   {
     name: 'object rest excludes numeric literal assignment keys',
@@ -1582,7 +1582,7 @@ const additionalComplianceCases: {
     `,
     plan: { transforms: { destructuring: true } },
     expected: ['one', { other: 'other' }],
-    knownFailure: true,
+    knownFailure: false,
   },
   {
     name: 'object rest coerces computed keys once before source reads',
@@ -1718,7 +1718,7 @@ const additionalComplianceCases: {
     `,
     plan: { transforms: { parameters: true } },
     expected: [1, 2],
-    knownFailure: true,
+    knownFailure: false,
   },
   {
     name: 'array rest parameter elisions preserve later supplied values',
@@ -1727,7 +1727,7 @@ const additionalComplianceCases: {
     `,
     plan: { transforms: { parameters: true } },
     expected: 2,
-    knownFailure: true,
+    knownFailure: false,
   },
   {
     name: 'array rest parameter iterator observes the populated rest array',
@@ -1737,7 +1737,7 @@ const additionalComplianceCases: {
     `,
     plan: { transforms: { parameters: true } },
     expected: 2,
-    knownFailure: true,
+    knownFailure: false,
   },
   {
     name: 'later parameters read original arguments after earlier defaults mutate arguments',
@@ -1836,7 +1836,7 @@ const additionalComplianceCases: {
     `,
     plan: { transforms: { parameters: true } },
     expected: 'ReferenceError',
-    knownFailure: true,
+    knownFailure: false,
   },
   {
     name: 'parameter closures can read rest after initialization',

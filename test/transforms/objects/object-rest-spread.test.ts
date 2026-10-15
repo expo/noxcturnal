@@ -12,11 +12,27 @@ test('lowers object rest and spread', async () => {
       },
     }),
   ).toMatchInlineSnapshot(`
-    "const _excluded = ['id'];
-    import _objectWithoutProperties from '@babel/runtime/helpers/objectWithoutPropertiesLoose';
-    export function rename(_ref, extra) {
-      let { id } = _ref,
-        attributes = _objectWithoutProperties(_ref, _excluded);
+    "import _babelHelper from '@babel/runtime/helpers/objectDestructuringEmpty';
+    import _babelHelper2 from '@babel/runtime/helpers/objectWithoutPropertiesLoose';
+    var _objectDestructuringEmpty2 = { objectDestructuringEmpty: _babelHelper };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: _babelHelper,
+      objectWithoutPropertiesLoose: _babelHelper2,
+    };
+    function _objectWithoutProperties(e, t) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(e),
+        _objectWithoutProperties2.objectWithoutPropertiesLoose(e, t)
+      );
+    }
+    export function rename() {
+      let _obj = _objectDestructuringEmpty(arguments.length > 0 ? arguments[0] : void 0),
+        id = _obj.id,
+        attributes = _objectWithoutProperties(_obj, ['id']);
+      let extra = arguments.length > 1 ? arguments[1] : void 0;
       return Object.assign({}, attributes, { identifier: id }, extra);
     }"
   `);

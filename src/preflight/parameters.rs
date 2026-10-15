@@ -4,11 +4,11 @@ use oxc_allocator::{Allocator, Box as ArenaBox, CloneIn, TakeIn, Vec as ArenaVec
 use oxc_ast::{
     AstBuilder, AstKind,
     ast::{
-        Argument, ArrayExpressionElement, ArrowFunctionExpression, BindingIdentifier,
-        BindingPattern, Class, Directive, Expression, FormalParameter, FormalParameterKind,
-        FormalParameterRest, FormalParameters, Function, FunctionBody, FunctionType, NumberBase,
-        Program, Statement, TSThisParameter, TSTypeAnnotation, TSTypeParameterDeclaration,
-        TSTypeParameterInstantiation, VariableDeclarationKind,
+        Argument, ArrowFunctionExpression, BindingIdentifier, BindingPattern, Class, Directive,
+        Expression, FormalParameter, FormalParameterKind, FormalParameterRest, FormalParameters,
+        Function, FunctionBody, FunctionType, NumberBase, Program, Statement, TSThisParameter,
+        TSTypeAnnotation, TSTypeParameterDeclaration, TSTypeParameterInstantiation,
+        VariableDeclarationKind,
     },
 };
 use oxc_ast_visit::{Visit, VisitMut, walk_mut};
@@ -68,29 +68,10 @@ struct RestNames {
     array: Option<String>,
 }
 
-fn direct_rest_array_names(pattern: &BindingPattern<'_>) -> Option<Vec<Option<String>>> {
-    let BindingPattern::ArrayPattern(array) = pattern else {
-        return None;
-    };
-    if array.rest.is_some() {
-        return None;
-    }
-    array
-        .elements
-        .iter()
-        .map(|element| match element {
-            None => Some(None),
-            Some(BindingPattern::BindingIdentifier(identifier)) => {
-                Some(Some(identifier.name.to_string()))
-            }
-            _ => None,
-        })
-        .collect()
-}
-
 #[derive(Clone, Default)]
 struct CaptureAliases {
     this_name: Option<String>,
+    deferred_this: bool,
     arguments_name: Option<String>,
     new_target_name: Option<String>,
     this_spans: FxHashSet<(u32, u32)>,
@@ -105,6 +86,41 @@ impl CaptureAliases {
 }
 
 pub(super) fn prepare_ast(source: &str, semantic: &Semantic<'_>) -> Result<AstPlan, &'static str> {
+    prepare_selected(source, semantic, false, false)
+}
+
+pub(super) fn prepare_object_rest(
+    source: &str,
+    semantic: &Semantic<'_>,
+    object_rest_loose: bool,
+) -> Result<AstPlan, &'static str> {
+    prepare_selected(source, semantic, true, object_rest_loose)
+}
+
+fn prepare_selected(
+    source: &str,
+    semantic: &Semantic<'_>,
+    only_object_rest: bool,
+    object_rest_loose: bool,
+) -> Result<AstPlan, &'static str> {
+    if !semantic.nodes().iter().any(|node| match node.kind() {
+        AstKind::Function(function) => {
+            function.body.is_some()
+                && non_simple(&function.params).is_some()
+                && (!only_object_rest || parameters_have_object_rest(&function.params))
+        }
+        AstKind::ArrowFunctionExpression(arrow) => {
+            non_simple(&arrow.params).is_some()
+                && (!only_object_rest || parameters_have_object_rest(&arrow.params))
+        }
+        _ => false,
+    }) {
+        return Ok(AstPlan {
+            functions: FxHashMap::default(),
+            arrows: FxHashMap::default(),
+            hoists: FxHashMap::default(),
+        });
+    }
     let scoping = semantic.scoping();
     let mut symbols = scoping
         .symbol_ids()
@@ -118,8 +134,47 @@ pub(super) fn prepare_ast(source: &str, semantic: &Semantic<'_>) -> Result<AstPl
     let mut functions: FxHashMap<u32, VecDeque<AstFunctionPlan>> = FxHashMap::default();
     let mut arrows: FxHashMap<u32, VecDeque<AstArrowPlan>> = FxHashMap::default();
     let mut hoists: FxHashMap<NodeId, Vec<CaptureAliases>> = FxHashMap::default();
-    let mut reserved: FxHashSet<String> = scoping.symbol_names().map(str::to_owned).collect();
-    let (arrow_facts, function_facts, planning_nodes) = collect_lexical_facts(semantic, &symbols);
+    let mut reserved: FxHashSet<String> = scoping
+        .symbol_names()
+        .chain(
+            scoping
+                .root_unresolved_references()
+                .keys()
+                .map(|name| name.as_str()),
+        )
+        .map(str::to_owned)
+        .collect();
+    let mut planning_nodes = Vec::new();
+    let mut needs_lexical_facts = false;
+    for (node_id, node) in semantic.nodes().iter_enumerated() {
+        match node.kind() {
+            AstKind::Function(function)
+                if function.body.is_some()
+                    && non_simple(&function.params).is_some()
+                    && (!only_object_rest || parameters_have_object_rest(&function.params)) =>
+            {
+                planning_nodes.push(node_id);
+                needs_lexical_facts |= function.generator;
+            }
+            AstKind::ArrowFunctionExpression(arrow)
+                if non_simple(&arrow.params).is_some()
+                    && (!only_object_rest || parameters_have_object_rest(&arrow.params)) =>
+            {
+                needs_lexical_facts = true;
+            }
+            _ => {}
+        }
+        if needs_lexical_facts {
+            break;
+        }
+    }
+    // Only lowered arrows and generator wrappers consume capture facts. Ordinary
+    // functions need their parameter/body binding analysis, but no capture walk.
+    let (arrow_facts, function_facts, planning_nodes) = if needs_lexical_facts {
+        collect_lexical_facts_selected(semantic, &symbols, only_object_rest)
+    } else {
+        (FxHashMap::default(), FxHashMap::default(), planning_nodes)
+    };
     // Plan functions and arrows in one traversal, sharing one collision set for
     // every generated capture and rest binding.
     for node_id in planning_nodes {
@@ -128,7 +183,9 @@ pub(super) fn prepare_ast(source: &str, semantic: &Semantic<'_>) -> Result<AstPl
                 let Some(body) = &function.body else {
                     continue;
                 };
-                if !ast_eligible(source, function, body, &symbols) {
+                if !ast_eligible(source, function, body, &symbols)
+                    || (only_object_rest && !parameters_have_object_rest(&function.params))
+                {
                     continue;
                 }
                 let boundary =
@@ -145,16 +202,33 @@ pub(super) fn prepare_ast(source: &str, semantic: &Semantic<'_>) -> Result<AstPl
                     body,
                     &param_bindings,
                 );
-                let captures = if wrapper {
+                // Oxc can lower a single flat rest parameter without moving
+                // initializers across parameter/body environments. Keep scope
+                // collisions, eval, generators, and ordered parameter lists here.
+                if only_object_rest
+                    && !object_rest_loose
+                    && !wrapper
+                    && !function.generator
+                    && function.params.rest.is_none()
+                    && function.params.items.len() == 1
+                    && !param_bindings.contains("arguments")
+                    && !reserved.contains("eval")
+                    && super::destructuring::is_simple_object_rest(
+                        &function.params.items[0].pattern,
+                    )
+                {
+                    continue;
+                }
+                let wrapper = wrapper || function.generator;
+                let captures = if wrapper && function.generator {
                     plan_function_capture(&function_facts[&node_id], &mut reserved)
                 } else {
                     CaptureAliases::default()
                 };
                 let rest_names = function.params.rest.as_ref().map(|rest| {
                     let array =
-                        (!matches!(&rest.rest.argument, BindingPattern::BindingIdentifier(_))
-                            && direct_rest_array_names(&rest.rest.argument).is_none())
-                        .then(|| reserve_name("_args", &mut reserved));
+                        (!matches!(&rest.rest.argument, BindingPattern::BindingIdentifier(_)))
+                            .then(|| reserve_name("_args", &mut reserved));
                     RestNames {
                         length: reserve_name("_len", &mut reserved),
                         key: reserve_name("_key", &mut reserved),
@@ -181,7 +255,9 @@ pub(super) fn prepare_ast(source: &str, semantic: &Semantic<'_>) -> Result<AstPl
                     });
             }
             AstKind::ArrowFunctionExpression(arrow) => {
-                if non_simple(&arrow.params).is_none() {
+                if non_simple(&arrow.params).is_none()
+                    || (only_object_rest && !parameters_have_object_rest(&arrow.params))
+                {
                     continue;
                 }
                 let facts = &arrow_facts[&node_id];
@@ -208,9 +284,8 @@ pub(super) fn prepare_ast(source: &str, semantic: &Semantic<'_>) -> Result<AstPl
                 );
                 let rest_names = arrow.params.rest.as_ref().map(|rest| {
                     let array =
-                        (!matches!(&rest.rest.argument, BindingPattern::BindingIdentifier(_))
-                            && direct_rest_array_names(&rest.rest.argument).is_none())
-                        .then(|| reserve_name("_args", &mut reserved));
+                        (!matches!(&rest.rest.argument, BindingPattern::BindingIdentifier(_)))
+                            .then(|| reserve_name("_args", &mut reserved));
                     RestNames {
                         length: reserve_name("_len", &mut reserved),
                         key: reserve_name("_key", &mut reserved),
@@ -375,13 +450,12 @@ impl<'a> OrdinaryParameterLowerer<'a> {
             array: array_name,
         } = names;
         let rest_pattern = rest.rest.argument;
-        let direct_array_names = direct_rest_array_names(&rest_pattern);
+
         let target_name = match (&rest_pattern, array_name.as_ref()) {
             (BindingPattern::BindingIdentifier(identifier), None) => {
                 Some(identifier.name.to_string())
             }
             (_, Some(name)) => Some(name.clone()),
-            _ if direct_array_names.is_some() => None,
             _ => unreachable!("rest planning reserves a temporary for binding patterns"),
         };
         let length = self.id(anchor, &length_name);
@@ -439,30 +513,10 @@ impl<'a> OrdinaryParameterLowerer<'a> {
             self.allocator.alloc_str(&key_name),
         );
         let update = ast.expression_update(anchor, UpdateOperator::Increment, false, update_target);
-        let target_object = if let Some(target_name) = target_name.as_deref() {
-            self.id(anchor, target_name)
-        } else {
-            ast.expression_array(
-                anchor,
-                ArenaVec::from_iter_in(
-                    direct_array_names
-                        .as_ref()
-                        .expect("direct array names were planned")
-                        .iter()
-                        .map(|name| {
-                            name.as_ref().map_or(
-                                ArrayExpressionElement::Elision(ast.alloc_elision(anchor)),
-                                |name| {
-                                    ArrayExpressionElement::from(
-                                        self.id(anchor, self.allocator.alloc_str(name)),
-                                    )
-                                },
-                            )
-                        }),
-                    &ast,
-                ),
-            )
-        };
+        let target_object = self.id(
+            anchor,
+            target_name.as_deref().expect("rest target reserved"),
+        );
         let target_index = ast.expression_binary(
             anchor,
             key.clone_in(self.allocator),
@@ -645,7 +699,30 @@ impl<'a> OrdinaryParameterLowerer<'a> {
                 VariableDeclarationKind::Var,
                 ast.binding_pattern_binding_identifier(anchor, self.allocator.alloc_str(name)),
                 None::<ArenaBox<'a, TSTypeAnnotation<'a>>>,
-                Some(ast.expression_this(anchor)),
+                Some(if aliases.deferred_this {
+                    ast.expression_arrow_function(
+                        anchor,
+                        true,
+                        false,
+                        None::<ArenaBox<'a, TSTypeParameterDeclaration<'a>>>,
+                        ast.alloc_formal_parameters(
+                            anchor,
+                            FormalParameterKind::ArrowFormalParameters,
+                            ArenaVec::new_in(&ast),
+                            None::<ArenaBox<'a, FormalParameterRest<'a>>>,
+                        ),
+                        None::<ArenaBox<'a, TSTypeAnnotation<'a>>>,
+                        ast.alloc_function_body(
+                            anchor,
+                            ArenaVec::new_in(&ast),
+                            ast.vec_from_array([
+                                ast.statement_expression(anchor, ast.expression_this(anchor))
+                            ]),
+                        ),
+                    )
+                } else {
+                    ast.expression_this(anchor)
+                }),
                 false,
             ));
         }
@@ -722,8 +799,20 @@ impl<'a> VisitMut<'a> for CaptureRewriter<'a, '_> {
         if let Some(name) = name {
             #[expect(deprecated)]
             {
-                *expression = AstBuilder::new(self.allocator)
-                    .expression_identifier(span, self.allocator.alloc_str(name));
+                let ast = AstBuilder::new(self.allocator);
+                let reference = ast.expression_identifier(span, self.allocator.alloc_str(name));
+                *expression =
+                    if self.aliases.deferred_this && self.aliases.this_spans.contains(&key) {
+                        ast.expression_call(
+                            span,
+                            reference,
+                            None::<ArenaBox<'a, TSTypeParameterInstantiation<'a>>>,
+                            ArenaVec::new_in(&ast),
+                            false,
+                        )
+                    } else {
+                        reference
+                    };
             }
             return;
         }
@@ -861,6 +950,10 @@ impl<'a> VisitMut<'a> for OrdinaryParameterLowerer<'a> {
                     Ok(wrapper) => {
                         prologue.push(wrapper);
                         body.statements = prologue;
+                        if function.generator {
+                            function.generator = false;
+                            function.r#async = false;
+                        }
                     }
                     Err(error) => {
                         self.error = Some(error);
@@ -925,30 +1018,48 @@ fn parse_wrapper_statement<'a>(
     #[expect(deprecated)]
     let body = ast.alloc_function_body(anchor, directives, statements);
     #[expect(deprecated)]
-    let function = ast.expression_function(
-        anchor,
-        FunctionType::FunctionExpression,
-        None,
-        generator,
-        r#async,
-        false,
-        None::<ArenaBox<'a, TSTypeParameterDeclaration<'a>>>,
-        None::<ArenaBox<'a, TSThisParameter<'a>>>,
-        params,
-        None::<ArenaBox<'a, TSTypeAnnotation<'a>>>,
-        Some(body),
-    );
+    let function = if generator {
+        ast.expression_function(
+            anchor,
+            FunctionType::FunctionExpression,
+            None,
+            generator,
+            r#async,
+            false,
+            None::<ArenaBox<'a, TSTypeParameterDeclaration<'a>>>,
+            None::<ArenaBox<'a, TSThisParameter<'a>>>,
+            params,
+            None::<ArenaBox<'a, TSTypeAnnotation<'a>>>,
+            Some(body),
+        )
+    } else {
+        ast.expression_arrow_function(
+            anchor,
+            false,
+            r#async,
+            None::<ArenaBox<'a, TSTypeParameterDeclaration<'a>>>,
+            params,
+            None::<ArenaBox<'a, TSTypeAnnotation<'a>>>,
+            body,
+        )
+    };
     #[expect(deprecated)]
-    let call_member = Expression::from(ast.member_expression_static(
-        anchor,
-        function,
-        ast.identifier_name(anchor, "call"),
-        false,
-    ));
+    let call_member = if generator {
+        Expression::from(ast.member_expression_static(
+            anchor,
+            function,
+            ast.identifier_name(anchor, "call"),
+            false,
+        ))
+    } else {
+        function
+    };
     let mut arguments = ArenaVec::new_in(&ast);
     #[expect(deprecated)]
     {
-        arguments.push(Argument::from(ast.expression_this(anchor)));
+        if generator {
+            arguments.push(Argument::from(ast.expression_this(anchor)));
+        }
         for name in wrapper_arguments {
             arguments.push(Argument::from(
                 ast.expression_identifier(anchor, allocator.alloc_str(name)),
@@ -963,14 +1074,7 @@ fn parse_wrapper_statement<'a>(
         arguments,
         false,
     );
-    let result = if generator {
-        #[expect(deprecated)]
-        {
-            ast.expression_yield(anchor, true, Some(call))
-        }
-    } else {
-        call
-    };
+    let result = call;
     #[expect(deprecated)]
     Ok(ast.statement_return(anchor, Some(result)))
 }
@@ -991,15 +1095,29 @@ fn ast_eligible(
 #[derive(Default)]
 struct ArrowFacts {
     has_super: bool,
+    derived_constructor: bool,
     this_spans: Vec<(u32, u32)>,
     arguments_spans: Vec<(u32, u32)>,
     new_target_spans: Vec<(u32, u32)>,
     statement_insertion: Option<NodeId>,
 }
 
+#[cfg(test)]
 fn collect_lexical_facts(
     semantic: &Semantic<'_>,
     symbols: &[SymbolFact<'_>],
+) -> (
+    FxHashMap<NodeId, ArrowFacts>,
+    FxHashMap<NodeId, ArrowFacts>,
+    Vec<NodeId>,
+) {
+    collect_lexical_facts_selected(semantic, symbols, false)
+}
+
+fn collect_lexical_facts_selected(
+    semantic: &Semantic<'_>,
+    symbols: &[SymbolFact<'_>],
+    only_object_rest: bool,
 ) -> (
     FxHashMap<NodeId, ArrowFacts>,
     FxHashMap<NodeId, ArrowFacts>,
@@ -1013,9 +1131,41 @@ fn collect_lexical_facts(
     let mut arrow_parents = FxHashMap::<NodeId, Option<NodeId>>::default();
     let mut arrow_order = Vec::new();
     let mut argument_shadow_ends = Vec::<u32>::new();
-    let mut statement_insertions = FxHashMap::<NodeId, Option<NodeId>>::default();
+    let node_count = semantic.nodes().len();
+    let mut statement_insertions = vec![None; node_count];
+    let mut class_boundaries = vec![None; node_count];
+    let mut derived_contexts = vec![false; node_count];
     for (node_id, node) in semantic.nodes().iter_enumerated() {
         let span = node.kind().span();
+        let parent_id = semantic.nodes().parent_id(node_id);
+        let parent = semantic.nodes().kind(parent_id);
+        let initializer_boundary = matches!(node.kind(), AstKind::StaticBlock(_))
+            || match parent {
+                AstKind::PropertyDefinition(property) => property
+                    .value
+                    .as_ref()
+                    .is_some_and(|value| value.span() == span),
+                AstKind::AccessorProperty(property) => property
+                    .value
+                    .as_ref()
+                    .is_some_and(|value| value.span() == span),
+                _ => false,
+            };
+        let boundary = if initializer_boundary {
+            Some(node_id)
+        } else {
+            class_boundaries[parent_id.index()]
+        };
+        class_boundaries[node_id.index()] = boundary;
+        let derived = if matches!(node.kind(), AstKind::Function(_)) {
+            matches!(parent, AstKind::MethodDefinition(method) if method.kind == oxc_ast::ast::MethodDefinitionKind::Constructor)
+                && matches!(semantic.nodes().parent_kind(semantic.nodes().parent_id(parent_id)), AstKind::Class(class) if class.super_class.is_some())
+        } else if initializer_boundary {
+            false
+        } else {
+            derived_contexts[parent_id.index()]
+        };
+        derived_contexts[node_id.index()] = derived;
         let statement_insertion = if matches!(node.kind(), AstKind::Program(_)) {
             None
         } else {
@@ -1031,15 +1181,16 @@ fn collect_lexical_facts(
                         Some(node_id)
                     }
                 }
-                AstKind::Program(_)
-                | AstKind::BlockStatement(_)
-                | AstKind::StaticBlock(_)
-                | AstKind::SwitchCase(_) => Some(node_id),
+                AstKind::Program(_) | AstKind::BlockStatement(_) | AstKind::StaticBlock(_) => {
+                    Some(node_id)
+                }
+                AstKind::SwitchCase(_) => node.kind().is_statement().then_some(node_id),
+                AstKind::FormalParameters(_) => None,
                 AstKind::PropertyDefinition(_) | AstKind::AccessorProperty(_) => None,
-                _ => statement_insertions.get(&parent_id).copied().flatten(),
+                _ => statement_insertions[parent_id.index()],
             }
         };
-        statement_insertions.insert(node_id, statement_insertion);
+        statement_insertions[node_id.index()] = statement_insertion;
         while active_arrows
             .last()
             .is_some_and(|(_, end)| span.start >= *end)
@@ -1060,13 +1211,19 @@ fn collect_lexical_facts(
         }
         match node.kind() {
             AstKind::Function(function) => {
-                planning_nodes.push(node_id);
-                function_facts.insert(node_id, ArrowFacts::default());
+                if function.body.is_some()
+                    && non_simple(&function.params).is_some()
+                    && (!only_object_rest || parameters_have_object_rest(&function.params))
+                {
+                    planning_nodes.push(node_id);
+                    function_facts.insert(node_id, ArrowFacts::default());
+                }
                 active_functions.push((node_id, function.span.end, active_arrows.len()));
                 continue;
             }
             AstKind::ArrowFunctionExpression(arrow) => {
-                let selected = non_simple(&arrow.params).is_some();
+                let selected = non_simple(&arrow.params).is_some()
+                    && (!only_object_rest || parameters_have_object_rest(&arrow.params));
                 if parameter_binding_names(symbols, &arrow.params).contains("arguments") {
                     argument_shadow_ends.push(arrow.span.end);
                 }
@@ -1075,6 +1232,7 @@ fn collect_lexical_facts(
                         node_id,
                         ArrowFacts {
                             statement_insertion,
+                            derived_constructor: derived,
                             ..ArrowFacts::default()
                         },
                     );
@@ -1100,6 +1258,27 @@ fn collect_lexical_facts(
             AstKind::NewTarget(_) => 3,
             _ => continue,
         };
+        // Class initializer bodies introduce their own receiver/new.target. Computed
+        // keys and heritage stay in the enclosing evaluation environment.
+        if let Some((arrow_id, _)) = active_arrows.last() {
+            if class_boundaries[arrow_id.index()] != boundary {
+                continue;
+            }
+            if lexical_kind == 2
+                && let AstKind::IdentifierReference(reference) = node.kind()
+                && let Some(symbol) = reference
+                    .reference_id
+                    .get()
+                    .and_then(|id| semantic.scoping().get_reference(id).symbol_id())
+                && semantic
+                    .nodes()
+                    .kind(*arrow_id)
+                    .span()
+                    .contains_inclusive(semantic.scoping().symbol_span(symbol))
+            {
+                continue;
+            }
+        }
         if lexical_kind == 2 && !argument_shadow_ends.is_empty() {
             continue;
         }
@@ -1117,8 +1296,10 @@ fn collect_lexical_facts(
                 _ => arrow_facts.new_target_spans.push((span.start, span.end)),
             }
         }
-        if let Some((function_id, _, _)) = active_functions.last() {
-            let function_facts = function_facts.get_mut(function_id).unwrap();
+        if let Some((function_id, _, _)) = active_functions.last()
+            && class_boundaries[function_id.index()] == boundary
+            && let Some(function_facts) = function_facts.get_mut(function_id)
+        {
             match lexical_kind {
                 2 => function_facts.arguments_spans.push((span.start, span.end)),
                 3 => function_facts.new_target_spans.push((span.start, span.end)),
@@ -1153,6 +1334,7 @@ fn collect_lexical_facts(
             arrow_id,
             ArrowFacts {
                 has_super: direct.has_super,
+                derived_constructor: direct.derived_constructor,
                 statement_insertion: direct.statement_insertion,
                 ..ArrowFacts::default()
             },
@@ -1191,7 +1373,10 @@ struct ArrowCapturePlan {
 }
 
 fn plan_arrow_capture(facts: &ArrowFacts, reserved: &mut FxHashSet<String>) -> ArrowCapturePlan {
-    let mut aliases = CaptureAliases::default();
+    let mut aliases = CaptureAliases {
+        deferred_this: facts.derived_constructor,
+        ..CaptureAliases::default()
+    };
     if !facts.this_spans.is_empty() {
         aliases.this_name = Some(reserve_name("_this", reserved));
         aliases.this_spans.extend(facts.this_spans.iter().copied());
@@ -1291,26 +1476,62 @@ fn body_scope_wrapper_plan(
         .cloned()
         .collect::<Vec<_>>();
     wrapper_arguments.sort_unstable();
-    let initializer_uses_body_name = params.items.iter().any(|parameter| {
-        parameter.initializer.as_ref().is_some_and(|initializer| {
-            let initializer = slice(source, initializer.span());
-            let mut token_start = None;
-            for (offset, character) in initializer.char_indices() {
-                if character.is_alphanumeric() || character == '_' {
-                    token_start.get_or_insert(offset);
-                } else if let Some(start) = token_start.take()
-                    && body_names.contains(&initializer[start..offset])
-                {
-                    return true;
-                }
-            }
-            token_start.is_some_and(|start| body_names.contains(&initializer[start..]))
-        })
-    });
+    let _ = source;
+    let mut references = ParameterReferenceCollector::default();
+    references.visit_formal_parameters(params);
+    let initializer_uses_body_name = references.has_eval
+        || references
+            .names
+            .iter()
+            .any(|name| body_names.contains(name));
     (
-        !wrapper_arguments.is_empty() || initializer_uses_body_name,
+        !wrapper_arguments.is_empty()
+            || initializer_uses_body_name
+            || body_names.contains("arguments"),
         wrapper_arguments,
     )
+}
+
+#[derive(Default)]
+struct ParameterReferenceCollector<'a> {
+    names: FxHashSet<&'a str>,
+    has_eval: bool,
+}
+impl<'a> Visit<'a> for ParameterReferenceCollector<'a> {
+    fn visit_identifier_reference(&mut self, reference: &oxc_ast::ast::IdentifierReference<'a>) {
+        self.names.insert(reference.name.as_str());
+        self.has_eval |= reference.name == "eval";
+    }
+}
+fn parameters_have_object_rest(params: &FormalParameters<'_>) -> bool {
+    fn has_rest(pattern: &BindingPattern<'_>) -> bool {
+        match pattern {
+            BindingPattern::ObjectPattern(pattern) => {
+                pattern.rest.is_some()
+                    || pattern
+                        .properties
+                        .iter()
+                        .any(|property| has_rest(&property.value))
+            }
+            BindingPattern::ArrayPattern(pattern) => {
+                pattern.elements.iter().flatten().any(has_rest)
+                    || pattern
+                        .rest
+                        .as_ref()
+                        .is_some_and(|rest| has_rest(&rest.argument))
+            }
+            BindingPattern::AssignmentPattern(pattern) => has_rest(&pattern.left),
+            BindingPattern::BindingIdentifier(_) => false,
+        }
+    }
+    params
+        .items
+        .iter()
+        .any(|parameter| has_rest(&parameter.pattern))
+        || params
+            .rest
+            .as_ref()
+            .is_some_and(|rest| has_rest(&rest.rest.argument))
 }
 
 #[derive(Default)]
@@ -1348,10 +1569,6 @@ fn symbols_in<'a>(
     symbols[start..]
         .iter()
         .take_while(move |symbol| symbol.span.start <= span.end)
-}
-
-fn slice(source: &str, span: Span) -> &str {
-    &source[span.start as usize..span.end as usize]
 }
 
 #[cfg(test)]
@@ -1410,8 +1627,8 @@ mod tests {
         assert!(run_ast(&allocator, &mut program, plan).unwrap());
         let code = Codegen::new().build(&program).code;
         assert!(code.contains("let value = arguments.length"));
-        assert!(code.contains("return function()"));
-        assert!(code.contains(".call(this)"));
+        assert!(code.contains("return (() =>"));
+        assert!(code.contains("})()"));
     }
 
     #[test]
@@ -1517,7 +1734,7 @@ mod tests {
     }
 
     #[test]
-    fn wrapper_scanner_preserves_textual_token_compatibility() {
+    fn wrapper_planning_uses_parameter_references() {
         let wrapper = |source: &str| {
             let allocator = Allocator::default();
             let parsed = Parser::new(&allocator, source, SourceType::default()).parse();
@@ -1527,10 +1744,10 @@ mod tests {
             let plan = prepare_ast(source, &semantic.semantic).unwrap();
             plan.functions.values().next().unwrap()[0].wrapper
         };
-        assert!(wrapper(
+        assert!(!wrapper(
             "function read(value = object.body) { let body = 1; return value; }"
         ));
-        assert!(wrapper(
+        assert!(!wrapper(
             "function read(value = 'body') { let body = 1; return value; }"
         ));
         assert!(!wrapper(
@@ -1542,7 +1759,7 @@ mod tests {
         assert!(!wrapper(
             "function read(value = somebody) { let body = 1; return value; }"
         ));
-        assert!(!wrapper(
+        assert!(wrapper(
             "function read(value = $body) { let $body = 1; return value; }"
         ));
     }

@@ -212,8 +212,6 @@ describe.each(configs)('array tail rest loose=$loose builtins=$useBuiltIns', con
       '%s array tail',
       form => {
         let actual: unknown;
-        const strict = !config.loose && !config.useBuiltIns;
-        const fails = strict && (form === 'declaration' || form === 'assignment');
         const expected = {
           status: 'complete',
           remainingRest: false,
@@ -275,18 +273,11 @@ describe.each(configs)('array tail rest loose=$loose builtins=$useBuiltIns', con
             { encoding: 'utf8', timeout: 10_000 },
           );
           expect(child.error).toBeUndefined();
-          if (strict && form === 'assignment') {
-            expect(child.status).toBeNull();
-            expect(['SIGSEGV', 'SIGABRT']).toContain(child.signal);
-            actual = { nativeCrash: child.signal };
-          } else {
-            expect(child.signal).toBeNull();
-            expect(child.status, child.stderr).toBe(0);
-            actual = JSON.parse(child.stdout);
-            expect(actual).toEqual({ ...expected, remainingRest: fails });
-          }
+          expect(child.signal).toBeNull();
+          expect(child.status, child.stderr).toBe(0);
+          actual = JSON.parse(child.stdout);
         });
-        (fails ? test.fails : test)('completes and removes selected object-rest syntax', () => {
+        test('completes and removes selected object-rest syntax', () => {
           expect(actual).toEqual(expected);
         });
       },

@@ -10,24 +10,22 @@ test('lowers destructuring', async () => {
     }),
   ).toMatchInlineSnapshot(`
     "import _babelHelper from '@babel/runtime/helpers/slicedToArray';
-    import _babelHelper2 from '@babel/runtime/helpers/toArray';
+    import _babelHelper2 from '@babel/runtime/helpers/toConsumableArray';
     import _babelHelper3 from '@babel/runtime/helpers/objectDestructuringEmpty';
     var _toArray2 = {
       slicedToArray: _babelHelper,
-      toArray: _babelHelper2,
+      toConsumableArray: _babelHelper2,
     };
     function _toArray(r, e, a) {
-      return a ? _toArray2.toArray(r) : _toArray2.slicedToArray(r, e);
+      return a ? _toArray2.toConsumableArray(r) : _toArray2.slicedToArray(r, e);
     }
     var _objectDestructuringEmpty2 = { objectDestructuringEmpty: _babelHelper3 };
     function _objectDestructuringEmpty(t) {
       return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
     }
-    const _ref = record,
-      _obj = _objectDestructuringEmpty(_ref),
+    const _obj = _objectDestructuringEmpty(record),
       value = _obj.value;
-    const _ref10 = values,
-      _arr = _toArray(_ref10, 1, false),
+    const _arr = _toArray(values, 1, false),
       first = _arr[0];
     export { value, first };"
   `);

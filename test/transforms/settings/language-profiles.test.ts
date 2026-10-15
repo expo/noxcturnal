@@ -94,11 +94,12 @@ test('composes the native portion of the legacy Hermes language profile in one p
       Object.defineProperty(_Reader.prototype, 'read', {
         value: Object.defineProperty(
           _asyncToGenerator(function* () {
-            var _ref = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : {},
-              _obj = _objectDestructuringEmpty(_ref),
-              _value19 = _obj.value,
+            var _obj = _objectDestructuringEmpty(
+                arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : {},
+              ),
+              _value23 = _obj.value,
               value =
-                _value19 === void 0 ? _classPrivateFieldLooseBase(this, _value)[_value] : _value19;
+                _value23 === void 0 ? _classPrivateFieldLooseBase(this, _value)[_value] : _value23;
             return yield value;
           }),
           'name',
@@ -110,7 +111,7 @@ test('composes the native portion of the legacy Hermes language profile in one p
       Object.defineProperty(_Reader.prototype, 'values', {
         value: Object.defineProperty(
           (function () {
-            var _ref2 = _wrapAsyncGenerator(function* (items) {
+            var _ref = _wrapAsyncGenerator(function* (items) {
               var _iteratorAbruptCompletion = false;
               var _didIteratorError = false;
               var _iteratorError;
@@ -140,7 +141,7 @@ test('composes the native portion of the legacy Hermes language profile in one p
               }
             });
             return function (_x) {
-              return _ref2.apply(this, arguments);
+              return _ref.apply(this, arguments);
             };
           })(),
           'name',
@@ -223,11 +224,27 @@ test('composes the native portion of the modern Hermes language profile', async 
 test('composes the non-Hermes object rest and spread profile', async () => {
   const source = `export const merge = ({ ignored, ...rest }, extra) => ({ ...rest, ...extra });`;
   expect(await transformSource(source, 'input.js', web)).toMatchInlineSnapshot(`
-    "const _excluded = ['ignored'];
-    import _objectWithoutProperties from '@babel/runtime/helpers/objectWithoutPropertiesLoose';
-    export const merge = (_ref, extra) => {
-      let { ignored } = _ref,
-        rest = _objectWithoutProperties(_ref, _excluded);
+    "import _babelHelper from '@babel/runtime/helpers/objectDestructuringEmpty';
+    import _babelHelper2 from '@babel/runtime/helpers/objectWithoutPropertiesLoose';
+    var _objectDestructuringEmpty2 = { objectDestructuringEmpty: _babelHelper };
+    function _objectDestructuringEmpty(t) {
+      return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
+    }
+    var _objectWithoutProperties2 = {
+      objectDestructuringEmpty: _babelHelper,
+      objectWithoutPropertiesLoose: _babelHelper2,
+    };
+    function _objectWithoutProperties(e, t) {
+      return (
+        _objectWithoutProperties2.objectDestructuringEmpty(e),
+        _objectWithoutProperties2.objectWithoutPropertiesLoose(e, t)
+      );
+    }
+    export const merge = function () {
+      let _obj = _objectDestructuringEmpty(arguments.length > 0 ? arguments[0] : void 0),
+        ignored = _obj.ignored,
+        rest = _objectWithoutProperties(_obj, ['ignored']);
+      let extra = arguments.length > 1 ? arguments[1] : void 0;
       return Object.assign({}, rest, extra);
     };"
   `);

@@ -192,7 +192,7 @@ const REVIEWED: &[Entry] = &[
         "destructuring",
         true
     ),
-    fatal!("destructuring-for-of-target-missing", "destructuring", true),
+    fatal!("destructuring-loop-target-missing", "destructuring", true),
     fatal!(
         "destructuring-generated-initializer-missing",
         "destructuring",
