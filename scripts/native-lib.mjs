@@ -88,6 +88,7 @@ export function readBuild(target, directory) {
 }
 
 const nativeInputRoots = [
+  'vendor',
   'Cargo.toml',
   'Cargo.lock',
   'build.rs',

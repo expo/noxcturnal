@@ -798,8 +798,6 @@ dependencies = [
 [[package]]
 name = "oxc_transformer"
 version = "0.141.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3481b17ea50d4866901de759f736aa2c63bfca1fb6a20a67faa423f5361429e9"
 dependencies = [
  "base64",
  "compact_str",

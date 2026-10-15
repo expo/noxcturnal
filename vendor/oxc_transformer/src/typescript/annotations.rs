@@ -1,0 +1,685 @@
+use oxc_allocator::{ArenaVec, ReplaceWith, TakeIn};
+use oxc_ast::ast::*;
+use oxc_diagnostics::OxcDiagnostic;
+use oxc_semantic::{Reference, SymbolFlags};
+use oxc_span::{GetSpan, SPAN, Span};
+use oxc_str::Str;
+use oxc_syntax::{
+    operator::AssignmentOperator,
+    reference::ReferenceFlags,
+    scope::{ScopeFlags, ScopeId},
+    symbol::SymbolId,
+};
+use oxc_traverse::Traverse;
+
+use crate::{TypeScriptOptions, context::TraverseCtx, state::TransformState};
+
+pub struct TypeScriptAnnotations<'a> {
+    // Options
+    only_remove_type_imports: bool,
+
+    /// Assignments to be added to the constructor body
+    assignments: Vec<Assignment<'a>>,
+    has_super_call: bool,
+
+    has_jsx_element: bool,
+    has_jsx_fragment: bool,
+    jsx_element_import_name: String,
+    jsx_fragment_import_name: String,
+}
+
+impl TypeScriptAnnotations<'_> {
+    pub fn new(options: &TypeScriptOptions) -> Self {
+        let jsx_element_import_name = if options.jsx_pragma.contains('.') {
+            options.jsx_pragma.split('.').next().map(String::from).unwrap()
+        } else {
+            options.jsx_pragma.to_string()
+        };
+
+        let jsx_fragment_import_name = if options.jsx_pragma_frag.contains('.') {
+            options.jsx_pragma_frag.split('.').next().map(String::from).unwrap()
+        } else {
+            options.jsx_pragma_frag.to_string()
+        };
+
+        Self {
+            only_remove_type_imports: options.only_remove_type_imports,
+            has_super_call: false,
+            assignments: vec![],
+            has_jsx_element: false,
+            has_jsx_fragment: false,
+            jsx_element_import_name,
+            jsx_fragment_import_name,
+        }
+    }
+}
+
+impl<'a> Traverse<'a, TransformState<'a>> for TypeScriptAnnotations<'a> {
+    fn exit_program(&mut self, program: &mut Program<'a>, ctx: &mut TraverseCtx<'a>) {
+        let mut no_modules_remaining = true;
+        let mut some_modules_deleted = false;
+
+        program.body.retain_mut(|stmt| {
+            let need_retain = match stmt {
+                Statement::ExportNamedDeclaration(decl)
+                    if let Some(declaration) = &decl.declaration =>
+                {
+                    !declaration.is_typescript_syntax()
+                }
+                Statement::ExportNamedDeclaration(decl) => {
+                    if decl.export_kind.is_type() {
+                        false
+                    } else if decl.specifiers.is_empty() {
+                        // `export {}` or `export {} from 'mod'`
+                        // Keep the export declaration if there are no export specifiers
+                        true
+                    } else {
+                        decl.specifiers
+                            .retain(|specifier| Self::can_retain_export_specifier(specifier, ctx));
+                        // Keep the export declaration if there are still specifiers after removing type exports
+                        !decl.specifiers.is_empty()
+                    }
+                }
+                Statement::ExportAllDeclaration(decl) => !decl.export_kind.is_type(),
+                Statement::ExportDefaultDeclaration(decl) => {
+                    !decl.is_typescript_syntax()
+                        && !matches!(
+                            &decl.declaration,
+                            ExportDefaultDeclarationKind::Identifier(ident) if Self::is_refers_to_type(ident, ctx)
+                        )
+                }
+                Statement::ImportDeclaration(decl) => {
+                    if decl.import_kind.is_type() {
+                        Self::remove_import_declaration_bindings(decl, ctx);
+                        false
+                    } else if let Some(specifiers) = &mut decl.specifiers {
+                        if specifiers.is_empty() {
+                            // import {} from 'mod' -> import 'mod'
+                            decl.specifiers = None;
+                            true
+                        } else {
+                            specifiers.retain(|specifier| {
+                                let id = match specifier {
+                                    ImportDeclarationSpecifier::ImportSpecifier(s) => {
+                                        if s.import_kind.is_type() {
+                                            Self::remove_binding(&s.local, ctx);
+                                            return false;
+                                        }
+                                        &s.local
+                                    }
+                                    ImportDeclarationSpecifier::ImportDefaultSpecifier(s) => {
+                                        &s.local
+                                    }
+                                    ImportDeclarationSpecifier::ImportNamespaceSpecifier(s) => {
+                                        &s.local
+                                    }
+                                };
+                                // If `only_remove_type_imports` is true, then we can return `true` to keep it because
+                                // it is not a type import, otherwise we need to check if the identifier is referenced
+                                if self.only_remove_type_imports || self.has_value_reference(id, ctx) {
+                                    true
+                                } else {
+                                    Self::remove_binding(id, ctx);
+                                    false
+                                }
+                            });
+
+                            if specifiers.is_empty() {
+                                // `import { type A } from 'mod'`
+                                if self.only_remove_type_imports {
+                                    // -> `import 'mod'`
+                                    decl.specifiers = None;
+                                    true
+                                } else {
+                                    // Remove the import declaration if all specifiers are removed
+                                    false
+                                }
+                            } else {
+                                true
+                            }
+                        }
+                    } else {
+                        true
+                    }
+                }
+                // `import Binding = X.Y.Z`
+                // `Binding` can be referenced as a value or a type, but here we already know it only as a type
+                // See `TypeScriptModule::transform_ts_import_equals`
+                Statement::TSTypeAliasDeclaration(_)
+                | Statement::TSExportAssignment(_)
+                | Statement::TSNamespaceExportDeclaration(_) => false,
+                _ => return true,
+            };
+
+            if need_retain {
+                no_modules_remaining = false;
+            } else {
+                some_modules_deleted = true;
+            }
+
+            need_retain
+        });
+
+        // Determine if we still have import/export statements, otherwise we
+        // need to inject an empty statement (`export {}`) so that the file is
+        // still considered a module
+        if no_modules_remaining && some_modules_deleted && ctx.state.module_imports.is_empty() {
+            let export_decl = Statement::ExportNamedDeclaration(
+                ExportNamedDeclaration::boxed_plain(SPAN, [], None, ctx),
+            );
+            program.body.push(export_decl);
+        }
+    }
+
+    fn enter_arrow_function_expression(
+        &mut self,
+        expr: &mut ArrowFunctionExpression<'a>,
+        _ctx: &mut TraverseCtx<'a>,
+    ) {
+        expr.type_parameters = None;
+        expr.return_type = None;
+    }
+
+    fn enter_variable_declarator(
+        &mut self,
+        decl: &mut VariableDeclarator<'a>,
+        _ctx: &mut TraverseCtx<'a>,
+    ) {
+        decl.definite = false;
+        decl.type_annotation = None;
+    }
+
+    fn enter_call_expression(&mut self, expr: &mut CallExpression<'a>, _ctx: &mut TraverseCtx<'a>) {
+        expr.type_arguments = None;
+    }
+
+    fn enter_chain_element(&mut self, element: &mut ChainElement<'a>, ctx: &mut TraverseCtx<'a>) {
+        if let ChainElement::TSNonNullExpression(e) = element {
+            *element = match e.expression.get_inner_expression_mut().take_in(ctx) {
+                Expression::CallExpression(call_expr) => ChainElement::CallExpression(call_expr),
+                expr @ match_member_expression!(Expression) => {
+                    ChainElement::from(expr.into_member_expression())
+                }
+                _ => {
+                    /* syntax error */
+                    return;
+                }
+            }
+        }
+    }
+
+    fn enter_function(&mut self, func: &mut Function<'a>, _ctx: &mut TraverseCtx<'a>) {
+        // Remove TypeScript annotations from function declarations
+        // Note: declare flag is preserved for exit_statements to handle declaration removal
+        func.type_parameters = None;
+        func.return_type = None;
+        func.this_param = None;
+    }
+
+    fn enter_class(&mut self, class: &mut Class<'a>, _ctx: &mut TraverseCtx<'a>) {
+        // Remove TypeScript annotations from class declarations
+        // Note: declare flag is preserved for exit_statements to handle declaration removal
+        class.type_parameters = None;
+        class.super_type_arguments = None;
+        class.implements.clear();
+        class.r#abstract = false;
+
+        // Remove type only members
+        class.body.body.retain(|elem| match elem {
+            ClassElement::MethodDefinition(method) => {
+                matches!(method.r#type, MethodDefinitionType::MethodDefinition)
+                    && !method.value.is_typescript_syntax()
+            }
+            ClassElement::PropertyDefinition(prop) => {
+                matches!(prop.r#type, PropertyDefinitionType::PropertyDefinition)
+            }
+            ClassElement::AccessorProperty(prop) => {
+                matches!(prop.r#type, AccessorPropertyType::AccessorProperty)
+            }
+            ClassElement::TSIndexSignature(_) => false,
+            ClassElement::StaticBlock(_) => true,
+        });
+    }
+
+    fn exit_class(&mut self, class: &mut Class<'a>, _: &mut TraverseCtx<'a>) {
+        // Remove `declare` properties from the class body, other ts-only properties have been removed in `enter_class`.
+        // The reason that removing `declare` properties here because the legacy-decorator plugin needs to transform
+        // `declare` field in the `exit_class` phase, so we have to ensure this step is run after the legacy-decorator plugin.
+        class
+            .body
+            .body
+            .retain(|elem| !matches!(elem, ClassElement::PropertyDefinition(prop) if prop.declare));
+    }
+
+    fn enter_expression(&mut self, expr: &mut Expression<'a>, _ctx: &mut TraverseCtx<'a>) {
+        if expr.is_typescript_syntax() {
+            expr.replace_with(Expression::into_inner_expression);
+        }
+    }
+
+    fn enter_simple_assignment_target(
+        &mut self,
+        target: &mut SimpleAssignmentTarget<'a>,
+        ctx: &mut TraverseCtx<'a>,
+    ) {
+        if let Some(expr) = target.get_expression_mut() {
+            match expr.get_inner_expression_mut() {
+                // `foo!++` to `foo++`
+                inner_expr @ Expression::Identifier(_) => {
+                    let inner_expr = inner_expr.take_in(ctx);
+                    let Expression::Identifier(ident) = inner_expr else {
+                        unreachable!();
+                    };
+                    *target = SimpleAssignmentTarget::AssignmentTargetIdentifier(ident);
+                }
+                // `foo.bar!++` to `foo.bar++`
+                inner_expr @ match_member_expression!(Expression) => {
+                    let inner_expr = inner_expr.take_in(ctx);
+                    let member_expr = inner_expr.into_member_expression();
+                    *target = SimpleAssignmentTarget::from(member_expr);
+                }
+                _ => {
+                    // This should be never hit until more syntax is added to the JavaScript/TypeScrips
+                    ctx.state.error(OxcDiagnostic::error("Cannot strip out typescript syntax if SimpleAssignmentTarget is not an IdentifierReference or MemberExpression"));
+                }
+            }
+        }
+    }
+
+    fn enter_assignment_target(
+        &mut self,
+        target: &mut AssignmentTarget<'a>,
+        ctx: &mut TraverseCtx<'a>,
+    ) {
+        if let Some(expr) = target.get_expression_mut() {
+            let inner_expr = expr.get_inner_expression_mut();
+            if inner_expr.is_member_expression() {
+                let inner_expr = inner_expr.take_in(ctx);
+                let member_expr = inner_expr.into_member_expression();
+                *target = AssignmentTarget::from(member_expr);
+            }
+        }
+    }
+
+    fn enter_formal_parameter(
+        &mut self,
+        param: &mut FormalParameter<'a>,
+        _ctx: &mut TraverseCtx<'a>,
+    ) {
+        param.accessibility = None;
+        param.readonly = false;
+        param.r#override = false;
+        param.optional = false;
+        param.type_annotation = None;
+    }
+
+    fn exit_function(&mut self, func: &mut Function<'a>, _ctx: &mut TraverseCtx<'a>) {
+        func.this_param = None;
+        func.type_parameters = None;
+        func.return_type = None;
+    }
+
+    fn enter_jsx_opening_element(
+        &mut self,
+        elem: &mut JSXOpeningElement<'a>,
+        _ctx: &mut TraverseCtx<'a>,
+    ) {
+        elem.type_arguments = None;
+    }
+
+    fn enter_method_definition(
+        &mut self,
+        def: &mut MethodDefinition<'a>,
+        _ctx: &mut TraverseCtx<'a>,
+    ) {
+        def.accessibility = None;
+        def.optional = false;
+        def.r#override = false;
+    }
+
+    fn enter_new_expression(&mut self, expr: &mut NewExpression<'a>, _ctx: &mut TraverseCtx<'a>) {
+        expr.type_arguments = None;
+    }
+
+    fn enter_property_definition(
+        &mut self,
+        def: &mut PropertyDefinition<'a>,
+        _ctx: &mut TraverseCtx<'a>,
+    ) {
+        def.accessibility = None;
+        def.definite = false;
+        def.r#override = false;
+        def.optional = false;
+        def.readonly = false;
+        def.type_annotation = None;
+    }
+
+    fn enter_accessor_property(
+        &mut self,
+        def: &mut AccessorProperty<'a>,
+        _ctx: &mut TraverseCtx<'a>,
+    ) {
+        def.accessibility = None;
+        def.definite = false;
+        def.type_annotation = None;
+    }
+
+    fn enter_statements(
+        &mut self,
+        stmts: &mut ArenaVec<'a, Statement<'a>>,
+        ctx: &mut TraverseCtx<'a>,
+    ) {
+        // Remove TS-only statements early to avoid traversing their children
+        stmts.retain(|stmt| match stmt {
+            match_declaration!(Statement) => {
+                self.should_keep_declaration(stmt.to_declaration(), ctx)
+            }
+            _ => true,
+        });
+    }
+
+    fn exit_statement(&mut self, stmt: &mut Statement<'a>, ctx: &mut TraverseCtx<'a>) {
+        // Add assignments after super calls
+        if self.assignments.is_empty() {
+            return;
+        }
+
+        let has_super_call = matches!(stmt, Statement::ExpressionStatement(stmt) if stmt.expression.is_super_call_expression());
+        if !has_super_call {
+            return;
+        }
+
+        // Add assignments after super calls
+        let assignments: Vec<_> = self
+            .assignments
+            .iter()
+            .map(|assignment| assignment.create_this_property_assignment(ctx))
+            .collect();
+        ctx.state.statement_injector.insert_many_after(stmt, assignments);
+        self.has_super_call = true;
+    }
+
+    /// Transform if statement's consequent and alternate to block statements if they are super calls
+    /// ```ts
+    /// if (true) super() else super();
+    /// // to
+    /// if (true) { super() } else { super() }
+    /// ```
+    fn enter_if_statement(&mut self, stmt: &mut IfStatement<'a>, ctx: &mut TraverseCtx<'a>) {
+        if !self.assignments.is_empty() {
+            let consequent_span = match &stmt.consequent {
+                Statement::ExpressionStatement(expr)
+                    if expr.expression.is_super_call_expression() =>
+                {
+                    Some(expr.span)
+                }
+                _ => None,
+            };
+            if let Some(span) = consequent_span {
+                stmt.consequent.replace_with(|consequent| {
+                    Self::create_block_with_statement(consequent, span, ctx)
+                });
+            }
+
+            let alternate_span = match &stmt.alternate {
+                Some(Statement::ExpressionStatement(expr))
+                    if expr.expression.is_super_call_expression() =>
+                {
+                    Some(expr.span)
+                }
+                _ => None,
+            };
+            if let Some(span) = alternate_span {
+                let alternate = stmt.alternate.take().unwrap();
+                stmt.alternate = Some(Self::create_block_with_statement(alternate, span, ctx));
+            }
+        }
+
+        Self::replace_with_empty_block_if_ts(&mut stmt.consequent, ctx.current_scope_id(), ctx);
+
+        if stmt.alternate.as_ref().is_some_and(Statement::is_typescript_syntax) {
+            stmt.alternate = None;
+        }
+    }
+
+    fn enter_for_statement(&mut self, stmt: &mut ForStatement<'a>, ctx: &mut TraverseCtx<'a>) {
+        let scope_id = stmt.scope_id();
+        Self::replace_for_statement_body_with_empty_block_if_ts(&mut stmt.body, scope_id, ctx);
+    }
+
+    fn enter_for_in_statement(&mut self, stmt: &mut ForInStatement<'a>, ctx: &mut TraverseCtx<'a>) {
+        let scope_id = stmt.scope_id();
+        Self::replace_for_statement_body_with_empty_block_if_ts(&mut stmt.body, scope_id, ctx);
+    }
+
+    fn enter_for_of_statement(&mut self, stmt: &mut ForOfStatement<'a>, ctx: &mut TraverseCtx<'a>) {
+        let scope_id = stmt.scope_id();
+        Self::replace_for_statement_body_with_empty_block_if_ts(&mut stmt.body, scope_id, ctx);
+    }
+
+    fn enter_while_statement(&mut self, stmt: &mut WhileStatement<'a>, ctx: &mut TraverseCtx<'a>) {
+        Self::replace_with_empty_block_if_ts(&mut stmt.body, ctx.current_scope_id(), ctx);
+    }
+
+    fn enter_do_while_statement(
+        &mut self,
+        stmt: &mut DoWhileStatement<'a>,
+        ctx: &mut TraverseCtx<'a>,
+    ) {
+        Self::replace_with_empty_block_if_ts(&mut stmt.body, ctx.current_scope_id(), ctx);
+    }
+
+    fn enter_tagged_template_expression(
+        &mut self,
+        expr: &mut TaggedTemplateExpression<'a>,
+        _ctx: &mut TraverseCtx<'a>,
+    ) {
+        expr.type_arguments = None;
+    }
+
+    fn enter_jsx_element(&mut self, _elem: &mut JSXElement<'a>, _ctx: &mut TraverseCtx<'a>) {
+        self.has_jsx_element = true;
+    }
+
+    fn enter_jsx_fragment(&mut self, _elem: &mut JSXFragment<'a>, _ctx: &mut TraverseCtx<'a>) {
+        self.has_jsx_fragment = true;
+    }
+
+    fn enter_formal_parameter_rest(
+        &mut self,
+        node: &mut FormalParameterRest<'a>,
+        _ctx: &mut oxc_traverse::TraverseCtx<'a, TransformState<'a>>,
+    ) {
+        node.type_annotation = None;
+    }
+
+    fn enter_catch_parameter(
+        &mut self,
+        node: &mut CatchParameter<'a>,
+        _ctx: &mut oxc_traverse::TraverseCtx<'a, TransformState<'a>>,
+    ) {
+        node.type_annotation = None;
+    }
+}
+
+impl<'a> TypeScriptAnnotations<'a> {
+    #[inline]
+    fn should_keep_declaration(&self, decl: &Declaration<'a>, ctx: &mut TraverseCtx<'a>) -> bool {
+        match decl {
+            // Remove type aliases, interfaces, and `declare global {}`
+            Declaration::TSTypeAliasDeclaration(_)
+            | Declaration::TSInterfaceDeclaration(_)
+            | Declaration::TSGlobalDeclaration(_) => false,
+            // Remove `declare var/let/const`
+            Declaration::VariableDeclaration(var_decl) => !var_decl.declare,
+            // Remove `declare function` and function overload signatures (no body)
+            Declaration::FunctionDeclaration(func_decl) => {
+                !func_decl.declare && func_decl.body.is_some()
+            }
+            // Remove `declare class`
+            Declaration::ClassDeclaration(class_decl) => !class_decl.declare,
+            // Remove `declare module` or uninstantiated namespace declarations.
+            // Keep instantiated `module` declarations — they have runtime
+            // representation and need to be transformed.
+            Declaration::TSModuleDeclaration(module_decl) => {
+                !module_decl.declare
+                    && !matches!(
+                        &module_decl.id,
+                        TSModuleDeclarationName::Identifier(ident)
+                            if ctx.scoping().symbol_flags(ident.symbol_id()).is_namespace_module()
+                    )
+            }
+            // Remove `declare enum`
+            Declaration::TSEnumDeclaration(enum_decl) => !enum_decl.declare,
+            // Remove unused import-equals (used ones are transformed by module transform)
+            Declaration::TSImportEqualsDeclaration(import_equals) => {
+                let keep = import_equals.import_kind.is_value()
+                    && (self.only_remove_type_imports
+                        || !ctx
+                            .scoping()
+                            .get_resolved_references(import_equals.id.symbol_id())
+                            .all(Reference::is_type));
+                if !keep {
+                    let scope_id = ctx.current_scope_id();
+                    ctx.scoping_mut().remove_binding(scope_id, import_equals.id.name);
+                }
+                keep
+            }
+        }
+    }
+
+    fn remove_import_declaration_bindings(decl: &ImportDeclaration<'a>, ctx: &mut TraverseCtx<'a>) {
+        if let Some(specifiers) = &decl.specifiers {
+            for specifier in specifiers {
+                match specifier {
+                    ImportDeclarationSpecifier::ImportSpecifier(specifier) => {
+                        Self::remove_binding(&specifier.local, ctx);
+                    }
+                    ImportDeclarationSpecifier::ImportDefaultSpecifier(specifier) => {
+                        Self::remove_binding(&specifier.local, ctx);
+                    }
+                    ImportDeclarationSpecifier::ImportNamespaceSpecifier(specifier) => {
+                        Self::remove_binding(&specifier.local, ctx);
+                    }
+                }
+            }
+        }
+    }
+
+    fn remove_binding(ident: &BindingIdentifier<'a>, ctx: &mut TraverseCtx<'a>) {
+        let symbol_id = ident.symbol_id();
+        let flags = ctx.scoping().symbol_flags(symbol_id);
+        if (flags - SymbolFlags::Import - SymbolFlags::TypeImport).is_value() {
+            ctx.scoping_mut().remove_symbol_declaration(symbol_id, ident.span);
+            return;
+        }
+
+        let scope_id = ctx.scoping().symbol_scope_id(symbol_id);
+        ctx.scoping_mut().remove_binding(scope_id, ident.name);
+    }
+
+    /// Check if the given name is a JSX pragma or fragment pragma import
+    /// and if the file contains JSX elements or fragments
+    fn is_jsx_imports(&self, name: &str) -> bool {
+        self.has_jsx_element && name == self.jsx_element_import_name
+            || self.has_jsx_fragment && name == self.jsx_fragment_import_name
+    }
+
+    fn create_block_with_statement(
+        stmt: Statement<'a>,
+        span: Span,
+        ctx: &mut TraverseCtx<'a>,
+    ) -> Statement<'a> {
+        let scope_id = ctx.insert_scope_below_statement(&stmt, ScopeFlags::empty());
+        Statement::new_block_statement_with_scope_id(span, [stmt], scope_id, ctx)
+    }
+
+    fn replace_for_statement_body_with_empty_block_if_ts(
+        body: &mut Statement<'a>,
+        parent_scope_id: ScopeId,
+        ctx: &mut TraverseCtx<'a>,
+    ) {
+        Self::replace_with_empty_block_if_ts(body, parent_scope_id, ctx);
+    }
+
+    fn replace_with_empty_block_if_ts(
+        stmt: &mut Statement<'a>,
+        parent_scope_id: ScopeId,
+        ctx: &mut TraverseCtx<'a>,
+    ) {
+        if stmt.is_typescript_syntax() {
+            let scope_id = ctx.create_child_scope(parent_scope_id, ScopeFlags::empty());
+            *stmt = Statement::new_block_statement_with_scope_id(stmt.span(), [], scope_id, ctx);
+        }
+    }
+
+    fn has_value_reference(&self, id: &BindingIdentifier<'a>, ctx: &TraverseCtx<'a>) -> bool {
+        let symbol_id = id.symbol_id();
+
+        // `import T from 'mod'; const T = 1;` The T has a value redeclaration
+        // `import T from 'mod'; type T = number;` The T has a type redeclaration
+        // If the symbol is still a value symbol after `SymbolFlags::Import` is removed, then it's a value redeclaration.
+        // That means the import is shadowed, and we can safely remove the import.
+        if (ctx.scoping().symbol_flags(symbol_id) - SymbolFlags::Import).is_value() {
+            return false;
+        }
+
+        if ctx.scoping().get_resolved_references(symbol_id).any(|reference| !reference.is_type()) {
+            return true;
+        }
+
+        self.is_jsx_imports(&id.name)
+    }
+
+    fn can_retain_export_specifier(specifier: &ExportSpecifier<'a>, ctx: &TraverseCtx<'a>) -> bool {
+        if specifier.export_kind.is_type() {
+            return false;
+        }
+        !matches!(&specifier.local, ModuleExportName::IdentifierReference(ident) if Self::is_refers_to_type(ident, ctx))
+    }
+
+    fn is_refers_to_type(ident: &IdentifierReference<'a>, ctx: &TraverseCtx<'a>) -> bool {
+        let scoping = ctx.scoping();
+        let reference = scoping.get_reference(ident.reference_id());
+
+        reference.symbol_id().is_some_and(|symbol_id| {
+            reference.is_type()
+                || scoping.symbol_flags(symbol_id).is_ambient()
+                    && scoping.symbol_redeclarations(symbol_id).iter().all(|r| r.flags.is_ambient())
+        })
+    }
+}
+
+struct Assignment<'a> {
+    span: Span,
+    name: Str<'a>,
+    symbol_id: SymbolId,
+}
+
+impl<'a> Assignment<'a> {
+    // Creates `this.name = name`
+    fn create_this_property_assignment(&self, ctx: &mut TraverseCtx<'a>) -> Statement<'a> {
+        let reference_id = ctx.create_bound_reference(self.symbol_id, ReferenceFlags::Read);
+        let id =
+            IdentifierReference::boxed_with_reference_id(self.span, self.name, reference_id, ctx);
+
+        Statement::new_expression_statement(
+            SPAN,
+            Expression::new_assignment_expression(
+                SPAN,
+                AssignmentOperator::Assign,
+                SimpleAssignmentTarget::new_static_member_expression(
+                    SPAN,
+                    Expression::new_this_expression(SPAN, ctx),
+                    IdentifierName::new(self.span, self.name, ctx),
+                    false,
+                    ctx,
+                )
+                .into(),
+                Expression::Identifier(id),
+                ctx,
+            ),
+            ctx,
+        )
+    }
+}
