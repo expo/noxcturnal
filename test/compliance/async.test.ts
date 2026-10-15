@@ -664,7 +664,7 @@ const additionalComplianceCases = [
     `,
     plan: { transforms: { asyncFunctions: true } },
     expected: 1,
-    knownFailure: true,
+    knownFailure: false,
   },
   {
     name: 'async functions ignore lexical undefined bindings when returning',
@@ -684,7 +684,7 @@ const additionalComplianceCases = [
     `,
     plan: { transforms: { asyncGeneratorFunctions: true } },
     expected: 1,
-    knownFailure: true,
+    knownFailure: false,
   },
   {
     name: 'async generator methods reject invalid receivers through promises',
