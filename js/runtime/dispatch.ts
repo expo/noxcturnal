@@ -155,21 +155,9 @@ export function createDispatcher(
       const prefix =
         (first && session.sourceTextOperations.needsLineBoundary(offset) ? '\n' : '') +
         (needsSeparator ? ';\n' : '');
-      // A trailing semicolon is trivially safe when there is no possible comment.
-      // Otherwise put the separator on its own line so // cannot swallow it.
-      const tail = realized.content ?? realized.contentParts?.at(-1);
-      const commentFree =
-        realized.content != null
-          ? !realized.content.includes('/')
-          : realized.contentParts.every(part => {
-              if (typeof part === 'string') return !part.includes('/');
-              for (let offset = part.start; offset < part.end; offset++) {
-                if (session.source[offset] === '/') return false;
-              }
-              return true;
-            });
-      const suffix =
-        typeof tail === 'string' && commentFree && tail.trimEnd().endsWith(';') ? '\n' : '\n;\n';
+      const suffix = session.sourceTextOperations.insertionSuffix(
+        realized.contentParts ?? [realized.content!],
+      );
       programInsertionPoints.add(offset);
       edits.push({
         kind,

@@ -1,7 +1,10 @@
 //! Source-dependent operations live beside native parsing, never in JS heuristics.
 use std::cell::OnceCell;
 
-use napi::{Error, Result, Status, bindgen_prelude::Utf16String};
+use napi::{
+    Error, Result, Status,
+    bindgen_prelude::{Either, Utf16String},
+};
 use napi_derive::napi;
 use oxc_allocator::Allocator;
 use oxc_ast::{AstKind, ast::Program};
@@ -15,6 +18,12 @@ pub struct SourceMatch {
     pub end: u32,
     pub captures: Vec<Utf16String>,
     pub content: Option<Utf16String>,
+}
+
+#[napi(object)]
+pub struct SourceTextRange {
+    pub start: u32,
+    pub end: u32,
 }
 
 #[napi]
@@ -106,6 +115,42 @@ impl NativeSourceText {
         offset > 0 && self.source.get(offset as usize - 1) != Some(&10)
     }
 
+    /// Keep a terminated insertion compact when no line comment can hide its end.
+    #[napi]
+    pub fn insertion_suffix(
+        &self,
+        parts: Vec<Either<Utf16String, SourceTextRange>>,
+    ) -> Result<String> {
+        let terminated = matches!(parts.last(), Some(Either::A(text)) if text.iter().rev().find(|&&unit| !is_whitespace(unit)) == Some(&59));
+        if terminated {
+            for part in &parts {
+                let text: &[u16] = match part {
+                    Either::A(text) => text,
+                    Either::B(range) => {
+                        self.source
+                            .get(range.start as usize..range.end as usize)
+                            .ok_or_else(|| Error::new(Status::InvalidArg, "invalid source range"))?
+                    }
+                };
+                if text.contains(&47) {
+                    return Ok("\n;\n".into());
+                }
+            }
+            return Ok("\n".into());
+        }
+        Ok("\n;\n".into())
+    }
+
+    /// Whether only horizontal ECMAScript whitespace precedes this offset on its line.
+    #[napi]
+    pub fn starts_line(&self, offset: u32) -> bool {
+        self.source[..(offset as usize).min(self.source.len())]
+            .iter()
+            .rev()
+            .find(|&&unit| !is_whitespace(unit) || matches!(unit, 10 | 13 | 0x2028 | 0x2029))
+            .is_none_or(|&unit| matches!(unit, 10 | 13 | 0x2028 | 0x2029))
+    }
+
     #[napi]
     pub fn locations(&mut self, start: u32, end: u32) -> Vec<u32> {
         let lines = self.line_starts();
@@ -133,7 +178,7 @@ impl NativeSourceText {
         flags: Option<String>,
         all: bool,
         replacement: Option<Utf16String>,
-        start: Option<u32>,
+        start: Option<f64>,
     ) -> Result<Vec<SourceMatch>> {
         let text: &[u16] = &self.source;
         let mut output = Vec::new();
@@ -169,10 +214,18 @@ impl NativeSourceText {
         let flags = flags.unwrap_or_default();
         let expression = regress::Regex::from_unicode(pattern.into_iter(), flags.as_str())
             .map_err(|error| Error::new(Status::InvalidArg, error.to_string()))?;
-        let mut offset = usize::try_from(start.unwrap_or(0)).unwrap_or(usize::MAX);
-        if offset > text.len() {
+        // ToLength: NaN and negative cursors become zero; positive cursors are
+        // truncated. Compare before narrowing so large values cannot wrap.
+        let cursor = start.unwrap_or(0.0);
+        let cursor = if cursor.is_nan() || cursor < 0.0 {
+            0.0
+        } else {
+            cursor.trunc()
+        };
+        if cursor > text.len() as f64 {
             return Ok(output);
         }
+        let mut offset = cursor as usize;
         while offset <= text.len() {
             let found = if unicode {
                 expression.find_from_utf16(text, offset).next()

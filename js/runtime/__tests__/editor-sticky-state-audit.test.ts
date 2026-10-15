@@ -12,6 +12,14 @@ const cases = [
     cursor: 1,
     fails: true,
   },
+  ...[2 ** 32, Infinity, Number.MAX_SAFE_INTEGER, -4294967295, -Infinity, NaN, 0.9, 1.9].map(
+    cursor => ({
+      name: `sticky normalizes cursor ${cursor}`,
+      source: 'a',
+      flags: 'y',
+      cursor,
+    }),
+  ),
   { name: 'ordinary regex ignores cursor', source: 'ba', flags: '', cursor: 1, fails: false },
   { name: 'global regex resets cursor', source: 'a', flags: 'g', cursor: 1, fails: false },
 ];

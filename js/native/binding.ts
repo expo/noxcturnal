@@ -84,6 +84,8 @@ interface NativeBinding {
     whitespace(): number[];
     indent(prefix: string): string;
     needsLineBoundary(offset: number): boolean;
+    startsLine(offset: number): boolean;
+    insertionSuffix(parts: readonly (string | { start: number; end: number })[]): string;
     locations(start: number, end: number): number[];
     locationOffset(line: number, column: number): number;
     matches(
