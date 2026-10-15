@@ -205,6 +205,34 @@ for (const count of [100, 1000])
       });
     }
   });
+for (const scope of [false, true])
+  describe(`global query with scope capability=${scope}`, () => {
+    const request = { globals: [{ name: 'external', references: true }] };
+    for (const [label, api] of implementations) {
+      const plan = api.defineNativePipeline({
+        phases: [
+          {
+            name: 'query',
+            plugins: [
+              api.defineNativePlugin({
+                name: 'query-globals',
+                contract: { queries: [request] },
+                pre(context: any) {
+                  context.query(request);
+                },
+                visitors: [api.defineVisitor('Program', { scope }, () => {})],
+              }),
+            ],
+          },
+        ],
+      });
+      bench(label, () => {
+        const result = api.transform(source, 'input.js', plan);
+        if (result.status !== 'complete') throw new Error('Unexpected benchmark bailout');
+        return result;
+      });
+    }
+  });
 const constructors = [
   ...(baselineRoot
     ? [

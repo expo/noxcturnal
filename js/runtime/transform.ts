@@ -208,6 +208,7 @@ function buildRetainedPlan(
   let ancestryDepth = 0;
   const retainedRoutes: CompiledRouteTemplate[] = [...prepared.compiledRoutes];
   let futureRetentionCapabilities = 0;
+  let retainScope = prepared.includeScope;
   const collect = (phase: PreparedPhase) => {
     for (const plugin of phase.activePlugins) {
       const plan = phase.plans.get(plugin);
@@ -235,6 +236,7 @@ function buildRetainedPlan(
     for (const subscription of future.subscriptions) futureSubscriptions.add(subscription);
     retainedRoutes.push(...future.compiledRoutes);
     futureRetentionCapabilities |= future.retentionCapabilities;
+    retainScope ||= future.includeScope;
     collect(future);
   }
   return {
@@ -243,7 +245,7 @@ function buildRetainedPlan(
     retentionManifest: packRouteManifest(
       retainedRoutes.map((route, id) => ({ ...route, id })),
       prepared.includeParent,
-      prepared.includeScope,
+      retainScope,
       prepared.retentionCapabilities | futureRetentionCapabilities,
       childRetention,
       retainedFields,
