@@ -1145,7 +1145,7 @@ function _get(e, t, r) {
 "#;
 pub const INLINE_CLASS_SUPER_GET_HELPER_RUNTIME_BINDINGS: &[&str] = &["_get", "_get2"];
 pub const INLINE_CLASS_SUPER_GET_HELPER_RUNTIME_DEPENDENCIES: &[&str] = &["get"];
-pub const INLINE_CLASS_SUPER_REFERENCE_HELPER: &str = r#"var _superReference2=(()=>{var a={getPrototypeOf:function(e,o){function t(n){return e.exports=t=Object.setPrototypeOf?Object.getPrototypeOf.bind():function(r){return r.__proto__||Object.getPrototypeOf(r)},e.exports.__esModule=!0,e.exports.default=e.exports,t(n)}e.exports=t,e.exports.__esModule=!0,e.exports.default=e.exports},superPropBase:function(e,o){var t=o("getPrototypeOf");function n(r,u){for(;!{}.hasOwnProperty.call(r,u)&&(r=t(r))!==null;);return r}e.exports=n,e.exports.__esModule=!0,e.exports.default=e.exports},get:function(e,o){var t=o("superPropBase");function n(){return e.exports=n=typeof Reflect!="undefined"&&Reflect.get?Reflect.get.bind():function(r,u,p){var s=t(r,u);if(s){var l=Object.getOwnPropertyDescriptor(s,u);return l.get?l.get.call(arguments.length<3?r:p):l.value}},e.exports.__esModule=!0,e.exports.default=e.exports,n.apply(null,arguments)}e.exports=n,e.exports.__esModule=!0,e.exports.default=e.exports},typeof:function(e,o){function t(n){"@babel/helpers - typeof";return e.exports=t=typeof Symbol=="function"&&typeof Symbol.iterator=="symbol"?function(r){return typeof r}:function(r){return r&&typeof Symbol=="function"&&r.constructor===Symbol&&r!==Symbol.prototype?"symbol":typeof r},e.exports.__esModule=!0,e.exports.default=e.exports,t(n)}e.exports=t,e.exports.__esModule=!0,e.exports.default=e.exports},toPrimitive:function(e,o){var t=o("typeof").default;function n(r,u){if(t(r)!="object"||!r)return r;var p=r[Symbol.toPrimitive];if(p!==void 0){var s=p.call(r,u||"default");if(t(s)!="object")return s;throw new TypeError("@@toPrimitive must return a primitive value.")}return(u==="string"?String:Number)(r)}e.exports=n,e.exports.__esModule=!0,e.exports.default=e.exports},toPropertyKey:function(e,o){var t=o("typeof").default,n=o("toPrimitive");function r(u){var p=n(u,"string");return t(p)=="symbol"?p:p+""}e.exports=r,e.exports.__esModule=!0,e.exports.default=e.exports},defineProperty:function(e,o){var t=o("toPropertyKey");function n(r,u,p){return(u=t(u))in r?Object.defineProperty(r,u,{value:p,enumerable:!0,configurable:!0,writable:!0}):r[u]=p,r}e.exports=n,e.exports.__esModule=!0,e.exports.default=e.exports},set:function(e,o){var t=o("superPropBase"),n=o("defineProperty");function r(p,s,l,d){return r=typeof Reflect!="undefined"&&Reflect.set?Reflect.set:function(b,x,_,y){var c,v=t(b,x);if(v){if((c=Object.getOwnPropertyDescriptor(v,x)).set)return c.set.call(y,_),!0;if(!c.writable)return!1}if(c=Object.getOwnPropertyDescriptor(y,x)){if(!c.writable)return!1;c.value=_,Object.defineProperty(y,x,c)}else n(y,x,_);return!0},r(p,s,l,d)}function u(p,s,l,d,b){if(!r(p,s,l,d||p)&&b)throw new TypeError("failed to set property");return l}e.exports=u,e.exports.__esModule=!0,e.exports.default=e.exports}},f={};function i(e){if(f[e])return f[e].exports;var o=f[e]={exports:{}};return a[e](o,i),o.exports}return{get:i("get"),set:i("set")}})();function _superReference(a,f,i){return{get value(){return _superReference2.get(a,f,i)},set value(e){_superReference2.set(a,f,e,i,!0)}}}_superReference.set=function(a,f,i,e){return _superReference2.set(a,f,e,i,!0)};"#;
+pub const INLINE_CLASS_SUPER_REFERENCE_HELPER: &str = r#"var _superReference2=(()=>{var l={getPrototypeOf:function(e,o){function t(n){return e.exports=t=Object.setPrototypeOf?Object.getPrototypeOf.bind():function(r){return r.__proto__||Object.getPrototypeOf(r)},e.exports.__esModule=!0,e.exports.default=e.exports,t(n)}e.exports=t,e.exports.__esModule=!0,e.exports.default=e.exports},superPropBase:function(e,o){var t=o("getPrototypeOf");function n(r,u){for(;!{}.hasOwnProperty.call(r,u)&&(r=t(r))!==null;);return r}e.exports=n,e.exports.__esModule=!0,e.exports.default=e.exports},get:function(e,o){var t=o("superPropBase");function n(){return e.exports=n=typeof Reflect!="undefined"&&Reflect.get?Reflect.get.bind():function(r,u,p){var i=t(r,u);if(i){var c=Object.getOwnPropertyDescriptor(i,u);return c.get?c.get.call(arguments.length<3?r:p):c.value}},e.exports.__esModule=!0,e.exports.default=e.exports,n.apply(null,arguments)}e.exports=n,e.exports.__esModule=!0,e.exports.default=e.exports},typeof:function(e,o){function t(n){"@babel/helpers - typeof";return e.exports=t=typeof Symbol=="function"&&typeof Symbol.iterator=="symbol"?function(r){return typeof r}:function(r){return r&&typeof Symbol=="function"&&r.constructor===Symbol&&r!==Symbol.prototype?"symbol":typeof r},e.exports.__esModule=!0,e.exports.default=e.exports,t(n)}e.exports=t,e.exports.__esModule=!0,e.exports.default=e.exports},toPrimitive:function(e,o){var t=o("typeof").default;function n(r,u){if(t(r)!="object"||!r)return r;var p=r[Symbol.toPrimitive];if(p!==void 0){var i=p.call(r,u||"default");if(t(i)!="object")return i;throw new TypeError("@@toPrimitive must return a primitive value.")}return(u==="string"?String:Number)(r)}e.exports=n,e.exports.__esModule=!0,e.exports.default=e.exports},toPropertyKey:function(e,o){var t=o("typeof").default,n=o("toPrimitive");function r(u){var p=n(u,"string");return t(p)=="symbol"?p:p+""}e.exports=r,e.exports.__esModule=!0,e.exports.default=e.exports},defineProperty:function(e,o){var t=o("toPropertyKey");function n(r,u,p){return(u=t(u))in r?Object.defineProperty(r,u,{value:p,enumerable:!0,configurable:!0,writable:!0}):r[u]=p,r}e.exports=n,e.exports.__esModule=!0,e.exports.default=e.exports},set:function(e,o){var t=o("superPropBase"),n=o("defineProperty");function r(p,i,c,d){return r=typeof Reflect!="undefined"&&Reflect.set?Reflect.set:function(b,x,_,y){var a,v=t(b,x);if(v){if((a=Object.getOwnPropertyDescriptor(v,x)).set)return a.set.call(y,_),!0;if(!a.writable)return!1}if(a=Object.getOwnPropertyDescriptor(y,x)){if(!a.writable)return!1;a.value=_,Object.defineProperty(y,x,a)}else n(y,x,_);return!0},r(p,i,c,d)}function u(p,i,c,d,b){if(!r(p,i,c,d||p)&&b)throw new TypeError("failed to set property");return c}e.exports=u,e.exports.__esModule=!0,e.exports.default=e.exports}},s={};function f(e){if(s[e])return s[e].exports;var o=s[e]={exports:{}};return l[e](o,f),o.exports}return{get:f("get"),set:f("set")}})();function _get(l,s,f){return _superReference2.get(l,s,f)}function _superReference(l,s,f){return{get value(){return _superReference2.get(l,s,f)},set value(e){_superReference2.set(l,s,e,f,!0)}}}_superReference.set=function(l,s,f,e){return _superReference2.set(l,s,e,f,!0)};"#;
 pub const INLINE_CLASS_SUPER_REFERENCE_HELPER_GLOBALS: &[&str] = &[
     "Number",
     "Object",
@@ -1156,7 +1156,7 @@ pub const INLINE_CLASS_SUPER_REFERENCE_HELPER_GLOBALS: &[&str] = &[
     "arguments",
 ];
 pub const INLINE_CLASS_SUPER_REFERENCE_HELPER_PRETTY: &str = r#"var _superReference2 = (() => {
-	var a = {
+	var l = {
 		getPrototypeOf: function(e, o) {
 			function t(n) {
 				return e.exports = t = Object.setPrototypeOf ? Object.getPrototypeOf.bind() : function(r) {
@@ -1177,10 +1177,10 @@ pub const INLINE_CLASS_SUPER_REFERENCE_HELPER_PRETTY: &str = r#"var _superRefere
 			var t = o("superPropBase");
 			function n() {
 				return e.exports = n = typeof Reflect != "undefined" && Reflect.get ? Reflect.get.bind() : function(r, u, p) {
-					var s = t(r, u);
-					if (s) {
-						var l = Object.getOwnPropertyDescriptor(s, u);
-						return l.get ? l.get.call(arguments.length < 3 ? r : p) : l.value;
+					var i = t(r, u);
+					if (i) {
+						var c = Object.getOwnPropertyDescriptor(i, u);
+						return c.get ? c.get.call(arguments.length < 3 ? r : p) : c.value;
 					}
 				}, e.exports.__esModule = !0, e.exports.default = e.exports, n.apply(null, arguments);
 			}
@@ -1203,8 +1203,8 @@ pub const INLINE_CLASS_SUPER_REFERENCE_HELPER_PRETTY: &str = r#"var _superRefere
 				if (t(r) != "object" || !r) return r;
 				var p = r[Symbol.toPrimitive];
 				if (p !== void 0) {
-					var s = p.call(r, u || "default");
-					if (t(s) != "object") return s;
+					var i = p.call(r, u || "default");
+					if (t(i) != "object") return i;
 					throw new TypeError("@@toPrimitive must return a primitive value.");
 				}
 				return (u === "string" ? String : Number)(r);
@@ -1233,7 +1233,171 @@ pub const INLINE_CLASS_SUPER_REFERENCE_HELPER_PRETTY: &str = r#"var _superRefere
 		},
 		set: function(e, o) {
 			var t = o("superPropBase"), n = o("defineProperty");
-			function r(p, s, l, d) {
+			function r(p, i, c, d) {
+				return r = typeof Reflect != "undefined" && Reflect.set ? Reflect.set : function(b, x, _, y) {
+					var a, v = t(b, x);
+					if (v) {
+						if ((a = Object.getOwnPropertyDescriptor(v, x)).set) return a.set.call(y, _), !0;
+						if (!a.writable) return !1;
+					}
+					if (a = Object.getOwnPropertyDescriptor(y, x)) {
+						if (!a.writable) return !1;
+						a.value = _, Object.defineProperty(y, x, a);
+					} else n(y, x, _);
+					return !0;
+				}, r(p, i, c, d);
+			}
+			function u(p, i, c, d, b) {
+				if (!r(p, i, c, d || p) && b) throw new TypeError("failed to set property");
+				return c;
+			}
+			e.exports = u, e.exports.__esModule = !0, e.exports.default = e.exports;
+		}
+	}, s = {};
+	function f(e) {
+		if (s[e]) return s[e].exports;
+		var o = s[e] = { exports: {} };
+		return l[e](o, f), o.exports;
+	}
+	return {
+		get: f("get"),
+		set: f("set")
+	};
+})();
+function _get(l, s, f) {
+	return _superReference2.get(l, s, f);
+}
+function _superReference(l, s, f) {
+	return {
+		get value() {
+			return _superReference2.get(l, s, f);
+		},
+		set value(e) {
+			_superReference2.set(l, s, e, f, !0);
+		}
+	};
+}
+_superReference.set = function(l, s, f, e) {
+	return _superReference2.set(l, s, e, f, !0);
+};
+"#;
+pub const INLINE_CLASS_SUPER_REFERENCE_HELPER_BINDINGS: &[&str] =
+    &["_get", "_superReference", "_superReference2"];
+pub const INLINE_CLASS_SUPER_REFERENCE_HELPER_RUNTIME: &str = r#"var _superReference2={get:require("@babel/runtime/helpers/get"),set:require("@babel/runtime/helpers/set")};function _get(e,t,r){return _superReference2.get(e,t,r)}function _superReference(e,t,r){return{get value(){return _superReference2.get(e,t,r)},set value(u){_superReference2.set(e,t,u,r,!0)}}}_superReference.set=function(e,t,r,u){return _superReference2.set(e,t,u,r,!0)};"#;
+pub const INLINE_CLASS_SUPER_REFERENCE_HELPER_RUNTIME_GLOBALS: &[&str] = &[];
+pub const INLINE_CLASS_SUPER_REFERENCE_HELPER_RUNTIME_PRETTY: &str = r#"var _superReference2 = {
+	get: require("@babel/runtime/helpers/get"),
+	set: require("@babel/runtime/helpers/set")
+};
+function _get(e, t, r) {
+	return _superReference2.get(e, t, r);
+}
+function _superReference(e, t, r) {
+	return {
+		get value() {
+			return _superReference2.get(e, t, r);
+		},
+		set value(u) {
+			_superReference2.set(e, t, u, r, !0);
+		}
+	};
+}
+_superReference.set = function(e, t, r, u) {
+	return _superReference2.set(e, t, u, r, !0);
+};
+"#;
+pub const INLINE_CLASS_SUPER_REFERENCE_HELPER_RUNTIME_BINDINGS: &[&str] =
+    &["_get", "_superReference", "_superReference2"];
+pub const INLINE_CLASS_SUPER_REFERENCE_HELPER_RUNTIME_DEPENDENCIES: &[&str] = &["get", "set"];
+pub const INLINE_CLASS_SUPER_GET_SET_HELPER: &str = r#"var _superReference2=(()=>{var a={getPrototypeOf:function(e,o){function t(n){return e.exports=t=Object.setPrototypeOf?Object.getPrototypeOf.bind():function(r){return r.__proto__||Object.getPrototypeOf(r)},e.exports.__esModule=!0,e.exports.default=e.exports,t(n)}e.exports=t,e.exports.__esModule=!0,e.exports.default=e.exports},superPropBase:function(e,o){var t=o("getPrototypeOf");function n(r,p){for(;!{}.hasOwnProperty.call(r,p)&&(r=t(r))!==null;);return r}e.exports=n,e.exports.__esModule=!0,e.exports.default=e.exports},get:function(e,o){var t=o("superPropBase");function n(){return e.exports=n=typeof Reflect!="undefined"&&Reflect.get?Reflect.get.bind():function(r,p,u){var s=t(r,p);if(s){var f=Object.getOwnPropertyDescriptor(s,p);return f.get?f.get.call(arguments.length<3?r:u):f.value}},e.exports.__esModule=!0,e.exports.default=e.exports,n.apply(null,arguments)}e.exports=n,e.exports.__esModule=!0,e.exports.default=e.exports},typeof:function(e,o){function t(n){"@babel/helpers - typeof";return e.exports=t=typeof Symbol=="function"&&typeof Symbol.iterator=="symbol"?function(r){return typeof r}:function(r){return r&&typeof Symbol=="function"&&r.constructor===Symbol&&r!==Symbol.prototype?"symbol":typeof r},e.exports.__esModule=!0,e.exports.default=e.exports,t(n)}e.exports=t,e.exports.__esModule=!0,e.exports.default=e.exports},toPrimitive:function(e,o){var t=o("typeof").default;function n(r,p){if(t(r)!="object"||!r)return r;var u=r[Symbol.toPrimitive];if(u!==void 0){var s=u.call(r,p||"default");if(t(s)!="object")return s;throw new TypeError("@@toPrimitive must return a primitive value.")}return(p==="string"?String:Number)(r)}e.exports=n,e.exports.__esModule=!0,e.exports.default=e.exports},toPropertyKey:function(e,o){var t=o("typeof").default,n=o("toPrimitive");function r(p){var u=n(p,"string");return t(u)=="symbol"?u:u+""}e.exports=r,e.exports.__esModule=!0,e.exports.default=e.exports},defineProperty:function(e,o){var t=o("toPropertyKey");function n(r,p,u){return(p=t(p))in r?Object.defineProperty(r,p,{value:u,enumerable:!0,configurable:!0,writable:!0}):r[p]=u,r}e.exports=n,e.exports.__esModule=!0,e.exports.default=e.exports},set:function(e,o){var t=o("superPropBase"),n=o("defineProperty");function r(u,s,f,d){return r=typeof Reflect!="undefined"&&Reflect.set?Reflect.set:function(b,x,_,y){var c,v=t(b,x);if(v){if((c=Object.getOwnPropertyDescriptor(v,x)).set)return c.set.call(y,_),!0;if(!c.writable)return!1}if(c=Object.getOwnPropertyDescriptor(y,x)){if(!c.writable)return!1;c.value=_,Object.defineProperty(y,x,c)}else n(y,x,_);return!0},r(u,s,f,d)}function p(u,s,f,d,b){if(!r(u,s,f,d||u)&&b)throw new TypeError("failed to set property");return f}e.exports=p,e.exports.__esModule=!0,e.exports.default=e.exports}},i={};function l(e){if(i[e])return i[e].exports;var o=i[e]={exports:{}};return a[e](o,l),o.exports}return{get:l("get"),set:l("set")}})();function _get(a,i,l){return _superReference2.get(a,i,l)}var _superReference={set:function(a,i,l,e){return _superReference2.set(a,i,e,l,!0)}};"#;
+pub const INLINE_CLASS_SUPER_GET_SET_HELPER_GLOBALS: &[&str] = &[
+    "Number",
+    "Object",
+    "Reflect",
+    "String",
+    "Symbol",
+    "TypeError",
+    "arguments",
+];
+pub const INLINE_CLASS_SUPER_GET_SET_HELPER_PRETTY: &str = r#"var _superReference2 = (() => {
+	var a = {
+		getPrototypeOf: function(e, o) {
+			function t(n) {
+				return e.exports = t = Object.setPrototypeOf ? Object.getPrototypeOf.bind() : function(r) {
+					return r.__proto__ || Object.getPrototypeOf(r);
+				}, e.exports.__esModule = !0, e.exports.default = e.exports, t(n);
+			}
+			e.exports = t, e.exports.__esModule = !0, e.exports.default = e.exports;
+		},
+		superPropBase: function(e, o) {
+			var t = o("getPrototypeOf");
+			function n(r, p) {
+				for (; !{}.hasOwnProperty.call(r, p) && (r = t(r)) !== null;);
+				return r;
+			}
+			e.exports = n, e.exports.__esModule = !0, e.exports.default = e.exports;
+		},
+		get: function(e, o) {
+			var t = o("superPropBase");
+			function n() {
+				return e.exports = n = typeof Reflect != "undefined" && Reflect.get ? Reflect.get.bind() : function(r, p, u) {
+					var s = t(r, p);
+					if (s) {
+						var f = Object.getOwnPropertyDescriptor(s, p);
+						return f.get ? f.get.call(arguments.length < 3 ? r : u) : f.value;
+					}
+				}, e.exports.__esModule = !0, e.exports.default = e.exports, n.apply(null, arguments);
+			}
+			e.exports = n, e.exports.__esModule = !0, e.exports.default = e.exports;
+		},
+		typeof: function(e, o) {
+			function t(n) {
+				"@babel/helpers - typeof";
+				return e.exports = t = typeof Symbol == "function" && typeof Symbol.iterator == "symbol" ? function(r) {
+					return typeof r;
+				} : function(r) {
+					return r && typeof Symbol == "function" && r.constructor === Symbol && r !== Symbol.prototype ? "symbol" : typeof r;
+				}, e.exports.__esModule = !0, e.exports.default = e.exports, t(n);
+			}
+			e.exports = t, e.exports.__esModule = !0, e.exports.default = e.exports;
+		},
+		toPrimitive: function(e, o) {
+			var t = o("typeof").default;
+			function n(r, p) {
+				if (t(r) != "object" || !r) return r;
+				var u = r[Symbol.toPrimitive];
+				if (u !== void 0) {
+					var s = u.call(r, p || "default");
+					if (t(s) != "object") return s;
+					throw new TypeError("@@toPrimitive must return a primitive value.");
+				}
+				return (p === "string" ? String : Number)(r);
+			}
+			e.exports = n, e.exports.__esModule = !0, e.exports.default = e.exports;
+		},
+		toPropertyKey: function(e, o) {
+			var t = o("typeof").default, n = o("toPrimitive");
+			function r(p) {
+				var u = n(p, "string");
+				return t(u) == "symbol" ? u : u + "";
+			}
+			e.exports = r, e.exports.__esModule = !0, e.exports.default = e.exports;
+		},
+		defineProperty: function(e, o) {
+			var t = o("toPropertyKey");
+			function n(r, p, u) {
+				return (p = t(p)) in r ? Object.defineProperty(r, p, {
+					value: u,
+					enumerable: !0,
+					configurable: !0,
+					writable: !0
+				}) : r[p] = u, r;
+			}
+			e.exports = n, e.exports.__esModule = !0, e.exports.default = e.exports;
+		},
+		set: function(e, o) {
+			var t = o("superPropBase"), n = o("defineProperty");
+			function r(u, s, f, d) {
 				return r = typeof Reflect != "undefined" && Reflect.set ? Reflect.set : function(b, x, _, y) {
 					var c, v = t(b, x);
 					if (v) {
@@ -1245,64 +1409,166 @@ pub const INLINE_CLASS_SUPER_REFERENCE_HELPER_PRETTY: &str = r#"var _superRefere
 						c.value = _, Object.defineProperty(y, x, c);
 					} else n(y, x, _);
 					return !0;
-				}, r(p, s, l, d);
+				}, r(u, s, f, d);
 			}
-			function u(p, s, l, d, b) {
-				if (!r(p, s, l, d || p) && b) throw new TypeError("failed to set property");
-				return l;
+			function p(u, s, f, d, b) {
+				if (!r(u, s, f, d || u) && b) throw new TypeError("failed to set property");
+				return f;
 			}
-			e.exports = u, e.exports.__esModule = !0, e.exports.default = e.exports;
+			e.exports = p, e.exports.__esModule = !0, e.exports.default = e.exports;
 		}
-	}, f = {};
-	function i(e) {
-		if (f[e]) return f[e].exports;
-		var o = f[e] = { exports: {} };
-		return a[e](o, i), o.exports;
+	}, i = {};
+	function l(e) {
+		if (i[e]) return i[e].exports;
+		var o = i[e] = { exports: {} };
+		return a[e](o, l), o.exports;
 	}
 	return {
-		get: i("get"),
-		set: i("set")
+		get: l("get"),
+		set: l("set")
 	};
 })();
-function _superReference(a, f, i) {
-	return {
-		get value() {
-			return _superReference2.get(a, f, i);
-		},
-		set value(e) {
-			_superReference2.set(a, f, e, i, !0);
-		}
-	};
+function _get(a, i, l) {
+	return _superReference2.get(a, i, l);
 }
-_superReference.set = function(a, f, i, e) {
-	return _superReference2.set(a, f, e, i, !0);
-};
+var _superReference = { set: function(a, i, l, e) {
+	return _superReference2.set(a, i, e, l, !0);
+} };
 "#;
-pub const INLINE_CLASS_SUPER_REFERENCE_HELPER_BINDINGS: &[&str] =
-    &["_superReference", "_superReference2"];
-pub const INLINE_CLASS_SUPER_REFERENCE_HELPER_RUNTIME: &str = r#"var _superReference2={get:require("@babel/runtime/helpers/get"),set:require("@babel/runtime/helpers/set")};function _superReference(e,r,t){return{get value(){return _superReference2.get(e,r,t)},set value(u){_superReference2.set(e,r,u,t,!0)}}}_superReference.set=function(e,r,t,u){return _superReference2.set(e,r,u,t,!0)};"#;
-pub const INLINE_CLASS_SUPER_REFERENCE_HELPER_RUNTIME_GLOBALS: &[&str] = &[];
-pub const INLINE_CLASS_SUPER_REFERENCE_HELPER_RUNTIME_PRETTY: &str = r#"var _superReference2 = {
+pub const INLINE_CLASS_SUPER_GET_SET_HELPER_BINDINGS: &[&str] =
+    &["_get", "_superReference", "_superReference2"];
+pub const INLINE_CLASS_SUPER_GET_SET_HELPER_RUNTIME: &str = r#"var _superReference2={get:require("@babel/runtime/helpers/get"),set:require("@babel/runtime/helpers/set")};function _get(e,r,t){return _superReference2.get(e,r,t)}var _superReference={set:function(e,r,t,u){return _superReference2.set(e,r,u,t,!0)}};"#;
+pub const INLINE_CLASS_SUPER_GET_SET_HELPER_RUNTIME_GLOBALS: &[&str] = &[];
+pub const INLINE_CLASS_SUPER_GET_SET_HELPER_RUNTIME_PRETTY: &str = r#"var _superReference2 = {
 	get: require("@babel/runtime/helpers/get"),
 	set: require("@babel/runtime/helpers/set")
 };
-function _superReference(e, r, t) {
-	return {
-		get value() {
-			return _superReference2.get(e, r, t);
-		},
-		set value(u) {
-			_superReference2.set(e, r, u, t, !0);
-		}
-	};
+function _get(e, r, t) {
+	return _superReference2.get(e, r, t);
 }
-_superReference.set = function(e, r, t, u) {
+var _superReference = { set: function(e, r, t, u) {
 	return _superReference2.set(e, r, u, t, !0);
-};
+} };
 "#;
-pub const INLINE_CLASS_SUPER_REFERENCE_HELPER_RUNTIME_BINDINGS: &[&str] =
+pub const INLINE_CLASS_SUPER_GET_SET_HELPER_RUNTIME_BINDINGS: &[&str] =
+    &["_get", "_superReference", "_superReference2"];
+pub const INLINE_CLASS_SUPER_GET_SET_HELPER_RUNTIME_DEPENDENCIES: &[&str] = &["get", "set"];
+pub const INLINE_CLASS_SUPER_SET_HELPER: &str = r#"var _superReference2=(()=>{var y={getPrototypeOf:function(e,o){function t(p){return e.exports=t=Object.setPrototypeOf?Object.getPrototypeOf.bind():function(r){return r.__proto__||Object.getPrototypeOf(r)},e.exports.__esModule=!0,e.exports.default=e.exports,t(p)}e.exports=t,e.exports.__esModule=!0,e.exports.default=e.exports},superPropBase:function(e,o){var t=o("getPrototypeOf");function p(r,u){for(;!{}.hasOwnProperty.call(r,u)&&(r=t(r))!==null;);return r}e.exports=p,e.exports.__esModule=!0,e.exports.default=e.exports},typeof:function(e,o){function t(p){"@babel/helpers - typeof";return e.exports=t=typeof Symbol=="function"&&typeof Symbol.iterator=="symbol"?function(r){return typeof r}:function(r){return r&&typeof Symbol=="function"&&r.constructor===Symbol&&r!==Symbol.prototype?"symbol":typeof r},e.exports.__esModule=!0,e.exports.default=e.exports,t(p)}e.exports=t,e.exports.__esModule=!0,e.exports.default=e.exports},toPrimitive:function(e,o){var t=o("typeof").default;function p(r,u){if(t(r)!="object"||!r)return r;var n=r[Symbol.toPrimitive];if(n!==void 0){var s=n.call(r,u||"default");if(t(s)!="object")return s;throw new TypeError("@@toPrimitive must return a primitive value.")}return(u==="string"?String:Number)(r)}e.exports=p,e.exports.__esModule=!0,e.exports.default=e.exports},toPropertyKey:function(e,o){var t=o("typeof").default,p=o("toPrimitive");function r(u){var n=p(u,"string");return t(n)=="symbol"?n:n+""}e.exports=r,e.exports.__esModule=!0,e.exports.default=e.exports},defineProperty:function(e,o){var t=o("toPropertyKey");function p(r,u,n){return(u=t(u))in r?Object.defineProperty(r,u,{value:n,enumerable:!0,configurable:!0,writable:!0}):r[u]=n,r}e.exports=p,e.exports.__esModule=!0,e.exports.default=e.exports},set:function(e,o){var t=o("superPropBase"),p=o("defineProperty");function r(n,s,a,d){return r=typeof Reflect!="undefined"&&Reflect.set?Reflect.set:function(b,l,v,x){var f,_=t(b,l);if(_){if((f=Object.getOwnPropertyDescriptor(_,l)).set)return f.set.call(x,v),!0;if(!f.writable)return!1}if(f=Object.getOwnPropertyDescriptor(x,l)){if(!f.writable)return!1;f.value=v,Object.defineProperty(x,l,f)}else p(x,l,v);return!0},r(n,s,a,d)}function u(n,s,a,d,b){if(!r(n,s,a,d||n)&&b)throw new TypeError("failed to set property");return a}e.exports=u,e.exports.__esModule=!0,e.exports.default=e.exports}},i={};function c(e){if(i[e])return i[e].exports;var o=i[e]={exports:{}};return y[e](o,c),o.exports}return{set:c("set")}})(),_superReference={set:function(y,i,c,e){return _superReference2.set(y,i,e,c,!0)}};"#;
+pub const INLINE_CLASS_SUPER_SET_HELPER_GLOBALS: &[&str] = &[
+    "Number",
+    "Object",
+    "Reflect",
+    "String",
+    "Symbol",
+    "TypeError",
+];
+pub const INLINE_CLASS_SUPER_SET_HELPER_PRETTY: &str = r#"var _superReference2 = (() => {
+	var y = {
+		getPrototypeOf: function(e, o) {
+			function t(p) {
+				return e.exports = t = Object.setPrototypeOf ? Object.getPrototypeOf.bind() : function(r) {
+					return r.__proto__ || Object.getPrototypeOf(r);
+				}, e.exports.__esModule = !0, e.exports.default = e.exports, t(p);
+			}
+			e.exports = t, e.exports.__esModule = !0, e.exports.default = e.exports;
+		},
+		superPropBase: function(e, o) {
+			var t = o("getPrototypeOf");
+			function p(r, u) {
+				for (; !{}.hasOwnProperty.call(r, u) && (r = t(r)) !== null;);
+				return r;
+			}
+			e.exports = p, e.exports.__esModule = !0, e.exports.default = e.exports;
+		},
+		typeof: function(e, o) {
+			function t(p) {
+				"@babel/helpers - typeof";
+				return e.exports = t = typeof Symbol == "function" && typeof Symbol.iterator == "symbol" ? function(r) {
+					return typeof r;
+				} : function(r) {
+					return r && typeof Symbol == "function" && r.constructor === Symbol && r !== Symbol.prototype ? "symbol" : typeof r;
+				}, e.exports.__esModule = !0, e.exports.default = e.exports, t(p);
+			}
+			e.exports = t, e.exports.__esModule = !0, e.exports.default = e.exports;
+		},
+		toPrimitive: function(e, o) {
+			var t = o("typeof").default;
+			function p(r, u) {
+				if (t(r) != "object" || !r) return r;
+				var n = r[Symbol.toPrimitive];
+				if (n !== void 0) {
+					var s = n.call(r, u || "default");
+					if (t(s) != "object") return s;
+					throw new TypeError("@@toPrimitive must return a primitive value.");
+				}
+				return (u === "string" ? String : Number)(r);
+			}
+			e.exports = p, e.exports.__esModule = !0, e.exports.default = e.exports;
+		},
+		toPropertyKey: function(e, o) {
+			var t = o("typeof").default, p = o("toPrimitive");
+			function r(u) {
+				var n = p(u, "string");
+				return t(n) == "symbol" ? n : n + "";
+			}
+			e.exports = r, e.exports.__esModule = !0, e.exports.default = e.exports;
+		},
+		defineProperty: function(e, o) {
+			var t = o("toPropertyKey");
+			function p(r, u, n) {
+				return (u = t(u)) in r ? Object.defineProperty(r, u, {
+					value: n,
+					enumerable: !0,
+					configurable: !0,
+					writable: !0
+				}) : r[u] = n, r;
+			}
+			e.exports = p, e.exports.__esModule = !0, e.exports.default = e.exports;
+		},
+		set: function(e, o) {
+			var t = o("superPropBase"), p = o("defineProperty");
+			function r(n, s, a, d) {
+				return r = typeof Reflect != "undefined" && Reflect.set ? Reflect.set : function(b, l, v, x) {
+					var f, _ = t(b, l);
+					if (_) {
+						if ((f = Object.getOwnPropertyDescriptor(_, l)).set) return f.set.call(x, v), !0;
+						if (!f.writable) return !1;
+					}
+					if (f = Object.getOwnPropertyDescriptor(x, l)) {
+						if (!f.writable) return !1;
+						f.value = v, Object.defineProperty(x, l, f);
+					} else p(x, l, v);
+					return !0;
+				}, r(n, s, a, d);
+			}
+			function u(n, s, a, d, b) {
+				if (!r(n, s, a, d || n) && b) throw new TypeError("failed to set property");
+				return a;
+			}
+			e.exports = u, e.exports.__esModule = !0, e.exports.default = e.exports;
+		}
+	}, i = {};
+	function c(e) {
+		if (i[e]) return i[e].exports;
+		var o = i[e] = { exports: {} };
+		return y[e](o, c), o.exports;
+	}
+	return { set: c("set") };
+})(), _superReference = { set: function(y, i, c, e) {
+	return _superReference2.set(y, i, e, c, !0);
+} };
+"#;
+pub const INLINE_CLASS_SUPER_SET_HELPER_BINDINGS: &[&str] =
     &["_superReference", "_superReference2"];
-pub const INLINE_CLASS_SUPER_REFERENCE_HELPER_RUNTIME_DEPENDENCIES: &[&str] = &["get", "set"];
+pub const INLINE_CLASS_SUPER_SET_HELPER_RUNTIME: &str = r#"var _superReference2={set:require("@babel/runtime/helpers/set")},_superReference={set:function(e,r,t,s){return _superReference2.set(e,r,s,t,!0)}};"#;
+pub const INLINE_CLASS_SUPER_SET_HELPER_RUNTIME_GLOBALS: &[&str] = &[];
+pub const INLINE_CLASS_SUPER_SET_HELPER_RUNTIME_PRETTY: &str = r#"var _superReference2 = { set: require("@babel/runtime/helpers/set") }, _superReference = { set: function(e, r, t, s) {
+	return _superReference2.set(e, r, s, t, !0);
+} };
+"#;
+pub const INLINE_CLASS_SUPER_SET_HELPER_RUNTIME_BINDINGS: &[&str] =
+    &["_superReference", "_superReference2"];
+pub const INLINE_CLASS_SUPER_SET_HELPER_RUNTIME_DEPENDENCIES: &[&str] = &["set"];
 pub const INLINE_CLASS_KEY_HELPER: &str = r#"var _classKey2=(()=>{var y={typeof:function(e,t){function r(p){"@babel/helpers - typeof";return e.exports=r=typeof Symbol=="function"&&typeof Symbol.iterator=="symbol"?function(o){return typeof o}:function(o){return o&&typeof Symbol=="function"&&o.constructor===Symbol&&o!==Symbol.prototype?"symbol":typeof o},e.exports.__esModule=!0,e.exports.default=e.exports,r(p)}e.exports=r,e.exports.__esModule=!0,e.exports.default=e.exports},toPrimitive:function(e,t){var r=t("typeof").default;function p(o,u){if(r(o)!="object"||!o)return o;var n=o[Symbol.toPrimitive];if(n!==void 0){var f=n.call(o,u||"default");if(r(f)!="object")return f;throw new TypeError("@@toPrimitive must return a primitive value.")}return(u==="string"?String:Number)(o)}e.exports=p,e.exports.__esModule=!0,e.exports.default=e.exports},toPropertyKey:function(e,t){var r=t("typeof").default,p=t("toPrimitive");function o(u){var n=p(u,"string");return r(n)=="symbol"?n:n+""}e.exports=o,e.exports.__esModule=!0,e.exports.default=e.exports}},i={};function s(e){if(i[e])return i[e].exports;var t=i[e]={exports:{}};return y[e](t,s),t.exports}return{toPropertyKey:s("toPropertyKey")}})(),_classKey=_classKey2.toPropertyKey;"#;
 pub const INLINE_CLASS_KEY_HELPER_GLOBALS: &[&str] = &["Number", "String", "Symbol", "TypeError"];
 pub const INLINE_CLASS_KEY_HELPER_PRETTY: &str = r#"var _classKey2 = (() => {
@@ -1702,6 +1968,30 @@ pub static INLINE_CLASS_SUPER_REFERENCE_HELPER_DESCRIPTOR: GeneratedHelperFragme
         babel_dependencies: INLINE_CLASS_SUPER_REFERENCE_HELPER_RUNTIME_DEPENDENCIES,
         inline_globals: INLINE_CLASS_SUPER_REFERENCE_HELPER_GLOBALS,
         runtime_globals: INLINE_CLASS_SUPER_REFERENCE_HELPER_RUNTIME_GLOBALS,
+    };
+pub static INLINE_CLASS_SUPER_GET_SET_HELPER_DESCRIPTOR: GeneratedHelperFragment =
+    GeneratedHelperFragment {
+        inline_compact: INLINE_CLASS_SUPER_GET_SET_HELPER,
+        inline_pretty: INLINE_CLASS_SUPER_GET_SET_HELPER_PRETTY,
+        runtime_compact: INLINE_CLASS_SUPER_GET_SET_HELPER_RUNTIME,
+        runtime_pretty: INLINE_CLASS_SUPER_GET_SET_HELPER_RUNTIME_PRETTY,
+        inline_bindings: INLINE_CLASS_SUPER_GET_SET_HELPER_BINDINGS,
+        runtime_bindings: INLINE_CLASS_SUPER_GET_SET_HELPER_RUNTIME_BINDINGS,
+        babel_dependencies: INLINE_CLASS_SUPER_GET_SET_HELPER_RUNTIME_DEPENDENCIES,
+        inline_globals: INLINE_CLASS_SUPER_GET_SET_HELPER_GLOBALS,
+        runtime_globals: INLINE_CLASS_SUPER_GET_SET_HELPER_RUNTIME_GLOBALS,
+    };
+pub static INLINE_CLASS_SUPER_SET_HELPER_DESCRIPTOR: GeneratedHelperFragment =
+    GeneratedHelperFragment {
+        inline_compact: INLINE_CLASS_SUPER_SET_HELPER,
+        inline_pretty: INLINE_CLASS_SUPER_SET_HELPER_PRETTY,
+        runtime_compact: INLINE_CLASS_SUPER_SET_HELPER_RUNTIME,
+        runtime_pretty: INLINE_CLASS_SUPER_SET_HELPER_RUNTIME_PRETTY,
+        inline_bindings: INLINE_CLASS_SUPER_SET_HELPER_BINDINGS,
+        runtime_bindings: INLINE_CLASS_SUPER_SET_HELPER_RUNTIME_BINDINGS,
+        babel_dependencies: INLINE_CLASS_SUPER_SET_HELPER_RUNTIME_DEPENDENCIES,
+        inline_globals: INLINE_CLASS_SUPER_SET_HELPER_GLOBALS,
+        runtime_globals: INLINE_CLASS_SUPER_SET_HELPER_RUNTIME_GLOBALS,
     };
 pub static INLINE_CLASS_KEY_HELPER_DESCRIPTOR: GeneratedHelperFragment = GeneratedHelperFragment {
     inline_compact: INLINE_CLASS_KEY_HELPER,

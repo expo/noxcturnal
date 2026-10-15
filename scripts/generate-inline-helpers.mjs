@@ -200,7 +200,19 @@ const adapterBundles = {
     roots: ['get', 'set'],
     binding: '_superReference2',
     adapter:
-      'function _superReference(base,key,receiver){return {get value(){return _superReference2.get(base,key,receiver)},set value(value){_superReference2.set(base,key,value,receiver,true)}}}_superReference.set=function(base,key,receiver,value){return _superReference2.set(base,key,value,receiver,true)};',
+      'function _get(base,key,receiver){return _superReference2.get(base,key,receiver)}function _superReference(base,key,receiver){return {get value(){return _superReference2.get(base,key,receiver)},set value(value){_superReference2.set(base,key,value,receiver,true)}}}_superReference.set=function(base,key,receiver,value){return _superReference2.set(base,key,value,receiver,true)};',
+  },
+  INLINE_CLASS_SUPER_GET_SET_HELPER: {
+    roots: ['get', 'set'],
+    binding: '_superReference2',
+    adapter:
+      'function _get(base,key,receiver){return _superReference2.get(base,key,receiver)}var _superReference={set:function(base,key,receiver,value){return _superReference2.set(base,key,value,receiver,true)}};',
+  },
+  INLINE_CLASS_SUPER_SET_HELPER: {
+    roots: ['set'],
+    binding: '_superReference2',
+    adapter:
+      'var _superReference={set:function(base,key,receiver,value){return _superReference2.set(base,key,value,receiver,true)}};',
   },
   INLINE_CLASS_KEY_HELPER: {
     roots: ['toPropertyKey'],

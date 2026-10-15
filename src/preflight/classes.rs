@@ -24,7 +24,8 @@ use crate::generated::inline_helpers::{
     INLINE_CLASS_CONSTRUCT_ASSERT_HELPER_DESCRIPTOR, INLINE_CLASS_CONSTRUCT_HELPER_DESCRIPTOR,
     INLINE_CLASS_KEY_HELPER_DESCRIPTOR, INLINE_CLASS_PRIVATE_HELPERS_DESCRIPTOR,
     INLINE_CLASS_PRIVATE_IN_HELPER_DESCRIPTOR, INLINE_CLASS_SUPER_GET_HELPER_DESCRIPTOR,
-    INLINE_CLASS_SUPER_REFERENCE_HELPER_DESCRIPTOR,
+    INLINE_CLASS_SUPER_GET_SET_HELPER_DESCRIPTOR, INLINE_CLASS_SUPER_REFERENCE_HELPER_DESCRIPTOR,
+    INLINE_CLASS_SUPER_SET_HELPER_DESCRIPTOR,
 };
 use crate::preflight::helpers::CustomHelperRequests;
 
@@ -52,6 +53,7 @@ struct DirectClassPlan {
     helper_names: ClassHelperNames,
     uses_super_get: bool,
     uses_super_reference: bool,
+    uses_super_accessor: bool,
     uses_private_helper: bool,
     uses_check_in_rhs: bool,
 }
@@ -117,6 +119,7 @@ struct ClassHelperPlan {
     construct: bool,
     super_get: bool,
     super_reference: bool,
+    super_accessor: bool,
     property_key: bool,
     private: bool,
     check_in_rhs: bool,
@@ -162,23 +165,29 @@ impl ClassHelperPlan {
                 ],
             );
         }
-        if self.super_get {
+        if self.super_reference {
+            let descriptor = if self.super_accessor {
+                &INLINE_CLASS_SUPER_REFERENCE_HELPER_DESCRIPTOR
+            } else if self.super_get {
+                &INLINE_CLASS_SUPER_GET_SET_HELPER_DESCRIPTOR
+            } else {
+                &INLINE_CLASS_SUPER_SET_HELPER_DESCRIPTOR
+            };
+            let mut renames = vec![
+                ("_superReference", names.super_reference.as_str()),
+                ("_superReference2", names.super_reference_runtime.as_str()),
+            ];
+            if self.super_get {
+                renames.push(("_get", names.super_get.as_str()));
+            }
+            requests.materialize_generated(descriptor, self.inline, &renames);
+        } else if self.super_get {
             requests.materialize_generated(
                 &INLINE_CLASS_SUPER_GET_HELPER_DESCRIPTOR,
                 self.inline,
                 &[
                     ("_get", &names.super_get),
                     ("_get2", &names.super_get_runtime),
-                ],
-            );
-        }
-        if self.super_reference {
-            requests.materialize_generated(
-                &INLINE_CLASS_SUPER_REFERENCE_HELPER_DESCRIPTOR,
-                self.inline,
-                &[
-                    ("_superReference", &names.super_reference),
-                    ("_superReference2", &names.super_reference_runtime),
                 ],
             );
         }
@@ -392,9 +401,9 @@ fn direct_class_candidates(
             .keys()
             .map(|key| (key.clone(), reserve("_privateMethod", reserved)))
             .collect();
-        let mut writes = SuperWriteDetector(false);
+        let mut usage = SuperHelperUsage::default();
         if uses_super_get {
-            writes.visit_class_body(&class.body);
+            usage.visit_class_body(&class.body);
         }
         direct.insert(
             (class.span.start, class.span.end),
@@ -426,8 +435,9 @@ fn direct_class_candidates(
                 class_properties_loose,
                 class_static_blocks,
                 helper_names: helper_names.clone(),
-                uses_super_get,
-                uses_super_reference: writes.0,
+                uses_super_get: usage.read,
+                uses_super_reference: usage.write,
+                uses_super_accessor: usage.accessor,
                 uses_private_helper,
                 uses_check_in_rhs: has_private_in,
             },
@@ -550,6 +560,7 @@ pub(super) fn prepare_ast(
         .any(|plan| plan.uses_private_helper || !plan.private_keys.is_empty());
     let uses_check_in_rhs = direct.values().any(|plan| plan.uses_check_in_rhs);
     let uses_super_reference = direct.values().any(|plan| plan.uses_super_reference);
+    let uses_super_accessor = direct.values().any(|plan| plan.uses_super_accessor);
     let uses_property_key = direct.values().any(|plan| !plan.computed_keys.is_empty());
     Ok(AstPlan {
         direct,
@@ -558,6 +569,7 @@ pub(super) fn prepare_ast(
             construct: uses_construct,
             super_get: uses_super_get,
             super_reference: uses_super_reference,
+            super_accessor: uses_super_accessor,
             property_key: uses_property_key,
             private: uses_private,
             check_in_rhs: uses_check_in_rhs,
@@ -2076,10 +2088,63 @@ impl<'a> VisitMut<'a> for PrivateLooseRewriter<'a, '_> {
     }
 }
 
-struct SuperWriteDetector(bool);
-impl<'a> Visit<'a> for SuperWriteDetector {
+// Match the rewriter's distinction between ordinary writes, reads, and
+// assignable references. Compound/update/pattern targets use the accessor
+// adapter, while a direct `=` only needs Babel's set helper.
+#[derive(Default)]
+struct SuperHelperUsage {
+    read: bool,
+    write: bool,
+    accessor: bool,
+}
+impl<'a> Visit<'a> for SuperHelperUsage {
+    fn visit_method_definition(&mut self, method: &oxc_ast::ast::MethodDefinition<'a>) {
+        if method.computed {
+            self.visit_property_key(&method.key);
+        }
+        self.visit_formal_parameters(&method.value.params);
+        if let Some(body) = &method.value.body {
+            self.visit_function_body(body);
+        }
+    }
+    fn visit_function(&mut self, _: &Function<'a>, _: ScopeFlags) {}
+
+    fn visit_expression(&mut self, expression: &Expression<'a>) {
+        if let Expression::AssignmentExpression(assignment) = expression
+            && assignment.operator.is_assign()
+        {
+            match &assignment.left {
+                AssignmentTarget::StaticMemberExpression(member)
+                    if matches!(member.object, Expression::Super(_)) =>
+                {
+                    self.write = true;
+                    self.visit_expression(&assignment.right);
+                    return;
+                }
+                AssignmentTarget::ComputedMemberExpression(member)
+                    if matches!(member.object, Expression::Super(_)) =>
+                {
+                    self.write = true;
+                    self.visit_expression(&member.expression);
+                    self.visit_expression(&assignment.right);
+                    return;
+                }
+                _ => {}
+            }
+        }
+        self.read |= match expression {
+            Expression::StaticMemberExpression(member) => {
+                matches!(member.object, Expression::Super(_))
+            }
+            Expression::ComputedMemberExpression(member) => {
+                matches!(member.object, Expression::Super(_))
+            }
+            _ => false,
+        };
+        walk::walk_expression(self, expression);
+    }
     fn visit_assignment_target(&mut self, target: &AssignmentTarget<'a>) {
-        self.0 |= match target {
+        let reference = match target {
             AssignmentTarget::StaticMemberExpression(member) => {
                 matches!(member.object, Expression::Super(_))
             }
@@ -2088,12 +2153,13 @@ impl<'a> Visit<'a> for SuperWriteDetector {
             }
             _ => false,
         };
-        if !self.0 {
-            walk::walk_assignment_target(self, target);
-        }
+        self.read |= reference;
+        self.write |= reference;
+        self.accessor |= reference;
+        walk::walk_assignment_target(self, target);
     }
     fn visit_simple_assignment_target(&mut self, target: &SimpleAssignmentTarget<'a>) {
-        self.0 |= match target {
+        let reference = match target {
             SimpleAssignmentTarget::StaticMemberExpression(member) => {
                 matches!(member.object, Expression::Super(_))
             }
@@ -2102,11 +2168,25 @@ impl<'a> Visit<'a> for SuperWriteDetector {
             }
             _ => false,
         };
-        if !self.0 {
-            walk::walk_simple_assignment_target(self, target);
+        self.read |= reference;
+        self.write |= reference;
+        self.accessor |= reference;
+        walk::walk_simple_assignment_target(self, target);
+    }
+    fn visit_class(&mut self, class: &Class<'a>) {
+        // Heritage and computed keys use the surrounding super environment;
+        // the nested class body owns its own methods and initializers.
+        if let Some(super_class) = &class.super_class {
+            self.visit_expression(super_class);
+        }
+        for element in &class.body.body {
+            if element.computed()
+                && let Some(key) = element.property_key()
+            {
+                self.visit_property_key(key);
+            }
         }
     }
-    fn visit_class(&mut self, _: &Class<'a>) {}
 }
 
 struct SuperAccessRewriter<'a> {
