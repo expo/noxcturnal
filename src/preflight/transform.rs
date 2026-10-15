@@ -1377,24 +1377,24 @@ fn transform_impl(
         let mut custom_helper_requests = Vec::new();
         let mut custom_helper_fragments = Vec::new();
         let compact = options.compact.unwrap_or(false);
-        structural_custom_helper_requests.extend_into(
+        let mut helper_globals = structural_custom_helper_requests.extend_into(
             &mut custom_helper_requests,
             &mut custom_helper_fragments,
             compact,
             runtime_policy.as_ref(),
         );
-        destructuring_custom_helper_requests.extend_into(
+        helper_globals.extend(destructuring_custom_helper_requests.extend_into(
             &mut custom_helper_requests,
             &mut custom_helper_fragments,
             compact,
             runtime_policy.as_ref(),
-        );
-        classes_custom_helper_requests.extend_into(
+        ));
+        helper_globals.extend(classes_custom_helper_requests.extend_into(
             &mut custom_helper_requests,
             &mut custom_helper_fragments,
             compact,
             runtime_policy.as_ref(),
-        );
+        ));
         let unavailable_helpers = helper_requests
             .iter()
             .filter_map(|(helper, _)| {
@@ -1420,6 +1420,9 @@ fn transform_impl(
         } else {
             None
         };
+        if let Some(inline) = &inline {
+            helper_globals.extend(inline.globals.iter().copied());
+        }
         let mut helpers_used: Vec<String> = helper_requests
             .iter()
             .map(|(helper, _)| {
@@ -1492,14 +1495,14 @@ fn transform_impl(
                         ));
                         binding
                     });
-            let may_capture = transformed
-                .scoping
-                .get_bindings(transformed.scoping.root_scope_id())
-                .keys()
-                .any(|name| {
-                    crate::generated::inline_helpers::INLINE_HELPER_GLOBALS.contains(&name.as_str())
-                });
-            if !declarations.is_empty() || (may_capture && inline_prefix.is_some()) {
+            protect_helper_globals(
+                allocator,
+                &mut program,
+                &helper_globals,
+                &mut reservations,
+                &transformed.scoping,
+            );
+            if !declarations.is_empty() {
                 let bridge_source = allocator.alloc_str(&declarations);
                 let mut parsed_bridge =
                     Parser::new(allocator, bridge_source, active_source_type).parse();
@@ -1531,32 +1534,6 @@ fn transform_impl(
                         let trailing = parsed_bridge.program.body.split_off(0);
                         parsed_bridge.program.body.extend(imports.program.body);
                         parsed_bridge.program.body.extend(trailing);
-                    }
-                }
-                if may_capture {
-                    if let Some(prefix) = &inline_prefix {
-                        let mut helpers =
-                            Parser::new(allocator, allocator.alloc_str(prefix), active_source_type)
-                                .parse()
-                                .program;
-                        helpers
-                            .body
-                            .extend(parsed_bridge.program.body.clone_in(allocator));
-                        protect_helper_globals(
-                            allocator,
-                            &mut program,
-                            &helpers,
-                            &mut reservations,
-                            &transformed.scoping,
-                        );
-                    } else {
-                        protect_helper_globals(
-                            allocator,
-                            &mut program,
-                            &parsed_bridge.program,
-                            &mut reservations,
-                            &transformed.scoping,
-                        );
                     }
                 }
                 SyntheticSpanZeroer.visit_program(&mut parsed_bridge.program);
@@ -2486,23 +2463,15 @@ impl<'a> VisitMut<'a> for HelperImportRewriter<'a, '_> {
 fn protect_helper_globals<'a>(
     allocator: &'a Allocator,
     program: &mut Program<'a>,
-    helpers: &Program<'a>,
+    globals: &rustc_hash::FxHashSet<&str>,
     reservations: &mut SourceNameReservations,
     scoping: &Scoping,
 ) {
-    let helper_semantic = SemanticBuilder::new().build(helpers);
-    let globals = helper_semantic
-        .semantic
-        .scoping()
-        .root_unresolved_references();
     let mut renames = FxHashMap::default();
-    for symbol in scoping.symbol_ids() {
-        let name = scoping.symbol_name(symbol);
-        if scoping.symbol_scope_id(symbol) == scoping.root_scope_id()
-            && name != "require"
-            && globals.contains_key(name)
-        {
-            renames.insert(symbol, reservations.reserve(&format!("_{name}")));
+    let bindings = scoping.get_bindings(scoping.root_scope_id());
+    for name in globals {
+        if let Some(symbol) = bindings.get(*name) {
+            renames.insert(*symbol, reservations.reserve(&format!("_{name}")));
         }
     }
     if renames.is_empty() {

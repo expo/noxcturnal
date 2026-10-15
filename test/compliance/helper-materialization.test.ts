@@ -58,6 +58,19 @@ const captures: {
   },
 ];
 describe.each(modes)('helper globals $mode $version', helpers => {
+  test('an unrelated intrinsic binding keeps its original name', () => {
+    const code = compile(
+      'function Promise(){};globalThis.result=[Promise.name,{...{value:1}}.value];',
+      {
+        transforms: { objectRestSpread: { loose: false, useBuiltIns: false } },
+        helpers,
+      },
+    );
+    expect(code).not.toContain('...');
+    const context = { require, result: undefined };
+    runInNewContext(code, context);
+    expect(context.result).toEqual(['Promise', 1]);
+  });
   for (const entry of captures)
     test(entry.name, async () => {
       if (
