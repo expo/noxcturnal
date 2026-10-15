@@ -468,6 +468,15 @@ fn transform_impl(
                         // one here would give it a span it could no longer match.
                         ..TransformOptions::default()
                     };
+                    // Preserve the factory bindings needed by the later JSX pass while
+                    // leaving JSX syntax intact for source rewrites and React tooling.
+                    // Transformer still applies source directives over these defaults.
+                    if let Some(pragma) = &transform_options.jsx.pragma {
+                        language_options.typescript.jsx_pragma = pragma.clone().into();
+                    }
+                    if let Some(pragma) = &transform_options.jsx.pragma_frag {
+                        language_options.typescript.jsx_pragma_frag = pragma.clone().into();
+                    }
                     if has_decorators {
                         // NOTE: Decorators use the legacy evaluation model. Lower them
                         // before type and class rewrites so those passes never discard

@@ -196,11 +196,18 @@ impl<'a> TypeScriptEnum {
             ctx,
         );
 
+        // Only constant-evaluated initializers are known to be effect-free. An
+        // arbitrary expression can read getters, coerce values, or throw, even
+        // when its outermost node is not a call. Use the same semantic constants
+        // that member lowering substitutes below, retaining purity for literals,
+        // arithmetic, and references to constant enum members.
         let has_potential_side_effect = decl.body.members.iter().any(|member| {
-            matches!(
-                member.initializer,
-                Some(Expression::NewExpression(_) | Expression::CallExpression(_))
-            )
+            member.initializer.is_some()
+                && ctx
+                    .scoping()
+                    .get_binding(func_scope_id, member.id.static_name().as_str().into())
+                    .and_then(|symbol_id| ctx.scoping().get_enum_member_value(symbol_id))
+                    .is_none()
         });
 
         let statements = Self::transform_ts_enum_members(

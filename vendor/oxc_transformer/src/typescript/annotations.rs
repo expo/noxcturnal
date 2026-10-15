@@ -581,7 +581,7 @@ impl<'a> TypeScriptAnnotations<'a> {
     /// Check if the given name is a JSX pragma or fragment pragma import
     /// and if the file contains JSX elements or fragments
     fn is_jsx_imports(&self, name: &str) -> bool {
-        self.has_jsx_element && name == self.jsx_element_import_name
+        (self.has_jsx_element || self.has_jsx_fragment) && name == self.jsx_element_import_name
             || self.has_jsx_fragment && name == self.jsx_fragment_import_name
     }
 
