@@ -34,10 +34,7 @@ for (const retained of [false, true])
         );
         expect(result.status).toBe('complete');
       });
-      (retained && entry.omitted ? test.fails : test)(
-        'distinguishes an available constant from an unevaluable expression',
-        () => {
-          expect(visits).toBe(Number(entry.constant === present));
-        },
-      );
+      test('distinguishes an available constant from an unevaluable expression', () => {
+        expect(visits).toBe(Number(entry.constant === present));
+      });
     });

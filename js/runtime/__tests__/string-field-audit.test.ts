@@ -3,10 +3,16 @@ import { defineNativePipeline, defineNativePlugin, defineVisitor, transform } fr
 import { packRouteManifest } from '../../protocol/manifest';
 import { NativeTransformSession } from '../session';
 const cases = [
-  { name: 'high surrogate', literal: String.raw`"\uD800"`, expected: '\uD800', fails: true },
-  { name: 'low surrogate', literal: String.raw`"\uDC00"`, expected: '\uDC00', fails: true },
-  { name: 'valid pair', literal: String.raw`"\uD83D\uDE00"`, expected: '😀', fails: false },
-  { name: 'replacement character', literal: '"�d800"', expected: '�d800', fails: false },
+  { name: 'high surrogate', literal: String.raw`"\uD800"`, expected: '\uD800' },
+  { name: 'low surrogate', literal: String.raw`"\uDC00"`, expected: '\uDC00' },
+  { name: 'valid pair', literal: String.raw`"\uD83D\uDE00"`, expected: '😀' },
+  { name: 'replacement character', literal: '"�d800"', expected: '�d800' },
+  { name: 'leading NUL', literal: String.raw`"\u0000"`, expected: '\0' },
+  {
+    name: 'replacement plus surrogate',
+    literal: String.raw`"\uFFFD\uD800"`,
+    expected: '\uFFFD\uD800',
+  },
 ];
 describe.each(cases)('$name', entry => {
   let value: unknown, argument: unknown, query: unknown;
@@ -46,14 +52,10 @@ describe.each(cases)('$name', entry => {
     }
     expect([value, argument, query].every(item => typeof item === 'string')).toBe(true);
   });
-  const check = entry.fails ? test.fails : test;
-  check('string literal field preserves JavaScript code units', () =>
-    expect(value).toBe(entry.expected),
-  );
-  check('call argument field preserves JavaScript code units', () =>
-    expect(argument).toBe(entry.expected),
-  );
-  check('retained call query preserves JavaScript code units', () =>
-    expect(query).toBe(entry.expected),
-  );
+  test('string literal field preserves JavaScript code units', () =>
+    expect(value).toBe(entry.expected));
+  test('call argument field preserves JavaScript code units', () =>
+    expect(argument).toBe(entry.expected));
+  test('retained call query preserves JavaScript code units', () =>
+    expect(query).toBe(entry.expected));
 });

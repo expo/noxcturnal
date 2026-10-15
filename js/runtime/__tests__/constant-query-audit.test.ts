@@ -10,6 +10,8 @@ describe.each([
   ['lone low surrogate', String.raw`"\uDC00"`, '\uDC00'],
   ['negative-zero arithmetic', '0 / -1', -0],
   ['number stringification', '"" + 1000000000000000.25', '1000000000000000.2'],
+  ['leading NUL string', String.raw`"\u0000"`, '\0'],
+  ['replacement plus surrogate', String.raw`"\uFFFD\uD800"`, '\uFFFD\uD800'],
 ])('constant query: %s', (_name, expression, expected) => {
   let actual: unknown;
   beforeAll(() => {
@@ -34,6 +36,5 @@ describe.each([
   test('native expression control', () => {
     expect(Object.is(new Function(`return (${expression});`)(), expected)).toBe(true);
   });
-  test.fails('query preserves the evaluated value', () =>
-    expect(Object.is(actual, expected)).toBe(true));
+  test('query preserves the evaluated value', () => expect(Object.is(actual, expected)).toBe(true));
 });

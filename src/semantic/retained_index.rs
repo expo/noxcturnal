@@ -8,7 +8,7 @@ use std::cell::OnceCell;
 #[cfg(test)]
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use super::constant_eval::{EvaluatedConstant, constant_for_kind};
+use super::value_transport::{TransportConstant, constant};
 use crate::generated::event_schema::{
     child_role_parent_has_roles, child_role_projects_formal_parameters, node_type_id,
     node_type_name,
@@ -41,7 +41,7 @@ pub struct RetainedIndex {
     bindings: FxHashMap<(u32, u32), BindingRecord>,
     redeclarations: Vec<Vec<u32>>,
     globals: FxHashMap<u32, Vec<SemanticReference>>,
-    constants: Option<Vec<Option<EvaluatedConstant>>>,
+    constants: Option<Vec<Option<TransportConstant>>>,
     calls: Vec<CallRecord>,
     scalar_field_ranges: Option<Vec<(u32, u32)>>,
     scalar_fields: Vec<RetainedField>,
@@ -507,7 +507,7 @@ impl RetainedIndex {
 
     pub fn record_constant(&mut self, kind: AstKind<'_>, node_id: u32) {
         if let Some(constants) = &mut self.constants {
-            constants[node_id as usize] = constant_for_kind(kind);
+            constants[node_id as usize] = constant(kind);
         }
     }
 
@@ -771,8 +771,8 @@ impl RetainedIndex {
                     .as_ref()
                     .map(|constant| NativeConstantFact {
                         id: node_id,
-                        kind: constant.kind().to_owned(),
-                        value: constant.encode(),
+                        kind: constant.kind.to_owned(),
+                        value: constant.encoded.clone(),
                     })
             })
             .collect()
@@ -1445,18 +1445,13 @@ impl RetainedIndex {
                 })
                 .sum::<usize>()
             + self.constants.as_ref().map_or(0, |constants| {
-                constants.capacity() * size_of::<Option<EvaluatedConstant>>()
+                constants.capacity() * size_of::<Option<TransportConstant>>()
+                    + constants
+                        .iter()
+                        .flatten()
+                        .map(|constant| constant.encoded.capacity())
+                        .sum::<usize>()
             })
-            + self
-                .constants
-                .as_ref()
-                .into_iter()
-                .flatten()
-                .filter_map(|constant| match constant {
-                    Some(EvaluatedConstant::String(value)) => Some(value.capacity()),
-                    _ => None,
-                })
-                .sum::<usize>()
             + self.calls.capacity() * size_of::<CallRecord>()
             + self.scalar_strings.capacity() * size_of::<String>()
             + self

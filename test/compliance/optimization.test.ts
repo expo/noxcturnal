@@ -139,6 +139,20 @@ test('constant folding follows ECMAScript StringNumericLiteral parsing', () => {
   ]);
 });
 
+test('constant folding does not emit isolated-surrogate encodings', () => {
+  const source = String.raw`globalThis.result = ['\uD800' + 'x', '\uD800' < '\uE000', '\uD800' === '\uFFFD'];`;
+  const code = compile(source, { optimize: { constantFolding: true } });
+  const run = (program: string) => {
+    const context: { result?: unknown } = {};
+    new Function('globalThis', program)(context);
+    return context.result;
+  };
+  // The evaluator refuses Oxc's lone-surrogate marker instead of treating it
+  // as text. Unfolded output must still match the JavaScript values.
+  expect(run(source)).toEqual(['\uD800x', true, false]);
+  expect(run(code)).toEqual(run(source));
+});
+
 test('constant folding preserves signed zero semantics', () => {
   const result = execute<{ result: number[] }>(
     `globalThis.result = [1 / -0, 1 / +'-0', 1 / ((0 * -1) ** 3), 1 / ((0 * -1) ** 2)];`,

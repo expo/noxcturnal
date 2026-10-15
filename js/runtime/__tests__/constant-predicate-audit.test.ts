@@ -9,7 +9,6 @@ const cases: {
   source: string;
   value: ScalarValue;
   expected: number;
-  fails: boolean;
 }[] = [
   {
     name: 'null matches null',
@@ -17,7 +16,6 @@ const cases: {
     source: 'null;',
     value: null,
     expected: 1,
-    fails: true,
   },
   {
     name: 'null does not match empty string',
@@ -25,7 +23,6 @@ const cases: {
     source: 'null;',
     value: '',
     expected: 0,
-    fails: true,
   },
   {
     name: 'boolean-looking string matches string',
@@ -33,7 +30,6 @@ const cases: {
     source: '"true";',
     value: 'true',
     expected: 1,
-    fails: true,
   },
   {
     name: 'boolean-looking string does not match boolean',
@@ -41,7 +37,6 @@ const cases: {
     source: '"true";',
     value: true,
     expected: 0,
-    fails: true,
   },
   {
     name: 'numeric-looking string matches string',
@@ -49,7 +44,6 @@ const cases: {
     source: '"3";',
     value: '3',
     expected: 1,
-    fails: true,
   },
   {
     name: 'numeric-looking string does not match number',
@@ -57,7 +51,6 @@ const cases: {
     source: '"3";',
     value: 3,
     expected: 0,
-    fails: true,
   },
   {
     name: 'ordinary string',
@@ -65,7 +58,13 @@ const cases: {
     source: '"word";',
     value: 'word',
     expected: 1,
-    fails: false,
+  },
+  {
+    name: 'lone surrogate string',
+    route: 'StringLiteral',
+    source: '"\\uD800";',
+    value: '\uD800',
+    expected: 1,
   },
   {
     name: 'empty string',
@@ -73,16 +72,14 @@ const cases: {
     source: '"";',
     value: '',
     expected: 1,
-    fails: false,
   },
-  { name: 'number', route: 'NumericLiteral', source: '3;', value: 3, expected: 1, fails: false },
+  { name: 'number', route: 'NumericLiteral', source: '3;', value: 3, expected: 1 },
   {
     name: 'boolean',
     route: 'BooleanLiteral',
     source: 'true;',
     value: true,
     expected: 1,
-    fails: false,
   },
 ];
 for (const retained of [false, true]) {
@@ -120,9 +117,7 @@ for (const retained of [false, true]) {
           retainedCalls.mockRestore();
         }
       });
-      (entry.fails && !(retained && entry.name === 'null does not match empty string')
-        ? test.fails
-        : test)('matches the typed constant, not its text encoding', () => {
+      test('matches the typed constant, not its text encoding', () => {
         expect(visits).toBe(entry.expected);
       });
     });

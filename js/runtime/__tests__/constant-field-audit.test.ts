@@ -2,14 +2,13 @@ import { beforeAll, describe, expect, test, vi } from 'vitest';
 import { defineNativePlugin, defineNativePipeline, defineVisitor, transform } from '../../index';
 import { NativeTransformSession } from '../session';
 const cases = [
-  { name: 'null', route: 'NullLiteral', source: 'null;', kind: 'null', value: null, fails: true },
+  { name: 'null', route: 'NullLiteral', source: 'null;', kind: 'null', value: null },
   {
     name: 'numeric string',
     route: 'StringLiteral',
     source: '"3";',
     kind: 'string',
     value: '3',
-    fails: true,
   },
   {
     name: 'boolean string',
@@ -17,7 +16,6 @@ const cases = [
     source: '"true";',
     kind: 'string',
     value: 'true',
-    fails: true,
   },
   {
     name: 'empty string',
@@ -25,7 +23,6 @@ const cases = [
     source: '"";',
     kind: 'string',
     value: '',
-    fails: false,
   },
   {
     name: 'ordinary string',
@@ -33,16 +30,14 @@ const cases = [
     source: '"word";',
     kind: 'string',
     value: 'word',
-    fails: false,
   },
-  { name: 'number', route: 'NumericLiteral', source: '3;', kind: 'number', value: 3, fails: false },
+  { name: 'number', route: 'NumericLiteral', source: '3;', kind: 'number', value: 3 },
   {
     name: 'boolean',
     route: 'BooleanLiteral',
     source: 'true;',
     kind: 'boolean',
     value: true,
-    fails: false,
   },
   {
     name: 'conditional',
@@ -50,7 +45,6 @@ const cases = [
     source: 'true ? 3 : 4;',
     kind: 'number',
     value: 3,
-    fails: 'retained',
   },
   {
     name: 'sequence',
@@ -58,7 +52,6 @@ const cases = [
     source: '1, 3;',
     kind: 'number',
     value: 3,
-    fails: 'retained',
   },
   {
     name: 'parenthesized',
@@ -66,7 +59,6 @@ const cases = [
     source: '(3);',
     kind: 'number',
     value: 3,
-    fails: 'retained',
   },
   {
     name: 'unary',
@@ -74,7 +66,13 @@ const cases = [
     source: '-3;',
     kind: 'number',
     value: -3,
-    fails: false,
+  },
+  {
+    name: 'negative zero',
+    route: 'UnaryExpression',
+    source: '-0;',
+    kind: 'number',
+    value: -0,
   },
   {
     name: 'binary',
@@ -82,7 +80,6 @@ const cases = [
     source: '1 + 2;',
     kind: 'number',
     value: 3,
-    fails: false,
   },
   {
     name: 'logical',
@@ -90,7 +87,6 @@ const cases = [
     source: 'false || 3;',
     kind: 'number',
     value: 3,
-    fails: false,
   },
   {
     name: 'overflow literal',
@@ -98,7 +94,6 @@ const cases = [
     source: '1e400;',
     kind: 'number',
     value: Infinity,
-    fails: true,
   },
   {
     name: 'positive infinity',
@@ -106,7 +101,6 @@ const cases = [
     source: '1 / 0;',
     kind: 'number',
     value: Infinity,
-    fails: true,
   },
   {
     name: 'negative infinity',
@@ -114,7 +108,6 @@ const cases = [
     source: '-1e400;',
     kind: 'number',
     value: -Infinity,
-    fails: true,
   },
   {
     name: 'NaN',
@@ -122,7 +115,6 @@ const cases = [
     source: '0 / 0;',
     kind: 'number',
     value: NaN,
-    fails: true,
   },
 ] as const;
 for (const retained of [false, true])
@@ -156,10 +148,10 @@ for (const retained of [false, true])
         calls.mockRestore();
       }
     });
-    (entry.fails === true || (entry.fails === 'retained' && retained) ? test.fails : test)(
-      'delivers the requested constant kind and typed value',
-      () => {
-        expect(actual).toEqual([[entry.kind, entry.value]]);
-      },
-    );
+    test('delivers the requested constant kind and typed value', () => {
+      expect(actual).toHaveLength(1);
+      const [kind, value] = actual[0] as [unknown, unknown];
+      expect(kind).toBe(entry.kind);
+      expect(Object.is(value, entry.value)).toBe(true);
+    });
   });

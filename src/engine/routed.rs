@@ -302,23 +302,23 @@ impl RoutedEventCollector<'_> {
             return false;
         };
         let scalar_type = predicate_scalar_type(field_name, node_type_id, &actual.value);
+        let value = if field_name == "constantValue" {
+            crate::semantic::value_transport::scalar(&actual.value).1
+        } else {
+            &actual.value
+        };
         predicate.values.iter().any(|expected| match expected {
-            CompiledScalar::String(value) => scalar_type == 0 && actual.value == *value,
-            CompiledScalar::Number(value) => {
-                scalar_type == 1
-                    && actual
-                        .value
-                        .parse::<f64>()
-                        .is_ok_and(|actual| actual == *value)
+            CompiledScalar::String(expected) => scalar_type == 0 && value == expected,
+            CompiledScalar::Number(expected) => {
+                scalar_type == 1 && value.parse::<f64>().is_ok_and(|actual| actual == *expected)
             }
-            CompiledScalar::Boolean(value) => {
+            CompiledScalar::Boolean(expected) => {
                 scalar_type == 2
-                    && actual
-                        .value
+                    && value
                         .parse::<bool>()
-                        .is_ok_and(|actual| actual == *value)
+                        .is_ok_and(|actual| actual == *expected)
             }
-            CompiledScalar::Null => false,
+            CompiledScalar::Null => scalar_type == 3,
         })
     }
 

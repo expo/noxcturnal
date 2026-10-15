@@ -1,3 +1,4 @@
+import { encodeString } from './value-transport';
 import {
   CHILD_ROLES,
   FIELD_KEY_IDS,
@@ -146,7 +147,7 @@ export function packRouteManifest(
         values.length,
       );
       for (const value of values) {
-        if (typeof value === 'string') words.push(0, intern(value));
+        if (typeof value === 'string') words.push(0, intern(encodeString(value)));
         else if (typeof value === 'number') words.push(1, intern(String(value)));
         else if (typeof value === 'boolean') words.push(2, Number(value));
         else words.push(3, 0);

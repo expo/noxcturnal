@@ -1,3 +1,4 @@
+import { decodeConstant, decodeString } from './value-transport';
 import { FIELD_KEYS, NODE_TYPES } from '../generated/event-schema';
 import type { EventBatch, NativeEvent } from '../types';
 import type { NativeComment } from '../types';
@@ -290,19 +291,30 @@ export function parseScalar(value: string): string | number | boolean {
 
 /** Coerce a decoded string field only where a non-string value is meaningful.
  *
- * Booleans and counts arrive packed as typed words; the only string-carried
- * scalars that can represent numbers or booleans are literal `value`s and
- * evaluated `constantValue`s. Identifier names, operators, and other
- * source-derived strings stay strings without a numeric parse attempt.
+ * Booleans and counts arrive packed as typed words. String-carried numbers are
+ * numeric literals. `constantValue` carries an explicit kind tag and is never
+ * guessed from its text. Other host strings decode only the exceptional
+ * UTF-16 form; identifier names and operators stay untouched.
  */
 export function coerceFieldValue(
   key: string,
   nodeType: string,
   value: string,
-): string | number | boolean {
-  return (key === 'value' && nodeType !== 'StringLiteral') || key === 'constantValue'
-    ? parseScalar(value)
-    : value;
+): string | number | boolean | null {
+  if (key === 'constantValue') return decodeConstant(value);
+  if (key === 'value' && nodeType === 'NumericLiteral') return Number(value);
+  if (key === 'value' && nodeType === 'BooleanLiteral') return parseScalar(value);
+  if (
+    key === 'value' ||
+    key === 'staticArgument' ||
+    key === 'property' ||
+    key === 'source' ||
+    key === 'imported' ||
+    key === 'exported' ||
+    key === 'local'
+  )
+    return decodeString(value);
+  return value;
 }
 
 function decodeTag(tag: number, known: readonly string[], strings: string[]): string {
