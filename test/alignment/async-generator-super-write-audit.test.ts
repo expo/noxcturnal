@@ -11,7 +11,6 @@ const cases = [
       { value: 2, done: false },
       { value: 4, done: false },
     ],
-    broken: true,
   },
   {
     name: 'plain write without suspension',
@@ -20,7 +19,6 @@ const cases = [
       { value: 3, done: false },
       { value: undefined, done: true },
     ],
-    broken: false,
   },
 ];
 async function run(fn: Function): Promise<unknown> {
@@ -71,12 +69,9 @@ for (const mode of ['inline', 'runtime'] as const)
           }
           if (fn) actual = await run(fn);
         });
-        (entry.broken && classes ? test.fails : test)(
-          'preserves the super operation across suspension',
-          () => {
-            expect(parseError).toBeUndefined();
-            expect(actual).toEqual(entry.expected);
-          },
-        );
+        test('preserves the super operation across suspension', () => {
+          expect(parseError).toBeUndefined();
+          expect(actual).toEqual(entry.expected);
+        });
       });
     }

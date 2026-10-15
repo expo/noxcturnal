@@ -19,11 +19,9 @@ const cases = [
     declaration: `const f = ({ async f(a) { 'use strict'; ${body} } }).f;`,
     native: strictResult,
     selected: strictResult,
-    broken: true,
   },
   {
     name: 'object method inheriting script strictness',
-    brokenInline: true,
     declaration: `'use strict'; const f = ({ async f(a) { ${body} } }).f;`,
     native: strictResult,
     selected: strictResult,
@@ -102,12 +100,9 @@ for (const entry of cases) {
       }
     });
     for (const mode of ['inline', 'runtime']) {
-      (entry.brokenInline && mode === 'inline' ? test.fails : test)(
-        `${mode} preserves the selected contract`,
-        () => {
-          expect(outcomes.get(mode)).toEqual(entry.selected);
-        },
-      );
+      test(`${mode} preserves the selected contract`, () => {
+        expect(outcomes.get(mode)).toEqual(entry.selected);
+      });
     }
   });
 }
