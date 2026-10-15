@@ -155,7 +155,7 @@ impl<'a> TypeScriptEnum {
     ///   return Foo;
     /// })(Foo || {});
     /// ```
-    fn transform_ts_enum(
+    pub(crate) fn transform_ts_enum(
         decl: &mut TSEnumDeclaration<'a>,
         export_span: Option<Span>,
         ctx: &mut TraverseCtx<'a>,

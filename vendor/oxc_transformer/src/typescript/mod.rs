@@ -14,7 +14,7 @@ mod options;
 mod rewrite_extensions;
 
 use annotations::TypeScriptAnnotations;
-use r#enum::TypeScriptEnum;
+pub(crate) use r#enum::TypeScriptEnum;
 use module::TypeScriptModule;
 use namespace::TypeScriptNamespace;
 pub use options::{RewriteExtensionsMode, TypeScriptOptions};
