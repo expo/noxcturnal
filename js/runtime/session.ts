@@ -159,8 +159,18 @@ export class NativeTransformSession {
     const constantNodesById = request.constants?.length
       ? new Map(this.constantNodes(request.constants).map(node => [node.id, node]))
       : undefined;
-    for (const id of request.constants ?? [])
-      constants[id] = constantNodesById!.get(id)?.constantValue ?? null;
+    for (const id of request.constants ?? []) {
+      // Node fields are `unknown`. Narrow the decoded constant so 0, -0, and
+      // empty strings survive, and a missing node stays null.
+      const value: unknown = constantNodesById!.get(id)?.constantValue;
+      constants[id] =
+        typeof value === 'string' ||
+        typeof value === 'number' ||
+        typeof value === 'boolean' ||
+        value === null
+          ? value
+          : null;
+    }
     const captureRequests = new Map<number, boolean | undefined>();
     for (const capture of request.captures ?? []) {
       if (
