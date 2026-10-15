@@ -89,6 +89,37 @@ for (const [label, addon] of [
   );
   session.close();
 }
+for (const count of [100, 1000])
+  for (const grouped of [false, true])
+    describe(`rename ${count} exports, grouped=${grouped}`, () => {
+      const source = grouped
+        ? `export let ${Array.from({ length: count }, (_, i) => `value${i}=${i}`).join(',')};`
+        : Array.from({ length: count }, (_, i) => `export let value${i}=${i};`).join('\n');
+      for (const [label, api] of implementations) {
+        const plan = api.defineNativePipeline({
+          phases: [
+            {
+              name: 'rename',
+              plugins: [
+                api.defineNativePlugin({
+                  name: 'rename-exports',
+                  visitors: [
+                    api.defineVisitor('Program', { scope: true }, (path: any) => {
+                      for (let i = 0; i < count; i++) path.scope.rename(`value${i}`, `renamed${i}`);
+                    }),
+                  ],
+                }),
+              ],
+            },
+          ],
+        });
+        bench(label, () => {
+          const result = api.transform(source, 'input.mjs', plan);
+          if (result.status !== 'complete') throw new Error('Unexpected benchmark bailout');
+          return result;
+        });
+      }
+    });
 const constructors = [
   ...(baselineRoot
     ? [

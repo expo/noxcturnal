@@ -447,6 +447,9 @@ export class NativeTransformSession {
   bindingRenamePlan(name: string, scopeId: number) {
     return this.#binding('binding.rename').bindingRenamePlan(name, scopeId);
   }
+  bindingRenameExportNames(start: number): string[] {
+    return this.#binding('binding.rename.exports').bindingRenameExportNames(start);
+  }
   resolveBinding(name: string, scopeId: number): QueryResult['bindings'][number] | undefined {
     const scope = this.resolveBindingScope(name, scopeId);
     const fact =

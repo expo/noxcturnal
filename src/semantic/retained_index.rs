@@ -4,6 +4,7 @@ use oxc_ast::AstKind;
 use oxc_semantic::{AstNodes, Scoping};
 use oxc_span::GetSpan;
 use rustc_hash::FxHashMap;
+use std::cell::OnceCell;
 #[cfg(test)]
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -48,6 +49,7 @@ pub struct RetainedIndex {
     scope_metadata: Vec<[u32; 5]>,
     rename_kinds: FxHashMap<u32, u32>,
     exported_declarations: Vec<(u32, u32)>,
+    rename_exports: OnceCell<Box<FxHashMap<u32, Vec<u32>>>>,
 }
 
 #[derive(Clone, Copy)]
@@ -178,7 +180,6 @@ pub struct NativeRenameTarget {
 pub struct NativeRenameExport {
     pub start: u32,
     pub end: u32,
-    pub names: Vec<String>,
 }
 #[napi(object)]
 pub struct NativeRenamePlan {
@@ -277,6 +278,7 @@ impl RetainedIndex {
             scope_metadata: Vec::new(),
             rename_kinds: FxHashMap::default(),
             exported_declarations: Vec::new(),
+            rename_exports: OnceCell::new(),
         }
     }
 
@@ -415,36 +417,66 @@ impl RetainedIndex {
                 kind: self.rename_kinds.get(&id).copied().unwrap_or(0),
             })
             .collect();
-        let exports = self
-            .exported_declarations
+        let mut exports = binding
+            .declaration_ids
             .iter()
-            .filter(|(id, scope)| {
-                *scope == scope_id
-                    && binding.declaration_ids.iter().any(|declaration| {
-                        self.starts[*declaration as usize] >= self.starts[*id as usize]
-                            && self.ends[*declaration as usize] <= self.ends[*id as usize]
-                    })
+            .filter_map(|id| self.export_for_declaration(scope_id, *id))
+            .map(|id| NativeRenameExport {
+                start: self.starts[id as usize],
+                end: self.ends[id as usize],
             })
-            .map(|(id, _)| {
-                let start = self.starts[*id as usize];
-                let end = self.ends[*id as usize];
-                let mut names = self
-                    .bindings
-                    .iter()
-                    .filter(|((scope, _), record)| {
-                        *scope == scope_id
-                            && record.declaration_ids.iter().any(|declaration| {
-                                self.starts[*declaration as usize] >= start
-                                    && self.ends[*declaration as usize] <= end
-                            })
-                    })
-                    .map(|((_, name), _)| self.names[*name as usize].to_string())
-                    .collect::<Vec<_>>();
-                names.sort();
-                NativeRenameExport { start, end, names }
-            })
-            .collect();
+            .collect::<Vec<_>>();
+        exports.dedup_by_key(|declaration| declaration.start);
         NativeRenamePlan { targets, exports }
+    }
+
+    /// Exports are recorded in source order. A binding declared by an export
+    /// precedes any exports nested in a namespace body, so its preceding export
+    /// must contain the declaration and belong to the same semantic scope.
+    fn export_for_declaration(&self, scope: u32, declaration: u32) -> Option<u32> {
+        let start = self.starts[declaration as usize];
+        let position = self
+            .exported_declarations
+            .partition_point(|(id, _)| self.starts[*id as usize] <= start);
+        let &(id, owner_scope) = self.exported_declarations.get(position.checked_sub(1)?)?;
+        (owner_scope == scope && self.ends[declaration as usize] <= self.ends[id as usize])
+            .then_some(id)
+    }
+
+    pub fn rename_export_names(&self, start: u32) -> Vec<String> {
+        // Build names only when a declaration is actually rewritten. Ordinary
+        // binding renames in an export-heavy module do not need this index.
+        self.rename_exports
+            .get_or_init(|| {
+                let mut exports: FxHashMap<u32, Vec<u32>> = FxHashMap::default();
+                for (&(scope, name), binding) in &self.bindings {
+                    let mut previous = None;
+                    for &declaration in &binding.declaration_ids {
+                        let Some(id) = self.export_for_declaration(scope, declaration) else {
+                            continue;
+                        };
+                        if previous == Some(id) {
+                            continue;
+                        }
+                        previous = Some(id);
+                        exports
+                            .entry(self.starts[id as usize])
+                            .or_default()
+                            .push(name);
+                    }
+                }
+                for names in exports.values_mut() {
+                    names.sort_unstable_by(|a, b| {
+                        self.names[*a as usize].cmp(&self.names[*b as usize])
+                    });
+                }
+                Box::new(exports)
+            })
+            .get(&start)
+            .into_iter()
+            .flatten()
+            .map(|name| self.names[*name as usize].to_string())
+            .collect()
     }
 
     pub fn record_constant(&mut self, kind: AstKind<'_>, node_id: u32) {
@@ -1329,7 +1361,14 @@ impl RetainedIndex {
     }
 
     pub fn memory_usage(&self) -> usize {
-        self.rename_kinds.capacity() * size_of::<(u32, u32)>()
+        self.rename_exports.get().map_or(0, |exports| {
+            size_of::<FxHashMap<u32, Vec<u32>>>()
+                + exports.capacity() * size_of::<(u32, Vec<u32>)>()
+                + exports
+                    .values()
+                    .map(|ids| ids.capacity() * size_of::<u32>())
+                    .sum::<usize>()
+        }) + self.rename_kinds.capacity() * size_of::<(u32, u32)>()
             + self.exported_declarations.capacity() * size_of::<(u32, u32)>()
             + self.scope_metadata.capacity() * size_of::<[u32; 5]>()
             + self.type_ids.capacity() * size_of::<u32>()

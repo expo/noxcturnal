@@ -632,7 +632,7 @@ function mappingPolicy(value?: CodeFragment['mapping']): EditCommand['mapping'] 
 }
 
 type ScopeEdits = {
-  exports: Map<number, { names: Map<string, string>; edit: EditCommand }>;
+  exports: Map<number, { positions: Map<string, number>; parts: string[] }>;
   push?: EditCommand & { contentParts?: NonNullable<RealizedContent['contentParts']> };
 };
 // One phase shares an edit list across plugins and route runtimes. Structural
@@ -782,15 +782,23 @@ function makeScope(runtime: PathRuntime, id: number, parentId: number | null): N
       for (const declaration of plan.exports) {
         let entry = exportEdits.get(declaration.start);
         if (!entry) {
+          const parts = ['\nexport { '];
+          const positions = new Map<string, number>();
+          for (const external of session.bindingRenameExportNames(declaration.start)) {
+            if (positions.size > 0) parts.push(', ');
+            positions.set(external, parts.length);
+            parts.push(external);
+          }
+          parts.push(' };');
           const edit: EditCommand = {
             kind: 'AppendLeft',
             start: declaration.end,
             end: declaration.end,
-            content: '',
+            contentParts: parts,
             owner: runtime.owner,
             order: runtime.nextOrder(),
           };
-          entry = { names: new Map(declaration.names.map(name => [name, name])), edit };
+          entry = { positions, parts };
           exportEdits.set(declaration.start, entry);
           runtime.edits.push(
             {
@@ -804,8 +812,8 @@ function makeScope(runtime: PathRuntime, id: number, parentId: number | null): N
             edit,
           );
         }
-        entry.names.set(name, replacement);
-        entry.edit.content = `\nexport { ${[...entry.names].map(([external, local]) => (local === external ? local : `${local} as ${external}`)).join(', ')} };`;
+        entry.parts[entry.positions.get(name)!] =
+          name === replacement ? name : `${replacement} as ${name}`;
       }
       return replacement;
     },

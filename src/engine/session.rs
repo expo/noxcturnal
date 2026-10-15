@@ -283,6 +283,12 @@ impl NativeIndexedSession {
     }
 
     #[napi]
+    pub fn binding_rename_export_names(&self, start: u32) -> Result<Vec<String>> {
+        self.ensure_open()?;
+        Ok(self.retained_index.rename_export_names(start))
+    }
+
+    #[napi]
     pub fn global_binding_references_buffer(&self, name: String) -> Result<Buffer> {
         self.ensure_open()?;
         Ok(self.retained_index.global_binding_references_buffer(&name))

@@ -141,8 +141,9 @@ interface NativeBinding {
       scopeId: number,
     ): {
       targets: { start: number; end: number; kind: number }[];
-      exports: { start: number; end: number; names: string[] }[];
+      exports: { start: number; end: number }[];
     };
+    bindingRenameExportNames(start: number): string[];
     bindingIndexBuffer(): Buffer;
     scopeParentsBuffer(): Buffer;
     scopeMetadataBuffer(): Buffer;
