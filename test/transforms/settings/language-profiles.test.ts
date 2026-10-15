@@ -53,24 +53,24 @@ test('composes the native portion of the legacy Hermes language profile in one p
     import _asyncIterator from '@babel/runtime/helpers/asyncIterator';
     import _awaitAsyncGenerator from '@babel/runtime/helpers/awaitAsyncGenerator';
     import _wrapAsyncGenerator from '@babel/runtime/helpers/wrapAsyncGenerator';
-    var _wrapRegExp2 = { wrapRegExp: require('@babel/runtime/helpers/wrapRegExp') },
+    import _babelHelper from '@babel/runtime/helpers/wrapRegExp';
+    import _babelHelper2 from '@babel/runtime/helpers/objectDestructuringEmpty';
+    import _babelHelper3 from '@babel/runtime/helpers/classPrivateFieldLooseBase';
+    import _babelHelper4 from '@babel/runtime/helpers/checkInRHS';
+    var _wrapRegExp2 = { wrapRegExp: _babelHelper },
       _wrapRegExp = _wrapRegExp2.wrapRegExp;
-    var _objectDestructuringEmpty2 = {
-      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
-    };
+    var _objectDestructuringEmpty2 = { objectDestructuringEmpty: _babelHelper2 };
     function _objectDestructuringEmpty(t) {
       return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
     }
-    var _classPrivateFieldLooseBase2 = {
-      classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
-    };
+    var _classPrivateFieldLooseBase2 = { classPrivateFieldLooseBase: _babelHelper3 };
     function _classPrivateFieldLooseBase(e, s) {
       return _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
     }
     function _classPrivateMethodCall(e, s, a) {
       return _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s)[s].apply(e, a);
     }
-    var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+    var _checkInRHS2 = { checkInRHS: _babelHelper4 },
       _checkInRHS = _checkInRHS2.checkInRHS;
     export var Reader = (() => {
       'use strict';

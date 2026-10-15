@@ -9,9 +9,8 @@ test('lowers private methods', async () => {
       transforms: { privateMethods: true },
     }),
   ).toMatchInlineSnapshot(`
-    "var _classPrivateFieldLooseBase2 = {
-      classPrivateFieldLooseBase: require('@babel/runtime/helpers/classPrivateFieldLooseBase'),
-    };
+    "import _babelHelper from '@babel/runtime/helpers/classPrivateFieldLooseBase';
+    var _classPrivateFieldLooseBase2 = { classPrivateFieldLooseBase: _babelHelper };
     function _classPrivateFieldLooseBase(e, s) {
       return _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
     }

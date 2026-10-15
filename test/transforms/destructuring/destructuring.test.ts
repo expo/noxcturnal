@@ -9,16 +9,17 @@ test('lowers destructuring', async () => {
       transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
-    "var _toArray2 = {
-      slicedToArray: require('@babel/runtime/helpers/slicedToArray'),
-      toArray: require('@babel/runtime/helpers/toArray'),
+    "import _babelHelper from '@babel/runtime/helpers/slicedToArray';
+    import _babelHelper2 from '@babel/runtime/helpers/toArray';
+    import _babelHelper3 from '@babel/runtime/helpers/objectDestructuringEmpty';
+    var _toArray2 = {
+      slicedToArray: _babelHelper,
+      toArray: _babelHelper2,
     };
     function _toArray(r, e, a) {
       return a ? _toArray2.toArray(r) : _toArray2.slicedToArray(r, e);
     }
-    var _objectDestructuringEmpty2 = {
-      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
-    };
+    var _objectDestructuringEmpty2 = { objectDestructuringEmpty: _babelHelper3 };
     function _objectDestructuringEmpty(t) {
       return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
     }

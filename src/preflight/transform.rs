@@ -220,6 +220,12 @@ fn validate_generated_async_iterator_results<'a>(
     }
     let used = scoping
         .symbol_names()
+        .chain(
+            scoping
+                .root_unresolved_references()
+                .keys()
+                .map(|name| name.as_str()),
+        )
         .map(str::to_owned)
         .collect::<rustc_hash::FxHashSet<_>>();
     let mut helper = "_iteratorResult".to_owned();
@@ -517,6 +523,13 @@ fn transform_impl(
                             let mut reserved = transformed
                                 .scoping
                                 .symbol_names()
+                                .chain(
+                                    transformed
+                                        .scoping
+                                        .root_unresolved_references()
+                                        .keys()
+                                        .map(|name| name.as_str()),
+                                )
                                 .map(str::to_owned)
                                 .collect::<std::collections::HashSet<_>>();
                             let decorate_name = reserve_prepass_name("_decorate", &mut reserved);
@@ -544,7 +557,7 @@ fn transform_impl(
                             &filename,
                             false,
                             options.comments.unwrap_or(true),
-                            0,
+                            None,
                         )?;
                         source = printed;
                         rewrite_layers.push(layer);
@@ -610,7 +623,7 @@ fn transform_impl(
                 &filename,
                 options.compact.unwrap_or(false),
                 options.comments.unwrap_or(true),
-                0,
+                None,
             )?;
             Ok(NativePreflightResult {
                 status: "complete".into(),
@@ -1360,36 +1373,28 @@ fn transform_impl(
         } else {
             None
         };
-        let output_is_module = program.body.iter().any(|statement| {
-            matches!(
-                statement,
-                Statement::ImportDeclaration(_)
-                    | Statement::ExportAllDeclaration(_)
-                    | Statement::ExportDefaultDeclaration(_)
-                    | Statement::ExportNamedDeclaration(_)
-            )
-        });
+        let output_is_module = program.source_type.is_module();
         let mut custom_helper_requests = Vec::new();
         let mut custom_helper_fragments = Vec::new();
         let compact = options.compact.unwrap_or(false);
-        structural_custom_helper_requests.extend_into(
+        let mut helper_globals = structural_custom_helper_requests.extend_into(
             &mut custom_helper_requests,
             &mut custom_helper_fragments,
             compact,
             runtime_policy.as_ref(),
         );
-        destructuring_custom_helper_requests.extend_into(
+        helper_globals.extend(destructuring_custom_helper_requests.extend_into(
             &mut custom_helper_requests,
             &mut custom_helper_fragments,
             compact,
             runtime_policy.as_ref(),
-        );
-        classes_custom_helper_requests.extend_into(
+        ));
+        helper_globals.extend(classes_custom_helper_requests.extend_into(
             &mut custom_helper_requests,
             &mut custom_helper_fragments,
             compact,
             runtime_policy.as_ref(),
-        );
+        ));
         let unavailable_helpers = helper_requests
             .iter()
             .filter_map(|(helper, _)| {
@@ -1415,6 +1420,9 @@ fn transform_impl(
         } else {
             None
         };
+        if let Some(inline) = &inline {
+            helper_globals.extend(inline.globals.iter().copied());
+        }
         let mut helpers_used: Vec<String> = helper_requests
             .iter()
             .map(|(helper, _)| {
@@ -1487,6 +1495,13 @@ fn transform_impl(
                         ));
                         binding
                     });
+            protect_helper_globals(
+                allocator,
+                &mut program,
+                &helper_globals,
+                &mut reservations,
+                &transformed.scoping,
+            );
             if !declarations.is_empty() {
                 let bridge_source = allocator.alloc_str(&declarations);
                 let mut parsed_bridge =
@@ -1496,6 +1511,30 @@ fn transform_impl(
                         "helper-bridge-parse-error",
                         parsed_bridge.diagnostics,
                     ));
+                }
+                if output_is_module {
+                    let mut imports = HelperImportRewriter {
+                        allocator,
+                        reservations: &mut reservations,
+                        imports: Vec::new(),
+                    };
+                    imports.visit_program(&mut parsed_bridge.program);
+                    let import_source = imports
+                        .imports
+                        .into_iter()
+                        .map(|(path, binding)| format!("import {binding} from {path:?};"))
+                        .collect::<String>();
+                    if !import_source.is_empty() {
+                        let imports = Parser::new(
+                            allocator,
+                            allocator.alloc_str(&import_source),
+                            active_source_type,
+                        )
+                        .parse();
+                        let trailing = parsed_bridge.program.body.split_off(0);
+                        parsed_bridge.program.body.extend(imports.program.body);
+                        parsed_bridge.program.body.extend(trailing);
+                    }
                 }
                 SyntheticSpanZeroer.visit_program(&mut parsed_bridge.program);
                 let insertion = program
@@ -1521,13 +1560,12 @@ fn transform_impl(
                 .visit_program(&mut program);
             }
         }
-        let generated_line_offset = u32::from(inline_prefix.is_some());
         let (generated_code, codegen_layer) = render_program(
             &program,
             &filename,
             options.compact.unwrap_or(false),
             options.comments.unwrap_or(true),
-            generated_line_offset,
+            inline_prefix.as_deref(),
         )?;
         rewrite_layers.push(codegen_layer);
         let layer = if rewrite_layers.len() == 1 {
@@ -1557,10 +1595,7 @@ fn transform_impl(
                 || active_source_type.is_typescript(),
             jsx: active_source_type.is_jsx() && options.jsx.is_none(),
             reason: None,
-            code: Some(match inline_prefix {
-                Some(prefix) => prefix + &generated_code,
-                None => generated_code,
-            }),
+            code: Some(generated_code),
             map: Some(layer.into()),
             diagnostics: Vec::new(),
             helpers_used,
@@ -1748,27 +1783,74 @@ fn push_codegen_segment(words: &mut Vec<u32>, segment: [u32; 5]) {
 
 /// Print a program and pack its map into a decoded layer.
 ///
-/// `generated_line_offset` accounts for lines the caller prepends to the
-/// printed code after the fact, which the map has to be shifted past.
+/// Inline helper bundles remain opaque generated text to avoid reparsing large
+/// Babel bodies. Insert them after hashbangs/directives and shift only subsequent
+/// mappings, explicitly marking the helper span as unmapped.
 fn render_program(
     program: &Program<'_>,
     filename: &str,
     minify: bool,
     comments: bool,
-    generated_line_offset: u32,
+    prefix: Option<&str>,
 ) -> Result<(String, DecodedLayer)> {
-    let generated = Codegen::new()
-        .with_options(CodegenOptions {
-            minify,
-            comments: if comments {
-                CommentOptions::default()
-            } else {
-                CommentOptions::disabled()
-            },
-            source_map_path: Some(PathBuf::from(filename)),
-            ..CodegenOptions::default()
-        })
-        .build(program);
+    debug_assert!(prefix.is_none_or(|prefix| {
+        prefix.ends_with('\n')
+            && !prefix[..prefix.len() - 1]
+                .chars()
+                .any(|c| matches!(c, '\n' | '\r' | '\u{2028}' | '\u{2029}'))
+    }));
+    let options = CodegenOptions {
+        minify,
+        comments: if comments {
+            CommentOptions::default()
+        } else {
+            CommentOptions::disabled()
+        },
+        source_map_path: Some(PathBuf::from(filename)),
+        ..CodegenOptions::default()
+    };
+    let mut generated = Codegen::new().with_options(options.clone()).build(program);
+    let insertion =
+        if prefix.is_some() && (program.hashbang.is_some() || !program.directives.is_empty()) {
+            let allocator = Allocator::default();
+            let last_header = program
+                .directives
+                .last()
+                .map_or(0, |directive| directive.span.end);
+            let mut header = Parser::new(&allocator, "", program.source_type)
+                .parse()
+                .program;
+            header.span = program.span;
+            header.source_text = program.source_text;
+            header.comments.extend(
+                program
+                    .comments
+                    .iter()
+                    .filter(|comment| comment.span.end <= last_header)
+                    .map(|comment| comment.clone_in(&allocator)),
+            );
+            header.hashbang = program.hashbang.clone_in(&allocator);
+            header.directives = program.directives.clone_in(&allocator);
+            let header = Codegen::new().with_options(options).build(&header).code;
+            if !generated.code.starts_with(&header) {
+                return Err(Error::new(
+                    Status::GenericFailure,
+                    "generated helper header mismatch",
+                ));
+            }
+            header.len()
+        } else {
+            0
+        };
+    let header = &generated.code[..insertion];
+    let insertion_line = header.bytes().filter(|byte| *byte == b'\n').count() as u32;
+    let insertion_column = header
+        .rsplit('\n')
+        .next()
+        .unwrap_or("")
+        .encode_utf16()
+        .count() as u32;
+    let generated_line_offset = u32::from(prefix.is_some());
     let map = generated.map.ok_or_else(|| {
         Error::new(
             Status::GenericFailure,
@@ -1789,14 +1871,33 @@ fn render_program(
                 )
             })?;
     let mut last_segment_line = None;
+    let mut prefix_unmapped = false;
     for token in tokens {
+        let after_prefix = prefix.is_some()
+            && (token.get_dst_line(), token.get_dst_col()) >= (insertion_line, insertion_column);
+        if after_prefix && !prefix_unmapped {
+            push_codegen_segment(
+                &mut words,
+                [insertion_line, insertion_column, u32::MAX, u32::MAX, 0],
+            );
+            prefix_unmapped = true;
+        }
         let generated_line = token
             .get_dst_line()
-            .checked_add(generated_line_offset)
+            .checked_add(if after_prefix {
+                generated_line_offset
+            } else {
+                0
+            })
             .ok_or_else(|| {
                 Error::new(Status::GenericFailure, "generated source-map line overflow")
             })?;
-        let generated_column = token.get_dst_col();
+        let generated_column = token.get_dst_col()
+            - if after_prefix && token.get_dst_line() == insertion_line {
+                insertion_column
+            } else {
+                0
+            };
         // Generated punctuation must close the preceding mapped span instead of
         // inheriting its source position. For duplicate positions, the later
         // codegen token is authoritative.
@@ -1824,6 +1925,9 @@ fn render_program(
     // later EOF edit cannot interpolate a stale mapping across the boundary.
     if !generated.code.is_empty() && last_segment_line.is_none_or(|line| line < emitted_last_line) {
         push_codegen_segment(&mut words, [emitted_last_line, 0, u32::MAX, u32::MAX, 0]);
+    }
+    if let Some(prefix) = prefix {
+        generated.code.insert_str(insertion, prefix);
     }
     Ok((
         generated.code,
@@ -2135,7 +2239,7 @@ impl<'a> VisitMut<'a> for DecoratorHelperReferenceRewriter<'a, '_> {
             walk_mut::walk_expression(self, expression);
             return;
         };
-        if object.name != "babelHelpers" {
+        if !object.span.is_empty() || object.name != "babelHelpers" {
             walk_mut::walk_expression(self, expression);
             return;
         }
@@ -2315,6 +2419,116 @@ impl<'a> Visit<'a> for ClassFeaturesUnsupportedDetector {
             return;
         }
         walk::walk_private_in_expression(self, expression);
+    }
+}
+
+// Only generated fragments enter this visitor: user calls to require are untouched.
+struct HelperImportRewriter<'a, 'r> {
+    allocator: &'a Allocator,
+    reservations: &'r mut SourceNameReservations,
+    imports: Vec<(String, String)>,
+}
+
+impl<'a> VisitMut<'a> for HelperImportRewriter<'a, '_> {
+    #[expect(deprecated)]
+    fn visit_expression(&mut self, expression: &mut Expression<'a>) {
+        if let Expression::CallExpression(call) = expression
+            && matches!(&call.callee, Expression::Identifier(id) if id.name == "require")
+            && call.arguments.len() == 1
+            && let Argument::StringLiteral(path) = &call.arguments[0]
+            && path.value.starts_with("@babel/runtime/helpers/")
+        {
+            let binding = if let Some((_, binding)) = self
+                .imports
+                .iter()
+                .find(|(name, _)| name == path.value.as_str())
+            {
+                binding.clone()
+            } else {
+                let binding = self.reservations.reserve("_babelHelper");
+                self.imports.push((path.value.to_string(), binding.clone()));
+                binding
+            };
+            *expression = AstBuilder::new(self.allocator)
+                .expression_identifier(Span::default(), self.allocator.alloc_str(&binding));
+            return;
+        }
+        walk_mut::walk_expression(self, expression);
+    }
+}
+
+/// Keep Babel's free globals free when embedding its module bodies in the source
+/// program. Rename only colliding program bindings, preserving reference identity
+/// and public export names. Nested source bindings cannot capture root helpers.
+fn protect_helper_globals<'a>(
+    allocator: &'a Allocator,
+    program: &mut Program<'a>,
+    globals: &rustc_hash::FxHashSet<&str>,
+    reservations: &mut SourceNameReservations,
+    scoping: &Scoping,
+) {
+    let mut renames = FxHashMap::default();
+    let bindings = scoping.get_bindings(scoping.root_scope_id());
+    for name in globals {
+        if let Some(symbol) = bindings.get(*name) {
+            renames.insert(*symbol, reservations.reserve(&format!("_{name}")));
+        }
+    }
+    if renames.is_empty() {
+        return;
+    }
+    let mut exports = String::new();
+    for statement in &mut program.body {
+        if let Statement::ExportNamedDeclaration(export) = statement
+            && let Some(declaration) = &export.declaration
+        {
+            let mut bindings = Vec::new();
+            oxc_ecmascript::BoundNames::bound_names(declaration, &mut |id| {
+                if let Some(symbol) = id.symbol_id.get() {
+                    bindings.push((id.name.to_string(), symbol));
+                }
+            });
+            if bindings.iter().any(|(_, id)| renames.contains_key(id)) {
+                for (name, id) in bindings {
+                    let local = renames.get(&id).map_or(name.as_str(), String::as_str);
+                    let _ = write!(exports, "export {{{local} as {name}}};");
+                }
+                *statement = export.declaration.take().unwrap().into();
+            }
+        }
+    }
+    struct Renamer<'a, 's> {
+        allocator: &'a Allocator,
+        scoping: &'s Scoping,
+        renames: &'s FxHashMap<oxc_semantic::SymbolId, String>,
+    }
+    impl<'a> VisitMut<'a> for Renamer<'a, '_> {
+        fn visit_binding_identifier(&mut self, id: &mut oxc_ast::ast::BindingIdentifier<'a>) {
+            if let Some(symbol) = id.symbol_id.get()
+                && let Some(name) = self.renames.get(&symbol)
+            {
+                id.name = self.allocator.alloc_str(name).into();
+            }
+        }
+        fn visit_identifier_reference(&mut self, id: &mut IdentifierReference<'a>) {
+            if let Some(reference) = id.reference_id.get()
+                && let Some(symbol) = self.scoping.get_reference(reference).symbol_id()
+                && let Some(name) = self.renames.get(&symbol)
+            {
+                id.name = self.allocator.alloc_str(name).into();
+            }
+        }
+    }
+    Renamer {
+        allocator,
+        scoping,
+        renames: &renames,
+    }
+    .visit_program(program);
+    if !exports.is_empty() {
+        let parsed =
+            Parser::new(allocator, allocator.alloc_str(&exports), SourceType::mjs()).parse();
+        program.body.extend(parsed.program.body);
     }
 }
 

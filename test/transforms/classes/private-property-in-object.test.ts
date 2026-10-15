@@ -9,7 +9,8 @@ test('lowers private property checks', async () => {
       transforms: { privatePropertyInObject: true },
     }),
   ).toMatchInlineSnapshot(`
-    "var _checkInRHS2 = { checkInRHS: require('@babel/runtime/helpers/checkInRHS') },
+    "import _babelHelper from '@babel/runtime/helpers/checkInRHS';
+    var _checkInRHS2 = { checkInRHS: _babelHelper },
       _checkInRHS = _checkInRHS2.checkInRHS;
     export let Counter = (() => {
       'use strict';

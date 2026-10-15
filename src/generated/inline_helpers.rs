@@ -240,146 +240,237 @@ pub static BABEL_INLINE_ROOTS: &[GeneratedInlineRoot] = &[
     GeneratedInlineRoot {
         name: "assertClassBrand",
         compact: r#"(()=>{var o={assertClassBrand:function(r,t){function i(e,n,p){if(typeof e=="function"?e===n:e.has(n))return arguments.length<3?n:p;throw new TypeError("Private element is not present on this object")}r.exports=i,r.exports.__esModule=!0,r.exports.default=r.exports}},s={};function a(r){if(s[r])return s[r].exports;var t=s[r]={exports:{}};return o[r](t,a),t.exports}return{assertClassBrand:a("assertClassBrand")}})()"#,
+        globals: &["TypeError", "arguments"],
     },
     GeneratedInlineRoot {
         name: "asyncGeneratorDelegate",
         compact: r#"(()=>{var p={OverloadYield:function(e,n){function a(f,o){this.v=f,this.k=o}e.exports=a,e.exports.__esModule=!0,e.exports.default=e.exports},asyncGeneratorDelegate:function(e,n){var a=n("OverloadYield");function f(o){var u={},t=!1;function s(r,c){return t=!0,c=new Promise(function(x){x(o[r](c))}),{done:!1,value:new a(c,1)}}return u[typeof Symbol!="undefined"&&Symbol.iterator||"@@iterator"]=function(){return this},u.next=function(r){return t?(t=!1,r):s("next",r)},typeof o.throw=="function"&&(u.throw=function(r){if(t)throw t=!1,r;return s("throw",r)}),typeof o.return=="function"&&(u.return=function(r){return t?(t=!1,r):s("return",r)}),u}e.exports=f,e.exports.__esModule=!0,e.exports.default=e.exports}},i={};function l(e){if(i[e])return i[e].exports;var n=i[e]={exports:{}};return p[e](n,l),n.exports}return{asyncGeneratorDelegate:l("asyncGeneratorDelegate")}})()"#,
+        globals: &["Promise", "Symbol"],
     },
     GeneratedInlineRoot {
         name: "asyncIterator",
         compact: r#"(()=>{var l={asyncIterator:function(n,i){function y(s){var o,t,r,e=2;for(typeof Symbol!="undefined"&&(t=Symbol.asyncIterator,r=Symbol.iterator);e--;){if(t&&(o=s[t])!=null)return o.call(s);if(r&&(o=s[r])!=null)return new a(o.call(s));t="@@asyncIterator",r="@@iterator"}throw new TypeError("Object is not async iterable")}function a(s){function o(t){if(Object(t)!==t)return Promise.reject(new TypeError(t+" is not an object."));var r=t.done;return Promise.resolve(t.value).then(function(e){return{value:e,done:r}})}return a=function(r){this.s=r,this.n=r.next},a.prototype={s:null,n:null,next:function(){return o(this.n.apply(this.s,arguments))},return:function(r){var e=this.s.return;return e===void 0?Promise.resolve({value:r,done:!0}):o(e.apply(this.s,arguments))},throw:function(r){var e=this.s.return;return e===void 0?Promise.reject(r):o(e.apply(this.s,arguments))}},new a(s)}n.exports=y,n.exports.__esModule=!0,n.exports.default=n.exports}},u={};function c(n){if(u[n])return u[n].exports;var i=u[n]={exports:{}};return l[n](i,c),i.exports}return{asyncIterator:c("asyncIterator")}})()"#,
+        globals: &["Object", "Promise", "Symbol", "TypeError", "arguments"],
     },
     GeneratedInlineRoot {
         name: "asyncToGenerator",
         compact: r#"(()=>{var y={asyncToGenerator:function(r,u){function x(i,f,p,o,a,s,e){try{var n=i[s](e),t=n.value}catch(d){return void p(d)}n.done?f(t):Promise.resolve(t).then(o,a)}function h(i){return function(){var f=this,p=arguments;return new Promise(function(o,a){var s=i.apply(f,p);function e(t){x(s,o,a,e,n,"next",t)}function n(t){x(s,o,a,e,n,"throw",t)}e(void 0)})}}r.exports=h,r.exports.__esModule=!0,r.exports.default=r.exports}},c={};function v(r){if(c[r])return c[r].exports;var u=c[r]={exports:{}};return y[r](u,v),u.exports}return{asyncToGenerator:v("asyncToGenerator")}})()"#,
+        globals: &["Promise", "arguments"],
     },
     GeneratedInlineRoot {
         name: "awaitAsyncGenerator",
         compact: r#"(()=>{var i={OverloadYield:function(r,t){function o(a,n){this.v=a,this.k=n}r.exports=o,r.exports.__esModule=!0,r.exports.default=r.exports},awaitAsyncGenerator:function(r,t){var o=t("OverloadYield");function a(n){return new o(n,0)}r.exports=a,r.exports.__esModule=!0,r.exports.default=r.exports}},e={};function s(r){if(e[r])return e[r].exports;var t=e[r]={exports:{}};return i[r](t,s),t.exports}return{awaitAsyncGenerator:s("awaitAsyncGenerator")}})()"#,
+        globals: &[],
     },
     GeneratedInlineRoot {
         name: "checkInRHS",
         compact: r#"(()=>{var s={typeof:function(t,o){function e(p){"@babel/helpers - typeof";return t.exports=e=typeof Symbol=="function"&&typeof Symbol.iterator=="symbol"?function(r){return typeof r}:function(r){return r&&typeof Symbol=="function"&&r.constructor===Symbol&&r!==Symbol.prototype?"symbol":typeof r},t.exports.__esModule=!0,t.exports.default=t.exports,e(p)}t.exports=e,t.exports.__esModule=!0,t.exports.default=t.exports},checkInRHS:function(t,o){var e=o("typeof").default;function p(r){if(Object(r)!==r)throw TypeError("right-hand side of 'in' should be an object, got "+(r!==null?e(r):"null"));return r}t.exports=p,t.exports.__esModule=!0,t.exports.default=t.exports}},n={};function f(t){if(n[t])return n[t].exports;var o=n[t]={exports:{}};return s[t](o,f),o.exports}return{checkInRHS:f("checkInRHS")}})()"#,
+        globals: &["Object", "Symbol", "TypeError"],
     },
     GeneratedInlineRoot {
         name: "classPrivateFieldGet2",
         compact: r#"(()=>{var l={assertClassBrand:function(t,e){function n(s,r,o){if(typeof s=="function"?s===r:s.has(r))return arguments.length<3?r:o;throw new TypeError("Private element is not present on this object")}t.exports=n,t.exports.__esModule=!0,t.exports.default=t.exports},classPrivateFieldGet2:function(t,e){var n=e("assertClassBrand");function s(r,o){return r.get(n(r,o))}t.exports=s,t.exports.__esModule=!0,t.exports.default=t.exports}},a={};function i(t){if(a[t])return a[t].exports;var e=a[t]={exports:{}};return l[t](e,i),e.exports}return{classPrivateFieldGet2:i("classPrivateFieldGet2")}})()"#,
+        globals: &["TypeError", "arguments"],
     },
     GeneratedInlineRoot {
         name: "classPrivateFieldInitSpec",
         compact: r#"(()=>{var o={checkPrivateRedeclaration:function(e,t){function a(c,r){if(r.has(c))throw new TypeError("Cannot initialize the same private elements twice on an object")}e.exports=a,e.exports.__esModule=!0,e.exports.default=e.exports},classPrivateFieldInitSpec:function(e,t){var a=t("checkPrivateRedeclaration");function c(r,n,p){a(r,n),n.set(r,p)}e.exports=c,e.exports.__esModule=!0,e.exports.default=e.exports}},i={};function s(e){if(i[e])return i[e].exports;var t=i[e]={exports:{}};return o[e](t,s),t.exports}return{classPrivateFieldInitSpec:s("classPrivateFieldInitSpec")}})()"#,
+        globals: &["TypeError"],
     },
     GeneratedInlineRoot {
         name: "classPrivateFieldLooseBase",
         compact: r#"(()=>{var a={classPrivateFieldLooseBase:function(e,t){function i(o,n){if(!{}.hasOwnProperty.call(o,n))throw new TypeError("attempted to use private field on non-instance");return o}e.exports=i,e.exports.__esModule=!0,e.exports.default=e.exports}},r={};function s(e){if(r[e])return r[e].exports;var t=r[e]={exports:{}};return a[e](t,s),t.exports}return{classPrivateFieldLooseBase:s("classPrivateFieldLooseBase")}})()"#,
+        globals: &["TypeError"],
     },
     GeneratedInlineRoot {
         name: "classPrivateFieldLooseKey",
         compact: r#"(()=>{var o={classPrivateFieldLooseKey:function(e,t){var i=0;function a(c){return"__private_"+i+++"_"+c}e.exports=a,e.exports.__esModule=!0,e.exports.default=e.exports}},r={};function s(e){if(r[e])return r[e].exports;var t=r[e]={exports:{}};return o[e](t,s),t.exports}return{classPrivateFieldLooseKey:s("classPrivateFieldLooseKey")}})()"#,
+        globals: &[],
     },
     GeneratedInlineRoot {
         name: "classPrivateFieldSet2",
         compact: r#"(()=>{var c={assertClassBrand:function(t,r){function n(s,e,o){if(typeof s=="function"?s===e:s.has(e))return arguments.length<3?e:o;throw new TypeError("Private element is not present on this object")}t.exports=n,t.exports.__esModule=!0,t.exports.default=t.exports},classPrivateFieldSet2:function(t,r){var n=r("assertClassBrand");function s(e,o,l){return e.set(n(e,o),l),l}t.exports=s,t.exports.__esModule=!0,t.exports.default=t.exports}},a={};function i(t){if(a[t])return a[t].exports;var r=a[t]={exports:{}};return c[t](r,i),r.exports}return{classPrivateFieldSet2:i("classPrivateFieldSet2")}})()"#,
+        globals: &["TypeError", "arguments"],
     },
     GeneratedInlineRoot {
         name: "classPrivateMethodInitSpec",
         compact: r#"(()=>{var s={checkPrivateRedeclaration:function(e,t){function c(i,r){if(r.has(i))throw new TypeError("Cannot initialize the same private elements twice on an object")}e.exports=c,e.exports.__esModule=!0,e.exports.default=e.exports},classPrivateMethodInitSpec:function(e,t){var c=t("checkPrivateRedeclaration");function i(r,n){c(r,n),n.add(r)}e.exports=i,e.exports.__esModule=!0,e.exports.default=e.exports}},a={};function o(e){if(a[e])return a[e].exports;var t=a[e]={exports:{}};return s[e](t,o),t.exports}return{classPrivateMethodInitSpec:o("classPrivateMethodInitSpec")}})()"#,
+        globals: &["TypeError"],
     },
     GeneratedInlineRoot {
         name: "construct",
         compact: r#"(()=>{var x={isNativeReflectConstruct:function(t,r){function e(){try{var o=!Boolean.prototype.valueOf.call(Reflect.construct(Boolean,[],function(){}))}catch(s){}return(t.exports=e=function(){return!!o},t.exports.__esModule=!0,t.exports.default=t.exports)()}t.exports=e,t.exports.__esModule=!0,t.exports.default=t.exports},setPrototypeOf:function(t,r){function e(o,s){return t.exports=e=Object.setPrototypeOf?Object.setPrototypeOf.bind():function(n,p){return n.__proto__=p,n},t.exports.__esModule=!0,t.exports.default=t.exports,e(o,s)}t.exports=e,t.exports.__esModule=!0,t.exports.default=t.exports},construct:function(t,r){var e=r("isNativeReflectConstruct"),o=r("setPrototypeOf");function s(n,p,a){if(e())return Reflect.construct.apply(null,arguments);var u=[null];u.push.apply(u,p);var i=new(n.bind.apply(n,u));return a&&o(i,a.prototype),i}t.exports=s,t.exports.__esModule=!0,t.exports.default=t.exports}},c={};function f(t){if(c[t])return c[t].exports;var r=c[t]={exports:{}};return x[t](r,f),r.exports}return{construct:f("construct")}})()"#,
+        globals: &["Boolean", "Object", "Reflect", "arguments"],
     },
     GeneratedInlineRoot {
         name: "createForOfIteratorHelper",
         compact: r#"(()=>{var v={arrayLikeToArray:function(t,n){function u(a,r){(r==null||r>a.length)&&(r=a.length);for(var o=0,e=Array(r);o<r;o++)e[o]=a[o];return e}t.exports=u,t.exports.__esModule=!0,t.exports.default=t.exports},unsupportedIterableToArray:function(t,n){var u=n("arrayLikeToArray");function a(r,o){if(r){if(typeof r=="string")return u(r,o);var e={}.toString.call(r).slice(8,-1);return e==="Object"&&r.constructor&&(e=r.constructor.name),e==="Map"||e==="Set"?Array.from(r):e==="Arguments"||/^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(e)?u(r,o):void 0}}t.exports=a,t.exports.__esModule=!0,t.exports.default=t.exports},createForOfIteratorHelper:function(t,n){var u=n("unsupportedIterableToArray");function a(r,o){var e=typeof Symbol!="undefined"&&r[Symbol.iterator]||r["@@iterator"];if(!e){if(Array.isArray(r)||(e=u(r))||o&&r&&typeof r.length=="number"){e&&(r=e);var c=0,l=function(){};return{s:l,n:function(){return c>=r.length?{done:!0}:{done:!1,value:r[c++]}},e:function(f){throw f},f:l}}throw new TypeError(`Invalid attempt to iterate non-iterable instance.
 In order to be iterable, non-array objects must have a [Symbol.iterator]() method.`)}var y,x=!0,d=!1;return{s:function(){e=e.call(r)},n:function(){var f=e.next();return x=f.done,f},e:function(f){d=!0,y=f},f:function(){try{x||e.return==null||e.return()}finally{if(d)throw y}}}}t.exports=a,t.exports.__esModule=!0,t.exports.default=t.exports}},s={};function p(t){if(s[t])return s[t].exports;var n=s[t]={exports:{}};return v[t](n,p),n.exports}return{createForOfIteratorHelper:p("createForOfIteratorHelper")}})()"#,
+        globals: &["Array", "Symbol", "TypeError"],
     },
     GeneratedInlineRoot {
         name: "defineProperty",
         compact: r#"(()=>{var u={typeof:function(t,r){function o(n){"@babel/helpers - typeof";return t.exports=o=typeof Symbol=="function"&&typeof Symbol.iterator=="symbol"?function(e){return typeof e}:function(e){return e&&typeof Symbol=="function"&&e.constructor===Symbol&&e!==Symbol.prototype?"symbol":typeof e},t.exports.__esModule=!0,t.exports.default=t.exports,o(n)}t.exports=o,t.exports.__esModule=!0,t.exports.default=t.exports},toPrimitive:function(t,r){var o=r("typeof").default;function n(e,i){if(o(e)!="object"||!e)return e;var p=e[Symbol.toPrimitive];if(p!==void 0){var y=p.call(e,i||"default");if(o(y)!="object")return y;throw new TypeError("@@toPrimitive must return a primitive value.")}return(i==="string"?String:Number)(e)}t.exports=n,t.exports.__esModule=!0,t.exports.default=t.exports},toPropertyKey:function(t,r){var o=r("typeof").default,n=r("toPrimitive");function e(i){var p=n(i,"string");return o(p)=="symbol"?p:p+""}t.exports=e,t.exports.__esModule=!0,t.exports.default=t.exports},defineProperty:function(t,r){var o=r("toPropertyKey");function n(e,i,p){return(i=o(i))in e?Object.defineProperty(e,i,{value:p,enumerable:!0,configurable:!0,writable:!0}):e[i]=p,e}t.exports=n,t.exports.__esModule=!0,t.exports.default=t.exports}},f={};function s(t){if(f[t])return f[t].exports;var r=f[t]={exports:{}};return u[t](r,s),r.exports}return{defineProperty:s("defineProperty")}})()"#,
+        globals: &["Number", "Object", "String", "Symbol", "TypeError"],
     },
     GeneratedInlineRoot {
         name: "extends",
         compact: r#"(()=>{var u={extends:function(r,e){function s(){return r.exports=s=Object.assign?Object.assign.bind():function(p){for(var n=1;n<arguments.length;n++){var o=arguments[n];for(var a in o)({}).hasOwnProperty.call(o,a)&&(p[a]=o[a])}return p},r.exports.__esModule=!0,r.exports.default=r.exports,s.apply(null,arguments)}r.exports=s,r.exports.__esModule=!0,r.exports.default=r.exports}},t={};function x(r){if(t[r])return t[r].exports;var e=t[r]={exports:{}};return u[r](e,x),e.exports}return{extends:x("extends")}})()"#,
+        globals: &["Object", "arguments"],
     },
     GeneratedInlineRoot {
         name: "get",
         compact: r#"(()=>{var x={getPrototypeOf:function(t,r){function o(p){return t.exports=o=Object.setPrototypeOf?Object.getPrototypeOf.bind():function(e){return e.__proto__||Object.getPrototypeOf(e)},t.exports.__esModule=!0,t.exports.default=t.exports,o(p)}t.exports=o,t.exports.__esModule=!0,t.exports.default=t.exports},superPropBase:function(t,r){var o=r("getPrototypeOf");function p(e,s){for(;!{}.hasOwnProperty.call(e,s)&&(e=o(e))!==null;);return e}t.exports=p,t.exports.__esModule=!0,t.exports.default=t.exports},get:function(t,r){var o=r("superPropBase");function p(){return t.exports=p=typeof Reflect!="undefined"&&Reflect.get?Reflect.get.bind():function(e,s,c){var a=o(e,s);if(a){var f=Object.getOwnPropertyDescriptor(a,s);return f.get?f.get.call(arguments.length<3?e:c):f.value}},t.exports.__esModule=!0,t.exports.default=t.exports,p.apply(null,arguments)}t.exports=p,t.exports.__esModule=!0,t.exports.default=t.exports}},n={};function u(t){if(n[t])return n[t].exports;var r=n[t]={exports:{}};return x[t](r,u),r.exports}return{get:u("get")}})()"#,
+        globals: &["Object", "Reflect", "arguments"],
     },
     GeneratedInlineRoot {
         name: "objectDestructuringEmpty",
         compact: r#"(()=>{var c={objectDestructuringEmpty:function(t,e){function n(u){if(u==null)throw new TypeError("Cannot destructure "+u)}t.exports=n,t.exports.__esModule=!0,t.exports.default=t.exports}},r={};function o(t){if(r[t])return r[t].exports;var e=r[t]={exports:{}};return c[t](e,o),e.exports}return{objectDestructuringEmpty:o("objectDestructuringEmpty")}})()"#,
+        globals: &["TypeError"],
     },
     GeneratedInlineRoot {
         name: "objectSpread2",
         compact: r#"(()=>{var y={typeof:function(t,n){function p(f){"@babel/helpers - typeof";return t.exports=p=typeof Symbol=="function"&&typeof Symbol.iterator=="symbol"?function(e){return typeof e}:function(e){return e&&typeof Symbol=="function"&&e.constructor===Symbol&&e!==Symbol.prototype?"symbol":typeof e},t.exports.__esModule=!0,t.exports.default=t.exports,p(f)}t.exports=p,t.exports.__esModule=!0,t.exports.default=t.exports},toPrimitive:function(t,n){var p=n("typeof").default;function f(e,r){if(p(e)!="object"||!e)return e;var o=e[Symbol.toPrimitive];if(o!==void 0){var i=o.call(e,r||"default");if(p(i)!="object")return i;throw new TypeError("@@toPrimitive must return a primitive value.")}return(r==="string"?String:Number)(e)}t.exports=f,t.exports.__esModule=!0,t.exports.default=t.exports},toPropertyKey:function(t,n){var p=n("typeof").default,f=n("toPrimitive");function e(r){var o=f(r,"string");return p(o)=="symbol"?o:o+""}t.exports=e,t.exports.__esModule=!0,t.exports.default=t.exports},defineProperty:function(t,n){var p=n("toPropertyKey");function f(e,r,o){return(r=p(r))in e?Object.defineProperty(e,r,{value:o,enumerable:!0,configurable:!0,writable:!0}):e[r]=o,e}t.exports=f,t.exports.__esModule=!0,t.exports.default=t.exports},objectSpread2:function(t,n){var p=n("defineProperty");function f(r,o){var i=Object.keys(r);if(Object.getOwnPropertySymbols){var s=Object.getOwnPropertySymbols(r);o&&(s=s.filter(function(a){return Object.getOwnPropertyDescriptor(r,a).enumerable})),i.push.apply(i,s)}return i}function e(r){for(var o=1;o<arguments.length;o++){var i=arguments[o]!=null?arguments[o]:{};o%2?f(Object(i),!0).forEach(function(s){p(r,s,i[s])}):Object.getOwnPropertyDescriptors?Object.defineProperties(r,Object.getOwnPropertyDescriptors(i)):f(Object(i)).forEach(function(s){Object.defineProperty(r,s,Object.getOwnPropertyDescriptor(i,s))})}return r}t.exports=e,t.exports.__esModule=!0,t.exports.default=t.exports}},c={};function u(t){if(c[t])return c[t].exports;var n=c[t]={exports:{}};return y[t](n,u),n.exports}return{objectSpread2:u("objectSpread2")}})()"#,
+        globals: &[
+            "Number",
+            "Object",
+            "String",
+            "Symbol",
+            "TypeError",
+            "arguments",
+        ],
     },
     GeneratedInlineRoot {
         name: "objectWithoutProperties",
         compact: r#"(()=>{var b={objectWithoutPropertiesLoose:function(t,i){function n(o,e){if(o==null)return{};var s={};for(var r in o)if({}.hasOwnProperty.call(o,r)){if(e.indexOf(r)!==-1)continue;s[r]=o[r]}return s}t.exports=n,t.exports.__esModule=!0,t.exports.default=t.exports},objectWithoutProperties:function(t,i){var n=i("objectWithoutPropertiesLoose");function o(e,s){if(e==null)return{};var r,u,f=n(e,s);if(Object.getOwnPropertySymbols){var a=Object.getOwnPropertySymbols(e);for(u=0;u<a.length;u++)r=a[u],s.indexOf(r)===-1&&{}.propertyIsEnumerable.call(e,r)&&(f[r]=e[r])}return f}t.exports=o,t.exports.__esModule=!0,t.exports.default=t.exports}},p={};function c(t){if(p[t])return p[t].exports;var i=p[t]={exports:{}};return b[t](i,c),i.exports}return{objectWithoutProperties:c("objectWithoutProperties")}})()"#,
+        globals: &["Object"],
     },
     GeneratedInlineRoot {
         name: "objectWithoutPropertiesLoose",
         compact: r#"(()=>{var c={objectWithoutPropertiesLoose:function(t,i){function p(o,f){if(o==null)return{};var u={};for(var e in o)if({}.hasOwnProperty.call(o,e)){if(f.indexOf(e)!==-1)continue;u[e]=o[e]}return u}t.exports=p,t.exports.__esModule=!0,t.exports.default=t.exports}},r={};function s(t){if(r[t])return r[t].exports;var i=r[t]={exports:{}};return c[t](i,s),i.exports}return{objectWithoutPropertiesLoose:s("objectWithoutPropertiesLoose")}})()"#,
+        globals: &[],
     },
     GeneratedInlineRoot {
         name: "readOnlyError",
         compact: r#"(()=>{var n={readOnlyError:function(r,e){function s(a){throw new TypeError('"'+a+'" is read-only')}r.exports=s,r.exports.__esModule=!0,r.exports.default=r.exports}},o={};function t(r){if(o[r])return o[r].exports;var e=o[r]={exports:{}};return n[r](e,t),e.exports}return{readOnlyError:t("readOnlyError")}})()"#,
+        globals: &["TypeError"],
     },
     GeneratedInlineRoot {
         name: "slicedToArray",
         compact: r#"(()=>{var b={arrayWithHoles:function(r,n){function s(o){if(Array.isArray(o))return o}r.exports=s,r.exports.__esModule=!0,r.exports.default=r.exports},iterableToArrayLimit:function(r,n){function s(o,t){var e=o==null?null:typeof Symbol!="undefined"&&o[Symbol.iterator]||o["@@iterator"];if(e!=null){var a,i,l,y,c=[],u=!0,x=!1;try{if(l=(e=e.call(o)).next,t===0){if(Object(e)!==e)return;u=!1}else for(;!(u=(a=l.call(e)).done)&&(c.push(a.value),c.length!==t);u=!0);}catch(A){x=!0,i=A}finally{try{if(!u&&e.return!=null&&(y=e.return(),Object(y)!==y))return}finally{if(x)throw i}}return c}}r.exports=s,r.exports.__esModule=!0,r.exports.default=r.exports},arrayLikeToArray:function(r,n){function s(o,t){(t==null||t>o.length)&&(t=o.length);for(var e=0,a=Array(t);e<t;e++)a[e]=o[e];return a}r.exports=s,r.exports.__esModule=!0,r.exports.default=r.exports},unsupportedIterableToArray:function(r,n){var s=n("arrayLikeToArray");function o(t,e){if(t){if(typeof t=="string")return s(t,e);var a={}.toString.call(t).slice(8,-1);return a==="Object"&&t.constructor&&(a=t.constructor.name),a==="Map"||a==="Set"?Array.from(t):a==="Arguments"||/^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(a)?s(t,e):void 0}}r.exports=o,r.exports.__esModule=!0,r.exports.default=r.exports},nonIterableRest:function(r,n){function s(){throw new TypeError(`Invalid attempt to destructure non-iterable instance.
 In order to be iterable, non-array objects must have a [Symbol.iterator]() method.`)}r.exports=s,r.exports.__esModule=!0,r.exports.default=r.exports},slicedToArray:function(r,n){var s=n("arrayWithHoles"),o=n("iterableToArrayLimit"),t=n("unsupportedIterableToArray"),e=n("nonIterableRest");function a(i,l){return s(i)||o(i,l)||t(i,l)||e()}r.exports=a,r.exports.__esModule=!0,r.exports.default=r.exports}},p={};function f(r){if(p[r])return p[r].exports;var n=p[r]={exports:{}};return b[r](n,f),n.exports}return{slicedToArray:f("slicedToArray")}})()"#,
+        globals: &["Array", "Object", "Symbol", "TypeError"],
     },
     GeneratedInlineRoot {
         name: "superPropGet",
         compact: r#"(()=>{var g={getPrototypeOf:function(t,r){function p(o){return t.exports=p=Object.setPrototypeOf?Object.getPrototypeOf.bind():function(e){return e.__proto__||Object.getPrototypeOf(e)},t.exports.__esModule=!0,t.exports.default=t.exports,p(o)}t.exports=p,t.exports.__esModule=!0,t.exports.default=t.exports},superPropBase:function(t,r){var p=r("getPrototypeOf");function o(e,s){for(;!{}.hasOwnProperty.call(e,s)&&(e=p(e))!==null;);return e}t.exports=o,t.exports.__esModule=!0,t.exports.default=t.exports},get:function(t,r){var p=r("superPropBase");function o(){return t.exports=o=typeof Reflect!="undefined"&&Reflect.get?Reflect.get.bind():function(e,s,a){var f=p(e,s);if(f){var n=Object.getOwnPropertyDescriptor(f,s);return n.get?n.get.call(arguments.length<3?e:a):n.value}},t.exports.__esModule=!0,t.exports.default=t.exports,o.apply(null,arguments)}t.exports=o,t.exports.__esModule=!0,t.exports.default=t.exports},superPropGet:function(t,r){var p=r("get"),o=r("getPrototypeOf");function e(s,a,f,n){var x=p(o(1&n?s.prototype:s),a,f);return 2&n&&typeof x=="function"?function(i){return x.apply(f,i)}:x}t.exports=e,t.exports.__esModule=!0,t.exports.default=t.exports}},u={};function c(t){if(u[t])return u[t].exports;var r=u[t]={exports:{}};return g[t](r,c),r.exports}return{superPropGet:c("superPropGet")}})()"#,
+        globals: &["Object", "Reflect", "arguments"],
     },
     GeneratedInlineRoot {
         name: "superPropSet",
         compact: r#"(()=>{var l={getPrototypeOf:function(t,o){function r(s){return t.exports=r=Object.setPrototypeOf?Object.getPrototypeOf.bind():function(e){return e.__proto__||Object.getPrototypeOf(e)},t.exports.__esModule=!0,t.exports.default=t.exports,r(s)}t.exports=r,t.exports.__esModule=!0,t.exports.default=t.exports},superPropBase:function(t,o){var r=o("getPrototypeOf");function s(e,p){for(;!{}.hasOwnProperty.call(e,p)&&(e=r(e))!==null;);return e}t.exports=s,t.exports.__esModule=!0,t.exports.default=t.exports},typeof:function(t,o){function r(s){"@babel/helpers - typeof";return t.exports=r=typeof Symbol=="function"&&typeof Symbol.iterator=="symbol"?function(e){return typeof e}:function(e){return e&&typeof Symbol=="function"&&e.constructor===Symbol&&e!==Symbol.prototype?"symbol":typeof e},t.exports.__esModule=!0,t.exports.default=t.exports,r(s)}t.exports=r,t.exports.__esModule=!0,t.exports.default=t.exports},toPrimitive:function(t,o){var r=o("typeof").default;function s(e,p){if(r(e)!="object"||!e)return e;var n=e[Symbol.toPrimitive];if(n!==void 0){var f=n.call(e,p||"default");if(r(f)!="object")return f;throw new TypeError("@@toPrimitive must return a primitive value.")}return(p==="string"?String:Number)(e)}t.exports=s,t.exports.__esModule=!0,t.exports.default=t.exports},toPropertyKey:function(t,o){var r=o("typeof").default,s=o("toPrimitive");function e(p){var n=s(p,"string");return r(n)=="symbol"?n:n+""}t.exports=e,t.exports.__esModule=!0,t.exports.default=t.exports},defineProperty:function(t,o){var r=o("toPropertyKey");function s(e,p,n){return(p=r(p))in e?Object.defineProperty(e,p,{value:n,enumerable:!0,configurable:!0,writable:!0}):e[p]=n,e}t.exports=s,t.exports.__esModule=!0,t.exports.default=t.exports},set:function(t,o){var r=o("superPropBase"),s=o("defineProperty");function e(n,f,u,y){return e=typeof Reflect!="undefined"&&Reflect.set?Reflect.set:function(a,c,_,x){var i,v=r(a,c);if(v){if((i=Object.getOwnPropertyDescriptor(v,c)).set)return i.set.call(x,_),!0;if(!i.writable)return!1}if(i=Object.getOwnPropertyDescriptor(x,c)){if(!i.writable)return!1;i.value=_,Object.defineProperty(x,c,i)}else s(x,c,_);return!0},e(n,f,u,y)}function p(n,f,u,y,a){if(!e(n,f,u,y||n)&&a)throw new TypeError("failed to set property");return u}t.exports=p,t.exports.__esModule=!0,t.exports.default=t.exports},superPropSet:function(t,o){var r=o("set"),s=o("getPrototypeOf");function e(p,n,f,u,y,a){return r(s(a?p.prototype:p),n,f,u,y)}t.exports=e,t.exports.__esModule=!0,t.exports.default=t.exports}},P={};function b(t){if(P[t])return P[t].exports;var o=P[t]={exports:{}};return l[t](o,b),o.exports}return{superPropSet:b("superPropSet")}})()"#,
+        globals: &[
+            "Number",
+            "Object",
+            "Reflect",
+            "String",
+            "Symbol",
+            "TypeError",
+        ],
     },
     GeneratedInlineRoot {
         name: "taggedTemplateLiteral",
         compact: r#"(()=>{var l={taggedTemplateLiteral:function(e,r){function p(i,a){return a||(a=i.slice(0)),Object.freeze(Object.defineProperties(i,{raw:{value:Object.freeze(a)}}))}e.exports=p,e.exports.__esModule=!0,e.exports.default=e.exports}},t={};function o(e){if(t[e])return t[e].exports;var r=t[e]={exports:{}};return l[e](r,o),r.exports}return{taggedTemplateLiteral:o("taggedTemplateLiteral")}})()"#,
+        globals: &["Object"],
     },
     GeneratedInlineRoot {
         name: "toArray",
         compact: r#"(()=>{var y={arrayWithHoles:function(r,o){function a(e){if(Array.isArray(e))return e}r.exports=a,r.exports.__esModule=!0,r.exports.default=r.exports},iterableToArray:function(r,o){function a(e){if(typeof Symbol!="undefined"&&e[Symbol.iterator]!=null||e["@@iterator"]!=null)return Array.from(e)}r.exports=a,r.exports.__esModule=!0,r.exports.default=r.exports},arrayLikeToArray:function(r,o){function a(e,t){(t==null||t>e.length)&&(t=e.length);for(var s=0,n=Array(t);s<t;s++)n[s]=e[s];return n}r.exports=a,r.exports.__esModule=!0,r.exports.default=r.exports},unsupportedIterableToArray:function(r,o){var a=o("arrayLikeToArray");function e(t,s){if(t){if(typeof t=="string")return a(t,s);var n={}.toString.call(t).slice(8,-1);return n==="Object"&&t.constructor&&(n=t.constructor.name),n==="Map"||n==="Set"?Array.from(t):n==="Arguments"||/^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(n)?a(t,s):void 0}}r.exports=e,r.exports.__esModule=!0,r.exports.default=r.exports},nonIterableRest:function(r,o){function a(){throw new TypeError(`Invalid attempt to destructure non-iterable instance.
 In order to be iterable, non-array objects must have a [Symbol.iterator]() method.`)}r.exports=a,r.exports.__esModule=!0,r.exports.default=r.exports},toArray:function(r,o){var a=o("arrayWithHoles"),e=o("iterableToArray"),t=o("unsupportedIterableToArray"),s=o("nonIterableRest");function n(p){return a(p)||e(p)||t(p)||s()}r.exports=n,r.exports.__esModule=!0,r.exports.default=r.exports}},i={};function u(r){if(i[r])return i[r].exports;var o=i[r]={exports:{}};return y[r](o,u),o.exports}return{toArray:u("toArray")}})()"#,
+        globals: &["Array", "Symbol", "TypeError"],
     },
     GeneratedInlineRoot {
         name: "toPropertyKey",
         compact: r#"(()=>{var u={typeof:function(t,e){function o(p){"@babel/helpers - typeof";return t.exports=o=typeof Symbol=="function"&&typeof Symbol.iterator=="symbol"?function(r){return typeof r}:function(r){return r&&typeof Symbol=="function"&&r.constructor===Symbol&&r!==Symbol.prototype?"symbol":typeof r},t.exports.__esModule=!0,t.exports.default=t.exports,o(p)}t.exports=o,t.exports.__esModule=!0,t.exports.default=t.exports},toPrimitive:function(t,e){var o=e("typeof").default;function p(r,f){if(o(r)!="object"||!r)return r;var i=r[Symbol.toPrimitive];if(i!==void 0){var y=i.call(r,f||"default");if(o(y)!="object")return y;throw new TypeError("@@toPrimitive must return a primitive value.")}return(f==="string"?String:Number)(r)}t.exports=p,t.exports.__esModule=!0,t.exports.default=t.exports},toPropertyKey:function(t,e){var o=e("typeof").default,p=e("toPrimitive");function r(f){var i=p(f,"string");return o(i)=="symbol"?i:i+""}t.exports=r,t.exports.__esModule=!0,t.exports.default=t.exports}},n={};function s(t){if(n[t])return n[t].exports;var e=n[t]={exports:{}};return u[t](e,s),e.exports}return{toPropertyKey:s("toPropertyKey")}})()"#,
+        globals: &["Number", "String", "Symbol", "TypeError"],
     },
     GeneratedInlineRoot {
         name: "toSetter",
         compact: r#"(()=>{var s={toSetter:function(t,o){function p(u,r,c){r||(r=[]);var f=r.length++;return Object.defineProperty({},"_",{set:function(i){r[f]=i,u.apply(c,r)}})}t.exports=p,t.exports.__esModule=!0,t.exports.default=t.exports}},e={};function n(t){if(e[t])return e[t].exports;var o=e[t]={exports:{}};return s[t](o,n),o.exports}return{toSetter:n("toSetter")}})()"#,
+        globals: &["Object"],
     },
     GeneratedInlineRoot {
         name: "usingCtx",
         compact: r#"(()=>{var y={usingCtx:function(n,l){function v(){var b=typeof SuppressedError=="function"?SuppressedError:function(t,r){var e=Error();return e.name="SuppressedError",e.error=t,e.suppressed=r,e},i={},u=[];function d(t,r){if(r!=null){if(Object(r)!==r)throw new TypeError("using declarations can only be used with objects, functions, null, or undefined.");if(t)var e=r[Symbol.asyncDispose||Symbol.for("Symbol.asyncDispose")];if(e===void 0&&(e=r[Symbol.dispose||Symbol.for("Symbol.dispose")],t))var o=e;if(typeof e!="function")throw new TypeError("Object is not disposable.");o&&(e=function(){try{o.call(r)}catch(f){return Promise.reject(f)}}),u.push({v:r,d:e,a:t})}else t&&u.push({d:r,a:t});return r}return{e:i,u:d.bind(null,!1),a:d.bind(null,!0),d:function(){var r,e=this.e,o=0;function s(){for(;r=u.pop();)try{if(!r.a&&o===1)return o=0,u.push(r),Promise.resolve().then(s);if(r.d){var c=r.d.call(r.v);if(r.a)return o|=2,Promise.resolve(c).then(s,f)}else o|=1}catch(h){return f(h)}if(o===1)return e!==i?Promise.reject(e):Promise.resolve();if(e!==i)throw e}function f(c){return e=e!==i?new b(c,e):c,s()}return s()}}}n.exports=v,n.exports.__esModule=!0,n.exports.default=n.exports}},p={};function a(n){if(p[n])return p[n].exports;var l=p[n]={exports:{}};return y[n](l,a),l.exports}return{usingCtx:a("usingCtx")}})()"#,
+        globals: &[
+            "Error",
+            "Object",
+            "Promise",
+            "SuppressedError",
+            "Symbol",
+            "TypeError",
+        ],
     },
     GeneratedInlineRoot {
         name: "wrapAsyncGenerator",
         compact: r#"(()=>{var k={OverloadYield:function(t,a){function y(x,o){this.v=x,this.k=o}t.exports=y,t.exports.__esModule=!0,t.exports.default=t.exports},wrapAsyncGenerator:function(t,a){var y=a("OverloadYield");function x(e){return function(){return new o(e.apply(this,arguments))}}function o(e){var i,c;function p(r,u){try{var v=e[r](u),s=v.value,f=s instanceof y;Promise.resolve(f?s.v:s).then(function(n){if(f){var _=r==="return"&&s.k?r:"next";if(!s.k||n.done)return p(_,n);n=e[_](n).value}d(!!v.done,n)},function(n){p("throw",n)})}catch(n){d(2,n)}}function d(r,u){r===2?i.reject(u):i.resolve({value:u,done:r}),(i=i.next)?p(i.key,i.arg):c=null}this._invoke=function(r,u){return new Promise(function(v,s){var f={key:r,arg:u,resolve:v,reject:s,next:null};c?c=c.next=f:(i=c=f,p(r,u))})},typeof e.return!="function"&&(this.return=void 0)}o.prototype[typeof Symbol=="function"&&Symbol.asyncIterator||"@@asyncIterator"]=function(){return this},o.prototype.next=function(e){return this._invoke("next",e)},o.prototype.throw=function(e){return this._invoke("throw",e)},o.prototype.return=function(e){return this._invoke("return",e)},t.exports=x,t.exports.__esModule=!0,t.exports.default=t.exports}},l={};function h(t){if(l[t])return l[t].exports;var a=l[t]={exports:{}};return k[t](a,h),a.exports}return{wrapAsyncGenerator:h("wrapAsyncGenerator")}})()"#,
+        globals: &["Promise", "Symbol", "arguments"],
     },
     GeneratedInlineRoot {
         name: "wrapRegExp",
         compact: r#"(()=>{var O={typeof:function(t,i){function f(a){"@babel/helpers - typeof";return t.exports=f=typeof Symbol=="function"&&typeof Symbol.iterator=="symbol"?function(r){return typeof r}:function(r){return r&&typeof Symbol=="function"&&r.constructor===Symbol&&r!==Symbol.prototype?"symbol":typeof r},t.exports.__esModule=!0,t.exports.default=t.exports,f(a)}t.exports=f,t.exports.__esModule=!0,t.exports.default=t.exports},setPrototypeOf:function(t,i){function f(a,r){return t.exports=f=Object.setPrototypeOf?Object.setPrototypeOf.bind():function(o,y){return o.__proto__=y,o},t.exports.__esModule=!0,t.exports.default=t.exports,f(a,r)}t.exports=f,t.exports.__esModule=!0,t.exports.default=t.exports},inherits:function(t,i){var f=i("setPrototypeOf");function a(r,o){if(typeof o!="function"&&o!==null)throw new TypeError("Super expression must either be null or a function");r.prototype=Object.create(o&&o.prototype,{constructor:{value:r,writable:!0,configurable:!0}}),Object.defineProperty(r,"prototype",{writable:!1}),o&&f(r,o)}t.exports=a,t.exports.__esModule=!0,t.exports.default=t.exports},wrapRegExp:function(t,i){var f=i("typeof").default,a=i("setPrototypeOf"),r=i("inherits");function o(){t.exports=o=function(e,n){return new l(e,void 0,n)},t.exports.__esModule=!0,t.exports.default=t.exports;var y=RegExp.prototype,b=new WeakMap;function l(p,e,n){var u=RegExp(p,e);return b.set(u,n||b.get(p)),a(u,l.prototype)}function h(p,e){var n=b.get(e);return Object.keys(n).reduce(function(u,s){var c=n[s];if(typeof c=="number")u[s]=p[c];else{for(var x=0;p[c[x]]===void 0&&x+1<c.length;)x++;u[s]=p[c[x]]}return u},Object.create(null))}return r(l,RegExp),l.prototype.exec=function(p){var e=y.exec.call(this,p);if(e){e.groups=h(e,this);var n=e.indices;n&&(n.groups=h(n,this))}return e},l.prototype[Symbol.replace]=function(p,e){if(typeof e=="string"){var n=b.get(this);return y[Symbol.replace].call(this,p,e.replace(/\$<([^>]+)(>|$)/g,function(s,c,x){if(x==="")return s;var _=n[c];return Array.isArray(_)?"$"+_.join("$"):typeof _=="number"?"$"+_:""}))}if(typeof e=="function"){var u=this;return y[Symbol.replace].call(this,p,function(){var s=arguments;return f(s[s.length-1])!="object"&&(s=[].slice.call(s)).push(h(s,u)),e.apply(this,s)})}return y[Symbol.replace].call(this,p,e)},o.apply(this,arguments)}t.exports=o,t.exports.__esModule=!0,t.exports.default=t.exports}},g={};function v(t){if(g[t])return g[t].exports;var i=g[t]={exports:{}};return O[t](i,v),i.exports}return{wrapRegExp:v("wrapRegExp")}})()"#,
+        globals: &[
+            "Array",
+            "Object",
+            "RegExp",
+            "Symbol",
+            "TypeError",
+            "WeakMap",
+            "arguments",
+        ],
     },
     GeneratedInlineRoot {
         name: "writeOnlyError",
         compact: r#"(()=>{var n={writeOnlyError:function(r,o){function i(s){throw new TypeError('"'+s+'" is write-only')}r.exports=i,r.exports.__esModule=!0,r.exports.default=r.exports}},t={};function e(r){if(t[r])return t[r].exports;var o=t[r]={exports:{}};return n[r](o,e),o.exports}return{writeOnlyError:e("writeOnlyError")}})()"#,
+        globals: &["TypeError"],
     },
 ];
 pub const INLINE_ASYNC_HELPERS: &str = r#"(()=>{var _={OverloadYield:function(t,f){function c(s,a){this.v=s,this.k=a}t.exports=c,t.exports.__esModule=!0,t.exports.default=t.exports},awaitAsyncGenerator:function(t,f){var c=f("OverloadYield");function s(a){return new c(a,0)}t.exports=s,t.exports.__esModule=!0,t.exports.default=t.exports},asyncGeneratorDelegate:function(t,f){var c=f("OverloadYield");function s(a){var r={},e=!1;function o(n,l){return e=!0,l=new Promise(function(i){i(a[n](l))}),{done:!1,value:new c(l,1)}}return r[typeof Symbol!="undefined"&&Symbol.iterator||"@@iterator"]=function(){return this},r.next=function(n){return e?(e=!1,n):o("next",n)},typeof a.throw=="function"&&(r.throw=function(n){if(e)throw e=!1,n;return o("throw",n)}),typeof a.return=="function"&&(r.return=function(n){return e?(e=!1,n):o("return",n)}),r}t.exports=s,t.exports.__esModule=!0,t.exports.default=t.exports},asyncIterator:function(t,f){function c(a){var r,e,o,n=2;for(typeof Symbol!="undefined"&&(e=Symbol.asyncIterator,o=Symbol.iterator);n--;){if(e&&(r=a[e])!=null)return r.call(a);if(o&&(r=a[o])!=null)return new s(r.call(a));e="@@asyncIterator",o="@@iterator"}throw new TypeError("Object is not async iterable")}function s(a){function r(e){if(Object(e)!==e)return Promise.reject(new TypeError(e+" is not an object."));var o=e.done;return Promise.resolve(e.value).then(function(n){return{value:n,done:o}})}return s=function(o){this.s=o,this.n=o.next},s.prototype={s:null,n:null,next:function(){return r(this.n.apply(this.s,arguments))},return:function(o){var n=this.s.return;return n===void 0?Promise.resolve({value:o,done:!0}):r(n.apply(this.s,arguments))},throw:function(o){var n=this.s.return;return n===void 0?Promise.reject(o):r(n.apply(this.s,arguments))}},new s(a)}t.exports=c,t.exports.__esModule=!0,t.exports.default=t.exports},wrapAsyncGenerator:function(t,f){var c=f("OverloadYield");function s(r){return function(){return new a(r.apply(this,arguments))}}function a(r){var e,o;function n(i,u){try{var p=r[i](u),y=p.value,h=y instanceof c;Promise.resolve(h?y.v:y).then(function(v){if(h){var w=i==="return"&&y.k?i:"next";if(!y.k||v.done)return n(w,v);v=r[w](v).value}l(!!p.done,v)},function(v){n("throw",v)})}catch(v){l(2,v)}}function l(i,u){i===2?e.reject(u):e.resolve({value:u,done:i}),(e=e.next)?n(e.key,e.arg):o=null}this._invoke=function(i,u){return new Promise(function(p,y){var h={key:i,arg:u,resolve:p,reject:y,next:null};o?o=o.next=h:(e=o=h,n(i,u))})},typeof r.return!="function"&&(this.return=void 0)}a.prototype[typeof Symbol=="function"&&Symbol.asyncIterator||"@@asyncIterator"]=function(){return this},a.prototype.next=function(r){return this._invoke("next",r)},a.prototype.throw=function(r){return this._invoke("throw",r)},a.prototype.return=function(r){return this._invoke("return",r)},t.exports=s,t.exports.__esModule=!0,t.exports.default=t.exports},asyncToGenerator:function(t,f){function c(a,r,e,o,n,l,i){try{var u=a[l](i),p=u.value}catch(y){return void e(y)}u.done?r(p):Promise.resolve(p).then(o,n)}function s(a){return function(){var r=this,e=arguments;return new Promise(function(o,n){var l=a.apply(r,e);function i(p){c(l,o,n,i,u,"next",p)}function u(p){c(l,o,n,i,u,"throw",p)}i(void 0)})}}t.exports=s,t.exports.__esModule=!0,t.exports.default=t.exports}},d={};function x(t){if(d[t])return d[t].exports;var f=d[t]={exports:{}};return _[t](f,x),f.exports}return{awaitAsyncGenerator:x("awaitAsyncGenerator"),asyncGeneratorDelegate:x("asyncGeneratorDelegate"),asyncIterator:x("asyncIterator"),wrapAsyncGenerator:x("wrapAsyncGenerator"),asyncToGenerator:x("asyncToGenerator")}})()"#;
+pub const INLINE_ASYNC_HELPERS_GLOBALS: &[&str] =
+    &["Object", "Promise", "Symbol", "TypeError", "arguments"];
 pub const INLINE_ASYNC_TO_GENERATOR: &str = r#"(()=>{var y={asyncToGenerator:function(r,u){function x(i,f,p,o,a,s,e){try{var n=i[s](e),t=n.value}catch(d){return void p(d)}n.done?f(t):Promise.resolve(t).then(o,a)}function h(i){return function(){var f=this,p=arguments;return new Promise(function(o,a){var s=i.apply(f,p);function e(t){x(s,o,a,e,n,"next",t)}function n(t){x(s,o,a,e,n,"throw",t)}e(void 0)})}}r.exports=h,r.exports.__esModule=!0,r.exports.default=r.exports}},c={};function v(r){if(c[r])return c[r].exports;var u=c[r]={exports:{}};return y[r](u,v),u.exports}return{asyncToGenerator:v("asyncToGenerator")}})()"#;
+pub const INLINE_ASYNC_TO_GENERATOR_GLOBALS: &[&str] = &["Promise", "arguments"];
 pub const INLINE_USING_CTX: &str = r#"(()=>{var y={usingCtx:function(n,l){function v(){var b=typeof SuppressedError=="function"?SuppressedError:function(t,r){var e=Error();return e.name="SuppressedError",e.error=t,e.suppressed=r,e},i={},u=[];function d(t,r){if(r!=null){if(Object(r)!==r)throw new TypeError("using declarations can only be used with objects, functions, null, or undefined.");if(t)var e=r[Symbol.asyncDispose||Symbol.for("Symbol.asyncDispose")];if(e===void 0&&(e=r[Symbol.dispose||Symbol.for("Symbol.dispose")],t))var o=e;if(typeof e!="function")throw new TypeError("Object is not disposable.");o&&(e=function(){try{o.call(r)}catch(f){return Promise.reject(f)}}),u.push({v:r,d:e,a:t})}else t&&u.push({d:r,a:t});return r}return{e:i,u:d.bind(null,!1),a:d.bind(null,!0),d:function(){var r,e=this.e,o=0;function s(){for(;r=u.pop();)try{if(!r.a&&o===1)return o=0,u.push(r),Promise.resolve().then(s);if(r.d){var c=r.d.call(r.v);if(r.a)return o|=2,Promise.resolve(c).then(s,f)}else o|=1}catch(h){return f(h)}if(o===1)return e!==i?Promise.reject(e):Promise.resolve();if(e!==i)throw e}function f(c){return e=e!==i?new b(c,e):c,s()}return s()}}}n.exports=v,n.exports.__esModule=!0,n.exports.default=n.exports}},p={};function a(n){if(p[n])return p[n].exports;var l=p[n]={exports:{}};return y[n](l,a),l.exports}return{usingCtx:a("usingCtx")}})()"#;
+pub const INLINE_USING_CTX_GLOBALS: &[&str] = &[
+    "Error",
+    "Object",
+    "Promise",
+    "SuppressedError",
+    "Symbol",
+    "TypeError",
+];
 pub const INLINE_OBJECT_HELPERS: &str = r#"(()=>{var y={typeof:function(t,s){function p(n){"@babel/helpers - typeof";return t.exports=p=typeof Symbol=="function"&&typeof Symbol.iterator=="symbol"?function(e){return typeof e}:function(e){return e&&typeof Symbol=="function"&&e.constructor===Symbol&&e!==Symbol.prototype?"symbol":typeof e},t.exports.__esModule=!0,t.exports.default=t.exports,p(n)}t.exports=p,t.exports.__esModule=!0,t.exports.default=t.exports},toPrimitive:function(t,s){var p=s("typeof").default;function n(e,o){if(p(e)!="object"||!e)return e;var r=e[Symbol.toPrimitive];if(r!==void 0){var i=r.call(e,o||"default");if(p(i)!="object")return i;throw new TypeError("@@toPrimitive must return a primitive value.")}return(o==="string"?String:Number)(e)}t.exports=n,t.exports.__esModule=!0,t.exports.default=t.exports},toPropertyKey:function(t,s){var p=s("typeof").default,n=s("toPrimitive");function e(o){var r=n(o,"string");return p(r)=="symbol"?r:r+""}t.exports=e,t.exports.__esModule=!0,t.exports.default=t.exports},defineProperty:function(t,s){var p=s("toPropertyKey");function n(e,o,r){return(o=p(o))in e?Object.defineProperty(e,o,{value:r,enumerable:!0,configurable:!0,writable:!0}):e[o]=r,e}t.exports=n,t.exports.__esModule=!0,t.exports.default=t.exports},extends:function(t,s){function p(){return t.exports=p=Object.assign?Object.assign.bind():function(n){for(var e=1;e<arguments.length;e++){var o=arguments[e];for(var r in o)({}).hasOwnProperty.call(o,r)&&(n[r]=o[r])}return n},t.exports.__esModule=!0,t.exports.default=t.exports,p.apply(null,arguments)}t.exports=p,t.exports.__esModule=!0,t.exports.default=t.exports},objectDestructuringEmpty:function(t,s){function p(n){if(n==null)throw new TypeError("Cannot destructure "+n)}t.exports=p,t.exports.__esModule=!0,t.exports.default=t.exports},objectSpread2:function(t,s){var p=s("defineProperty");function n(o,r){var i=Object.keys(o);if(Object.getOwnPropertySymbols){var u=Object.getOwnPropertySymbols(o);r&&(u=u.filter(function(f){return Object.getOwnPropertyDescriptor(o,f).enumerable})),i.push.apply(i,u)}return i}function e(o){for(var r=1;r<arguments.length;r++){var i=arguments[r]!=null?arguments[r]:{};r%2?n(Object(i),!0).forEach(function(u){p(o,u,i[u])}):Object.getOwnPropertyDescriptors?Object.defineProperties(o,Object.getOwnPropertyDescriptors(i)):n(Object(i)).forEach(function(u){Object.defineProperty(o,u,Object.getOwnPropertyDescriptor(i,u))})}return o}t.exports=e,t.exports.__esModule=!0,t.exports.default=t.exports},objectWithoutPropertiesLoose:function(t,s){function p(n,e){if(n==null)return{};var o={};for(var r in n)if({}.hasOwnProperty.call(n,r)){if(e.indexOf(r)!==-1)continue;o[r]=n[r]}return o}t.exports=p,t.exports.__esModule=!0,t.exports.default=t.exports},objectWithoutProperties:function(t,s){var p=s("objectWithoutPropertiesLoose");function n(e,o){if(e==null)return{};var r,i,u=p(e,o);if(Object.getOwnPropertySymbols){var f=Object.getOwnPropertySymbols(e);for(i=0;i<f.length;i++)r=f[i],o.indexOf(r)===-1&&{}.propertyIsEnumerable.call(e,r)&&(u[r]=e[r])}return u}t.exports=n,t.exports.__esModule=!0,t.exports.default=t.exports}},a={};function c(t){if(a[t])return a[t].exports;var s=a[t]={exports:{}};return y[t](s,c),s.exports}return{defineProperty:c("defineProperty"),extends:c("extends"),objectDestructuringEmpty:c("objectDestructuringEmpty"),objectSpread2:c("objectSpread2"),objectWithoutProperties:c("objectWithoutProperties"),objectWithoutPropertiesLoose:c("objectWithoutPropertiesLoose"),toPropertyKey:c("toPropertyKey")}})()"#;
+pub const INLINE_OBJECT_HELPERS_GLOBALS: &[&str] = &[
+    "Number",
+    "Object",
+    "String",
+    "Symbol",
+    "TypeError",
+    "arguments",
+];
 pub const INLINE_OXC_CLASS_FEATURE_HELPERS: &str = r#"(()=>{var d={checkPrivateRedeclaration:function(e,s){function o(r,t){if(t.has(r))throw new TypeError("Cannot initialize the same private elements twice on an object")}e.exports=o,e.exports.__esModule=!0,e.exports.default=e.exports},classPrivateFieldInitSpec:function(e,s){var o=s("checkPrivateRedeclaration");function r(t,n,p){o(t,n),n.set(t,p)}e.exports=r,e.exports.__esModule=!0,e.exports.default=e.exports},classPrivateMethodInitSpec:function(e,s){var o=s("checkPrivateRedeclaration");function r(t,n){o(t,n),n.add(t)}e.exports=r,e.exports.__esModule=!0,e.exports.default=e.exports},assertClassBrand:function(e,s){function o(r,t,n){if(typeof r=="function"?r===t:r.has(t))return arguments.length<3?t:n;throw new TypeError("Private element is not present on this object")}e.exports=o,e.exports.__esModule=!0,e.exports.default=e.exports},classPrivateFieldGet2:function(e,s){var o=s("assertClassBrand");function r(t,n){return t.get(o(t,n))}e.exports=r,e.exports.__esModule=!0,e.exports.default=e.exports},classPrivateFieldSet2:function(e,s){var o=s("assertClassBrand");function r(t,n,p){return t.set(o(t,n),p),p}e.exports=r,e.exports.__esModule=!0,e.exports.default=e.exports},toSetter:function(e,s){function o(r,t,n){t||(t=[]);var p=t.length++;return Object.defineProperty({},"_",{set:function(c){t[p]=c,r.apply(n,t)}})}e.exports=o,e.exports.__esModule=!0,e.exports.default=e.exports},classPrivateFieldLooseKey:function(e,s){var o=0;function r(t){return"__private_"+o+++"_"+t}e.exports=r,e.exports.__esModule=!0,e.exports.default=e.exports},classPrivateFieldLooseBase:function(e,s){function o(r,t){if(!{}.hasOwnProperty.call(r,t))throw new TypeError("attempted to use private field on non-instance");return r}e.exports=o,e.exports.__esModule=!0,e.exports.default=e.exports},getPrototypeOf:function(e,s){function o(r){return e.exports=o=Object.setPrototypeOf?Object.getPrototypeOf.bind():function(t){return t.__proto__||Object.getPrototypeOf(t)},e.exports.__esModule=!0,e.exports.default=e.exports,o(r)}e.exports=o,e.exports.__esModule=!0,e.exports.default=e.exports},superPropBase:function(e,s){var o=s("getPrototypeOf");function r(t,n){for(;!{}.hasOwnProperty.call(t,n)&&(t=o(t))!==null;);return t}e.exports=r,e.exports.__esModule=!0,e.exports.default=e.exports},get:function(e,s){var o=s("superPropBase");function r(){return e.exports=r=typeof Reflect!="undefined"&&Reflect.get?Reflect.get.bind():function(t,n,p){var i=o(t,n);if(i){var c=Object.getOwnPropertyDescriptor(i,n);return c.get?c.get.call(arguments.length<3?t:p):c.value}},e.exports.__esModule=!0,e.exports.default=e.exports,r.apply(null,arguments)}e.exports=r,e.exports.__esModule=!0,e.exports.default=e.exports},superPropGet:function(e,s){var o=s("get"),r=s("getPrototypeOf");function t(n,p,i,c){var f=o(r(1&c?n.prototype:n),p,i);return 2&c&&typeof f=="function"?function(u){return f.apply(i,u)}:f}e.exports=t,e.exports.__esModule=!0,e.exports.default=e.exports},typeof:function(e,s){function o(r){"@babel/helpers - typeof";return e.exports=o=typeof Symbol=="function"&&typeof Symbol.iterator=="symbol"?function(t){return typeof t}:function(t){return t&&typeof Symbol=="function"&&t.constructor===Symbol&&t!==Symbol.prototype?"symbol":typeof t},e.exports.__esModule=!0,e.exports.default=e.exports,o(r)}e.exports=o,e.exports.__esModule=!0,e.exports.default=e.exports},toPrimitive:function(e,s){var o=s("typeof").default;function r(t,n){if(o(t)!="object"||!t)return t;var p=t[Symbol.toPrimitive];if(p!==void 0){var i=p.call(t,n||"default");if(o(i)!="object")return i;throw new TypeError("@@toPrimitive must return a primitive value.")}return(n==="string"?String:Number)(t)}e.exports=r,e.exports.__esModule=!0,e.exports.default=e.exports},toPropertyKey:function(e,s){var o=s("typeof").default,r=s("toPrimitive");function t(n){var p=r(n,"string");return o(p)=="symbol"?p:p+""}e.exports=t,e.exports.__esModule=!0,e.exports.default=e.exports},defineProperty:function(e,s){var o=s("toPropertyKey");function r(t,n,p){return(n=o(n))in t?Object.defineProperty(t,n,{value:p,enumerable:!0,configurable:!0,writable:!0}):t[n]=p,t}e.exports=r,e.exports.__esModule=!0,e.exports.default=e.exports},set:function(e,s){var o=s("superPropBase"),r=s("defineProperty");function t(p,i,c,f){return t=typeof Reflect!="undefined"&&Reflect.set?Reflect.set:function(u,x,P,y){var l,v=o(u,x);if(v){if((l=Object.getOwnPropertyDescriptor(v,x)).set)return l.set.call(y,P),!0;if(!l.writable)return!1}if(l=Object.getOwnPropertyDescriptor(y,x)){if(!l.writable)return!1;l.value=P,Object.defineProperty(y,x,l)}else r(y,x,P);return!0},t(p,i,c,f)}function n(p,i,c,f,u){if(!t(p,i,c,f||p)&&u)throw new TypeError("failed to set property");return c}e.exports=n,e.exports.__esModule=!0,e.exports.default=e.exports},superPropSet:function(e,s){var o=s("set"),r=s("getPrototypeOf");function t(n,p,i,c,f,u){return o(r(u?n.prototype:n),p,i,c,f)}e.exports=t,e.exports.__esModule=!0,e.exports.default=e.exports},readOnlyError:function(e,s){function o(r){throw new TypeError('"'+r+'" is read-only')}e.exports=o,e.exports.__esModule=!0,e.exports.default=e.exports},writeOnlyError:function(e,s){function o(r){throw new TypeError('"'+r+'" is write-only')}e.exports=o,e.exports.__esModule=!0,e.exports.default=e.exports},checkInRHS:function(e,s){var o=s("typeof").default;function r(t){if(Object(t)!==t)throw TypeError("right-hand side of 'in' should be an object, got "+(t!==null?o(t):"null"));return t}e.exports=r,e.exports.__esModule=!0,e.exports.default=e.exports},taggedTemplateLiteral:function(e,s){function o(r,t){return t||(t=r.slice(0)),Object.freeze(Object.defineProperties(r,{raw:{value:Object.freeze(t)}}))}e.exports=o,e.exports.__esModule=!0,e.exports.default=e.exports}},_={};function a(e){if(_[e])return _[e].exports;var s=_[e]={exports:{}};return d[e](s,a),s.exports}return{classPrivateFieldInitSpec:a("classPrivateFieldInitSpec"),classPrivateMethodInitSpec:a("classPrivateMethodInitSpec"),classPrivateFieldGet2:a("classPrivateFieldGet2"),classPrivateFieldSet2:a("classPrivateFieldSet2"),assertClassBrand:a("assertClassBrand"),toSetter:a("toSetter"),classPrivateFieldLooseKey:a("classPrivateFieldLooseKey"),classPrivateFieldLooseBase:a("classPrivateFieldLooseBase"),superPropGet:a("superPropGet"),superPropSet:a("superPropSet"),readOnlyError:a("readOnlyError"),writeOnlyError:a("writeOnlyError"),checkInRHS:a("checkInRHS"),taggedTemplateLiteral:a("taggedTemplateLiteral")}})()"#;
+pub const INLINE_OXC_CLASS_FEATURE_HELPERS_GLOBALS: &[&str] = &[
+    "Number",
+    "Object",
+    "Reflect",
+    "String",
+    "Symbol",
+    "TypeError",
+    "arguments",
+];
 pub const INLINE_FOR_OF_HELPER: &str = r#"var _createForOfIteratorHelper=(function(){var arrayLikeToArray=function(r,a){(a==null||a>r.length)&&(a=r.length);for(var e=0,n=Array(a);e<a;e++)n[e]=r[e];return n},unsupportedIterableToArray=function(r,a){if(r){if(typeof r=="string")return arrayLikeToArray(r,a);var t={}.toString.call(r).slice(8,-1);return t==="Object"&&r.constructor&&(t=r.constructor.name),t==="Map"||t==="Set"?Array.from(r):t==="Arguments"||/^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(t)?arrayLikeToArray(r,a):void 0}};return function(r,e){var t=typeof Symbol!="undefined"&&r[Symbol.iterator]||r["@@iterator"];if(!t){if(Array.isArray(r)||(t=unsupportedIterableToArray(r))||e&&r&&typeof r.length=="number"){t&&(r=t);var _n=0,F=function(){};return{s:F,n:function(){return _n>=r.length?{done:!0}:{done:!1,value:r[_n++]}},e:function(r2){throw r2},f:F}}throw new TypeError(`Invalid attempt to iterate non-iterable instance.
 In order to be iterable, non-array objects must have a [Symbol.iterator]() method.`)}var o,a=!0,u=!1;return{s:function(){t=t.call(r)},n:function(){var r2=t.next();return a=r2.done,r2},e:function(r2){u=!0,o=r2},f:function(){try{a||t.return==null||t.return()}finally{if(u)throw o}}}}})();"#;
+pub const INLINE_FOR_OF_HELPER_GLOBALS: &[&str] = &["Array", "Symbol", "TypeError"];
 pub const INLINE_FOR_OF_HELPER_PRETTY: &str = r#"var _createForOfIteratorHelper = (function() {
 	var arrayLikeToArray = function(r, a) {
 		(a == null || a > r.length) && (a = r.length);
@@ -440,11 +531,13 @@ In order to be iterable, non-array objects must have a [Symbol.iterator]() metho
 "#;
 pub const INLINE_FOR_OF_HELPER_BINDINGS: &[&str] = &["_createForOfIteratorHelper"];
 pub const INLINE_FOR_OF_HELPER_RUNTIME: &str = r#"var _createForOfIteratorHelper=require("@babel/runtime/helpers/createForOfIteratorHelper");"#;
+pub const INLINE_FOR_OF_HELPER_RUNTIME_GLOBALS: &[&str] = &[];
 pub const INLINE_FOR_OF_HELPER_RUNTIME_PRETTY: &str = r#"var _createForOfIteratorHelper = require("@babel/runtime/helpers/createForOfIteratorHelper");
 "#;
 pub const INLINE_FOR_OF_HELPER_RUNTIME_BINDINGS: &[&str] = &["_createForOfIteratorHelper"];
 pub const INLINE_FOR_OF_HELPER_RUNTIME_DEPENDENCIES: &[&str] = &["createForOfIteratorHelper"];
 pub const INLINE_EXTENDS_HELPER: &str = r#"function _extends(){return _extends=Object.assign?Object.assign.bind():function(n){for(var e=1;e<arguments.length;e++){var t=arguments[e];for(var r in t)({}).hasOwnProperty.call(t,r)&&(n[r]=t[r])}return n},_extends.apply(null,arguments)}"#;
+pub const INLINE_EXTENDS_HELPER_GLOBALS: &[&str] = &["Object", "arguments"];
 pub const INLINE_EXTENDS_HELPER_PRETTY: &str = r#"function _extends() {
 	return _extends = Object.assign ? Object.assign.bind() : function(n) {
 		for (var e = 1; e < arguments.length; e++) {
@@ -458,12 +551,14 @@ pub const INLINE_EXTENDS_HELPER_PRETTY: &str = r#"function _extends() {
 pub const INLINE_EXTENDS_HELPER_BINDINGS: &[&str] = &["_extends"];
 pub const INLINE_EXTENDS_HELPER_RUNTIME: &str =
     r#"var _extends=require("@babel/runtime/helpers/extends");"#;
+pub const INLINE_EXTENDS_HELPER_RUNTIME_GLOBALS: &[&str] = &[];
 pub const INLINE_EXTENDS_HELPER_RUNTIME_PRETTY: &str = r#"var _extends = require("@babel/runtime/helpers/extends");
 "#;
 pub const INLINE_EXTENDS_HELPER_RUNTIME_BINDINGS: &[&str] = &["_extends"];
 pub const INLINE_EXTENDS_HELPER_RUNTIME_DEPENDENCIES: &[&str] = &["extends"];
 pub const INLINE_READ_ONLY_ERROR_HELPER: &str =
     r#"function _readOnlyError(r){throw new TypeError('"'+r+'" is read-only')}"#;
+pub const INLINE_READ_ONLY_ERROR_HELPER_GLOBALS: &[&str] = &["TypeError"];
 pub const INLINE_READ_ONLY_ERROR_HELPER_PRETTY: &str = r#"function _readOnlyError(r) {
 	throw new TypeError("\"" + r + "\" is read-only");
 }
@@ -471,11 +566,14 @@ pub const INLINE_READ_ONLY_ERROR_HELPER_PRETTY: &str = r#"function _readOnlyErro
 pub const INLINE_READ_ONLY_ERROR_HELPER_BINDINGS: &[&str] = &["_readOnlyError"];
 pub const INLINE_READ_ONLY_ERROR_HELPER_RUNTIME: &str =
     r#"var _readOnlyError=require("@babel/runtime/helpers/readOnlyError");"#;
+pub const INLINE_READ_ONLY_ERROR_HELPER_RUNTIME_GLOBALS: &[&str] = &[];
 pub const INLINE_READ_ONLY_ERROR_HELPER_RUNTIME_PRETTY: &str = r#"var _readOnlyError = require("@babel/runtime/helpers/readOnlyError");
 "#;
 pub const INLINE_READ_ONLY_ERROR_HELPER_RUNTIME_BINDINGS: &[&str] = &["_readOnlyError"];
 pub const INLINE_READ_ONLY_ERROR_HELPER_RUNTIME_DEPENDENCIES: &[&str] = &["readOnlyError"];
 pub const INLINE_TO_PROPERTY_KEY_HELPER: &str = r#"var _toPropertyKey2=(()=>{var i={typeof:function(e,t){function r(p){"@babel/helpers - typeof";return e.exports=r=typeof Symbol=="function"&&typeof Symbol.iterator=="symbol"?function(o){return typeof o}:function(o){return o&&typeof Symbol=="function"&&o.constructor===Symbol&&o!==Symbol.prototype?"symbol":typeof o},e.exports.__esModule=!0,e.exports.default=e.exports,r(p)}e.exports=r,e.exports.__esModule=!0,e.exports.default=e.exports},toPrimitive:function(e,t){var r=t("typeof").default;function p(o,u){if(r(o)!="object"||!o)return o;var n=o[Symbol.toPrimitive];if(n!==void 0){var y=n.call(o,u||"default");if(r(y)!="object")return y;throw new TypeError("@@toPrimitive must return a primitive value.")}return(u==="string"?String:Number)(o)}e.exports=p,e.exports.__esModule=!0,e.exports.default=e.exports},toPropertyKey:function(e,t){var r=t("typeof").default,p=t("toPrimitive");function o(u){var n=p(u,"string");return r(n)=="symbol"?n:n+""}e.exports=o,e.exports.__esModule=!0,e.exports.default=e.exports}},s={};function f(e){if(s[e])return s[e].exports;var t=s[e]={exports:{}};return i[e](t,f),t.exports}return{toPropertyKey:f("toPropertyKey")}})();function _toPropertyKey(i){return _toPropertyKey2.toPropertyKey(i)}"#;
+pub const INLINE_TO_PROPERTY_KEY_HELPER_GLOBALS: &[&str] =
+    &["Number", "String", "Symbol", "TypeError"];
 pub const INLINE_TO_PROPERTY_KEY_HELPER_PRETTY: &str = r#"var _toPropertyKey2 = (() => {
 	var i = {
 		typeof: function(e, t) {
@@ -525,6 +623,7 @@ function _toPropertyKey(i) {
 "#;
 pub const INLINE_TO_PROPERTY_KEY_HELPER_BINDINGS: &[&str] = &["_toPropertyKey", "_toPropertyKey2"];
 pub const INLINE_TO_PROPERTY_KEY_HELPER_RUNTIME: &str = r#"var _toPropertyKey2=require("@babel/runtime/helpers/toPropertyKey");function _toPropertyKey(value){return _toPropertyKey2(value)}"#;
+pub const INLINE_TO_PROPERTY_KEY_HELPER_RUNTIME_GLOBALS: &[&str] = &[];
 pub const INLINE_TO_PROPERTY_KEY_HELPER_RUNTIME_PRETTY: &str = r#"var _toPropertyKey2 = require("@babel/runtime/helpers/toPropertyKey");
 function _toPropertyKey(value) {
 	return _toPropertyKey2(value);
@@ -535,6 +634,8 @@ pub const INLINE_TO_PROPERTY_KEY_HELPER_RUNTIME_BINDINGS: &[&str] =
 pub const INLINE_TO_PROPERTY_KEY_HELPER_RUNTIME_DEPENDENCIES: &[&str] = &["toPropertyKey"];
 pub const INLINE_DESTRUCTURING_ITER_HELPER: &str = r#"var _toArray2=(()=>{var f={arrayWithHoles:function(r,n){function a(t){if(Array.isArray(t))return t}r.exports=a,r.exports.__esModule=!0,r.exports.default=r.exports},iterableToArrayLimit:function(r,n){function a(t,e){var o=t==null?null:typeof Symbol!="undefined"&&t[Symbol.iterator]||t["@@iterator"];if(o!=null){var l,u,p,c,x=[],y=!0,d=!1;try{if(p=(o=o.call(t)).next,e===0){if(Object(o)!==o)return;y=!1}else for(;!(y=(l=p.call(o)).done)&&(x.push(l.value),x.length!==e);y=!0);}catch(A){d=!0,u=A}finally{try{if(!y&&o.return!=null&&(c=o.return(),Object(c)!==c))return}finally{if(d)throw u}}return x}}r.exports=a,r.exports.__esModule=!0,r.exports.default=r.exports},arrayLikeToArray:function(r,n){function a(t,e){(e==null||e>t.length)&&(e=t.length);for(var o=0,l=Array(e);o<e;o++)l[o]=t[o];return l}r.exports=a,r.exports.__esModule=!0,r.exports.default=r.exports},unsupportedIterableToArray:function(r,n){var a=n("arrayLikeToArray");function t(e,o){if(e){if(typeof e=="string")return a(e,o);var l={}.toString.call(e).slice(8,-1);return l==="Object"&&e.constructor&&(l=e.constructor.name),l==="Map"||l==="Set"?Array.from(e):l==="Arguments"||/^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(l)?a(e,o):void 0}}r.exports=t,r.exports.__esModule=!0,r.exports.default=r.exports},nonIterableRest:function(r,n){function a(){throw new TypeError(`Invalid attempt to destructure non-iterable instance.
 In order to be iterable, non-array objects must have a [Symbol.iterator]() method.`)}r.exports=a,r.exports.__esModule=!0,r.exports.default=r.exports},slicedToArray:function(r,n){var a=n("arrayWithHoles"),t=n("iterableToArrayLimit"),e=n("unsupportedIterableToArray"),o=n("nonIterableRest");function l(u,p){return a(u)||t(u,p)||e(u,p)||o()}r.exports=l,r.exports.__esModule=!0,r.exports.default=r.exports},iterableToArray:function(r,n){function a(t){if(typeof Symbol!="undefined"&&t[Symbol.iterator]!=null||t["@@iterator"]!=null)return Array.from(t)}r.exports=a,r.exports.__esModule=!0,r.exports.default=r.exports},toArray:function(r,n){var a=n("arrayWithHoles"),t=n("iterableToArray"),e=n("unsupportedIterableToArray"),o=n("nonIterableRest");function l(u){return a(u)||t(u)||e(u)||o()}r.exports=l,r.exports.__esModule=!0,r.exports.default=r.exports}},s={};function i(r){if(s[r])return s[r].exports;var n=s[r]={exports:{}};return f[r](n,i),n.exports}return{slicedToArray:i("slicedToArray"),toArray:i("toArray")}})();function _toArray(f,s,i){return i?_toArray2.toArray(f):_toArray2.slicedToArray(f,s)}"#;
+pub const INLINE_DESTRUCTURING_ITER_HELPER_GLOBALS: &[&str] =
+    &["Array", "Object", "Symbol", "TypeError"];
 pub const INLINE_DESTRUCTURING_ITER_HELPER_PRETTY: &str = r#"var _toArray2 = (() => {
 	var f = {
 		arrayWithHoles: function(r, n) {
@@ -630,6 +731,7 @@ function _toArray(f, s, i) {
 "#;
 pub const INLINE_DESTRUCTURING_ITER_HELPER_BINDINGS: &[&str] = &["_toArray", "_toArray2"];
 pub const INLINE_DESTRUCTURING_ITER_HELPER_RUNTIME: &str = r#"var _toArray2={slicedToArray:require("@babel/runtime/helpers/slicedToArray"),toArray:require("@babel/runtime/helpers/toArray")};function _toArray(r,e,a){return a?_toArray2.toArray(r):_toArray2.slicedToArray(r,e)}"#;
+pub const INLINE_DESTRUCTURING_ITER_HELPER_RUNTIME_GLOBALS: &[&str] = &[];
 pub const INLINE_DESTRUCTURING_ITER_HELPER_RUNTIME_PRETTY: &str = r#"var _toArray2 = {
 	slicedToArray: require("@babel/runtime/helpers/slicedToArray"),
 	toArray: require("@babel/runtime/helpers/toArray")
@@ -642,6 +744,7 @@ pub const INLINE_DESTRUCTURING_ITER_HELPER_RUNTIME_BINDINGS: &[&str] = &["_toArr
 pub const INLINE_DESTRUCTURING_ITER_HELPER_RUNTIME_DEPENDENCIES: &[&str] =
     &["slicedToArray", "toArray"];
 pub const INLINE_DESTRUCTURING_OBJECT_HELPER: &str = r#"var _objectDestructuringEmpty2=(()=>{var r={objectDestructuringEmpty:function(t,n){function c(o){if(o==null)throw new TypeError("Cannot destructure "+o)}t.exports=c,t.exports.__esModule=!0,t.exports.default=t.exports}},e={};function u(t){if(e[t])return e[t].exports;var n=e[t]={exports:{}};return r[t](n,u),n.exports}return{objectDestructuringEmpty:u("objectDestructuringEmpty")}})();function _objectDestructuringEmpty(r){return _objectDestructuringEmpty2.objectDestructuringEmpty(r),r}"#;
+pub const INLINE_DESTRUCTURING_OBJECT_HELPER_GLOBALS: &[&str] = &["TypeError"];
 pub const INLINE_DESTRUCTURING_OBJECT_HELPER_PRETTY: &str = r#"var _objectDestructuringEmpty2 = (() => {
 	var r = { objectDestructuringEmpty: function(t, n) {
 		function c(o) {
@@ -663,6 +766,7 @@ function _objectDestructuringEmpty(r) {
 pub const INLINE_DESTRUCTURING_OBJECT_HELPER_BINDINGS: &[&str] =
     &["_objectDestructuringEmpty", "_objectDestructuringEmpty2"];
 pub const INLINE_DESTRUCTURING_OBJECT_HELPER_RUNTIME: &str = r#"var _objectDestructuringEmpty2={objectDestructuringEmpty:require("@babel/runtime/helpers/objectDestructuringEmpty")};function _objectDestructuringEmpty(t){return _objectDestructuringEmpty2.objectDestructuringEmpty(t),t}"#;
+pub const INLINE_DESTRUCTURING_OBJECT_HELPER_RUNTIME_GLOBALS: &[&str] = &[];
 pub const INLINE_DESTRUCTURING_OBJECT_HELPER_RUNTIME_PRETTY: &str = r#"var _objectDestructuringEmpty2 = { objectDestructuringEmpty: require("@babel/runtime/helpers/objectDestructuringEmpty") };
 function _objectDestructuringEmpty(t) {
 	return _objectDestructuringEmpty2.objectDestructuringEmpty(t), t;
@@ -673,6 +777,7 @@ pub const INLINE_DESTRUCTURING_OBJECT_HELPER_RUNTIME_BINDINGS: &[&str] =
 pub const INLINE_DESTRUCTURING_OBJECT_HELPER_RUNTIME_DEPENDENCIES: &[&str] =
     &["objectDestructuringEmpty"];
 pub const INLINE_DESTRUCTURING_REST_HELPER: &str = r#"var _objectWithoutProperties2=(()=>{var p={objectDestructuringEmpty:function(t,n){function i(r){if(r==null)throw new TypeError("Cannot destructure "+r)}t.exports=i,t.exports.__esModule=!0,t.exports.default=t.exports},objectWithoutPropertiesLoose:function(t,n){function i(r,o){if(r==null)return{};var s={};for(var e in r)if({}.hasOwnProperty.call(r,e)){if(o.indexOf(e)!==-1)continue;s[e]=r[e]}return s}t.exports=i,t.exports.__esModule=!0,t.exports.default=t.exports},objectWithoutProperties:function(t,n){var i=n("objectWithoutPropertiesLoose");function r(o,s){if(o==null)return{};var e,c,l=i(o,s);if(Object.getOwnPropertySymbols){var b=Object.getOwnPropertySymbols(o);for(c=0;c<b.length;c++)e=b[c],s.indexOf(e)===-1&&{}.propertyIsEnumerable.call(o,e)&&(l[e]=o[e])}return l}t.exports=r,t.exports.__esModule=!0,t.exports.default=t.exports}},u={};function f(t){if(u[t])return u[t].exports;var n=u[t]={exports:{}};return p[t](n,f),n.exports}return{objectDestructuringEmpty:f("objectDestructuringEmpty"),objectWithoutProperties:f("objectWithoutProperties")}})();function _objectWithoutProperties(p,u){return _objectWithoutProperties2.objectDestructuringEmpty(p),_objectWithoutProperties2.objectWithoutProperties(p,u)}"#;
+pub const INLINE_DESTRUCTURING_REST_HELPER_GLOBALS: &[&str] = &["Object", "TypeError"];
 pub const INLINE_DESTRUCTURING_REST_HELPER_PRETTY: &str = r#"var _objectWithoutProperties2 = (() => {
 	var p = {
 		objectDestructuringEmpty: function(t, n) {
@@ -724,6 +829,7 @@ function _objectWithoutProperties(p, u) {
 pub const INLINE_DESTRUCTURING_REST_HELPER_BINDINGS: &[&str] =
     &["_objectWithoutProperties", "_objectWithoutProperties2"];
 pub const INLINE_DESTRUCTURING_REST_HELPER_RUNTIME: &str = r#"var _objectWithoutProperties2={objectDestructuringEmpty:require("@babel/runtime/helpers/objectDestructuringEmpty"),objectWithoutProperties:require("@babel/runtime/helpers/objectWithoutProperties")};function _objectWithoutProperties(t,e){return _objectWithoutProperties2.objectDestructuringEmpty(t),_objectWithoutProperties2.objectWithoutProperties(t,e)}"#;
+pub const INLINE_DESTRUCTURING_REST_HELPER_RUNTIME_GLOBALS: &[&str] = &[];
 pub const INLINE_DESTRUCTURING_REST_HELPER_RUNTIME_PRETTY: &str = r#"var _objectWithoutProperties2 = {
 	objectDestructuringEmpty: require("@babel/runtime/helpers/objectDestructuringEmpty"),
 	objectWithoutProperties: require("@babel/runtime/helpers/objectWithoutProperties")
@@ -737,6 +843,7 @@ pub const INLINE_DESTRUCTURING_REST_HELPER_RUNTIME_BINDINGS: &[&str] =
 pub const INLINE_DESTRUCTURING_REST_HELPER_RUNTIME_DEPENDENCIES: &[&str] =
     &["objectDestructuringEmpty", "objectWithoutProperties"];
 pub const INLINE_DESTRUCTURING_LOOSE_REST_HELPER: &str = r#"var _objectWithoutProperties2=(()=>{var o={objectDestructuringEmpty:function(e,u){function s(t){if(t==null)throw new TypeError("Cannot destructure "+t)}e.exports=s,e.exports.__esModule=!0,e.exports.default=e.exports},objectWithoutPropertiesLoose:function(e,u){function s(t,p){if(t==null)return{};var c={};for(var n in t)if({}.hasOwnProperty.call(t,n)){if(p.indexOf(n)!==-1)continue;c[n]=t[n]}return c}e.exports=s,e.exports.__esModule=!0,e.exports.default=e.exports}},r={};function i(e){if(r[e])return r[e].exports;var u=r[e]={exports:{}};return o[e](u,i),u.exports}return{objectDestructuringEmpty:i("objectDestructuringEmpty"),objectWithoutPropertiesLoose:i("objectWithoutPropertiesLoose")}})();function _objectWithoutProperties(o,r){return _objectWithoutProperties2.objectDestructuringEmpty(o),_objectWithoutProperties2.objectWithoutPropertiesLoose(o,r)}"#;
+pub const INLINE_DESTRUCTURING_LOOSE_REST_HELPER_GLOBALS: &[&str] = &["TypeError"];
 pub const INLINE_DESTRUCTURING_LOOSE_REST_HELPER_PRETTY: &str = r#"var _objectWithoutProperties2 = (() => {
 	var o = {
 		objectDestructuringEmpty: function(e, u) {
@@ -775,6 +882,7 @@ function _objectWithoutProperties(o, r) {
 pub const INLINE_DESTRUCTURING_LOOSE_REST_HELPER_BINDINGS: &[&str] =
     &["_objectWithoutProperties", "_objectWithoutProperties2"];
 pub const INLINE_DESTRUCTURING_LOOSE_REST_HELPER_RUNTIME: &str = r#"var _objectWithoutProperties2={objectDestructuringEmpty:require("@babel/runtime/helpers/objectDestructuringEmpty"),objectWithoutPropertiesLoose:require("@babel/runtime/helpers/objectWithoutPropertiesLoose")};function _objectWithoutProperties(e,t){return _objectWithoutProperties2.objectDestructuringEmpty(e),_objectWithoutProperties2.objectWithoutPropertiesLoose(e,t)}"#;
+pub const INLINE_DESTRUCTURING_LOOSE_REST_HELPER_RUNTIME_GLOBALS: &[&str] = &[];
 pub const INLINE_DESTRUCTURING_LOOSE_REST_HELPER_RUNTIME_PRETTY: &str = r#"var _objectWithoutProperties2 = {
 	objectDestructuringEmpty: require("@babel/runtime/helpers/objectDestructuringEmpty"),
 	objectWithoutPropertiesLoose: require("@babel/runtime/helpers/objectWithoutPropertiesLoose")
@@ -788,6 +896,8 @@ pub const INLINE_DESTRUCTURING_LOOSE_REST_HELPER_RUNTIME_BINDINGS: &[&str] =
 pub const INLINE_DESTRUCTURING_LOOSE_REST_HELPER_RUNTIME_DEPENDENCIES: &[&str] =
     &["objectDestructuringEmpty", "objectWithoutPropertiesLoose"];
 pub const INLINE_CLASS_CONSTRUCT_HELPER: &str = r#"var _construct2=(()=>{var p={isNativeReflectConstruct:function(e,r){function t(){try{var n=!Boolean.prototype.valueOf.call(Reflect.construct(Boolean,[],function(){}))}catch(c){}return(e.exports=t=function(){return!!n},e.exports.__esModule=!0,e.exports.default=e.exports)()}e.exports=t,e.exports.__esModule=!0,e.exports.default=e.exports},setPrototypeOf:function(e,r){function t(n,c){return e.exports=t=Object.setPrototypeOf?Object.setPrototypeOf.bind():function(s,f){return s.__proto__=f,s},e.exports.__esModule=!0,e.exports.default=e.exports,t(n,c)}e.exports=t,e.exports.__esModule=!0,e.exports.default=e.exports},construct:function(e,r){var t=r("isNativeReflectConstruct"),n=r("setPrototypeOf");function c(s,f,x){if(t())return Reflect.construct.apply(null,arguments);var l=[null];l.push.apply(l,f);var a=new(s.bind.apply(s,l));return x&&n(a,x.prototype),a}e.exports=c,e.exports.__esModule=!0,e.exports.default=e.exports}},o={};function u(e){if(o[e])return o[e].exports;var r=o[e]={exports:{}};return p[e](r,u),r.exports}return{construct:u("construct")}})();function _construct(p,o,u){return _construct2.construct(p,o,u)}"#;
+pub const INLINE_CLASS_CONSTRUCT_HELPER_GLOBALS: &[&str] =
+    &["Boolean", "Object", "Reflect", "arguments"];
 pub const INLINE_CLASS_CONSTRUCT_HELPER_PRETTY: &str = r#"var _construct2 = (() => {
 	var p = {
 		isNativeReflectConstruct: function(e, r) {
@@ -834,6 +944,7 @@ function _construct(p, o, u) {
 "#;
 pub const INLINE_CLASS_CONSTRUCT_HELPER_BINDINGS: &[&str] = &["_construct", "_construct2"];
 pub const INLINE_CLASS_CONSTRUCT_HELPER_RUNTIME: &str = r#"var _construct2={construct:require("@babel/runtime/helpers/construct")};function _construct(t,r,c){return _construct2.construct(t,r,c)}"#;
+pub const INLINE_CLASS_CONSTRUCT_HELPER_RUNTIME_GLOBALS: &[&str] = &[];
 pub const INLINE_CLASS_CONSTRUCT_HELPER_RUNTIME_PRETTY: &str = r#"var _construct2 = { construct: require("@babel/runtime/helpers/construct") };
 function _construct(t, r, c) {
 	return _construct2.construct(t, r, c);
@@ -842,6 +953,7 @@ function _construct(t, r, c) {
 pub const INLINE_CLASS_CONSTRUCT_HELPER_RUNTIME_BINDINGS: &[&str] = &["_construct", "_construct2"];
 pub const INLINE_CLASS_CONSTRUCT_HELPER_RUNTIME_DEPENDENCIES: &[&str] = &["construct"];
 pub const INLINE_CLASS_SUPER_GET_HELPER: &str = r#"var _get2=(()=>{var f={getPrototypeOf:function(e,t){function o(n){return e.exports=o=Object.setPrototypeOf?Object.getPrototypeOf.bind():function(r){return r.__proto__||Object.getPrototypeOf(r)},e.exports.__esModule=!0,e.exports.default=e.exports,o(n)}e.exports=o,e.exports.__esModule=!0,e.exports.default=e.exports},superPropBase:function(e,t){var o=t("getPrototypeOf");function n(r,s){for(;!{}.hasOwnProperty.call(r,s)&&(r=o(r))!==null;);return r}e.exports=n,e.exports.__esModule=!0,e.exports.default=e.exports},get:function(e,t){var o=t("superPropBase");function n(){return e.exports=n=typeof Reflect!="undefined"&&Reflect.get?Reflect.get.bind():function(r,s,a){var x=o(r,s);if(x){var l=Object.getOwnPropertyDescriptor(x,s);return l.get?l.get.call(arguments.length<3?r:a):l.value}},e.exports.__esModule=!0,e.exports.default=e.exports,n.apply(null,arguments)}e.exports=n,e.exports.__esModule=!0,e.exports.default=e.exports}},p={};function u(e){if(p[e])return p[e].exports;var t=p[e]={exports:{}};return f[e](t,u),t.exports}return{get:u("get")}})();function _get(f,p,u){return _get2.get(f,p,u)}"#;
+pub const INLINE_CLASS_SUPER_GET_HELPER_GLOBALS: &[&str] = &["Object", "Reflect", "arguments"];
 pub const INLINE_CLASS_SUPER_GET_HELPER_PRETTY: &str = r#"var _get2 = (() => {
 	var f = {
 		getPrototypeOf: function(e, t) {
@@ -887,6 +999,7 @@ function _get(f, p, u) {
 "#;
 pub const INLINE_CLASS_SUPER_GET_HELPER_BINDINGS: &[&str] = &["_get", "_get2"];
 pub const INLINE_CLASS_SUPER_GET_HELPER_RUNTIME: &str = r#"var _get2={get:require("@babel/runtime/helpers/get")};function _get(e,t,r){return _get2.get(e,t,r)}"#;
+pub const INLINE_CLASS_SUPER_GET_HELPER_RUNTIME_GLOBALS: &[&str] = &[];
 pub const INLINE_CLASS_SUPER_GET_HELPER_RUNTIME_PRETTY: &str = r#"var _get2 = { get: require("@babel/runtime/helpers/get") };
 function _get(e, t, r) {
 	return _get2.get(e, t, r);
@@ -895,6 +1008,7 @@ function _get(e, t, r) {
 pub const INLINE_CLASS_SUPER_GET_HELPER_RUNTIME_BINDINGS: &[&str] = &["_get", "_get2"];
 pub const INLINE_CLASS_SUPER_GET_HELPER_RUNTIME_DEPENDENCIES: &[&str] = &["get"];
 pub const INLINE_CLASS_PRIVATE_HELPERS: &str = r#"var _classPrivateFieldLooseBase2=(()=>{var t={classPrivateFieldLooseBase:function(e,a){function i(o,l){if(!{}.hasOwnProperty.call(o,l))throw new TypeError("attempted to use private field on non-instance");return o}e.exports=i,e.exports.__esModule=!0,e.exports.default=e.exports}},s={};function r(e){if(s[e])return s[e].exports;var a=s[e]={exports:{}};return t[e](a,r),a.exports}return{classPrivateFieldLooseBase:r("classPrivateFieldLooseBase")}})();function _classPrivateFieldLooseBase(t,s){return _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(t,s)}function _classPrivateMethodCall(t,s,r){return _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(t,s)[s].apply(t,r)}"#;
+pub const INLINE_CLASS_PRIVATE_HELPERS_GLOBALS: &[&str] = &["TypeError"];
 pub const INLINE_CLASS_PRIVATE_HELPERS_PRETTY: &str = r#"var _classPrivateFieldLooseBase2 = (() => {
 	var t = { classPrivateFieldLooseBase: function(e, a) {
 		function i(o, l) {
@@ -923,6 +1037,7 @@ pub const INLINE_CLASS_PRIVATE_HELPERS_BINDINGS: &[&str] = &[
     "_classPrivateMethodCall",
 ];
 pub const INLINE_CLASS_PRIVATE_HELPERS_RUNTIME: &str = r#"var _classPrivateFieldLooseBase2={classPrivateFieldLooseBase:require("@babel/runtime/helpers/classPrivateFieldLooseBase")};function _classPrivateFieldLooseBase(e,s){return _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e,s)}function _classPrivateMethodCall(e,s,a){return _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e,s)[s].apply(e,a)}"#;
+pub const INLINE_CLASS_PRIVATE_HELPERS_RUNTIME_GLOBALS: &[&str] = &[];
 pub const INLINE_CLASS_PRIVATE_HELPERS_RUNTIME_PRETTY: &str = r#"var _classPrivateFieldLooseBase2 = { classPrivateFieldLooseBase: require("@babel/runtime/helpers/classPrivateFieldLooseBase") };
 function _classPrivateFieldLooseBase(e, s) {
 	return _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
@@ -939,6 +1054,7 @@ pub const INLINE_CLASS_PRIVATE_HELPERS_RUNTIME_BINDINGS: &[&str] = &[
 pub const INLINE_CLASS_PRIVATE_HELPERS_RUNTIME_DEPENDENCIES: &[&str] =
     &["classPrivateFieldLooseBase"];
 pub const INLINE_CLASS_PRIVATE_IN_HELPER: &str = r#"var _checkInRHS2=(()=>{var c={typeof:function(e,t){function n(p){"@babel/helpers - typeof";return e.exports=n=typeof Symbol=="function"&&typeof Symbol.iterator=="symbol"?function(o){return typeof o}:function(o){return o&&typeof Symbol=="function"&&o.constructor===Symbol&&o!==Symbol.prototype?"symbol":typeof o},e.exports.__esModule=!0,e.exports.default=e.exports,n(p)}e.exports=n,e.exports.__esModule=!0,e.exports.default=e.exports},checkInRHS:function(e,t){var n=t("typeof").default;function p(o){if(Object(o)!==o)throw TypeError("right-hand side of 'in' should be an object, got "+(o!==null?n(o):"null"));return o}e.exports=p,e.exports.__esModule=!0,e.exports.default=e.exports}},r={};function u(e){if(r[e])return r[e].exports;var t=r[e]={exports:{}};return c[e](t,u),t.exports}return{checkInRHS:u("checkInRHS")}})(),_checkInRHS=_checkInRHS2.checkInRHS;"#;
+pub const INLINE_CLASS_PRIVATE_IN_HELPER_GLOBALS: &[&str] = &["Object", "Symbol", "TypeError"];
 pub const INLINE_CLASS_PRIVATE_IN_HELPER_PRETTY: &str = r#"var _checkInRHS2 = (() => {
 	var c = {
 		typeof: function(e, t) {
@@ -971,12 +1087,22 @@ pub const INLINE_CLASS_PRIVATE_IN_HELPER_PRETTY: &str = r#"var _checkInRHS2 = ((
 "#;
 pub const INLINE_CLASS_PRIVATE_IN_HELPER_BINDINGS: &[&str] = &["_checkInRHS", "_checkInRHS2"];
 pub const INLINE_CLASS_PRIVATE_IN_HELPER_RUNTIME: &str = r#"var _checkInRHS2={checkInRHS:require("@babel/runtime/helpers/checkInRHS")},_checkInRHS=_checkInRHS2.checkInRHS;"#;
+pub const INLINE_CLASS_PRIVATE_IN_HELPER_RUNTIME_GLOBALS: &[&str] = &[];
 pub const INLINE_CLASS_PRIVATE_IN_HELPER_RUNTIME_PRETTY: &str = r#"var _checkInRHS2 = { checkInRHS: require("@babel/runtime/helpers/checkInRHS") }, _checkInRHS = _checkInRHS2.checkInRHS;
 "#;
 pub const INLINE_CLASS_PRIVATE_IN_HELPER_RUNTIME_BINDINGS: &[&str] =
     &["_checkInRHS", "_checkInRHS2"];
 pub const INLINE_CLASS_PRIVATE_IN_HELPER_RUNTIME_DEPENDENCIES: &[&str] = &["checkInRHS"];
 pub const INLINE_REGEXP_NAMED_CAPTURE_HELPER: &str = r#"var _wrapRegExp2=(()=>{var h={typeof:function(e,s){function u(a){"@babel/helpers - typeof";return e.exports=u=typeof Symbol=="function"&&typeof Symbol.iterator=="symbol"?function(t){return typeof t}:function(t){return t&&typeof Symbol=="function"&&t.constructor===Symbol&&t!==Symbol.prototype?"symbol":typeof t},e.exports.__esModule=!0,e.exports.default=e.exports,u(a)}e.exports=u,e.exports.__esModule=!0,e.exports.default=e.exports},setPrototypeOf:function(e,s){function u(a,t){return e.exports=u=Object.setPrototypeOf?Object.setPrototypeOf.bind():function(p,c){return p.__proto__=c,p},e.exports.__esModule=!0,e.exports.default=e.exports,u(a,t)}e.exports=u,e.exports.__esModule=!0,e.exports.default=e.exports},inherits:function(e,s){var u=s("setPrototypeOf");function a(t,p){if(typeof p!="function"&&p!==null)throw new TypeError("Super expression must either be null or a function");t.prototype=Object.create(p&&p.prototype,{constructor:{value:t,writable:!0,configurable:!0}}),Object.defineProperty(t,"prototype",{writable:!1}),p&&u(t,p)}e.exports=a,e.exports.__esModule=!0,e.exports.default=e.exports},wrapRegExp:function(e,s){var u=s("typeof").default,a=s("setPrototypeOf"),t=s("inherits");function p(){e.exports=p=function(o,r){return new x(o,void 0,r)},e.exports.__esModule=!0,e.exports.default=e.exports;var c=RegExp.prototype,b=new WeakMap;function x(o,r,f){var i=RegExp(o,r);return b.set(i,f||b.get(o)),a(i,x.prototype)}function v(o,r){var f=b.get(r);return Object.keys(f).reduce(function(i,n){var l=f[n];if(typeof l=="number")i[n]=o[l];else{for(var y=0;o[l[y]]===void 0&&y+1<l.length;)y++;i[n]=o[l[y]]}return i},Object.create(null))}return t(x,RegExp),x.prototype.exec=function(o){var r=c.exec.call(this,o);if(r){r.groups=v(r,this);var f=r.indices;f&&(f.groups=v(f,this))}return r},x.prototype[Symbol.replace]=function(o,r){if(typeof r=="string"){var f=b.get(this);return c[Symbol.replace].call(this,o,r.replace(/\$<([^>]+)(>|$)/g,function(n,l,y){if(y==="")return n;var g=f[l];return Array.isArray(g)?"$"+g.join("$"):typeof g=="number"?"$"+g:""}))}if(typeof r=="function"){var i=this;return c[Symbol.replace].call(this,o,function(){var n=arguments;return u(n[n.length-1])!="object"&&(n=[].slice.call(n)).push(v(n,i)),r.apply(this,n)})}return c[Symbol.replace].call(this,o,r)},p.apply(this,arguments)}e.exports=p,e.exports.__esModule=!0,e.exports.default=e.exports}},d={};function _(e){if(d[e])return d[e].exports;var s=d[e]={exports:{}};return h[e](s,_),s.exports}return{wrapRegExp:_("wrapRegExp")}})(),_wrapRegExp=_wrapRegExp2.wrapRegExp;"#;
+pub const INLINE_REGEXP_NAMED_CAPTURE_HELPER_GLOBALS: &[&str] = &[
+    "Array",
+    "Object",
+    "RegExp",
+    "Symbol",
+    "TypeError",
+    "WeakMap",
+    "arguments",
+];
 pub const INLINE_REGEXP_NAMED_CAPTURE_HELPER_PRETTY: &str = r#"var _wrapRegExp2 = (() => {
 	var h = {
 		typeof: function(e, s) {
@@ -1073,6 +1199,7 @@ pub const INLINE_REGEXP_NAMED_CAPTURE_HELPER_PRETTY: &str = r#"var _wrapRegExp2 
 "#;
 pub const INLINE_REGEXP_NAMED_CAPTURE_HELPER_BINDINGS: &[&str] = &["_wrapRegExp", "_wrapRegExp2"];
 pub const INLINE_REGEXP_NAMED_CAPTURE_HELPER_RUNTIME: &str = r#"var _wrapRegExp2={wrapRegExp:require("@babel/runtime/helpers/wrapRegExp")},_wrapRegExp=_wrapRegExp2.wrapRegExp;"#;
+pub const INLINE_REGEXP_NAMED_CAPTURE_HELPER_RUNTIME_GLOBALS: &[&str] = &[];
 pub const INLINE_REGEXP_NAMED_CAPTURE_HELPER_RUNTIME_PRETTY: &str = r#"var _wrapRegExp2 = { wrapRegExp: require("@babel/runtime/helpers/wrapRegExp") }, _wrapRegExp = _wrapRegExp2.wrapRegExp;
 "#;
 pub const INLINE_REGEXP_NAMED_CAPTURE_HELPER_RUNTIME_BINDINGS: &[&str] =
@@ -1086,6 +1213,8 @@ pub static INLINE_FOR_OF_HELPER_DESCRIPTOR: GeneratedHelperFragment = GeneratedH
     inline_bindings: INLINE_FOR_OF_HELPER_BINDINGS,
     runtime_bindings: INLINE_FOR_OF_HELPER_RUNTIME_BINDINGS,
     babel_dependencies: INLINE_FOR_OF_HELPER_RUNTIME_DEPENDENCIES,
+    inline_globals: INLINE_FOR_OF_HELPER_GLOBALS,
+    runtime_globals: INLINE_FOR_OF_HELPER_RUNTIME_GLOBALS,
 };
 pub static INLINE_EXTENDS_HELPER_DESCRIPTOR: GeneratedHelperFragment = GeneratedHelperFragment {
     inline_compact: INLINE_EXTENDS_HELPER,
@@ -1095,6 +1224,8 @@ pub static INLINE_EXTENDS_HELPER_DESCRIPTOR: GeneratedHelperFragment = Generated
     inline_bindings: INLINE_EXTENDS_HELPER_BINDINGS,
     runtime_bindings: INLINE_EXTENDS_HELPER_RUNTIME_BINDINGS,
     babel_dependencies: INLINE_EXTENDS_HELPER_RUNTIME_DEPENDENCIES,
+    inline_globals: INLINE_EXTENDS_HELPER_GLOBALS,
+    runtime_globals: INLINE_EXTENDS_HELPER_RUNTIME_GLOBALS,
 };
 pub static INLINE_READ_ONLY_ERROR_HELPER_DESCRIPTOR: GeneratedHelperFragment =
     GeneratedHelperFragment {
@@ -1105,6 +1236,8 @@ pub static INLINE_READ_ONLY_ERROR_HELPER_DESCRIPTOR: GeneratedHelperFragment =
         inline_bindings: INLINE_READ_ONLY_ERROR_HELPER_BINDINGS,
         runtime_bindings: INLINE_READ_ONLY_ERROR_HELPER_RUNTIME_BINDINGS,
         babel_dependencies: INLINE_READ_ONLY_ERROR_HELPER_RUNTIME_DEPENDENCIES,
+        inline_globals: INLINE_READ_ONLY_ERROR_HELPER_GLOBALS,
+        runtime_globals: INLINE_READ_ONLY_ERROR_HELPER_RUNTIME_GLOBALS,
     };
 pub static INLINE_TO_PROPERTY_KEY_HELPER_DESCRIPTOR: GeneratedHelperFragment =
     GeneratedHelperFragment {
@@ -1115,6 +1248,8 @@ pub static INLINE_TO_PROPERTY_KEY_HELPER_DESCRIPTOR: GeneratedHelperFragment =
         inline_bindings: INLINE_TO_PROPERTY_KEY_HELPER_BINDINGS,
         runtime_bindings: INLINE_TO_PROPERTY_KEY_HELPER_RUNTIME_BINDINGS,
         babel_dependencies: INLINE_TO_PROPERTY_KEY_HELPER_RUNTIME_DEPENDENCIES,
+        inline_globals: INLINE_TO_PROPERTY_KEY_HELPER_GLOBALS,
+        runtime_globals: INLINE_TO_PROPERTY_KEY_HELPER_RUNTIME_GLOBALS,
     };
 pub static INLINE_DESTRUCTURING_ITER_HELPER_DESCRIPTOR: GeneratedHelperFragment =
     GeneratedHelperFragment {
@@ -1125,6 +1260,8 @@ pub static INLINE_DESTRUCTURING_ITER_HELPER_DESCRIPTOR: GeneratedHelperFragment 
         inline_bindings: INLINE_DESTRUCTURING_ITER_HELPER_BINDINGS,
         runtime_bindings: INLINE_DESTRUCTURING_ITER_HELPER_RUNTIME_BINDINGS,
         babel_dependencies: INLINE_DESTRUCTURING_ITER_HELPER_RUNTIME_DEPENDENCIES,
+        inline_globals: INLINE_DESTRUCTURING_ITER_HELPER_GLOBALS,
+        runtime_globals: INLINE_DESTRUCTURING_ITER_HELPER_RUNTIME_GLOBALS,
     };
 pub static INLINE_DESTRUCTURING_OBJECT_HELPER_DESCRIPTOR: GeneratedHelperFragment =
     GeneratedHelperFragment {
@@ -1135,6 +1272,8 @@ pub static INLINE_DESTRUCTURING_OBJECT_HELPER_DESCRIPTOR: GeneratedHelperFragmen
         inline_bindings: INLINE_DESTRUCTURING_OBJECT_HELPER_BINDINGS,
         runtime_bindings: INLINE_DESTRUCTURING_OBJECT_HELPER_RUNTIME_BINDINGS,
         babel_dependencies: INLINE_DESTRUCTURING_OBJECT_HELPER_RUNTIME_DEPENDENCIES,
+        inline_globals: INLINE_DESTRUCTURING_OBJECT_HELPER_GLOBALS,
+        runtime_globals: INLINE_DESTRUCTURING_OBJECT_HELPER_RUNTIME_GLOBALS,
     };
 pub static INLINE_DESTRUCTURING_REST_HELPER_DESCRIPTOR: GeneratedHelperFragment =
     GeneratedHelperFragment {
@@ -1145,6 +1284,8 @@ pub static INLINE_DESTRUCTURING_REST_HELPER_DESCRIPTOR: GeneratedHelperFragment 
         inline_bindings: INLINE_DESTRUCTURING_REST_HELPER_BINDINGS,
         runtime_bindings: INLINE_DESTRUCTURING_REST_HELPER_RUNTIME_BINDINGS,
         babel_dependencies: INLINE_DESTRUCTURING_REST_HELPER_RUNTIME_DEPENDENCIES,
+        inline_globals: INLINE_DESTRUCTURING_REST_HELPER_GLOBALS,
+        runtime_globals: INLINE_DESTRUCTURING_REST_HELPER_RUNTIME_GLOBALS,
     };
 pub static INLINE_DESTRUCTURING_LOOSE_REST_HELPER_DESCRIPTOR: GeneratedHelperFragment =
     GeneratedHelperFragment {
@@ -1155,6 +1296,8 @@ pub static INLINE_DESTRUCTURING_LOOSE_REST_HELPER_DESCRIPTOR: GeneratedHelperFra
         inline_bindings: INLINE_DESTRUCTURING_LOOSE_REST_HELPER_BINDINGS,
         runtime_bindings: INLINE_DESTRUCTURING_LOOSE_REST_HELPER_RUNTIME_BINDINGS,
         babel_dependencies: INLINE_DESTRUCTURING_LOOSE_REST_HELPER_RUNTIME_DEPENDENCIES,
+        inline_globals: INLINE_DESTRUCTURING_LOOSE_REST_HELPER_GLOBALS,
+        runtime_globals: INLINE_DESTRUCTURING_LOOSE_REST_HELPER_RUNTIME_GLOBALS,
     };
 pub static INLINE_CLASS_CONSTRUCT_HELPER_DESCRIPTOR: GeneratedHelperFragment =
     GeneratedHelperFragment {
@@ -1165,6 +1308,8 @@ pub static INLINE_CLASS_CONSTRUCT_HELPER_DESCRIPTOR: GeneratedHelperFragment =
         inline_bindings: INLINE_CLASS_CONSTRUCT_HELPER_BINDINGS,
         runtime_bindings: INLINE_CLASS_CONSTRUCT_HELPER_RUNTIME_BINDINGS,
         babel_dependencies: INLINE_CLASS_CONSTRUCT_HELPER_RUNTIME_DEPENDENCIES,
+        inline_globals: INLINE_CLASS_CONSTRUCT_HELPER_GLOBALS,
+        runtime_globals: INLINE_CLASS_CONSTRUCT_HELPER_RUNTIME_GLOBALS,
     };
 pub static INLINE_CLASS_SUPER_GET_HELPER_DESCRIPTOR: GeneratedHelperFragment =
     GeneratedHelperFragment {
@@ -1175,6 +1320,8 @@ pub static INLINE_CLASS_SUPER_GET_HELPER_DESCRIPTOR: GeneratedHelperFragment =
         inline_bindings: INLINE_CLASS_SUPER_GET_HELPER_BINDINGS,
         runtime_bindings: INLINE_CLASS_SUPER_GET_HELPER_RUNTIME_BINDINGS,
         babel_dependencies: INLINE_CLASS_SUPER_GET_HELPER_RUNTIME_DEPENDENCIES,
+        inline_globals: INLINE_CLASS_SUPER_GET_HELPER_GLOBALS,
+        runtime_globals: INLINE_CLASS_SUPER_GET_HELPER_RUNTIME_GLOBALS,
     };
 pub static INLINE_CLASS_PRIVATE_HELPERS_DESCRIPTOR: GeneratedHelperFragment =
     GeneratedHelperFragment {
@@ -1185,6 +1332,8 @@ pub static INLINE_CLASS_PRIVATE_HELPERS_DESCRIPTOR: GeneratedHelperFragment =
         inline_bindings: INLINE_CLASS_PRIVATE_HELPERS_BINDINGS,
         runtime_bindings: INLINE_CLASS_PRIVATE_HELPERS_RUNTIME_BINDINGS,
         babel_dependencies: INLINE_CLASS_PRIVATE_HELPERS_RUNTIME_DEPENDENCIES,
+        inline_globals: INLINE_CLASS_PRIVATE_HELPERS_GLOBALS,
+        runtime_globals: INLINE_CLASS_PRIVATE_HELPERS_RUNTIME_GLOBALS,
     };
 pub static INLINE_CLASS_PRIVATE_IN_HELPER_DESCRIPTOR: GeneratedHelperFragment =
     GeneratedHelperFragment {
@@ -1195,6 +1344,8 @@ pub static INLINE_CLASS_PRIVATE_IN_HELPER_DESCRIPTOR: GeneratedHelperFragment =
         inline_bindings: INLINE_CLASS_PRIVATE_IN_HELPER_BINDINGS,
         runtime_bindings: INLINE_CLASS_PRIVATE_IN_HELPER_RUNTIME_BINDINGS,
         babel_dependencies: INLINE_CLASS_PRIVATE_IN_HELPER_RUNTIME_DEPENDENCIES,
+        inline_globals: INLINE_CLASS_PRIVATE_IN_HELPER_GLOBALS,
+        runtime_globals: INLINE_CLASS_PRIVATE_IN_HELPER_RUNTIME_GLOBALS,
     };
 pub static INLINE_REGEXP_NAMED_CAPTURE_HELPER_DESCRIPTOR: GeneratedHelperFragment =
     GeneratedHelperFragment {
@@ -1205,4 +1356,6 @@ pub static INLINE_REGEXP_NAMED_CAPTURE_HELPER_DESCRIPTOR: GeneratedHelperFragmen
         inline_bindings: INLINE_REGEXP_NAMED_CAPTURE_HELPER_BINDINGS,
         runtime_bindings: INLINE_REGEXP_NAMED_CAPTURE_HELPER_RUNTIME_BINDINGS,
         babel_dependencies: INLINE_REGEXP_NAMED_CAPTURE_HELPER_RUNTIME_DEPENDENCIES,
+        inline_globals: INLINE_REGEXP_NAMED_CAPTURE_HELPER_GLOBALS,
+        runtime_globals: INLINE_REGEXP_NAMED_CAPTURE_HELPER_RUNTIME_GLOBALS,
     };

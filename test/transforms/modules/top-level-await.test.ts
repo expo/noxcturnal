@@ -16,9 +16,8 @@ test('preserves top-level await while lowering unrelated syntax', async () => {
       transforms: { destructuring: true },
     }),
   ).toMatchInlineSnapshot(`
-    "var _objectDestructuringEmpty2 = {
-      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
-    };
+    "import _babelHelper from '@babel/runtime/helpers/objectDestructuringEmpty';
+    var _objectDestructuringEmpty2 = { objectDestructuringEmpty: _babelHelper };
     function _objectDestructuringEmpty(t) {
       return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
     }
