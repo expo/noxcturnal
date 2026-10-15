@@ -106,6 +106,15 @@ const commonOutput = {
   },
 };
 
+// Provide CommonJS bindings for the native addon and code-frame loaders in ESM.
+const esmNativeLoaderBanner = [
+  'import { createRequire as __noxCreateRequire } from "node:module";',
+  'import { dirname as __noxDirname } from "node:path";',
+  'import { fileURLToPath as __noxFileURLToPath } from "node:url";',
+  'const require = __noxCreateRequire(import.meta.url);',
+  'const __dirname = __noxDirname(__noxFileURLToPath(import.meta.url));',
+].join('\n');
+
 const outputPlugins = [
   {
     name: 'outputPackageJsons',
@@ -236,6 +245,7 @@ export default [
       {
         ...commonOutput,
         format: 'esm',
+        banner: esmNativeLoaderBanner,
         chunkFileNames(chunk) {
           return `dist/chunks/[name]-chunk${extension(chunk.name) || '.mjs'}`;
         },
