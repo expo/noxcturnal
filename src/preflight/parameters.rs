@@ -101,13 +101,18 @@ fn prepare_selected(
     semantic: &Semantic<'_>,
     only_object_rest: bool,
 ) -> Result<AstPlan, &'static str> {
-    if only_object_rest
-        && !semantic.nodes().iter().any(|node| match node.kind() {
-            AstKind::Function(function) => parameters_have_object_rest(&function.params),
-            AstKind::ArrowFunctionExpression(arrow) => parameters_have_object_rest(&arrow.params),
-            _ => false,
-        })
-    {
+    if !semantic.nodes().iter().any(|node| match node.kind() {
+        AstKind::Function(function) => {
+            function.body.is_some()
+                && non_simple(&function.params).is_some()
+                && (!only_object_rest || parameters_have_object_rest(&function.params))
+        }
+        AstKind::ArrowFunctionExpression(arrow) => {
+            non_simple(&arrow.params).is_some()
+                && (!only_object_rest || parameters_have_object_rest(&arrow.params))
+        }
+        _ => false,
+    }) {
         return Ok(AstPlan {
             functions: FxHashMap::default(),
             arrows: FxHashMap::default(),
@@ -1078,9 +1083,10 @@ fn collect_lexical_facts_selected(
     let mut arrow_parents = FxHashMap::<NodeId, Option<NodeId>>::default();
     let mut arrow_order = Vec::new();
     let mut argument_shadow_ends = Vec::<u32>::new();
-    let mut statement_insertions = FxHashMap::<NodeId, Option<NodeId>>::default();
-    let mut class_boundaries = FxHashMap::<NodeId, Option<NodeId>>::default();
-    let mut derived_contexts = FxHashMap::<NodeId, bool>::default();
+    let node_count = semantic.nodes().len();
+    let mut statement_insertions = vec![None; node_count];
+    let mut class_boundaries = vec![None; node_count];
+    let mut derived_contexts = vec![false; node_count];
     for (node_id, node) in semantic.nodes().iter_enumerated() {
         let span = node.kind().span();
         let parent_id = semantic.nodes().parent_id(node_id);
@@ -1100,18 +1106,18 @@ fn collect_lexical_facts_selected(
         let boundary = if initializer_boundary {
             Some(node_id)
         } else {
-            class_boundaries.get(&parent_id).copied().flatten()
+            class_boundaries[parent_id.index()]
         };
-        class_boundaries.insert(node_id, boundary);
+        class_boundaries[node_id.index()] = boundary;
         let derived = if matches!(node.kind(), AstKind::Function(_)) {
             matches!(parent, AstKind::MethodDefinition(method) if method.kind == oxc_ast::ast::MethodDefinitionKind::Constructor)
                 && matches!(semantic.nodes().parent_kind(semantic.nodes().parent_id(parent_id)), AstKind::Class(class) if class.super_class.is_some())
         } else if initializer_boundary {
             false
         } else {
-            derived_contexts.get(&parent_id).copied().unwrap_or(false)
+            derived_contexts[parent_id.index()]
         };
-        derived_contexts.insert(node_id, derived);
+        derived_contexts[node_id.index()] = derived;
         let statement_insertion = if matches!(node.kind(), AstKind::Program(_)) {
             None
         } else {
@@ -1133,10 +1139,10 @@ fn collect_lexical_facts_selected(
                 AstKind::SwitchCase(_) => node.kind().is_statement().then_some(node_id),
                 AstKind::FormalParameters(_) => None,
                 AstKind::PropertyDefinition(_) | AstKind::AccessorProperty(_) => None,
-                _ => statement_insertions.get(&parent_id).copied().flatten(),
+                _ => statement_insertions[parent_id.index()],
             }
         };
-        statement_insertions.insert(node_id, statement_insertion);
+        statement_insertions[node_id.index()] = statement_insertion;
         while active_arrows
             .last()
             .is_some_and(|(_, end)| span.start >= *end)
@@ -1157,8 +1163,13 @@ fn collect_lexical_facts_selected(
         }
         match node.kind() {
             AstKind::Function(function) => {
-                planning_nodes.push(node_id);
-                function_facts.insert(node_id, ArrowFacts::default());
+                if function.body.is_some()
+                    && non_simple(&function.params).is_some()
+                    && (!only_object_rest || parameters_have_object_rest(&function.params))
+                {
+                    planning_nodes.push(node_id);
+                    function_facts.insert(node_id, ArrowFacts::default());
+                }
                 active_functions.push((node_id, function.span.end, active_arrows.len()));
                 continue;
             }
@@ -1202,7 +1213,7 @@ fn collect_lexical_facts_selected(
         // Class initializer bodies introduce their own receiver/new.target. Computed
         // keys and heritage stay in the enclosing evaluation environment.
         if let Some((arrow_id, _)) = active_arrows.last() {
-            if class_boundaries[arrow_id] != boundary {
+            if class_boundaries[arrow_id.index()] != boundary {
                 continue;
             }
             if lexical_kind == 2
@@ -1238,9 +1249,9 @@ fn collect_lexical_facts_selected(
             }
         }
         if let Some((function_id, _, _)) = active_functions.last()
-            && class_boundaries[function_id] == boundary
+            && class_boundaries[function_id.index()] == boundary
+            && let Some(function_facts) = function_facts.get_mut(function_id)
         {
-            let function_facts = function_facts.get_mut(function_id).unwrap();
             match lexical_kind {
                 2 => function_facts.arguments_spans.push((span.start, span.end)),
                 3 => function_facts.new_target_spans.push((span.start, span.end)),

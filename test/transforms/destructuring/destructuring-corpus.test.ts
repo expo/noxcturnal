@@ -210,7 +210,7 @@ export const cases = [
   [
     'array patterns > spread from generator into rest',
     '() => {\n  function* f() {\n    for (var i = 0; i < 3; i++) {\n      yield i;\n    }\n  }\n  var [...xs] = f();\n  expect(xs).toEqual([0, 1, 2]);\n}',
-    "var _toArray2 = {\n  slicedToArray: require('@babel/runtime/helpers/slicedToArray'),\n  toConsumableArray: require('@babel/runtime/helpers/toConsumableArray'),\n};\nfunction _toArray(r, e, a) {\n  return a ? _toArray2.toConsumableArray(r) : _toArray2.slicedToArray(r, e);\n}\n() => {\n  function* f() {\n    for (var i = 0; i < 3; i++) {\n      yield i;\n    }\n  }\n  var _arr = _toArray(f(), 0, true),\n    xs = _arr.slice(0);\n  expect(xs).toEqual([0, 1, 2]);\n};",
+    "var _toArray2 = {\n  slicedToArray: require('@babel/runtime/helpers/slicedToArray'),\n  toConsumableArray: require('@babel/runtime/helpers/toConsumableArray'),\n};\nfunction _toArray(r, e, a) {\n  return a ? _toArray2.toConsumableArray(r) : _toArray2.slicedToArray(r, e);\n}\n() => {\n  function* f() {\n    for (var i = 0; i < 3; i++) {\n      yield i;\n    }\n  }\n  var _arr = _toArray(f(), 0, true),\n    xs = _arr;\n  expect(xs).toEqual([0, 1, 2]);\n};",
   ],
   [
     'array patterns > rest from extended array produces plain Array',
@@ -425,12 +425,12 @@ export const cases = [
   [
     'holes and sparse arrays > rest from sparse array fills holes with undefined',
     '() => {\n  // eslint-disable-next-line no-sparse-arrays\n  const [...d] = [,];\n  expect(d).toEqual([undefined]);\n}',
-    "var _toArray2 = {\n  slicedToArray: require('@babel/runtime/helpers/slicedToArray'),\n  toConsumableArray: require('@babel/runtime/helpers/toConsumableArray'),\n};\nfunction _toArray(r, e, a) {\n  return a ? _toArray2.toConsumableArray(r) : _toArray2.slicedToArray(r, e);\n}\n() => {\n  // eslint-disable-next-line no-sparse-arrays\n  const _arr = _toArray([,], 0, true),\n    d = _arr.slice(0);\n  expect(d).toEqual([undefined]);\n};",
+    "var _toArray2 = {\n  slicedToArray: require('@babel/runtime/helpers/slicedToArray'),\n  toConsumableArray: require('@babel/runtime/helpers/toConsumableArray'),\n};\nfunction _toArray(r, e, a) {\n  return a ? _toArray2.toConsumableArray(r) : _toArray2.slicedToArray(r, e);\n}\n() => {\n  // eslint-disable-next-line no-sparse-arrays\n  const _arr = _toArray([,], 0, true),\n    d = _arr;\n  expect(d).toEqual([undefined]);\n};",
   ],
   [
     'holes and sparse arrays > rest with object pattern from sparse array',
     '() => {\n  // eslint-disable-next-line no-sparse-arrays\n  const [...{ 0: e }] = [,];\n  expect(e).toEqual(undefined);\n}',
-    "var _toArray2 = {\n  slicedToArray: require('@babel/runtime/helpers/slicedToArray'),\n  toConsumableArray: require('@babel/runtime/helpers/toConsumableArray'),\n};\nfunction _toArray(r, e, a) {\n  return a ? _toArray2.toConsumableArray(r) : _toArray2.slicedToArray(r, e);\n}\nvar _objectDestructuringEmpty2 = {\n  objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),\n};\nfunction _objectDestructuringEmpty(t) {\n  return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);\n}\n() => {\n  // eslint-disable-next-line no-sparse-arrays\n  const _arr = _toArray([,], 0, true),\n    _obj = _objectDestructuringEmpty(_arr.slice(0)),\n    e = _obj[0];\n  expect(e).toEqual(undefined);\n};",
+    "var _toArray2 = {\n  slicedToArray: require('@babel/runtime/helpers/slicedToArray'),\n  toConsumableArray: require('@babel/runtime/helpers/toConsumableArray'),\n};\nfunction _toArray(r, e, a) {\n  return a ? _toArray2.toConsumableArray(r) : _toArray2.slicedToArray(r, e);\n}\nvar _objectDestructuringEmpty2 = {\n  objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),\n};\nfunction _objectDestructuringEmpty(t) {\n  return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);\n}\n() => {\n  // eslint-disable-next-line no-sparse-arrays\n  const _arr = _toArray([,], 0, true),\n    _obj = _objectDestructuringEmpty(_arr),\n    e = _obj[0];\n  expect(e).toEqual(undefined);\n};",
   ],
   [
     'holes and sparse arrays > single element from sparse array is undefined',

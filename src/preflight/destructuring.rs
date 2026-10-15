@@ -1,6 +1,6 @@
-use std::collections::VecDeque;
-
-use oxc_allocator::{Allocator, Box as ArenaBox, CloneIn, TakeIn, Vec as ArenaVec};
+use oxc_allocator::{
+    Address, Allocator, Box as ArenaBox, CloneIn, GetAddress, TakeIn, Vec as ArenaVec,
+};
 use oxc_ast::{
     AstBuilder, AstKind,
     ast::{
@@ -29,7 +29,7 @@ use crate::generated::inline_helpers::{
 use crate::preflight::helpers::CustomHelperRequests;
 
 pub(super) struct AstPlan {
-    declarations: FxHashMap<(u32, String), VecDeque<AstDeclaratorPlan>>,
+    declarations: FxHashMap<Address, AstDeclaratorPlan>,
     catches: FxHashMap<u32, AstCatchPlan>,
     assignments: FxHashMap<u32, AstAssignmentPlan>,
     loop_assignments: FxHashMap<u32, AstAssignmentPlan>,
@@ -212,8 +212,7 @@ pub(super) fn prepare_ast(
         property_key: String::new(),
         property_key_runtime: String::new(),
     };
-    let mut declarations: FxHashMap<(u32, String), VecDeque<AstDeclaratorPlan>> =
-        FxHashMap::default();
+    let mut declarations: FxHashMap<Address, AstDeclaratorPlan> = FxHashMap::default();
     let mut catches = FxHashMap::default();
     let mut assignments = FxHashMap::default();
     let mut loop_assignments = FxHashMap::default();
@@ -253,17 +252,17 @@ pub(super) fn prepare_ast(
                 let root = reserve("_ref", &mut reserved);
                 let reservation_checkpoint = reserved.checkpoint();
                 plan_binding_names(&declarator.id, &mut reserved, &mut helper_usage);
-                declarations
-                    .entry((
-                        declarator.span.start,
-                        binding_pattern_fingerprint(&declarator.id),
-                    ))
-                    .or_default()
-                    .push_back(AstDeclaratorPlan {
+                // Binding patterns live in the arena: their address survives
+                // declaration moves and distinguishes generated patterns whose
+                // source spans coincide, without serializing their structure.
+                declarations.insert(
+                    declarator.id.address(),
+                    AstDeclaratorPlan {
                         root,
                         anchor: declarator.span,
                         reservation_checkpoint,
-                    });
+                    },
+                );
             }
             AstKind::CatchClause(clause) => {
                 let Some(param) = &clause.param else {
@@ -477,7 +476,7 @@ pub(super) fn run_ast<'a>(
 
 struct DestructuringDeclaratorLowerer<'a> {
     allocator: &'a Allocator,
-    declarations: FxHashMap<(u32, String), VecDeque<AstDeclaratorPlan>>,
+    declarations: FxHashMap<Address, AstDeclaratorPlan>,
     catches: FxHashMap<u32, AstCatchPlan>,
     assignments: FxHashMap<u32, AstAssignmentPlan>,
     loop_assignments: FxHashMap<u32, AstAssignmentPlan>,
@@ -675,12 +674,17 @@ impl<'a> DestructuringDeclaratorLowerer<'a> {
                     }
                 }
                 if let Some(rest) = pattern.rest {
-                    let value = self.call_method(
-                        anchor,
-                        self.id(anchor, &array),
-                        "slice",
-                        [self.number(anchor, element_count)],
-                    );
+                    let value = if element_count == 0 {
+                        // The rest conversion already returns a fresh plain array.
+                        self.id(anchor, &array)
+                    } else {
+                        self.call_method(
+                            anchor,
+                            self.id(anchor, &array),
+                            "slice",
+                            [self.number(anchor, element_count)],
+                        )
+                    };
                     self.lower_assignment(rest.unbox().target, value, anchor, output, reserved)?;
                 }
             }
@@ -819,17 +823,17 @@ impl<'a> DestructuringDeclaratorLowerer<'a> {
                     }
                 }
                 if let Some(rest) = pattern.rest {
-                    let slice = self.member(anchor, self.id(anchor, &array), "slice");
-                    let ast = self.ast();
-                    let mut arguments = ArenaVec::new_in(&ast);
-                    arguments.push(Argument::from(self.number(anchor, element_count)));
-                    let value = ast.expression_call(
-                        anchor,
-                        slice,
-                        None::<ArenaBox<'a, TSTypeParameterInstantiation<'a>>>,
-                        arguments,
-                        false,
-                    );
+                    let value = if element_count == 0 {
+                        // The rest conversion already returns a fresh plain array.
+                        self.id(anchor, &array)
+                    } else {
+                        self.call_method(
+                            anchor,
+                            self.id(anchor, &array),
+                            "slice",
+                            [self.number(anchor, element_count)],
+                        )
+                    };
                     self.lower_binding(
                         rest.unbox().argument,
                         value,
@@ -1020,18 +1024,9 @@ impl<'a> DestructuringDeclaratorLowerer<'a> {
             return;
         }
 
-        let start = declarator.span.start;
-        let pattern = binding_pattern_fingerprint(&declarator.id);
-        let key = (start, pattern);
-        let Some(plans) = self.declarations.get_mut(&key) else {
+        let Some(plan) = self.declarations.remove(&declarator.id.address()) else {
             return;
         };
-        let plan = plans
-            .pop_front()
-            .expect("nonempty destructuring plan bucket");
-        if plans.is_empty() {
-            self.declarations.remove(&key);
-        }
 
         let ast = self.ast();
         let old = declarator.take_in(&ast);
@@ -1113,19 +1108,13 @@ impl<'a> VisitMut<'a> for DestructuringDeclaratorLowerer<'a> {
                 index += 1;
                 continue;
             }
-            let start = declaration.declarations[index].span.start;
-            let pattern = binding_pattern_fingerprint(&declaration.declarations[index].id);
-            let key = (start, pattern);
-            let Some(plans) = self.declarations.get_mut(&key) else {
+            let Some(plan) = self
+                .declarations
+                .remove(&declaration.declarations[index].id.address())
+            else {
                 index += 1;
                 continue;
             };
-            let plan = plans
-                .pop_front()
-                .expect("nonempty destructuring plan bucket");
-            if plans.is_empty() {
-                self.declarations.remove(&key);
-            }
             let ast = self.ast();
             let old = declaration.declarations[index].take_in(&ast);
             let Some(mut init) = old.init else {
@@ -1324,70 +1313,6 @@ fn ast_eligible_declarator(
                     AstKind::ForOfStatement(_) | AstKind::ForInStatement(_)
                 )
             }))
-}
-
-fn binding_pattern_fingerprint(pattern: &BindingPattern<'_>) -> String {
-    fn write(pattern: &BindingPattern<'_>, output: &mut String) {
-        match pattern {
-            BindingPattern::BindingIdentifier(identifier) => {
-                output.push_str("id:");
-                output.push_str(identifier.name.as_str());
-            }
-            BindingPattern::AssignmentPattern(pattern) => {
-                output.push_str("default(");
-                write(&pattern.left, output);
-                output.push(')');
-            }
-            BindingPattern::ArrayPattern(pattern) => {
-                output.push('[');
-                for element in &pattern.elements {
-                    if let Some(element) = element {
-                        write(element, output);
-                    } else {
-                        output.push('_');
-                    }
-                    output.push(',');
-                }
-                if let Some(rest) = &pattern.rest {
-                    output.push_str("...");
-                    write(&rest.argument, output);
-                }
-                output.push(']');
-            }
-            BindingPattern::ObjectPattern(pattern) => {
-                output.push('{');
-                for property in &pattern.properties {
-                    if property.computed {
-                        output.push_str("computed");
-                    } else {
-                        match &property.key {
-                            PropertyKey::StaticIdentifier(identifier) => {
-                                output.push_str(identifier.name.as_str());
-                            }
-                            key => {
-                                output.push_str("key@");
-                                output.push_str(&key.span().start.to_string());
-                                output.push(':');
-                                output.push_str(&key.span().end.to_string());
-                            }
-                        }
-                    }
-                    output.push(':');
-                    write(&property.value, output);
-                    output.push(',');
-                }
-                if let Some(rest) = &pattern.rest {
-                    output.push_str("...");
-                    write(&rest.argument, output);
-                }
-                output.push('}');
-            }
-        }
-    }
-
-    let mut output = String::new();
-    write(pattern, &mut output);
-    output
 }
 
 #[derive(Default)]
