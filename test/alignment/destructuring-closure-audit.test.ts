@@ -1,4 +1,5 @@
 import { createRequire } from 'node:module';
+import { pathToFileURL } from 'node:url';
 import { transformSync } from '@babel/core';
 import destructuring from '@babel/plugin-transform-destructuring';
 import typescript from '@babel/plugin-transform-typescript';
@@ -123,7 +124,7 @@ describe.each(['inline', 'runtime', 'fallback'] as const)(
       expect(original.update).toBeTypeOf('function');
       (original.update as () => void)();
       expect(original.value).toBe(2);
-      const code = compile(
+      let code = compile(
         source,
         {
           transforms: { destructuring: true },
@@ -138,24 +139,23 @@ describe.each(['inline', 'runtime', 'fallback'] as const)(
       expect(code).not.toMatch(/export\s+let\s*\[/);
       if (profile === 'runtime') {
         expect(code).toContain('@babel/runtime/helpers/');
-        try {
-          await importCode(code);
-          throw new Error('expected runtime loader failure');
-        } catch (error) {
-          expect(error).toBeInstanceOf(ReferenceError);
-          expect((error as Error).message).toMatch(/require is not defined/);
-          actual = { error: 'ReferenceError' };
-        }
+        // Data URLs have no package-resolution base; resolve genuine ESM imports
+        // without injecting require into the module being tested.
+        code = code.replace(
+          /from\s+(["'])(@babel\/runtime\/[^"']+)\1/g,
+          (_match, _quote, specifier) =>
+            'from ' + JSON.stringify(pathToFileURL(require.resolve(specifier)).href),
+        );
       } else {
         expect(code).not.toContain('@babel/runtime');
-        const module = await importCode(code);
-        const initial = module.value;
-        expect(module.update).toBeTypeOf('function');
-        (module.update as () => void)();
-        actual = [initial, module.value];
       }
+      const module = await importCode(code);
+      const initial = module.value;
+      expect(module.update).toBeTypeOf('function');
+      (module.update as () => void)();
+      actual = [initial, module.value];
     });
-    (profile === 'runtime' ? test.fails : test)('preserves the exported live binding', () => {
+    test('preserves the exported live binding', () => {
       expect(actual).toEqual([1, 2]);
     });
   },

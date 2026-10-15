@@ -7,7 +7,7 @@ const cases = [
   {
     name: 'for-of parameter Symbol',
     expected: [1, 2],
-    bothFail: true,
+    bothFail: false,
     key: 'forOf',
     plugins: ['for-of'],
     source: `function read(Symbol){const out=[];for(const x of [1,2])out.push(x);return out}globalThis.result=read(null);`,

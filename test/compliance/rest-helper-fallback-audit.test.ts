@@ -56,7 +56,8 @@ describe.each(configs)('rest helper fallback loose=$loose builtins=$useBuiltIns'
           expect(code).not.toMatch(/\.\.\.rest/);
           const importsPropertyKey = !['7.0.0-beta.0', '7.1.4', '8.0.0'].includes(version);
           expect(code.includes('@babel/runtime/helpers/toPropertyKey')).toBe(importsPropertyKey);
-          const strict = !config.loose && !config.useBuiltIns;
+          // useBuiltIns only selects the assignment path in loose mode.
+          const strict = !config.loose;
           expect(code.includes('@babel/runtime/helpers/objectSpread2')).toBe(
             strict && ['7.5.0', '7.29.7'].includes(version),
           );
