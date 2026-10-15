@@ -47,11 +47,21 @@ export function packEdits(edits: readonly EditCommand[]): Buffer {
     if (edit.kind === 'Move') {
       contentWords[index] = edit.destination ?? MISSING_VALUE;
     } else if (edit.contentParts != null) {
-      contentWords[index] = PARTS_TAG | partsEntryCount++;
-      partsData.push(edit.contentParts.length);
-      for (const part of edit.contentParts) {
-        if (typeof part === 'string') partsData.push(0, addString(part), 0);
-        else partsData.push(1, part.start, part.end);
+      if (
+        (edit.mapping ?? 'Sourceless') === 'Sourceless' &&
+        !edit.names?.length &&
+        edit.contentParts.every(part => typeof part === 'string')
+      ) {
+        // Batched, source-free contributions need one text payload, not a
+        // separate native string and generated piece for every contribution.
+        contentWords[index] = addString(edit.contentParts.join(''));
+      } else {
+        contentWords[index] = PARTS_TAG | partsEntryCount++;
+        partsData.push(edit.contentParts.length);
+        for (const part of edit.contentParts) {
+          if (typeof part === 'string') partsData.push(0, addString(part), 0);
+          else partsData.push(1, part.start, part.end);
+        }
       }
     } else if (edit.content != null) {
       contentWords[index] = addString(edit.content);
