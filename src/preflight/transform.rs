@@ -1170,27 +1170,6 @@ fn transform_impl(
             &transform_options,
         )
         .build_with_scoping(scoping, &mut program);
-        if !transformed.diagnostics.is_empty()
-            && options.react_compiler == Some(true)
-            && options
-                .react_compiler_panic_threshold
-                .as_deref()
-                .unwrap_or("none")
-                == "none"
-        {
-            // React Compiler diagnostics are recoverable at the `none` threshold: the
-            // compiler leaves the offending function untouched. Oxc's combined
-            // transformer still returns early when those diagnostics have error
-            // severity, so run the transforms it skipped without invoking the
-            // compiler a second time.
-            transform_options.react_compiler = None;
-            transformed = Transformer::new(
-                allocator,
-                Path::new(options.source_filename.as_deref().unwrap_or(&filename)),
-                &transform_options,
-            )
-            .build_with_scoping(transformed.scoping, &mut program);
-        }
         restore_export_namespace_attributes(&mut program, &mut export_namespace_attributes);
         if let Some(deferred) = deferred_async
             && transformed.diagnostics.is_empty()

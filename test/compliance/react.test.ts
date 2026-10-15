@@ -40,9 +40,16 @@ test('custom React Refresh identifiers preserve hook execution and signatures', 
   expect(signatures.length).toBeGreaterThan(0);
 });
 
-test('React Compiler output remains executable and memoizes equal inputs', async () => {
-  const runtimeUrl =
-    'data:text/javascript,export%20function%20c(size)%7Breturn%20new%20Array(size).fill(Symbol.for(%22react.memo_cache_sentinel%22))%7D';
+test('React Compiler reuses and invalidates output with persistent memo slots', async () => {
+  // A single component instance's cache across calls, not a React render harness.
+  const runtimeUrl = `data:text/javascript,${encodeURIComponent(`
+      let slots;
+      export function c(size) {
+        if (!slots) slots = new Array(size).fill(Symbol.for('react.memo_cache_sentinel'));
+        if (slots.length !== size) throw new Error('memo slot count changed');
+        return slots;
+      }
+    `)}`;
   const code = compile(
     `export function calculate({ value }) { return { doubled: value * 2 }; }`,
     {
@@ -60,5 +67,9 @@ test('React Compiler output remains executable and memoizes equal inputs', async
   const first = calculate({ value: 2 });
   const second = calculate({ value: 2 });
   expect(first).toEqual({ doubled: 4 });
-  expect(second).toEqual({ doubled: 4 });
+  expect(second).toBe(first);
+  const third = calculate({ value: 3 });
+  expect(third).toEqual({ doubled: 6 });
+  expect(third).not.toBe(first);
+  expect(calculate({ value: 3 })).toBe(third);
 });

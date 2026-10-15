@@ -277,16 +277,20 @@ test('can enable source-file cache resets', async () => {
   ).toMatchInlineSnapshot(`
     "import { c as _c } from 'react/compiler-runtime';
     export function Greeting(t0) {
-      const $ = _c(2);
+      const $ = _c(3);
+      if ($[0] !== '41b93c60e698291325bbaf4e117cdd33c4f8f530') {
+        for (let i = 1; i < 3; i++) $[i] = Symbol.for('react.memo_cache_sentinel');
+        $[0] = '41b93c60e698291325bbaf4e117cdd33c4f8f530';
+      }
       const { name } = t0;
       const message = 'Hello, ' + name;
       let t1;
-      if ($[0] !== message) {
+      if ($[1] !== message) {
         t1 = <Text>{message}</Text>;
-        $[0] = message;
-        $[1] = t1;
+        $[1] = message;
+        $[2] = t1;
       } else {
-        t1 = $[1];
+        t1 = $[2];
       }
       return t1;
     }"

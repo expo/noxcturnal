@@ -677,10 +677,9 @@ dependencies = [
 [[package]]
 name = "oxc_react_compiler"
 version = "0.141.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7d2dd0c52fb4e90464605951b18a14efb525f7f6ea0ca0b811ecc5d167983962"
 dependencies = [
  "cow-utils",
+ "hmac-sha1-compact",
  "indexmap",
  "oxc_allocator",
  "oxc_ast",

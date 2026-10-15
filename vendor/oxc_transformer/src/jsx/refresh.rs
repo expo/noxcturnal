@@ -34,76 +34,49 @@ use super::options::{DEFAULT_REFRESH_REG, DEFAULT_REFRESH_SIG, ReactRefreshOptio
 
 /// Parse a string into a `RefreshIdentifierResolver` and convert it into an `Expression`
 #[derive(Debug)]
-enum RefreshIdentifierResolver<'a> {
-    /// Simple IdentifierReference (e.g. `$RefreshReg$`)
-    Identifier(IdentifierReference<'a>),
-    /// StaticMemberExpression (object, property) (e.g. `window.$RefreshReg$`)
-    Member((IdentifierReference<'a>, IdentifierName<'a>)),
-    /// Used for `import.meta` expression (e.g. `import.meta.$RefreshReg$`)
-    Expression(Expression<'a>),
+struct RefreshIdentifierResolver<'a> {
+    root: Option<Str<'a>>,
+    properties: Vec<Str<'a>>,
 }
 
 impl<'a> RefreshIdentifierResolver<'a> {
-    /// Parses a string into a RefreshIdentifierResolver
     pub fn parse(input: &str, ast: &AstBuilder<'a>) -> Self {
         let mut parts = input.split('.');
-
-        let first_part = parts.next().unwrap();
-        let Some(second_part) = parts.next() else {
-            // Handle simple identifier reference
-            return Self::Identifier(IdentifierReference::new(
-                SPAN,
-                Str::from_str_in(input, ast),
-                ast,
-            ));
+        let first = parts.next().unwrap();
+        let root = if input == "import.meta" || input.starts_with("import.meta.") {
+            parts.next();
+            None
+        } else {
+            Some(Str::from_str_in(first, ast))
         };
-
-        if first_part == "import" && second_part == "meta" {
-            // Handle `import.meta.$RefreshReg$` expression
-            let mut expr = Expression::new_import_meta(SPAN, ast);
-            if let Some(property) = parts.next() {
-                expr = Expression::new_static_member_expression(
-                    SPAN,
-                    expr,
-                    IdentifierName::new(SPAN, Str::from_str_in(property, ast), ast),
-                    false,
-                    ast,
-                );
-            }
-            return Self::Expression(expr);
-        }
-
-        // Handle `window.$RefreshReg$` member expression
-        let object = IdentifierReference::new(SPAN, Str::from_str_in(first_part, ast), ast);
-        let property = IdentifierName::new(SPAN, Str::from_str_in(second_part, ast), ast);
-        Self::Member((object, property))
+        Self { root, properties: parts.map(|part| Str::from_str_in(part, ast)).collect() }
     }
 
-    /// Converts the RefreshIdentifierResolver into an Expression
     pub fn to_expression(&self, ctx: &mut TraverseCtx<'a>) -> Expression<'a> {
-        match self {
-            Self::Identifier(ident) => {
-                let reference_id = ctx.create_unbound_reference(ident.name, ReferenceFlags::Read);
-                Expression::new_identifier_with_reference_id(
-                    ident.span,
-                    ident.name,
-                    reference_id,
-                    ctx,
-                )
-            }
-            Self::Member((ident, property)) => {
-                let reference_id = ctx.create_unbound_reference(ident.name, ReferenceFlags::Read);
-                let ident = Expression::new_identifier_with_reference_id(
-                    ident.span,
-                    ident.name,
-                    reference_id,
-                    ctx,
-                );
-                Expression::new_static_member_expression(SPAN, ident, property.clone(), false, ctx)
-            }
-            Self::Expression(expr) => expr.clone_in(ctx.allocator()),
+        let mut expression = if let Some(root) = self.root {
+            let reference_id = ctx.create_unbound_reference(root.into(), ReferenceFlags::Read);
+            Expression::new_identifier_with_reference_id(SPAN, root, reference_id, ctx)
+        } else {
+            Expression::new_import_meta(SPAN, ctx)
+        };
+        for property in &self.properties {
+            expression = Expression::new_static_member_expression(
+                SPAN,
+                expression,
+                IdentifierName::new(SPAN, *property, ctx),
+                false,
+                ctx,
+            );
         }
+        expression
     }
+}
+
+/// Generated nodes have no source fragment, matching Babel's compiled-node
+/// signature boundary. Invalid ranges must not panic during downstream traversal.
+fn signature_text<'s>(node: &impl GetSpan, source: &'s str) -> &'s str {
+    let span = node.span();
+    source.get(span.start as usize..span.end as usize).unwrap_or_default()
 }
 
 /// React Fast Refresh
@@ -118,6 +91,7 @@ pub struct ReactRefresh<'a> {
     refresh_reg: RefreshIdentifierResolver<'a>,
     refresh_sig: RefreshIdentifierResolver<'a>,
     emit_full_signatures: bool,
+    force_reset: bool,
     // States
     registrations: Vec<(BoundIdentifier<'a>, Str<'a>)>,
     /// Used to wrap call expression with signature.
@@ -138,6 +112,7 @@ impl<'a> ReactRefresh<'a> {
             refresh_reg: RefreshIdentifierResolver::parse(refresh_reg, ast),
             refresh_sig: RefreshIdentifierResolver::parse(refresh_sig, ast),
             emit_full_signatures: options.is_some_and(|options| options.emit_full_signatures),
+            force_reset: false,
             registrations: Vec::default(),
             last_signature: None,
             function_signature_keys: FxHashMap::default(),
@@ -149,6 +124,7 @@ impl<'a> ReactRefresh<'a> {
 
 impl<'a> Traverse<'a, TransformState<'a>> for ReactRefresh<'a> {
     fn enter_program(&mut self, program: &mut Program<'a>, ctx: &mut TraverseCtx<'a>) {
+        self.force_reset = ctx.state.refresh_force_reset;
         self.used_in_jsx_bindings = UsedInJSXBindingsCollector::collect(program, ctx);
 
         let mut new_statements = ArenaVec::with_capacity_in(program.body.len() * 2, ctx);
@@ -267,11 +243,6 @@ impl<'a> Traverse<'a, TransformState<'a>> for ReactRefresh<'a> {
         call_expr: &mut CallExpression<'a>,
         ctx: &mut TraverseCtx<'a>,
     ) {
-        let current_scope_id = ctx.current_scope_id();
-        if !ctx.scoping().scope_flags(current_scope_id).is_function() {
-            return;
-        }
-
         let hook_name: Str = match &call_expr.callee {
             Expression::Identifier(ident) => ident.name.into(),
             Expression::StaticMemberExpression(member) => member.property.name.into(),
@@ -281,6 +252,15 @@ impl<'a> Traverse<'a, TransformState<'a>> for ReactRefresh<'a> {
         if !is_use_hook_name(&hook_name) {
             return;
         }
+
+        let Some(current_scope_id) = ctx
+            .scoping()
+            .scope_ancestors(ctx.current_scope_id())
+            .take_while(|scope_id| !ctx.scoping().scope_flags(*scope_id).is_class_static_block())
+            .find(|scope_id| ctx.scoping().scope_flags(*scope_id).is_function())
+        else {
+            return;
+        };
 
         if !is_builtin_hook(&hook_name) {
             // Check if a corresponding binding exists where we emit the signature.
@@ -312,7 +292,7 @@ impl<'a> Traverse<'a, TransformState<'a>> for ReactRefresh<'a> {
                 self.non_builtin_hooks_callee.entry(current_scope_id).or_default().push(
                     ctx.scoping()
                         .find_binding(
-                            ctx.scoping().scope_parent_id(ctx.current_scope_id()).unwrap(),
+                            ctx.scoping().scope_parent_id(current_scope_id).unwrap(),
                             binding_name,
                         )
                         .map(|symbol_id| {
@@ -351,23 +331,23 @@ impl<'a> Traverse<'a, TransformState<'a>> for ReactRefresh<'a> {
 
         let declarator_id = if let Ancestor::VariableDeclaratorInit(declarator) = ctx.parent() {
             // TODO: if there is no LHS, consider some other heuristic.
-            declarator.id().span().source_text(ctx.state.source_text)
+            signature_text(declarator.id(), ctx.state.source_text)
         } else {
             ""
         };
 
         let args = &call_expr.arguments;
-        let (args_key, mut key_len) = if hook_name == "useState" && !args.is_empty() {
-            let args_key = args[0].span().source_text(ctx.state.source_text);
-            (args_key, args_key.len() + 4)
+        let args_key = if hook_name == "useState" && !args.is_empty() {
+            signature_text(&args[0], ctx.state.source_text)
         } else if hook_name == "useReducer" && args.len() > 1 {
-            let args_key = args[1].span().source_text(ctx.state.source_text);
-            (args_key, args_key.len() + 4)
+            signature_text(&args[1], ctx.state.source_text)
         } else {
-            ("", 2)
+            ""
         };
-
-        key_len += hook_name.len() + declarator_id.len();
+        let key_len = hook_name.len()
+            + declarator_id.len()
+            + 2
+            + if args_key.is_empty() { 0 } else { args_key.len() + 2 };
 
         let string = match self.function_signature_keys.entry(current_scope_id) {
             Entry::Occupied(entry) => {
@@ -641,7 +621,7 @@ impl<'a> ReactRefresh<'a> {
             ctx,
         );
 
-        let force_reset = custom_hooks_in_scope.len() != callee_len;
+        let force_reset = self.force_reset || custom_hooks_in_scope.len() != callee_len;
 
         let mut arguments = ArenaVec::new_in(ctx);
         arguments.push(Argument::new_string_literal(SPAN, key, None, ctx));

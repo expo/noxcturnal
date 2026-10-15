@@ -19,16 +19,20 @@ test('compiles React components', async () => {
   ).toMatchInlineSnapshot(`
     "import { c as _c } from 'react/compiler-runtime';
     export function Greeting(t0) {
-      const $ = _c(2);
+      const $ = _c(3);
+      if ($[0] !== 'fc62a1d58a79478e0c3bcfde8a6a08d838f2047a') {
+        for (let i = 1; i < 3; i++) $[i] = Symbol.for('react.memo_cache_sentinel');
+        $[0] = 'fc62a1d58a79478e0c3bcfde8a6a08d838f2047a';
+      }
       const { name } = t0;
       const message = \`Hello, \${name}\`;
       let t1;
-      if ($[0] !== message) {
+      if ($[1] !== message) {
         t1 = <Text>{message}</Text>;
-        $[0] = message;
-        $[1] = t1;
+        $[1] = message;
+        $[2] = t1;
       } else {
-        t1 = $[1];
+        t1 = $[2];
       }
       return t1;
     }"
