@@ -5,8 +5,7 @@ import { compile } from '../compliance/runtime';
 const require = createRequire(import.meta.url);
 const source =
   "const events=[];const descriptor=Object.getOwnPropertyDescriptor(Number.prototype,'next');Object.defineProperty(Number.prototype,'next',{configurable:true,value(){events.push('next');return{done:true};}});try{try{for(const value of {[Symbol.iterator](){return 1;}}){}}catch(e){events.push(e.name);}}finally{if(descriptor)Object.defineProperty(Number.prototype,'next',descriptor);else delete Number.prototype.next;}globalThis.result=events;";
-// Babel accepts this modified-prototype primitive iterator too. Noxcturnal's
-// lowering is helper-free; Babel uses its for-of helper in the selected mode.
+// Both transforms use Babel's for-of helper and accept this primitive iterator.
 test.each(['inline', 'runtime'] as const)(
   'primitive iterator acquisition follows Babel with %s helpers',
   mode => {
@@ -32,7 +31,8 @@ test.each(['inline', 'runtime'] as const)(
     });
     expect(reference?.code).toBeTypeOf('string');
     expect(code).not.toMatch(/for\s*\([^;]*\bof\b/);
-    expect(code).not.toContain('require(');
+    if (mode === 'inline') expect(code).not.toContain('require(');
+    else expect(code).toContain('@babel/runtime/helpers/createForOfIteratorHelper');
     if (mode === 'runtime') expect(reference!.code!).toContain('@babel/runtime/helpers/');
     for (const output of [reference!.code!, code]) {
       const context: Record<string, unknown> = {};

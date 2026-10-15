@@ -1,9 +1,11 @@
+import { createRequire } from 'node:module';
 import { runInNewContext } from 'node:vm';
 import { transformSync } from '@babel/core';
 import forOf from '@babel/plugin-transform-for-of';
 import { describe, expect, test } from 'vitest';
 import { compile } from '../compliance/runtime';
 
+const require = createRequire(import.meta.url);
 const cases = [
   {
     name: 'shadowed Symbol and direct eval on a generic iterable',
@@ -35,7 +37,7 @@ const cases = [
 ];
 
 describe.each(cases)('$name', ({ source, expected }) => {
-  const observe = (code: string) => runInNewContext(code + ';globalThis.result');
+  const observe = (code: string) => runInNewContext(code + ';globalThis.result', { require });
   test('native and pinned Babel controls', () => {
     expect(observe(source)).toEqual(expected);
     const babel = transformSync(source, {

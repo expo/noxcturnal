@@ -1,6 +1,10 @@
+import { pathToFileURL } from 'node:url';
+import { createRequire } from 'node:module';
+import { defineNativePipeline, transform } from '../../js';
 import { beforeAll, describe, expect, test } from 'vitest';
 import { compile, importCode } from './runtime';
 
+const require = createRequire(import.meta.url);
 const modes = ['inline', 'runtime'] as const;
 const cases = [
   {
@@ -50,6 +54,7 @@ const cases = [
   },
   {
     name: 'root Symbol bindings retain source references and shorthand keys',
+    inlineBoundary: true,
     source: `const Symbol='root';const out=[];for(const value of [1,2])out.push([value,{Symbol}.Symbol]);globalThis.result=out;`,
     expected: [
       [1, 'root'],
@@ -107,7 +112,8 @@ const cases = [
     expected: [[true, 0]],
   },
   {
-    name: 'return proxies are looked up once and observe the iterator receiver',
+    name: 'return proxies observe the iterator receiver with Babel return lookups',
+    babelExpected: ['return:get', 'return:get', [true, 0]],
     source: `const events=[];let iterator;const close=new Proxy(function(){},{apply(target,receiver,args){events.push([receiver===iterator,args.length]);return {};},get(){throw new Error('property read');}});
       iterator={next(){return {done:false,value:1};},get return(){events.push('return:get');return close;}};
       for(const value of {[Symbol.iterator](){return iterator;}}){break;}globalThis.result=events;`,
@@ -115,6 +121,7 @@ const cases = [
   },
   {
     name: 'body errors win over a noncallable return with an own call getter',
+    babelExpected: ['return:get', 'return:get', 'body'],
     source: `const events=[];const close={get call(){events.push('call:get');return ()=>({});}};
       try{for(const value of {[Symbol.iterator](){return {next(){return {done:false,value:1};},get return(){events.push('return:get');return close;}};}}){throw new Error('body');}}catch(error){events.push(error.message);}
       globalThis.result=events;`,
@@ -130,32 +137,57 @@ const cases = [
 
 function run(source: string, bindings: Record<string, unknown> = {}): unknown {
   const context: Record<string, unknown> = {};
-  new Function(...Object.keys(bindings), 'globalThis', source)(...Object.values(bindings), context);
+  new Function('require', ...Object.keys(bindings), 'globalThis', source)(
+    require,
+    ...Object.values(bindings),
+    context,
+  );
   return context.result;
 }
 
 describe.each(modes)('%s helpers', mode => {
-  describe.each(cases)('$name', ({ source, expected, bindings }) => {
+  describe.each(cases)('$name', entry => {
+    const { source, expected, bindings } = entry;
+    const boundary = mode === 'inline' && 'inlineBoundary' in entry;
     let code: string;
     beforeAll(() => {
-      code = compile(source, { transforms: { forOf: true }, helpers: { mode } });
+      if (boundary) {
+        expectInlineBoundary(source);
+        return;
+      }
+      code = compile(source, { transforms: { forOf: true }, helpers: { mode, version: '7.29.7' } });
       expect(code).not.toMatch(/for\s*\([^;]*\bof\b/);
       expect(run(source, bindings)).toEqual(expected);
     });
-    test('transformed execution', () => {
-      expect(run(code, bindings)).toEqual(expected);
+    test(boundary ? 'pristine inline bailout' : 'transformed execution', () => {
+      if (boundary) return;
+      expect(run(code, bindings)).toEqual(
+        'babelExpected' in entry ? entry.babelExpected : expected,
+      );
     });
   });
 
   test('isolated root Symbols preserve named exports and live updates', async () => {
-    const code = compile(
-      `export let Symbol=1, other=2;export {Symbol as alias};
+    const source = `export let Symbol=1, other=2;export {Symbol as alias};
       export function update(){Symbol++;}
-      export function collect(){const out=[];for(const value of [1,2])out.push([value,Symbol]);return out;}`,
-      { transforms: { forOf: true }, helpers: { mode } },
+      export function collect(){const out=[];for(const value of [1,2])out.push([value,Symbol]);return out;}`;
+    if (mode === 'inline') {
+      expectInlineBoundary(source, 'input.mjs');
+      return;
+    }
+    const code = compile(
+      source,
+      { transforms: { forOf: true }, helpers: { mode, version: '7.29.7' } },
       'input.mjs',
     );
-    const module = await importCode(code);
+    const module = await importCode(
+      code.replace(
+        /(["'])@babel\/runtime\/helpers\/createForOfIteratorHelper\1/g,
+        JSON.stringify(
+          pathToFileURL(require.resolve('@babel/runtime/helpers/createForOfIteratorHelper')).href,
+        ),
+      ),
+    );
     expect(module.Symbol).toBe(1);
     expect(module.alias).toBe(1);
     expect(module.other).toBe(2);
@@ -171,15 +203,72 @@ describe.each(modes)('%s helpers', mode => {
     'named default %s exports retain identity',
     async kind => {
       const declaration = kind === 'function' ? 'function Symbol() {}' : 'class Symbol {}';
+      const source = `export default ${declaration}; export {Symbol as alias};
+      export function collect(){const out=[];for(const value of [1,2])out.push(value);return [out,Symbol];}`;
+      if (mode === 'inline') {
+        expectInlineBoundary(source, 'input.mjs');
+        return;
+      }
       const code = compile(
-        `export default ${declaration}; export {Symbol as alias};
-      export function collect(){const out=[];for(const value of [1,2])out.push(value);return [out,Symbol];}`,
-        { transforms: { forOf: true }, helpers: { mode } },
+        source,
+        { transforms: { forOf: true }, helpers: { mode, version: '7.29.7' } },
         'input.mjs',
       );
-      const module = await importCode(code);
+      const module = await importCode(
+        code.replace(
+          /(["'])@babel\/runtime\/helpers\/createForOfIteratorHelper\1/g,
+          JSON.stringify(
+            pathToFileURL(require.resolve('@babel/runtime/helpers/createForOfIteratorHelper')).href,
+          ),
+        ),
+      );
       expect(module.alias).toBe(module.default);
       expect((module.collect as () => unknown)()).toEqual([[1, 2], module.default]);
     },
   );
+});
+
+function expectInlineBoundary(source: string, filename = 'input.js') {
+  const result = transform(
+    source,
+    filename,
+    defineNativePipeline({
+      phases: [
+        {
+          name: 'for-of',
+          native: { transforms: { forOf: true }, helpers: { mode: 'inline' } },
+        },
+      ],
+    }),
+  );
+  expect(result.status).toBe('bailout');
+  if (result.status === 'bailout') {
+    expect(result.reason).toBe('for-of:for-of-inline-helper-shadowed-global');
+    expect(result.source).toBe(source);
+  }
+}
+
+describe.each(modes)('%s root binding preservation', mode => {
+  test.each([
+    {
+      source: `const Symbol='local'; function unused(){for(const value of []){}} globalThis.result=eval('Symbol');`,
+      expected: 'local',
+    },
+    {
+      source: `function Symbol(){} function unused(){for(const value of []){}} globalThis.result=Symbol.name;`,
+      expected: 'Symbol',
+    },
+    {
+      source: `class Symbol{} function unused(){for(const value of []){}} globalThis.result=Symbol.name;`,
+      expected: 'Symbol',
+    },
+  ])('preserves $source', ({ source, expected }) => {
+    if (mode === 'inline') {
+      expectInlineBoundary(source);
+      return;
+    }
+    expect(
+      run(compile(source, { transforms: { forOf: true }, helpers: { mode, version: '7.29.7' } })),
+    ).toBe(expected);
+  });
 });

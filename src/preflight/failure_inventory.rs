@@ -40,6 +40,7 @@ const REVIEWED: &[Entry] = &[
     unsupported!("react-compiler-not-built", "feature-selection"),
     unsupported!("parse-error", "initial-parse"),
     unsupported!("semantic-error", "initial-semantics"),
+    unsupported!("for-of-inline-helper-shadowed-global", "helper-selection"),
     unsupported!("helper-not-compatible:{helper}", "helper-selection"),
     unsupported!("helper-not-compatible:{}", "helper-selection"),
     unsupported!(

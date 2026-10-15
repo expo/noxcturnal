@@ -35,10 +35,9 @@ globalThis.__result = seen;`,
   ).resolves.toEqual(['body', 'body']);
 });
 
-// Babel currently accepts a primitive iterator.return() result here. Keep the
-// behavioral comparison executable so an upstream change makes this expected
-// divergence fail and prompts us to turn it into ordinary alignment coverage.
-describe('Babel IteratorClose object-result divergence', () => {
+// The standard Babel helper accepts primitive return results. Keep the native
+// control explicit while asserting the adopted helper compatibility behavior.
+describe('Babel IteratorClose object-result compatibility', () => {
   let babelOutcome: unknown;
   beforeAll(() => {
     const source = `const iterable = {
@@ -73,11 +72,11 @@ describe('Babel IteratorClose object-result divergence', () => {
     expect(noxcturnal).not.toMatch(/for\s*\([^)]*\bof\b/);
     expect(babel).not.toMatch(/for\s*\([^)]*\bof\b/);
     expect(observe(source)).toBe('TypeError');
-    expect(observe(noxcturnal)).toBe('TypeError');
+    expect(observe(noxcturnal)).toBe('completed');
     babelOutcome = observe(babel);
     expect(babelOutcome).toBe('completed');
   });
-  test.fails('records Babel divergence for IteratorClose object-result validation', () => {
-    expect(babelOutcome).toBe('TypeError');
+  test('accepts primitive close results like Babel', () => {
+    expect(babelOutcome).toBe('completed');
   });
 });

@@ -2,4 +2,4 @@
 'noxcturnal': patch
 ---
 
-Preserve complete iteration-label chains when lowering for-of loops, avoid capturing external names and shadowed Symbol bindings, and invoke cached iterator methods without consulting their own call properties. Keep iterator receivers, single method lookup, and cleanup error precedence intact.
+Lower for-of loops with Babel's standard createForOfIteratorHelper in inline and runtime modes. Preserve complete label chains and collision-free generated bindings while removing custom iterator dispatch, validation, and Symbol-binding rewrites. Adopt Babel's iterator lookup and cleanup semantics; inline helpers bail out with pristine input when root bindings shadow required globals.

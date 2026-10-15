@@ -179,6 +179,31 @@ impl CustomHelperRequests {
         });
     }
 
+    /// Materialize a standard runtime import after the caller checks availability.
+    pub(super) fn materialize_runtime(
+        &mut self,
+        helper: &'static str,
+        binding: &str,
+        module: bool,
+    ) {
+        let spec =
+            babel_helper_spec(helper).expect("runtime helper has generated compatibility metadata");
+        let source = if module {
+            format!(
+                "import {binding} from \"@babel/runtime/helpers/{}\";",
+                spec.babel_path
+            )
+        } else {
+            format!(
+                "var {binding}=require(\"@babel/runtime/helpers/{}\");",
+                spec.babel_path
+            )
+        };
+        self.names.insert(helper);
+        self.scope_names.insert(binding.to_owned());
+        self.fragments.push((source.clone(), source));
+    }
+
     pub(super) fn reserve_scope_names(&mut self, names: impl IntoIterator<Item = String>) {
         self.scope_names.extend(names);
     }
@@ -335,6 +360,7 @@ pub fn babel_helper_spec(name: &str) -> Option<HelperCompatibility> {
         "writeOnlyError" => "writeOnlyError",
         "taggedTemplateLiteral" => "taggedTemplateLiteral",
         "construct" => "construct",
+        "createForOfIteratorHelper" => "createForOfIteratorHelper",
         "get" => "get",
         "slicedToArray" => "slicedToArray",
         "toArray" => "toArray",

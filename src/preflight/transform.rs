@@ -948,15 +948,33 @@ fn transform_impl(
             }
             reserve_custom_helper_scope_names(
                 semantic.semantic.scoping_mut(),
-                classes_custom_helper_requests.scope_names(),
+                classes_custom_helper_requests
+                    .scope_names()
+                    .chain(structural_custom_helper_requests.scope_names()),
             );
             Some(super::for_of::prepare(&semantic.semantic))
         } else {
             None
         };
+        let inline_for_of_helper = helper_mode != "runtime"
+            || runtime_policy
+                .as_ref()
+                .and_then(|policy| policy.as_ref().ok())
+                .is_some_and(|policy| {
+                    policy.availability("createForOfIteratorHelper") == RuntimeAvailability::Inline
+                });
         let had_for_of_syntax = if let Some(plan) = for_of_plan.filter(|plan| !plan.is_empty()) {
-            match super::for_of::run(allocator, &mut program, plan) {
-                Ok(changed) => changed,
+            if inline_for_of_helper && plan.shadows_helper_globals() {
+                return Ok(unsupported(
+                    "for-of-inline-helper-shadowed-global",
+                    [] as [String; 0],
+                ));
+            }
+            match super::for_of::run(allocator, &mut program, plan, inline_for_of_helper) {
+                Ok((changed, requests)) => {
+                    structural_custom_helper_requests.prepend(requests);
+                    changed
+                }
                 Err(reason) => return Ok(fatal(reason, [] as [String; 0])),
             }
         } else {

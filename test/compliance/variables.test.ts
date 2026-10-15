@@ -259,7 +259,7 @@ test('for-of IteratorClose preserves a thrown body completion over a throwing re
   expect(result.result).toEqual(['return', 'body']);
 });
 
-test('for-of validates IteratorClose results for non-throwing abrupt completion', () => {
+test('for-of accepts primitive IteratorClose results like Babel', () => {
   const result = execute<{ result: boolean }>(
     `
       const iterable = {
@@ -277,10 +277,10 @@ test('for-of validates IteratorClose results for non-throwing abrupt completion'
     `,
     { transforms: { forOf: true } },
   );
-  expect(result.result).toBe(true);
+  expect(result.result).toBe(false);
 });
 
-test('for-of reads the return method once and calls it with the iterator receiver', () => {
+test('for-of uses Babel return lookups and preserves the iterator receiver', () => {
   const result = execute<{ result: unknown[] }>(
     `
       const calls = [];
@@ -302,7 +302,7 @@ test('for-of reads the return method once and calls it with the iterator receive
     `,
     { transforms: { forOf: true } },
   );
-  expect(result.result).toEqual(['get', ['call', true]]);
+  expect(result.result).toEqual(['get', 'get', ['call', true]]);
 });
 
 test('continue targeting the same for-of loop does not close its iterator', () => {
@@ -326,7 +326,7 @@ test('continue targeting the same for-of loop does not close its iterator', () =
   expect(result.result).toEqual([1, 2]);
 });
 
-test('for-of captures the next method once and preserves its iterator receiver', () => {
+test('for-of reads next per step like Babel and preserves its iterator receiver', () => {
   const result = execute<{ result: unknown[] }>(
     `
       const calls = [];
@@ -354,11 +354,11 @@ test('for-of captures the next method once and preserves its iterator receiver',
   );
   expect(result.result).toEqual([
     [1, 2],
-    ['get', ['call', true], ['call', true], ['call', true]],
+    ['get', ['call', true], 'get', ['call', true], 'get', ['call', true]],
   ]);
 });
 
-test('for-of rejects a primitive result returned by iterator.next', () => {
+test('for-of accepts primitive next results like Babel', () => {
   const result = execute<{ result: unknown[] }>(
     `
       const calls = [];
@@ -382,7 +382,7 @@ test('for-of rejects a primitive result returned by iterator.next', () => {
     `,
     { transforms: { forOf: true } },
   );
-  expect(result.result).toEqual([true, ['next']]);
+  expect(result.result).toEqual([false, ['next', undefined, 'next']]);
 });
 
 test('for-of closes only after IteratorComplete succeeds', () => {
@@ -423,6 +423,7 @@ test('for-of closes only after IteratorComplete succeeds', () => {
     'done:done',
     'throw:done',
     'next:value',
+    'done:value',
     'done:value',
     'value:value',
     'return:value',

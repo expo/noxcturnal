@@ -49,7 +49,6 @@ describe.each(cases)('$name', ({ source, expected, knownFailure }) => {
   let code: string;
   let babel: string;
   beforeAll(() => {
-    // Noxcturnal's for-of lowering is helper-free in either helper mode.
     code = compile(source, { transforms: { forOf: true }, helpers: { mode: 'inline' } });
     const reference = transformSync(source, {
       configFile: false,

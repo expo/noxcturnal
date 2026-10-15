@@ -60,5 +60,5 @@ test('primitive step with inherited done retains shared validation limitation', 
   const code = compile(source, { transforms: { forOf: true } });
   expect(code).not.toMatch(/for\s*\([^)]*\bof\b/);
   expect(code).not.toContain('@babel/runtime');
-  expect(observe(code)).toEqual([1, 'accepted']);
+  expect(observe(code)).toEqual([2, 'accepted']);
 });

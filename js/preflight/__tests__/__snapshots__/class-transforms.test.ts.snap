@@ -90,10 +90,12 @@ exports[`every public native transform has an explicit ownership fixture 5`] = `
 
 exports[`every public native transform has an explicit ownership fixture 6`] = `
 {
-  "code": "{var _iteratorNormalCompletion=true,_didIteratorError=false,_iteratorError,_iteratorReturnMethod,_iteratorReturn;try{for(var _iterator=values[Symbol.iterator](),_iteratorNext=_iterator.next,_iteratorCall=function(){}.call,_step;_step=_iteratorCall.call(_iteratorNext,_iterator),!_step.done;_iteratorNormalCompletion=true){if(Object(_step)!==_step)throw new TypeError(\`Iterator result is not an object\`);_iteratorNormalCompletion=false;var value=_step.value;consume(value)}}catch(_iteratorError2){_didIteratorError=true;_iteratorError=_iteratorError2}finally{try{if(!_iteratorNormalCompletion&&(_iteratorReturnMethod=_iterator.return)!=null){_iteratorReturn=_iteratorCall.call(_iteratorReturnMethod,_iterator);if(Object(_iteratorReturn)!==_iteratorReturn)throw new TypeError(\`Iterator result is not an object\`)}}finally{if(_didIteratorError)throw _iteratorError}}}",
-  "helpers": [],
+  "code": "var _createForOfIteratorHelper=require("@babel/runtime/helpers/createForOfIteratorHelper");{var _iterator=_createForOfIteratorHelper(values),_step;try{for(_iterator.s();_step=_iterator.n(),!_step.done;){var value=_step.value;consume(value)}}catch(_iteratorError2){_iterator.e(_iteratorError2)}finally{_iterator.f()}}",
+  "helpers": [
+    "createForOfIteratorHelper",
+  ],
   "map": {
-    "mappings": "AAAA,uIAAkB,OAAlBA,gBAAC,CAAD,oRAAK,IAAI,MAATA,YAA0B,QAAQ,KAAK,CAAvC,uYAAwC",
+    "mappings": "2FAAA,0CAAkB,MAAlB,gEAAK,IAAI,MAATA,YAA0B,QAAQ,KAAK,CAAvC,4EAAwC",
     "names": [
       "f",
     ],
