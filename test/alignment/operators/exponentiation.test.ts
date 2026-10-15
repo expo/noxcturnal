@@ -1,5 +1,9 @@
+import { transformSync } from '@babel/core';
+import { runInNewContext } from 'node:vm';
 import exponentiation from '@babel/plugin-transform-exponentiation-operator';
-import { expect, test } from 'vitest';
+import { beforeAll, describe, expect, test } from 'vitest';
+
+import { compile } from '../../compliance/runtime';
 
 import { alignBabelBehavior } from '../transform';
 
@@ -44,16 +48,42 @@ globalThis.__result = [child.update(), child.current, calls];`,
 // Babel currently emits Math.pow for BigInts, making valid BigInt
 // exponentiation throw. Noxcturnal intentionally retains the operator until
 // Babel has a semantics-preserving lowering.
-test.fails('records Babel BigInt exponentiation divergence', async () => {
-  await expect(
-    alignBabelBehavior({
-      source: `let value = 3n;
+describe('Babel BigInt exponentiation divergence', () => {
+  const expected = [18446744073709551616n, 81n];
+  let babelOutcome: unknown;
+
+  beforeAll(() => {
+    const source = `let value = 3n;
 value **= 4n;
-globalThis.__result = [2n ** 64n, value];`,
+globalThis.__result = [2n ** 64n, value];`;
+    const observe = (code: string) => {
+      const context: Record<string, unknown> = {};
+      try {
+        runInNewContext(code, context, { timeout: 1000 });
+        return context.__result;
+      } catch (error) {
+        return { throws: (error as Error).name };
+      }
+    };
+    const noxcturnal = compile(source, { transforms: { exponentiationOperator: true } });
+    const reference = transformSync(source, {
       filename: 'input.js',
+      babelrc: false,
+      configFile: false,
       plugins: [exponentiation],
-      noxcturnal: { transforms: { exponentiationOperator: true } },
-      output: { mustNotMatch: [] },
-    }),
-  ).resolves.toEqual([18446744073709551616n, 81n]);
+    });
+    expect(reference?.code).toBeTypeOf('string');
+    const babel = reference!.code!;
+    expect(noxcturnal).toContain('**');
+    expect(babel).not.toContain('**');
+    expect(babel).toContain('Math.pow');
+    expect(observe(source)).toEqual(expected);
+    expect(observe(noxcturnal)).toEqual(expected);
+    babelOutcome = observe(babel);
+    expect(babelOutcome).toEqual({ throws: 'TypeError' });
+  });
+
+  test.fails('records Babel BigInt exponentiation divergence', () => {
+    expect(babelOutcome).toEqual(expected);
+  });
 });
