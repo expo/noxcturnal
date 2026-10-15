@@ -10,30 +10,35 @@ test('lowers private methods', async () => {
     }),
   ).toMatchInlineSnapshot(`
     "import _babelHelper from '@babel/runtime/helpers/classPrivateFieldLooseBase';
-    var _classPrivateFieldLooseBase2 = { classPrivateFieldLooseBase: _babelHelper };
-    function _classPrivateFieldLooseBase(e, s) {
-      return _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
-    }
-    function _classPrivateMethodCall(e, s, a) {
-      return _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s)[s].apply(e, a);
+    import _babelHelper2 from '@babel/runtime/helpers/classPrivateFieldLooseKey';
+    var _classPrivateFieldLooseBase2 = {
+      classPrivateFieldLooseBase: _babelHelper,
+      classPrivateFieldLooseKey: _babelHelper2,
+    };
+    function _classPrivateFieldLooseBase(e, s, a) {
+      return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
     }
     export let Counter = (() => {
       'use strict';
-      var _increment = '__private_Counter_increment';
+      var _increment = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey(
+        '__private_Counter_increment',
+      );
+      var _privateMethod = function (value) {
+        if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
+        return value + 1;
+      };
+      function _initialize() {
+        Object.defineProperty(this, _increment, { value: _privateMethod });
+      }
       const Counter = function Counter() {
         if (!new.target) throw new TypeError('Cannot call a class as a function');
-        Object.defineProperty(this, _increment, {
-          value: function (value) {
-            if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
-            return value + 1;
-          },
-        });
+        _initialize.call(this);
       };
       Object.defineProperty(Counter.prototype, 'add', {
         value: Object.defineProperty(
           function (value) {
             if (new.target) throw new TypeError("Class methods cannot be invoked with 'new'");
-            return _classPrivateMethodCall(this, _increment, [value]);
+            return _classPrivateFieldLooseBase(this, _increment)[_increment](value);
           },
           'name',
           {

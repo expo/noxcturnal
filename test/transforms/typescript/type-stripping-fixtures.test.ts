@@ -17,7 +17,7 @@ const expectedOutputs = [
   'class C {}',
   'class C {\n  #m(x) {}\n  m(x, ...y) {}\n  constructor() {}\n}',
   "class Foo extends Bar {\n  foo() {}\n  bar = 'bar';\n}",
-  "class B extends A {\n  p;\n  constructor(p) {\n    this.p = p;\n    console.log('anything before super');\n    if (p) super();\n    else {\n      super();\n    }\n  }\n}",
+  "class B extends A {\n  p;\n  constructor(p) {\n    var _initialize = () => ((this.p = p), this);\n    console.log('anything before super');\n    if (p) _initialize(super());\n    else {\n      _initialize(super());\n    }\n  }\n}",
   'class Employee extends Person {\n  name;\n  constructor(name) {\n    super();\n    this.name = name;\n  }\n}',
   'class Person {\n  name;\n  constructor(name) {\n    this.name = name;\n  }\n}',
   'export default class Example {\n  arg1;\n  constructor(arg1 = null) {\n    this.arg1 = arg1;\n  }\n}',

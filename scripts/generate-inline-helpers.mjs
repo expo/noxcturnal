@@ -194,11 +194,36 @@ const adapterBundles = {
     binding: '_get2',
     adapter: 'function _get(base,key,receiver){return _get2.get(base,key,receiver)}',
   },
+  // Preserve a super reference across assignment patterns and suspension. Babel
+  // owns get/set semantics; the accessor adapter exposes an assignable target.
+  INLINE_CLASS_SUPER_REFERENCE_HELPER: {
+    roots: ['get', 'set'],
+    binding: '_superReference2',
+    adapter:
+      'function _get(base,key,receiver){return _superReference2.get(base,key,receiver)}function _superReference(base,key,receiver){return {get value(){return _superReference2.get(base,key,receiver)},set value(value){_superReference2.set(base,key,value,receiver,true)}}}_superReference.set=function(base,key,receiver,value){return _superReference2.set(base,key,value,receiver,true)};',
+  },
+  INLINE_CLASS_SUPER_GET_SET_HELPER: {
+    roots: ['get', 'set'],
+    binding: '_superReference2',
+    adapter:
+      'function _get(base,key,receiver){return _superReference2.get(base,key,receiver)}var _superReference={set:function(base,key,receiver,value){return _superReference2.set(base,key,value,receiver,true)}};',
+  },
+  INLINE_CLASS_SUPER_SET_HELPER: {
+    roots: ['set'],
+    binding: '_superReference2',
+    adapter:
+      'var _superReference={set:function(base,key,receiver,value){return _superReference2.set(base,key,value,receiver,true)}};',
+  },
+  INLINE_CLASS_KEY_HELPER: {
+    roots: ['toPropertyKey'],
+    binding: '_classKey2',
+    adapter: 'var _classKey=_classKey2.toPropertyKey;',
+  },
   INLINE_CLASS_PRIVATE_HELPERS: {
-    roots: ['classPrivateFieldLooseBase'],
+    roots: ['classPrivateFieldLooseBase', 'classPrivateFieldLooseKey'],
     binding: '_classPrivateFieldLooseBase2',
     adapter:
-      'function _classPrivateFieldLooseBase(receiver,key){return _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(receiver,key)}function _classPrivateMethodCall(receiver,key,args){return _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(receiver,key)[key].apply(receiver,args)}',
+      'function _classPrivateFieldLooseBase(receiver,key,optional){if(optional&&(receiver===null||receiver===void 0))return receiver;return _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(receiver,key)}',
   },
   INLINE_CLASS_PRIVATE_IN_HELPER: {
     roots: ['checkInRHS'],

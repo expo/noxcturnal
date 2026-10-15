@@ -3,12 +3,12 @@ use oxc_ast::{
     AstBuilder, AstKind,
     ast::{
         AccessorProperty, Argument, ArrayExpressionElement, AssignmentTarget, BindingPattern,
-        Class, ClassElement, Declaration, ExportDefaultDeclaration, ExportDefaultDeclarationKind,
-        ExportNamedDeclaration, Expression, FormalParameterKind, FormalParameterRest, Function,
-        FunctionType, MethodDefinitionKind, MethodDefinitionType, Program, PropertyKey,
-        PropertyKind, SimpleAssignmentTarget, Statement, TSThisParameter, TSTypeAnnotation,
-        TSTypeParameterDeclaration, TSTypeParameterInstantiation, VariableDeclaration,
-        VariableDeclarationKind,
+        ChainElement, Class, ClassElement, Declaration, ExportDefaultDeclaration,
+        ExportDefaultDeclarationKind, ExportNamedDeclaration, Expression, FormalParameterKind,
+        FormalParameterRest, FormalParameters, Function, FunctionType, MethodDefinitionKind,
+        MethodDefinitionType, Program, PropertyKey, PropertyKind, SimpleAssignmentTarget,
+        Statement, TSThisParameter, TSTypeAnnotation, TSTypeParameterDeclaration,
+        TSTypeParameterInstantiation, VariableDeclaration, VariableDeclarationKind,
     },
 };
 use oxc_ast_visit::{Visit, VisitMut, walk, walk_mut};
@@ -22,8 +22,10 @@ use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::generated::inline_helpers::{
     INLINE_CLASS_CONSTRUCT_ASSERT_HELPER_DESCRIPTOR, INLINE_CLASS_CONSTRUCT_HELPER_DESCRIPTOR,
-    INLINE_CLASS_PRIVATE_HELPERS_DESCRIPTOR, INLINE_CLASS_PRIVATE_IN_HELPER_DESCRIPTOR,
-    INLINE_CLASS_SUPER_GET_HELPER_DESCRIPTOR,
+    INLINE_CLASS_KEY_HELPER_DESCRIPTOR, INLINE_CLASS_PRIVATE_HELPERS_DESCRIPTOR,
+    INLINE_CLASS_PRIVATE_IN_HELPER_DESCRIPTOR, INLINE_CLASS_SUPER_GET_HELPER_DESCRIPTOR,
+    INLINE_CLASS_SUPER_GET_SET_HELPER_DESCRIPTOR, INLINE_CLASS_SUPER_REFERENCE_HELPER_DESCRIPTOR,
+    INLINE_CLASS_SUPER_SET_HELPER_DESCRIPTOR,
 };
 use crate::preflight::helpers::CustomHelperRequests;
 
@@ -42,10 +44,16 @@ struct DirectClassPlan {
     super_call_name: Option<String>,
     private_keys: FxHashMap<String, (String, String)>,
     computed_keys: FxHashMap<(u32, u32), String>,
+    private_methods: FxHashMap<String, String>,
+    initializer_name: String,
+    constructor_parameters: Vec<String>,
+    initializer_new_target_name: String,
     class_properties_loose: Option<bool>,
     class_static_blocks: bool,
     helper_names: ClassHelperNames,
     uses_super_get: bool,
+    uses_super_reference: bool,
+    uses_super_accessor: bool,
     uses_private_helper: bool,
     uses_check_in_rhs: bool,
 }
@@ -90,8 +98,11 @@ struct ClassHelperNames {
     construct_runtime: String,
     super_get: String,
     super_get_runtime: String,
+    super_reference: String,
+    super_reference_runtime: String,
+    property_key: String,
+    property_key_runtime: String,
     private_base: String,
-    private_call: String,
     check_in_rhs: String,
     check_in_rhs_runtime: String,
     private_runtime: String,
@@ -107,6 +118,9 @@ struct ClassHelperPlan {
     names: ClassHelperNames,
     construct: bool,
     super_get: bool,
+    super_reference: bool,
+    super_accessor: bool,
+    property_key: bool,
     private: bool,
     check_in_rhs: bool,
     inline: bool,
@@ -122,7 +136,6 @@ impl ClassHelperPlan {
                 self.inline,
                 &[
                     ("_classPrivateFieldLooseBase", &names.private_base),
-                    ("_classPrivateMethodCall", &names.private_call),
                     ("_classPrivateFieldLooseBase2", &names.private_runtime),
                 ],
             );
@@ -152,13 +165,39 @@ impl ClassHelperPlan {
                 ],
             );
         }
-        if self.super_get {
+        if self.super_reference {
+            let descriptor = if self.super_accessor {
+                &INLINE_CLASS_SUPER_REFERENCE_HELPER_DESCRIPTOR
+            } else if self.super_get {
+                &INLINE_CLASS_SUPER_GET_SET_HELPER_DESCRIPTOR
+            } else {
+                &INLINE_CLASS_SUPER_SET_HELPER_DESCRIPTOR
+            };
+            let mut renames = vec![
+                ("_superReference", names.super_reference.as_str()),
+                ("_superReference2", names.super_reference_runtime.as_str()),
+            ];
+            if self.super_get {
+                renames.push(("_get", names.super_get.as_str()));
+            }
+            requests.materialize_generated(descriptor, self.inline, &renames);
+        } else if self.super_get {
             requests.materialize_generated(
                 &INLINE_CLASS_SUPER_GET_HELPER_DESCRIPTOR,
                 self.inline,
                 &[
                     ("_get", &names.super_get),
                     ("_get2", &names.super_get_runtime),
+                ],
+            );
+        }
+        if self.property_key {
+            requests.materialize_generated(
+                &INLINE_CLASS_KEY_HELPER_DESCRIPTOR,
+                self.inline,
+                &[
+                    ("_classKey", &names.property_key),
+                    ("_classKey2", &names.property_key_runtime),
                 ],
             );
         }
@@ -179,7 +218,7 @@ fn direct_class_candidates(
     reserved: &mut FxHashSet<String>,
 ) -> FxHashMap<(u32, u32), DirectClassPlan> {
     let nodes = semantic.nodes();
-    let mut direct = FxHashMap::default();
+    let mut direct: FxHashMap<(u32, u32), DirectClassPlan> = FxHashMap::default();
     for (node_id, node) in nodes.iter_enumerated() {
         let AstKind::Class(class) = node.kind() else {
             continue;
@@ -214,7 +253,39 @@ fn direct_class_candidates(
         });
         let owned_by_focused_private = (has_private_methods && private_methods_loose.is_some())
             || (has_private_in && private_in_loose.is_some());
-        if !lower_all_classes && !owned_by_focused_private {
+        // Focused private lowering also owns a suspended nested class when its
+        // closures capture the enclosing lowered private environment. Lower it
+        // first so its suspended keys stay in the caller, just as with `classes`.
+        let suspended_private_dependency = if !lower_all_classes && !owned_by_focused_private {
+            let mut suspension = KeySuspension(false);
+            suspension.visit_class(class);
+            let mut enclosing = FxHashSet::default();
+            if suspension.0 {
+                for ancestor in nodes.ancestor_ids(node_id) {
+                    if let AstKind::Class(parent) = nodes.kind(ancestor)
+                        && let Some(plan) = direct.get(&(parent.span.start, parent.span.end))
+                        && parent.body.body.iter().any(|element| {
+                            element.computed()
+                                && element.property_key().is_some_and(|key| {
+                                    let span = key.span();
+                                    span.start <= class.span.start && span.end >= class.span.end
+                                })
+                        })
+                    {
+                        enclosing.extend(plan.private_keys.keys().cloned());
+                    }
+                }
+            }
+            let mut capture = EnclosingPrivateUse {
+                names: enclosing,
+                found: false,
+            };
+            capture.visit_class(class);
+            capture.found
+        } else {
+            false
+        };
+        if !lower_all_classes && !owned_by_focused_private && !suspended_private_dependency {
             continue;
         }
         if !class.decorators.is_empty()
@@ -258,9 +329,14 @@ fn direct_class_candidates(
         let receiver_name = derived.then(|| local_name("_this", reserved));
         let result_name =
             (derived && constructor.is_some()).then(|| local_name("_result", reserved));
-        let generic_derived = constructor
-            .and_then(|constructor| constructor.value.body.as_ref())
-            .is_some_and(|body| !has_single_leading_super(body));
+        let generic_derived = constructor.is_some_and(|constructor| {
+            constructor.value.params.has_parameter()
+                || constructor
+                    .value
+                    .body
+                    .as_ref()
+                    .is_some_and(|body| !has_single_leading_super(body))
+        });
         let captures_new_target = constructor
             .and_then(|constructor| constructor.value.body.as_ref())
             .is_some_and(|body| contains_new_target(body));
@@ -321,6 +397,14 @@ fn direct_class_candidates(
                 _ => {}
             }
         }
+        let private_methods = private_keys
+            .keys()
+            .map(|key| (key.clone(), reserve("_privateMethod", reserved)))
+            .collect();
+        let mut usage = SuperHelperUsage::default();
+        if uses_super_get {
+            usage.visit_class_body(&class.body);
+        }
         direct.insert(
             (class.span.start, class.span.end),
             DirectClassPlan {
@@ -333,10 +417,27 @@ fn direct_class_candidates(
                 super_call_name,
                 private_keys,
                 computed_keys,
+                private_methods,
+                constructor_parameters: constructor
+                    .map(|method| {
+                        method
+                            .value
+                            .params
+                            .items
+                            .iter()
+                            .take_while(|parameter| parameter.initializer.is_none())
+                            .map(|_| reserve("_argument", reserved))
+                            .collect()
+                    })
+                    .unwrap_or_default(),
+                initializer_name: reserve("_initialize", reserved),
+                initializer_new_target_name: reserve("_fieldNewTarget", reserved),
                 class_properties_loose,
                 class_static_blocks,
                 helper_names: helper_names.clone(),
-                uses_super_get,
+                uses_super_get: usage.read,
+                uses_super_reference: usage.write,
+                uses_super_accessor: usage.accessor,
                 uses_private_helper,
                 uses_check_in_rhs: has_private_in,
             },
@@ -359,6 +460,18 @@ fn inferred_class_name(nodes: &oxc_semantic::AstNodes<'_>, node_id: NodeId) -> O
                 _ => None,
             }
         }
+        AstKind::AssignmentPattern(pattern) => pattern
+            .left
+            .get_binding_identifier()
+            .map(|id| id.name.to_string()),
+        AstKind::FormalParameter(parameter) => parameter
+            .pattern
+            .get_binding_identifier()
+            .map(|id| id.name.to_string()),
+        AstKind::AssignmentTargetWithDefault(default) => match &default.binding {
+            AssignmentTarget::AssignmentTargetIdentifier(id) => Some(id.name.to_string()),
+            _ => None,
+        },
         AstKind::ObjectProperty(property) if !property.computed => {
             property.key.static_name().map(|name| name.into_owned())
         }
@@ -392,8 +505,11 @@ pub(super) fn prepare_ast(
         construct_runtime: reserve("_construct2", &mut reserved),
         super_get: reserve("_get", &mut reserved),
         super_get_runtime: reserve("_get2", &mut reserved),
+        super_reference: reserve("_superReference", &mut reserved),
+        super_reference_runtime: reserve("_superReference2", &mut reserved),
+        property_key: reserve("_classKey", &mut reserved),
+        property_key_runtime: reserve("_classKey2", &mut reserved),
         private_base: reserve("_classPrivateFieldLooseBase", &mut reserved),
-        private_call: reserve("_classPrivateMethodCall", &mut reserved),
         check_in_rhs: reserve("_checkInRHS", &mut reserved),
         check_in_rhs_runtime: reserve("_checkInRHS2", &mut reserved),
         private_runtime: reserve("_classPrivateFieldLooseBase2", &mut reserved),
@@ -439,14 +555,22 @@ pub(super) fn prepare_ast(
     }
     let uses_construct = direct.values().any(|plan| plan.super_name.is_some());
     let uses_super_get = direct.values().any(|plan| plan.uses_super_get);
-    let uses_private = direct.values().any(|plan| plan.uses_private_helper);
+    let uses_private = direct
+        .values()
+        .any(|plan| plan.uses_private_helper || !plan.private_keys.is_empty());
     let uses_check_in_rhs = direct.values().any(|plan| plan.uses_check_in_rhs);
+    let uses_super_reference = direct.values().any(|plan| plan.uses_super_reference);
+    let uses_super_accessor = direct.values().any(|plan| plan.uses_super_accessor);
+    let uses_property_key = direct.values().any(|plan| !plan.computed_keys.is_empty());
     Ok(AstPlan {
         direct,
         helper_requests: Some(ClassHelperPlan {
             names: helper_names,
             construct: uses_construct,
             super_get: uses_super_get,
+            super_reference: uses_super_reference,
+            super_accessor: uses_super_accessor,
+            property_key: uses_property_key,
             private: uses_private,
             check_in_rhs: uses_check_in_rhs,
             inline: inline_helpers,
@@ -465,6 +589,7 @@ pub(super) fn run_ast<'a>(
         construct_assert: false,
         changed: false,
         error: None,
+        private_temporaries: Vec::new(),
     };
     pass.visit_program(program);
     if let Some(error) = pass.error {
@@ -486,9 +611,76 @@ struct ClassAstLowerer<'a> {
     construct_assert: bool,
     changed: bool,
     error: Option<&'static str>,
+    private_temporaries: Vec<String>,
+}
+
+impl<'a> ClassAstLowerer<'a> {
+    #[expect(deprecated)]
+    fn prepend_private_temporaries(
+        &self,
+        statements: &mut ArenaVec<'a, Statement<'a>>,
+        names: Vec<String>,
+    ) {
+        if names.is_empty() {
+            return;
+        }
+        let ast = AstBuilder::new(self.allocator);
+        let declarations = names.into_iter().map(|name| {
+            ast.variable_declarator(
+                Span::default(),
+                VariableDeclarationKind::Var,
+                ast.binding_pattern_binding_identifier(
+                    Span::default(),
+                    self.allocator.alloc_str(&name),
+                ),
+                None::<ArenaBox<'a, TSTypeAnnotation<'a>>>,
+                None,
+                false,
+            )
+        });
+        statements.insert(
+            0,
+            Statement::VariableDeclaration(ast.alloc_variable_declaration(
+                Span::default(),
+                VariableDeclarationKind::Var,
+                ArenaVec::from_iter_in(declarations, &ast),
+                false,
+            )),
+        );
+    }
 }
 
 impl<'a> VisitMut<'a> for ClassAstLowerer<'a> {
+    fn visit_program(&mut self, program: &mut Program<'a>) {
+        walk_mut::walk_program(self, program);
+        let names = std::mem::take(&mut self.private_temporaries);
+        self.prepend_private_temporaries(&mut program.body, names);
+    }
+
+    fn visit_function_body(&mut self, body: &mut oxc_ast::ast::FunctionBody<'a>) {
+        let outer = std::mem::take(&mut self.private_temporaries);
+        walk_mut::walk_function_body(self, body);
+        let names = std::mem::replace(&mut self.private_temporaries, outer);
+        self.prepend_private_temporaries(&mut body.statements, names);
+    }
+
+    #[expect(deprecated)]
+    fn visit_arrow_function_expression(
+        &mut self,
+        arrow: &mut oxc_ast::ast::ArrowFunctionExpression<'a>,
+    ) {
+        walk_mut::walk_arrow_function_expression(self, arrow);
+        if arrow.expression && arrow.body.statements.len() > 1 {
+            let ast = AstBuilder::new(self.allocator);
+            let last = arrow.body.statements.last_mut().unwrap();
+            let Statement::ExpressionStatement(expression) = last.take_in(&ast) else {
+                unreachable!()
+            };
+            *last = ast.statement_return(expression.span, Some(expression.unbox().expression));
+            arrow.expression = false;
+        }
+    }
+
     #[expect(deprecated)]
     fn visit_statements(&mut self, statements: &mut ArenaVec<'a, Statement<'a>>) {
         let mut index = 0;
@@ -526,7 +718,13 @@ impl<'a> VisitMut<'a> for ClassAstLowerer<'a> {
                 if self.error.is_some() {
                     return;
                 }
-                match lower_simple_class(self.allocator, class, &plan, &mut self.construct_assert) {
+                match lower_simple_class(
+                    self.allocator,
+                    class,
+                    &plan,
+                    &mut self.construct_assert,
+                    &mut self.private_temporaries,
+                ) {
                     Ok(expression) => {
                         declaration.declaration =
                             ExportDefaultDeclarationKind::from(ast.expression_identifier(
@@ -571,7 +769,13 @@ impl<'a> VisitMut<'a> for ClassAstLowerer<'a> {
                 if self.error.is_some() {
                     return;
                 }
-                match lower_simple_class(self.allocator, class, &plan, &mut self.construct_assert) {
+                match lower_simple_class(
+                    self.allocator,
+                    class,
+                    &plan,
+                    &mut self.construct_assert,
+                    &mut self.private_temporaries,
+                ) {
                     Ok(expression) => {
                         statements[index] = Statement::VariableDeclaration(direct_class_variable(
                             &ast,
@@ -610,7 +814,13 @@ impl<'a> VisitMut<'a> for ClassAstLowerer<'a> {
             if self.error.is_some() {
                 return;
             }
-            match lower_simple_class(self.allocator, class, &plan, &mut self.construct_assert) {
+            match lower_simple_class(
+                self.allocator,
+                class,
+                &plan,
+                &mut self.construct_assert,
+                &mut self.private_temporaries,
+            ) {
                 Ok(lowered) => {
                     *expression = lowered;
                     self.changed = true;
@@ -640,7 +850,13 @@ impl<'a> VisitMut<'a> for ClassAstLowerer<'a> {
         if self.error.is_some() {
             return;
         }
-        match lower_simple_class(self.allocator, class, &plan, &mut self.construct_assert) {
+        match lower_simple_class(
+            self.allocator,
+            class,
+            &plan,
+            &mut self.construct_assert,
+            &mut self.private_temporaries,
+        ) {
             Ok(expression) => {
                 let _ = binding;
                 declaration.declaration = ExportDefaultDeclarationKind::from(expression);
@@ -667,7 +883,13 @@ impl<'a> VisitMut<'a> for ClassAstLowerer<'a> {
         if self.error.is_some() {
             return;
         }
-        match lower_simple_class(self.allocator, class, &plan, &mut self.construct_assert) {
+        match lower_simple_class(
+            self.allocator,
+            class,
+            &plan,
+            &mut self.construct_assert,
+            &mut self.private_temporaries,
+        ) {
             Ok(expression) => {
                 declaration.declaration =
                     Some(Declaration::VariableDeclaration(direct_class_variable(
@@ -718,14 +940,45 @@ fn lower_derived_constructor_body<'a>(
     super_name: &str,
     construct_name: &str,
     super_get_name: &str,
+    super_reference_name: &str,
     receiver_name: &str,
     result_name: &str,
     new_target_name: Option<&str>,
     super_call_name: Option<&str>,
+    parameter_names: &[String],
     anchor: Span,
     instance_initializers: &mut ArenaVec<'a, Statement<'a>>,
     construct_assert: &mut bool,
 ) -> Result<bool, &'static str> {
+    let parameters = function.params.has_parameter().then(|| {
+        std::mem::replace(
+            &mut function.params,
+            ast.alloc_formal_parameters(
+                anchor,
+                FormalParameterKind::FormalParameter,
+                ArenaVec::from_iter_in(
+                    parameter_names.iter().map(|name| {
+                        ast.formal_parameter(
+                            anchor,
+                            ArenaVec::new_in(ast),
+                            ast.binding_pattern_binding_identifier(
+                                anchor,
+                                ast.allocator.alloc_str(name),
+                            ),
+                            None::<ArenaBox<'a, TSTypeAnnotation<'a>>>,
+                            None::<ArenaBox<'a, Expression<'a>>>,
+                            false,
+                            None,
+                            false,
+                            false,
+                        )
+                    }),
+                    ast,
+                ),
+                None::<ArenaBox<'a, FormalParameterRest<'a>>>,
+            ),
+        )
+    });
     let body = function
         .body
         .as_mut()
@@ -734,25 +987,28 @@ fn lower_derived_constructor_body<'a>(
         allocator: ast.allocator,
         class_name: ast.allocator.alloc_str(class_name),
         get_name: ast.allocator.alloc_str(super_get_name),
+        reference_name: ast.allocator.alloc_str(super_reference_name),
         is_static: false,
         receiver_name: None,
     };
     for statement in &mut body.statements {
         super_access_rewriter.visit_statement(statement);
     }
-    if lower_leading_super_constructor_body(
-        ast,
-        body,
-        class_name,
-        super_name,
-        construct_name,
-        receiver_name,
-        result_name,
-        new_target_name,
-        anchor,
-        instance_initializers,
-        construct_assert,
-    )? {
+    if parameters.is_none()
+        && lower_leading_super_constructor_body(
+            ast,
+            body,
+            class_name,
+            super_name,
+            construct_name,
+            receiver_name,
+            result_name,
+            new_target_name,
+            anchor,
+            instance_initializers,
+            construct_assert,
+        )?
+    {
         return Ok(false);
     }
     let mut declarations = ArenaVec::new_in(ast);
@@ -783,6 +1039,8 @@ fn lower_derived_constructor_body<'a>(
         anchor,
         instance_initializers,
         receiver_declaration,
+        parameters,
+        construct_assert,
     )?;
     Ok(false)
 }
@@ -943,7 +1201,7 @@ fn lower_leading_super_constructor_body<'a>(
     };
     let mut after = body.statements.split_off(index);
     let mut rewritten = ArenaVec::new_in(ast);
-    let mut leading_this_rewriter = LeadingThisRewriter {
+    let mut leading_this_rewriter = DerivedThisRewriter {
         allocator: ast.allocator,
         receiver_name: ast.allocator.alloc_str(receiver_name),
         construct_name: ast.allocator.alloc_str(construct_name),
@@ -1070,7 +1328,7 @@ fn lower_general_derived_constructor_body<'a>(
     ast: &AstBuilder<'a>,
     body: &mut oxc_ast::ast::FunctionBody<'a>,
     class_name: &str,
-    super_name: &str,
+    _super_name: &str,
     construct_name: &str,
     receiver_name: &str,
     result_name: &str,
@@ -1079,6 +1337,8 @@ fn lower_general_derived_constructor_body<'a>(
     anchor: Span,
     instance_initializers: &mut ArenaVec<'a, Statement<'a>>,
     _receiver_declaration: Statement<'a>,
+    mut parameters: Option<ArenaBox<'a, FormalParameters<'a>>>,
+    construct_assert: &mut bool,
 ) -> Result<(), &'static str> {
     let mut contents = std::mem::replace(&mut body.statements, ArenaVec::new_in(ast));
     let mut super_rewriter = SuperThunkCallRewriter {
@@ -1088,16 +1348,24 @@ fn lower_general_derived_constructor_body<'a>(
     let mut this_rewriter = DerivedThisRewriter {
         allocator: ast.allocator,
         receiver_name: ast.allocator.alloc_str(receiver_name),
+        construct_name: ast.allocator.alloc_str(construct_name),
+        used: false,
     };
     let mut new_target_rewriter = NewTargetRewriter {
         allocator: ast.allocator,
         name: ast.allocator.alloc_str(new_target_name),
     };
+    if let Some(parameters) = parameters.as_mut() {
+        super_rewriter.visit_formal_parameters(parameters);
+        this_rewriter.visit_formal_parameters(parameters);
+        new_target_rewriter.visit_formal_parameters(parameters);
+    }
     for statement in &mut contents {
         super_rewriter.visit_statement(statement);
         this_rewriter.visit_statement(statement);
         new_target_rewriter.visit_statement(statement);
     }
+    *construct_assert |= this_rewriter.used;
 
     let mut declarations = ArenaVec::new_in(ast);
     declarations.push(ast.variable_declarator(
@@ -1121,9 +1389,7 @@ fn lower_general_derived_constructor_body<'a>(
     ));
 
     let mut construct_arguments = ArenaVec::new_in(ast);
-    construct_arguments.push(Argument::from(
-        ast.expression_identifier(anchor, ast.allocator.alloc_str(super_name)),
-    ));
+    construct_arguments.push(Argument::from(super_constructor(ast, class_name, anchor)));
     construct_arguments.push(Argument::from(
         ast.expression_identifier(anchor, "arguments"),
     ));
@@ -1197,12 +1463,14 @@ fn lower_general_derived_constructor_body<'a>(
         false,
         None::<ArenaBox<'a, TSTypeParameterDeclaration<'a>>>,
         None::<ArenaBox<'a, TSThisParameter<'a>>>,
-        ast.alloc_formal_parameters(
-            anchor,
-            FormalParameterKind::FormalParameter,
-            ArenaVec::new_in(ast),
-            None::<ArenaBox<'a, FormalParameterRest<'a>>>,
-        ),
+        parameters.unwrap_or_else(|| {
+            ast.alloc_formal_parameters(
+                anchor,
+                FormalParameterKind::FormalParameter,
+                ArenaVec::new_in(ast),
+                None::<ArenaBox<'a, FormalParameterRest<'a>>>,
+            )
+        }),
         None::<ArenaBox<'a, TSTypeAnnotation<'a>>>,
         Some(ast.alloc_function_body(anchor, ArenaVec::new_in(ast), contents)),
     );
@@ -1318,11 +1586,30 @@ fn split_leading_super_expression<'a>(
 }
 
 #[expect(deprecated)]
+fn super_constructor<'a>(ast: &AstBuilder<'a>, class_name: &str, span: Span) -> Expression<'a> {
+    ast.expression_call(
+        span,
+        Expression::from(ast.member_expression_static(
+            span,
+            ast.expression_identifier(span, "Object"),
+            ast.identifier_name(span, "getPrototypeOf"),
+            false,
+        )),
+        None::<ArenaBox<'a, TSTypeParameterInstantiation<'a>>>,
+        ast.vec1(Argument::from(ast.expression_identifier(
+            span,
+            ast.allocator.alloc_str(class_name),
+        ))),
+        false,
+    )
+}
+
+#[expect(deprecated)]
 fn super_construct_expression<'a>(
     ast: &AstBuilder<'a>,
     mut call: ArenaBox<'a, oxc_ast::ast::CallExpression<'a>>,
     class_name: &str,
-    super_name: &str,
+    _super_name: &str,
     construct_name: &str,
     new_target_name: Option<&str>,
 ) -> Expression<'a> {
@@ -1332,9 +1619,7 @@ fn super_construct_expression<'a>(
         elements.push(ArrayExpressionElement::from(argument));
     }
     let mut arguments = ArenaVec::new_in(ast);
-    arguments.push(Argument::from(
-        ast.expression_identifier(span, ast.allocator.alloc_str(super_name)),
-    ));
+    arguments.push(Argument::from(super_constructor(ast, class_name, span)));
     arguments.push(Argument::from(ast.expression_array(span, elements)));
     arguments.push(Argument::from(ast.expression_logical(
         span,
@@ -1535,14 +1820,14 @@ impl<'a> VisitMut<'a> for SuperThunkCallRewriter<'a> {
     fn visit_function(&mut self, _function: &mut Function<'a>, _flags: ScopeFlags) {}
 }
 
-// Closures created before super must read the initialized receiver when called.
-struct LeadingThisRewriter<'a> {
+struct DerivedThisRewriter<'a> {
     allocator: &'a Allocator,
     receiver_name: &'a str,
     construct_name: &'a str,
     used: bool,
 }
-impl<'a> VisitMut<'a> for LeadingThisRewriter<'a> {
+
+impl<'a> VisitMut<'a> for DerivedThisRewriter<'a> {
     #[expect(deprecated)]
     fn visit_expression(&mut self, expression: &mut Expression<'a>) {
         if matches!(expression, Expression::ThisExpression(_)) {
@@ -1567,6 +1852,7 @@ impl<'a> VisitMut<'a> for LeadingThisRewriter<'a> {
             walk_mut::walk_expression(self, expression);
         }
     }
+
     fn visit_class(&mut self, class: &mut Class<'a>) {
         if let Some(super_class) = &mut class.super_class {
             self.visit_expression(super_class);
@@ -1587,25 +1873,6 @@ impl<'a> VisitMut<'a> for LeadingThisRewriter<'a> {
         }
     }
 
-    fn visit_function(&mut self, _: &mut Function<'a>, _: ScopeFlags) {}
-}
-
-struct DerivedThisRewriter<'a> {
-    allocator: &'a Allocator,
-    receiver_name: &'a str,
-}
-
-impl<'a> VisitMut<'a> for DerivedThisRewriter<'a> {
-    #[expect(deprecated)]
-    fn visit_expression(&mut self, expression: &mut Expression<'a>) {
-        if matches!(expression, Expression::ThisExpression(_)) {
-            *expression = AstBuilder::new(self.allocator)
-                .expression_identifier(expression.span(), self.receiver_name);
-        } else {
-            walk_mut::walk_expression(self, expression);
-        }
-    }
-
     fn visit_function(&mut self, _function: &mut Function<'a>, _flags: ScopeFlags) {}
 }
 
@@ -1620,6 +1887,18 @@ impl<'a> VisitMut<'a> for StaticInitializerThisRewriter<'a> {
         if matches!(expression, Expression::ThisExpression(_)) {
             *expression = AstBuilder::new(self.allocator)
                 .expression_identifier(expression.span(), self.class_name);
+        } else if matches!(expression, Expression::NewTarget(_)) {
+            let ast = AstBuilder::new(self.allocator);
+            *expression = ast.expression_unary(
+                expression.span(),
+                oxc_syntax::operator::UnaryOperator::Void,
+                ast.expression_numeric_literal(
+                    expression.span(),
+                    0.0,
+                    None,
+                    oxc_ast::ast::NumberBase::Decimal,
+                ),
+            );
         } else {
             walk_mut::walk_expression(self, expression);
         }
@@ -1631,9 +1910,7 @@ impl<'a> VisitMut<'a> for StaticInitializerThisRewriter<'a> {
 struct PrivateLooseRewriter<'a, 'p> {
     allocator: &'a Allocator,
     keys: &'p FxHashMap<String, (String, String)>,
-    read_only: &'p FxHashSet<String>,
     base_name: &'a str,
-    call_name: &'a str,
     check_in_rhs_name: &'a str,
 }
 
@@ -1643,54 +1920,22 @@ impl<'a> PrivateLooseRewriter<'a, '_> {
     }
 
     #[expect(deprecated)]
-    fn read_only_error(&self, span: Span) -> Expression<'a> {
-        let ast = AstBuilder::new(self.allocator);
-        let mut arguments = ArenaVec::new_in(&ast);
-        arguments.push(Argument::from(ast.expression_string_literal(
-            span,
-            "Attempted to set read only private field",
-            None,
-        )));
-        let mut statements = ArenaVec::new_in(&ast);
-        statements.push(ast.statement_throw(
-            span,
-            ast.expression_new(
-                span,
-                ast.expression_identifier(span, "TypeError"),
-                None::<ArenaBox<'a, TSTypeParameterInstantiation<'a>>>,
-                arguments,
-            ),
-        ));
-        ast.expression_call(
-            span,
-            ast.expression_arrow_function(
-                span,
-                false,
-                false,
-                None::<ArenaBox<'a, TSTypeParameterDeclaration<'a>>>,
-                ast.alloc_formal_parameters(
-                    span,
-                    FormalParameterKind::FormalParameter,
-                    ArenaVec::new_in(&ast),
-                    None::<ArenaBox<'a, FormalParameterRest<'a>>>,
-                ),
-                None::<ArenaBox<'a, TSTypeAnnotation<'a>>>,
-                ast.alloc_function_body(span, ArenaVec::new_in(&ast), statements),
-            ),
-            None::<ArenaBox<'a, TSTypeParameterInstantiation<'a>>>,
-            ArenaVec::new_in(&ast),
-            false,
-        )
-    }
-
-    #[expect(deprecated)]
-    fn checked_object(&self, span: Span, object: Expression<'a>, key_name: &str) -> Expression<'a> {
+    fn checked_object(
+        &self,
+        span: Span,
+        object: Expression<'a>,
+        key_name: &str,
+        optional: bool,
+    ) -> Expression<'a> {
         let ast = AstBuilder::new(self.allocator);
         let mut arguments = ArenaVec::new_in(&ast);
         arguments.push(Argument::from(object));
         arguments.push(Argument::from(
             ast.expression_identifier(span, self.allocator.alloc_str(key_name)),
         ));
+        if optional {
+            arguments.push(Argument::from(ast.expression_boolean_literal(span, true)));
+        }
         ast.expression_call(
             span,
             ast.expression_identifier(span, self.base_name),
@@ -1702,66 +1947,43 @@ impl<'a> PrivateLooseRewriter<'a, '_> {
 }
 
 impl<'a> VisitMut<'a> for PrivateLooseRewriter<'a, '_> {
+    fn visit_class(&mut self, class: &mut Class<'a>) {
+        if let Some(heritage) = &mut class.super_class {
+            self.visit_expression(heritage);
+        }
+        let mut keys = self.keys.clone();
+        for element in &class.body.body {
+            if let Some(PropertyKey::PrivateIdentifier(identifier)) = element.property_key() {
+                keys.remove(identifier.name.as_str());
+            }
+        }
+        PrivateLooseRewriter {
+            allocator: self.allocator,
+            keys: &keys,
+            base_name: self.base_name,
+            check_in_rhs_name: self.check_in_rhs_name,
+        }
+        .visit_class_body(&mut class.body);
+    }
+
+    fn visit_chain_element(&mut self, element: &mut ChainElement<'a>) {
+        let ast = AstBuilder::new(self.allocator);
+        let mut expression = match element.take_in(&ast) {
+            ChainElement::CallExpression(call) => Expression::CallExpression(call),
+            ChainElement::TSNonNullExpression(expr) => Expression::TSNonNullExpression(expr),
+            other => Expression::from(other.into_member_expression()),
+        };
+        self.visit_expression(&mut expression);
+        *element = match expression {
+            Expression::CallExpression(call) => ChainElement::CallExpression(call),
+            Expression::TSNonNullExpression(expr) => ChainElement::TSNonNullExpression(expr),
+            other => ChainElement::from(other.into_member_expression()),
+        };
+    }
+
     #[expect(deprecated)]
     fn visit_expression(&mut self, expression: &mut Expression<'a>) {
         let ast = AstBuilder::new(self.allocator);
-        let read_only_write = match expression {
-            Expression::AssignmentExpression(assignment) => {
-                if let AssignmentTarget::PrivateFieldExpression(field) = &assignment.left {
-                    self.read_only.contains(field.field.name.as_str())
-                } else {
-                    false
-                }
-            }
-            Expression::UpdateExpression(update) => {
-                if let SimpleAssignmentTarget::PrivateFieldExpression(field) = &update.argument {
-                    self.read_only.contains(field.field.name.as_str())
-                } else {
-                    false
-                }
-            }
-            _ => false,
-        };
-        if read_only_write {
-            *expression = self.read_only_error(expression.span());
-            return;
-        }
-        if let Expression::CallExpression(call) = expression {
-            let span = call.span;
-            let optional = call.optional;
-            let private_call = if let Expression::PrivateFieldExpression(field) = &mut call.callee {
-                self.visit_expression(&mut field.object);
-                self.key(field.field.name.as_str())
-                    .map(|key| (field.object.take_in(&ast), field.field.span, key.to_owned()))
-            } else {
-                None
-            };
-            let Some((receiver, key_span, key)) = private_call else {
-                walk_mut::walk_expression(self, expression);
-                return;
-            };
-            for argument in &mut call.arguments {
-                self.visit_argument(argument);
-            }
-            let mut elements = ArenaVec::with_capacity_in(call.arguments.len(), &ast);
-            for argument in call.arguments.drain(..) {
-                elements.push(ArrayExpressionElement::from(argument));
-            }
-            let mut arguments = ArenaVec::new_in(&ast);
-            arguments.push(Argument::from(receiver));
-            arguments.push(Argument::from(
-                ast.expression_identifier(key_span, self.allocator.alloc_str(&key)),
-            ));
-            arguments.push(Argument::from(ast.expression_array(span, elements)));
-            *expression = ast.expression_call(
-                span,
-                ast.expression_identifier(span, self.call_name),
-                None::<ArenaBox<'a, TSTypeParameterInstantiation<'a>>>,
-                arguments,
-                optional,
-            );
-            return;
-        }
         match expression {
             Expression::PrivateFieldExpression(field) => {
                 self.visit_expression(&mut field.object);
@@ -1771,9 +1993,9 @@ impl<'a> VisitMut<'a> for PrivateLooseRewriter<'a, '_> {
                 let object = field.object.take_in(&ast);
                 *expression = Expression::from(ast.member_expression_computed(
                     field.span,
-                    self.checked_object(field.span, object, key),
+                    self.checked_object(field.span, object, key, field.optional),
                     ast.expression_identifier(field.field.span, self.allocator.alloc_str(key)),
-                    false,
+                    field.optional,
                 ));
             }
             Expression::PrivateInExpression(private_in) => {
@@ -1834,7 +2056,7 @@ impl<'a> VisitMut<'a> for PrivateLooseRewriter<'a, '_> {
             *target =
                 AssignmentTarget::ComputedMemberExpression(ast.alloc_computed_member_expression(
                     field.span,
-                    self.checked_object(field.span, object, key),
+                    self.checked_object(field.span, object, key, field.optional),
                     ast.expression_identifier(field.field.span, self.allocator.alloc_str(key)),
                     false,
                 ));
@@ -1855,7 +2077,7 @@ impl<'a> VisitMut<'a> for PrivateLooseRewriter<'a, '_> {
             *target = SimpleAssignmentTarget::ComputedMemberExpression(
                 ast.alloc_computed_member_expression(
                     field.span,
-                    self.checked_object(field.span, object, key),
+                    self.checked_object(field.span, object, key, field.optional),
                     ast.expression_identifier(field.field.span, self.allocator.alloc_str(key)),
                     false,
                 ),
@@ -1866,10 +2088,112 @@ impl<'a> VisitMut<'a> for PrivateLooseRewriter<'a, '_> {
     }
 }
 
+// Match the rewriter's distinction between ordinary writes, reads, and
+// assignable references. Compound/update/pattern targets use the accessor
+// adapter, while a direct `=` only needs Babel's set helper.
+#[derive(Default)]
+struct SuperHelperUsage {
+    read: bool,
+    write: bool,
+    accessor: bool,
+}
+impl<'a> Visit<'a> for SuperHelperUsage {
+    fn visit_method_definition(&mut self, method: &oxc_ast::ast::MethodDefinition<'a>) {
+        if method.computed {
+            self.visit_property_key(&method.key);
+        }
+        self.visit_formal_parameters(&method.value.params);
+        if let Some(body) = &method.value.body {
+            self.visit_function_body(body);
+        }
+    }
+    fn visit_function(&mut self, _: &Function<'a>, _: ScopeFlags) {}
+
+    fn visit_expression(&mut self, expression: &Expression<'a>) {
+        if let Expression::AssignmentExpression(assignment) = expression
+            && assignment.operator.is_assign()
+        {
+            match &assignment.left {
+                AssignmentTarget::StaticMemberExpression(member)
+                    if matches!(member.object, Expression::Super(_)) =>
+                {
+                    self.write = true;
+                    self.visit_expression(&assignment.right);
+                    return;
+                }
+                AssignmentTarget::ComputedMemberExpression(member)
+                    if matches!(member.object, Expression::Super(_)) =>
+                {
+                    self.write = true;
+                    self.visit_expression(&member.expression);
+                    self.visit_expression(&assignment.right);
+                    return;
+                }
+                _ => {}
+            }
+        }
+        self.read |= match expression {
+            Expression::StaticMemberExpression(member) => {
+                matches!(member.object, Expression::Super(_))
+            }
+            Expression::ComputedMemberExpression(member) => {
+                matches!(member.object, Expression::Super(_))
+            }
+            _ => false,
+        };
+        walk::walk_expression(self, expression);
+    }
+    fn visit_assignment_target(&mut self, target: &AssignmentTarget<'a>) {
+        let reference = match target {
+            AssignmentTarget::StaticMemberExpression(member) => {
+                matches!(member.object, Expression::Super(_))
+            }
+            AssignmentTarget::ComputedMemberExpression(member) => {
+                matches!(member.object, Expression::Super(_))
+            }
+            _ => false,
+        };
+        self.read |= reference;
+        self.write |= reference;
+        self.accessor |= reference;
+        walk::walk_assignment_target(self, target);
+    }
+    fn visit_simple_assignment_target(&mut self, target: &SimpleAssignmentTarget<'a>) {
+        let reference = match target {
+            SimpleAssignmentTarget::StaticMemberExpression(member) => {
+                matches!(member.object, Expression::Super(_))
+            }
+            SimpleAssignmentTarget::ComputedMemberExpression(member) => {
+                matches!(member.object, Expression::Super(_))
+            }
+            _ => false,
+        };
+        self.read |= reference;
+        self.write |= reference;
+        self.accessor |= reference;
+        walk::walk_simple_assignment_target(self, target);
+    }
+    fn visit_class(&mut self, class: &Class<'a>) {
+        // Heritage and computed keys use the surrounding super environment;
+        // the nested class body owns its own methods and initializers.
+        if let Some(super_class) = &class.super_class {
+            self.visit_expression(super_class);
+        }
+        for element in &class.body.body {
+            if element.computed()
+                && let Some(key) = element.property_key()
+            {
+                self.visit_property_key(key);
+            }
+        }
+    }
+}
+
 struct SuperAccessRewriter<'a> {
     allocator: &'a Allocator,
     class_name: &'a str,
     get_name: &'a str,
+    reference_name: &'a str,
     is_static: bool,
     receiver_name: Option<&'a str>,
 }
@@ -1887,6 +2211,9 @@ impl<'a> SuperAccessRewriter<'a> {
     fn take_key(&self, expression: &mut Expression<'a>) -> Option<(Span, Expression<'a>)> {
         let ast = AstBuilder::new(self.allocator);
         match expression {
+            Expression::ParenthesizedExpression(parenthesized) => {
+                self.take_key(&mut parenthesized.expression)
+            }
             Expression::StaticMemberExpression(member)
                 if matches!(member.object, Expression::Super(_)) =>
             {
@@ -1969,178 +2296,6 @@ impl<'a> SuperAccessRewriter<'a> {
     }
 
     #[expect(deprecated)]
-    fn set(&self, span: Span, key: Expression<'a>, value: Expression<'a>) -> Expression<'a> {
-        let ast = AstBuilder::new(self.allocator);
-        let target = if self.is_static {
-            ast.expression_identifier(span, self.class_name)
-        } else {
-            Expression::from(ast.member_expression_static(
-                span,
-                ast.expression_identifier(span, self.class_name),
-                ast.identifier_name(span, "prototype"),
-                false,
-            ))
-        };
-        let mut prototype_arguments = ArenaVec::new_in(&ast);
-        prototype_arguments.push(Argument::from(target));
-        let prototype = ast.expression_call(
-            span,
-            Expression::from(ast.member_expression_static(
-                span,
-                ast.expression_identifier(span, "Object"),
-                ast.identifier_name(span, "getPrototypeOf"),
-                false,
-            )),
-            None::<ArenaBox<'a, TSTypeParameterInstantiation<'a>>>,
-            prototype_arguments,
-            false,
-        );
-        let mut arguments = ArenaVec::new_in(&ast);
-        arguments.push(Argument::from(prototype));
-        arguments.push(Argument::from(key));
-        arguments.push(Argument::from(value));
-        arguments.push(Argument::from(self.receiver(span)));
-        ast.expression_call(
-            span,
-            Expression::from(ast.member_expression_static(
-                span,
-                ast.expression_identifier(span, "Reflect"),
-                ast.identifier_name(span, "set"),
-                false,
-            )),
-            None::<ArenaBox<'a, TSTypeParameterInstantiation<'a>>>,
-            arguments,
-            false,
-        )
-    }
-
-    #[expect(deprecated)]
-    fn set_value(
-        &self,
-        span: Span,
-        key: Expression<'a>,
-        value: Expression<'a>,
-        operator: oxc_syntax::operator::AssignmentOperator,
-    ) -> Expression<'a> {
-        let ast = AstBuilder::new(self.allocator);
-        let key_name = ast.allocator.alloc_str("_key");
-        let value_name = ast.allocator.alloc_str("_value");
-        let mut pending_value = Some(value);
-        let mut key_declarations = ArenaVec::new_in(&ast);
-        key_declarations.push(ast.variable_declarator(
-            span,
-            VariableDeclarationKind::Var,
-            ast.binding_pattern_binding_identifier(span, key_name),
-            None::<ArenaBox<'a, TSTypeAnnotation<'a>>>,
-            Some(key),
-            false,
-        ));
-        let computed_value = if operator.is_logical() {
-            self.get(span, ast.expression_identifier(span, key_name))
-        } else if let Some(binary_operator) = operator.to_binary_operator() {
-            ast.expression_binary(
-                span,
-                self.get(span, ast.expression_identifier(span, key_name)),
-                binary_operator,
-                pending_value.take().unwrap(),
-            )
-        } else {
-            pending_value.take().unwrap()
-        };
-        let mut value_declarations = ArenaVec::new_in(&ast);
-        value_declarations.push(ast.variable_declarator(
-            span,
-            VariableDeclarationKind::Var,
-            ast.binding_pattern_binding_identifier(span, value_name),
-            None::<ArenaBox<'a, TSTypeAnnotation<'a>>>,
-            Some(computed_value),
-            false,
-        ));
-        let set = self.set(
-            span,
-            ast.expression_identifier(span, key_name),
-            ast.expression_identifier(span, value_name),
-        );
-        let mut body_statements = ArenaVec::new_in(&ast);
-        body_statements.push(Statement::VariableDeclaration(
-            ast.alloc_variable_declaration(
-                span,
-                VariableDeclarationKind::Var,
-                key_declarations,
-                false,
-            ),
-        ));
-        body_statements.push(Statement::VariableDeclaration(
-            ast.alloc_variable_declaration(
-                span,
-                VariableDeclarationKind::Var,
-                value_declarations,
-                false,
-            ),
-        ));
-        if operator.is_logical() {
-            let current = || ast.expression_identifier(span, value_name);
-            let short_circuit = match operator {
-                oxc_syntax::operator::AssignmentOperator::LogicalOr => current(),
-                oxc_syntax::operator::AssignmentOperator::LogicalAnd => ast.expression_unary(
-                    span,
-                    oxc_syntax::operator::UnaryOperator::LogicalNot,
-                    current(),
-                ),
-                oxc_syntax::operator::AssignmentOperator::LogicalNullish => ast.expression_binary(
-                    span,
-                    current(),
-                    oxc_syntax::operator::BinaryOperator::Inequality,
-                    ast.expression_null_literal(span),
-                ),
-                _ => unreachable!(),
-            };
-            body_statements.push(ast.statement_if(
-                span,
-                short_circuit,
-                ast.statement_return(span, Some(current())),
-                None,
-            ));
-            body_statements.push(
-                ast.statement_expression(
-                    span,
-                    ast.expression_assignment(
-                        span,
-                        oxc_syntax::operator::AssignmentOperator::Assign,
-                        ast.simple_assignment_target_assignment_target_identifier(span, value_name)
-                            .into(),
-                        pending_value.take().unwrap(),
-                    ),
-                ),
-            );
-        }
-        body_statements.push(ast.statement_expression(span, set));
-        body_statements
-            .push(ast.statement_return(span, Some(ast.expression_identifier(span, value_name))));
-        let arrow = ast.expression_arrow_function(
-            span,
-            false,
-            false,
-            None::<ArenaBox<'a, TSTypeParameterDeclaration<'a>>>,
-            ast.alloc_formal_parameters(
-                span,
-                FormalParameterKind::FormalParameter,
-                ArenaVec::new_in(&ast),
-                None::<ArenaBox<'a, FormalParameterRest<'a>>>,
-            ),
-            None::<ArenaBox<'a, TSTypeAnnotation<'a>>>,
-            ast.alloc_function_body(span, ArenaVec::new_in(&ast), body_statements),
-        );
-        ast.expression_call(
-            span,
-            arrow,
-            None::<ArenaBox<'a, TSTypeParameterInstantiation<'a>>>,
-            ArenaVec::new_in(&ast),
-            false,
-        )
-    }
-
-    #[expect(deprecated)]
     fn take_update_key(
         &self,
         target: &mut SimpleAssignmentTarget<'a>,
@@ -2165,112 +2320,58 @@ impl<'a> SuperAccessRewriter<'a> {
     }
 
     #[expect(deprecated)]
-    fn update_value(
-        &self,
-        span: Span,
-        key: Expression<'a>,
-        operator: oxc_syntax::operator::UpdateOperator,
-        prefix: bool,
-    ) -> Expression<'a> {
+    fn reference(&self, span: Span, key: Expression<'a>) -> oxc_ast::ast::MemberExpression<'a> {
         let ast = AstBuilder::new(self.allocator);
-        let key_name = ast.allocator.alloc_str("_key");
-        let value_name = ast.allocator.alloc_str("_value");
-        let result_name = ast.allocator.alloc_str("_result");
-        let mut key_declarations = ArenaVec::new_in(&ast);
-        key_declarations.push(ast.variable_declarator(
+        let Expression::CallExpression(mut reference) = self.get(span, key) else {
+            unreachable!()
+        };
+        reference.callee = ast.expression_identifier(span, self.reference_name);
+        ast.member_expression_static(
             span,
-            VariableDeclarationKind::Var,
-            ast.binding_pattern_binding_identifier(span, key_name),
-            None::<ArenaBox<'a, TSTypeAnnotation<'a>>>,
-            Some(key),
-            false,
-        ));
-        let mut value_declarations = ArenaVec::new_in(&ast);
-        value_declarations.push(ast.variable_declarator(
-            span,
-            VariableDeclarationKind::Var,
-            ast.binding_pattern_binding_identifier(span, value_name),
-            None::<ArenaBox<'a, TSTypeAnnotation<'a>>>,
-            Some(self.get(span, ast.expression_identifier(span, key_name))),
-            false,
-        ));
-        let update = ast.expression_update(
-            span,
-            operator,
-            prefix,
-            ast.simple_assignment_target_assignment_target_identifier(span, value_name),
-        );
-        let mut result_declarations = ArenaVec::new_in(&ast);
-        result_declarations.push(ast.variable_declarator(
-            span,
-            VariableDeclarationKind::Var,
-            ast.binding_pattern_binding_identifier(span, result_name),
-            None::<ArenaBox<'a, TSTypeAnnotation<'a>>>,
-            Some(update),
-            false,
-        ));
-        let set = self.set(
-            span,
-            ast.expression_identifier(span, key_name),
-            ast.expression_identifier(span, value_name),
-        );
-        let mut statements = ArenaVec::new_in(&ast);
-        for declarations in [key_declarations, value_declarations, result_declarations] {
-            statements.push(Statement::VariableDeclaration(
-                ast.alloc_variable_declaration(
-                    span,
-                    VariableDeclarationKind::Var,
-                    declarations,
-                    false,
-                ),
-            ));
-        }
-        statements.push(ast.statement_expression(span, set));
-        statements
-            .push(ast.statement_return(span, Some(ast.expression_identifier(span, result_name))));
-        let arrow = ast.expression_arrow_function(
-            span,
-            false,
-            false,
-            None::<ArenaBox<'a, TSTypeParameterDeclaration<'a>>>,
-            ast.alloc_formal_parameters(
-                span,
-                FormalParameterKind::FormalParameter,
-                ArenaVec::new_in(&ast),
-                None::<ArenaBox<'a, FormalParameterRest<'a>>>,
-            ),
-            None::<ArenaBox<'a, TSTypeAnnotation<'a>>>,
-            ast.alloc_function_body(span, ArenaVec::new_in(&ast), statements),
-        );
-        ast.expression_call(
-            span,
-            arrow,
-            None::<ArenaBox<'a, TSTypeParameterInstantiation<'a>>>,
-            ArenaVec::new_in(&ast),
+            Expression::CallExpression(reference),
+            ast.identifier_name(span, "value"),
             false,
         )
     }
 }
 
 impl<'a> VisitMut<'a> for SuperAccessRewriter<'a> {
+    fn visit_chain_element(&mut self, element: &mut ChainElement<'a>) {
+        let ast = AstBuilder::new(self.allocator);
+        let mut expression = match element.take_in(&ast) {
+            ChainElement::CallExpression(call) => Expression::CallExpression(call),
+            ChainElement::TSNonNullExpression(expr) => Expression::TSNonNullExpression(expr),
+            other => Expression::from(other.into_member_expression()),
+        };
+        self.visit_expression(&mut expression);
+        *element = match expression {
+            Expression::CallExpression(call) => ChainElement::CallExpression(call),
+            Expression::TSNonNullExpression(expr) => ChainElement::TSNonNullExpression(expr),
+            other => ChainElement::from(other.into_member_expression()),
+        };
+    }
+
     #[expect(deprecated)]
     fn visit_expression(&mut self, expression: &mut Expression<'a>) {
-        if let Expression::UpdateExpression(update) = expression
-            && let Some((span, key)) = self.take_update_key(&mut update.argument)
-        {
-            *expression = self.update_value(span, key, update.operator, update.prefix);
-            walk_mut::walk_expression(self, expression);
-            return;
-        }
         if let Expression::AssignmentExpression(assignment) = expression
-            && (assignment.operator.is_assign()
-                || assignment.operator.to_binary_operator().is_some()
-                || assignment.operator.is_logical())
+            && assignment.operator.is_assign()
             && let Some((span, key)) = self.take_assignment_key(&mut assignment.left)
         {
             let ast = AstBuilder::new(self.allocator);
-            let value = assignment.right.take_in(&ast);
-            *expression = self.set_value(span, key, value, assignment.operator);
+            let Expression::CallExpression(mut call) = self.get(span, key) else {
+                unreachable!()
+            };
+            // Capture the receiver before the RHS, including an uninitialized
+            // derived receiver. Ordinary writes need no accessor allocation.
+            call.callee = Expression::from(ast.member_expression_static(
+                span,
+                ast.expression_identifier(span, self.reference_name),
+                ast.identifier_name(span, "set"),
+                false,
+            ));
+            call.arguments
+                .push(Argument::from(assignment.right.take_in(&ast)));
+            *expression = Expression::CallExpression(call);
             walk_mut::walk_expression(self, expression);
             return;
         }
@@ -2287,11 +2388,11 @@ impl<'a> VisitMut<'a> for SuperAccessRewriter<'a> {
                     span,
                     get,
                     ast.identifier_name(span, "call"),
-                    false,
+                    call.optional,
                 )),
                 None::<ArenaBox<'a, TSTypeParameterInstantiation<'a>>>,
                 arguments,
-                call.optional,
+                false,
             );
             walk_mut::walk_expression(self, expression);
             return;
@@ -2302,6 +2403,24 @@ impl<'a> VisitMut<'a> for SuperAccessRewriter<'a> {
             return;
         }
         walk_mut::walk_expression(self, expression);
+    }
+
+    fn visit_assignment_target(&mut self, target: &mut AssignmentTarget<'a>) {
+        if let Some((span, mut key)) = self.take_assignment_key(target) {
+            self.visit_expression(&mut key);
+            *target = self.reference(span, key).into();
+        } else {
+            walk_mut::walk_assignment_target(self, target);
+        }
+    }
+
+    fn visit_simple_assignment_target(&mut self, target: &mut SimpleAssignmentTarget<'a>) {
+        if let Some((span, mut key)) = self.take_update_key(target) {
+            self.visit_expression(&mut key);
+            *target = self.reference(span, key).into();
+        } else {
+            walk_mut::walk_simple_assignment_target(self, target);
+        }
     }
 
     fn visit_function(&mut self, _function: &mut Function<'a>, _flags: ScopeFlags) {}
@@ -2482,7 +2601,7 @@ pub(super) fn rewrite_loose_static_field_super<'a>(
 fn derived_default_constructor<'a>(
     ast: &AstBuilder<'a>,
     class_name: &str,
-    super_name: &str,
+    _super_name: &str,
     construct_name: &str,
     receiver_name: &str,
     anchor: Span,
@@ -2495,9 +2614,7 @@ fn derived_default_constructor<'a>(
         None::<ArenaBox<'a, FormalParameterRest<'a>>>,
     );
     let mut construct_arguments = ArenaVec::new_in(ast);
-    construct_arguments.push(Argument::from(
-        ast.expression_identifier(anchor, ast.allocator.alloc_str(super_name)),
-    ));
+    construct_arguments.push(Argument::from(super_constructor(ast, class_name, anchor)));
     construct_arguments.push(Argument::from(
         ast.expression_identifier(anchor, "arguments"),
     ));
@@ -2718,6 +2835,217 @@ fn derived_inheritance_statements<'a>(
     statements
 }
 
+// A suspending key remains in the caller. Closures created along the way must
+// retain this evaluation's private tokens rather than the next loop iteration's.
+struct PrivateKeyClosureCapture<'a, 'p> {
+    allocator: &'a Allocator,
+    plan: &'p DirectClassPlan,
+}
+impl<'a> VisitMut<'a> for PrivateKeyClosureCapture<'a, '_> {
+    #[expect(deprecated)]
+    fn visit_expression(&mut self, expression: &mut Expression<'a>) {
+        let captures = matches!(
+            expression,
+            Expression::ArrowFunctionExpression(_)
+                | Expression::FunctionExpression(_)
+                | Expression::ClassExpression(_)
+                | Expression::ObjectExpression(_)
+        );
+        if captures {
+            let mut names = KeyCaptureNames(FxHashSet::default());
+            names.visit_expression(expression);
+            if !self
+                .plan
+                .private_keys
+                .values()
+                .any(|(binding, _)| names.0.contains(binding))
+            {
+                return;
+            }
+        }
+        let mut suspension = KeySuspension(false);
+        if captures {
+            suspension.visit_expression(expression);
+        }
+        if !captures {
+            walk_mut::walk_expression(self, expression);
+            return;
+        }
+        let ast = AstBuilder::new(self.allocator);
+        let span = expression.span();
+        let parameters = self.plan.private_keys.values().map(|(name, _)| {
+            ast.formal_parameter(
+                span,
+                ArenaVec::new_in(&ast),
+                ast.binding_pattern_binding_identifier(span, self.allocator.alloc_str(name)),
+                None::<ArenaBox<'a, TSTypeAnnotation<'a>>>,
+                None::<ArenaBox<'a, Expression<'a>>>,
+                false,
+                None,
+                false,
+                false,
+            )
+        });
+        let mut parameters = ArenaVec::from_iter_in(parameters, &ast);
+        let arguments = self.plan.private_keys.values().map(|(name, _)| {
+            Argument::from(ast.expression_identifier(span, self.allocator.alloc_str(name)))
+        });
+        let mut arguments = ArenaVec::from_iter_in(arguments, &ast);
+        if suspension.0 {
+            let mut names = KeyCaptureNames(FxHashSet::default());
+            names.visit_expression(expression);
+            let Expression::ObjectExpression(object) = expression else {
+                unreachable!()
+            };
+            let mut lift = |value: &mut Expression<'a>, normalize: bool, spread: bool| {
+                self.visit_expression(value);
+                let value_span = value.span();
+                let name = self
+                    .allocator
+                    .alloc_str(&reserve("_keyValue", &mut names.0));
+                let mut argument = value.take_in(&ast);
+                if normalize {
+                    argument = ast.expression_call(
+                        value_span,
+                        ast.expression_identifier(
+                            value_span,
+                            self.allocator
+                                .alloc_str(&self.plan.helper_names.property_key),
+                        ),
+                        None::<ArenaBox<'a, TSTypeParameterInstantiation<'a>>>,
+                        ast.vec1(Argument::from(argument)),
+                        false,
+                    );
+                }
+                if spread {
+                    argument = ast.expression_object(
+                        value_span,
+                        ast.vec1(ast.object_property_kind_spread_property(value_span, argument)),
+                    );
+                }
+                parameters.push(ast.formal_parameter(
+                    value_span,
+                    ArenaVec::new_in(&ast),
+                    ast.binding_pattern_binding_identifier(value_span, name),
+                    None::<ArenaBox<'a, TSTypeAnnotation<'a>>>,
+                    None::<ArenaBox<'a, Expression<'a>>>,
+                    false,
+                    None,
+                    false,
+                    false,
+                ));
+                arguments.push(Argument::from(argument));
+                *value = ast.expression_identifier(value_span, name);
+            };
+            for property in &mut object.properties {
+                match property {
+                    oxc_ast::ast::ObjectPropertyKind::ObjectProperty(property) => {
+                        if property.computed {
+                            let mut key = property.key.take_in(&ast).into_expression();
+                            lift(&mut key, true, false);
+                            property.key = PropertyKey::from(key);
+                        }
+                        // Keep methods on their original home object. Pure function
+                        // creation also stays here to retain property-name inference.
+                        if !matches!(
+                            property.value,
+                            Expression::FunctionExpression(_)
+                                | Expression::ArrowFunctionExpression(_)
+                        ) {
+                            lift(&mut property.value, false, false);
+                            property.shorthand = false;
+                        }
+                    }
+                    oxc_ast::ast::ObjectPropertyKind::SpreadProperty(spread) => {
+                        lift(&mut spread.argument, false, true);
+                    }
+                }
+            }
+        }
+        let value = expression.take_in(&ast);
+        let factory = ast.expression_arrow_function(
+            span,
+            true,
+            false,
+            None::<ArenaBox<'a, TSTypeParameterDeclaration<'a>>>,
+            ast.alloc_formal_parameters(
+                span,
+                FormalParameterKind::FormalParameter,
+                parameters,
+                None::<ArenaBox<'a, FormalParameterRest<'a>>>,
+            ),
+            None::<ArenaBox<'a, TSTypeAnnotation<'a>>>,
+            ast.alloc_function_body(
+                span,
+                ArenaVec::new_in(&ast),
+                ast.vec1(ast.statement_expression(span, value)),
+            ),
+        );
+        *expression = ast.expression_call(
+            span,
+            factory,
+            None::<ArenaBox<'a, TSTypeParameterInstantiation<'a>>>,
+            arguments,
+            false,
+        );
+    }
+}
+
+struct EnclosingPrivateUse {
+    names: FxHashSet<String>,
+    found: bool,
+}
+impl<'a> Visit<'a> for EnclosingPrivateUse {
+    fn visit_class(&mut self, class: &Class<'a>) {
+        if let Some(heritage) = &class.super_class {
+            self.visit_expression(heritage);
+        }
+        let outer = self.names.clone();
+        for element in &class.body.body {
+            if let Some(PropertyKey::PrivateIdentifier(identifier)) = element.property_key() {
+                self.names.remove(identifier.name.as_str());
+            }
+        }
+        self.visit_class_body(&class.body);
+        self.names = outer;
+    }
+
+    fn visit_private_field_expression(&mut self, field: &oxc_ast::ast::PrivateFieldExpression<'a>) {
+        self.found |= self.names.contains(field.field.name.as_str());
+        walk::walk_private_field_expression(self, field);
+    }
+    fn visit_private_in_expression(&mut self, expression: &oxc_ast::ast::PrivateInExpression<'a>) {
+        self.found |= self.names.contains(expression.left.name.as_str());
+        walk::walk_private_in_expression(self, expression);
+    }
+}
+
+struct KeyCaptureNames(FxHashSet<String>);
+impl<'a> Visit<'a> for KeyCaptureNames {
+    fn visit_identifier_reference(&mut self, identifier: &oxc_ast::ast::IdentifierReference<'a>) {
+        self.0.insert(identifier.name.to_string());
+    }
+    fn visit_binding_identifier(&mut self, identifier: &oxc_ast::ast::BindingIdentifier<'a>) {
+        self.0.insert(identifier.name.to_string());
+    }
+}
+
+struct KeySuspension(bool);
+impl<'a> Visit<'a> for KeySuspension {
+    fn visit_expression(&mut self, expression: &Expression<'a>) {
+        if matches!(
+            expression,
+            Expression::AwaitExpression(_) | Expression::YieldExpression(_)
+        ) {
+            self.0 = true;
+        } else {
+            walk::walk_expression(self, expression);
+        }
+    }
+    fn visit_function(&mut self, _: &Function<'a>, _: ScopeFlags) {}
+    fn visit_arrow_function_expression(&mut self, _: &oxc_ast::ast::ArrowFunctionExpression<'a>) {}
+}
+
 struct PrivateAccessorPlan<'a> {
     key: String,
     is_static: bool,
@@ -2732,59 +3060,23 @@ fn lower_simple_class<'a>(
     mut class: Class<'a>,
     plan: &DirectClassPlan,
     construct_assert: &mut bool,
+    private_temporaries: &mut Vec<String>,
 ) -> Result<Expression<'a>, &'static str> {
     let ast = AstBuilder::new(allocator);
     let anchor = class.span;
     let name = &plan.name;
     let super_class = class.super_class.take();
     let super_name = plan.super_name.as_deref();
-    let private_setters = class
-        .body
-        .body
-        .iter()
-        .filter_map(|element| match element {
-            ClassElement::MethodDefinition(method)
-                if method.kind == MethodDefinitionKind::Set
-                    && matches!(method.key, PropertyKey::PrivateIdentifier(_)) =>
-            {
-                let PropertyKey::PrivateIdentifier(key) = &method.key else {
-                    unreachable!()
-                };
-                Some(key.name.to_string())
-            }
-            _ => None,
-        })
-        .collect::<FxHashSet<_>>();
-    let read_only_private = class
-        .body
-        .body
-        .iter()
-        .filter_map(|element| match element {
-            ClassElement::MethodDefinition(method)
-                if matches!(method.key, PropertyKey::PrivateIdentifier(_))
-                    && method.kind != MethodDefinitionKind::Set =>
-            {
-                let PropertyKey::PrivateIdentifier(key) = &method.key else {
-                    unreachable!()
-                };
-                (method.kind != MethodDefinitionKind::Get
-                    || !private_setters.contains(key.name.as_str()))
-                .then(|| key.name.to_string())
-            }
-            _ => None,
-        })
-        .collect::<FxHashSet<_>>();
     if !plan.private_keys.is_empty() {
         PrivateLooseRewriter {
             allocator,
             keys: &plan.private_keys,
-            read_only: &read_only_private,
             base_name: allocator.alloc_str(&plan.helper_names.private_base),
-            call_name: allocator.alloc_str(&plan.helper_names.private_call),
             check_in_rhs_name: allocator.alloc_str(&plan.helper_names.check_in_rhs),
         }
-        .visit_class(&mut class);
+        .visit_class_body(&mut class.body);
     }
+    let mut private_method_definitions = ArenaVec::new_in(&ast);
     let mut constructor = None;
     let mut methods = Vec::new();
     let mut instance_initializers = ArenaVec::new_in(&ast);
@@ -2833,19 +3125,19 @@ fn lower_simple_class<'a>(
                         body.statements
                             .insert(0, method_construct_guard(&ast, method.span));
                     }
-                    if super_name.is_some()
-                        && let Some(body) = value.body.as_mut()
-                    {
+                    if let Some(body) = value.body.as_mut() {
                         let mut rewriter = SuperAccessRewriter {
                             allocator,
                             class_name: allocator.alloc_str(name),
                             get_name: allocator.alloc_str(&plan.helper_names.super_get),
+                            reference_name: allocator.alloc_str(&plan.helper_names.super_reference),
                             is_static: method.r#static,
                             receiver_name: None,
                         };
                         for statement in &mut body.statements {
                             rewriter.visit_statement(statement);
                         }
+                        rewriter.visit_formal_parameters(&mut value.params);
                     }
                     if matches!(
                         method.kind,
@@ -2894,11 +3186,33 @@ fn lower_simple_class<'a>(
                             private_accessors[index].set = Some(value);
                         }
                     } else {
+                        let method_binding = &plan.private_methods[key.name.as_str()];
+                        private_method_definitions.push(Statement::VariableDeclaration(
+                            ast.alloc_variable_declaration(
+                                method.span,
+                                VariableDeclarationKind::Var,
+                                ast.vec1(ast.variable_declarator(
+                                    method.span,
+                                    VariableDeclarationKind::Var,
+                                    ast.binding_pattern_binding_identifier(
+                                        method.span,
+                                        allocator.alloc_str(method_binding),
+                                    ),
+                                    None::<ArenaBox<'a, TSTypeAnnotation<'a>>>,
+                                    Some(Expression::FunctionExpression(value)),
+                                    false,
+                                )),
+                                false,
+                            ),
+                        ));
                         let statement = private_element_initializer(
                             &ast,
                             name,
                             &private_key,
-                            Some(Expression::FunctionExpression(value)),
+                            Some(ast.expression_identifier(
+                                method.span,
+                                allocator.alloc_str(method_binding),
+                            )),
                             method.r#static,
                             false,
                             method.span,
@@ -2931,6 +3245,8 @@ fn lower_simple_class<'a>(
                                 allocator,
                                 class_name: allocator.alloc_str(name),
                                 get_name: allocator.alloc_str(&plan.helper_names.super_get),
+                                reference_name: allocator
+                                    .alloc_str(&plan.helper_names.super_reference),
                                 is_static: property.r#static,
                                 receiver_name: property.r#static.then(|| allocator.alloc_str(name)),
                             }
@@ -2945,6 +3261,11 @@ fn lower_simple_class<'a>(
                         .visit_expression(value);
                     }
                 }
+                let requires_definition = property.r#static
+                    && property
+                        .key
+                        .static_name()
+                        .is_some_and(|key| matches!(key.as_ref(), "name" | "length"));
                 let computed_binding = plan
                     .computed_keys
                     .get(&(property.span.start, property.span.end))
@@ -2977,7 +3298,8 @@ fn lower_simple_class<'a>(
                         property,
                         computed_binding.as_deref(),
                         plan.class_properties_loose
-                            .ok_or("classes-direct-field-options-missing")?,
+                            .ok_or("classes-direct-field-options-missing")?
+                            && !requires_definition,
                         anchor,
                     )?
                 };
@@ -2998,6 +3320,15 @@ fn lower_simple_class<'a>(
                     .clone();
                 if let Some(value) = &mut accessor.value {
                     clear_leading_pure_annotation(value);
+                    SuperAccessRewriter {
+                        allocator,
+                        class_name: allocator.alloc_str(name),
+                        get_name: allocator.alloc_str(&plan.helper_names.super_get),
+                        reference_name: allocator.alloc_str(&plan.helper_names.super_reference),
+                        is_static: accessor.r#static,
+                        receiver_name: None,
+                    }
+                    .visit_expression(value);
                     if accessor.r#static {
                         StaticInitializerThisRewriter {
                             allocator,
@@ -3039,20 +3370,105 @@ fn lower_simple_class<'a>(
                 if !plan.class_static_blocks {
                     return Err("classes-direct-static-block-options-missing");
                 }
-                static_initializers.push(static_block_initializer(&ast, name, block.unbox()));
+                let mut block = block.unbox();
+                let mut rewriter = SuperAccessRewriter {
+                    allocator,
+                    class_name: allocator.alloc_str(name),
+                    get_name: allocator.alloc_str(&plan.helper_names.super_get),
+                    reference_name: allocator.alloc_str(&plan.helper_names.super_reference),
+                    is_static: true,
+                    receiver_name: None,
+                };
+                for statement in &mut block.body {
+                    rewriter.visit_statement(statement);
+                }
+                static_initializers.push(static_block_initializer(&ast, name, block));
             }
             ClassElement::TSIndexSignature(_) => {}
         }
     }
-    instance_initializers.append(&mut private_instance_method_initializers);
-    static_initializers.append(&mut private_static_method_initializers);
     for accessor in private_accessors {
         let statement = private_accessor_initializer(&ast, name, &accessor);
         if accessor.is_static {
-            static_initializers.push(statement);
+            private_static_method_initializers.push(statement);
         } else {
-            instance_initializers.push(statement);
+            private_instance_method_initializers.push(statement);
         }
+    }
+    private_instance_method_initializers.append(&mut instance_initializers);
+    instance_initializers = private_instance_method_initializers;
+    private_static_method_initializers.append(&mut static_initializers);
+    static_initializers = private_static_method_initializers;
+    if !instance_initializers.is_empty() {
+        let mut detector = ConstructorShapeDetector {
+            super_calls: 0,
+            new_target: false,
+        };
+        for statement in &instance_initializers {
+            detector.visit_statement(statement);
+        }
+        let mut parameters = ArenaVec::new_in(&ast);
+        let mut arguments = ast.vec1(Argument::from(ast.expression_this(anchor)));
+        if detector.new_target {
+            let binding = allocator.alloc_str(&plan.initializer_new_target_name);
+            let mut rewriter = NewTargetRewriter {
+                allocator,
+                name: binding,
+            };
+            for statement in &mut instance_initializers {
+                rewriter.visit_statement(statement);
+            }
+            parameters.push(ast.formal_parameter(
+                anchor,
+                ArenaVec::new_in(&ast),
+                ast.binding_pattern_binding_identifier(anchor, binding),
+                None::<ArenaBox<'a, TSTypeAnnotation<'a>>>,
+                None::<ArenaBox<'a, Expression<'a>>>,
+                false,
+                None,
+                false,
+                false,
+            ));
+            arguments.push(Argument::from(ast.expression_new_target(anchor)));
+        }
+        let initializer = ast.alloc_function(
+            anchor,
+            FunctionType::FunctionDeclaration,
+            Some(ast.binding_identifier(anchor, allocator.alloc_str(&plan.initializer_name))),
+            false,
+            false,
+            false,
+            None::<ArenaBox<'a, TSTypeParameterDeclaration<'a>>>,
+            None::<ArenaBox<'a, TSThisParameter<'a>>>,
+            ast.alloc_formal_parameters(
+                anchor,
+                FormalParameterKind::FormalParameter,
+                parameters,
+                None::<ArenaBox<'a, FormalParameterRest<'a>>>,
+            ),
+            None::<ArenaBox<'a, TSTypeAnnotation<'a>>>,
+            Some(ast.alloc_function_body(
+                anchor,
+                ArenaVec::new_in(&ast),
+                std::mem::replace(&mut instance_initializers, ArenaVec::new_in(&ast)),
+            )),
+        );
+        private_method_definitions.push(Statement::FunctionDeclaration(initializer));
+        instance_initializers.push(ast.statement_expression(
+            anchor,
+            ast.expression_call(
+                anchor,
+                Expression::from(ast.member_expression_static(
+                    anchor,
+                    ast.expression_identifier(anchor, allocator.alloc_str(&plan.initializer_name)),
+                    ast.identifier_name(anchor, "call"),
+                    false,
+                )),
+                None::<ArenaBox<'a, TSTypeParameterInstantiation<'a>>>,
+                arguments,
+                false,
+            ),
+        ));
     }
     let mut needs_assertion = false;
     let mut constructor = if let Some(mut function) = constructor {
@@ -3065,12 +3481,14 @@ fn lower_simple_class<'a>(
                 super_name,
                 &plan.helper_names.construct,
                 &plan.helper_names.super_get,
+                &plan.helper_names.super_reference,
                 receiver_name,
                 plan.result_name
                     .as_deref()
                     .ok_or("classes-direct-derived-result-name-missing")?,
                 plan.new_target_name.as_deref(),
                 plan.super_call_name.as_deref(),
+                &plan.constructor_parameters,
                 anchor,
                 &mut instance_initializers,
                 construct_assert,
@@ -3120,16 +3538,25 @@ fn lower_simple_class<'a>(
         let mut rewriter = DerivedThisRewriter {
             allocator,
             receiver_name: allocator.alloc_str(receiver_name),
+            construct_name: allocator.alloc_str(&plan.helper_names.construct),
+            used: false,
         };
         for statement in &mut instance_initializers {
             rewriter.visit_statement(statement);
         }
+        *construct_assert |= rewriter.used;
         body.statements.append(&mut instance_initializers);
         body.statements.append(&mut original_body);
     } else {
         body.statements.append(&mut instance_initializers);
         body.statements.append(&mut original_body);
     }
+    let suspended_private_keys = !plan.private_keys.is_empty()
+        && computed_key_initializers.iter().any(|(_, key, _)| {
+            let mut detector = KeySuspension(false);
+            detector.visit_expression(key);
+            detector.0
+        });
     let mut wrapper_statements = ArenaVec::new_in(&ast);
     for (binding, key) in plan.private_keys.values() {
         let mut declarations = ArenaVec::new_in(&ast);
@@ -3138,7 +3565,25 @@ fn lower_simple_class<'a>(
             VariableDeclarationKind::Var,
             ast.binding_pattern_binding_identifier(anchor, allocator.alloc_str(binding)),
             None::<ArenaBox<'a, TSTypeAnnotation<'a>>>,
-            Some(ast.expression_string_literal(anchor, allocator.alloc_str(key), None)),
+            Some(ast.expression_call(
+                anchor,
+                Expression::from(ast.member_expression_static(
+                    anchor,
+                    ast.expression_identifier(
+                        anchor,
+                        allocator.alloc_str(&plan.helper_names.private_runtime),
+                    ),
+                    ast.identifier_name(anchor, "classPrivateFieldLooseKey"),
+                    false,
+                )),
+                None::<ArenaBox<'a, TSTypeParameterInstantiation<'a>>>,
+                ast.vec1(Argument::from(ast.expression_string_literal(
+                    anchor,
+                    allocator.alloc_str(key),
+                    None,
+                ))),
+                false,
+            )),
             false,
         ));
         wrapper_statements.push(Statement::VariableDeclaration(
@@ -3166,7 +3611,47 @@ fn lower_simple_class<'a>(
         ));
         wrapper_arguments.push(Argument::from(super_class));
     }
-    for (binding, key, span) in computed_key_initializers {
+    if suspended_private_keys {
+        // The caller evaluates suspending keys. Its activation owns temporary
+        // tokens; the wrapper and every escaping key closure capture their values.
+        for statement in std::mem::replace(&mut wrapper_statements, ArenaVec::new_in(&ast)) {
+            let Statement::VariableDeclaration(mut declaration) = statement else {
+                unreachable!()
+            };
+            let declarator = declaration.declarations.pop().unwrap();
+            let BindingPattern::BindingIdentifier(binding) = declarator.id else {
+                unreachable!()
+            };
+            let name = binding.name;
+            private_temporaries.push(name.to_string());
+            wrapper_parameters.push(ast.formal_parameter(
+                anchor,
+                ArenaVec::new_in(&ast),
+                ast.binding_pattern_binding_identifier(anchor, name),
+                None::<ArenaBox<'a, TSTypeAnnotation<'a>>>,
+                None::<ArenaBox<'a, Expression<'a>>>,
+                false,
+                None,
+                false,
+                false,
+            ));
+            wrapper_arguments.push(Argument::from(
+                ast.expression_assignment(
+                    anchor,
+                    AssignmentOperator::Assign,
+                    ast.simple_assignment_target_assignment_target_identifier(anchor, name)
+                        .into(),
+                    declarator.init.unwrap(),
+                ),
+            ));
+        }
+    }
+    wrapper_statements.append(&mut private_method_definitions);
+    let private_key_thunks = !plan.private_keys.is_empty() && !suspended_private_keys;
+    for (binding, mut key, span) in computed_key_initializers {
+        if suspended_private_keys {
+            PrivateKeyClosureCapture { allocator, plan }.visit_expression(&mut key);
+        }
         wrapper_parameters.push(ast.formal_parameter(
             span,
             ArenaVec::new_in(&ast),
@@ -3181,7 +3666,94 @@ fn lower_simple_class<'a>(
         // Computed keys are evaluated in the class's surrounding context. In
         // particular, `yield` and `await` are valid here but become syntax
         // errors if moved into the non-generator class wrapper body.
-        wrapper_arguments.push(Argument::from(key));
+        if private_key_thunks {
+            let parameters = plan
+                .private_keys
+                .values()
+                .map(|(binding, _)| {
+                    ast.formal_parameter(
+                        span,
+                        ArenaVec::new_in(&ast),
+                        ast.binding_pattern_binding_identifier(span, allocator.alloc_str(binding)),
+                        None::<ArenaBox<'a, TSTypeAnnotation<'a>>>,
+                        None::<ArenaBox<'a, Expression<'a>>>,
+                        false,
+                        None,
+                        false,
+                        false,
+                    )
+                })
+                .collect::<Vec<_>>();
+            let thunk = ast.expression_arrow_function(
+                span,
+                true,
+                false,
+                None::<ArenaBox<'a, TSTypeParameterDeclaration<'a>>>,
+                ast.alloc_formal_parameters(
+                    span,
+                    FormalParameterKind::FormalParameter,
+                    ArenaVec::from_iter_in(parameters, &ast),
+                    None::<ArenaBox<'a, FormalParameterRest<'a>>>,
+                ),
+                None::<ArenaBox<'a, TSTypeAnnotation<'a>>>,
+                ast.alloc_function_body(
+                    span,
+                    ArenaVec::new_in(&ast),
+                    ast.vec1(ast.statement_expression(span, key)),
+                ),
+            );
+            wrapper_arguments.push(Argument::from(thunk));
+            let arguments = plan.private_keys.values().map(|(binding, _)| {
+                Argument::from(ast.expression_identifier(span, allocator.alloc_str(binding)))
+            });
+            wrapper_statements.push(
+                ast.statement_expression(
+                    span,
+                    ast.expression_assignment(
+                        span,
+                        AssignmentOperator::Assign,
+                        ast.simple_assignment_target_assignment_target_identifier(
+                            span,
+                            allocator.alloc_str(&binding),
+                        )
+                        .into(),
+                        ast.expression_call(
+                            span,
+                            ast.expression_identifier(span, allocator.alloc_str(&binding)),
+                            None::<ArenaBox<'a, TSTypeParameterInstantiation<'a>>>,
+                            ArenaVec::from_iter_in(arguments, &ast),
+                            false,
+                        ),
+                    ),
+                ),
+            );
+        } else {
+            wrapper_arguments.push(Argument::from(key));
+        }
+        let value = ast.expression_call(
+            span,
+            ast.expression_identifier(span, allocator.alloc_str(&plan.helper_names.property_key)),
+            None::<ArenaBox<'a, TSTypeParameterInstantiation<'a>>>,
+            ast.vec1(Argument::from(
+                ast.expression_identifier(span, allocator.alloc_str(&binding)),
+            )),
+            false,
+        );
+        wrapper_statements.push(
+            ast.statement_expression(
+                span,
+                ast.expression_assignment(
+                    span,
+                    AssignmentOperator::Assign,
+                    ast.simple_assignment_target_assignment_target_identifier(
+                        span,
+                        allocator.alloc_str(&binding),
+                    )
+                    .into(),
+                    value,
+                ),
+            ),
+        );
     }
     debug_assert!(!needs_assertion);
     constructor.r#type = FunctionType::FunctionExpression;
@@ -3217,6 +3789,18 @@ fn lower_simple_class<'a>(
     for method in methods {
         let method_name =
             match &method.key {
+                PropertyKey::StringLiteral(key) if !method.computed => {
+                    let prefix = match method.kind {
+                        MethodDefinitionKind::Get => "get ",
+                        MethodDefinitionKind::Set => "set ",
+                        _ => "",
+                    };
+                    Some(ast.expression_string_literal(
+                        anchor,
+                        allocator.alloc_str(&format!("{prefix}{}", key.value)),
+                        None,
+                    ))
+                }
                 PropertyKey::StaticIdentifier(key) if !method.computed => {
                     let prefix = match method.kind {
                         MethodDefinitionKind::Get => "get ",
@@ -3260,17 +3844,19 @@ fn lower_simple_class<'a>(
             body.statements
                 .insert(0, method_construct_guard(&ast, method.span));
         }
-        if super_name.is_some() {
+        {
             let mut rewriter = SuperAccessRewriter {
                 allocator,
                 class_name: allocator.alloc_str(name),
                 get_name: allocator.alloc_str(&plan.helper_names.super_get),
+                reference_name: allocator.alloc_str(&plan.helper_names.super_reference),
                 is_static: method.r#static,
                 receiver_name: None,
             };
             for statement in &mut body.statements {
                 rewriter.visit_statement(statement);
             }
+            rewriter.visit_formal_parameters(&mut function.params);
         }
         let target = if method.r#static {
             ast.expression_identifier(anchor, allocator.alloc_str(name))
@@ -3762,7 +4348,10 @@ fn public_field_initializer<'a>(
         )
     });
     clear_leading_pure_annotation(&mut value);
-    let expression = if loose {
+    let expression = if loose
+        && !(property.r#static
+            && key_name.is_some_and(|key| matches!(key.as_str(), "name" | "length")))
+    {
         let member = if let Some(key) = computed_key {
             ast.member_expression_computed(anchor, target, key, false)
                 .into()
@@ -3924,42 +4513,44 @@ fn computed_function_name<'a>(
     anchor: Span,
 ) -> Expression<'a> {
     let key = || ast.expression_identifier(anchor, ast.allocator.alloc_str(key_name));
-    let description = || {
-        Expression::from(ast.member_expression_static(
-            anchor,
-            key(),
-            ast.identifier_name(anchor, "description"),
-            false,
-        ))
-    };
-    let undefined = || {
-        ast.expression_unary(
-            anchor,
-            oxc_syntax::operator::UnaryOperator::Void,
-            ast.expression_numeric_literal(anchor, 0.0, None, oxc_ast::ast::NumberBase::Decimal),
-        )
-    };
-    let symbol_name = ast.expression_conditional(
+    // Native computed-property naming reads the symbol's internal description,
+    // rather than invoking a replaceable Symbol.prototype.description getter.
+    let function = ast.expression_function(
         anchor,
-        ast.expression_binary(
+        FunctionType::FunctionExpression,
+        None,
+        false,
+        false,
+        false,
+        None::<ArenaBox<'a, TSTypeParameterDeclaration<'a>>>,
+        None::<ArenaBox<'a, TSThisParameter<'a>>>,
+        ast.alloc_formal_parameters(
             anchor,
-            description(),
-            oxc_syntax::operator::BinaryOperator::StrictEquality,
-            undefined(),
+            FormalParameterKind::FormalParameter,
+            ArenaVec::new_in(ast),
+            None::<ArenaBox<'a, FormalParameterRest<'a>>>,
         ),
-        ast.expression_string_literal(anchor, "", None),
-        ast.expression_binary(
-            anchor,
-            ast.expression_binary(
-                anchor,
-                ast.expression_string_literal(anchor, "[", None),
-                oxc_syntax::operator::BinaryOperator::Addition,
-                description(),
-            ),
-            oxc_syntax::operator::BinaryOperator::Addition,
-            ast.expression_string_literal(anchor, "]", None),
-        ),
+        None::<ArenaBox<'a, TSTypeAnnotation<'a>>>,
+        Some(ast.alloc_function_body(anchor, ArenaVec::new_in(ast), ArenaVec::new_in(ast))),
     );
+    let named = ast.expression_object(
+        anchor,
+        ast.vec1(ast.object_property_kind_object_property(
+            anchor,
+            PropertyKind::Init,
+            PropertyKey::from(key()),
+            function,
+            false,
+            false,
+            true,
+        )),
+    );
+    let symbol_name = Expression::from(ast.member_expression_static(
+        anchor,
+        Expression::from(ast.member_expression_computed(anchor, named, key(), false)),
+        ast.identifier_name(anchor, "name"),
+        false,
+    ));
     let mut string_arguments = ArenaVec::new_in(ast);
     string_arguments.push(Argument::from(key()));
     let ordinary_name = ast.expression_call(

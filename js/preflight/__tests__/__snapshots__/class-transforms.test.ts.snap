@@ -319,10 +319,13 @@ exports[`every public native transform has an explicit ownership fixture 18`] = 
 
 exports[`every public native transform has an explicit ownership fixture 19`] = `
 {
-  "code": "let Value=(()=>{"use strict";var _read=\`__private_Value_read\`;const Value=function Value(){if(!new.target)throw new TypeError(\`Cannot call a class as a function\`);Object.defineProperty(this,_read,{value:function(){if(new.target)throw new TypeError(\`Class methods cannot be invoked with 'new'\`)}})};Object.defineProperty(Value,"prototype",{writable:false});return Value})();",
-  "helpers": [],
+  "code": "var _classPrivateFieldLooseBase2={classPrivateFieldLooseBase:require("@babel/runtime/helpers/classPrivateFieldLooseBase"),classPrivateFieldLooseKey:require("@babel/runtime/helpers/classPrivateFieldLooseKey")};function _classPrivateFieldLooseBase(e,s,a){return a&&e==null?e:_classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e,s)}let Value=(()=>{"use strict";var _read=_classPrivateFieldLooseBase2.classPrivateFieldLooseKey(\`__private_Value_read\`);var _privateMethod=function(){if(new.target)throw new TypeError(\`Class methods cannot be invoked with 'new'\`)};function _initialize(){Object.defineProperty(this,_read,{value:_privateMethod})}const Value=function Value(){if(!new.target)throw new TypeError(\`Cannot call a class as a function\`);_initialize.call(this)};Object.defineProperty(Value,"prototype",{writable:false});return Value})();",
+  "helpers": [
+    "classPrivateFieldLooseBase",
+    "classPrivateFieldLooseKey",
+  ],
   "map": {
-    "mappings": "AAAA,IAAM,WAAN,kJAAyB,EAAXA,wCAAK,UAAG,CAAR,8EAAS,IAAE,EAAzBC,uDAAyB,GAAzB,YAAyB",
+    "mappings": "8UAAA,IAAM,WAAN,qGAAyB,EAAX,mBAAK,UAAG,CAAR,8EAAS,GAAvB,uBAAcA,sDAAS,EAAE,CAAzB,mGAAyB,EAAzBC,qBAAyB,GAAzBA,uDAAyB,GAAzB,YAAyB",
     "names": [
       "#read() {}",
       "class Value { #read() {} }",
@@ -338,12 +341,14 @@ exports[`every public native transform has an explicit ownership fixture 19`] = 
 
 exports[`every public native transform has an explicit ownership fixture 20`] = `
 {
-  "code": "var _checkInRHS2={checkInRHS:require("@babel/runtime/helpers/checkInRHS")},_checkInRHS=_checkInRHS2.checkInRHS;let Value=(()=>{"use strict";var _field=\`__private_Value_field\`;const Value=function Value(){if(!new.target)throw new TypeError(\`Cannot call a class as a function\`);Object.defineProperty(this,_field,{writable:true,value:void 0})};Object.defineProperty(Value.prototype,"has",{value:Object.defineProperty(function(input){if(new.target)throw new TypeError(\`Class methods cannot be invoked with 'new'\`);return Object.prototype.hasOwnProperty.call(_checkInRHS(input),_field)},"name",{value:\`has\`,configurable:true}),writable:true,configurable:true});Object.defineProperty(Value,"prototype",{writable:false});return Value})();",
+  "code": "var _classPrivateFieldLooseBase2={classPrivateFieldLooseBase:require("@babel/runtime/helpers/classPrivateFieldLooseBase"),classPrivateFieldLooseKey:require("@babel/runtime/helpers/classPrivateFieldLooseKey")};function _classPrivateFieldLooseBase(e,s,a){return a&&e==null?e:_classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e,s)}var _checkInRHS2={checkInRHS:require("@babel/runtime/helpers/checkInRHS")},_checkInRHS=_checkInRHS2.checkInRHS;let Value=(()=>{"use strict";var _field=_classPrivateFieldLooseBase2.classPrivateFieldLooseKey(\`__private_Value_field\`);function _initialize(){Object.defineProperty(this,_field,{writable:true,value:void 0})}const Value=function Value(){if(!new.target)throw new TypeError(\`Cannot call a class as a function\`);_initialize.call(this)};Object.defineProperty(Value.prototype,"has",{value:Object.defineProperty(function(input){if(new.target)throw new TypeError(\`Class methods cannot be invoked with 'new'\`);return Object.prototype.hasOwnProperty.call(_checkInRHS(input),_field)},"name",{value:\`has\`,configurable:true}),writable:true,configurable:true});Object.defineProperty(Value,"prototype",{writable:false});return Value})();",
   "helpers": [
     "checkInRHS",
+    "classPrivateFieldLooseBase",
+    "classPrivateFieldLooseKey",
   ],
   "map": {
-    "mappings": "+GAAA,IAAM,WAAN,oJAA6D,EAA/CA,6DAAM,EAAyC,EAA7DC,yEAAyB,SAAC,MAAO,CAAX,8EAAqC,EAAxB,OAAOC,iDAAU,KAAI,EAAdC,MAAc,CAAG,EAA3D,qCAA6D,GAA7DF,+BAA6D,GAA7DA,uDAA6D,GAA7D,YAA6D",
+    "mappings": "6bAAA,IAAM,WAAN,uGAA6D,EAA7D,uBAAcA,6DAAM,EAAyC,CAA7D,mGAA6D,EAA7DC,qBAA6D,GAA7DA,yEAAyB,SAAC,MAAO,CAAX,8EAAqC,EAAxB,OAAOC,iDAAU,KAAI,EAAdC,MAAc,CAAG,EAA3D,qCAA6D,GAA7DF,+BAA6D,GAA7DA,uDAA6D,GAA7D,YAA6D",
     "names": [
       "#field;",
       "class Value { #field; has(input) { return #field in input; } }",

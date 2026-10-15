@@ -19,18 +19,30 @@ test('lowers inherited private brands referenced from a static block', async () 
       },
     }),
   ).toMatchInlineSnapshot(`
-    "import _babelHelper from '@babel/runtime/helpers/checkInRHS';
-    var _checkInRHS2 = { checkInRHS: _babelHelper },
+    "import _babelHelper from '@babel/runtime/helpers/classPrivateFieldLooseBase';
+    import _babelHelper2 from '@babel/runtime/helpers/classPrivateFieldLooseKey';
+    import _babelHelper3 from '@babel/runtime/helpers/checkInRHS';
+    var _classPrivateFieldLooseBase2 = {
+      classPrivateFieldLooseBase: _babelHelper,
+      classPrivateFieldLooseKey: _babelHelper2,
+    };
+    function _classPrivateFieldLooseBase(e, s, a) {
+      return a && e == null ? e : _classPrivateFieldLooseBase2.classPrivateFieldLooseBase(e, s);
+    }
+    var _checkInRHS2 = { checkInRHS: _babelHelper3 },
       _checkInRHS = _checkInRHS2.checkInRHS;
     export let Base = (() => {
       'use strict';
-      var _value = '__private_Base_value';
-      const Base = function Base() {
-        if (!new.target) throw new TypeError('Cannot call a class as a function');
+      var _value = _classPrivateFieldLooseBase2.classPrivateFieldLooseKey('__private_Base_value');
+      function _initialize() {
         Object.defineProperty(this, _value, {
           writable: true,
           value: 1,
         });
+      }
+      const Base = function Base() {
+        if (!new.target) throw new TypeError('Cannot call a class as a function');
+        _initialize.call(this);
       };
       Object.defineProperty(Base, 'prototype', { writable: false });
       (function () {
