@@ -24,7 +24,6 @@ import { alias, querySubscriptions } from '../pipeline/route-utils';
 
 export class NativeTransformSession {
   #closed = false;
-  #batches = 0;
   #uids = new Set<string>();
   #sourceIdentifiers: Set<string> | null = null;
   #uidSourceScans = 0;
@@ -46,7 +45,7 @@ export class NativeTransformSession {
   constructor(
     readonly source: string,
     readonly filename: string,
-    readonly options: TransformOptions = {},
+    options: TransformOptions = {},
     retentionManifest?: Buffer,
     initialManifest?: Buffer,
     buildInitialRoute = true,
@@ -62,12 +61,6 @@ export class NativeTransformSession {
         initialManifest,
         buildInitialRoute,
       );
-      if (options.maxNativeMemoryBytes != null) {
-        if (this.#native.memoryUsage() > options.maxNativeMemoryBytes) {
-          this.#native.close();
-          throw new Error('native-memory-budget-exceeded');
-        }
-      }
     }
   }
   get nativeMemoryBytes(): number {
@@ -76,20 +69,8 @@ export class NativeTransformSession {
   retentionDebugSummary(): ReturnType<NativeIndexedSessionBinding['retentionDebugSummary']> {
     return this.#binding('retention.debug').retentionDebugSummary();
   }
-  nextRoutedPacked(
-    manifest: Buffer,
-    root?: { start: number; end: number },
-    followUp = true,
-  ): RoutedEventBatch {
+  nextRoutedPacked(manifest: Buffer, root?: { start: number; end: number }): RoutedEventBatch {
     this.#assertOpen();
-    if (followUp) {
-      this.#batches++;
-      if (
-        this.options.maxFollowUpBatches != null &&
-        this.#batches > this.options.maxFollowUpBatches
-      )
-        throw new Error('follow-up-batch-budget-exceeded');
-    }
     const buffer = this.#binding('route.next').nextRoutedPacked(manifest, root?.start, root?.end);
     return decodeRoutedEnvelope(buffer);
   }
@@ -348,23 +329,11 @@ export class NativeTransformSession {
       decodePackedEnvelope(this.#binding('query.nodes').queryNodesPackedBuffer([...nodeTypes])),
     ).events.map(toNodeView);
   }
-  prefetchChildren(
-    parentIds: readonly number[] = [],
-    parentTypes: readonly string[] = [],
-    countFollowUp = true,
-  ): void {
+  prefetchChildren(parentIds: readonly number[] = [], parentTypes: readonly string[] = []): void {
     this.#assertOpen();
     const missing = parentIds.filter(parentId => !this.#childrenCache.has(parentId));
     const missingTypes = parentTypes.filter(type => !this.#prefetchedChildTypes.has(type));
     if (missing.length === 0 && missingTypes.length === 0) return;
-    if (countFollowUp) {
-      this.#batches++;
-      if (
-        this.options.maxFollowUpBatches != null &&
-        this.#batches > this.options.maxFollowUpBatches
-      )
-        throw new Error('follow-up-batch-budget-exceeded');
-    }
     const typeIds: number[] = [];
     const fallbackTypes: string[] = [];
     for (const type of missingTypes) {
@@ -411,11 +380,6 @@ export class NativeTransformSession {
       }
     }
     for (const type of missingTypes) this.#prefetchedChildTypes.add(type);
-    if (
-      this.options.maxNativeMemoryBytes != null &&
-      this.#binding('memory-budget').memoryUsage() > this.options.maxNativeMemoryBytes
-    )
-      throw new Error('native-memory-budget-exceeded');
   }
   event(nodeId: number): NativeEvent | undefined {
     this.#assertOpen();

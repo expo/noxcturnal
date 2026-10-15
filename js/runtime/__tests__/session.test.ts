@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { test } from 'vitest';
+import { expect, test } from 'vitest';
 
 import { packRouteManifest } from '../../protocol/manifest';
 import { NativeTransformSession } from '../session';
@@ -17,23 +17,7 @@ const openRetained = (
     packRouteManifest([], false, false, ALL_RETAINED_CAPABILITIES),
   );
 
-test('enforces native memory and follow-up batch budgets', () => {
-  assert.throws(
-    () => openRetained('const value = 1', 'fixture.js', { maxNativeMemoryBytes: 1 }),
-    /native-memory-budget-exceeded/,
-  );
-  const session = openRetained('const value = 1', 'fixture.js', {
-    maxFollowUpBatches: 1,
-  });
-  session.nextRoutedPacked(packRouteManifest([], false, false));
-  assert.throws(
-    () => session.nextRoutedPacked(packRouteManifest([], false, false)),
-    /follow-up-batch-budget-exceeded/,
-  );
-  session.close();
-});
-
-test('does not impose an arbitrary follow-up batch limit by default', () => {
+test('supports repeated routing requests', () => {
   const session = openRetained('const value = 1', 'fixture.js');
   const manifest = packRouteManifest([], false, false);
   for (let index = 0; index < 128; index++) session.nextRoutedPacked(manifest);
@@ -60,4 +44,20 @@ test('rejects native operations after the session is closed', () => {
     () => session.nextRoutedPacked(packRouteManifest([], false, false)),
     /session-closed/,
   );
+});
+
+test('retained sessions close repeatedly and reject cached event/query/children operations', () => {
+  const session = openRetained('const value = 1; value;', 'input.js');
+  const request = { globals: [{ name: 'value' }] };
+  const program = session.nodes(['Program'])[0];
+  expect(program).toBeDefined();
+  expect(session.event(program.id)).toBeDefined();
+  session.query(request);
+  session.prefetchChildren([program.id]);
+  session.children(program.id);
+  session.close();
+  expect(() => session.close()).not.toThrow();
+  expect(() => session.event(program.id)).toThrow('session-closed');
+  expect(() => session.query(request)).toThrow('session-closed');
+  expect(() => session.children(program.id)).toThrow('session-closed');
 });

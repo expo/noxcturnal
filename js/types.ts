@@ -246,10 +246,6 @@ export interface TransformOptions {
   preflight?: PreflightPlan;
   sourceMapMode?: SourceMapMode;
   parser?: 'auto' | 'js' | 'jsx' | 'ts' | 'tsx' | 'dts';
-  /** Optional caller-imposed cap. By default finite follow-up work is bounded
-   * by the retained session and native memory limit, not an arbitrary count. */
-  maxFollowUpBatches?: number;
-  maxNativeMemoryBytes?: number;
   allowBroadVisitors?: boolean;
   inputSourceMap?: NativeVlqMap & { sources?: string[]; sourcesContent?: (string | null)[] };
   parserAdapter?: string;
