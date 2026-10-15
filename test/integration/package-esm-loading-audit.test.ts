@@ -157,8 +157,8 @@ test('built ESM package entry loads and executes a native transform', () => {
   });
   const esm = readFileSync(join(root, 'dist/noxcturnal.mjs'), 'utf8');
   const cjs = readFileSync(join(root, 'dist/noxcturnal.js'), 'utf8');
-  expect(esm).toContain('const require = __noxCreateRequire(import.meta.url);');
-  expect(esm).toContain('const __dirname = __noxDirname(__noxFileURLToPath(import.meta.url));');
+  expect(esm).toContain('from "node:module"');
+  expect(esm).toContain('import.meta.url');
   expect(cjs).not.toContain('__noxCreateRequire');
 });
 

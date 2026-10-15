@@ -106,100 +106,14 @@ const commonOutput = {
   },
 };
 
-const esmBridgeImports = [
+// Provide CommonJS bindings for the native addon and code-frame loaders in ESM.
+const esmNativeLoaderBanner = [
   'import { createRequire as __noxCreateRequire } from "node:module";',
   'import { dirname as __noxDirname } from "node:path";',
   'import { fileURLToPath as __noxFileURLToPath } from "node:url";',
-];
-
-const esmBridgeLocals = [
   'const require = __noxCreateRequire(import.meta.url);',
   'const __dirname = __noxDirname(__noxFileURLToPath(import.meta.url));',
-];
-
-const vlqCharacters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-
-function encodeVlq(value) {
-  let vlq = value < 0 ? ((-value) << 1) + 1 : value << 1;
-  let encoded = '';
-  do {
-    let digit = vlq & 31;
-    vlq >>>= 5;
-    if (vlq > 0) digit |= 32;
-    encoded += vlqCharacters[digit];
-  } while (vlq > 0);
-  return encoded;
-}
-
-function importPreambleLineCount(lines) {
-  const code = lines.join('\n');
-  let index = 0;
-  while (index < code.length) {
-    let cursor = index;
-    while (cursor < code.length && ' \t\n\r'.includes(code[cursor])) cursor += 1;
-    if (!code.startsWith('import', cursor)) break;
-    const next = code[cursor + 'import'.length];
-    if (next !== ' ' && next !== '\n' && next !== '\t' && next !== '"' && next !== "'" && next !== '{')
-      break;
-    const semi = code.indexOf(';', cursor);
-    if (semi < 0) break;
-    index = semi + 1;
-  }
-  if (index === 0) return 0;
-  return code.slice(0, index).split('\n').length;
-}
-
-// The published ESM bundle still calls require and reads __dirname while loading
-// the native addon. Define those CommonJS bindings from this module's URL after
-// minification so the identifiers stay aligned with the loader. CommonJS output
-// already has both, and must not receive a second binding.
-function esmNativeLoaderBridge() {
-  return {
-    name: 'esmNativeLoaderBridge',
-    renderChunk(code, chunk, options) {
-      if (options.format !== 'es') return null;
-      if (!code.includes('__dirname') && !/\brequire\s*\(/.test(code)) return null;
-      if (code.includes('__noxCreateRequire'))
-        throw new Error('ESM native loader bridge was applied twice');
-      const endsWithNewline = code.endsWith('\n');
-      const originalLines = endsWithNewline ? code.slice(0, -1).split('\n') : code.split('\n');
-      const preambleLineCount = importPreambleLineCount(originalLines);
-      const outLines = [];
-      const origin = [];
-      const push = (line, originalLine) => {
-        outLines.push(line);
-        origin.push(originalLine);
-      };
-      for (const line of esmBridgeImports) push(line, null);
-      for (let index = 0; index < preambleLineCount; index += 1)
-        push(originalLines[index], index);
-      for (const line of esmBridgeLocals) push(line, null);
-      for (let index = preambleLineCount; index < originalLines.length; index += 1)
-        push(originalLines[index], index);
-      const reconstructed = origin.flatMap((originalLine, index) =>
-        originalLine == null ? [] : [outLines[index]]);
-      if (reconstructed.join('\n') !== originalLines.join('\n'))
-        throw new Error('ESM native loader bridge changed existing bundle lines');
-      let previousLine = 0;
-      const mappings = origin.map(originalLine => {
-        if (originalLine == null) return '';
-        const lineDelta = originalLine - previousLine;
-        previousLine = originalLine;
-        return encodeVlq(0) + encodeVlq(0) + encodeVlq(lineDelta) + encodeVlq(0);
-      }).join(';');
-      return {
-        code: endsWithNewline ? `${outLines.join('\n')}\n` : outLines.join('\n'),
-        map: {
-          version: 3,
-          file: chunk.fileName,
-          sources: [chunk.fileName],
-          names: [],
-          mappings,
-        },
-      };
-    },
-  };
-}
+].join('\n');
 
 const outputPlugins = [
   {
@@ -307,8 +221,6 @@ const outputPlugins = [
       indent_level: 2,
     },
   }),
-
-  esmNativeLoaderBridge(),
 ];
 
 export default [
@@ -333,6 +245,7 @@ export default [
       {
         ...commonOutput,
         format: 'esm',
+        banner: esmNativeLoaderBanner,
         chunkFileNames(chunk) {
           return `dist/chunks/[name]-chunk${extension(chunk.name) || '.mjs'}`;
         },
