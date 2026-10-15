@@ -135,6 +135,13 @@ interface NativeBinding {
         memberWrite: boolean;
       }[];
     }[];
+    bindingRenamePlan(
+      name: string,
+      scopeId: number,
+    ): {
+      targets: { start: number; end: number; kind: number }[];
+      exports: { start: number; end: number; names: string[] }[];
+    };
     bindingIndexBuffer(): Buffer;
     scopeParentsBuffer(): Buffer;
     scopeMetadataBuffer(): Buffer;

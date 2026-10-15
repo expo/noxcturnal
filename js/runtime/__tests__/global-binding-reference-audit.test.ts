@@ -39,7 +39,7 @@ for (const global of [false, true])
       ).toBe('complete');
       expect(visits).toBe(1);
     });
-    (global ? test.fails : test)('returns the required semantic reference fields', () => {
+    (global ? test : test)('returns the required semantic reference fields', () => {
       expect(actual).toEqual([0, ...entry.flags]);
     });
   });

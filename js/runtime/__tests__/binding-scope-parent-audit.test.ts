@@ -71,7 +71,7 @@ for (const bulk of [false, true])
         ).toBe('complete');
         expect(visits).toBe(1);
       });
-      (entry.fails && !warm ? test.fails : test)('binding scope retains its lexical parent', () => {
+      (entry.fails && !warm ? test : test)('binding scope retains its lexical parent', () => {
         expect([parentId, parent]).toEqual([entry.parent, entry.parent]);
       });
     });

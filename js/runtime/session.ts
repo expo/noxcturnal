@@ -36,6 +36,7 @@ export class NativeTransformSession {
   #nativeFilename: string;
   #scopeParents: Uint32Array | null = null;
   #scopeMetadata: Uint32Array | null = null;
+  #ownedScopes = new Map<number, number>();
   #programBodyOffsets: readonly [number, number, boolean] | null = null;
   #bindingIndex: { nameIds: Map<string, number>; keys: Set<number> } | null = null;
   #bindingsByScope = new Map<number, Map<string, QueryResult['bindings'][number]>>();
@@ -442,6 +443,9 @@ export class NativeTransformSession {
       keys.add(words[index * 2] * 0x200000 + words[index * 2 + 1]);
     return { nameIds, keys };
   }
+  bindingRenamePlan(name: string, scopeId: number) {
+    return this.#binding('binding.rename').bindingRenamePlan(name, scopeId);
+  }
   resolveBinding(name: string, scopeId: number): QueryResult['bindings'][number] | undefined {
     const scope = this.resolveBindingScope(name, scopeId);
     const fact =
@@ -509,22 +513,33 @@ export class NativeTransformSession {
     const parent = this.#scopeParentTable()[scopeId];
     return parent === undefined || parent === 0xffffffff ? null : parent;
   }
-  scopeMetadata(scopeId: number): {
-    ownerId: number;
-    directivePrologueEnd: number;
-    hasDirectives: boolean;
-  } | null {
+  #loadScopeMetadata(): Uint32Array {
     if (this.#scopeMetadata == null) {
       const data = this.#binding('scope-metadata').scopeMetadataBuffer();
       this.#scopeMetadata = new Uint32Array(data.buffer, data.byteOffset, data.byteLength / 4);
+      for (let offset = 0; offset < this.#scopeMetadata.length; offset += 5)
+        this.#ownedScopes.set(this.#scopeMetadata[offset], this.#scopeMetadata[offset + 4]);
     }
-    const offset = scopeId * 3;
-    const ownerId = this.#scopeMetadata[offset];
-    if (ownerId === 0xffffffff) return null;
+    return this.#scopeMetadata;
+  }
+  ownedScopeId(nodeId: number): number | undefined {
+    this.#loadScopeMetadata();
+    return this.#ownedScopes.get(nodeId);
+  }
+  scopeMetadata(scopeId: number): {
+    ownerId: number;
+    start: number;
+    end: number;
+    kind: number;
+  } | null {
+    const words = this.#loadScopeMetadata();
+    const offset = scopeId * 5;
+    if (offset >= words.length) return null;
     return {
-      ownerId,
-      directivePrologueEnd: this.#scopeMetadata[offset + 1],
-      hasDirectives: this.#scopeMetadata[offset + 2] === 1,
+      ownerId: words[offset],
+      start: words[offset + 1],
+      end: words[offset + 2],
+      kind: words[offset + 3],
     };
   }
   programBodyOffsets(): readonly [prepend: number, append: number, needsEofLineBoundary: boolean] {

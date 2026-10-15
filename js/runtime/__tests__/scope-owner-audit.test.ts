@@ -48,8 +48,6 @@ describe.each(cases)('$type owner scope', entry => {
   });
   test('Babel sees the scope-owned binding', () => expect(babel).toBe(true));
   const check =
-    entry.type === 'FunctionDeclaration' || entry.type === 'ArrowFunctionExpression'
-      ? test
-      : test.fails;
+    entry.type === 'FunctionDeclaration' || entry.type === 'ArrowFunctionExpression' ? test : test;
   check('owner path exposes its local binding', () => expect(nox).toBe(true));
 });

@@ -112,6 +112,14 @@ function resolveTypedVisitors(plugin: NativePlugin<any, any>): ResolvedVisitor[]
  * into the plan shape the phase machinery consumes. Predicates deliberately stay
  * per-visitor (they compile per route); everything here is unioned native work.
  */
+// Body editing is available on every delivered path. These two internal offsets
+// are required for function containers even when scalar node fields are omitted.
+function bodyEditFields(type: string, fields: readonly NativeFieldKey[]): NativeFieldKey[] {
+  return type === 'Function' || type === 'ArrowFunctionExpression'
+    ? [...new Set<NativeFieldKey>([...fields, 'bodyStart', 'bodyEnd'])]
+    : [...fields];
+}
+
 function synthesizeVisitorPlan(
   plugin: NativePlugin<any, any>,
   resolved: readonly ResolvedVisitor[],
@@ -136,13 +144,12 @@ function synthesizeVisitorPlan(
     retainComments ||= contract.comments === 'inner';
     for (const { nodeType, predicates } of typedRouteExpansion(definition, contract.where))
       mergeFieldRequests(fields, { [nodeType]: Object.keys(predicates) as NativeFieldKey[] });
-    if (contract.fields.length > 0)
-      for (const concrete of concreteRouteTypes(definition.route)) {
-        const applicable = contract.fields.filter(field =>
-          PREDICATE_FIELDS[concrete]?.includes(field),
-        );
-        if (applicable.length > 0) mergeFieldRequests(fields, { [concrete]: applicable });
-      }
+    for (const concrete of concreteRouteTypes(definition.route)) {
+      const applicable = bodyEditFields(concrete, contract.fields).filter(field =>
+        PREDICATE_FIELDS[concrete]?.includes(field),
+      );
+      if (applicable.length > 0) mergeFieldRequests(fields, { [concrete]: applicable });
+    }
     const attachChildren = (
       parentTypes: readonly string[],
       declared: Readonly<Record<string, ChildContract>> | undefined,
@@ -158,32 +165,36 @@ function synthesizeVisitorPlan(
       }
       for (const child of Object.values(declared)) {
         const childTypes = concreteRouteTypes(child.route);
-        if ((child.fields?.length ?? 0) > 0)
-          for (const concrete of childTypes) {
-            const applicable = child.fields!.filter(field =>
-              PREDICATE_FIELDS[concrete]?.includes(field),
-            );
-            if (applicable.length > 0) mergeFieldRequests(fields, { [concrete]: applicable });
-          }
+        for (const concrete of childTypes) {
+          const applicable = bodyEditFields(concrete, child.fields ?? []).filter(field =>
+            PREDICATE_FIELDS[concrete]?.includes(field),
+          );
+          if (applicable.length > 0) mergeFieldRequests(fields, { [concrete]: applicable });
+        }
         attachChildren(childTypes, child.children);
       }
     };
     attachChildren(concreteRouteTypes(definition.route), contract.children);
     for (const capability of contract.controlFlow) controlFlow.add(capability);
+    if (
+      contract.controlFlow.some(
+        capability => capability === 'nested-traverse' || capability === 'dynamic-subscriptions',
+      )
+    )
+      for (const type of ['Function', 'ArrowFunctionExpression'])
+        mergeFieldRequests(fields, { [type]: bodyEditFields(type, []) });
     scope ||= contract.scope;
     if (contract.ancestry != null) {
       ancestry = mergeAncestry(ancestry, contract.ancestry);
       for (const [route, requirement] of Object.entries(contract.ancestry.routes)) {
         const ancestorTypes = concreteRouteTypes(route);
         for (const type of ancestorTypes) ancestryTypes.add(type as NativeNodeType);
-        if ((requirement.fields?.length ?? 0) > 0)
-          for (const concrete of ancestorTypes) {
-            const applicable = requirement.fields!.filter(field =>
-              PREDICATE_FIELDS[concrete]?.includes(field),
-            );
-            if (applicable.length > 0)
-              mergeFieldRequests(ancestryFields, { [concrete]: applicable });
-          }
+        for (const concrete of ancestorTypes) {
+          const applicable = bodyEditFields(concrete, requirement.fields ?? []).filter(field =>
+            PREDICATE_FIELDS[concrete]?.includes(field),
+          );
+          if (applicable.length > 0) mergeFieldRequests(ancestryFields, { [concrete]: applicable });
+        }
         const attachAncestorChildren = (
           parentTypes: readonly string[],
           declared: Readonly<Record<string, ChildContract>> | undefined,
@@ -202,14 +213,13 @@ function synthesizeVisitorPlan(
           }
           for (const child of Object.values(declared)) {
             const childTypes = concreteRouteTypes(child.route);
-            if ((child.fields?.length ?? 0) > 0)
-              for (const concrete of childTypes) {
-                const applicable = child.fields!.filter(field =>
-                  PREDICATE_FIELDS[concrete]?.includes(field),
-                );
-                if (applicable.length > 0)
-                  mergeFieldRequests(ancestryFields, { [concrete]: applicable });
-              }
+            for (const concrete of childTypes) {
+              const applicable = bodyEditFields(concrete, child.fields ?? []).filter(field =>
+                PREDICATE_FIELDS[concrete]?.includes(field),
+              );
+              if (applicable.length > 0)
+                mergeFieldRequests(ancestryFields, { [concrete]: applicable });
+            }
             attachAncestorChildren(childTypes, child.children);
           }
         };
@@ -671,7 +681,7 @@ function compilePhaseRoutes(
             side,
             order: pluginId,
             predicates,
-            payloadFields: definition.contract.fields,
+            payloadFields: bodyEditFields(nodeType, definition.contract.fields),
             comments: definition.contract.comments,
             plugin,
             callbacks: [callback as Handler<any>],
@@ -868,7 +878,7 @@ export function compileNestedVisitor(visitor: NestedVisitor): CompiledNestedRout
           comments: defined.contract.comments,
         });
         capabilities.push(caps);
-        payloads.push([...defined.contract.fields]);
+        payloads.push(bodyEditFields(nodeType, defined.contract.fields));
       }
     }
   }
@@ -923,7 +933,10 @@ function assertNestedFieldsDeclared(
   routes: readonly NativeRouteManifestEntry[],
 ): void {
   for (const route of routes) {
-    const declared = plan?.fields?.[route.nodeType as NativeNodeType] ?? [];
+    const declared = bodyEditFields(
+      route.nodeType,
+      plan?.fields?.[route.nodeType as NativeNodeType] ?? [],
+    );
     for (const field of [...Object.keys(route.predicates), ...route.payloadFields])
       if (!declared.includes(field as NativeFieldKey))
         throw new Error(

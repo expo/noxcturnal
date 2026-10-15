@@ -220,6 +220,10 @@ impl<'a> EventCollector<'a> {
                 parent_kind.and_then(|parent| child_role_id_for_edge(parent, kind)),
             );
         }
+        if self.retention_capabilities & RETAIN_IDENTIFIERS != 0 {
+            self.retained_index
+                .record_rename_roles(kind, self.nodes, scope_id.index() as u32);
+        }
         self.retained_index.record_semantics(
             kind,
             self.scoping,
@@ -484,6 +488,11 @@ pub(crate) fn materialize_with_scope_parents(
         ),
     };
     collector.visit_program(&parsed.program);
+    if retention_capabilities & RETAIN_IDENTIFIERS != 0 {
+        collector
+            .retained_index
+            .record_scopes(collector.scoping, collector.nodes, collector.utf16);
+    }
     collector.retained_index.finalize_child_edges();
     collector
         .retained_index

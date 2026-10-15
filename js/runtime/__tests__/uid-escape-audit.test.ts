@@ -43,7 +43,7 @@ describe.each(cases)('$name', entry => {
       code = result.code;
       expect(code).not.toContain('const temp=');
     });
-    test.fails('default rename avoids decoded binding and reference names', () =>
+    test('default rename avoids decoded binding and reference names', () =>
       expect(run(code, entry.external)).toEqual([3, 9]));
   });
 });

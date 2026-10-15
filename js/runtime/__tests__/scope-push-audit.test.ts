@@ -71,7 +71,7 @@ describe.each(cases)('$name', entry => {
   };
   test('Babel scope insertion control', () => expect(run(babel)).toEqual([1, 1]));
   const fails = !entry.field || entry.name === 'concise arrow';
-  (fails ? test.fails : test)('insertion creates per-call local state', () =>
+  (fails ? test : test)('insertion creates per-call local state', () =>
     expect(run(code)).toEqual([1, 1]),
   );
 });
@@ -96,7 +96,7 @@ describe.each(['', '#!/usr/bin/env node\n', '#!/usr/bin/env node\n"use strict";\
       if (result.status !== 'complete') throw new Error(result.reason);
       code = result.code;
     });
-    (prefix === '#!/usr/bin/env node\n' ? test.fails : test)(
+    (prefix === '#!/usr/bin/env node\n' ? test : test)(
       'insertion preserves module parseability and value',
       async () => {
         const module = await import(

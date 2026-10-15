@@ -73,11 +73,9 @@ for (const method of [
         if (result.status !== 'complete') throw new Error('Unexpected container bailout');
         expect(visits).toBe(1);
         output = result.code;
-        expect(output).toBe(
-          retained ? expected : prepend ? `/* inserted */${source}` : `${source}/* inserted */`,
-        );
+        expect(output).toContain('/* inserted */');
       });
-      (retained ? test : test.fails)('inserts inside the requested body', () => {
+      (retained ? test : test)('inserts inside the requested body', () => {
         expect(output).toBe(expected);
       });
     });
@@ -116,9 +114,9 @@ for (const method of [
         if (result.status !== 'complete') throw new Error('Unexpected block bailout');
         expect(visits).toBe(1);
         output = result.code;
-        expect(output).toBe(prepend ? `${prefix}/* inserted */{1;}` : `${source}/* inserted */`);
+        expect(output).toContain('/* inserted */');
       });
-      test.fails('inserts within the braces of the body', () => expect(output).toBe(expected));
+      test('inserts within the braces of the body', () => expect(output).toBe(expected));
     });
   }
 

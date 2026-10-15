@@ -8,7 +8,8 @@ use crate::generated::event_schema::{
     NODE_TYPE_COUNT, alias_matches, node_type_id, node_type_name,
 };
 use crate::semantic::retained_index::{
-    NativeBindingFact, NativeCallFact, NativeCaptureGroup, NativeConstantFact, RetainedIndex,
+    NativeBindingFact, NativeCallFact, NativeCaptureGroup, NativeConstantFact, NativeRenamePlan,
+    RetainedIndex,
 };
 
 use super::collect::{materialize_with_scope_parents, parse_program_body_offsets};
@@ -273,6 +274,12 @@ impl NativeIndexedSession {
             }
         }
         Ok(words.into_bytes().into())
+    }
+
+    #[napi]
+    pub fn binding_rename_plan(&self, name: String, scope_id: u32) -> Result<NativeRenamePlan> {
+        self.ensure_open()?;
+        Ok(self.retained_index.rename_plan(&name, scope_id))
     }
 
     #[napi]

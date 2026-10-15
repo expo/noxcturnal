@@ -67,7 +67,7 @@ describe.each(cases)('%s', (_name, source, expected, fails) => {
   test('original module control', async () => expect({ ...(await run(source)) }).toEqual(expected));
   test('Babel scope rename control', async () =>
     expect({ ...(await run(babel)) }).toEqual(expected));
-  (fails ? test.fails : test)('scope rename preserves property and module interfaces', async () =>
+  (fails ? test : test)('scope rename preserves property and module interfaces', async () =>
     expect({ ...(await run(code)) }).toEqual(expected),
   );
 });

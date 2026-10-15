@@ -195,12 +195,10 @@ export class NodePathImpl implements NativeNodePath {
   get scope(): NativeScope {
     if (!this.runtime.allowsScope())
       throw new Error(`${this.runtime.owner}: undeclared scope semantics`);
-    return (this.lazyScope ??= makeScope(
-      this.runtime,
-      this.event.scopeId,
-      this.event.scopeParentId ?? null,
-    ));
+    const id = this.runtime.session.ownedScopeId(this.event.id) ?? this.event.scopeId;
+    return (this.lazyScope ??= makeScope(this.runtime, id, this.runtime.session.scopeParentId(id)));
   }
+
   getSource(): SourceFragment {
     return makeSourceFragment(this.runtime.session, this.event.start, this.event.end);
   }
@@ -546,21 +544,21 @@ export class NodePathImpl implements NativeNodePath {
       order: this.runtime.nextOrder(),
     });
   }
+  #bodyOffset(prepend: boolean): number {
+    if (this.event.type === 'BlockStatement' || this.event.type === 'FunctionBody')
+      return prepend ? this.event.start + 1 : this.event.end - 1;
+    const metadata = this.event as NativeEvent & Record<string, unknown>;
+    return Number(
+      metadata[prepend ? 'bodyStart' : 'bodyEnd'] ?? (prepend ? this.event.start : this.event.end),
+    );
+  }
   unshiftContainer(key: 'body', code: Code | readonly Code[]): void {
     if (key !== 'body') throw new Error(`Unsupported container: ${key}`);
-    this.#insert(
-      'AppendRight',
-      Number((this.event as NativeEvent & Record<string, unknown>).bodyStart ?? this.event.start),
-      code,
-    );
+    this.#insert('AppendRight', this.#bodyOffset(true), code);
   }
   pushContainer(key: 'body', code: Code | readonly Code[]): void {
     if (key !== 'body') throw new Error(`Unsupported container: ${key}`);
-    this.#insert(
-      'PrependLeft',
-      Number((this.event as NativeEvent & Record<string, unknown>).bodyEnd ?? this.event.end),
-      code,
-    );
+    this.#insert('PrependLeft', this.#bodyOffset(false), code);
   }
   addComment(position: 'leading' | 'trailing' | 'inner', content: string, line = false): void {
     const comment = line ? `//${content}\n` : `/*${content}*/`;
@@ -572,18 +570,10 @@ export class NodePathImpl implements NativeNodePath {
     return this.#pluginError(message);
   }
   prependToBody(content: Code): void {
-    this.#insert(
-      'AppendRight',
-      Number((this.event as NativeEvent & Record<string, unknown>).bodyStart ?? this.event.start),
-      content,
-    );
+    this.#insert('AppendRight', this.#bodyOffset(true), content);
   }
   appendToBody(content: Code): void {
-    this.#insert(
-      'PrependLeft',
-      Number((this.event as NativeEvent & Record<string, unknown>).bodyEnd ?? this.event.end),
-      content,
-    );
+    this.#insert('PrependLeft', this.#bodyOffset(false), content);
   }
 
   #pluginError(message: string, cause?: unknown): NativeTransformError {
@@ -640,6 +630,40 @@ function mappingPolicy(value?: CodeFragment['mapping']): EditCommand['mapping'] 
   )[value ?? 'sourceless'];
 }
 
+type ScopeEdits = {
+  exports: Map<number, { names: Map<string, string>; edit: EditCommand }>;
+  contents: Code[];
+  push?: EditCommand;
+};
+// One phase shares an edit list across plugins and route runtimes. Structural
+// wrappers and export clauses are keyed by that list so separate plugins cannot
+// each emit another wrapper or another `export { ... }` for the same scope.
+const scopeEditTransactions = new WeakMap<EditCommand[], Map<number, ScopeEdits>>();
+function scopeEdits(runtime: PathRuntime, id: number): ScopeEdits {
+  let transactions = scopeEditTransactions.get(runtime.edits);
+  if (!transactions) scopeEditTransactions.set(runtime.edits, (transactions = new Map()));
+  let edits = transactions.get(id);
+  if (!edits) transactions.set(id, (edits = { exports: new Map(), contents: [] }));
+  return edits;
+}
+function insertionTarget(
+  session: NativeTransformSession,
+  scopeId: number,
+): {
+  id: number;
+  metadata: NonNullable<ReturnType<NativeTransformSession['scopeMetadata']>>;
+} | null {
+  let id = scopeId;
+  let metadata = session.scopeMetadata(id);
+  // Modes 4 and 5 store the host scope id in the start word.
+  if (metadata && (metadata.kind === 4 || metadata.kind === 5)) {
+    id = metadata.start;
+    metadata = session.scopeMetadata(id);
+  }
+  if (!metadata || metadata.kind === 3 || metadata.kind === 4 || metadata.kind === 5) return null;
+  return { id, metadata };
+}
+
 function makeScope(runtime: PathRuntime, id: number, parentId: number | null): NativeScope {
   const cached = runtime.scopeCache.get(id);
   if (cached) return cached;
@@ -647,6 +671,7 @@ function makeScope(runtime: PathRuntime, id: number, parentId: number | null): N
   const resolve = (name: string): QueryResult['bindings'][number] | undefined => {
     return session.resolveBinding(name, id);
   };
+
   let parentScope: NativeScope | undefined;
   let ownerPath: NativeNodePath | null | undefined;
   const scope: NativeScope = {
@@ -682,61 +707,98 @@ function makeScope(runtime: PathRuntime, id: number, parentId: number | null): N
     push(content) {
       const owner = this.path;
       if (!owner) throw new Error(`Cannot find owner path for scope ${id}`);
-      const metadata = session.scopeMetadata(id);
-      const hasDirectives = metadata?.hasDirectives === true;
-      const offset = hasDirectives
-        ? metadata.directivePrologueEnd
-        : Number(
-            (owner instanceof NodePathImpl
-              ? (owner.event as NativeEvent & Record<string, unknown>).bodyStart
-              : undefined) ?? owner.start,
-          );
-      runtime.edits.push({
-        kind: 'AppendLeft',
-        start: offset,
-        end: offset,
-        ...realizeContent(runtime.session, content, undefined, hasDirectives ? '\n' : '', '\n'),
-        owner: runtime.owner,
-        order: runtime.nextOrder(),
-      });
+      const target = insertionTarget(session, id);
+      if (!target) throw new Error(`Scope ${id} has no statement insertion body`);
+      const { metadata } = target;
+      const wrapping = metadata.kind === 1 || metadata.kind === 2;
+      const edits = scopeEdits(runtime, target.id);
+      const pushedContents = edits.contents;
+      if (pushedContents.length) pushedContents.push('\n;\n');
+      pushedContents.push(content);
+      if (!edits.push) {
+        edits.push = {
+          kind: 'AppendLeft',
+          start: metadata.start,
+          end: metadata.start,
+          owner: runtime.owner,
+          order: runtime.nextOrder(),
+        };
+        runtime.edits.push(edits.push);
+        if (wrapping)
+          runtime.edits.push({
+            kind: 'AppendLeft',
+            start: metadata.end,
+            end: metadata.end,
+            content: metadata.kind === 1 ? ');}' : '}',
+            owner: runtime.owner,
+            order: runtime.nextOrder(),
+          });
+      }
+      Object.assign(
+        edits.push,
+        realizeContent(
+          session,
+          pushedContents,
+          undefined,
+          wrapping ? '{\n' : '\n;\n',
+          metadata.kind === 1 ? '\n;\nreturn (' : '\n;\n',
+        ),
+      );
     },
     generateUid: name => session.generateUid(name),
     rename(name, replacement = session.generateUid(name)) {
       const binding = resolve(name);
       if (!binding) throw new Error(`Cannot rename unbound identifier ${name}`);
       native.validateIdentifier(replacement);
-      const nodes = [binding.declaration, ...binding.references].filter(
-        (node): node is NodeSummary | NodeView => node != null,
-      );
-      const shorthandParentIds = [
-        ...new Set(
-          nodes.flatMap(node => {
-            const view = node as NodeView;
-            return view.parentId != null && isShorthandPropertyType(view.parentType)
-              ? [view.parentId]
-              : [];
-          }),
-        ),
-      ];
-      const parentStarts = new Map(
-        session
-          .inspect(shorthandParentIds.map(nodeId => ({ nodeId, fields: [] })))
-          .map(parent => [parent.id, parent.start]),
-      );
-      for (const node of nodes) {
-        const view = node as NodeView;
-        const preservesShorthandKey =
-          view.parentId != null && parentStarts.get(view.parentId) === view.start;
+      const plan = session.bindingRenamePlan(name, binding.scopeId);
+      for (const target of plan.targets) {
+        const content =
+          target.kind === 1
+            ? `${name}: ${replacement}`
+            : target.kind === 2
+              ? `${name} as ${replacement}`
+              : target.kind === 3
+                ? `${replacement} as ${name}`
+                : replacement;
         runtime.edits.push({
           kind: 'Replace',
-          start: node.start!,
-          end: node.end!,
-          content: preservesShorthandKey ? `${name}: ${replacement}` : replacement,
+          start: target.start,
+          end: target.end,
+          content,
           mapping: 'AnchorBoundaries',
           names: [name],
           owner: runtime.owner,
           order: runtime.nextOrder(),
         });
+      }
+      const exportEdits = scopeEdits(runtime, binding.scopeId).exports;
+      for (const declaration of plan.exports) {
+        let entry = exportEdits.get(declaration.start);
+        if (!entry) {
+          const edit: EditCommand = {
+            kind: 'AppendLeft',
+            start: declaration.end,
+            end: declaration.end,
+            content: '',
+            owner: runtime.owner,
+            order: runtime.nextOrder(),
+          };
+          entry = { names: new Map(declaration.names.map(name => [name, name])), edit };
+          exportEdits.set(declaration.start, entry);
+          runtime.edits.push(
+            {
+              kind: 'Replace',
+              start: declaration.start,
+              end: declaration.start + 6,
+              content: '',
+              owner: runtime.owner,
+              order: runtime.nextOrder(),
+            },
+            edit,
+          );
+        }
+        entry.names.set(name, replacement);
+        entry.edit.content = `\nexport { ${[...entry.names].map(([external, local]) => (local === external ? local : `${local} as ${external}`)).join(', ')} };`;
       }
       return replacement;
     },
@@ -764,9 +826,11 @@ function makeBinding(
     },
     get scope() {
       if (scope !== undefined) return scope;
-      const event =
-        binding.declaration == null ? undefined : runtime.session.event(binding.declaration.id);
-      return (scope = makeScope(runtime, binding.scopeId, event?.scopeParentId ?? null));
+      return (scope = makeScope(
+        runtime,
+        binding.scopeId,
+        runtime.session.scopeParentId(binding.scopeId),
+      ));
     },
   };
 }
@@ -816,10 +880,4 @@ function joinFragments(values: readonly (string | CodeFragment)[]): CodeFragment
   };
 }
 
-function isShorthandPropertyType(type: string | undefined): boolean {
-  return (
-    type === 'ObjectProperty' ||
-    type === 'BindingProperty' ||
-    type === 'AssignmentTargetPropertyIdentifier'
-  );
-}
+

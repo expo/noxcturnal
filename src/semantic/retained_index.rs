@@ -1,7 +1,8 @@
 use napi::bindgen_prelude::Buffer;
 use napi_derive::napi;
 use oxc_ast::AstKind;
-use oxc_semantic::Scoping;
+use oxc_semantic::{AstNodes, Scoping};
+use oxc_span::GetSpan;
 use rustc_hash::FxHashMap;
 #[cfg(test)]
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -44,6 +45,9 @@ pub struct RetainedIndex {
     scalar_fields: Vec<RetainedField>,
     scalar_strings: Vec<String>,
     comments: Option<Vec<RetainedComment>>,
+    scope_metadata: Vec<[u32; 5]>,
+    rename_kinds: FxHashMap<u32, u32>,
+    exported_declarations: Vec<(u32, u32)>,
 }
 
 #[derive(Clone, Copy)]
@@ -105,7 +109,7 @@ impl SemanticReference {
 }
 
 struct BindingRecord {
-    declaration_id: Option<u32>,
+    declaration_ids: Vec<u32>,
     references: Vec<SemanticReference>,
 }
 
@@ -162,6 +166,24 @@ pub struct NativeBindingFact {
     pub declaration_end: Option<u32>,
     pub declaration_parent_id: Option<u32>,
     pub references: Vec<NativeSemanticReference>,
+}
+
+#[napi(object)]
+pub struct NativeRenameTarget {
+    pub start: u32,
+    pub end: u32,
+    pub kind: u32,
+}
+#[napi(object)]
+pub struct NativeRenameExport {
+    pub start: u32,
+    pub end: u32,
+    pub names: Vec<String>,
+}
+#[napi(object)]
+pub struct NativeRenamePlan {
+    pub targets: Vec<NativeRenameTarget>,
+    pub exports: Vec<NativeRenameExport>,
 }
 
 #[napi(object)]
@@ -252,6 +274,9 @@ impl RetainedIndex {
             scalar_fields: Vec::new(),
             scalar_strings: Vec::new(),
             comments: None,
+            scope_metadata: Vec::new(),
+            rename_kinds: FxHashMap::default(),
+            exported_declarations: Vec::new(),
         }
     }
 
@@ -280,10 +305,11 @@ impl RetainedIndex {
                 self.bindings
                     .entry((scope_id, name_id))
                     .or_insert_with(|| BindingRecord {
-                        declaration_id: Some(node_id),
+                        declaration_ids: Vec::new(),
                         references: Vec::new(),
                     })
-                    .declaration_id = Some(node_id);
+                    .declaration_ids
+                    .push(node_id);
             }
             AstKind::IdentifierReference(identifier) => {
                 let Some(reference_id) = identifier.reference_id.get() else {
@@ -303,7 +329,7 @@ impl RetainedIndex {
                     self.bindings
                         .entry((binding_scope_id, name_id))
                         .or_insert_with(|| BindingRecord {
-                            declaration_id: None,
+                            declaration_ids: Vec::new(),
                             references: Vec::new(),
                         })
                         .references
@@ -317,6 +343,108 @@ impl RetainedIndex {
             }
             _ => {}
         }
+    }
+
+    pub fn record_rename_roles(&mut self, kind: AstKind<'_>, nodes: &AstNodes<'_>, scope_id: u32) {
+        if let AstKind::ExportNamedDeclaration(export) = kind {
+            if export.declaration.is_some() {
+                self.exported_declarations
+                    .push((kind.node_id().index() as u32, scope_id));
+            }
+            return;
+        }
+        if !matches!(
+            kind,
+            AstKind::BindingIdentifier(_) | AstKind::IdentifierReference(_)
+        ) {
+            return;
+        }
+        let mut parent = nodes.parent_kind(kind.node_id());
+        if matches!(parent, AstKind::AssignmentPattern(_)) {
+            parent = nodes.parent_kind(parent.node_id());
+        }
+        let role = match parent {
+            AstKind::BindingProperty(property)
+                if property.shorthand && property.key.span().start == kind.span().start =>
+            {
+                1
+            }
+            AstKind::ObjectProperty(property) if property.shorthand => 1,
+            AstKind::AssignmentTargetPropertyIdentifier(property)
+                if property.binding.span.start == kind.span().start =>
+            {
+                1
+            }
+            AstKind::ImportSpecifier(specifier)
+                if specifier.imported.span() == specifier.local.span =>
+            {
+                2
+            }
+            AstKind::ExportSpecifier(specifier)
+                if specifier.local.span() == specifier.exported.span() =>
+            {
+                3
+            }
+            _ => 0,
+        };
+        if role != 0 {
+            self.rename_kinds
+                .insert(kind.node_id().index() as u32, role);
+        }
+    }
+
+    pub fn rename_plan(&self, name: &str, scope_id: u32) -> NativeRenamePlan {
+        let Some(binding) = self
+            .name_ids
+            .get(name)
+            .and_then(|id| self.bindings.get(&(scope_id, *id)))
+        else {
+            return NativeRenamePlan {
+                targets: Vec::new(),
+                exports: Vec::new(),
+            };
+        };
+        let targets = binding
+            .declaration_ids
+            .iter()
+            .copied()
+            .chain(binding.references.iter().map(SemanticReference::node_id))
+            .map(|id| NativeRenameTarget {
+                start: self.starts[id as usize],
+                end: self.ends[id as usize],
+                kind: self.rename_kinds.get(&id).copied().unwrap_or(0),
+            })
+            .collect();
+        let exports = self
+            .exported_declarations
+            .iter()
+            .filter(|(id, scope)| {
+                *scope == scope_id
+                    && binding.declaration_ids.iter().any(|declaration| {
+                        self.starts[*declaration as usize] >= self.starts[*id as usize]
+                            && self.ends[*declaration as usize] <= self.ends[*id as usize]
+                    })
+            })
+            .map(|(id, _)| {
+                let start = self.starts[*id as usize];
+                let end = self.ends[*id as usize];
+                let mut names = self
+                    .bindings
+                    .iter()
+                    .filter(|((scope, _), record)| {
+                        *scope == scope_id
+                            && record.declaration_ids.iter().any(|declaration| {
+                                self.starts[*declaration as usize] >= start
+                                    && self.ends[*declaration as usize] <= end
+                            })
+                    })
+                    .map(|((_, name), _)| self.names[*name as usize].to_string())
+                    .collect::<Vec<_>>();
+                names.sort();
+                NativeRenameExport { start, end, names }
+            })
+            .collect();
+        NativeRenamePlan { targets, exports }
     }
 
     pub fn record_constant(&mut self, kind: AstKind<'_>, node_id: u32) {
@@ -389,7 +517,7 @@ impl RetainedIndex {
         reads: bool,
         writes: bool,
     ) -> NativeBindingFact {
-        let declaration = binding.declaration_id.map(|node_id| {
+        let declaration = binding.declaration_ids.last().copied().map(|node_id| {
             (
                 node_id,
                 self.starts[node_id as usize],
@@ -1034,35 +1162,148 @@ impl RetainedIndex {
             .map(|(node_id, _)| node_id as u32)
     }
 
-    pub fn scope_metadata_buffer(&self, scope_count: usize) -> Buffer {
-        let program = node_type_id("Program").unwrap();
-        let function = node_type_id("Function").unwrap();
-        let arrow = node_type_id("ArrowFunctionExpression").unwrap();
-        let directive = node_type_id("Directive").unwrap();
-        let mut words = vec![ABSENT_ID; scope_count * 3];
-        for node_id in 0..self.type_ids.len() {
-            let scope = self.scope_ids[node_id] as usize;
-            let offset = scope * 3;
-            let type_id = self.type_ids[node_id];
-            if type_id == program || type_id == function || type_id == arrow {
-                words[offset] = node_id as u32;
-            } else if type_id == directive {
-                let end = self.ends[node_id];
-                if words[offset + 2] == ABSENT_ID || end > words[offset + 1] {
-                    words[offset + 1] = end;
+    /// Owned scopes and insertion coordinates are semantic facts, independent of
+    /// optional scalar fields on routed events.
+    ///
+    /// Modes: statement list `0`, concise-arrow expression `1`, unbraced loop
+    /// statement `2`, no statement body `3`, class delegate `4`, switch delegate
+    /// `5`, function-like list `6`. Delegate records store the host scope id in
+    /// the start word. Class insertion stops at the nearest statement list;
+    /// switch insertion stops at the enclosing function, static block, or
+    /// program, matching Babel's block and function parents. A statement before
+    /// the first `case`, or inside a class body, is not a statement list.
+    pub fn record_scopes(
+        &mut self,
+        scoping: &Scoping,
+        nodes: &AstNodes<'_>,
+        utf16: Option<&[u32]>,
+    ) {
+        use oxc_ast::ast::Statement;
+        let offset = |byte: u32| utf16.map_or(byte, |index| index[byte as usize]);
+        let mut records = vec![[0, 0, 0, 3, 0]; scoping.scopes_len()];
+        let mut parents = vec![u32::MAX; scoping.scopes_len()];
+        for scope in scoping.scope_descendants_from_root() {
+            let index = scope.index();
+            parents[index] = scoping
+                .scope_parent_id(scope)
+                .map_or(u32::MAX, |parent| parent.index() as u32);
+            let owner = scoping.get_node_id(scope);
+            let kind = nodes.get_node(owner).kind();
+            let mut insertion = None;
+            let mut mode = 0;
+            let mut public_scope = scope;
+            let mut statement = None;
+            match kind {
+                AstKind::Program(program) => {
+                    let start = program
+                        .directives
+                        .last()
+                        .map(|directive| directive.span.end)
+                        .or_else(|| program.hashbang.as_ref().map(|hashbang| hashbang.span.end))
+                        .unwrap_or(program.span.start);
+                    insertion = Some((start, program.span.end));
+                    mode = 6;
                 }
-                words[offset + 2] = 1;
+                AstKind::Function(function) => {
+                    if let Some(body) = &function.body {
+                        insertion = Some((
+                            body.directives
+                                .last()
+                                .map_or(body.span.start + 1, |directive| directive.span.end),
+                            body.span.end - 1,
+                        ));
+                        mode = 6;
+                    }
+                }
+                AstKind::ArrowFunctionExpression(function) => {
+                    let body = &function.body;
+                    let inset = u32::from(!function.expression);
+                    insertion = Some((
+                        body.directives
+                            .last()
+                            .map_or(body.span.start + inset, |directive| directive.span.end),
+                        body.span.end - inset,
+                    ));
+                    mode = if function.expression { 1 } else { 6 };
+                }
+                AstKind::BlockStatement(block) => {
+                    insertion = Some((block.span.start + 1, block.span.end - 1));
+                }
+                AstKind::StaticBlock(block) => {
+                    insertion = Some((
+                        block
+                            .body
+                            .first()
+                            .map_or(block.span.end - 1, |statement| statement.span().start),
+                        block.span.end - 1,
+                    ));
+                    mode = 6;
+                }
+                AstKind::CatchClause(catch) => {
+                    // Oxc associates simple catch symbols with the body scope.
+                    public_scope = catch.body.scope_id.get().unwrap_or(scope);
+                    insertion = Some((catch.body.span.start + 1, catch.body.span.end - 1));
+                }
+                AstKind::ForStatement(node) => statement = Some(&node.body),
+                AstKind::ForInStatement(node) => statement = Some(&node.body),
+                AstKind::ForOfStatement(node) => statement = Some(&node.body),
+                AstKind::Class(_) => mode = 4,
+                AstKind::SwitchStatement(_) => mode = 5,
+                _ => {}
+            }
+            if let Some(body) = statement {
+                let span = body.span();
+                if matches!(body, Statement::BlockStatement(_)) {
+                    insertion = Some((span.start + 1, span.end - 1));
+                } else {
+                    insertion = Some((span.start, span.end));
+                    mode = 2;
+                }
+            }
+            let (start, end) = if let Some(span) = insertion {
+                span
+            } else if mode == 4 || mode == 5 {
+                (0, 0)
+            } else {
+                mode = 3;
+                (0, 0)
+            };
+            records[index] = [
+                owner.index() as u32,
+                offset(start),
+                offset(end),
+                mode,
+                public_scope.index() as u32,
+            ];
+        }
+        for index in 0..records.len() {
+            let mode = records[index][3];
+            if mode != 4 && mode != 5 {
+                continue;
+            }
+            if let Some(host) = statement_host(&records, &parents, parents[index], mode == 5) {
+                records[index][1] = host as u32;
+            } else {
+                records[index][3] = 3;
             }
         }
-        let mut output = Vec::with_capacity(words.len() * 4);
-        for word in words {
-            output.extend_from_slice(&word.to_le_bytes());
-        }
-        output.into()
+        self.scope_metadata = records;
+    }
+
+    pub fn scope_metadata_buffer(&self, _scope_count: usize) -> Buffer {
+        self.scope_metadata
+            .iter()
+            .flatten()
+            .flat_map(|word| word.to_le_bytes())
+            .collect::<Vec<_>>()
+            .into()
     }
 
     pub fn memory_usage(&self) -> usize {
-        self.type_ids.capacity() * size_of::<u32>()
+        self.rename_kinds.capacity() * size_of::<(u32, u32)>()
+            + self.exported_declarations.capacity() * size_of::<(u32, u32)>()
+            + self.scope_metadata.capacity() * size_of::<[u32; 5]>()
+            + self.type_ids.capacity() * size_of::<u32>()
             + self.starts.capacity() * size_of::<u32>()
             + self.ends.capacity() * size_of::<u32>()
             + self.parent_ids.capacity() * size_of::<u32>()
@@ -1091,6 +1332,7 @@ impl RetainedIndex {
                 .values()
                 .map(|binding| {
                     size_of::<((u32, u32), BindingRecord)>()
+                        + binding.declaration_ids.capacity() * size_of::<u32>()
                         + binding.references.capacity() * size_of::<SemanticReference>()
                 })
                 .sum::<usize>()
@@ -1144,6 +1386,41 @@ impl RetainedIndex {
     pub fn clear(&mut self) {
         *self = Self::default();
     }
+}
+
+/// Class and switch scopes have no statement list of their own. `switch` walks
+/// to the nearest function-like list or concise arrow; other delegates stop at
+/// the nearest scope that can host statements, and a switch on that walk uses
+/// the switch rule.
+fn statement_host(
+    records: &[[u32; 5]],
+    parents: &[u32],
+    mut current: u32,
+    switch: bool,
+) -> Option<usize> {
+    let mut guard = 0;
+    while current != u32::MAX {
+        guard += 1;
+        if guard > records.len() {
+            return None;
+        }
+        let index = current as usize;
+        let mode = records.get(index).map_or(3, |record| record[3]);
+        // A switch walk skips blocks and nested switches until a function-like
+        // list or concise arrow. Other walks stop at the first real statement host.
+        if switch && (mode == 6 || mode == 1) {
+            return Some(index);
+        }
+        if !switch && mode == 5 {
+            let parent = parents.get(index).copied().unwrap_or(u32::MAX);
+            return statement_host(records, parents, parent, true);
+        }
+        if !switch && mode != 4 && mode != 3 {
+            return Some(index);
+        }
+        current = parents.get(index).copied().unwrap_or(u32::MAX);
+    }
+    None
 }
 
 fn scope_intervals(scope_parents: &[u32]) -> (Vec<u32>, Vec<u32>) {
@@ -1234,7 +1511,7 @@ mod tests {
         index.bindings.insert(
             (0, 0),
             BindingRecord {
-                declaration_id: None,
+                declaration_ids: Vec::new(),
                 references,
             },
         );
@@ -1259,25 +1536,18 @@ mod tests {
     #[test]
     fn scope_metadata_encodes_all_scopes() {
         const COUNT: usize = 128;
-        let program = node_type_id("Program").unwrap();
-        let function = node_type_id("Function").unwrap();
-        let directive = node_type_id("Directive").unwrap();
-        let mut index = RetainedIndex {
-            type_ids: vec![0; COUNT * 2],
-            starts: vec![0; COUNT * 2],
-            ends: vec![0; COUNT * 2],
-            scope_ids: vec![0; COUNT * 2],
+        let index = RetainedIndex {
+            scope_metadata: (0..COUNT as u32)
+                .map(|scope| [scope * 2, scope + 10, scope + 20, 0, scope])
+                .collect(),
             ..RetainedIndex::default()
         };
-        for scope in 0..COUNT {
-            index.type_ids[scope] = if scope == 0 { program } else { function };
-            index.scope_ids[scope] = scope as u32;
-            let directive_id = COUNT + scope;
-            index.type_ids[directive_id] = directive;
-            index.scope_ids[directive_id] = scope as u32;
-            index.ends[directive_id] = scope as u32 + 10;
-        }
         let buffer = index.scope_metadata_buffer(COUNT);
-        assert_eq!(buffer.len(), COUNT * 3 * size_of::<u32>());
+        assert_eq!(buffer.len(), COUNT * 5 * size_of::<u32>());
+        let words = buffer
+            .chunks_exact(4)
+            .map(|word| u32::from_le_bytes(word.try_into().unwrap()))
+            .collect::<Vec<_>>();
+        assert_eq!(&words[(COUNT - 1) * 5..], &[254, 137, 147, 0, 127]);
     }
 }

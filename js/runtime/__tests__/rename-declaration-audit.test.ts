@@ -51,7 +51,7 @@ describe.each(cases)('%s', (_name, source, fails) => {
   });
   test('original binding control', () => expect(run(source)).toBe(3));
   test('Babel rename control', () => expect(run(babel)).toBe(3));
-  (fails ? test.fails : test)('rename preserves all declarations of one binding', () =>
+  (fails ? test : test)('rename preserves all declarations of one binding', () =>
     expect(run(code)).toBe(3),
   );
 });
