@@ -120,6 +120,63 @@ for (const count of [100, 1000])
         });
       }
     });
+for (const count of [1000, 10000])
+  describe(`read a path's scope ${count} times`, () => {
+    for (const [label, api] of implementations) {
+      let scopeId: number | undefined;
+      const plan = api.defineNativePipeline({
+        phases: [
+          {
+            name: 'scope',
+            plugins: [
+              api.defineNativePlugin({
+                name: 'scope-reads',
+                visitors: [
+                  api.defineVisitor('Function', { scope: true }, (path: any) => {
+                    for (let i = 0; i < count; i++) scopeId = path.scope.id;
+                  }),
+                ],
+              }),
+            ],
+          },
+        ],
+      });
+      bench(label, () => {
+        const result = api.transform('function f(value){return value}', 'input.js', plan);
+        if (result.status !== 'complete' || scopeId == null)
+          throw new Error('Unexpected scope benchmark result');
+        return result;
+      });
+    }
+  });
+for (const count of [100, 1000, 10000])
+  describe(`rename a binding with ${count} references`, () => {
+    const source = `function f(value){return [${Array(count).fill('value').join(',')}]}`;
+    for (const [label, api] of implementations) {
+      const plan = api.defineNativePipeline({
+        phases: [
+          {
+            name: 'rename',
+            plugins: [
+              api.defineNativePlugin({
+                name: 'rename-references',
+                visitors: [
+                  api.defineVisitor('Function', { scope: true }, (path: any) =>
+                    path.scope.rename('value', 'renamed'),
+                  ),
+                ],
+              }),
+            ],
+          },
+        ],
+      });
+      bench(label, () => {
+        const result = api.transform(source, 'input.js', plan);
+        if (result.status !== 'complete') throw new Error('Unexpected benchmark bailout');
+        return result;
+      });
+    }
+  });
 const constructors = [
   ...(baselineRoot
     ? [

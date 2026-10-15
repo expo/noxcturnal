@@ -196,8 +196,9 @@ export class NodePathImpl implements NativeNodePath {
   get scope(): NativeScope {
     if (!this.runtime.allowsScope())
       throw new Error(`${this.runtime.owner}: undeclared scope semantics`);
+    if (this.lazyScope) return this.lazyScope;
     const id = this.runtime.session.ownedScopeId(this.event.id) ?? this.event.scopeId;
-    return (this.lazyScope ??= makeScope(this.runtime, id, this.runtime.session.scopeParentId(id)));
+    return (this.lazyScope = makeScope(this.runtime, id, this.runtime.session.scopeParentId(id)));
   }
 
   getSource(): SourceFragment {
@@ -754,10 +755,10 @@ function makeScope(runtime: PathRuntime, id: number, parentId: number | null): N
     },
     generateUid: name => session.generateUid(name),
     rename(name, replacement = session.generateUid(name)) {
-      const binding = resolve(name);
-      if (!binding) throw new Error(`Cannot rename unbound identifier ${name}`);
+      const bindingScopeId = session.resolveBindingScope(name, id);
+      if (bindingScopeId == null) throw new Error(`Cannot rename unbound identifier ${name}`);
       native.validateIdentifier(replacement);
-      const plan = session.bindingRenamePlan(name, binding.scopeId);
+      const plan = session.bindingRenamePlan(name, bindingScopeId);
       for (const target of plan.targets) {
         const content =
           target.kind === 1
@@ -778,7 +779,7 @@ function makeScope(runtime: PathRuntime, id: number, parentId: number | null): N
           order: runtime.nextOrder(),
         });
       }
-      const exportEdits = scopeEdits(runtime, binding.scopeId).exports;
+      const exportEdits = scopeEdits(runtime, bindingScopeId).exports;
       for (const declaration of plan.exports) {
         let entry = exportEdits.get(declaration.start);
         if (!entry) {
