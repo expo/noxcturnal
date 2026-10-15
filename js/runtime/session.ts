@@ -28,6 +28,7 @@ export class NativeTransformSession {
   #eventCache: (NativeEvent | undefined)[] = [];
   #queryCache = new WeakMap<QueryRequest, { request: QueryRequest; result: QueryResult }>();
   #globalReferencesCache = new Map<string, SemanticReferenceView[]>();
+  #globalBindingReferencesCache = new Map<string, SemanticReferenceView[]>();
   #childrenCache = new Map<number, number[]>();
   #childIdsCache = new Map<number, Set<number>>();
   #childRoleCache = new Map<number, Map<number, number[]>>();
@@ -474,6 +475,18 @@ export class NativeTransformSession {
       return fact == null ? [] : [fact];
     });
   }
+  globalBindingReferences(name: string): SemanticReferenceView[] {
+    this.#assertOpen();
+    const cached = this.#globalBindingReferencesCache.get(name);
+    if (cached) return cached;
+    // Semantic facts describe immutable session input, including across plugins.
+    // Keep them separate from the coarse globals-query cache.
+    const references = this.#binding('binding.globals')
+      .globalBindingReferences(name)
+      .map(reference => ({ ...reference, type: 'Identifier' }));
+    this.#globalBindingReferencesCache.set(name, references);
+    return references;
+  }
   globalReferences(name: string): SemanticReferenceView[] {
     const cached = this.#globalReferencesCache.get(name);
     if (cached) return cached;
@@ -599,6 +612,7 @@ export class NativeTransformSession {
     );
   }
   close(): void {
+    this.#globalBindingReferencesCache.clear();
     this.#sourceText = null;
     if (!this.#closed && this.#native) {
       this.#native.close();

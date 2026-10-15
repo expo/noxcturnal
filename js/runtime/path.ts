@@ -690,7 +690,7 @@ function makeScope(runtime: PathRuntime, id: number, parentId: number | null): N
     getBinding(name) {
       const binding = resolve(name);
       if (binding) return makeBinding(runtime, binding);
-      const references = session.globalReferences(name);
+      const references = session.globalBindingReferences(name);
       if (references.length > 0)
         return { name, global: true, declaration: null, references, path: null, scope: null };
       return null;
@@ -879,5 +879,3 @@ function joinFragments(values: readonly (string | CodeFragment)[]): CodeFragment
     names: values.flatMap(value => (typeof value === 'string' ? [] : [...(value.names ?? [])])),
   };
 }
-
-

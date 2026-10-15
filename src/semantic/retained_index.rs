@@ -557,6 +557,16 @@ impl RetainedIndex {
             })
     }
 
+    pub fn global_binding_references(&self, name: &str) -> Vec<NativeSemanticReference> {
+        self.name_ids
+            .get(name)
+            .and_then(|name_id| self.globals.get(name_id))
+            .map_or(&[][..], Vec::as_slice)
+            .iter()
+            .map(|reference| self.native_reference(reference))
+            .collect()
+    }
+
     pub fn captures_batch(
         &self,
         function_ids: &[u32],

@@ -9,7 +9,7 @@ use crate::generated::event_schema::{
 };
 use crate::semantic::retained_index::{
     NativeBindingFact, NativeCallFact, NativeCaptureGroup, NativeConstantFact, NativeRenamePlan,
-    RetainedIndex,
+    NativeSemanticReference, RetainedIndex,
 };
 
 use super::collect::{materialize_with_scope_parents, parse_program_body_offsets};
@@ -280,6 +280,12 @@ impl NativeIndexedSession {
     pub fn binding_rename_plan(&self, name: String, scope_id: u32) -> Result<NativeRenamePlan> {
         self.ensure_open()?;
         Ok(self.retained_index.rename_plan(&name, scope_id))
+    }
+
+    #[napi]
+    pub fn global_binding_references(&self, name: String) -> Result<Vec<NativeSemanticReference>> {
+        self.ensure_open()?;
+        Ok(self.retained_index.global_binding_references(&name))
     }
 
     #[napi]
