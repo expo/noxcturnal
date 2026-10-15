@@ -115,42 +115,40 @@ impl NativeSourceText {
         offset > 0 && self.source.get(offset as usize - 1) != Some(&10)
     }
 
-    /// One batch of immutable insertion facts, including direct strings so text
-    /// insertions do not need a one-element parts array at the native boundary.
+    /// Text and composite payloads use separate typed batches. Results are in
+    /// text-first order, followed by composite order, without an outer union.
     #[napi]
     pub fn insertion_suffixes(
         &self,
-        contents: Vec<Either<Utf16String, Vec<Either<Utf16String, SourceTextRange>>>>,
+        texts: Vec<Utf16String>,
+        composites: Vec<Vec<Either<Utf16String, SourceTextRange>>>,
     ) -> Result<Buffer> {
-        let mut separators = Vec::with_capacity(contents.len());
-        for content in contents {
-            let terminated = match content {
-                Either::A(text) => terminated_insertion(&text) && !text.contains(&47),
-                Either::B(parts) => {
-                    let terminated =
-                        matches!(parts.last(), Some(Either::A(text)) if terminated_insertion(text));
-                    let mut comment_free = true;
-                    if terminated {
-                        for part in &parts {
-                            let text: &[u16] = match part {
-                                Either::A(text) => text,
-                                Either::B(range) => self
-                                    .source
-                                    .get(range.start as usize..range.end as usize)
-                                    .ok_or_else(|| {
-                                        Error::new(Status::InvalidArg, "invalid source range")
-                                    })?,
-                            };
-                            if text.contains(&47) {
-                                comment_free = false;
-                                break;
-                            }
-                        }
+        let mut separators = Vec::with_capacity(texts.len() + composites.len());
+        for text in texts {
+            separators.push(u8::from(!terminated_insertion(&text) || text.contains(&47)));
+        }
+        for parts in composites {
+            let terminated =
+                matches!(parts.last(), Some(Either::A(text)) if terminated_insertion(text));
+            let mut comment_free = true;
+            if terminated {
+                for part in &parts {
+                    let text: &[u16] = match part {
+                        Either::A(text) => text,
+                        Either::B(range) => self
+                            .source
+                            .get(range.start as usize..range.end as usize)
+                            .ok_or_else(|| {
+                                Error::new(Status::InvalidArg, "invalid source range")
+                            })?,
+                    };
+                    if text.contains(&47) {
+                        comment_free = false;
+                        break;
                     }
-                    terminated && comment_free
                 }
-            };
-            separators.push(u8::from(!terminated));
+            }
+            separators.push(u8::from(!terminated || !comment_free));
         }
         Ok(separators.into())
     }

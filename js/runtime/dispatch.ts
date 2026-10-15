@@ -98,28 +98,35 @@ export function createDispatcher(
   let hasPendingInsertions = false;
   const flushInsertions = (): void => {
     if (!hasPendingInsertions) return;
-    const contents: (string | (string | { start: number; end: number })[])[] = [];
+    const texts: string[] = [];
+    const composites: (string | { start: number; end: number })[][] = [];
     const targets: EditCommand[] = [];
+    // Text indices are nonnegative; composites use -1-based indices so their
+    // final position remains correct when later inserts add more text requests.
     const indices: number[] = [];
     let previous: RealizedContent | undefined;
+    let requestIndex = 0;
     for (const edit of edits) {
       const realized = programInsertions.get(edit)?.pending;
       if (!realized) continue;
       if (!previous || !identicalRealizedContent(previous, realized)) {
-        contents.push(realized.contentParts ?? realized.content!);
+        requestIndex = realized.contentParts
+          ? -composites.push(realized.contentParts)
+          : texts.push(realized.content!) - 1;
         previous = realized;
       }
       targets.push(edit);
-      indices.push(contents.length - 1);
+      indices.push(requestIndex);
     }
-    // Reset may have removed every pending insertion. Native facts are needed
-    // only for live edits; previews and the final commit use this same path.
     if (targets.length) {
-      const separators = session.sourceTextOperations.insertionSuffixes(contents);
-      if (separators.length !== contents.length) throw new Error('invalid insertion suffix batch');
+      const separators = session.sourceTextOperations.insertionSuffixes(texts, composites);
+      if (separators.length !== texts.length + composites.length)
+        throw new Error('invalid insertion suffix batch');
       for (let index = 0; index < targets.length; index++) {
         const edit = targets[index];
-        const suffix = separators[indices[index]] ? '\n;\n' : '\n';
+        const request = indices[index];
+        const separator = separators[request >= 0 ? request : texts.length - request - 1];
+        const suffix = separator ? '\n;\n' : '\n';
         if (edit.contentParts) edit.contentParts = [...edit.contentParts, suffix];
         else edit.content += suffix;
         programInsertions.get(edit)!.pending = undefined;

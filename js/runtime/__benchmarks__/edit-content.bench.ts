@@ -91,6 +91,8 @@ for (const surface of surfaces) {
       'unique text',
       'mutated fragment',
       'composite',
+      'unique composite',
+      'large unique text',
       'Unicode',
     ] as const) {
       const source = 'globalThis.result=1;';
@@ -115,7 +117,11 @@ for (const surface of surfaces) {
                             ? fragment
                             : mode === 'composite'
                               ? context.code.template`void ${copied};`
-                              : `void "é😀${index}";`,
+                              : mode === 'unique composite'
+                                ? context.code.template`void [${copied},${String(index)}];`
+                                : mode === 'large unique text'
+                                  ? `void "${'x'.repeat(1000)}${index}";`
+                                  : `void "é😀${index}";`,
                     );
                   }
                 },

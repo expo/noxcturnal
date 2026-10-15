@@ -365,3 +365,36 @@ test('preview includes pending peer inserts before their owner resets them', () 
   if (result.status !== 'complete') throw new Error(result.reason);
   expect(run(result.code)).toBe(5);
 });
+
+test('typed suffix batches keep interleaved text and composite boundaries in order', () => {
+  const result = transform(
+    'globalThis.result=0;',
+    'input.js',
+    defineNativePipeline({
+      phases: [
+        {
+          name: 'mixed-batches',
+          plugins: [
+            defineNativePlugin({
+              name: 'mixed-batches',
+              pre(context) {
+                const name = context.sourceSlice(11, 17);
+                context.appendToProgram('globalThis.result=1');
+                context.appendToProgram(
+                  context.code.template`[2].forEach(x=>globalThis.${name}+=x);`,
+                );
+                context.appendToProgram('globalThis.result*=3 // tail');
+                context.appendToProgram(
+                  context.code.template`[4].forEach(x=>globalThis.${name}+=x);`,
+                );
+              },
+            }),
+          ],
+        },
+      ],
+    }),
+  );
+  expect(result.status).toBe('complete');
+  if (result.status !== 'complete') throw new Error(result.reason);
+  expect(run(result.code)).toBe(13);
+});
