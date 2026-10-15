@@ -99,8 +99,35 @@ pub fn materialize_routed_buffer(
             .needs_comments
             .then_some(parsed.program.comments.as_slice()),
     };
-    collector.visit_program(&parsed.program);
-    if !manifest.needs_semantics {
+    // Program-only routes need no descendant payloads or traversal. Validation
+    // still visits the entire AST and supplies its exact node count; reuse that
+    // count instead of walking the same tree again just to emit its root.
+    if manifest.program_only && !manifest.needs_semantics {
+        let validated = crate::syntax::validation::validate_program(
+            &parsed.program,
+            "routed-materialization",
+            &allocator,
+        )?;
+        collector.node_count = validated.stats.nodes;
+        collector.emit(
+            AstKind::Program(&parsed.program),
+            VisitSide::Enter,
+            false,
+            false,
+        );
+        if manifest.include_exit {
+            collector.sequence = collector.node_count;
+            collector.emit(
+                AstKind::Program(&parsed.program),
+                VisitSide::Exit,
+                false,
+                false,
+            );
+        }
+    } else {
+        collector.visit_program(&parsed.program);
+    }
+    if !manifest.needs_semantics && !manifest.program_only {
         collector.validation_stats.nodes = collector.node_count;
         crate::syntax::validation::validate_program_with_stats(
             &parsed.program,
@@ -683,9 +710,10 @@ impl<'a> Visit<'a> for RoutedEventCollector<'a> {
         } else {
             (false, false)
         };
-        if self.manifest.routes_by_type[ast_kind_protocol_id(kind) as usize]
-            .iter()
-            .any(|route| route.side == VisitSide::Exit)
+        if self.manifest.include_exit
+            && self.manifest.routes_by_type[ast_kind_protocol_id(kind) as usize]
+                .iter()
+                .any(|route| route.side == VisitSide::Exit)
         {
             self.emit(kind, VisitSide::Exit, member_write, member_root_write);
         }

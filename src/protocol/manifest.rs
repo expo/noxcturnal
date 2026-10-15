@@ -3,7 +3,7 @@ use rustc_hash::FxHashSet;
 
 use crate::generated::event_schema::{
     CHILD_ROLE_COUNT, NODE_TYPE_COUNT, child_role_cardinality, child_role_id, child_role_name,
-    child_role_parent_type_id, field_key_id, field_key_name, node_type_name,
+    child_role_parent_type_id, field_key_id, field_key_name, node_type_id, node_type_name,
     predicate_field_supported,
 };
 
@@ -42,6 +42,7 @@ pub(crate) struct CompiledRoute {
 
 pub(crate) struct CompiledManifest {
     pub(crate) routes_by_type: Vec<Vec<CompiledRoute>>,
+    pub(crate) program_only: bool,
     pub(crate) include_parent: bool,
     pub(crate) include_scope: bool,
     pub(crate) include_exit: bool,
@@ -544,6 +545,8 @@ pub(crate) fn decode_route_manifest(
             .flatten()
             .any(|route| route.comments_inner);
     Ok(CompiledManifest {
+        program_only: routes_by_type[node_type_id("Program").expect("Program type") as usize].len()
+            == route_count,
         routes_by_type,
         include_parent,
         include_scope,

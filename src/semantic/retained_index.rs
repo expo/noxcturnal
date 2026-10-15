@@ -417,12 +417,12 @@ impl RetainedIndex {
 
     /// Global queries expose only node ids and spans. Avoid constructing binding
     /// metadata (including allocated parent names) that the caller discards.
-    pub fn global_references(&self, name: &str) -> impl Iterator<Item = (u32, u32, u32)> {
+    pub fn global_references(&self, name: &str) -> impl ExactSizeIterator<Item = (u32, u32, u32)> {
         self.name_ids
             .get(name)
             .and_then(|name_id| self.globals.get(name_id))
-            .into_iter()
-            .flatten()
+            .map_or(&[][..], Vec::as_slice)
+            .iter()
             .map(|reference| {
                 let id = reference.node_id();
                 (id, self.starts[id as usize], self.ends[id as usize])

@@ -138,25 +138,10 @@ export class NativeTransformSession {
       : [];
     const globals: QueryResult['globals'] = {};
     if (request.globals?.length) {
-      for (const fact of this.#binding('query.globals').queryGlobals([
-        ...new Set(request.globals.map(query => query.name)),
-      ])) {
-        const references = fact.references.map(reference => ({
-          id: reference.id,
-          type: 'Identifier' as const,
-          start: reference.start,
-          end: reference.end,
-          scopeId: reference.scopeId,
-          parentId: reference.parentId,
-          parentType: reference.parentType,
-          parentStart: reference.parentStart,
-          read: reference.read,
-          write: reference.write,
-          memberWrite: reference.memberWrite,
-        }));
-        globals[fact.name] = { references };
-        this.#globalReferencesCache.set(fact.name, references);
-      }
+      const names = [...new Set(request.globals.map(query => query.name))];
+      const references = this.#queryGlobalReferences(names);
+      for (let index = 0; index < names.length; index++)
+        globals[names[index]] = { references: references[index] };
     }
     const constants: QueryResult['constants'] = {};
     const constantNodesById = request.constants?.length
@@ -488,24 +473,36 @@ export class NativeTransformSession {
   globalReferences(name: string): SemanticReferenceView[] {
     const cached = this.#globalReferencesCache.get(name);
     if (cached) return cached;
-    const references =
-      this.#binding('query.globals')
-        .queryGlobals([name])[0]
-        ?.references.map(reference => ({
-          id: reference.id,
-          type: 'Identifier' as const,
-          start: reference.start,
-          end: reference.end,
-          scopeId: reference.scopeId,
-          parentId: reference.parentId,
-          parentType: reference.parentType,
-          parentStart: reference.parentStart,
-          read: reference.read,
-          write: reference.write,
-          memberWrite: reference.memberWrite,
-        })) ?? [];
-    this.#globalReferencesCache.set(name, references);
-    return references;
+    return this.#queryGlobalReferences([name])[0];
+  }
+  #queryGlobalReferences(names: string[]): SemanticReferenceView[][] {
+    const buffer = this.#binding('query.globals').queryGlobalsBuffer(names);
+    let offset = 0;
+    return names.map(name => {
+      const count = buffer.readUInt32LE(offset);
+      offset += 4;
+      const references: SemanticReferenceView[] = [];
+      for (let index = 0; index < count; index++) {
+        // Coarse global queries expose identity and spans. Preserve the existing
+        // view shape; richer semantic facts are supplied by binding queries.
+        references.push({
+          id: buffer.readUInt32LE(offset),
+          type: 'Identifier',
+          start: buffer.readUInt32LE(offset + 4),
+          end: buffer.readUInt32LE(offset + 8),
+          scopeId: undefined,
+          parentId: undefined,
+          parentType: undefined,
+          parentStart: undefined,
+          read: undefined,
+          write: undefined,
+          memberWrite: undefined,
+        } as unknown as SemanticReferenceView);
+        offset += 12;
+      }
+      this.#globalReferencesCache.set(name, references);
+      return references;
+    });
   }
   scopeParentId(scopeId: number): number | null {
     this.#assertOpen();

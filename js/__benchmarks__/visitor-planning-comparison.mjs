@@ -51,27 +51,45 @@ const visitorPipeline = (scope, route = 'Program', controlFlow = []) =>
     }),
   );
 if (process.argv[3]?.startsWith('memory')) {
+  const mode = process.argv[3];
+  const globalNames =
+    mode === 'memory-query' ? Array.from({ length: 10_000 }, (_, index) => `external${index}`) : [];
   const source =
-    process.argv[3] === 'memory-literal'
-      ? 'const text="' + '\\u0061'.repeat(2_000_000) + '";'
-      : Array.from(
-          { length: 10_000 },
-          (_, i) => `function f${i}(value) { const local = value + ${i}; return local; }`,
-        ).join('\n');
+    mode === 'memory-query'
+      ? globalNames.join(';') + ';'
+      : mode === 'memory-literal'
+        ? 'const text="' + '\\u0061'.repeat(2_000_000) + '";'
+        : Array.from(
+            { length: mode === 'memory-program-1000' ? 1000 : 10_000 },
+            (_, i) => `function f${i}(value) { const local = value + ${i}; return local; }`,
+          ).join('\n');
   let visits = 0;
+  const request = { globals: globalNames.map(name => ({ name })) };
   const plan =
-    process.argv[3] !== 'memory'
-      ? api.defineNativePipeline({ phases: [] })
-      : pipeline(
+    mode === 'memory-query'
+      ? pipeline(
           api.defineNativePlugin({
-            name: 'retained-fields',
-            visitors: [
-              api.defineVisitor('Identifier', { fields: ['name'] }, () => {
-                visits++;
-              }),
-            ],
+            name: 'globals',
+            contract: { queries: [request] },
+            pre(context) {
+              visits = Object.keys(context.query(request).globals).length;
+            },
           }),
-        );
+        )
+      : mode === 'memory-program' || mode === 'memory-program-1000'
+        ? visitorPipeline(false)
+        : mode !== 'memory'
+          ? api.defineNativePipeline({ phases: [] })
+          : pipeline(
+              api.defineNativePlugin({
+                name: 'retained-fields',
+                visitors: [
+                  api.defineVisitor('Identifier', { fields: ['name'] }, () => {
+                    visits++;
+                  }),
+                ],
+              }),
+            );
   const start = performance.now();
   assert.equal(api.transform(source, 'bench.js', plan).status, 'complete');
   const first_transform_us = (performance.now() - start) * 1000;
@@ -283,6 +301,36 @@ for (const count of [100, 1000]) {
     ),
   );
 }
+for (const [shape, source, names] of [
+  ['one name / 2000 references', 'external;'.repeat(2000), ['external']],
+  ['1000 absent names', 'const local = 1;', Array.from({ length: 1000 }, (_, i) => `absent${i}`)],
+  [
+    'mixed groups',
+    'first;second;first;second;'.repeat(500),
+    ['missing', 'first', 'second', 'absent'],
+  ],
+]) {
+  const request = { globals: names.map(name => ({ name })) };
+  addTransform(
+    `global query transport / ${shape}`,
+    source,
+    pipeline(
+      api.defineNativePlugin({
+        name: 'global-transport',
+        contract: { queries: [request] },
+        pre(context) {
+          sink = context.query(request);
+        },
+      }),
+    ),
+  );
+}
+for (const [shape, source] of [
+  ['unknown arithmetic', 'value' + ' * 2'.repeat(512)],
+  ['nonconstant wrappers', '('.repeat(512) + 'value' + ', 1)'.repeat(512)],
+  ['string concatenation', Array.from({ length: 512 }, () => '"text"').join('+')],
+])
+  addTransform(`folding chains / ${shape}`, `const result = ${source};`, folding);
 // Vary syntax density independently of source bytes to expose sizing overhead.
 for (const [shape, source] of [
   ['one function', 'function f(value){const local=value+1;return local;}'],

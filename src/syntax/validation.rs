@@ -4,13 +4,18 @@ use oxc_ast::ast::Program;
 use oxc_parser::Parser;
 use oxc_semantic::{Scoping, SemanticBuilder, Stats};
 
+pub(crate) struct ValidatedProgram {
+    pub(crate) scoping: Scoping,
+    pub(crate) stats: Stats,
+}
+
 /// Validate early errors without retaining an AST-node index. Routes that already
 /// build semantic data perform these checks in their existing build instead.
 pub(crate) fn validate_program(
     program: &Program<'_>,
     operation: &'static str,
     allocator: &Allocator,
-) -> Result<Scoping> {
+) -> Result<ValidatedProgram> {
     // Allocation hints avoid a separate AST counting traversal. The semantic
     // tables grow normally when needed; these hints never limit validation.
     // Arena usage reflects syntax rather than source length (e.g. comments).
@@ -36,7 +41,7 @@ pub(crate) fn validate_program_with_stats(
     program: &Program<'_>,
     operation: &'static str,
     stats: Stats,
-) -> Result<Scoping> {
+) -> Result<ValidatedProgram> {
     check_program(program, operation, stats, true)
 }
 
@@ -45,7 +50,7 @@ fn check_program(
     operation: &'static str,
     stats: Stats,
     exact: bool,
-) -> Result<Scoping> {
+) -> Result<ValidatedProgram> {
     let checked = SemanticBuilder::new_compiler()
         .with_stats(stats)
         .build(program);
@@ -56,7 +61,10 @@ fn check_program(
     #[cfg(not(debug_assertions))]
     let _ = exact;
     if checked.diagnostics.is_empty() {
-        Ok(checked.semantic.into_scoping())
+        Ok(ValidatedProgram {
+            stats: checked.semantic.stats(),
+            scoping: checked.semantic.into_scoping(),
+        })
     } else {
         Err(crate::parse_failure::error(
             program.source_text,

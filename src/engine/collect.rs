@@ -106,10 +106,6 @@ impl<'a> Visit<'a> for SyntaxIndexCollector<'a> {
         kind.set_node_id(NodeId::new(id as usize));
         let protocol_id = ast_kind_protocol_id(kind);
         let parent_id = self.parent_stack.last().map(|(id, _, _)| *id);
-        let child_role_id = self
-            .parent_stack
-            .last()
-            .and_then(|(_, _, parent)| child_role_id_for_edge(*parent, kind));
         let span = kind.span();
         self.retained_index.record_enter(id);
         self.retained_index.record(
@@ -122,8 +118,14 @@ impl<'a> Visit<'a> for SyntaxIndexCollector<'a> {
             parent_id,
             0,
         );
-        self.retained_index
-            .record_child_edge(id, parent_id, child_role_id);
+        if self.retention_capabilities & RETAIN_CHILDREN != 0 {
+            let child_role_id = self
+                .parent_stack
+                .last()
+                .and_then(|(_, _, parent)| child_role_id_for_edge(*parent, kind));
+            self.retained_index
+                .record_child_edge(id, parent_id, child_role_id);
+        }
         if self.retention_capabilities & RETAIN_CONSTANTS != 0 {
             self.retained_index.record_constant(kind, id);
         }
@@ -200,7 +202,6 @@ impl<'a> EventCollector<'a> {
         };
         let is_root = id.index() == 0;
         let protocol_id = ast_kind_protocol_id(kind);
-        let parent_kind = (!is_root).then(|| self.nodes.parent_kind(id));
         self.retained_index.record(
             id.index() as u32,
             protocol_id,
@@ -211,11 +212,14 @@ impl<'a> EventCollector<'a> {
             (!is_root).then(|| self.nodes.parent_id(id).index() as u32),
             scope_id.index() as u32,
         );
-        self.retained_index.record_child_edge(
-            id.index() as u32,
-            (!is_root).then(|| self.nodes.parent_id(id).index() as u32),
-            parent_kind.and_then(|parent| child_role_id_for_edge(parent, kind)),
-        );
+        if self.retention_capabilities & RETAIN_CHILDREN != 0 {
+            let parent_kind = (!is_root).then(|| self.nodes.parent_kind(id));
+            self.retained_index.record_child_edge(
+                id.index() as u32,
+                (!is_root).then(|| self.nodes.parent_id(id).index() as u32),
+                parent_kind.and_then(|parent| child_role_id_for_edge(parent, kind)),
+            );
+        }
         self.retained_index.record_semantics(
             kind,
             self.scoping,

@@ -109,21 +109,7 @@ interface NativeBinding {
     buildInitialRoute?: boolean,
   ) => {
     nextRoutedPacked(manifest: Buffer, rootStart?: number, rootEnd?: number): Buffer;
-    queryGlobals(names: string[]): {
-      name: string;
-      references: {
-        id: number;
-        start: number;
-        end: number;
-        scopeId: number;
-        parentId?: number;
-        parentType?: string;
-        parentStart?: number;
-        read: boolean;
-        write: boolean;
-        memberWrite: boolean;
-      }[];
-    }[];
+    queryGlobalsBuffer(names: string[]): Buffer;
     queryBindings(
       name?: string,
       scopeId?: number,

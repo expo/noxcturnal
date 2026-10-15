@@ -162,13 +162,22 @@ impl<'a> VisitMut<'a> for ConstantFolder<'a> {
                 };
                 *expression = self.value(selected);
             }
-            _ => {
+            Expression::ParenthesizedExpression(_)
+            | Expression::TSAsExpression(_)
+            | Expression::TSSatisfiesExpression(_)
+            | Expression::TSTypeAssertion(_)
+            | Expression::TSNonNullExpression(_)
+            | Expression::SequenceExpression(_)
                 if expression_has_failed_operand(expression, &self.failed)
-                    || evaluate_expression(expression).is_none()
-                {
-                    self.failed.insert((span.start, span.end));
-                }
+                    || evaluate_expression(expression).is_none() =>
+            {
+                self.failed.insert((span.start, span.end));
             }
+            // Only recursive evaluations need failure memoization. Literals
+            // and unsupported expressions are constant-time leaves for the
+            // evaluator; evaluating them here copies unused string values and
+            // fills the failure set with identifiers and calls.
+            _ => {}
         }
     }
 

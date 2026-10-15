@@ -599,7 +599,8 @@ fn transform_impl(
             &final_program.borrow_dependent().program,
             "native-phase",
             &final_program.borrow_owner().allocator,
-        )?;
+        )?
+        .scoping;
         let should_render = options.constant_folding == Some(true)
             || options.dead_code_elimination == Some(true)
             || options.compact == Some(true)

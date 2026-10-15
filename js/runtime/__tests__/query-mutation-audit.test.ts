@@ -3,6 +3,44 @@ import { packRouteManifest } from '../../protocol/manifest';
 import { NativeTransformSession } from '../session';
 import type { QueryRequest } from '../../index';
 
+test('batched globals preserve empty groups, reference order, and UTF-16 spans', () => {
+  const source = '"😀"; α; second; α; function shadow(α) { return α + second; }';
+  const session = new NativeTransformSession(
+    source,
+    'input.js',
+    {},
+    packRouteManifest([], false, false, (1 << 6) - 1),
+  );
+  try {
+    const request = {
+      globals: ['missing', 'α', 'second', 'anotherMissing', 'α'].map(name => ({ name })),
+    };
+    const result = session.query(request);
+    expect(Object.keys(result.globals)).toEqual(['missing', 'α', 'second', 'anotherMissing']);
+    expect(result.globals.missing.references).toEqual([]);
+    expect(result.globals.anotherMissing.references).toEqual([]);
+    for (const name of ['α', 'second']) {
+      const references = result.globals[name].references;
+      expect(references).toHaveLength(2);
+      expect(references.map(reference => source.slice(reference.start, reference.end))).toEqual([
+        name,
+        name,
+      ]);
+      expect(references[0].start).toBe(source.indexOf(name));
+      expect(references[0].start).toBeLessThan(references[1].start!);
+      expect(session.globalReferences(name)).toBe(references);
+      expect(
+        session
+          .inspect(references.map(reference => ({ nodeId: reference.id, fields: ['name'] })))
+          .map(node => node.name),
+      ).toEqual([name, name]);
+    }
+    expect(session.query(request)).toBe(result);
+  } finally {
+    session.close();
+  }
+});
+
 test('large warm query requests still detect mutation of the final descriptor', () => {
   const session = new NativeTransformSession(
     'first; second;',
