@@ -120,12 +120,12 @@ export const cases = [
   [
     'complex parameters > async method with destructured parameter that throws',
     'async () => {\n  let caught = false;\n  class Foo {\n    async bar(a, { b }) {}\n  }\n  try {\n    await new Foo().bar();\n  } catch (e) {\n    caught = true;\n  }\n  expect(caught).toBe(true);\n}',
-    "var _asyncToGenerator = require('@babel/runtime/helpers/asyncToGenerator');\n_asyncToGenerator(function* () {\n  let caught = false;\n  class Foo {\n    bar(a, { b }) {\n      return _asyncToGenerator(function* () {})();\n    }\n  }\n  try {\n    yield new Foo().bar();\n  } catch (e) {\n    caught = true;\n  }\n  expect(caught).toBe(true);\n});",
+    "var _asyncToGenerator = require('@babel/runtime/helpers/asyncToGenerator');\n_asyncToGenerator(function* () {\n  let caught = false;\n  class Foo {\n    bar(_x, _x2) {\n      return _asyncToGenerator(function* (a, { b }) {}).apply(this, arguments);\n    }\n  }\n  try {\n    yield new Foo().bar();\n  } catch (e) {\n    caught = true;\n  }\n  expect(caught).toBe(true);\n});",
   ],
   [
     'complex parameters > async method with destructured parameter',
     'async () => {\n  class Foo {\n    async bar(a, { b }) {\n      return [a, b];\n    }\n  }\n  expect(await new Foo().bar(1, { b: 2 })).toEqual([1, 2]);\n}',
-    "var _asyncToGenerator = require('@babel/runtime/helpers/asyncToGenerator');\n_asyncToGenerator(function* () {\n  class Foo {\n    bar(a, { b }) {\n      return _asyncToGenerator(function* () {\n        return [a, b];\n      })();\n    }\n  }\n  expect(yield new Foo().bar(1, { b: 2 })).toEqual([1, 2]);\n});",
+    "var _asyncToGenerator = require('@babel/runtime/helpers/asyncToGenerator');\n_asyncToGenerator(function* () {\n  class Foo {\n    bar(_x, _x2) {\n      return _asyncToGenerator(function* (a, { b }) {\n        return [a, b];\n      }).apply(this, arguments);\n    }\n  }\n  expect(yield new Foo().bar(1, { b: 2 })).toEqual([1, 2]);\n});",
   ],
   [
     'complex parameters > async method with default parameter',
@@ -140,12 +140,12 @@ export const cases = [
   [
     'complex parameters > async method with rest parameter',
     'async () => {\n  class Foo {\n    async bar(a, ...b) {\n      return [a, b];\n    }\n  }\n  expect(await new Foo().bar(1, 2, 3)).toEqual([1, [2, 3]]);\n}',
-    "var _asyncToGenerator = require('@babel/runtime/helpers/asyncToGenerator');\n_asyncToGenerator(function* () {\n  class Foo {\n    bar(a, ...b) {\n      return _asyncToGenerator(function* () {\n        return [a, b];\n      })();\n    }\n  }\n  expect(yield new Foo().bar(1, 2, 3)).toEqual([1, [2, 3]]);\n});",
+    "var _asyncToGenerator = require('@babel/runtime/helpers/asyncToGenerator');\n_asyncToGenerator(function* () {\n  class Foo {\n    bar(_x) {\n      return _asyncToGenerator(function* (a, ...b) {\n        return [a, b];\n      }).apply(this, arguments);\n    }\n  }\n  expect(yield new Foo().bar(1, 2, 3)).toEqual([1, [2, 3]]);\n});",
   ],
   [
     'complex parameters > async method with super access',
     "async () => {\n  class Base {\n    get val() {\n      return 'base';\n    }\n  }\n  class Child extends Base {\n    async foo(a, { b }) {\n      return [a, b, super.val];\n    }\n  }\n  expect(await new Child().foo(1, { b: 2 })).toEqual([1, 2, 'base']);\n}",
-    "var _asyncToGenerator = require('@babel/runtime/helpers/asyncToGenerator');\n_asyncToGenerator(function* () {\n  class Base {\n    get val() {\n      return 'base';\n    }\n  }\n  class Child extends Base {\n    foo(a, { b }) {\n      var _superprop_getVal = () => super.val;\n      return _asyncToGenerator(function* () {\n        return [a, b, _superprop_getVal()];\n      })();\n    }\n  }\n  expect(yield new Child().foo(1, { b: 2 })).toEqual([1, 2, 'base']);\n});",
+    "var _asyncToGenerator = require('@babel/runtime/helpers/asyncToGenerator');\n_asyncToGenerator(function* () {\n  class Base {\n    get val() {\n      return 'base';\n    }\n  }\n  class Child extends Base {\n    foo(_x, _x2) {\n      var _superprop_getVal = () => super.val;\n      return _asyncToGenerator(function* (a, { b }) {\n        return [a, b, _superprop_getVal()];\n      }).apply(this, arguments);\n    }\n  }\n  expect(yield new Child().foo(1, { b: 2 })).toEqual([1, 2, 'base']);\n});",
   ],
   [
     'execution order > code after await runs asynchronously',
@@ -400,12 +400,12 @@ export const cases = [
   [
     'destructuring + state lifting > control: class async method with destructured param',
     'async () => {\n  class C {\n    async m({ b }) {\n      return 42;\n    }\n  }\n  expect(await new C().m({ b: 1 })).toBe(42);\n}',
-    "var _asyncToGenerator = require('@babel/runtime/helpers/asyncToGenerator');\n_asyncToGenerator(function* () {\n  class C {\n    m({ b }) {\n      return _asyncToGenerator(function* () {\n        return 42;\n      })();\n    }\n  }\n  expect(yield new C().m({ b: 1 })).toBe(42);\n});",
+    "var _asyncToGenerator = require('@babel/runtime/helpers/asyncToGenerator');\n_asyncToGenerator(function* () {\n  class C {\n    m(_x) {\n      return _asyncToGenerator(function* ({ b }) {\n        return 42;\n      }).apply(this, arguments);\n    }\n  }\n  expect(yield new C().m({ b: 1 })).toBe(42);\n});",
   ],
   [
     'destructuring + state lifting > control: object shorthand async method with destructured param',
     'async () => {\n  const o = {\n    async m({ b }) {\n      return 42;\n    },\n  };\n  expect(await o.m({ b: 1 })).toBe(42);\n}',
-    "var _asyncToGenerator = require('@babel/runtime/helpers/asyncToGenerator');\n_asyncToGenerator(function* () {\n  const o = {\n    m({ b }) {\n      return _asyncToGenerator(function* () {\n        return 42;\n      })();\n    },\n  };\n  expect(yield o.m({ b: 1 })).toBe(42);\n});",
+    "var _asyncToGenerator = require('@babel/runtime/helpers/asyncToGenerator');\n_asyncToGenerator(function* () {\n  const o = {\n    m(_x) {\n      return _asyncToGenerator(function* ({ b }) {\n        return 42;\n      }).apply(this, arguments);\n    },\n  };\n  expect(yield o.m({ b: 1 })).toBe(42);\n});",
   ],
   [
     'destructuring + state lifting > control: arrow with body destructure (not in params)',

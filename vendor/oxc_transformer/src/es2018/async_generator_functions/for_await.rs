@@ -29,17 +29,14 @@ impl<'a> AsyncGeneratorFunctions<'a> {
     }
 
     pub(crate) fn transform_statement(&self, stmt: &mut Statement<'a>, ctx: &mut TraverseCtx<'a>) {
-        let (for_of, label) = match stmt {
-            Statement::LabeledStatement(labeled) => {
-                let LabeledStatement { label, body, .. } = labeled.as_mut();
-                if let Statement::ForOfStatement(for_of) = body {
-                    (for_of, Some(label))
-                } else {
-                    return;
-                }
-            }
-            Statement::ForOfStatement(for_of) => (for_of, None),
-            _ => return,
+        let mut labels = Vec::new();
+        let mut inner = &mut *stmt;
+        while let Statement::LabeledStatement(labeled) = inner {
+            labels.push(labeled.label.clone());
+            inner = &mut labeled.body;
+        }
+        let Statement::ForOfStatement(for_of) = inner else {
+            return;
         };
 
         if !for_of.r#await {
@@ -66,20 +63,19 @@ impl<'a> AsyncGeneratorFunctions<'a> {
         let mut new_stmt = statements.pop().unwrap();
 
         // If it's a labeled statement, we need to wrap the ForStatement with a labeled statement.
-        if let Some(label) = label {
+        if !labels.is_empty() {
             let Statement::TryStatement(try_statement) = &mut new_stmt else {
                 unreachable!(
                     "The last statement should be a try statement, please see the `build_for_await` function"
                 );
             };
             let try_statement_block_body = &mut try_statement.block.body;
-            let for_statement = try_statement_block_body.pop().unwrap();
-            try_statement_block_body.push(Statement::new_labeled_statement(
-                for_of_span,
-                label.clone(),
-                for_statement,
-                ctx,
-            ));
+            let mut for_statement = try_statement_block_body.pop().unwrap();
+            for label in labels.into_iter().rev() {
+                for_statement =
+                    Statement::new_labeled_statement(for_of_span, label, for_statement, ctx);
+            }
+            try_statement_block_body.push(for_statement);
         }
         ctx.state.statement_injector.insert_many_before(&new_stmt, statements);
 
@@ -271,6 +267,7 @@ impl<'a> AsyncGeneratorFunctions<'a> {
 
         let iterator_key =
             ctx.generate_uid("iterator", var_scope_id, SymbolFlags::FunctionScopedVariable);
+        ctx.state.generated_async_iterators.push(iterator_key.symbol_id);
         let block = {
             let block_scope_id = ctx.create_child_scope(parent_scope_id, ScopeFlags::empty());
             let for_statement_scope_id =

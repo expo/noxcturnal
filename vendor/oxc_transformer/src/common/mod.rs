@@ -148,6 +148,14 @@ impl<'a> Traverse<'a, TransformState<'a>> for Common<'a> {
         self.arrow_function_converter.enter_jsx_member_expression_object(object, ctx);
     }
 
+    fn enter_simple_assignment_target(
+        &mut self,
+        target: &mut SimpleAssignmentTarget<'a>,
+        ctx: &mut TraverseCtx<'a>,
+    ) {
+        self.arrow_function_converter.enter_simple_assignment_target(target, ctx);
+    }
+
     fn enter_expression(&mut self, expr: &mut Expression<'a>, ctx: &mut TraverseCtx<'a>) {
         self.arrow_function_converter.enter_expression(expr, ctx);
     }

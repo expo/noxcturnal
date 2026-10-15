@@ -17,6 +17,7 @@ use crate::{
 
 pub struct TransformState<'a> {
     errors: Vec<OxcDiagnostic>,
+    pub generated_async_iterators: Vec<oxc_semantic::SymbolId>,
 
     /// <https://babeljs.io/docs/options#filename>
     pub filename: String,
@@ -53,6 +54,7 @@ impl Default for TransformState<'_> {
     fn default() -> Self {
         Self {
             errors: vec![],
+            generated_async_iterators: Vec::new(),
             filename: String::from("unknown"),
             source_path: PathBuf::new(),
             source_type: SourceType::default(),
@@ -77,6 +79,7 @@ impl TransformState<'_> {
 
         Self {
             errors: vec![],
+            generated_async_iterators: Vec::new(),
             filename,
             source_path: source_path.to_path_buf(),
             source_type: SourceType::default(),
