@@ -2,7 +2,17 @@ import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
-import { mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import {
+  copyFileSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  readdirSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { transformSync } from '@babel/core';
@@ -11,6 +21,21 @@ import { beforeAll, describe, expect, test } from 'vitest';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
 const observations = new Map<string, unknown>();
+
+function hostSuffix(): string {
+  if (process.platform === 'darwin') return `darwin-${process.arch}`;
+  if (process.platform === 'win32') return `win32-${process.arch}-msvc`;
+  if (process.platform === 'linux') {
+    const glibc = (
+      process.report?.getReport?.() as { header?: { glibcVersionRuntime?: string } } | undefined
+    )?.header?.glibcVersionRuntime;
+    return `linux-${process.arch}-${glibc ? 'gnu' : 'musl'}`;
+  }
+  return `${process.platform}-${process.arch}`;
+}
+
+const hostBinaryName = `noxcturnal.${hostSuffix()}.node`;
+const hostBinary = realpathSync(join(root, hostBinaryName));
 
 beforeAll(() => {
   // Exercise fresh published entry points, outside Vitest's module rewriting.
@@ -22,10 +47,9 @@ beforeAll(() => {
         : `await import('noxcturnal')`;
     const script = `
       import { createRequire } from 'node:module';
-import { mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+      import { realpathSync } from 'node:fs';
       import { runInNewContext } from 'node:vm';
+      const require = createRequire(import.meta.url);
       let observation;
       try {
         const api = ${load};
@@ -35,11 +59,16 @@ import { join } from 'node:path';
         }] });
         const result = api.transform(
           'function read(value = 3) { return value; } globalThis.result = read();',
-          'fixture.js', pipeline,
+          'fixture.js',
+          pipeline,
         );
         const context = {};
         runInNewContext(result.code, context);
-        observation = { status: result.status, value: context.result };
+        const loaded = Object.keys(require.cache)
+          .filter(file => file.endsWith('.node'))
+          .map(file => realpathSync(file))
+          .sort();
+        observation = { status: result.status, value: context.result, loaded };
       } catch (error) {
         observation = { name: error.name, message: error.message };
       }
@@ -55,15 +84,17 @@ import { join } from 'node:path';
       ),
     );
   }
-  assert.deepEqual(observations.get('require'), { status: 'complete', value: 3 });
-  assert.deepEqual(observations.get('import'), {
-    name: 'ReferenceError',
-    message: '__dirname is not defined in ES module scope',
-  });
+  const loaded = { status: 'complete', value: 3, loaded: [hostBinary] };
+  assert.deepEqual(observations.get('require'), loaded);
+  assert.deepEqual(observations.get('import'), loaded);
 }, 120_000);
 
 test('built CommonJS package entry loads and executes a native transform', () => {
-  assert.deepEqual(observations.get('require'), { status: 'complete', value: 3 });
+  assert.deepEqual(observations.get('require'), {
+    status: 'complete',
+    value: 3,
+    loaded: [hostBinary],
+  });
 });
 
 test('built package supports native/visitor composition and diagnostics on the selected Node runtime', () => {
@@ -118,8 +149,47 @@ test('built package supports native/visitor composition and diagnostics on the s
   );
 });
 
-test.fails('built ESM package entry loads and executes a native transform', () => {
-  assert.deepEqual(observations.get('import'), { status: 'complete', value: 3 });
+test('built ESM package entry loads and executes a native transform', () => {
+  assert.deepEqual(observations.get('import'), {
+    status: 'complete',
+    value: 3,
+    loaded: [hostBinary],
+  });
+  const esm = readFileSync(join(root, 'dist/noxcturnal.mjs'), 'utf8');
+  const cjs = readFileSync(join(root, 'dist/noxcturnal.js'), 'utf8');
+  expect(esm).toContain('const require = __noxCreateRequire(import.meta.url);');
+  expect(esm).toContain('const __dirname = __noxDirname(__noxFileURLToPath(import.meta.url));');
+  expect(cjs).not.toContain('__noxCreateRequire');
+});
+
+test('built ESM package entry formats native syntax errors', () => {
+  const script = `
+    const api = await import('noxcturnal');
+    const plugin = api.defineNativePlugin({
+      name: 'runtime-smoke',
+      visitors: [api.defineVisitor('NumericLiteral', { fields: ['value'] }, () => {})],
+    });
+    const parsing = api.defineNativePipeline({ phases: [{ name: 'parse', plugins: [plugin] }] });
+    try {
+      api.transform('const =;', 'invalid.js', parsing);
+      console.log(JSON.stringify({ threw: false }));
+    } catch (error) {
+      console.log(JSON.stringify({
+        name: error.name,
+        syntax: error instanceof api.TransformSyntaxError,
+        frame: String(error.codeFrame ?? ''),
+      }));
+    }
+  `;
+  const observation = JSON.parse(
+    execFileSync(process.execPath, ['--input-type=module', '--eval', script], {
+      cwd: root,
+      encoding: 'utf8',
+      timeout: 30_000,
+    }),
+  );
+  expect(observation).toMatchObject({ name: 'SyntaxError', syntax: true });
+  expect(observation.frame).toContain('const =;');
 });
 
 // Share the fresh package build above with isolated native crash regressions.
@@ -295,3 +365,108 @@ test('pnpm packs exact native dependency versions and published entry files', ()
     rmSync(directory, { recursive: true, force: true });
   }
 }, 90_000);
+
+function runInstalledPackage(cwd: string, mode: 'import' | 'require') {
+  const load =
+    mode === 'import'
+      ? `await import('noxcturnal')`
+      : `createRequire(import.meta.url)('noxcturnal')`;
+  const script = `
+    import { createRequire } from 'node:module';
+    import { realpathSync } from 'node:fs';
+    import { runInNewContext } from 'node:vm';
+    const require = createRequire(import.meta.url);
+    try {
+      const api = ${load};
+      const pipeline = api.defineNativePipeline({ phases: [{
+        name: 'parameters',
+        native: { transforms: { parameters: true }, helpers: { mode: 'inline' } },
+      }] });
+      const result = api.transform(
+        'function read(value = 3) { return value; } globalThis.result = read();',
+        'fixture.js',
+        pipeline,
+      );
+      const context = {};
+      runInNewContext(result.code, context);
+      const loaded = Object.keys(require.cache)
+        .filter(file => file.endsWith('.node'))
+        .map(file => realpathSync(file))
+        .sort();
+      console.log(JSON.stringify({ status: result.status, value: context.result, loaded }));
+    } catch (error) {
+      console.log(JSON.stringify({
+        name: error.name,
+        code: error.code,
+        message: error.message,
+      }));
+    }
+  `;
+  const env = { ...process.env };
+  delete env.NODE_PATH;
+  return JSON.parse(
+    execFileSync(process.execPath, ['--input-type=module', '--eval', script], {
+      cwd,
+      encoding: 'utf8',
+      timeout: 30_000,
+      env,
+    }),
+  ) as { status?: string; value?: number; loaded?: string[]; code?: string; message?: string };
+}
+
+test('installed tarball prefers a colocated addon and falls back to the optional package', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'noxcturnal-installed-loader-'));
+  try {
+    execFileSync('pnpm', ['pack', '--pack-destination', directory], {
+      cwd: root,
+      stdio: 'pipe',
+      timeout: 60_000,
+    });
+    const archives = readdirSync(directory).filter(name => name.endsWith('.tgz'));
+    expect(archives).toHaveLength(1);
+    const consumer = join(directory, 'consumer');
+    mkdirSync(join(consumer, 'node_modules'), { recursive: true });
+    execFileSync('tar', ['-xzf', join(directory, archives[0]!), '-C', consumer]);
+    const packageRoot = join(consumer, 'node_modules', 'noxcturnal');
+    renameSync(join(consumer, 'package'), packageRoot);
+    const localBinary = join(packageRoot, hostBinaryName);
+    copyFileSync(hostBinary, localBinary);
+    const optionalDir = join(consumer, 'node_modules', '@noxcturnal', `noxcturnal-${hostSuffix()}`);
+    mkdirSync(optionalDir, { recursive: true });
+    const optionalBinary = join(optionalDir, hostBinaryName);
+    copyFileSync(hostBinary, optionalBinary);
+    writeFileSync(
+      join(optionalDir, 'package.json'),
+      JSON.stringify({
+        name: `@noxcturnal/noxcturnal-${hostSuffix()}`,
+        version: '0.1.1',
+        main: hostBinaryName,
+      }),
+    );
+    const optionalPackage = `@noxcturnal/noxcturnal-${hostSuffix()}`;
+    for (const mode of ['require', 'import'] as const) {
+      expect(runInstalledPackage(consumer, mode)).toEqual({
+        status: 'complete',
+        value: 3,
+        loaded: [realpathSync(localBinary)],
+      });
+    }
+    rmSync(localBinary);
+    for (const mode of ['require', 'import'] as const) {
+      expect(runInstalledPackage(consumer, mode)).toEqual({
+        status: 'complete',
+        value: 3,
+        loaded: [realpathSync(optionalBinary)],
+      });
+    }
+    rmSync(optionalDir, { recursive: true, force: true });
+    for (const mode of ['require', 'import'] as const) {
+      const failure = runInstalledPackage(consumer, mode);
+      expect(failure.code).toBe('MODULE_NOT_FOUND');
+      expect(failure.message).toContain(optionalPackage);
+      expect(failure.status).toBeUndefined();
+    }
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+}, 120_000);

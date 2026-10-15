@@ -283,7 +283,10 @@ interface NativeBinding {
 }
 
 function loadBinding(): NativeBinding {
-  // Source tests load this file from js/native; Rollup places it in dist/noxcturnal.js.
+  // Source tests load this file from js/native; Rollup places the bundle in dist/.
+  // Published ESM has no CommonJS scope, so the ESM bundle defines require and
+  // __dirname from import.meta.url before this runs. Both are required: fixing
+  // only __dirname still leaves the addon require call unresolved.
   const root = join(__dirname, basename(__dirname) === 'native' ? '../..' : '..');
   const suffix = platformSuffix();
   // Probe by requiring rather than fs-checking: test environments routinely mock `fs`,
