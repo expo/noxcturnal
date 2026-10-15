@@ -58,7 +58,7 @@ const cases = [
     name: 'private logical receiver mutation',
     native: ['first', 3],
     babel: ['first', 3],
-    localFailure: true,
+    localFailure: false,
     source: `const events=[];let receiver;class Value{constructor(name){this.name=name}get #value(){receiver=second;return 0}set #value(value){events.push(this.name,value)}static write(){return receiver.#value ||= 3}}const first=new Value('first'),second=new Value('second');receiver=first;Value.write();globalThis.result=events;`,
   },
 ];
@@ -127,7 +127,8 @@ describe.each(cases)('$name', entry => {
     test('Babel loose-private reference', () => {
       expect(run(referenceCode)).toEqual(entry.babel);
     });
-    const check = entry.name === 'private logical receiver mutation' ? test.fails : test;
+    const check =
+      entry.name === 'private logical receiver mutation' && entry.localFailure ? test.fails : test;
     check('Noxcturnal follows the Babel loose-private baseline', () => {
       expect(run(code)).toEqual(entry.babel);
     });

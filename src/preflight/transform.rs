@@ -1246,14 +1246,6 @@ fn transform_impl(
         if rewrites_object_rest_helper {
             ObjectRestLooseCompletionRewriter { allocator }.visit_program(&mut program);
         }
-        if options.logical_assignment_operators == Some(true) {
-            let existing = transformed
-                .scoping
-                .symbol_names()
-                .map(str::to_owned)
-                .collect::<rustc_hash::FxHashSet<_>>();
-            if super::logical_assignment::run(allocator, &mut program, existing) {}
-        }
         if options.private_methods == Some(true) || options.private_property_in_object == Some(true)
         {
             let mut detector = ClassFeaturesUnsupportedDetector {
