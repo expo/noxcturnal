@@ -75,7 +75,6 @@ test('provides lazy compact structural child roles without recursive ESTree tran
     "import item, { x as y } from 'pkg'; function f(a, { b }) {} const result = fn({ platform: 1 }, y); export default result;",
     'fixture.js',
     defineNativePipeline({ phases: [{ name: 'inspect', plugins: [plugin] }] }),
-    { maxFollowUpBatches: 2 },
   );
   assert.deepEqual(observed.callee, ['fn']);
   assert.deepEqual(observed.arguments, ['{ platform: 1 }', 'y']);
@@ -471,7 +470,6 @@ test('implements a Platform.select-style transform through declared compact role
     "const selected = Platform.select({ web: 'web', native: makeNative(), ios: 'ios' });",
     'fixture.js',
     defineNativePipeline({ phases: [{ name: 'platform', plugins: [plugin] }] }),
-    { maxFollowUpBatches: 2 },
   );
   assert.equal(result.status, 'complete');
   assert.equal(result.code, "const selected = 'ios';");

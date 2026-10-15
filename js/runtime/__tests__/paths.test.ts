@@ -292,7 +292,6 @@ test('hydrates declared ancestor fields in the initial routed envelope', () => {
     'const Foo = create(); exports.Bar = create(); obj["Baz"] = create(); obj[key] = create();',
     'fixture.js',
     defineNativePipeline({ phases: [{ name: 'visit', plugins: [plugin] }] }),
-    { maxFollowUpBatches: 0 },
   );
   assert.deepEqual(names, ['Foo', 'Bar', 'Baz', undefined]);
 });
@@ -403,7 +402,6 @@ test('hydrates ancestor child roles and provenance without follow-up native batc
     'try /* gap */ { use(value); } catch {}',
     'fixture.js',
     defineNativePipeline({ phases: [{ name: 'visit', plugins: [plugin] }] }),
-    { maxFollowUpBatches: 0 },
   );
   assert.deepEqual(observed, {
     statement: 1,
@@ -443,7 +441,6 @@ test('keeps hydrated ancestor capabilities identical on enter and exit', () => {
     'const owner = create();',
     'fixture.js',
     defineNativePipeline({ phases: [{ name: 'visit', plugins: [plugin] }] }),
-    { maxFollowUpBatches: 0 },
   );
   assert.deepEqual(observed, ['owner', 'owner']);
 });

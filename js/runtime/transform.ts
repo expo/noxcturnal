@@ -632,33 +632,17 @@ export function transform(
           manifest: Buffer;
           batch: RoutedEventBatch;
         } | null;
-        if (
-          options.maxNativeMemoryBytes != null &&
-          manifest.byteLength > options.maxNativeMemoryBytes
-        )
-          throw new Error('native-memory-budget-exceeded');
         if (cachedRouted?.manifest.equals(manifest)) {
           batch = cachedRouted.batch;
         } else {
           if (requiresIndex) {
-            batch = session.nextRoutedPacked(manifest, undefined, false);
-            if (
-              options.maxNativeMemoryBytes != null &&
-              session.nativeMemoryBytes + manifest.byteLength + batch.data.byteLength >
-                options.maxNativeMemoryBytes
-            )
-              throw new Error('native-memory-budget-exceeded');
+            batch = session.nextRoutedPacked(manifest);
           } else {
             const routedBuffer = native.materializeRoutedBuffer(
               observationSource,
               parseFilename,
               manifest,
             );
-            if (
-              options.maxNativeMemoryBytes != null &&
-              manifest.byteLength + routedBuffer.byteLength > options.maxNativeMemoryBytes
-            )
-              throw new Error('native-memory-budget-exceeded');
             batch = decodeRoutedEnvelope(routedBuffer);
           }
         }
@@ -668,7 +652,7 @@ export function transform(
         session.reserveEventCache(batch.nodeCount);
       if (structuralParentTypes.length > 0) session.prefetchChildren([], structuralParentTypes);
       if (prepared.ancestorChildParentTypes.length > 0)
-        session.prefetchChildren([], prepared.ancestorChildParentTypes, false);
+        session.prefetchChildren([], prepared.ancestorChildParentTypes);
       if (batch.includeParent) session.seedSummaries(batch.parentSummaries);
       const dispatch = createDispatcher(
         session,
