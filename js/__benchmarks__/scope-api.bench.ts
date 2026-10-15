@@ -1,0 +1,89 @@
+import { bench, describe } from 'vitest';
+import * as candidate from '../index';
+import { NativeTransformSession } from '../runtime/session';
+import { native } from '../native/binding';
+import { packRouteManifest } from '../protocol/manifest';
+import { createRequire } from 'node:module';
+
+// Baseline directory contains `git archive BASE js package.json`, shared readonly
+// node_modules and its separately preserved debug native addon.
+const baselineRoot = process.env.NOXCTURNAL_BENCH_BASELINE_ROOT;
+const reverse = process.env.NOXCTURNAL_BENCH_REVERSE === '1';
+const baseline = baselineRoot ? await import(`${baselineRoot}/js/index.ts`) : undefined;
+const implementations = [
+  ...(baseline ? [['baseline', baseline] as const] : []),
+  ['candidate', candidate] as const,
+];
+if (reverse) implementations.reverse();
+const source = Array.from(
+  { length: 200 },
+  (_, i) => `function f${i}(value){let local=value+${i};return local+external}`,
+).join('\n');
+for (const operation of ['route', 'scope', 'rename', 'push'] as const)
+  describe(`${operation}: 200 functions`, () => {
+    for (const [label, api] of implementations) {
+      const visitor = api.defineVisitor(
+        'Function',
+        operation === 'route' ? {} : { scope: true },
+        (path: any) => {
+          if (operation === 'scope') path.scope.hasBinding('value');
+          if (operation === 'rename') path.scope.rename('value', 'renamed');
+          if (operation === 'push') path.scope.push('var injected=1;');
+        },
+      );
+      const pipeline = api.defineNativePipeline({
+        phases: [
+          {
+            name: 'bench',
+            plugins: [api.defineNativePlugin({ name: 'bench', visitors: [visitor] })],
+          },
+        ],
+      });
+      const run = () => {
+        const result = api.transform(source, 'input.js', pipeline);
+        if (result.status !== 'complete') throw new Error('Unexpected benchmark bailout');
+        return result;
+      };
+      const result = run();
+      console.log(`${operation} ${label}: ${result.code.length} output chars`);
+      bench(label, run);
+    }
+  });
+const manifest = packRouteManifest([], true, true, 1);
+for (const [label, addon] of [
+  ...(baselineRoot
+    ? [['baseline', createRequire(import.meta.url)(`${baselineRoot}/noxcturnal.darwin-arm64.node`)]]
+    : []),
+  ['candidate', native],
+] as const) {
+  const session = new addon.NativeIndexedSession(source, 'input.js', manifest);
+  console.log(
+    `${label}: ${session.retentionDebugSummary().retainedIndexBytes} retained bytes, ${session.scopeMetadataBuffer().length} scope transfer bytes`,
+  );
+  session.close();
+}
+const constructors = [
+  ...(baselineRoot
+    ? [
+        [
+          'baseline',
+          (await import(`${baselineRoot}/js/runtime/session.ts`)).NativeTransformSession,
+        ] as const,
+      ]
+    : []),
+  ['candidate', NativeTransformSession] as const,
+];
+if (reverse) constructors.reverse();
+for (const escaped of [false, true])
+  describe(`UID source escaped=${escaped}`, () => {
+    const text = source + (escaped ? String.raw`/* _t\u0065mp */` : '');
+    for (const [label, Session] of constructors)
+      bench(label, () => {
+        const session = new Session(text, 'input.js');
+        try {
+          for (let i = 0; i < 20; i++) session.generateUid(`temp${i}`);
+        } finally {
+          session.close();
+        }
+      });
+  });
