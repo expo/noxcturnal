@@ -24,7 +24,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use crate::generated::inline_helpers::{
     INLINE_DESTRUCTURING_ITER_HELPER_DESCRIPTOR, INLINE_DESTRUCTURING_LOOSE_REST_HELPER_DESCRIPTOR,
     INLINE_DESTRUCTURING_OBJECT_HELPER_DESCRIPTOR, INLINE_DESTRUCTURING_REST_HELPER_DESCRIPTOR,
-    INLINE_TO_PROPERTY_KEY_HELPER_DESCRIPTOR,
+    INLINE_EXTENDS_HELPER_DESCRIPTOR, INLINE_TO_PROPERTY_KEY_HELPER_DESCRIPTOR,
 };
 use crate::preflight::helpers::CustomHelperRequests;
 
@@ -208,6 +208,7 @@ pub(super) fn prepare_ast(
         object_runtime: reserve("_objectDestructuringEmpty2", &mut reserved),
         rest: reserve("_objectWithoutProperties", &mut reserved),
         rest_runtime: reserve("_objectWithoutProperties2", &mut reserved),
+        copy: String::new(),
         property_key: String::new(),
         property_key_runtime: String::new(),
     };
@@ -395,6 +396,14 @@ pub(super) fn prepare_ast(
                 ("_objectDestructuringEmpty", &helper_names.object),
                 ("_objectDestructuringEmpty2", &helper_names.object_runtime),
             ],
+        );
+    }
+    if helper_usage.copy {
+        helper_names.copy = reserve("_extends", &mut reserved);
+        helper_requests.materialize_generated(
+            &INLINE_EXTENDS_HELPER_DESCRIPTOR,
+            inline_helpers,
+            &[("_extends", &helper_names.copy)],
         );
     }
     if helper_usage.rest {
@@ -747,12 +756,7 @@ impl<'a> DestructuringDeclaratorLowerer<'a> {
                     }
                 }
                 if let Some(rest) = pattern.rest {
-                    let excluded = ast.expression_array(anchor, excluded);
-                    let value = self.call(
-                        anchor,
-                        &self.helper_names.rest,
-                        [self.id(anchor, &object), excluded],
-                    );
+                    let value = self.object_rest(anchor, &object, excluded);
                     self.lower_assignment(rest.unbox().target, value, anchor, output, reserved)?;
                 }
             }
@@ -868,12 +872,7 @@ impl<'a> DestructuringDeclaratorLowerer<'a> {
                     self.lower_binding(property.value, access, kind, anchor, output, reserved)?;
                 }
                 if let Some(rest) = pattern.rest {
-                    let excluded = ast.expression_array(anchor, excluded);
-                    let value = self.call(
-                        anchor,
-                        &self.helper_names.rest,
-                        [self.id(anchor, &object), excluded],
-                    );
+                    let value = self.object_rest(anchor, &object, excluded);
                     self.lower_binding(
                         rest.unbox().argument,
                         value,
@@ -886,6 +885,37 @@ impl<'a> DestructuringDeclaratorLowerer<'a> {
             }
         }
         Ok(())
+    }
+
+    fn object_rest(
+        &self,
+        anchor: Span,
+        object: &str,
+        excluded: ArenaVec<'a, ArrayExpressionElement<'a>>,
+    ) -> Expression<'a> {
+        let ast = self.ast();
+        if excluded.is_empty() {
+            // Empty exclusions are a copy operation. Babel's general rest helper
+            // enumerates strings and symbols separately; extends uses the native
+            // assign path and therefore takes one key snapshot before getters run.
+            self.call(
+                anchor,
+                &self.helper_names.copy,
+                [
+                    ast.expression_object(anchor, ArenaVec::new_in(&ast)),
+                    self.id(anchor, object),
+                ],
+            )
+        } else {
+            self.call(
+                anchor,
+                &self.helper_names.rest,
+                [
+                    self.id(anchor, object),
+                    ast.expression_array(anchor, excluded),
+                ],
+            )
+        }
     }
 
     fn static_access_ast(
@@ -1368,6 +1398,7 @@ struct HelperNames {
     object_runtime: String,
     rest: String,
     rest_runtime: String,
+    copy: String,
     property_key: String,
     property_key_runtime: String,
 }
@@ -1377,6 +1408,7 @@ struct HelperUsage {
     iter: bool,
     object: bool,
     rest: bool,
+    copy: bool,
     property_key: bool,
 }
 
@@ -1415,7 +1447,11 @@ fn plan_binding_names(
                 plan_binding_names(&property.value, reserved, helpers);
             }
             if let Some(rest) = &pattern.rest {
-                helpers.rest = true;
+                if pattern.properties.is_empty() {
+                    helpers.copy = true;
+                } else {
+                    helpers.rest = true;
+                }
                 plan_binding_names(&rest.argument, reserved, helpers);
             }
         }
@@ -1464,7 +1500,11 @@ fn plan_assignment_names(
                 }
             }
             if let Some(rest) = &pattern.rest {
-                helpers.rest = true;
+                if pattern.properties.is_empty() {
+                    helpers.copy = true;
+                } else {
+                    helpers.rest = true;
+                }
                 plan_assignment_names(&rest.target, reserved, helpers);
             }
         }

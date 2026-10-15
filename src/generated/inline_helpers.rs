@@ -882,86 +882,125 @@ pub const INLINE_DESTRUCTURING_REST_HELPER_RUNTIME_BINDINGS: &[&str] =
     &["_objectWithoutProperties", "_objectWithoutProperties2"];
 pub const INLINE_DESTRUCTURING_REST_HELPER_RUNTIME_DEPENDENCIES: &[&str] =
     &["objectDestructuringEmpty", "objectWithoutProperties"];
-pub const INLINE_DESTRUCTURING_LOOSE_REST_HELPER: &str = r#"var _objectWithoutProperties2=(()=>{var u={objectDestructuringEmpty:function(e,i){function r(t){if(t==null)throw new TypeError("Cannot destructure "+t)}e.exports=r,e.exports.__esModule=!0,e.exports.default=e.exports},objectWithoutPropertiesLoose:function(e,i){function r(t,p){if(t==null)return{};var s={};for(var o in t)if({}.hasOwnProperty.call(t,o)){if(p.indexOf(o)!==-1)continue;s[o]=t[o]}return s}e.exports=r,e.exports.__esModule=!0,e.exports.default=e.exports},extends:function(e,i){function r(){return e.exports=r=Object.assign?Object.assign.bind():function(t){for(var p=1;p<arguments.length;p++){var s=arguments[p];for(var o in s)({}).hasOwnProperty.call(s,o)&&(t[o]=s[o])}return t},e.exports.__esModule=!0,e.exports.default=e.exports,r.apply(null,arguments)}e.exports=r,e.exports.__esModule=!0,e.exports.default=e.exports}},n={};function c(e){if(n[e])return n[e].exports;var i=n[e]={exports:{}};return u[e](i,c),i.exports}return{objectDestructuringEmpty:c("objectDestructuringEmpty"),objectWithoutPropertiesLoose:c("objectWithoutPropertiesLoose"),extends:c("extends")}})();function _objectWithoutProperties(u,n){return _objectWithoutProperties2.objectDestructuringEmpty(u),n.length?_objectWithoutProperties2.objectWithoutPropertiesLoose(u,n):_objectWithoutProperties2.extends({},u)}"#;
-pub const INLINE_DESTRUCTURING_LOOSE_REST_HELPER_GLOBALS: &[&str] =
-    &["Object", "TypeError", "arguments"];
+pub const INLINE_DESTRUCTURING_LOOSE_REST_HELPER: &str = r#"var _objectWithoutProperties2=(()=>{var o={objectDestructuringEmpty:function(e,u){function s(t){if(t==null)throw new TypeError("Cannot destructure "+t)}e.exports=s,e.exports.__esModule=!0,e.exports.default=e.exports},objectWithoutPropertiesLoose:function(e,u){function s(t,p){if(t==null)return{};var c={};for(var n in t)if({}.hasOwnProperty.call(t,n)){if(p.indexOf(n)!==-1)continue;c[n]=t[n]}return c}e.exports=s,e.exports.__esModule=!0,e.exports.default=e.exports}},r={};function i(e){if(r[e])return r[e].exports;var u=r[e]={exports:{}};return o[e](u,i),u.exports}return{objectDestructuringEmpty:i("objectDestructuringEmpty"),objectWithoutPropertiesLoose:i("objectWithoutPropertiesLoose")}})();function _objectWithoutProperties(o,r){return _objectWithoutProperties2.objectDestructuringEmpty(o),_objectWithoutProperties2.objectWithoutPropertiesLoose(o,r)}"#;
+pub const INLINE_DESTRUCTURING_LOOSE_REST_HELPER_GLOBALS: &[&str] = &["TypeError"];
 pub const INLINE_DESTRUCTURING_LOOSE_REST_HELPER_PRETTY: &str = r#"var _objectWithoutProperties2 = (() => {
-	var u = {
-		objectDestructuringEmpty: function(e, i) {
-			function r(t) {
+	var o = {
+		objectDestructuringEmpty: function(e, u) {
+			function s(t) {
 				if (t == null) throw new TypeError("Cannot destructure " + t);
 			}
-			e.exports = r, e.exports.__esModule = !0, e.exports.default = e.exports;
+			e.exports = s, e.exports.__esModule = !0, e.exports.default = e.exports;
 		},
-		objectWithoutPropertiesLoose: function(e, i) {
-			function r(t, p) {
+		objectWithoutPropertiesLoose: function(e, u) {
+			function s(t, p) {
 				if (t == null) return {};
-				var s = {};
-				for (var o in t) if ({}.hasOwnProperty.call(t, o)) {
-					if (p.indexOf(o) !== -1) continue;
-					s[o] = t[o];
+				var c = {};
+				for (var n in t) if ({}.hasOwnProperty.call(t, n)) {
+					if (p.indexOf(n) !== -1) continue;
+					c[n] = t[n];
 				}
-				return s;
+				return c;
 			}
-			e.exports = r, e.exports.__esModule = !0, e.exports.default = e.exports;
-		},
-		extends: function(e, i) {
-			function r() {
-				return e.exports = r = Object.assign ? Object.assign.bind() : function(t) {
-					for (var p = 1; p < arguments.length; p++) {
-						var s = arguments[p];
-						for (var o in s) ({}).hasOwnProperty.call(s, o) && (t[o] = s[o]);
-					}
-					return t;
-				}, e.exports.__esModule = !0, e.exports.default = e.exports, r.apply(null, arguments);
-			}
-			e.exports = r, e.exports.__esModule = !0, e.exports.default = e.exports;
+			e.exports = s, e.exports.__esModule = !0, e.exports.default = e.exports;
 		}
-	}, n = {};
-	function c(e) {
-		if (n[e]) return n[e].exports;
-		var i = n[e] = { exports: {} };
-		return u[e](i, c), i.exports;
+	}, r = {};
+	function i(e) {
+		if (r[e]) return r[e].exports;
+		var u = r[e] = { exports: {} };
+		return o[e](u, i), u.exports;
 	}
 	return {
-		objectDestructuringEmpty: c("objectDestructuringEmpty"),
-		objectWithoutPropertiesLoose: c("objectWithoutPropertiesLoose"),
-		extends: c("extends")
+		objectDestructuringEmpty: i("objectDestructuringEmpty"),
+		objectWithoutPropertiesLoose: i("objectWithoutPropertiesLoose")
 	};
 })();
-function _objectWithoutProperties(u, n) {
-	return _objectWithoutProperties2.objectDestructuringEmpty(u), n.length ? _objectWithoutProperties2.objectWithoutPropertiesLoose(u, n) : _objectWithoutProperties2.extends({}, u);
+function _objectWithoutProperties(o, r) {
+	return _objectWithoutProperties2.objectDestructuringEmpty(o), _objectWithoutProperties2.objectWithoutPropertiesLoose(o, r);
 }
 "#;
 pub const INLINE_DESTRUCTURING_LOOSE_REST_HELPER_BINDINGS: &[&str] =
     &["_objectWithoutProperties", "_objectWithoutProperties2"];
-pub const INLINE_DESTRUCTURING_LOOSE_REST_HELPER_RUNTIME: &str = r#"var _objectWithoutProperties2={objectDestructuringEmpty:require("@babel/runtime/helpers/objectDestructuringEmpty"),objectWithoutPropertiesLoose:require("@babel/runtime/helpers/objectWithoutPropertiesLoose"),extends:require("@babel/runtime/helpers/extends")};function _objectWithoutProperties(e,t){return _objectWithoutProperties2.objectDestructuringEmpty(e),t.length?_objectWithoutProperties2.objectWithoutPropertiesLoose(e,t):_objectWithoutProperties2.extends({},e)}"#;
+pub const INLINE_DESTRUCTURING_LOOSE_REST_HELPER_RUNTIME: &str = r#"var _objectWithoutProperties2={objectDestructuringEmpty:require("@babel/runtime/helpers/objectDestructuringEmpty"),objectWithoutPropertiesLoose:require("@babel/runtime/helpers/objectWithoutPropertiesLoose")};function _objectWithoutProperties(e,t){return _objectWithoutProperties2.objectDestructuringEmpty(e),_objectWithoutProperties2.objectWithoutPropertiesLoose(e,t)}"#;
 pub const INLINE_DESTRUCTURING_LOOSE_REST_HELPER_RUNTIME_GLOBALS: &[&str] = &[];
 pub const INLINE_DESTRUCTURING_LOOSE_REST_HELPER_RUNTIME_PRETTY: &str = r#"var _objectWithoutProperties2 = {
 	objectDestructuringEmpty: require("@babel/runtime/helpers/objectDestructuringEmpty"),
-	objectWithoutPropertiesLoose: require("@babel/runtime/helpers/objectWithoutPropertiesLoose"),
-	extends: require("@babel/runtime/helpers/extends")
+	objectWithoutPropertiesLoose: require("@babel/runtime/helpers/objectWithoutPropertiesLoose")
 };
 function _objectWithoutProperties(e, t) {
-	return _objectWithoutProperties2.objectDestructuringEmpty(e), t.length ? _objectWithoutProperties2.objectWithoutPropertiesLoose(e, t) : _objectWithoutProperties2.extends({}, e);
+	return _objectWithoutProperties2.objectDestructuringEmpty(e), _objectWithoutProperties2.objectWithoutPropertiesLoose(e, t);
 }
 "#;
 pub const INLINE_DESTRUCTURING_LOOSE_REST_HELPER_RUNTIME_BINDINGS: &[&str] =
     &["_objectWithoutProperties", "_objectWithoutProperties2"];
-pub const INLINE_DESTRUCTURING_LOOSE_REST_HELPER_RUNTIME_DEPENDENCIES: &[&str] = &[
-    "objectDestructuringEmpty",
-    "objectWithoutPropertiesLoose",
-    "extends",
-];
-pub const INLINE_CLASS_CONSTRUCT_HELPER: &str = r#"var _construct2=(()=>{var p={isNativeReflectConstruct:function(e,r){function t(){try{var o=!Boolean.prototype.valueOf.call(Reflect.construct(Boolean,[],function(){}))}catch(i){}return(e.exports=t=function(){return!!o},e.exports.__esModule=!0,e.exports.default=e.exports)()}e.exports=t,e.exports.__esModule=!0,e.exports.default=e.exports},setPrototypeOf:function(e,r){function t(o,i){return e.exports=t=Object.setPrototypeOf?Object.setPrototypeOf.bind():function(u,c){return u.__proto__=c,u},e.exports.__esModule=!0,e.exports.default=e.exports,t(o,i)}e.exports=t,e.exports.__esModule=!0,e.exports.default=e.exports},construct:function(e,r){var t=r("isNativeReflectConstruct"),o=r("setPrototypeOf");function i(u,c,l){if(t())return Reflect.construct.apply(null,arguments);var a=[null];a.push.apply(a,c);var f=new(u.bind.apply(u,a));return l&&o(f,l.prototype),f}e.exports=i,e.exports.__esModule=!0,e.exports.default=e.exports},assertThisInitialized:function(e,r){function t(o){if(o===void 0)throw new ReferenceError("this hasn't been initialised - super() hasn't been called");return o}e.exports=t,e.exports.__esModule=!0,e.exports.default=e.exports}},s={};function n(e){if(s[e])return s[e].exports;var r=s[e]={exports:{}};return p[e](r,n),r.exports}return{construct:n("construct"),assertThisInitialized:n("assertThisInitialized")}})();function _construct(p,s,n){return _construct2.construct(p,s,n)}_construct.assert=_construct2.assertThisInitialized;"#;
-pub const INLINE_CLASS_CONSTRUCT_HELPER_GLOBALS: &[&str] = &[
+pub const INLINE_DESTRUCTURING_LOOSE_REST_HELPER_RUNTIME_DEPENDENCIES: &[&str] =
+    &["objectDestructuringEmpty", "objectWithoutPropertiesLoose"];
+pub const INLINE_CLASS_CONSTRUCT_HELPER: &str = r#"var _construct2=(()=>{var p={isNativeReflectConstruct:function(e,r){function t(){try{var n=!Boolean.prototype.valueOf.call(Reflect.construct(Boolean,[],function(){}))}catch(c){}return(e.exports=t=function(){return!!n},e.exports.__esModule=!0,e.exports.default=e.exports)()}e.exports=t,e.exports.__esModule=!0,e.exports.default=e.exports},setPrototypeOf:function(e,r){function t(n,c){return e.exports=t=Object.setPrototypeOf?Object.setPrototypeOf.bind():function(s,f){return s.__proto__=f,s},e.exports.__esModule=!0,e.exports.default=e.exports,t(n,c)}e.exports=t,e.exports.__esModule=!0,e.exports.default=e.exports},construct:function(e,r){var t=r("isNativeReflectConstruct"),n=r("setPrototypeOf");function c(s,f,x){if(t())return Reflect.construct.apply(null,arguments);var l=[null];l.push.apply(l,f);var a=new(s.bind.apply(s,l));return x&&n(a,x.prototype),a}e.exports=c,e.exports.__esModule=!0,e.exports.default=e.exports}},o={};function u(e){if(o[e])return o[e].exports;var r=o[e]={exports:{}};return p[e](r,u),r.exports}return{construct:u("construct")}})();function _construct(p,o,u){return _construct2.construct(p,o,u)}"#;
+pub const INLINE_CLASS_CONSTRUCT_HELPER_GLOBALS: &[&str] =
+    &["Boolean", "Object", "Reflect", "arguments"];
+pub const INLINE_CLASS_CONSTRUCT_HELPER_PRETTY: &str = r#"var _construct2 = (() => {
+	var p = {
+		isNativeReflectConstruct: function(e, r) {
+			function t() {
+				try {
+					var n = !Boolean.prototype.valueOf.call(Reflect.construct(Boolean, [], function() {}));
+				} catch (c) {}
+				return (e.exports = t = function() {
+					return !!n;
+				}, e.exports.__esModule = !0, e.exports.default = e.exports)();
+			}
+			e.exports = t, e.exports.__esModule = !0, e.exports.default = e.exports;
+		},
+		setPrototypeOf: function(e, r) {
+			function t(n, c) {
+				return e.exports = t = Object.setPrototypeOf ? Object.setPrototypeOf.bind() : function(s, f) {
+					return s.__proto__ = f, s;
+				}, e.exports.__esModule = !0, e.exports.default = e.exports, t(n, c);
+			}
+			e.exports = t, e.exports.__esModule = !0, e.exports.default = e.exports;
+		},
+		construct: function(e, r) {
+			var t = r("isNativeReflectConstruct"), n = r("setPrototypeOf");
+			function c(s, f, x) {
+				if (t()) return Reflect.construct.apply(null, arguments);
+				var l = [null];
+				l.push.apply(l, f);
+				var a = new (s.bind.apply(s, l))();
+				return x && n(a, x.prototype), a;
+			}
+			e.exports = c, e.exports.__esModule = !0, e.exports.default = e.exports;
+		}
+	}, o = {};
+	function u(e) {
+		if (o[e]) return o[e].exports;
+		var r = o[e] = { exports: {} };
+		return p[e](r, u), r.exports;
+	}
+	return { construct: u("construct") };
+})();
+function _construct(p, o, u) {
+	return _construct2.construct(p, o, u);
+}
+"#;
+pub const INLINE_CLASS_CONSTRUCT_HELPER_BINDINGS: &[&str] = &["_construct", "_construct2"];
+pub const INLINE_CLASS_CONSTRUCT_HELPER_RUNTIME: &str = r#"var _construct2={construct:require("@babel/runtime/helpers/construct")};function _construct(t,r,c){return _construct2.construct(t,r,c)}"#;
+pub const INLINE_CLASS_CONSTRUCT_HELPER_RUNTIME_GLOBALS: &[&str] = &[];
+pub const INLINE_CLASS_CONSTRUCT_HELPER_RUNTIME_PRETTY: &str = r#"var _construct2 = { construct: require("@babel/runtime/helpers/construct") };
+function _construct(t, r, c) {
+	return _construct2.construct(t, r, c);
+}
+"#;
+pub const INLINE_CLASS_CONSTRUCT_HELPER_RUNTIME_BINDINGS: &[&str] = &["_construct", "_construct2"];
+pub const INLINE_CLASS_CONSTRUCT_HELPER_RUNTIME_DEPENDENCIES: &[&str] = &["construct"];
+pub const INLINE_CLASS_CONSTRUCT_ASSERT_HELPER: &str = r#"var _construct2=(()=>{var p={isNativeReflectConstruct:function(e,r){function t(){try{var o=!Boolean.prototype.valueOf.call(Reflect.construct(Boolean,[],function(){}))}catch(i){}return(e.exports=t=function(){return!!o},e.exports.__esModule=!0,e.exports.default=e.exports)()}e.exports=t,e.exports.__esModule=!0,e.exports.default=e.exports},setPrototypeOf:function(e,r){function t(o,i){return e.exports=t=Object.setPrototypeOf?Object.setPrototypeOf.bind():function(u,c){return u.__proto__=c,u},e.exports.__esModule=!0,e.exports.default=e.exports,t(o,i)}e.exports=t,e.exports.__esModule=!0,e.exports.default=e.exports},construct:function(e,r){var t=r("isNativeReflectConstruct"),o=r("setPrototypeOf");function i(u,c,l){if(t())return Reflect.construct.apply(null,arguments);var a=[null];a.push.apply(a,c);var f=new(u.bind.apply(u,a));return l&&o(f,l.prototype),f}e.exports=i,e.exports.__esModule=!0,e.exports.default=e.exports},assertThisInitialized:function(e,r){function t(o){if(o===void 0)throw new ReferenceError("this hasn't been initialised - super() hasn't been called");return o}e.exports=t,e.exports.__esModule=!0,e.exports.default=e.exports}},s={};function n(e){if(s[e])return s[e].exports;var r=s[e]={exports:{}};return p[e](r,n),r.exports}return{construct:n("construct"),assertThisInitialized:n("assertThisInitialized")}})();function _construct(p,s,n){return _construct2.construct(p,s,n)}_construct.assert=_construct2.assertThisInitialized;"#;
+pub const INLINE_CLASS_CONSTRUCT_ASSERT_HELPER_GLOBALS: &[&str] = &[
     "Boolean",
     "Object",
     "ReferenceError",
     "Reflect",
     "arguments",
 ];
-pub const INLINE_CLASS_CONSTRUCT_HELPER_PRETTY: &str = r#"var _construct2 = (() => {
+pub const INLINE_CLASS_CONSTRUCT_ASSERT_HELPER_PRETTY: &str = r#"var _construct2 = (() => {
 	var p = {
 		isNativeReflectConstruct: function(e, r) {
 			function t() {
@@ -1016,10 +1055,10 @@ function _construct(p, s, n) {
 }
 _construct.assert = _construct2.assertThisInitialized;
 "#;
-pub const INLINE_CLASS_CONSTRUCT_HELPER_BINDINGS: &[&str] = &["_construct", "_construct2"];
-pub const INLINE_CLASS_CONSTRUCT_HELPER_RUNTIME: &str = r#"var _construct2={construct:require("@babel/runtime/helpers/construct"),assertThisInitialized:require("@babel/runtime/helpers/assertThisInitialized")};function _construct(t,e,r){return _construct2.construct(t,e,r)}_construct.assert=_construct2.assertThisInitialized;"#;
-pub const INLINE_CLASS_CONSTRUCT_HELPER_RUNTIME_GLOBALS: &[&str] = &[];
-pub const INLINE_CLASS_CONSTRUCT_HELPER_RUNTIME_PRETTY: &str = r#"var _construct2 = {
+pub const INLINE_CLASS_CONSTRUCT_ASSERT_HELPER_BINDINGS: &[&str] = &["_construct", "_construct2"];
+pub const INLINE_CLASS_CONSTRUCT_ASSERT_HELPER_RUNTIME: &str = r#"var _construct2={construct:require("@babel/runtime/helpers/construct"),assertThisInitialized:require("@babel/runtime/helpers/assertThisInitialized")};function _construct(t,e,r){return _construct2.construct(t,e,r)}_construct.assert=_construct2.assertThisInitialized;"#;
+pub const INLINE_CLASS_CONSTRUCT_ASSERT_HELPER_RUNTIME_GLOBALS: &[&str] = &[];
+pub const INLINE_CLASS_CONSTRUCT_ASSERT_HELPER_RUNTIME_PRETTY: &str = r#"var _construct2 = {
 	construct: require("@babel/runtime/helpers/construct"),
 	assertThisInitialized: require("@babel/runtime/helpers/assertThisInitialized")
 };
@@ -1028,8 +1067,9 @@ function _construct(t, e, r) {
 }
 _construct.assert = _construct2.assertThisInitialized;
 "#;
-pub const INLINE_CLASS_CONSTRUCT_HELPER_RUNTIME_BINDINGS: &[&str] = &["_construct", "_construct2"];
-pub const INLINE_CLASS_CONSTRUCT_HELPER_RUNTIME_DEPENDENCIES: &[&str] =
+pub const INLINE_CLASS_CONSTRUCT_ASSERT_HELPER_RUNTIME_BINDINGS: &[&str] =
+    &["_construct", "_construct2"];
+pub const INLINE_CLASS_CONSTRUCT_ASSERT_HELPER_RUNTIME_DEPENDENCIES: &[&str] =
     &["construct", "assertThisInitialized"];
 pub const INLINE_CLASS_SUPER_GET_HELPER: &str = r#"var _get2=(()=>{var f={getPrototypeOf:function(e,t){function o(n){return e.exports=o=Object.setPrototypeOf?Object.getPrototypeOf.bind():function(r){return r.__proto__||Object.getPrototypeOf(r)},e.exports.__esModule=!0,e.exports.default=e.exports,o(n)}e.exports=o,e.exports.__esModule=!0,e.exports.default=e.exports},superPropBase:function(e,t){var o=t("getPrototypeOf");function n(r,s){for(;!{}.hasOwnProperty.call(r,s)&&(r=o(r))!==null;);return r}e.exports=n,e.exports.__esModule=!0,e.exports.default=e.exports},get:function(e,t){var o=t("superPropBase");function n(){return e.exports=n=typeof Reflect!="undefined"&&Reflect.get?Reflect.get.bind():function(r,s,a){var x=o(r,s);if(x){var l=Object.getOwnPropertyDescriptor(x,s);return l.get?l.get.call(arguments.length<3?r:a):l.value}},e.exports.__esModule=!0,e.exports.default=e.exports,n.apply(null,arguments)}e.exports=n,e.exports.__esModule=!0,e.exports.default=e.exports}},p={};function u(e){if(p[e])return p[e].exports;var t=p[e]={exports:{}};return f[e](t,u),t.exports}return{get:u("get")}})();function _get(f,p,u){return _get2.get(f,p,u)}"#;
 pub const INLINE_CLASS_SUPER_GET_HELPER_GLOBALS: &[&str] = &["Object", "Reflect", "arguments"];
@@ -1389,6 +1429,18 @@ pub static INLINE_CLASS_CONSTRUCT_HELPER_DESCRIPTOR: GeneratedHelperFragment =
         babel_dependencies: INLINE_CLASS_CONSTRUCT_HELPER_RUNTIME_DEPENDENCIES,
         inline_globals: INLINE_CLASS_CONSTRUCT_HELPER_GLOBALS,
         runtime_globals: INLINE_CLASS_CONSTRUCT_HELPER_RUNTIME_GLOBALS,
+    };
+pub static INLINE_CLASS_CONSTRUCT_ASSERT_HELPER_DESCRIPTOR: GeneratedHelperFragment =
+    GeneratedHelperFragment {
+        inline_compact: INLINE_CLASS_CONSTRUCT_ASSERT_HELPER,
+        inline_pretty: INLINE_CLASS_CONSTRUCT_ASSERT_HELPER_PRETTY,
+        runtime_compact: INLINE_CLASS_CONSTRUCT_ASSERT_HELPER_RUNTIME,
+        runtime_pretty: INLINE_CLASS_CONSTRUCT_ASSERT_HELPER_RUNTIME_PRETTY,
+        inline_bindings: INLINE_CLASS_CONSTRUCT_ASSERT_HELPER_BINDINGS,
+        runtime_bindings: INLINE_CLASS_CONSTRUCT_ASSERT_HELPER_RUNTIME_BINDINGS,
+        babel_dependencies: INLINE_CLASS_CONSTRUCT_ASSERT_HELPER_RUNTIME_DEPENDENCIES,
+        inline_globals: INLINE_CLASS_CONSTRUCT_ASSERT_HELPER_GLOBALS,
+        runtime_globals: INLINE_CLASS_CONSTRUCT_ASSERT_HELPER_RUNTIME_GLOBALS,
     };
 pub static INLINE_CLASS_SUPER_GET_HELPER_DESCRIPTOR: GeneratedHelperFragment =
     GeneratedHelperFragment {

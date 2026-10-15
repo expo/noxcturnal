@@ -224,23 +224,20 @@ test('composes the native portion of the modern Hermes language profile', async 
 test('composes the non-Hermes object rest and spread profile', async () => {
   const source = `export const merge = ({ ignored, ...rest }, extra) => ({ ...rest, ...extra });`;
   expect(await transformSource(source, 'input.js', web)).toMatchInlineSnapshot(`
-    "var _objectDestructuringEmpty2 = {
-      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
-    };
+    "import _babelHelper from '@babel/runtime/helpers/objectDestructuringEmpty';
+    import _babelHelper2 from '@babel/runtime/helpers/objectWithoutPropertiesLoose';
+    var _objectDestructuringEmpty2 = { objectDestructuringEmpty: _babelHelper };
     function _objectDestructuringEmpty(t) {
       return (_objectDestructuringEmpty2.objectDestructuringEmpty(t), t);
     }
     var _objectWithoutProperties2 = {
-      objectDestructuringEmpty: require('@babel/runtime/helpers/objectDestructuringEmpty'),
-      objectWithoutPropertiesLoose: require('@babel/runtime/helpers/objectWithoutPropertiesLoose'),
-      extends: require('@babel/runtime/helpers/extends'),
+      objectDestructuringEmpty: _babelHelper,
+      objectWithoutPropertiesLoose: _babelHelper2,
     };
     function _objectWithoutProperties(e, t) {
       return (
         _objectWithoutProperties2.objectDestructuringEmpty(e),
-        t.length
-          ? _objectWithoutProperties2.objectWithoutPropertiesLoose(e, t)
-          : _objectWithoutProperties2.extends({}, e)
+        _objectWithoutProperties2.objectWithoutPropertiesLoose(e, t)
       );
     }
     export const merge = function () {

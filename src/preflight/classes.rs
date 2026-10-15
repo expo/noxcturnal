@@ -21,14 +21,15 @@ use oxc_syntax::scope::ScopeFlags;
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::generated::inline_helpers::{
-    INLINE_CLASS_CONSTRUCT_HELPER_DESCRIPTOR, INLINE_CLASS_PRIVATE_HELPERS_DESCRIPTOR,
-    INLINE_CLASS_PRIVATE_IN_HELPER_DESCRIPTOR, INLINE_CLASS_SUPER_GET_HELPER_DESCRIPTOR,
+    INLINE_CLASS_CONSTRUCT_ASSERT_HELPER_DESCRIPTOR, INLINE_CLASS_CONSTRUCT_HELPER_DESCRIPTOR,
+    INLINE_CLASS_PRIVATE_HELPERS_DESCRIPTOR, INLINE_CLASS_PRIVATE_IN_HELPER_DESCRIPTOR,
+    INLINE_CLASS_SUPER_GET_HELPER_DESCRIPTOR,
 };
 use crate::preflight::helpers::CustomHelperRequests;
 
 pub(super) struct AstPlan {
     direct: FxHashMap<(u32, u32), DirectClassPlan>,
-    helper_requests: CustomHelperRequests,
+    helper_requests: Option<ClassHelperPlan>,
 }
 
 struct DirectClassPlan {
@@ -102,57 +103,67 @@ impl AstPlan {
     }
 }
 
-fn class_helper_requests(
-    names: &ClassHelperNames,
+struct ClassHelperPlan {
+    names: ClassHelperNames,
     construct: bool,
     super_get: bool,
     private: bool,
     check_in_rhs: bool,
     inline: bool,
-) -> CustomHelperRequests {
-    let mut requests = CustomHelperRequests::default();
-    if private {
-        requests.materialize_generated(
-            &INLINE_CLASS_PRIVATE_HELPERS_DESCRIPTOR,
-            inline,
-            &[
-                ("_classPrivateFieldLooseBase", &names.private_base),
-                ("_classPrivateMethodCall", &names.private_call),
-                ("_classPrivateFieldLooseBase2", &names.private_runtime),
-            ],
-        );
+}
+
+impl ClassHelperPlan {
+    fn materialize(self, construct_assert: bool) -> CustomHelperRequests {
+        let names = &self.names;
+        let mut requests = CustomHelperRequests::default();
+        if self.private {
+            requests.materialize_generated(
+                &INLINE_CLASS_PRIVATE_HELPERS_DESCRIPTOR,
+                self.inline,
+                &[
+                    ("_classPrivateFieldLooseBase", &names.private_base),
+                    ("_classPrivateMethodCall", &names.private_call),
+                    ("_classPrivateFieldLooseBase2", &names.private_runtime),
+                ],
+            );
+        }
+        if self.check_in_rhs {
+            requests.materialize_generated(
+                &INLINE_CLASS_PRIVATE_IN_HELPER_DESCRIPTOR,
+                self.inline,
+                &[
+                    ("_checkInRHS", &names.check_in_rhs),
+                    ("_checkInRHS2", &names.check_in_rhs_runtime),
+                ],
+            );
+        }
+        if self.construct {
+            let descriptor = if construct_assert {
+                &INLINE_CLASS_CONSTRUCT_ASSERT_HELPER_DESCRIPTOR
+            } else {
+                &INLINE_CLASS_CONSTRUCT_HELPER_DESCRIPTOR
+            };
+            requests.materialize_generated(
+                descriptor,
+                self.inline,
+                &[
+                    ("_construct", &names.construct),
+                    ("_construct2", &names.construct_runtime),
+                ],
+            );
+        }
+        if self.super_get {
+            requests.materialize_generated(
+                &INLINE_CLASS_SUPER_GET_HELPER_DESCRIPTOR,
+                self.inline,
+                &[
+                    ("_get", &names.super_get),
+                    ("_get2", &names.super_get_runtime),
+                ],
+            );
+        }
+        requests
     }
-    if check_in_rhs {
-        requests.materialize_generated(
-            &INLINE_CLASS_PRIVATE_IN_HELPER_DESCRIPTOR,
-            inline,
-            &[
-                ("_checkInRHS", &names.check_in_rhs),
-                ("_checkInRHS2", &names.check_in_rhs_runtime),
-            ],
-        );
-    }
-    if construct {
-        requests.materialize_generated(
-            &INLINE_CLASS_CONSTRUCT_HELPER_DESCRIPTOR,
-            inline,
-            &[
-                ("_construct", &names.construct),
-                ("_construct2", &names.construct_runtime),
-            ],
-        );
-    }
-    if super_get {
-        requests.materialize_generated(
-            &INLINE_CLASS_SUPER_GET_HELPER_DESCRIPTOR,
-            inline,
-            &[
-                ("_get", &names.super_get),
-                ("_get2", &names.super_get_runtime),
-            ],
-        );
-    }
-    requests
 }
 
 #[expect(clippy::too_many_arguments)]
@@ -368,7 +379,7 @@ pub(super) fn prepare_ast(
     if class_facts.is_empty() {
         return Ok(AstPlan {
             direct: FxHashMap::default(),
-            helper_requests: CustomHelperRequests::default(),
+            helper_requests: None,
         });
     }
     let mut reserved: FxHashSet<String> = semantic
@@ -430,17 +441,16 @@ pub(super) fn prepare_ast(
     let uses_super_get = direct.values().any(|plan| plan.uses_super_get);
     let uses_private = direct.values().any(|plan| plan.uses_private_helper);
     let uses_check_in_rhs = direct.values().any(|plan| plan.uses_check_in_rhs);
-    let helper_requests = class_helper_requests(
-        &helper_names,
-        uses_construct,
-        uses_super_get,
-        uses_private,
-        uses_check_in_rhs,
-        inline_helpers,
-    );
     Ok(AstPlan {
         direct,
-        helper_requests,
+        helper_requests: Some(ClassHelperPlan {
+            names: helper_names,
+            construct: uses_construct,
+            super_get: uses_super_get,
+            private: uses_private,
+            check_in_rhs: uses_check_in_rhs,
+            inline: inline_helpers,
+        }),
     })
 }
 
@@ -452,6 +462,7 @@ pub(super) fn run_ast<'a>(
     let mut pass = ClassAstLowerer {
         allocator,
         direct: plan.direct,
+        construct_assert: false,
         changed: false,
         error: None,
     };
@@ -462,12 +473,17 @@ pub(super) fn run_ast<'a>(
     if !pass.direct.is_empty() {
         return Err("classes-direct-ast-target-missing");
     }
-    Ok((pass.changed, plan.helper_requests))
+    let requests = plan
+        .helper_requests
+        .map(|helpers| helpers.materialize(pass.construct_assert))
+        .unwrap_or_default();
+    Ok((pass.changed, requests))
 }
 
 struct ClassAstLowerer<'a> {
     allocator: &'a Allocator,
     direct: FxHashMap<(u32, u32), DirectClassPlan>,
+    construct_assert: bool,
     changed: bool,
     error: Option<&'static str>,
 }
@@ -510,7 +526,7 @@ impl<'a> VisitMut<'a> for ClassAstLowerer<'a> {
                 if self.error.is_some() {
                     return;
                 }
-                match lower_simple_class(self.allocator, class, &plan) {
+                match lower_simple_class(self.allocator, class, &plan, &mut self.construct_assert) {
                     Ok(expression) => {
                         declaration.declaration =
                             ExportDefaultDeclarationKind::from(ast.expression_identifier(
@@ -555,7 +571,7 @@ impl<'a> VisitMut<'a> for ClassAstLowerer<'a> {
                 if self.error.is_some() {
                     return;
                 }
-                match lower_simple_class(self.allocator, class, &plan) {
+                match lower_simple_class(self.allocator, class, &plan, &mut self.construct_assert) {
                     Ok(expression) => {
                         statements[index] = Statement::VariableDeclaration(direct_class_variable(
                             &ast,
@@ -594,7 +610,7 @@ impl<'a> VisitMut<'a> for ClassAstLowerer<'a> {
             if self.error.is_some() {
                 return;
             }
-            match lower_simple_class(self.allocator, class, &plan) {
+            match lower_simple_class(self.allocator, class, &plan, &mut self.construct_assert) {
                 Ok(lowered) => {
                     *expression = lowered;
                     self.changed = true;
@@ -624,7 +640,7 @@ impl<'a> VisitMut<'a> for ClassAstLowerer<'a> {
         if self.error.is_some() {
             return;
         }
-        match lower_simple_class(self.allocator, class, &plan) {
+        match lower_simple_class(self.allocator, class, &plan, &mut self.construct_assert) {
             Ok(expression) => {
                 let _ = binding;
                 declaration.declaration = ExportDefaultDeclarationKind::from(expression);
@@ -651,7 +667,7 @@ impl<'a> VisitMut<'a> for ClassAstLowerer<'a> {
         if self.error.is_some() {
             return;
         }
-        match lower_simple_class(self.allocator, class, &plan) {
+        match lower_simple_class(self.allocator, class, &plan, &mut self.construct_assert) {
             Ok(expression) => {
                 declaration.declaration =
                     Some(Declaration::VariableDeclaration(direct_class_variable(
@@ -708,6 +724,7 @@ fn lower_derived_constructor_body<'a>(
     super_call_name: Option<&str>,
     anchor: Span,
     instance_initializers: &mut ArenaVec<'a, Statement<'a>>,
+    construct_assert: &mut bool,
 ) -> Result<bool, &'static str> {
     let body = function
         .body
@@ -734,6 +751,7 @@ fn lower_derived_constructor_body<'a>(
         new_target_name,
         anchor,
         instance_initializers,
+        construct_assert,
     )? {
         return Ok(false);
     }
@@ -864,6 +882,7 @@ fn lower_leading_super_constructor_body<'a>(
     new_target_name: Option<&str>,
     anchor: Span,
     instance_initializers: &mut ArenaVec<'a, Statement<'a>>,
+    construct_assert: &mut bool,
 ) -> Result<bool, &'static str> {
     let mut counter = SuperCallCounter { count: 0 };
     for statement in &mut body.statements {
@@ -928,10 +947,12 @@ fn lower_leading_super_constructor_body<'a>(
         allocator: ast.allocator,
         receiver_name: ast.allocator.alloc_str(receiver_name),
         construct_name: ast.allocator.alloc_str(construct_name),
+        used: false,
     };
     for statement in &mut body.statements {
         leading_this_rewriter.visit_statement(statement);
     }
+    *construct_assert |= leading_this_rewriter.used;
     rewritten.append(&mut body.statements);
     if let Some(new_target_name) = new_target_name {
         rewritten.push(Statement::VariableDeclaration(direct_class_variable(
@@ -1519,11 +1540,13 @@ struct LeadingThisRewriter<'a> {
     allocator: &'a Allocator,
     receiver_name: &'a str,
     construct_name: &'a str,
+    used: bool,
 }
 impl<'a> VisitMut<'a> for LeadingThisRewriter<'a> {
     #[expect(deprecated)]
     fn visit_expression(&mut self, expression: &mut Expression<'a>) {
         if matches!(expression, Expression::ThisExpression(_)) {
+            self.used = true;
             let ast = AstBuilder::new(self.allocator);
             let span = expression.span();
             *expression = ast.expression_call(
@@ -2708,6 +2731,7 @@ fn lower_simple_class<'a>(
     allocator: &'a Allocator,
     mut class: Class<'a>,
     plan: &DirectClassPlan,
+    construct_assert: &mut bool,
 ) -> Result<Expression<'a>, &'static str> {
     let ast = AstBuilder::new(allocator);
     let anchor = class.span;
@@ -3049,6 +3073,7 @@ fn lower_simple_class<'a>(
                 plan.super_call_name.as_deref(),
                 anchor,
                 &mut instance_initializers,
+                construct_assert,
             )?;
         }
         function.r#type = FunctionType::FunctionDeclaration;

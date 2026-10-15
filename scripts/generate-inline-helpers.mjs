@@ -173,12 +173,17 @@ const adapterBundles = {
       'function _objectWithoutProperties(value,excluded){_objectWithoutProperties2.objectDestructuringEmpty(value);return _objectWithoutProperties2.objectWithoutProperties(value,excluded)}',
   },
   INLINE_DESTRUCTURING_LOOSE_REST_HELPER: {
-    roots: ['objectDestructuringEmpty', 'objectWithoutPropertiesLoose', 'extends'],
+    roots: ['objectDestructuringEmpty', 'objectWithoutPropertiesLoose'],
     binding: '_objectWithoutProperties2',
     adapter:
-      'function _objectWithoutProperties(value,excluded){_objectWithoutProperties2.objectDestructuringEmpty(value);return excluded.length?_objectWithoutProperties2.objectWithoutPropertiesLoose(value,excluded):_objectWithoutProperties2.extends({},value)}',
+      'function _objectWithoutProperties(value,excluded){_objectWithoutProperties2.objectDestructuringEmpty(value);return _objectWithoutProperties2.objectWithoutPropertiesLoose(value,excluded)}',
   },
   INLINE_CLASS_CONSTRUCT_HELPER: {
+    roots: ['construct'],
+    binding: '_construct2',
+    adapter: 'function _construct(S,args,D){return _construct2.construct(S,args,D)}',
+  },
+  INLINE_CLASS_CONSTRUCT_ASSERT_HELPER: {
     roots: ['construct', 'assertThisInitialized'],
     binding: '_construct2',
     adapter:
