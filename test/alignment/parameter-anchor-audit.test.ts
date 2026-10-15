@@ -1,11 +1,14 @@
+import { createRequire } from 'node:module';
 import { transformSync } from '@babel/core';
 import parameters from '@babel/plugin-transform-parameters';
 import { describe, expect, test } from 'vitest';
 import { compile } from '../compliance/runtime';
 
+const require = createRequire(import.meta.url);
+
 function observe(code: string): unknown {
   const context: Record<string, unknown> = {};
-  new Function('globalThis', code)(context);
+  new Function('require', 'globalThis', code)(require, context);
   return context.result;
 }
 
@@ -68,7 +71,9 @@ describe.each(['inline', 'runtime'] as const)('parameter capture anchors, mode=%
     expect(first).toContain('=>');
     const code = compile(first, { transforms: { classes: true }, helpers: { mode } });
     expect(code).not.toMatch(/\baccessor\b/);
-    expect(first + code).not.toContain('@babel/runtime');
+    expect(first).not.toContain('@babel/runtime');
+    if (mode === 'inline') expect(code).not.toContain('@babel/runtime');
+    else expect(code).toContain('@babel/runtime/helpers/classPrivateFieldLooseKey');
     expect(observe(code)).toEqual([7, 3, 'function', 'function', false]);
   });
 
@@ -82,7 +87,9 @@ describe.each(['inline', 'runtime'] as const)('parameter capture anchors, mode=%
     expect(first).toContain('=>');
     const code = compile(first, { transforms: { classes: true }, helpers: { mode } });
     expect(code).not.toMatch(/\baccessor\b/);
-    expect(first + code).not.toContain('@babel/runtime');
+    expect(first).not.toContain('@babel/runtime');
+    if (mode === 'inline') expect(code).not.toContain('@babel/runtime');
+    else expect(code).toContain('@babel/runtime/helpers/classPrivateFieldLooseKey');
     expect(observe(code)).toBe(3);
   });
 });

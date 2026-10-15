@@ -98,11 +98,12 @@ test('composes the native portion of the legacy Hermes language profile in one p
       Object.defineProperty(_Reader.prototype, 'read', {
         value: Object.defineProperty(
           _asyncToGenerator(function* () {
-            var _ref = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : {},
-              _obj = _objectDestructuringEmpty(_ref),
-              _value19 = _obj.value,
+            var _obj = _objectDestructuringEmpty(
+                arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : {},
+              ),
+              _value23 = _obj.value,
               value =
-                _value19 === void 0 ? _classPrivateFieldLooseBase(this, _value)[_value] : _value19;
+                _value23 === void 0 ? _classPrivateFieldLooseBase(this, _value)[_value] : _value23;
             return yield value;
           }),
           'name',
@@ -114,7 +115,7 @@ test('composes the native portion of the legacy Hermes language profile in one p
       Object.defineProperty(_Reader.prototype, 'values', {
         value: Object.defineProperty(
           (function () {
-            var _ref2 = _wrapAsyncGenerator(function* (items) {
+            var _ref = _wrapAsyncGenerator(function* (items) {
               var _iteratorAbruptCompletion = false;
               var _didIteratorError = false;
               var _iteratorError;
@@ -144,7 +145,7 @@ test('composes the native portion of the legacy Hermes language profile in one p
               }
             });
             return function (_x) {
-              return _ref2.apply(this, arguments);
+              return _ref.apply(this, arguments);
             };
           })(),
           'name',
