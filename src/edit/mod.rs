@@ -142,6 +142,7 @@ struct Key {
     public_start: u32,
     public_end: u32,
     role: KeyRole,
+    sorts_as_range: bool,
 }
 
 /// A `Move` command contributes two keys: the ranged hole it leaves behind and the
@@ -292,6 +293,7 @@ pub fn build(source: &str, commands: Vec<EditCommand>) -> Result<Vec<Piece>> {
                 public_start,
                 public_end,
                 role: KeyRole::MoveHole,
+                sorts_as_range: true,
             });
             keys.push(Key {
                 start: destination,
@@ -302,6 +304,7 @@ pub fn build(source: &str, commands: Vec<EditCommand>) -> Result<Vec<Piece>> {
                 public_start,
                 public_end,
                 role: KeyRole::MoveDestination,
+                sorts_as_range: false,
             });
             continue;
         }
@@ -348,6 +351,7 @@ pub fn build(source: &str, commands: Vec<EditCommand>) -> Result<Vec<Piece>> {
             public_start,
             public_end,
             role: KeyRole::Body,
+            sorts_as_range: start != end,
         });
     }
     // Attribute conflicts to the logical replacement range, including its
@@ -361,16 +365,13 @@ pub fn build(source: &str, commands: Vec<EditCommand>) -> Result<Vec<Piece>> {
         {
             key.public_start = start;
             key.public_end = end;
+            key.sorts_as_range = true;
         }
     }
     keys.sort_unstable_by_key(|key| {
         (
             key.start,
-            key.end != key.start
-                || (key.affinity == 4
-                    && grouped_orders
-                        .get(&key.order)
-                        .is_some_and(|group| group.count > 1 && group.public_range.is_some())),
+            key.sorts_as_range,
             key.affinity,
             key.order,
             key.index,

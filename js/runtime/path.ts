@@ -508,29 +508,54 @@ export class NodePathImpl implements NativeNodePath {
       );
       return;
     }
-    const policies = fragments.map(value =>
-      typeof value === 'string' ? 'anchor-boundaries' : (value.mapping ?? 'sourceless'),
-    );
-    if (
-      new Set(policies).size > 1 ||
-      fragments.some(value => typeof value !== 'string' && value.names?.length)
-    ) {
+    const first = fragments[0];
+    const policy =
+      typeof first === 'string' ? 'anchor-boundaries' : (first?.mapping ?? 'sourceless');
+    let separate = false;
+    for (const value of fragments) {
+      if (
+        (typeof value === 'string' ? 'anchor-boundaries' : (value.mapping ?? 'sourceless')) !==
+          policy ||
+        (typeof value !== 'string' && value.names?.length)
+      ) {
+        separate = true;
+        break;
+      }
+    }
+    if (separate) {
       // Keep one ranged replacement for conflicts, with preceding zero-width
       // replacement runs at the same affinity. They form one deduplication unit.
-      const firstEdit = this.runtime.edits.length;
       const order = this.runtime.nextOrder();
+      let separatorNeeded = false;
       fragments.forEach((value, index) => {
-        if (index > 0) this.#insert('Replace', this.event.start, '\n');
-        const fragment =
-          typeof value === 'string'
-            ? { code: value, mapping: 'anchor-boundaries' as const }
-            : value;
-        if (index === fragments.length - 1) this.#edit('Replace', fragment);
-        else this.#insert('Replace', this.event.start, fragment);
+        if (separatorNeeded)
+          this.runtime.edits.push({
+            kind: 'Replace',
+            start: this.event.start,
+            end: this.event.start,
+            content: '\n',
+            mapping: 'Sourceless',
+            owner: this.runtime.owner,
+            order,
+          });
+        const mapping =
+          typeof value === 'string' ? 'AnchorBoundaries' : mappingPolicy(value.mapping);
+        const text = typeof value === 'string' ? value : value.code;
+        // A sourceless separator can share the preceding sourceless run. Mapped
+        // runs retain a separate separator so its provenance stays unmapped.
+        const absorbSeparator = mapping === 'Sourceless' && index < fragments.length - 1;
+        this.runtime.edits.push({
+          kind: 'Replace',
+          start: this.event.start,
+          end: index === fragments.length - 1 ? this.event.end : this.event.start,
+          content: absorbSeparator ? text + '\n' : text,
+          mapping,
+          names: typeof value === 'string' || !value.names ? undefined : [...value.names],
+          owner: this.runtime.owner,
+          order,
+        });
+        separatorNeeded = !absorbSeparator;
       });
-      for (let index = firstEdit; index < this.runtime.edits.length; index++) {
-        this.runtime.edits[index]!.order = order;
-      }
       return;
     }
     this.#edit('Replace', joinFragments(fragments));
@@ -551,6 +576,20 @@ export class NodePathImpl implements NativeNodePath {
     prefix = '',
     suffix = '',
   ): void {
+    if (typeof content === 'string' || (!isFragmentList(content) && !('kind' in content))) {
+      const fragment = typeof content === 'string' ? undefined : content;
+      this.runtime.edits.push({
+        kind,
+        start: offset,
+        end: offset,
+        content: prefix + (typeof content === 'string' ? content : fragment!.code) + suffix,
+        mapping: fragment ? mappingPolicy(fragment.mapping) : undefined,
+        names: fragment?.names ? [...fragment.names] : undefined,
+        owner: this.runtime.owner,
+        order: this.runtime.nextOrder(),
+      });
+      return;
+    }
     if (
       isFragmentList(content) ||
       (typeof content !== 'string' && 'kind' in content && content.kind === 'composite')
@@ -570,17 +609,11 @@ export class NodePathImpl implements NativeNodePath {
       for (const part of parts) this.#insert(kind, offset, part);
       return;
     }
-    const fragment =
-      !isFragmentList(content) && typeof content !== 'string' && !('kind' in content)
-        ? content
-        : undefined;
     this.runtime.edits.push({
       kind,
       start: offset,
       end: offset,
       ...realizeContent(this.runtime.session, content, this.#degraded, prefix, suffix),
-      mapping: fragment ? mappingPolicy(fragment.mapping) : undefined,
-      names: fragment?.names ? [...fragment.names] : undefined,
       owner: this.runtime.owner,
       order: this.runtime.nextOrder(),
     });

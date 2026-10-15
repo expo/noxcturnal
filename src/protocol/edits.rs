@@ -3,7 +3,7 @@ use napi::{Error, Result, Status};
 use crate::edit;
 use crate::protocol::constants::PARTS_TAG;
 
-fn decode_packed_words(data: &[u8], strings: Vec<String>) -> Result<Vec<edit::EditCommand>> {
+fn decode_packed_words(data: &[u8], strings: Vec<&str>) -> Result<Vec<edit::EditCommand>> {
     if !data.len().is_multiple_of(4) || data.len() < 4 {
         return Err(Error::new(Status::InvalidArg, "invalid packed edit buffer"));
     }
@@ -35,7 +35,7 @@ fn decode_packed_words(data: &[u8], strings: Vec<String>) -> Result<Vec<edit::Ed
                 0 => edit::RawContentPart::Text(
                     strings
                         .get(word(base + 1) as usize)
-                        .cloned()
+                        .map(|text| (*text).to_owned())
                         .ok_or_else(|| {
                             Error::new(Status::InvalidArg, "invalid packed string id")
                         })?,
@@ -94,36 +94,40 @@ fn decode_packed_words(data: &[u8], strings: Vec<String>) -> Result<Vec<edit::Ed
             .map(|index| {
                 strings
                     .get(word(index) as usize)
-                    .cloned()
+                    .map(|text| (*text).to_owned())
                     .ok_or_else(|| Error::new(Status::InvalidArg, "invalid packed string id"))
             })
             .collect::<Result<Vec<_>>>()?;
         // Move edits reuse the content word as their destination offset.
-        let (content, parts, destination) =
-            if kind == edit::EditKind::Move {
-                let destination = (content_id != u32::MAX).then_some(content_id);
-                (None, Vec::new(), destination)
-            } else if content_id == u32::MAX {
-                (None, Vec::new(), None)
-            } else if content_id & PARTS_TAG != 0 {
-                let entry = (content_id & !PARTS_TAG) as usize;
-                (
-                    None,
-                    parts_entries
-                        .get(entry)
-                        .cloned()
-                        .ok_or_else(|| Error::new(Status::InvalidArg, "invalid packed parts id"))?,
-                    None,
-                )
-            } else {
-                (
-                    Some(strings.get(content_id as usize).cloned().ok_or_else(|| {
-                        Error::new(Status::InvalidArg, "invalid packed string id")
-                    })?),
-                    Vec::new(),
-                    None,
-                )
-            };
+        let (content, parts, destination) = if kind == edit::EditKind::Move {
+            let destination = (content_id != u32::MAX).then_some(content_id);
+            (None, Vec::new(), destination)
+        } else if content_id == u32::MAX {
+            (None, Vec::new(), None)
+        } else if content_id & PARTS_TAG != 0 {
+            let entry = (content_id & !PARTS_TAG) as usize;
+            (
+                None,
+                parts_entries
+                    .get(entry)
+                    .cloned()
+                    .ok_or_else(|| Error::new(Status::InvalidArg, "invalid packed parts id"))?,
+                None,
+            )
+        } else {
+            (
+                Some(
+                    strings
+                        .get(content_id as usize)
+                        .map(|text| (*text).to_owned())
+                        .ok_or_else(|| {
+                            Error::new(Status::InvalidArg, "invalid packed string id")
+                        })?,
+                ),
+                Vec::new(),
+                None,
+            )
+        };
         edits.push(edit::EditCommand {
             kind,
             start: word(cursor + 1),
@@ -177,8 +181,7 @@ pub(crate) fn decode_packed_commands(data: &[u8]) -> Result<Vec<edit::EditComman
         }
         strings.push(
             std::str::from_utf8(&data[cursor..cursor + length])
-                .map_err(|_| Error::new(Status::InvalidArg, "invalid packed edit UTF-8"))?
-                .to_owned(),
+                .map_err(|_| Error::new(Status::InvalidArg, "invalid packed edit UTF-8"))?,
         );
         cursor += length;
     }

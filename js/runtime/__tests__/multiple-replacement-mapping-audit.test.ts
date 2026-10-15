@@ -105,6 +105,63 @@ const mixedReplacement = (name: string, first = 'first();') =>
     ],
   });
 
+test.each(['boundary', 'character'] as const)(
+  'sourceless separators retain every lookup in %s maps',
+  sourceMapMode => {
+    for (const prefix of ['', 'first();', 'first();\ninside();']) {
+      const run = (multiple: boolean) => {
+        const result = transform(
+          'old();',
+          'input.js',
+          defineNativePipeline({
+            phases: [
+              {
+                name: 'replace',
+                plugins: [
+                  defineNativePlugin({
+                    name: 'replace',
+                    pre(context) {
+                      if (!multiple) {
+                        context.editor.overwrite(0, 0, prefix, 'sourceless');
+                        context.editor.overwrite(0, 0, '\n', 'sourceless');
+                      }
+                    },
+                    visitors: [
+                      defineVisitor('ExpressionStatement', {}, path => {
+                        const last = {
+                          code: 'last();',
+                          mapping: 'anchor-start' as const,
+                          names: ['last'],
+                        };
+                        if (multiple)
+                          path.replaceWithMultiple([{ code: prefix, mapping: 'sourceless' }, last]);
+                        else path.replaceWith(last);
+                      }),
+                    ],
+                  }),
+                ],
+              },
+            ],
+          }),
+          { sourceMapMode },
+        );
+        expect(result.status).toBe('complete');
+        if (result.status !== 'complete') throw new Error(result.reason);
+        expect(result.code).toBe(prefix + '\nlast();');
+        const map = new TraceMap({ version: 3, sources: ['input.js'], ...result.map });
+        return result.code
+          .split('\n')
+          .flatMap((line, index) =>
+            Array.from({ length: line.length + 1 }, (_, column) =>
+              originalPositionFor(map, { line: index + 1, column }),
+            ),
+          );
+      };
+      expect(run(true)).toEqual(run(false));
+    }
+  },
+);
+
 test.each([false, true])(
   'mixed replacement retains insertion affinity, external edit first=%s',
   externalFirst => {

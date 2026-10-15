@@ -235,9 +235,12 @@ function identicalContentParts(
 function identicalConvergentEdit(a: EditCommand, b: EditCommand): boolean {
   if (a.kind !== b.kind || a.content !== b.content || a.destination !== b.destination) return false;
   if ((a.mapping ?? 'Sourceless') !== (b.mapping ?? 'Sourceless')) return false;
-  const aNames = a.names ?? [];
-  const bNames = b.names ?? [];
-  if (aNames.length !== bNames.length || aNames.some((name, index) => name !== bNames[index]))
+  const aNames = a.names;
+  const bNames = b.names;
+  if (
+    (aNames?.length ?? 0) !== (bNames?.length ?? 0) ||
+    aNames?.some((name, index) => name !== bNames![index])
+  )
     return false;
   if (a.contentParts == null || b.contentParts == null)
     return a.contentParts == null && b.contentParts == null;
@@ -250,18 +253,33 @@ function dedupeConvergentEdits(edits: readonly EditCommand[]): {
 } {
   // Structured operations can consist of several commands with one order. A
   // matching ranged tail does not prove their prefixes/copies are equivalent.
-  const groups = new Map<string, EditCommand[]>();
-  const keys = new Map<EditCommand, string>();
-  edits.forEach((edit, index) => {
-    const key = `${edit.owner ?? ''}:${edit.order ?? index}`;
-    keys.set(edit, key);
-    const group = groups.get(key);
-    if (group) group.push(edit);
-    else groups.set(key, [edit]);
-  });
-  const identicalGroup = (a: string, b: string): boolean => {
-    const left = groups.get(a)!;
-    const right = groups.get(b)!;
+  // Orders come from the phase-wide counter. Keep singleton operations as edits;
+  // only compound replacements need an array and whole-group comparison.
+  let previousOrder = -1;
+  let ordered = true;
+  for (let index = 0; index < edits.length; index++) {
+    const order = edits[index]!.order ?? index;
+    if (order <= previousOrder) {
+      ordered = false;
+      break;
+    }
+    previousOrder = order;
+  }
+  // Strictly increasing orders cannot contain a compound operation. Ordinary
+  // visitor edits therefore need only the original range index, without groups.
+  const groups = ordered ? undefined : new Map<number, EditCommand | EditCommand[]>();
+  if (groups)
+    edits.forEach((edit, index) => {
+      const key = edit.order ?? index;
+      const group = groups.get(key);
+      if (Array.isArray(group)) group.push(edit);
+      else groups.set(key, group ? [group, edit] : edit);
+    });
+  const identicalGroup = (a: number, b: number): boolean => {
+    const left = groups!.get(a)!;
+    const right = groups!.get(b)!;
+    if (!Array.isArray(left) || !Array.isArray(right))
+      return !Array.isArray(left) && !Array.isArray(right) && identicalConvergentEdit(left, right);
     return (
       left.length === right.length &&
       left.every((edit, index) => {
@@ -274,17 +292,34 @@ function dedupeConvergentEdits(edits: readonly EditCommand[]): {
       })
     );
   };
-  const byRange = new Map<string, EditCommand>();
-  const droppedGroups = new Set<string>();
-  for (const edit of edits) {
-    if (edit.end === edit.start) continue;
+  const byRange = new Map<string, number>();
+  const droppedGroups = groups ? new Set<number>() : undefined;
+  const kept: EditCommand[] = [];
+  for (let index = 0; index < edits.length; index++) {
+    const edit = edits[index]!;
+    if (edit.end === edit.start) {
+      kept.push(edit);
+      continue;
+    }
     const key = `${Math.min(edit.start, edit.end)}:${Math.max(edit.start, edit.end)}`;
-    const first = byRange.get(key);
-    const group = keys.get(edit)!;
-    if (first && keys.get(first) !== group && identicalGroup(keys.get(first)!, group)) {
-      droppedGroups.add(group);
-    } else if (!first) byRange.set(key, edit);
+    const firstIndex = byRange.get(key);
+    const group = edit.order ?? index;
+    const firstOrder = firstIndex == null ? undefined : (edits[firstIndex]!.order ?? firstIndex);
+    if (
+      firstOrder != null &&
+      firstOrder !== group &&
+      (groups
+        ? identicalGroup(firstOrder, group)
+        : identicalConvergentEdit(edits[firstIndex!]!, edit))
+    ) {
+      droppedGroups?.add(group);
+      continue;
+    }
+    if (firstIndex == null) byRange.set(key, index);
+    kept.push(edit);
   }
-  const kept = edits.filter(edit => !droppedGroups.has(keys.get(edit)!));
-  return { edits: kept, dropped: edits.length - kept.length };
+  const result = droppedGroups
+    ? edits.filter((edit, index) => !droppedGroups.has(edit.order ?? index))
+    : kept;
+  return { edits: result, dropped: edits.length - result.length };
 }
