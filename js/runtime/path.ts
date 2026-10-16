@@ -43,6 +43,13 @@ export function childRoleIsDeclared(roles: readonly string[], requestedRole: str
   return roles.includes(requestedRole);
 }
 
+/** Identifier and static/computed member nodes are the only patterns `matchesPattern` can match. */
+function patternField(type: string): 'name' | 'memberPath' | undefined {
+  if (type === 'Identifier') return 'name';
+  if (type === 'StaticMemberExpression' || type === 'ComputedMemberExpression') return 'memberPath';
+  return undefined;
+}
+
 export function eventIsSkipped(event: NativeEvent, skipped: SkipState | undefined): boolean {
   if (!skipped) return false;
   const active = skipped.active;
@@ -319,7 +326,11 @@ export class NodePathImpl implements NativeNodePath {
     return value;
   }
   matchesPattern(pattern: string, allowPartial = false): boolean {
-    const field = this.type === 'Identifier' ? 'name' : 'memberPath';
+    // Super, spread elements, and other non-members cannot match. Requiring
+    // memberPath for them rejects valid children of an Expression route, such
+    // as the callee of `super(one, two)`.
+    const field = patternField(this.type);
+    if (field == null) return false;
     const capabilities = this.runtime.capabilities;
     const fields =
       this.ancestryDepth > 0

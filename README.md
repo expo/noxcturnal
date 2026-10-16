@@ -63,9 +63,10 @@ Every plugin in a phase observes the same immutable input. Its edits become visi
 phase boundary, after validation and an optional reparse. Split dependent transforms into separate
 phases when a later transform must observe an earlier transform's output.
 
-`path.matchesPattern()` uses native AST facts. Declare `fields: ['memberPath']` for member
-expressions or `fields: ['name']` for identifiers, including in child contracts. Missing declarations
-throw; matching never reparses source in JavaScript. For fixed patterns, prefer a native
+`path.matchesPattern()` uses native AST facts. Declare `fields: ['memberPath']` for static or
+computed member expressions or `fields: ['name']` for identifiers, including in child contracts.
+Missing declarations throw. Other nodes, such as a `super()` callee or a spread argument, return
+false. Matching never reparses source in JavaScript. For fixed patterns, prefer a native
 `where: { memberPath: { equals: 'process.env.NODE_ENV' } }` predicate. Predicates share chain
 prefixes without transferring full paths for every nested member.
 
