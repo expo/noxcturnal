@@ -133,6 +133,9 @@ interface NativeBinding {
     nextRoutedPacked(manifest: Buffer, rootStart?: number, rootEnd?: number): Buffer;
     queryGlobalsBuffer(names: string[]): Buffer;
     globalBindingReferencesBuffer(name: string): Buffer;
+    queryBindingsBatch(
+      requests: { name: string; scopeId: number }[],
+    ): ReturnType<NativeIndexedSessionBinding['queryBindings']>;
     queryBindings(
       name?: string,
       scopeId?: number,
