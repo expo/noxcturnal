@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import { test } from 'vitest';
+import { test, vi } from 'vitest';
+import { NativeTransformSession } from '../session';
 
 import { defineNativePipeline, defineNativePlugin, defineVisitor, transform } from '../../index';
 test('provides lazy compact structural child roles without recursive ESTree transfer', () => {
@@ -578,4 +579,42 @@ test('projects flattened arrow parameters with parser-accurate binding roles', (
       },
     ],
   ]);
+});
+
+test('batches child hydration for sparse matched parents and caches empty children', () => {
+  const prefetch = vi.spyOn(NativeTransformSession.prototype, 'prefetchChildren');
+  const observed: string[][] = [];
+  const plugin = defineNativePlugin({
+    name: 'selective-children',
+    visitors: [
+      defineVisitor(
+        'CallExpression',
+        {
+          fields: ['calleeName'],
+          where: { calleeName: { equals: 'selected' } },
+          children: { arguments: { route: 'Expression' } },
+        },
+        path => {
+          observed.push(path.getChildList('arguments').map(child => child.sourceText()));
+          path.getChildList('arguments');
+        },
+      ),
+    ],
+  });
+  try {
+    for (const size of [32, 64, 128]) {
+      prefetch.mockClear();
+      transform(
+        `${'other(1);'.repeat(size)} selected(2); selected();`,
+        'fixture.js',
+        defineNativePipeline({ phases: [{ name: 'inspect', plugins: [plugin] }] }),
+      );
+      assert.equal(prefetch.mock.calls.length, 1);
+      assert.equal(prefetch.mock.calls[0][0]?.length, 2);
+      assert.equal(prefetch.mock.calls[0][1], undefined);
+    }
+    assert.deepEqual(observed, [['2'], [], ['2'], [], ['2'], []]);
+  } finally {
+    prefetch.mockRestore();
+  }
 });
