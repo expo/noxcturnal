@@ -13,7 +13,10 @@ const ordinary = Array.from(
   { length: 400 },
   (_, index) => `const s${index} = "word${index}";\nconst n${index} = ${index};`,
 ).join('\n');
-const exceptional = `const value = ${JSON.stringify('\uD800x\uDC00\0')};\n`.repeat(40);
+const exceptional = Array.from(
+  { length: 40 },
+  (_, index) => `const value${index} = ${JSON.stringify('\uD800x\uDC00\0')};`,
+).join('\n');
 
 for (const [label, api] of implementations) {
   const pipeline = (scope: boolean, fields: string[]) =>
