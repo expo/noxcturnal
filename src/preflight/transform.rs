@@ -619,6 +619,7 @@ fn transform_impl(
                 &mut program,
                 options.constant_folding == Some(true),
                 options.dead_code_elimination == Some(true),
+                options.optimization_module_context == Some(true),
                 (options.constant_folding != Some(true)).then_some(checked_scoping),
             );
             let (code, layer) = render_program(
@@ -1312,6 +1313,7 @@ fn transform_impl(
                 &mut program,
                 options.constant_folding == Some(true),
                 options.dead_code_elimination == Some(true),
+                options.optimization_module_context == Some(true),
                 None,
             );
         }

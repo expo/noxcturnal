@@ -399,7 +399,7 @@ function validateNativePlan(phaseName: string, plan: PreflightPlan): void {
       throw new Error(`${phaseName}: invalid React Compiler customOptOutDirectives`);
   }
   if (plan.optimize != null) {
-    const allowed = new Set(['constantFolding', 'deadCodeElimination']);
+    const allowed = new Set(['constantFolding', 'deadCodeElimination', 'moduleContext']);
     for (const [name, value] of Object.entries(plan.optimize)) {
       if (!allowed.has(name)) throw new Error(`${phaseName}: unknown native optimization ${name}`);
       if (value !== true)

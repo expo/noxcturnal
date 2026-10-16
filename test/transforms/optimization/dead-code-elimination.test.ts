@@ -213,3 +213,53 @@ test('does not empty variable declarations used as for initializers', async () =
     `"for (let unused = () => 1; condition(); update()) work();"`,
   );
 });
+
+test('removes a dead CommonJS dependency chain in explicit module context', async () => {
+  const source = `
+function leaf() { return 7; }
+function dead() { return leaf(); }
+module.exports = 3;
+`;
+  expect(
+    await transformSource(source, 'input.js', {
+      optimize: { ...options.optimize, moduleContext: true },
+    }),
+  ).toBe('module.exports = 3;');
+});
+
+test('preserves observable script functions without ESM syntax', async () => {
+  const source = 'function leaf() { return 7; } function dead() { return leaf(); }';
+  for (const moduleContext of [undefined, false] as const) {
+    const output = await transformSource(source, 'input.js', {
+      optimize: { ...options.optimize, moduleContext },
+    });
+    expect(output).toContain('function leaf()');
+    expect(output).toContain('function dead()');
+  }
+});
+
+test('retains CommonJS exports, referenced functions and side effects in module context', async () => {
+  const source = `
+function leaf() { return 7; }
+function dead() { return leaf(); }
+function retained() { return 42; }
+sideEffect();
+module.exports = retained;
+`;
+  const output = await transformSource(source, 'input.js', {
+    optimize: { ...options.optimize, moduleContext: true },
+  });
+  expect(output).not.toContain('function leaf');
+  expect(output).not.toContain('function dead');
+  expect(output).toContain('function retained()');
+  expect(output).toContain('sideEffect();');
+  expect(output).toContain('module.exports = retained;');
+});
+
+test('module-local DCE preserves script parsing semantics', async () => {
+  const output = await transformSource('function unused() {} module.exports = 010;', 'input.js', {
+    optimize: { deadCodeElimination: true, moduleContext: true },
+  });
+  expect(output).not.toContain('function unused');
+  expect(output).toContain('module.exports =');
+});

@@ -54,3 +54,20 @@ for (const [name, build] of Object.entries(builders)) {
     }
   });
 }
+
+test('module context distinguishes optimizer cache keys', () => {
+  const pipeline = (moduleContext: boolean) =>
+    defineNativePipeline({
+      phases: [
+        {
+          name: 'dce',
+          native: {
+            optimize: { deadCodeElimination: true, moduleContext },
+          },
+        },
+      ],
+    });
+  expect(pipelineCacheKey(pipeline(true), 'input.js')).not.toBe(
+    pipelineCacheKey(pipeline(false), 'input.js'),
+  );
+});

@@ -10,6 +10,7 @@ use napi_derive::napi;
 pub struct NativePreflightOptions {
     /// Original public filename, separate from the parser dialect path.
     pub source_filename: Option<String>,
+    pub optimization_module_context: Option<bool>,
     pub react_compiler: Option<bool>,
     pub react_compiler_compilation_mode: Option<String>,
     pub react_compiler_panic_threshold: Option<String>,
