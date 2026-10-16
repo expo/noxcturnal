@@ -5,6 +5,8 @@ use std::env;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+mod build_support;
+
 /// The pinned Hermes submodule, relative to this crate.
 const VENDORED: &str = "hermes";
 
@@ -54,14 +56,12 @@ fn main() {
 /// Libraries rustc already links for the target are dropped, so this contributes
 /// the C++ half and nothing else.
 fn link_cxx_runtime(install: &Path) {
-    const ALREADY_LINKED: [&str; 8] = ["c", "m", "dl", "rt", "util", "pthread", "gcc", "gcc_s"];
-
     let share = install.join("share");
     for directory in read_list(&share.join("cxx-link-directories.txt")) {
         println!("cargo::rustc-link-search=native={directory}");
     }
     for library in read_list(&share.join("cxx-link-libraries.txt")) {
-        if ALREADY_LINKED.contains(&library.as_str()) {
+        if build_support::is_rust_runtime(&library) {
             continue;
         }
         // Some toolchains report a full archive path rather than a `-l` name.
