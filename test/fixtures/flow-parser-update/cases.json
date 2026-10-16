@@ -1,0 +1,742 @@
+[
+  {
+    "id": "scroll-view-interface",
+    "source": "interface ScrollView { readonly getScrollResponder: () => ScrollResponderType; }",
+    "output": "",
+    "provenance": "readonly",
+    "outcome": "erased",
+    "classification": "supported erasure/lowering",
+    "pinnedAccepted": true
+  },
+  {
+    "id": "packager-asset",
+    "source": "type Asset = { readonly __packager_asset: boolean };",
+    "output": "",
+    "provenance": "readonly",
+    "outcome": "erased",
+    "classification": "supported erasure/lowering",
+    "pinnedAccepted": true
+  },
+  {
+    "id": "virtual-collection",
+    "source": "export interface VirtualCollection<out T extends Item> {}",
+    "output": "",
+    "provenance": "out",
+    "outcome": "erased",
+    "classification": "supported erasure/lowering",
+    "pinnedAccepted": true
+  },
+  {
+    "id": "dom-exception",
+    "source": "class DOMException { static readonly INDEX_SIZE_ERR: 1; }",
+    "output": "class DOMException {  }",
+    "provenance": "readonly",
+    "outcome": "erased",
+    "classification": "supported erasure/lowering",
+    "pinnedAccepted": true
+  },
+  {
+    "id": "readonly-property",
+    "source": "type T = { readonly value: string };",
+    "output": "",
+    "provenance": "readonly",
+    "outcome": "erased",
+    "classification": "supported erasure/lowering",
+    "pinnedAccepted": true
+  },
+  {
+    "id": "readonly-string-key",
+    "source": "type T = { readonly \"key\": string };",
+    "output": "",
+    "provenance": "readonly",
+    "outcome": "erased",
+    "classification": "supported erasure/lowering",
+    "pinnedAccepted": true
+  },
+  {
+    "id": "readonly-numeric-key",
+    "source": "type T = { readonly 0: string };",
+    "output": "",
+    "provenance": "readonly",
+    "outcome": "erased",
+    "classification": "supported erasure/lowering",
+    "pinnedAccepted": true
+  },
+  {
+    "id": "readonly-indexer",
+    "source": "type T = { readonly [string]: mixed };",
+    "output": "",
+    "provenance": "readonly",
+    "outcome": "erased",
+    "classification": "supported erasure/lowering",
+    "pinnedAccepted": true
+  },
+  {
+    "id": "readonly-named-indexer",
+    "source": "type T = { readonly [key: string]: mixed };",
+    "output": "",
+    "provenance": "readonly",
+    "outcome": "erased",
+    "classification": "supported erasure/lowering",
+    "pinnedAccepted": true
+  },
+  {
+    "id": "readonly-reserved-with",
+    "source": "type T = { readonly with: string };",
+    "output": "",
+    "provenance": "readonly",
+    "outcome": "erased",
+    "classification": "supported erasure/lowering",
+    "pinnedAccepted": true
+  },
+  {
+    "id": "readonly-reserved-enum",
+    "source": "type T = { readonly enum: string };",
+    "output": "",
+    "provenance": "readonly",
+    "outcome": "erased",
+    "classification": "supported erasure/lowering",
+    "pinnedAccepted": true
+  },
+  {
+    "id": "readonly-reserved-default",
+    "source": "type T = { readonly default: string };",
+    "output": "",
+    "provenance": "readonly",
+    "outcome": "erased",
+    "classification": "supported erasure/lowering",
+    "pinnedAccepted": true
+  },
+  {
+    "id": "readonly-reserved-new",
+    "source": "type T = { readonly new: string };",
+    "output": "",
+    "provenance": "readonly",
+    "outcome": "erased",
+    "classification": "supported erasure/lowering",
+    "pinnedAccepted": true
+  },
+  {
+    "id": "readonly-tuple",
+    "source": "type T = [readonly label: string];",
+    "output": "",
+    "provenance": "readonly",
+    "outcome": "erased",
+    "classification": "supported erasure/lowering",
+    "pinnedAccepted": true
+  },
+  {
+    "id": "readonly-initialized",
+    "source": "class C { readonly value: number = 1; static readonly other: number = 2; }",
+    "output": "class C {  value = 1; static  other = 2; }",
+    "provenance": "readonly",
+    "outcome": "erased",
+    "classification": "supported erasure/lowering",
+    "pinnedAccepted": true
+  },
+  {
+    "id": "readonly-private",
+    "source": "class C { readonly #value: number = 1; read() { return this.#value; } }",
+    "output": "class C {  #value = 1; read() { return this.#value; } }",
+    "provenance": "readonly",
+    "outcome": "erased",
+    "classification": "supported erasure/lowering",
+    "pinnedAccepted": true
+  },
+  {
+    "id": "readonly-property-name",
+    "source": "type T = { readonly: string, readonly?: string }; class C { readonly: number = 1; }",
+    "output": " class C { readonly = 1; }",
+    "provenance": "readonly",
+    "outcome": "erased",
+    "classification": "supported erasure/lowering",
+    "pinnedAccepted": true
+  },
+  {
+    "id": "readonly-method-name",
+    "source": "class C { readonly() { return 1; } }",
+    "output": "class C { readonly() { return 1; } }",
+    "provenance": "readonly",
+    "outcome": "erased",
+    "classification": "supported erasure/lowering",
+    "pinnedAccepted": true
+  },
+  {
+    "id": "readonly-invalid-object-method",
+    "source": "type T = { readonly f(): number };",
+    "output": "",
+    "provenance": "readonly",
+    "outcome": "ParseFailed",
+    "classification": "invalid syntax",
+    "pinnedAccepted": false
+  },
+  {
+    "id": "readonly-invalid-class-method",
+    "source": "class C { readonly f() {} }",
+    "output": "",
+    "provenance": "readonly",
+    "outcome": "ParseFailed",
+    "classification": "invalid syntax",
+    "pinnedAccepted": false
+  },
+  {
+    "id": "writeonly-property",
+    "source": "type T = { writeonly value: string };",
+    "output": "",
+    "provenance": "writeonly",
+    "outcome": "erased",
+    "classification": "supported erasure/lowering",
+    "pinnedAccepted": true
+  },
+  {
+    "id": "writeonly-string-key",
+    "source": "type T = { writeonly \"key\": string };",
+    "output": "",
+    "provenance": "writeonly",
+    "outcome": "erased",
+    "classification": "supported erasure/lowering",
+    "pinnedAccepted": true
+  },
+  {
+    "id": "writeonly-numeric-key",
+    "source": "type T = { writeonly 0: string };",
+    "output": "",
+    "provenance": "writeonly",
+    "outcome": "erased",
+    "classification": "supported erasure/lowering",
+    "pinnedAccepted": true
+  },
+  {
+    "id": "writeonly-indexer",
+    "source": "type T = { writeonly [string]: mixed };",
+    "output": "",
+    "provenance": "writeonly",
+    "outcome": "erased",
+    "classification": "supported erasure/lowering",
+    "pinnedAccepted": true
+  },
+  {
+    "id": "writeonly-named-indexer",
+    "source": "type T = { writeonly [key: string]: mixed };",
+    "output": "",
+    "provenance": "writeonly",
+    "outcome": "erased",
+    "classification": "supported erasure/lowering",
+    "pinnedAccepted": true
+  },
+  {
+    "id": "writeonly-reserved-with",
+    "source": "type T = { writeonly with: string };",
+    "output": "",
+    "provenance": "writeonly",
+    "outcome": "erased",
+    "classification": "supported erasure/lowering",
+    "pinnedAccepted": true
+  },
+  {
+    "id": "writeonly-reserved-enum",
+    "source": "type T = { writeonly enum: string };",
+    "output": "",
+    "provenance": "writeonly",
+    "outcome": "erased",
+    "classification": "supported erasure/lowering",
+    "pinnedAccepted": true
+  },
+  {
+    "id": "writeonly-reserved-default",
+    "source": "type T = { writeonly default: string };",
+    "output": "",
+    "provenance": "writeonly",
+    "outcome": "erased",
+    "classification": "supported erasure/lowering",
+    "pinnedAccepted": true
+  },
+  {
+    "id": "writeonly-reserved-new",
+    "source": "type T = { writeonly new: string };",
+    "output": "",
+    "provenance": "writeonly",
+    "outcome": "erased",
+    "classification": "supported erasure/lowering",
+    "pinnedAccepted": true
+  },
+  {
+    "id": "writeonly-tuple",
+    "source": "type T = [writeonly label: string];",
+    "output": "",
+    "provenance": "writeonly",
+    "outcome": "erased",
+    "classification": "supported erasure/lowering",
+    "pinnedAccepted": true
+  },
+  {
+    "id": "writeonly-initialized",
+    "source": "class C { writeonly value: number = 1; static writeonly other: number = 2; }",
+    "output": "class C {  value = 1; static  other = 2; }",
+    "provenance": "writeonly",
+    "outcome": "erased",
+    "classification": "supported erasure/lowering",
+    "pinnedAccepted": true
+  },
+  {
+    "id": "writeonly-private",
+    "source": "class C { writeonly #value: number = 1; read() { return this.#value; } }",
+    "output": "class C {  #value = 1; read() { return this.#value; } }",
+    "provenance": "writeonly",
+    "outcome": "erased",
+    "classification": "supported erasure/lowering",
+    "pinnedAccepted": true
+  },
+  {
+    "id": "writeonly-property-name",
+    "source": "type T = { writeonly: string, writeonly?: string }; class C { writeonly: number = 1; }",
+    "output": " class C { writeonly = 1; }",
+    "provenance": "writeonly",
+    "outcome": "erased",
+    "classification": "supported erasure/lowering",
+    "pinnedAccepted": true
+  },
+  {
+    "id": "writeonly-method-name",
+    "source": "class C { writeonly() { return 1; } }",
+    "output": "class C { writeonly() { return 1; } }",
+    "provenance": "writeonly",
+    "outcome": "erased",
+    "classification": "supported erasure/lowering",
+    "pinnedAccepted": true
+  },
+  {
+    "id": "writeonly-invalid-object-method",
+    "source": "type T = { writeonly f(): number };",
+    "output": "",
+    "provenance": "writeonly",
+    "outcome": "ParseFailed",
+    "classification": "invalid syntax",
+    "pinnedAccepted": false
+  },
+  {
+    "id": "writeonly-invalid-class-method",
+    "source": "class C { writeonly f() {} }",
+    "output": "",
+    "provenance": "writeonly",
+    "outcome": "ParseFailed",
+    "classification": "invalid syntax",
+    "pinnedAccepted": false
+  },
+  {
+    "id": "in-variance",
+    "source": "type T<in T> = void;",
+    "output": "",
+    "provenance": "in",
+    "outcome": "erased",
+    "classification": "supported erasure/lowering",
+    "pinnedAccepted": true
+  },
+  {
+    "id": "in-mixed",
+    "source": "type T<X, in Y, Z> = void;",
+    "output": "",
+    "provenance": "in",
+    "outcome": "erased",
+    "classification": "supported erasure/lowering",
+    "pinnedAccepted": true
+  },
+  {
+    "id": "in-same-name",
+    "source": "type T<in in> = void;",
+    "output": "",
+    "provenance": "in",
+    "outcome": "erased",
+    "classification": "supported erasure/lowering",
+    "pinnedAccepted": true
+  },
+  {
+    "id": "in-name",
+    "source": "type T<in> = void;",
+    "output": "",
+    "provenance": "in",
+    "outcome": "erased",
+    "classification": "supported erasure/lowering",
+    "pinnedAccepted": true
+  },
+  {
+    "id": "in-name-colon",
+    "source": "type T<in: number> = void;",
+    "output": "",
+    "provenance": "in",
+    "outcome": "erased",
+    "classification": "supported erasure/lowering",
+    "pinnedAccepted": true
+  },
+  {
+    "id": "in-name-extends",
+    "source": "type T<in extends number> = void;",
+    "output": "",
+    "provenance": "in",
+    "outcome": "erased",
+    "classification": "supported erasure/lowering",
+    "pinnedAccepted": true
+  },
+  {
+    "id": "in-name-default",
+    "source": "type T<in = string> = void;",
+    "output": "",
+    "provenance": "in",
+    "outcome": "erased",
+    "classification": "supported erasure/lowering",
+    "pinnedAccepted": true
+  },
+  {
+    "id": "out-variance",
+    "source": "type T<out T> = void;",
+    "output": "",
+    "provenance": "out",
+    "outcome": "erased",
+    "classification": "supported erasure/lowering",
+    "pinnedAccepted": true
+  },
+  {
+    "id": "out-mixed",
+    "source": "type T<X, out Y, Z> = void;",
+    "output": "",
+    "provenance": "out",
+    "outcome": "erased",
+    "classification": "supported erasure/lowering",
+    "pinnedAccepted": true
+  },
+  {
+    "id": "out-same-name",
+    "source": "type T<out out> = void;",
+    "output": "",
+    "provenance": "out",
+    "outcome": "erased",
+    "classification": "supported erasure/lowering",
+    "pinnedAccepted": true
+  },
+  {
+    "id": "out-name",
+    "source": "type T<out> = void;",
+    "output": "",
+    "provenance": "out",
+    "outcome": "erased",
+    "classification": "supported erasure/lowering",
+    "pinnedAccepted": true
+  },
+  {
+    "id": "out-name-colon",
+    "source": "type T<out: number> = void;",
+    "output": "",
+    "provenance": "out",
+    "outcome": "erased",
+    "classification": "supported erasure/lowering",
+    "pinnedAccepted": true
+  },
+  {
+    "id": "out-name-extends",
+    "source": "type T<out extends number> = void;",
+    "output": "",
+    "provenance": "out",
+    "outcome": "erased",
+    "classification": "supported erasure/lowering",
+    "pinnedAccepted": true
+  },
+  {
+    "id": "out-name-default",
+    "source": "type T<out = string> = void;",
+    "output": "",
+    "provenance": "out",
+    "outcome": "erased",
+    "classification": "supported erasure/lowering",
+    "pinnedAccepted": true
+  },
+  {
+    "id": "mixed-variance-function",
+    "source": "function read<in A, out B extends Item, out>(value: A): B { return value; }",
+    "output": "function read(value) { return value; }",
+    "provenance": "out",
+    "outcome": "erased",
+    "classification": "supported erasure/lowering",
+    "pinnedAccepted": true
+  },
+  {
+    "id": "in-out-names",
+    "source": "type T<in, out> = void;",
+    "output": "",
+    "provenance": "in",
+    "outcome": "erased",
+    "classification": "supported erasure/lowering",
+    "pinnedAccepted": true
+  },
+  {
+    "id": "out-in-name",
+    "source": "type T<out in> = void;",
+    "output": "",
+    "provenance": "out",
+    "outcome": "erased",
+    "classification": "supported erasure/lowering",
+    "pinnedAccepted": true
+  },
+  {
+    "id": "value-keywords",
+    "source": "const readonly = 1, writeonly = 2, out = 3; const value = {readonly, writeonly, out};",
+    "output": "const readonly = 1, writeonly = 2, out = 3; const value = {readonly, writeonly, out};",
+    "provenance": "readonly",
+    "outcome": "erased",
+    "classification": "supported erasure/lowering",
+    "pinnedAccepted": true
+  },
+  {
+    "id": "invalid-type-param-0",
+    "source": "type T = <0>(x: number) => number;",
+    "output": "",
+    "provenance": "in",
+    "outcome": "ParseFailed",
+    "classification": "invalid syntax",
+    "pinnedAccepted": false
+  },
+  {
+    "id": "invalid-type-param-return",
+    "source": "type T = <return>(x: number) => number;",
+    "output": "",
+    "provenance": "in",
+    "outcome": "ParseFailed",
+    "classification": "invalid syntax",
+    "pinnedAccepted": false
+  },
+  {
+    "id": "invalid-type-param-class",
+    "source": "type T = <class>(x: number) => number;",
+    "output": "",
+    "provenance": "in",
+    "outcome": "ParseFailed",
+    "classification": "invalid syntax",
+    "pinnedAccepted": false
+  },
+  {
+    "id": "invalid-type-param-void",
+    "source": "type T = <void>(x: number) => number;",
+    "output": "",
+    "provenance": "in",
+    "outcome": "ParseFailed",
+    "classification": "invalid syntax",
+    "pinnedAccepted": false
+  },
+  {
+    "id": "invalid-type-param-const",
+    "source": "type T = <const>(x: number) => number;",
+    "output": "",
+    "provenance": "in",
+    "outcome": "ParseFailed",
+    "classification": "invalid syntax",
+    "pinnedAccepted": false
+  },
+  {
+    "id": "async-component-await",
+    "source": "async component Read(value: number) { return await Promise.resolve(value); }",
+    "output": "",
+    "provenance": "async-component",
+    "outcome": "Proposal",
+    "classification": "intentional compatibility boundary",
+    "pinnedAccepted": false
+  },
+  {
+    "id": "async-component-nested",
+    "source": "async component Read() { function inner() { return 1; } return await Promise.resolve(inner()); }",
+    "output": "",
+    "provenance": "async-component",
+    "outcome": "Proposal",
+    "classification": "intentional compatibility boundary",
+    "pinnedAccepted": false
+  },
+  {
+    "id": "sync-component-await-invalid",
+    "source": "component Read() { return await value; }",
+    "output": "",
+    "provenance": "async-component",
+    "outcome": "ParseFailed",
+    "classification": "invalid syntax",
+    "pinnedAccepted": false
+  },
+  {
+    "id": "match-binding-invalid",
+    "source": "const e = match (x) { const [y]: 2 };",
+    "output": "",
+    "provenance": "match-binding-invalid",
+    "outcome": "ParseFailed",
+    "classification": "invalid syntax",
+    "pinnedAccepted": false
+  },
+  {
+    "id": "match-object-binding-invalid",
+    "source": "const e = match (x) { {a: const [y]}: 2 };",
+    "output": "",
+    "provenance": "match-object-binding-invalid",
+    "outcome": "ParseFailed",
+    "classification": "invalid syntax",
+    "pinnedAccepted": false
+  },
+  {
+    "id": "match-object-value-invalid",
+    "source": "const e = match (x) { {a: *}: 2 };",
+    "output": "",
+    "provenance": "match-object-value-invalid",
+    "outcome": "ParseFailed",
+    "classification": "invalid syntax",
+    "pinnedAccepted": false
+  },
+  {
+    "id": "match-statement-body-invalid",
+    "source": "match (x) { _ => 1 };",
+    "output": "",
+    "provenance": "match-statement-body-invalid",
+    "outcome": "ParseFailed",
+    "classification": "invalid syntax",
+    "pinnedAccepted": false
+  },
+  {
+    "id": "jsx-attribute-member-invalid",
+    "source": "const el = <foo a.b=\"1\"></foo>;",
+    "output": "",
+    "provenance": "jsx",
+    "outcome": "ParseFailed",
+    "classification": "invalid syntax",
+    "pinnedAccepted": true
+  },
+  {
+    "id": "jsx-member-tag",
+    "source": "const el = <Foo.Bar value={1} />;",
+    "output": "const el = <Foo.Bar value={1} />;",
+    "provenance": "jsx",
+    "outcome": "erased",
+    "classification": "supported erasure/lowering",
+    "pinnedAccepted": true
+  },
+  {
+    "id": "using-of",
+    "source": "for (using x of y);",
+    "output": "for (using x of y);",
+    "provenance": "using",
+    "outcome": "erased",
+    "classification": "supported erasure/lowering",
+    "pinnedAccepted": true
+  },
+  {
+    "id": "using-in",
+    "source": "for (using x in y);",
+    "output": "for (using x in y);",
+    "provenance": "using",
+    "outcome": "erased",
+    "public": "flow-erasure-unsupported-syntax",
+    "classification": "invalid syntax",
+    "pinnedAccepted": true
+  },
+  {
+    "id": "await-using-of",
+    "source": "async function f() { for (await using x of y); }",
+    "output": "async function f() { for (await using x of y); }",
+    "provenance": "using",
+    "outcome": "erased",
+    "classification": "supported erasure/lowering",
+    "pinnedAccepted": true
+  },
+  {
+    "id": "await-using-await-of",
+    "source": "async function f() { for await (await using x of y); }",
+    "output": "async function f() { for await (await using x of y); }",
+    "provenance": "using",
+    "outcome": "erased",
+    "classification": "supported erasure/lowering",
+    "pinnedAccepted": true
+  },
+  {
+    "id": "directive-lexer",
+    "source": "\"use strict\"; const text = `value`;",
+    "output": "\"use strict\"; const text = `value`;",
+    "provenance": "lexer",
+    "outcome": "erased",
+    "classification": "supported erasure/lowering",
+    "pinnedAccepted": true
+  },
+  {
+    "id": "regex-modifiers",
+    "source": "const re = /(?i:a)(?-i:b)/;",
+    "output": "const re = /(?i:a)(?-i:b)/;",
+    "provenance": "regex",
+    "outcome": "erased",
+    "classification": "supported erasure/lowering",
+    "pinnedAccepted": true
+  },
+  {
+    "id": "regex-modifiers-invalid",
+    "source": "const re = /(?ii:a)/;",
+    "output": "const re = /(?ii:a)/;",
+    "provenance": "regex",
+    "outcome": "erased",
+    "public": "deferred-regexp-validation",
+    "classification": "invalid syntax",
+    "pinnedAccepted": true
+  },
+  {
+    "id": "unicode17-identifier",
+    "source": "const 𞛀: number = 1;",
+    "output": "const 𞛀 = 1;",
+    "provenance": "unicode",
+    "outcome": "erased",
+    "classification": "supported erasure/lowering",
+    "pinnedAccepted": true
+  },
+  {
+    "id": "readonly-default-optional",
+    "source": "type T = { readonly default?: string };",
+    "output": "",
+    "provenance": "readonly",
+    "outcome": "erased",
+    "classification": "supported erasure/lowering",
+    "pinnedAccepted": true
+  },
+  {
+    "id": "readonly-uninitialized",
+    "source": "class C { readonly value: number; }",
+    "output": "class C {  }",
+    "provenance": "readonly",
+    "outcome": "erased",
+    "classification": "supported erasure/lowering",
+    "pinnedAccepted": true
+  },
+  {
+    "id": "writeonly-uninitialized",
+    "source": "class C { writeonly value: number; }",
+    "output": "class C {  }",
+    "provenance": "writeonly",
+    "outcome": "erased",
+    "classification": "supported erasure/lowering",
+    "pinnedAccepted": true
+  },
+  {
+    "id": "out-mixed-name",
+    "source": "type T<X, out, Y> = [X, Y];",
+    "output": "",
+    "provenance": "out",
+    "outcome": "erased",
+    "classification": "supported erasure/lowering",
+    "pinnedAccepted": true
+  },
+  {
+    "id": "in-out-mixed",
+    "source": "type T<in T, out U> = [T, U];",
+    "output": "",
+    "provenance": "out",
+    "outcome": "erased",
+    "classification": "supported erasure/lowering",
+    "pinnedAccepted": true
+  },
+  {
+    "id": "decorator-property-and-method",
+    "source": "class C { @d1 prop; @d2 method() {} }",
+    "output": "",
+    "provenance": "decorators",
+    "outcome": "UnhandledSyntax",
+    "classification": "intentional compatibility boundary",
+    "pinnedAccepted": true
+  }
+]

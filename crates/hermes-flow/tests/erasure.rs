@@ -647,6 +647,48 @@ fn bails_on_a_syntax_error() {
     assert_eq!(bailed("const = ;\n"), BailKind::ParseFailed);
 }
 
+#[test]
+fn parser_update_inventory() {
+    let cases: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../test/fixtures/flow-parser-update/cases.json"
+    ))
+    .unwrap();
+    for case in cases.as_array().unwrap() {
+        let source = case["source"].as_str().unwrap();
+        let id = case["id"].as_str().unwrap();
+        match erase_source(source) {
+            Ok(erasure) => {
+                assert_eq!(case["outcome"], "erased", "{id}");
+                assert_eq!(erasure.apply(source), case["output"], "{id}");
+            }
+            Err(bail) => assert_eq!(format!("{:?}", bail.kind), case["outcome"], "{id}: {bail}"),
+        }
+    }
+}
+
+#[test]
+fn readonly_spans_preserve_comments_and_utf8() {
+    let source = "// café 🦉\nclass C { static readonly /* λ */ value: number = 'é'; readonly /* 保 */ other: string = '✓'; }";
+    let erasure = erase_source(source).unwrap();
+    assert_eq!(
+        erasure.apply(source),
+        "// café 🦉\nclass C { static  /* λ */ value = 'é';  /* 保 */ other = '✓'; }"
+    );
+    let removed: Vec<_> = erasure
+        .edits
+        .iter()
+        .map(|edit| {
+            assert!(edit.is_deletion());
+            assert!(source.is_char_boundary(edit.span.start as usize));
+            assert!(source.is_char_boundary(edit.span.end as usize));
+            &source[edit.span.start as usize..edit.span.end as usize]
+        })
+        .collect();
+    assert_eq!(removed, ["readonly", ": number", "readonly", ": string"]);
+    let spans: Vec<_> = erasure.edits.iter().map(|edit| edit.span.clone()).collect();
+    assert_eq!(spans, [31..39, 54..62, 71..79, 95..103]);
+}
+
 /// Erasure preserves formatting where the Babel printer reformats. That is the
 /// property the byte-identical corpus gate loses and the equivalence harness
 /// replaces, so it is worth pinning directly.

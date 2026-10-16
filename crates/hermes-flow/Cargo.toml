@@ -19,5 +19,12 @@ parser = ["dep:hermes-parser-sys"]
 [dependencies]
 hermes-parser-sys = { path = "../hermes-parser-sys", optional = true }
 
+[dev-dependencies]
+serde_json = "1.0.145"
+
+[[example]]
+name = "parser_update_probe"
+required-features = ["parser"]
+
 [lints]
 workspace = true

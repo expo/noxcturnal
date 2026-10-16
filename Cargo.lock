@@ -280,6 +280,7 @@ name = "hermes-flow"
 version = "0.1.0"
 dependencies = [
  "hermes-parser-sys",
+ "serde_json",
 ]
 
 [[package]]
