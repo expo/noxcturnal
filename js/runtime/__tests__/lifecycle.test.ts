@@ -731,3 +731,16 @@ test('UID inventories preserve property, label, and escaped names with overlappi
     assert.throws(() => session.generateUid('temp'), /closed/);
   }
 });
+
+test('retained source operations preserve original UTF-16 units alongside UID reservations', () => {
+  const source = 'const _temp = "\ud800x\udfff😀";';
+  const session = openRetained(source, 'fixture.js');
+  assert.equal(session.generateUid('temp'), '_temp2');
+  assert.equal(session.sourceTextOperations.indent('> '), '> ' + source);
+  assert.equal(
+    session.sourceTextOperations.matches('\ud800', undefined, false)[0]?.captures[0],
+    '\ud800',
+  );
+  assert.equal(session.generateUid('temp'), '_temp3');
+  session.close();
+});

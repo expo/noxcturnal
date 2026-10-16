@@ -373,7 +373,7 @@ fn is_whitespace(unit: u16) -> bool {
     })
 }
 
-fn identifier_names(program: &Program<'_>) -> FxHashSet<String> {
+pub(crate) fn identifier_names(program: &Program<'_>) -> FxHashSet<String> {
     #[derive(Default)]
     struct Names(FxHashSet<String>);
     impl<'a> Visit<'a> for Names {

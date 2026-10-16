@@ -38,6 +38,8 @@ pub struct RetainedIndex {
     child_offsets: Option<Vec<u32>>,
     child_edges: Vec<ChildEdge>,
     child_role_mask_by_parent_type: Vec<ChildRoleMask>,
+    // Names not already represented by the binding/global indexes. Complete
+    // the inventory only if source operations request it.
     uid_identifiers: Option<FxHashSet<String>>,
     names: Vec<Rc<str>>,
     name_ids: FxHashMap<Rc<str>, u32>,
@@ -376,7 +378,21 @@ impl RetainedIndex {
     }
 
     pub(crate) fn take_uid_identifiers(&mut self) -> Option<FxHashSet<String>> {
-        self.uid_identifiers.take()
+        let mut identifiers = self.uid_identifiers.take()?;
+        // The general interned-name table also contains static call arguments,
+        // which must not reserve otherwise available identifiers.
+        for name_id in self
+            .bindings
+            .keys()
+            .map(|(_, name_id)| name_id)
+            .chain(self.globals.keys())
+        {
+            let name = self.names[*name_id as usize].as_ref();
+            if !identifiers.contains(name) {
+                identifiers.insert(name.to_owned());
+            }
+        }
+        Some(identifiers)
     }
 
     pub fn record_semantics(
@@ -394,8 +410,9 @@ impl RetainedIndex {
         }
         let names = self.uid_identifiers.get_or_insert_with(FxHashSet::default);
         let name = match kind {
-            AstKind::BindingIdentifier(node) => Some(node.name.as_str()),
-            AstKind::IdentifierReference(node) => Some(node.name.as_str()),
+            AstKind::IdentifierReference(node) if node.reference_id.get().is_none() => {
+                Some(node.name.as_str())
+            }
             AstKind::IdentifierName(node) => Some(node.name.as_str()),
             AstKind::LabelIdentifier(node) => Some(node.name.as_str()),
             _ => None,
@@ -1807,6 +1824,40 @@ use std::rc::Rc;
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn semantic_uid_names_are_not_duplicated_before_the_inventory_is_requested() {
+        let source = (0..1_000)
+            .map(|id| format!("let _local{id} = _global{id};"))
+            .collect::<String>();
+        let allocator = oxc_allocator::Allocator::default();
+        let parsed =
+            oxc_parser::Parser::new(&allocator, &source, oxc_span::SourceType::mjs()).parse();
+        assert!(parsed.diagnostics.is_empty());
+        let semantic = oxc_semantic::SemanticBuilder::new()
+            .with_build_nodes(true)
+            .build(&parsed.program)
+            .semantic;
+        let mut index = RetainedIndex::default();
+        for (id, node) in semantic.nodes().iter_enumerated() {
+            index.record_semantics(
+                node.kind(),
+                semantic.scoping(),
+                id.index() as u32,
+                node.scope_id().index() as u32,
+                true,
+                false,
+            );
+        }
+        assert!(index.uid_identifiers.as_ref().unwrap().is_empty());
+        assert_eq!(index.uid_identifiers.as_ref().unwrap().capacity(), 0);
+        let inventory = index.take_uid_identifiers().unwrap();
+        assert_eq!(inventory.len(), 2_000);
+        for id in 0..1_000 {
+            assert!(inventory.contains(&format!("_local{id}")));
+            assert!(inventory.contains(&format!("_global{id}")));
+        }
+    }
 
     #[test]
     fn packed_response_strings_scale_with_selected_fields() {

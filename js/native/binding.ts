@@ -129,7 +129,7 @@ interface NativeBinding {
     initialRouteManifest?: Buffer,
     buildInitialRoute?: boolean,
   ) => {
-    createSourceText(): InstanceType<NativeBinding['NativeSourceText']>;
+    createSourceText(source: string): InstanceType<NativeBinding['NativeSourceText']>;
     nextRoutedPacked(manifest: Buffer, rootStart?: number, rootEnd?: number): Buffer;
     queryGlobalsBuffer(names: string[]): Buffer;
     globalBindingReferencesBuffer(name: string): Buffer;

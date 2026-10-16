@@ -1,4 +1,7 @@
-use napi::{Error, Result, Status, bindgen_prelude::Buffer};
+use napi::{
+    Error, Result, Status,
+    bindgen_prelude::{Buffer, Utf16String},
+};
 use napi_derive::napi;
 use rustc_hash::FxHashSet;
 
@@ -86,12 +89,17 @@ impl NativeIndexedSession {
     }
 
     /// Move the requested identifier inventory without serializing names through JS.
+    /// Keep the caller's original UTF-16 text: the parser's UTF-8 copy cannot
+    /// preserve lone surrogates used by source operations such as replacement.
     #[napi]
-    pub fn create_source_text(&mut self) -> Result<crate::syntax::source_text::NativeSourceText> {
+    pub fn create_source_text(
+        &mut self,
+        source: Utf16String,
+    ) -> Result<crate::syntax::source_text::NativeSourceText> {
         self.ensure_open()?;
         Ok(
             crate::syntax::source_text::NativeSourceText::with_identifiers(
-                self.source.encode_utf16().collect::<Vec<_>>().into(),
+                source,
                 self.retained_index.take_uid_identifiers(),
             ),
         )
