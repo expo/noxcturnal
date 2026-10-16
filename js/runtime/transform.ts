@@ -323,14 +323,13 @@ export function transform(
   const originalSource = source;
   let parseFilename = parserFilename(filename, options.parser);
   let parser = classifyForTransform(parseFilename, source);
-  let nativeFlowErased = false;
+  let flowErasureDiagnostic: Diagnostic | undefined;
   let adapterMap: NativeVlqMap | null = null;
   let adapterMetadata: Record<string, unknown> | undefined;
-  // Native erasure runs ahead of the auto-selected adapter. It deletes byte
-  // ranges instead of reprinting, so the file keeps its formatting and the map
-  // it produces is deletion-only. The adapter stays the fallback for proposal
-  // syntax, for a file this Hermes cannot parse, and for a binary built
-  // without the `flow_parser` feature.
+  // Native erasure runs ahead of the auto-selected adapter. It preserves
+  // retained source spans and lowers runtime Flow constructs. Hermes parser
+  // gaps need an adapter; JavaScript parseability cannot prove Flow semantics
+  // are unchanged. Fatal erasure failures propagate.
   //
   // An adapter the caller names by hand wins outright: naming one is how a
   // caller pins which implementation runs, and silently overriding that would
@@ -338,7 +337,6 @@ export function transform(
   if (!parser.supported && parser.syntax === 'flow' && options.parserAdapter == null) {
     const erased = native.nativeFlowErase(source, filename);
     if (erased.status === 'erased' && erased.code != null) {
-      nativeFlowErased = true;
       source = erased.code;
       adapterMap = erased.map ?? null;
       // Flow files routinely contain JSX, and the erased source still carries
@@ -346,6 +344,12 @@ export function transform(
       // re-derived.
       parseFilename = parserFilename(filename, 'jsx');
       parser = classifyForTransform(parseFilename, source, 'jsx');
+    } else {
+      flowErasureDiagnostic = {
+        code: erased.reason ?? erased.status,
+        message: erased.detail ?? erased.reason ?? 'Native Flow erasure is unavailable.',
+        phase: 'flow-erasure',
+      };
     }
   }
   if (!parser.supported) {
@@ -359,7 +363,9 @@ export function transform(
           status: 'bailout',
           reason: adapted.reason,
           source: originalSource,
-          diagnostics: adapted.diagnostics ?? [],
+          diagnostics: flowErasureDiagnostic
+            ? [flowErasureDiagnostic, ...(adapted.diagnostics ?? [])]
+            : (adapted.diagnostics ?? []),
         };
       source = adapted.code;
       adapterMap = adapted.map;
@@ -392,7 +398,7 @@ export function transform(
         status: 'bailout',
         reason: parser.reason,
         source: originalSource,
-        diagnostics: [],
+        diagnostics: flowErasureDiagnostic ? [flowErasureDiagnostic] : [],
       };
     } catch (error) {
       // A preparation failure remains primary; cleanup still visits every peer.
@@ -848,33 +854,18 @@ export function transform(
   } catch (error) {
     openSession?.close();
     let parseFailure = nativeParseFailure(error);
-    // Hermes accepted the original Flow grammar, but its eraser can leave an
-    // unsupported predicate behind. This exception belongs only to that adapter,
-    // never to a caller's declared JavaScript output or arbitrary parse failures.
-    let flowBoundary =
-      nativeFlowErased &&
-      parseFailure?.message === 'Flow is not supported' &&
-      parseFailure.source === source;
     let bailout = error instanceof Bailout;
     try {
-      cleanupStates(allStates, bailout || flowBoundary ? 'bailout' : 'error');
+      cleanupStates(allStates, bailout ? 'bailout' : 'error');
     } catch (cleanupError) {
       // Fatal work remains primary. Failed cleanup turns a compatibility bailout
       // into a fatal result, rather than hiding a resource-release failure.
-      if (bailout || flowBoundary) {
+      if (bailout) {
         error = cleanupError;
         bailout = false;
-        flowBoundary = false;
         parseFailure = nativeParseFailure(error);
       }
     }
-    if (flowBoundary)
-      return {
-        status: 'bailout',
-        reason: 'flow-erasure-unsupported-syntax',
-        source: originalSource,
-        diagnostics,
-      };
     if (bailout) {
       return {
         status: 'bailout',

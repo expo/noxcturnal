@@ -33,7 +33,7 @@ use crate::generated::estree::{Dialect, NODE_KIND_COUNT, NODE_KINDS};
 pub enum BailKind {
     /// Hermes could not parse it.
     ParseFailed,
-    /// Component, hook, enum, match, or record syntax.
+    /// A proposal shape the lowering does not recognize.
     Proposal,
     /// A `TS*` node. Hermes is built with TypeScript parsing on, but nothing
     /// here erases TypeScript.
@@ -42,14 +42,14 @@ pub enum BailKind {
     CoverGrammar,
     /// Flow syntax with no rule.
     UnhandledFlow,
-    /// Syntax outside Flow that the rules do not cover, such as decorators.
+    /// Syntax outside Flow that the rules do not cover.
     UnhandledSyntax,
     /// The buffer did not read back, or a rule could not find a marker it
     /// needs in the source. Either is a defect rather than unsupported input.
     Malformed,
-    /// A construct that has no lowering here *or* in `hermes-parser` — a `var`
+    /// Invalid syntax, or a construct with no supported lowering — a `var`
     /// binding in a match pattern, a `yield` in a case body that becomes a
-    /// function. Unlike every other kind this is not a fallback: it is the
+    /// function. Unlike a compatibility gap this is not a fallback: it is the
     /// answer, and the caller reports it.
     Rejected,
 }
@@ -71,14 +71,15 @@ impl BailKind {
     /// Whether handing the file to the caller's parser adapter could do any
     /// better than stopping here.
     ///
-    /// It could for everything the rules merely do not cover. It could not for
+    /// Internal buffer/AST failures must never become adapter fallbacks.
+    /// For syntax the rules merely do not cover, an adapter may help. Not for
     /// [`BailKind::Rejected`]: the adapter runs the same transforms this one
     /// mirrors, so it arrives at the same refusal by a longer route — or, where
     /// that transform emits code that does not parse, at a syntax error
     /// reported against a line nobody wrote. Reporting it here is the whole
     /// difference between a diagnostic and a mystery.
     pub fn has_fallback(self) -> bool {
-        !matches!(self, Self::Rejected)
+        !matches!(self, Self::Rejected | Self::Malformed | Self::CoverGrammar)
     }
 }
 
@@ -151,13 +152,13 @@ pub const FIELD_RULES: &[(&str, &str, FieldRule)] = &[
     ("FunctionDeclaration",      "params",         FieldRule::Hook),
     ("FunctionDeclaration",      "typeParameters", FieldRule::Erase),
     ("FunctionDeclaration",      "returnType",     FieldRule::Erase),
-    ("FunctionDeclaration",      "predicate",      FieldRule::Erase),
+    ("FunctionDeclaration",      "predicate",      FieldRule::Hook),
     ("FunctionDeclaration",      "generator",      FieldRule::Plain),
     ("FunctionDeclaration",      "async",          FieldRule::Plain),
     ("FunctionExpression",       "params",         FieldRule::Hook),
     ("FunctionExpression",       "typeParameters", FieldRule::Erase),
     ("FunctionExpression",       "returnType",     FieldRule::Erase),
-    ("FunctionExpression",       "predicate",      FieldRule::Erase),
+    ("FunctionExpression",       "predicate",      FieldRule::Hook),
     ("FunctionExpression",       "generator",      FieldRule::Plain),
     ("FunctionExpression",       "async",          FieldRule::Plain),
     ("ArrowFunctionExpression",  "params",         FieldRule::Hook),
@@ -168,22 +169,24 @@ pub const FIELD_RULES: &[(&str, &str, FieldRule)] = &[
     ("HookDeclaration",          "async",          FieldRule::Plain),
     ("ArrowFunctionExpression",  "typeParameters", FieldRule::Erase),
     ("ArrowFunctionExpression",  "returnType",     FieldRule::Erase),
-    ("ArrowFunctionExpression",  "predicate",      FieldRule::Erase),
+    ("ArrowFunctionExpression",  "predicate",      FieldRule::Hook),
     ("ArrowFunctionExpression",  "expression",     FieldRule::Plain),
     ("ArrowFunctionExpression",  "async",          FieldRule::Plain),
 
     // -- classes -----------------------------------------------------------
     // `implements` is a hook rather than an erase: the `implements` keyword
     // itself belongs to no node, so erasing the list would leave it behind.
+    // Decorators remain value syntax for a later, explicitly selected native
+    // decorator transform; their expressions may themselves contain Flow.
     ("ClassDeclaration",         "typeParameters",     FieldRule::Erase),
     ("ClassDeclaration",         "superTypeArguments", FieldRule::Erase),
     ("ClassDeclaration",         "implements",         FieldRule::Hook),
-    ("ClassDeclaration",         "decorators",         FieldRule::BailIfPresent),
+    ("ClassDeclaration",         "decorators",         FieldRule::Plain),
     ("ClassExpression",          "typeParameters",     FieldRule::Erase),
     ("ClassExpression",          "superTypeArguments", FieldRule::Erase),
     ("ClassExpression",          "implements",         FieldRule::Hook),
-    ("ClassExpression",          "decorators",         FieldRule::BailIfPresent),
-    ("MethodDefinition",         "decorators",         FieldRule::BailIfPresent),
+    ("ClassExpression",          "decorators",         FieldRule::Plain),
+    ("MethodDefinition",         "decorators",         FieldRule::Plain),
     ("MethodDefinition",         "kind",               FieldRule::Plain),
     ("MethodDefinition",         "computed",           FieldRule::Plain),
     ("MethodDefinition",         "static",             FieldRule::Plain),
@@ -196,7 +199,7 @@ pub const FIELD_RULES: &[(&str, &str, FieldRule)] = &[
     ("ClassProperty",            "declare",        FieldRule::Hook),
     ("ClassProperty",            "optional",       FieldRule::Hook),
     ("ClassProperty",            "tsModifiers",    FieldRule::BailIfPresent),
-    ("ClassProperty",            "decorators",     FieldRule::BailIfPresent),
+    ("ClassProperty",            "decorators",     FieldRule::Plain),
     ("ClassProperty",            "computed",       FieldRule::Plain),
     ("ClassProperty",            "static",         FieldRule::Plain),
     ("ClassPrivateProperty",     "typeAnnotation", FieldRule::Erase),
@@ -204,7 +207,7 @@ pub const FIELD_RULES: &[(&str, &str, FieldRule)] = &[
     ("ClassPrivateProperty",     "declare",        FieldRule::Hook),
     ("ClassPrivateProperty",     "optional",       FieldRule::Hook),
     ("ClassPrivateProperty",     "tsModifiers",    FieldRule::BailIfPresent),
-    ("ClassPrivateProperty",     "decorators",     FieldRule::BailIfPresent),
+    ("ClassPrivateProperty",     "decorators",     FieldRule::Plain),
     ("ClassPrivateProperty",     "static",         FieldRule::Plain),
 
     // -- bindings and calls ------------------------------------------------
@@ -330,7 +333,14 @@ fn build() -> Box<[Resolved; NODE_KIND_COUNT]> {
         table[index_of(name)].node = NodeRule::EraseTail;
     }
     // Handled by `erase`, which rewrites them rather than abandoning the file.
-    for name in ["EnumDeclaration", "ComponentDeclaration", "HookDeclaration"] {
+    for name in [
+        "EnumDeclaration",
+        "ComponentDeclaration",
+        "HookDeclaration",
+        "RecordDeclaration",
+        "RecordExpression",
+        "RecordExpressionProperties",
+    ] {
         table[index_of(name)].node = NodeRule::Walk;
     }
     for (node, field, rule) in FIELD_RULES {
@@ -454,19 +464,23 @@ mod tests {
         }
     }
 
-    /// The distinction the caller acts on: everything but a rejection means
-    /// "try the parser adapter instead".
+    /// Internal failures and reference-rejected syntax are fatal; coverage gaps
+    /// can still use a parser adapter.
     #[test]
-    fn only_a_rejection_has_no_fallback() {
-        assert!(!BailKind::Rejected.has_fallback());
+    fn rejections_and_internal_failures_have_no_fallback() {
+        for kind in [
+            BailKind::Rejected,
+            BailKind::Malformed,
+            BailKind::CoverGrammar,
+        ] {
+            assert!(!kind.has_fallback());
+        }
         for kind in [
             BailKind::ParseFailed,
             BailKind::Proposal,
             BailKind::TypeScript,
-            BailKind::CoverGrammar,
             BailKind::UnhandledFlow,
             BailKind::UnhandledSyntax,
-            BailKind::Malformed,
         ] {
             assert!(kind.has_fallback(), "{}", kind.as_str());
         }

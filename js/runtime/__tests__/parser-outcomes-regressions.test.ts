@@ -205,7 +205,7 @@ test('an unused explicit adapter selector does not override native supported JS'
     }).status,
   ).toBe('complete');
 });
-test('built-in Flow erasure preserves its unsupported predicate boundary', () => {
+test('built-in Flow erasure removes inferred predicates before handing off to Oxc', () => {
   const source = '// @flow\nvar f = (x): %checks => typeof x === "string";';
   const result = transform(
     source,
@@ -214,11 +214,8 @@ test('built-in Flow erasure preserves its unsupported predicate boundary', () =>
       phases: [{ name: 'native', native: { transforms: { parameters: true } } }],
     }),
   );
-  expect(result).toMatchObject({
-    status: 'bailout',
-    source,
-    reason: 'flow-erasure-unsupported-syntax',
-  });
+  expect(result.status).toBe('complete');
+  if (result.status === 'complete') expect(result.code).not.toContain('%checks');
 });
 test('declared JS adapter output with residual Flow is invalid input', () => {
   const unregister = registerParserAdapter({

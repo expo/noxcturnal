@@ -24,17 +24,17 @@
     "hermes": {
       "flake": false,
       "locked": {
-        "lastModified": 1784576103,
-        "narHash": "sha256-OnELE8VDXuFTfVS2kYINKrVgtEgRcUX7CfU1ULqT9Lg=",
+        "lastModified": 1792089620,
+        "narHash": "sha256-TgvdocL+imyRWuuE5UGc0C+XZQ7psxactp5qiYG5J0Y=",
         "owner": "facebook",
         "repo": "hermes",
-        "rev": "73855a1475e016cec814d67578f860112ef711e1",
+        "rev": "17b37301da5da4a2cd55d78f9697c46c0fd96123",
         "type": "github"
       },
       "original": {
         "owner": "facebook",
         "repo": "hermes",
-        "rev": "73855a1475e016cec814d67578f860112ef711e1",
+        "rev": "17b37301da5da4a2cd55d78f9697c46c0fd96123",
         "type": "github"
       }
     },

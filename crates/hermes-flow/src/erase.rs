@@ -1,9 +1,10 @@
 //! The walk that turns an AST buffer into a set of byte ranges to delete.
 //!
-//! One pass, no tree, nothing allocated per node. A field is walked, skipped,
+//! A streaming walk with no reconstructed tree. A field is walked, skipped,
 //! or recorded as a span; recording a span skips the subtree under it, so the
 //! ranges rarely overlap and the merge at the end only has to reconcile the few
-//! rules that reach backwards.
+//! rules that reach backwards. Files with components or records also collect
+//! identifier labels first so generated bindings cannot capture app identifiers.
 //!
 //! # Why the defaulted-parameter bug cannot recur
 //!
@@ -27,6 +28,8 @@ use crate::proposals::{
 };
 use crate::reader::{Buffer, Cursor, Node, ReadError};
 use crate::rules::{self, BailKind, FieldRule, NodeRule};
+
+mod records;
 
 /// One change to the source.
 ///
@@ -81,8 +84,8 @@ impl Erasure {
     }
 }
 
-/// A file the rules decline to handle. The caller falls back to its own parser
-/// adapter; none of these is an error a user should see.
+/// An erasure failure. Compatibility gaps can use a parser adapter; rejected
+/// syntax and internal failures must propagate as errors.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Bail {
     pub kind: BailKind,
@@ -120,11 +123,18 @@ pub fn erase(source: &str, words: &[u32]) -> Result<Erasure, Bail> {
         ));
     }
 
+    let mut occupied_names = HashSet::new();
+    if source.contains("component") || source.contains("record") {
+        collect_names(&mut buffer.cursor(), &mut occupied_names)?;
+    }
     let mut walk = Walk {
         source: source.as_bytes(),
         edits: Vec::new(),
-        seen_names: source.contains("component").then(Default::default),
+        component_scopes: source.contains("component").then(Vec::new),
         names: Names::after(source),
+        record_names: Names::records(source),
+        occupied_names,
+        jsx_reference: 0,
         function_depth: 0,
         suspension_floor: None,
         suspension: None,
@@ -146,7 +156,9 @@ pub fn erase(source: &str, words: &[u32]) -> Result<Erasure, Bail> {
 /// a binding and a `break` in an empty match case body — and the order they
 /// were pushed in is the order they were meant to be written in.
 fn merge(mut edits: Vec<Edit>) -> Result<Vec<Edit>, Bail> {
-    edits.sort_by_key(|edit| edit.span.start);
+    // A relocated binding may be inserted exactly where another transform
+    // removes/replaces a statement. Emit the insertion before that edit.
+    edits.sort_by_key(|edit| (edit.span.start, edit.span.start != edit.span.end));
     let mut merged: Vec<Edit> = Vec::with_capacity(edits.len());
     for edit in edits {
         match merged.last_mut() {
@@ -178,18 +190,18 @@ const MAX_FIELDS: usize = 10;
 struct Walk<'a> {
     source: &'a [u8],
     edits: Vec<Edit>,
-    /// Names of identifiers already walked past.
-    ///
-    /// A `ref` component becomes a `const` binding, which unlike the
-    /// declaration it replaces is not hoisted, so it may not be named earlier
-    /// in the file. The walk visits identifiers in source order, so by the time
-    /// it reaches the declaration this holds exactly the references above it —
-    /// which a textual search could not tell apart from a mention in a comment.
-    /// Only collected for files that could contain a component at all.
-    seen_names: Option<std::collections::HashSet<&'a [u8]>>,
+    /// Earlier runtime references and their containing statements, separately
+    /// for every active Program, block, or switch-case statement list. A ref
+    /// component's wrapper is inserted before its first reference in that list.
+    component_scopes: Option<Vec<ComponentScope<'a>>>,
     /// The counter behind `$$gen$m0`, `$$gen$m1`, … Runs for the whole file, as
     /// `TransformMatchSyntax`'s does.
     names: Names,
+    record_names: Names,
+    occupied_names: HashSet<Vec<u8>>,
+    /// 1 for a JSX tag, 2 for the object of a JSX member tag; attributes and
+    /// member properties are names, while tag objects are runtime references.
+    jsx_reference: u8,
     /// How many functions deep the walk is. Only the depth matters, and only
     /// for `await` and `yield`: one inside a nested function belongs to that
     /// function, not to the one a match expression would be wrapped in.
@@ -216,6 +228,13 @@ struct Seen {
     optional: bool,
     /// The node turned out to be entirely type syntax after all.
     erase_self: bool,
+    decorated: bool,
+}
+
+#[derive(Default)]
+struct ComponentScope<'a> {
+    first_references: std::collections::HashMap<&'a [u8], u32>,
+    statement_start: u32,
 }
 
 impl Seen {
@@ -225,6 +244,7 @@ impl Seen {
             fields: [const { None }; MAX_FIELDS],
             optional: false,
             erase_self: false,
+            decorated: false,
         }
     }
 }
@@ -267,7 +287,42 @@ impl<'a> Walk<'a> {
         // decide for themselves which parts of it the walk still visits.
         match node.kind {
             kind::ENUM_DECLARATION => return self.enum_declaration(node, cursor),
-            kind::COMPONENT_DECLARATION => return self.component_declaration(node, cursor),
+            kind::COMPONENT_DECLARATION => return self.component_declaration(node, cursor, None),
+            kind::EXPORT_NAMED_DECLARATION | kind::EXPORT_DEFAULT_DECLARATION => {
+                let mut probe = *cursor;
+                for field in NODE_KINDS[node.kind as usize].fields {
+                    if field.name == "declaration"
+                        && probe
+                            .peek_node()?
+                            .is_some_and(|child| child.kind == kind::COMPONENT_DECLARATION)
+                    {
+                        for field in NODE_KINDS[node.kind as usize].fields {
+                            if field.name == "declaration" {
+                                let component = cursor.node()?.ok_or_else(|| {
+                                    Bail::new(BailKind::Malformed, "missing component")
+                                })?;
+                                self.function_depth += 1;
+                                let walked = self.component_declaration(
+                                    component,
+                                    cursor,
+                                    Some((
+                                        node.start,
+                                        node.kind == kind::EXPORT_DEFAULT_DECLARATION,
+                                    )),
+                                );
+                                self.function_depth -= 1;
+                                walked?;
+                            } else {
+                                cursor.skip_field(field.ty)?;
+                            }
+                        }
+                        return Ok(());
+                    }
+                    probe.skip_field(field.ty)?;
+                }
+            }
+            kind::RECORD_DECLARATION => return self.record_declaration(node, cursor),
+            kind::RECORD_EXPRESSION => return self.record_expression(node, cursor),
             kind::MATCH_STATEMENT => return self.match_construct(node, cursor, true),
             kind::MATCH_EXPRESSION => return self.match_construct(node, cursor, false),
             kind::AWAIT_EXPRESSION | kind::YIELD_EXPRESSION => {
@@ -282,8 +337,20 @@ impl<'a> Walk<'a> {
             // to change is the keyword; the rules below erase its type
             // parameters and return type like any other function's.
             kind::HOOK_DECLARATION => {
+                let id = cursor
+                    .peek_node()?
+                    .ok_or_else(|| Bail::new(BailKind::Malformed, "hook without name"))?;
+                let start = self.skip_trivia(node.start as usize);
+                let start = if self.source.get(start..start + 5) == Some(b"async") {
+                    self.skip_trivia(start + 5)
+                } else {
+                    start
+                };
+                if self.source.get(start..start + 4) != Some(b"hook") || start as u32 >= id.start {
+                    return Err(Bail::new(BailKind::Malformed, "missing hook keyword"));
+                }
                 self.replace_span(
-                    node.start..node.start + b"hook".len() as u32,
+                    start as u32..start as u32 + b"hook".len() as u32,
                     "function".into(),
                 );
             }
@@ -368,10 +435,15 @@ impl<'a> Walk<'a> {
         Ok(header.map(|node| node.start..node.end))
     }
 
-    /// Notes an identifier the output will reference. See [`Walk::seen_names`].
+    /// Notes the statement containing a runtime reference in each active list.
     fn remember(&mut self, name: &'a [u8]) {
-        if let Some(seen) = self.seen_names.as_mut() {
-            seen.insert(name);
+        if let Some(scopes) = self.component_scopes.as_mut() {
+            for scope in scopes {
+                scope
+                    .first_references
+                    .entry(name)
+                    .or_insert(scope.statement_start);
+            }
         }
     }
 
@@ -382,7 +454,7 @@ impl<'a> Walk<'a> {
             .map_err(|_| Bail::new(BailKind::Malformed, "source is not UTF-8"))
     }
 
-    /// Refuses the file over a construct nothing can compile.
+    /// Refuses invalid syntax or a construct without supported semantics.
     ///
     /// The message is the one `TransformMatchSyntax` throws where it has one,
     /// so a search for it finds the same answers, and it carries a position in
@@ -406,8 +478,15 @@ impl<'a> Walk<'a> {
 
     fn walk_fields(&mut self, node: Node, cursor: &mut Cursor<'a>) -> Result<(), Bail> {
         if node.kind == kind::IDENTIFIER
-            && self.seen_names.is_some()
+            && self.component_scopes.is_some()
             && let Some(name) = peek_label(cursor)
+        {
+            self.remember(name);
+        }
+        if node.kind == kind::JSX_IDENTIFIER
+            && self.jsx_reference != 0
+            && let Some(name) = peek_label(cursor)
+            && (self.jsx_reference == 2 || !name.first().is_some_and(u8::is_ascii_lowercase))
         {
             self.remember(name);
         }
@@ -418,8 +497,30 @@ impl<'a> Walk<'a> {
         for (index, field) in fields.iter().enumerate() {
             match resolved.field(index) {
                 FieldRule::Plain => {
+                    if field.name == "decorators" {
+                        let mut probe = *cursor;
+                        seen.decorated |= probe.list_len()? > 0;
+                    }
                     if field.ty == FieldType::Node {
-                        seen.fields[index] = self.walk_node_field(cursor)?;
+                        let previous = self.jsx_reference;
+                        self.jsx_reference = match (node.kind, field.name) {
+                            (kind::JSX_OPENING_ELEMENT | kind::JSX_CLOSING_ELEMENT, "name") => 1,
+                            (kind::JSX_MEMBER_EXPRESSION, "object") if previous != 0 => 2,
+                            _ => 0,
+                        };
+                        let walked = self.walk_node_field(cursor);
+                        self.jsx_reference = previous;
+                        seen.fields[index] = walked?;
+                    } else if self.component_scopes.is_some()
+                        && matches!(
+                            (node.kind, field.name),
+                            (
+                                kind::PROGRAM | kind::BLOCK_STATEMENT | kind::STATIC_BLOCK,
+                                "body"
+                            ) | (kind::SWITCH_CASE, "consequent")
+                        )
+                    {
+                        self.statement_list(cursor)?;
                     } else {
                         self.walk_field(field.ty, cursor)?;
                     }
@@ -440,6 +541,27 @@ impl<'a> Walk<'a> {
         }
 
         self.finish(node, &seen)
+    }
+
+    fn statement_list(&mut self, cursor: &mut Cursor<'a>) -> Result<(), Bail> {
+        let count = cursor.list_len()?;
+        self.component_scopes
+            .as_mut()
+            .unwrap()
+            .push(ComponentScope::default());
+        for _ in 0..count {
+            if let Some(node) = cursor.peek_node()? {
+                self.component_scopes
+                    .as_mut()
+                    .unwrap()
+                    .last_mut()
+                    .unwrap()
+                    .statement_start = node.start;
+            }
+            self.node(cursor)?;
+        }
+        self.component_scopes.as_mut().unwrap().pop();
+        Ok(())
     }
 
     fn walk_field(&mut self, ty: FieldType, cursor: &mut Cursor<'a>) -> Result<(), Bail> {
@@ -544,7 +666,12 @@ impl<'a> Walk<'a> {
                 seen.erase_self |= matches!(cursor.label()?, Some(b"type") | Some(b"typeof"));
             }
             (kind::CLASS_DECLARATION | kind::CLASS_EXPRESSION, "implements") => {
-                self.class_implements(cursor)?;
+                let from = ["id", "typeParameters", "superClass", "superTypeArguments"]
+                    .iter()
+                    .filter_map(|name| self.field_span(node, seen, name).map(|span| span.end))
+                    .max()
+                    .unwrap_or(node.start);
+                self.class_implements(cursor, from)?;
             }
             (kind::IMPORT_DECLARATION, "specifiers") => {
                 seen.erase_self |= self.import_specifiers(cursor)?;
@@ -554,7 +681,46 @@ impl<'a> Walk<'a> {
                 | kind::FUNCTION_EXPRESSION
                 | kind::ARROW_FUNCTION_EXPRESSION,
                 "params",
-            ) => self.function_params(cursor)?,
+            ) => {
+                let index = NODE_KINDS[node.kind as usize]
+                    .fields
+                    .iter()
+                    .position(|field| field.name == "params")
+                    .unwrap();
+                seen.fields[index] = self.function_params(cursor)?;
+            }
+            (_, "predicate") => {
+                if let Some(span) = self.erase_field(FieldType::Node, cursor)? {
+                    if let Some(return_type) = self.field_span(node, seen, "returnType") {
+                        self.erase_span(return_type.start..span.end);
+                        return Ok(());
+                    }
+                    // Inferred predicates have no return-type annotation to
+                    // own the colon before `%checks`. Skip header trivia from
+                    // the last parameter, so colons inside comments stay put.
+                    let mut at = ["params", "id", "typeParameters"]
+                        .iter()
+                        .filter_map(|name| self.field_span(node, seen, name).map(|span| span.end))
+                        .max()
+                        .unwrap_or(node.start) as usize;
+                    let mut colon = None;
+                    while at < span.start as usize {
+                        at = self.skip_trivia(at);
+                        if self.source.get(at) == Some(&b':')
+                            && self.skip_trivia(at + 1) == span.start as usize
+                        {
+                            colon = Some(at as u32);
+                            break;
+                        }
+                        at += 1;
+                    }
+                    let colon = colon
+                        .ok_or_else(|| Bail::new(BailKind::Malformed, "missing predicate colon"))?;
+                    // Include trivia inside the annotation. Leaving a line
+                    // comment/newline here would separate arrow params from =>.
+                    self.erase_span(colon..span.end);
+                }
+            }
             (kind::EXPORT_NAMED_DECLARATION, "declaration") => {
                 // `export type Foo = ...` reaches here as an export wrapping a
                 // `TypeAlias`. Erasing only the alias would leave `export`
@@ -644,9 +810,15 @@ impl<'a> Walk<'a> {
     ///
     /// Only the header is rewritten. The body keeps its own bytes so the walk
     /// erases the Flow inside it and the piece table composes the two.
-    fn component_declaration(&mut self, node: Node, cursor: &mut Cursor<'a>) -> Result<(), Bail> {
+    fn component_declaration(
+        &mut self,
+        node: Node,
+        cursor: &mut Cursor<'a>,
+        export: Option<(u32, bool)>,
+    ) -> Result<(), Bail> {
         let bail = |detail: &str| Bail::new(BailKind::Proposal, format!("component: {detail}"));
 
+        let id_name = identifier_name(cursor).map(<[u8]>::to_vec);
         let Some(id) = cursor.node()? else {
             return Err(bail("no name"));
         };
@@ -665,29 +837,42 @@ impl<'a> Walk<'a> {
                     let Some(argument) = cursor.peek_node()? else {
                         return Err(bail("rest without an argument"));
                     };
-                    if argument.kind != kind::IDENTIFIER {
-                        // A destructured rest spreads its properties into the
-                        // props pattern, which nothing observed needs.
-                        return Err(bail("destructured rest parameter"));
+                    if !matches!(argument.kind, kind::IDENTIFIER | kind::OBJECT_PATTERN) {
+                        return Err(self.reject(
+                            param.start,
+                            &format!("Unhandled {} encountered in restParameter", argument.name()),
+                        ));
                     }
-                    let Some(name) = identifier_name(cursor) else {
-                        return Err(bail("rest argument has no name"));
-                    };
-                    let local = name_span(argument, name);
-                    cursor.skip_node()?;
+                    let local_span = self.binding_span(argument, cursor)?;
+                    let mut local = self.capture(cursor, local_span)?;
+                    let flatten = argument.kind == kind::OBJECT_PATTERN;
+                    if flatten {
+                        local = local
+                            .trim()
+                            .strip_prefix('{')
+                            .and_then(|text| text.strip_suffix('}'))
+                            .ok_or_else(|| {
+                                Bail::new(BailKind::Malformed, "component rest pattern")
+                            })?
+                            .to_owned();
+                        // Keep the inner trivia: a trailing line comment needs
+                        // its newline before the generated closing brace. Rest
+                        // props are last, so an existing trailing comma is safe.
+                    }
                     // `component Foo(...props: P)` is just `function Foo(props)`.
                     // The optimisation needs the rest to be the *only*
                     // parameter — a ref beside it still forces a pattern, which
                     // is what `TransformComponentSyntax` does.
-                    if count == 1 {
+                    if count == 1 && !flatten {
                         whole_props = Some(local);
                     } else {
                         params.push(ComponentParam {
-                            name: local.clone(),
+                            name: argument.start..argument.end,
                             local,
                             default: None,
                             shorthand: true,
                             rest: true,
+                            flatten,
                         });
                     }
                 }
@@ -695,8 +880,8 @@ impl<'a> Walk<'a> {
                     let Some(name) = cursor.peek_node()? else {
                         return Err(bail("parameter without a name"));
                     };
-                    let is_ref =
-                        name.kind == kind::IDENTIFIER && identifier_name(cursor) == Some(b"ref");
+                    let is_ref = matches!(name.kind, kind::IDENTIFIER | kind::STRING_LITERAL)
+                        && identifier_name(cursor) == Some(b"ref");
                     cursor.skip_node()?;
                     let param = self.component_parameter(name, cursor)?;
                     // React 18 lifts `ref` out of props into a second argument
@@ -705,9 +890,15 @@ impl<'a> Walk<'a> {
                     // defaults to 18 and nothing here sets otherwise.
                     if is_ref {
                         if ref_binding.is_some() {
-                            return Err(bail("more than one ref parameter"));
+                            return Err(self.reject(
+                                name.start,
+                                "Component declarations cannot have more than one 'ref' parameter.",
+                            ));
                         }
-                        ref_binding = Some(param.local);
+                        ref_binding = Some(match param.default {
+                            Some(default) => format!("{} = {default}", param.local),
+                            None => param.local,
+                        });
                     } else {
                         params.push(param);
                     }
@@ -721,46 +912,90 @@ impl<'a> Walk<'a> {
         };
         let source = std::str::from_utf8(self.source)
             .map_err(|_| Bail::new(BailKind::Malformed, "source is not UTF-8"))?;
+        let mut flags = *cursor;
+        flags.skip_node()?;
+        let mut is_async = false;
+        for field in &NODE_KINDS[node.kind as usize].fields[3..] {
+            if field.name == "async" {
+                is_async = flags.boolean()?;
+            } else {
+                flags.skip_field(field.ty)?;
+            }
+        }
+        let inner_name = if ref_binding.is_some() {
+            let name = id_name
+                .as_ref()
+                .ok_or_else(|| Bail::new(BailKind::Malformed, "component identifier"))?;
+            let mut suffix = "_withRef".to_owned();
+            let mut index = 0u32;
+            loop {
+                let mut candidate = name.clone();
+                candidate.extend_from_slice(suffix.as_bytes());
+                if !self.occupied_names.contains(&candidate) {
+                    break;
+                }
+                suffix = format!("_withRef${index}");
+                index += 1;
+            }
+            Some(format!(
+                "{}{suffix}",
+                &source[id.start as usize..id.end as usize]
+            ))
+        } else {
+            None
+        };
+        let empty_props_name =
+            if ref_binding.is_some() && params.is_empty() && whole_props.is_none() {
+                let base = "_$$empty_props_placeholder$$";
+                let mut name = base.to_owned();
+                let mut index = 0u32;
+                while self.occupied_names.contains(name.as_bytes()) {
+                    name = format!("{base}${index}");
+                    index += 1;
+                }
+                Some(name)
+            } else {
+                None
+            };
         let component = Component {
             id: id.start..id.end,
             params,
             whole_props,
             ref_binding,
-            // `async` is the last field, so it is read after the body below.
-            is_async: false,
+            is_async,
+            inner_name,
+            empty_props_name,
         };
-        // The `forwardRef` binding is a `const`, which is not hoisted the way
-        // the `component` declaration it replaces was. `TransformComponentSyntax`
-        // handles that by moving the binding above the first reference; this
-        // declines instead, on a textual search that errs towards declining.
-        // The `forwardRef` binding is a `const`, which is not hoisted the way
-        // the `component` declaration it replaces was.
-        // `TransformComponentSyntax` handles a reference above the declaration
-        // by moving the binding up to it; this declines instead, on a textual
-        // search that errs towards declining.
-        if component.ref_binding.is_some() {
-            let name = &self.source[component.id.start as usize..component.id.end as usize];
-            if self
-                .seen_names
+        let start = export.map_or(node.start, |(start, _)| start);
+        let wrapper = component.forward_ref(source);
+        let mut header = component.render(source);
+        if let Some(wrapper) = wrapper {
+            let name = id_name.as_deref().unwrap();
+            let anchor = self
+                .component_scopes
                 .as_ref()
-                .is_some_and(|seen| seen.contains(name))
-            {
-                return Err(bail("component referenced before its forwardRef binding"));
+                .and_then(|scopes| scopes.last())
+                .and_then(|scope| scope.first_references.get(name))
+                .copied()
+                .unwrap_or(start);
+            self.replace_span(anchor..anchor, wrapper);
+            if let Some((_, default)) = export {
+                let name = &source[id.start as usize..id.end as usize];
+                self.replace_span(
+                    node.end..node.end,
+                    if default {
+                        format!("\nexport default {name};")
+                    } else {
+                        format!("\nexport {{{name}}};")
+                    },
+                );
             }
+        } else if let Some((_, default)) = export {
+            header = format!("export {}{header}", if default { "default " } else { "" });
         }
-        // Everything from `component` to the body's `{` goes, which takes the
-        // type parameters and the `renders` clause with it — both of them sit
-        // in that range even though the buffer stores them after the body.
-        self.replace_span(node.start..body.start, component.render(source));
+        self.replace_span(start..body.start, header);
         self.node(cursor)?;
-
         for field in &NODE_KINDS[node.kind as usize].fields[3..] {
-            if field.name == "async" {
-                if cursor.boolean()? {
-                    return Err(bail("async component"));
-                }
-                continue;
-            }
             cursor.skip_field(field.ty)?;
         }
         Ok(())
@@ -782,16 +1017,23 @@ impl<'a> Walk<'a> {
             let Some(left) = cursor.peek_node()? else {
                 return Err(bail("default without a binding"));
             };
-            let binding = self.binding_span(left, cursor)?;
-            cursor.skip_node()?;
+            let binding_span = self.binding_span(left, cursor)?;
+            let binding = self.capture(cursor, binding_span)?;
             let Some(right) = cursor.peek_node()? else {
                 return Err(bail("default without a value"));
             };
-            cursor.skip_node()?;
-            (binding, Some(right.start..right.end))
+            let default = self.capture(cursor, right.start..right.end)?;
+            (
+                binding,
+                Some(if right.kind == kind::SEQUENCE_EXPRESSION {
+                    format!("({default})")
+                } else {
+                    default
+                }),
+            )
         } else {
-            let binding = self.binding_span(local, cursor)?;
-            cursor.skip_node()?;
+            let binding_span = self.binding_span(local, cursor)?;
+            let binding = self.capture(cursor, binding_span)?;
             (binding, None)
         };
         let shorthand = cursor.boolean()?;
@@ -801,7 +1043,20 @@ impl<'a> Walk<'a> {
             default,
             shorthand,
             rest: false,
+            flatten: false,
         })
+    }
+
+    fn capture(&mut self, cursor: &mut Cursor<'a>, span: Range<u32>) -> Result<String, Bail> {
+        let mark = self.edits.len();
+        self.node(cursor)?;
+        let edits = self
+            .edits
+            .split_off(mark)
+            .into_iter()
+            .filter(|edit| edit.span.start >= span.start && edit.span.end <= span.end)
+            .collect();
+        rendered(self.source_str()?, span, edits)
     }
 
     /// The source range of a binding with its type annotation left out.
@@ -816,17 +1071,37 @@ impl<'a> Walk<'a> {
                 let Some(name) = identifier_name(cursor) else {
                     return Err(bail("binding has no name"));
                 };
-                Ok(name_span(binding, name))
+                Ok(name_span(self.source, binding, name))
             }
             kind::OBJECT_PATTERN | kind::ARRAY_PATTERN => {
                 let mut probe = *cursor;
                 probe.node()?;
-                probe.skip_field(FieldType::List)?;
-                let end = match probe.peek_node()? {
-                    Some(annotation) => annotation.start,
-                    None => binding.end,
+                let count = probe.list_len()?;
+                let mut end = binding.start as usize + 1;
+                for _ in 0..count {
+                    if let Some(child) = probe.peek_node()? {
+                        end = child.end as usize;
+                    }
+                    probe.skip_node()?;
+                }
+                let close = if binding.kind == kind::OBJECT_PATTERN {
+                    b'}'
+                } else {
+                    b']'
                 };
-                Ok(binding.start..end)
+                loop {
+                    end = self.skip_trivia(end);
+                    match self.source.get(end) {
+                        Some(byte) if *byte == close => return Ok(binding.start..end as u32 + 1),
+                        Some(b',' | b')') => end += 1,
+                        _ => {
+                            return Err(Bail::new(
+                                BailKind::Malformed,
+                                "binding closing delimiter",
+                            ));
+                        }
+                    }
+                }
             }
             _ => Err(bail(NODE_KINDS[binding.kind as usize].name)),
         }
@@ -1499,11 +1774,26 @@ impl<'a> Walk<'a> {
     /// `class A implements B, C {}`. The `implements` keyword belongs to no
     /// node, so the erasure has to start at the keyword rather than at the
     /// first `ClassImplements`.
-    fn class_implements(&mut self, cursor: &mut Cursor<'a>) -> Result<(), Bail> {
+    fn class_implements(&mut self, cursor: &mut Cursor<'a>, from: u32) -> Result<(), Bail> {
         let Some(range) = self.skip_list(cursor)? else {
             return Ok(());
         };
-        let Some(keyword) = scan_back_keyword(self.source, range.start, b"implements") else {
+        // Only closing punctuation and trivia follow the last header node.
+        // Walk forward from there so keywords mentioned in comments cannot be
+        // mistaken for the clause's keyword.
+        let mut at = from as usize;
+        let mut keyword = None;
+        while at < range.start as usize {
+            at = self.skip_trivia(at);
+            if self.source.get(at..at + 10) == Some(b"implements")
+                && self.skip_trivia(at + 10) == range.start as usize
+            {
+                keyword = Some(at as u32);
+                break;
+            }
+            at += 1;
+        }
+        let Some(keyword) = keyword else {
             return Err(Bail::new(
                 BailKind::Malformed,
                 "no `implements` keyword before the clause",
@@ -1575,10 +1865,16 @@ impl<'a> Walk<'a> {
     /// is no `thisParam` field. Erasing only its annotation would leave a real
     /// parameter named `this` behind, so the whole parameter goes, comma
     /// included.
-    fn function_params(&mut self, cursor: &mut Cursor<'a>) -> Result<(), Bail> {
+    /// Returns the original parameter span during the same traversal, including
+    /// erased `this` parameters, for locating inferred predicate annotations.
+    fn function_params(&mut self, cursor: &mut Cursor<'a>) -> Result<Option<Range<u32>>, Bail> {
         let count = cursor.list_len()?;
+        let mut span: Option<Range<u32>> = None;
         for index in 0..count {
             let header = cursor.peek_node()?;
+            if let Some(node) = header {
+                span = Some(span.map_or(node.start, |span| span.start)..node.end);
+            }
             let is_this_param = index == 0
                 && header.is_some_and(|node| node.kind == kind::IDENTIFIER)
                 && self.parameter_is_this(cursor)?;
@@ -1590,7 +1886,7 @@ impl<'a> Walk<'a> {
             cursor.skip_node()?;
             self.erase_span(self.list_element_span(node.start..node.end));
         }
-        Ok(())
+        Ok(span)
     }
 
     /// Reads the name of the `Identifier` the cursor is parked on, without
@@ -1640,12 +1936,33 @@ impl<'a> Walk<'a> {
     /// and leave a dangling one behind.
     fn skip_trivia(&self, mut at: usize) -> usize {
         loop {
-            while self.source.get(at).is_some_and(u8::is_ascii_whitespace) {
-                at += 1;
+            loop {
+                let width = match self.source.get(at) {
+                    Some(b'\t' | 0x0b | 0x0c | b' ' | b'\r' | b'\n') => 1,
+                    Some(0xc2) if self.source.get(at + 1) == Some(&0xa0) => 2,
+                    Some(0xe1 | 0xe2 | 0xe3 | 0xef) => match self.source.get(at..at + 3) {
+                        Some(
+                            [0xe1, 0x9a, 0x80]
+                            | [0xe2, 0x80, 0x80..=0x8a | 0xa8 | 0xa9 | 0xaf]
+                            | [0xe2, 0x81, 0x9f]
+                            | [0xe3, 0x80, 0x80]
+                            | [0xef, 0xbb, 0xbf],
+                        ) => 3,
+                        _ => 0,
+                    },
+                    _ => 0,
+                };
+                if width == 0 {
+                    break;
+                }
+                at += width;
             }
             match self.source.get(at..at + 2) {
                 Some(b"//") => {
-                    while self.source.get(at).is_some_and(|byte| *byte != b'\n') {
+                    while at < self.source.len()
+                        && !matches!(self.source[at], b'\r' | b'\n')
+                        && !matches!(self.source.get(at..at + 3), Some([0xe2, 0x80, 0xa8 | 0xa9]))
+                    {
                         at += 1;
                     }
                 }
@@ -1668,7 +1985,8 @@ impl<'a> Walk<'a> {
         // the ordinary child erasure below remove only its type annotation.
         let type_only_class_field = node.kind == kind::CLASS_PROPERTY
             && self.field_span(node, seen, "typeAnnotation").is_some()
-            && self.field_span(node, seen, "value").is_none();
+            && self.field_span(node, seen, "value").is_none()
+            && !seen.decorated;
 
         if seen.erase_self || type_only_class_field {
             self.edits.truncate(seen.mark);
@@ -1816,8 +2134,57 @@ fn peek_label<'a>(cursor: &Cursor<'a>) -> Option<&'a [u8]> {
 
 /// The range an identifier's name occupies, which is the head of its own range
 /// — the rest is the type annotation and any `?`.
-fn name_span(identifier: Node, name: &[u8]) -> Range<u32> {
-    identifier.start..identifier.start + name.len() as u32
+fn name_span(source: &[u8], identifier: Node, name: &[u8]) -> Range<u32> {
+    let start = identifier.start as usize;
+    if source.get(start..start + name.len()) == Some(name) {
+        return identifier.start..identifier.start + name.len() as u32;
+    }
+    // Identifier labels are decoded; an escaped source spelling is longer.
+    let mut end = start;
+    while end < identifier.end as usize {
+        if source.get(end..end + 2) == Some(b"\\u") {
+            end += 2;
+            if source.get(end) == Some(&b'{') {
+                while end < identifier.end as usize && source[end] != b'}' {
+                    end += 1;
+                }
+                end += 1;
+            } else {
+                end += 4;
+            }
+        } else if source
+            .get(end)
+            .is_some_and(|byte| is_identifier_byte(*byte))
+        {
+            end += 1;
+        } else {
+            break;
+        }
+    }
+    identifier.start..end as u32
+}
+
+fn collect_names(cursor: &mut Cursor<'_>, names: &mut HashSet<Vec<u8>>) -> Result<(), Bail> {
+    let Some(node) = cursor.node()? else {
+        return Ok(());
+    };
+    if matches!(node.kind, kind::IDENTIFIER | kind::JSX_IDENTIFIER)
+        && let Some(name) = peek_label(cursor)
+    {
+        names.insert(name.to_vec());
+    }
+    for field in NODE_KINDS[node.kind as usize].fields {
+        match field.ty {
+            FieldType::Node => collect_names(cursor, names)?,
+            FieldType::List => {
+                for _ in 0..cursor.list_len()? {
+                    collect_names(cursor, names)?;
+                }
+            }
+            _ => cursor.skip_field(field.ty)?,
+        }
+    }
+    Ok(())
 }
 
 /// Finds the last `byte` in `source[from..to]`.

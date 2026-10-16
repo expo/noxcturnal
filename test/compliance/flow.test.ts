@@ -1,6 +1,74 @@
 import { expect, test } from 'vitest';
 import { execute } from './runtime';
 
+test('Flow resource-loop heads preserve asynchronous disposal through Oxc lowering', async () => {
+  const result = execute<{ result: Promise<string[]> }>(
+    `// @flow
+    globalThis.result = (async () => {
+      const calls: Array<string> = [];
+      const values = [{[Symbol.asyncDispose]() {
+        calls.push('dispose:start');
+        return Promise.resolve().then(() => calls.push('dispose:end'));
+      }}];
+      for (await using value of values) { calls.push('body'); }
+      for await (await using value of values) { calls.push('for-await-body'); }
+      calls.push('after');
+      return calls;
+    })();`,
+    { helpers: { mode: 'inline' }, transforms: { explicitResourceManagement: true } },
+  );
+  await expect(result.result).resolves.toEqual([
+    'body',
+    'dispose:start',
+    'dispose:end',
+    'for-await-body',
+    'dispose:start',
+    'dispose:end',
+    'after',
+  ]);
+});
+
+test('Flow readonly and writeonly fields retain initialization, descriptors, and writable values', () => {
+  const result = execute<{ result: unknown[] }>(
+    `// @flow
+    const order = [];
+    const read = value => { order.push(value); return value; };
+    class Fields {
+      static readonly first: number = read(1);
+      readonly second: number = read(2);
+      static writeonly third: number = read(3);
+      writeonly fourth: number = read(4);
+      static readonly absent: number;
+      readonly missing: number;
+      readonly: number = read(5);
+      writeonly: number = read(6);
+    }
+    const fields = new Fields();
+    fields.second = 20;
+    Fields.first = 10;
+    const descriptor = Object.getOwnPropertyDescriptor(fields, 'second');
+    globalThis.result = [order, Fields.first, fields.second, Fields.third, fields.fourth,
+      fields.readonly, fields.writeonly, Object.hasOwn(Fields, 'absent'),
+      Object.hasOwn(fields, 'missing'), descriptor.enumerable, descriptor.configurable, descriptor.writable];
+  `,
+    {},
+  );
+  expect(result.result).toEqual([
+    [1, 3, 2, 4, 5, 6],
+    10,
+    20,
+    3,
+    4,
+    5,
+    6,
+    false,
+    false,
+    true,
+    true,
+    true,
+  ]);
+});
+
 test('Flow components preserve renamed, defaulted, destructured, and rest props', () => {
   const result = execute<{ result: unknown[] }>(
     `

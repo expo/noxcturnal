@@ -5,12 +5,12 @@
 //! built and no AST is translated, so the output keeps the original file's
 //! formatting and the resulting source map stays near-identity.
 //!
-//! The walk is bail-first: anything the rules do not recognise — record
-//! syntax, a cover-grammar node, an unhandled Flow-bearing field — abandons the
+//! The walk is bail-first: anything the rules do not recognise — a
+//! cover-grammar node or an unhandled Flow-bearing field — abandons the
 //! file to the caller's existing parser adapter rather than guessing.
 //!
 //! The proposals that declare runtime constructs — `enum`, `component`, `hook`,
-//! and `match` — are the exception, because deleting them would change what a
+//! `record`, and `match` — are the exception, because deleting them would change what a
 //! program does. Each is rewritten in place instead, matching what
 //! `hermes-parser`'s own JavaScript transforms produce.
 //!
@@ -23,7 +23,7 @@
 //! - [`rules`] is the reviewable disposition table: what each node kind and
 //!   each attachment point means.
 //! - [`erase`] is the walk that turns those into spans.
-//! - [`proposals`] is what the four rewritten constructs turn into.
+//! - [`proposals`] and the record lowering in [`erase`] implement the runtime constructs.
 //!
 //! The `parser` feature links Hermes. Without it everything above still builds
 //! and tests, because the buffer is a self-contained blob that a fixture file
@@ -41,8 +41,8 @@ pub use rules::BailKind;
 
 /// Parses `source` with the linked Hermes and erases its Flow syntax.
 ///
-/// `Err` covers both a parse failure and a bail; either way the caller should
-/// fall back to its own parser adapter.
+/// `Err` distinguishes coverage/parser gaps from fatal failures through
+/// [`BailKind::has_fallback`]. Parse failures may reflect parser coverage gaps.
 #[cfg(feature = "parser")]
 pub fn erase_source(source: &str) -> Result<Erasure, Bail> {
     let parse = hermes_parser_sys::Parse::new(source).map_err(|error| Bail {

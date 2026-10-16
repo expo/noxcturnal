@@ -91,14 +91,19 @@ pub(crate) fn erase(
 
     let erasure = match hermes_flow::erase_source(source) {
         Ok(erasure) => erasure,
-        // Every bail but one says the caller's parser adapter should try
-        // instead. A rejection says nothing can compile this, so it is reported
-        // here — against the line it was written on, rather than as a parse
-        // failure two steps later over code the user never saw.
-        Err(bail) if bail.kind.has_fallback() => return Ok(NativeFlowErasure::bailed(&bail)),
+        // Coverage/parser gaps may use an adapter. Internal failures
+        // and invalid/reference-rejected constructs are fatal.
+        Err(bail) if bail.kind.has_fallback() => {
+            return Ok(NativeFlowErasure::bailed(&bail));
+        }
         Err(bail) => {
+            let status = if bail.kind == hermes_flow::BailKind::Rejected {
+                napi::Status::InvalidArg
+            } else {
+                napi::Status::GenericFailure
+            };
             return Err(napi::Error::new(
-                napi::Status::InvalidArg,
+                status,
                 format!("{filename}: {}", bail.detail),
             ));
         }
@@ -195,11 +200,19 @@ mod tests {
     }
 
     #[test]
-    fn reports_a_bail_reason() {
+    fn lowers_record_expressions_without_bailing() {
         let result = erase("const x = R {a: 1};\n", "a.js", Some("none")).unwrap();
+        assert_eq!(result.status, "erased");
+        assert_eq!(result.code.as_deref(), Some("const x = new R({a: 1});\n"));
+        assert!(result.reason.is_none());
+    }
+
+    #[test]
+    fn reports_a_bail_reason() {
+        let result = erase("const x = ;\n", "a.js", Some("none")).unwrap();
         assert_eq!(result.status, "bailed");
-        assert_eq!(result.reason.as_deref(), Some("proposal-syntax"));
-        assert_eq!(result.detail.as_deref(), Some("RecordExpression"));
+        assert_eq!(result.reason.as_deref(), Some("parse-failed"));
+        assert!(result.detail.is_some_and(|detail| !detail.is_empty()));
     }
 
     /// A construct nothing can compile is reported rather than handed on: the
