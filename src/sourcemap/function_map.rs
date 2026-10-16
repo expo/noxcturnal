@@ -548,12 +548,15 @@ impl MappingEncoder {
 
 fn line_starts(source: &str) -> Vec<usize> {
     let mut starts = vec![0];
-    starts.extend(
-        source
-            .bytes()
-            .enumerate()
-            .filter_map(|(index, byte)| (byte == b'\n').then_some(index + 1)),
-    );
+    let mut characters = source.char_indices().peekable();
+    while let Some((index, character)) = characters.next() {
+        if character == '\r' && characters.peek().is_some_and(|(_, next)| *next == '\n') {
+            characters.next();
+            starts.push(index + 2);
+        } else if matches!(character, '\n' | '\r' | '\u{2028}' | '\u{2029}') {
+            starts.push(index + character.len_utf8());
+        }
+    }
     starts
 }
 

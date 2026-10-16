@@ -142,6 +142,7 @@ struct Key {
     public_start: u32,
     public_end: u32,
     role: KeyRole,
+    sorts_as_range: bool,
 }
 
 /// A `Move` command contributes two keys: the ranged hole it leaves behind and the
@@ -185,13 +186,30 @@ pub fn utf16_to_byte(source: &str, offset: u32) -> Result<usize> {
 /// replaced source lower directly into `Original` pieces, and adjacent original
 /// ranges merge.
 pub fn build(source: &str, commands: Vec<EditCommand>) -> Result<Vec<Piece>> {
-    let mut grouped_orders = FxHashMap::<u32, (usize, bool)>::default();
+    #[derive(Default)]
+    struct EditGroup {
+        count: usize,
+        has_parts: bool,
+        public_range: Option<(u32, u32)>,
+    }
+    let mut grouped_orders = FxHashMap::<u32, EditGroup>::default();
     for (index, command) in commands.iter().enumerate() {
         let entry = grouped_orders
             .entry(command.order.unwrap_or(index as u32))
             .or_default();
-        entry.0 += 1;
-        entry.1 |= !command.parts.is_empty();
+        entry.count += 1;
+        entry.has_parts |= !command.parts.is_empty();
+        if command.start != command.end {
+            let range = (
+                command.start.min(command.end),
+                command.start.max(command.end),
+            );
+            entry.public_range = Some(
+                entry
+                    .public_range
+                    .map_or(range, |old| (old.0.min(range.0), old.1.max(range.1))),
+            );
+        }
     }
     let byte_offsets = if source.is_ascii() {
         None
@@ -275,6 +293,7 @@ pub fn build(source: &str, commands: Vec<EditCommand>) -> Result<Vec<Piece>> {
                 public_start,
                 public_end,
                 role: KeyRole::MoveHole,
+                sorts_as_range: true,
             });
             keys.push(Key {
                 start: destination,
@@ -285,6 +304,7 @@ pub fn build(source: &str, commands: Vec<EditCommand>) -> Result<Vec<Piece>> {
                 public_start,
                 public_end,
                 role: KeyRole::MoveDestination,
+                sorts_as_range: false,
             });
             continue;
         }
@@ -331,12 +351,27 @@ pub fn build(source: &str, commands: Vec<EditCommand>) -> Result<Vec<Piece>> {
             public_start,
             public_end,
             role: KeyRole::Body,
+            sorts_as_range: start != end,
         });
+    }
+    // Attribute conflicts to the logical replacement range, including its
+    // zero-width prefix runs, so diagnostics can identify both operation owners.
+    for key in &mut keys {
+        if key.start == key.end
+            && key.affinity == 4
+            && let Some(group) = grouped_orders.get(&key.order)
+            && group.count > 1
+            && let Some((start, end)) = group.public_range
+        {
+            key.public_start = start;
+            key.public_end = end;
+            key.sorts_as_range = true;
+        }
     }
     keys.sort_unstable_by_key(|key| {
         (
             key.start,
-            key.end != key.start,
+            key.sorts_as_range,
             key.affinity,
             key.order,
             key.index,
@@ -399,7 +434,7 @@ pub fn build(source: &str, commands: Vec<EditCommand>) -> Result<Vec<Piece>> {
                 && key.order != order
                 && grouped_orders
                     .get(&order)
-                    .is_some_and(|(count, has_parts)| *count > 1 && *has_parts);
+                    .is_some_and(|group| group.count > 1 && group.has_parts);
             if structured_sibling {
                 continue;
             }
@@ -554,6 +589,7 @@ pub fn build(source: &str, commands: Vec<EditCommand>) -> Result<Vec<Piece>> {
                     });
                 }
             } else if edit.mapping == MappingPolicy::Identity
+                && edit.names.is_empty()
                 && edit.content == source[edit.start..edit.end]
             {
                 push_original(&mut pieces, edit.start, edit.end);
@@ -569,7 +605,7 @@ pub fn build(source: &str, commands: Vec<EditCommand>) -> Result<Vec<Piece>> {
             if edit
                 .order
                 .and_then(|order| grouped_orders.get(&order))
-                .is_some_and(|(count, has_parts)| *count > 1 && *has_parts)
+                .is_some_and(|group| group.count > 1 && group.has_parts)
             {
                 structured_end = structured_end.max(edit.end);
             }
@@ -587,7 +623,10 @@ pub fn build(source: &str, commands: Vec<EditCommand>) -> Result<Vec<Piece>> {
         let (content, mapping, names, mark_only, _) = take_command(&mut slots[key.index as usize]);
         if mark_only {
             pieces.push(Piece::Mark { origin: key.start });
-        } else if mapping == MappingPolicy::Identity && content == source[key.start..key.end] {
+        } else if mapping == MappingPolicy::Identity
+            && names.is_empty()
+            && content == source[key.start..key.end]
+        {
             push_original(&mut pieces, key.start, key.end);
         } else {
             pieces.push(Piece::Generated {
@@ -699,12 +738,27 @@ fn expand_copies(source: &str, edits: &mut [Edit]) -> Result<Vec<Option<Vec<Piec
         }
         table
     });
+    // Boundary runs belonging to a ranged replacement are part of that edit,
+    // unlike independent insertions at a copied range's edges.
+    let mut replacement_ranges = FxHashMap::<u32, (usize, usize)>::default();
+    for edit in edits.iter().filter(|edit| edit.end > edit.start) {
+        if let Some(order) = edit.order {
+            replacement_ranges
+                .entry(order)
+                .and_modify(|range| {
+                    range.0 = range.0.min(edit.start);
+                    range.1 = range.1.max(edit.end);
+                })
+                .or_insert((edit.start, edit.end));
+        }
+    }
     let mut expansions = vec![None; edits.len()];
     let mut expander = Expander {
         source,
         states: vec![State::Unresolved; edits.len()],
         previous_end_conflict,
         next_effective,
+        replacement_ranges,
         cache: FxHashMap::default(),
     };
     for index in 0..edits.len() {
@@ -731,6 +785,7 @@ struct Expander<'a> {
     next_effective: Option<Vec<usize>>,
     /// Expanded pieces per copied range, shared across identical copies.
     cache: FxHashMap<(usize, usize), Rc<[Piece]>>,
+    replacement_ranges: FxHashMap<u32, (usize, usize)>,
 }
 
 /// The edit whose content parts are being expanded: its public range, whether
@@ -871,7 +926,14 @@ impl Expander<'_> {
             let contained = if edit_end > edit_start {
                 edit_end <= end
             } else {
-                edit_start > start && edit_start < end
+                (edit_start > start && edit_start < end)
+                    || (edit_start == start
+                        && edits[index]
+                            .order
+                            .and_then(|order| self.replacement_ranges.get(&order))
+                            .is_some_and(|&(group_start, group_end)| {
+                                group_start >= start && group_end <= end
+                            }))
             };
             if !contained {
                 if edit_end > edit_start {

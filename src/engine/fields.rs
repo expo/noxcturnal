@@ -767,51 +767,68 @@ fn declaration_name_anchor(kind: AstKind<'_>, source: &str) -> Option<u32> {
     let bytes = source.as_bytes();
     let start = span.start as usize;
     let end = span.end as usize;
-    let keyword_start = find_header_keyword(bytes, start, end, keyword)?;
+    let keyword_start = find_header_keyword(source, start, end, keyword)?;
     let keyword_end = keyword_start + keyword.len();
     if !generator {
         return Some(keyword_end as u32);
     }
     let mut cursor = keyword_end;
     while cursor < end {
-        cursor = skip_header_trivia(bytes, cursor, end);
+        cursor = skip_header_trivia(source, cursor, end);
         if bytes.get(cursor) == Some(&b'*') {
             return Some((cursor + 1) as u32);
         }
-        cursor += 1;
+        cursor += source[cursor..].chars().next()?.len_utf8();
     }
     None
 }
 
 fn find_header_keyword(
-    bytes: &[u8],
+    source: &str,
     mut cursor: usize,
     end: usize,
     keyword: &[u8],
 ) -> Option<usize> {
+    let bytes = source.as_bytes();
     while cursor + keyword.len() <= end {
-        cursor = skip_header_trivia(bytes, cursor, end);
+        cursor = skip_header_trivia(source, cursor, end);
         if bytes.get(cursor..cursor + keyword.len()) == Some(keyword)
-            && (cursor == 0 || !is_identifier_byte(bytes[cursor - 1]))
-            && (cursor + keyword.len() == bytes.len()
-                || !is_identifier_byte(bytes[cursor + keyword.len()]))
+            && source[..cursor]
+                .chars()
+                .next_back()
+                .is_none_or(|ch| !oxc_syntax::identifier::is_identifier_part(ch))
+            && source[cursor + keyword.len()..]
+                .chars()
+                .next()
+                .is_none_or(|ch| !oxc_syntax::identifier::is_identifier_part(ch))
         {
             return Some(cursor);
         }
-        cursor += 1;
+        cursor += source[cursor..].chars().next()?.len_utf8();
     }
     None
 }
 
-fn skip_header_trivia(bytes: &[u8], mut cursor: usize, end: usize) -> usize {
+fn skip_header_trivia(source: &str, mut cursor: usize, end: usize) -> usize {
+    let bytes = source.as_bytes();
     loop {
-        while cursor < end && bytes[cursor].is_ascii_whitespace() {
-            cursor += 1;
+        while cursor < end {
+            let character = source[cursor..].chars().next().unwrap();
+            if !oxc_syntax::identifier::is_white_space(character)
+                && !matches!(character, '\n' | '\r' | '\u{2028}' | '\u{2029}')
+            {
+                break;
+            }
+            cursor += character.len_utf8();
         }
         if bytes.get(cursor..cursor + 2) == Some(b"//") {
             cursor += 2;
-            while cursor < end && !matches!(bytes[cursor], b'\n' | b'\r') {
-                cursor += 1;
+            while cursor < end {
+                let character = source[cursor..].chars().next().unwrap();
+                if matches!(character, '\n' | '\r' | '\u{2028}' | '\u{2029}') {
+                    break;
+                }
+                cursor += character.len_utf8();
             }
         } else if bytes.get(cursor..cursor + 2) == Some(b"/*") {
             cursor += 2;
@@ -823,10 +840,6 @@ fn skip_header_trivia(bytes: &[u8], mut cursor: usize, end: usize) -> usize {
             return cursor;
         }
     }
-}
-
-fn is_identifier_byte(byte: u8) -> bool {
-    byte == b'$' || byte == b'_' || byte.is_ascii_alphanumeric() || byte >= 0x80
 }
 
 pub(crate) fn fields(

@@ -41,6 +41,10 @@ impl MapBuilder {
                     i64::from(segment.generated_column) - i64::from(prev_generated),
                     &mut output,
                 );
+                prev_generated = segment.generated_column;
+                if segment.original_line == u32::MAX {
+                    continue;
+                }
                 vlq::encode(
                     i64::from(segment.source) - i64::from(prev_source),
                     &mut output,
@@ -862,9 +866,25 @@ pub fn render_code(source: &str, pieces: &[Piece]) -> String {
 
 fn decode(mappings: &str) -> Vec<Vec<Segment>> {
     let mut lines = Vec::new();
+    let count: Result<usize, std::convert::Infallible> =
+        visit_decoded(mappings, |line, segment| {
+            lines.resize_with(line as usize + 1, Vec::new);
+            lines[line as usize].push(segment);
+            Ok(())
+        });
+    let Ok(count) = count;
+    lines.resize_with(count, Vec::new);
+    lines
+}
+
+fn visit_decoded<E>(
+    mappings: &str,
+    mut visit: impl FnMut(u32, Segment) -> Result<(), E>,
+) -> Result<usize, E> {
     let (mut source, mut original_line, mut original_column, mut name) = (0, 0, 0, 0);
-    for encoded_line in mappings.split(';') {
-        let mut line = Vec::new();
+    let mut line_count = 0;
+    for (generated_line, encoded_line) in mappings.split(';').enumerate() {
+        line_count = generated_line + 1;
         let mut generated_column = 0;
         for encoded in encoded_line
             .split(',')
@@ -876,6 +896,21 @@ fn decode(mappings: &str) -> Vec<Vec<Segment>> {
                 continue;
             };
             generated_column += generated_delta;
+            if cursor == bytes.len() {
+                if let Ok(generated_column) = u32::try_from(generated_column) {
+                    visit(
+                        generated_line as u32,
+                        Segment {
+                            generated_column,
+                            source: 0,
+                            original_line: u32::MAX,
+                            original_column: u32::MAX,
+                            name: 0,
+                        },
+                    )?;
+                }
+                continue;
+            }
             let Some(source_delta) = vlq::decode(bytes, &mut cursor) else {
                 continue;
             };
@@ -909,17 +944,19 @@ fn decode(mappings: &str) -> Vec<Vec<Segment>> {
             let name = decoded_name
                 .and_then(|name| u32::try_from(name).ok())
                 .map_or(0, |name| name + 1);
-            line.push(Segment {
-                generated_column,
-                source,
-                original_line,
-                original_column,
-                name,
-            });
+            visit(
+                generated_line as u32,
+                Segment {
+                    generated_column,
+                    source,
+                    original_line,
+                    original_column,
+                    name,
+                },
+            )?;
         }
-        lines.push(line);
     }
-    lines
+    Ok(line_count)
 }
 
 #[cfg(test)]
@@ -943,8 +980,20 @@ fn compose_lines(
         .into_iter()
         .map(|line| {
             line.into_iter()
-                .filter_map(|segment| {
-                    let inner_line = inner_lines.get(segment.original_line as usize)?;
+                .map(|segment| {
+                    let unmapped = || Segment {
+                        generated_column: segment.generated_column,
+                        source: 0,
+                        original_line: u32::MAX,
+                        original_column: u32::MAX,
+                        name: 0,
+                    };
+                    if segment.original_line == u32::MAX {
+                        return unmapped();
+                    }
+                    let Some(inner_line) = inner_lines.get(segment.original_line as usize) else {
+                        return unmapped();
+                    };
                     // Segments are emitted in generated-column order. Looking up the closest
                     // preceding inner segment used to scan backwards from the end for every
                     // outer segment, making composition quadratic for dense, single-line maps
@@ -952,16 +1001,25 @@ fn compose_lines(
                     // same greatest-lower-bound behavior in logarithmic time.
                     let traced_index = inner_line
                         .partition_point(|inner| inner.generated_column <= segment.original_column);
-                    let traced = inner_line.get(traced_index.checked_sub(1)?)?;
+                    let Some(traced) = traced_index
+                        .checked_sub(1)
+                        .and_then(|index| inner_line.get(index))
+                    else {
+                        return unmapped();
+                    };
+                    if traced.original_line == u32::MAX {
+                        return unmapped();
+                    }
                     let delta = segment.original_column - traced.generated_column;
                     let bounded_by_next = inner_line.get(traced_index).is_some_and(|next| {
-                        next.original_line == traced.original_line
+                        next.source == traced.source
+                            && next.original_line == traced.original_line
                             && next.original_column >= traced.original_column
                             && delta <= next.original_column - traced.original_column
                     });
                     let identity_tail = inner_line.get(traced_index).is_none()
                         && traced.generated_column == traced.original_column;
-                    Some(Segment {
+                    Segment {
                         generated_column: segment.generated_column,
                         source: traced.source,
                         original_line: traced.original_line,
@@ -971,14 +1029,14 @@ fn compose_lines(
                             } else {
                                 0
                             },
-                        name: if segment.name != 0 {
-                            segment.name
-                        } else if traced.name != 0 {
+                        name: if traced.name != 0 {
                             traced.name + outer_name_count
+                        } else if segment.name != 0 {
+                            segment.name
                         } else {
                             0
                         },
-                    })
+                    }
                 })
                 .collect()
         })
@@ -1004,7 +1062,8 @@ pub fn compose(outer: &str, inner: &str, outer_name_count: u32) -> String {
 mod decoded;
 
 pub(crate) use decoded::{
-    DecodedLayer, DecodedMapError, compose_decoded_layers, compose_layer_chain, pack_decoded_layer,
+    DecodedLayer, DecodedMapError, compose_decoded_layers, compose_layer_chain,
+    compose_layer_chain_with_input, pack_decoded_layer,
 };
 
 #[cfg(test)]
@@ -1032,6 +1091,7 @@ mod tests {
 
     #[test]
     fn composes_two_maps() {
+        assert_eq!(compose("AAAA;;", "AAAA", 0), "AAAA;;");
         assert_eq!(compose("AAAA;AACA", "AAAA;AACA", 0), "AAAA;AACA");
     }
 
@@ -1661,7 +1721,11 @@ mod tests {
                 // carries no input line extent to stop it at. Bounding that needs the
                 // explicit mapping runs the rearchitecture plan describes.
                 let source_lines = source.split('\n').count() as u32;
-                for segment in decode(&mappings).iter().flatten() {
+                for segment in decode(&mappings)
+                    .iter()
+                    .flatten()
+                    .filter(|segment| segment.original_line != u32::MAX)
+                {
                     assert!(
                         segment.original_line < source_lines,
                         "case {case} phase {phase} ({mode}): original line {} of {source_lines}\nmappings {mappings}",
@@ -1971,6 +2035,46 @@ mod tests {
         assert_eq!(code, mapped_code);
         assert!(!mappings.is_empty());
         assert_eq!(names, ["value"]);
+    }
+
+    #[test]
+    fn named_identity_survives_both_edit_build_paths() {
+        for deferred_copy in [false, true] {
+            let source = "1; 2;";
+            let mut edits = vec![EditCommand {
+                kind: EditKind::Replace,
+                start: 0,
+                end: 1,
+                content: Some("1".into()),
+                parts: Vec::new(),
+                destination: None,
+                mapping: Some(MappingPolicy::Identity),
+                order: Some(0),
+                names: Some(vec!["label".into()]),
+            }];
+            if deferred_copy {
+                edits.push(EditCommand {
+                    kind: EditKind::Replace,
+                    start: 3,
+                    end: 4,
+                    content: None,
+                    parts: vec![crate::edit::RawContentPart::Copy { start: 0, end: 1 }],
+                    destination: None,
+                    mapping: Some(MappingPolicy::Sourceless),
+                    order: Some(1),
+                    names: None,
+                });
+            }
+            let pieces = build(source, edits).unwrap();
+            let (code, mappings, names) = render(source, &pieces, "boundary");
+            assert_eq!(code, if deferred_copy { "1; 1;" } else { source });
+            assert_eq!(names, ["label"]);
+            let point = decode(&mappings)[0][0];
+            assert_eq!(
+                (point.original_line, point.original_column, point.name),
+                (0, 0, 1)
+            );
+        }
     }
 
     #[test]

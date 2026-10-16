@@ -2,6 +2,7 @@ import { native } from '../native/binding';
 import { CHILD_ROLES, FIELD_KEY_IDS } from '../generated/event-schema';
 import { alias, array } from '../pipeline/route-utils';
 import {
+  isFragmentList,
   isProvenanceCode,
   makeSourceFragment,
   realizeContent,
@@ -498,7 +499,66 @@ export class NodePathImpl implements NativeNodePath {
       this.#replaceStructured({ kind: 'composite', parts });
       return;
     }
-    this.#edit('Replace', joinFragments(code as readonly (string | CodeFragment)[]));
+    const fragments = code as readonly (string | CodeFragment)[];
+    if (fragments.length === 1) {
+      const fragment = fragments[0]!;
+      this.#edit(
+        'Replace',
+        typeof fragment === 'string' ? { code: fragment, mapping: 'anchor-boundaries' } : fragment,
+      );
+      return;
+    }
+    const first = fragments[0];
+    const policy =
+      typeof first === 'string' ? 'anchor-boundaries' : (first?.mapping ?? 'sourceless');
+    let separate = false;
+    for (const value of fragments) {
+      if (
+        (typeof value === 'string' ? 'anchor-boundaries' : (value.mapping ?? 'sourceless')) !==
+          policy ||
+        (typeof value !== 'string' && value.names?.length)
+      ) {
+        separate = true;
+        break;
+      }
+    }
+    if (separate) {
+      // Keep one ranged replacement for conflicts, with preceding zero-width
+      // replacement runs at the same affinity. They form one deduplication unit.
+      const order = this.runtime.nextOrder();
+      let separatorNeeded = false;
+      fragments.forEach((value, index) => {
+        if (separatorNeeded)
+          this.runtime.edits.push({
+            kind: 'Replace',
+            start: this.event.start,
+            end: this.event.start,
+            content: '\n',
+            mapping: 'Sourceless',
+            owner: this.runtime.owner,
+            order,
+          });
+        const mapping =
+          typeof value === 'string' ? 'AnchorBoundaries' : mappingPolicy(value.mapping);
+        const text = typeof value === 'string' ? value : value.code;
+        // A sourceless separator can share the preceding sourceless run. Mapped
+        // runs retain a separate separator so its provenance stays unmapped.
+        const absorbSeparator = mapping === 'Sourceless' && index < fragments.length - 1;
+        this.runtime.edits.push({
+          kind: 'Replace',
+          start: this.event.start,
+          end: index === fragments.length - 1 ? this.event.end : this.event.start,
+          content: absorbSeparator ? text + '\n' : text,
+          mapping,
+          names: typeof value === 'string' || !value.names ? undefined : [...value.names],
+          owner: this.runtime.owner,
+          order,
+        });
+        separatorNeeded = !absorbSeparator;
+      });
+      return;
+    }
+    this.#edit('Replace', joinFragments(fragments));
   }
   update(code: Code): void {
     this.replaceWith(code);
@@ -516,6 +576,39 @@ export class NodePathImpl implements NativeNodePath {
     prefix = '',
     suffix = '',
   ): void {
+    if (typeof content === 'string' || (!isFragmentList(content) && !('kind' in content))) {
+      const fragment = typeof content === 'string' ? undefined : content;
+      this.runtime.edits.push({
+        kind,
+        start: offset,
+        end: offset,
+        content: prefix + (typeof content === 'string' ? content : fragment!.code) + suffix,
+        mapping: fragment ? mappingPolicy(fragment.mapping) : undefined,
+        names: fragment?.names ? [...fragment.names] : undefined,
+        owner: this.runtime.owner,
+        order: this.runtime.nextOrder(),
+      });
+      return;
+    }
+    if (
+      isFragmentList(content) ||
+      (typeof content !== 'string' && 'kind' in content && content.kind === 'composite')
+    ) {
+      const parts: Code[] = [];
+      if (prefix) parts.push(prefix);
+      if (isFragmentList(content)) {
+        content.forEach((part, index) => {
+          if (index > 0) parts.push('\n');
+          parts.push(part);
+        });
+      } else {
+        parts.push(...content.parts);
+      }
+      if (suffix) parts.push(suffix);
+      if (kind === 'PrependLeft' || kind === 'PrependRight' || kind === 'Prefix') parts.reverse();
+      for (const part of parts) this.#insert(kind, offset, part);
+      return;
+    }
     this.runtime.edits.push({
       kind,
       start: offset,
@@ -894,9 +987,8 @@ function isBindingOwnerType(type: string): boolean {
 function joinFragments(values: readonly (string | CodeFragment)[]): CodeFragment {
   return {
     code: values.map(value => (typeof value === 'string' ? value : value.code)).join('\n'),
-    mapping: values.some(value => typeof value !== 'string' && value.mapping === 'identity')
-      ? 'identity'
-      : 'anchor-boundaries',
+    mapping:
+      typeof values[0] === 'string' ? 'anchor-boundaries' : (values[0]?.mapping ?? 'sourceless'),
     names: values.flatMap(value => (typeof value === 'string' ? [] : [...(value.names ?? [])])),
   };
 }

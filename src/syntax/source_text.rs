@@ -319,11 +319,25 @@ impl NativeSourceText {
 impl NativeSourceText {
     fn line_starts(&mut self) -> &[u32] {
         self.lines.get_or_insert_with(|| {
+            // ECMAScript line terminators, including a single CRLF. Offsets are
+            // UTF-16 code units, matching JavaScript source coordinates.
             let mut lines = vec![0];
-            for (offset, &unit) in self.source.iter().enumerate() {
-                if unit == 10 {
-                    lines.push(offset as u32 + 1);
+            let mut index = 0;
+            while index < self.source.len() {
+                let unit = self.source[index];
+                let width = if unit == 13 && self.source.get(index + 1) == Some(&10) {
+                    2
+                } else if matches!(unit, 10 | 13 | 0x2028 | 0x2029) {
+                    1
+                } else {
+                    0
+                };
+                if width == 0 {
+                    index += 1;
+                    continue;
                 }
+                index += width;
+                lines.push(index as u32);
             }
             lines
         })

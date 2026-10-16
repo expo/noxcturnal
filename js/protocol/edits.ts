@@ -41,6 +41,10 @@ export function packEdits(edits: readonly EditCommand[]): Buffer {
   };
   const contentWords = new Uint32Array(edits.length);
   const nameIds: number[] = [];
+  // Consecutive visitor edits often use the same label. Reuse its slab entry
+  // without building a table that would slow down unique labels.
+  let previousName: string | undefined;
+  let previousNameId = 0;
   const partsData: number[] = [];
   let editWords = 0;
   let partsEntryCount = 0;
@@ -88,7 +92,15 @@ export function packEdits(edits: readonly EditCommand[]): Buffer {
       contentWords[index] = MISSING_VALUE;
     }
     const names = edit.names;
-    if (names) for (const name of names) nameIds.push(addString(name));
+    if (names?.length) {
+      for (const name of names) {
+        if (previousName === undefined || name !== previousName) {
+          previousNameId = addString(name);
+          previousName = name;
+        }
+        nameIds.push(previousNameId);
+      }
+    }
     editWords += 7 + (names?.length ?? 0);
   }
   const wordCount = 1 + editWords + partsData.length;

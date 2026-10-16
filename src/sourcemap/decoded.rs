@@ -143,6 +143,7 @@ enum MappingBehavior {
 
 #[derive(Debug, Clone, Copy)]
 struct MappingPoint {
+    source: u32,
     generated_column: u32,
     original_line: u32,
     original_column: u32,
@@ -153,6 +154,7 @@ struct MappingPoint {
 impl MappingPoint {
     fn unmapped(generated_column: u32) -> Self {
         Self {
+            source: 0,
             generated_column,
             original_line: u32::MAX,
             original_column: u32::MAX,
@@ -267,6 +269,7 @@ fn decoded_map_from_words(
         budget.push(
             &mut segments,
             MappingPoint {
+                source: 0,
                 generated_column,
                 original_line,
                 original_column: words[3],
@@ -480,6 +483,7 @@ fn unpack_decoded_layer(
         budget.push(
             &mut segments,
             MappingPoint {
+                source: 0,
                 generated_column,
                 original_line,
                 original_column: word(3),
@@ -506,6 +510,7 @@ fn trace_segment(
     segment: &MappingPoint,
     inner: &DecodedMap,
     line_lookup: &mut LineLookup,
+    serialized_input: bool,
 ) -> Option<MappingPoint> {
     if segment.is_unmapped() {
         return Some(*segment);
@@ -513,14 +518,19 @@ fn trace_segment(
     let inner_line = line_lookup.line(inner, segment.original_line)?;
     let traced_index =
         inner_line.partition_point(|inner| inner.generated_column <= segment.original_column);
-    trace_segment_in_line(segment, inner_line, traced_index)
+    trace_segment_in_line(segment, inner_line, traced_index, serialized_input)
 }
 
 fn trace_segment_in_line(
     segment: &MappingPoint,
     inner_line: &[MappingPoint],
     traced_index: usize,
+    serialized_input: bool,
 ) -> Option<MappingPoint> {
+    // Serialized maps use greatest-lower-bound lookup: a leading gap is unmapped.
+    if serialized_input && traced_index == 0 {
+        return None;
+    }
     // Code generators can omit a segment at column zero. Preserve mappings in
     // that leading gap by clamping to the line's first mapping without applying
     // the gap as an original-column delta.
@@ -538,7 +548,8 @@ fn trace_segment_in_line(
         .original_column
         .saturating_sub(traced.generated_column);
     let bounded_by_next = inner_line.get(traced_index).is_some_and(|next| {
-        next.original_line == traced.original_line
+        next.source == traced.source
+            && next.original_line == traced.original_line
             && next.original_column >= traced.original_column
             && delta <= next.original_column - traced.original_column
     });
@@ -561,10 +572,13 @@ fn trace_segment_in_line(
         MappingBehavior::Boundary
     };
     Some(MappingPoint {
+        source: traced.source,
         generated_column: segment.generated_column,
         original_line: traced.original_line,
         original_column,
-        name: if segment.name != 0 {
+        name: if serialized_input && traced.name != 0 {
+            traced.name
+        } else if segment.name != 0 {
             segment.name
         } else if traced.name != 0 {
             traced.name
@@ -603,6 +617,15 @@ fn compose_decoded(
     inner: &DecodedMap,
     budget: &mut MappingBudget,
 ) -> Result<DecodedMap, DecodedMapError> {
+    compose_decoded_with_policy(outer, inner, budget, false)
+}
+
+fn compose_decoded_with_policy(
+    outer: &DecodedMap,
+    inner: &DecodedMap,
+    budget: &mut MappingBudget,
+    serialized_input: bool,
+) -> Result<DecodedMap, DecodedMapError> {
     let mut segments = Vec::new();
     let mut lines = Vec::new();
     // Composition usually keeps at least the outer layer's segments, so start from
@@ -618,7 +641,7 @@ fn compose_decoded(
         let line_start = segments.len();
         for (index, segment) in outer_line.iter().enumerate() {
             if segment.behavior != MappingBehavior::Identity {
-                let traced = trace_segment(segment, inner, &mut line_lookup);
+                let traced = trace_segment(segment, inner, &mut line_lookup, serialized_input);
                 push_traced_segment(
                     budget,
                     &mut segments,
@@ -640,9 +663,13 @@ fn compose_decoded(
             };
             let first = inner_line
                 .partition_point(|inner| inner.generated_column <= segment.original_column);
-            if let Some(composed) = trace_segment_in_line(segment, inner_line, first) {
-                budget.push(&mut segments, composed)?;
-            }
+            push_traced_segment(
+                budget,
+                &mut segments,
+                line_start,
+                segment.generated_column,
+                trace_segment_in_line(segment, inner_line, first, serialized_input),
+            )?;
             let input_end = outer_line.get(index + 1).map(|next| {
                 segment.original_column.saturating_add(
                     next.generated_column
@@ -661,6 +688,7 @@ fn compose_decoded(
                 budget.push(
                     &mut segments,
                     MappingPoint {
+                        source: boundary.source,
                         generated_column,
                         original_line: boundary.original_line,
                         original_column: boundary.original_column,
@@ -668,6 +696,8 @@ fn compose_decoded(
                             0
                         } else if boundary.name != 0 {
                             boundary.name
+                        } else if serialized_input {
+                            segment.name
                         } else {
                             0
                         },
@@ -712,7 +742,7 @@ fn reserve_encoded(output: &mut String, additional: usize) -> Result<(), Decoded
 
 fn encode_decoded(map: &DecodedMap) -> Result<String, DecodedMapError> {
     let mut output = String::new();
-    let (mut prev_line, mut prev_column, mut prev_name) = (0, 0, 0);
+    let (mut prev_source, mut prev_line, mut prev_column, mut prev_name) = (0, 0, 0, 0);
     let mut current_generated_line = 0u32;
     for (line_index, entry) in map.lines.iter().enumerate() {
         let empty_lines = entry.generated_line.saturating_sub(current_generated_line) as usize;
@@ -727,12 +757,16 @@ fn encode_decoded(map: &DecodedMap) -> Result<String, DecodedMapError> {
         {
             let generated_delta = i64::from(segment.generated_column) - i64::from(prev_generated);
             let mut segment_len = usize::from(index > 0) + vlq::encoded_len(generated_delta);
+            let source_delta = i64::from(segment.source) - i64::from(prev_source);
             let original_line_delta = i64::from(segment.original_line) - i64::from(prev_line);
             let original_column_delta = i64::from(segment.original_column) - i64::from(prev_column);
             let name = (segment.name != 0).then(|| i64::from(segment.name - 1));
             if !segment.is_unmapped() {
-                segment_len += 1
-                    + vlq::encoded_len(original_line_delta)
+                segment_len += if source_delta == 0 {
+                    1
+                } else {
+                    vlq::encoded_len(source_delta)
+                } + vlq::encoded_len(original_line_delta)
                     + vlq::encoded_len(original_column_delta)
                     + name.map_or(0, |name| vlq::encoded_len(name - prev_name));
             }
@@ -745,7 +779,11 @@ fn encode_decoded(map: &DecodedMap) -> Result<String, DecodedMapError> {
                 prev_generated = segment.generated_column;
                 continue;
             }
-            vlq::encode(0, &mut output);
+            if source_delta == 0 {
+                output.push('A');
+            } else {
+                vlq::encode(source_delta, &mut output);
+            }
             vlq::encode(original_line_delta, &mut output);
             vlq::encode(original_column_delta, &mut output);
             if let Some(name) = name {
@@ -753,6 +791,7 @@ fn encode_decoded(map: &DecodedMap) -> Result<String, DecodedMapError> {
                 prev_name = name;
             }
             prev_generated = segment.generated_column;
+            prev_source = segment.source;
             prev_line = segment.original_line;
             prev_column = segment.original_column;
         }
@@ -770,6 +809,17 @@ fn encode_decoded(map: &DecodedMap) -> Result<String, DecodedMapError> {
 /// (closest to the original source) to the latest, and encode the final map once.
 pub(crate) fn compose_layer_chain(
     layers: &[&[u8]],
+) -> Result<(String, Vec<String>), DecodedMapError> {
+    compose_layer_chain_with_input(layers, None)
+}
+
+/// Fold serialized input while copied spans still retain their affine provenance.
+/// Input maps can reference multiple sources; resident edit layers reference one.
+/// Explicit edit labels win within the resident chain, whereas input symbol names
+/// trace back to the original symbol when crossing the serialized boundary.
+pub(crate) fn compose_layer_chain_with_input(
+    layers: &[&[u8]],
+    input: Option<(&str, &[String])>,
 ) -> Result<(String, Vec<String>), DecodedMapError> {
     let mut budget = MappingBudget::new();
     let mut name_counts = Vec::with_capacity(layers.len());
@@ -803,16 +853,92 @@ pub(crate) fn compose_layer_chain(
             None => map,
         });
     }
-    let map = composed.ok_or(DecodedMapError::Invalid)?;
-    Ok((
-        encode_decoded(&map)?,
+    let mut map = composed.ok_or(DecodedMapError::Invalid)?;
+    // Charge both the returned string table and its owned text before cloning.
+    let name_count = name_layers.iter().map(Vec::len).sum();
+    let name_bytes = name_layers
+        .iter()
+        .flatten()
+        .try_fold(0usize, |bytes, name| bytes.checked_add(name.len()))
+        .ok_or(DecodedMapError::ResidentLimit)?;
+    let mut names = Vec::new();
+    budget.reserve_exact(&mut names, name_count)?;
+    budget.remaining = budget
+        .remaining
+        .checked_sub(name_bytes)
+        .ok_or(DecodedMapError::ResidentLimit)?;
+    names.extend(
         name_layers
             .into_iter()
             .rev()
             .flatten()
-            .map(|name| name.as_ref().to_owned())
-            .collect(),
-    ))
+            .map(|name| name.as_ref().to_owned()),
+    );
+    if let Some((mappings, input_names)) = input {
+        let mut inner = DecodedMap {
+            segments: Vec::new(),
+            lines: Vec::new(),
+            last_generated_line: 0,
+        };
+        super::visit_decoded(mappings, |generated_line, segment| {
+            inner.last_generated_line = generated_line;
+            if inner
+                .lines
+                .last()
+                .is_none_or(|line| line.generated_line != generated_line)
+            {
+                budget.push(
+                    &mut inner.lines,
+                    MappedLine {
+                        generated_line,
+                        segment_start: inner.segments.len() as u32,
+                    },
+                )?;
+            }
+            budget.push(
+                &mut inner.segments,
+                MappingPoint {
+                    source: segment.source,
+                    generated_column: segment.generated_column,
+                    original_line: segment.original_line,
+                    original_column: segment.original_column,
+                    name: if segment.name == 0 {
+                        0
+                    } else {
+                        if segment.name as usize > input_names.len() {
+                            return Err(DecodedMapError::Invalid);
+                        }
+                        segment
+                            .name
+                            .checked_add(
+                                u32::try_from(names.len()).map_err(|_| DecodedMapError::Invalid)?,
+                            )
+                            .ok_or(DecodedMapError::Invalid)?
+                    },
+                    behavior: if segment.original_line == u32::MAX {
+                        MappingBehavior::Unmapped
+                    } else {
+                        MappingBehavior::Boundary
+                    },
+                },
+            )
+        })?;
+        let next = compose_decoded_with_policy(&map, &inner, &mut budget, true)?;
+        budget.refund(&map);
+        budget.refund(&inner);
+        map = next;
+        drop(inner);
+        let name_bytes = input_names
+            .iter()
+            .try_fold(0usize, |bytes, name| bytes.checked_add(name.len()))
+            .ok_or(DecodedMapError::ResidentLimit)?;
+        budget.reserve_exact(&mut names, input_names.len())?;
+        if name_bytes > budget.remaining {
+            return Err(DecodedMapError::ResidentLimit);
+        }
+        names.extend_from_slice(input_names);
+    }
+    Ok((encode_decoded(&map)?, names))
 }
 
 /// Compose layers that have not crossed N-API, avoiding pack/unpack at every
@@ -867,10 +993,127 @@ mod tests {
     use super::*;
 
     #[test]
+    fn serialized_input_preserves_sources_names_and_unmapped_boundaries() {
+        use super::super::{MapBuilder, Segment, decode};
+        let input = MapBuilder {
+            lines: vec![vec![
+                Segment {
+                    generated_column: 0,
+                    source: 0,
+                    original_line: 5,
+                    original_column: 8,
+                    name: 1,
+                },
+                Segment {
+                    generated_column: 3,
+                    source: 1,
+                    original_line: 1,
+                    original_column: 2,
+                    name: 2,
+                },
+                Segment {
+                    generated_column: 5,
+                    source: 0,
+                    original_line: u32::MAX,
+                    original_column: u32::MAX,
+                    name: 0,
+                },
+                Segment {
+                    generated_column: 7,
+                    source: 0,
+                    original_line: 9,
+                    original_column: 4,
+                    name: 0,
+                },
+            ]],
+        }
+        .encode();
+        let outer = pack_decoded_layer(
+            &[0, 0, 0, 0, IDENTITY_TAIL | 1, 0, 9, 0, 9, 0],
+            &["outer"],
+            0,
+        );
+        let input_names = vec!["original".to_owned(), "other".to_owned()];
+        let (mappings, names) =
+            compose_layer_chain_with_input(&[&outer], Some((&input, &input_names))).unwrap();
+        assert_eq!(names, ["outer", "original", "other"]);
+        let lines = decode(&mappings);
+        let points = &lines[0];
+        assert_eq!(
+            (
+                points[0].generated_column,
+                points[0].source,
+                points[0].original_line,
+                points[0].original_column,
+                points[0].name
+            ),
+            (0, 0, 5, 8, 2)
+        );
+        assert_eq!(
+            (
+                points[1].generated_column,
+                points[1].source,
+                points[1].original_line,
+                points[1].original_column,
+                points[1].name
+            ),
+            (3, 1, 1, 2, 3)
+        );
+        assert_eq!(
+            (
+                points[2].generated_column,
+                points[2].original_line,
+                points[2].name
+            ),
+            (5, u32::MAX, 0)
+        );
+        assert_eq!(
+            (points[3].generated_column, points[3].source, points[3].name),
+            (7, 0, 1)
+        );
+    }
+
+    #[test]
+    fn serialized_input_leading_gaps_remain_unmapped() {
+        let outer = pack_decoded_layer(
+            &[0, 0, 0, 0, IDENTITY_TAIL, 0, 9, 0, 9, 0],
+            &[] as &[String],
+            0,
+        );
+        let (mappings, _) = compose_layer_chain_with_input(&[&outer], Some(("GAAA", &[]))).unwrap();
+        let points = super::super::decode(&mappings);
+        assert_eq!(points[0][0].generated_column, 3);
+        assert_eq!(points[0][0].original_column, 0);
+    }
+
+    #[test]
+    fn serialized_input_sparse_lines_and_allocation_limits() {
+        let input = format!("{}AAAA{}", ";".repeat(20_000), ";".repeat(20_000));
+        let outer = pack_decoded_layer(
+            &[0, 0, 20_000, 0, IDENTITY_TAIL, 0, 1, 20_000, 1, 0],
+            &[] as &[String],
+            0,
+        );
+        let _limit = ResidentBudgetOverride::bytes(8 * 1024);
+        let (mappings, _) = compose_layer_chain_with_input(&[&outer], Some((&input, &[]))).unwrap();
+        assert_eq!(mappings, "AAAA,CAAC");
+        let dense = "AAAA,".repeat(2_000);
+        assert_eq!(
+            compose_layer_chain_with_input(&[&outer], Some((&dense, &[]))),
+            Err(DecodedMapError::ResidentLimit)
+        );
+        let names = vec!["x".repeat(8 * 1024)];
+        assert_eq!(
+            compose_layer_chain_with_input(&[&outer], Some((&input, &names))),
+            Err(DecodedMapError::ResidentLimit)
+        );
+    }
+
+    #[test]
     fn mapping_point_stays_word_packed() {
         assert_eq!(
             std::mem::size_of::<MappingPoint>(),
-            5 * std::mem::size_of::<u32>()
+            6 * std::mem::size_of::<u32>()
         );
     }
 
@@ -891,6 +1134,7 @@ mod tests {
         behavior: MappingBehavior,
     ) -> MappingPoint {
         MappingPoint {
+            source: 0,
             generated_column,
             original_line: 0,
             original_column,
@@ -909,6 +1153,58 @@ mod tests {
             names: Vec::new(),
             last_generated_line,
         }
+    }
+
+    #[test]
+    fn named_identity_projects_inner_names_at_later_boundaries() {
+        let inner = single_line(vec![
+            MappingPoint {
+                name: 1,
+                ..mapped(0, 10, MappingBehavior::Boundary)
+            },
+            MappingPoint {
+                name: 2,
+                ..mapped(3, 20, MappingBehavior::Anchor)
+            },
+            unmapped(5),
+            MappingPoint {
+                name: 3,
+                ..mapped(7, 30, MappingBehavior::Boundary)
+            },
+        ]);
+        let outer = single_line(vec![MappingPoint {
+            name: 4,
+            ..mapped(0, 0, MappingBehavior::Identity)
+        }]);
+        let result = compose_decoded(&outer, &inner, &mut MappingBudget::new()).unwrap();
+        let points = result.line(0).unwrap();
+        assert_eq!(points.len(), 4);
+        assert_eq!(
+            (
+                points[0].generated_column,
+                points[0].original_column,
+                points[0].name
+            ),
+            (0, 10, 4)
+        );
+        assert_eq!(
+            (
+                points[1].generated_column,
+                points[1].original_column,
+                points[1].name
+            ),
+            (3, 20, 2)
+        );
+        assert!(points[2].is_unmapped());
+        assert_eq!((points[2].generated_column, points[2].name), (5, 0));
+        assert_eq!(
+            (
+                points[3].generated_column,
+                points[3].original_column,
+                points[3].name
+            ),
+            (7, 30, 3)
+        );
     }
 
     #[test]
