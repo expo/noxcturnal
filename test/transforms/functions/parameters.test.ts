@@ -27,3 +27,14 @@ test('composes rest parameter and block-scoping lowering across closure boundari
   expect(output).toContain('for (var _len = arguments.length');
   expect(output).toContain('var readCount = () => refs.length;');
 });
+
+test('captures reassigned arguments when a concise arrow creates a lowered arrow', async () => {
+  const source = `function f() {
+    let make = () => (x = 1) => arguments[0];
+    arguments = ['later'];
+    return make()();
+  }`;
+  const output = await transformSource(source, 'input.js', { transforms: { parameters: true } });
+  expect(new Function(`${source}; return f('before');`)()).toBe('later');
+  expect(new Function(`${output}; return f('before');`)()).toBe('later');
+});

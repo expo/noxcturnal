@@ -356,16 +356,7 @@ pub(super) fn prepare_ast(
                         reservation_checkpoint,
                     },
                 );
-                let scope_start = semantic
-                    .nodes()
-                    .ancestor_ids(node_id)
-                    .find_map(|ancestor| match semantic.nodes().kind(ancestor) {
-                        AstKind::FunctionBody(body) => Some(body.span.start),
-                        AstKind::StaticBlock(block) => Some(block.span.start),
-                        AstKind::Program(program) => Some(program.span.start),
-                        _ => None,
-                    })
-                    .unwrap_or(0);
+                let scope_start = assignment_temporary_scope_start(semantic, node_id);
                 temporary_declarations
                     .entry(scope_start)
                     .or_default()
@@ -392,16 +383,7 @@ pub(super) fn prepare_ast(
                         reservation_checkpoint,
                     },
                 );
-                let scope_start = semantic
-                    .nodes()
-                    .ancestor_ids(node_id)
-                    .find_map(|ancestor| match semantic.nodes().kind(ancestor) {
-                        AstKind::FunctionBody(body) => Some(body.span.start),
-                        AstKind::StaticBlock(block) => Some(block.span.start),
-                        AstKind::Program(program) => Some(program.span.start),
-                        _ => None,
-                    })
-                    .unwrap_or(0);
+                let scope_start = assignment_temporary_scope_start(semantic, node_id);
                 temporary_declarations
                     .entry(scope_start)
                     .or_default()
@@ -512,6 +494,27 @@ pub(super) fn run_ast<'a>(
         return Err(error);
     }
     Ok((pass.changed, plan.helper_requests))
+}
+
+fn assignment_temporary_scope_start(semantic: &Semantic<'_>, node_id: oxc_semantic::NodeId) -> u32 {
+    let nodes = semantic.nodes();
+    let mut child = node_id;
+    for ancestor in nodes.ancestor_ids(node_id) {
+        match nodes.kind(ancestor) {
+            AstKind::FunctionBody(body) => return body.span.start,
+            AstKind::ArrowFunctionExpression(arrow)
+                if arrow.is_expression()
+                    && !matches!(nodes.kind(child), AstKind::FormalParameters(_)) =>
+            {
+                return arrow.body.span().start;
+            }
+            AstKind::StaticBlock(block) => return block.span.start,
+            AstKind::Program(program) => return program.span.start,
+            _ => {}
+        }
+        child = ancestor;
+    }
+    0
 }
 
 struct DestructuringDeclaratorLowerer<'a> {
@@ -1349,6 +1352,32 @@ impl<'a> VisitMut<'a> for DestructuringDeclaratorLowerer<'a> {
             self.changed = true;
         }
         walk_mut::walk_catch_clause(self, clause);
+    }
+
+    fn visit_arrow_function_expression(
+        &mut self,
+        arrow: &mut oxc_ast::ast::ArrowFunctionExpression<'a>,
+    ) {
+        if arrow.is_expression()
+            && self
+                .temporary_declarations
+                .contains_key(&arrow.body.span().start)
+        {
+            let ast = self.ast();
+            let span = arrow.body.span();
+            let expression = arrow.body.take_in(&ast).into_expression();
+            arrow.body = oxc_ast::ast::ArrowFunctionBody::FunctionBody(FunctionBody::boxed(
+                span,
+                [],
+                [Statement::new_return_statement(
+                    span,
+                    Some(expression),
+                    &ast,
+                )],
+                &ast,
+            ));
+        }
+        walk_mut::walk_arrow_function_expression(self, arrow);
     }
 
     fn visit_function_body(&mut self, body: &mut FunctionBody<'a>) {

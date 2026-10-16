@@ -1379,16 +1379,8 @@ fn collect_lexical_facts_selected(
         } else {
             let parent_id = semantic.nodes().parent_id(node_id);
             match semantic.nodes().kind(parent_id) {
-                AstKind::FunctionBody(_) => {
-                    if matches!(
-                        semantic.nodes().parent_kind(parent_id),
-                        AstKind::ArrowFunctionExpression(arrow) if arrow.is_expression()
-                    ) {
-                        None
-                    } else {
-                        Some(node_id)
-                    }
-                }
+                AstKind::ArrowFunctionExpression(arrow) if arrow.is_expression() => None,
+                AstKind::FunctionBody(_) => Some(node_id),
                 AstKind::Program(_) | AstKind::BlockStatement(_) | AstKind::StaticBlock(_) => {
                     Some(node_id)
                 }

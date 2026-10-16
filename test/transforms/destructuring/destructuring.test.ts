@@ -44,3 +44,26 @@ test('accepts defaults nested in a for-of binding pattern', async () => {
   expect(output).toMatch(/value = (_value\d+) === void 0 \? '' : \1/);
   expect(output).not.toContain('= void 0 of');
 });
+
+test('keeps destructuring temporaries local to reentrant concise arrows', async () => {
+  const source = `let a, b;
+    const f = obj => ({a, b} = obj);
+    const inner = {a: 2, b: 20};
+    const outer = {get a() {f(inner); return 1}, b: 10};
+    f(outer);`;
+  const output = await transformSource(source, 'input.js', {
+    helpers: { mode: 'inline' },
+    transforms: { destructuring: true },
+  });
+  expect(new Function(`${source}; return [a, b];`)()).toEqual([1, 10]);
+  expect(new Function(`${output}; return [a, b];`)()).toEqual([1, 10]);
+});
+
+test('keeps destructuring temporaries visible to concise-arrow parameter defaults', async () => {
+  const source = `'use strict'; let a; const f = (x = ({a} = {a: 1})) => x; f();`;
+  const output = await transformSource(source, 'input.js', {
+    helpers: { mode: 'inline' },
+    transforms: { destructuring: true },
+  });
+  expect(new Function(`${output}; return a;`)()).toBe(1);
+});
