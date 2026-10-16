@@ -261,7 +261,9 @@
               windowsSdkArch = if target.rustTarget == "aarch64-pc-windows-msvc" then "arm64" else "x64";
               cargoXwinSdk = releaseSystem.pkgs.runCommand "noxcturnal-cargo-xwin-sdk-${windowsRustArch}" { } ''
                 mkdir -p "$out/xwin"
-                cp -R ${windowsSdk}/. "$out/xwin"
+                # Keep SDK payloads in the store; only the directory layout and
+                # architecture aliases belong to this derivation.
+                cp -rs ${windowsSdk}/. "$out/xwin"
                 chmod -R u+w "$out/xwin"
                 test -d "$out/xwin/crt/lib/${windowsSdkArch}"
                 test -d "$out/xwin/sdk/lib/um/${windowsSdkArch}"
@@ -274,6 +276,7 @@
               windowsEnvironment = nixpkgs.lib.optionalString (target.os == "win32") ''
                 export XWIN_CACHE_DIR="$TMPDIR/xwin-cache"
                 mkdir -p "$XWIN_CACHE_DIR"
+                # Copy writable directories and symlinks, not SDK payloads.
                 cp -R ${cargoXwinSdk}/. "$XWIN_CACHE_DIR"
                 chmod -R u+w "$XWIN_CACHE_DIR"
                 export XWIN_ARCH=${windowsRustArch}

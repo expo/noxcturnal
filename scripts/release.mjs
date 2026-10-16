@@ -38,6 +38,9 @@ function plan() {
     mode,
     version: rootPackage.version,
     sha,
+    buildMatrix: JSON.stringify({
+      include: nativeTargets.map(target => ({ target: target.rustTarget })),
+    }),
     smokeMatrix: matrix(target => target.libc !== 'musl'),
     muslSmokeMatrix: matrix(target => target.libc === 'musl'),
   };

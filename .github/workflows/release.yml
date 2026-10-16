@@ -24,6 +24,7 @@ jobs:
       mode: ${{ steps.plan.outputs.mode }}
       version: ${{ steps.plan.outputs.version }}
       sha: ${{ steps.plan.outputs.sha }}
+      build_matrix: ${{ steps.plan.outputs.buildMatrix }}
       smoke_matrix: ${{ steps.plan.outputs.smokeMatrix }}
       musl_smoke_matrix: ${{ steps.plan.outputs.muslSmokeMatrix }}
     steps:
@@ -75,8 +76,7 @@ jobs:
     if: needs.plan.outputs.mode == 'publish'
     strategy:
       fail-fast: false
-      matrix:
-        architecture: [aarch64, x86_64]
+      matrix: ${{ fromJSON(needs.plan.outputs.build_matrix) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     steps:
@@ -89,14 +89,17 @@ jobs:
       - uses: DeterminateSystems/magic-nix-cache-action@565684385bcd71bad329742eefe8d12f2e765b39 # v13
       - run: |
           test "$(uname -m)" = x86_64
-          nix build ".#native-artifacts-${{ matrix.architecture }}" \
+          df -h / /nix
+          nix build ".#native-${{ matrix.target }}" \
             --out-link target/native-artifacts \
             --log-lines 100 \
             --max-jobs 1
-          cp -R -L target/native-artifacts target/native-artifacts-upload
+          mkdir -p "target/native-artifacts-upload/${{ matrix.target }}"
+          cp -R -L target/native-artifacts/. "target/native-artifacts-upload/${{ matrix.target }}/"
+          df -h / /nix
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: native-artifacts-${{ matrix.architecture }}
+          name: native-artifacts-${{ matrix.target }}
           path: target/native-artifacts-upload/*
           if-no-files-found: error
           compression-level: 0
