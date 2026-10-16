@@ -3,9 +3,10 @@ use oxc_allocator::{Allocator, TakeIn};
 use oxc_ast::builder::GetAstBuilder;
 use oxc_ast::{
     ast::{
-        CallExpression, Class, Declaration, ExportDeclaration, ExportDefaultDeclaration,
-        ExportDefaultDeclarationKind, Expression, Function, FunctionType, IdentifierReference,
-        NumberBase, Program, Statement, VariableDeclaration, VariableDeclarator, WithStatement,
+        BindingIdentifier, BindingPattern, CallExpression, Class, Declaration, ExportDeclaration,
+        ExportDefaultDeclaration, ExportDefaultDeclarationKind, Expression, Function, FunctionType,
+        IdentifierReference, NumberBase, Program, Statement, VariableDeclaration,
+        VariableDeclarationKind, VariableDeclarator, WithStatement,
     },
     builder::AstBuilder,
 };
@@ -221,30 +222,58 @@ impl<'a> VisitMut<'a> for ConstantFolder<'a> {
         } else {
             Some(&if_statement.consequent)
         };
+        let mut bindings = HoistedBindingCollector {
+            ast: &self.ast,
+            declarations: oxc_allocator::Vec::new_in(&self.ast),
+            block_function: false,
+            var_pattern: false,
+        };
         if let Some(discarded) = discarded {
-            let mut bindings = HoistedBindingDetector(false);
             bindings.visit_statement(discarded);
-            if bindings.0 {
+            if bindings.block_function {
                 return;
             }
         }
-        *statement = if test.truthy() {
+        let span = if_statement.span;
+        let selected = if test.truthy() {
             if_statement.consequent.take_in(&self.ast)
         } else if let Some(alternate) = &mut if_statement.alternate {
             alternate.take_in(&self.ast)
         } else {
             oxc_ast::ast::Statement::new_empty_statement(if_statement.span, self.ast.builder())
         };
+        *statement = if bindings.declarations.is_empty() {
+            selected
+        } else {
+            let hoisted = Statement::new_variable_declaration(
+                span,
+                VariableDeclarationKind::Var,
+                bindings.declarations,
+                false,
+                &self.ast,
+            );
+            Statement::new_block_statement(
+                span,
+                oxc_allocator::Vec::from_array_in([hoisted, selected], &self.ast),
+                &self.ast,
+            )
+        };
     }
 }
 
 // Discarding a branch must not discard declaration instantiation. Keeping
 // the branch is cheaper and less error-prone than synthesizing Annex B vars.
-struct HoistedBindingDetector(bool);
+// Ordinary vars only need their bound names, never patterns or initializers.
+struct HoistedBindingCollector<'s, 'a> {
+    ast: &'s AstBuilder<'a>,
+    declarations: oxc_allocator::Vec<'a, VariableDeclarator<'a>>,
+    block_function: bool,
+    var_pattern: bool,
+}
 
-impl<'a> Visit<'a> for HoistedBindingDetector {
+impl<'a> Visit<'a> for HoistedBindingCollector<'_, 'a> {
     fn visit_statement(&mut self, statement: &Statement<'a>) {
-        if !self.0 {
+        if !self.block_function {
             walk::walk_statement(self, statement);
         }
     }
@@ -253,11 +282,32 @@ impl<'a> Visit<'a> for HoistedBindingDetector {
     fn visit_expression(&mut self, _expression: &Expression<'a>) {}
 
     fn visit_variable_declaration(&mut self, declaration: &VariableDeclaration<'a>) {
-        self.0 |= declaration.kind.is_var();
+        if declaration.kind.is_var() {
+            self.var_pattern = true;
+            for declarator in &declaration.declarations {
+                self.visit_binding_pattern(&declarator.id);
+            }
+            self.var_pattern = false;
+        }
     }
 
     fn visit_function(&mut self, function: &Function<'a>, _flags: ScopeFlags) {
-        self.0 |= function.r#type == FunctionType::FunctionDeclaration;
+        self.block_function |= function.r#type == FunctionType::FunctionDeclaration;
+    }
+
+    fn visit_binding_identifier(&mut self, identifier: &BindingIdentifier<'a>) {
+        if !self.var_pattern {
+            return;
+        }
+        let id = BindingPattern::new_binding_identifier(identifier.span, identifier.name, self.ast);
+        self.declarations.push(VariableDeclarator::new(
+            identifier.span,
+            id,
+            None,
+            None,
+            false,
+            self.ast,
+        ));
     }
 
     fn visit_class(&mut self, _class: &Class<'a>) {}
