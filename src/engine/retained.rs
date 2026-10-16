@@ -9,7 +9,7 @@ use crate::protocol::routed::{PackedWords, encode_routed_envelope};
 use crate::semantic::retained_index::{RetainedFieldValue, RetainedIndex};
 
 use super::RoutedCounts;
-use super::fields::predicate_scalar_type;
+use super::fields::{intern_packed, predicate_scalar_type};
 
 pub(crate) fn routed_buffer_from_index(
     manifest: &CompiledManifest,
@@ -192,8 +192,7 @@ impl RetainedRouteWriter {
                     let value = index
                         .scalar_string(id)
                         .expect("retained scalar string id is valid");
-                    let next = self.string_ids.len() as u32;
-                    *self.string_ids.entry(value.to_owned()).or_insert(next)
+                    intern_packed(&mut self.string_ids, value)
                 }
             };
             self.words.extend([field_id, value]);
@@ -203,8 +202,7 @@ impl RetainedRouteWriter {
                 let comments = index.inner_comments(start, end).collect::<Vec<_>>();
                 self.words.push(comments.len() as u32);
                 for comment in comments {
-                    let next = self.string_ids.len() as u32;
-                    let value = *self.string_ids.entry(comment.value.clone()).or_insert(next);
+                    let value = intern_packed(&mut self.string_ids, &comment.value);
                     self.words.extend([
                         u32::from(comment.block),
                         value,
@@ -364,8 +362,7 @@ impl RetainedRouteWriter {
                         let value = index
                             .scalar_string(id)
                             .expect("retained scalar string id is valid");
-                        let next = self.string_ids.len() as u32;
-                        *self.string_ids.entry(value.to_owned()).or_insert(next)
+                        intern_packed(&mut self.string_ids, value)
                     }
                 };
                 hydrated.extend([field_id, value]);
