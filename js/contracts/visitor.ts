@@ -249,8 +249,9 @@ export interface NativeNodePath<T extends NodeView = NodeView> {
   /** Match a static member chain. Dots separate properties; escape literal dots
    * and backslashes within a property with a backslash. Ordinary dotted paths
    * keep their spelling. Declare fields: ['memberPath'] for static or computed
-   * members or ['name'] for identifiers. Other nodes return false. Matching
-   * never parses source text. */
+   * members or ['name'] for identifiers. An identifier under a memberPath
+   * declaration, and any other node, returns false. Matching never parses
+   * source text. */
   matchesPattern(pattern: string, allowPartial?: boolean): boolean;
   findParent(predicate: (path: NativeNodePath) => boolean): NativeNodePath | null;
   find(predicate: (path: NativeNodePath) => boolean): NativeNodePath | null;
@@ -556,8 +557,9 @@ export interface ContractPathBase<Node, IsNode = Node> {
   /** Match a static member chain. Dots separate properties; escape literal dots
    * and backslashes within a property with a backslash. Ordinary dotted paths
    * keep their spelling. Declare fields: ['memberPath'] for static or computed
-   * members or ['name'] for identifiers. Other nodes return false. Matching
-   * never parses source text. */
+   * members or ['name'] for identifiers. An identifier under a memberPath
+   * declaration, and any other node, returns false. Matching never parses
+   * source text. */
   matchesPattern(pattern: string, allowPartial?: boolean): boolean;
   replaceWith(code: Code): void;
   replaceWithMultiple(code: readonly Code[]): void;

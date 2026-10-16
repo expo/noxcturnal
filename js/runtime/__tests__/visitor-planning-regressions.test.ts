@@ -181,18 +181,10 @@ test('child member matching still requires the declared member field', () => {
   ).toThrow('matchesPattern requires declared field memberPath');
 });
 
-test('identifier child matching still requires a declared name', () => {
+test('identifier matching still requires a declared name', () => {
   const plugin = defineNativePlugin({
-    name: 'undeclared-child-name',
-    visitors: [
-      defineVisitor(
-        'CallExpression',
-        { children: { callee: { route: 'Expression', fields: ['memberPath'] } } },
-        path => {
-          path.getChild('callee')?.matchesPattern('foo');
-        },
-      ),
-    ],
+    name: 'undeclared-identifier-name',
+    visitors: [defineVisitor('Identifier', {}, path => path.matchesPattern('foo'))],
   });
   expect(() =>
     transform(
@@ -201,6 +193,39 @@ test('identifier child matching still requires a declared name', () => {
       defineNativePipeline({ phases: [{ name: 'scan', plugins: [plugin] }] }),
     ),
   ).toThrow('matchesPattern requires declared field name');
+});
+
+test('a memberPath callee contract does not require name on identifier callees', () => {
+  const seen: Array<[string, boolean]> = [];
+  const plugin = defineNativePlugin({
+    name: 'member-callee-contract',
+    visitors: [
+      defineVisitor(
+        'CallExpression',
+        {
+          fields: ['argumentCount'],
+          children: { callee: { route: 'Expression', fields: ['memberPath'] } },
+        },
+        path => {
+          if (path.node.argumentCount !== 1) return;
+          const callee = path.getChild('callee');
+          if (!callee) return;
+          seen.push([callee.type, callee.matchesPattern('Icon.select')]);
+        },
+      ),
+    ],
+  });
+  expect(
+    transform(
+      'Icon.select({ ios: 1 }); other({ ios: 1 });',
+      'input.js',
+      defineNativePipeline({ phases: [{ name: 'scan', plugins: [plugin] }] }),
+    ).status,
+  ).toBe('complete');
+  expect(seen).toEqual([
+    ['StaticMemberExpression', true],
+    ['Identifier', false],
+  ]);
 });
 
 test('matchesPattern on non-member children returns false when member facts are declared for the route', () => {

@@ -326,11 +326,6 @@ export class NodePathImpl implements NativeNodePath {
     return value;
   }
   matchesPattern(pattern: string, allowPartial = false): boolean {
-    // Super, spread elements, and other non-members cannot match. Requiring
-    // memberPath for them rejects valid children of an Expression route, such
-    // as the callee of `super(one, two)`.
-    const field = patternField(this.type);
-    if (field == null) return false;
     const capabilities = this.runtime.capabilities;
     const fields =
       this.ancestryDepth > 0
@@ -338,8 +333,15 @@ export class NodePathImpl implements NativeNodePath {
         : this.deliveredRoute
           ? capabilities.declaredFields
           : capabilities.childFields?.[this.type];
-    if (!fields?.includes(field))
+    // Super, spread elements, and other non-members cannot match. An identifier
+    // reached through a memberPath declaration is not a static chain either:
+    // `Icon.select({})` and `other({})` share one Expression callee contract.
+    const field = patternField(this.type);
+    if (field == null) return false;
+    if (!fields?.includes(field)) {
+      if (field === 'name' && fields?.includes('memberPath')) return false;
       throw this.#pluginError(`matchesPattern requires declared field ${field}`);
+    }
     const memberPath = this.node[field];
     // This validates the small pattern contract, never JavaScript source.
     if (pattern.includes('\\'))
