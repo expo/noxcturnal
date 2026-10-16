@@ -856,8 +856,7 @@ impl<'a> OrdinaryParameterLowerer<'a> {
                         ),
                         None::<ArenaBox<'a, TSTypeAnnotation<'a>>>,
                         {
-    let mut body = 
-                            oxc_ast::ast::FunctionBody::boxed(
+                            let mut body = oxc_ast::ast::FunctionBody::boxed(
                                 anchor,
                                 ArenaVec::new_in(&ast),
                                 oxc_allocator::Vec::from_array_in(
@@ -872,10 +871,15 @@ impl<'a> OrdinaryParameterLowerer<'a> {
                                     ast.builder(),
                                 ),
                                 ast.builder(),
-                            ).unbox();
-    let Statement::ExpressionStatement(statement) = body.statements.remove(0) else { unreachable!("generated concise arrow has one expression") };
-    oxc_ast::ast::ArrowFunctionBody::from(statement.unbox().expression)
-},
+                            )
+                            .unbox();
+                            let Statement::ExpressionStatement(statement) =
+                                body.statements.remove(0)
+                            else {
+                                unreachable!("generated concise arrow has one expression")
+                            };
+                            oxc_ast::ast::ArrowFunctionBody::from(statement.unbox().expression)
+                        },
                         ast.builder(),
                     )
                 } else {

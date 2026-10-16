@@ -141,12 +141,12 @@
             src = nativeSource;
             inherit pnpm;
             fetcherVersion = 3;
-            hash = "sha256-mdQ0bnjrNLeyRZLqsfGMu4bWaMwmHa89WipUXDjOkZQ=";
+            hash = "sha256-7LHeuW1FuFDJ/c8ITHOu8T8zbweHXVK0hrTuSTt8r8g=";
           };
           cargoDeps = pkgs.rustPlatform.fetchCargoVendor {
             name = "noxcturnal-cargo-deps";
             src = nativeSource;
-            hash = "sha256-7pnp+yHvXfH3UGS6IA1MlgRxxlL5dY+MYu8SJjs6lfI=";
+            hash = "sha256-4gJAEabt5SIHzqofSTZ5OH/O83n5L2bbyGkPvO6HgyI=";
           };
           pnpmStoreKey = builtins.hashString "sha256" (toString pnpmDeps);
           pnpmStoreShellHook = ''
@@ -312,8 +312,8 @@
                 export NOXCTURNAL_TARGET_DIR="$TMPDIR/native-target"
                 export NOXCTURNAL_SOURCE_HASH=${nixpkgs.lib.escapeShellArg sourceHash}
                 export NOXCTURNAL_NATIVE_INPUT_HASH="$(cat ${nativeInputFingerprint})"
-                export NOXCTURNAL_CARGO_VENDOR_HASH=sha256-7pnp+yHvXfH3UGS6IA1MlgRxxlL5dY+MYu8SJjs6lfI=
-                export NOXCTURNAL_PNPM_STORE_HASH=sha256-mdQ0bnjrNLeyRZLqsfGMu4bWaMwmHa89WipUXDjOkZQ=
+                export NOXCTURNAL_CARGO_VENDOR_HASH=sha256-4gJAEabt5SIHzqofSTZ5OH/O83n5L2bbyGkPvO6HgyI=
+                export NOXCTURNAL_PNPM_STORE_HASH=sha256-7LHeuW1FuFDJ/c8ITHOu8T8zbweHXVK0hrTuSTt8r8g=
                 export RUSTFLAGS="''${RUSTFLAGS:+$RUSTFLAGS }--remap-path-prefix=$NIX_BUILD_TOP=/build"
                 export CFLAGS="''${CFLAGS:+$CFLAGS }-ffile-prefix-map=$NIX_BUILD_TOP=/build -fdebug-prefix-map=$NIX_BUILD_TOP=/build"
                 export CXXFLAGS="''${CXXFLAGS:+$CXXFLAGS }-ffile-prefix-map=$NIX_BUILD_TOP=/build -fdebug-prefix-map=$NIX_BUILD_TOP=/build"

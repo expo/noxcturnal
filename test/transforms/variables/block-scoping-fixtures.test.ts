@@ -11,7 +11,7 @@ const expectedOutputs = [
   'for (var i in arr) {\n  var MULTIPLIER = 5;\n  console.log(arr[i] * MULTIPLIER);\n}',
   "var _readOnlyValue;\nfunction _readOnlyError(r) {\n  throw new TypeError('\"' + r + '\" is read-only');\n}\nfunction f() {\n  var a = 'foo';\n  if (false) ('false', _readOnlyError('a'));\n  return a;\n}\nexpect(f()).toBe('foo');",
   "var _readOnlyValue;\nfunction _readOnlyError(r) {\n  throw new TypeError('\"' + r + '\" is read-only');\n}\n(function () {\n  var a = 'foo';\n  if (false) ('false', _readOnlyError('a'));\n  return a;\n})();",
-  "var _readOnlyValue;\nfunction _readOnlyError(r) {\n  throw new TypeError('\"' + r + '\" is read-only');\n}\nexpect(function () {\n  var [a, b] = [1, 2];\n  (3, _readOnlyError('a'));\n}).toThrow('\"a\" is read-only');\nexpect(function () {\n  var a = 1;\n  ([2], _readOnlyError('a'));\n}).toThrow('\"a\" is read-only');\nexpect(function () {\n  var b = 1;\n  (({ b: 2 }), _readOnlyError('b'));\n}).toThrow('\"b\" is read-only');",
+  "var _readOnlyValue;\nfunction _readOnlyError(r) {\n  throw new TypeError('\"' + r + '\" is read-only');\n}\nexpect(function () {\n  var [a, b] = [1, 2];\n  (3, _readOnlyError('a'));\n}).toThrow('\"a\" is read-only');\nexpect(function () {\n  var a = 1;\n  ([2], _readOnlyError('a'));\n}).toThrow('\"a\" is read-only');\nexpect(function () {\n  var b = 1;\n  ({ b: 2 }, _readOnlyError('b'));\n}).toThrow('\"b\" is read-only');",
   "var _readOnlyValue;\nfunction _readOnlyError(r) {\n  throw new TypeError('\"' + r + '\" is read-only');\n}\nvar [a, b] = [1, 2];\n(3, _readOnlyError('a'));",
   'var [a, b] = [1, 2];\nvar [c, d] = [3, 4];\nvar { e, f } = {\n  e: 5,\n  f: 6,\n};\nvar { a: g, b: h } = {\n  a: 7,\n  b: 8,\n};',
   '// @flow\nvar foo1 = 1;',

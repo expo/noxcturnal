@@ -131,12 +131,12 @@ test('conflicting commit cleans peer states and closes the retained session', ()
   const events: string[] = [];
   const closed: NativeTransformSession[] = [];
   const originalClose = NativeTransformSession.prototype.close;
-  const close = vi
-    .spyOn(NativeTransformSession.prototype, 'close')
-    .mockImplementation(function (this: NativeTransformSession) {
-      closed.push(this);
-      originalClose.call(this);
-    });
+  const close = vi.spyOn(NativeTransformSession.prototype, 'close').mockImplementation(function (
+    this: NativeTransformSession,
+  ) {
+    closed.push(this);
+    originalClose.call(this);
+  });
   const plugins = [0, 1].map(id =>
     defineNativePlugin({
       name: `conflict-${id}`,

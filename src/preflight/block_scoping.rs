@@ -536,22 +536,25 @@ fn captured_loop_result<'a>(
             ),
             None::<ArenaBox<'a, TSTypeAnnotation<'a>>>,
             {
-    let mut body = oxc_ast::ast::FunctionBody::boxed(
-                span,
-                oxc_allocator::Vec::new_in(ast.builder()),
-                oxc_allocator::Vec::from_array_in(
-                    [oxc_ast::ast::Statement::new_expression_statement(
-                        span,
-                        vars,
+                let mut body = oxc_ast::ast::FunctionBody::boxed(
+                    span,
+                    oxc_allocator::Vec::new_in(ast.builder()),
+                    oxc_allocator::Vec::from_array_in(
+                        [oxc_ast::ast::Statement::new_expression_statement(
+                            span,
+                            vars,
+                            ast.builder(),
+                        )],
                         ast.builder(),
-                    )],
+                    ),
                     ast.builder(),
-                ),
-                ast.builder(),
-            ).unbox();
-    let Statement::ExpressionStatement(statement) = body.statements.remove(0) else { unreachable!("generated concise arrow has one expression") };
-    oxc_ast::ast::ArrowFunctionBody::from(statement.unbox().expression)
-},
+                )
+                .unbox();
+                let Statement::ExpressionStatement(statement) = body.statements.remove(0) else {
+                    unreachable!("generated concise arrow has one expression")
+                };
+                oxc_ast::ast::ArrowFunctionBody::from(statement.unbox().expression)
+            },
             ast.builder(),
         );
     }

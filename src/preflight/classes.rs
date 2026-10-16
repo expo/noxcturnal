@@ -3457,22 +3457,25 @@ impl<'a> VisitMut<'a> for PrivateKeyClosureCapture<'a, '_> {
             ),
             None::<ArenaBox<'a, TSTypeAnnotation<'a>>>,
             {
-    let mut body = oxc_ast::ast::FunctionBody::boxed(
-                span,
-                ArenaVec::new_in(&ast),
-                oxc_allocator::Vec::from_array_in(
-                    [oxc_ast::ast::Statement::new_expression_statement(
-                        span,
-                        value,
+                let mut body = oxc_ast::ast::FunctionBody::boxed(
+                    span,
+                    ArenaVec::new_in(&ast),
+                    oxc_allocator::Vec::from_array_in(
+                        [oxc_ast::ast::Statement::new_expression_statement(
+                            span,
+                            value,
+                            ast.builder(),
+                        )],
                         ast.builder(),
-                    )],
+                    ),
                     ast.builder(),
-                ),
-                ast.builder(),
-            ).unbox();
-    let Statement::ExpressionStatement(statement) = body.statements.remove(0) else { unreachable!("generated concise arrow has one expression") };
-    oxc_ast::ast::ArrowFunctionBody::from(statement.unbox().expression)
-},
+                )
+                .unbox();
+                let Statement::ExpressionStatement(statement) = body.statements.remove(0) else {
+                    unreachable!("generated concise arrow has one expression")
+                };
+                oxc_ast::ast::ArrowFunctionBody::from(statement.unbox().expression)
+            },
             ast.builder(),
         );
         *expression = oxc_ast::ast::Expression::new_call_expression(
@@ -4286,22 +4289,26 @@ fn lower_simple_class<'a>(
                 ),
                 None::<ArenaBox<'a, TSTypeAnnotation<'a>>>,
                 {
-    let mut body = oxc_ast::ast::FunctionBody::boxed(
-                    span,
-                    ArenaVec::new_in(&ast),
-                    oxc_allocator::Vec::from_array_in(
-                        [oxc_ast::ast::Statement::new_expression_statement(
-                            span,
-                            key,
+                    let mut body = oxc_ast::ast::FunctionBody::boxed(
+                        span,
+                        ArenaVec::new_in(&ast),
+                        oxc_allocator::Vec::from_array_in(
+                            [oxc_ast::ast::Statement::new_expression_statement(
+                                span,
+                                key,
+                                ast.builder(),
+                            )],
                             ast.builder(),
-                        )],
+                        ),
                         ast.builder(),
-                    ),
-                    ast.builder(),
-                ).unbox();
-    let Statement::ExpressionStatement(statement) = body.statements.remove(0) else { unreachable!("generated concise arrow has one expression") };
-    oxc_ast::ast::ArrowFunctionBody::from(statement.unbox().expression)
-},
+                    )
+                    .unbox();
+                    let Statement::ExpressionStatement(statement) = body.statements.remove(0)
+                    else {
+                        unreachable!("generated concise arrow has one expression")
+                    };
+                    oxc_ast::ast::ArrowFunctionBody::from(statement.unbox().expression)
+                },
                 ast.builder(),
             );
             wrapper_arguments.push(Argument::from(thunk));
