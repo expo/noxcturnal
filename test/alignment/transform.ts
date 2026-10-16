@@ -125,24 +125,31 @@ export async function alignBabelBehavior(options: BehaviorAlignmentOptions): Pro
 export function alignHermesFlowTransform(
   source: string,
   filename = 'input.js',
+  referenceParser: typeof hermesParser = hermesParser,
 ): StructuralAlignment {
-  const ast = hermesParser.parse(source, {
+  const ast = referenceParser.parse(source, {
     babel: true,
     enableExperimentalComponentSyntax: true,
     enableExperimentalFlowMatchSyntax: true,
+    enableExperimentalFlowRecordSyntax: true,
     flow: 'all',
     sourceType: 'module',
     transformOptions: { TransformEnumSyntax: { enable: true } },
   });
-  const transformed = generate(ast, { comments: false, compact: false }).code;
-  const reference = babel.transformSync(transformed, {
-    babelrc: false,
-    comments: false,
-    configFile: false,
-    filename,
-    parserOpts: { plugins: ['jsx'] },
-    plugins: [flowStripTypes],
-  });
+  // Keep Hermes' Babel AST through stripping: printing and reparsing it with
+  // Babel would reject valid Hermes syntax such as a type parameter named `in`.
+  const reference = babel.transformFromAstSync(
+    ast as Parameters<typeof babel.transformFromAstSync>[0],
+    source,
+    {
+      babelrc: false,
+      comments: false,
+      configFile: false,
+      filename,
+      parserOpts: { plugins: ['jsx'] },
+      plugins: [flowStripTypes],
+    },
+  );
   if (reference?.code == null) throw new Error('Hermes/Babel produced no output');
   return alignOutput(
     source,
