@@ -279,7 +279,9 @@
     "ImportNamespaceSpecifier": "ImportNamespaceSpecifier",
     "WithClause": "WithClause",
     "ImportAttribute": "ImportAttribute",
+    "ExportDeclaration": "ExportNamedDeclaration",
     "ExportNamedDeclaration": "ExportNamedDeclaration",
+    "ExportFromDeclaration": "ExportNamedDeclaration",
     "ExportDefaultDeclaration": "ExportDefaultDeclaration",
     "ExportAllDeclaration": "ExportAllDeclaration",
     "ExportSpecifier": "ExportSpecifier",
@@ -353,7 +355,8 @@
     "TSIndexSignatureName": "TSIndexSignatureName",
     "TSInterfaceHeritage": "TSInterfaceHeritage",
     "TSTypePredicate": "TSTypePredicate",
-    "TSModuleDeclaration": "TSModuleDeclaration",
+    "TSExternalModuleDeclaration": "TSModuleDeclaration",
+    "TSNamespaceDeclaration": "TSModuleDeclaration",
     "TSGlobalDeclaration": "TSGlobalDeclaration",
     "TSModuleBlock": "TSModuleBlock",
     "TSTypeLiteral": "TSTypeLiteral",
@@ -913,8 +916,9 @@
       "shape": "single"
     },
     "Class.superClass": {
-      "field": "super_class",
-      "shape": "optional"
+      "field": "heritage",
+      "shape": "optional",
+      "nodeField": "expression"
     },
     "ComputedMemberExpression.property": {
       "field": "expression",
@@ -931,6 +935,59 @@
     "SwitchStatement.test": {
       "field": "discriminant",
       "shape": "single"
+    },
+    "ExportNamedDeclaration.declaration": {
+      "field": "declaration",
+      "shape": "optional",
+      "variants": {
+        "ExportDeclaration": {
+          "edges": [
+            {
+              "field": "declaration",
+              "shape": "single"
+            }
+          ]
+        },
+        "ExportNamedDeclaration": false,
+        "ExportFromDeclaration": false
+      }
+    },
+    "ExportNamedDeclaration.source": {
+      "field": "source",
+      "shape": "optional",
+      "variants": {
+        "ExportDeclaration": false,
+        "ExportNamedDeclaration": false,
+        "ExportFromDeclaration": {
+          "edges": [
+            {
+              "field": "source",
+              "shape": "single"
+            }
+          ]
+        }
+      }
+    },
+    "ExportNamedDeclaration.specifiers": {
+      "field": "specifiers",
+      "shape": "list",
+      "variants": {
+        "ExportDeclaration": false
+      }
+    },
+    "TSModuleDeclaration.body": {
+      "field": "body",
+      "shape": "optional",
+      "variants": {
+        "TSNamespaceDeclaration": {
+          "edges": [
+            {
+              "field": "body",
+              "shape": "single"
+            }
+          ]
+        }
+      }
     }
   },
   "childRoles": {
@@ -980,7 +1037,7 @@
     },
     "TSModuleDeclaration": {
       "body": {
-        "routes": ["TSModuleBlock"],
+        "routes": ["TSModuleBlock", "TSModuleDeclaration"],
         "list": false
       }
     },

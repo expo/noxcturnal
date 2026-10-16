@@ -1,11 +1,13 @@
+use oxc_allocator::GetAllocator;
 use oxc_allocator::{Allocator, TakeIn};
+use oxc_ast::builder::GetAstBuilder;
 use oxc_ast::{
-    AstBuilder,
     ast::{
-        CallExpression, Class, Declaration, ExportDefaultDeclaration, ExportDefaultDeclarationKind,
-        ExportNamedDeclaration, Expression, Function, FunctionType, IdentifierReference,
+        CallExpression, Class, Declaration, ExportDeclaration, ExportDefaultDeclaration,
+        ExportDefaultDeclarationKind, Expression, Function, FunctionType, IdentifierReference,
         NumberBase, Program, Statement, VariableDeclaration, VariableDeclarator, WithStatement,
     },
+    builder::AstBuilder,
 };
 use oxc_ast_visit::{Visit, VisitMut, walk, walk_mut};
 use oxc_semantic::{Scoping, SemanticBuilder, SymbolId};
@@ -53,7 +55,6 @@ impl<'a> ConstantFolder<'a> {
     // Conditional/logical evaluation performs GetValue and does not trigger
     // anonymous-function named evaluation. Preserve that context when selecting
     // an operand; plain references would change calls, delete, typeof, and names.
-    #[expect(deprecated)]
     fn value(&self, expression: Expression<'a>) -> Expression<'a> {
         if matches!(
             expression.get_inner_expression(),
@@ -67,34 +68,51 @@ impl<'a> ConstantFolder<'a> {
                 | Expression::ChainExpression(_)
         ) {
             let span = expression.span();
-            self.ast.expression_sequence(
+            oxc_ast::ast::Expression::new_sequence_expression(
                 span,
-                self.ast.vec_from_array([
-                    self.ast
-                        .expression_numeric_literal(span, 0.0, None, NumberBase::Decimal),
-                    expression,
-                ]),
+                oxc_allocator::Vec::from_array_in(
+                    [
+                        oxc_ast::ast::Expression::new_numeric_literal(
+                            span,
+                            0.0,
+                            None,
+                            NumberBase::Decimal,
+                            self.ast.builder(),
+                        ),
+                        expression,
+                    ],
+                    self.ast.builder(),
+                ),
+                self.ast.builder(),
             )
         } else {
             expression
         }
     }
 
-    #[expect(deprecated)]
     fn literal(&self, span: oxc_span::Span, value: EvaluatedConstant) -> Option<Expression<'a>> {
         Some(match value {
-            EvaluatedConstant::Null => self.ast.expression_null_literal(span),
-            EvaluatedConstant::Boolean(value) => self.ast.expression_boolean_literal(span, value),
+            EvaluatedConstant::Null => {
+                oxc_ast::ast::Expression::new_null_literal(span, self.ast.builder())
+            }
+            EvaluatedConstant::Boolean(value) => {
+                oxc_ast::ast::Expression::new_boolean_literal(span, value, self.ast.builder())
+            }
             EvaluatedConstant::Number(value) => {
                 if !value.is_finite() {
                     return None;
                 }
-                self.ast
-                    .expression_numeric_literal(span, value, None, NumberBase::Decimal)
+                oxc_ast::ast::Expression::new_numeric_literal(
+                    span,
+                    value,
+                    None,
+                    NumberBase::Decimal,
+                    self.ast.builder(),
+                )
             }
             EvaluatedConstant::String(value) => {
-                let value = self.ast.allocator.alloc_str(&value);
-                self.ast.expression_string_literal(span, value, None)
+                let value = self.ast.allocator().alloc_str(&value);
+                oxc_ast::ast::Expression::new_string_literal(span, value, None, self.ast.builder())
             }
         })
     }
@@ -215,8 +233,7 @@ impl<'a> VisitMut<'a> for ConstantFolder<'a> {
         } else if let Some(alternate) = &mut if_statement.alternate {
             alternate.take_in(&self.ast)
         } else {
-            #[expect(deprecated)]
-            self.ast.statement_empty(if_statement.span)
+            oxc_ast::ast::Statement::new_empty_statement(if_statement.span, self.ast.builder())
         };
     }
 }
@@ -368,14 +385,14 @@ impl<'a> Visit<'a> for DeadFunctionCandidateCollector<'_> {
         walk::walk_export_default_declaration(self, export);
     }
 
-    fn visit_export_named_declaration(&mut self, export: &ExportNamedDeclaration<'a>) {
-        match export.declaration.as_ref() {
-            Some(Declaration::FunctionDeclaration(function)) => {
+    fn visit_export_declaration(&mut self, export: &ExportDeclaration<'a>) {
+        match &export.declaration {
+            Declaration::FunctionDeclaration(function) => {
                 if let Some(symbol_id) = function.id.as_ref().and_then(|id| id.symbol_id.get()) {
                     self.roots.insert(symbol_id);
                 }
             }
-            Some(Declaration::VariableDeclaration(declaration)) => {
+            Declaration::VariableDeclaration(declaration) => {
                 for declarator in &declaration.declarations {
                     if matches!(
                         declarator.init,
@@ -394,7 +411,7 @@ impl<'a> Visit<'a> for DeadFunctionCandidateCollector<'_> {
             }
             _ => {}
         }
-        walk::walk_export_named_declaration(self, export);
+        walk::walk_export_declaration(self, export);
     }
 
     fn visit_function(&mut self, function: &Function<'a>, flags: ScopeFlags) {

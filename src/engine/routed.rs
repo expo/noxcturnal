@@ -99,6 +99,7 @@ pub(super) fn materialize_routed_program<'a>(
         root,
         node_count: 0,
         validation_stats: Stats::default(),
+        declaration_kinds: Vec::new(),
         sequence: 0,
         words: PackedWords::with_capacity(source.len().saturating_mul(2)),
         string_ids: FxHashMap::default(),
@@ -235,6 +236,7 @@ struct RoutedEventCollector<'a> {
     root: Option<(u32, u32)>,
     node_count: u32,
     validation_stats: Stats,
+    declaration_kinds: Vec<oxc_ast::ast::VariableDeclarationKind>,
     sequence: u32,
     words: PackedWords,
     string_ids: FxHashMap<String, u32>,
@@ -285,6 +287,7 @@ impl RoutedEventCollector<'_> {
         }
         if let Some(actual) = direct_predicate_scalar(
             kind,
+            self.declaration_kinds.last().copied(),
             self.scoping,
             field_name,
             member_write,
@@ -361,6 +364,7 @@ impl RoutedEventCollector<'_> {
         } else {
             fields(
                 kind,
+                self.declaration_kinds.last().copied(),
                 self.source,
                 member_write,
                 member_root_write,
@@ -418,6 +422,7 @@ impl RoutedEventCollector<'_> {
         }
         let direct_payload = packed_fields_direct(
             kind,
+            self.declaration_kinds.last().copied(),
             self.source,
             member_write,
             member_root_write,
@@ -430,6 +435,7 @@ impl RoutedEventCollector<'_> {
         let mut fallback_payload = if direct_payload.is_none() && !payload_mask.is_empty() {
             fields(
                 kind,
+                self.declaration_kinds.last().copied(),
                 self.source,
                 member_write,
                 member_root_write,
@@ -505,7 +511,7 @@ impl RoutedEventCollector<'_> {
                 let contained = comments[first..]
                     .iter()
                     .take_while(|comment| comment.span.end <= span.end)
-                    .copied()
+                    .cloned()
                     .collect::<Vec<_>>();
                 self.words.push(contained.len() as u32);
                 for comment in contained {
@@ -564,6 +570,7 @@ pub(crate) fn has_direct_predicate_scalar(node_type_id: u32, field: &str) -> boo
 
 fn direct_predicate_scalar<'a>(
     kind: AstKind<'a>,
+    declaration_kind: Option<oxc_ast::ast::VariableDeclarationKind>,
     scoping: Option<&Scoping>,
     field: &str,
     member_write: bool,
@@ -612,9 +619,13 @@ fn direct_predicate_scalar<'a>(
         AstKind::VariableDeclaration(declaration) if field == "kind" => Some(
             PredicateScalar::String(Cow::Owned(declaration.kind.to_string())),
         ),
-        AstKind::VariableDeclarator(declarator) if field == "kind" => Some(
-            PredicateScalar::String(Cow::Owned(declarator.kind.to_string())),
-        ),
+        AstKind::VariableDeclarator(_) if field == "kind" => {
+            Some(PredicateScalar::String(Cow::Owned(
+                declaration_kind
+                    .expect("variable declarator has a declaration parent")
+                    .to_string(),
+            )))
+        }
         AstKind::StaticMemberExpression(_)
         | AstKind::ComputedMemberExpression(_)
         | AstKind::PrivateFieldExpression(_)
@@ -671,6 +682,9 @@ impl<'a> Visit<'a> for RoutedEventCollector<'a> {
     }
 
     fn enter_node(&mut self, kind: AstKind<'a>) {
+        if let AstKind::VariableDeclaration(declaration) = kind {
+            self.declaration_kinds.push(declaration.kind);
+        }
         let member_write = self.tracks_member_writes
             && self
                 .target_stack
@@ -721,6 +735,9 @@ impl<'a> Visit<'a> for RoutedEventCollector<'a> {
                 .any(|route| route.side == VisitSide::Exit)
         {
             self.emit(kind, VisitSide::Exit, member_write, member_root_write);
+        }
+        if matches!(kind, AstKind::VariableDeclaration(_)) {
+            self.declaration_kinds.pop();
         }
     }
 

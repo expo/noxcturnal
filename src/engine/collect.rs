@@ -135,8 +135,16 @@ impl<'a> Visit<'a> for SyntaxIndexCollector<'a> {
             manifest.merged_field_mask_by_type[protocol_id as usize]
         });
         if retain_all_fields || !requested.is_empty() {
+            let declaration_kind =
+                self.parent_stack
+                    .last()
+                    .and_then(|(_, _, parent)| match parent {
+                        AstKind::VariableDeclaration(declaration) => Some(declaration.kind),
+                        _ => None,
+                    });
             let retained_fields = packed_fields_direct(
                 kind,
+                declaration_kind,
                 self.source,
                 member_write,
                 member_root_write,
@@ -261,8 +269,16 @@ impl<'a> EventCollector<'a> {
             manifest.merged_field_mask_by_type[protocol_id as usize]
         });
         if retain_all_fields || !requested.is_empty() {
+            let declaration_kind =
+                (!is_root)
+                    .then(|| self.nodes.parent_kind(id))
+                    .and_then(|parent| match parent {
+                        AstKind::VariableDeclaration(declaration) => Some(declaration.kind),
+                        _ => None,
+                    });
             let retained_fields = packed_fields_direct(
                 kind,
+                declaration_kind,
                 self.source,
                 member_write,
                 member_root_write,

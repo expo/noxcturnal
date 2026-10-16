@@ -5,8 +5,11 @@ test('lowers class static blocks', async () => {
   const source = `export class Counter { static { this.value = 1; } }`;
   expect(await transformSource(source, 'input.js', { transforms: { classStaticBlock: true } }))
     .toMatchInlineSnapshot(`
-    "export class Counter {
-      static #_ = (this.value = 1);
-    }"
-  `);
+      "var _staticBlock;
+      export let Counter =
+        (class Counter {
+          static #_ = (_staticBlock = () => ((this.value = 1), this));
+        },
+        _staticBlock());"
+    `);
 });

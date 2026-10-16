@@ -9,7 +9,8 @@ test('lowers for-of loops', async () => {
       transforms: { forOf: true },
     }),
   ).toMatchInlineSnapshot(`
-    "import _createForOfIteratorHelper from '@babel/runtime/helpers/createForOfIteratorHelper';
+    "import _babelHelper from '@babel/runtime/helpers/createForOfIteratorHelper';
+    var _createForOfIteratorHelper = _babelHelper;
     export function collect(items) {
       const values = [];
       {

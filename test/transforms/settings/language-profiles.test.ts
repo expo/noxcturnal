@@ -176,43 +176,48 @@ test('composes the native portion of the modern Hermes language profile', async 
     "import _asyncIterator from '@babel/runtime/helpers/asyncIterator';
     import _awaitAsyncGenerator from '@babel/runtime/helpers/awaitAsyncGenerator';
     import _wrapAsyncGenerator from '@babel/runtime/helpers/wrapAsyncGenerator';
-    export class Reader {
-      static #_ = (this.kind = \`reader\`);
-      async read(value) {
-        return await value;
-      }
-      values(items) {
-        return _wrapAsyncGenerator(function* () {
-          var _iteratorAbruptCompletion = false;
-          var _didIteratorError = false;
-          var _iteratorError;
-          try {
-            for (
-              var _iterator = _asyncIterator(items), _step;
-              (_iteratorAbruptCompletion = !(_step = yield _awaitAsyncGenerator(_iterator.next()))
-                .done);
-              _iteratorAbruptCompletion = false
-            ) {
-              var item = _step.value;
-              yield item;
-            }
-          } catch (err) {
-            _didIteratorError = true;
-            _iteratorError = err;
-          } finally {
+    var _staticBlock;
+    export var Reader =
+      (class Reader {
+        async read(value) {
+          return await value;
+        }
+        values(items) {
+          return _wrapAsyncGenerator(function* () {
+            var _iteratorAbruptCompletion = false;
+            var _didIteratorError = false;
+            var _iteratorError;
             try {
-              if (_iteratorAbruptCompletion && _iterator.return != null) {
-                yield _awaitAsyncGenerator(_iterator.return());
+              for (
+                var _iterator = _asyncIterator(items), _step;
+                (_iteratorAbruptCompletion = !(_step = yield _awaitAsyncGenerator(_iterator.next()))
+                  .done);
+                _iteratorAbruptCompletion = false
+              ) {
+                var item = _step.value;
+                yield item;
               }
+            } catch (err) {
+              _didIteratorError = true;
+              _iteratorError = err;
             } finally {
-              if (_didIteratorError) {
-                throw _iteratorError;
+              try {
+                if (_iteratorAbruptCompletion && _iterator.return != null) {
+                  yield _awaitAsyncGenerator(_iterator.return());
+                }
+              } finally {
+                if (_didIteratorError) {
+                  throw _iteratorError;
+                }
               }
             }
-          }
-        })();
-      }
-    }
+          })();
+        }
+        static #_ = (_staticBlock = () => {
+          return ((this.kind = \`reader\`), this);
+        });
+      },
+      _staticBlock());
     var _loopResult;
     var _loop = index => {
       queue(() => index);

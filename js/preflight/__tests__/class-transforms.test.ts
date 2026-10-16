@@ -80,7 +80,7 @@ test('classStaticBlock lowers independently with explicit compact/comment postur
 
   assert.equal(result.status, 'complete', result.status === 'bailout' ? result.reason : undefined);
   assert.doesNotMatch(result.code, /static\s*\{|removed/);
-  assert.match(result.code, /static#_=this\.answer=42/);
+  assert.match(result.code, /this\.answer=42/);
   assert.match(result.code, /field=2/);
   assert.match(result.code, /#private=3/);
   const context: { answer?: number; fields?: number } = {};

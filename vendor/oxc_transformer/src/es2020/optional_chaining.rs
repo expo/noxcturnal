@@ -50,7 +50,7 @@
 use std::mem;
 
 use oxc_allocator::{CloneIn, GetAllocator, ReplaceWith, TakeIn};
-use oxc_ast::{ast::*, builder::NONE};
+use oxc_ast::ast::*;
 use oxc_span::{GetSpan, SPAN, Span};
 use oxc_traverse::{Ancestor, BoundIdentifier, MaybeBoundIdentifier, Traverse};
 
@@ -400,7 +400,7 @@ impl<'a> OptionalChaining<'a> {
         let callee =
             MemberExpression::new_static_member_expression(SPAN, expr, property, false, ctx);
         let callee = Expression::from(callee);
-        Expression::new_call_expression(SPAN, callee, NONE, [context], false, ctx)
+        Expression::new_call_expression(SPAN, callee, None, [context], false, ctx)
     }
 
     /// Recursively transform chain expression elements
@@ -575,7 +575,7 @@ impl<'a> OptionalChaining<'a> {
         {
             if ident.name == "eval" {
                 // `eval?.()` is an indirect eval call transformed to `(0,eval)()`
-                let zero = Expression::new_number_0(ctx);
+                let zero = Expression::new_number_0(SPAN, ctx);
                 expr.replace_with(|original_callee| {
                     Expression::new_sequence_expression(SPAN, [zero, original_callee], ctx)
                 });

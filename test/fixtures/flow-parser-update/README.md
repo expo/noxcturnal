@@ -41,7 +41,7 @@ The assertion names for **every** row `id` are:
   downstream Oxc/public compilation, parser compatibility fallback, or a downstream
   syntax error.
 - Canonical: `test/alignment/flow/parser-update.test.ts::hermes-parser 0.36.0
-parses id` and `Hermes 17b373... parses id`. Supported rows run `aligns id`
+  parses id` and `Hermes 17b373... parses id`. Supported rows run `aligns id`
   through `alignHermesFlowTransform` against each reference that accepts them.
   The two async-component/await rows use the exact candidate for transformation
   alignment because 0.36.0 rejects them. Member decorators are checked directly

@@ -17,13 +17,13 @@ test.each([false, true])(
         events.push('observe');
         return originalResolve.apply(this, args);
       });
-    const close = vi
-      .spyOn(NativeTransformSession.prototype, 'close')
-      .mockImplementation(function (this: NativeTransformSession) {
-        closed.push(this);
-        events.push('close');
-        originalClose.call(this);
-      });
+    const close = vi.spyOn(NativeTransformSession.prototype, 'close').mockImplementation(function (
+      this: NativeTransformSession,
+    ) {
+      closed.push(this);
+      events.push('close');
+      originalClose.call(this);
+    });
     const first = defineNativePlugin({
       name: 'first',
       editEffect: changed ? 'expression-shape' : 'none',

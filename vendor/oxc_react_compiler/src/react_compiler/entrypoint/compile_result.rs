@@ -1,13 +1,12 @@
 use oxc_diagnostics::Diagnostics;
-
 use oxc_span::Span;
-use oxc_str::Ident;
 
 use crate::react_compiler_hir::ReactFunctionType;
 
 use super::program::CompileOutput;
 
 /// Main result type returned by the compile function.
+#[must_use]
 pub enum CompileResult<'a> {
     /// Compilation succeeded (or no functions needed compilation).
     /// `output` is None if no changes are to be made to the program — always so
@@ -17,8 +16,9 @@ pub enum CompileResult<'a> {
         /// Errors and warnings accumulated during compilation.
         diagnostics: Diagnostics,
     },
-    /// A fatal error occurred and panicThreshold dictates it should throw.
-    Error { diagnostics: Diagnostics },
+    /// Compilation was aborted because `panicThreshold` dictates that the
+    /// diagnostics should be surfaced as a fatal error.
+    Fatal { diagnostics: Diagnostics },
 }
 
 /// Codegen output for a single compiled function.
@@ -31,16 +31,11 @@ pub enum CompileResult<'a> {
 pub struct CodegenFunction<'a> {
     pub span: Option<Span>,
     pub id: Option<oxc_ast::ast::BindingIdentifier<'a>>,
-    pub name_hint: Option<Ident<'a>>,
     pub params: oxc_allocator::Box<'a, oxc_ast::ast::FormalParameters<'a>>,
     pub body: oxc_allocator::Box<'a, oxc_ast::ast::FunctionBody<'a>>,
     pub generator: bool,
     pub is_async: bool,
     pub memo_slots_used: u32,
-    pub memo_blocks: u32,
-    pub memo_values: u32,
-    pub pruned_memo_blocks: u32,
-    pub pruned_memo_values: u32,
     pub outlined: Vec<OutlinedFunction<'a>>,
 }
 

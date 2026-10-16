@@ -206,11 +206,6 @@ const REVIEWED: &[Entry] = &[
     fatal!("for-of-empty-declaration", "for-of", true),
     fatal!("for-of-postcondition-failed", "for-of", true),
     fatal!("helper-bridge-parse-error", "generated-helper-bridge", true),
-    fatal!(
-        "parameters-arrow-expression-body-shape-error",
-        "parameters",
-        true
-    ),
     fatal!("parameters-body-missing", "parameters", true),
     fatal!("parameters-empty-capture-declaration", "parameters", true),
     fatal!("parameters-postcondition-failed", "parameters", true),

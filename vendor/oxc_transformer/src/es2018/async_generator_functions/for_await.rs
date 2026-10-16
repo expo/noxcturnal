@@ -1,7 +1,7 @@
 //! This module is responsible for transforming `for await` to `for` statement
 
 use oxc_allocator::{ArenaVec, TakeIn};
-use oxc_ast::{ast::*, builder::NONE};
+use oxc_ast::ast::*;
 use oxc_semantic::{ScopeFlags, ScopeId, SymbolFlags};
 use oxc_span::{SPAN, Span};
 use oxc_str::static_ident;
@@ -118,9 +118,10 @@ impl<'a> AsyncGeneratorFunctions<'a> {
         let assignment_statement = match &mut stmt.left {
             ForStatementLeft::VariableDeclaration(variable) => {
                 // for await (let i of test)
+                let kind = variable.kind;
                 let mut declarator = variable.declarations.pop().unwrap();
                 declarator.init = Some(step_value);
-                Statement::new_variable_declaration(SPAN, declarator.kind, [declarator], false, ctx)
+                Statement::new_variable_declaration(SPAN, kind, [declarator], false, ctx)
             }
             left @ match_assignment_target!(ForStatementLeft) => {
                 // for await (i of test), for await ({ i } of test)
@@ -224,9 +225,8 @@ impl<'a> AsyncGeneratorFunctions<'a> {
             VariableDeclarationKind::Var,
             [VariableDeclarator::new(
                 SPAN,
-                VariableDeclarationKind::Var,
                 iterator_abrupt_completion.create_binding_pattern(ctx),
-                NONE,
+                None,
                 Some(Expression::new_boolean_literal(SPAN, false, ctx)),
                 false,
                 ctx,
@@ -239,9 +239,8 @@ impl<'a> AsyncGeneratorFunctions<'a> {
             VariableDeclarationKind::Var,
             [VariableDeclarator::new(
                 SPAN,
-                VariableDeclarationKind::Var,
                 iterator_had_error_key.create_binding_pattern(ctx),
-                NONE,
+                None,
                 Some(Expression::new_boolean_literal(SPAN, false, ctx)),
                 false,
                 ctx,
@@ -254,9 +253,8 @@ impl<'a> AsyncGeneratorFunctions<'a> {
             VariableDeclarationKind::Var,
             [VariableDeclarator::new(
                 SPAN,
-                VariableDeclarationKind::Var,
                 iterator_error_key.create_binding_pattern(ctx),
-                NONE,
+                None,
                 None,
                 false,
                 ctx,
@@ -281,18 +279,16 @@ impl<'a> AsyncGeneratorFunctions<'a> {
                     [
                         VariableDeclarator::new(
                             SPAN,
-                            VariableDeclarationKind::Var,
                             iterator_key.create_binding_pattern(ctx),
-                            NONE,
+                            None,
                             Some(iterator),
                             false,
                             ctx,
                         ),
                         VariableDeclarator::new(
                             SPAN,
-                            VariableDeclarationKind::Var,
                             step_key.create_binding_pattern(ctx),
-                            NONE,
+                            None,
                             None,
                             false,
                             ctx,
@@ -327,7 +323,7 @@ impl<'a> AsyncGeneratorFunctions<'a> {
                                                 false,
                                                 ctx,
                                             ),
-                                            NONE,
+                                            None,
                                             [],
                                             false,
                                             ctx,
@@ -369,7 +365,7 @@ impl<'a> AsyncGeneratorFunctions<'a> {
                 ctx,
             );
 
-            BlockStatement::new_with_scope_id(SPAN, [for_statement], block_scope_id, ctx)
+            BlockStatement::boxed_with_scope_id(SPAN, [for_statement], block_scope_id, ctx)
         };
 
         let catch_clause = {
@@ -380,11 +376,11 @@ impl<'a> AsyncGeneratorFunctions<'a> {
                 block_scope_id,
                 SymbolFlags::CatchVariable | SymbolFlags::FunctionScopedVariable,
             );
-            Some(CatchClause::new_with_scope_id(
+            Some(CatchClause::boxed_with_scope_id(
                 SPAN,
-                Some(CatchParameter::new(SPAN, err_ident.create_binding_pattern(ctx), NONE, ctx)),
+                Some(CatchParameter::new(SPAN, err_ident.create_binding_pattern(ctx), None, ctx)),
                 {
-                    BlockStatement::new_with_scope_id(
+                    BlockStatement::boxed_with_scope_id(
                         SPAN,
                         [
                             Statement::new_expression_statement(
@@ -463,7 +459,7 @@ impl<'a> AsyncGeneratorFunctions<'a> {
                                             false,
                                             ctx,
                                         ),
-                                        NONE,
+                                        None,
                                         [],
                                         false,
                                         ctx,
@@ -479,7 +475,7 @@ impl<'a> AsyncGeneratorFunctions<'a> {
                         ctx,
                     )
                 };
-                let block = BlockStatement::new_with_scope_id(
+                let block = BlockStatement::boxed_with_scope_id(
                     SPAN,
                     [if_statement],
                     try_block_scope_id,
@@ -508,13 +504,13 @@ impl<'a> AsyncGeneratorFunctions<'a> {
                             ctx,
                         )
                     };
-                    BlockStatement::new_with_scope_id(SPAN, [if_statement], finally_scope_id, ctx)
+                    BlockStatement::boxed_with_scope_id(SPAN, [if_statement], finally_scope_id, ctx)
                 };
-                Statement::new_try_statement(SPAN, block, NONE, Some(finally), ctx)
+                Statement::new_try_statement(SPAN, block, None, Some(finally), ctx)
             };
 
             let block_statement =
-                BlockStatement::new_with_scope_id(SPAN, [try_statement], finally_scope_id, ctx);
+                BlockStatement::boxed_with_scope_id(SPAN, [try_statement], finally_scope_id, ctx);
             Some(block_statement)
         };
 

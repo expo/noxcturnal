@@ -11,12 +11,12 @@
 
 [package]
 edition = "2024"
-rust-version = "1.95.0"
+rust-version = "1.97.0"
 name = "oxc_react_compiler"
-version = "0.141.0"
+version = "0.143.0"
 authors = ["Boshen <boshenc@gmail.com>", "Oxc contributors"]
 build = false
-publish = true
+publish = false
 autolib = false
 autobins = false
 autoexamples = false
@@ -46,35 +46,35 @@ version = "0.1.3"
 version = "2"
 
 [dependencies.oxc_allocator]
-version = "0.141.0"
+version = "0.154.0"
 
 [dependencies.oxc_ast]
-version = "0.141.0"
+version = "0.154.0"
 
 [dependencies.oxc_ast_visit]
-version = "0.141.0"
+version = "0.154.0"
 
 [dependencies.oxc_diagnostics]
-version = "0.141.0"
+version = "0.154.0"
 
 [dependencies.oxc_ecmascript]
-version = "0.141.0"
+version = "0.154.0"
 
 [dependencies.oxc_index]
 version = "5.0.0"
 features = ["nonmax", "serde"]
 
 [dependencies.oxc_semantic]
-version = "0.141.0"
+version = "0.154.0"
 
 [dependencies.oxc_span]
-version = "0.141.0"
+version = "0.154.0"
 
 [dependencies.oxc_str]
-version = "0.141.0"
+version = "0.154.0"
 
 [dependencies.oxc_syntax]
-version = "0.141.0"
+version = "0.154.0"
 features = ["to_js_string"]
 
 [dependencies.rustc-hash]
@@ -92,15 +92,14 @@ version = "1.48.0"
 features = ["glob"]
 
 [dev-dependencies.oxc_ast]
-version = "0.141.0"
-features = ["disable_old_builder"]
+version = "0.154.0"
 
 [dev-dependencies.oxc_codegen]
-version = "0.141.0"
+version = "0.154.0"
 default-features = false
 
 [dev-dependencies.oxc_parser]
-version = "0.141.0"
+version = "0.154.0"
 features = ["regular_expression"]
 
 [lints.clippy]

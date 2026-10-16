@@ -200,7 +200,7 @@ describe('named reference compatibility', () => {
     test('Babel accepts the equivalent names', () =>
       expect(run(babel(source, 'named-capturing-groups-regex'))).toBe(true));
     test.each(['inline', 'runtime'] as const)(
-      '%s preserves the source at the structural parser boundary',
+      '%s lowers equivalent names and matches Babel behavior',
       mode => {
         const result = transform(
           source,
@@ -217,10 +217,10 @@ describe('named reference compatibility', () => {
             ],
           }),
         );
-        expect(result.status).toBe('bailout');
-        if (result.status === 'bailout') {
-          expect(result.source).toBe(source);
-          expect(result.reason).toBe('regexp:parse-error');
+        expect(result.status).toBe('complete');
+        if (result.status === 'complete') {
+          expect(result.code).not.toContain('(?<');
+          expect(run(result.code)).toBe(run(babel(source, 'named-capturing-groups-regex')));
         }
       },
     );

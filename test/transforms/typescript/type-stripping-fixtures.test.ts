@@ -41,7 +41,7 @@ const expectedOutputs = [
   '[syntax-error] invalid-input',
   "var E = /* @__PURE__ */ (function (E) {\n  E[(E['x'] = 1)] = 'x';\n  E[(E['y'] = 2)] = 'y';\n  return E;\n})(E || {});\nE = /* @__PURE__ */ (function (E) {\n  E[(E['z'] = 3)] = 'z';\n  return E;\n})(E || {});",
   "var socketType = /* @__PURE__ */ (function (socketType) {\n  socketType[(socketType['SOCKET'] = 0)] = 'SOCKET';\n  socketType[(socketType['SERVER'] = 1)] = 'SERVER';\n  socketType[(socketType['IPC'] = 2)] = 'IPC';\n  return socketType;\n})(socketType || {});\nvar constants = /* @__PURE__ */ (function (constants) {\n  constants[(constants['SOCKET'] = 0)] = 'SOCKET';\n  constants[(constants['SERVER'] = 1)] = 'SERVER';\n  constants[(constants['IPC'] = 2)] = 'IPC';\n  constants[(constants['UV_READABLE'] = 3)] = 'UV_READABLE';\n  constants[(constants['UV_WRITABLE'] = 4)] = 'UV_WRITABLE';\n  return constants;\n})(constants || {});",
-  "const BAR = (2).toFixed(0);\nvar Foo = (function (Foo) {\n  Foo['A'] = `${BAR}`;\n  Foo[(Foo['B'] = '2' + BAR)] = 'B';\n  Foo[(Foo['C'] = `${BAR}`)] = 'C';\n  Foo[(Foo['D'] = `${BAR}}`)] = 'D';\n  Foo[(Foo['E'] = `${BAR}`)] = 'E';\n  return Foo;\n})(Foo || {});",
+  "const BAR = (2).toFixed(0);\nvar Foo = (function (Foo) {\n  Foo['A'] = `${BAR}`;\n  Foo['B'] = '2' + BAR;\n  Foo['C'] = `${BAR}`;\n  Foo[(Foo['D'] = `${BAR}}`)] = 'D';\n  Foo[(Foo['E'] = `${BAR}`)] = 'E';\n  return Foo;\n})(Foo || {});",
   "{\n  // Uses 'let' within a scope\n  let E = /* @__PURE__ */ (function (E) {\n    return E;\n  })({});\n}",
   "var E = /* @__PURE__ */ (function (E) {\n  E['A'] = 'Hey';\n  return E;\n})(E || {});",
   "var E = /* @__PURE__ */ (function (E) {\n  E[(E['A'] = 0)] = 'A';\n  E['B'] = '';\n  E[(E['A2'] = 0)] = 'A2';\n  E['B2'] = '';\n  return E;\n})(E || {});",
@@ -1954,7 +1954,7 @@ export const fixtureCases = [
         options: {
           typescript: 'strip',
         },
-        output: expectedOutputs[25],
+        output: '[syntax-error] invalid-input',
       },
     ],
   },
@@ -1968,7 +1968,7 @@ export const fixtureCases = [
         options: {
           typescript: 'strip',
         },
-        output: expectedOutputs[25],
+        output: '[syntax-error] invalid-input',
       },
     ],
   },

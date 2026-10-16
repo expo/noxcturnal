@@ -1,6 +1,8 @@
+use oxc_allocator::GetAllocator;
 use oxc_allocator::{Allocator, Box as ArenaBox, CloneIn, TakeIn, Vec as ArenaVec};
+use oxc_ast::builder::GetAstBuilder;
 use oxc_ast::{
-    AstBuilder, AstKind,
+    AstKind,
     ast::{
         Argument, ArrayExpressionElement, AssignmentTarget, AssignmentTargetMaybeDefault,
         AssignmentTargetProperty, BindingIdentifier, ClassElement, Expression, FormalParameterKind,
@@ -9,6 +11,7 @@ use oxc_ast::{
         TSTypeParameterDeclaration, TSTypeParameterInstantiation, VariableDeclaration,
         VariableDeclarationKind,
     },
+    builder::AstBuilder,
 };
 use oxc_ast_visit::{Visit, VisitMut, walk, walk_mut};
 use oxc_semantic::{NodeId, ScopeId, Semantic, SymbolId};
@@ -160,7 +163,6 @@ impl<'a> VisitMut<'a> for CapturedLoopAstLowerer<'a> {
     }
 }
 
-#[expect(deprecated)]
 fn mutate_captured_loop<'a>(
     allocator: &'a Allocator,
     root: &mut Statement<'a>,
@@ -168,16 +170,21 @@ fn mutate_captured_loop<'a>(
 ) -> Result<ArenaVec<'a, Statement<'a>>, &'static str> {
     let ast = AstBuilder::new(allocator);
     let insertion_anchor = mutation.insertion_anchor;
-    let header_expressions = mutation
-        .header
-        .as_ref()
-        .map(|plan| header::prepare(ast, root, mutation.loop_span, &mutation.bindings, plan));
+    let header_expressions = mutation.header.as_ref().map(|plan| {
+        header::prepare(
+            AstBuilder::new(allocator),
+            root,
+            mutation.loop_span,
+            &mutation.bindings,
+            plan,
+        )
+    });
     if !mutation.extract_body {
-        return Ok(ast.vec());
+        return Ok(oxc_allocator::Vec::new_in(ast.builder()));
     }
     let dispatch = captured_loop_dispatch(&ast, &mutation);
     let mut mover = CapturedLoopBodyMover {
-        ast,
+        ast: AstBuilder::new(allocator),
         mutation: &mutation,
         replacement: Some(dispatch),
         moved: None,
@@ -207,14 +214,15 @@ fn mutate_captured_loop<'a>(
         if let Some(test) = test {
             helper_body.insert(
                 0,
-                ast.statement_if(
+                oxc_ast::ast::Statement::new_if_statement(
                     mutation.anchor,
-                    ast.expression_unary(
+                    oxc_ast::ast::Expression::new_unary_expression(
                         mutation.anchor,
                         oxc_syntax::operator::UnaryOperator::LogicalNot,
                         test,
+                        ast.builder(),
                     ),
-                    ast.statement_return(
+                    oxc_ast::ast::Statement::new_return_statement(
                         mutation.anchor,
                         Some(captured_loop_result(
                             &ast,
@@ -223,48 +231,59 @@ fn mutate_captured_loop<'a>(
                             "break",
                             None,
                         )),
+                        ast.builder(),
                     ),
                     None,
+                    ast.builder(),
                 ),
             );
         }
         if let Some(update) = update {
             helper_body.insert(
                 0,
-                ast.statement_if(
+                oxc_ast::ast::Statement::new_if_statement(
                     mutation.anchor,
-                    ast.expression_unary(
+                    oxc_ast::ast::Expression::new_unary_expression(
                         mutation.anchor,
                         oxc_syntax::operator::UnaryOperator::LogicalNot,
-                        ast.expression_identifier(
+                        oxc_ast::ast::Expression::new_identifier(
                             mutation.anchor,
                             allocator.alloc_str(plan.first.as_ref().expect("relocated update")),
+                            ast.builder(),
                         ),
+                        ast.builder(),
                     ),
-                    ast.statement_expression(mutation.anchor, update),
+                    oxc_ast::ast::Statement::new_expression_statement(
+                        mutation.anchor,
+                        update,
+                        ast.builder(),
+                    ),
                     None,
+                    ast.builder(),
                 ),
             );
         }
     }
-    let hoisted = body::rewrite(ast, &mut helper_body, &mutation);
+    let hoisted = body::rewrite(AstBuilder::new(allocator), &mut helper_body, &mutation);
     for binding in mutation.bindings.iter().rev() {
         if let Some(parameter) = &binding.parameter_alias {
             helper_body.insert(
                 0,
                 binding_declaration(
-                    ast,
+                    AstBuilder::new(ast.allocator()),
                     mutation.anchor,
                     VariableDeclarationKind::Const,
                     &binding.name,
-                    Some(
-                        ast.expression_identifier(mutation.anchor, allocator.alloc_str(parameter)),
-                    ),
+                    Some(oxc_ast::ast::Expression::new_identifier(
+                        mutation.anchor,
+                        allocator.alloc_str(parameter),
+                        ast.builder(),
+                    )),
                 ),
             );
         }
     }
-    helper_body.push(ast.statement_return(
+    helper_body.push(oxc_ast::ast::Statement::new_return_statement(
         mutation.anchor,
         Some(captured_loop_result(
             &ast,
@@ -273,9 +292,14 @@ fn mutate_captured_loop<'a>(
             "normal",
             None,
         )),
+        ast.builder(),
     ));
-    let function_body =
-        ast.alloc_function_body(mutation.anchor, ArenaVec::new_in(&allocator), helper_body);
+    let function_body = oxc_ast::ast::FunctionBody::boxed(
+        mutation.anchor,
+        ArenaVec::new_in(&allocator),
+        helper_body,
+        ast.builder(),
+    );
     let mut parameters = ArenaVec::new_in(&allocator);
     for alias in mutation
         .bindings
@@ -289,26 +313,32 @@ fn mutate_captured_loop<'a>(
                 .filter_map(|plan| plan.first.as_ref()),
         )
     {
-        parameters.push(ast.formal_parameter(
+        parameters.push(oxc_ast::ast::FormalParameter::new(
             mutation.anchor,
-            ast.vec(),
-            ast.binding_pattern_binding_identifier(mutation.anchor, allocator.alloc_str(alias)),
+            oxc_allocator::Vec::new_in(ast.builder()),
+            oxc_ast::ast::BindingPattern::new_binding_identifier(
+                mutation.anchor,
+                allocator.alloc_str(alias),
+                ast.builder(),
+            ),
             None::<ArenaBox<'a, TSTypeAnnotation<'a>>>,
             None::<ArenaBox<'a, Expression<'a>>>,
             false,
             None,
             false,
             false,
+            ast.builder(),
         ));
     }
-    let parameters = ast.alloc_formal_parameters(
+    let parameters = oxc_ast::ast::FormalParameters::boxed(
         mutation.anchor,
         FormalParameterKind::FormalParameter,
         parameters,
         None::<ArenaBox<'a, FormalParameterRest<'a>>>,
+        ast.builder(),
     );
     let helper_expression = if mutation.has_yield {
-        ast.expression_function(
+        oxc_ast::ast::Expression::new_function_expression(
             mutation.anchor,
             oxc_ast::ast::FunctionType::FunctionExpression,
             None,
@@ -320,22 +350,23 @@ fn mutate_captured_loop<'a>(
             parameters,
             None::<ArenaBox<'a, TSTypeAnnotation<'a>>>,
             Some(function_body),
+            ast.builder(),
         )
     } else {
-        ast.expression_arrow_function(
+        oxc_ast::ast::Expression::new_arrow_function_expression(
             mutation.anchor,
-            false,
             mutation.has_await,
             None::<ArenaBox<'a, TSTypeParameterDeclaration<'a>>>,
             parameters,
             None::<ArenaBox<'a, TSTypeAnnotation<'a>>>,
-            function_body,
+            oxc_ast::ast::ArrowFunctionBody::FunctionBody(function_body),
+            ast.builder(),
         )
     };
     let mut generated = ArenaVec::new_in(&allocator);
     for name in hoisted {
         generated.push(binding_declaration(
-            ast,
+            AstBuilder::new(ast.allocator()),
             insertion_anchor,
             VariableDeclarationKind::Var,
             &name,
@@ -344,7 +375,7 @@ fn mutate_captured_loop<'a>(
     }
     if let Some(record) = &mutation.record {
         generated.push(binding_declaration(
-            ast,
+            AstBuilder::new(ast.allocator()),
             insertion_anchor,
             VariableDeclarationKind::Var,
             record,
@@ -352,14 +383,14 @@ fn mutate_captured_loop<'a>(
         ));
     }
     generated.push(binding_declaration(
-        ast,
+        AstBuilder::new(ast.allocator()),
         insertion_anchor,
         VariableDeclarationKind::Var,
         &mutation.result,
         None,
     ));
     generated.push(binding_declaration(
-        ast,
+        AstBuilder::new(ast.allocator()),
         insertion_anchor,
         VariableDeclarationKind::Var,
         &mutation.helper,
@@ -368,7 +399,6 @@ fn mutate_captured_loop<'a>(
     Ok(generated)
 }
 
-#[expect(deprecated)]
 fn binding_declaration<'a>(
     ast: AstBuilder<'a>,
     span: Span,
@@ -376,18 +406,26 @@ fn binding_declaration<'a>(
     name: &str,
     init: Option<Expression<'a>>,
 ) -> Statement<'a> {
-    Statement::VariableDeclaration(ast.alloc_variable_declaration(
+    Statement::VariableDeclaration(oxc_ast::ast::VariableDeclaration::boxed(
         span,
         kind,
-        ast.vec1(ast.variable_declarator(
-            span,
-            kind,
-            ast.binding_pattern_binding_identifier(span, ast.allocator.alloc_str(name)),
-            None::<ArenaBox<'a, TSTypeAnnotation<'a>>>,
-            init,
-            false,
-        )),
+        oxc_allocator::Vec::from_array_in(
+            [oxc_ast::ast::VariableDeclarator::new(
+                span,
+                oxc_ast::ast::BindingPattern::new_binding_identifier(
+                    span,
+                    ast.allocator().alloc_str(name),
+                    ast.builder(),
+                ),
+                None::<ArenaBox<'a, TSTypeAnnotation<'a>>>,
+                init,
+                false,
+                ast.builder(),
+            )],
+            ast.builder(),
+        ),
         false,
+        ast.builder(),
     ))
 }
 
@@ -403,7 +441,7 @@ impl<'a> VisitMut<'a> for ArgumentsRewriter<'a, '_> {
             .references
             .contains(&(identifier.span.start, identifier.span.end))
         {
-            identifier.name = self.ast.allocator.alloc_str(self.alias).into();
+            identifier.name = self.ast.allocator().alloc_str(self.alias).into();
         }
     }
 }
@@ -438,7 +476,6 @@ impl<'a> VisitMut<'a> for CapturedLoopBodyMover<'a, '_> {
     }
 }
 
-#[expect(deprecated)]
 fn captured_loop_result<'a>(
     ast: &AstBuilder<'a>,
     mutation: &CapturedLoopMutation,
@@ -447,80 +484,109 @@ fn captured_loop_result<'a>(
     value: Option<Expression<'a>>,
 ) -> Expression<'a> {
     let mut properties = ArenaVec::new_in(ast);
-    properties.push(ast.object_property_kind_object_property(
+    properties.push(oxc_ast::ast::ObjectPropertyKind::new_object_property(
         span,
         PropertyKind::Init,
-        ast.property_key_static_identifier(span, "type"),
-        ast.expression_string_literal(span, ast.allocator.alloc_str(kind), None),
+        oxc_ast::ast::PropertyKey::new_static_identifier(span, "type", ast.builder()),
+        oxc_ast::ast::Expression::new_string_literal(
+            span,
+            ast.allocator().alloc_str(kind),
+            None,
+            ast.builder(),
+        ),
         false,
         false,
         false,
+        ast.builder(),
     ));
     if let Some(value) = value {
-        properties.push(ast.object_property_kind_object_property(
+        properties.push(oxc_ast::ast::ObjectPropertyKind::new_object_property(
             span,
             PropertyKind::Init,
-            ast.property_key_static_identifier(span, "value"),
+            oxc_ast::ast::PropertyKey::new_static_identifier(span, "value", ast.builder()),
             value,
             false,
             false,
             false,
+            ast.builder(),
         ));
     }
     let mut elements = ArenaVec::new_in(ast);
     for binding in &mutation.bindings {
         elements.push(ArrayExpressionElement::from(
-            ast.expression_identifier(span, ast.allocator.alloc_str(&binding.name)),
+            oxc_ast::ast::Expression::new_identifier(
+                span,
+                ast.allocator().alloc_str(&binding.name),
+                ast.builder(),
+            ),
         ));
     }
-    let mut vars = ast.expression_array(span, elements);
+    let mut vars = oxc_ast::ast::Expression::new_array_expression(span, elements, ast.builder());
     if mutation.defer_bindings {
-        vars = ast.expression_arrow_function(
+        vars = oxc_ast::ast::Expression::new_arrow_function_expression(
             span,
-            true,
             false,
             None::<ArenaBox<'a, TSTypeParameterDeclaration<'a>>>,
-            ast.alloc_formal_parameters(
+            oxc_ast::ast::FormalParameters::boxed(
                 span,
                 FormalParameterKind::ArrowFormalParameters,
-                ast.vec(),
+                oxc_allocator::Vec::new_in(ast.builder()),
                 None::<ArenaBox<'a, FormalParameterRest<'a>>>,
+                ast.builder(),
             ),
             None::<ArenaBox<'a, TSTypeAnnotation<'a>>>,
-            ast.alloc_function_body(
-                span,
-                ast.vec(),
-                ast.vec1(ast.statement_expression(span, vars)),
-            ),
+            {
+                let mut body = oxc_ast::ast::FunctionBody::boxed(
+                    span,
+                    oxc_allocator::Vec::new_in(ast.builder()),
+                    oxc_allocator::Vec::from_array_in(
+                        [oxc_ast::ast::Statement::new_expression_statement(
+                            span,
+                            vars,
+                            ast.builder(),
+                        )],
+                        ast.builder(),
+                    ),
+                    ast.builder(),
+                )
+                .unbox();
+                let Statement::ExpressionStatement(statement) = body.statements.remove(0) else {
+                    unreachable!("generated concise arrow has one expression")
+                };
+                oxc_ast::ast::ArrowFunctionBody::from(statement.unbox().expression)
+            },
+            ast.builder(),
         );
     }
-    properties.push(ast.object_property_kind_object_property(
+    properties.push(oxc_ast::ast::ObjectPropertyKind::new_object_property(
         span,
         PropertyKind::Init,
-        ast.property_key_static_identifier(span, "vars"),
+        oxc_ast::ast::PropertyKey::new_static_identifier(span, "vars", ast.builder()),
         vars,
         false,
         false,
         false,
+        ast.builder(),
     ));
-    let record = ast.expression_object(span, properties);
+    let record = oxc_ast::ast::Expression::new_object_expression(span, properties, ast.builder());
     if let Some(name) = &mutation.record {
-        ast.expression_assignment(
+        oxc_ast::ast::Expression::new_assignment_expression(
             span,
             AssignmentOperator::Assign,
-            ast.simple_assignment_target_assignment_target_identifier(
+            oxc_ast::ast::SimpleAssignmentTarget::new_assignment_target_identifier(
                 span,
-                ast.allocator.alloc_str(name),
+                ast.allocator().alloc_str(name),
+                ast.builder(),
             )
             .into(),
             record,
+            ast.builder(),
         )
     } else {
         record
     }
 }
 
-#[expect(deprecated)]
 fn captured_loop_dispatch<'a>(
     ast: &AstBuilder<'a>,
     mutation: &CapturedLoopMutation,
@@ -528,164 +594,230 @@ fn captured_loop_dispatch<'a>(
     let anchor = mutation.dispatch_anchor;
     let mut call_arguments = ArenaVec::new_in(ast);
     for binding in &mutation.bindings {
-        call_arguments.push(Argument::from(
-            ast.expression_identifier(anchor, ast.allocator.alloc_str(&binding.name)),
-        ));
+        call_arguments.push(Argument::from(oxc_ast::ast::Expression::new_identifier(
+            anchor,
+            ast.allocator().alloc_str(&binding.name),
+            ast.builder(),
+        )));
     }
     if mutation.arguments_alias.is_some() {
-        call_arguments.push(Argument::from(
-            ast.expression_identifier(anchor, "arguments"),
-        ));
+        call_arguments.push(Argument::from(oxc_ast::ast::Expression::new_identifier(
+            anchor,
+            "arguments",
+            ast.builder(),
+        )));
     }
     if let Some(first) = mutation
         .header
         .as_ref()
         .and_then(|plan| plan.first.as_ref())
     {
-        call_arguments.push(Argument::from(
-            ast.expression_identifier(anchor, ast.allocator.alloc_str(first)),
-        ));
+        call_arguments.push(Argument::from(oxc_ast::ast::Expression::new_identifier(
+            anchor,
+            ast.allocator().alloc_str(first),
+            ast.builder(),
+        )));
     }
     let mut call = if mutation.has_yield {
-        call_arguments.insert(0, Argument::from(ast.expression_this(anchor)));
-        ast.expression_call(
-            anchor,
-            Expression::from(ast.member_expression_static(
+        call_arguments.insert(
+            0,
+            Argument::from(oxc_ast::ast::Expression::new_this_expression(
                 anchor,
-                ast.expression_identifier(anchor, ast.allocator.alloc_str(&mutation.helper)),
-                ast.identifier_name(anchor, "call"),
-                false,
+                ast.builder(),
             )),
+        );
+        oxc_ast::ast::Expression::new_call_expression(
+            anchor,
+            Expression::from(
+                oxc_ast::ast::MemberExpression::new_static_member_expression(
+                    anchor,
+                    oxc_ast::ast::Expression::new_identifier(
+                        anchor,
+                        ast.allocator().alloc_str(&mutation.helper),
+                        ast.builder(),
+                    ),
+                    oxc_ast::ast::IdentifierName::new(anchor, "call", ast.builder()),
+                    false,
+                    ast.builder(),
+                ),
+            ),
             None::<ArenaBox<'a, TSTypeParameterInstantiation<'a>>>,
             call_arguments,
             false,
+            ast.builder(),
         )
     } else {
-        ast.expression_call(
+        oxc_ast::ast::Expression::new_call_expression(
             anchor,
-            ast.expression_identifier(anchor, ast.allocator.alloc_str(&mutation.helper)),
+            oxc_ast::ast::Expression::new_identifier(
+                anchor,
+                ast.allocator().alloc_str(&mutation.helper),
+                ast.builder(),
+            ),
             None::<ArenaBox<'a, TSTypeParameterInstantiation<'a>>>,
             call_arguments,
             false,
+            ast.builder(),
         )
     };
     call = if mutation.has_yield {
-        ast.expression_yield(anchor, true, Some(call))
+        oxc_ast::ast::Expression::new_yield_expression(anchor, true, Some(call), ast.builder())
     } else if mutation.has_await {
-        ast.expression_await(anchor, call)
+        oxc_ast::ast::Expression::new_await_expression(anchor, call, ast.builder())
     } else {
         call
     };
-    let assignment = ast.expression_assignment(
+    let assignment = oxc_ast::ast::Expression::new_assignment_expression(
         anchor,
         oxc_syntax::operator::AssignmentOperator::Assign,
-        ast.simple_assignment_target_assignment_target_identifier(
+        oxc_ast::ast::SimpleAssignmentTarget::new_assignment_target_identifier(
             anchor,
-            ast.allocator.alloc_str(&mutation.result),
+            ast.allocator().alloc_str(&mutation.result),
+            ast.builder(),
         )
         .into(),
         call,
+        ast.builder(),
     );
     let mut body = ArenaVec::new_in(ast);
     if let Some(record) = &mutation.record {
         // A delegated external return can complete after yielding in finally.
         // Only records created by this helper may be decoded; caller values can
         // be null, primitives, or proxies with arbitrary property traps.
-        body.push(
-            ast.statement_expression(
-                anchor,
-                ast.expression_assignment(
-                    anchor,
-                    AssignmentOperator::Assign,
-                    ast.simple_assignment_target_assignment_target_identifier(
-                        anchor,
-                        ast.allocator.alloc_str(record),
-                    )
-                    .into(),
-                    ast.expression_null_literal(anchor),
-                ),
-            ),
-        );
-    }
-    body.push(ast.statement_expression(anchor, assignment));
-    if let Some(record) = &mutation.record {
-        let record_ref = || ast.expression_identifier(anchor, ast.allocator.alloc_str(record));
-        let result_ref =
-            || ast.expression_identifier(anchor, ast.allocator.alloc_str(&mutation.result));
-        let test = ast.expression_logical(
+        body.push(oxc_ast::ast::Statement::new_expression_statement(
             anchor,
-            ast.expression_unary(
+            oxc_ast::ast::Expression::new_assignment_expression(
+                anchor,
+                AssignmentOperator::Assign,
+                oxc_ast::ast::SimpleAssignmentTarget::new_assignment_target_identifier(
+                    anchor,
+                    ast.allocator().alloc_str(record),
+                    ast.builder(),
+                )
+                .into(),
+                oxc_ast::ast::Expression::new_null_literal(anchor, ast.builder()),
+                ast.builder(),
+            ),
+            ast.builder(),
+        ));
+    }
+    body.push(oxc_ast::ast::Statement::new_expression_statement(
+        anchor,
+        assignment,
+        ast.builder(),
+    ));
+    if let Some(record) = &mutation.record {
+        let record_ref = || {
+            oxc_ast::ast::Expression::new_identifier(
+                anchor,
+                ast.allocator().alloc_str(record),
+                ast.builder(),
+            )
+        };
+        let result_ref = || {
+            oxc_ast::ast::Expression::new_identifier(
+                anchor,
+                ast.allocator().alloc_str(&mutation.result),
+                ast.builder(),
+            )
+        };
+        let test = oxc_ast::ast::Expression::new_logical_expression(
+            anchor,
+            oxc_ast::ast::Expression::new_unary_expression(
                 anchor,
                 oxc_syntax::operator::UnaryOperator::LogicalNot,
                 record_ref(),
+                ast.builder(),
             ),
             oxc_syntax::operator::LogicalOperator::Or,
-            ast.expression_binary(
+            oxc_ast::ast::Expression::new_binary_expression(
                 anchor,
                 result_ref(),
                 oxc_syntax::operator::BinaryOperator::StrictInequality,
                 record_ref(),
+                ast.builder(),
             ),
+            ast.builder(),
         );
-        body.push(ast.statement_if(
+        body.push(oxc_ast::ast::Statement::new_if_statement(
             anchor,
             test,
-            ast.statement_return(anchor, Some(result_ref())),
+            oxc_ast::ast::Statement::new_return_statement(
+                anchor,
+                Some(result_ref()),
+                ast.builder(),
+            ),
             None,
+            ast.builder(),
         ));
     }
     let result_vars = || {
-        ast.member_expression_static(
+        oxc_ast::ast::MemberExpression::new_static_member_expression(
             anchor,
-            ast.expression_identifier(anchor, ast.allocator.alloc_str(&mutation.result)),
-            ast.identifier_name(anchor, "vars"),
+            oxc_ast::ast::Expression::new_identifier(
+                anchor,
+                ast.allocator().alloc_str(&mutation.result),
+                ast.builder(),
+            ),
+            oxc_ast::ast::IdentifierName::new(anchor, "vars", ast.builder()),
             false,
+            ast.builder(),
         )
     };
     if mutation.defer_bindings {
-        body.push(ast.statement_expression(
+        body.push(oxc_ast::ast::Statement::new_expression_statement(
             anchor,
-            ast.expression_assignment(
+            oxc_ast::ast::Expression::new_assignment_expression(
                 anchor,
                 AssignmentOperator::Assign,
                 AssignmentTarget::from(result_vars()),
-                ast.expression_call(
+                oxc_ast::ast::Expression::new_call_expression(
                     anchor,
                     Expression::from(result_vars()),
                     None::<ArenaBox<'a, TSTypeParameterInstantiation<'a>>>,
-                    ast.vec(),
+                    oxc_allocator::Vec::new_in(ast.builder()),
                     false,
+                    ast.builder(),
                 ),
+                ast.builder(),
             ),
+            ast.builder(),
         ));
     }
     for (index, binding) in mutation.bindings.iter().enumerate() {
         if binding.protect_writes {
             continue;
         }
-        let target = ast.simple_assignment_target_assignment_target_identifier(
+        let target = oxc_ast::ast::SimpleAssignmentTarget::new_assignment_target_identifier(
             anchor,
-            ast.allocator.alloc_str(&binding.name),
+            ast.allocator().alloc_str(&binding.name),
+            ast.builder(),
         );
-        let value = Expression::from(ast.member_expression_computed(
-            anchor,
-            Expression::from(result_vars()),
-            ast.expression_numeric_literal(
+        let value = Expression::from(
+            oxc_ast::ast::MemberExpression::new_computed_member_expression(
                 anchor,
-                index as f64,
-                None,
-                oxc_ast::ast::NumberBase::Decimal,
+                Expression::from(result_vars()),
+                oxc_ast::ast::Expression::new_numeric_literal(
+                    anchor,
+                    index as f64,
+                    None,
+                    oxc_ast::ast::NumberBase::Decimal,
+                    ast.builder(),
+                ),
+                false,
+                ast.builder(),
             ),
-            false,
-        ));
-        body.push(ast.statement_expression(
+        );
+        body.push(oxc_ast::ast::Statement::new_expression_statement(
             anchor,
-            ast.expression_assignment(
+            oxc_ast::ast::Expression::new_assignment_expression(
                 anchor,
                 oxc_syntax::operator::AssignmentOperator::Assign,
                 target.into(),
                 value,
+                ast.builder(),
             ),
+            ast.builder(),
         ));
     }
     let mut exits = Vec::new();
@@ -706,40 +838,81 @@ fn captured_loop_dispatch<'a>(
     }
     for (kind, label) in exits {
         let tag = label.map_or_else(|| kind.to_owned(), |label| format!("{kind}:{label}"));
-        let result_type = Expression::from(ast.member_expression_static(
-            anchor,
-            ast.expression_identifier(anchor, ast.allocator.alloc_str(&mutation.result)),
-            ast.identifier_name(anchor, "type"),
-            false,
-        ));
-        let test = ast.expression_binary(
+        let result_type = Expression::from(
+            oxc_ast::ast::MemberExpression::new_static_member_expression(
+                anchor,
+                oxc_ast::ast::Expression::new_identifier(
+                    anchor,
+                    ast.allocator().alloc_str(&mutation.result),
+                    ast.builder(),
+                ),
+                oxc_ast::ast::IdentifierName::new(anchor, "type", ast.builder()),
+                false,
+                ast.builder(),
+            ),
+        );
+        let test = oxc_ast::ast::Expression::new_binary_expression(
             anchor,
             result_type,
             oxc_syntax::operator::BinaryOperator::StrictEquality,
-            ast.expression_string_literal(anchor, ast.allocator.alloc_str(&tag), None),
+            oxc_ast::ast::Expression::new_string_literal(
+                anchor,
+                ast.allocator().alloc_str(&tag),
+                None,
+                ast.builder(),
+            ),
+            ast.builder(),
         );
         let consequent = match kind {
-            "return" => ast.statement_return(
+            "return" => oxc_ast::ast::Statement::new_return_statement(
                 anchor,
-                Some(Expression::from(ast.member_expression_static(
-                    anchor,
-                    ast.expression_identifier(anchor, ast.allocator.alloc_str(&mutation.result)),
-                    ast.identifier_name(anchor, "value"),
-                    false,
-                ))),
+                Some(Expression::from(
+                    oxc_ast::ast::MemberExpression::new_static_member_expression(
+                        anchor,
+                        oxc_ast::ast::Expression::new_identifier(
+                            anchor,
+                            ast.allocator().alloc_str(&mutation.result),
+                            ast.builder(),
+                        ),
+                        oxc_ast::ast::IdentifierName::new(anchor, "value", ast.builder()),
+                        false,
+                        ast.builder(),
+                    ),
+                )),
+                ast.builder(),
             ),
-            "break" => ast.statement_break(
+            "break" => oxc_ast::ast::Statement::new_break_statement(
                 anchor,
-                label.map(|label| ast.label_identifier(anchor, ast.allocator.alloc_str(label))),
+                label.map(|label| {
+                    oxc_ast::ast::LabelIdentifier::new(
+                        anchor,
+                        ast.allocator().alloc_str(label),
+                        ast.builder(),
+                    )
+                }),
+                ast.builder(),
             ),
-            _ => ast.statement_continue(
+            _ => oxc_ast::ast::Statement::new_continue_statement(
                 anchor,
-                label.map(|label| ast.label_identifier(anchor, ast.allocator.alloc_str(label))),
+                label.map(|label| {
+                    oxc_ast::ast::LabelIdentifier::new(
+                        anchor,
+                        ast.allocator().alloc_str(label),
+                        ast.builder(),
+                    )
+                }),
+                ast.builder(),
             ),
         };
-        body.push(ast.statement_if(anchor, test, consequent, None));
+        body.push(oxc_ast::ast::Statement::new_if_statement(
+            anchor,
+            test,
+            consequent,
+            None,
+            ast.builder(),
+        ));
     }
-    ast.statement_block(anchor, body)
+    oxc_ast::ast::Statement::new_block_statement(anchor, body, ast.builder())
 }
 
 fn captured_loop_mutations(
@@ -1725,7 +1898,6 @@ struct BlockScopingLowerer<'a> {
 }
 
 impl<'a> BlockScopingLowerer<'a> {
-    #[expect(deprecated)]
     fn read_only_error(&self, span: Span, name: &str) -> Expression<'a> {
         let ast = AstBuilder::new(self.allocator);
         let helper = self
@@ -1733,19 +1905,29 @@ impl<'a> BlockScopingLowerer<'a> {
             .read_only_helper
             .as_deref()
             .expect("const writes reserve a read-only helper");
-        ast.expression_call(
+        oxc_ast::ast::Expression::new_call_expression(
             span,
-            ast.expression_identifier(span, self.allocator.alloc_str(helper)),
+            oxc_ast::ast::Expression::new_identifier(
+                span,
+                self.allocator.alloc_str(helper),
+                ast.builder(),
+            ),
             None::<ArenaBox<'a, TSTypeParameterInstantiation<'a>>>,
-            ast.vec1(
-                ast.expression_string_literal(span, self.allocator.alloc_str(name), None)
-                    .into(),
+            oxc_allocator::Vec::from_array_in(
+                [oxc_ast::ast::Expression::new_string_literal(
+                    span,
+                    self.allocator.alloc_str(name),
+                    None,
+                    ast.builder(),
+                )
+                .into()],
+                ast.builder(),
             ),
             false,
+            ast.builder(),
         )
     }
 
-    #[expect(deprecated)]
     fn temp_assignment(&self, span: Span, value: Expression<'a>) -> Expression<'a> {
         let ast = AstBuilder::new(self.allocator);
         let temp = self
@@ -1753,39 +1935,43 @@ impl<'a> BlockScopingLowerer<'a> {
             .read_only_temp
             .as_deref()
             .expect("const writes reserve a temporary");
-        ast.expression_assignment(
+        oxc_ast::ast::Expression::new_assignment_expression(
             span,
             AssignmentOperator::Assign,
-            ast.simple_assignment_target_assignment_target_identifier(
+            oxc_ast::ast::SimpleAssignmentTarget::new_assignment_target_identifier(
                 span,
                 self.allocator.alloc_str(temp),
+                ast.builder(),
             )
             .into(),
             value,
+            ast.builder(),
         )
     }
 
-    #[expect(deprecated)]
     fn temp_target(&self, span: Span) -> AssignmentTarget<'a> {
-        AstBuilder::new(self.allocator)
-            .simple_assignment_target_assignment_target_identifier(
-                span,
-                self.allocator.alloc_str(
-                    self.plan
-                        .read_only_temp
-                        .as_deref()
-                        .expect("const writes reserve a temporary"),
-                ),
-            )
-            .into()
+        oxc_ast::ast::SimpleAssignmentTarget::new_assignment_target_identifier(
+            span,
+            self.allocator.alloc_str(
+                self.plan
+                    .read_only_temp
+                    .as_deref()
+                    .expect("const writes reserve a temporary"),
+            ),
+            &AstBuilder::new(self.allocator),
+        )
+        .into()
     }
 
-    #[expect(deprecated)]
     fn target_read(&self, target: &AssignmentTarget<'a>) -> Option<Expression<'a>> {
         let ast = AstBuilder::new(self.allocator);
         match target {
             AssignmentTarget::AssignmentTargetIdentifier(identifier) => {
-                Some(ast.expression_identifier(identifier.span, identifier.name))
+                Some(oxc_ast::ast::Expression::new_identifier(
+                    identifier.span,
+                    identifier.name,
+                    ast.builder(),
+                ))
             }
             AssignmentTarget::PrivateFieldExpression(field) => Some(
                 Expression::PrivateFieldExpression(field.clone_in(self.allocator)),
@@ -1803,9 +1989,12 @@ impl<'a> BlockScopingLowerer<'a> {
         }
     }
 
-    #[expect(deprecated)]
     fn sequence(&self, span: Span, expressions: ArenaVec<'a, Expression<'a>>) -> Expression<'a> {
-        AstBuilder::new(self.allocator).expression_sequence(span, expressions)
+        oxc_ast::ast::Expression::new_sequence_expression(
+            span,
+            expressions,
+            &AstBuilder::new(self.allocator),
+        )
     }
 }
 
@@ -1824,7 +2013,6 @@ impl<'a> Visit<'a> for RemainingBlockScopingDetector {
 }
 
 impl<'a> VisitMut<'a> for BlockScopingLowerer<'a> {
-    #[expect(deprecated)]
     fn visit_assignment_target_property(&mut self, property: &mut AssignmentTargetProperty<'a>) {
         let AssignmentTargetProperty::AssignmentTargetPropertyIdentifier(shorthand) = property
         else {
@@ -1843,29 +2031,31 @@ impl<'a> VisitMut<'a> for BlockScopingLowerer<'a> {
         let ast = AstBuilder::new(self.allocator);
         let span = shorthand.span;
         let original_name = shorthand.binding.name;
-        let target = ast.simple_assignment_target_assignment_target_identifier(
+        let target = oxc_ast::ast::SimpleAssignmentTarget::new_assignment_target_identifier(
             shorthand.binding.span,
             self.allocator.alloc_str(replacement),
+            ast.builder(),
         );
         let binding = if let Some(mut init) = shorthand.init.take() {
             self.visit_expression(&mut init);
-            ast.assignment_target_maybe_default_assignment_target_with_default(
+            oxc_ast::ast::AssignmentTargetMaybeDefault::new_assignment_target_with_default(
                 span,
                 AssignmentTarget::from(target),
                 init,
+                &ast,
             )
         } else {
             AssignmentTargetMaybeDefault::from(target)
         };
-        *property = ast.assignment_target_property_assignment_target_property_property(
+        *property = oxc_ast::ast::AssignmentTargetProperty::new_assignment_target_property_property(
             span,
-            ast.property_key_static_identifier(span, original_name),
+            oxc_ast::ast::PropertyKey::new_static_identifier(span, original_name, ast.builder()),
             binding,
             false,
+            ast.builder(),
         );
     }
 
-    #[expect(deprecated)]
     fn visit_expression(&mut self, expression: &mut Expression<'a>) {
         let span = expression.span();
         let Some(name) = self
@@ -1932,7 +2122,11 @@ impl<'a> VisitMut<'a> for BlockScopingLowerer<'a> {
                 let mut update = update.unbox();
                 let read = match &update.argument {
                     SimpleAssignmentTarget::AssignmentTargetIdentifier(identifier) => {
-                        ast.expression_identifier(identifier.span, identifier.name)
+                        oxc_ast::ast::Expression::new_identifier(
+                            identifier.span,
+                            identifier.name,
+                            ast.builder(),
+                        )
                     }
                     SimpleAssignmentTarget::PrivateFieldExpression(field) => {
                         Expression::PrivateFieldExpression(field.clone_in(self.allocator))
@@ -1955,7 +2149,6 @@ impl<'a> VisitMut<'a> for BlockScopingLowerer<'a> {
         }
     }
 
-    #[expect(deprecated)]
     fn visit_variable_declaration(&mut self, declaration: &mut VariableDeclaration<'a>) {
         if matches!(
             declaration.kind,
@@ -1970,15 +2163,17 @@ impl<'a> VisitMut<'a> for BlockScopingLowerer<'a> {
                 {
                     let span = declarator.span;
                     let ast = AstBuilder::new(self.allocator);
-                    declarator.init = Some(ast.expression_unary(
+                    declarator.init = Some(oxc_ast::ast::Expression::new_unary_expression(
                         span,
                         oxc_syntax::operator::UnaryOperator::Void,
-                        ast.expression_numeric_literal(
+                        oxc_ast::ast::Expression::new_numeric_literal(
                             span,
                             0.0,
                             None,
                             oxc_ast::ast::NumberBase::Decimal,
+                            ast.builder(),
                         ),
+                        ast.builder(),
                     ));
                 }
             }

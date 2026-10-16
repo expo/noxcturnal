@@ -15,12 +15,13 @@ mod react_compiler_typeinference;
 mod react_compiler_utils;
 mod react_compiler_validation;
 
-use crate::react_compiler::entrypoint::compile_result::CompileResult;
 use crate::react_compiler::entrypoint::imports::{
     get_react_compiler_runtime_module, has_memo_cache_function_import, validate_restricted_imports,
 };
 use crate::react_compiler::entrypoint::program::compile_program;
 
+pub use crate::diagnostics::{ErrorCategory, LintDiagnostic};
+pub use crate::react_compiler::entrypoint::compile_result::CompileResult;
 pub use crate::react_compiler::entrypoint::program::CompileOutput;
 
 // Re-exported so integrations needn't depend on the upstream `react_compiler` crates.
@@ -34,8 +35,9 @@ pub use crate::react_compiler_hir::environment_config::{
     InstrumentationConfig,
 };
 pub use crate::react_compiler_hir::type_config::{
-    BuiltInTypeRef, FunctionTypeConfig, HookTypeConfig, ObjectTypeConfig, TypeConfig,
-    TypeReferenceConfig, ValueKind,
+    AliasingEffectConfig, AliasingSignatureConfig, ApplyArgConfig, BuiltInTypeRef,
+    FunctionTypeConfig, HookTypeConfig, ObjectTypeConfig, TypeConfig, TypeReferenceConfig,
+    ValueKind, ValueReason,
 };
 pub use crate::react_compiler_utils::FxIndexMap;
 
@@ -44,17 +46,20 @@ use oxc_diagnostics::Diagnostics;
 use oxc_semantic::Semantic;
 
 pub struct LintResult {
-    /// Errors and warnings produced by the compile.
-    pub diagnostics: Diagnostics,
+    /// Errors and warnings produced by the compile, paired with their
+    /// [`ErrorCategory`] for routing to category-specific lint rules.
+    pub diagnostics: Vec<LintDiagnostic>,
+    /// Whether compilation was aborted according to `panic_threshold`.
+    pub fatal: bool,
 }
 
 /// Run the React Compiler on a pre-parsed program.
 ///
-/// Returns the compiled output — `None` when the compiler has nothing to change
-/// (no React-like functions, a bail-out, nothing to memoize, or a fatal error) —
-/// together with the diagnostics. Errors (e.g. Rules of Hooks violations) are
-/// hard problems in the source; the program is still left valid. Warnings
-/// include bail-outs where the compiler declined to optimize.
+/// Returns [`CompileResult::Success`] when compilation completed, even if one or
+/// more functions bailed out with diagnostics. Returns
+/// [`CompileResult::Fatal`] only when compilation was aborted according to
+/// [`PluginOptions::panic_threshold`]. Diagnostic severity and fatality are
+/// intentionally separate.
 ///
 /// Must run **first**, on the pristine AST, before any other transform. The
 /// borrowed `semantic` must have been built from that same pristine AST with
@@ -62,12 +67,14 @@ pub struct LintResult {
 /// the output with [`CompileOutput::transform`] once `semantic` is dropped:
 ///
 /// ```ignore
-/// let (output, diagnostics) = {
+/// let result = {
 ///     let semantic = SemanticBuilder::new().with_build_nodes(true).build(&program).semantic;
 ///     compile(&program, &semantic, &allocator, options)
 /// }; // `semantic`'s borrow of `program` ends here
-/// if let Some(output) = output {
-///     output.transform(&mut program);
+/// match result {
+///     CompileResult::Success { output: Some(output), .. } => output.transform(&mut program),
+///     CompileResult::Success { output: None, .. } => {}
+///     CompileResult::Fatal { diagnostics } => report(diagnostics),
 /// }
 /// ```
 pub fn compile<'a>(
@@ -75,38 +82,35 @@ pub fn compile<'a>(
     semantic: &Semantic<'_>,
     allocator: &'a Allocator,
     options: PluginOptions,
-) -> (Option<CompileOutput<'a>>, Diagnostics) {
-    match compile_with_status(program, semantic, allocator, options) {
-        Ok(result) => result,
-        Err(diagnostics) => (None, diagnostics),
-    }
+) -> CompileResult<'a> {
+    run_compiler::<true>(program, semantic, allocator, options)
 }
 
-/// Compile while preserving the selected panic threshold's fatal/nonfatal outcome.
-/// Successful skips may carry diagnostics; integrations must still run later passes.
-pub fn compile_with_status<'a>(
+fn run_compiler<'a, const EMIT: bool>(
     program: &Program<'a>,
     semantic: &Semantic<'_>,
     allocator: &'a Allocator,
     options: PluginOptions,
-) -> Result<(Option<CompileOutput<'a>>, Diagnostics), Diagnostics> {
+) -> CompileResult<'a> {
     // Check for existing runtime imports (file already compiled).
     if has_memo_cache_function_import(program, &get_react_compiler_runtime_module(&options.target))
     {
-        return Ok((None, Diagnostics::default()));
+        return CompileResult::Success { output: None, diagnostics: Diagnostics::default() };
     }
 
-    // Blocklisted imports fail the whole file: report and bail without compiling.
+    // Blocklisted imports bail out the whole file. Whether that aborts the
+    // surrounding transform is controlled by `panic_threshold`.
     if let Some(diagnostics) =
         validate_restricted_imports(program, &options.environment.validate_blocklisted_imports)
     {
-        return Err(diagnostics);
+        return if diagnostics::should_panic(&diagnostics, options.panic_threshold) {
+            CompileResult::Fatal { diagnostics }
+        } else {
+            CompileResult::Success { output: None, diagnostics }
+        };
     }
 
-    match compile_program(allocator, semantic, program, options) {
-        CompileResult::Success { output, diagnostics } => Ok((output.map(|b| *b), diagnostics)),
-        CompileResult::Error { diagnostics } => Err(diagnostics),
-    }
+    compile_program::<EMIT>(allocator, semantic, program, options)
 }
 
 /// Lint a pre-parsed program — like [`compile`] but read-only: it collects
@@ -123,6 +127,10 @@ pub fn lint<'a>(
     let mut options = options;
     options.no_emit = true;
 
-    let (_output, diagnostics) = compile(program, semantic, allocator, options);
-    LintResult { diagnostics }
+    let (diagnostics, fatal) = match run_compiler::<false>(program, semantic, allocator, options) {
+        CompileResult::Success { diagnostics, .. } => (diagnostics, false),
+        CompileResult::Fatal { diagnostics } => (diagnostics, true),
+    };
+    let diagnostics = diagnostics.into_vec().into_iter().map(diagnostics::categorize).collect();
+    LintResult { diagnostics, fatal }
 }

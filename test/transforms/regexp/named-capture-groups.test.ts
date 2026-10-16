@@ -61,9 +61,7 @@ test('uses structural spans for escaped syntax, lookbehind, nesting, and Unicode
   expect(output).toMatch(/\{\s+a: 1,\s+deep: 2,?\s+\}/u);
 });
 
-// The pinned structural regexp parser compares these name spellings literally.
-// This valid input uses the public pristine-bailout compatibility boundary;
-// native and Babel acceptance controls retain evidence of the parser limitation.
+// Oxc decodes equivalent escaped and literal group names before reference lookup.
 describe('equivalent surrogate escapes in regexp backreferences', () => {
   const source = String.raw`globalThis.result=/^(?<\uD835\uDC9C>a)\k<𝒜>$/u.test('aa');`;
   let outcome: ReturnType<typeof transform>;
@@ -86,11 +84,13 @@ describe('equivalent surrogate escapes in regexp backreferences', () => {
     new Function('globalThis', source)(context);
     expect(context.result).toBe(true);
   });
-  test('transform preserves valid input at the structural regexp parser boundary', () => {
-    expect(outcome.status).toBe('bailout');
-    if (outcome.status === 'bailout') {
-      expect(outcome.reason).toBe('regexp:parse-error');
-      expect(outcome.source).toBe(source);
+  test('transform lowers equivalent names and preserves the match', () => {
+    expect(outcome.status).toBe('complete');
+    if (outcome.status === 'complete') {
+      expect(outcome.code).not.toContain('(?<');
+      const context: Record<string, unknown> = {};
+      new Function('globalThis', outcome.code)(context);
+      expect(context.result).toBe(true);
     }
   });
 });

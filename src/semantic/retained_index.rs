@@ -503,11 +503,9 @@ impl RetainedIndex {
     }
 
     pub fn record_rename_roles(&mut self, kind: AstKind<'_>, nodes: &AstNodes<'_>, scope_id: u32) {
-        if let AstKind::ExportNamedDeclaration(export) = kind {
-            if export.declaration.is_some() {
-                self.exported_declarations
-                    .push((kind.node_id().index() as u32, scope_id));
-            }
+        if let AstKind::ExportDeclaration(_) = kind {
+            self.exported_declarations
+                .push((kind.node_id().index() as u32, scope_id));
             return;
         }
         if !matches!(
@@ -1603,14 +1601,13 @@ impl RetainedIndex {
                 }
                 AstKind::ArrowFunctionExpression(function) => {
                     let body = &function.body;
-                    let inset = u32::from(!function.expression);
-                    insertion = Some((
-                        body.directives
-                            .last()
-                            .map_or(body.span.start + inset, |directive| directive.span.end),
-                        body.span.end - inset,
-                    ));
-                    mode = if function.expression { 1 } else { 6 };
+                    let inset = u32::from(!function.is_expression());
+                    let start = body
+                        .as_function_body()
+                        .and_then(|body| body.directives.last())
+                        .map_or(body.span().start + inset, |directive| directive.span.end);
+                    insertion = Some((start, body.span().end - inset));
+                    mode = if function.is_expression() { 1 } else { 6 };
                 }
                 AstKind::BlockStatement(block) => {
                     insertion = Some((block.span.start + 1, block.span.end - 1));

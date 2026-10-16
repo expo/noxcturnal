@@ -45,12 +45,16 @@ if (!body) throw new Error('Could not read Oxc AstType variants');
 const variants = [...body.matchAll(/^\s*([A-Za-z][A-Za-z0-9_]*)\s*=\s*\d+,/gm)].map(
   match => match[1],
 );
-const publicName = variant =>
-  variant === 'IdentifierName' ||
-  variant === 'IdentifierReference' ||
-  variant === 'BindingIdentifier'
-    ? 'Identifier'
-    : variant;
+// Project internal Oxc variants onto the public ESTree-facing node contracts.
+const publicName = variant => {
+  if (['IdentifierName', 'IdentifierReference', 'BindingIdentifier'].includes(variant))
+    return 'Identifier';
+  if (['ExportDeclaration', 'ExportFromDeclaration'].includes(variant))
+    return 'ExportNamedDeclaration';
+  if (['TSNamespaceDeclaration', 'TSExternalModuleDeclaration'].includes(variant))
+    return 'TSModuleDeclaration';
+  return variant;
+};
 const nodeTypes = [...new Set(variants.map(publicName))];
 const nodeTypeSet = new Set(nodeTypes);
 

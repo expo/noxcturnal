@@ -1,3 +1,5 @@
+use oxc_allocator::GetAllocator;
+use oxc_ast::builder::GetAstBuilder;
 use std::collections::VecDeque;
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
@@ -7,7 +9,7 @@ use napi::{Error, Result, Status, bindgen_prelude::Buffer};
 use napi_derive::napi;
 use oxc_allocator::{Allocator, Box as ArenaBox, CloneIn, TakeIn};
 use oxc_ast::{
-    AstBuilder, AstKind,
+    AstKind,
     ast::{
         Argument, AssignmentTargetPattern, CatchClause, Class, Decorator, Expression,
         ForOfStatement, FormalParameters, IdentifierReference, ImportDeclarationSpecifier,
@@ -15,6 +17,7 @@ use oxc_ast::{
         Statement, StaticMemberExpression, StringLiteral, TSTypeParameterInstantiation,
         VariableDeclarator, WithClause,
     },
+    builder::AstBuilder,
 };
 use oxc_ast_visit::{Visit, VisitMut, walk, walk_mut};
 use oxc_codegen::{Codegen, CodegenOptions, CommentOptions};
@@ -126,7 +129,7 @@ fn restore_export_namespace_attributes<'a>(
 }
 
 struct AsyncIteratorResultValidator<'a, 's> {
-    ast: oxc_ast::AstBuilder<'a>,
+    ast: oxc_ast::builder::AstBuilder<'a>,
     iterators: rustc_hash::FxHashSet<oxc_semantic::SymbolId>,
     scoping: &'s Scoping,
     helper: String,
@@ -147,7 +150,6 @@ impl AsyncIteratorResultValidator<'_, '_> {
 }
 
 impl<'a> VisitMut<'a> for AsyncIteratorResultValidator<'a, '_> {
-    #[expect(deprecated)]
     fn visit_expression(&mut self, expression: &mut Expression<'a>) {
         walk_mut::walk_expression(self, expression);
         let should_wrap = match expression {
@@ -165,13 +167,17 @@ impl<'a> VisitMut<'a> for AsyncIteratorResultValidator<'a, '_> {
         }
         let span = expression.span();
         let value = expression.take_in(&self.ast);
-        *expression = self.ast.expression_call(
+        *expression = oxc_ast::ast::Expression::new_call_expression(
             span,
-            self.ast
-                .expression_identifier(span, self.ast.allocator.alloc_str(&self.helper)),
+            oxc_ast::ast::Expression::new_identifier(
+                span,
+                self.ast.allocator().alloc_str(&self.helper),
+                self.ast.builder(),
+            ),
             None::<ArenaBox<'a, TSTypeParameterInstantiation<'a>>>,
-            self.ast.vec1(Argument::from(value)),
+            oxc_allocator::Vec::from_array_in([Argument::from(value)], self.ast.builder()),
             false,
+            self.ast.builder(),
         );
         self.changed = true;
     }
@@ -207,7 +213,7 @@ fn validate_generated_async_iterator_results<'a>(
         suffix += 1;
     }
     let mut validator = AsyncIteratorResultValidator {
-        ast: oxc_ast::AstBuilder::new(allocator),
+        ast: oxc_ast::builder::AstBuilder::new(allocator),
         iterators: generated_iterators.iter().copied().collect(),
         scoping,
         helper: helper.clone(),
@@ -2303,7 +2309,6 @@ struct DecoratorHelperReferenceRewriter<'a, 'n> {
 }
 
 impl<'a> VisitMut<'a> for DecoratorHelperReferenceRewriter<'a, '_> {
-    #[expect(deprecated)]
     fn visit_expression(&mut self, expression: &mut Expression<'a>) {
         let Expression::StaticMemberExpression(member) = expression else {
             walk_mut::walk_expression(self, expression);
@@ -2325,8 +2330,11 @@ impl<'a> VisitMut<'a> for DecoratorHelperReferenceRewriter<'a, '_> {
                 return;
             }
         };
-        *expression = AstBuilder::new(self.allocator)
-            .expression_identifier(member.span, self.allocator.alloc_str(replacement));
+        *expression = oxc_ast::ast::Expression::new_identifier(
+            member.span,
+            self.allocator.alloc_str(replacement),
+            &AstBuilder::new(self.allocator),
+        );
     }
 }
 
@@ -2504,7 +2512,6 @@ struct HelperImportRewriter<'a, 'r> {
 }
 
 impl<'a> VisitMut<'a> for HelperImportRewriter<'a, '_> {
-    #[expect(deprecated)]
     fn visit_expression(&mut self, expression: &mut Expression<'a>) {
         if let Expression::CallExpression(call) = expression
             && matches!(&call.callee, Expression::Identifier(id) if id.name == "require")
@@ -2523,8 +2530,11 @@ impl<'a> VisitMut<'a> for HelperImportRewriter<'a, '_> {
                 self.imports.push((path.value.to_string(), binding.clone()));
                 binding
             };
-            *expression = AstBuilder::new(self.allocator)
-                .expression_identifier(Span::default(), self.allocator.alloc_str(&binding));
+            *expression = oxc_ast::ast::Expression::new_identifier(
+                Span::default(),
+                self.allocator.alloc_str(&binding),
+                &AstBuilder::new(self.allocator),
+            );
             return;
         }
         walk_mut::walk_expression(self, expression);
@@ -2553,9 +2563,8 @@ fn protect_helper_globals<'a>(
     }
     let mut exports = String::new();
     for statement in &mut program.body {
-        if let Statement::ExportNamedDeclaration(export) = statement
-            && let Some(declaration) = &export.declaration
-        {
+        if let Statement::ExportDeclaration(export) = statement {
+            let declaration = &export.declaration;
             let mut bindings = Vec::new();
             oxc_ecmascript::BoundNames::bound_names(declaration, &mut |id| {
                 if let Some(symbol) = id.symbol_id.get() {
@@ -2567,7 +2576,10 @@ fn protect_helper_globals<'a>(
                     let local = renames.get(&id).map_or(name.as_str(), String::as_str);
                     let _ = write!(exports, "export {{{local} as {name}}};");
                 }
-                *statement = export.declaration.take().unwrap().into();
+                *statement = export
+                    .declaration
+                    .take_in(&AstBuilder::new(allocator))
+                    .into();
             }
         }
     }
@@ -2670,7 +2682,6 @@ impl<'a> VisitMut<'a> for SyntheticSpanZeroer {
 }
 
 impl<'a> VisitMut<'a> for MixedHelperReferenceRewriter<'a, '_> {
-    #[expect(deprecated)]
     fn visit_expression(&mut self, expression: &mut Expression<'a>) {
         let Expression::StaticMemberExpression(member) = expression else {
             walk_mut::walk_expression(self, expression);
@@ -2693,13 +2704,17 @@ impl<'a> VisitMut<'a> for MixedHelperReferenceRewriter<'a, '_> {
             return;
         };
         if let Some(binding) = replacement {
-            *expression = AstBuilder::new(self.allocator)
-                .expression_identifier(member.span, self.allocator.alloc_str(binding));
+            *expression = oxc_ast::ast::Expression::new_identifier(
+                member.span,
+                self.allocator.alloc_str(binding),
+                &AstBuilder::new(self.allocator),
+            );
         } else {
-            member.object = AstBuilder::new(self.allocator).expression_identifier(
+            member.object = oxc_ast::ast::Expression::new_identifier(
                 member.object.span(),
                 self.allocator
                     .alloc_str(self.fallback.expect("fallback binding exists")),
+                &AstBuilder::new(self.allocator),
             );
         }
     }

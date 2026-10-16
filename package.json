@@ -55,7 +55,7 @@
   },
   "dependencies": {
     "@babel/code-frame": "^7.20.0",
-    "@oxc-project/types": "0.141.0"
+    "@oxc-project/types": "0.154.0"
   },
   "devDependencies": {
     "@babel/core": "^7.29.7",
@@ -115,7 +115,7 @@
     "hermes-parser": "0.36.0",
     "lint-staged": "^17.1.1",
     "npm": "11.6.2",
-    "oxfmt": "^0.60.0",
+    "oxfmt": "^0.73.0",
     "prettier": "^3.9.6",
     "regenerate-unicode-properties": "10.2.2",
     "regexpu-core": "6.4.0",

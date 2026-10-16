@@ -172,7 +172,7 @@ test.each(['export var value = 1;', 'export namespace Inner { export let value =
 );
 
 test.each(['inline', 'runtime'] as const)(
-  'retains only the known escaped-name regexp parser boundary (%s)',
+  'lowers equivalent regexp names while rejecting invalid input (%s)',
   mode => {
     const source = String.raw`globalThis.result=/^(?<\uD835\uDC9C>a)\k<𝒜>$/u.test('aa');`;
     const pipeline = defineNativePipeline({
@@ -187,11 +187,14 @@ test.each(['inline', 'runtime'] as const)(
       ],
     });
     expect(new Function(source + 'return globalThis.result;')()).toBe(true);
-    expect(transform(source, 'input.js', pipeline)).toMatchObject({
-      status: 'bailout',
-      source,
-      reason: 'regexp:parse-error',
-    });
+    const result = transform(source, 'input.js', pipeline);
+    expect(result.status).toBe('complete');
+    if (result.status === 'complete') {
+      expect(result.code).not.toContain('(?<');
+      const context = { require: createRequire(import.meta.url), result: undefined };
+      runInNewContext(result.code, context);
+      expect(context.result).toBe(true);
+    }
     for (const bad of [
       String.raw`/(?<name>a)\k<missing>/u;`,
       source + ' let x; let x;',

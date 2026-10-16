@@ -1,6 +1,8 @@
 //! Rewrite an extracted body in one pass: hoisted vars, control flow, and arguments.
 use super::*;
+use oxc_allocator::GetAllocator;
 use oxc_ast::ast::{BindingPattern, ForStatement, ForStatementInit, ForStatementLeft, StaticBlock};
+use oxc_ast::builder::GetAstBuilder;
 
 /// Keep declarations initialized before every use in the same body scope.
 /// Restricting this to direct statements avoids data-flow analysis and walking
@@ -85,7 +87,6 @@ struct BodyRewriter<'a, 'p> {
     local_declarations: std::slice::Iter<'p, NodeId>,
 }
 
-#[expect(deprecated)]
 impl<'a> BodyRewriter<'a, '_> {
     fn record(&mut self, pattern: &BindingPattern<'a>) {
         pattern.all_binding_identifiers(&mut |identifier| {
@@ -97,28 +98,32 @@ impl<'a> BodyRewriter<'a, '_> {
     }
 
     fn initializers(&mut self, declaration: VariableDeclaration<'a>) -> Option<Expression<'a>> {
-        let mut expressions = self.ast.vec();
+        let mut expressions = oxc_allocator::Vec::new_in(self.ast.builder());
         let span = declaration.span;
         for declarator in declaration.declarations {
             self.record(&declarator.id);
             if let Some(init) = declarator.init {
-                expressions.push(self.ast.expression_assignment(
+                expressions.push(oxc_ast::ast::Expression::new_assignment_expression(
                     declarator.span,
                     AssignmentOperator::Assign,
-                    assignment_target(self.ast, declarator.id),
+                    assignment_target(AstBuilder::new(self.ast.allocator()), declarator.id),
                     init,
+                    self.ast.builder(),
                 ));
             }
         }
         match expressions.len() {
             0 => None,
             1 => expressions.pop(),
-            _ => Some(self.ast.expression_sequence(span, expressions)),
+            _ => Some(oxc_ast::ast::Expression::new_sequence_expression(
+                span,
+                expressions,
+                self.ast.builder(),
+            )),
         }
     }
 }
 
-#[expect(deprecated)]
 impl<'a> VisitMut<'a> for BodyRewriter<'a, '_> {
     fn visit_statement(&mut self, statement: &mut Statement<'a>) {
         if matches!(statement, Statement::VariableDeclaration(declaration) if declaration.kind == VariableDeclarationKind::Var)
@@ -137,8 +142,12 @@ impl<'a> VisitMut<'a> for BodyRewriter<'a, '_> {
             };
             let span = declaration.span;
             *statement = match self.initializers(declaration.unbox()) {
-                Some(expression) => self.ast.statement_expression(span, expression),
-                None => self.ast.statement_empty(span),
+                Some(expression) => oxc_ast::ast::Statement::new_expression_statement(
+                    span,
+                    expression,
+                    self.ast.builder(),
+                ),
+                None => oxc_ast::ast::Statement::new_empty_statement(span, self.ast.builder()),
             };
         }
         let span = statement.span();
@@ -146,15 +155,17 @@ impl<'a> VisitMut<'a> for BodyRewriter<'a, '_> {
         let completion = match statement {
             Statement::ReturnStatement(return_) if self.mutation.returns.contains(&key) => {
                 let value = return_.argument.take().unwrap_or_else(|| {
-                    self.ast.expression_unary(
+                    oxc_ast::ast::Expression::new_unary_expression(
                         span,
                         oxc_syntax::operator::UnaryOperator::Void,
-                        self.ast.expression_numeric_literal(
+                        oxc_ast::ast::Expression::new_numeric_literal(
                             span,
                             0.0,
                             None,
                             oxc_ast::ast::NumberBase::Decimal,
+                            self.ast.builder(),
                         ),
+                        self.ast.builder(),
                     )
                 });
                 Some(("return", Some(value)))
@@ -173,7 +184,7 @@ impl<'a> VisitMut<'a> for BodyRewriter<'a, '_> {
                 .exit_labels
                 .get(&key)
                 .map_or_else(|| kind.to_owned(), |label| format!("{kind}:{label}"));
-            *statement = self.ast.statement_return(
+            *statement = oxc_ast::ast::Statement::new_return_statement(
                 span,
                 Some(captured_loop_result(
                     &self.ast,
@@ -182,6 +193,7 @@ impl<'a> VisitMut<'a> for BodyRewriter<'a, '_> {
                     &tag,
                     value,
                 )),
+                self.ast.builder(),
             );
         }
         walk_mut::walk_statement(self, statement);
@@ -213,7 +225,10 @@ impl<'a> VisitMut<'a> for BodyRewriter<'a, '_> {
                 .pop()
                 .expect("iteration declaration");
             self.record(&declarator.id);
-            *left = ForStatementLeft::from(assignment_target(self.ast, declarator.id));
+            *left = ForStatementLeft::from(assignment_target(
+                AstBuilder::new(self.ast.allocator()),
+                declarator.id,
+            ));
         }
         walk_mut::walk_for_statement_left(self, left);
     }
@@ -227,7 +242,7 @@ impl<'a> VisitMut<'a> for BodyRewriter<'a, '_> {
             ArgumentsRewriter {
                 alias,
                 references: &self.mutation.arguments_references,
-                ast: self.ast,
+                ast: AstBuilder::new(self.ast.allocator()),
             }
             .visit_arrow_function_expression(expression);
         }
@@ -237,7 +252,7 @@ impl<'a> VisitMut<'a> for BodyRewriter<'a, '_> {
             ArgumentsRewriter {
                 alias,
                 references: &self.mutation.arguments_references,
-                ast: self.ast,
+                ast: AstBuilder::new(self.ast.allocator()),
             }
             .visit_identifier_reference(identifier);
         }
@@ -254,16 +269,15 @@ fn maybe_default<'a>(
             let pattern = pattern.unbox();
             AssignmentTargetMaybeDefault::new_assignment_target_with_default(
                 pattern.span,
-                assignment_target(ast, pattern.left),
+                assignment_target(AstBuilder::new(ast.allocator()), pattern.left),
                 pattern.right,
                 &ast,
             )
         }
-        pattern => assignment_target(ast, pattern).into(),
+        pattern => assignment_target(AstBuilder::new(ast.allocator()), pattern).into(),
     }
 }
 
-#[expect(deprecated)]
 fn assignment_target<'a>(ast: AstBuilder<'a>, pattern: BindingPattern<'a>) -> AssignmentTarget<'a> {
     match pattern {
         BindingPattern::BindingIdentifier(identifier) => {
@@ -275,25 +289,31 @@ fn assignment_target<'a>(ast: AstBuilder<'a>, pattern: BindingPattern<'a>) -> As
         }
         BindingPattern::ArrayPattern(pattern) => {
             let pattern = pattern.unbox();
-            let mut elements = ast.vec();
+            let mut elements = oxc_allocator::Vec::new_in(ast.builder());
             for element in pattern.elements {
-                elements.push(element.map(|pattern| maybe_default(ast, pattern)));
+                elements.push(
+                    element.map(|pattern| maybe_default(AstBuilder::new(ast.allocator()), pattern)),
+                );
             }
             let rest = pattern.rest.map(|rest| {
                 let rest = rest.unbox();
-                ast.alloc_assignment_target_rest(rest.span, assignment_target(ast, rest.argument))
+                oxc_ast::ast::AssignmentTargetRest::boxed(
+                    rest.span,
+                    assignment_target(AstBuilder::new(ast.allocator()), rest.argument),
+                    ast.builder(),
+                )
             });
             AssignmentTarget::new_array_assignment_target(pattern.span, elements, rest, &ast)
         }
         BindingPattern::ObjectPattern(pattern) => {
             let pattern = pattern.unbox();
-            let mut properties = ast.vec();
+            let mut properties = oxc_allocator::Vec::new_in(ast.builder());
             for property in pattern.properties {
                 properties.push(
                     AssignmentTargetProperty::new_assignment_target_property_property(
                         property.span,
                         property.key,
-                        maybe_default(ast, property.value),
+                        maybe_default(AstBuilder::new(ast.allocator()), property.value),
                         property.computed,
                         &ast,
                     ),
@@ -301,7 +321,11 @@ fn assignment_target<'a>(ast: AstBuilder<'a>, pattern: BindingPattern<'a>) -> As
             }
             let rest = pattern.rest.map(|rest| {
                 let rest = rest.unbox();
-                ast.alloc_assignment_target_rest(rest.span, assignment_target(ast, rest.argument))
+                oxc_ast::ast::AssignmentTargetRest::boxed(
+                    rest.span,
+                    assignment_target(AstBuilder::new(ast.allocator()), rest.argument),
+                    ast.builder(),
+                )
             });
             AssignmentTarget::new_object_assignment_target(pattern.span, properties, rest, &ast)
         }

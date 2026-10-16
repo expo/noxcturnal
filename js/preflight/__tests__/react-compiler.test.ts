@@ -175,3 +175,107 @@ test('refuses to compile parser-adapted source after its original syntax was str
   assert.equal(result.reason, 'react-compiler-original-source-required');
   assert.equal(result.source, source);
 });
+
+// A persistent cache exercises sequential calls in the normal test suite. The
+// assessment additionally checks these cases using the real React 19 renderer.
+function compiledComponent(
+  source: string,
+  panicThreshold: PreflightReactCompiler['panicThreshold'] = 'none',
+) {
+  const result = transform(
+    `${source}\nglobalThis.Component = Component;`,
+    'fixture.jsx',
+    defineNativePipeline({
+      phases: [
+        {
+          name: 'react-compiler',
+          native: {
+            reactCompiler: compiler({ panicThreshold, enableResetCacheOnSourceFileChanges: false }),
+            jsx: 'classic',
+          },
+        },
+      ],
+    }),
+  );
+  assert.equal(result.status, 'complete');
+  const context: { Component?: (props?: Record<string, unknown>) => any } = {};
+  let cache: unknown[] | undefined;
+  const runtime = {
+    c(size: number) {
+      return (cache ??= Array(size).fill(Symbol.for('react.memo_cache_sentinel')));
+    },
+  };
+  const Widget = () => 'widget';
+  new Function('globalThis', 'React', '_Widget', 'require', result.code)(
+    context,
+    {
+      createElement: (type: unknown, props: unknown, ...children: unknown[]) => ({
+        type,
+        props,
+        children,
+      }),
+    },
+    Widget,
+    (name: string) => {
+      assert.equal(name, 'react/compiler-runtime');
+      return runtime;
+    },
+  );
+  assert.ok(context.Component);
+  return { call: context.Component, code: result.code, Widget };
+}
+
+test('implicit arguments do not freeze JSX across prop updates', () => {
+  const component = compiledComponent(
+    `function Component(props) { return <div>{arguments[0].value}</div>; }`,
+  );
+  assert.deepEqual(component.call({ value: 1 }).children, [1]);
+  assert.deepEqual(component.call({ value: 2 }).children, [2]);
+});
+
+test('compiler constant propagation preserves JavaScript exponentiation edge cases', () => {
+  const component = compiledComponent(
+    `function Component() { 'use memo'; return [1 ** (0/0), 1 ** (1/0), (-1) ** (1/0), (0/0) ** 0]; }`,
+  );
+  const values = component.call();
+  assert.ok(values.slice(0, 3).every(Number.isNaN));
+  assert.equal(values[3], 1);
+});
+
+test('compiler retains unused reads whose throws are caught during render', () => {
+  const component = compiledComponent(
+    `function Component(props) { try { props.obj.value; return <div>ok</div>; } catch { return <div>caught</div>; } }`,
+  );
+  assert.deepEqual(component.call({ obj: null }).children, ['caught']);
+});
+
+test('tagged template mutations remain local to each render', () => {
+  const component = compiledComponent(
+    'function Component({initial}) { const object = {value:initial}; function tag() { object.value++; return 0; } tag`value`; return <div>{object.value}</div>; }',
+  );
+  assert.deepEqual(component.call({ initial: 0 }).children, [1]);
+  assert.deepEqual(component.call({ initial: 0 }).children, [1]);
+});
+
+test('underscore-prefixed JSX names remain component references', () => {
+  const component = compiledComponent('function Component() { return <_Widget/>; }');
+  assert.equal(component.call().type, component.Widget);
+});
+
+test('recursive named component expressions compile without an invariant failure', () => {
+  const component = compiledComponent(
+    'const Component = function Component({n}) { return n ? <Component n={n-1}/> : <div/>; };',
+    'all_errors',
+  );
+  assert.match(component.code, /_c\(/);
+  assert.equal(component.call({ n: 2 }).props.n, 1);
+});
+
+test('components with classic for loops lacking a test can be optimized', () => {
+  const component = compiledComponent(
+    'function Component({n}) { let value=0; for(let i=0;;i++) { if(i===n) break; value+=i; } return <div>{value}</div>; }',
+    'all_errors',
+  );
+  assert.match(component.code, /_c\(/);
+  assert.deepEqual(component.call({ n: 4 }).children, [6]);
+});

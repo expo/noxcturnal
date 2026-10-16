@@ -4,7 +4,7 @@
 use std::mem;
 
 use oxc_allocator::{ArenaBox, ArenaVec, ReplaceWith, TakeIn};
-use oxc_ast::{ast::*, builder::NONE};
+use oxc_ast::ast::*;
 use oxc_span::SPAN;
 use oxc_str::static_ident;
 use oxc_syntax::{reference::ReferenceId, symbol::SymbolId};
@@ -1219,8 +1219,9 @@ impl<'a> ClassProperties<'a> {
         if matches!(element, ChainElement::PrivateFieldExpression(_)) {
             // The PrivateFieldExpression must be transformed, so we can convert it to a normal expression here.
             let mut chain_expr = Self::convert_chain_expression_to_expression(expr, ctx);
+            let bind_context = matches!(ctx.ancestor(1), Ancestor::CallExpressionCallee(_));
             let result = self
-                .transform_private_field_expression_of_chain_expression(&mut chain_expr, ctx)
+                .transform_private_field_expression_of_chain_expression(&mut chain_expr, bind_context, ctx)
                 .expect("The ChainExpression must contain at least one optional expression, so it can never be `None` here.");
             Some((result, chain_expr))
         } else if let Some(result) = self.transform_chain_expression_element(element, ctx) {
@@ -1264,7 +1265,7 @@ impl<'a> ClassProperties<'a> {
     ) -> Option<Expression<'a>> {
         match expr {
             Expression::PrivateFieldExpression(_) => {
-                self.transform_private_field_expression_of_chain_expression(expr, ctx)
+                self.transform_private_field_expression_of_chain_expression(expr, false, ctx)
             }
             match_member_expression!(Expression) => self
                 .transform_member_expression_of_chain_expression(
@@ -1356,6 +1357,7 @@ impl<'a> ClassProperties<'a> {
     fn transform_private_field_expression_of_chain_expression(
         &mut self,
         expr: &mut Expression<'a>,
+        bind_context: bool,
         ctx: &mut TraverseCtx<'a>,
     ) -> Option<Expression<'a>> {
         let Expression::PrivateFieldExpression(field_expr) = expr else { unreachable!() };
@@ -1369,9 +1371,9 @@ impl<'a> ClassProperties<'a> {
             self.transform_first_optional_expression(object, ctx)
         };
 
-        if matches!(ctx.ancestor(1), Ancestor::CallExpressionCallee(_)) {
+        if bind_context {
             // `(Foo?.#m)();` -> `(Foo === null || Foo === void 0 ? void 0 : _m._.bind(Foo))();`
-            // ^^^^^^^^^^^^ is a call expression, we need to bind the proper context
+            // Only bind when the private field is the chain's result, not an intermediate object.
             *expr = self.transform_bindable_private_field(field_expr, ctx);
         } else {
             self.transform_private_field_expression(expr, ctx);
@@ -1830,7 +1832,7 @@ impl<'a> ClassProperties<'a> {
             ctx,
         );
         let arguments = ArenaVec::from_value_in(Argument::from(context), ctx);
-        Expression::new_call_expression(field_expr.span, callee, NONE, arguments, false, ctx)
+        Expression::new_call_expression(field_expr.span, callee, None, arguments, false, ctx)
     }
 
     /// Transform private field in assignment pattern.
@@ -1929,7 +1931,7 @@ impl<'a> ClassProperties<'a> {
         };
         let callee = create_member_callee(callee, static_ident!("has"), span, ctx);
         let argument = Argument::from(self.create_check_in_rhs(right, ctx));
-        Expression::new_call_expression(span, callee, NONE, [argument], false, ctx)
+        Expression::new_call_expression(span, callee, None, [argument], false, ctx)
     }
 
     /// Duplicate object to be used in get/set pair.
@@ -2215,7 +2217,7 @@ impl<'a> ClassProperties<'a> {
                 ArenaVec::from_array_in([Argument::from(object), Argument::from(value)], ctx);
             let callee = create_member_callee(prop_ident, static_ident!("call"), span, ctx);
             // `_prop.call(_assertClassBrand(Class, object), value)`
-            Expression::new_call_expression(span, callee, NONE, arguments, false, ctx)
+            Expression::new_call_expression(span, callee, None, arguments, false, ctx)
         } else {
             // `_privateFieldSet(_prop, object, value)`
             self.create_private_field_set(prop_ident, object, value, ctx)
