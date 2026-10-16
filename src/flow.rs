@@ -91,14 +91,19 @@ pub(crate) fn erase(
 
     let erasure = match hermes_flow::erase_source(source) {
         Ok(erasure) => erasure,
-        // Every bail but one says the caller's parser adapter should try
-        // instead. A rejection says nothing can compile this, so it is reported
-        // here — against the line it was written on, rather than as a parse
-        // failure two steps later over code the user never saw.
-        Err(bail) if bail.kind.has_fallback() => return Ok(NativeFlowErasure::bailed(&bail)),
+        // Coverage/parser gaps may use an adapter. Internal failures
+        // and invalid/reference-rejected constructs are fatal.
+        Err(bail) if bail.kind.has_fallback() => {
+            return Ok(NativeFlowErasure::bailed(&bail));
+        }
         Err(bail) => {
+            let status = if bail.kind == hermes_flow::BailKind::Rejected {
+                napi::Status::InvalidArg
+            } else {
+                napi::Status::GenericFailure
+            };
             return Err(napi::Error::new(
-                napi::Status::InvalidArg,
+                status,
                 format!("{filename}: {}", bail.detail),
             ));
         }

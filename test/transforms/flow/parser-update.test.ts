@@ -1,7 +1,7 @@
 import { originalPositionFor, TraceMap } from '@jridgewell/trace-mapping';
 import { expect, test } from 'vitest';
 
-import { defineNativePipeline, transform } from '../../../js';
+import { defineNativePipeline, transform, TransformSyntaxError } from '../../../js';
 import { native } from '../../../js/native/binding';
 import cases from '../../fixtures/flow-parser-update/cases.json';
 
@@ -18,8 +18,8 @@ test.each(cases)('native public path: $id', row => {
     expect(erased.status).toBe('bailed');
   }
   const run = () => transform(source, 'input.js', pipeline);
-  if (row.public === 'flow-erasure-unsupported-syntax') {
-    expect(run()).toMatchObject({ status: 'bailout', reason: row.public, source });
+  if (row.public === 'syntax-error') {
+    expect(run).toThrow(TransformSyntaxError);
   } else {
     const result = run();
     expect(result.status).toBe(row.outcome === 'erased' ? 'complete' : 'bailout');

@@ -138,7 +138,7 @@ for (const reference of references) {
     cases.filter(
       row =>
         row.outcome === 'erased' &&
-        row.public !== 'flow-erasure-unsupported-syntax' &&
+        row.public !== 'syntax-error' &&
         (reference.exact || row.pinnedAccepted),
     ),
   )(`${reference.name} aligns $id`, row => {

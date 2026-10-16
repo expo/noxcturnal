@@ -139,7 +139,15 @@ fn erases_function_type_syntax() {
     );
     assert_eq!(
         erased("function f(x: mixed): boolean %checks { return true; }\n"),
-        "function f(x)  { return true; }\n"
+        "function f(x) { return true; }\n"
+    );
+    assert_eq!(
+        erased("const f = (x): /* colon : */ %checks => !!x;"),
+        "const f = (x) => !!x;"
+    );
+    assert_eq!(
+        erased("const f = (): // comment\r\u{a0}%checks => true;"),
+        "const f = () => true;"
     );
 }
 

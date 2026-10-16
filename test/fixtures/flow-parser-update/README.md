@@ -38,7 +38,8 @@ The assertion names for **every** row `id` are:
   messages include `id`); direct output text, or the specific bailout kind.
 - Public: `test/transforms/flow/parser-update.test.ts::native public path: id`;
   no parser adapter is registered. It checks direct native output, successful
-  downstream Oxc/public compilation, or a pristine-input controlled boundary.
+  downstream Oxc/public compilation, parser compatibility fallback, or a downstream
+  syntax error.
 - Canonical: `test/alignment/flow/parser-update.test.ts::hermes-parser 0.36.0
 parses id` and `Hermes 17b373... parses id`. Supported rows run `aligns id`
   through `alignHermesFlowTransform` against each reference that accepts them.
@@ -65,7 +66,7 @@ and downstream Oxc acceptance.
 | [Reserved-word variance lookahead][reserved-commit]                                                                            | Same readonly fixture, optional `default` also in [TypeAnnotations-test.js][annotations-js]; `*-reserved-*`, `readonly-default-optional`                                                                        | Supported; contextual names remain names                                                                                                     |
 | [Writeonly variance][writeonly-commit]                                                                                         | [writeonly-variance.js][writeonly-test], [writeonly-variance-error.js][writeonly-error]; `writeonly-*`                                                                                                          | Supported erasure; method variance rejected                                                                                                  |
 | [`in` names][in-name-commit], [`in` variance][in-commit], [`out` variance][out-commit], [extra upstream cases][variance-extra] | [in-type-param-name.js][in-name-test], [in-type-param-name-error.js][in-name-error], [in-variance.js][in-test], [out-variance.js][out-test]; `in-*`, `out-*`, `mixed-variance-function`, `invalid-type-param-*` | Supported erasure and ambiguity handling; invalid names rejected                                                                             |
-| [Resource-loop declarators][using-commit]                                                                                      | [for-using.js][using-test], [for-using-declarator.js][using-declarator]; `using-*`, `await-using-*`                                                                                                             | Correct AST wrapper; `for…in` remains an Oxc compatibility boundary; `for…of` works                                                          |
+| [Resource-loop declarators][using-commit]                                                                                      | [for-using.js][using-test], [for-using-declarator.js][using-declarator]; `using-*`, `await-using-*`                                                                                                             | Correct AST wrapper; `for…in` is invalid and throws downstream; `for…of` works                                                               |
 | [Async component await][async-commit]                                                                                          | [async-component.js][async-test], [ComponentDeclaration-test.js][component-js]; `async-component-*`, `sync-component-await-invalid`                                                                             | Parser fix and native async lowering verified, including await and ref wrappers                                                              |
 | [Bad binding return][match-binding-commit]                                                                                     | [pattern-binding-error.js][match-binding-test]; `match-binding-invalid`                                                                                                                                         | Controlled ParseFailed                                                                                                                       |
 | [Bad object pattern return][match-object-commit]                                                                               | [pattern-object-binding-error.js][match-object-binding-test], [pattern-object-value-error.js][match-object-value-test]; corresponding `match-object-*-invalid`                                                  | Controlled ParseFailed                                                                                                                       |
@@ -292,9 +293,10 @@ Reference differences are explicit:
   unlowered Hermes structural comparisons remain the oracle for these loops.
 
 The 17 invalid matrix cases remain classified as invalid. Hermes rejects 15 at
-parse time. `using-in` reaches Oxc's controlled
-`flow-erasure-unsupported-syntax` bailout with pristine input. Invalid duplicate
-regexp flags remain raw pattern text until a regexp engine validates them.
+parse time; public parser failures retain adapter fallback because the same
+failure category also includes valid grammar that Hermes does not support.
+`using-in` passes through erasure but Oxc rejects it with a syntax error too.
+Invalid duplicate regexp flags remain raw pattern text until a regexp engine validates them.
 Existing match forms rejected by Hermes' own transforms remain explicit errors,
 not adapter compatibility bailouts; no new semantics are invented for them.
 
@@ -303,6 +305,18 @@ output assertions for the same inputs. Their replacement tests preserve the
 input/options/public path, adding structural/runtime/map evidence. The adapter
 selection test now asserts native record success ahead of automatic selection;
 a controlled native-bailout fixture retains coverage of actual adapter fallback.
+
+The bailout audit retains adapter fallback for Hermes parser gaps, including
+source/deferred imports, export attributes, decorators before `export`, and a
+default import named `type`. There is no speculative Oxc validation or recovery
+scanner: Flow generic calls can also parse as JavaScript comparisons. A regression
+checks the pristine boundary, adapter selection, and executed call result.
+Malformed buffers and impossible AST shapes throw. Inferred `%checks` annotations
+erase their colon and internal trivia using JavaScript whitespace and line
+terminators, including CR and Unicode. Oxc errors after successful erasure
+propagate as syntax errors instead of being converted into a compatibility bail.
+Predicate parameter bounds come from the existing parameter walk, with no
+separate recursive probe through defaults or nested functions.
 
 ## Reproduction and validation
 
@@ -363,9 +377,9 @@ validation remain step 5 work.
 
 Native-support follow-up validation passed 53 parser-enabled crate tests,
 parser-enabled Clippy across all targets, 82/82 baseline/candidate comparisons,
-and 552 focused public/alignment/compliance/adapter tests with the exact reference
+and 578 focused public/alignment/compliance/adapter tests with the exact reference
 enabled. `HERMES_SOURCE_DIR` was unset for candidate validation.
-`pnpm format` and the complete `pnpm check` passed: 10,784 JavaScript tests and
+`pnpm format` and the complete `pnpm check` passed: 10,810 JavaScript tests and
 141 root Rust tests, together with type, generation, lint, and package checks.
 
 [readonly-commit]: https://github.com/facebook/hermes/commit/d235b337de9ae1ce0638625d6f8f0e42cfbcb506

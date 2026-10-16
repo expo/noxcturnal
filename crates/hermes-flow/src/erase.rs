@@ -84,8 +84,8 @@ impl Erasure {
     }
 }
 
-/// A file the rules decline to handle. The caller falls back to its own parser
-/// adapter; none of these is an error a user should see.
+/// An erasure failure. Compatibility gaps can use a parser adapter; rejected
+/// syntax and internal failures must propagate as errors.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Bail {
     pub kind: BailKind,
@@ -454,7 +454,7 @@ impl<'a> Walk<'a> {
             .map_err(|_| Bail::new(BailKind::Malformed, "source is not UTF-8"))
     }
 
-    /// Refuses the file over a construct nothing can compile.
+    /// Refuses invalid syntax or a construct without supported semantics.
     ///
     /// The message is the one `TransformMatchSyntax` throws where it has one,
     /// so a search for it finds the same answers, and it carries a position in
@@ -681,7 +681,46 @@ impl<'a> Walk<'a> {
                 | kind::FUNCTION_EXPRESSION
                 | kind::ARROW_FUNCTION_EXPRESSION,
                 "params",
-            ) => self.function_params(cursor)?,
+            ) => {
+                let index = NODE_KINDS[node.kind as usize]
+                    .fields
+                    .iter()
+                    .position(|field| field.name == "params")
+                    .unwrap();
+                seen.fields[index] = self.function_params(cursor)?;
+            }
+            (_, "predicate") => {
+                if let Some(span) = self.erase_field(FieldType::Node, cursor)? {
+                    if let Some(return_type) = self.field_span(node, seen, "returnType") {
+                        self.erase_span(return_type.start..span.end);
+                        return Ok(());
+                    }
+                    // Inferred predicates have no return-type annotation to
+                    // own the colon before `%checks`. Skip header trivia from
+                    // the last parameter, so colons inside comments stay put.
+                    let mut at = ["params", "id", "typeParameters"]
+                        .iter()
+                        .filter_map(|name| self.field_span(node, seen, name).map(|span| span.end))
+                        .max()
+                        .unwrap_or(node.start) as usize;
+                    let mut colon = None;
+                    while at < span.start as usize {
+                        at = self.skip_trivia(at);
+                        if self.source.get(at) == Some(&b':')
+                            && self.skip_trivia(at + 1) == span.start as usize
+                        {
+                            colon = Some(at as u32);
+                            break;
+                        }
+                        at += 1;
+                    }
+                    let colon = colon
+                        .ok_or_else(|| Bail::new(BailKind::Malformed, "missing predicate colon"))?;
+                    // Include trivia inside the annotation. Leaving a line
+                    // comment/newline here would separate arrow params from =>.
+                    self.erase_span(colon..span.end);
+                }
+            }
             (kind::EXPORT_NAMED_DECLARATION, "declaration") => {
                 // `export type Foo = ...` reaches here as an export wrapping a
                 // `TypeAlias`. Erasing only the alias would leave `export`
@@ -851,7 +890,10 @@ impl<'a> Walk<'a> {
                     // defaults to 18 and nothing here sets otherwise.
                     if is_ref {
                         if ref_binding.is_some() {
-                            return Err(bail("more than one ref parameter"));
+                            return Err(self.reject(
+                                name.start,
+                                "Component declarations cannot have more than one 'ref' parameter.",
+                            ));
                         }
                         ref_binding = Some(match param.default {
                             Some(default) => format!("{} = {default}", param.local),
@@ -1823,10 +1865,16 @@ impl<'a> Walk<'a> {
     /// is no `thisParam` field. Erasing only its annotation would leave a real
     /// parameter named `this` behind, so the whole parameter goes, comma
     /// included.
-    fn function_params(&mut self, cursor: &mut Cursor<'a>) -> Result<(), Bail> {
+    /// Returns the original parameter span during the same traversal, including
+    /// erased `this` parameters, for locating inferred predicate annotations.
+    fn function_params(&mut self, cursor: &mut Cursor<'a>) -> Result<Option<Range<u32>>, Bail> {
         let count = cursor.list_len()?;
+        let mut span: Option<Range<u32>> = None;
         for index in 0..count {
             let header = cursor.peek_node()?;
+            if let Some(node) = header {
+                span = Some(span.map_or(node.start, |span| span.start)..node.end);
+            }
             let is_this_param = index == 0
                 && header.is_some_and(|node| node.kind == kind::IDENTIFIER)
                 && self.parameter_is_this(cursor)?;
@@ -1838,7 +1886,7 @@ impl<'a> Walk<'a> {
             cursor.skip_node()?;
             self.erase_span(self.list_element_span(node.start..node.end));
         }
-        Ok(())
+        Ok(span)
     }
 
     /// Reads the name of the `Identifier` the cursor is parked on, without
@@ -1888,12 +1936,33 @@ impl<'a> Walk<'a> {
     /// and leave a dangling one behind.
     fn skip_trivia(&self, mut at: usize) -> usize {
         loop {
-            while self.source.get(at).is_some_and(u8::is_ascii_whitespace) {
-                at += 1;
+            loop {
+                let width = match self.source.get(at) {
+                    Some(b'\t' | 0x0b | 0x0c | b' ' | b'\r' | b'\n') => 1,
+                    Some(0xc2) if self.source.get(at + 1) == Some(&0xa0) => 2,
+                    Some(0xe1 | 0xe2 | 0xe3 | 0xef) => match self.source.get(at..at + 3) {
+                        Some(
+                            [0xe1, 0x9a, 0x80]
+                            | [0xe2, 0x80, 0x80..=0x8a | 0xa8 | 0xa9 | 0xaf]
+                            | [0xe2, 0x81, 0x9f]
+                            | [0xe3, 0x80, 0x80]
+                            | [0xef, 0xbb, 0xbf],
+                        ) => 3,
+                        _ => 0,
+                    },
+                    _ => 0,
+                };
+                if width == 0 {
+                    break;
+                }
+                at += width;
             }
             match self.source.get(at..at + 2) {
                 Some(b"//") => {
-                    while self.source.get(at).is_some_and(|byte| *byte != b'\n') {
+                    while at < self.source.len()
+                        && !matches!(self.source[at], b'\r' | b'\n')
+                        && !matches!(self.source.get(at..at + 3), Some([0xe2, 0x80, 0xa8 | 0xa9]))
+                    {
                         at += 1;
                     }
                 }

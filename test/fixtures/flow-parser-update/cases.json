@@ -626,7 +626,7 @@
     "output": "for (using x in y);",
     "provenance": "using",
     "outcome": "erased",
-    "public": "flow-erasure-unsupported-syntax",
+    "public": "syntax-error",
     "classification": "invalid syntax",
     "pinnedAccepted": true
   },

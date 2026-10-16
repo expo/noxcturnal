@@ -41,8 +41,8 @@ pub use rules::BailKind;
 
 /// Parses `source` with the linked Hermes and erases its Flow syntax.
 ///
-/// `Err` covers both a parse failure and a bail; either way the caller should
-/// fall back to its own parser adapter.
+/// `Err` distinguishes coverage/parser gaps from fatal failures through
+/// [`BailKind::has_fallback`]. Parse failures may reflect parser coverage gaps.
 #[cfg(feature = "parser")]
 pub fn erase_source(source: &str) -> Result<Erasure, Bail> {
     let parse = hermes_parser_sys::Parse::new(source).map_err(|error| Bail {

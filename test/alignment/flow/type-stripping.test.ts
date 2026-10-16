@@ -53,6 +53,22 @@ export function View(props: Props) { return <Widget value={props.value} />; }`,
 });
 
 test.each([
+  'var f = (x): %checks => typeof x === "string";',
+  'function f(x: mixed): /* colon : */ %checks { return !!x; }',
+  'var f = function(): %checks { return true; };',
+  'var f = (): // colon :\n%checks => true;',
+  'var f = (x): boolean // colon :\n%checks => !!x;',
+  'var f = (): // colon :\r%checks => true;',
+  'var f = (): // colon :\u2028%checks => true;',
+  'var f = (): // colon :\u2029%checks => true;',
+  'var f = (): \u00a0%checks => true;',
+  'var f = (): \u1680\u2000\u200a\u202f\u205f\u3000\ufeff%checks => true;',
+  'function f(this: Receiver, value: number = ((x: number): number => x)(1)): %checks { return !!value; }',
+])('erases inferred predicates against Hermes: %s', body => {
+  alignHermesFlowTransform(`// @flow\n${body}`);
+});
+
+test.each([
   [
     'opaque and exported types',
     `opaque type ID = string; export type Value = number; const value: Value = 1;`,

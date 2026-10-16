@@ -289,7 +289,7 @@ interface NativeBinding {
     rootEnd?: number,
   ): Buffer;
   /**
-   * Throws for a construct no implementation compiles — a `var` binding in a
+   * Throws for internal failures and invalid constructs — a `var` binding in a
    * match pattern, say. `bailed` is for everything the erasure merely does not
    * cover, where the parser adapter is expected to take over; a throw means it
    * would fail too, so the message is the answer.
