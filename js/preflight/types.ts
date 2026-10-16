@@ -35,6 +35,8 @@ export interface PreflightReactRefresh {
 
 /** Focused Metro-compatible post-processing. Each operation is independently selectable. */
 export interface PreflightOptimize {
+  /** Top-level bindings are private to a module wrapper. Affects DCE only, not parsing. */
+  moduleContext?: boolean | undefined;
   constantFolding?: boolean | undefined;
   deadCodeElimination?: boolean | undefined;
 }

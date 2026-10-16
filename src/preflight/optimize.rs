@@ -23,6 +23,7 @@ pub(super) fn run<'a>(
     program: &mut Program<'a>,
     constant_folding: bool,
     dead_code_elimination: bool,
+    module_context: bool,
     checked_scoping: Option<Scoping>,
 ) {
     debug_assert!(
@@ -38,7 +39,7 @@ pub(super) fn run<'a>(
         .visit_program(program);
     }
     if dead_code_elimination {
-        eliminate_dead_functions(program, checked_scoping);
+        eliminate_dead_functions(program, module_context, checked_scoping);
     }
 }
 
@@ -266,7 +267,11 @@ fn expression_has_failed_operand(
     }
 }
 
-fn eliminate_dead_functions(program: &mut Program<'_>, checked_scoping: Option<Scoping>) {
+fn eliminate_dead_functions(
+    program: &mut Program<'_>,
+    module_context: bool,
+    checked_scoping: Option<Scoping>,
+) {
     // Metro's Babel pass repeatedly removes unreferenced function bindings and
     // recrawls scope until reaching a fixed point. Rebuilding the complete
     // semantic graph on every layer makes a dead chain quadratic. Compute the
@@ -289,7 +294,9 @@ fn eliminate_dead_functions(program: &mut Program<'_>, checked_scoping: Option<S
     // a different binding.
     let mut collector = DeadFunctionCandidateCollector {
         scoping: &scoping,
-        script: program.source_type.is_script(),
+        // Bundlers may wrap this script after optimization. Its bindings are
+        // then private even though the parser correctly uses script semantics.
+        script: program.source_type.is_script() && !module_context,
         candidates: FxHashSet::default(),
         roots: FxHashSet::default(),
         with_depth: 0,

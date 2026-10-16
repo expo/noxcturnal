@@ -5,6 +5,7 @@ import type { PreflightPlan } from '../preflight/types';
 
 interface NativePreflightOptionsInput {
   sourceFilename?: string;
+  optimizationModuleContext?: boolean;
   reactCompiler?: boolean;
   reactCompilerCompilationMode?: string;
   reactCompilerPanicThreshold?: string;
@@ -367,6 +368,7 @@ export function nativePreflightOptions(plan: PreflightPlan): NativePreflightOpti
   const nullishCoalescingOperator = plan.transforms?.nullishCoalescingOperator || undefined;
   const objectRestSpread = plan.transforms?.objectRestSpread || undefined;
   const options: NativePreflightOptionsInput = {
+    optimizationModuleContext: plan.optimize?.moduleContext,
     reactCompiler: plan.reactCompiler != null,
     reactCompilerCompilationMode: plan.reactCompiler?.compilationMode,
     reactCompilerPanicThreshold: plan.reactCompiler?.panicThreshold,
