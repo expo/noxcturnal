@@ -55,7 +55,7 @@
   },
   "dependencies": {
     "@babel/code-frame": "^7.20.0",
-    "@oxc-project/types": "0.141.0"
+    "@oxc-project/types": "0.154.0"
   },
   "devDependencies": {
     "@babel/core": "^7.29.7",

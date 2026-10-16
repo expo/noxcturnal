@@ -936,7 +936,7 @@ export const CHILD_ROLES: Readonly<
       id: 91,
       cardinality: 'optional',
       native: { edges: [{ field: 'body', shape: 'optional' }], projection: null },
-      types: ['TSModuleBlock'],
+      types: ['TSModuleBlock', 'TSModuleDeclaration'],
       list: false,
     },
   },
@@ -1043,7 +1043,10 @@ export const CHILD_ROLES: Readonly<
     superClass: {
       id: 27,
       cardinality: 'optional',
-      native: { edges: [{ field: 'super_class', shape: 'optional' }], projection: null },
+      native: {
+        edges: [{ field: 'heritage', shape: 'optional', nodeField: 'expression' }],
+        projection: null,
+      },
       types: [
         'Identifier',
         'ThisExpression',
@@ -5289,7 +5292,10 @@ export interface NativeChildRoles {
     };
   };
   TSModuleDeclaration: {
-    readonly body: { readonly child: 'TSModuleBlock'; readonly list: false };
+    readonly body: {
+      readonly child: 'TSModuleBlock' | 'TSModuleDeclaration';
+      readonly list: false;
+    };
   };
   Function: {
     readonly body: {

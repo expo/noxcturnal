@@ -11,9 +11,9 @@
 
 [package]
 edition = "2024"
-rust-version = "1.95.0"
+rust-version = "1.97.0"
 name = "oxc_transformer"
-version = "0.141.0"
+version = "0.154.0"
 authors = ["Boshen <boshenc@gmail.com>", "Oxc contributors"]
 build = false
 include = ["/examples", "/src"]
@@ -31,9 +31,6 @@ categories = ["compilers", "development-tools", "web-programming"]
 license = "MIT"
 repository = "https://github.com/oxc-project/oxc"
 
-[features]
-react_compiler = ["dep:oxc_react_compiler"]
-
 [lib]
 name = "oxc_transformer"
 path = "src/lib.rs"
@@ -45,7 +42,7 @@ name = "transformer"
 path = "examples/transformer.rs"
 
 [dependencies.base64]
-version = "0.22.1"
+version = "0.23.0"
 
 [dependencies.compact_str]
 version = "0.10.0"
@@ -63,49 +60,45 @@ version = "1.0.18"
 version = "2.8.2"
 
 [dependencies.oxc_allocator]
-version = "0.141.0"
+version = "0.154.0"
 
 [dependencies.oxc_ast]
-version = "0.141.0"
+version = "0.154.0"
 
 [dependencies.oxc_ast_visit]
-version = "0.141.0"
+version = "0.154.0"
 
 [dependencies.oxc_compat]
-version = "0.141.0"
+version = "0.154.0"
 
 [dependencies.oxc_data_structures]
-version = "0.141.0"
+version = "0.154.0"
 features = ["assert_unchecked", "inline_string", "rope", "slice_iter", "stack"]
 
 [dependencies.oxc_diagnostics]
-version = "0.141.0"
+version = "0.154.0"
 
 [dependencies.oxc_ecmascript]
-version = "0.141.0"
-
-[dependencies.oxc_react_compiler]
-version = "0.141.0"
-optional = true
+version = "0.154.0"
 
 [dependencies.oxc_regular_expression]
-version = "0.141.0"
+version = "0.154.0"
 
 [dependencies.oxc_semantic]
-version = "0.141.0"
+version = "0.154.0"
 
 [dependencies.oxc_span]
-version = "0.141.0"
+version = "0.154.0"
 
 [dependencies.oxc_str]
-version = "0.141.0"
+version = "0.154.0"
 
 [dependencies.oxc_syntax]
-version = "0.141.0"
+version = "0.154.0"
 features = ["to_js_string"]
 
 [dependencies.oxc_traverse]
-version = "0.141.0"
+version = "0.154.0"
 
 [dependencies.rustc-hash]
 version = "2"
@@ -120,17 +113,13 @@ version = "1"
 [dev-dependencies.insta]
 version = "1.48.0"
 
-[dev-dependencies.oxc_ast]
-version = "0.141.0"
-features = ["disable_old_builder"]
-
 [dev-dependencies.oxc_codegen]
-version = "0.141.0"
+version = "0.154.0"
 features = ["sourcemap"]
 default-features = false
 
 [dev-dependencies.oxc_parser]
-version = "0.141.0"
+version = "0.154.0"
 features = ["regular_expression"]
 
 [dev-dependencies.pico-args]
@@ -223,7 +212,7 @@ priority = -1
 absolute_paths_not_starting_with_crate = "warn"
 non_ascii_idents = "warn"
 tail_expr_drop_order = "warn"
-unit-bindings = "warn"
+unit_bindings = "warn"
 unsafe_op_in_unsafe_fn = "warn"
 unused_unsafe = "warn"
 
@@ -231,3 +220,10 @@ unused_unsafe = "warn"
 level = "warn"
 priority = 0
 check-cfg = ["cfg(coverage)", "cfg(coverage_nightly)"]
+
+[features]
+react_compiler = ["dep:oxc_react_compiler"]
+
+[dependencies.oxc_react_compiler]
+version = "=0.143.0"
+optional = true

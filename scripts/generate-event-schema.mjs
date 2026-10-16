@@ -293,7 +293,7 @@ const childRoleNativeEntries = concreteChildRoleEntries.map(entry => {
       );
     if (!['single', 'optional', 'list', 'optionalList', 'listOptionalItems'].includes(shape))
       throw new Error(`child role ${key} has invalid native shape ${JSON.stringify(shape)}`);
-    return { field: edge.field, shape };
+    return { field: edge.field, shape, nodeField: edge.nodeField ?? override.nodeField };
   });
   return {
     ...entry,
@@ -406,60 +406,68 @@ const rustIntegerPattern = values => {
 const rustChildRoleForEdge = `pub(crate) fn child_role_id_for_edge(parent: oxc_ast::AstKind<'_>, child: oxc_ast::AstKind<'_>) -> Option<u32> {\n    let child_id = child.node_id();\n    match parent {\n${Object.entries(
   Object.groupBy(childRoleNativeEntries, entry => entry.parentType),
 )
-  .map(([parentType, entries]) => {
-    const variant = Object.entries(schema.astKinds).find(
-      ([, publicType]) => publicType === parentType,
-    )?.[0];
-    if (variant == null) throw new Error(`child role parent ${parentType} has no AstKind variant`);
-    const edgeEntries = entries.flatMap(entry => entry.edges.map(edge => ({ entry, edge })));
-    const listEntries = edgeEntries.filter(({ edge }) =>
-      ['list', 'optionalList', 'listOptionalItems'].includes(edge.shape),
-    );
-    for (let index = 0; index < listEntries.length; index++) {
-      const left = listEntries[index].entry;
-      const leftTypes = new Set(left.declaration.routes.flatMap(expansionOf));
-      for (const { entry: right } of listEntries.slice(index + 1)) {
-        const overlap = right.declaration.routes
-          .flatMap(expansionOf)
-          .filter(type => leftTypes.has(type));
-        if (overlap.length > 0)
-          throw new Error(
-            `child roles ${parentType}.${left.role} and ${parentType}.${right.role} have ambiguous native list child types: ${overlap.join(', ')}`,
-          );
+  .flatMap(([parentType, entries]) => {
+    const variants = Object.entries(schema.astKinds)
+      .filter(([, publicType]) => publicType === parentType)
+      .map(([variant]) => variant);
+    if (variants.length === 0)
+      throw new Error(`child role parent ${parentType} has no AstKind variant`);
+    return variants.map(variant => {
+      const edgeEntries = entries.flatMap(entry => {
+        const variantOverride =
+          schema.childRoleNative?.[`${parentType}.${entry.role}`]?.variants?.[variant];
+        if (variantOverride === false) return [];
+        return (variantOverride?.edges ?? entry.edges).map(edge => ({ entry, edge }));
+      });
+      const listEntries = edgeEntries.filter(({ edge }) =>
+        ['list', 'optionalList', 'listOptionalItems'].includes(edge.shape),
+      );
+      for (let index = 0; index < listEntries.length; index++) {
+        const left = listEntries[index].entry;
+        const leftTypes = new Set(left.declaration.routes.flatMap(expansionOf));
+        for (const { entry: right } of listEntries.slice(index + 1)) {
+          const overlap = right.declaration.routes
+            .flatMap(expansionOf)
+            .filter(type => leftTypes.has(type));
+          if (overlap.length > 0)
+            throw new Error(
+              `child roles ${parentType}.${left.role} and ${parentType}.${right.role} have ambiguous native list child types: ${overlap.join(', ')}`,
+            );
+        }
       }
-    }
-    const checks = edgeEntries
-      // Exact scalar fields must win when their public types overlap a list role,
-      // such as CallExpression.callee and CallExpression.arguments.
-      .sort(
-        (left, right) =>
-          Number(['list', 'optionalList', 'listOptionalItems'].includes(left.edge.shape)) -
-          Number(['list', 'optionalList', 'listOptionalItems'].includes(right.edge.shape)),
+      const checks = edgeEntries
+        // Exact scalar fields must win when their public types overlap a list role,
+        // such as CallExpression.callee and CallExpression.arguments.
+        .sort(
+          (left, right) =>
+            Number(['list', 'optionalList', 'listOptionalItems'].includes(left.edge.shape)) -
+            Number(['list', 'optionalList', 'listOptionalItems'].includes(right.edge.shape)),
+        )
+        .map(({ entry, edge }) => {
+          const access = `parent.${edge.field}`;
+          const listTypeIds = [
+            ...new Set(
+              entry.declaration.routes
+                .flatMap(expansionOf)
+                .map(type => schema.nodeTypes.indexOf(type) + 1)
+                .filter(id => id > 0),
+            ),
+          ];
+          const matches = ['list', 'optionalList', 'listOptionalItems'].includes(edge.shape)
+            ? `matches!(ast_kind_protocol_id(child), ${rustIntegerPattern(listTypeIds)})`
+            : edge.shape === 'optional'
+              ? `${access}.as_ref().is_some_and(|edge| edge${edge.nodeField ? `.${edge.nodeField}` : ''}.node_id() == child_id)`
+              : `${access}.node_id() == child_id`;
+          return `            if ${matches} { return Some(${entry.id}); }`;
+        })
+        .join('\n');
+      const parentBinding = edgeEntries.some(({ edge }) =>
+        ['single', 'optional'].includes(edge.shape),
       )
-      .map(({ entry, edge }) => {
-        const access = `parent.${edge.field}`;
-        const listTypeIds = [
-          ...new Set(
-            entry.declaration.routes
-              .flatMap(expansionOf)
-              .map(type => schema.nodeTypes.indexOf(type) + 1)
-              .filter(id => id > 0),
-          ),
-        ];
-        const matches = ['list', 'optionalList', 'listOptionalItems'].includes(edge.shape)
-          ? `matches!(ast_kind_protocol_id(child), ${rustIntegerPattern(listTypeIds)})`
-          : edge.shape === 'optional'
-            ? `${access}.as_ref().is_some_and(|edge| edge.node_id() == child_id)`
-            : `${access}.node_id() == child_id`;
-        return `            if ${matches} { return Some(${entry.id}); }`;
-      })
-      .join('\n');
-    const parentBinding = edgeEntries.some(({ edge }) =>
-      ['single', 'optional'].includes(edge.shape),
-    )
-      ? 'parent'
-      : '_parent';
-    return `        oxc_ast::AstKind::${variant}(${parentBinding}) => {\n${checks}\n            None\n        }`;
+        ? 'parent'
+        : '_parent';
+      return `        oxc_ast::AstKind::${variant}(${parentBinding}) => {\n${checks}\n            None\n        }`;
+    });
   })
   .join('\n')}\n        _ => None,\n    }\n}\n`;
 

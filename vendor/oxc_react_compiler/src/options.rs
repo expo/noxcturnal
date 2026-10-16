@@ -138,9 +138,8 @@ pub struct PluginOptions {
     pub output_mode: Option<CompilerOutputMode>,
 
     /// ESLint rule names whose `eslint-disable` comments make the compiler skip the
-    /// function they cover, so it doesn't optimize code the author has already
-    /// flagged. `None` uses the defaults (`react-hooks/exhaustive-deps` and
-    /// `react-hooks/rules-of-hooks`).
+    /// function they cover. `None` uses the defaults (`react-hooks/exhaustive-deps`
+    /// and `react-hooks/rules-of-hooks`); an empty list disables this behavior.
     pub eslint_suppression_rules: Option<Vec<String>>,
 
     /// Whether Flow suppression comments (e.g. `$FlowFixMe`) likewise make the

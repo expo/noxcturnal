@@ -1,7 +1,7 @@
 use rustc_hash::FxHashSet;
 
 use oxc_allocator::{ArenaVec, ReplaceWith, TakeIn};
-use oxc_ast::{ast::*, builder::NONE};
+use oxc_ast::ast::*;
 use oxc_ast_visit::{VisitMut, walk_mut};
 use oxc_semantic::{ScopeFlags, ScopeId};
 use oxc_span::SPAN;
@@ -228,7 +228,7 @@ impl<'a> TypeScript<'a> {
             );
             let ctor = create_class_constructor(
                 property_assignments,
-                class.super_class.is_some(),
+                class.heritage.is_some(),
                 scope_id,
                 ctx,
             );
@@ -355,7 +355,7 @@ impl<'a> TypeScript<'a> {
             PropertyDefinitionType::PropertyDefinition,
             [],
             key,
-            NONE,
+            None,
             None,
             false,
             false,
@@ -525,20 +525,20 @@ impl<'a> TypeScript<'a> {
             constructor_scope,
             ScopeFlags::Function | ScopeFlags::Arrow,
         );
+        let Statement::ExpressionStatement(body) = body else { unreachable!() };
         let initializer = Expression::new_arrow_function_expression_with_scope_id_and_pure_and_pife(
             SPAN,
-            true,
             false,
-            NONE,
+            None,
             FormalParameters::boxed(
                 SPAN,
                 FormalParameterKind::ArrowFormalParameters,
                 [],
-                NONE,
+                None,
                 ctx,
             ),
-            NONE,
-            FunctionBody::boxed(SPAN, [], [body], ctx),
+            None,
+            ArrowFunctionBody::from(body.unbox().expression),
             scope,
             false,
             false,
@@ -551,9 +551,8 @@ impl<'a> TypeScript<'a> {
                 VariableDeclarationKind::Var,
                 [VariableDeclarator::new(
                     SPAN,
-                    VariableDeclarationKind::Var,
                     binding.create_binding_pattern(ctx),
-                    NONE,
+                    None,
                     Some(initializer),
                     false,
                     ctx,
@@ -709,7 +708,7 @@ impl<'a> VisitMut<'a> for ConstructorAssignments<'a, '_> {
             *expression = Expression::new_call_expression(
                 SPAN,
                 binding.create_read_expression(self.ctx),
-                NONE,
+                None,
                 [Argument::from(expression.take_in(self.ctx))],
                 false,
                 self.ctx,

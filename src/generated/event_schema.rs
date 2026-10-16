@@ -1234,9 +1234,9 @@ pub(crate) fn child_role_id_for_edge(
                 return Some(26);
             }
             if parent
-                .super_class
+                .heritage
                 .as_ref()
-                .is_some_and(|edge| edge.node_id() == child_id)
+                .is_some_and(|edge| edge.expression.node_id() == child_id)
             {
                 return Some(27);
             }
@@ -1293,19 +1293,20 @@ pub(crate) fn child_role_id_for_edge(
             }
             None
         }
-        oxc_ast::AstKind::ExportNamedDeclaration(parent) => {
-            if parent
-                .declaration
-                .as_ref()
-                .is_some_and(|edge| edge.node_id() == child_id)
-            {
+        oxc_ast::AstKind::ExportDeclaration(parent) => {
+            if parent.declaration.node_id() == child_id {
                 return Some(38);
             }
-            if parent
-                .source
-                .as_ref()
-                .is_some_and(|edge| edge.node_id() == child_id)
-            {
+            None
+        }
+        oxc_ast::AstKind::ExportNamedDeclaration(_parent) => {
+            if matches!(ast_kind_protocol_id(child), 92) {
+                return Some(40);
+            }
+            None
+        }
+        oxc_ast::AstKind::ExportFromDeclaration(parent) => {
+            if parent.source.node_id() == child_id {
                 return Some(39);
             }
             if matches!(ast_kind_protocol_id(child), 92) {
@@ -1599,12 +1600,18 @@ pub(crate) fn child_role_id_for_edge(
             }
             None
         }
-        oxc_ast::AstKind::TSModuleDeclaration(parent) => {
+        oxc_ast::AstKind::TSExternalModuleDeclaration(parent) => {
             if parent
                 .body
                 .as_ref()
                 .is_some_and(|edge| edge.node_id() == child_id)
             {
+                return Some(91);
+            }
+            None
+        }
+        oxc_ast::AstKind::TSNamespaceDeclaration(parent) => {
+            if parent.body.node_id() == child_id {
                 return Some(91);
             }
             None
@@ -2043,7 +2050,9 @@ pub(crate) fn ast_kind_protocol_id(kind: oxc_ast::AstKind<'_>) -> u32 {
         oxc_ast::AstKind::ImportNamespaceSpecifier(..) => 86,
         oxc_ast::AstKind::WithClause(..) => 87,
         oxc_ast::AstKind::ImportAttribute(..) => 88,
+        oxc_ast::AstKind::ExportDeclaration(..) => 89,
         oxc_ast::AstKind::ExportNamedDeclaration(..) => 89,
+        oxc_ast::AstKind::ExportFromDeclaration(..) => 89,
         oxc_ast::AstKind::ExportDefaultDeclaration(..) => 90,
         oxc_ast::AstKind::ExportAllDeclaration(..) => 91,
         oxc_ast::AstKind::ExportSpecifier(..) => 92,
@@ -2117,7 +2126,8 @@ pub(crate) fn ast_kind_protocol_id(kind: oxc_ast::AstKind<'_>) -> u32 {
         oxc_ast::AstKind::TSIndexSignatureName(..) => 160,
         oxc_ast::AstKind::TSInterfaceHeritage(..) => 161,
         oxc_ast::AstKind::TSTypePredicate(..) => 162,
-        oxc_ast::AstKind::TSModuleDeclaration(..) => 163,
+        oxc_ast::AstKind::TSExternalModuleDeclaration(..) => 163,
+        oxc_ast::AstKind::TSNamespaceDeclaration(..) => 163,
         oxc_ast::AstKind::TSGlobalDeclaration(..) => 164,
         oxc_ast::AstKind::TSModuleBlock(..) => 165,
         oxc_ast::AstKind::TSTypeLiteral(..) => 166,

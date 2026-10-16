@@ -51,7 +51,7 @@ use oxc_allocator::{
     Address, ArenaBox, ArenaVec, CloneIn, GetAddress, GetAllocator, ReplaceWith, TakeIn,
     UnstableAddress,
 };
-use oxc_ast::{ast::*, builder::NONE};
+use oxc_ast::ast::*;
 use oxc_ast_visit::{VisitJs, VisitMut};
 use oxc_data_structures::stack::NonEmptyStack;
 use oxc_semantic::{ScopeFlags, ScopeId, SymbolFlags};
@@ -198,7 +198,7 @@ impl<'a> Traverse<'a, TransformState<'a>> for LegacyDecorator<'a> {
     fn exit_statement(&mut self, stmt: &mut Statement<'a>, ctx: &mut TraverseCtx<'a>) {
         match stmt {
             Statement::ClassDeclaration(_) => self.transform_class_statement(stmt, ctx),
-            Statement::ExportNamedDeclaration(_) => {
+            Statement::ExportDeclaration(_) => {
                 self.transform_export_named_class(stmt, ctx);
             }
             Statement::ExportDefaultDeclaration(_) => {
@@ -473,7 +473,7 @@ impl<'a> LegacyDecorator<'a> {
                 PropertyDefinitionType::PropertyDefinition,
                 [],
                 PropertyKey::new_private_identifier(SPAN, storage_name, ctx),
-                NONE,
+                None,
                 accessor.value.take(),
                 false,
                 is_static,
@@ -552,7 +552,7 @@ impl<'a> LegacyDecorator<'a> {
 
         let (params, body_stmt) = if is_getter {
             let params =
-                FormalParameters::boxed(SPAN, FormalParameterKind::FormalParameter, [], NONE, ctx);
+                FormalParameters::boxed(SPAN, FormalParameterKind::FormalParameter, [], None, ctx);
             let field_expr = Expression::new_private_field_expression(
                 SPAN,
                 create_object(ctx),
@@ -572,8 +572,8 @@ impl<'a> LegacyDecorator<'a> {
                 SPAN,
                 [],
                 value_binding.create_binding_pattern(ctx),
-                NONE,
-                NONE,
+                None,
+                None,
                 false,
                 None,
                 false,
@@ -584,7 +584,7 @@ impl<'a> LegacyDecorator<'a> {
                 SPAN,
                 FormalParameterKind::FormalParameter,
                 [param],
-                NONE,
+                None,
                 ctx,
             );
             let assign = Expression::new_assignment_expression(
@@ -781,15 +781,15 @@ impl<'a> LegacyDecorator<'a> {
     ///
     /// export { Class };
     /// ```
-    // `#[inline]` so that compiler sees that `stmt` is a `Statement::ExportNamedDeclaration`.
+    // `#[inline]` so that compiler sees that `stmt` is a `Statement::ExportDeclaration`.
     #[inline]
     fn transform_export_named_class(
         &mut self,
         stmt: &mut Statement<'a>,
         ctx: &mut TraverseCtx<'a>,
     ) {
-        let Statement::ExportNamedDeclaration(export) = stmt else { unreachable!() };
-        let Some(Declaration::ClassDeclaration(class)) = &mut export.declaration else { return };
+        let Statement::ExportDeclaration(export) = stmt else { unreachable!() };
+        let Declaration::ClassDeclaration(class) = &mut export.declaration else { return };
 
         let Some(ClassDecoratedData { binding, alias_binding }) = self.class_decorated_data.take()
         else {
@@ -1034,7 +1034,7 @@ impl<'a> LegacyDecorator<'a> {
         {
             let address = match ctx.parent() {
                 parent @ (Ancestor::ExportDefaultDeclarationDeclaration(_)
-                | Ancestor::ExportNamedDeclarationDeclaration(_)) => parent.address(),
+                | Ancestor::ExportDeclarationDeclaration(_)) => parent.address(),
                 // `Class` is always stored in a `Box`, so has a stable memory location
                 _ => class.unstable_address(),
             };
@@ -1083,9 +1083,8 @@ impl<'a> LegacyDecorator<'a> {
         );
         let declarator = VariableDeclarator::new(
             SPAN,
-            VariableDeclarationKind::Let,
             binding.create_spanned_binding_pattern(binding_span, ctx),
-            NONE,
+            None,
             Some(initializer),
             false,
             ctx,
@@ -1134,7 +1133,7 @@ impl<'a> LegacyDecorator<'a> {
         } else {
             let stmt_address = match ctx.parent() {
                 parent @ (Ancestor::ExportDefaultDeclarationDeclaration(_)
-                | Ancestor::ExportNamedDeclarationDeclaration(_)) => parent.address(),
+                | Ancestor::ExportDeclarationDeclaration(_)) => parent.address(),
                 // `Class` is always stored in a `Box`, so has a stable memory location
                 _ => class.unstable_address(),
             };
@@ -1541,9 +1540,8 @@ impl<'a> LegacyDecorator<'a> {
         let local = ModuleExportName::IdentifierReference(class_binding.create_read_reference(ctx));
         let exported = ModuleExportName::new_identifier_name(SPAN, class_binding.name, ctx);
         let specifiers = [ExportSpecifier::new(SPAN, local, exported, kind, ctx)];
-        let export_class_reference = ModuleDeclaration::new_export_named_declaration(
-            SPAN, None, specifiers, None, kind, NONE, ctx,
-        );
+        let export_class_reference =
+            ModuleDeclaration::new_export_named_declaration(SPAN, specifiers, kind, ctx);
         Statement::from(export_class_reference)
     }
 }
@@ -1574,8 +1572,8 @@ impl<'a> VisitJs<'a> for PrivateEnvironmentDetector {
     }
     fn visit_class(&mut self, class: &Class<'a>) {
         self.visit_decorators(&class.decorators);
-        if let Some(super_class) = &class.super_class {
-            self.visit_expression(super_class);
+        if let Some(heritage) = &class.heritage {
+            self.visit_expression(&heritage.expression);
         }
         let names = self.names.clone();
         for element in &class.body.body {
