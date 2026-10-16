@@ -1935,3 +1935,29 @@ for (const mode of ['inline', 'runtime'] as const) {
     ).toEqual(expected);
   });
 }
+
+test('private optional chains do not bind intermediate collection receivers', () => {
+  const result = execute<{ result: unknown[] }>(
+    `class C {
+       #items = new Map([['present', [{ paused: true, continue() { return this.paused; } }]]]);
+       call(key) { return (this.#items.get(key)?.find(x => x.paused))?.continue(); }
+       missing() { return (this.#items.get('missing')?.find(x => x.paused))?.(); }
+     }
+     const value = new C();
+     globalThis.result = [value.call('present'), value.call('missing'), value.missing()];`,
+    { transforms: { classProperties: { loose: false } } },
+  );
+  expect(result.result).toEqual([true, undefined, undefined]);
+});
+
+test('static-block lowering retains class binding, super, and inferred names', () => {
+  const result = execute<{ result: unknown[] }>(
+    `class Base { static value = 4; }
+     class C extends Base { static { this.value = super.value + 1; this.self = C; } }
+     const Saved = C; C = null;
+     const Named = class { static { this.label = this.name; } };
+     globalThis.result = [Saved.value, Saved.self === Saved, Named.label];`,
+    { transforms: { classStaticBlock: true } },
+  );
+  expect(result.result).toEqual([5, true, 'Named']);
+});

@@ -315,3 +315,25 @@ test('automatic-if-present transforms JSX and leaves JSX-free programs runnable'
   });
   expect(withoutJsx.result).toBe(42);
 });
+
+test('string enum expressions do not reverse-map over existing members', () => {
+  const output = execute<{ result: unknown[] }>(
+    `const foo = 'x'; enum E { 'xa' = 1, A = foo + 'a' }
+     globalThis.result = [E.xa, E.A, E[1]];`,
+    { typescript: 'strip' },
+    {},
+    'input.ts',
+  );
+  expect(output.result).toEqual([1, 'xa', 'xa']);
+});
+
+test('unary string enum initializers retain JavaScript numeric coercion', () => {
+  const output = execute<{ result: unknown[] }>(
+    `enum E { A = +'\\u00a0', B = -'2', C = ~'1' }
+     globalThis.result = [E.A, E.B, E.C];`,
+    { typescript: 'strip' },
+    {},
+    'input.ts',
+  );
+  expect(output.result).toEqual([0, -2, -2]);
+});

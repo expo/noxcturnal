@@ -634,3 +634,46 @@ describe.each(additionalComplianceCases)(
     });
   },
 );
+
+test('resource declarations in catch and finally dispose at their own block exits', () => {
+  const result = execute<{ result: string[] }>(
+    `const log = [];
+     const make = name => ({ [Symbol.dispose]() { log.push(name); } });
+     try { throw new Error('original'); }
+     catch (error) { using caught = make(error.message); log.push('catch'); }
+     finally { using final = make('final'); log.push('finally'); }
+     globalThis.result = log;`,
+    { transforms: { explicitResourceManagement: true } },
+  );
+  expect(result.result).toEqual(['catch', 'original', 'finally', 'final']);
+});
+
+test('classic for resources dispose once after labeled continuation and break', () => {
+  const result = execute<{ result: string[] }>(
+    `const log = [];
+     const make = name => ({ [Symbol.dispose]() { log.push(name); } });
+     let index = 0;
+     outer: for (using resource = make('disposed'); index < 3; index++) {
+       if (index === 0) continue outer;
+       log.push('body:' + index);
+       break outer;
+     }
+     log.push('after');
+     globalThis.result = log;`,
+    { transforms: { explicitResourceManagement: true } },
+  );
+  expect(result.result).toEqual(['body:1', 'disposed', 'after']);
+});
+
+test('classic for resources dispose earlier acquisitions when a later initializer throws', () => {
+  const result = execute<{ result: string[] }>(
+    `const log = [];
+     const make = () => ({ [Symbol.dispose]() { log.push('disposed'); } });
+     const fail = () => { throw new Error('initializer'); };
+     try { for (using first = make(), second = fail(); false;) {} }
+     catch (error) { log.push(error.message); }
+     globalThis.result = log;`,
+    { transforms: { explicitResourceManagement: true } },
+  );
+  expect(result.result).toEqual(['disposed', 'initializer']);
+});

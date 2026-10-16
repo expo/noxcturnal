@@ -128,10 +128,10 @@ exports[`every public native transform has an explicit ownership fixture 7`] = `
 
 exports[`every public native transform has an explicit ownership fixture 8`] = `
 {
-  "code": "class Value{static#_=this.value=1}",
+  "code": "var _staticBlock;let Value=(class Value{static#_=_staticBlock=()=>(this.value=1,this)},_staticBlock());",
   "helpers": [],
   "map": {
-    "mappings": "AAAA,MAAM,KAAM,CAAE,SAAS,KAAK,MAAQ,CAAK",
+    "mappings": "iBAAA,IAAM,OAAN,MAAM,KAAM,4BAAW,KAAK,MAAQ,OAAK",
     "names": [],
   },
   "name": "classStaticBlock",
