@@ -79,6 +79,7 @@ export interface NativePreflightResultOutput {
 }
 
 interface NativeBinding {
+  validateProgram(source: string, filename: string): void;
   NativeIndexedSession: new (
     source: string,
     filename: string,

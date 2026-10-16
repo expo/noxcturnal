@@ -39,6 +39,9 @@ pub(crate) fn error(source: &str, diagnostics: &[OxcDiagnostic], operation: &'st
         "line": line,
         "column": column,
         "operation": operation,
+        // A failed resident phase may already have consumed its source. Carry it
+        // only on the cold error path for accurate frames and adapter attribution.
+        "source": source,
     });
     Error::new(Status::InvalidArg, format!("{PREFIX}{payload}"))
 }

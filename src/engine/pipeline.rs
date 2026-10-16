@@ -299,11 +299,29 @@ mod tests {
     }
 
     #[test]
-    fn unsupported_phase_stops_without_committing_source_or_map() {
+    fn invalid_phase_throws_without_committing_source_or_map() {
         let mut session = NativePipelineSession::new("fixture.js".into(), "const = ;".into());
-        let results = session
+        let error = session
             .run_native_phases(vec![NativePreflightOptions {
                 block_scoping: Some(true),
+                ..NativePreflightOptions::default()
+            }])
+            .err()
+            .expect("invalid input must throw");
+        assert!(error.reason.starts_with("__NOXCTURNAL_PARSE_FAILURE__:"));
+        assert!(session.current.is_none());
+        assert!(session.layers.is_empty());
+    }
+
+    #[test]
+    fn unsupported_phase_stops_without_committing_source_or_map() {
+        let mut session = NativePipelineSession::new(
+            "fixture.ts".into(),
+            "namespace N { export let value = 1; }".into(),
+        );
+        let results = session
+            .run_native_phases(vec![NativePreflightOptions {
+                typescript: Some("strip".into()),
                 ..NativePreflightOptions::default()
             }])
             .unwrap();

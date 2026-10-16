@@ -257,7 +257,7 @@ test('generated prologue statements do not fuse with an unterminated directive',
     [
       'function body directive',
       { parameters: true },
-      "function read(value = 2) {\n  'use strict'\n  return value\n}\nglobalThis.answer = read()",
+      "'use strict';\nfunction read(value = 2) {\n  'custom directive'\n  return value\n}\nglobalThis.answer = read()",
       2,
     ],
   ] as const) {
@@ -268,6 +268,7 @@ test('generated prologue statements do not fuse with an unterminated directive',
       `${name}: ${result.status === 'bailout' ? result.reason : result.status}`,
     );
     assert.match(result.code, /"use strict";/, name);
+    if (name === 'function body directive') assert.match(result.code, /"custom directive";/);
     const context: { input: { value: number }; answer?: unknown } = { input: { value: 5 } };
     new Function('globalThis', 'require', result.code)(context, runtimeRequire);
     assert.equal(context.answer, answer, name);

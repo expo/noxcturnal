@@ -10,7 +10,7 @@ export const NATIVE_TRANSFORM_OWNERSHIP_FIXTURES = {
   destructuring: ['var { value } = input;', true],
   parameters: ['function read(value = 1) { return value; }', true],
   forOf: ['for (var value of values) consume(value);', true],
-  explicitResourceManagement: ['using value = acquire();', true],
+  explicitResourceManagement: ['{ using value = acquire(); }', true],
   classStaticBlock: ['class Value { static { this.value = 1; } }', true],
   classProperties: ['class Value { field = 1; }', { loose: true }],
   logicalAssignmentOperators: ['value ||= 1;', true],

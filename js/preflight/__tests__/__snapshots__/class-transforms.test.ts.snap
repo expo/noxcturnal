@@ -110,18 +110,18 @@ exports[`every public native transform has an explicit ownership fixture 6`] = `
 
 exports[`every public native transform has an explicit ownership fixture 7`] = `
 {
-  "code": "var _usingCtx2=require("@babel/runtime/helpers/usingCtx");try{var _usingCtx=_usingCtx2();var value=_usingCtx.u(acquire())}catch(_){_usingCtx.e=_}finally{_usingCtx.d()}",
+  "code": "var _usingCtx2=require("@babel/runtime/helpers/usingCtx");try{var _usingCtx=_usingCtx2();const value=_usingCtx.u(acquire())}catch(_){_usingCtx.e=_}finally{_usingCtx.d()}",
   "helpers": [
     "usingCtx",
   ],
   "map": {
-    "mappings": "yFAAA,IAAM,kBAAQ,QAAQ",
+    "mappings": "0DAAA,+BAAE,MAAM,kBAAQ,QAAQ",
     "names": [],
   },
   "name": "explicitResourceManagement",
   "option": true,
   "reason": undefined,
-  "source": "using value = acquire();",
+  "source": "{ using value = acquire(); }",
   "status": "complete",
 }
 `;

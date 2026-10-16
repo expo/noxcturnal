@@ -19,7 +19,7 @@ const expectedOutputs = [
   '[bailout] flow-requires-parser-adapter',
   '// @flow',
   '/*@flow*/\n\n/* @flow */\n\n/**\n * @flow\n */\n\n/**\n * @providesModule Foo\n * @flow\n */',
-  '[bailout] preflight:parse-error',
+  '[bailout] flow-erasure-unsupported-syntax',
   '// @flow\n\nclass Foo {}\nclass Foo2 extends Bar {}\nclass Foo3 extends class Bar {} {}\nclass Foo4 extends class Bar {} {}',
   '// @flow\nfunction createElement(tagName) {}\nfunction createElement(tagName) {}',
   '// @flow\nfunction one() {}\nfunction two(a) {}\nfunction three(...a) {}\nfunction four(a, b, ...c) {}\nfunction five() {}\n\nclass Ten {\n  m1() {}\n  m2(a) {}\n  m3(...a) {}\n  m4(a, b, ...c) {}\n  m5() {}\n}\n\nlet eleven = {\n  m1() {},\n  m2(a) {},\n  m3(...a) {},\n  m4(a, b, ...c) {},\n  m5() {},\n};',

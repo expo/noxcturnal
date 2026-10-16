@@ -347,6 +347,7 @@ pub(crate) fn materialize_with_scope_parents(
             .as_ref()
             .is_some_and(|manifest| manifest.needs_comments);
     if !needs_semantics {
+        crate::syntax::validation::validate_program(&parsed.program, "indexed-session")?;
         let mut collector = SyntaxIndexCollector {
             source,
             utf16: utf16.as_deref().map(|offsets| &**offsets),

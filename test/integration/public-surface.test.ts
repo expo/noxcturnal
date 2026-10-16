@@ -50,6 +50,7 @@ test('preserves the public source and native ABI surfaces', () => {
     'nativePreflightTransform',
     'runNativePipeline',
     'validateExpression',
+    'validateProgram',
     'validateStatements',
   ]);
 });

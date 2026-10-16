@@ -44,6 +44,7 @@ import { TransformSyntaxError } from '../errors';
 const NATIVE_PARSE_FAILURE_PREFIX = '__NOXCTURNAL_PARSE_FAILURE__:';
 
 interface NativeParseFailurePayload {
+  source?: string;
   message: string;
   line: number;
   column: number;
@@ -279,6 +280,7 @@ export function transform(
   const originalSource = source;
   let parseFilename = parserFilename(filename, options.parser);
   let parser = classifyForTransform(parseFilename, source);
+  let nativeFlowErased = false;
   let adapterMap: NativeVlqMap | null = null;
   let adapterMetadata: Record<string, unknown> | undefined;
   // Native erasure runs ahead of the auto-selected adapter. It deletes byte
@@ -293,6 +295,7 @@ export function transform(
   if (!parser.supported && parser.syntax === 'flow' && options.parserAdapter == null) {
     const erased = native.nativeFlowErase(source, filename);
     if (erased.status === 'erased' && erased.code != null) {
+      nativeFlowErased = true;
       source = erased.code;
       adapterMap = erased.map ?? null;
       // Flow files routinely contain JSX, and the erased source still carries
@@ -304,6 +307,8 @@ export function transform(
   }
   if (!parser.supported) {
     const adapter = selectParserAdapter(options.parserAdapter, parser);
+    if (options.parserAdapter != null && adapter == null)
+      throw new Error(`Parser adapter is not registered: ${options.parserAdapter}`);
     if (adapter) {
       const adapted = adapter.compile(source, filename, options);
       if (adapted.status === 'unsupported')
@@ -481,6 +486,7 @@ export function transform(
     };
   };
   try {
+    if (pipeline.phases.length === 0) native.validateProgram(source, parseFilename);
     // All-native fast path: one crossing runs every phase and returns the final
     // products directly. Using NativePipelineSession here would add session
     // construction and a terminal crossing without providing a JS observer.
@@ -808,8 +814,23 @@ export function transform(
     return completeResult();
   } catch (error) {
     openSession?.close();
+    const parseFailure = nativeParseFailure(error);
+    // Hermes accepted the original Flow grammar, but its eraser can leave an
+    // unsupported predicate behind. This exception belongs only to that adapter,
+    // never to a caller's declared JavaScript output or arbitrary parse failures.
+    const flowBoundary =
+      nativeFlowErased &&
+      parseFailure?.message === 'Flow is not supported' &&
+      parseFailure.source === source;
     const bailout = error instanceof Bailout;
-    cleanupStates(bailout ? 'bailout' : 'error');
+    cleanupStates(bailout || flowBoundary ? 'bailout' : 'error');
+    if (flowBoundary)
+      return {
+        status: 'bailout',
+        reason: 'flow-erasure-unsupported-syntax',
+        source: originalSource,
+        diagnostics,
+      };
     if (bailout) {
       return {
         status: 'bailout',
@@ -818,8 +839,8 @@ export function transform(
         diagnostics,
       } satisfies NativeBailoutResult;
     }
-    const parseFailure = nativeParseFailure(error);
-    if (parseFailure != null) throw syntaxError(parseFailure, filename, currentSource());
+    if (parseFailure != null)
+      throw syntaxError(parseFailure, filename, parseFailure.source ?? currentSource());
     if (error instanceof NativeTransformError) throw error;
     const message = error instanceof Error ? error.message : String(error);
     const owners =

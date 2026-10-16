@@ -195,7 +195,7 @@ function inspect(eval) {
   const hidden = () => 42;
   return eval('hidden()');
 }
-export { inspect };
+globalThis.inspect = inspect;
 `;
   expect(await transformSource(source, 'input.js', options)).toContain('const hidden = () => 42');
 });
