@@ -19,7 +19,7 @@ import {
   type NativePreflightResultOutput,
 } from '../native/binding';
 import { decodeRoutedEnvelope, type RoutedEventBatch } from '../protocol/events';
-import { packRouteManifest } from '../protocol/manifest';
+import { MAX_COMPILED_ROUTES, packRouteManifest } from '../protocol/manifest';
 import type {
   Diagnostic,
   EditCommand,
@@ -498,6 +498,7 @@ export function transform(
   const allStates: PreparedState[] = [];
   let openSession: NativeTransformSession | null = null;
   let reusableSession: NativeTransformSession | null = null;
+  let retainedThroughPhase = -1;
   let reusableRoutedBatch: { manifest: Buffer; batch: RoutedEventBatch } | null = null;
   // Record one native run's per-phase results into diagnostics/metadata and bail
   // on the first phase that did not complete. Shared by the mixed-pipeline loop
@@ -635,22 +636,29 @@ export function transform(
       if (retainedSession == null) {
         const lookahead: PreparedPhase[] = [];
         let chain = retainedChains(prepared);
-        if (runtimeEditEffect === 'none') {
-          for (
-            let futureIndex = phaseIndex + 1;
-            futureIndex < pipeline.phases.length;
-            futureIndex++
-          ) {
-            if (phasePlan[futureIndex].requiresPrintedInput) break;
-            const futurePrepared = preparePhase(pipeline.phases[futureIndex]);
-            lookahead.push(futurePrepared);
-            chain = retainedChains(futurePrepared, chain);
-          }
+        let retainedRouteCount = prepared.compiledRoutes.length;
+        // Bound speculative retention to eight later visitor phases and the
+        // manifest's route budget. A phase may edit; only its actual outcome
+        // decides whether this index survives.
+        retainedThroughPhase = phaseIndex;
+        for (
+          let futureIndex = phaseIndex + 1;
+          futureIndex < Math.min(pipeline.phases.length, phaseIndex + 9);
+          futureIndex++
+        ) {
+          if (phasePlan[futureIndex].requiresPrintedInput) break;
+          const futurePrepared = preparePhase(pipeline.phases[futureIndex]);
+          if (retainedRouteCount + futurePrepared.compiledRoutes.length > MAX_COMPILED_ROUTES)
+            break;
+          retainedRouteCount += futurePrepared.compiledRoutes.length;
+          lookahead.push(futurePrepared);
+          chain = retainedChains(futurePrepared, chain);
+          retainedThroughPhase = futureIndex;
         }
         const retained = (chain.plan ??= buildRetainedPlan(prepared, lookahead));
         ({ futureSubscriptions, retentionManifest } = retained);
       } else {
-        // The retained session was opened with the complete compatible suffix.
+        // The retained session was opened with the capabilities through retainedThroughPhase.
         // Later phases reuse that native index and do not rebuild progressively
         // shorter suffix plans.
         futureSubscriptions = new Set();
@@ -659,15 +667,17 @@ export function transform(
       const nextPhase = pipeline.phases[phaseIndex + 1];
       const canReuseForNextPhase =
         phaseIndex + 1 === pipeline.phases.length ||
-        (runtimeEditEffect === 'none' &&
+        (phaseIndex + 1 <= retainedThroughPhase &&
           nextPhase?.native == null &&
           !phasePlan[phaseIndex + 1].requiresPrintedInput);
       const artifactDemand = phaseArtifactDemand(executionPlan.artifactDemand, prepared);
       const requiresIndex =
+        retainedSession != null ||
         requiresIndexBase ||
         includeParent ||
         includeScope ||
         futureSubscriptions.size > 0 ||
+        retainedThroughPhase > phaseIndex ||
         hasSemanticDemand(artifactDemand);
       // Parsed/index artifacts live exactly as long as their retained native
       // session. If orchestration dropped that owner, the generic planner must
