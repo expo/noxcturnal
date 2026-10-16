@@ -301,11 +301,13 @@ impl RoutedEventCollector<'_> {
         let Some(actual) = actual else {
             return false;
         };
-        let scalar_type = predicate_scalar_type(field_name, node_type_id, &actual.value);
-        let value = if field_name == "constantValue" {
-            crate::semantic::value_transport::scalar(&actual.value).1
+        let (scalar_type, value) = if field_name == "constantValue" {
+            crate::semantic::value_transport::scalar(&actual.value)
         } else {
-            &actual.value
+            (
+                predicate_scalar_type(field_name, node_type_id, &actual.value),
+                actual.value.as_str(),
+            )
         };
         predicate.values.iter().any(|expected| match expected {
             CompiledScalar::String(expected) => scalar_type == 0 && value == expected,

@@ -37,7 +37,8 @@ fn encode_host_string(value: &str, lone_surrogates: bool) -> Cow<'_, str> {
     if !lone_surrogates && !value.starts_with('\0') {
         return Cow::Borrowed(value);
     }
-    let mut json = String::from("\0\"");
+    let mut json = String::with_capacity(value.len() + 8);
+    json.push_str("\0\"");
     if lone_surrogates {
         push_marked_json(&mut json, value);
     } else {
@@ -58,7 +59,8 @@ fn push_marked_json(json: &mut String, value: &str) {
         let after = &rest[start + '\u{fffd}'.len_utf8()..];
         if let Some(unit) = marked_unit(after) {
             if (0xd800..=0xdfff).contains(&unit) {
-                write!(json, "\\u{unit:04x}").unwrap();
+                json.push_str("\\u");
+                json.push_str(&after[..4]);
             } else {
                 json.push_str("\\ufffd");
             }

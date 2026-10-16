@@ -418,8 +418,11 @@ fn retained_predicate_matches(
             let actual = index
                 .scalar_string(id)
                 .expect("retained scalar string id is valid");
-            let scalar_type = predicate_scalar_type(field_name, node_type_id, actual);
-            let actual = if field_name == "constantValue" { crate::semantic::value_transport::scalar(actual).1 } else { actual };
+            let (scalar_type, actual) = if field_name == "constantValue" {
+                crate::semantic::value_transport::scalar(actual)
+            } else {
+                (predicate_scalar_type(field_name, node_type_id, actual), actual)
+            };
             predicate.values.iter().any(|expected| match expected {
                 CompiledScalar::String(value) => scalar_type == 0 && actual == value,
                 CompiledScalar::Number(value) => {

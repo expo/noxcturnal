@@ -146,30 +146,24 @@ export class NativeTransformSession {
       const names = [...new Set(request.globals.map(query => query.name))];
       const references = this.#queryGlobalReferences(names);
       for (let index = 0; index < names.length; index++) {
-        // Own data properties, including `__proto__`, never invoke the inherited prototype setter.
-        Object.defineProperty(globals, names[index]!, {
-          value: { references: references[index] },
-          enumerable: true,
-          configurable: true,
-          writable: true,
-        });
+        const name = names[index]!;
+        const value = { references: references[index] };
+        if (name === '__proto__')
+          Object.defineProperty(globals, name, {
+            value,
+            enumerable: true,
+            configurable: true,
+            writable: true,
+          });
+        else globals[name] = value;
       }
     }
     const constants: QueryResult['constants'] = {};
-    const constantNodesById = request.constants?.length
-      ? new Map(this.constantNodes(request.constants).map(node => [node.id, node]))
-      : undefined;
-    for (const id of request.constants ?? []) {
-      // Node fields are `unknown`. Narrow the decoded constant so 0, -0, and
-      // empty strings survive, and a missing node stays null.
-      const value: unknown = constantNodesById!.get(id)?.constantValue;
-      constants[id] =
-        typeof value === 'string' ||
-        typeof value === 'number' ||
-        typeof value === 'boolean' ||
-        value === null
-          ? value
-          : null;
+    if (request.constants?.length) {
+      for (const id of request.constants) constants[id] = null;
+      // Constant facts already carry the value; no node hydration is needed.
+      for (const fact of this.#binding('query.constants').queryConstants([...request.constants]))
+        constants[fact.id] = decodeConstant(fact.value);
     }
     const captureRequests = new Map<number, boolean | undefined>();
     for (const capture of request.captures ?? []) {

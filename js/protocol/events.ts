@@ -115,6 +115,8 @@ export function dispatchRoutedEvents(
   // values and absent-id sentinels as -1, so no heap numbers are allocated per record.
   const words = new Int32Array(batch.data.buffer, batch.data.byteOffset, batch.data.byteLength / 4);
   const enterEvents: (NativeEvent | undefined)[] | null = batch.includeExit ? [] : null;
+  // Interned exceptional strings need JSON decoding only once per tape.
+  const decodedStrings = new Map<string, string>();
   let offset = 0;
   for (let record = 0; record < batch.nodeRecordCount; record++) {
     const sequenceWord = words[offset++];
@@ -164,7 +166,8 @@ export function dispatchRoutedEvents(
       const key = FIELD_KEYS[words[offset++]];
       if (!key) throw new Error('invalid routed field key');
       const value = decodeValue(words[offset++], batch.stringAt);
-      node[key] = typeof value === 'string' ? coerceFieldValue(key, type, value) : value;
+      node[key] =
+        typeof value === 'string' ? coerceFieldValue(key, type, value, decodedStrings) : value;
     }
     if (batch.includeComments) {
       const commentCount = words[offset++];
@@ -300,8 +303,9 @@ export function coerceFieldValue(
   key: string,
   nodeType: string,
   value: string,
+  decodedStrings?: Map<string, string>,
 ): string | number | boolean | null {
-  if (key === 'constantValue') return decodeConstant(value);
+  if (key === 'constantValue') return decodeConstant(value, decodedStrings);
   if (key === 'value' && nodeType === 'NumericLiteral') return Number(value);
   if (key === 'value' && nodeType === 'BooleanLiteral') return parseScalar(value);
   if (
@@ -313,7 +317,7 @@ export function coerceFieldValue(
     key === 'exported' ||
     key === 'local'
   )
-    return decodeString(value);
+    return decodeString(value, decodedStrings);
   return value;
 }
 

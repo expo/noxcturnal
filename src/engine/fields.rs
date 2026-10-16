@@ -1357,7 +1357,9 @@ pub(crate) fn fields(
         }
         _ => {}
     }
-    if let Some(value) = constant(kind) {
+    if (requested.wants(field_ids::CONSTANT_KIND) || requested.wants(field_ids::CONSTANT_VALUE))
+        && let Some(value) = constant(kind)
+    {
         push!(field_ids::CONSTANT_KIND, "constantKind", value.kind.into());
         push!(field_ids::CONSTANT_VALUE, "constantValue", value.encoded);
     }
