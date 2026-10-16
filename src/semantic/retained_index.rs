@@ -3,7 +3,7 @@ use napi_derive::napi;
 use oxc_ast::AstKind;
 use oxc_semantic::{AstNodes, Scoping};
 use oxc_span::GetSpan;
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 use std::cell::OnceCell;
 #[cfg(test)]
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -38,6 +38,7 @@ pub struct RetainedIndex {
     child_offsets: Option<Vec<u32>>,
     child_edges: Vec<ChildEdge>,
     child_role_mask_by_parent_type: Vec<ChildRoleMask>,
+    uid_identifiers: Option<FxHashSet<String>>,
     names: Vec<Rc<str>>,
     name_ids: FxHashMap<Rc<str>, u32>,
     bindings: FxHashMap<(u32, u32), BindingRecord>,
@@ -355,6 +356,7 @@ impl RetainedIndex {
             child_role_mask_by_parent_type: child_role_mask_by_parent_type
                 .map(<[ChildRoleMask]>::to_vec)
                 .unwrap_or_default(),
+            uid_identifiers: None,
             names: Vec::new(),
             name_ids: FxHashMap::default(),
             bindings: FxHashMap::default(),
@@ -373,6 +375,10 @@ impl RetainedIndex {
         }
     }
 
+    pub(crate) fn take_uid_identifiers(&mut self) -> Option<FxHashSet<String>> {
+        self.uid_identifiers.take()
+    }
+
     pub fn record_semantics(
         &mut self,
         kind: AstKind<'_>,
@@ -385,6 +391,19 @@ impl RetainedIndex {
         self.record_constant(kind, node_id);
         if !retain_identifiers {
             return;
+        }
+        let names = self.uid_identifiers.get_or_insert_with(FxHashSet::default);
+        let name = match kind {
+            AstKind::BindingIdentifier(node) => Some(node.name.as_str()),
+            AstKind::IdentifierReference(node) => Some(node.name.as_str()),
+            AstKind::IdentifierName(node) => Some(node.name.as_str()),
+            AstKind::LabelIdentifier(node) => Some(node.name.as_str()),
+            _ => None,
+        };
+        if let Some(name) = name
+            && !names.contains(name)
+        {
+            names.insert(name.to_owned());
         }
         match kind {
             AstKind::BindingIdentifier(identifier) => {
@@ -1593,7 +1612,10 @@ impl RetainedIndex {
     }
 
     pub fn memory_usage(&self) -> usize {
-        self.rename_exports.get().map_or(0, |exports| {
+        self.uid_identifiers.as_ref().map_or(0, |names| {
+            names.capacity() * size_of::<String>()
+                + names.iter().map(String::capacity).sum::<usize>()
+        }) + self.rename_exports.get().map_or(0, |exports| {
             size_of::<FxHashMap<u32, Vec<u32>>>()
                 + exports.capacity() * size_of::<(u32, Vec<u32>)>()
                 + exports

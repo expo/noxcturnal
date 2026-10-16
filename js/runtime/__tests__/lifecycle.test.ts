@@ -715,3 +715,19 @@ function definitionPipeline<State, Options, Analysis>(
 ): ReturnType<typeof defineNativePipeline> {
   return defineNativePipeline({ phases: [{ name: 'visit', plugins: [plugin] }] });
 }
+
+test('UID inventories preserve property, label, and escaped names with overlapping hints', () => {
+  const source = String.raw`const obj = { _temp: 1, _t\u0065mp2: 2 }; _temp3: while (false) { break _temp3; } obj._temp4;`;
+  for (const session of [
+    new NativeTransformSession(source, 'fixture.js'),
+    openRetained(source, 'fixture.js'),
+  ]) {
+    assert.equal(session.generateUid('temp'), '_temp5');
+    assert.equal(session.generateUid('temp2'), '_temp22');
+    assert.equal(session.generateUid('t-e-m-p'), '_temp6');
+    assert.equal(session.generateUid('temp5'), '_temp52');
+    assert.equal(session.generateUid('temp'), '_temp7');
+    session.close();
+    assert.throws(() => session.generateUid('temp'), /closed/);
+  }
+});

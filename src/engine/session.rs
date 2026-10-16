@@ -85,6 +85,18 @@ impl NativeIndexedSession {
         Ok(session)
     }
 
+    /// Move the requested identifier inventory without serializing names through JS.
+    #[napi]
+    pub fn create_source_text(&mut self) -> Result<crate::syntax::source_text::NativeSourceText> {
+        self.ensure_open()?;
+        Ok(
+            crate::syntax::source_text::NativeSourceText::with_identifiers(
+                self.source.encode_utf16().collect::<Vec<_>>().into(),
+                self.retained_index.take_uid_identifiers(),
+            ),
+        )
+    }
+
     #[napi]
     pub fn program_body_offsets(&mut self) -> Result<Vec<u32>> {
         self.ensure_open()?;

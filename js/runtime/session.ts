@@ -672,7 +672,8 @@ export class NativeTransformSession {
   }
   get sourceTextOperations(): InstanceType<typeof native.NativeSourceText> {
     this.#assertOpen();
-    return (this.#sourceText ??= new native.NativeSourceText(this.source));
+    return (this.#sourceText ??=
+      this.#native?.createSourceText() ?? new native.NativeSourceText(this.source));
   }
   startsLine(offset: number): boolean {
     // Keep one 8 KiB source window. A single sparse query uses the adjacent
