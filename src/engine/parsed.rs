@@ -84,6 +84,14 @@ impl NativeParsedSource {
     }
 
     #[napi]
+    pub fn function_map(&self) -> Result<crate::sourcemap::function_map::FunctionMap> {
+        let parsed = self.parsed.as_ref().ok_or_else(consumed)?;
+        Ok(parsed.with_dependent(|owner, parsed| {
+            crate::sourcemap::function_map::collect(&owner.source, &self.filename, &parsed.program)
+        }))
+    }
+
+    #[napi]
     pub fn syntax_facts(&self) -> Result<Vec<String>> {
         let parsed = self.parsed.as_ref().ok_or_else(consumed)?;
         let mut facts = SyntaxFacts {

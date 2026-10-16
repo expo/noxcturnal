@@ -233,6 +233,7 @@ pub struct NativePreflightResult {
     pub map: Option<Buffer>,
     pub diagnostics: Vec<String>,
     pub helpers_used: Vec<String>,
+    pub function_map: Option<crate::sourcemap::function_map::FunctionMap>,
 }
 
 struct ParseOwner {
@@ -316,19 +317,44 @@ pub(crate) fn transform_resident(
 }
 
 fn transform_impl(
+    source: String,
+    filename: String,
+    options: NativePreflightOptions,
+    standalone_identity_map: bool,
+    normalized_javascript: bool,
+    resident_jsx: Option<bool>,
+) -> Result<NativePreflightResult> {
+    let mut function_map = None;
+    let mut result = transform_with_function_map(
+        source,
+        filename,
+        options,
+        standalone_identity_map,
+        normalized_javascript,
+        resident_jsx,
+        &mut function_map,
+    )?;
+    if result.status == "complete" {
+        result.function_map = function_map;
+    }
+    Ok(result)
+}
+
+fn transform_with_function_map(
     mut source: String,
     filename: String,
     mut options: NativePreflightOptions,
     standalone_identity_map: bool,
     normalized_javascript: bool,
     resident_jsx: Option<bool>,
+    function_map: &mut Option<crate::sourcemap::function_map::FunctionMap>,
 ) -> Result<NativePreflightResult> {
     validate_option_ownership(&options)?;
     let initial_jsx = resident_jsx.unwrap_or_else(|| {
         let filename = filename.to_ascii_lowercase();
         filename.ends_with(".jsx") || filename.ends_with(".tsx")
     });
-    if !has_active_operation(&options) {
+    if !has_active_operation(&options) && options.function_map != Some(true) {
         return Ok(identity_result(
             source,
             standalone_identity_map,
@@ -431,6 +457,13 @@ fn transform_impl(
         // A file that does not parse is reported by the parse below, with its
         // original spans rather than the prepass's.
         if parsed.diagnostics.is_empty() {
+            if options.function_map == Some(true) {
+                *function_map = Some(crate::sourcemap::function_map::collect(
+                    &source,
+                    &filename,
+                    &parsed.program,
+                ));
+            }
             let mut program = parsed.program;
             let has_decorators = if possible_decorators {
                 let mut decorator_detector = DecoratorDetector(false);
@@ -590,6 +623,11 @@ fn transform_impl(
             "native-phase",
         ));
     }
+    if options.function_map == Some(true) && function_map.is_none() {
+        *function_map = Some(final_program.with_dependent(|owner, parsed| {
+            crate::sourcemap::function_map::collect(&owner.source, &filename, &parsed.program)
+        }));
+    }
     // The parser recognizes HTML-style script comments as well as // and /*.
     // Reuse its comment list instead of scanning text (which also matches strings).
     let strip_comments = options.comments == Some(false)
@@ -631,6 +669,7 @@ fn transform_impl(
             )?;
             Ok(NativePreflightResult {
                 status: "complete".into(),
+                function_map: None,
                 changed: true,
                 normalized_javascript: output_normalized_javascript,
                 jsx: active_source_type.is_jsx(),
@@ -1630,6 +1669,7 @@ fn transform_impl(
         };
         Ok(NativePreflightResult {
             status: "complete".into(),
+            function_map: None,
             changed: true,
             normalized_javascript: output_normalized_javascript
                 || active_source_type.is_typescript(),
@@ -2671,6 +2711,7 @@ fn unsupported(
 ) -> NativePreflightResult {
     NativePreflightResult {
         status: "unsupported".into(),
+        function_map: None,
         changed: false,
         normalized_javascript: false,
         jsx: false,
@@ -2693,6 +2734,7 @@ fn fatal(
 ) -> NativePreflightResult {
     NativePreflightResult {
         status: "error".into(),
+        function_map: None,
         changed: false,
         normalized_javascript: false,
         jsx: false,
@@ -2723,6 +2765,7 @@ fn identity_result(
     });
     NativePreflightResult {
         status: "complete".into(),
+        function_map: None,
         changed: false,
         normalized_javascript,
         jsx,

@@ -453,7 +453,7 @@ export function transform(
   // they belong to the transform's input source, not to the final generated
   // JavaScript. Babel's function-map plugin likewise collects from the input AST
   // before transformation begins.
-  let initialFunctionMap: FunctionMap | null | undefined;
+  let initialFunctionMap: FunctionMap | null = null;
   // The resident source: native phases and visitor commits mutate it in place
   // and accumulate their map layers natively, so the intermediate phase source
   // and per-phase map layers never cross the boundary — only the final composed
@@ -517,6 +517,7 @@ export function transform(
     for (let resultIndex = 0; resultIndex < results.length; resultIndex++) {
       const result = results[resultIndex];
       const { phase: batchPhase } = batch[resultIndex];
+      if (result.functionMap != null) initialFunctionMap ??= result.functionMap;
       if (result.status === 'complete' && result.changed)
         currentVersion = sourceVersions.commit(currentVersion, {
           normalizedEditCount: 1,
@@ -536,9 +537,8 @@ export function transform(
   // all-native path.
   const completeResult = (): TransformResult => {
     cleanupStates(allStates, 'complete');
-    initialFunctionMap ??= options.functionMap
-      ? native.generateFunctionMap(source, parseFilename)
-      : null;
+    if (options.functionMap && initialFunctionMap == null)
+      throw new Error('Input function map was not collected');
     return {
       status: 'complete',
       code: currentSource(),
@@ -549,7 +549,14 @@ export function transform(
     };
   };
   try {
-    if (pipeline.phases.length === 0) native.validateProgram(source, parseFilename);
+    if (pipeline.phases.length === 0) {
+      if (options.functionMap) {
+        parsedSource = new native.NativeParsedSource(source, parseFilename);
+        initialFunctionMap = parsedSource.functionMap();
+        parsedSource.validate();
+        parsedSource = null;
+      } else native.validateProgram(source, parseFilename);
+    }
     // All-native fast path: one crossing runs every phase and returns the final
     // products directly. Using NativePipelineSession here would add session
     // construction and a terminal crossing without providing a JS observer.
@@ -558,8 +565,9 @@ export function transform(
       const pipelineResult = native.runNativePipeline(
         parseFilename,
         source,
-        batch.map(({ phase }) => ({
+        batch.map(({ phase }, index) => ({
           ...nativePreflightOptions(phase.native!),
+          functionMap: options.functionMap && index === 0,
           sourceFilename: filename,
         })),
         inputMap?.mappings,
@@ -592,8 +600,9 @@ export function transform(
         const batch = nativePhaseBatch(pipeline, phaseIndex);
         phaseIndex = batch.at(-1)!.index;
         const results = pipelineSession!.runNativePhases(
-          batch.map(({ phase: batchPhase }) => ({
+          batch.map(({ phase: batchPhase }, index) => ({
             ...nativePreflightOptions(batchPhase.native!),
+            functionMap: options.functionMap && initialFunctionMap == null && index === 0,
             sourceFilename: filename,
           })),
         );
@@ -618,10 +627,15 @@ export function transform(
         reusableRoutedBatch = null;
       }
       const edits: EditCommand[] = [];
-      if (usesSyntax && syntaxSource !== observationSource) {
+      if (
+        (usesSyntax && syntaxSource !== observationSource) ||
+        (options.functionMap && initialFunctionMap == null)
+      ) {
         parsedSource?.close();
         parsedSource = new native.NativeParsedSource(observationSource, parseFilename);
-        syntaxFacts = new Set(parsedSource.syntaxFacts());
+        if (options.functionMap && initialFunctionMap == null)
+          initialFunctionMap = parsedSource.functionMap();
+        if (usesSyntax) syntaxFacts = new Set(parsedSource.syntaxFacts());
         syntaxSource = observationSource;
       }
       const prepared = prepareApplicablePhase(phase, syntaxFacts);

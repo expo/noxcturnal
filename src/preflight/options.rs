@@ -8,6 +8,8 @@ use napi_derive::napi;
 #[napi(object)]
 #[derive(Default)]
 pub struct NativePreflightOptions {
+    /// Collect input function maps before any language lowering or source rewrite.
+    pub function_map: Option<bool>,
     /// Original public filename, separate from the parser dialect path.
     pub source_filename: Option<String>,
     pub optimization_module_context: Option<bool>,

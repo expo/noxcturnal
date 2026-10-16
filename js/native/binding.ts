@@ -4,6 +4,7 @@ import type { FunctionMap, NativeVlqMap, ParseClassification } from '../types';
 import type { PreflightPlan } from '../preflight/types';
 
 interface NativePreflightOptionsInput {
+  functionMap?: boolean;
   sourceFilename?: string;
   optimizationModuleContext?: boolean;
   reactCompiler?: boolean;
@@ -67,6 +68,7 @@ interface NativePreflightOptionsInput {
 
 export interface NativePreflightResultOutput {
   status: 'complete' | 'unsupported' | 'error';
+  functionMap?: FunctionMap;
   changed: boolean;
   normalizedJavascript: boolean;
   jsx: boolean;
@@ -85,6 +87,7 @@ interface NativeBinding {
     filename: string,
   ) => {
     syntaxFacts(): string[];
+    functionMap(): FunctionMap;
     materializeRouted(manifest: Buffer): Buffer;
     materialize(
       retentionManifest: Buffer,

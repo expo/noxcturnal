@@ -45,9 +45,18 @@ pub fn generate(source: &str, filename: &str) -> napi::Result<FunctionMap> {
             "function-map",
         ));
     }
+    Ok(collect(source, filename, &parsed.program))
+}
+
+/// Collect from an existing parse of this exact input version, before mutation.
+pub(crate) fn collect<'a>(
+    source: &'a str,
+    filename: &str,
+    program: &oxc_ast::ast::Program<'a>,
+) -> FunctionMap {
     let mut collector = FunctionMapCollector::new(source, filename);
-    collector.visit_program(&parsed.program);
-    Ok(collector.finish())
+    collector.visit_program(program);
+    collector.finish()
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
