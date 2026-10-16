@@ -157,6 +157,32 @@ test('supports path-scoped and lexical-scope dynamic subscriptions', () => {
   assert.deepEqual(identifiers, ['within', 'inner', 'run', 'scope', 'after']);
 });
 
+test('path widening delivers immediately after a long traversal prefix', () => {
+  const seen: string[] = [];
+  let within: string[] = [];
+  const plugin = defineNativePlugin({
+    name: 'bounded-widen',
+    visitors: [
+      defineVisitor('CallExpression', { controlFlow: ['dynamic-subscriptions'] }, path => {
+        path.subscribeWithin('Identifier');
+        within = seen.slice();
+      }),
+      defineVisitor('Identifier', { fields: ['name'] }, path => {
+        seen.push(String(path.node.name));
+      }),
+    ],
+  });
+  const prefix = '0;'.repeat(100);
+  const result = transform(
+    `${prefix}within(inner); outside;`,
+    'fixture.js',
+    defineNativePipeline({ phases: [{ name: 'visit', plugins: [plugin] }] }),
+  );
+  assert.equal(result.status, 'complete');
+  assert.deepEqual(within, ['within', 'inner']);
+  assert.deepEqual(seen, ['within', 'inner', 'outside']);
+});
+
 test('implements per-plugin skip and stop', () => {
   const skipped: string[] = [];
   const stopped: string[] = [];
