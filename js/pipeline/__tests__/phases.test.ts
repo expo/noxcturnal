@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import { test } from 'vitest';
+import { test, vi } from 'vitest';
+import { NativeTransformSession } from '../../runtime/session';
 
 import {
   compilePhasePlan,
@@ -413,35 +414,42 @@ test('keeps the source version for an identity-equivalent transaction', () => {
   assert.equal(result.code, 'const value = 1;');
 });
 
-test('does not reuse a no-op phase session without the next phase fields', () => {
-  const conservativeNoop = defineNativePlugin({
-    name: 'conservative-noop',
-    editEffect: 'whole-program',
-    visitors: [defineVisitor('Identifier', { fields: ['name'] }, () => {})],
-  });
-  let importedSource: string | undefined;
-  const readImport = defineNativePlugin({
-    name: 'read-import',
-    editEffect: 'none',
-    visitors: [
-      defineVisitor('ImportDeclaration', { fields: ['source'] }, path => {
-        importedSource = path.node.source;
-      }),
-    ],
-  });
-  const result = transform(
-    'import value from "./dependency"; value;',
-    'fixture.js',
-    defineNativePipeline({
-      phases: [
-        { name: 'conservative-noop', plugins: [conservativeNoop] },
-        { name: 'read-import', plugins: [readImport] },
+test('retains broader fields to reuse a potentially editing no-op phase session', () => {
+  const next = vi.spyOn(NativeTransformSession.prototype, 'nextRoutedPacked');
+  try {
+    const conservativeNoop = defineNativePlugin({
+      name: 'conservative-noop',
+      editEffect: 'whole-program',
+      visitors: [defineVisitor('Identifier', { fields: ['name'] }, () => {})],
+    });
+    let importedSource: string | undefined;
+    const readImport = defineNativePlugin({
+      name: 'read-import',
+      editEffect: 'none',
+      visitors: [
+        defineVisitor('ImportDeclaration', { fields: ['source'] }, path => {
+          importedSource = path.node.source;
+        }),
       ],
-    }),
-    {},
-  );
-  assert.equal(result.status, 'complete');
-  assert.equal(importedSource, './dependency');
+    });
+    const result = transform(
+      'import value from "./dependency"; value;',
+      'fixture.js',
+      defineNativePipeline({
+        phases: [
+          { name: 'conservative-noop', plugins: [conservativeNoop] },
+          { name: 'read-import', plugins: [readImport] },
+        ],
+      }),
+      {},
+    );
+    assert.equal(result.status, 'complete');
+    assert.equal(importedSource, './dependency');
+    assert.equal(next.mock.contexts.length, 2);
+    assert.equal(next.mock.contexts[0], next.mock.contexts[1]);
+  } finally {
+    next.mockRestore();
+  }
 });
 
 test('creates a map-only version without reparsing unchanged code', () => {
@@ -504,3 +512,76 @@ test('keeps bytes and maps correct across structural render/reparse boundaries',
   assert.equal(result.code, 'const one = two;');
   assert.ok(result.map);
 });
+
+test('bounds speculative index retention across long runs of zero-edit phases', () => {
+  const next = vi.spyOn(NativeTransformSession.prototype, 'nextRoutedPacked');
+  let visits = 0;
+  try {
+    const result = transform(
+      'const value = other;',
+      'fixture.js',
+      defineNativePipeline({
+        phases: Array.from({ length: 20 }, (_, index) => ({
+          name: `phase-${index}`,
+          plugins: [
+            defineNativePlugin({
+              name: `plugin-${index}`,
+              editEffect: 'whole-program',
+              visitors: [
+                defineVisitor('Identifier', { fields: index % 2 ? ['name'] : [] }, () => {
+                  visits++;
+                }),
+              ],
+            }),
+          ],
+        })),
+      }),
+    );
+    assert.equal(result.status, 'complete');
+    assert.equal(visits, 40);
+    assert.equal(next.mock.contexts.length, 20);
+    assert.equal(new Set(next.mock.contexts).size, 3);
+    assert.equal(next.mock.contexts[0], next.mock.contexts[8]);
+    assert.notEqual(next.mock.contexts[8], next.mock.contexts[9]);
+  } finally {
+    next.mockRestore();
+  }
+});
+
+test.each(['printed', 'native'] as const)(
+  'ends zero-edit index reuse at a %s boundary',
+  boundary => {
+    const next = vi.spyOn(NativeTransformSession.prototype, 'nextRoutedPacked');
+    let visits = 0;
+    const plugin = defineNativePlugin({
+      name: 'observe-boundary',
+      editEffect: 'whole-program',
+      visitors: [
+        defineVisitor('Identifier', { ancestry: { mode: 'parent' } }, () => {
+          visits++;
+        }),
+      ],
+    });
+    try {
+      const result = transform(
+        'const value = other;',
+        'fixture.js',
+        defineNativePipeline({
+          phases: [
+            { name: 'before', plugins: [plugin] },
+            boundary === 'native'
+              ? { name: 'boundary', native: { transforms: { forOf: true } } }
+              : { name: 'boundary', plugins: [], requiresPrintedInput: true },
+            { name: 'after', plugins: [plugin] },
+          ],
+        }),
+      );
+      assert.equal(result.status, 'complete');
+      assert.equal(visits, 4);
+      assert.ok(next.mock.contexts.length >= 2);
+      assert.notEqual(next.mock.contexts[0], next.mock.contexts.at(-1));
+    } finally {
+      next.mockRestore();
+    }
+  },
+);
