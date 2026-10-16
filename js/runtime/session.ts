@@ -529,17 +529,19 @@ export class NativeTransformSession {
       const bindingScope = this.resolveBindingScope(name, scopeId);
       return bindingScope == null ? [] : [{ name, scopeId: bindingScope }];
     });
-    for (const bindingScope of new Set(resolved.map(binding => binding.scopeId))) {
-      if (this.#bindingsByScope.has(bindingScope)) continue;
-      this.#bindingsByScope.set(
-        bindingScope,
-        new Map(
-          this.#binding('query.bindings.scope')
-            .queryBindings(undefined, bindingScope)
-            .map(adaptBindingFact)
-            .map(binding => [binding.name, binding]),
-        ),
-      );
+    const missing = new Map<string, { name: string; scopeId: number }>();
+    for (const binding of resolved) {
+      if (this.#bindingsByScope.get(binding.scopeId)?.has(binding.name)) continue;
+      missing.set(binding.name, binding);
+    }
+    if (missing.size > 0) {
+      const facts = this.#binding('query.bindings.batch').queryBindingsBatch([...missing.values()]);
+      for (const raw of facts) {
+        const fact = adaptBindingFact(raw);
+        let scope = this.#bindingsByScope.get(fact.scopeId);
+        if (!scope) this.#bindingsByScope.set(fact.scopeId, (scope = new Map()));
+        scope.set(fact.name, fact);
+      }
     }
     return resolved.flatMap(binding => {
       const fact = this.#bindingsByScope.get(binding.scopeId)?.get(binding.name);

@@ -18,6 +18,12 @@ use super::retained::routed_buffer_from_index;
 use super::{MaterializedSessionParts, decode_route_manifest};
 
 #[napi(object)]
+pub struct NativeBindingQuery {
+    pub name: String,
+    pub scope_id: u32,
+}
+
+#[napi(object)]
 pub struct NativeCallQuery {
     pub callee: String,
     pub global_only: Option<bool>,
@@ -334,6 +340,25 @@ impl NativeIndexedSession {
             reads.unwrap_or(false),
             writes.unwrap_or(false),
         ))
+    }
+
+    #[napi]
+    pub fn query_bindings_batch(
+        &self,
+        requests: Vec<NativeBindingQuery>,
+    ) -> Result<Vec<NativeBindingFact>> {
+        self.ensure_open()?;
+        Ok(requests
+            .iter()
+            .flat_map(|request| {
+                self.retained_index.binding_facts(
+                    Some(&request.name),
+                    Some(request.scope_id),
+                    false,
+                    false,
+                )
+            })
+            .collect())
     }
 
     #[napi]

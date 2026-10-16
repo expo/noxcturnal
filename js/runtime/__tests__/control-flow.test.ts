@@ -752,3 +752,90 @@ test('provides Babel-shaped multi-replacement, container, comment, and code-fram
   assert.equal(result.status, 'complete');
   assert.equal(result.code, '/* first */\nconst value = 2\n3;\n/* last */');
 });
+
+test.each([128, 256, 512])(
+  'sparse binding batches hydrate only requested facts among %i unrelated bindings',
+  size => {
+    const prototype = native.NativeIndexedSession.prototype;
+    const originalBatch = prototype.queryBindingsBatch;
+    const originalQuery = prototype.queryBindings;
+    const batches: { name: string; scopeId: number }[][] = [];
+    prototype.queryBindingsBatch = function (requests: { name: string; scopeId: number }[]) {
+      batches.push(requests);
+      const facts = originalBatch.call(this, requests);
+      assert.equal(facts.length, requests.length);
+      return facts;
+    };
+    prototype.queryBindings = function () {
+      throw new Error('sparse resolution must not enumerate scopes');
+    };
+    const session = openRetained(
+      `${Array.from({ length: size }, (_, i) => `let unused${i} = 0;`).join('')}
+     let outer = 1; let shared = 2;
+     function fn(shared) { shared++; outer += shared; return outer; }`,
+      'fixture.js',
+    );
+    try {
+      const fn = session.nodes(['Function']).find(node => node.name === 'fn')!;
+      const scopeId = fn.scopeId!;
+      const facts = session.resolveBindings(['outer', 'shared', 'outer', 'missing'], scopeId);
+      assert.deepEqual(
+        facts.map(fact => fact.name),
+        ['outer', 'shared', 'outer'],
+      );
+      assert.equal(batches.length, 1);
+      assert.deepEqual(
+        batches[0].map(request => request.name),
+        ['outer', 'shared'],
+      );
+      assert.notEqual(facts[0].scopeId, facts[1].scopeId);
+      assert.ok(facts[0].references.some(reference => reference.write));
+      assert.ok(facts[0].references.some(reference => reference.read));
+      assert.deepEqual(session.resolveBindings(['shared', 'outer'], scopeId), [facts[1], facts[0]]);
+      assert.equal(batches.length, 1);
+      assert.deepEqual(session.resolveBindings(['missing'], scopeId), []);
+      assert.equal(batches.length, 1);
+    } finally {
+      session.close();
+      prototype.queryBindingsBatch = originalBatch;
+      prototype.queryBindings = originalQuery;
+    }
+  },
+);
+
+test('binding batches preserve exact facts across many small scopes', () => {
+  const source = Array.from(
+    { length: 64 },
+    (_, i) => `function fn${i}(value) { value += ${i}; return value; }`,
+  ).join('');
+  const session = openRetained(source, 'fixture.js');
+  const raw = new native.NativeIndexedSession(
+    source,
+    'fixture.js',
+    packRouteManifest([], false, false, ALL_RETAINED_CAPABILITIES),
+  );
+  try {
+    const requests = session
+      .nodes(['Function'])
+      .map(node => ({ name: 'value', scopeId: node.scopeId! }));
+    const facts = raw.queryBindingsBatch(requests);
+    assert.equal(facts.length, 64);
+    assert.deepEqual(
+      facts,
+      requests.flatMap(request => raw.queryBindings(request.name, request.scopeId)),
+    );
+    for (const request of requests) {
+      assert.equal(session.resolveBindings(['value'], request.scopeId)[0].scopeId, request.scopeId);
+    }
+    assert.deepEqual(
+      raw.queryBindingsBatch([{ name: 'missing', scopeId: requests[0].scopeId }]),
+      [],
+    );
+    assert.deepEqual(raw.queryBindingsBatch([]), []);
+    raw.close();
+    assert.throws(() => raw.queryBindingsBatch(requests), /closed/);
+  } finally {
+    raw.close();
+    session.close();
+  }
+});
