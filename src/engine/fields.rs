@@ -7,6 +7,7 @@ use oxc_ast::{
     },
 };
 use oxc_semantic::Scoping;
+use oxc_span::GetSpan;
 use rustc_hash::FxHashMap;
 
 use crate::event_types::NodeField;
@@ -166,6 +167,7 @@ pub(crate) struct DirectPackedFields {
 )]
 pub(crate) fn packed_fields_direct(
     kind: AstKind<'_>,
+    declaration_kind: Option<VariableDeclarationKind>,
     source: &str,
     member_write: bool,
     member_root_write: bool,
@@ -533,15 +535,15 @@ pub(crate) fn packed_fields_direct(
             push(field_ids::ASYNC, 0x8000_0000 | u32::from(function.r#async));
             push(
                 field_ids::EXPRESSION,
-                0x8000_0000 | u32::from(function.expression),
+                0x8000_0000 | u32::from(function.is_expression()),
             );
             push(
                 field_ids::PARAMETER_COUNT,
                 0x4000_0000 | function.params.items.len() as u32,
             );
-            let inset = u32::from(!function.expression);
-            let body_start = function.body.span.start + inset;
-            let body_end = function.body.span.end.saturating_sub(inset);
+            let inset = u32::from(!function.is_expression());
+            let body_start = function.body.span().start + inset;
+            let body_end = function.body.span().end.saturating_sub(inset);
             push(
                 field_ids::BODY_START,
                 0x4000_0000 | utf16.map_or(body_start, |index| index[body_start as usize]),
@@ -614,13 +616,28 @@ pub(crate) fn packed_fields_direct(
                 push(field_ids::LOCAL, local);
             }
         }
-        AstKind::ExportNamedDeclaration(declaration) => {
-            if wants(field_ids::SOURCE)
-                && let Some(source) = &declaration.source
-            {
-                let source = intern_packed(strings, &literal_string(source));
-                push(field_ids::SOURCE, source);
+        AstKind::ExportDeclaration(declaration) => {
+            if wants(field_ids::EXPORT_KIND) {
+                let value = intern_packed(strings, import_export_kind(declaration.export_kind()));
+                push(field_ids::EXPORT_KIND, value);
             }
+            push(field_ids::SPECIFIER_COUNT, 0x4000_0000);
+        }
+        AstKind::ExportFromDeclaration(declaration) => {
+            if wants(field_ids::SOURCE) {
+                let value = intern_packed(strings, &literal_string(&declaration.source));
+                push(field_ids::SOURCE, value);
+            }
+            if wants(field_ids::EXPORT_KIND) {
+                let value = intern_packed(strings, import_export_kind(declaration.export_kind));
+                push(field_ids::EXPORT_KIND, value);
+            }
+            push(
+                field_ids::SPECIFIER_COUNT,
+                0x4000_0000 | declaration.specifiers.len() as u32,
+            );
+        }
+        AstKind::ExportNamedDeclaration(declaration) => {
             if wants(field_ids::EXPORT_KIND) {
                 let export_kind = import_export_kind(declaration.export_kind);
                 let export_kind = intern_packed(strings, export_kind);
@@ -694,7 +711,9 @@ pub(crate) fn packed_fields_direct(
         }
         AstKind::VariableDeclarator(declarator) => {
             if wants(field_ids::KIND) {
-                let kind = variable_kind(declarator.kind);
+                let kind = variable_kind(
+                    declaration_kind.expect("variable declarator has a declaration parent"),
+                );
                 let kind = intern_packed(strings, kind);
                 push(field_ids::KIND, kind);
             }
@@ -853,6 +872,7 @@ fn skip_header_trivia(source: &str, mut cursor: usize, end: usize) -> usize {
 
 pub(crate) fn fields(
     kind: AstKind<'_>,
+    declaration_kind: Option<VariableDeclarationKind>,
     source: &str,
     member_write: bool,
     member_root_write: bool,
@@ -1165,23 +1185,23 @@ pub(crate) fn fields(
             push!(
                 field_ids::EXPRESSION,
                 "expression",
-                function.expression.to_string()
+                function.is_expression().to_string()
             );
             push!(
                 field_ids::PARAMETER_COUNT,
                 "parameterCount",
                 function.params.items.len().to_string()
             );
-            let inset = u32::from(!function.expression);
+            let inset = u32::from(!function.is_expression());
             push!(
                 field_ids::BODY_START,
                 "bodyStartByte",
-                (function.body.span.start + inset).to_string(),
+                (function.body.span().start + inset).to_string(),
             );
             push!(
                 field_ids::BODY_END,
                 "bodyEndByte",
-                function.body.span.end.saturating_sub(inset).to_string(),
+                function.body.span().end.saturating_sub(inset).to_string(),
             );
         }
         AstKind::Class(class) => {
@@ -1236,14 +1256,32 @@ pub(crate) fn fields(
             push!(field_ids::IMPORTED, "imported", "*".into());
             push!(field_ids::LOCAL, "local", specifier.local.name.to_string());
         }
+        AstKind::ExportDeclaration(declaration) => {
+            push!(
+                field_ids::EXPORT_KIND,
+                "exportKind",
+                import_export_kind(declaration.export_kind()).to_owned()
+            );
+            push!(field_ids::SPECIFIER_COUNT, "specifierCount", "0".into());
+        }
+        AstKind::ExportFromDeclaration(declaration) => {
+            push!(
+                field_ids::SOURCE,
+                "source",
+                literal_string(&declaration.source).into_owned()
+            );
+            push!(
+                field_ids::EXPORT_KIND,
+                "exportKind",
+                import_export_kind(declaration.export_kind).to_owned()
+            );
+            push!(
+                field_ids::SPECIFIER_COUNT,
+                "specifierCount",
+                declaration.specifiers.len().to_string()
+            );
+        }
         AstKind::ExportNamedDeclaration(declaration) => {
-            if let Some(source) = &declaration.source {
-                push!(
-                    field_ids::SOURCE,
-                    "source",
-                    literal_string(source).into_owned()
-                );
-            }
             push!(
                 field_ids::EXPORT_KIND,
                 "exportKind",
@@ -1322,7 +1360,10 @@ pub(crate) fn fields(
             push!(
                 field_ids::KIND,
                 "kind",
-                variable_kind(declarator.kind).to_owned()
+                variable_kind(
+                    declaration_kind.expect("variable declarator has a declaration parent")
+                )
+                .to_owned()
             );
             push!(
                 field_ids::HAS_INITIALIZER,

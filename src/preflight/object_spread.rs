@@ -1,10 +1,12 @@
+use oxc_allocator::GetAllocator;
 use oxc_allocator::{Allocator, Box as ArenaBox, TakeIn, Vec as ArenaVec};
+use oxc_ast::builder::GetAstBuilder;
 use oxc_ast::{
-    AstBuilder,
     ast::{
         Argument, Expression, JSXAttributeItem, JSXElement, ObjectPropertyKind, Program,
         TSTypeParameterInstantiation,
     },
+    builder::AstBuilder,
 };
 use oxc_ast_visit::{Visit, VisitMut, walk, walk_mut};
 use oxc_span::{GetSpan, Span};
@@ -141,10 +143,11 @@ impl<'a> ObjectSpreadLowerer<'a> {
             .first()
             .map_or(fallback_span, GetSpan::span)
             .merge(properties.last().map_or(fallback_span, GetSpan::span));
-        #[expect(deprecated)]
-        let group = self
-            .ast
-            .expression_object(span, properties.take_in(&self.ast));
+        let group = oxc_ast::ast::Expression::new_object_expression(
+            span,
+            properties.take_in(&self.ast),
+            self.ast.builder(),
+        );
         arguments.push(group.into());
     }
 
@@ -170,10 +173,11 @@ impl<'a> ObjectSpreadLowerer<'a> {
         let mut arguments = ArenaVec::new_in(&self.ast);
 
         if starts_with_spread {
-            #[expect(deprecated)]
-            let empty = self
-                .ast
-                .expression_object(object_span, ArenaVec::new_in(&self.ast));
+            let empty = oxc_ast::ast::Expression::new_object_expression(
+                object_span,
+                ArenaVec::new_in(&self.ast),
+                self.ast.builder(),
+            );
             arguments.push(empty.into());
         }
 
@@ -190,28 +194,30 @@ impl<'a> ObjectSpreadLowerer<'a> {
         }
         self.flush_properties(&mut grouped, &mut arguments, object_span);
 
-        #[expect(deprecated)]
         let callee = if let Some(helper_name) = self.helper_name {
-            self.ast
-                .expression_identifier(object_span, self.ast.allocator.alloc_str(helper_name))
+            oxc_ast::ast::Expression::new_identifier(
+                object_span,
+                self.ast.allocator().alloc_str(helper_name),
+                self.ast.builder(),
+            )
         } else {
-            self.ast
-                .member_expression_static(
-                    object_span,
-                    self.ast.expression_identifier(object_span, "Object"),
-                    self.ast.identifier_name(object_span, "assign"),
-                    false,
-                )
-                .into()
+            oxc_ast::ast::MemberExpression::new_static_member_expression(
+                object_span,
+                oxc_ast::ast::Expression::new_identifier(object_span, "Object", self.ast.builder()),
+                oxc_ast::ast::IdentifierName::new(object_span, "assign", self.ast.builder()),
+                false,
+                self.ast.builder(),
+            )
+            .into()
         };
-        #[expect(deprecated)]
         {
-            *expression = self.ast.expression_call(
+            *expression = oxc_ast::ast::Expression::new_call_expression(
                 object_span,
                 callee,
                 None::<ArenaBox<'a, TSTypeParameterInstantiation<'a>>>,
                 arguments,
                 false,
+                self.ast.builder(),
             );
         }
         self.changed = true;

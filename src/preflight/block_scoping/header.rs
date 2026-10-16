@@ -1,6 +1,8 @@
 //! Move a captured for-loop's update/test into the next iteration's environment.
 use super::*;
+use oxc_allocator::GetAllocator;
 use oxc_ast::ast::{ForStatement, ForStatementInit};
+use oxc_ast::builder::GetAstBuilder;
 
 pub(super) struct Plan {
     pub(super) first: Option<String>,
@@ -44,94 +46,125 @@ fn labeled_loop<'s, 'a>(
     }
 }
 
-#[expect(deprecated)]
 impl<'a> VisitMut<'a> for HeaderLowerer<'a, '_> {
     fn visit_statement(&mut self, statement: &mut Statement<'a>) {
         let Some(loop_) = labeled_loop(statement, self.span) else {
             walk_mut::walk_statement(self, statement);
             return;
         };
-        let ast = self.ast;
+        let ast = AstBuilder::new(self.ast.allocator());
         let anchor = Span::new(self.span.start, self.span.start);
         self.expressions = Some((None, None));
         if let Some(first) = &self.plan.first {
             self.expressions = Some((loop_.test.take(), loop_.update.take()));
-            loop_.update = Some(
-                ast.expression_assignment(
+            loop_.update = Some(oxc_ast::ast::Expression::new_assignment_expression(
+                anchor,
+                AssignmentOperator::Assign,
+                oxc_ast::ast::SimpleAssignmentTarget::new_assignment_target_identifier(
                     anchor,
-                    AssignmentOperator::Assign,
-                    ast.simple_assignment_target_assignment_target_identifier(
-                        anchor,
-                        ast.allocator.alloc_str(first),
-                    )
-                    .into(),
-                    ast.expression_boolean_literal(anchor, false),
-                ),
-            );
+                    ast.allocator().alloc_str(first),
+                    ast.builder(),
+                )
+                .into(),
+                oxc_ast::ast::Expression::new_boolean_literal(anchor, false, ast.builder()),
+                ast.builder(),
+            ));
         }
         let Some(ForStatementInit::VariableDeclaration(mut declaration)) = loop_.init.take() else {
             unreachable!("captured let header")
         };
-        let mut prefix = ast.vec();
+        let mut prefix = oxc_allocator::Vec::new_in(ast.builder());
         if let Some(initial) = &self.plan.initial {
             // Initialization has its own environment. Closures created there must
             // not observe the later copies written back by the iteration helper.
             prefix.push(Statement::VariableDeclaration(declaration));
-            let mut values = ast.vec();
-            let mut declarations = ast.vec();
+            let mut values = oxc_allocator::Vec::new_in(ast.builder());
+            let mut declarations = oxc_allocator::Vec::new_in(ast.builder());
             for (index, binding) in self.bindings.iter().enumerate() {
                 let name = &binding.name;
                 values.push(ArrayExpressionElement::from(
-                    ast.expression_identifier(anchor, ast.allocator.alloc_str(name)),
-                ));
-                let value = Expression::from(ast.member_expression_computed(
-                    anchor,
-                    ast.expression_identifier(anchor, ast.allocator.alloc_str(initial)),
-                    ast.expression_numeric_literal(
+                    oxc_ast::ast::Expression::new_identifier(
                         anchor,
-                        index as f64,
-                        None,
-                        oxc_ast::ast::NumberBase::Decimal,
+                        ast.allocator().alloc_str(name),
+                        ast.builder(),
                     ),
-                    false,
                 ));
-                declarations.push(ast.variable_declarator(
+                let value = Expression::from(
+                    oxc_ast::ast::MemberExpression::new_computed_member_expression(
+                        anchor,
+                        oxc_ast::ast::Expression::new_identifier(
+                            anchor,
+                            ast.allocator().alloc_str(initial),
+                            ast.builder(),
+                        ),
+                        oxc_ast::ast::Expression::new_numeric_literal(
+                            anchor,
+                            index as f64,
+                            None,
+                            oxc_ast::ast::NumberBase::Decimal,
+                            ast.builder(),
+                        ),
+                        false,
+                        ast.builder(),
+                    ),
+                );
+                declarations.push(oxc_ast::ast::VariableDeclarator::new(
                     anchor,
-                    VariableDeclarationKind::Let,
-                    ast.binding_pattern_binding_identifier(anchor, ast.allocator.alloc_str(name)),
+                    oxc_ast::ast::BindingPattern::new_binding_identifier(
+                        anchor,
+                        ast.allocator().alloc_str(name),
+                        ast.builder(),
+                    ),
                     None::<ArenaBox<'a, TSTypeAnnotation<'a>>>,
                     Some(value),
                     false,
+                    ast.builder(),
                 ));
             }
             prefix.push(binding_declaration(
-                ast,
+                AstBuilder::new(ast.allocator()),
                 anchor,
                 VariableDeclarationKind::Var,
                 initial,
-                Some(ast.expression_array(anchor, values)),
+                Some(oxc_ast::ast::Expression::new_array_expression(
+                    anchor,
+                    values,
+                    ast.builder(),
+                )),
             ));
-            declaration = ast.alloc_variable_declaration(
+            declaration = oxc_ast::ast::VariableDeclaration::boxed(
                 anchor,
                 VariableDeclarationKind::Let,
                 declarations,
                 false,
+                ast.builder(),
             );
         }
         if let Some(first) = &self.plan.first {
-            declaration.declarations.push(ast.variable_declarator(
-                anchor,
-                VariableDeclarationKind::Let,
-                ast.binding_pattern_binding_identifier(anchor, ast.allocator.alloc_str(first)),
-                None::<ArenaBox<'a, TSTypeAnnotation<'a>>>,
-                Some(ast.expression_boolean_literal(anchor, true)),
-                false,
-            ));
+            declaration
+                .declarations
+                .push(oxc_ast::ast::VariableDeclarator::new(
+                    anchor,
+                    oxc_ast::ast::BindingPattern::new_binding_identifier(
+                        anchor,
+                        ast.allocator().alloc_str(first),
+                        ast.builder(),
+                    ),
+                    None::<ArenaBox<'a, TSTypeAnnotation<'a>>>,
+                    Some(oxc_ast::ast::Expression::new_boolean_literal(
+                        anchor,
+                        true,
+                        ast.builder(),
+                    )),
+                    false,
+                    ast.builder(),
+                ));
         }
         loop_.init = Some(ForStatementInit::VariableDeclaration(declaration));
         if !prefix.is_empty() {
             prefix.push(statement.take_in(&ast));
-            *statement = ast.statement_block(anchor, prefix);
+            *statement =
+                oxc_ast::ast::Statement::new_block_statement(anchor, prefix, ast.builder());
         }
     }
 }

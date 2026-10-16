@@ -1,13 +1,16 @@
+use oxc_allocator::GetAllocator;
+use oxc_ast::builder::GetAstBuilder;
 use std::collections::VecDeque;
 
 use oxc_allocator::{Allocator, Box as ArenaBox, TakeIn, Vec as ArenaVec};
 use oxc_ast::{
-    AstBuilder, AstKind,
+    AstKind,
     ast::{
         Argument, AssignmentTarget, Expression, ForOfStatement, ForStatementInit, ForStatementLeft,
         Program, Statement, TSTypeAnnotation, TSTypeParameterInstantiation,
         VariableDeclarationKind, VariableDeclarator,
     },
+    builder::AstBuilder,
 };
 use oxc_ast_visit::{VisitMut, walk_mut};
 use oxc_semantic::Semantic;
@@ -154,7 +157,6 @@ struct ForOfLowerer<'a> {
     error: Option<&'static str>,
 }
 
-#[expect(deprecated)]
 impl<'a> ForOfLowerer<'a> {
     fn lower(
         &mut self,
@@ -196,23 +198,27 @@ impl<'a> ForOfLowerer<'a> {
             target => {
                 let target = AssignmentTarget::try_from(target)
                     .map_err(|_| "for-of-assignment-target-invalid")?;
-                #[expect(deprecated)]
-                let assignment = self.ast.expression_assignment(
+                let assignment = oxc_ast::ast::Expression::new_assignment_expression(
                     target.span(),
                     AssignmentOperator::Assign,
                     target,
                     step_value,
+                    self.ast.builder(),
                 );
-                #[expect(deprecated)]
-                self.ast.statement_expression(assignment.span(), assignment)
+                oxc_ast::ast::Statement::new_expression_statement(
+                    assignment.span(),
+                    assignment,
+                    self.ast.builder(),
+                )
             }
         };
-        let helper_call = self.ast.expression_call(
+        let helper_call = oxc_ast::ast::Expression::new_call_expression(
             anchor,
             self.id(anchor, &self.helper),
             None::<ArenaBox<'a, TSTypeParameterInstantiation<'a>>>,
             self.vec([Argument::from(right)]),
             false,
+            self.ast.builder(),
         );
         let iterator_declaration = self.declarator(anchor, &iterator, Some(helper_call));
         let step_declaration = self.declarator(anchor, &step, None);
@@ -222,137 +228,166 @@ impl<'a> ForOfLowerer<'a> {
         let next = self.call0(anchor, self.member(anchor, self.id(anchor, &iterator), "n"));
         let assign_step = self.assign_name(anchor, &step, next);
         let done = self.member(anchor, self.id(anchor, &step), "done");
-        #[expect(deprecated)]
-        let not_done = self
-            .ast
-            .expression_unary(anchor, UnaryOperator::LogicalNot, done);
-        #[expect(deprecated)]
-        let test = self
-            .ast
-            .expression_sequence(anchor, self.vec([assign_step, not_done]));
+        let not_done = oxc_ast::ast::Expression::new_unary_expression(
+            anchor,
+            UnaryOperator::LogicalNot,
+            done,
+            self.ast.builder(),
+        );
+        let test = oxc_ast::ast::Expression::new_sequence_expression(
+            anchor,
+            self.vec([assign_step, not_done]),
+            self.ast.builder(),
+        );
         // The loop-head binding and the source body have distinct lexical
         // environments. Keep an existing body block nested so declarations in
         // it may legally shadow the per-iteration binding.
         let body = self.vec([binding, statement.body]);
-        #[expect(deprecated)]
-        let loop_body = self.ast.statement_block(anchor, body);
-        #[expect(deprecated)]
-        let mut loop_statement =
-            self.ast
-                .statement_for(anchor, Some(init), Some(test), None, loop_body);
+        let loop_body =
+            oxc_ast::ast::Statement::new_block_statement(anchor, body, self.ast.builder());
+        let mut loop_statement = oxc_ast::ast::Statement::new_for_statement(
+            anchor,
+            Some(init),
+            Some(test),
+            None,
+            loop_body,
+            self.ast.builder(),
+        );
         for label in labels.into_iter().rev() {
-            #[expect(deprecated)]
             {
-                loop_statement = self.ast.statement_labeled(
+                loop_statement = oxc_ast::ast::Statement::new_labeled_statement(
                     anchor,
-                    self.ast
-                        .label_identifier(anchor, self.ast.allocator.alloc_str(&label)),
+                    oxc_ast::ast::LabelIdentifier::new(
+                        anchor,
+                        self.ast.allocator().alloc_str(&label),
+                        self.ast.builder(),
+                    ),
                     loop_statement,
+                    self.ast.builder(),
                 );
             }
         }
 
-        let try_block = self
-            .ast
-            .alloc_block_statement(anchor, self.vec([loop_statement]));
-        let report_error = self.ast.expression_call(
+        let try_block = oxc_ast::ast::BlockStatement::boxed(
+            anchor,
+            self.vec([loop_statement]),
+            self.ast.builder(),
+        );
+        let report_error = oxc_ast::ast::Expression::new_call_expression(
             anchor,
             self.member(anchor, self.id(anchor, &iterator), "e"),
             None::<ArenaBox<'a, TSTypeParameterInstantiation<'a>>>,
             self.vec([Argument::from(self.id(anchor, &caught))]),
             false,
+            self.ast.builder(),
         );
-        let catch_body = self.ast.alloc_block_statement(
+        let catch_body = oxc_ast::ast::BlockStatement::boxed(
             anchor,
             self.vec([self.expression_statement(anchor, report_error)]),
+            self.ast.builder(),
         );
-        #[expect(deprecated)]
-        let catch = self.ast.alloc_catch_clause(
+        let catch = oxc_ast::ast::CatchClause::boxed(
             anchor,
-            Some(self.ast.catch_parameter(
+            Some(oxc_ast::ast::CatchParameter::new(
                 anchor,
-                self.ast.binding_pattern_binding_identifier(
+                oxc_ast::ast::BindingPattern::new_binding_identifier(
                     anchor,
-                    self.ast.allocator.alloc_str(&caught),
+                    self.ast.allocator().alloc_str(&caught),
+                    self.ast.builder(),
                 ),
                 None::<ArenaBox<'a, TSTypeAnnotation<'a>>>,
+                self.ast.builder(),
             )),
             catch_body,
+            self.ast.builder(),
         );
 
         let close = self.call0(anchor, self.member(anchor, self.id(anchor, &iterator), "f"));
-        let outer_finally = self
-            .ast
-            .alloc_block_statement(anchor, self.vec([self.expression_statement(anchor, close)]));
-        let try_statement =
-            self.ast
-                .statement_try(anchor, try_block, Some(catch), Some(outer_finally));
+        let outer_finally = oxc_ast::ast::BlockStatement::boxed(
+            anchor,
+            self.vec([self.expression_statement(anchor, close)]),
+            self.ast.builder(),
+        );
+        let try_statement = oxc_ast::ast::Statement::new_try_statement(
+            anchor,
+            try_block,
+            Some(catch),
+            Some(outer_finally),
+            self.ast.builder(),
+        );
         let declarations = self.vec([iterator_declaration, step_declaration]);
-        let variables = Statement::VariableDeclaration(self.ast.alloc_variable_declaration(
+        let variables = Statement::VariableDeclaration(oxc_ast::ast::VariableDeclaration::boxed(
             anchor,
             VariableDeclarationKind::Var,
             declarations,
             false,
+            self.ast.builder(),
         ));
-        #[expect(deprecated)]
-        Ok(self
-            .ast
-            .statement_block(enclosing_span, self.vec([variables, try_statement])))
+        Ok(oxc_ast::ast::Statement::new_block_statement(
+            enclosing_span,
+            self.vec([variables, try_statement]),
+            self.ast.builder(),
+        ))
     }
 
     fn id(&self, span: Span, name: &str) -> Expression<'a> {
-        self.ast
-            .expression_identifier(span, self.ast.allocator.alloc_str(name))
+        oxc_ast::ast::Expression::new_identifier(
+            span,
+            self.ast.allocator().alloc_str(name),
+            self.ast.builder(),
+        )
     }
 
     fn member(&self, span: Span, object: Expression<'a>, property: &str) -> Expression<'a> {
-        #[expect(deprecated)]
         {
             Expression::from(
-                self.ast.member_expression_static(
+                oxc_ast::ast::MemberExpression::new_static_member_expression(
                     span,
                     object,
-                    self.ast
-                        .identifier_name(span, self.ast.allocator.alloc_str(property)),
+                    oxc_ast::ast::IdentifierName::new(
+                        span,
+                        self.ast.allocator().alloc_str(property),
+                        self.ast.builder(),
+                    ),
                     false,
+                    self.ast.builder(),
                 ),
             )
         }
     }
 
     fn call0(&self, span: Span, callee: Expression<'a>) -> Expression<'a> {
-        #[expect(deprecated)]
         {
-            self.ast.expression_call(
+            oxc_ast::ast::Expression::new_call_expression(
                 span,
                 callee,
                 None::<ArenaBox<'a, TSTypeParameterInstantiation<'a>>>,
                 ArenaVec::<Argument<'a>>::new_in(&self.ast),
                 false,
+                self.ast.builder(),
             )
         }
     }
 
     fn assign_name(&self, span: Span, name: &str, right: Expression<'a>) -> Expression<'a> {
-        #[expect(deprecated)]
-        let left = self
-            .ast
-            .simple_assignment_target_assignment_target_identifier(
-                span,
-                self.ast.allocator.alloc_str(name),
-            );
-        #[expect(deprecated)]
+        let left = oxc_ast::ast::SimpleAssignmentTarget::new_assignment_target_identifier(
+            span,
+            self.ast.allocator().alloc_str(name),
+            self.ast.builder(),
+        );
         {
-            self.ast
-                .expression_assignment(span, AssignmentOperator::Assign, left.into(), right)
+            oxc_ast::ast::Expression::new_assignment_expression(
+                span,
+                AssignmentOperator::Assign,
+                left.into(),
+                right,
+                self.ast.builder(),
+            )
         }
     }
 
     fn expression_statement(&self, span: Span, expression: Expression<'a>) -> Statement<'a> {
-        #[expect(deprecated)]
-        {
-            self.ast.statement_expression(span, expression)
-        }
+        oxc_ast::ast::Statement::new_expression_statement(span, expression, self.ast.builder())
     }
 
     fn declarator(
@@ -361,16 +396,18 @@ impl<'a> ForOfLowerer<'a> {
         name: &str,
         init: Option<Expression<'a>>,
     ) -> VariableDeclarator<'a> {
-        #[expect(deprecated)]
         {
-            self.ast.variable_declarator(
+            oxc_ast::ast::VariableDeclarator::new(
                 span,
-                VariableDeclarationKind::Var,
-                self.ast
-                    .binding_pattern_binding_identifier(span, self.ast.allocator.alloc_str(name)),
+                oxc_ast::ast::BindingPattern::new_binding_identifier(
+                    span,
+                    self.ast.allocator().alloc_str(name),
+                    self.ast.builder(),
+                ),
                 None::<ArenaBox<'a, TSTypeAnnotation<'a>>>,
                 init,
                 false,
+                self.ast.builder(),
             )
         }
     }

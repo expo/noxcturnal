@@ -594,6 +594,7 @@ export const CHILD_ROLES: Readonly<
     readonly native: {
       readonly edges: readonly {
         readonly field: string;
+        readonly nodeField?: string;
         readonly shape: 'single' | 'optional' | 'list' | 'optionalList' | 'listOptionalItems';
       }[];
       readonly projection: string | null;

@@ -1,8 +1,9 @@
+use oxc_ast::builder::GetAstBuilder;
 use std::collections::VecDeque;
 
 use oxc_allocator::{Allocator, Box as ArenaBox, CloneIn, TakeIn, Vec as ArenaVec};
 use oxc_ast::{
-    AstBuilder, AstKind,
+    AstKind,
     ast::{
         Argument, ArrowFunctionExpression, BindingIdentifier, BindingPattern, Class, Directive,
         Expression, FormalParameter, FormalParameterKind, FormalParameterRest, FormalParameters,
@@ -10,6 +11,7 @@ use oxc_ast::{
         TSTypeAnnotation, TSTypeParameterDeclaration, TSTypeParameterInstantiation,
         VariableDeclarationKind,
     },
+    builder::AstBuilder,
 };
 use oxc_ast_visit::{Visit, VisitMut, walk_mut};
 #[cfg(test)]
@@ -275,12 +277,17 @@ fn prepare_selected(
                     plan_arrow_capture(facts, &mut reserved)
                 };
                 let boundary = non_simple(&arrow.params).expect("non-simple arrow");
-                let (wrapper, wrapper_arguments) = body_scope_wrapper_plan(
-                    source,
-                    &symbols,
-                    &arrow.params,
-                    &arrow.body,
-                    &parameter_binding_names(&symbols, &arrow.params),
+                let (wrapper, wrapper_arguments) = arrow.body.as_function_body().map_or_else(
+                    || (false, Vec::new()),
+                    |body| {
+                        body_scope_wrapper_plan(
+                            source,
+                            &symbols,
+                            &arrow.params,
+                            body,
+                            &parameter_binding_names(&symbols, &arrow.params),
+                        )
+                    },
                 );
                 let rest_names = arrow.params.rest.as_ref().map(|rest| {
                     let array =
@@ -351,44 +358,61 @@ struct OrdinaryParameterLowerer<'a> {
     error: Option<&'static str>,
 }
 
-#[expect(deprecated)]
 impl<'a> OrdinaryParameterLowerer<'a> {
     fn ast(&self) -> AstBuilder<'a> {
         AstBuilder::new(self.allocator)
     }
 
     fn id(&self, span: Span, name: &str) -> Expression<'a> {
-        self.ast()
-            .expression_identifier(span, self.allocator.alloc_str(name))
+        oxc_ast::ast::Expression::new_identifier(
+            span,
+            self.allocator.alloc_str(name),
+            self.ast().builder(),
+        )
     }
 
     fn number(&self, span: Span, value: usize) -> Expression<'a> {
-        self.ast()
-            .expression_numeric_literal(span, value as f64, None, NumberBase::Decimal)
+        oxc_ast::ast::Expression::new_numeric_literal(
+            span,
+            value as f64,
+            None,
+            NumberBase::Decimal,
+            self.ast().builder(),
+        )
     }
 
     fn arguments_at(&self, span: Span, index: Expression<'a>) -> Expression<'a> {
-        Expression::from(self.ast().member_expression_computed(
-            span,
-            self.id(span, "arguments"),
-            index,
-            false,
-        ))
+        Expression::from(
+            oxc_ast::ast::MemberExpression::new_computed_member_expression(
+                span,
+                self.id(span, "arguments"),
+                index,
+                false,
+                self.ast().builder(),
+            ),
+        )
     }
 
     fn arguments_length(&self, span: Span) -> Expression<'a> {
         let ast = self.ast();
-        Expression::from(ast.member_expression_static(
-            span,
-            self.id(span, "arguments"),
-            ast.identifier_name(span, "length"),
-            false,
-        ))
+        Expression::from(
+            oxc_ast::ast::MemberExpression::new_static_member_expression(
+                span,
+                self.id(span, "arguments"),
+                oxc_ast::ast::IdentifierName::new(span, "length", ast.builder()),
+                false,
+                ast.builder(),
+            ),
+        )
     }
 
     fn undefined(&self, span: Span) -> Expression<'a> {
-        self.ast()
-            .expression_unary(span, UnaryOperator::Void, self.number(span, 0))
+        oxc_ast::ast::Expression::new_unary_expression(
+            span,
+            UnaryOperator::Void,
+            self.number(span, 0),
+            self.ast().builder(),
+        )
     }
 
     fn parameter_statement(
@@ -399,40 +423,61 @@ impl<'a> OrdinaryParameterLowerer<'a> {
     ) -> Statement<'a> {
         let ast = self.ast();
         let index_expression = self.number(anchor, index);
-        let present = ast.expression_binary(
+        let present = oxc_ast::ast::Expression::new_binary_expression(
             anchor,
             self.arguments_length(anchor),
             BinaryOperator::GreaterThan,
             self.number(anchor, index),
+            ast.builder(),
         );
         let argument = self.arguments_at(anchor, index_expression);
         let value = if let Some(initializer) = parameter.initializer.map(ArenaBox::unbox) {
-            let defined = ast.expression_binary(
+            let defined = oxc_ast::ast::Expression::new_binary_expression(
                 anchor,
                 argument.clone_in(self.allocator),
                 BinaryOperator::StrictInequality,
                 self.undefined(anchor),
+                ast.builder(),
             );
-            let test = ast.expression_logical(anchor, present, LogicalOperator::And, defined);
-            ast.expression_conditional(anchor, test, argument, initializer)
+            let test = oxc_ast::ast::Expression::new_logical_expression(
+                anchor,
+                present,
+                LogicalOperator::And,
+                defined,
+                ast.builder(),
+            );
+            oxc_ast::ast::Expression::new_conditional_expression(
+                anchor,
+                test,
+                argument,
+                initializer,
+                ast.builder(),
+            )
         } else {
-            ast.expression_conditional(anchor, present, argument, self.undefined(anchor))
+            oxc_ast::ast::Expression::new_conditional_expression(
+                anchor,
+                present,
+                argument,
+                self.undefined(anchor),
+                ast.builder(),
+            )
         };
-        let declarator = ast.variable_declarator(
+        let declarator = oxc_ast::ast::VariableDeclarator::new(
             anchor,
-            VariableDeclarationKind::Let,
             parameter.pattern,
             None::<ArenaBox<'a, TSTypeAnnotation<'a>>>,
             Some(value),
             false,
+            ast.builder(),
         );
         let mut declarations = ArenaVec::new_in(&ast);
         declarations.push(declarator);
-        Statement::VariableDeclaration(ast.alloc_variable_declaration(
+        Statement::VariableDeclaration(oxc_ast::ast::VariableDeclaration::boxed(
             anchor,
             VariableDeclarationKind::Let,
             declarations,
             false,
+            ast.builder(),
         ))
     }
 
@@ -463,23 +508,31 @@ impl<'a> OrdinaryParameterLowerer<'a> {
         // Rest arrays are created from the current realm's intrinsic Array,
         // independent of any lexical or global binding named `Array`. An array
         // literal preserves that behavior; `new Array(...)` does not.
-        let array = ast.expression_array(anchor, ArenaVec::new_in(&ast));
-        let mut declarations = ArenaVec::new_in(&ast);
-        declarations.push(ast.variable_declarator(
+        let array = oxc_ast::ast::Expression::new_array_expression(
             anchor,
-            VariableDeclarationKind::Var,
-            ast.binding_pattern_binding_identifier(anchor, self.allocator.alloc_str(&length_name)),
+            ArenaVec::new_in(&ast),
+            ast.builder(),
+        );
+        let mut declarations = ArenaVec::new_in(&ast);
+        declarations.push(oxc_ast::ast::VariableDeclarator::new(
+            anchor,
+            oxc_ast::ast::BindingPattern::new_binding_identifier(
+                anchor,
+                self.allocator.alloc_str(&length_name),
+                ast.builder(),
+            ),
             None::<ArenaBox<'a, TSTypeAnnotation<'a>>>,
             Some(self.arguments_length(anchor)),
             false,
+            ast.builder(),
         ));
-        declarations.push(ast.variable_declarator(
+        declarations.push(oxc_ast::ast::VariableDeclarator::new(
             anchor,
-            VariableDeclarationKind::Var,
             if target_name.is_some() {
-                ast.binding_pattern_binding_identifier(
+                oxc_ast::ast::BindingPattern::new_binding_identifier(
                     anchor,
                     self.allocator.alloc_str(target_name.as_deref().unwrap()),
+                    ast.builder(),
                 )
             } else {
                 rest_pattern.clone_in(self.allocator)
@@ -487,69 +540,111 @@ impl<'a> OrdinaryParameterLowerer<'a> {
             None::<ArenaBox<'a, TSTypeAnnotation<'a>>>,
             Some(array),
             false,
+            ast.builder(),
         ));
-        declarations.push(ast.variable_declarator(
+        declarations.push(oxc_ast::ast::VariableDeclarator::new(
             anchor,
-            VariableDeclarationKind::Var,
-            ast.binding_pattern_binding_identifier(anchor, self.allocator.alloc_str(&key_name)),
+            oxc_ast::ast::BindingPattern::new_binding_identifier(
+                anchor,
+                self.allocator.alloc_str(&key_name),
+                ast.builder(),
+            ),
             None::<ArenaBox<'a, TSTypeAnnotation<'a>>>,
             Some(self.number(anchor, index)),
             false,
+            ast.builder(),
         ));
-        let init = ast.for_statement_init_variable_declaration(
+        let init = oxc_ast::ast::ForStatementInit::new_variable_declaration(
             anchor,
             VariableDeclarationKind::Var,
             declarations,
             false,
+            ast.builder(),
         );
-        let test = ast.expression_binary(
+        let test = oxc_ast::ast::Expression::new_binary_expression(
             anchor,
             key.clone_in(self.allocator),
             BinaryOperator::LessThan,
             length,
+            ast.builder(),
         );
-        let update_target = ast.simple_assignment_target_assignment_target_identifier(
+        let update_target = oxc_ast::ast::SimpleAssignmentTarget::new_assignment_target_identifier(
             anchor,
             self.allocator.alloc_str(&key_name),
+            ast.builder(),
         );
-        let update = ast.expression_update(anchor, UpdateOperator::Increment, false, update_target);
+        let update = oxc_ast::ast::Expression::new_update_expression(
+            anchor,
+            UpdateOperator::Increment,
+            false,
+            update_target,
+            ast.builder(),
+        );
         let target_object = self.id(
             anchor,
             target_name.as_deref().expect("rest target reserved"),
         );
-        let target_index = ast.expression_binary(
+        let target_index = oxc_ast::ast::Expression::new_binary_expression(
             anchor,
             key.clone_in(self.allocator),
             BinaryOperator::Subtraction,
             self.number(anchor, index),
+            ast.builder(),
         );
-        let target = ast.member_expression_computed(anchor, target_object, target_index, false);
+        let target = oxc_ast::ast::MemberExpression::new_computed_member_expression(
+            anchor,
+            target_object,
+            target_index,
+            false,
+            ast.builder(),
+        );
         let value = self.arguments_at(anchor, key);
-        let assignment =
-            ast.expression_assignment(anchor, AssignmentOperator::Assign, target.into(), value);
-        let body = ast.statement_block(anchor, {
-            let mut body = ArenaVec::new_in(&ast);
-            body.push(ast.statement_expression(anchor, assignment));
-            body
-        });
+        let assignment = oxc_ast::ast::Expression::new_assignment_expression(
+            anchor,
+            AssignmentOperator::Assign,
+            target.into(),
+            value,
+            ast.builder(),
+        );
+        let body = oxc_ast::ast::Statement::new_block_statement(
+            anchor,
+            {
+                let mut body = ArenaVec::new_in(&ast);
+                body.push(oxc_ast::ast::Statement::new_expression_statement(
+                    anchor,
+                    assignment,
+                    ast.builder(),
+                ));
+                body
+            },
+            ast.builder(),
+        );
         let mut statements = ArenaVec::new_in(&ast);
-        statements.push(ast.statement_for(anchor, Some(init), Some(test), Some(update), body));
+        statements.push(oxc_ast::ast::Statement::new_for_statement(
+            anchor,
+            Some(init),
+            Some(test),
+            Some(update),
+            body,
+            ast.builder(),
+        ));
         if !matches!(&rest_pattern, BindingPattern::BindingIdentifier(_)) && target_name.is_some() {
             let mut declarations = ArenaVec::new_in(&ast);
-            declarations.push(ast.variable_declarator(
+            declarations.push(oxc_ast::ast::VariableDeclarator::new(
                 anchor,
-                VariableDeclarationKind::Let,
                 rest_pattern,
                 None::<ArenaBox<'a, TSTypeAnnotation<'a>>>,
                 Some(self.id(anchor, target_name.as_deref().unwrap())),
                 false,
+                ast.builder(),
             ));
             statements.push(Statement::VariableDeclaration(
-                ast.alloc_variable_declaration(
+                oxc_ast::ast::VariableDeclaration::boxed(
                     anchor,
                     VariableDeclarationKind::Let,
                     declarations,
                     false,
+                    ast.builder(),
                 ),
             ));
         }
@@ -588,7 +683,8 @@ impl<'a> OrdinaryParameterLowerer<'a> {
             aliases: &plan.captures,
         };
         capture_rewriter.visit_formal_parameters(&mut arrow.params);
-        capture_rewriter.visit_function_body(&mut arrow.body);
+        capture_rewriter.visit_arrow_function_body(&mut arrow.body);
+        let expression_body = arrow.is_expression();
         let mut params = arrow.params.unbox();
         let mut removed = ArenaVec::new_in(&ast);
         removed.extend(params.items.drain(plan.boundary..));
@@ -596,18 +692,30 @@ impl<'a> OrdinaryParameterLowerer<'a> {
         params.kind = FormalParameterKind::FormalParameter;
         let mut prologue =
             self.parameter_prologue(removed, rest, plan.boundary, plan.rest_names, plan.anchor)?;
-        let mut body = arrow.body.unbox();
-        if arrow.expression {
-            if body.statements.len() != 1 {
-                return Err("parameters-arrow-expression-body-shape-error");
-            }
-            let statement = body.statements.remove(0);
-            let Statement::ExpressionStatement(statement) = statement else {
-                return Err("parameters-arrow-expression-body-shape-error");
+        let mut body = match arrow.body {
+            oxc_ast::ast::ArrowFunctionBody::FunctionBody(body) => body.unbox(),
+            body => oxc_ast::ast::FunctionBody::new(
+                body.span(),
+                [],
+                [oxc_ast::ast::Statement::new_expression_statement(
+                    body.span(),
+                    body.into_expression(),
+                    &ast,
+                )],
+                &ast,
+            ),
+        };
+        if expression_body {
+            let Statement::ExpressionStatement(statement) = body.statements.remove(0) else {
+                unreachable!()
             };
             let mut expression = statement.unbox().expression;
             clear_leading_pure_annotation(&mut expression);
-            prologue.push(ast.statement_return(plan.anchor, Some(expression)));
+            prologue.push(oxc_ast::ast::Statement::new_return_statement(
+                plan.anchor,
+                Some(expression),
+                ast.builder(),
+            ));
             body.statements = prologue;
         } else if plan.wrapper {
             let directives =
@@ -627,21 +735,30 @@ impl<'a> OrdinaryParameterLowerer<'a> {
         } else {
             body.statements.splice(0..0, prologue);
         }
-        #[expect(deprecated)]
         if plan.retain_arrow {
             params.kind = FormalParameterKind::ArrowFormalParameters;
-            return Ok(ast.expression_arrow_function(
+            return Ok(oxc_ast::ast::Expression::new_arrow_function_expression(
                 plan.anchor,
-                false,
                 arrow.r#async,
                 arrow.type_parameters,
-                ast.alloc_formal_parameters(params.span, params.kind, params.items, params.rest),
+                oxc_ast::ast::FormalParameters::boxed(
+                    params.span,
+                    params.kind,
+                    params.items,
+                    params.rest,
+                    ast.builder(),
+                ),
                 arrow.return_type,
-                ast.alloc_function_body(body.span, body.directives, body.statements),
+                oxc_ast::ast::ArrowFunctionBody::FunctionBody(oxc_ast::ast::FunctionBody::boxed(
+                    body.span,
+                    body.directives,
+                    body.statements,
+                    ast.builder(),
+                )),
+                ast.builder(),
             ));
         }
-        #[expect(deprecated)]
-        let function = ast.expression_function(
+        let function = oxc_ast::ast::Expression::new_function_expression(
             plan.anchor,
             FunctionType::FunctionExpression,
             None,
@@ -650,9 +767,21 @@ impl<'a> OrdinaryParameterLowerer<'a> {
             false,
             None::<ArenaBox<'a, TSTypeParameterDeclaration<'a>>>,
             None::<ArenaBox<'a, TSThisParameter<'a>>>,
-            ast.alloc_formal_parameters(params.span, params.kind, params.items, params.rest),
+            oxc_ast::ast::FormalParameters::boxed(
+                params.span,
+                params.kind,
+                params.items,
+                params.rest,
+                ast.builder(),
+            ),
             arrow.return_type,
-            Some(ast.alloc_function_body(body.span, body.directives, body.statements)),
+            Some(oxc_ast::ast::FunctionBody::boxed(
+                body.span,
+                body.directives,
+                body.statements,
+                ast.builder(),
+            )),
+            ast.builder(),
         );
         if !plan.capture_in_place {
             return Ok(function);
@@ -660,29 +789,40 @@ impl<'a> OrdinaryParameterLowerer<'a> {
         let declaration = self.capture_declaration(&plan.captures, plan.anchor)?;
         let mut statements = ArenaVec::new_in(&ast);
         statements.push(declaration);
-        statements.push(ast.statement_return(plan.anchor, Some(function)));
-        let body = ast.alloc_function_body(plan.anchor, ArenaVec::new_in(&ast), statements);
-        let params = ast.alloc_formal_parameters(
+        statements.push(oxc_ast::ast::Statement::new_return_statement(
+            plan.anchor,
+            Some(function),
+            ast.builder(),
+        ));
+        let body = oxc_ast::ast::FunctionBody::boxed(
+            plan.anchor,
+            ArenaVec::new_in(&ast),
+            statements,
+            ast.builder(),
+        );
+        let params = oxc_ast::ast::FormalParameters::boxed(
             plan.anchor,
             FormalParameterKind::ArrowFormalParameters,
             ArenaVec::new_in(&ast),
             None::<ArenaBox<'a, FormalParameterRest<'a>>>,
+            ast.builder(),
         );
-        let wrapper = ast.expression_arrow_function(
+        let wrapper = oxc_ast::ast::Expression::new_arrow_function_expression(
             plan.anchor,
-            false,
             false,
             None::<ArenaBox<'a, TSTypeParameterDeclaration<'a>>>,
             params,
             None::<ArenaBox<'a, TSTypeAnnotation<'a>>>,
-            body,
+            oxc_ast::ast::ArrowFunctionBody::FunctionBody(body),
+            ast.builder(),
         );
-        Ok(ast.expression_call(
+        Ok(oxc_ast::ast::Expression::new_call_expression(
             plan.anchor,
             wrapper,
             None::<ArenaBox<'a, TSTypeParameterInstantiation<'a>>>,
             ArenaVec::new_in(&ast),
             false,
+            ast.builder(),
         ))
     }
 
@@ -694,79 +834,123 @@ impl<'a> OrdinaryParameterLowerer<'a> {
         let ast = self.ast();
         let mut declarations = ArenaVec::new_in(&ast);
         if let Some(name) = &aliases.this_name {
-            declarations.push(ast.variable_declarator(
+            declarations.push(oxc_ast::ast::VariableDeclarator::new(
                 anchor,
-                VariableDeclarationKind::Var,
-                ast.binding_pattern_binding_identifier(anchor, self.allocator.alloc_str(name)),
+                oxc_ast::ast::BindingPattern::new_binding_identifier(
+                    anchor,
+                    self.allocator.alloc_str(name),
+                    ast.builder(),
+                ),
                 None::<ArenaBox<'a, TSTypeAnnotation<'a>>>,
                 Some(if aliases.deferred_this {
-                    ast.expression_arrow_function(
+                    oxc_ast::ast::Expression::new_arrow_function_expression(
                         anchor,
-                        true,
                         false,
                         None::<ArenaBox<'a, TSTypeParameterDeclaration<'a>>>,
-                        ast.alloc_formal_parameters(
+                        oxc_ast::ast::FormalParameters::boxed(
                             anchor,
                             FormalParameterKind::ArrowFormalParameters,
                             ArenaVec::new_in(&ast),
                             None::<ArenaBox<'a, FormalParameterRest<'a>>>,
+                            ast.builder(),
                         ),
                         None::<ArenaBox<'a, TSTypeAnnotation<'a>>>,
-                        ast.alloc_function_body(
-                            anchor,
-                            ArenaVec::new_in(&ast),
-                            ast.vec_from_array([
-                                ast.statement_expression(anchor, ast.expression_this(anchor))
-                            ]),
-                        ),
+                        {
+    let mut body = 
+                            oxc_ast::ast::FunctionBody::boxed(
+                                anchor,
+                                ArenaVec::new_in(&ast),
+                                oxc_allocator::Vec::from_array_in(
+                                    [oxc_ast::ast::Statement::new_expression_statement(
+                                        anchor,
+                                        oxc_ast::ast::Expression::new_this_expression(
+                                            anchor,
+                                            ast.builder(),
+                                        ),
+                                        ast.builder(),
+                                    )],
+                                    ast.builder(),
+                                ),
+                                ast.builder(),
+                            ).unbox();
+    let Statement::ExpressionStatement(statement) = body.statements.remove(0) else { unreachable!("generated concise arrow has one expression") };
+    oxc_ast::ast::ArrowFunctionBody::from(statement.unbox().expression)
+},
+                        ast.builder(),
                     )
                 } else {
-                    ast.expression_this(anchor)
+                    oxc_ast::ast::Expression::new_this_expression(anchor, ast.builder())
                 }),
                 false,
+                ast.builder(),
             ));
         }
         if let Some(name) = &aliases.arguments_name {
             let argument = self.id(anchor, "arguments");
-            let test = ast.expression_binary(
+            let test = oxc_ast::ast::Expression::new_binary_expression(
                 anchor,
-                ast.expression_unary(
+                oxc_ast::ast::Expression::new_unary_expression(
                     anchor,
                     UnaryOperator::Typeof,
                     argument.clone_in(self.allocator),
+                    ast.builder(),
                 ),
                 BinaryOperator::StrictEquality,
-                ast.expression_string_literal(anchor, "undefined", None),
+                oxc_ast::ast::Expression::new_string_literal(
+                    anchor,
+                    "undefined",
+                    None,
+                    ast.builder(),
+                ),
+                ast.builder(),
             );
-            let value = ast.expression_conditional(anchor, test, self.undefined(anchor), argument);
-            declarations.push(ast.variable_declarator(
+            let value = oxc_ast::ast::Expression::new_conditional_expression(
                 anchor,
-                VariableDeclarationKind::Var,
-                ast.binding_pattern_binding_identifier(anchor, self.allocator.alloc_str(name)),
+                test,
+                self.undefined(anchor),
+                argument,
+                ast.builder(),
+            );
+            declarations.push(oxc_ast::ast::VariableDeclarator::new(
+                anchor,
+                oxc_ast::ast::BindingPattern::new_binding_identifier(
+                    anchor,
+                    self.allocator.alloc_str(name),
+                    ast.builder(),
+                ),
                 None::<ArenaBox<'a, TSTypeAnnotation<'a>>>,
                 Some(value),
                 false,
+                ast.builder(),
             ));
         }
         if let Some(name) = &aliases.new_target_name {
-            declarations.push(ast.variable_declarator(
+            declarations.push(oxc_ast::ast::VariableDeclarator::new(
                 anchor,
-                VariableDeclarationKind::Var,
-                ast.binding_pattern_binding_identifier(anchor, self.allocator.alloc_str(name)),
+                oxc_ast::ast::BindingPattern::new_binding_identifier(
+                    anchor,
+                    self.allocator.alloc_str(name),
+                    ast.builder(),
+                ),
                 None::<ArenaBox<'a, TSTypeAnnotation<'a>>>,
-                Some(ast.expression_new_target(anchor)),
+                Some(oxc_ast::ast::Expression::new_new_target(
+                    anchor,
+                    ast.builder(),
+                )),
                 false,
+                ast.builder(),
             ));
         }
         if declarations.is_empty() {
             return Err("parameters-empty-capture-declaration");
         }
         Ok(Statement::VariableDeclaration(
-            ast.alloc_variable_declaration(
+            oxc_ast::ast::VariableDeclaration::boxed(
                 anchor,
                 VariableDeclarationKind::Var,
                 declarations,
                 false,
+                ast.builder(),
             ),
         ))
     }
@@ -797,18 +981,22 @@ impl<'a> VisitMut<'a> for CaptureRewriter<'a, '_> {
             _ => None,
         };
         if let Some(name) = name {
-            #[expect(deprecated)]
             {
                 let ast = AstBuilder::new(self.allocator);
-                let reference = ast.expression_identifier(span, self.allocator.alloc_str(name));
+                let reference = oxc_ast::ast::Expression::new_identifier(
+                    span,
+                    self.allocator.alloc_str(name),
+                    ast.builder(),
+                );
                 *expression =
                     if self.aliases.deferred_this && self.aliases.this_spans.contains(&key) {
-                        ast.expression_call(
+                        oxc_ast::ast::Expression::new_call_expression(
                             span,
                             reference,
                             None::<ArenaBox<'a, TSTypeParameterInstantiation<'a>>>,
                             ArenaVec::new_in(&ast),
                             false,
+                            ast.builder(),
                         )
                     } else {
                         reference
@@ -875,7 +1063,6 @@ impl<'a> VisitMut<'a> for OrdinaryParameterLowerer<'a> {
         walk_mut::walk_expression(self, expression);
     }
 
-    #[expect(deprecated)]
     fn visit_function(
         &mut self,
         function: &mut Function<'a>,
@@ -895,20 +1082,25 @@ impl<'a> VisitMut<'a> for OrdinaryParameterLowerer<'a> {
             let mut parameters = ArenaVec::new_in(&self.allocator);
             parameters.extend(function.params.items.drain(..));
             for placeholder in &plan.length_placeholders {
-                function.params.items.push(self.ast().formal_parameter(
-                    plan.anchor,
-                    ArenaVec::new_in(&self.allocator),
-                    self.ast().binding_pattern_binding_identifier(
+                function
+                    .params
+                    .items
+                    .push(oxc_ast::ast::FormalParameter::new(
                         plan.anchor,
-                        self.allocator.alloc_str(placeholder),
-                    ),
-                    None::<ArenaBox<'a, TSTypeAnnotation<'a>>>,
-                    None::<ArenaBox<'a, Expression<'a>>>,
-                    false,
-                    None,
-                    false,
-                    false,
-                ));
+                        ArenaVec::new_in(&self.allocator),
+                        oxc_ast::ast::BindingPattern::new_binding_identifier(
+                            plan.anchor,
+                            self.allocator.alloc_str(placeholder),
+                            self.ast().builder(),
+                        ),
+                        None::<ArenaBox<'a, TSTypeAnnotation<'a>>>,
+                        None::<ArenaBox<'a, Expression<'a>>>,
+                        false,
+                        None,
+                        false,
+                        false,
+                        self.ast().builder(),
+                    ));
             }
             let rest = function.params.rest.take().map(ArenaBox::unbox);
             let mut prologue =
@@ -980,7 +1172,6 @@ fn clear_leading_pure_annotation(expression: &mut Expression<'_>) {
     }
 }
 
-#[expect(deprecated)]
 fn parse_wrapper_statement<'a>(
     allocator: &'a Allocator,
     r#async: bool,
@@ -997,29 +1188,33 @@ fn parse_wrapper_statement<'a>(
     let ast = AstBuilder::new(allocator);
     let mut items = ArenaVec::new_in(&ast);
     for name in wrapper_arguments {
-        items.push(ast.formal_parameter(
+        items.push(oxc_ast::ast::FormalParameter::new(
             anchor,
             ArenaVec::new_in(&ast),
-            ast.binding_pattern_binding_identifier(anchor, allocator.alloc_str(name)),
+            oxc_ast::ast::BindingPattern::new_binding_identifier(
+                anchor,
+                allocator.alloc_str(name),
+                ast.builder(),
+            ),
             None::<ArenaBox<'a, TSTypeAnnotation<'a>>>,
             None::<ArenaBox<'a, Expression<'a>>>,
             false,
             None,
             false,
             false,
+            ast.builder(),
         ));
     }
-    let params = ast.alloc_formal_parameters(
+    let params = oxc_ast::ast::FormalParameters::boxed(
         anchor,
         FormalParameterKind::FormalParameter,
         items,
         None::<ArenaBox<'a, FormalParameterRest<'a>>>,
+        ast.builder(),
     );
-    #[expect(deprecated)]
-    let body = ast.alloc_function_body(anchor, directives, statements);
-    #[expect(deprecated)]
+    let body = oxc_ast::ast::FunctionBody::boxed(anchor, directives, statements, ast.builder());
     let function = if generator {
-        ast.expression_function(
+        oxc_ast::ast::Expression::new_function_expression(
             anchor,
             FunctionType::FunctionExpression,
             None,
@@ -1031,52 +1226,61 @@ fn parse_wrapper_statement<'a>(
             params,
             None::<ArenaBox<'a, TSTypeAnnotation<'a>>>,
             Some(body),
+            ast.builder(),
         )
     } else {
-        ast.expression_arrow_function(
+        oxc_ast::ast::Expression::new_arrow_function_expression(
             anchor,
-            false,
             r#async,
             None::<ArenaBox<'a, TSTypeParameterDeclaration<'a>>>,
             params,
             None::<ArenaBox<'a, TSTypeAnnotation<'a>>>,
-            body,
+            oxc_ast::ast::ArrowFunctionBody::FunctionBody(body),
+            ast.builder(),
         )
     };
-    #[expect(deprecated)]
     let call_member = if generator {
-        Expression::from(ast.member_expression_static(
-            anchor,
-            function,
-            ast.identifier_name(anchor, "call"),
-            false,
-        ))
+        Expression::from(
+            oxc_ast::ast::MemberExpression::new_static_member_expression(
+                anchor,
+                function,
+                oxc_ast::ast::IdentifierName::new(anchor, "call", ast.builder()),
+                false,
+                ast.builder(),
+            ),
+        )
     } else {
         function
     };
     let mut arguments = ArenaVec::new_in(&ast);
-    #[expect(deprecated)]
     {
         if generator {
-            arguments.push(Argument::from(ast.expression_this(anchor)));
-        }
-        for name in wrapper_arguments {
             arguments.push(Argument::from(
-                ast.expression_identifier(anchor, allocator.alloc_str(name)),
+                oxc_ast::ast::Expression::new_this_expression(anchor, ast.builder()),
             ));
         }
+        for name in wrapper_arguments {
+            arguments.push(Argument::from(oxc_ast::ast::Expression::new_identifier(
+                anchor,
+                allocator.alloc_str(name),
+                ast.builder(),
+            )));
+        }
     }
-    #[expect(deprecated)]
-    let call = ast.expression_call(
+    let call = oxc_ast::ast::Expression::new_call_expression(
         anchor,
         call_member,
         None::<ArenaBox<'a, TSTypeParameterInstantiation<'a>>>,
         arguments,
         false,
+        ast.builder(),
     );
     let result = call;
-    #[expect(deprecated)]
-    Ok(ast.statement_return(anchor, Some(result)))
+    Ok(oxc_ast::ast::Statement::new_return_statement(
+        anchor,
+        Some(result),
+        ast.builder(),
+    ))
 }
 
 fn ast_eligible(
@@ -1159,7 +1363,7 @@ fn collect_lexical_facts_selected(
         class_boundaries[node_id.index()] = boundary;
         let derived = if matches!(node.kind(), AstKind::Function(_)) {
             matches!(parent, AstKind::MethodDefinition(method) if method.kind == oxc_ast::ast::MethodDefinitionKind::Constructor)
-                && matches!(semantic.nodes().parent_kind(semantic.nodes().parent_id(parent_id)), AstKind::Class(class) if class.super_class.is_some())
+                && matches!(semantic.nodes().parent_kind(semantic.nodes().parent_id(parent_id)), AstKind::Class(class) if class.heritage.is_some())
         } else if initializer_boundary {
             false
         } else {
@@ -1174,7 +1378,7 @@ fn collect_lexical_facts_selected(
                 AstKind::FunctionBody(_) => {
                     if matches!(
                         semantic.nodes().parent_kind(parent_id),
-                        AstKind::ArrowFunctionExpression(arrow) if arrow.expression
+                        AstKind::ArrowFunctionExpression(arrow) if arrow.is_expression()
                     ) {
                         None
                     } else {

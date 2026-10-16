@@ -1,12 +1,14 @@
 #![allow(clippy::format_push_string)]
 
+use oxc_allocator::GetAllocator;
 use oxc_allocator::{Allocator, Box as ArenaBox, TakeIn, Vec as ArenaVec};
+use oxc_ast::builder::GetAstBuilder;
 use oxc_ast::{
-    AstBuilder,
     ast::{
         Argument, ArrayExpressionElement, Expression, Program, PropertyKind,
         TSTypeParameterInstantiation,
     },
+    builder::AstBuilder,
 };
 use oxc_ast_visit::{VisitMut, walk_mut};
 use oxc_regular_expression::{
@@ -135,7 +137,7 @@ impl<'a> RegexpLowerer<'a> {
         let needs_pattern = self.named_groups || self.unicode_properties || self.unicode_sets;
         if needs_pattern && literal.regex.pattern.pattern.is_none() {
             let parsed = LiteralParser::new(
-                self.ast.allocator,
+                self.ast.allocator(),
                 literal.regex.pattern.text.as_str(),
                 Some(&flags),
                 RegExpParserOptions {
@@ -147,7 +149,7 @@ impl<'a> RegexpLowerer<'a> {
             match parsed {
                 Ok(parsed) => {
                     literal.regex.pattern.pattern =
-                        Some(ArenaBox::new_in(parsed, &self.ast.allocator));
+                        Some(ArenaBox::new_in(parsed, self.ast.builder()));
                 }
                 // Babel/regexpu accepts range operands in set algebra even though
                 // ECMA-262 requires those ranges to be nested. Preserve that
@@ -217,7 +219,7 @@ impl<'a> RegexpLowerer<'a> {
         if !changed {
             return Ok(None);
         }
-        literal.regex.pattern.text = self.ast.allocator.alloc_str(&pattern).into();
+        literal.regex.pattern.text = self.ast.allocator().alloc_str(&pattern).into();
         literal.regex.pattern.pattern = None;
         literal.regex.flags = flags
             .bytes()
@@ -235,33 +237,35 @@ impl<'a> RegexpLowerer<'a> {
         let regexp = expression.take_in(&self.ast);
         let mut properties = ArenaVec::new_in(&self.ast);
         for (name, indices) in groups {
-            #[expect(deprecated)]
-            let key = self
-                .ast
-                .expression_string_literal(span, self.ast.allocator.alloc_str(&name), None)
-                .into();
-            #[expect(deprecated)]
+            let key = oxc_ast::ast::Expression::new_string_literal(
+                span,
+                self.ast.allocator().alloc_str(&name),
+                None,
+                self.ast.builder(),
+            )
+            .into();
             let value = if indices.len() == 1 {
-                self.ast.expression_numeric_literal(
+                oxc_ast::ast::Expression::new_numeric_literal(
                     span,
                     indices[0] as f64,
                     None,
                     oxc_ast::ast::NumberBase::Decimal,
+                    self.ast.builder(),
                 )
             } else {
                 let mut elements = ArenaVec::new_in(&self.ast);
                 elements.extend(indices.into_iter().map(|index| {
-                    ArrayExpressionElement::from(self.ast.expression_numeric_literal(
+                    ArrayExpressionElement::from(oxc_ast::ast::Expression::new_numeric_literal(
                         span,
                         index as f64,
                         None,
                         oxc_ast::ast::NumberBase::Decimal,
+                        self.ast.builder(),
                     ))
                 }));
-                self.ast.expression_array(span, elements)
+                oxc_ast::ast::Expression::new_array_expression(span, elements, self.ast.builder())
             };
-            #[expect(deprecated)]
-            properties.push(self.ast.object_property_kind_object_property(
+            properties.push(oxc_ast::ast::ObjectPropertyKind::new_object_property(
                 span,
                 PropertyKind::Init,
                 key,
@@ -269,21 +273,26 @@ impl<'a> RegexpLowerer<'a> {
                 false,
                 false,
                 name == "__proto__",
+                self.ast.builder(),
             ));
         }
-        #[expect(deprecated)]
-        let group_map = self.ast.expression_object(span, properties);
+        let group_map =
+            oxc_ast::ast::Expression::new_object_expression(span, properties, self.ast.builder());
         let mut arguments = ArenaVec::new_in(&self.ast);
         arguments.push(Argument::from(regexp));
         arguments.push(Argument::from(group_map));
-        #[expect(deprecated)]
         {
-            *expression = self.ast.expression_call(
+            *expression = oxc_ast::ast::Expression::new_call_expression(
                 span,
-                self.ast.expression_identifier(span, self.named_helper),
+                oxc_ast::ast::Expression::new_identifier(
+                    span,
+                    self.named_helper,
+                    self.ast.builder(),
+                ),
                 None::<ArenaBox<'a, TSTypeParameterInstantiation<'a>>>,
                 arguments,
                 false,
+                self.ast.builder(),
             );
         }
     }

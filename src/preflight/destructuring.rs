@@ -1,8 +1,9 @@
 use oxc_allocator::{
     Address, Allocator, Box as ArenaBox, CloneIn, GetAddress, TakeIn, Vec as ArenaVec,
 };
+use oxc_ast::builder::GetAstBuilder;
 use oxc_ast::{
-    AstBuilder, AstKind,
+    AstKind,
     ast::{
         Argument, ArrayExpressionElement, AssignmentTarget, AssignmentTargetMaybeDefault,
         AssignmentTargetProperty, BindingPattern, Expression, ForStatementLeft, FunctionBody,
@@ -10,6 +11,7 @@ use oxc_ast::{
         TSTypeParameterInstantiation, VariableDeclaration, VariableDeclarationKind,
         VariableDeclarator,
     },
+    builder::AstBuilder,
 };
 use oxc_ast_visit::{VisitMut, walk_mut};
 #[cfg(test)]
@@ -236,7 +238,7 @@ pub(super) fn prepare_ast(
             // Oxc inserts temporaries into the containing statement. Parameter,
             // field, and concise-arrow expressions require the focused planner.
             semantic.nodes().ancestor_ids(id).find_map(|ancestor| match semantic.nodes().kind(ancestor) {
-                AstKind::FunctionBody(_) => Some(!matches!(semantic.nodes().parent_kind(ancestor), AstKind::ArrowFunctionExpression(arrow) if arrow.expression)),
+                AstKind::FunctionBody(_) => Some(!matches!(semantic.nodes().parent_kind(ancestor), AstKind::ArrowFunctionExpression(arrow) if arrow.is_expression())),
                 AstKind::StaticBlock(_) | AstKind::Program(_) => Some(true),
                 AstKind::FormalParameters(_) | AstKind::Function(_) | AstKind::ArrowFunctionExpression(_)
                     | AstKind::PropertyDefinition(_) | AstKind::AccessorProperty(_) => Some(false),
@@ -527,32 +529,38 @@ struct DestructuringDeclaratorLowerer<'a> {
     error: Option<&'static str>,
 }
 
-#[expect(deprecated)]
 impl<'a> DestructuringDeclaratorLowerer<'a> {
     fn ast(&self) -> AstBuilder<'a> {
         AstBuilder::new(self.allocator)
     }
 
     fn id(&self, span: Span, name: &str) -> Expression<'a> {
-        self.ast()
-            .expression_identifier(span, self.allocator.alloc_str(name))
+        oxc_ast::ast::Expression::new_identifier(
+            span,
+            self.allocator.alloc_str(name),
+            self.ast().builder(),
+        )
     }
 
     fn declarator(
         &self,
         span: Span,
-        kind: VariableDeclarationKind,
+        _kind: VariableDeclarationKind,
         name: &str,
         init: Option<Expression<'a>>,
     ) -> VariableDeclarator<'a> {
         let ast = self.ast();
-        ast.variable_declarator(
+        oxc_ast::ast::VariableDeclarator::new(
             span,
-            kind,
-            ast.binding_pattern_binding_identifier(span, self.allocator.alloc_str(name)),
+            oxc_ast::ast::BindingPattern::new_binding_identifier(
+                span,
+                self.allocator.alloc_str(name),
+                ast.builder(),
+            ),
             None::<ArenaBox<'a, TSTypeAnnotation<'a>>>,
             init,
             false,
+            ast.builder(),
         )
     }
 
@@ -565,51 +573,80 @@ impl<'a> DestructuringDeclaratorLowerer<'a> {
         let ast = self.ast();
         let mut arguments = ArenaVec::new_in(&ast);
         arguments.extend(values.into_iter().map(Argument::from));
-        ast.expression_call(
+        oxc_ast::ast::Expression::new_call_expression(
             span,
             self.id(span, callee),
             None::<ArenaBox<'a, TSTypeParameterInstantiation<'a>>>,
             arguments,
             false,
+            ast.builder(),
         )
     }
 
     fn computed(&self, span: Span, object: Expression<'a>, key: Expression<'a>) -> Expression<'a> {
         Expression::from(
-            self.ast()
-                .member_expression_computed(span, object, key, false),
+            oxc_ast::ast::MemberExpression::new_computed_member_expression(
+                span,
+                object,
+                key,
+                false,
+                self.ast().builder(),
+            ),
         )
     }
 
     fn member(&self, span: Span, object: Expression<'a>, property: &str) -> Expression<'a> {
         let ast = self.ast();
-        Expression::from(ast.member_expression_static(
-            span,
-            object,
-            ast.identifier_name(span, self.allocator.alloc_str(property)),
-            false,
-        ))
+        Expression::from(
+            oxc_ast::ast::MemberExpression::new_static_member_expression(
+                span,
+                object,
+                oxc_ast::ast::IdentifierName::new(
+                    span,
+                    self.allocator.alloc_str(property),
+                    ast.builder(),
+                ),
+                false,
+                ast.builder(),
+            ),
+        )
     }
 
     fn number(&self, span: Span, value: usize) -> Expression<'a> {
-        self.ast()
-            .expression_numeric_literal(span, value as f64, None, NumberBase::Decimal)
+        oxc_ast::ast::Expression::new_numeric_literal(
+            span,
+            value as f64,
+            None,
+            NumberBase::Decimal,
+            self.ast().builder(),
+        )
     }
 
     fn undefined(&self, span: Span) -> Expression<'a> {
-        self.ast()
-            .expression_unary(span, UnaryOperator::Void, self.number(span, 0))
+        oxc_ast::ast::Expression::new_unary_expression(
+            span,
+            UnaryOperator::Void,
+            self.number(span, 0),
+            self.ast().builder(),
+        )
     }
 
     fn default_value(&self, span: Span, temp: &str, fallback: Expression<'a>) -> Expression<'a> {
         let ast = self.ast();
-        let test = ast.expression_binary(
+        let test = oxc_ast::ast::Expression::new_binary_expression(
             span,
             self.id(span, temp),
             BinaryOperator::StrictEquality,
             self.undefined(span),
+            ast.builder(),
         );
-        ast.expression_conditional(span, test, fallback, self.id(span, temp))
+        oxc_ast::ast::Expression::new_conditional_expression(
+            span,
+            test,
+            fallback,
+            self.id(span, temp),
+            ast.builder(),
+        )
     }
 
     fn assign(
@@ -618,17 +655,21 @@ impl<'a> DestructuringDeclaratorLowerer<'a> {
         target: AssignmentTarget<'a>,
         value: Expression<'a>,
     ) -> Expression<'a> {
-        self.ast()
-            .expression_assignment(span, AssignmentOperator::Assign, target, value)
+        oxc_ast::ast::Expression::new_assignment_expression(
+            span,
+            AssignmentOperator::Assign,
+            target,
+            value,
+            self.ast().builder(),
+        )
     }
 
     fn assign_name(&self, span: Span, name: &str, value: Expression<'a>) -> Expression<'a> {
-        let target = self
-            .ast()
-            .simple_assignment_target_assignment_target_identifier(
-                span,
-                self.allocator.alloc_str(name),
-            );
+        let target = oxc_ast::ast::SimpleAssignmentTarget::new_assignment_target_identifier(
+            span,
+            self.allocator.alloc_str(name),
+            self.ast().builder(),
+        );
         self.assign(span, target.into(), value)
     }
 
@@ -642,12 +683,13 @@ impl<'a> DestructuringDeclaratorLowerer<'a> {
         let ast = self.ast();
         let mut arguments = ArenaVec::new_in(&ast);
         arguments.extend(values.into_iter().map(Argument::from));
-        ast.expression_call(
+        oxc_ast::ast::Expression::new_call_expression(
             span,
             self.member(span, object, method),
             None::<ArenaBox<'a, TSTypeParameterInstantiation<'a>>>,
             arguments,
             false,
+            ast.builder(),
         )
     }
 
@@ -697,8 +739,11 @@ impl<'a> DestructuringDeclaratorLowerer<'a> {
                     [
                         value,
                         self.number(anchor, element_count),
-                        self.ast()
-                            .expression_boolean_literal(anchor, pattern.rest.is_some()),
+                        oxc_ast::ast::Expression::new_boolean_literal(
+                            anchor,
+                            pattern.rest.is_some(),
+                            self.ast().builder(),
+                        ),
                     ],
                 );
                 output.push(self.assign_name(anchor, &array, converted));
@@ -743,12 +788,16 @@ impl<'a> DestructuringDeclaratorLowerer<'a> {
                             let access =
                                 self.member(anchor, self.id(anchor, &object), name.as_str());
                             excluded.push(ArrayExpressionElement::from(
-                                ast.expression_string_literal(anchor, name, None),
+                                oxc_ast::ast::Expression::new_string_literal(
+                                    anchor,
+                                    name,
+                                    None,
+                                    ast.builder(),
+                                ),
                             ));
                             let target = AssignmentTarget::from(
-                                ast.simple_assignment_target_assignment_target_identifier(
-                                    anchor, name,
-                                ),
+                                oxc_ast::ast::SimpleAssignmentTarget::new_assignment_target_identifier(
+                                    anchor, name, ast.builder()),
                             );
                             if let Some(init) = property.init {
                                 let temp = reserve("_value", reserved);
@@ -820,13 +869,13 @@ impl<'a> DestructuringDeclaratorLowerer<'a> {
         match pattern {
             BindingPattern::BindingIdentifier(identifier) => {
                 let ast = self.ast();
-                output.push(ast.variable_declarator(
+                output.push(oxc_ast::ast::VariableDeclarator::new(
                     anchor,
-                    kind,
                     BindingPattern::BindingIdentifier(identifier),
                     None::<ArenaBox<'a, TSTypeAnnotation<'a>>>,
                     Some(value),
                     false,
+                    ast.builder(),
                 ));
             }
             BindingPattern::AssignmentPattern(pattern) => {
@@ -846,8 +895,11 @@ impl<'a> DestructuringDeclaratorLowerer<'a> {
                     [
                         value,
                         self.number(anchor, element_count),
-                        self.ast()
-                            .expression_boolean_literal(anchor, pattern.rest.is_some()),
+                        oxc_ast::ast::Expression::new_boolean_literal(
+                            anchor,
+                            pattern.rest.is_some(),
+                            self.ast().builder(),
+                        ),
                     ],
                 );
                 output.push(self.declarator(anchor, kind, &array, Some(converted)));
@@ -945,7 +997,11 @@ impl<'a> DestructuringDeclaratorLowerer<'a> {
                 anchor,
                 &self.helper_names.copy,
                 [
-                    ast.expression_object(anchor, ArenaVec::new_in(&ast)),
+                    oxc_ast::ast::Expression::new_object_expression(
+                        anchor,
+                        ArenaVec::new_in(&ast),
+                        ast.builder(),
+                    ),
                     self.id(anchor, object),
                 ],
             )
@@ -955,7 +1011,7 @@ impl<'a> DestructuringDeclaratorLowerer<'a> {
                 &self.helper_names.rest,
                 [
                     self.id(anchor, object),
-                    ast.expression_array(anchor, excluded),
+                    oxc_ast::ast::Expression::new_array_expression(anchor, excluded, ast.builder()),
                 ],
             )
         }
@@ -972,7 +1028,12 @@ impl<'a> DestructuringDeclaratorLowerer<'a> {
                 let name = identifier.name;
                 Ok((
                     self.member(span, self.id(span, object), name.as_str()),
-                    self.ast().expression_string_literal(span, name, None),
+                    oxc_ast::ast::Expression::new_string_literal(
+                        span,
+                        name,
+                        None,
+                        self.ast().builder(),
+                    ),
                 ))
             }
             key => {
@@ -980,11 +1041,17 @@ impl<'a> DestructuringDeclaratorLowerer<'a> {
                     .map_err(|_| "destructuring-property-key-not-expression")?;
                 let exclusion = match &expression {
                     Expression::NumericLiteral(_) | Expression::BigIntLiteral(_) => {
-                        self.ast().expression_binary(
+                        oxc_ast::ast::Expression::new_binary_expression(
                             span,
-                            self.ast().expression_string_literal(span, "", None),
+                            oxc_ast::ast::Expression::new_string_literal(
+                                span,
+                                "",
+                                None,
+                                self.ast().builder(),
+                            ),
                             BinaryOperator::Addition,
                             expression.clone_in(self.allocator),
+                            self.ast().builder(),
                         )
                     }
                     _ => expression.clone_in(self.allocator),
@@ -999,7 +1066,6 @@ impl<'a> DestructuringDeclaratorLowerer<'a> {
 }
 
 impl<'a> DestructuringDeclaratorLowerer<'a> {
-    #[expect(deprecated)]
     fn lower_loop_head(
         &mut self,
         span: Span,
@@ -1016,12 +1082,12 @@ impl<'a> DestructuringDeclaratorLowerer<'a> {
                     return;
                 }
             };
-            (*left) = ast
-                .simple_assignment_target_assignment_target_identifier(
-                    plan.anchor,
-                    self.allocator.alloc_str(&plan.root),
-                )
-                .into();
+            (*left) = oxc_ast::ast::SimpleAssignmentTarget::new_assignment_target_identifier(
+                plan.anchor,
+                self.allocator.alloc_str(&plan.root),
+                ast.builder(),
+            )
+            .into();
             let mut expressions = ArenaVec::new_in(&ast);
             let mut reserved = SnapshotReservations {
                 base: &self.base_reserved,
@@ -1039,15 +1105,22 @@ impl<'a> DestructuringDeclaratorLowerer<'a> {
                 self.error = Some(error);
                 return;
             }
-            #[expect(deprecated)]
-            let binding = ast.statement_expression(
+            let binding = oxc_ast::ast::Statement::new_expression_statement(
                 plan.anchor,
-                ast.expression_sequence(plan.anchor, expressions),
+                oxc_ast::ast::Expression::new_sequence_expression(
+                    plan.anchor,
+                    expressions,
+                    ast.builder(),
+                ),
+                ast.builder(),
             );
             let old_body = body.take_in(&ast);
-            #[expect(deprecated)]
             {
-                *body = ast.statement_block(plan.anchor, ast.vec_from_array([binding, old_body]));
+                *body = oxc_ast::ast::Statement::new_block_statement(
+                    plan.anchor,
+                    oxc_allocator::Vec::from_array_in([binding, old_body], ast.builder()),
+                    ast.builder(),
+                );
             }
             self.changed = true;
             return;
@@ -1056,6 +1129,7 @@ impl<'a> DestructuringDeclaratorLowerer<'a> {
         let ForStatementLeft::VariableDeclaration(declaration) = &mut (*left) else {
             return;
         };
+        let declaration_kind = declaration.kind;
         let Some(declarator) = declaration.declarations.first_mut() else {
             return;
         };
@@ -1073,7 +1147,7 @@ impl<'a> DestructuringDeclaratorLowerer<'a> {
             old.init.is_none(),
             "loop-head declarators have no initializer"
         );
-        *declarator = self.declarator(plan.anchor, old.kind, &plan.root, None);
+        *declarator = self.declarator(plan.anchor, declaration_kind, &plan.root, None);
 
         let mut lowered = ArenaVec::new_in(&ast);
         let mut reserved = SnapshotReservations {
@@ -1085,7 +1159,7 @@ impl<'a> DestructuringDeclaratorLowerer<'a> {
         if let Err(error) = self.lower_binding(
             old.id,
             self.id(plan.anchor, &plan.root),
-            old.kind,
+            declaration_kind,
             plan.anchor,
             &mut lowered,
             &mut reserved,
@@ -1093,21 +1167,24 @@ impl<'a> DestructuringDeclaratorLowerer<'a> {
             self.error = Some(error);
             return;
         }
-        #[expect(deprecated)]
-        let binding = Statement::VariableDeclaration(ast.alloc_variable_declaration(
+        let binding = Statement::VariableDeclaration(oxc_ast::ast::VariableDeclaration::boxed(
             plan.anchor,
-            old.kind,
+            declaration_kind,
             lowered,
             false,
+            ast.builder(),
         ));
         let old_body = body.take_in(&ast);
-        #[expect(deprecated)]
         {
             // Keep an existing block nested. Its lexical environment is the
             // original loop-body environment; destructuring computed keys are
             // evaluated before entering it and therefore must not observe the
             // TDZ of same-named `let`/`const` declarations in that body.
-            *body = ast.statement_block(plan.anchor, ast.vec_from_array([binding, old_body]));
+            *body = oxc_ast::ast::Statement::new_block_statement(
+                plan.anchor,
+                oxc_allocator::Vec::from_array_in([binding, old_body], ast.builder()),
+                ast.builder(),
+            );
         }
         self.changed = true;
     }
@@ -1140,7 +1217,6 @@ impl<'a> VisitMut<'a> for DestructuringDeclaratorLowerer<'a> {
         walk_mut::walk_static_block(self, block);
     }
 
-    #[expect(deprecated)]
     fn visit_variable_declaration(&mut self, declaration: &mut VariableDeclaration<'a>) {
         let mut index = 0;
         while index < declaration.declarations.len() {
@@ -1164,7 +1240,11 @@ impl<'a> VisitMut<'a> for DestructuringDeclaratorLowerer<'a> {
                     let mut expressions = ArenaVec::new_in(&ast);
                     expressions.push(self.number(declaration.span, 0));
                     expressions.push(original);
-                    *init = ast.expression_sequence(declaration.span, expressions);
+                    *init = oxc_ast::ast::Expression::new_sequence_expression(
+                        declaration.span,
+                        expressions,
+                        ast.builder(),
+                    );
                 }
                 index += 1;
                 continue;
@@ -1195,7 +1275,7 @@ impl<'a> VisitMut<'a> for DestructuringDeclaratorLowerer<'a> {
             if let Err(error) = self.lower_binding(
                 old.id,
                 init,
-                old.kind,
+                declaration.kind,
                 plan.anchor,
                 &mut replacements,
                 &mut reserved,
@@ -1228,14 +1308,15 @@ impl<'a> VisitMut<'a> for DestructuringDeclaratorLowerer<'a> {
                 return;
             };
             let ast = self.ast();
-            #[expect(deprecated)]
-            let param = ast.catch_parameter(
+            let param = oxc_ast::ast::CatchParameter::new(
                 plan.anchor,
-                ast.binding_pattern_binding_identifier(
+                oxc_ast::ast::BindingPattern::new_binding_identifier(
                     plan.anchor,
                     self.allocator.alloc_str(&plan.caught),
+                    ast.builder(),
                 ),
                 None::<ArenaBox<'a, TSTypeAnnotation<'a>>>,
+                ast.builder(),
             );
             let mut declarators = ArenaVec::new_in(&ast);
             let mut reserved = SnapshotReservations {
@@ -1255,13 +1336,14 @@ impl<'a> VisitMut<'a> for DestructuringDeclaratorLowerer<'a> {
                 self.error = Some(error);
                 return;
             }
-            #[expect(deprecated)]
-            let declaration = Statement::VariableDeclaration(ast.alloc_variable_declaration(
-                plan.anchor,
-                VariableDeclarationKind::Let,
-                declarators,
-                false,
-            ));
+            let declaration =
+                Statement::VariableDeclaration(oxc_ast::ast::VariableDeclaration::boxed(
+                    plan.anchor,
+                    VariableDeclarationKind::Let,
+                    declarators,
+                    false,
+                    ast.builder(),
+                ));
             clause.param = Some(param);
             clause.body.body.insert(0, declaration);
             self.changed = true;
@@ -1315,9 +1397,12 @@ impl<'a> VisitMut<'a> for DestructuringDeclaratorLowerer<'a> {
             return;
         }
         expressions.push(self.id(plan.anchor, &plan.root));
-        #[expect(deprecated)]
         {
-            *expression = ast.expression_sequence(plan.anchor, expressions);
+            *expression = oxc_ast::ast::Expression::new_sequence_expression(
+                plan.anchor,
+                expressions,
+                ast.builder(),
+            );
         }
         self.changed = true;
     }
@@ -1345,19 +1430,27 @@ fn parse_var_declaration<'a>(
     let ast = AstBuilder::new(allocator);
     let mut declarations = ArenaVec::with_capacity_in(names.len(), &allocator);
     for name in names {
-        #[expect(deprecated)]
-        declarations.push(ast.variable_declarator(
+        declarations.push(oxc_ast::ast::VariableDeclarator::new(
             anchor,
-            VariableDeclarationKind::Var,
-            ast.binding_pattern_binding_identifier(anchor, allocator.alloc_str(name)),
+            oxc_ast::ast::BindingPattern::new_binding_identifier(
+                anchor,
+                allocator.alloc_str(name),
+                ast.builder(),
+            ),
             None::<ArenaBox<'a, TSTypeAnnotation<'a>>>,
             None,
             false,
+            ast.builder(),
         ));
     }
-    #[expect(deprecated)]
     Ok(Statement::VariableDeclaration(
-        ast.alloc_variable_declaration(anchor, VariableDeclarationKind::Var, declarations, false),
+        oxc_ast::ast::VariableDeclaration::boxed(
+            anchor,
+            VariableDeclarationKind::Var,
+            declarations,
+            false,
+            ast.builder(),
+        ),
     ))
 }
 
