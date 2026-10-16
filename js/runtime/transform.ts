@@ -19,7 +19,7 @@ import {
   type NativePreflightResultOutput,
 } from '../native/binding';
 import { decodeRoutedEnvelope, type RoutedEventBatch } from '../protocol/events';
-import { packRouteManifest } from '../protocol/manifest';
+import { MAX_COMPILED_ROUTES, packRouteManifest } from '../protocol/manifest';
 import type {
   Diagnostic,
   EditCommand,
@@ -636,8 +636,10 @@ export function transform(
       if (retainedSession == null) {
         const lookahead: PreparedPhase[] = [];
         let chain = retainedChains(prepared);
-        // Bound speculative retention to eight later visitor phases. A phase
-        // may edit; only its actual outcome decides whether this index survives.
+        let retainedRouteCount = prepared.compiledRoutes.length;
+        // Bound speculative retention to eight later visitor phases and the
+        // manifest's route budget. A phase may edit; only its actual outcome
+        // decides whether this index survives.
         retainedThroughPhase = phaseIndex;
         for (
           let futureIndex = phaseIndex + 1;
@@ -646,6 +648,9 @@ export function transform(
         ) {
           if (phasePlan[futureIndex].requiresPrintedInput) break;
           const futurePrepared = preparePhase(pipeline.phases[futureIndex]);
+          if (retainedRouteCount + futurePrepared.compiledRoutes.length > MAX_COMPILED_ROUTES)
+            break;
+          retainedRouteCount += futurePrepared.compiledRoutes.length;
           lookahead.push(futurePrepared);
           chain = retainedChains(futurePrepared, chain);
           retainedThroughPhase = futureIndex;

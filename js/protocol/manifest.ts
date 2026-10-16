@@ -22,6 +22,8 @@ export interface NativeRouteManifestEntry {
 
 export type ChildRetentionPlan = Readonly<Record<string, readonly string[]>>;
 
+export const MAX_COMPILED_ROUTES = 4096;
+
 export function packRouteManifest(
   routes: readonly NativeRouteManifestEntry[],
   includeParent: boolean,
@@ -34,7 +36,7 @@ export function packRouteManifest(
   ancestorChildParentTypes: readonly string[] = [],
   ancestryDepth = includeParent ? Number.POSITIVE_INFINITY : 0,
 ): Buffer {
-  if (routes.length > 4096) throw new Error('compiled route limit exceeded');
+  if (routes.length > MAX_COMPILED_ROUTES) throw new Error('compiled route limit exceeded');
   const concreteChildRetention = new Map<string, { wildcard: boolean; roleIds: number[] }>();
   for (const [type, requestedRoles] of Object.entries(childRetention)) {
     const concreteTypes = NODE_TYPE_IDS.has(type)
