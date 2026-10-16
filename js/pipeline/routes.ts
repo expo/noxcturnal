@@ -498,8 +498,11 @@ export function prepareApplicablePhase(
   phase: PipelinePhase,
   facts: ReadonlySet<string> | null,
 ): PreparedPhase {
-  if (facts == null) return preparePhase(phase);
-  const plugins = phase.plugins ?? [];
+  // Public callers may pass a pipeline directly to transform. Validate its
+  // complete definition before applicability can hide an invalid contract.
+  const complete = preparePhase(phase);
+  if (facts == null) return complete;
+  const plugins = complete.activePlugins;
   let key = '';
   const active = plugins.filter(plugin => {
     const applicable =
@@ -508,7 +511,7 @@ export function prepareApplicablePhase(
     key += applicable ? '1' : '0';
     return applicable;
   });
-  if (active.length === plugins.length) return preparePhase(phase);
+  if (active.length === plugins.length) return complete;
   let cache = applicablePhases.get(phase);
   const cached = cache?.get(key);
   if (cached != null) return cached;
