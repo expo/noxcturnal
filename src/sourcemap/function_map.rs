@@ -341,27 +341,37 @@ impl<'a> FunctionMapCollector<'a> {
 
     // Only identifier/member paths can name a call. Never copy arbitrary callee
     // source: an IIFE can contain the entire rest of the file.
-    fn callee_name(&self, callee: &Expression<'_>) -> String {
-        fn is_name(expression: &Expression<'_>) -> bool {
-            match expression {
-                Expression::Identifier(_) | Expression::ThisExpression(_) => true,
-                Expression::StaticMemberExpression(member) => is_name(&member.object),
+    fn callee_name(&self, mut callee: &Expression<'_>) -> String {
+        let mut parts = Vec::new();
+        loop {
+            match callee {
+                Expression::Identifier(identifier) => {
+                    parts.push(metro_identifier(&identifier.name));
+                    break;
+                }
+                Expression::ThisExpression(_) => {
+                    parts.push("this".into());
+                    break;
+                }
+                Expression::StaticMemberExpression(member) => {
+                    parts.push(metro_identifier(&member.property.name));
+                    callee = &member.object;
+                }
                 Expression::ComputedMemberExpression(member) => {
-                    is_name(&member.object)
-                        && matches!(member.expression, Expression::StringLiteral(_))
+                    let Expression::StringLiteral(property) = &member.expression else {
+                        return "<anonymous>".into();
+                    };
+                    parts.push(metro_identifier(&property.value));
+                    callee = &member.object;
                 }
                 Expression::ParenthesizedExpression(parenthesized) => {
-                    is_name(&parenthesized.expression)
+                    callee = &parenthesized.expression;
                 }
-                _ => false,
+                _ => return "<anonymous>".into(),
             }
         }
-        if is_name(callee) {
-            self.name_from_id_span(callee.span())
-                .unwrap_or_else(|| "<anonymous>".into())
-        } else {
-            "<anonymous>".into()
-        }
+        parts.reverse();
+        metro_name_from_parts(&parts).unwrap_or_else(|| "<anonymous>".into())
     }
 
     fn property_name(&self, key: &oxc_ast::ast::PropertyKey<'_>) -> String {
@@ -479,6 +489,10 @@ fn metro_name_from_source(source: &str) -> Option<String> {
             parts.push(metro_identifier(rest));
         }
     }
+    metro_name_from_parts(&parts)
+}
+
+fn metro_name_from_parts(parts: &[String]) -> Option<String> {
     if parts.is_empty() {
         None
     } else if parts.len() > 5 {

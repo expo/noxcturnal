@@ -110,7 +110,13 @@ test.each([
   { source: 'factory()(() => 1);', expected: '<anonymous>$argument_0' },
   { source: 'new (factory())(() => 1);', expected: '<anonymous>$argument_0' },
   { source: 'api["subscribe"](() => 1);', expected: 'api.subscribe$argument_0' },
+  { source: '(api).subscribe(() => 1);', expected: 'api.subscribe$argument_0' },
+  { source: 'api /* comment */ . subscribe(() => 1);', expected: 'api.subscribe$argument_0' },
+  { source: 'api["sub.scribe"](() => 1);', expected: 'api.subScribe$argument_0' },
+  { source: 'api["sub\\u0073cribe"](() => 1);', expected: 'api.subscribe$argument_0' },
+  { source: 'a.b.c.d.e.subscribe(() => 1);', expected: 'a.b...e.subscribe$argument_0' },
   { source: 'api[key](() => 1);', expected: '<anonymous>$argument_0' },
+  { source: 'api[Symbol.iterator](() => 1);', expected: '<anonymous>$argument_0' },
 ])('callee inference stays structural for $source', ({ source, expected }) => {
   const standalone = native.generateFunctionMap(source, 'input.js');
   const result = transform(source, 'input.js', defineNativePipeline({ phases: [] }), {
