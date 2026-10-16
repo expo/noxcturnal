@@ -163,6 +163,115 @@ test('member matching requires its own declared facts even when another route re
   ).toThrow('matchesPattern requires declared field memberPath');
 });
 
+test('child member matching still requires the declared member field', () => {
+  const plugin = defineNativePlugin({
+    name: 'undeclared-child-member',
+    visitors: [
+      defineVisitor('CallExpression', { children: { callee: { route: 'Expression' } } }, path => {
+        path.getChild('callee')?.matchesPattern('Object.assign');
+      }),
+    ],
+  });
+  expect(() =>
+    transform(
+      'Object.assign(target, source);',
+      'input.js',
+      defineNativePipeline({ phases: [{ name: 'scan', plugins: [plugin] }] }),
+    ),
+  ).toThrow('matchesPattern requires declared field memberPath');
+});
+
+test('identifier matching still requires a declared name', () => {
+  const plugin = defineNativePlugin({
+    name: 'undeclared-identifier-name',
+    visitors: [defineVisitor('Identifier', {}, path => path.matchesPattern('foo'))],
+  });
+  expect(() =>
+    transform(
+      'foo(one, two);',
+      'input.js',
+      defineNativePipeline({ phases: [{ name: 'scan', plugins: [plugin] }] }),
+    ),
+  ).toThrow('matchesPattern requires declared field name');
+});
+
+test('a memberPath callee contract does not require name on identifier callees', () => {
+  const seen: Array<[string, boolean]> = [];
+  const plugin = defineNativePlugin({
+    name: 'member-callee-contract',
+    visitors: [
+      defineVisitor(
+        'CallExpression',
+        {
+          fields: ['argumentCount'],
+          children: { callee: { route: 'Expression', fields: ['memberPath'] } },
+        },
+        path => {
+          if (path.node.argumentCount !== 1) return;
+          const callee = path.getChild('callee');
+          if (!callee) return;
+          seen.push([callee.type, callee.matchesPattern('Icon.select')]);
+        },
+      ),
+    ],
+  });
+  expect(
+    transform(
+      'Icon.select({ ios: 1 }); other({ ios: 1 });',
+      'input.js',
+      defineNativePipeline({ phases: [{ name: 'scan', plugins: [plugin] }] }),
+    ).status,
+  ).toBe('complete');
+  expect(seen).toEqual([
+    ['StaticMemberExpression', true],
+    ['Identifier', false],
+  ]);
+});
+
+test('matchesPattern on non-member children returns false when member facts are declared for the route', () => {
+  const seen: boolean[] = [];
+  const plugin = defineNativePlugin({
+    name: 'heterogeneous-callees',
+    visitors: [
+      defineVisitor(
+        'CallExpression',
+        {
+          scope: true,
+          children: {
+            callee: { route: 'Expression', fields: ['memberPath'] },
+            arguments: { route: 'Expression', fields: ['name', 'memberPath'] },
+          },
+        },
+        path => {
+          const args = path.getChildList('arguments');
+          if (args.length <= 1) return;
+          const callee = path.getChild('callee');
+          seen.push(
+            Boolean(callee?.matchesPattern('Object.assign')),
+            Boolean(args[0]?.matchesPattern('module.exports')),
+          );
+        },
+      ),
+    ],
+  });
+  expect(
+    transform(
+      `class Example extends Base {
+        constructor() {
+          super(one, two);
+          Object.assign(module.exports, {});
+          Object.assign(exports, {});
+          Object.assign(...extra, more);
+          foo(one, two);
+        }
+      }`,
+      'input.js',
+      defineNativePipeline({ phases: [{ name: 'scan', plugins: [plugin] }] }),
+    ).status,
+  ).toBe('complete');
+  expect(seen).toEqual([false, false, true, true, true, false, true, false, false, false]);
+});
+
 test.each([false, true])('dynamic-root fields remain absent with scope retention %s', scope => {
   for (const root of ['root[key]', 'factory()']) {
     const seen: unknown[] = [];
