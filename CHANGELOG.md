@@ -1,5 +1,11 @@
 # noxcturnal
 
+## 0.1.4
+
+### Patch Changes
+
+- Remove unreachable `var` initializers when folding constant `if` conditions while preserving hoisted bindings. This prevents dependencies referenced only by unreachable initializers from being retained after block-scoping transforms, including when lowering and optimization run in the same phase, by [@kitten](https://github.com/kitten) (See [#54](https://github.com/expo/noxcturnal/pull/54))
+
 ## 0.1.3
 
 ### Patch Changes
