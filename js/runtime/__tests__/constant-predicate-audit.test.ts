@@ -73,6 +73,15 @@ const cases: {
     value: '',
     expected: 1,
   },
+  ...['\uD800', '\0'].flatMap(prefix =>
+    ['\u2028', '\u2029'].map(separator => ({
+      name: `exceptional string ${JSON.stringify(prefix + separator)}`,
+      route: 'StringLiteral' as const,
+      source: `${JSON.stringify(prefix + separator)};`,
+      value: prefix + separator,
+      expected: 1,
+    })),
+  ),
   { name: 'number', route: 'NumericLiteral', source: '3;', value: 3, expected: 1 },
   {
     name: 'boolean',

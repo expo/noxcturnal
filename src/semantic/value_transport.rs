@@ -82,6 +82,8 @@ fn marked_unit(after: &str) -> Option<u16> {
     ((0xd800..=0xdfff).contains(&unit) || unit == 0xfffd).then_some(unit)
 }
 
+// Match JSON.stringify, including literal U+2028/U+2029, so native payloads
+// and predicate manifests have identical spelling.
 fn push_json_escaped(output: &mut String, ch: char) {
     match ch {
         '"' => output.push_str("\\\""),
@@ -91,8 +93,6 @@ fn push_json_escaped(output: &mut String, ch: char) {
         '\n' => output.push_str("\\n"),
         '\r' => output.push_str("\\r"),
         '\t' => output.push_str("\\t"),
-        '\u{2028}' => output.push_str("\\u2028"),
-        '\u{2029}' => output.push_str("\\u2029"),
         ch if (ch as u32) < 0x20 => {
             write!(output, "\\u{:04x}", ch as u32).unwrap();
         }
