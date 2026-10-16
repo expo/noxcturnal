@@ -453,7 +453,7 @@ export function transform(
   // they belong to the transform's input source, not to the final generated
   // JavaScript. Babel's function-map plugin likewise collects from the input AST
   // before transformation begins.
-  let initialFunctionMap: FunctionMap | null | undefined;
+  let initialFunctionMap: FunctionMap | null = null;
   // The resident source: native phases and visitor commits mutate it in place
   // and accumulate their map layers natively, so the intermediate phase source
   // and per-phase map layers never cross the boundary — only the final composed
@@ -543,7 +543,7 @@ export function transform(
       status: 'complete',
       code: currentSource(),
       map: finalMap ?? { mappings: '', names: [] },
-      functionMap: initialFunctionMap ?? null,
+      functionMap: initialFunctionMap,
       metadata,
       diagnostics,
     };
