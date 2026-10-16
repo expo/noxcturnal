@@ -267,3 +267,56 @@ export const evenPower = 1 / ((0 * -1) ** 2);
     export const evenPower = 1 / 0;"
   `);
 });
+
+test.each([false, true])('drops unreachable var initializers (truthy=%s)', async truthy => {
+  const source = `export function read() {
+    if (${truthy}) { ${truthy ? 'return 1;' : "var { [key()]: value = require('default'), ...rest } = require('dead');"} }
+    else { ${truthy ? "var [value, ...rest] = require('dead');" : 'return 1;'} }
+    return [value, rest];
+  }`;
+  const output = await transformSource(source, 'input.js', options);
+  expect(output).not.toContain('require(');
+  expect(output).not.toContain('key()');
+  expect(output).toContain('var value, rest;');
+  expect(output).toContain('return 1;');
+});
+
+test('hoists vars from nested statements without hoisting catch parameters or nested locals', async () => {
+  const output = await transformSource(
+    `export function read() {
+    if (false) {
+      try {} catch (error) { var caught = require('caught'); }
+      while (unknown) { var nested = require('nested'); }
+      var fn = function () { var privateBinding; };
+      class Hidden { static { var staticBinding; } }
+    }
+    return [caught, nested, fn];
+  }`,
+    'input.js',
+    options,
+  );
+  expect(output).toContain('var caught, nested, fn;');
+  for (const text of ['require(', 'error', 'privateBinding', 'staticBinding']) {
+    expect(output).not.toContain(text);
+  }
+});
+
+test.each([false, true])(
+  'removes explicit unreachable var dependencies (moduleContext=%s)',
+  async moduleContext => {
+    const output = await transformSource(
+      `function read() {
+    if (false) { var value = require('unreachable'); }
+    return value;
+  }
+  globalThis.read = read;`,
+      'input.js',
+      {
+        optimize: { constantFolding: true, deadCodeElimination: true, moduleContext },
+      },
+    );
+    expect(output).not.toContain('require(');
+    expect(output).toContain('var value;');
+    expect(output).toContain('return value;');
+  },
+);

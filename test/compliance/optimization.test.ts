@@ -593,3 +593,24 @@ describe.each(eliminationComplianceCases)('$name', ({ source, expected }) => {
     expect(run(code)).toEqual(expected);
   });
 });
+
+test('unreachable vars retain hoisting without evaluating destructuring or crossing scopes', () => {
+  const source = `
+    function read() {
+      if (false) {
+        for (var [first = fail(), ...rest] of fail()) {}
+        try { fail(); } catch (error) { var caught = fail(); }
+        var { [fail()]: property = fail() } = fail();
+        var nested = function () { var privateBinding; };
+        class Hidden { static { var staticBinding; } }
+      }
+      return [first, rest, caught, property, typeof privateBinding, typeof staticBinding];
+    }
+    globalThis.result = read();
+  `;
+  expect(
+    execute<{ result: unknown[] }>(source, {
+      optimize: { constantFolding: true, deadCodeElimination: true },
+    }).result,
+  ).toEqual([undefined, undefined, undefined, undefined, 'undefined', 'undefined']);
+});
