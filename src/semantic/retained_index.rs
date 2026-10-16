@@ -27,6 +27,8 @@ static CAPTURE_RECORDS_MATERIALIZED: AtomicUsize = AtomicUsize::new(0);
 #[derive(Default)]
 pub struct RetainedIndex {
     type_ids: Vec<u32>,
+    node_type_index: OnceCell<FxHashMap<u32, Vec<u32>>>,
+    call_name_index: OnceCell<FxHashMap<u32, Vec<u32>>>,
     starts: Vec<u32>,
     ends: Vec<u32>,
     parent_ids: Vec<u32>,
@@ -347,6 +349,8 @@ impl RetainedIndex {
     ) -> Self {
         Self {
             type_ids: vec![ABSENT_ID; node_count],
+            node_type_index: OnceCell::new(),
+            call_name_index: OnceCell::new(),
             starts: vec![0; node_count],
             ends: vec![0; node_count],
             parent_ids: vec![ABSENT_ID; node_count],
@@ -922,6 +926,7 @@ impl RetainedIndex {
         callee_global: bool,
         static_argument: Option<&str>,
     ) {
+        self.call_name_index.take();
         let callee_name_id = self.intern_name(callee_name);
         debug_assert_eq!(callee_name_id & !CALL_NAME_MASK, 0);
         let static_argument_id = static_argument
@@ -1050,11 +1055,23 @@ impl RetainedIndex {
         let Some(&callee_name_id) = self.name_ids.get(callee_name) else {
             return Vec::new();
         };
-        self.calls
-            .iter()
+        let index = self.call_name_index.get_or_init(|| {
+            let mut index: FxHashMap<u32, Vec<u32>> = FxHashMap::default();
+            for (position, call) in self.calls.iter().enumerate() {
+                index
+                    .entry(call.callee_name_id())
+                    .or_default()
+                    .push(position as u32);
+            }
+            index
+        });
+        index
+            .get(&callee_name_id)
+            .into_iter()
+            .flatten()
+            .map(|&position| &self.calls[position as usize])
             .filter(|call| {
-                call.callee_name_id() == callee_name_id
-                    && (!global_only || call.callee_global())
+                (!global_only || call.callee_global())
                     && (!static_arguments || call.static_argument_id != ABSENT_ID)
             })
             .map(|call| NativeCallFact {
@@ -1136,6 +1153,7 @@ impl RetainedIndex {
     ) {
         self.traversal_ranges.take();
         self.traversal_sequences.take();
+        self.node_type_index.take();
         let index = node_id as usize;
         if index >= self.type_ids.len() {
             let new_len = index + 1;
@@ -1504,15 +1522,30 @@ impl RetainedIndex {
         edges.iter().map(|edge| (edge.child_id, edge.role_id))
     }
 
-    pub fn node_ids_of_types<'a>(
-        &'a self,
-        type_ids: &'a rustc_hash::FxHashSet<u32>,
-    ) -> impl Iterator<Item = u32> + 'a {
-        self.type_ids
-            .iter()
-            .enumerate()
-            .filter(|(_, type_id)| type_ids.contains(type_id))
-            .map(|(node_id, _)| node_id as u32)
+    /// Build only on demand; selected buckets contain IDs, never duplicate facts.
+    /// Sorting the union preserves the original ascending-node-ID query order.
+    pub fn node_ids_of_types(&self, type_ids: &FxHashSet<u32>) -> impl Iterator<Item = u32> {
+        let mut selected = Vec::new();
+        if !type_ids.is_empty() {
+            let index = self.node_type_index.get_or_init(|| {
+                let mut index: FxHashMap<u32, Vec<u32>> = FxHashMap::default();
+                for (id, &type_id) in self.type_ids.iter().enumerate() {
+                    if type_id != ABSENT_ID {
+                        index.entry(type_id).or_default().push(id as u32);
+                    }
+                }
+                index
+            });
+            for type_id in type_ids {
+                if let Some(ids) = index.get(type_id) {
+                    selected.extend_from_slice(ids);
+                }
+            }
+            if type_ids.len() > 1 {
+                selected.sort_unstable();
+            }
+        }
+        selected.into_iter()
     }
 
     /// Owned scopes and insertion coordinates are semantic facts, independent of
@@ -1653,10 +1686,20 @@ impl RetainedIndex {
     }
 
     pub fn memory_usage(&self) -> usize {
-        self.uid_identifiers.as_ref().map_or(0, |names| {
-            names.capacity() * size_of::<String>()
-                + names.iter().map(String::capacity).sum::<usize>()
-        }) + self.identifier_name_bits.capacity() * size_of::<u64>()
+        fn query_index_bytes(index: &FxHashMap<u32, Vec<u32>>) -> usize {
+            index.capacity() * size_of::<(u32, Vec<u32>)>()
+                + index
+                    .values()
+                    .map(|ids| ids.capacity() * size_of::<u32>())
+                    .sum::<usize>()
+        }
+        self.node_type_index.get().map_or(0, query_index_bytes)
+            + self.call_name_index.get().map_or(0, query_index_bytes)
+            + self.uid_identifiers.as_ref().map_or(0, |names| {
+                names.capacity() * size_of::<String>()
+                    + names.iter().map(String::capacity).sum::<usize>()
+            })
+            + self.identifier_name_bits.capacity() * size_of::<u64>()
             + self.rename_exports.get().map_or(0, |exports| {
                 size_of::<FxHashMap<u32, Vec<u32>>>()
                     + exports.capacity() * size_of::<(u32, Vec<u32>)>()
@@ -1851,6 +1894,118 @@ use std::rc::Rc;
 mod tests {
     use super::*;
     use crate::syntax::source_text::UidAllocator;
+
+    #[test]
+    fn selective_query_indexes_are_lazy_reused_and_invalidated() {
+        let mut index = RetainedIndex::default();
+        assert!(
+            index
+                .node_ids_of_types(&FxHashSet::default())
+                .next()
+                .is_none()
+        );
+        assert!(index.node_type_index.get().is_none());
+        assert!(index.call_facts("missing", false, false).is_empty());
+        assert!(index.call_name_index.get().is_none());
+        // Deliberately record out of order, with holes and an overwritten type.
+        for (id, kind) in [(8, 2), (1, 1), (5, 2), (3, 1), (1, 2)] {
+            index.record(id, kind, id, id + 1, None, 0);
+        }
+        let before = index.memory_usage();
+        let types = [1, 2].into_iter().collect();
+        assert_eq!(
+            index.node_ids_of_types(&types).collect::<Vec<_>>(),
+            [1, 3, 5, 8]
+        );
+        assert!(index.memory_usage() > before);
+        let node_index = index.node_type_index.get().unwrap() as *const _;
+        assert_eq!(
+            index
+                .node_ids_of_types(&[2].into_iter().collect())
+                .collect::<Vec<_>>(),
+            [1, 5, 8]
+        );
+        assert_eq!(index.node_type_index.get().unwrap() as *const _, node_index);
+        index.record(3, 2, 3, 4, None, 0);
+        assert!(index.node_type_index.get().is_none());
+        assert!(
+            index
+                .node_ids_of_types(&[1].into_iter().collect())
+                .next()
+                .is_none()
+        );
+
+        index.record_call(8, "load", true, Some("first"));
+        index.record_call(3, "other", true, Some("other"));
+        index.record_call(5, "load", false, Some("local"));
+        index.record_call(1, "load", true, None);
+        assert!(index.call_name_index.get().is_none());
+        assert_eq!(
+            index
+                .call_facts("load", false, false)
+                .iter()
+                .map(|call| call.id)
+                .collect::<Vec<_>>(),
+            [8, 5, 1]
+        );
+        assert_eq!(
+            index
+                .call_facts("load", true, false)
+                .iter()
+                .map(|call| call.id)
+                .collect::<Vec<_>>(),
+            [8, 1]
+        );
+        let filtered = index.call_facts("load", true, true);
+        assert_eq!(filtered.len(), 1);
+        assert_eq!(filtered[0].static_argument.as_deref(), Some("first"));
+        assert!(filtered[0].callee_global);
+        index.record_call(3, "load", true, Some("new"));
+        assert!(index.call_name_index.get().is_none());
+        assert_eq!(
+            index
+                .call_facts("load", true, true)
+                .iter()
+                .map(|call| call.id)
+                .collect::<Vec<_>>(),
+            [8, 3]
+        );
+        index.clear();
+        assert!(index.node_type_index.get().is_none());
+        assert!(index.call_name_index.get().is_none());
+    }
+
+    #[test]
+    fn selective_buckets_do_not_expand_with_unrelated_records() {
+        for count in [1_000, 10_000, 100_000] {
+            let mut index = RetainedIndex::default();
+            for id in 0..count {
+                index.record(id, 1, id, id + 1, None, 0);
+                index.record_call(id, "unrelated", true, None);
+            }
+            index.record(count, 2, count, count + 1, None, 0);
+            index.record_call(count, "selected", true, Some("value"));
+            assert_eq!(
+                index
+                    .node_ids_of_types(&[2].into_iter().collect())
+                    .collect::<Vec<_>>(),
+                [count]
+            );
+            assert_eq!(index.node_type_index.get().unwrap()[&2].len(), 1);
+            assert_eq!(index.call_facts("selected", false, false).len(), 1);
+            let selected = index.name_ids["selected"];
+            assert_eq!(index.call_name_index.get().unwrap()[&selected].len(), 1);
+            // Known names without calls must not fall back to a full scan.
+            assert!(index.call_facts("value", false, false).is_empty());
+            assert!(
+                !index
+                    .call_name_index
+                    .get()
+                    .unwrap()
+                    .contains_key(&index.name_ids["value"])
+            );
+        }
+    }
 
     #[test]
     fn uid_candidate_probes_do_not_grow_with_unrelated_module_names() {
