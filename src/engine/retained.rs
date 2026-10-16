@@ -17,9 +17,28 @@ pub(crate) fn routed_buffer_from_index(
     scope_parents: &[u32],
     root: Option<(u32, u32)>,
 ) -> Result<Buffer> {
-    let mut writer =
-        RetainedRouteWriter::with_capacity(index.traversal_records().len().saturating_mul(8));
-    for &record in index.traversal_records() {
+    let range = root.map_or_else(
+        || 0..index.traversal_records().len(),
+        |(start, end)| index.traversal_range(start, end),
+    );
+    let mut writer = RetainedRouteWriter::with_capacity(range.len().saturating_mul(8));
+    if range.start > 0 {
+        writer.sequence = index.traversal_sequence_before(
+            range.start,
+            manifest
+                .routes_by_type
+                .iter()
+                .enumerate()
+                .filter_map(|(type_id, routes)| {
+                    routes
+                        .iter()
+                        .any(|route| route.side == VisitSide::Exit)
+                        .then_some(type_id as u32)
+                }),
+        );
+    }
+    let records = &index.traversal_records()[range];
+    for &record in records {
         let side = if record & 0x8000_0000 != 0 {
             VisitSide::Exit
         } else {

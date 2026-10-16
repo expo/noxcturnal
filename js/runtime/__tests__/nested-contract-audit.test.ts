@@ -243,3 +243,64 @@ test('nested scope lookup and nonconflicting edits retain their behavior', () =>
   expect(seen).toEqual(['value', 'value']);
   expect(result.code).toBe('const renamed = 3; renamed;');
 });
+
+test('bounded nested enter and exit routes hydrate ancestors outside the queried span', () => {
+  const seen: string[] = [];
+  const ancestry = {
+    mode: 'findParent',
+    routes: { VariableDeclarator: { fields: ['bindingName'] } },
+  } as const;
+  const nested = [
+    defineVisitor(
+      'CallExpression',
+      { fields: ['calleeName'], ancestry },
+      {
+        enter(path) {
+          const owner = path.findParent(parent => parent.node.type === 'VariableDeclarator');
+          expect(owner?.node.type === 'VariableDeclarator' && owner.node.bindingName).toBe('owner');
+          seen.push(`enter:${path.node.calleeName}`);
+        },
+        exit(path) {
+          const owner = path.findParent(parent => parent.node.type === 'VariableDeclarator');
+          expect(owner?.node.type === 'VariableDeclarator' && owner.node.bindingName).toBe('owner');
+          seen.push(`exit:${path.node.calleeName}`);
+        },
+      },
+    ),
+    defineVisitor(
+      'Identifier',
+      { fields: ['name'], where: { name: { equals: 'value' } }, ancestry },
+      {
+        exit(path) {
+          const owner = path.findParent(parent => parent.node.type === 'VariableDeclarator');
+          expect(owner?.node.type === 'VariableDeclarator' && owner.node.bindingName).toBe('owner');
+          seen.push(`exit:${path.node.name}`);
+        },
+      },
+    ),
+  ];
+  const plugin = defineNativePlugin({
+    name: 'bounded-nested-ancestry',
+    visitors: [
+      defineVisitor(
+        'VariableDeclarator',
+        {
+          children: { init: { route: 'CallExpression' } },
+          nested,
+          controlFlow: ['nested-traverse'],
+        },
+        path => path.getChild('init')?.traverse(nested),
+      ),
+    ],
+  });
+  const source = `${'before();'.repeat(100)}const owner = outer(inner(value)); after();`;
+  const result = transform(
+    source,
+    'input.js',
+    defineNativePipeline({ phases: [{ name: 'visit', plugins: [plugin] }] }),
+  );
+  expect(result.status).toBe('complete');
+  if (result.status !== 'complete') throw new Error(result.reason);
+  expect(result.code).toBe(source);
+  expect(seen).toEqual(['enter:outer', 'enter:inner', 'exit:value', 'exit:inner', 'exit:outer']);
+});
