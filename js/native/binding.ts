@@ -110,6 +110,7 @@ interface NativeBinding {
   ) => {
     nextRoutedPacked(manifest: Buffer, rootStart?: number, rootEnd?: number): Buffer;
     queryGlobalsBuffer(names: string[]): Buffer;
+    globalBindingReferencesBuffer(name: string): Buffer;
     queryBindings(
       name?: string,
       scopeId?: number,
@@ -135,6 +136,14 @@ interface NativeBinding {
         memberWrite: boolean;
       }[];
     }[];
+    bindingRenamePlan(
+      name: string,
+      scopeId: number,
+    ): {
+      targets: { start: number; end: number; kind: number }[];
+      exports: { start: number; end: number }[];
+    };
+    bindingRenameExportNames(start: number): string[];
     bindingIndexBuffer(): Buffer;
     scopeParentsBuffer(): Buffer;
     scopeMetadataBuffer(): Buffer;

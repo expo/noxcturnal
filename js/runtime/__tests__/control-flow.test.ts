@@ -700,7 +700,7 @@ test('pushes generated declarations into a scope after its directive prologue', 
   assert.equal(result.status, 'complete');
   assert.equal(
     result.code,
-    'function action() { "use action";\nvar injected = 1;\n return injected }',
+    'function action() { "use action";\n;\nvar injected = 1;\n;\n return injected }',
   );
 });
 

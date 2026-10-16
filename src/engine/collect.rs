@@ -39,6 +39,7 @@ struct EventCollector<'a> {
     tracks_member_writes: bool,
     retention_routes: Option<&'a CompiledManifest>,
     retention_capabilities: u32,
+    retain_scopes: bool,
     retained_string_ids: FxHashMap<String, u32>,
     member_paths: MemberPathInterner,
 }
@@ -220,6 +221,10 @@ impl<'a> EventCollector<'a> {
                 parent_kind.and_then(|parent| child_role_id_for_edge(parent, kind)),
             );
         }
+        if self.retain_scopes && self.retention_capabilities & RETAIN_IDENTIFIERS != 0 {
+            self.retained_index
+                .record_rename_roles(kind, self.nodes, scope_id.index() as u32);
+        }
         self.retained_index.record_semantics(
             kind,
             self.scoping,
@@ -373,6 +378,12 @@ pub(crate) fn materialize_with_scope_parents(
         || compiled_manifest
             .as_ref()
             .is_some_and(|manifest| manifest.needs_comments);
+    let retain_scopes = retention_manifest
+        .as_ref()
+        .is_some_and(|manifest| manifest.include_scope)
+        || compiled_manifest
+            .as_ref()
+            .is_some_and(|manifest| manifest.include_scope);
     if !needs_semantics {
         let mut collector = SyntaxIndexCollector {
             source,
@@ -475,6 +486,7 @@ pub(crate) fn materialize_with_scope_parents(
         ),
         retention_routes: retention_manifest.as_ref(),
         retention_capabilities,
+        retain_scopes,
         retained_string_ids: FxHashMap::default(),
         member_paths: MemberPathInterner::default(),
         target_stack: Vec::new(),
@@ -484,6 +496,11 @@ pub(crate) fn materialize_with_scope_parents(
         ),
     };
     collector.visit_program(&parsed.program);
+    if retain_scopes && retention_capabilities & RETAIN_IDENTIFIERS != 0 {
+        collector
+            .retained_index
+            .record_scopes(collector.scoping, collector.nodes, collector.utf16);
+    }
     collector.retained_index.finalize_child_edges();
     collector
         .retained_index
