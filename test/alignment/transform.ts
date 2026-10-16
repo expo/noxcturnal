@@ -159,6 +159,25 @@ export function alignHermesFlowTransform(
   );
 }
 
+/** Hermes' Babel adapter drops member decorators, including at the candidate
+ * revision. Use Babel's Flow stripper as the preservation oracle for these
+ * cases; Hermes parser acceptance is asserted separately. */
+export function alignFlowDecoratorTransform(source: string): StructuralAlignment {
+  return alignBabelTransform({
+    source,
+    filename: 'input.js',
+    noxcturnal: {},
+    plugins: [
+      {
+        manipulateOptions(_options, parser) {
+          parser.plugins.push('decorators-legacy');
+        },
+      },
+      flowStripTypes,
+    ],
+  });
+}
+
 function alignOutput(
   source: string,
   filename: string,
@@ -190,7 +209,7 @@ function canonicalize(source: string, filename: string): string {
     babelrc: false,
     configFile: false,
     filename,
-    parserOpts: { plugins: ['jsx'] },
+    parserOpts: { plugins: ['jsx', 'decorators-legacy'] },
     sourceType: 'unambiguous',
   });
   if (ast == null) throw new Error(`Could not canonicalize ${filename}`);

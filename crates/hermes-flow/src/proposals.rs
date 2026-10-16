@@ -1,6 +1,6 @@
 //! The Flow proposal transforms that sit beside type erasure.
 //!
-//! Erasure only deletes. `enum`, `component`, `hook`, and `match` declare
+//! Erasure only deletes. `enum`, `component`, `hook`, `record`, and `match` declare
 //! runtime constructs, so they have to write something in place of what they
 //! remove. The output matches `hermes-parser`'s JavaScript transforms —
 //! `TransformEnumSyntax.js`, `TransformComponentSyntax.js`, and
@@ -101,25 +101,29 @@ pub(crate) struct Component {
     pub params: Vec<ComponentParam>,
     /// Present when a single rest parameter takes the whole props object, which
     /// needs no destructuring at all.
-    pub whole_props: Option<Range<u32>>,
+    pub whole_props: Option<String>,
     /// The binding of a `ref` parameter. React 18 treats `ref` specially, so
     /// the component becomes an inner function taking `(props, ref)` wrapped in
     /// `React.forwardRef`.
-    pub ref_binding: Option<Range<u32>>,
+    pub ref_binding: Option<String>,
     pub is_async: bool,
+    pub inner_name: Option<String>,
+    pub empty_props_name: Option<String>,
 }
 
 pub(crate) struct ComponentParam {
     /// The property name as written, which may be a string literal.
     pub name: Range<u32>,
     /// The binding, without its type annotation.
-    pub local: Range<u32>,
+    pub local: String,
     /// A default value, if the parameter had one.
-    pub default: Option<Range<u32>>,
+    pub default: Option<String>,
     /// `a` rather than `a as a`, so the pattern can use shorthand.
     pub shorthand: bool,
     /// `...rest`.
     pub rest: bool,
+    /// A destructured rest contributes its properties directly.
+    pub flatten: bool,
 }
 
 impl Component {
@@ -129,17 +133,16 @@ impl Component {
     fn function_name(&self, source: &str) -> String {
         let name = slice(source, &self.id);
         match self.ref_binding {
-            Some(_) => format!("{name}_withRef"),
+            Some(_) => self
+                .inner_name
+                .clone()
+                .unwrap_or_else(|| format!("{name}_withRef")),
             None => name.to_owned(),
         }
     }
 
-    /// Everything that replaces the source from `component` up to the body's
-    /// `{`: the `forwardRef` binding when there is one, then the function
-    /// header.
-    ///
-    /// The binding comes *first*, which is what `TransformComponentSyntax`
-    /// emits and is safe because the function declaration below it hoists.
+    /// The function header replacing `component` up to the body's `{`.
+    /// The walk inserts a ref wrapper separately, before its first reference.
     pub fn render(&self, source: &str) -> String {
         let name = self.function_name(source);
         let prefix = if self.is_async {
@@ -148,15 +151,12 @@ impl Component {
             "function"
         };
         let reference = match &self.ref_binding {
-            Some(binding) => format!(", {}", slice(source, binding)),
+            Some(binding) => format!(", {binding}"),
             None => String::new(),
         };
-        let wrapper = self.forward_ref(source).unwrap_or_default();
+
         if let Some(props) = &self.whole_props {
-            return format!(
-                "{wrapper}{prefix} {name}({}{reference}) ",
-                slice(source, props)
-            );
+            return format!("{prefix} {name}({props}{reference}) ");
         }
         if self.params.is_empty() {
             // A component whose only parameter was the ref still needs a props
@@ -164,9 +164,11 @@ impl Component {
             let props = if reference.is_empty() {
                 ""
             } else {
-                "_$$empty_props_placeholder$$"
+                self.empty_props_name
+                    .as_deref()
+                    .unwrap_or("_$$empty_props_placeholder$$")
             };
-            return format!("{wrapper}{prefix} {name}({props}{reference}) ");
+            return format!("{prefix} {name}({props}{reference}) ");
         }
         let properties = self
             .params
@@ -174,7 +176,7 @@ impl Component {
             .map(|param| param.render(source))
             .collect::<Vec<_>>()
             .join(", ");
-        format!("{wrapper}{prefix} {name}({{{properties}}}{reference}) ")
+        format!("{prefix} {name}({{{properties}}}{reference}) ")
     }
 
     /// `const Foo = React.forwardRef(Foo_withRef);`, or nothing when there was
@@ -191,13 +193,16 @@ impl Component {
 
 impl ComponentParam {
     fn render(&self, source: &str) -> String {
-        if self.rest {
-            return format!("...{}", slice(source, &self.local));
+        if self.flatten {
+            return self.local.clone();
         }
-        let local = slice(source, &self.local);
+        if self.rest {
+            return format!("...{}", self.local);
+        }
+        let local = &self.local;
         let binding = match &self.default {
-            Some(default) => format!("{local} = {}", slice(source, default)),
-            None => local.to_owned(),
+            Some(default) => format!("{local} = {default}"),
+            None => local.clone(),
         };
         if self.shorthand {
             return binding;
@@ -216,9 +221,10 @@ impl ComponentParam {
 /// hole: a `$$gen$m0` further down the file has not been seen yet. Starting the
 /// counter above every such name in the source closes it, and costs one scan of
 /// a file that mentions the prefix at all.
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub(crate) struct Names {
-    next: u32,
+    next: u64,
+    prefix: &'static str,
 }
 
 /// What every generated name starts with. The `m` is this transform's; the
@@ -227,21 +233,29 @@ const GENERATED_PREFIX: &str = "$$gen$m";
 
 impl Names {
     pub fn after(source: &str) -> Self {
-        let mut next = 0u32;
-        for (at, _) in source.match_indices(GENERATED_PREFIX) {
-            let digits: String = source[at + GENERATED_PREFIX.len()..]
+        Self::after_prefix(source, GENERATED_PREFIX)
+    }
+
+    pub fn records(source: &str) -> Self {
+        Self::after_prefix(source, "$$gen$r")
+    }
+
+    fn after_prefix(source: &str, prefix: &'static str) -> Self {
+        let mut next = 0u64;
+        for (at, _) in source.match_indices(prefix) {
+            let digits: String = source[at + prefix.len()..]
                 .chars()
                 .take_while(char::is_ascii_digit)
                 .collect();
             if let Ok(index) = digits.parse::<u32>() {
-                next = next.max(index.saturating_add(1));
+                next = next.max(u64::from(index) + 1);
             }
         }
-        Self { next }
+        Self { next, prefix }
     }
 
     pub fn reserve(&mut self) -> String {
-        let name = format!("{GENERATED_PREFIX}{}", self.next);
+        let name = format!("{}{}", self.prefix, self.next);
         self.next += 1;
         name
     }

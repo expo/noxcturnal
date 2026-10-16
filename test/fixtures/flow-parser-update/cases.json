@@ -533,19 +533,19 @@
   {
     "id": "async-component-await",
     "source": "async component Read(value: number) { return await Promise.resolve(value); }",
-    "output": "",
+    "output": "async function Read({value}) { return await Promise.resolve(value); }",
     "provenance": "async-component",
-    "outcome": "Proposal",
-    "classification": "intentional compatibility boundary",
+    "outcome": "erased",
+    "classification": "supported erasure/lowering",
     "pinnedAccepted": false
   },
   {
     "id": "async-component-nested",
     "source": "async component Read() { function inner() { return 1; } return await Promise.resolve(inner()); }",
-    "output": "",
+    "output": "async function Read() { function inner() { return 1; } return await Promise.resolve(inner()); }",
     "provenance": "async-component",
-    "outcome": "Proposal",
-    "classification": "intentional compatibility boundary",
+    "outcome": "erased",
+    "classification": "supported erasure/lowering",
     "pinnedAccepted": false
   },
   {
@@ -733,10 +733,10 @@
   {
     "id": "decorator-property-and-method",
     "source": "class C { @d1 prop; @d2 method() {} }",
-    "output": "",
+    "output": "class C { @d1 prop; @d2 method() {} }",
     "provenance": "decorators",
-    "outcome": "UnhandledSyntax",
-    "classification": "intentional compatibility boundary",
+    "outcome": "erased",
+    "classification": "supported erasure/lowering",
     "pinnedAccepted": true
   }
 ]

@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 
 import type { NativeTransformResult, TransformResult } from '../../index';
 import { defineNativePipeline, registerParserAdapter, transform } from '../../index';
-import { nativeFlowErasureBuilt } from '../../native/binding';
+import { native, nativeFlowErasureBuilt } from '../../native/binding';
 
 /** Asserts success and narrows, so the assertions below can read `code`. */
 function completed(result: TransformResult): NativeTransformResult {
@@ -60,7 +60,7 @@ withErasure('native Flow erasure', () => {
     `);
   });
 
-  test('falls back to a registered adapter on unsupported proposal syntax', () => {
+  test('uses native record lowering ahead of an automatically selected adapter', () => {
     const unregister = registerParserAdapter({
       name: 'flow-fallback-fixture',
       version: '1.0.0',
@@ -77,9 +77,41 @@ withErasure('native Flow erasure', () => {
       const result = completed(
         transform('// @flow\nconst value = R { field: 1 };\n', 'fixture.js', pipeline),
       );
-      assert.deepEqual(result.metadata.sourceAdapter, { adapter: true });
+      expect(result.metadata.sourceAdapter).toBeUndefined();
+      expect(result.code).toContain('new R({ field: 1 })');
     } finally {
       unregister();
+    }
+  });
+
+  test('retains adapter fallback when native erasure reports a compatibility boundary', () => {
+    const erasure = vi.spyOn(native, 'nativeFlowErase').mockReturnValue({
+      status: 'bailed',
+      reason: 'proposal-syntax',
+      detail: 'fixture compatibility boundary',
+      erasedBytes: 0,
+      spanCount: 0,
+    });
+    const unregister = registerParserAdapter({
+      name: 'flow-compatibility-fixture',
+      version: '1.0.0',
+      supports: route => route.syntax === 'flow',
+      compile: () => ({
+        status: 'complete',
+        code: 'const fallback = 1;',
+        map: { mappings: 'AAAA', names: [] },
+        syntax: 'js',
+        metadata: { adapter: true },
+      }),
+    });
+    try {
+      const result = completed(
+        transform('// @flow\nconst value = R { field: 1 };\n', 'fixture.js', pipeline),
+      );
+      expect(result.metadata.sourceAdapter).toEqual({ adapter: true });
+    } finally {
+      unregister();
+      erasure.mockRestore();
     }
   });
 

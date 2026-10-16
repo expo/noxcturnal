@@ -33,7 +33,7 @@ use crate::generated::estree::{Dialect, NODE_KIND_COUNT, NODE_KINDS};
 pub enum BailKind {
     /// Hermes could not parse it.
     ParseFailed,
-    /// Component, hook, enum, match, or record syntax.
+    /// A proposal shape the lowering does not recognize.
     Proposal,
     /// A `TS*` node. Hermes is built with TypeScript parsing on, but nothing
     /// here erases TypeScript.
@@ -175,15 +175,17 @@ pub const FIELD_RULES: &[(&str, &str, FieldRule)] = &[
     // -- classes -----------------------------------------------------------
     // `implements` is a hook rather than an erase: the `implements` keyword
     // itself belongs to no node, so erasing the list would leave it behind.
+    // Decorators remain value syntax for a later, explicitly selected native
+    // decorator transform; their expressions may themselves contain Flow.
     ("ClassDeclaration",         "typeParameters",     FieldRule::Erase),
     ("ClassDeclaration",         "superTypeArguments", FieldRule::Erase),
     ("ClassDeclaration",         "implements",         FieldRule::Hook),
-    ("ClassDeclaration",         "decorators",         FieldRule::BailIfPresent),
+    ("ClassDeclaration",         "decorators",         FieldRule::Plain),
     ("ClassExpression",          "typeParameters",     FieldRule::Erase),
     ("ClassExpression",          "superTypeArguments", FieldRule::Erase),
     ("ClassExpression",          "implements",         FieldRule::Hook),
-    ("ClassExpression",          "decorators",         FieldRule::BailIfPresent),
-    ("MethodDefinition",         "decorators",         FieldRule::BailIfPresent),
+    ("ClassExpression",          "decorators",         FieldRule::Plain),
+    ("MethodDefinition",         "decorators",         FieldRule::Plain),
     ("MethodDefinition",         "kind",               FieldRule::Plain),
     ("MethodDefinition",         "computed",           FieldRule::Plain),
     ("MethodDefinition",         "static",             FieldRule::Plain),
@@ -196,7 +198,7 @@ pub const FIELD_RULES: &[(&str, &str, FieldRule)] = &[
     ("ClassProperty",            "declare",        FieldRule::Hook),
     ("ClassProperty",            "optional",       FieldRule::Hook),
     ("ClassProperty",            "tsModifiers",    FieldRule::BailIfPresent),
-    ("ClassProperty",            "decorators",     FieldRule::BailIfPresent),
+    ("ClassProperty",            "decorators",     FieldRule::Plain),
     ("ClassProperty",            "computed",       FieldRule::Plain),
     ("ClassProperty",            "static",         FieldRule::Plain),
     ("ClassPrivateProperty",     "typeAnnotation", FieldRule::Erase),
@@ -204,7 +206,7 @@ pub const FIELD_RULES: &[(&str, &str, FieldRule)] = &[
     ("ClassPrivateProperty",     "declare",        FieldRule::Hook),
     ("ClassPrivateProperty",     "optional",       FieldRule::Hook),
     ("ClassPrivateProperty",     "tsModifiers",    FieldRule::BailIfPresent),
-    ("ClassPrivateProperty",     "decorators",     FieldRule::BailIfPresent),
+    ("ClassPrivateProperty",     "decorators",     FieldRule::Plain),
     ("ClassPrivateProperty",     "static",         FieldRule::Plain),
 
     // -- bindings and calls ------------------------------------------------
@@ -330,7 +332,14 @@ fn build() -> Box<[Resolved; NODE_KIND_COUNT]> {
         table[index_of(name)].node = NodeRule::EraseTail;
     }
     // Handled by `erase`, which rewrites them rather than abandoning the file.
-    for name in ["EnumDeclaration", "ComponentDeclaration", "HookDeclaration"] {
+    for name in [
+        "EnumDeclaration",
+        "ComponentDeclaration",
+        "HookDeclaration",
+        "RecordDeclaration",
+        "RecordExpression",
+        "RecordExpressionProperties",
+    ] {
         table[index_of(name)].node = NodeRule::Walk;
     }
     for (node, field, rule) in FIELD_RULES {

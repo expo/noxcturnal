@@ -10,5 +10,6 @@ fn main() {
             serde_json::json!({"outcome": format!("{:?}", bail.kind), "detail": bail.detail})
         }
     };
-    writeln!(io::stdout(), "{result}").unwrap();
+    let mut output = io::stdout().lock();
+    writeln!(output, "{result}").unwrap();
 }

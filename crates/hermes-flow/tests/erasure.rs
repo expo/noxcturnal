@@ -332,11 +332,10 @@ fn transforms_component_ref_parameters() {
         erased("component Foo(ref?: R) { return null; }\n"),
         "const Foo = React.forwardRef(Foo_withRef);\nfunction Foo_withRef(_$$empty_props_placeholder$$, ref) { return null; }\n"
     );
-    // A reference above the declaration would read the `const` before it is
-    // initialised, so the file goes to the fallback instead.
+    // Relocate the wrapper before the first earlier reference, as Hermes does.
     assert_eq!(
-        bailed("const x = Foo;\ncomponent Foo(ref?: R) { return null; }\n"),
-        BailKind::Proposal
+        erased("const x = Foo;\ncomponent Foo(ref?: R) { return null; }\n"),
+        "const Foo = React.forwardRef(Foo_withRef);\nconst x = Foo;\nfunction Foo_withRef(_$$empty_props_placeholder$$, ref) { return null; }\n"
     );
 }
 
@@ -628,17 +627,94 @@ fn rejects_a_yield_it_would_have_to_wrap() {
     );
 }
 
-/// Records are the one proposal the shim parses and nothing here rewrites.
+/// Record expressions become constructor calls, preserving the object bytes.
 #[test]
-fn bails_on_untransformed_proposals() {
-    assert_eq!(bailed("const x = R {a: 1};\n"), BailKind::Proposal);
+fn transforms_record_expressions() {
+    assert_eq!(
+        erased("const x = R {a: 1};\n"),
+        "const x = new R({a: 1});\n"
+    );
 }
 
 #[test]
-fn bails_on_decorators() {
+fn preserves_decorators_for_the_native_decorator_transform() {
     assert_eq!(
-        bailed("class A { @dec foo = 1; }\n"),
-        BailKind::UnhandledSyntax
+        erased("class A { @dec foo = 1; }\n"),
+        "class A { @dec foo = 1; }\n"
+    );
+    assert_eq!(
+        erased("class A { @dec foo: number; }\n"),
+        "class A { @dec foo; }\n"
+    );
+}
+
+#[test]
+fn transforms_async_components_and_hooks() {
+    assert_eq!(
+        erased("async component Read(value: number) { return await Promise.resolve(value); }"),
+        "async function Read({value}) { return await Promise.resolve(value); }"
+    );
+    assert_eq!(
+        erased("async hook useValue(): Promise<number> { return await 1; }"),
+        "async function useValue() { return await 1; }"
+    );
+    assert_eq!(
+        erased("export async component Read() { return await 1; }"),
+        "export async function Read() { return await 1; }"
+    );
+}
+
+#[test]
+fn relocates_forward_ref_bindings_within_their_statement_list() {
+    assert_eq!(
+        erased("function outer() { const before = C; component C(ref?: R) { return null; } }"),
+        "function outer() { const C = React.forwardRef(C_withRef);\nconst before = C; function C_withRef(_$$empty_props_placeholder$$, ref) { return null; } }"
+    );
+    assert_eq!(
+        erased("const before = C; export component C(ref?: R) { return null; }"),
+        "const C = React.forwardRef(C_withRef);\nconst before = C; function C_withRef(_$$empty_props_placeholder$$, ref) { return null; }\nexport {C};"
+    );
+    assert_eq!(
+        erased("const before = C; export default async component C(ref?: R) { return await 1; }"),
+        "const C = React.forwardRef(C_withRef);\nconst before = C; async function C_withRef(_$$empty_props_placeholder$$, ref) { return await 1; }\nexport default C;"
+    );
+    // A use outside this block must not move its lexical binding out of it.
+    assert_eq!(
+        erased("use(C); { component C(ref?: R) { return null; } }"),
+        "use(C); { const C = React.forwardRef(C_withRef);\nfunction C_withRef(_$$empty_props_placeholder$$, ref) { return null; } }"
+    );
+}
+
+#[test]
+fn erases_flow_in_component_defaults_and_destructured_rest() {
+    assert_eq!(
+        erased(
+            "component C(value: number = (1: number), ...{a, b = (2: number)}: Props) { return value; }"
+        ),
+        "function C({value = (1), a, b = (2)}) { return value; }"
+    );
+    assert_eq!(
+        erased("component C(ref: R = (fallback: R)) { return ref; }"),
+        "const C = React.forwardRef(C_withRef);\nfunction C_withRef(_$$empty_props_placeholder$$, ref = (fallback)) { return ref; }"
+    );
+}
+
+#[test]
+fn transforms_record_declarations_and_nested_values() {
+    assert_eq!(erased("record R {}"), "class R {constructor({}) {}}");
+    assert_eq!(
+        erased(
+            "record R<T> implements I<T> { x: T, y: number = (1), read(): T { return this.x; } static n: number = (2), static get(): number { return this.n; } }"
+        ),
+        "class R  {constructor({x, y = (1)}) {this.x = x;this.y = y;}   read() { return this.x; } static n = (2); static get() { return this.n; } }"
+    );
+    assert_eq!(
+        erased("const x = NS.R<T> { value: (1: number), ...other };"),
+        "const x = new NS.R({ value: (1), ...other });"
+    );
+    assert_eq!(
+        erased("record R { value: number = (1, 2), }"),
+        "class R {constructor({value = (1, 2)}) {this.value = value;}  }"
     );
 }
 

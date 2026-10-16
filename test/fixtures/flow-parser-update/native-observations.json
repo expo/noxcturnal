@@ -658,7 +658,8 @@
         "outcome": "ParseFailed"
       },
       "candidate": {
-        "outcome": "Proposal"
+        "outcome": "erased",
+        "code": "async function Read({value}) { return await Promise.resolve(value); }"
       }
     },
     {
@@ -668,7 +669,8 @@
         "outcome": "ParseFailed"
       },
       "candidate": {
-        "outcome": "Proposal"
+        "outcome": "erased",
+        "code": "async function Read() { function inner() { return 1; } return await Promise.resolve(inner()); }"
       }
     },
     {
@@ -900,10 +902,12 @@
       "id": "decorator-property-and-method",
       "sha256": "14643cf8785c39d1d4c92dae38e998664c72a79eee94db2ec06a3c4dd88bfb65",
       "baseline": {
-        "outcome": "UnhandledSyntax"
+        "outcome": "erased",
+        "code": "class C { @d1 prop; @d2 method() {} }"
       },
       "candidate": {
-        "outcome": "UnhandledSyntax"
+        "outcome": "erased",
+        "code": "class C { @d1 prop; @d2 method() {} }"
       }
     }
   ]

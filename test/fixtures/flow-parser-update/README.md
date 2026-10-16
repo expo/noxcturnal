@@ -29,7 +29,8 @@ source, expected native outcome, exact erasure text, public exception/boundary
 where applicable, classification, provenance key, and 0.36.0 acceptance.
 `native-observations.json` records both native outcomes, exact emitted code for
 successes, input SHA-256, and both revision identities. The table below joins
-those files. It is not a list of the 101 application fallback files.
+those files. Both probe builds use the current erasure implementation, varying
+only the parser revision. It is not a list of the 101 application fallback files.
 
 The assertion names for **every** row `id` are:
 
@@ -39,14 +40,15 @@ The assertion names for **every** row `id` are:
   no parser adapter is registered. It checks direct native output, successful
   downstream Oxc/public compilation, or a pristine-input controlled boundary.
 - Canonical: `test/alignment/flow/parser-update.test.ts::hermes-parser 0.36.0
-parses id` and `Hermes 17b373... parses id`. Supported rows also run `aligns id`
-  through `alignHermesFlowTransform` against **both** references. Parser-rejected syntax
-  has no transformed-output comparison; rejection is compared directly instead.
-  Raw invalid regexp patterns additionally have a structural identity comparison,
-  since neither parser validates their pattern grammar.
-  The downstream-invalid resource `for…in` row likewise has no structural
-  transform comparison. Intentional native boundaries use
-  `expectBabelSupportedNoxcturnalBailout` with the exact Hermes parser override.
+parses id` and `Hermes 17b373... parses id`. Supported rows run `aligns id`
+  through `alignHermesFlowTransform` against each reference that accepts them.
+  The two async-component/await rows use the exact candidate for transformation
+  alignment because 0.36.0 rejects them. Member decorators are checked directly
+  in both references' ESTree ASTs; their Babel adapters discard them, so output
+  preservation is compared against Babel's Flow stripper instead.
+  Parser-rejected syntax has no transformed-output comparison. The invalid
+  resource `for…in` row has no output alignment; raw invalid regexp patterns
+  retain a structural identity comparison because pattern validation is deferred.
 
 For erased declarations, runtime and per-token map assertions are inapplicable:
 the entire declaration is deleted. Value-level fields have both the native text
@@ -64,7 +66,7 @@ and downstream Oxc acceptance.
 | [Writeonly variance][writeonly-commit]                                                                                         | [writeonly-variance.js][writeonly-test], [writeonly-variance-error.js][writeonly-error]; `writeonly-*`                                                                                                          | Supported erasure; method variance rejected                                                                                                  |
 | [`in` names][in-name-commit], [`in` variance][in-commit], [`out` variance][out-commit], [extra upstream cases][variance-extra] | [in-type-param-name.js][in-name-test], [in-type-param-name-error.js][in-name-error], [in-variance.js][in-test], [out-variance.js][out-test]; `in-*`, `out-*`, `mixed-variance-function`, `invalid-type-param-*` | Supported erasure and ambiguity handling; invalid names rejected                                                                             |
 | [Resource-loop declarators][using-commit]                                                                                      | [for-using.js][using-test], [for-using-declarator.js][using-declarator]; `using-*`, `await-using-*`                                                                                                             | Correct AST wrapper; `for…in` remains an Oxc compatibility boundary; `for…of` works                                                          |
-| [Async component await][async-commit]                                                                                          | [async-component.js][async-test], [ComponentDeclaration-test.js][component-js]; `async-component-*`, `sync-component-await-invalid`                                                                             | Parser fix verified; async component lowering remains intentionally unsupported                                                              |
+| [Async component await][async-commit]                                                                                          | [async-component.js][async-test], [ComponentDeclaration-test.js][component-js]; `async-component-*`, `sync-component-await-invalid`                                                                             | Parser fix and native async lowering verified, including await and ref wrappers                                                              |
 | [Bad binding return][match-binding-commit]                                                                                     | [pattern-binding-error.js][match-binding-test]; `match-binding-invalid`                                                                                                                                         | Controlled ParseFailed                                                                                                                       |
 | [Bad object pattern return][match-object-commit]                                                                               | [pattern-object-binding-error.js][match-object-binding-test], [pattern-object-value-error.js][match-object-value-test]; corresponding `match-object-*-invalid`                                                  | Controlled ParseFailed                                                                                                                       |
 | [Match statement body check][match-statement-commit]                                                                           | [statement-non-block-body-error.js][match-statement-test]; `match-statement-body-invalid`                                                                                                                       | Controlled ParseFailed                                                                                                                       |
@@ -83,7 +85,7 @@ not this shim; native and WASM proposal grammar flags are explicitly enabled.
 Changed upstream JS tests add the same readonly cases in
 [ClassProperty-test.js][class-js] and [TypeAnnotations-test.js][annotations-js]
 and decorator location checks in [Locations-test.js][locations-js]. The latter
-maps to `decorator-property-and-method`, an existing intentional native boundary.
+maps to `decorator-property-and-method`, now preserved through native erasure.
 [Hook][hook-js]/component printer round-trip assertions and [opaque-bound][opaque-js] printing change
 JavaScript printers, not native acceptance. [RecordDeclaration][record-declaration-js], [RecordExpression][record-expression-js],
 [MatchExpression][match-expression-js], [MatchStatement][match-statement-js], and
@@ -126,7 +128,9 @@ JIT disabled in this build. Native Flow erasure does not execute regexes.
 `A` = accepted by the parser, `R` = rejected. Native outcomes are explicit.
 `E` = supported erasure/lowering, `I` = invalid syntax, `B` = intentional
 compatibility boundary. `D` = direct acceptance/rejection comparison only;
-`S` = acceptance plus structural transformation alignment. The exact reference
+`S` = acceptance plus structural transformation alignment (exact reference only
+for the two 0.36.0-rejected async cases). `P` = ESTree decorator preservation plus
+Babel Flow-strip output alignment. The exact reference
 column is acceptance asserted against the source-built candidate (not 0.37.0).
 Every row also has native/public assertions as named above.
 
@@ -191,8 +195,8 @@ Every row also has native/public assertions as named above.
 | `invalid-type-param-class`        | [in][in-provenance]                                                     | R        | `ParseFailed`            | R             | R               | D                   | I     |
 | `invalid-type-param-void`         | [in][in-provenance]                                                     | R        | `ParseFailed`            | R             | R               | D                   | I     |
 | `invalid-type-param-const`        | [in][in-provenance]                                                     | R        | `ParseFailed`            | R             | R               | D                   | I     |
-| `async-component-await`           | [async-component][async-component-provenance]                           | R        | `Proposal`               | R             | A               | D                   | B     |
-| `async-component-nested`          | [async-component][async-component-provenance]                           | R        | `Proposal`               | R             | A               | D                   | B     |
+| `async-component-await`           | [async-component][async-component-provenance]                           | R        | `erased`                 | R             | A               | S                   | E     |
+| `async-component-nested`          | [async-component][async-component-provenance]                           | R        | `erased`                 | R             | A               | S                   | E     |
 | `sync-component-await-invalid`    | [async-component][async-component-provenance]                           | R        | `ParseFailed`            | R             | R               | D                   | I     |
 | `match-binding-invalid`           | [match-binding-invalid][match-binding-invalid-provenance]               | R        | `ParseFailed`            | R             | R               | D                   | I     |
 | `match-object-binding-invalid`    | [match-object-binding-invalid][match-object-binding-invalid-provenance] | R        | `ParseFailed`            | R             | R               | D                   | I     |
@@ -213,7 +217,7 @@ Every row also has native/public assertions as named above.
 | `writeonly-uninitialized`         | [writeonly][writeonly-provenance]                                       | R        | `erased`                 | A             | A               | S                   | E     |
 | `out-mixed-name`                  | [out][out-provenance]                                                   | A        | `erased`                 | A             | A               | S                   | E     |
 | `in-out-mixed`                    | [out][out-provenance]                                                   | R        | `erased`                 | A             | A               | S                   | E     |
-| `decorator-property-and-method`   | [decorators][decorators-provenance]                                     | A        | `UnhandledSyntax`        | A             | A               | D                   | B     |
+| `decorator-property-and-method`   | [decorators][decorators-provenance]                                     | A        | `erased`                 | A             | A               | P                   | E     |
 
 ## Existing Flow-family anchors (retained)
 
@@ -222,53 +226,83 @@ syntax. The native column names functions in `crates/hermes-flow/tests/erasure.r
 Canonical paths are under `test/alignment/flow/`, public paths under
 `test/transforms/flow/`, and executed tests under `test/compliance/flow.test.ts`.
 
-| Family                                                                                                                                         | Native anchors                                                                                                                                                                    | Public / canonical anchors                                                                                                                                                                                                                                                                                                                             | Observable contract                                                                                           |
-| ---------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------- |
-| Type/opaque/interface/declare forms                                                                                                            | `erases_type_declarations_whole`                                                                                                                                                  | `type-stripping.test.ts` (“opaque and exported types”, “interfaces and generics”, “declare module”)                                                                                                                                                                                                                                                    | Whole-declaration deletion, structural output                                                                 |
-| Type-expression families (primitive/literal/nullable, union/intersection, object/exact/indexer, tuple/array, generic/utility/typeof/key types) | `erases_type_declarations_whole`, `erases_annotations_on_bindings`, `erases_function_type_syntax`                                                                                 | public `type-stripping-fixtures.test.ts` named “strip type annotations”, “strip tuples”, “strip string literal types”, “strip qualified generic type”; canonical `type-stripping.test.ts` named “union and intersection aliases”, “variance and exact objects”, “tuple and array annotations”, “typeof and key types”, “nullable and optional members” | Whole-type deletion; existing tested variants retained                                                        |
-| Binding/function annotations, patterns, defaults, optional/this parameters                                                                     | `erases_annotations_on_bindings`, `erases_the_optional_marker`, `erases_a_this_parameter`, `keeps_defaults_on_typed_parameters`, `erases_function_type_syntax`                    | `type-stripping.test.ts`, including “aligns optional and defaulted parameters with Babel”                                                                                                                                                                                                                                                              | Exact erasure and defaults retained                                                                           |
-| Class headers/members/private fields                                                                                                           | `erases_class_type_syntax`                                                                                                                                                        | public `type-stripping.test.ts` (“removes type-only class fields…”, “preserves value-less private fields…”); canonical “typed class members”                                                                                                                                                                                                           | Runtime field identity, exact output, descriptors/initialization in new compliance tests                      |
-| Calls/new/optional calls/JSX attachments                                                                                                       | `erases_call_and_jsx_type_arguments`                                                                                                                                              | public `type-stripping-fixtures.test.ts`; canonical “aligns Flow annotations while preserving JSX”                                                                                                                                                                                                                                                     | Type arguments removed while preserving JSX/value syntax                                                      |
-| Imports/exports                                                                                                                                | `erases_type_only_imports_and_exports`, `keeps_side_effect_imports`                                                                                                               | public `type-stripping-fixtures.test.ts`; canonical “aligns type-only imports and exports with Babel”                                                                                                                                                                                                                                                  | Type-only dependency removal, side effects retained                                                           |
-| Casts and parenthesized values                                                                                                                 | `erases_casts_but_keeps_the_value`, `keeps_the_parentheses_around_a_cast_value`, `does_not_find_as_inside_an_identifier`                                                          | public `type-stripping-fixtures.test.ts`; canonical “casts”                                                                                                                                                                                                                                                                                            | Value/parens survive; keyword boundaries                                                                      |
-| Enums                                                                                                                                          | `transforms_enum_declarations`                                                                                                                                                    | `enums.test.ts` (mirrored, initialized string/number, symbol)                                                                                                                                                                                                                                                                                          | Structural lowering and executed representations                                                              |
-| Components                                                                                                                                     | `transforms_component_declarations`, `transforms_component_ref_parameters`                                                                                                        | `components.test.ts` (parameters, refs, renders, interacting proposals)                                                                                                                                                                                                                                                                                | Structural lowering, executed renamed/default/rest props; forward-reference bailout retained                  |
-| Hooks                                                                                                                                          | `transforms_hook_declarations`                                                                                                                                                    | `hooks.test.ts` (plain, defaults/rest, generics)                                                                                                                                                                                                                                                                                                       | Structural lowering and executed call behavior                                                                |
-| Match                                                                                                                                          | `transforms_match_expressions`, `transforms_match_statements`, `transforms_match_patterns`, `rejects_match_syntax_no_transform_compiles`, `rejects_a_yield_it_would_have_to_wrap` | `match.test.ts`; compliance “Flow match…” and “non-exhaustive Flow match…”                                                                                                                                                                                                                                                                             | Structural lowering, evaluation count, bindings/control flow, throws/rejections; malformed cases now explicit |
-| Records                                                                                                                                        | `bails_on_untransformed_proposals`                                                                                                                                                | canonical `boundaries.test.ts::records the Flow record fallback against Hermes`                                                                                                                                                                                                                                                                        | Intentional bailout, not implemented support                                                                  |
-| Decorators                                                                                                                                     | `bails_on_decorators`                                                                                                                                                             | canonical `boundaries.test.ts::records the decorated Flow class fallback against Hermes`; new location-shaped matrix row                                                                                                                                                                                                                               | Intentional bailout, not implemented support                                                                  |
-| Formatting/comments and maps                                                                                                                   | `preserves_formatting_around_what_it_removes`; new `readonly_spans_preserve_comments_and_utf8`                                                                                    | new public “readonly deletion maps retain UTF-16 positions…”                                                                                                                                                                                                                                                                                           | Exact comments/UTF-8 spans and byte offsets, character-mode UTF-16 deletion-map positions                     |
+| Family                                                                                                                                         | Native anchors                                                                                                                                                                                                                               | Public / canonical anchors                                                                                                                                                                                                                                                                                                                             | Observable contract                                                                                           |
+| ---------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------- |
+| Type/opaque/interface/declare forms                                                                                                            | `erases_type_declarations_whole`                                                                                                                                                                                                             | `type-stripping.test.ts` (“opaque and exported types”, “interfaces and generics”, “declare module”)                                                                                                                                                                                                                                                    | Whole-declaration deletion, structural output                                                                 |
+| Type-expression families (primitive/literal/nullable, union/intersection, object/exact/indexer, tuple/array, generic/utility/typeof/key types) | `erases_type_declarations_whole`, `erases_annotations_on_bindings`, `erases_function_type_syntax`                                                                                                                                            | public `type-stripping-fixtures.test.ts` named “strip type annotations”, “strip tuples”, “strip string literal types”, “strip qualified generic type”; canonical `type-stripping.test.ts` named “union and intersection aliases”, “variance and exact objects”, “tuple and array annotations”, “typeof and key types”, “nullable and optional members” | Whole-type deletion; existing tested variants retained                                                        |
+| Binding/function annotations, patterns, defaults, optional/this parameters                                                                     | `erases_annotations_on_bindings`, `erases_the_optional_marker`, `erases_a_this_parameter`, `keeps_defaults_on_typed_parameters`, `erases_function_type_syntax`                                                                               | `type-stripping.test.ts`, including “aligns optional and defaulted parameters with Babel”                                                                                                                                                                                                                                                              | Exact erasure and defaults retained                                                                           |
+| Class headers/members/private fields                                                                                                           | `erases_class_type_syntax`                                                                                                                                                                                                                   | public `type-stripping.test.ts` (“removes type-only class fields…”, “preserves value-less private fields…”); canonical “typed class members”                                                                                                                                                                                                           | Runtime field identity, exact output, descriptors/initialization in new compliance tests                      |
+| Calls/new/optional calls/JSX attachments                                                                                                       | `erases_call_and_jsx_type_arguments`                                                                                                                                                                                                         | public `type-stripping-fixtures.test.ts`; canonical “aligns Flow annotations while preserving JSX”                                                                                                                                                                                                                                                     | Type arguments removed while preserving JSX/value syntax                                                      |
+| Imports/exports                                                                                                                                | `erases_type_only_imports_and_exports`, `keeps_side_effect_imports`                                                                                                                                                                          | public `type-stripping-fixtures.test.ts`; canonical “aligns type-only imports and exports with Babel”                                                                                                                                                                                                                                                  | Type-only dependency removal, side effects retained                                                           |
+| Casts and parenthesized values                                                                                                                 | `erases_casts_but_keeps_the_value`, `keeps_the_parentheses_around_a_cast_value`, `does_not_find_as_inside_an_identifier`                                                                                                                     | public `type-stripping-fixtures.test.ts`; canonical “casts”                                                                                                                                                                                                                                                                                            | Value/parens survive; keyword boundaries                                                                      |
+| Enums                                                                                                                                          | `transforms_enum_declarations`                                                                                                                                                                                                               | `enums.test.ts` (mirrored, initialized string/number, symbol)                                                                                                                                                                                                                                                                                          | Structural lowering and executed representations                                                              |
+| Components                                                                                                                                     | `transforms_component_declarations`, `transforms_component_ref_parameters`, `transforms_async_components_and_hooks`, `relocates_forward_ref_bindings_within_their_statement_list`, `erases_flow_in_component_defaults_and_destructured_rest` | canonical `components.test.ts` and `component-support.test.ts`; public `components.test.ts` and `support.test.ts`; compliance `flow-support.test.ts`                                                                                                                                                                                                   | Async bodies, defaults, rest/renaming, exports, scoped ref relocation, and collision-free bindings            |
+| Hooks                                                                                                                                          | `transforms_hook_declarations`                                                                                                                                                                                                               | `hooks.test.ts` (plain, defaults/rest, generics)                                                                                                                                                                                                                                                                                                       | Structural lowering and executed call behavior                                                                |
+| Match                                                                                                                                          | `transforms_match_expressions`, `transforms_match_statements`, `transforms_match_patterns`, `rejects_match_syntax_no_transform_compiles`, `rejects_a_yield_it_would_have_to_wrap`                                                            | `match.test.ts`; compliance “Flow match…” and “non-exhaustive Flow match…”                                                                                                                                                                                                                                                                             | Structural lowering, evaluation count, bindings/control flow, throws/rejections; malformed cases now explicit |
+| Records                                                                                                                                        | `transforms_record_expressions`, `transforms_record_declarations_and_nested_values`                                                                                                                                                          | canonical/public `records.test.ts`; compliance `flow-support.test.ts`                                                                                                                                                                                                                                                                                  | Constructor/default/property/method/static behavior, expressions, spreads, and generated-name safety          |
+| Decorators                                                                                                                                     | `preserves_decorators_for_the_native_decorator_transform`                                                                                                                                                                                    | canonical `boundaries.test.ts` and matrix ESTree/preservation comparisons; public `support.test.ts`; compliance `flow-support.test.ts`                                                                                                                                                                                                                 | Decorators and uninitialized decorated fields survive erasure; selected legacy lowering executes              |
+| Formatting/comments and maps                                                                                                                   | `preserves_formatting_around_what_it_removes`; new `readonly_spans_preserve_comments_and_utf8`                                                                                                                                               | new public “readonly deletion maps retain UTF-16 positions…”                                                                                                                                                                                                                                                                                           | Exact comments/UTF-8 spans and byte offsets, character-mode UTF-16 deletion-map positions                     |
 
 The full native/public/alignment suites remain intact; no existing expectation was
 weakened and no test was deleted. These anchors describe tested scope, not a claim
 that every possible Flow combination or proposal lowers natively.
 
-## Runtime and reference limitations
+## Follow-up native support and reference differences
 
-- `Flow readonly and writeonly fields retain initialization, descriptors, and
-writable values` executes static/instance initializers, absence of type-only
-  fields, contextual names, writability, enumerability, and configurability.
-  The alignment case “Hermes 0.36.0 and native variance fields execute with
-  equivalent initialization and descriptors” executes both outputs independently.
-- Resource-loop AST wrapper assertions run against both Hermes references.
-  Synchronous disposal is also compared against Hermes 0.36.0 plus Babel's
-  resource transform. Native async disposal is executed by “Flow resource-loop
-  heads preserve asynchronous disposal through Oxc lowering”. Babel 7.29.7's
-  explicit-resource-management plugin lowers `for (await using …)` via its sync
-  helper, so it is not a valid execution oracle for those async cases. The
-  unlowered canonical Hermes structure still aligns for both async-loop forms;
-  native execution explicitly checks awaited disposal ordering. No assertion is
-  made to agree with that separate Babel lowering bug.
-- Async components parse with the candidate, but remain native `Proposal`
-  bailouts. Both async rows are reference-version mismatches in 0.36.0 and are
-  resolved with candidate acceptance and canonical-transform-supported bailout
-  assertions against the exact reference. They are not implemented support.
-- JSX member attributes are rejected by the candidate but accepted by 0.36.0.
-  The exact reference resolves this rejection mismatch. Valid member tag names
-  still pass native/public/canonical paths. Diagnostic wording is not compared.
-- `using-in` is accepted by Hermes but rejected downstream: the public Flow path
-  returns `flow-erasure-unsupported-syntax` with pristine source. That controlled
-  boundary remains; no new lowering or runtime promise is made for invalid loops.
+The initially missing transforms are now implemented. Records lower to classes
+with destructured constructor parameters, per-instance defaults, assignments,
+methods, and static properties; record expressions become constructor calls.
+Methods and static initializers stay at their source locations. Hermes groups
+member categories in its printed output; the interleaved-member execution
+comparison verifies equivalent initialization and property ordering without
+moving native method bodies or losing their source positions.
+
+Async components and hooks retain `async`/`await`. Ref wrappers move before the
+first earlier runtime reference in the containing Program, block, or switch case.
+Named/default exports refer to the wrapper. Defaults (including Flow inside
+values), destructured rest props, string-named refs, escaped identifiers, and
+occupied generated names have executable regressions.
+
+Review regressions also cover trailing line comments in destructured rest props
+and ref components inside separate class static blocks. Native supports the
+latter with block-local wrappers, while the Hermes reference transform rejects
+that placement. Generated constructors and copied defaults are sourceless in
+character maps; direct assertions cover this and retained method positions after
+map composition through class-property lowering.
+
+Decorators are ordinary value syntax during erasure, including expressions with
+Flow annotations. Decorated uninitialized fields are retained for the later
+explicitly selected native decorator phase. Native runtime tests execute class,
+method, and property decorators with the existing legacy-decorator option.
+
+Reference differences are explicit:
+
+- 0.36.0 rejects async-component `await`; the exact candidate accepts it and its
+  transformed output aligns with native lowering.
+- Both references retain member decorators in ESTree, but their Babel adapters
+  drop them. Native preserves them. Babel's Flow stripper supplies the output
+  preservation oracle, and executed legacy-decorator tests protect behavior.
+- Hermes' record key-name map aliases numeric `1` and bigint `1n`, selecting the
+  last generated local for both assignments. Native keeps each property's own
+  local. A reference-observation test pins this discrepancy and a native setter
+  test checks the assignment sequence `[2, 3]`. Strict constructor-binding words
+  and escaped temporary-name collisions also have native execution regressions.
+- Babel 7.29.7's resource-management plugin lowers `for (await using …)` via its
+  synchronous helper. The existing native async-disposal execution test and
+  unlowered Hermes structural comparisons remain the oracle for these loops.
+
+The 17 invalid matrix cases remain classified as invalid. Hermes rejects 15 at
+parse time. `using-in` reaches Oxc's controlled
+`flow-erasure-unsupported-syntax` bailout with pristine input. Invalid duplicate
+regexp flags remain raw pattern text until a regexp engine validates them.
+Existing match forms rejected by Hermes' own transforms remain explicit errors,
+not adapter compatibility bailouts; no new semantics are invented for them.
+
+Old record/decorator/native-ref bailout expectations were changed to successful
+output assertions for the same inputs. Their replacement tests preserve the
+input/options/public path, adding structural/runtime/map evidence. The adapter
+selection test now asserts native record success ahead of automatic selection;
+a controlled native-bailout fixture retains coverage of actual adapter fallback.
 
 ## Reproduction and validation
 
@@ -288,7 +322,7 @@ nix develop --command node scripts/check-hermes-update-baseline.mjs
 nix develop --command nix shell --inputs-from . nixpkgs#emscripten --command node scripts/build-hermes-update-reference.mjs
 nix develop --command cargo test -p hermes-flow --features parser
 nix develop --command pnpm build:native
-HERMES_UPDATE_REFERENCE=target/hermes-update-reference nix develop --command pnpm test test/transforms/flow test/alignment/flow test/compliance/flow.test.ts
+HERMES_UPDATE_REFERENCE=target/hermes-update-reference nix develop --command pnpm test test/transforms/flow test/alignment/flow test/compliance/flow.test.ts test/compliance/flow-support.test.ts
 nix develop --command cmake -S crates/hermes-parser-sys/hermes -B target/hermes-host -DHERMES_TEST_EXTRA_ARGS=--filter=Parser/
 nix develop --command cmake --build target/hermes-host --target check-hermes -j 8
 nix develop --command cmake -S crates/hermes-parser-sys/hermes -B target/hermes-host -DHERMES_TEST_EXTRA_ARGS=--filter=regexp
@@ -308,16 +342,17 @@ build and probes are supplemental audit commands; normal `pnpm check` keeps the
 pinned 0.36.0 suite and does not require an Emscripten installation.
 
 Coverage: **82/82 source cases** have executable native and public assertions.
-**62 supported**, **3 intentional boundaries**, **17 invalid syntax**. There are
+**65 supported**, **0 intentional boundaries**, **17 invalid syntax**. There are
 **3 resolved pinned-reference acceptance mismatches**, **0 unresolved reference
 mismatches**, **0 unclassified source changes**, and **0 open parser-update
 erasure gaps**. The compiler JSON entry point is specifically inapplicable to
 Flow source, with a passing upstream depth regression instead. The no-op lexer,
 Rust FFI consumer, and shared cleanup changes are classified in the ledger.
-Existing async-component, record, decorator, and downstream boundaries prevent
-any claim of unrestricted Flow support.
+The initially missing async-component, record, decorator, and ref-relocation
+paths now have native support. Invalid syntax and reference-rejected match forms
+are not claimed as supported Flow programs.
 
-Final Darwin ARM64 validation passed: 49 parser-enabled native crate tests,
+Original step-2 Darwin ARM64 validation passed: 49 parser-enabled native crate tests,
 82/82 baseline/candidate probe comparisons, 502 public/compliance/alignment tests
 with the exact reference enabled, 460 upstream parser tests, 20 upstream regexp
 tests (one JIT-only test unsupported), the JSON depth regression, 8 Regex/RegExp
@@ -325,6 +360,13 @@ unit tests, and 6 Unicode unit tests. `pnpm format` and the complete `pnpm check
 also passed (10,730 JavaScript tests and 140 root Rust tests). Generated files and
 JavaScript reference package pins are unchanged. Release-target and performance
 validation remain step 5 work.
+
+Native-support follow-up validation passed 53 parser-enabled crate tests,
+parser-enabled Clippy across all targets, 82/82 baseline/candidate comparisons,
+and 552 focused public/alignment/compliance/adapter tests with the exact reference
+enabled. `HERMES_SOURCE_DIR` was unset for candidate validation.
+`pnpm format` and the complete `pnpm check` passed: 10,784 JavaScript tests and
+141 root Rust tests, together with type, generation, lint, and package checks.
 
 [readonly-commit]: https://github.com/facebook/hermes/commit/d235b337de9ae1ce0638625d6f8f0e42cfbcb506
 [reserved-commit]: https://github.com/facebook/hermes/commit/61ac7fccaec282df9b8fd78b6113ce59c4f2db74

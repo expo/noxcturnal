@@ -2,7 +2,6 @@ import { createRequire } from 'node:module';
 import path from 'node:path';
 import { expect, test } from 'vitest';
 import flowStripTypes from '@babel/plugin-transform-flow-strip-types';
-import babel from '@babel/core';
 import explicitResourceManagement from '@babel/plugin-transform-explicit-resource-management';
 import syntaxHermesParser from 'babel-plugin-syntax-hermes-parser';
 
@@ -10,7 +9,7 @@ import cases from '../../fixtures/flow-parser-update/cases.json';
 import {
   alignBabelBehavior,
   alignHermesFlowTransform,
-  expectBabelSupportedNoxcturnalBailout,
+  alignFlowDecoratorTransform,
 } from '../transform';
 
 const require = createRequire(import.meta.url);
@@ -115,45 +114,40 @@ for (const reference of references) {
         enableExperimentalFlowRecordSyntax: true,
       });
     const accepts = reference.exact ? row.outcome !== 'ParseFailed' : row.pinnedAccepted;
-    if (accepts) expect(parse()).toBeDefined();
-    else expect(parse).toThrow(SyntaxError);
+    if (accepts) {
+      const ast = parse();
+      expect(ast).toBeDefined();
+      if (row.provenance === 'decorators') {
+        expect(ast).toMatchObject({
+          body: [
+            {
+              body: {
+                body: [
+                  { decorators: [{ type: 'Decorator' }] },
+                  { decorators: [{ type: 'Decorator' }] },
+                ],
+              },
+            },
+          ],
+        });
+      }
+    } else expect(parse).toThrow(SyntaxError);
   });
 
   test.each(
     cases.filter(
-      row => row.outcome === 'erased' && row.public !== 'flow-erasure-unsupported-syntax',
+      row =>
+        row.outcome === 'erased' &&
+        row.public !== 'flow-erasure-unsupported-syntax' &&
+        (reference.exact || row.pinnedAccepted),
     ),
   )(`${reference.name} aligns $id`, row => {
-    alignHermesFlowTransform(`// @flow\n${row.source}`, 'input.js', reference.parser);
+    if (row.provenance === 'decorators') {
+      // Both reference versions parse decorators in ESTree, but their Babel
+      // adapters discard them. Compare preservation with Babel's Flow stripper.
+      alignFlowDecoratorTransform(`// @flow\n${row.source}`);
+    } else {
+      alignHermesFlowTransform(`// @flow\n${row.source}`, 'input.js', reference.parser);
+    }
   });
-
-  if (reference.exact) {
-    test.each(cases.filter(row => row.classification === 'intentional compatibility boundary'))(
-      `${reference.name} preserves the $id compatibility boundary`,
-      row => {
-        expectBabelSupportedNoxcturnalBailout(
-          {
-            source: `// @flow\n${row.source}`,
-            filename: 'input.js',
-            noxcturnal: {},
-            plugins: [
-              {
-                parserOverride(source: string) {
-                  return reference.parser.parse(source, {
-                    babel: true,
-                    flow: 'all',
-                    sourceType: 'module',
-                    enableExperimentalComponentSyntax: true,
-                    enableExperimentalFlowMatchSyntax: true,
-                    enableExperimentalFlowRecordSyntax: true,
-                  }) as NonNullable<ReturnType<typeof babel.parseSync>>;
-                },
-              },
-            ],
-          },
-          'flow-requires-parser-adapter',
-        );
-      },
-    );
-  }
 }
