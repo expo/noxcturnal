@@ -27,7 +27,8 @@ self_cell! {
 }
 
 struct SyntaxFacts {
-    types: [bool; NODE_TYPE_COUNT],
+    // Protocol node IDs are one-based; reserve slot zero as well.
+    types: [bool; NODE_TYPE_COUNT + 1],
     async_function: bool,
     generator_function: bool,
 }
@@ -86,7 +87,7 @@ impl NativeParsedSource {
     pub fn syntax_facts(&self) -> Result<Vec<String>> {
         let parsed = self.parsed.as_ref().ok_or_else(consumed)?;
         let mut facts = SyntaxFacts {
-            types: [false; NODE_TYPE_COUNT],
+            types: [false; NODE_TYPE_COUNT + 1],
             async_function: false,
             generator_function: false,
         };
@@ -198,6 +199,15 @@ mod tests {
         for present in ["AsyncFunction", "GeneratorFunction", "Super", "Class"] {
             assert!(facts.iter().any(|fact| fact == present));
         }
+    }
+
+    #[test]
+    fn syntax_features_include_the_highest_protocol_node_id() {
+        let facts = NativeParsedSource::new("type Unknown = (?);".into(), "input.ts".into())
+            .unwrap()
+            .syntax_facts()
+            .unwrap();
+        assert!(facts.iter().any(|fact| fact == "JSDocUnknownType"));
     }
 
     #[test]

@@ -607,7 +607,12 @@ export function transform(
       // below then compare against a real, current string.
       const materializedSource = currentSource();
       const observationSource = materializedSource;
-      if (reusableSession && reusableSession.source !== observationSource) {
+      // Skipped phases can carry a session past its bounded retention window.
+      // Unchanged text alone does not authorize capabilities beyond that window.
+      if (
+        reusableSession &&
+        (reusableSession.source !== observationSource || phaseIndex > retainedThroughPhase)
+      ) {
         reusableSession.close();
         reusableSession = null;
         reusableRoutedBatch = null;

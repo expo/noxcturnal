@@ -937,14 +937,14 @@ export function defineVisitor<
   });
 }
 
-/**
- * Plugin-level requirements and typings for `context`: metadata ownership and
- * semantic queries. The visitor contract types the path; the plugin contract
- * types the context.
- */
 /** Concrete AST kinds, plus function modifiers needed by compatibility repairs. */
 export type SyntaxFeature = NativeNodeType | 'AsyncFunction' | 'GeneratorFunction';
 
+/**
+ * Plugin-level requirements and typings for `context`: syntax applicability,
+ * metadata ownership, and semantic queries. The visitor contract types the path;
+ * the plugin contract types the context.
+ */
 export interface PluginContract {
   /** Run this plugin only when at least one feature occurs in the current phase
    * input. Rejected plugins skip every lifecycle hook and contribute no retained

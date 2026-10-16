@@ -186,6 +186,43 @@ test('rechecks syntax after edits while keeping same-phase observation immutable
   expect(result.map.mappings.length).toBeGreaterThan(0);
 });
 
+test('expires retained capabilities after skipped phases exhaust the lookahead window', () => {
+  const active = defineNativePlugin({
+    name: 'initial-observer',
+    visitors: [defineVisitor('Program', {}, () => {})],
+  });
+  const rejected = defineNativePlugin({
+    name: 'class-only',
+    contract: { syntax: { anyOf: ['Class'] } },
+  });
+  let statements = 0;
+  const later = defineNativePlugin({
+    name: 'later-children',
+    visitors: [
+      defineVisitor('Program', { children: { body: { route: 'Statement' } } }, path => {
+        const body = path.get('body');
+        statements = Array.isArray(body) ? body.length : 0;
+      }),
+    ],
+  });
+  const result = transform(
+    'const retained = 1; retained;',
+    'input.js',
+    defineNativePipeline({
+      phases: [
+        { name: 'initial', plugins: [active] },
+        ...Array.from({ length: 8 }, (_, index) => ({
+          name: `skipped-${index}`,
+          plugins: [rejected],
+        })),
+        { name: 'later', plugins: [later] },
+      ],
+    }),
+  );
+  expect(result.status).toBe('complete');
+  expect(statements).toBe(2);
+});
+
 test.each(['break;', 'let duplicate; let duplicate;', 'const = ;'])(
   'still throws for invalid input when every plugin is rejected: %s',
   source => {
@@ -272,6 +309,19 @@ test.each([{ anyOf: [] }, { anyOf: ['unknown-syntax'] }])(
     ).toThrow('syntax.anyOf requires a nonempty list of syntax features');
   },
 );
+
+test('rejects invalid syntax requirements in a pipeline passed directly to transform', () => {
+  expect(() =>
+    transform('const value = 1;', 'input.js', {
+      phases: [
+        {
+          name: 'invalid',
+          plugins: [defineNativePlugin({ name: 'invalid', contract: { syntax: { anyOf: [] } } })],
+        },
+      ],
+    }),
+  ).toThrow('syntax.anyOf requires a nonempty list of syntax features');
+});
 
 test('rechecks applicability after a native phase removes async syntax', () => {
   let visits = 0;
