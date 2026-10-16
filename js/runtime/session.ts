@@ -1,3 +1,4 @@
+import { decodeConstant, decodeString } from '../protocol/value-transport';
 import { parserFilename } from '../adapters/classification';
 import { FIELD_KEY_IDS, NODE_TYPE_IDS, NODE_TYPES } from '../generated/event-schema';
 import { native, type NativeIndexedSessionBinding } from '../native/binding';
@@ -144,23 +145,25 @@ export class NativeTransformSession {
     if (request.globals?.length) {
       const names = [...new Set(request.globals.map(query => query.name))];
       const references = this.#queryGlobalReferences(names);
-      for (let index = 0; index < names.length; index++)
-        globals[names[index]] = { references: references[index] };
+      for (let index = 0; index < names.length; index++) {
+        const name = names[index]!;
+        const value = { references: references[index] };
+        if (name === '__proto__')
+          Object.defineProperty(globals, name, {
+            value,
+            enumerable: true,
+            configurable: true,
+            writable: true,
+          });
+        else globals[name] = value;
+      }
     }
     const constants: QueryResult['constants'] = {};
-    const constantNodesById = request.constants?.length
-      ? new Map(this.constantNodes(request.constants).map(node => [node.id, node]))
-      : undefined;
-    for (const id of request.constants ?? []) {
-      const node = constantNodesById!.get(id);
-      constants[id] =
-        node?.constantKind === 'string'
-          ? String(node.constantValue)
-          : node?.constantKind === 'number'
-            ? Number(node.constantValue)
-            : node?.constantKind === 'boolean'
-              ? node.constantValue === true || node.constantValue === 'true'
-              : null;
+    if (request.constants?.length) {
+      for (const id of request.constants) constants[id] = null;
+      // Constant facts already carry the value; no node hydration is needed.
+      for (const fact of this.#binding('query.constants').queryConstants([...request.constants]))
+        constants[fact.id] = decodeConstant(fact.value);
     }
     const captureRequests = new Map<number, boolean | undefined>();
     for (const capture of request.captures ?? []) {
@@ -218,7 +221,8 @@ export class NativeTransformSession {
               scopeId: fact.scopeId,
               calleeName: fact.calleeName,
               calleeGlobal: fact.calleeGlobal,
-              staticArgument: fact.staticArgument,
+              staticArgument:
+                fact.staticArgument == null ? undefined : decodeString(fact.staticArgument),
             })),
         ]),
       ),
@@ -303,7 +307,7 @@ export class NativeTransformSession {
               {
                 ...toNodeView(event),
                 constantKind: fact.kind,
-                constantValue: fact.value,
+                constantValue: decodeConstant(fact.value),
               },
             ]
           : [];

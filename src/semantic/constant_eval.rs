@@ -23,15 +23,6 @@ impl EvaluatedConstant {
         }
     }
 
-    pub(crate) fn encode(&self) -> String {
-        match self {
-            Self::Null => String::new(),
-            Self::Boolean(value) => value.to_string(),
-            Self::Number(value) => js_number_string(*value),
-            Self::String(value) => value.clone(),
-        }
-    }
-
     pub(crate) fn truthy(&self) -> bool {
         match self {
             Self::Null => false,

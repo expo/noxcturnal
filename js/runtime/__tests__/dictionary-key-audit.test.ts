@@ -38,8 +38,7 @@ describe.each(['__proto__', 'constructor', 'ordinary'])('dictionary key %s', nam
     if (result.status !== 'complete') throw new Error(result.reason);
     metadata = result.metadata;
   });
-  const check = name === '__proto__' ? test.fails : test;
-  check('global facts are enumerable own entries', () => {
+  test('global facts are enumerable own entries', () => {
     expect(Object.keys(globals)).toEqual([name]);
     expect(Object.hasOwn(globals, name)).toBe(true);
   });

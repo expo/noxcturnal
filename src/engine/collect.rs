@@ -243,7 +243,7 @@ impl<'a> EventCollector<'a> {
                 .is_some_and(|reference_id| !self.scoping.has_binding(reference_id));
             let static_argument = match call.arguments.first() {
                 Some(oxc_ast::ast::Argument::StringLiteral(literal)) => {
-                    Some(literal.value.as_str())
+                    Some(crate::semantic::value_transport::literal_string(literal))
                 }
                 _ => None,
             };
@@ -251,7 +251,7 @@ impl<'a> EventCollector<'a> {
                 id.index() as u32,
                 identifier.name.as_str(),
                 callee_global,
-                static_argument,
+                static_argument.as_deref(),
             );
         }
         let retain_all_fields = self.retention_capabilities & RETAIN_MODULE_FACTS != 0;

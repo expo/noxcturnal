@@ -12,7 +12,9 @@ use rustc_hash::FxHashMap;
 use crate::event_types::NodeField;
 use crate::generated::event_schema::{field_ids, node_type_name};
 use crate::protocol::constants::FieldMask;
-use crate::semantic::constant_eval::constant_for_kind;
+use crate::semantic::value_transport::{
+    constant, literal_string, module_export_name, number_literal,
+};
 
 use super::member::{
     MemberPathInterner, static_member_path, static_member_path_with, static_member_root,
@@ -268,7 +270,7 @@ pub(crate) fn packed_fields_direct(
         }
         AstKind::StringLiteral(literal) => {
             if wants(field_ids::VALUE) {
-                let value = intern_packed(strings, &literal.value);
+                let value = intern_packed(strings, &literal_string(literal));
                 push(field_ids::VALUE, value);
             }
         }
@@ -293,7 +295,7 @@ pub(crate) fn packed_fields_direct(
         }
         AstKind::NumericLiteral(literal) => {
             if wants(field_ids::VALUE) {
-                let value = intern_packed(strings, &literal.value.to_string());
+                let value = intern_packed(strings, &number_literal(literal.value));
                 push(field_ids::VALUE, value);
             }
         }
@@ -409,7 +411,7 @@ pub(crate) fn packed_fields_direct(
             if let Some(oxc_ast::ast::Argument::StringLiteral(literal)) = call.arguments.first()
                 && wants(field_ids::STATIC_ARGUMENT)
             {
-                let value = intern_packed(strings, &literal.value);
+                let value = intern_packed(strings, &literal_string(literal));
                 push(field_ids::STATIC_ARGUMENT, value);
             }
         }
@@ -427,7 +429,7 @@ pub(crate) fn packed_fields_direct(
             if let Some(oxc_ast::ast::Argument::StringLiteral(literal)) = call.arguments.first()
                 && wants(field_ids::STATIC_ARGUMENT)
             {
-                let value = intern_packed(strings, &literal.value);
+                let value = intern_packed(strings, &literal_string(literal));
                 push(field_ids::STATIC_ARGUMENT, value);
             }
         }
@@ -435,7 +437,7 @@ pub(crate) fn packed_fields_direct(
             if let Expression::StringLiteral(literal) = &import.source
                 && wants(field_ids::STATIC_ARGUMENT)
             {
-                let value = intern_packed(strings, &literal.value);
+                let value = intern_packed(strings, &literal_string(literal));
                 push(field_ids::STATIC_ARGUMENT, value);
             }
         }
@@ -478,7 +480,7 @@ pub(crate) fn packed_fields_direct(
             push(field_ids::WRITE, 0x8000_0000 | u32::from(member_write));
             if let Expression::StringLiteral(property) = &member.expression {
                 if wants(field_ids::PROPERTY) {
-                    let value = intern_packed(strings, &property.value);
+                    let value = intern_packed(strings, &literal_string(property));
                     push(field_ids::PROPERTY, value);
                 }
                 if wants(field_ids::MEMBER_PATH)
@@ -564,7 +566,7 @@ pub(crate) fn packed_fields_direct(
         }
         AstKind::ImportDeclaration(declaration) => {
             if wants(field_ids::SOURCE) {
-                let source = intern_packed(strings, &declaration.source.value);
+                let source = intern_packed(strings, &literal_string(&declaration.source));
                 push(field_ids::SOURCE, source);
             }
             if wants(field_ids::IMPORT_KIND) {
@@ -583,7 +585,7 @@ pub(crate) fn packed_fields_direct(
         }
         AstKind::ImportSpecifier(specifier) => {
             if wants(field_ids::IMPORTED) {
-                let imported = intern_packed(strings, &specifier.imported.name());
+                let imported = intern_packed(strings, &module_export_name(&specifier.imported));
                 push(field_ids::IMPORTED, imported);
             }
             if wants(field_ids::LOCAL) {
@@ -616,7 +618,7 @@ pub(crate) fn packed_fields_direct(
             if wants(field_ids::SOURCE)
                 && let Some(source) = &declaration.source
             {
-                let source = intern_packed(strings, &source.value);
+                let source = intern_packed(strings, &literal_string(source));
                 push(field_ids::SOURCE, source);
             }
             if wants(field_ids::EXPORT_KIND) {
@@ -649,13 +651,13 @@ pub(crate) fn packed_fields_direct(
         }
         AstKind::ExportAllDeclaration(declaration) => {
             if wants(field_ids::SOURCE) {
-                let source = intern_packed(strings, &declaration.source.value);
+                let source = intern_packed(strings, &literal_string(&declaration.source));
                 push(field_ids::SOURCE, source);
             }
             if wants(field_ids::EXPORTED)
                 && let Some(exported) = &declaration.exported
             {
-                let exported = intern_packed(strings, &exported.name());
+                let exported = intern_packed(strings, &module_export_name(exported));
                 push(field_ids::EXPORTED, exported);
             }
             if wants(field_ids::EXPORT_KIND) {
@@ -666,11 +668,11 @@ pub(crate) fn packed_fields_direct(
         }
         AstKind::ExportSpecifier(specifier) => {
             if wants(field_ids::LOCAL) {
-                let local = intern_packed(strings, &specifier.local.name());
+                let local = intern_packed(strings, &module_export_name(&specifier.local));
                 push(field_ids::LOCAL, local);
             }
             if wants(field_ids::EXPORTED) {
-                let exported = intern_packed(strings, &specifier.exported.name());
+                let exported = intern_packed(strings, &module_export_name(&specifier.exported));
                 push(field_ids::EXPORTED, exported);
             }
             if wants(field_ids::EXPORT_KIND) {
@@ -731,15 +733,22 @@ pub(crate) fn packed_fields_direct(
             let property = intern_packed(strings, "target");
             push(field_ids::PROPERTY, property);
         }
+        AstKind::NullLiteral(_)
+        | AstKind::ConditionalExpression(_)
+        | AstKind::SequenceExpression(_)
+        | AstKind::ParenthesizedExpression(_) => {}
         _ => return None,
     }
-    if let Some(value) = constant_for_kind(kind) {
+    // Tagged constant payloads allocate. Build them only when requested.
+    if (wants(field_ids::CONSTANT_KIND) || wants(field_ids::CONSTANT_VALUE))
+        && let Some(value) = constant(kind)
+    {
         if wants(field_ids::CONSTANT_KIND) {
-            let kind = intern_packed(strings, value.kind());
+            let kind = intern_packed(strings, value.kind);
             push(field_ids::CONSTANT_KIND, kind);
         }
         if wants(field_ids::CONSTANT_VALUE) {
-            let encoded = value.encode();
+            let encoded = value.encoded;
             let value = intern_packed(strings, &encoded);
             push(field_ids::CONSTANT_VALUE, value);
         }
@@ -901,7 +910,11 @@ pub(crate) fn fields(
             push!(field_ids::NAME, "name", identifier.name.to_string())
         }
         AstKind::StringLiteral(literal) => {
-            push!(field_ids::VALUE, "value", literal.value.to_string())
+            push!(
+                field_ids::VALUE,
+                "value",
+                literal_string(literal).into_owned()
+            )
         }
         AstKind::RegExpLiteral(literal) => {
             push!(
@@ -919,7 +932,7 @@ pub(crate) fn fields(
             push!(field_ids::FLAGS, "flags", flags.to_owned());
         }
         AstKind::NumericLiteral(literal) => {
-            push!(field_ids::VALUE, "value", literal.value.to_string())
+            push!(field_ids::VALUE, "value", number_literal(literal.value))
         }
         AstKind::BooleanLiteral(literal) => {
             push!(field_ids::VALUE, "value", literal.value.to_string())
@@ -1032,7 +1045,7 @@ pub(crate) fn fields(
                 push!(
                     field_ids::STATIC_ARGUMENT,
                     "staticArgument",
-                    literal.value.to_string()
+                    literal_string(literal).into_owned()
                 );
             }
         }
@@ -1053,7 +1066,7 @@ pub(crate) fn fields(
                 push!(
                     field_ids::STATIC_ARGUMENT,
                     "staticArgument",
-                    literal.value.to_string()
+                    literal_string(literal).into_owned()
                 );
             }
         }
@@ -1062,7 +1075,7 @@ pub(crate) fn fields(
                 push!(
                     field_ids::STATIC_ARGUMENT,
                     "staticArgument",
-                    literal.value.to_string()
+                    literal_string(literal).into_owned()
                 );
             }
         }
@@ -1101,7 +1114,11 @@ pub(crate) fn fields(
             push!(field_ids::COMPUTED, "computed", "true".into());
             push!(field_ids::WRITE, "write", member_write.to_string(),);
             if let Expression::StringLiteral(property) = &member.expression {
-                push!(field_ids::PROPERTY, "property", property.value.to_string());
+                push!(
+                    field_ids::PROPERTY,
+                    "property",
+                    literal_string(property).into_owned()
+                );
                 if let Some(path) = static_member_path_with(&member.object, Some(&property.value)) {
                     push!(field_ids::MEMBER_PATH, "memberPath", path);
                 }
@@ -1181,7 +1198,7 @@ pub(crate) fn fields(
             push!(
                 field_ids::SOURCE,
                 "source",
-                declaration.source.value.to_string()
+                literal_string(&declaration.source).into_owned()
             );
             push!(
                 field_ids::IMPORT_KIND,
@@ -1202,7 +1219,7 @@ pub(crate) fn fields(
             push!(
                 field_ids::IMPORTED,
                 "imported",
-                specifier.imported.name().to_string()
+                module_export_name(&specifier.imported).into_owned()
             );
             push!(field_ids::LOCAL, "local", specifier.local.name.to_string());
             push!(
@@ -1221,7 +1238,11 @@ pub(crate) fn fields(
         }
         AstKind::ExportNamedDeclaration(declaration) => {
             if let Some(source) = &declaration.source {
-                push!(field_ids::SOURCE, "source", source.value.to_string());
+                push!(
+                    field_ids::SOURCE,
+                    "source",
+                    literal_string(source).into_owned()
+                );
             }
             push!(
                 field_ids::EXPORT_KIND,
@@ -1253,10 +1274,14 @@ pub(crate) fn fields(
             push!(
                 field_ids::SOURCE,
                 "source",
-                declaration.source.value.to_string()
+                literal_string(&declaration.source).into_owned()
             );
             if let Some(exported) = &declaration.exported {
-                push!(field_ids::EXPORTED, "exported", exported.name().to_string());
+                push!(
+                    field_ids::EXPORTED,
+                    "exported",
+                    module_export_name(exported).into_owned()
+                );
             }
             push!(
                 field_ids::EXPORT_KIND,
@@ -1268,12 +1293,12 @@ pub(crate) fn fields(
             push!(
                 field_ids::LOCAL,
                 "local",
-                specifier.local.name().to_string()
+                module_export_name(&specifier.local).into_owned()
             );
             push!(
                 field_ids::EXPORTED,
                 "exported",
-                specifier.exported.name().to_string()
+                module_export_name(&specifier.exported).into_owned()
             );
             push!(
                 field_ids::EXPORT_KIND,
@@ -1332,13 +1357,11 @@ pub(crate) fn fields(
         }
         _ => {}
     }
-    if let Some(value) = constant_for_kind(kind) {
-        push!(
-            field_ids::CONSTANT_KIND,
-            "constantKind",
-            value.kind().into()
-        );
-        push!(field_ids::CONSTANT_VALUE, "constantValue", value.encode());
+    if (requested.wants(field_ids::CONSTANT_KIND) || requested.wants(field_ids::CONSTANT_VALUE))
+        && let Some(value) = constant(kind)
+    {
+        push!(field_ids::CONSTANT_KIND, "constantKind", value.kind.into());
+        push!(field_ids::CONSTANT_VALUE, "constantValue", value.encoded);
     }
     result
 }
@@ -1378,13 +1401,7 @@ pub(crate) fn predicate_scalar_type(field: &str, node_type_id: u32, value: &str)
     {
         2
     } else if field == "constantValue" {
-        if value == "true" || value == "false" {
-            2
-        } else if value.parse::<f64>().is_ok() {
-            1
-        } else {
-            0
-        }
+        crate::semantic::value_transport::scalar(value).0
     } else {
         0
     }
