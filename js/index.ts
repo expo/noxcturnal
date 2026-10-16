@@ -33,6 +33,7 @@ export type {
   NativeScope,
   PipelinePhase,
   PluginContract,
+  SyntaxFeature,
   PluginContextFor,
   ContractMetadataWriter,
   SnapshotOptions,

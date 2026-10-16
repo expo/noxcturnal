@@ -942,7 +942,14 @@ export function defineVisitor<
  * semantic queries. The visitor contract types the path; the plugin contract
  * types the context.
  */
+/** Concrete AST kinds, plus function modifiers needed by compatibility repairs. */
+export type SyntaxFeature = NativeNodeType | 'AsyncFunction' | 'GeneratorFunction';
+
 export interface PluginContract {
+  /** Run this plugin only when at least one feature occurs in the current phase
+   * input. Rejected plugins skip every lifecycle hook and contribute no retained
+   * data. Comments and string contents do not count as syntax. */
+  syntax?: { readonly anyOf: readonly SyntaxFeature[] };
   metadata?: { writes?: readonly string[]; reads?: readonly string[] };
   /** Opt in to query categories. Nonempty array requests enable that category
    * for dynamically chosen selectors; true enables imports/exports. A sibling's

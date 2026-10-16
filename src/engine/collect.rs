@@ -346,12 +346,27 @@ pub(crate) fn materialize_with_scope_parents(
             "indexed-session",
         ));
     }
-    let utf16 = (!source.is_ascii()).then(|| utf16_index(source, &allocator));
-    let program_body_offsets = program_body_offsets(
-        &parsed.program,
+    materialize_program(
         source,
-        utf16.as_deref().map(|offsets| &**offsets),
-    );
+        &allocator,
+        &parsed.program,
+        retention_manifest,
+        initial_route_manifest,
+        build_initial_route,
+    )
+}
+
+pub(crate) fn materialize_program<'a>(
+    source: &'a str,
+    allocator: &'a Allocator,
+    program: &oxc_ast::ast::Program<'a>,
+    retention_manifest: Option<&[u8]>,
+    initial_route_manifest: Option<&[u8]>,
+    build_initial_route: bool,
+) -> Result<MaterializedSessionParts> {
+    let utf16 = (!source.is_ascii()).then(|| utf16_index(source, allocator));
+    let program_body_offsets =
+        program_body_offsets(program, source, utf16.as_deref().map(|offsets| &**offsets));
     let compiled_manifest = initial_route_manifest
         .map(decode_route_manifest)
         .transpose()?;
@@ -410,10 +425,10 @@ pub(crate) fn materialize_with_scope_parents(
             node_count: 0,
             validation_stats: Stats::default(),
         };
-        collector.visit_program(&parsed.program);
+        collector.visit_program(program);
         collector.validation_stats.nodes = collector.node_count;
         crate::syntax::validation::validate_program_with_stats(
-            &parsed.program,
+            program,
             "indexed-session",
             collector.validation_stats,
         )?;
@@ -425,7 +440,7 @@ pub(crate) fn materialize_with_scope_parents(
             retain_comments(
                 &mut collector.retained_index,
                 source,
-                &parsed.program.comments,
+                &program.comments,
                 utf16.as_deref().map(|offsets| &**offsets),
             );
         }
@@ -450,7 +465,7 @@ pub(crate) fn materialize_with_scope_parents(
     let semantic_return = SemanticBuilder::new()
         .with_build_nodes(true)
         .with_check_syntax_error(true)
-        .build(&parsed.program);
+        .build(program);
     if !semantic_return.diagnostics.is_empty() {
         return Err(crate::parse_failure::error(
             source,
@@ -495,7 +510,7 @@ pub(crate) fn materialize_with_scope_parents(
             retention_capabilities,
         ),
     };
-    collector.visit_program(&parsed.program);
+    collector.visit_program(program);
     if retain_scopes && retention_capabilities & RETAIN_IDENTIFIERS != 0 {
         collector
             .retained_index
@@ -509,7 +524,7 @@ pub(crate) fn materialize_with_scope_parents(
         retain_comments(
             &mut collector.retained_index,
             source,
-            &parsed.program.comments,
+            &program.comments,
             utf16.as_deref().map(|offsets| &**offsets),
         );
     }

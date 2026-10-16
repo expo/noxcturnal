@@ -7,7 +7,7 @@ import {
   compileNestedVisitor,
   mergeFieldRequests,
   nestedManifest,
-  preparePhase,
+  prepareApplicablePhase,
 } from '../pipeline/routes';
 import { Bailout, createDispatcher } from './dispatch';
 import { SourceVersionStore, type SourceVersionId } from './source-versions';
@@ -17,6 +17,7 @@ import {
   native,
   nativePreflightOptions,
   type NativePreflightResultOutput,
+  type NativeParsedSourceBinding,
 } from '../native/binding';
 import { decodeRoutedEnvelope, type RoutedEventBatch } from '../protocol/events';
 import { MAX_COMPILED_ROUTES, packRouteManifest } from '../protocol/manifest';
@@ -499,6 +500,12 @@ export function transform(
   let openSession: NativeTransformSession | null = null;
   let reusableSession: NativeTransformSession | null = null;
   let retainedThroughPhase = -1;
+  const usesSyntax = pipeline.phases.some(phase =>
+    phase.plugins?.some(plugin => plugin.contract?.syntax != null),
+  );
+  let syntaxSource: string | null = null;
+  let syntaxFacts: ReadonlySet<string> | null = null;
+  let parsedSource: NativeParsedSourceBinding | null = null;
   let reusableRoutedBatch: { manifest: Buffer; batch: RoutedEventBatch } | null = null;
   // Record one native run's per-phase results into diagnostics/metadata and bail
   // on the first phase that did not complete. Shared by the mixed-pipeline loop
@@ -572,6 +579,8 @@ export function transform(
       const executionPlan = phasePlan[phaseIndex];
       const observedVersion: SourceVersionId = currentVersion;
       if (phase.native != null) {
+        parsedSource?.close();
+        parsedSource = null;
         reusableSession?.close();
         reusableSession = null;
         reusableRoutedBatch = null;
@@ -604,7 +613,16 @@ export function transform(
         reusableRoutedBatch = null;
       }
       const edits: EditCommand[] = [];
-      const prepared = preparePhase(phase);
+      if (usesSyntax && syntaxSource !== observationSource) {
+        parsedSource?.close();
+        parsedSource = new native.NativeParsedSource(observationSource, parseFilename);
+        syntaxFacts = new Set(parsedSource.syntaxFacts());
+        syntaxSource = observationSource;
+      }
+      const prepared = prepareApplicablePhase(phase, syntaxFacts);
+      // A syntax requirement rejects the entire plugin, including lifecycle work.
+      // Keep a pending parse for the next active phase, or validate it at the end.
+      if (usesSyntax && prepared.activePlugins.length === 0) continue;
       const {
         activePlugins,
         plans,
@@ -647,7 +665,7 @@ export function transform(
           futureIndex++
         ) {
           if (phasePlan[futureIndex].requiresPrintedInput) break;
-          const futurePrepared = preparePhase(pipeline.phases[futureIndex]);
+          const futurePrepared = prepareApplicablePhase(pipeline.phases[futureIndex], syntaxFacts);
           if (retainedRouteCount + futurePrepared.compiledRoutes.length > MAX_COMPILED_ROUTES)
             break;
           retainedRouteCount += futurePrepared.compiledRoutes.length;
@@ -699,7 +717,9 @@ export function transform(
           requiresIndex ? retentionManifest : undefined,
           requiresIndex ? manifest : undefined,
           true,
+          parsedSource ?? undefined,
         );
+      if (requiresIndex) parsedSource = null;
       reusableSession = null;
       openSession = session;
       let batch: RoutedEventBatch;
@@ -714,11 +734,11 @@ export function transform(
           if (requiresIndex) {
             batch = session.nextRoutedPacked(manifest);
           } else {
-            const routedBuffer = native.materializeRoutedBuffer(
-              observationSource,
-              parseFilename,
-              manifest,
-            );
+            const routedBuffer =
+              parsedSource != null
+                ? parsedSource.materializeRouted(manifest)
+                : native.materializeRoutedBuffer(observationSource, parseFilename, manifest);
+            parsedSource = null;
             batch = decodeRoutedEnvelope(routedBuffer);
           }
         }
@@ -726,10 +746,6 @@ export function transform(
       }
       if (requiresIndex || includeParent || includeScope)
         session.reserveEventCache(batch.nodeCount);
-      session.prefetchRoutedChildren(
-        batch,
-        dispatchRoutes.map(route => route.members.map(member => member.capabilities)),
-      );
       if (batch.includeParent) session.seedSummaries(batch.parentSummaries);
       const dispatch = createDispatcher(
         session,
@@ -783,6 +799,16 @@ export function transform(
         }
         if (decision.status === 'irrelevant') entry.stopped = true;
       }
+      // Analysis may reject a plugin using semantic facts. Its visitors no longer
+      // need structural hydration; pre/analyze nested traversals hydrate themselves.
+      session.prefetchRoutedChildren(
+        batch,
+        dispatchRoutes.map(route =>
+          route.members
+            .filter(member => !dispatch.contexts.get(member.plugin)!.stopped)
+            .map(member => member.capabilities),
+        ),
+      );
       for (const plugin of activePlugins) {
         const decision = decisions.get(plugin)!;
         if (decision.status === 'supported') {
@@ -858,6 +884,8 @@ export function transform(
       openSession = null;
       // Opening the next phase creates the explicit render/reparse boundary.
     }
+    parsedSource?.validate();
+    parsedSource = null;
     reusableSession?.close();
     openSession = null;
     // The single terminal crossing: the resident source becomes the final code
@@ -879,6 +907,7 @@ export function transform(
     }
     return completeResult();
   } catch (error) {
+    parsedSource?.close();
     openSession?.close();
     let parseFailure = nativeParseFailure(error);
     let bailout = error instanceof Bailout;

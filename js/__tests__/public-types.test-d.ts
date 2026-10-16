@@ -673,3 +673,14 @@ defineVisitor('Function', { controlFlow: ['nested-traverse'] }, path => {
   // @ts-expect-error the provided state must match the visitors' state.
   path.traverse([statefulNested], { other: true });
 });
+
+// Syntax selection is an explicit, typed plugin requirement.
+defineNativePlugin({
+  name: 'syntax-gated',
+  contract: { syntax: { anyOf: ['AsyncFunction', 'GeneratorFunction', 'Super', 'Class'] } },
+});
+defineNativePlugin({
+  name: 'invalid-syntax-feature',
+  // @ts-expect-error Syntax features are concrete AST kinds or named function modifiers.
+  contract: { syntax: { anyOf: ['async'] } },
+});

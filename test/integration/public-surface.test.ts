@@ -38,6 +38,7 @@ test('preserves the public source and native ABI surfaces', () => {
     'EditKind',
     'MappingPolicy',
     'NativeIndexedSession',
+    'NativeParsedSource',
     'NativePipelineSession',
     'NativeSourceText',
     'classify',

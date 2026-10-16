@@ -78,25 +78,11 @@ impl NativeIndexedSession {
                 build_initial_route.unwrap_or(true),
             )?
         };
-        let MaterializedSessionParts {
-            program_body_offsets,
-            scope_parents,
-            retained_index,
-            initial_routed_buffer,
-        } = parts;
-        let program_body_offsets =
-            (has_retention || has_initial_route).then_some(program_body_offsets);
-        Ok(Self {
-            source,
-            filename,
-            retained_index,
-            scope_parents,
-            initial_route_manifest: initial_route_manifest.map(|manifest| manifest.to_vec()),
-            initial_routed_buffer,
-            program_body_offsets,
-            initial_routed_served: false,
-            closed: false,
-        })
+        let mut session = Self::from_parts(source, filename, initial_route_manifest, parts);
+        if !has_retention && !has_initial_route {
+            session.program_body_offsets = None;
+        }
+        Ok(session)
     }
 
     #[napi]
@@ -449,6 +435,33 @@ impl NativeIndexedSession {
             Err(Error::new(Status::GenericFailure, "session-closed"))
         } else {
             Ok(())
+        }
+    }
+}
+
+impl NativeIndexedSession {
+    pub(super) fn from_parts(
+        source: String,
+        filename: String,
+        initial_route_manifest: Option<Buffer>,
+        parts: MaterializedSessionParts,
+    ) -> Self {
+        let MaterializedSessionParts {
+            program_body_offsets,
+            scope_parents,
+            retained_index,
+            initial_routed_buffer,
+        } = parts;
+        Self {
+            source,
+            filename,
+            retained_index,
+            scope_parents,
+            initial_route_manifest: initial_route_manifest.map(|manifest| manifest.to_vec()),
+            initial_routed_buffer,
+            program_body_offsets: Some(program_body_offsets),
+            initial_routed_served: false,
+            closed: false,
         }
     }
 }
