@@ -91,12 +91,19 @@ test.each([false, true])('native Flow unavailable falls back with adapter=%s', r
       expect(result.status).toBe('complete');
       if (result.status !== 'complete') throw new Error('Unexpected bailout');
       expect(result.code).toBe('const value = 1;');
+      expect(result.diagnostics).toEqual([]);
     } else {
       expect(result).toEqual({
         status: 'bailout',
         reason: 'flow-requires-parser-adapter',
         source,
-        diagnostics: [],
+        diagnostics: [
+          {
+            code: 'flow-parser-not-built',
+            message: 'flow-parser-not-built',
+            phase: 'flow-erasure',
+          },
+        ],
       });
     }
   } finally {

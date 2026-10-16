@@ -28,6 +28,7 @@ withErasure('native Flow erasure', () => {
         pipeline,
       ),
     );
+    expect(result.diagnostics).toEqual([]);
     expect(result.code).toMatchInlineSnapshot(`
       "// @flow
 
@@ -109,6 +110,7 @@ withErasure('native Flow erasure', () => {
         transform('// @flow\nconst value = R { field: 1 };\n', 'fixture.js', pipeline),
       );
       expect(result.metadata.sourceAdapter).toEqual({ adapter: true });
+      expect(result.diagnostics).toEqual([]);
     } finally {
       unregister();
       erasure.mockRestore();

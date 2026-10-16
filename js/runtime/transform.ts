@@ -323,6 +323,7 @@ export function transform(
   const originalSource = source;
   let parseFilename = parserFilename(filename, options.parser);
   let parser = classifyForTransform(parseFilename, source);
+  let flowErasureDiagnostic: Diagnostic | undefined;
   let adapterMap: NativeVlqMap | null = null;
   let adapterMetadata: Record<string, unknown> | undefined;
   // Native erasure runs ahead of the auto-selected adapter. It preserves
@@ -343,6 +344,12 @@ export function transform(
       // re-derived.
       parseFilename = parserFilename(filename, 'jsx');
       parser = classifyForTransform(parseFilename, source, 'jsx');
+    } else {
+      flowErasureDiagnostic = {
+        code: erased.reason ?? erased.status,
+        message: erased.detail ?? erased.reason ?? 'Native Flow erasure is unavailable.',
+        phase: 'flow-erasure',
+      };
     }
   }
   if (!parser.supported) {
@@ -356,7 +363,9 @@ export function transform(
           status: 'bailout',
           reason: adapted.reason,
           source: originalSource,
-          diagnostics: adapted.diagnostics ?? [],
+          diagnostics: flowErasureDiagnostic
+            ? [flowErasureDiagnostic, ...(adapted.diagnostics ?? [])]
+            : (adapted.diagnostics ?? []),
         };
       source = adapted.code;
       adapterMap = adapted.map;
@@ -389,7 +398,7 @@ export function transform(
         status: 'bailout',
         reason: parser.reason,
         source: originalSource,
-        diagnostics: [],
+        diagnostics: flowErasureDiagnostic ? [flowErasureDiagnostic] : [],
       };
     } catch (error) {
       // A preparation failure remains primary; cleanup still visits every peer.
