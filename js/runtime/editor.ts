@@ -54,8 +54,8 @@ export function createEditor(
       end,
       content,
       owner,
-      [EDIT_OWNER]: ownerIdentity,
       order: nextOrder(),
+      [EDIT_OWNER]: ownerIdentity,
     });
   // Replacing a range is an ordinary replacement whichever method asked for it, so
   // these agree with `overwrite`'s default rather than leaving the text unmapped.
@@ -67,8 +67,8 @@ export function createEditor(
       content,
       mapping: 'AnchorStart',
       owner,
-      [EDIT_OWNER]: ownerIdentity,
       order: nextOrder(),
+      [EDIT_OWNER]: ownerIdentity,
     });
   let text: InstanceType<typeof native.NativeSourceText> | undefined;
   const operations = () =>
@@ -117,8 +117,8 @@ export function createEditor(
         content,
         mapping: editorMappingPolicy(mapping),
         owner,
-        [EDIT_OWNER]: ownerIdentity,
         order: nextOrder(),
+        [EDIT_OWNER]: ownerIdentity,
       }),
     remove: (start, end) => push('Remove', start, end),
     move(start, end, destination) {
@@ -130,8 +130,8 @@ export function createEditor(
         end,
         destination,
         owner,
-        [EDIT_OWNER]: ownerIdentity,
         order: nextOrder(),
+        [EDIT_OWNER]: ownerIdentity,
       });
     },
     reset(start, end) {

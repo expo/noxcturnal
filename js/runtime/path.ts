@@ -404,8 +404,8 @@ export class NodePathImpl implements NativeNodePath {
       names:
         typeof content === 'string' ? undefined : content?.names ? [...content.names] : undefined,
       owner: this.runtime.owner,
-      [EDIT_OWNER]: this.runtime.ownerIdentity,
       order: this.runtime.nextOrder(),
+      [EDIT_OWNER]: this.runtime.ownerIdentity,
     });
   }
   /** Lower a provenance-carrying replacement into gap edits around kept source ranges.
@@ -438,8 +438,8 @@ export class NodePathImpl implements NativeNodePath {
           mapping: glue.length === 0 ? ('Sourceless' as const) : glueMapping,
           names: glueNames.length > 0 ? glueNames : undefined,
           owner: this.runtime.owner,
-          [EDIT_OWNER]: this.runtime.ownerIdentity,
           order,
+          [EDIT_OWNER]: this.runtime.ownerIdentity,
         };
         if (glueHasCopy) this.runtime.edits.push({ ...shared, contentParts: glue });
         else this.runtime.edits.push({ ...shared, content: glue.join('') });
@@ -540,8 +540,8 @@ export class NodePathImpl implements NativeNodePath {
             content: '\n',
             mapping: 'Sourceless',
             owner: this.runtime.owner,
-            [EDIT_OWNER]: this.runtime.ownerIdentity,
             order,
+            [EDIT_OWNER]: this.runtime.ownerIdentity,
           });
         const mapping =
           typeof value === 'string' ? 'AnchorBoundaries' : mappingPolicy(value.mapping);
@@ -557,8 +557,8 @@ export class NodePathImpl implements NativeNodePath {
           mapping,
           names: typeof value === 'string' || !value.names ? undefined : [...value.names],
           owner: this.runtime.owner,
-          [EDIT_OWNER]: this.runtime.ownerIdentity,
           order,
+          [EDIT_OWNER]: this.runtime.ownerIdentity,
         });
         separatorNeeded = !absorbSeparator;
       });
@@ -592,8 +592,8 @@ export class NodePathImpl implements NativeNodePath {
         mapping: fragment ? mappingPolicy(fragment.mapping) : undefined,
         names: fragment?.names ? [...fragment.names] : undefined,
         owner: this.runtime.owner,
-        [EDIT_OWNER]: this.runtime.ownerIdentity,
         order: this.runtime.nextOrder(),
+        [EDIT_OWNER]: this.runtime.ownerIdentity,
       });
       return;
     }
@@ -622,8 +622,8 @@ export class NodePathImpl implements NativeNodePath {
       end: offset,
       ...realizeContent(this.runtime.session, content, this.#degraded, prefix, suffix),
       owner: this.runtime.owner,
-      [EDIT_OWNER]: this.runtime.ownerIdentity,
       order: this.runtime.nextOrder(),
+      [EDIT_OWNER]: this.runtime.ownerIdentity,
     });
   }
   #degraded = (_message: string, _target: SourceFragment): void => {
@@ -644,8 +644,8 @@ export class NodePathImpl implements NativeNodePath {
       end: this.event.end,
       destination,
       owner: this.runtime.owner,
-      [EDIT_OWNER]: this.runtime.ownerIdentity,
       order: this.runtime.nextOrder(),
+      [EDIT_OWNER]: this.runtime.ownerIdentity,
     });
   }
   #bodyOffset(prepend: boolean): number {
@@ -828,8 +828,8 @@ function makeScope(runtime: PathRuntime, id: number, parentId: number | null): N
           end: metadata.start,
           ...realizeContent(session, content, undefined, wrapping ? '{\n' : '\n;\n', suffix),
           owner: runtime.owner,
-          [EDIT_OWNER]: runtime.ownerIdentity,
           order: runtime.nextOrder(),
+          [EDIT_OWNER]: runtime.ownerIdentity,
         };
         runtime.edits.push(edits.push);
         if (wrapping)
@@ -839,8 +839,8 @@ function makeScope(runtime: PathRuntime, id: number, parentId: number | null): N
             end: metadata.end,
             content: metadata.kind === 1 ? ');}' : '}',
             owner: runtime.owner,
-            [EDIT_OWNER]: runtime.ownerIdentity,
             order: runtime.nextOrder(),
+            [EDIT_OWNER]: runtime.ownerIdentity,
           });
         return;
       }
@@ -885,8 +885,8 @@ function makeScope(runtime: PathRuntime, id: number, parentId: number | null): N
           mapping: 'AnchorBoundaries',
           names: [name],
           owner: runtime.owner,
-          [EDIT_OWNER]: runtime.ownerIdentity,
           order: runtime.nextOrder(),
+          [EDIT_OWNER]: runtime.ownerIdentity,
         });
       }
       const exportEdits = scopeEdits(runtime, bindingScopeId).exports;
@@ -907,8 +907,8 @@ function makeScope(runtime: PathRuntime, id: number, parentId: number | null): N
             end: declaration.end,
             contentParts: parts,
             owner: runtime.owner,
-            [EDIT_OWNER]: runtime.ownerIdentity,
             order: runtime.nextOrder(),
+            [EDIT_OWNER]: runtime.ownerIdentity,
           };
           entry = { positions, parts };
           exportEdits.set(declaration.start, entry);
@@ -919,8 +919,8 @@ function makeScope(runtime: PathRuntime, id: number, parentId: number | null): N
               end: declaration.start + 6,
               content: '',
               owner: runtime.owner,
-              [EDIT_OWNER]: runtime.ownerIdentity,
               order: runtime.nextOrder(),
+              [EDIT_OWNER]: runtime.ownerIdentity,
             },
             edit,
           );

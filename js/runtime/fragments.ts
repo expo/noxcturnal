@@ -28,12 +28,25 @@ export interface IntentRegistration {
 
 /** Resolve only requested fragments against their immutable registration source. */
 export function realizedContentText(value: RealizedContent, source: string): string {
-  return (
-    value.content ??
-    value.contentParts
-      .map(part => (typeof part === 'string' ? part : source.slice(part.start, part.end)))
-      .join('')
-  );
+  if (value.content != null) return value.content;
+  const parts = value.contentParts;
+  const first = parts[0];
+  // A contiguous sequence needs only one slice. Mixed fragments retain the
+  // ordinary join, and the deferred edit representation remains unchanged.
+  if (first != null && typeof first !== 'string') {
+    let end = first.end;
+    let index = 1;
+    for (; index < parts.length; index++) {
+      const next = parts[index];
+      if (next === '') continue;
+      if (typeof next === 'string' || next.start !== end) break;
+      end = next.end;
+    }
+    if (index === parts.length) return source.slice(first.start, end);
+  }
+  return parts
+    .map(part => (typeof part === 'string' ? part : source.slice(part.start, part.end)))
+    .join('');
 }
 
 export function identicalRealizedContent(a: RealizedContent, b: RealizedContent): boolean {

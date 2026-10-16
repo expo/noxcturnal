@@ -172,15 +172,14 @@ export function createDispatcher(
         end: session.source.length,
         content: '\n',
         owner: append.owner,
-        [EDIT_OWNER]: append[EDIT_OWNER],
         order: order++,
+        [EDIT_OWNER]: append[EDIT_OWNER],
       };
       edits.push(programEndBoundary);
     }
   };
   const phaseIdentity = {};
   const contexts = new Map<NativePlugin<any, any>, DispatcherEntry>();
-  const contextOwners = new Map<PluginContext, object>();
   const metadataOwners = new Map<string, NativePlugin<any, any>>();
   for (const plugin of activePlugins)
     for (const key of plans.get(plugin)?.metadataWrites ?? []) {
@@ -260,8 +259,8 @@ export function createDispatcher(
           ? { contentParts: [...(prefix ? [prefix] : []), ...realized.contentParts] }
           : { content: `${prefix}${realized.content}` }),
         owner: plugin.name,
-        [EDIT_OWNER]: entry.ownerIdentity,
         order: order++,
+        [EDIT_OWNER]: entry.ownerIdentity,
       };
       if (!programInsertionPoints.has(offset)) programInsertionPoints.set(offset, edit);
       programInsertions.set(edit, { prefix, pending: realized });
@@ -282,12 +281,15 @@ export function createDispatcher(
         set(key, value) {
           if (!allowedMetadata.has(key))
             throw new Error(`${plugin.name}: undeclared metadata key ${key}`);
-          Object.defineProperty(metadata, key, {
-            value,
-            writable: true,
-            configurable: true,
-            enumerable: true,
-          });
+          // This key needs an own data property instead of the inherited setter.
+          if (key === '__proto__')
+            Object.defineProperty(metadata, key, {
+              value,
+              writable: true,
+              configurable: true,
+              enumerable: true,
+            });
+          else metadata[key] = value;
         },
         get: key => (Object.hasOwn(metadata, key) ? metadata[key] : undefined),
       },
@@ -348,8 +350,8 @@ export function createDispatcher(
             end: session.source.length,
             content: '\n',
             owner: plugin.name,
-            [EDIT_OWNER]: entry.ownerIdentity,
             order: order++,
+            [EDIT_OWNER]: entry.ownerIdentity,
           };
           edits.push(programEndBoundary);
         }
@@ -391,8 +393,8 @@ export function createDispatcher(
             ? { contentParts: realized.contentParts }
             : { content: realized.content }),
           owner: plugin.name,
-          [EDIT_OWNER]: entry.ownerIdentity,
           order: order++,
+          [EDIT_OWNER]: entry.ownerIdentity,
         });
       },
       sourceSlice: (start, end) => {
@@ -417,7 +419,6 @@ export function createDispatcher(
     };
     entry.context = context;
     contexts.set(plugin, entry);
-    contextOwners.set(context, entry.ownerIdentity);
   }
   const runtimeFor = (
     plugin: NativePlugin<any, any>,
@@ -445,7 +446,7 @@ export function createDispatcher(
       context,
       edits,
       owner: plugin.name,
-      ownerIdentity: contextOwners.get(context),
+      ownerIdentity: entry.ownerIdentity,
       nextOrder: () => order++,
       state: entry,
       nested(target, nested, state) {
@@ -600,7 +601,7 @@ export function createDispatcher(
     const entry = {
       context,
       state,
-      ownerIdentity: contextOwners.get(context)!,
+      ownerIdentity: contexts.get(plugin)!.ownerIdentity,
       stopped: false,
       skipped: undefined,
     };
