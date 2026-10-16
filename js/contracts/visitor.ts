@@ -1028,7 +1028,8 @@ export interface DefinedNativePlugin<
  */
 export interface PipelinePhase {
   name: string;
-  /** JavaScript visitor plugins. Mutually exclusive with `native`. */
+  /** JavaScript visitor plugins, mutually exclusive with `native`. Each definition
+   * occurs at most once per phase; definitions may be reused in later phases. */
   plugins?: readonly NativePlugin<any, any>[];
   /** Fused parse/transform/codegen phase executed entirely in Rust. */
   native?: import('../preflight/types').PreflightPlan;

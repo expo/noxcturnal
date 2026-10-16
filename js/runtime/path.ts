@@ -1,4 +1,5 @@
 import { native } from '../native/binding';
+import { EDIT_OWNER, type OwnedEdit } from './editor';
 import { CHILD_ROLES, FIELD_KEY_IDS } from '../generated/event-schema';
 import { alias, array } from '../pipeline/route-utils';
 import {
@@ -116,7 +117,8 @@ export type PathState = { stopped: boolean; skipped?: SkipState };
 export type PathRuntime = {
   session: NativeTransformSession;
   context: PluginContext;
-  edits: EditCommand[];
+  edits: OwnedEdit[];
+  ownerIdentity?: object;
   owner: string;
   nextOrder: () => number;
   state: PathState;
@@ -403,6 +405,7 @@ export class NodePathImpl implements NativeNodePath {
         typeof content === 'string' ? undefined : content?.names ? [...content.names] : undefined,
       owner: this.runtime.owner,
       order: this.runtime.nextOrder(),
+      [EDIT_OWNER]: this.runtime.ownerIdentity,
     });
   }
   /** Lower a provenance-carrying replacement into gap edits around kept source ranges.
@@ -436,6 +439,7 @@ export class NodePathImpl implements NativeNodePath {
           names: glueNames.length > 0 ? glueNames : undefined,
           owner: this.runtime.owner,
           order,
+          [EDIT_OWNER]: this.runtime.ownerIdentity,
         };
         if (glueHasCopy) this.runtime.edits.push({ ...shared, contentParts: glue });
         else this.runtime.edits.push({ ...shared, content: glue.join('') });
@@ -537,6 +541,7 @@ export class NodePathImpl implements NativeNodePath {
             mapping: 'Sourceless',
             owner: this.runtime.owner,
             order,
+            [EDIT_OWNER]: this.runtime.ownerIdentity,
           });
         const mapping =
           typeof value === 'string' ? 'AnchorBoundaries' : mappingPolicy(value.mapping);
@@ -553,6 +558,7 @@ export class NodePathImpl implements NativeNodePath {
           names: typeof value === 'string' || !value.names ? undefined : [...value.names],
           owner: this.runtime.owner,
           order,
+          [EDIT_OWNER]: this.runtime.ownerIdentity,
         });
         separatorNeeded = !absorbSeparator;
       });
@@ -587,6 +593,7 @@ export class NodePathImpl implements NativeNodePath {
         names: fragment?.names ? [...fragment.names] : undefined,
         owner: this.runtime.owner,
         order: this.runtime.nextOrder(),
+        [EDIT_OWNER]: this.runtime.ownerIdentity,
       });
       return;
     }
@@ -616,6 +623,7 @@ export class NodePathImpl implements NativeNodePath {
       ...realizeContent(this.runtime.session, content, this.#degraded, prefix, suffix),
       owner: this.runtime.owner,
       order: this.runtime.nextOrder(),
+      [EDIT_OWNER]: this.runtime.ownerIdentity,
     });
   }
   #degraded = (_message: string, _target: SourceFragment): void => {
@@ -637,6 +645,7 @@ export class NodePathImpl implements NativeNodePath {
       destination,
       owner: this.runtime.owner,
       order: this.runtime.nextOrder(),
+      [EDIT_OWNER]: this.runtime.ownerIdentity,
     });
   }
   #bodyOffset(prepend: boolean): number {
@@ -732,12 +741,12 @@ function mappingPolicy(value?: CodeFragment['mapping']): EditCommand['mapping'] 
 
 type ScopeEdits = {
   exports: Map<number, { positions: Map<string, number>; parts: string[] }>;
-  push?: EditCommand & { contentParts?: NonNullable<RealizedContent['contentParts']> };
+  push?: OwnedEdit & { contentParts?: NonNullable<RealizedContent['contentParts']> };
 };
 // One phase shares an edit list across plugins and route runtimes. Structural
 // wrappers and export clauses are keyed by that list so separate plugins cannot
 // each emit another wrapper or another `export { ... }` for the same scope.
-const scopeEditTransactions = new WeakMap<EditCommand[], Map<number, ScopeEdits>>();
+const scopeEditTransactions = new WeakMap<OwnedEdit[], Map<number, ScopeEdits>>();
 function scopeEdits(runtime: PathRuntime, id: number): ScopeEdits {
   let transactions = scopeEditTransactions.get(runtime.edits);
   if (!transactions) scopeEditTransactions.set(runtime.edits, (transactions = new Map()));
@@ -820,6 +829,7 @@ function makeScope(runtime: PathRuntime, id: number, parentId: number | null): N
           ...realizeContent(session, content, undefined, wrapping ? '{\n' : '\n;\n', suffix),
           owner: runtime.owner,
           order: runtime.nextOrder(),
+          [EDIT_OWNER]: runtime.ownerIdentity,
         };
         runtime.edits.push(edits.push);
         if (wrapping)
@@ -830,6 +840,7 @@ function makeScope(runtime: PathRuntime, id: number, parentId: number | null): N
             content: metadata.kind === 1 ? ');}' : '}',
             owner: runtime.owner,
             order: runtime.nextOrder(),
+            [EDIT_OWNER]: runtime.ownerIdentity,
           });
         return;
       }
@@ -875,6 +886,7 @@ function makeScope(runtime: PathRuntime, id: number, parentId: number | null): N
           names: [name],
           owner: runtime.owner,
           order: runtime.nextOrder(),
+          [EDIT_OWNER]: runtime.ownerIdentity,
         });
       }
       const exportEdits = scopeEdits(runtime, bindingScopeId).exports;
@@ -889,13 +901,14 @@ function makeScope(runtime: PathRuntime, id: number, parentId: number | null): N
             parts.push(external);
           }
           parts.push(' };');
-          const edit: EditCommand = {
+          const edit: OwnedEdit = {
             kind: 'AppendLeft',
             start: declaration.end,
             end: declaration.end,
             contentParts: parts,
             owner: runtime.owner,
             order: runtime.nextOrder(),
+            [EDIT_OWNER]: runtime.ownerIdentity,
           };
           entry = { positions, parts };
           exportEdits.set(declaration.start, entry);
@@ -907,6 +920,7 @@ function makeScope(runtime: PathRuntime, id: number, parentId: number | null): N
               content: '',
               owner: runtime.owner,
               order: runtime.nextOrder(),
+              [EDIT_OWNER]: runtime.ownerIdentity,
             },
             edit,
           );

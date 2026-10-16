@@ -43,7 +43,7 @@ describe.each(['__proto__', 'constructor', 'ordinary'])('dictionary key %s', nam
     expect(Object.keys(globals)).toEqual([name]);
     expect(Object.hasOwn(globals, name)).toBe(true);
   });
-  check('metadata preserves a declared numeric value', () => {
+  test('metadata preserves a declared numeric value', () => {
     expect(readback).toBe(3);
     expect(Object.hasOwn(metadata, name)).toBe(true);
     expect(JSON.parse(JSON.stringify(metadata))[name]).toBe(3);

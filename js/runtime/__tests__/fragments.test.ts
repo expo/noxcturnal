@@ -7,7 +7,37 @@ import {
   identicalRealizedContent,
   isFragmentList,
   isProvenanceCode,
+  realizedContentText,
 } from '../fragments';
+
+test('realizes adjacent UTF-16 ranges, literal separators, gaps and reordered copies', () => {
+  assert.equal(
+    realizedContentText(
+      { contentParts: [{ start: 1, end: 3 }, '', { start: 3, end: 5 }] },
+      'ab💤cd',
+    ),
+    'b💤c',
+  );
+  assert.equal(
+    realizedContentText(
+      {
+        contentParts: [
+          { start: 0, end: 1 },
+          '',
+          { start: 1, end: 2 },
+          '(',
+          { start: 2, end: 3 },
+          { start: 3, end: 4 },
+          ')',
+          { start: 5, end: 6 },
+          { start: 0, end: 1 },
+        ],
+      },
+      'ab💤cd',
+    ),
+    'ab(💤)da',
+  );
+});
 
 test('constructs and validates sourceless code fragments', () => {
   assert.deepEqual(codeFactory.identifier('$value'), { code: '$value', mapping: 'sourceless' });
