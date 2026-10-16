@@ -213,27 +213,28 @@ export class NativeTransformSession {
           write: reference.write,
         }));
       }
+    const callBatches = request.calls?.length
+      ? this.#binding('query.calls').queryCallsBatch([...request.calls])
+      : [];
     const result = {
       globals,
       imports: request.imports ? nodes.filter(node => node.type === 'ImportDeclaration') : [],
       exports: request.exports ? nodes.filter(node => node.type.startsWith('Export')) : [],
       constants,
       calls: Object.fromEntries(
-        (request.calls ?? []).map(call => [
+        (request.calls ?? []).map((call, index) => [
           call.callee,
-          this.#binding('query.calls')
-            .queryCalls(call.callee, call.globalOnly, call.staticArguments)
-            .map(fact => ({
-              id: fact.id,
-              type: 'CallExpression',
-              start: fact.start,
-              end: fact.end,
-              scopeId: fact.scopeId,
-              calleeName: fact.calleeName,
-              calleeGlobal: fact.calleeGlobal,
-              staticArgument:
-                fact.staticArgument == null ? undefined : decodeString(fact.staticArgument),
-            })),
+          callBatches[index]!.map(fact => ({
+            id: fact.id,
+            type: 'CallExpression',
+            start: fact.start,
+            end: fact.end,
+            scopeId: fact.scopeId,
+            calleeName: fact.calleeName,
+            calleeGlobal: fact.calleeGlobal,
+            staticArgument:
+              fact.staticArgument == null ? undefined : decodeString(fact.staticArgument),
+          })),
         ]),
       ),
       captures,

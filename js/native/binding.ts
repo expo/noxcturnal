@@ -224,6 +224,13 @@ interface NativeBinding {
       calleeGlobal: boolean;
       staticArgument?: string;
     }[];
+    queryCallsBatch(
+      requests: {
+        callee: string;
+        globalOnly?: boolean;
+        staticArguments?: boolean;
+      }[],
+    ): ReturnType<NativeIndexedSessionBinding['queryCalls']>[];
     queryNodesPackedBuffer(nodeTypes: string[]): Buffer;
     scopeParentId(scopeId: number): number | null;
     close(): void;

@@ -18,6 +18,13 @@ use super::retained::routed_buffer_from_index;
 use super::{MaterializedSessionParts, decode_route_manifest};
 
 #[napi(object)]
+pub struct NativeCallQuery {
+    pub callee: String,
+    pub global_only: Option<bool>,
+    pub static_arguments: Option<bool>,
+}
+
+#[napi(object)]
 pub struct NativeChildEdge {
     pub parent_id: u32,
     pub child_id: u32,
@@ -241,6 +248,24 @@ impl NativeIndexedSession {
             global_only.unwrap_or(false),
             static_arguments.unwrap_or(false),
         ))
+    }
+
+    #[napi]
+    pub fn query_calls_batch(
+        &self,
+        requests: Vec<NativeCallQuery>,
+    ) -> Result<Vec<Vec<NativeCallFact>>> {
+        self.ensure_open()?;
+        Ok(requests
+            .into_iter()
+            .map(|request| {
+                self.retained_index.call_facts(
+                    &request.callee,
+                    request.global_only.unwrap_or(false),
+                    request.static_arguments.unwrap_or(false),
+                )
+            })
+            .collect())
     }
 
     #[napi]
