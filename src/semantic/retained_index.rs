@@ -3,7 +3,7 @@ use napi_derive::napi;
 use oxc_ast::AstKind;
 use oxc_semantic::{AstNodes, Scoping};
 use oxc_span::GetSpan;
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 use std::cell::OnceCell;
 #[cfg(test)]
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -38,6 +38,11 @@ pub struct RetainedIndex {
     child_offsets: Option<Vec<u32>>,
     child_edges: Vec<ChildEdge>,
     child_role_mask_by_parent_type: Vec<ChildRoleMask>,
+    // Property/label names and references without semantic IDs supplement the
+    // existing semantic name dictionary. Bits distinguish actual identifiers
+    // from static call arguments sharing that dictionary.
+    uid_identifiers: Option<FxHashSet<String>>,
+    identifier_name_bits: Vec<u64>,
     names: Vec<Rc<str>>,
     name_ids: FxHashMap<Rc<str>, u32>,
     bindings: FxHashMap<(u32, u32), BindingRecord>,
@@ -355,6 +360,8 @@ impl RetainedIndex {
             child_role_mask_by_parent_type: child_role_mask_by_parent_type
                 .map(<[ChildRoleMask]>::to_vec)
                 .unwrap_or_default(),
+            uid_identifiers: None,
+            identifier_name_bits: Vec::new(),
             names: Vec::new(),
             name_ids: FxHashMap::default(),
             bindings: FxHashMap::default(),
@@ -373,6 +380,35 @@ impl RetainedIndex {
         }
     }
 
+    pub(crate) fn has_uid_identifiers(&self) -> bool {
+        self.uid_identifiers.is_some()
+    }
+
+    pub(crate) fn contains_uid_identifier(&self, name: &str) -> bool {
+        self.name_ids.get(name).is_some_and(|&id| {
+            self.identifier_name_bits
+                .get(id as usize / 64)
+                .is_some_and(|bits| bits & (1 << (id % 64)) != 0)
+        }) || self
+            .uid_identifiers
+            .as_ref()
+            .is_some_and(|names| names.contains(name))
+    }
+
+    #[cfg(test)]
+    pub(crate) fn uid_identifier_names(&self) -> FxHashSet<String> {
+        self.names
+            .iter()
+            .filter(|name| self.contains_uid_identifier(name))
+            .map(|name| name.to_string())
+            .chain(
+                self.uid_identifiers
+                    .iter()
+                    .flat_map(|names| names.iter().cloned()),
+            )
+            .collect()
+    }
+
     pub fn record_semantics(
         &mut self,
         kind: AstKind<'_>,
@@ -386,9 +422,23 @@ impl RetainedIndex {
         if !retain_identifiers {
             return;
         }
+        let names = self.uid_identifiers.get_or_insert_with(FxHashSet::default);
+        let name = match kind {
+            AstKind::IdentifierReference(node) if node.reference_id.get().is_none() => {
+                Some(node.name.as_str())
+            }
+            AstKind::IdentifierName(node) => Some(node.name.as_str()),
+            AstKind::LabelIdentifier(node) => Some(node.name.as_str()),
+            _ => None,
+        };
+        if let Some(name) = name
+            && !names.contains(name)
+        {
+            names.insert(name.to_owned());
+        }
         match kind {
             AstKind::BindingIdentifier(identifier) => {
-                let name_id = self.intern_name(identifier.name.as_str());
+                let name_id = self.intern_identifier_name(identifier.name.as_str());
                 let scope_id = identifier
                     .symbol_id
                     .get()
@@ -425,7 +475,7 @@ impl RetainedIndex {
                     reference.is_write(),
                     member_write,
                 );
-                let name_id = self.intern_name(identifier.name.as_str());
+                let name_id = self.intern_identifier_name(identifier.name.as_str());
                 if let Some(symbol_id) = reference.symbol_id() {
                     let binding_scope_id = scoping.symbol_scope_id(symbol_id).index() as u32;
                     self.bindings
@@ -1065,6 +1115,16 @@ impl RetainedIndex {
         name_id
     }
 
+    fn intern_identifier_name(&mut self, name: &str) -> u32 {
+        let id = self.intern_name(name);
+        let word = id as usize / 64;
+        if word >= self.identifier_name_bits.len() {
+            self.identifier_name_bits.resize(word + 1, 0);
+        }
+        self.identifier_name_bits[word] |= 1 << (id % 64);
+        id
+    }
+
     pub fn record(
         &mut self,
         node_id: u32,
@@ -1593,14 +1653,19 @@ impl RetainedIndex {
     }
 
     pub fn memory_usage(&self) -> usize {
-        self.rename_exports.get().map_or(0, |exports| {
-            size_of::<FxHashMap<u32, Vec<u32>>>()
-                + exports.capacity() * size_of::<(u32, Vec<u32>)>()
-                + exports
-                    .values()
-                    .map(|ids| ids.capacity() * size_of::<u32>())
-                    .sum::<usize>()
-        }) + self.rename_kinds.capacity() * size_of::<(u32, u32)>()
+        self.uid_identifiers.as_ref().map_or(0, |names| {
+            names.capacity() * size_of::<String>()
+                + names.iter().map(String::capacity).sum::<usize>()
+        }) + self.identifier_name_bits.capacity() * size_of::<u64>()
+            + self.rename_exports.get().map_or(0, |exports| {
+                size_of::<FxHashMap<u32, Vec<u32>>>()
+                    + exports.capacity() * size_of::<(u32, Vec<u32>)>()
+                    + exports
+                        .values()
+                        .map(|ids| ids.capacity() * size_of::<u32>())
+                        .sum::<usize>()
+            })
+            + self.rename_kinds.capacity() * size_of::<(u32, u32)>()
             + self.exported_declarations.capacity() * size_of::<(u32, u32)>()
             + self.scope_metadata.capacity() * size_of::<[u32; 5]>()
             + self.type_ids.capacity() * size_of::<u32>()
@@ -1785,6 +1850,79 @@ use std::rc::Rc;
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::syntax::source_text::UidAllocator;
+
+    #[test]
+    fn uid_candidate_probes_do_not_grow_with_unrelated_module_names() {
+        for count in [1_000, 10_000, 100_000] {
+            let mut index = RetainedIndex {
+                uid_identifiers: Some(FxHashSet::default()),
+                ..RetainedIndex::default()
+            };
+            for id in 0..count {
+                index.intern_identifier_name(&format!("_unrelated{id}"));
+            }
+            for name in ["_taken", "_taken2", "_taken3"] {
+                index.intern_identifier_name(name);
+            }
+            // An interned string literal is not an identifier. Later identifier
+            // occurrences must promote an existing string's membership bit.
+            index.intern_name("_literal");
+            index.intern_name("_promoted");
+            index.intern_identifier_name("_promoted");
+            let mut uids = UidAllocator::default();
+            for (hint, expected, expected_probes) in [
+                ("fresh", "_fresh", 1),
+                ("taken", "_taken4", 4),
+                ("f-r-e-s-h", "_fresh2", 1),
+                ("fresh2", "_fresh22", 2),
+                ("fresh", "_fresh3", 1),
+                ("literal", "_literal", 1),
+                ("promoted", "_promoted2", 2),
+            ] {
+                let mut probes = 0;
+                let result = uids.generate(hint, |candidate| {
+                    probes += 1;
+                    index.contains_uid_identifier(candidate)
+                });
+                assert_eq!(result, expected);
+                assert_eq!(probes, expected_probes, "{hint}: {count} module names");
+            }
+        }
+    }
+
+    #[test]
+    fn semantic_uid_names_use_bits_instead_of_another_string_inventory() {
+        let source = (0..1_000)
+            .map(|id| format!("let _local{id} = _global{id};"))
+            .collect::<String>();
+        let allocator = oxc_allocator::Allocator::default();
+        let parsed =
+            oxc_parser::Parser::new(&allocator, &source, oxc_span::SourceType::mjs()).parse();
+        assert!(parsed.diagnostics.is_empty());
+        let semantic = oxc_semantic::SemanticBuilder::new()
+            .with_build_nodes(true)
+            .build(&parsed.program)
+            .semantic;
+        let mut index = RetainedIndex::default();
+        for (id, node) in semantic.nodes().iter_enumerated() {
+            index.record_semantics(
+                node.kind(),
+                semantic.scoping(),
+                id.index() as u32,
+                node.scope_id().index() as u32,
+                true,
+                false,
+            );
+        }
+        assert!(index.uid_identifiers.as_ref().unwrap().is_empty());
+        assert_eq!(index.uid_identifiers.as_ref().unwrap().capacity(), 0);
+        assert_eq!(index.identifier_name_bits.len(), 2_000_usize.div_ceil(64));
+        for id in 0..1_000 {
+            assert!(index.contains_uid_identifier(&format!("_local{id}")));
+            assert!(index.contains_uid_identifier(&format!("_global{id}")));
+        }
+    }
 
     #[test]
     fn packed_response_strings_scale_with_selected_fields() {

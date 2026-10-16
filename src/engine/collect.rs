@@ -634,3 +634,75 @@ fn program_body_offsets(
         u32::from(append_separator),
     ]
 }
+
+#[cfg(test)]
+mod uid_tests {
+    use super::*;
+    use crate::protocol::constants::ROUTE_MANIFEST_MAGIC;
+    use crate::syntax::source_text::identifier_names;
+
+    #[test]
+    fn retained_uid_inventory_matches_standalone_ast_walk() {
+        let manifest = [
+            ROUTE_MANIFEST_MAGIC,
+            (RETAIN_IDENTIFIERS | RETAIN_CALLS) << 2,
+            0,
+            0,
+            32,
+            0,
+            0,
+            0,
+        ]
+        .into_iter()
+        .flat_map(u32::to_le_bytes)
+        .collect::<Vec<_>>();
+        for (filename, source) in [
+            ("empty.js", ""),
+            (
+                "names.js",
+                r#"var _temp; var _temp;
+                   function _fn(_arg) { const _temp = _arg; return _temp + _unknown; }
+                   const _obj = { _property: 1, _esc\u0061ped: 2 };
+                   _label: while (false) { _obj._member; break _label; }
+                   import { _imported as _local } from 'module';
+                   export { _local as _exported };
+                   _call('_notAnIdentifier');"#,
+            ),
+            (
+                "names.jsx",
+                "const _view = <_Component _attribute={_unknown}><_Namespace._Member /></_Component>;",
+            ),
+            (
+                "names.ts",
+                "interface _Merged { _property: _Unknown }
+                 namespace _Merged { export const _value = 1; }
+                 enum _Enum { _Member = 1 }
+                 type _Alias<_Type> = _Type & { _key: typeof _Merged._value };
+                 import _Import = _Merged._value;",
+            ),
+            (
+                "names.tsx",
+                "const _view = <_Component<_Type> _prop={_unknown} />;",
+            ),
+        ] {
+            let allocator = Allocator::default();
+            let parsed =
+                Parser::new(&allocator, source, source_type(filename, source).unwrap()).parse();
+            assert!(parsed.diagnostics.is_empty(), "{filename}");
+            let expected = identifier_names(&parsed.program);
+            let parts = materialize_program(
+                source,
+                &allocator,
+                &parsed.program,
+                Some(&manifest),
+                None,
+                false,
+            )
+            .unwrap();
+            assert!(parts.retained_index.has_uid_identifiers());
+            let inventory = parts.retained_index.uid_identifier_names();
+            assert_eq!(inventory, expected, "{filename}");
+            assert!(!inventory.contains("_notAnIdentifier"));
+        }
+    }
+}

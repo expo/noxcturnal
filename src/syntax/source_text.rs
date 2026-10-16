@@ -10,7 +10,7 @@ use oxc_allocator::Allocator;
 use oxc_ast::{AstKind, ast::Program};
 use oxc_ast_visit::Visit;
 use oxc_parser::Parser;
-use rustc_hash::FxHashSet;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 #[napi(object)]
 pub struct SourceMatch {
@@ -31,8 +31,52 @@ pub struct NativeSourceText {
     source: Utf16String,
     lines: Option<Vec<u32>>,
     identifiers: Option<FxHashSet<String>>,
-    reserved: FxHashSet<String>,
+    uids: UidAllocator,
     utf8: OnceCell<String>,
+}
+
+/// Reservations and normalized-hint cursors are independent of how the immutable
+/// source answers membership queries. Retained sessions use their existing index;
+/// standalone source operations lazily parse and cache identifier names.
+#[derive(Default)]
+pub(crate) struct UidAllocator {
+    reserved: FxHashSet<String>,
+    next_suffix: FxHashMap<String, u64>,
+}
+
+impl UidAllocator {
+    pub(crate) fn generate(
+        &mut self,
+        name: &str,
+        mut contains_identifier: impl FnMut(&str) -> bool,
+    ) -> String {
+        let hint: String = name
+            .chars()
+            .filter(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '$'))
+            .collect();
+        let base = format!("_{}", if hint.is_empty() { "temp" } else { &hint });
+        let mut index = self.next_suffix.get(&base).copied().unwrap_or(1);
+        let mut uid = if index == 1 {
+            base.clone()
+        } else {
+            format!("{base}{index}")
+        };
+        index = if index == 1 { 2 } else { index + 1 };
+        while contains_identifier(&uid) || self.reserved.contains(&uid) {
+            uid = format!("{base}{index}");
+            index += 1;
+        }
+        self.next_suffix.insert(base, index);
+        self.reserved.insert(uid.clone());
+        uid
+    }
+
+    pub(crate) fn memory_usage(&self) -> usize {
+        self.reserved.capacity() * size_of::<String>()
+            + self.reserved.iter().map(String::capacity).sum::<usize>()
+            + self.next_suffix.capacity() * size_of::<(String, u64)>()
+            + self.next_suffix.keys().map(String::capacity).sum::<usize>()
+    }
 }
 
 #[napi]
@@ -43,7 +87,7 @@ impl NativeSourceText {
             source,
             lines: None,
             identifiers: None,
-            reserved: FxHashSet::default(),
+            uids: UidAllocator::default(),
             utf8: OnceCell::new(),
         }
     }
@@ -68,19 +112,9 @@ impl NativeSourceText {
             }
             self.identifiers = Some(identifier_names(&parsed.program));
         }
-        let hint: String = name
-            .chars()
-            .filter(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '$'))
-            .collect();
-        let base = format!("_{}", if hint.is_empty() { "temp" } else { &hint });
-        let mut uid = base.clone();
-        let mut index = 2;
-        while self.identifiers.as_ref().unwrap().contains(&uid) || self.reserved.contains(&uid) {
-            uid = format!("{base}{index}");
-            index += 1;
-        }
-        self.reserved.insert(uid.clone());
-        Ok(uid)
+        Ok(self.uids.generate(&name, |uid| {
+            self.identifiers.as_ref().unwrap().contains(uid)
+        }))
     }
 
     #[napi]
@@ -317,6 +351,17 @@ impl NativeSourceText {
 }
 
 impl NativeSourceText {
+    #[cfg(test)]
+    pub(crate) fn with_identifiers(
+        source: Utf16String,
+        identifiers: Option<FxHashSet<String>>,
+    ) -> Self {
+        Self {
+            identifiers,
+            ..Self::new(source)
+        }
+    }
+
     fn line_starts(&mut self) -> &[u32] {
         self.lines.get_or_insert_with(|| {
             // ECMAScript line terminators, including a single CRLF. Offsets are
@@ -355,7 +400,7 @@ fn is_whitespace(unit: u16) -> bool {
     })
 }
 
-fn identifier_names(program: &Program<'_>) -> FxHashSet<String> {
+pub(crate) fn identifier_names(program: &Program<'_>) -> FxHashSet<String> {
     #[derive(Default)]
     struct Names(FxHashSet<String>);
     impl<'a> Visit<'a> for Names {
@@ -439,4 +484,56 @@ fn substitute(value: &[u16], text: &[u16], found: &regress::Match) -> Utf16Strin
         offset += consumed;
     }
     result.into()
+}
+
+#[cfg(test)]
+mod uid_tests {
+    use super::*;
+
+    #[test]
+    fn seeded_inventory_skips_parsing_and_preserves_reservations() {
+        let mut source = NativeSourceText::with_identifiers(
+            "invalid !!!".encode_utf16().collect::<Vec<_>>().into(),
+            Some(
+                ["_temp".to_string(), "_temp3".to_string()]
+                    .into_iter()
+                    .collect(),
+            ),
+        );
+        assert_eq!(
+            source
+                .generate_uid("temp".into(), "input.js".into())
+                .unwrap(),
+            "_temp2"
+        );
+        assert_eq!(
+            source
+                .generate_uid("temp".into(), "input.js".into())
+                .unwrap(),
+            "_temp4"
+        );
+        assert!(source.utf8.get().is_none());
+    }
+
+    #[test]
+    fn repeated_hints_advance_the_suffix_cursor() {
+        let mut source = NativeSourceText::with_identifiers(
+            Vec::<u16>::new().into(),
+            Some(FxHashSet::default()),
+        );
+        for index in 1..=10_000 {
+            let expected = if index == 1 {
+                "_temp".to_string()
+            } else {
+                format!("_temp{index}")
+            };
+            assert_eq!(
+                source
+                    .generate_uid("t-e-m-p".into(), "input.js".into())
+                    .unwrap(),
+                expected
+            );
+            assert_eq!(source.uids.next_suffix["_temp"], index.max(1) + 1);
+        }
+    }
 }

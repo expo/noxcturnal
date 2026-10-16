@@ -715,3 +715,70 @@ function definitionPipeline<State, Options, Analysis>(
 ): ReturnType<typeof defineNativePipeline> {
   return defineNativePipeline({ phases: [{ name: 'visit', plugins: [plugin] }] });
 }
+
+test('UID inventories preserve property, label, and escaped names with overlapping hints', () => {
+  const source = String.raw`const obj = { _temp: 1, _t\u0065mp2: 2 }; _temp3: while (false) { break _temp3; } obj._temp4;`;
+  for (const session of [
+    new NativeTransformSession(source, 'fixture.js'),
+    openRetained(source, 'fixture.js'),
+  ]) {
+    assert.equal(session.generateUid('temp'), '_temp5');
+    assert.equal(session.generateUid('temp2'), '_temp22');
+    assert.equal(session.generateUid('t-e-m-p'), '_temp6');
+    assert.equal(session.generateUid('temp5'), '_temp52');
+    assert.equal(session.generateUid('temp'), '_temp7');
+    session.close();
+    assert.throws(() => session.generateUid('temp'), /closed/);
+  }
+});
+
+test('retained source operations preserve original UTF-16 units alongside UID reservations', () => {
+  const source = 'const _temp = "\ud800x\udfff😀";';
+  const session = openRetained(source, 'fixture.js');
+  assert.equal(session.generateUid('temp'), '_temp2');
+  assert.equal(session.sourceTextOperations.indent('> '), '> ' + source);
+  assert.equal(
+    session.sourceTextOperations.matches('\ud800', undefined, false)[0]?.captures[0],
+    '\ud800',
+  );
+  assert.equal(session.generateUid('temp'), '_temp3');
+  session.close();
+});
+
+test('retained UID allocation bypasses source-text initialization', () => {
+  for (const source of ['', 'const _temp = 1; const obj = { _temp2: 2 };']) {
+    const session = openRetained(source, 'fixture.js');
+    const sourceText = vi.spyOn(session, 'sourceTextOperations', 'get');
+    try {
+      assert.equal(session.generateUid('temp'), source ? '_temp3' : '_temp');
+      assert.equal(session.generateUid('t-e-m-p'), source ? '_temp4' : '_temp2');
+      assert.equal(sourceText.mock.calls.length, 0);
+    } finally {
+      sourceText.mockRestore();
+      session.close();
+    }
+    assert.throws(() => session.generateUid('temp'), /closed/);
+  }
+});
+
+test('UID allocation without identifier retention preserves lazy parsing and errors', () => {
+  const session = new NativeTransformSession(
+    'const _temp = 1;',
+    'fixture.js',
+    {},
+    packRouteManifest([], false, false, 0),
+  );
+  const sourceText = vi.spyOn(session, 'sourceTextOperations', 'get');
+  try {
+    assert.equal(session.generateUid('temp'), '_temp2');
+    assert.equal(session.generateUid('temp'), '_temp3');
+    assert.equal(sourceText.mock.calls.length, 2);
+  } finally {
+    sourceText.mockRestore();
+    session.close();
+  }
+  const invalid = new NativeTransformSession('invalid !!!', 'fixture.js');
+  assert.throws(() => invalid.generateUid('temp'));
+  assert.throws(() => invalid.generateUid('temp'));
+  invalid.close();
+});

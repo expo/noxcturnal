@@ -707,7 +707,11 @@ export class NativeTransformSession {
     return low * 2 < intervals.length && intervals[low * 2] <= offset;
   }
   generateUid(name = 'temp'): string {
-    return this.sourceTextOperations.generateUid(name, this.#nativeFilename);
+    this.#assertOpen();
+    return (
+      this.#native?.generateUid(name) ??
+      this.sourceTextOperations.generateUid(name, this.#nativeFilename)
+    );
   }
   sourceLocation(start: number, end: number): SourceLocation {
     const [startLine, startColumn, endLine, endColumn] = this.sourceTextOperations.locations(
