@@ -259,24 +259,20 @@ impl NativeIndexedSession {
     }
 
     #[napi]
-    pub fn query_globals(&mut self, names: Vec<String>) -> Result<Vec<GlobalFact>> {
+    pub fn query_globals_buffer(&self, names: Vec<String>) -> Result<Buffer> {
         self.ensure_open()?;
-        Ok(names
-            .into_iter()
-            .map(|name| GlobalFact {
-                references: self
-                    .retained_index
-                    .global_references(&name)
-                    .into_iter()
-                    .map(|reference| GlobalReference {
-                        id: reference.id,
-                        start: reference.start,
-                        end: reference.end,
-                    })
-                    .collect(),
-                name,
-            })
-            .collect())
+        // One count followed by [id, start, end] triples per requested name,
+        // in request order. Names already live in JS; don't copy them back or
+        // allocate native objects that JS immediately copies into node views.
+        let mut words = crate::protocol::routed::PackedWords::with_capacity(names.len() * 16);
+        for name in names {
+            let references = self.retained_index.global_references(&name);
+            words.push(references.len() as u32);
+            for (id, start, end) in references {
+                words.extend([id, start, end]);
+            }
+        }
+        Ok(words.into_bytes().into())
     }
 
     #[napi]
@@ -436,17 +432,4 @@ impl NativeIndexedSession {
             Ok(())
         }
     }
-}
-
-#[napi(object)]
-pub struct GlobalReference {
-    pub id: u32,
-    pub start: u32,
-    pub end: u32,
-}
-
-#[napi(object)]
-pub struct GlobalFact {
-    pub name: String,
-    pub references: Vec<GlobalReference>,
 }

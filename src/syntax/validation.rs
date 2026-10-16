@@ -2,14 +2,69 @@ use napi::Result;
 use oxc_allocator::Allocator;
 use oxc_ast::ast::Program;
 use oxc_parser::Parser;
-use oxc_semantic::SemanticBuilder;
+use oxc_semantic::{Scoping, SemanticBuilder, Stats};
+
+pub(crate) struct ValidatedProgram {
+    pub(crate) scoping: Scoping,
+    pub(crate) stats: Stats,
+}
 
 /// Validate early errors without retaining an AST-node index. Routes that already
 /// build semantic data perform these checks in their existing build instead.
-pub(crate) fn validate_program(program: &Program<'_>, operation: &'static str) -> Result<()> {
-    let checked = SemanticBuilder::new_compiler().build(program);
+pub(crate) fn validate_program(
+    program: &Program<'_>,
+    operation: &'static str,
+    allocator: &Allocator,
+) -> Result<ValidatedProgram> {
+    // Allocation hints avoid a separate AST counting traversal. The semantic
+    // tables grow normally when needed; these hints never limit validation.
+    // Arena usage reflects syntax rather than source length (e.g. comments).
+    // Large arenas can contain decoded literals as well as large syntax trees.
+    // Use exact counts there: bounded hints would make semantic tables repeatedly
+    // grow, increasing first-call time and peak memory for large programs.
+    let bytes = allocator.used_bytes();
+    if bytes > 1024 * 1024 {
+        return validate_program_with_stats(program, operation, Stats::count(program));
+    }
+    let stats = Stats::new(
+        0,
+        (bytes / 512 + 1) as u32,
+        (bytes / 128) as u32,
+        (bytes / 64) as u32,
+    );
+    check_program(program, operation, stats, false)
+}
+
+/// Collection can count allocations in its existing traversal, avoiding Oxc's
+/// separate counting pass without omitting any semantic or early-error checks.
+pub(crate) fn validate_program_with_stats(
+    program: &Program<'_>,
+    operation: &'static str,
+    stats: Stats,
+) -> Result<ValidatedProgram> {
+    check_program(program, operation, stats, true)
+}
+
+fn check_program(
+    program: &Program<'_>,
+    operation: &'static str,
+    stats: Stats,
+    exact: bool,
+) -> Result<ValidatedProgram> {
+    let checked = SemanticBuilder::new_compiler()
+        .with_stats(stats)
+        .build(program);
+    #[cfg(debug_assertions)]
+    if exact {
+        stats.assert_accurate(checked.semantic.stats());
+    }
+    #[cfg(not(debug_assertions))]
+    let _ = exact;
     if checked.diagnostics.is_empty() {
-        Ok(())
+        Ok(ValidatedProgram {
+            stats: checked.semantic.stats(),
+            scoping: checked.semantic.into_scoping(),
+        })
     } else {
         Err(crate::parse_failure::error(
             program.source_text,
@@ -34,7 +89,7 @@ pub(crate) fn validate_source(source: &str, filename: &str) -> Result<()> {
             "native-phase",
         ));
     }
-    validate_program(&parsed.program, "native-phase")
+    validate_program(&parsed.program, "native-phase", &allocator).map(|_| ())
 }
 
 /// Oxc 0.141 compares an escaped surrogate-pair group name differently from the

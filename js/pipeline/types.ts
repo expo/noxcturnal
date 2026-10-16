@@ -22,6 +22,7 @@ export interface RouteCapabilities {
   childRules: Readonly<Partial<Record<string, readonly string[]>>> | null;
   controlFlow: readonly ControlFlowCapability[];
   declaredFields: readonly NativeFieldKey[];
+  childFields?: Readonly<Partial<Record<string, readonly NativeFieldKey[]>>>;
   comments: 'inner' | undefined;
 }
 
@@ -32,6 +33,7 @@ export type PreparedPluginPlan = {
   controlFlow?: readonly ControlFlowCapability[];
   scope?: boolean;
   queries?: readonly QueryRequest[];
+  retainComments?: boolean;
   metadataWrites?: readonly string[];
   ancestry?: StoredVisitorContract['ancestry'];
   ancestryFields?: Readonly<Partial<Record<NativeNodeType, readonly NativeFieldKey[]>>>;

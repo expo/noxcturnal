@@ -384,7 +384,7 @@ test('caches queries by request identity without structural serialization', () =
   session.close();
 });
 
-test('indexes source identifiers once for collision-free uid generation', () => {
+test('uses native AST identifier names for collision-free uid generation', () => {
   const session = new NativeTransformSession(
     'const _temp = 1; const _other2 = 2; /* _comment */',
     'fixture.js',
@@ -392,7 +392,7 @@ test('indexes source identifiers once for collision-free uid generation', () => 
   assert.equal(session.generateUid('temp'), '_temp2');
   assert.equal(session.generateUid('temp'), '_temp3');
   assert.equal(session.generateUid('other'), '_other');
-  assert.equal(session.generateUid('comment'), '_comment2');
+  assert.equal(session.generateUid('comment'), '_comment');
   session.close();
 
   const retained = openRetained('const _nox$existing = external;', 'fixture.js');
@@ -403,6 +403,18 @@ test('indexes source identifiers once for collision-free uid generation', () => 
   const substring = new NativeTransformSession('const _temporary = 1;', 'fixture.js');
   assert.equal(substring.generateUid('temp'), '_temp');
   substring.close();
+});
+
+test('UID allocation sees escaped native names and ignores nonidentifier text', () => {
+  const source = String.raw`const \u005ftemp = 1; const text = "_temp2"; /* _temp3 */`;
+  for (const session of [
+    new NativeTransformSession(source, 'fixture.js'),
+    openRetained(source, 'fixture.js'),
+  ]) {
+    assert.equal(session.generateUid('temp'), '_temp2');
+    assert.equal(session.generateUid('temp'), '_temp3');
+    session.close();
+  }
 });
 
 test('conservatively evaluates side-effect-free constant expressions', () => {

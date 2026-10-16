@@ -47,7 +47,7 @@ export function defineNativePlugin<
   } as DefinedNativePlugin<State, Options, Analysis, Contract>;
   Object.defineProperty(definition, 'withOptions', {
     enumerable: false,
-    value: (options: Options) => defineNativePlugin({ ...plugin, options }),
+    value: (options: Options) => defineNativePlugin({ ...definition, options }),
   });
   Object.defineProperty(definition, 'withParameters', {
     enumerable: false,
@@ -306,6 +306,25 @@ function normalizeNativePlan(plan: PreflightPlan): PreflightPlan {
 }
 
 function validateNativePlan(phaseName: string, plan: PreflightPlan): void {
+  const known = new Set([
+    'transforms',
+    'optimize',
+    'reactCompiler',
+    'reactRefresh',
+    'typescript',
+    'jsx',
+    'jsxPure',
+    'jsxThrowIfNamespace',
+    'jsxImportSource',
+    'jsxPragma',
+    'jsxPragmaFrag',
+    'helpers',
+    'compact',
+    'comments',
+  ]);
+  for (const [name, value] of Object.entries(plan))
+    if (!known.has(name) && value !== false && value !== undefined)
+      throw new Error(`${phaseName}: unknown native option ${name}`);
   if (plan.jsx === 'automatic-if-present') {
     const transformNames = plan.transforms == null ? [] : Object.keys(plan.transforms);
     const hasTransforms = transformNames.some(name => name !== 'blockScoping');

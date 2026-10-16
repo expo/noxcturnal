@@ -182,7 +182,7 @@ test('exercises path navigation, scopes, semantic queries, fragments, and progra
             routes: { Function: { fields: ['async'] }, Program: {} },
           },
           children: {
-            callee: { route: 'Expression' },
+            callee: { route: 'Expression', fields: ['name', 'memberPath'] },
             arguments: { route: 'Expression|SpreadElement' },
             '*': { route: 'Expression|SpreadElement' },
           },

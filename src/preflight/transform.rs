@@ -577,7 +577,11 @@ fn transform_impl(
             &parsed.program,
             &parsed.diagnostics,
         ) {
-            crate::syntax::validation::validate_program(&parsed.program, "native-phase")?;
+            crate::syntax::validation::validate_program(
+                &parsed.program,
+                "native-phase",
+                &final_program.borrow_owner().allocator,
+            )?;
             return Ok(unsupported("parse-error", &parsed.diagnostics));
         }
         return Err(crate::parse_failure::error(
@@ -591,10 +595,12 @@ fn transform_impl(
     let strip_comments = options.comments == Some(false)
         && !final_program.borrow_dependent().program.comments.is_empty();
     if !requires_generic_pipeline(&options) {
-        crate::syntax::validation::validate_program(
+        let checked_scoping = crate::syntax::validation::validate_program(
             &final_program.borrow_dependent().program,
             "native-phase",
-        )?;
+            &final_program.borrow_owner().allocator,
+        )?
+        .scoping;
         let should_render = options.constant_folding == Some(true)
             || options.dead_code_elimination == Some(true)
             || options.compact == Some(true)
@@ -613,6 +619,7 @@ fn transform_impl(
                 &mut program,
                 options.constant_folding == Some(true),
                 options.dead_code_elimination == Some(true),
+                (options.constant_folding != Some(true)).then_some(checked_scoping),
             );
             let (code, layer) = render_program(
                 &program,
@@ -690,7 +697,7 @@ fn transform_impl(
             // without printing. A fused source rewrite still has work even
             // when this particular file contains no JSX.
             if !detector.0 && !selects_source_rewrite {
-                crate::syntax::validation::validate_program(&program, "native-phase")?;
+                crate::syntax::validation::validate_program(&program, "native-phase", allocator)?;
                 return Ok(identity_result(
                     source.to_owned(),
                     standalone_identity_map,
@@ -1305,6 +1312,7 @@ fn transform_impl(
                 &mut program,
                 options.constant_folding == Some(true),
                 options.dead_code_elimination == Some(true),
+                None,
             );
         }
         #[expect(deprecated)]

@@ -121,13 +121,21 @@ function synthesizeVisitorPlan(
   const children: Record<string, string[]> = {};
   const controlFlow = new Set<ControlFlowCapability>();
   let scope = false;
+  let retainComments = false;
   let ancestry: PreparedPluginPlan['ancestry'];
   const ancestryFields: Record<string, NativeFieldKey[]> = {};
   const ancestryChildren: Record<string, string[]> = {};
   const ancestryTypes = new Set<NativeNodeType>();
-  for (const { definition } of resolved) {
+  const pending = resolved.map(({ definition }) => definition);
+  for (let index = 0; index < pending.length; index++) {
+    const definition = pending[index];
+    validateDefinedVisitor(plugin.name, definition);
+    pending.push(...definition.contract.nested);
     const contract = definition.contract;
-    subscriptions.push(definition.route);
+    if (index < resolved.length) subscriptions.push(definition.route);
+    retainComments ||= contract.comments === 'inner';
+    for (const { nodeType, predicates } of typedRouteExpansion(definition, contract.where))
+      mergeFieldRequests(fields, { [nodeType]: Object.keys(predicates) as NativeFieldKey[] });
     if (contract.fields.length > 0)
       for (const concrete of concreteRouteTypes(definition.route)) {
         const applicable = contract.fields.filter(field =>
@@ -208,55 +216,11 @@ function synthesizeVisitorPlan(
         attachAncestorChildren(ancestorTypes, requirement.children);
       }
     }
-    for (const nested of contract.nested) {
-      validateDefinedVisitor(plugin.name, nested);
-      for (const concrete of concreteRouteTypes(nested.route)) {
-        const nestedFields = [
-          ...nested.contract.fields,
-          ...Object.keys(nested.contract.where ?? {}),
-        ];
-        if (nestedFields.length > 0)
-          mergeFieldRequests(fields, { [concrete]: nestedFields as NativeFieldKey[] });
-      }
-      const collectNestedAncestry = (visitor: DefinedVisitor<any>) => {
-        const nestedContract = visitor.contract;
-        if (nestedContract.ancestry != null) {
-          ancestry = mergeAncestry(ancestry, nestedContract.ancestry);
-          const attach = (
-            route: string,
-            requestedFields: readonly NativeFieldKey[],
-            declaredChildren: Readonly<Record<string, ChildContract>> | undefined,
-          ) => {
-            const concreteTypes = concreteRouteTypes(route);
-            for (const type of concreteTypes) ancestryTypes.add(type as NativeNodeType);
-            if (requestedFields.length > 0)
-              for (const type of concreteTypes)
-                mergeFieldRequests(ancestryFields, { [type]: requestedFields });
-            if (declaredChildren != null) {
-              for (const type of concreteTypes) {
-                const roles = (ancestryChildren[type] ??= []);
-                for (const role of Object.keys(declaredChildren))
-                  if (!roles.includes(role)) roles.push(role);
-                attachChildProjectionDependencies(ancestryChildren, type, declaredChildren);
-              }
-              for (const child of Object.values(declaredChildren))
-                attach(child.route, child.fields ?? [], child.children);
-            }
-          };
-          for (const [route, requirement] of Object.entries(nestedContract.ancestry.routes))
-            attach(route, requirement.fields, requirement.children);
-        }
-        scope ||= nestedContract.scope;
-        for (const deeper of nestedContract.nested) {
-          validateDefinedVisitor(plugin.name, deeper);
-          collectNestedAncestry(deeper);
-        }
-      };
-      collectNestedAncestry(nested);
-    }
   }
+
   return {
     subscriptions,
+    retainComments,
     fields: fields as PreparedPluginPlan['fields'],
     children: Object.keys(children).length > 0 ? children : undefined,
     controlFlow: controlFlow.size > 0 ? [...controlFlow] : undefined,
@@ -364,6 +328,7 @@ function typedCapabilities(defined: DefinedVisitor<any>): RouteCapabilities {
   if (!capabilities) {
     const contract = defined.contract;
     let childRules: Record<string, string[]> | null = null;
+    const childFields: Record<string, NativeFieldKey[]> = {};
     if (contract.children != null) {
       const rules: Record<string, string[]> = {};
       const attach = (
@@ -374,8 +339,14 @@ function typedCapabilities(defined: DefinedVisitor<any>): RouteCapabilities {
           const roles = (rules[parentType] ??= []);
           for (const role of Object.keys(children)) if (!roles.includes(role)) roles.push(role);
         }
-        for (const child of Object.values(children))
-          if (child.children != null) attach(concreteRouteTypes(child.route), child.children);
+        for (const child of Object.values(children)) {
+          const types = concreteRouteTypes(child.route);
+          for (const type of types)
+            childFields[type] = [
+              ...new Set([...(childFields[type] ?? []), ...(child.fields ?? [])]),
+            ];
+          if (child.children != null) attach(types, child.children);
+        }
       };
       attach(concreteRouteTypes(defined.route), contract.children);
       childRules = rules;
@@ -391,6 +362,7 @@ function typedCapabilities(defined: DefinedVisitor<any>): RouteCapabilities {
       childRules,
       controlFlow: contract.controlFlow,
       declaredFields: contract.fields,
+      childFields,
       comments: contract.comments,
     };
     typedCapabilitiesCache.set(defined, capabilities);
@@ -442,6 +414,7 @@ const RETAIN_CALLS = 1 << 2;
 const RETAIN_CHILDREN = 1 << 3;
 const RETAIN_INSPECTION = 1 << 4;
 const RETAIN_MODULE_FACTS = 1 << 5;
+const RETAIN_COMMENTS = 1 << 6;
 
 export function mergeFieldRequests(
   target: Record<string, string[]>,
@@ -541,6 +514,7 @@ export function preparePhase(phase: PipelinePhase): PreparedPhase {
       retentionCapabilities |= RETAIN_CALLS;
     if (plan.queries?.some(query => query.imports === true || query.exports === true))
       retentionCapabilities |= RETAIN_MODULE_FACTS;
+    if (plan.retainComments) retentionCapabilities |= RETAIN_COMMENTS;
     if (plan.children && Object.keys(plan.children).length > 0)
       retentionCapabilities |= RETAIN_CHILDREN;
     if (plan.ancestryChildren && Object.keys(plan.ancestryChildren).length > 0)
@@ -674,7 +648,10 @@ function compilePhaseRoutes(
   // analysis or control-flow decision can change delivery for another route.
   // Global stop makes every route dynamic, including otherwise static peers.
   const fastRouteEligible = (plugin: NativePlugin<any, any>, definition: DefinedVisitor<any>) =>
-    !hasGlobalStop && definition.contract.controlFlow.length === 0 && plugin.analyze == null;
+    !hasGlobalStop &&
+    (plans.get(plugin)?.controlFlow?.length ?? 0) === 0 &&
+    definition.contract.controlFlow.length === 0 &&
+    plugin.analyze == null;
   for (let pluginId = 0; pluginId < plugins.length; pluginId++) {
     const plugin = plugins[pluginId];
     // Typed visitors compile directly: one route per (visitor, concrete type,
@@ -796,6 +773,13 @@ function typedRouteExpansion(
       aliasPredicates.nodeKind = { equals: part };
     for (const nodeType of concreteRouteTypes(part)) {
       const predicates: Record<string, ScalarPredicate> = { ...aliasPredicates };
+      if (
+        (nodeType === 'Function' || nodeType === 'Class') &&
+        ['Expression', 'Declaration', 'Statement'].includes(part)
+      )
+        predicates.nodeKind = {
+          equals: `${nodeType}${part === 'Expression' ? 'Expression' : 'Declaration'}`,
+        };
       for (const [field, predicate] of Object.entries(where ?? {})) {
         if (predicate == null) continue;
         predicates[field] = predicates[field]
@@ -898,14 +882,27 @@ export function compileNestedVisitor(visitor: NestedVisitor): CompiledNestedRout
     payloadFields: payloads[id],
     comments: variant.comments,
   }));
+  const requirements = synthesizeVisitorPlan(
+    { name: 'nested' },
+    visitor.map(definition => ({
+      definition,
+      where: definition.contract.where as ResolvedVisitor['where'],
+    })),
+  );
+  const retainedFields: Record<string, string[]> = {};
+  mergeFieldRequests(retainedFields, requirements.fields ?? {});
+  mergeFieldRequests(retainedFields, ancestorFields);
+  const childRetention: Record<string, string[]> = {};
+  mergeChildRoleRequests(childRetention, requirements.children);
+  mergeChildRoleRequests(childRetention, requirements.ancestryChildren);
   const compiled: CompiledNestedRoutes = {
     manifest: packRouteManifest(
       routes,
       true,
       true,
       0,
-      Object.fromEntries([...ancestorChildParentTypes].map(type => [type, ['*']])),
-      ancestorFields,
+      childRetention,
+      retainedFields,
       ancestorFields,
       [...ancestorTypes],
       [...ancestorChildParentTypes],

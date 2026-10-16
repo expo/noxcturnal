@@ -12,7 +12,6 @@ import {
 import { Bailout, createDispatcher } from './dispatch';
 import { SourceVersionStore, type SourceVersionId } from './source-versions';
 import { ArtifactDemand, hasSemanticDemand } from '../pipeline/artifacts';
-import { locationOffset } from './path';
 import type { IntentRegistration } from './fragments';
 import {
   native,
@@ -711,8 +710,8 @@ export function transform(
               message: decision.reason,
               plugin: plugin.name,
               phase: phase.name,
-              start: locationOffset(observationSource, decision.location.start),
-              end: locationOffset(observationSource, decision.location.end),
+              start: session.locationOffset(decision.location.start),
+              end: session.locationOffset(decision.location.end),
             });
           throw new Bailout(`${plugin.name}:${decision.reason}`);
         }

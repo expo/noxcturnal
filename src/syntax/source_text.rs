@@ -1,0 +1,324 @@
+//! Source-dependent operations live beside native parsing, never in JS heuristics.
+use std::cell::OnceCell;
+
+use napi::{Error, Result, Status, bindgen_prelude::Utf16String};
+use napi_derive::napi;
+use oxc_allocator::Allocator;
+use oxc_ast::{AstKind, ast::Program};
+use oxc_ast_visit::Visit;
+use oxc_parser::Parser;
+use rustc_hash::FxHashSet;
+
+#[napi(object)]
+pub struct SourceMatch {
+    pub start: u32,
+    pub end: u32,
+    pub captures: Vec<Utf16String>,
+    pub content: Option<Utf16String>,
+}
+
+#[napi]
+pub struct NativeSourceText {
+    source: Utf16String,
+    lines: Option<Vec<u32>>,
+    identifiers: Option<FxHashSet<String>>,
+    reserved: FxHashSet<String>,
+    utf8: OnceCell<String>,
+}
+
+#[napi]
+impl NativeSourceText {
+    #[napi(constructor)]
+    pub fn new(source: Utf16String) -> Self {
+        Self {
+            source,
+            lines: None,
+            identifiers: None,
+            reserved: FxHashSet::default(),
+            utf8: OnceCell::new(),
+        }
+    }
+
+    #[napi]
+    pub fn generate_uid(&mut self, name: String, filename: String) -> Result<String> {
+        if self.identifiers.is_none() {
+            let source = self.utf8.get_or_init(|| self.source.to_string());
+            let allocator = Allocator::default();
+            let parsed = Parser::new(
+                &allocator,
+                source,
+                super::classification::source_type(&filename, source)?,
+            )
+            .parse();
+            if !parsed.diagnostics.is_empty() {
+                return Err(crate::parse_failure::error(
+                    source,
+                    &parsed.diagnostics,
+                    "generate-uid",
+                ));
+            }
+            self.identifiers = Some(identifier_names(&parsed.program));
+        }
+        let hint: String = name
+            .chars()
+            .filter(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '$'))
+            .collect();
+        let base = format!("_{}", if hint.is_empty() { "temp" } else { &hint });
+        let mut uid = base.clone();
+        let mut index = 2;
+        while self.identifiers.as_ref().unwrap().contains(&uid) || self.reserved.contains(&uid) {
+            uid = format!("{base}{index}");
+            index += 1;
+        }
+        self.reserved.insert(uid.clone());
+        Ok(uid)
+    }
+
+    #[napi]
+    pub fn whitespace(&self) -> Vec<u32> {
+        vec![
+            self.source
+                .iter()
+                .take_while(|&&unit| is_whitespace(unit))
+                .count() as u32,
+            self.source
+                .iter()
+                .rev()
+                .take_while(|&&unit| is_whitespace(unit))
+                .count() as u32,
+        ]
+    }
+
+    #[napi]
+    pub fn indent(&self, prefix: Utf16String) -> Utf16String {
+        let mut output = Vec::with_capacity(self.source.len());
+        for line in self.source.split_inclusive(|&unit| unit == 10) {
+            if line.iter().any(|&unit| !is_whitespace(unit)) {
+                output.extend_from_slice(&prefix);
+            }
+            output.extend_from_slice(line);
+        }
+        output.into()
+    }
+
+    #[napi]
+    pub fn needs_line_boundary(&self, offset: u32) -> bool {
+        offset > 0 && self.source.get(offset as usize - 1) != Some(&10)
+    }
+
+    #[napi]
+    pub fn locations(&mut self, start: u32, end: u32) -> Vec<u32> {
+        let lines = self.line_starts();
+        let at = |offset| {
+            let line = lines.partition_point(|&start| start <= offset);
+            [line as u32, offset - lines[line - 1]]
+        };
+        [at(start), at(end)].concat()
+    }
+
+    #[napi]
+    pub fn location_offset(&mut self, line: u32, column: u32) -> Result<u32> {
+        self.line_starts()
+            .get(line.wrapping_sub(1) as usize)
+            .map(|start| start + column)
+            .ok_or_else(|| Error::new(Status::InvalidArg, "invalid source line"))
+    }
+
+    /// Regex execution uses an ECMAScript engine with UTF-16 offsets. JS only
+    /// receives match facts and invokes user callbacks; it never searches source.
+    #[napi]
+    pub fn matches(
+        &self,
+        search: Utf16String,
+        flags: Option<String>,
+        all: bool,
+        replacement: Option<Utf16String>,
+    ) -> Result<Vec<SourceMatch>> {
+        let text: &[u16] = &self.source;
+        let mut output = Vec::new();
+        let unicode = flags
+            .as_ref()
+            .is_some_and(|flags| flags.contains('u') || flags.contains('v'));
+        let pattern: Vec<u32> = if flags.is_some() {
+            if unicode {
+                char::decode_utf16(search.iter().copied())
+                    .map(|value| match value {
+                        Ok(ch) => u32::from(ch),
+                        Err(error) => u32::from(error.unpaired_surrogate()),
+                    })
+                    .collect()
+            } else {
+                search.iter().copied().map(u32::from).collect()
+            }
+        } else {
+            search
+                .iter()
+                .flat_map(|&unit| {
+                    let escape = matches!(
+                        unit,
+                        36 | 40 | 41 | 42 | 43 | 46 | 63 | 91 | 92 | 93 | 94 | 123 | 124 | 125
+                    );
+                    escape
+                        .then_some(92)
+                        .into_iter()
+                        .chain(std::iter::once(u32::from(unit)))
+                })
+                .collect()
+        };
+        let flags = flags.unwrap_or_default();
+        let expression = regress::Regex::from_unicode(pattern.into_iter(), flags.as_str())
+            .map_err(|error| Error::new(Status::InvalidArg, error.to_string()))?;
+        let mut offset = 0;
+        while offset <= text.len() {
+            let found = if unicode {
+                expression.find_from_utf16(text, offset).next()
+            } else {
+                expression.find_from_ucs2(text, offset).next()
+            };
+            let Some(found) = found else { break };
+            if flags.contains('y') && found.start() != offset {
+                break;
+            }
+            let captures: Vec<Utf16String> = (0..=found.captures.len())
+                .map(|i| {
+                    found
+                        .group(i)
+                        .map(|r| text[r].to_vec())
+                        .unwrap_or_default()
+                        .into()
+                })
+                .collect();
+            let content = replacement
+                .as_ref()
+                .map(|value| substitute(value, text, &found));
+            output.push(SourceMatch {
+                start: found.start() as u32,
+                end: found.end() as u32,
+                captures,
+                content,
+            });
+            if !all {
+                break;
+            }
+            offset = found.end();
+            if found.start() == offset {
+                offset += if unicode
+                    && (0xd800..=0xdbff).contains(text.get(offset).unwrap_or(&0))
+                    && (0xdc00..=0xdfff).contains(text.get(offset + 1).unwrap_or(&0))
+                {
+                    2
+                } else {
+                    1
+                };
+            }
+        }
+        Ok(output)
+    }
+}
+
+impl NativeSourceText {
+    fn line_starts(&mut self) -> &[u32] {
+        self.lines.get_or_insert_with(|| {
+            let mut lines = vec![0];
+            for (offset, &unit) in self.source.iter().enumerate() {
+                if unit == 10 {
+                    lines.push(offset as u32 + 1);
+                }
+            }
+            lines
+        })
+    }
+}
+
+fn is_whitespace(unit: u16) -> bool {
+    char::from_u32(u32::from(unit)).is_some_and(|ch| {
+        oxc_syntax::identifier::is_white_space(ch)
+            || matches!(ch, '\r' | '\n' | '\u{2028}' | '\u{2029}')
+    })
+}
+
+fn identifier_names(program: &Program<'_>) -> FxHashSet<String> {
+    #[derive(Default)]
+    struct Names(FxHashSet<String>);
+    impl<'a> Visit<'a> for Names {
+        fn enter_node(&mut self, node: AstKind<'a>) {
+            let name = match node {
+                AstKind::BindingIdentifier(node) => &node.name,
+                AstKind::IdentifierReference(node) => &node.name,
+                AstKind::IdentifierName(node) => &node.name,
+                AstKind::LabelIdentifier(node) => &node.name,
+                _ => return,
+            };
+            self.0.insert(name.to_string());
+        }
+    }
+    let mut names = Names::default();
+    names.visit_program(program);
+    names.0
+}
+
+fn substitute(value: &[u16], text: &[u16], found: &regress::Match) -> Utf16String {
+    let count = found.captures.len();
+    let has_named = found.named_groups().next().is_some();
+    let mut result = Vec::new();
+    let mut offset = 0;
+    while offset < value.len() {
+        let unit = value[offset];
+        let next = value.get(offset + 1).copied();
+        if unit != 36 || next.is_none() {
+            result.push(unit);
+            offset += 1;
+            continue;
+        }
+        let mut consumed = 2;
+        let range = match next.unwrap() {
+            36 => {
+                result.push(36);
+                offset += 2;
+                continue;
+            } // $$
+            38 => Some(found.range()),           // $&
+            96 => Some(0..found.start()),        // $`
+            39 => Some(found.end()..text.len()), // $'
+            60 if has_named => {
+                // $<name>
+                let Some(end) = value[offset + 2..].iter().position(|&unit| unit == 62) else {
+                    result.push(36);
+                    offset += 1;
+                    continue;
+                };
+                let name = String::from_utf16_lossy(&value[offset + 2..offset + 2 + end]);
+                consumed = end + 3;
+                found.named_group(&name)
+            }
+            digit @ 48..=57 => {
+                let first = usize::from(digit - 48);
+                let two = value
+                    .get(offset + 2)
+                    .filter(|&&unit| (48..=57).contains(&unit))
+                    .map(|&unit| first * 10 + usize::from(unit - 48));
+                let index = if let Some(two) = two.filter(|&index| index > 0 && index <= count) {
+                    consumed = 3;
+                    two
+                } else if first > 0 && first <= count {
+                    first
+                } else {
+                    result.push(36);
+                    offset += 1;
+                    continue;
+                };
+                found.group(index)
+            }
+            _ => {
+                result.push(36);
+                offset += 1;
+                continue;
+            }
+        };
+        if let Some(range) = range {
+            result.extend_from_slice(&text[range]);
+        }
+        offset += consumed;
+    }
+    result.into()
+}

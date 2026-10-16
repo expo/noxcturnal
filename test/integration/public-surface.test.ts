@@ -39,6 +39,7 @@ test('preserves the public source and native ABI surfaces', () => {
     'MappingPolicy',
     'NativeIndexedSession',
     'NativePipelineSession',
+    'NativeSourceText',
     'classify',
     'commitDecodedBuffer',
     'commitPackedBuffer',
@@ -49,7 +50,9 @@ test('preserves the public source and native ABI surfaces', () => {
     'nativeFlowErase',
     'nativePreflightTransform',
     'runNativePipeline',
+    'sourceHints',
     'validateExpression',
+    'validateIdentifier',
     'validateProgram',
     'validateStatements',
   ]);

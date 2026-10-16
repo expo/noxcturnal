@@ -1,3 +1,4 @@
+import { native } from '../native/binding';
 import { CHILD_ROLES, FIELD_KEY_IDS } from '../generated/event-schema';
 import { alias, array } from '../pipeline/route-utils';
 import {
@@ -43,8 +44,8 @@ export function eventIsSkipped(event: NativeEvent, skipped: SkipState | undefine
   if (!skipped) return false;
   const active = skipped.active;
   if (active) {
-    if (event.start > active.start && event.end <= active.end) return true;
-    if (event.side === 'exit' && event.start === active.start && event.end === active.end) {
+    if (event.id > active.id && event.start >= active.start && event.end <= active.end) return true;
+    if (event.side === 'exit' && event.id === active.id) {
       skipped.active = undefined;
       return false;
     }
@@ -56,11 +57,11 @@ export function eventIsSkipped(event: NativeEvent, skipped: SkipState | undefine
   const range = ranges[skipped.cursor];
   if (!range || event.start < range.start || event.end > range.end) return false;
   skipped.active = range;
-  if (event.start === range.start) return false;
+  if (event.id <= range.id) return false;
   return true;
 }
 
-export type SkipRange = { start: number; end: number };
+export type SkipRange = { id: number; start: number; end: number };
 export type SkipState = {
   ranges: SkipRange[];
   cursor: number;
@@ -73,18 +74,19 @@ export function resetSkippedTraversal(skipped: SkipState | undefined): void {
   skipped.active = undefined;
 }
 
-function addSkippedRange(state: PathState, start: number, end: number): void {
+function addSkippedRange(state: PathState, id: number, start: number, end: number): void {
   const skipped = (state.skipped ??= { ranges: [], cursor: 0 });
   const ranges = skipped.ranges;
   const last = ranges.at(-1);
   if (!last || last.end <= start) {
-    const range = { start, end };
+    const range = { id, start, end };
     ranges.push(range);
     skipped.active = range;
     skipped.cursor = ranges.length;
     return;
   }
   if (last.start <= start) {
+    last.id = Math.min(last.id, id);
     if (end > last.end) last.end = end;
     skipped.active = last;
     skipped.cursor = ranges.length;
@@ -92,15 +94,17 @@ function addSkippedRange(state: PathState, start: number, end: number): void {
   }
   let index = ranges.findIndex(range => range.end >= start);
   if (index < 0) index = ranges.length;
+  let mergedId = id;
   let mergedStart = start;
   let mergedEnd = end;
   let removeEnd = index;
   while (removeEnd < ranges.length && ranges[removeEnd].start < mergedEnd) {
+    mergedId = Math.min(mergedId, ranges[removeEnd].id);
     mergedStart = Math.min(mergedStart, ranges[removeEnd].start);
     mergedEnd = Math.max(mergedEnd, ranges[removeEnd].end);
     removeEnd++;
   }
-  const range = { start: mergedStart, end: mergedEnd };
+  const range = { id: mergedId, start: mergedStart, end: mergedEnd };
   ranges.splice(index, removeEnd - index, range);
   skipped.active = range;
   skipped.cursor = index + 1;
@@ -268,6 +272,11 @@ export class NodePathImpl implements NativeNodePath {
     for (const field of fields ?? Object.keys(source)) {
       if (!(field in snapshot) && field in source) snapshot[field] = source[field];
     }
+    if (options.ancestry === 'none') {
+      delete snapshot.parentId;
+      delete snapshot.parentType;
+      delete snapshot.parentStart;
+    }
     if (options.ancestry === 'parent' && this.event.parentId != null) {
       snapshot.parentId = this.event.parentId;
       snapshot.parentType = this.event.parentType;
@@ -307,13 +316,22 @@ export class NodePathImpl implements NativeNodePath {
     return value;
   }
   matchesPattern(pattern: string, allowPartial = false): boolean {
-    const retained = this.node.memberPath;
-    const memberPath =
-      typeof retained === 'string'
-        ? retained
-        : this.getSource()
-            .text()
-            .replace(/\s*(\?\.|\.)\s*/g, '$1');
+    const field = this.type === 'Identifier' ? 'name' : 'memberPath';
+    const capabilities = this.runtime.capabilities;
+    const fields =
+      this.ancestryDepth > 0
+        ? capabilities.ancestorFields?.[this.type]
+        : this.deliveredRoute
+          ? capabilities.declaredFields
+          : capabilities.childFields?.[this.type];
+    if (!fields?.includes(field))
+      throw this.#pluginError(`matchesPattern requires declared field ${field}`);
+    const memberPath = this.node[field];
+    // This validates the small pattern contract, never JavaScript source.
+    if (pattern.includes('\\'))
+      for (let i = 0; i < pattern.length; i++)
+        if (pattern[i] === '\\' && pattern[++i] !== '.' && pattern[i] !== '\\') return false;
+    if (!pattern.length || typeof memberPath !== 'string') return false;
     return memberPath === pattern || (allowPartial && memberPath.startsWith(`${pattern}.`));
   }
   #assertChildRole(role: string): void {
@@ -587,7 +605,7 @@ export class NodePathImpl implements NativeNodePath {
   }
   skip(): void {
     this.runtime.assertControl('skip');
-    addSkippedRange(this.runtime.state, this.event.start, this.event.end);
+    addSkippedRange(this.runtime.state, this.event.id, this.event.start, this.event.end);
   }
   stop(): void {
     this.runtime.assertControl('stop');
@@ -686,8 +704,7 @@ function makeScope(runtime: PathRuntime, id: number, parentId: number | null): N
     rename(name, replacement = session.generateUid(name)) {
       const binding = resolve(name);
       if (!binding) throw new Error(`Cannot rename unbound identifier ${name}`);
-      if (!/^[$A-Z_a-z][$\w]*$/.test(replacement))
-        throw new Error(`Invalid identifier: ${replacement}`);
+      native.validateIdentifier(replacement);
       const nodes = [binding.declaration, ...binding.references].filter(
         (node): node is NodeSummary | NodeView => node != null,
       );
@@ -805,10 +822,4 @@ function isShorthandPropertyType(type: string | undefined): boolean {
     type === 'BindingProperty' ||
     type === 'AssignmentTargetPropertyIdentifier'
   );
-}
-export function locationOffset(source: string, position: SourceLocation['start']): number {
-  const lines = source.split('\n');
-  let offset = 0;
-  for (let line = 1; line < position.line; line++) offset += (lines[line - 1]?.length ?? 0) + 1;
-  return offset + position.column;
 }

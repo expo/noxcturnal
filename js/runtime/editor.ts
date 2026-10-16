@@ -1,3 +1,4 @@
+import { native } from '../native/binding';
 import type { NativeEditor } from '../contracts/visitor';
 import { packEdits } from '../protocol/edits';
 import type { EditCommand } from '../types';
@@ -6,6 +7,7 @@ type EditKind = EditCommand['kind'];
 
 interface EditorSession {
   readonly source: string;
+  readonly sourceTextOperations?: InstanceType<typeof native.NativeSourceText>;
   commit(edits: EditCommand[], mode?: string): { code: string };
 }
 
@@ -49,8 +51,31 @@ export function createEditor(
       owner,
       order: nextOrder(),
     });
-  const leading = () => source.length - source.trimStart().length;
-  const trailing = () => source.length - source.trimEnd().length;
+  let text: InstanceType<typeof native.NativeSourceText> | undefined;
+  const operations = () =>
+    session.sourceTextOperations ?? (text ??= new native.NativeSourceText(source));
+  let whitespace: number[] | undefined;
+  const margins = () => (whitespace ??= operations().whitespace());
+  const replace = (
+    search: string | RegExp,
+    replacement: string | ((match: string, ...groups: string[]) => string),
+    all: boolean,
+  ) => {
+    const matches = operations().matches(
+      typeof search === 'string' ? search : search.source,
+      typeof search === 'string' ? undefined : search.flags,
+      all,
+      typeof replacement === 'string' ? replacement : undefined,
+    );
+    for (const match of matches)
+      replaceRange(
+        match.start,
+        match.end,
+        typeof replacement === 'function'
+          ? replacement(match.captures[0]!, ...match.captures.slice(1))
+          : match.content!,
+      );
+  };
   return {
     append: content => push('Suffix', source.length, source.length, content),
     prepend: content => push('Prefix', 0, 0, content),
@@ -84,29 +109,18 @@ export function createEditor(
       edits.length = write;
     },
     indent(prefix = '  ') {
-      // Re-indenting rewrites every line at once. Anchoring the whole output to
-      // offset zero would be worse than leaving it to the surrounding mapping, so
-      // this stays generated text.
-      push(
-        'Replace',
-        0,
-        source.length,
-        source
-          .split(/(?<=\n)/)
-          .map(line => (line.trim() ? prefix + line : line))
-          .join(''),
-      );
+      push('Replace', 0, source.length, operations().indent(prefix));
     },
     trim() {
       this.trimStart();
       this.trimEnd();
     },
     trimStart() {
-      const count = leading();
+      const count = margins()[0]!;
       if (count) push('Remove', 0, count);
     },
     trimEnd() {
-      const count = trailing();
+      const count = margins()[1]!;
       if (count) push('Remove', source.length - count, source.length);
     },
     addSourceMapLocation(offset) {
@@ -114,14 +128,14 @@ export function createEditor(
     },
     hasChanged: () => edits.some(edit => edit.owner === owner),
     replace(search, replacement) {
-      lowerReplacements(source, search, replacement, false, replaceRange);
+      replace(search, replacement, false);
     },
     replaceAll(search, replacement) {
-      lowerReplacements(source, search, replacement, true, replaceRange);
+      replace(search, replacement, true);
     },
     slice: (start, end) => source.slice(start, end),
     toString: () => session.commit(edits).code,
-    isEmpty: () => source.trim().length === 0,
+    isEmpty: () => margins()[0] === source.length,
   };
 }
 
@@ -233,50 +247,4 @@ function dedupeConvergentEdits(edits: readonly EditCommand[]): {
     kept.push(edit);
   }
   return { edits: kept, dropped };
-}
-
-function lowerReplacements(
-  source: string,
-  search: string | RegExp,
-  replacement: string | ((match: string, ...groups: string[]) => string),
-  all: boolean,
-  emit: (start: number, end: number, content: string) => void,
-): void {
-  const expression =
-    typeof search === 'string'
-      ? new RegExp(search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), all ? 'g' : '')
-      : new RegExp(search.source, all && !search.global ? `${search.flags}g` : search.flags);
-  let match: RegExpExecArray | null;
-  while ((match = expression.exec(source))) {
-    const content =
-      typeof replacement === 'function'
-        ? replacement(match[0], ...match.slice(1).map(value => value ?? ''))
-        : expandReplacement(source, replacement, match);
-    emit(match.index, match.index + match[0].length, content);
-    if (!all || !expression.global) break;
-    if (match[0] === '') expression.lastIndex++;
-  }
-}
-
-function expandReplacement(source: string, replacement: string, match: RegExpExecArray): string {
-  return replacement.replace(/\$([$&'`]|<[^>]+>|\d{1,2})/g, (token, reference: string) => {
-    if (reference === '$') return '$';
-    if (reference === '&') return match[0];
-    if (reference === '`') return source.slice(0, match.index);
-    if (reference === "'") return source.slice(match.index + match[0].length);
-    if (reference.startsWith('<')) {
-      if (match.groups == null) return token;
-      return match.groups[reference.slice(1, -1)] ?? '';
-    }
-    const index = Number(reference);
-    if (index === 0) return token;
-    if (index < match.length) return match[index] ?? '';
-    // Per String#replace, `$12` falls back to capture 1 followed by "2"
-    // when capture 12 does not exist.
-    if (reference.length === 2) {
-      const first = Number(reference[0]);
-      if (first > 0 && first < match.length) return `${match[first] ?? ''}${reference[1]}`;
-    }
-    return token;
-  });
 }

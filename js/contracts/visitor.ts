@@ -246,6 +246,10 @@ export interface NativeNodePath<T extends NodeView = NodeView> {
   getChild(key: string): NativeNodePath | null;
   getChildList(key: string): readonly NativeNodePath[];
   getChildren(): readonly NativeNodePath[];
+  /** Match a static member chain. Dots separate properties; escape literal dots
+   * and backslashes within a property with a backslash. Ordinary dotted paths
+   * keep their spelling. Declare fields: ['memberPath'] for members or ['name']
+   * for identifiers; matching never parses source text. */
   matchesPattern(pattern: string, allowPartial?: boolean): boolean;
   findParent(predicate: (path: NativeNodePath) => boolean): NativeNodePath | null;
   find(predicate: (path: NativeNodePath) => boolean): NativeNodePath | null;
@@ -548,6 +552,10 @@ export interface ContractPathBase<Node, IsNode = Node> {
   is<TType extends PathIsTypes<IsNode>>(
     type: TType,
   ): this is this & { readonly type: TType; readonly node: NarrowNodeByType<Node, TType> };
+  /** Match a static member chain. Dots separate properties; escape literal dots
+   * and backslashes within a property with a backslash. Ordinary dotted paths
+   * keep their spelling. Declare fields: ['memberPath'] for members or ['name']
+   * for identifiers; matching never parses source text. */
   matchesPattern(pattern: string, allowPartial?: boolean): boolean;
   replaceWith(code: Code): void;
   replaceWithMultiple(code: readonly Code[]): void;
@@ -932,6 +940,9 @@ export function defineVisitor<
  */
 export interface PluginContract {
   metadata?: { writes?: readonly string[]; reads?: readonly string[] };
+  /** Opt in to query categories. Nonempty array requests enable that category
+   * for dynamically chosen selectors; true enables imports/exports. A sibling's
+   * declarations never authorize this plugin's queries. */
   queries?: readonly QueryRequest[];
 }
 

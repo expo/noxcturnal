@@ -81,7 +81,10 @@ const ALIAS_RULES = {
     type.endsWith('FunctionExpression'),
   Statement: type => type.endsWith('Statement') || isDeclarationType(type),
   Declaration: isDeclarationType,
-  Expression: type => type.endsWith('Expression') || isLiteralExpressionType(type),
+  Expression: type =>
+    type.endsWith('Expression') ||
+    isLiteralExpressionType(type) ||
+    ['ImportMeta', 'NewTarget', 'JSXElement', 'JSXFragment', 'Function', 'Class'].includes(type),
   MemberExpression: type =>
     type === 'StaticMemberExpression' ||
     type === 'ComputedMemberExpression' ||

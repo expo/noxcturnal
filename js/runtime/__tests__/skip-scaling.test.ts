@@ -19,6 +19,7 @@ function event(start: number, end: number, side: 'enter' | 'exit' = 'enter'): Na
 
 test('skip lookup handles many independent ranges and resets', () => {
   const ranges: SkipRange[] = Array.from({ length: 1_024 }, (_, index) => ({
+    id: index * 4,
     start: index * 4,
     end: index * 4 + 2,
   }));
@@ -36,8 +37,8 @@ test('skip lookup handles many independent ranges and resets', () => {
 test('adjacent skipped roots remain independently deliverable', () => {
   const skipped: SkipState = {
     ranges: [
-      { start: 0, end: 2 },
-      { start: 2, end: 4 },
+      { id: 0, start: 0, end: 2 },
+      { id: 2, start: 2, end: 4 },
     ],
     cursor: 0,
   };

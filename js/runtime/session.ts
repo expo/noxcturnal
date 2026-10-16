@@ -24,11 +24,9 @@ import { alias, querySubscriptions } from '../pipeline/route-utils';
 
 export class NativeTransformSession {
   #closed = false;
-  #uids = new Set<string>();
-  #sourceIdentifiers: Set<string> | null = null;
-  #uidSourceScans = 0;
+  #sourceText: InstanceType<typeof native.NativeSourceText> | null = null;
   #eventCache: (NativeEvent | undefined)[] = [];
-  #queryCache = new WeakMap<QueryRequest, QueryResult>();
+  #queryCache = new WeakMap<QueryRequest, { request: QueryRequest; result: QueryResult }>();
   #globalReferencesCache = new Map<string, SemanticReferenceView[]>();
   #childrenCache = new Map<number, number[]>();
   #childIdsCache = new Map<number, Set<number>>();
@@ -36,7 +34,6 @@ export class NativeTransformSession {
   #prefetchedChildTypes = new Set<string>();
   #native: NativeIndexedSessionBinding | null = null;
   #nativeFilename: string;
-  #lineStarts: number[] | null = null;
   #scopeParents: Uint32Array | null = null;
   #scopeMetadata: Uint32Array | null = null;
   #programBodyOffsets: readonly [number, number, boolean] | null = null;
@@ -132,7 +129,7 @@ export class NativeTransformSession {
   query(request: QueryRequest): QueryResult {
     this.#assertOpen();
     const cached = this.#queryCache.get(request);
-    if (cached) return cached;
+    if (cached && sameQuery(request, cached.request)) return cached.result;
     const types = querySubscriptions(request);
     const nodes = types.length
       ? decodeEventBatch(
@@ -141,25 +138,10 @@ export class NativeTransformSession {
       : [];
     const globals: QueryResult['globals'] = {};
     if (request.globals?.length) {
-      for (const fact of this.#binding('query.globals').queryGlobals(
-        request.globals.map(query => query.name),
-      )) {
-        const references = fact.references.map(reference => ({
-          id: reference.id,
-          type: 'Identifier' as const,
-          start: reference.start,
-          end: reference.end,
-          scopeId: reference.scopeId,
-          parentId: reference.parentId,
-          parentType: reference.parentType,
-          parentStart: reference.parentStart,
-          read: reference.read,
-          write: reference.write,
-          memberWrite: reference.memberWrite,
-        }));
-        globals[fact.name] = { references };
-        this.#globalReferencesCache.set(fact.name, references);
-      }
+      const names = [...new Set(request.globals.map(query => query.name))];
+      const references = this.#queryGlobalReferences(names);
+      for (let index = 0; index < names.length; index++)
+        globals[names[index]] = { references: references[index] };
     }
     const constants: QueryResult['constants'] = {};
     const constantNodesById = request.constants?.length
@@ -243,7 +225,7 @@ export class NativeTransformSession {
           .map(adaptBindingFact),
       ),
     };
-    this.#queryCache.set(request, result);
+    this.#queryCache.set(request, { request: snapshotQuery(request), result });
     return result;
   }
   inspect(requests: readonly InspectRequest[]): NodeView[] {
@@ -491,24 +473,36 @@ export class NativeTransformSession {
   globalReferences(name: string): SemanticReferenceView[] {
     const cached = this.#globalReferencesCache.get(name);
     if (cached) return cached;
-    const references =
-      this.#binding('query.globals')
-        .queryGlobals([name])[0]
-        ?.references.map(reference => ({
-          id: reference.id,
-          type: 'Identifier' as const,
-          start: reference.start,
-          end: reference.end,
-          scopeId: reference.scopeId,
-          parentId: reference.parentId,
-          parentType: reference.parentType,
-          parentStart: reference.parentStart,
-          read: reference.read,
-          write: reference.write,
-          memberWrite: reference.memberWrite,
-        })) ?? [];
-    this.#globalReferencesCache.set(name, references);
-    return references;
+    return this.#queryGlobalReferences([name])[0];
+  }
+  #queryGlobalReferences(names: string[]): SemanticReferenceView[][] {
+    const buffer = this.#binding('query.globals').queryGlobalsBuffer(names);
+    let offset = 0;
+    return names.map(name => {
+      const count = buffer.readUInt32LE(offset);
+      offset += 4;
+      const references: SemanticReferenceView[] = [];
+      for (let index = 0; index < count; index++) {
+        // Coarse global queries expose identity and spans. Preserve the existing
+        // view shape; richer semantic facts are supplied by binding queries.
+        references.push({
+          id: buffer.readUInt32LE(offset),
+          type: 'Identifier',
+          start: buffer.readUInt32LE(offset + 4),
+          end: buffer.readUInt32LE(offset + 8),
+          scopeId: undefined,
+          parentId: undefined,
+          parentType: undefined,
+          parentStart: undefined,
+          read: undefined,
+          write: undefined,
+          memberWrite: undefined,
+        } as unknown as SemanticReferenceView);
+        offset += 12;
+      }
+      this.#globalReferencesCache.set(name, references);
+      return references;
+    });
   }
   scopeParentId(scopeId: number): number | null {
     this.#assertOpen();
@@ -547,59 +541,25 @@ export class NativeTransformSession {
     }
     return this.#scopeParents;
   }
+  get sourceTextOperations(): InstanceType<typeof native.NativeSourceText> {
+    this.#assertOpen();
+    return (this.#sourceText ??= new native.NativeSourceText(this.source));
+  }
   generateUid(name = 'temp'): string {
-    const hint = name.replace(/[^A-Za-z0-9_$]/g, '') || 'temp';
-    const base = `_${hint}`;
-    // UID spelling is part of output compatibility. Use the same source-based
-    // allocator whether this phase happens to own a retained syntax/semantic
-    // session or is routed statelessly; artifact selection must not change code.
-    let uid = base;
-    let index = 2;
-    while (this.#uids.has(uid)) uid = `${base}${index++}`;
-    if (this.#sourceIdentifiers == null) {
-      // Absence from the complete source proves absence from its identifier set.
-      // Preserve exact historical spelling when the candidate occurs as a
-      // substring by falling back to the Unicode identifier index.
-      if (this.#uidSourceScans < 8) {
-        this.#uidSourceScans++;
-        if (!this.source.includes(uid)) {
-          this.#uids.add(uid);
-          return uid;
-        }
-      }
-      this.#sourceIdentifiers = new Set(
-        this.source.match(/[$_\p{ID_Start}][$\u200c\u200d\p{ID_Continue}]*/gu) ?? [],
-      );
-    }
-    while (this.#uids.has(uid) || this.#sourceIdentifiers.has(uid)) uid = `${base}${index++}`;
-    this.#uids.add(uid);
-    return uid;
+    return this.sourceTextOperations.generateUid(name, this.#nativeFilename);
   }
   sourceLocation(start: number, end: number): SourceLocation {
-    if (this.#lineStarts == null) {
-      const starts = [0];
-      for (
-        let offset = this.source.indexOf('\n');
-        offset !== -1;
-        offset = this.source.indexOf('\n', offset + 1)
-      ) {
-        starts.push(offset + 1);
-      }
-      this.#lineStarts = starts;
-    }
-    const at = (offset: number) => {
-      const starts = this.#lineStarts!;
-      let low = 0;
-      let high = starts.length;
-      while (low < high) {
-        const middle = (low + high) >>> 1;
-        if (starts[middle]! <= offset) low = middle + 1;
-        else high = middle;
-      }
-      const lineIndex = low - 1;
-      return { line: low, column: offset - starts[lineIndex]! };
+    const [startLine, startColumn, endLine, endColumn] = this.sourceTextOperations.locations(
+      start,
+      end,
+    );
+    return {
+      start: { line: startLine!, column: startColumn! },
+      end: { line: endLine!, column: endColumn! },
     };
-    return { start: at(start), end: at(end) };
+  }
+  locationOffset(position: SourceLocation['start']): number {
+    return this.sourceTextOperations.locationOffset(position.line, position.column);
   }
   commit(edits: EditCommand[], mode?: string) {
     this.#assertOpen();
@@ -624,6 +584,7 @@ export class NativeTransformSession {
     );
   }
   close(): void {
+    this.#sourceText = null;
     if (!this.#closed && this.#native) {
       this.#native.close();
     }
@@ -639,4 +600,64 @@ export class NativeTransformSession {
     }
     return this.#native;
   }
+}
+
+// Requests are mutable: compare only the small descriptor, never the source or facts.
+// Copies are made on misses, so warm queries allocate nothing for cache validation.
+function sameList<T>(
+  left: readonly T[] | undefined,
+  right: readonly T[] | undefined,
+  same: (left: T, right: T) => boolean,
+): boolean {
+  if (left === right) return true;
+  if (left === undefined || right === undefined) return false;
+  if (left.length !== right.length) return false;
+  for (let index = 0; index < left.length; index++)
+    if (!same(left[index], right[index])) return false;
+  return true;
+}
+const sameGlobal: (
+  a: NonNullable<QueryRequest['globals']>[number],
+  b: NonNullable<QueryRequest['globals']>[number],
+) => boolean = (a, b) => a?.name === b?.name && a?.references === b?.references;
+const sameCall: (
+  a: NonNullable<QueryRequest['calls']>[number],
+  b: NonNullable<QueryRequest['calls']>[number],
+) => boolean = (a, b) =>
+  a?.callee === b?.callee &&
+  a?.globalOnly === b?.globalOnly &&
+  a?.staticArguments === b?.staticArguments;
+const sameCapture: (
+  a: NonNullable<QueryRequest['captures']>[number],
+  b: NonNullable<QueryRequest['captures']>[number],
+) => boolean = (a, b) =>
+  a?.functionId === b?.functionId && a?.programBindings === b?.programBindings;
+const sameBinding: (
+  a: NonNullable<QueryRequest['bindings']>[number],
+  b: NonNullable<QueryRequest['bindings']>[number],
+) => boolean = (a, b) =>
+  a?.name === b?.name &&
+  a?.scopeId === b?.scopeId &&
+  a?.reads === b?.reads &&
+  a?.writes === b?.writes;
+function sameQuery(left: QueryRequest, right: QueryRequest): boolean {
+  return (
+    left.imports === right.imports &&
+    left.exports === right.exports &&
+    sameList(left.constants, right.constants, Object.is) &&
+    sameList(left.globals, right.globals, sameGlobal) &&
+    sameList(left.calls, right.calls, sameCall) &&
+    sameList(left.captures, right.captures, sameCapture) &&
+    sameList(left.bindings, right.bindings, sameBinding)
+  );
+}
+function snapshotQuery(request: QueryRequest): QueryRequest {
+  return {
+    ...request,
+    constants: request.constants?.slice(),
+    globals: request.globals?.map(entry => ({ ...entry })),
+    calls: request.calls?.map(entry => ({ ...entry })),
+    captures: request.captures?.map(entry => ({ ...entry })),
+    bindings: request.bindings?.map(entry => ({ ...entry })),
+  };
 }

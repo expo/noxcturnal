@@ -36,6 +36,10 @@ impl FieldMask {
         Self(self.0 | 1u64 << field_id)
     }
 
+    pub(crate) const fn without(self, field_id: u32) -> Self {
+        Self(self.0 & !(1u64 << field_id))
+    }
+
     pub(crate) const fn union(self, other: Self) -> Self {
         Self(self.0 | other.0)
     }

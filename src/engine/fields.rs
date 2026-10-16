@@ -14,7 +14,9 @@ use crate::generated::event_schema::{field_ids, node_type_name};
 use crate::protocol::constants::FieldMask;
 use crate::semantic::constant_eval::constant_for_kind;
 
-use super::member::{static_member_path, static_member_path_with, static_member_root};
+use super::member::{
+    MemberPathInterner, static_member_path, static_member_path_with, static_member_root,
+};
 
 /// Byte offset to UTF-16 offset, one entry per byte plus the end of source.
 ///
@@ -169,7 +171,24 @@ pub(crate) fn packed_fields_direct(
     utf16: Option<&[u32]>,
     requested: FieldMask,
     strings: &mut FxHashMap<String, u32>,
+    member_paths: &mut MemberPathInterner,
 ) -> Option<DirectPackedFields> {
+    // Cache negative prefixes too: a dynamic root must not be rediscovered by
+    // traversing every enclosing member, even though no path strings are emitted.
+    let requested = if requested.wants(field_ids::MEMBER_PATH)
+        && matches!(
+            kind,
+            AstKind::StaticMemberExpression(_) | AstKind::ComputedMemberExpression(_)
+        )
+        && !member_paths.is_static(kind)
+    {
+        requested
+            .without(field_ids::MEMBER_PATH)
+            .without(field_ids::ROOT_NAME)
+            .without(field_ids::ROOT_GLOBAL)
+    } else {
+        requested
+    };
     let wants = |key: u32| requested.wants(key);
     let mut result = DirectPackedFields {
         words: [0; 32],
@@ -434,21 +453,23 @@ pub(crate) fn packed_fields_direct(
                 let value = intern_packed(strings, &path);
                 push(field_ids::MEMBER_PATH, value);
             }
-            let mut object = &member.object;
-            while let Expression::StaticMemberExpression(parent) = object {
-                object = &parent.object;
-            }
-            if let Expression::Identifier(identifier) = object {
-                if wants(field_ids::ROOT_NAME) {
-                    let value = intern_packed(strings, &identifier.name);
-                    push(field_ids::ROOT_NAME, value);
+            if wants(field_ids::ROOT_NAME) || wants(field_ids::ROOT_GLOBAL) {
+                let mut object = &member.object;
+                while let Expression::StaticMemberExpression(parent) = object {
+                    object = &parent.object;
                 }
-                if let Some(scoping) = scoping {
-                    let global = identifier
-                        .reference_id
-                        .get()
-                        .is_some_and(|id| scoping.get_reference(id).symbol_id().is_none());
-                    push(field_ids::ROOT_GLOBAL, 0x8000_0000 | u32::from(global));
+                if let Expression::Identifier(identifier) = object {
+                    if wants(field_ids::ROOT_NAME) {
+                        let value = intern_packed(strings, &identifier.name);
+                        push(field_ids::ROOT_NAME, value);
+                    }
+                    if let Some(scoping) = scoping {
+                        let global = identifier
+                            .reference_id
+                            .get()
+                            .is_some_and(|id| scoping.get_reference(id).symbol_id().is_none());
+                        push(field_ids::ROOT_GLOBAL, 0x8000_0000 | u32::from(global));
+                    }
                 }
             }
         }
@@ -1040,12 +1061,9 @@ pub(crate) fn fields(
                 "property",
                 member.property.name.to_string()
             );
-            if let Some(path) = static_member_path(&member.object) {
-                push!(
-                    field_ids::MEMBER_PATH,
-                    "memberPath",
-                    format!("{path}.{}", member.property.name)
-                );
+            if let Some(path) = static_member_path_with(&member.object, Some(&member.property.name))
+            {
+                push!(field_ids::MEMBER_PATH, "memberPath", path);
             }
             let mut object = &member.object;
             while let Expression::StaticMemberExpression(parent) = object {
@@ -1071,12 +1089,8 @@ pub(crate) fn fields(
             push!(field_ids::WRITE, "write", member_write.to_string(),);
             if let Expression::StringLiteral(property) = &member.expression {
                 push!(field_ids::PROPERTY, "property", property.value.to_string());
-                if let Some(path) = static_member_path(&member.object) {
-                    push!(
-                        field_ids::MEMBER_PATH,
-                        "memberPath",
-                        format!("{path}.{}", property.value)
-                    );
+                if let Some(path) = static_member_path_with(&member.object, Some(&property.value)) {
+                    push!(field_ids::MEMBER_PATH, "memberPath", path);
                 }
             }
         }

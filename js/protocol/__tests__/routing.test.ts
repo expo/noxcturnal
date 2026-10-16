@@ -21,6 +21,44 @@ const openRetained = (
     packRouteManifest([], false, false, ALL_RETAINED_CAPABILITIES),
   );
 
+test('Program-only routing agrees with descendant traversal for counts, exits, and comments', () => {
+  const source = '/* 😀 */ function outer(value) { /* inner */ return () => value; }';
+  for (const sides of [['enter'], ['exit'], ['enter', 'exit']] as const) {
+    const routes = sides.map((side, id) => ({
+      id,
+      pluginId: 0,
+      nodeType: 'Program',
+      side,
+      order: 0,
+      predicates: {},
+      payloadFields: [],
+      comments: 'inner' as const,
+    }));
+    const read = (descendants: boolean) => {
+      const manifest = packRouteManifest(
+        descendants
+          ? [...routes, { ...routes[0], id: routes.length, nodeType: 'Identifier', side: 'enter' }]
+          : routes,
+        false,
+        false,
+      );
+      const batch = decodeRoutedEnvelope(
+        native.materializeRoutedBuffer(source, 'fixture.js', manifest),
+      );
+      const events: unknown[] = [];
+      dispatchRoutedEvents(batch, [
+        ...routes.map(() => (event: unknown) => events.push(structuredClone(event))),
+        () => {},
+      ]);
+      return { count: batch.nodeCount, events };
+    };
+    const root = read(false);
+    assert.ok(root.count > 10);
+    assert.equal(root.events.length, sides.length);
+    assert.deepEqual(root, read(true));
+  }
+});
+
 test('packs only known field requests into the native request format', () => {
   assert.equal(packFieldRequests(), undefined);
   const packed = packFieldRequests({
@@ -779,7 +817,7 @@ test('matches static member paths structurally without materializing predicate s
     defineNativePipeline({ phases: [{ name: 'main', plugins: [plugin] }] }),
   );
   assert.equal(result.status, 'complete');
-  assert.deepEqual(matched, ['STATIC', 'COMPUTED', 'env.DOTTED']);
+  assert.deepEqual(matched, ['STATIC', 'COMPUTED']);
 });
 
 test('exposes common scalar discriminants without child-tree transfer', () => {

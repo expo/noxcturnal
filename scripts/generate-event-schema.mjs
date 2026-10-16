@@ -642,6 +642,7 @@ import type { NativeNodeType, NativeRouteTypes } from './event-schema';
 
 export interface NodeTypeLike {
   readonly type: string;
+  readonly nodeKind?: string;
 }
 
 export type NodeTypeRoute = NativeNodeType | ${literalUnion(typeOnlyAliases.map(([route]) => route))};
@@ -657,8 +658,7 @@ export function isNodeType<Node extends NodeTypeLike, Route extends NodeTypeRout
   switch (route) {
 ${typeOnlyAliases
   .map(
-    ([route]) =>
-      `    case ${JSON.stringify(route)}:\n      return ${typePredicateName(route)}(node.type);`,
+    ([route]) => `    case ${JSON.stringify(route)}:\n      return ${predicateName(route)}(node);`,
   )
   .join('\n')}
     default:
@@ -679,10 +679,16 @@ ${predicateCases(members)}
   }
 }
 
-export function ${predicateName(route)}<Node extends NodeTypeLike>(
+${['Expression', 'Declaration', 'Statement'].includes(route) ? '/** Collapsed Function/Class nodes require a retained nodeKind to identify their category. */\n' : ''}export function ${predicateName(route)}<Node extends NodeTypeLike>(
   node: Node,
 ): node is Node & { readonly type: NativeRouteTypes[${JSON.stringify(route)}] } {
-  return ${typePredicateName(route)}(node.type);
+${
+  ['Expression', 'Declaration', 'Statement'].includes(route)
+    ? `  if (node.type === 'Function' || node.type === 'Class')
+    return ${route === 'Expression' ? '' : "(node.type === 'Function' && node.nodeKind === 'TSDeclareFunction') || "}node.nodeKind === \`\${node.type}${route === 'Expression' ? 'Expression' : 'Declaration'}\`;
+`
+    : ''
+}  return ${typePredicateName(route)}(node.type);
 }`,
   )
   .join('\n\n')}

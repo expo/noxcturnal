@@ -1,14 +1,17 @@
+use std::cell::Cell;
+
 use napi::Result;
 use oxc_allocator::Allocator;
 use oxc_ast::{
     AstKind,
-    ast::{Comment, Expression},
+    ast::{Comment, Expression, TSEnumMemberName},
 };
 use oxc_ast_visit::{Visit, walk};
 use oxc_parser::Parser;
-use oxc_semantic::{AstNodes, Scoping, SemanticBuilder};
+use oxc_semantic::{AstNodes, Scoping, SemanticBuilder, Stats};
 use oxc_span::GetSpan;
 use oxc_syntax::node::NodeId;
+use oxc_syntax::scope::{ScopeFlags, ScopeId};
 use rustc_hash::FxHashMap;
 
 use crate::generated::event_schema::{ast_kind_protocol_id, child_role_id_for_edge};
@@ -18,6 +21,7 @@ use crate::semantic::retained_index::{RetainedComment, RetainedIndex};
 use crate::syntax::classification::source_type;
 
 use super::fields::{packed_fields_direct, utf16_index};
+use super::member::MemberPathInterner;
 use super::member::{member_write_root_child, mutation_target_child, tracks_member_writes};
 use super::retained::routed_buffer_from_index;
 use super::{
@@ -36,6 +40,7 @@ struct EventCollector<'a> {
     retention_routes: Option<&'a CompiledManifest>,
     retention_capabilities: u32,
     retained_string_ids: FxHashMap<String, u32>,
+    member_paths: MemberPathInterner,
 }
 
 struct SyntaxIndexCollector<'a> {
@@ -45,10 +50,12 @@ struct SyntaxIndexCollector<'a> {
     retention_routes: Option<&'a CompiledManifest>,
     retention_capabilities: u32,
     retained_string_ids: FxHashMap<String, u32>,
+    member_paths: MemberPathInterner,
     parent_stack: Vec<(u32, u32, AstKind<'a>)>,
     target_stack: Vec<(AstKind<'a>, bool, bool)>,
     tracks_member_writes: bool,
     node_count: u32,
+    validation_stats: Stats,
 }
 
 impl SyntaxIndexCollector<'_> {
@@ -61,7 +68,21 @@ impl SyntaxIndexCollector<'_> {
 }
 
 impl<'a> Visit<'a> for SyntaxIndexCollector<'a> {
+    fn enter_scope(&mut self, _: ScopeFlags, _: &Cell<Option<ScopeId>>) {
+        self.validation_stats.scopes += 1;
+    }
+
+    fn visit_ts_enum_member_name(&mut self, name: &TSEnumMemberName<'a>) {
+        self.validation_stats.symbols += 1;
+        walk::walk_ts_enum_member_name(self, name);
+    }
+
     fn enter_node(&mut self, kind: AstKind<'a>) {
+        match kind {
+            AstKind::BindingIdentifier(_) => self.validation_stats.symbols += 1,
+            AstKind::IdentifierReference(_) => self.validation_stats.references += 1,
+            _ => {}
+        }
         let member_write = self.tracks_member_writes
             && self
                 .target_stack
@@ -85,10 +106,6 @@ impl<'a> Visit<'a> for SyntaxIndexCollector<'a> {
         kind.set_node_id(NodeId::new(id as usize));
         let protocol_id = ast_kind_protocol_id(kind);
         let parent_id = self.parent_stack.last().map(|(id, _, _)| *id);
-        let child_role_id = self
-            .parent_stack
-            .last()
-            .and_then(|(_, _, parent)| child_role_id_for_edge(*parent, kind));
         let span = kind.span();
         self.retained_index.record_enter(id);
         self.retained_index.record(
@@ -101,8 +118,14 @@ impl<'a> Visit<'a> for SyntaxIndexCollector<'a> {
             parent_id,
             0,
         );
-        self.retained_index
-            .record_child_edge(id, parent_id, child_role_id);
+        if self.retention_capabilities & RETAIN_CHILDREN != 0 {
+            let child_role_id = self
+                .parent_stack
+                .last()
+                .and_then(|(_, _, parent)| child_role_id_for_edge(*parent, kind));
+            self.retained_index
+                .record_child_edge(id, parent_id, child_role_id);
+        }
         if self.retention_capabilities & RETAIN_CONSTANTS != 0 {
             self.retained_index.record_constant(kind, id);
         }
@@ -124,6 +147,7 @@ impl<'a> Visit<'a> for SyntaxIndexCollector<'a> {
                     requested
                 },
                 &mut self.retained_string_ids,
+                &mut self.member_paths,
             );
             if let Some(retained_fields) = retained_fields {
                 self.retained_index
@@ -178,7 +202,6 @@ impl<'a> EventCollector<'a> {
         };
         let is_root = id.index() == 0;
         let protocol_id = ast_kind_protocol_id(kind);
-        let parent_kind = (!is_root).then(|| self.nodes.parent_kind(id));
         self.retained_index.record(
             id.index() as u32,
             protocol_id,
@@ -189,11 +212,14 @@ impl<'a> EventCollector<'a> {
             (!is_root).then(|| self.nodes.parent_id(id).index() as u32),
             scope_id.index() as u32,
         );
-        self.retained_index.record_child_edge(
-            id.index() as u32,
-            (!is_root).then(|| self.nodes.parent_id(id).index() as u32),
-            parent_kind.and_then(|parent| child_role_id_for_edge(parent, kind)),
-        );
+        if self.retention_capabilities & RETAIN_CHILDREN != 0 {
+            let parent_kind = (!is_root).then(|| self.nodes.parent_kind(id));
+            self.retained_index.record_child_edge(
+                id.index() as u32,
+                (!is_root).then(|| self.nodes.parent_id(id).index() as u32),
+                parent_kind.and_then(|parent| child_role_id_for_edge(parent, kind)),
+            );
+        }
         self.retained_index.record_semantics(
             kind,
             self.scoping,
@@ -243,6 +269,7 @@ impl<'a> EventCollector<'a> {
                     requested
                 },
                 &mut self.retained_string_ids,
+                &mut self.member_paths,
             );
             if let Some(retained_fields) = retained_fields {
                 self.retained_index.record_packed_fields(
@@ -347,7 +374,6 @@ pub(crate) fn materialize_with_scope_parents(
             .as_ref()
             .is_some_and(|manifest| manifest.needs_comments);
     if !needs_semantics {
-        crate::syntax::validation::validate_program(&parsed.program, "indexed-session")?;
         let mut collector = SyntaxIndexCollector {
             source,
             utf16: utf16.as_deref().map(|offsets| &**offsets),
@@ -363,6 +389,7 @@ pub(crate) fn materialize_with_scope_parents(
             retention_routes: retention_manifest.as_ref(),
             retention_capabilities,
             retained_string_ids: FxHashMap::default(),
+            member_paths: MemberPathInterner::default(),
             parent_stack: Vec::new(),
             target_stack: Vec::new(),
             tracks_member_writes: tracks_member_writes(
@@ -370,8 +397,15 @@ pub(crate) fn materialize_with_scope_parents(
                 retention_capabilities,
             ),
             node_count: 0,
+            validation_stats: Stats::default(),
         };
         collector.visit_program(&parsed.program);
+        collector.validation_stats.nodes = collector.node_count;
+        crate::syntax::validation::validate_program_with_stats(
+            &parsed.program,
+            "indexed-session",
+            collector.validation_stats,
+        )?;
         collector.retained_index.finalize_child_edges();
         collector
             .retained_index
@@ -442,6 +476,7 @@ pub(crate) fn materialize_with_scope_parents(
         retention_routes: retention_manifest.as_ref(),
         retention_capabilities,
         retained_string_ids: FxHashMap::default(),
+        member_paths: MemberPathInterner::default(),
         target_stack: Vec::new(),
         tracks_member_writes: tracks_member_writes(
             retention_manifest.as_ref(),

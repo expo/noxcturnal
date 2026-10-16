@@ -1107,14 +1107,14 @@ pub(crate) fn child_role_id_for_edge(
             {
                 return Some(3);
             }
-            if matches!(ast_kind_protocol_id(child), 2 | 4..=7 | 9 | 10 | 12..=16 | 20..=30 | 33 | 35..=37 | 73 | 74 | 82 | 93..=99 | 107 | 109 | 175 | 176 | 180 | 184)
+            if matches!(ast_kind_protocol_id(child), 2 | 4..=7 | 9 | 10 | 12..=18 | 20..=30 | 33 | 35..=37 | 68 | 73..=75 | 82 | 93..=100 | 103 | 107 | 109 | 175 | 176 | 180 | 184)
             {
                 return Some(3);
             }
             None
         }
         oxc_ast::AstKind::ArrayExpression(_parent) => {
-            if matches!(ast_kind_protocol_id(child), 2 | 4..=7 | 9 | 10 | 12..=16 | 19..=26 | 33 | 35..=37 | 73 | 74 | 82 | 93..=99 | 107 | 109 | 175 | 176 | 180 | 184)
+            if matches!(ast_kind_protocol_id(child), 2 | 4..=7 | 9 | 10 | 12..=26 | 33 | 35..=37 | 68 | 73..=75 | 82 | 93..=100 | 103 | 107 | 109 | 175 | 176 | 180 | 184)
             {
                 return Some(4);
             }
@@ -1210,7 +1210,7 @@ pub(crate) fn child_role_id_for_edge(
             if parent.callee.node_id() == child_id {
                 return Some(22);
             }
-            if matches!(ast_kind_protocol_id(child), 2 | 4 | 5 | 7 | 9 | 10 | 12..=16 | 19..=26 | 33 | 35..=37 | 73 | 74 | 82 | 93..=99 | 107 | 109 | 175 | 176 | 180 | 184)
+            if matches!(ast_kind_protocol_id(child), 2 | 4 | 5 | 7 | 9 | 10 | 12..=26 | 33 | 35..=37 | 68 | 73..=75 | 82 | 93..=100 | 103 | 107 | 109 | 175 | 176 | 180 | 184)
             {
                 return Some(21);
             }
@@ -1458,7 +1458,7 @@ pub(crate) fn child_role_id_for_edge(
             if parent.callee.node_id() == child_id {
                 return Some(68);
             }
-            if matches!(ast_kind_protocol_id(child), 2 | 4 | 5 | 7 | 9 | 10 | 12..=16 | 19..=26 | 33 | 35..=37 | 73 | 74 | 82 | 93..=99 | 107 | 109 | 175 | 176 | 180 | 184)
+            if matches!(ast_kind_protocol_id(child), 2 | 4 | 5 | 7 | 9 | 10 | 12..=26 | 33 | 35..=37 | 68 | 73..=75 | 82 | 93..=100 | 103 | 107 | 109 | 175 | 176 | 180 | 184)
             {
                 return Some(67);
             }
@@ -1902,6 +1902,8 @@ pub(crate) fn alias_matches(subscription: &str, node_type: &str) -> bool {
                 | "PrivateFieldExpression"
                 | "CallExpression"
                 | "NewExpression"
+                | "ImportMeta"
+                | "NewTarget"
                 | "UpdateExpression"
                 | "UnaryExpression"
                 | "BinaryExpression"
@@ -1913,8 +1915,10 @@ pub(crate) fn alias_matches(subscription: &str, node_type: &str) -> bool {
                 | "AwaitExpression"
                 | "ChainExpression"
                 | "ParenthesizedExpression"
+                | "Function"
                 | "ArrowFunctionExpression"
                 | "YieldExpression"
+                | "Class"
                 | "ImportExpression"
                 | "V8IntrinsicExpression"
                 | "BooleanLiteral"
@@ -1923,6 +1927,8 @@ pub(crate) fn alias_matches(subscription: &str, node_type: &str) -> bool {
                 | "StringLiteral"
                 | "BigIntLiteral"
                 | "RegExpLiteral"
+                | "JSXElement"
+                | "JSXFragment"
                 | "JSXMemberExpression"
                 | "JSXEmptyExpression"
                 | "TSAsExpression"

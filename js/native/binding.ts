@@ -79,6 +79,27 @@ export interface NativePreflightResultOutput {
 }
 
 interface NativeBinding {
+  NativeSourceText: new (source: string) => {
+    generateUid(name: string, filename: string): string;
+    whitespace(): number[];
+    indent(prefix: string): string;
+    needsLineBoundary(offset: number): boolean;
+    locations(start: number, end: number): number[];
+    locationOffset(line: number, column: number): number;
+    matches(
+      search: string,
+      flags: string | undefined,
+      all: boolean,
+      replacement?: string,
+    ): {
+      start: number;
+      end: number;
+      captures: string[];
+      content?: string;
+    }[];
+  };
+  sourceHints(source: string): string[];
+  validateIdentifier(name: string): void;
   validateProgram(source: string, filename: string): void;
   NativeIndexedSession: new (
     source: string,
@@ -88,21 +109,7 @@ interface NativeBinding {
     buildInitialRoute?: boolean,
   ) => {
     nextRoutedPacked(manifest: Buffer, rootStart?: number, rootEnd?: number): Buffer;
-    queryGlobals(names: string[]): {
-      name: string;
-      references: {
-        id: number;
-        start: number;
-        end: number;
-        scopeId: number;
-        parentId?: number;
-        parentType?: string;
-        parentStart?: number;
-        read: boolean;
-        write: boolean;
-        memberWrite: boolean;
-      }[];
-    }[];
+    queryGlobalsBuffer(names: string[]): Buffer;
     queryBindings(
       name?: string,
       scopeId?: number,
