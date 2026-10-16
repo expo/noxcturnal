@@ -611,7 +611,6 @@ export function transform(
         includeParent,
         includeScope,
         requiresIndexBase,
-        structuralParentTypes,
         runtimeEditEffect,
         compiledRoutes,
         dispatchRoutes,
@@ -717,9 +716,10 @@ export function transform(
       }
       if (requiresIndex || includeParent || includeScope)
         session.reserveEventCache(batch.nodeCount);
-      if (structuralParentTypes.length > 0) session.prefetchChildren([], structuralParentTypes);
-      if (prepared.ancestorChildParentTypes.length > 0)
-        session.prefetchChildren([], prepared.ancestorChildParentTypes);
+      session.prefetchRoutedChildren(
+        batch,
+        dispatchRoutes.map(route => route.members.map(member => member.capabilities)),
+      );
       if (batch.includeParent) session.seedSummaries(batch.parentSummaries);
       const dispatch = createDispatcher(
         session,

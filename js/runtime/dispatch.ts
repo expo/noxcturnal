@@ -462,8 +462,6 @@ export function createDispatcher(
         activeTraversals.add(key);
         try {
           const compiled = services.compileNestedVisitor(nested);
-          if (compiled.ancestorChildParentTypes.length > 0)
-            session.seedRetainedChildTypes(compiled.ancestorChildParentTypes);
           replayCustomRouted(
             session.nextRoutedPacked(services.nestedManifest(plugin, plans.get(plugin), compiled), {
               start: target.start,
@@ -598,6 +596,11 @@ export function createDispatcher(
     session.reserveEventCache(routedBatch.nodeCount);
     if (routedBatch.includeParent) session.seedSummaries(routedBatch.parentSummaries);
 
+    session.prefetchRoutedChildren(
+      routedBatch,
+      compiled.capabilities.map(caps => [caps]),
+    );
+
     const entry = {
       context,
       state,
@@ -654,6 +657,10 @@ export function createDispatcher(
     }
     if (followup.routes.length === 0) return;
     const routed = session.nextRoutedPacked(followup.manifest, root);
+    session.prefetchRoutedChildren(
+      routed,
+      followup.routes.map(route => [route.capabilities]),
+    );
     resetSkippedTraversal(entry.skipped);
     const accepted = new WeakSet<NativeEvent>();
     dispatchRoutedEvents(

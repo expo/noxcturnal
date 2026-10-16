@@ -1,8 +1,10 @@
+import type { RouteCapabilities } from '../pipeline/types';
 import { decodeConstant, decodeString } from '../protocol/value-transport';
 import { parserFilename } from '../adapters/classification';
-import { FIELD_KEY_IDS, NODE_TYPE_IDS, NODE_TYPES } from '../generated/event-schema';
+import { CHILD_ROLES, FIELD_KEY_IDS, NODE_TYPE_IDS, NODE_TYPES } from '../generated/event-schema';
 import { native, type NativeIndexedSessionBinding } from '../native/binding';
 import {
+  dispatchRoutedEvents,
   decodeEventBatch,
   decodePackedEnvelope,
   decodeRoutedEnvelope,
@@ -318,6 +320,57 @@ export class NativeTransformSession {
     return decodeEventBatch(
       decodePackedEnvelope(this.#binding('query.nodes').queryNodesPackedBuffer([...nodeTypes])),
     ).events.map(toNodeView);
+  }
+  /** Hydrate only structural parents reached from actual route deliveries.
+   * Each frontier crosses the native boundary once, including empty parents. */
+  prefetchRoutedChildren(
+    batch: RoutedEventBatch,
+    routes: readonly (readonly RouteCapabilities[])[],
+  ): void {
+    if (!routes.some(members => members.some(caps => caps.childRules || caps.ancestorChildRules)))
+      return;
+    this.seedSummaries(batch.parentSummaries);
+    type Rules = NonNullable<RouteCapabilities['childRules']>;
+    let pending: { event: NativeEvent; rules: Rules }[] = [];
+    const seen = new Map<Rules, Set<number>>();
+    const enqueue = (event: NativeEvent, rules: Rules | null) => {
+      if (!rules?.[event.type]) return;
+      let ids = seen.get(rules);
+      if (!ids) seen.set(rules, (ids = new Set()));
+      if (ids.has(event.id)) return;
+      ids.add(event.id);
+      pending.push({ event, rules });
+    };
+    dispatchRoutedEvents(
+      batch,
+      routes.map(members => event => {
+        for (const caps of members) {
+          enqueue(event, caps.childRules);
+          if (!caps.ancestorChildRules || !caps.ancestry) continue;
+          const mode = caps.ancestry.mode;
+          const depth = typeof mode === 'number' ? mode : mode === 'parent' ? 1 : Infinity;
+          let parentId = event.parentId;
+          for (let level = 0; parentId != null && level < depth; level++) {
+            const parent = this.event(parentId);
+            if (!parent) break;
+            enqueue(parent, caps.ancestorChildRules);
+            parentId = parent.parentId;
+          }
+        }
+      }),
+    );
+    while (pending.length > 0) {
+      const frontier = pending;
+      pending = [];
+      this.prefetchChildren([...new Set(frontier.map(item => item.event.id))]);
+      for (const { event, rules } of frontier) {
+        for (const role of rules[event.type] ?? []) {
+          const roleId = role === '*' ? undefined : CHILD_ROLES[event.type]?.[role]?.id;
+          if (role !== '*' && roleId == null) continue;
+          for (const child of this.children(event.id, roleId)) enqueue(child, rules);
+        }
+      }
+    }
   }
   prefetchChildren(parentIds: readonly number[] = [], parentTypes: readonly string[] = []): void {
     this.#assertOpen();
