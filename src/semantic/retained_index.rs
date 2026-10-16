@@ -908,6 +908,16 @@ impl RetainedIndex {
 
     pub fn packed_events_buffer(&self, node_ids: &[u32], scope_parents: &[u32]) -> Buffer {
         let mut words = Vec::<u32>::new();
+        // Response-local IDs keep sparse and empty queries independent of the
+        // session dictionary size. Borrow strings instead of cloning dictionary entries.
+        let mut string_ids = FxHashMap::<u32, u32>::default();
+        // Dense responses can use direct lookup without hashing every field.
+        // Bound initialization by the selection size so sparse queries never
+        // regain work proportional to an unrelated session dictionary.
+        let mut dense_string_ids = (self.scalar_strings.len() <= node_ids.len().saturating_mul(4)
+            && !node_ids.is_empty())
+        .then(|| vec![ABSENT_ID; self.scalar_strings.len()]);
+        let mut strings = Vec::new();
         for &node_id in node_ids {
             let index = node_id as usize;
             let parent_id = self.parent_ids[index];
@@ -935,11 +945,28 @@ impl RetainedIndex {
             ]);
             for field in fields {
                 words.push(field.key_id);
-                words.push(field.value);
+                let value = if field.value & 0xc000_0000 == 0 {
+                    let next = strings.len() as u32;
+                    if let Some(ids) = &mut dense_string_ids {
+                        let id = &mut ids[field.value as usize];
+                        if *id == ABSENT_ID {
+                            strings.push(&self.scalar_strings[field.value as usize]);
+                            *id = next;
+                        }
+                        *id
+                    } else {
+                        *string_ids.entry(field.value).or_insert_with(|| {
+                            strings.push(&self.scalar_strings[field.value as usize]);
+                            next
+                        })
+                    }
+                } else {
+                    field.value
+                };
+                words.push(value);
             }
         }
-        let strings_size: usize = self
-            .scalar_strings
+        let strings_size: usize = strings
             .iter()
             .map(|value| 4 + value.len() + (4 - value.len() % 4) % 4)
             .sum();
@@ -948,12 +975,12 @@ impl RetainedIndex {
         for word in [
             self.len() as u32 | 0xc000_0000,
             node_ids.len() as u32,
-            self.scalar_strings.len() as u32,
+            strings.len() as u32,
             words_offset as u32,
         ] {
             output.extend_from_slice(&word.to_le_bytes());
         }
-        for value in &self.scalar_strings {
+        for value in strings {
             output.extend_from_slice(&(value.len() as u32).to_le_bytes());
             output.extend_from_slice(value.as_bytes());
             output.resize(output.len().next_multiple_of(4), 0);
@@ -1758,6 +1785,65 @@ use std::rc::Rc;
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn packed_response_strings_scale_with_selected_fields() {
+        let word = |bytes: &[u8], offset: usize| {
+            u32::from_le_bytes(bytes[offset..offset + 4].try_into().unwrap())
+        };
+        let mut previous = None;
+        for size in [32, 64, 128] {
+            let mut index = RetainedIndex {
+                type_ids: vec![1, 1],
+                starts: vec![0, 1],
+                ends: vec![1, 2],
+                parent_ids: vec![ABSENT_ID, 0],
+                scope_ids: vec![0, 0],
+                scalar_strings: (0..size).map(|id| format!("unrelated-{id}")).collect(),
+                scalar_field_ranges: Some(vec![(0, 1), (1, 6)]),
+                ..RetainedIndex::default()
+            };
+            index.scalar_strings.extend(["雪😀".into(), "".into()]);
+            index.scalar_fields = [0, size, size, size + 1, 0x8000_0001, 0x4000_0007, ABSENT_ID]
+                .into_iter()
+                .map(|value| RetainedField { key_id: 1, value })
+                .collect();
+            // Exercise the dense lookup path with the same fields, including
+            // repeated requests, without changing the response-local ID order.
+            let dense = index.packed_events_buffer(&vec![1; size as usize], &[ABSENT_ID]);
+            assert_eq!(word(&dense, 8), 2);
+            let dense_offset = word(&dense, 12) as usize;
+            for record in 0..size as usize {
+                let values = (0..6)
+                    .map(|field| word(&dense, dense_offset + record * 88 + 44 + field * 8))
+                    .collect::<Vec<_>>();
+                assert_eq!(values, [0, 0, 1, 0x8000_0001, 0x4000_0007, ABSENT_ID]);
+            }
+            let empty = index.packed_events_buffer(&[], &[ABSENT_ID]);
+            assert_eq!(empty.len(), 16);
+            assert_eq!(word(&empty, 8), 0);
+            assert_eq!(word(&empty, 12), 16);
+            let response = index.packed_events_buffer(&[1], &[ABSENT_ID]);
+            assert_eq!(word(&response, 8), 2);
+            assert_eq!(word(&response, 16), "雪😀".len() as u32);
+            assert_eq!(&response[20..27], "雪😀".as_bytes());
+            assert_eq!(word(&response, 28), 0); // Empty string, after UTF-8 padding.
+            let offset = word(&response, 12) as usize;
+            let values = (0..6)
+                .map(|field| word(&response, offset + 44 + field * 8))
+                .collect::<Vec<_>>();
+            assert_eq!(values, [0, 0, 1, 0x8000_0001, 0x4000_0007, ABSENT_ID]);
+            assert_eq!(index.scalar_fields_for(1)[0].value, size);
+            assert_eq!(
+                index.packed_events_buffer(&[1], &[ABSENT_ID]).as_ref(),
+                response.as_ref()
+            );
+            if let Some(previous) = previous {
+                assert_eq!(response.as_ref(), previous);
+            }
+            previous = Some(response.to_vec());
+        }
+    }
 
     #[test]
     fn bounded_traversal_preserves_span_filtering_and_tape_order() {
