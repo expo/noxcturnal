@@ -51,10 +51,27 @@ interface NativeParseFailurePayload {
 }
 
 function nativeParseFailure(error: unknown): NativeParseFailurePayload | null {
-  if (!(error instanceof Error) || !error.message.startsWith(NATIVE_PARSE_FAILURE_PREFIX))
-    return null;
+  // N-API errors can originate in a different realm from this runtime.
+  if (typeof error !== 'object' || error === null || !('message' in error)) return null;
+  const { message } = error;
+  if (typeof message !== 'string' || !message.startsWith(NATIVE_PARSE_FAILURE_PREFIX)) return null;
   try {
-    return JSON.parse(error.message.slice(NATIVE_PARSE_FAILURE_PREFIX.length));
+    const payload = JSON.parse(message.slice(NATIVE_PARSE_FAILURE_PREFIX.length));
+    if (
+      typeof payload !== 'object' ||
+      payload === null ||
+      typeof payload.message !== 'string' ||
+      !Number.isInteger(payload.line) ||
+      payload.line < 1 ||
+      !Number.isInteger(payload.column) ||
+      payload.column < 0 ||
+      (payload.source !== undefined && typeof payload.source !== 'string') ||
+      !['indexed-session', 'routed-materialization', 'function-map', 'native-phase'].includes(
+        payload.operation,
+      )
+    )
+      return null;
+    return payload;
   } catch {
     return null;
   }

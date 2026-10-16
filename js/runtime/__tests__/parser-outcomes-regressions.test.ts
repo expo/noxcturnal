@@ -1,3 +1,7 @@
+import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
+import { runInNewContext } from 'node:vm';
+import { buildSync } from 'esbuild';
 import { expect, test } from 'vitest';
 import {
   classify,
@@ -359,5 +363,55 @@ const result = /(?<x>a)\k<missing>/u;`;
       expect((error as TransformSyntaxError).codeFrame).toContain(printed.code);
       expect((error as TransformSyntaxError).codeFrame).not.toContain('original header');
     }
+  },
+);
+
+// Bundle current sources so this regression does not depend on a prebuilt dist.
+test.each(['ordinary Node', 'separate realm'] as const)(
+  'native parse failures retain public syntax error details in %s',
+  realm => {
+    const api = (() => {
+      if (realm === 'ordinary Node')
+        return { transform, defineNativePipeline, TransformSyntaxError };
+      const entry = fileURLToPath(new URL('../../index.ts', import.meta.url));
+      const bundled = buildSync({
+        entryPoints: [entry],
+        bundle: true,
+        platform: 'node',
+        format: 'cjs',
+        packages: 'external',
+        write: false,
+      }).outputFiles[0]!.text;
+      const module = { exports: {} };
+      runInNewContext(bundled, {
+        module,
+        exports: module.exports,
+        require: createRequire(entry),
+        __dirname: fileURLToPath(new URL('../../native/', import.meta.url)),
+        process,
+        structuredClone,
+      });
+      return module.exports as typeof import('../../index');
+    })();
+    const source = 'module.exports = <View />;';
+    const pipeline = api.defineNativePipeline({
+      phases: [{ name: 'parse', native: { optimize: { constantFolding: true } } }],
+    });
+    let caught: unknown;
+    try {
+      api.transform(source, 'input.ts', pipeline);
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(api.TransformSyntaxError);
+    expect(caught).toMatchObject({
+      code: 'TRANSFORM_SYNTAX_ERROR',
+      filename: 'input.ts',
+      loc: { line: 1, column: 23 },
+      codeFrame: expect.stringContaining(source),
+      message: expect.stringContaining('input.ts'),
+    });
+    expect((caught as TransformSyntaxError).codeFrame).toContain('^');
+    expect((caught as TransformSyntaxError).message).not.toContain('__NOXCTURNAL_PARSE_FAILURE__');
   },
 );
