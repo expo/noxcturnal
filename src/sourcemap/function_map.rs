@@ -1,6 +1,9 @@
 use napi_derive::napi;
 use oxc_allocator::Allocator;
-use oxc_ast::{AstKind, ast::MethodDefinitionKind};
+use oxc_ast::{
+    AstKind,
+    ast::{Expression, MethodDefinitionKind},
+};
 use oxc_ast_visit::{Visit, walk};
 use oxc_parser::Parser;
 use oxc_span::{GetSpan, Span};
@@ -57,9 +60,9 @@ pub(crate) struct FunctionMapCollector<'a> {
     source: &'a str,
     ancestors: Vec<AstKind<'a>>,
     encoder: MappingEncoder,
-    stack: Vec<Rc<str>>,
+    stack: Vec<usize>,
     tail: Position,
-    tail_name: Option<Rc<str>>,
+    tail_name: Option<usize>,
     line_starts: Vec<usize>,
     /// Byte offset to UTF-16 offset for non-ASCII source. Function-map
     /// collection asks for two positions per function/class. Recounting from
@@ -108,7 +111,8 @@ impl<'a> FunctionMapCollector<'a> {
         ) {
             self.advance(self.position(self.frame_span(kind).start));
             let name = self.remove_filename_prefix(self.frame_name(kind));
-            self.stack.push(Rc::from(name));
+            let name = self.encoder.intern(name);
+            self.stack.push(name);
         }
         self.ancestors.push(kind);
     }
@@ -131,9 +135,9 @@ impl<'a> FunctionMapCollector<'a> {
         FunctionMap {
             names: self
                 .encoder
-                .names
-                .into_iter()
-                .map(|name| name.as_ref().to_owned())
+                .emitted_names
+                .iter()
+                .map(|&id| self.encoder.names[id].to_string())
                 .collect(),
             mappings: self.encoder.mappings,
         }
@@ -167,10 +171,10 @@ impl<'a> FunctionMapCollector<'a> {
 
     fn advance(&mut self, position: Position) {
         if position_greater(position, self.tail)
-            && let Some(name) = self.stack.last().cloned()
+            && let Some(name) = self.stack.last().copied()
             && self.tail_name.as_ref() != Some(&name)
         {
-            self.encoder.push(Rc::clone(&name), self.tail);
+            self.encoder.push(name, self.tail);
             self.tail_name = Some(name);
         }
         self.tail = position;
@@ -211,7 +215,10 @@ impl<'a> FunctionMapCollector<'a> {
                         .unwrap_or_else(|| "<anonymous>".into());
                 }
                 AstKind::MethodDefinition(method) => {
-                    let class_name = self.stack.last().map(|name| name.to_string());
+                    let class_name = self
+                        .stack
+                        .last()
+                        .map(|&id| self.encoder.names[id].to_string());
                     let mut name = self.property_name(&method.key);
                     if name == "<anonymous>" {
                         return name;
@@ -242,7 +249,10 @@ impl<'a> FunctionMapCollector<'a> {
                 }
                 AstKind::PropertyDefinition(property) => {
                     let property_name = self.property_name(&property.key);
-                    let class_name = self.stack.last().map(|name| name.to_string());
+                    let class_name = self
+                        .stack
+                        .last()
+                        .map(|&id| self.encoder.names[id].to_string());
                     return class_name.map_or(property_name.clone(), |class_name| {
                         format!(
                             "{class_name}{}{property_name}",
@@ -256,7 +266,7 @@ impl<'a> FunctionMapCollector<'a> {
                         .iter()
                         .position(|argument| argument.span() == kind.span())
                     {
-                        let callee = self.name_from_span(call.callee.span());
+                        let callee = self.callee_name(&call.callee);
                         if argument_index == 0
                             && (callee == "Object.freeze"
                                 || callee == "useCallback"
@@ -277,7 +287,7 @@ impl<'a> FunctionMapCollector<'a> {
                     {
                         return format!(
                             "{}$argument_{argument_index}",
-                            self.name_from_span(call.callee.span())
+                            self.callee_name(&call.callee)
                         );
                     }
                 }
@@ -326,6 +336,31 @@ impl<'a> FunctionMapCollector<'a> {
             "<anonymous>".into()
         } else {
             value.to_owned()
+        }
+    }
+
+    // Only identifier/member paths can name a call. Never copy arbitrary callee
+    // source: an IIFE can contain the entire rest of the file.
+    fn callee_name(&self, callee: &Expression<'_>) -> String {
+        fn is_name(expression: &Expression<'_>) -> bool {
+            match expression {
+                Expression::Identifier(_) | Expression::ThisExpression(_) => true,
+                Expression::StaticMemberExpression(member) => is_name(&member.object),
+                Expression::ComputedMemberExpression(member) => {
+                    is_name(&member.object)
+                        && matches!(member.expression, Expression::StringLiteral(_))
+                }
+                Expression::ParenthesizedExpression(parenthesized) => {
+                    is_name(&parenthesized.expression)
+                }
+                _ => false,
+            }
+        }
+        if is_name(callee) {
+            self.name_from_id_span(callee.span())
+                .unwrap_or_else(|| "<anonymous>".into())
+        } else {
+            "<anonymous>".into()
         }
     }
 
@@ -387,7 +422,7 @@ impl<'a> FunctionMapCollector<'a> {
                     components.push(self.property_name(&property.key));
                 }
                 AstKind::CallExpression(call) => {
-                    components.push(self.name_from_span(call.callee.span()));
+                    components.push(self.callee_name(&call.callee));
                     break;
                 }
                 _ => {}
@@ -505,7 +540,9 @@ impl<'a> Visit<'a> for FunctionMapCollector<'a> {
 #[derive(Default)]
 struct MappingEncoder {
     names: Vec<Rc<str>>,
-    name_indexes: FxHashMap<Rc<str>, i64>,
+    name_indexes: FxHashMap<Rc<str>, usize>,
+    emitted_names: Vec<usize>,
+    emitted_indexes: Vec<Option<i64>>,
     mappings: String,
     previous_line: i64,
     previous_column: i64,
@@ -514,15 +551,26 @@ struct MappingEncoder {
 }
 
 impl MappingEncoder {
-    fn push(&mut self, name: Rc<str>, position: Position) {
-        let name_index = if let Some(index) = self.name_indexes.get(name.as_ref()) {
-            *index
-        } else {
-            let index = self.names.len() as i64;
-            self.names.push(Rc::clone(&name));
-            self.name_indexes.insert(name, index);
+    fn intern(&mut self, name: String) -> usize {
+        if let Some(&id) = self.name_indexes.get(name.as_str()) {
+            return id;
+        }
+        let id = self.names.len();
+        let name: Rc<str> = Rc::from(name);
+        self.names.push(Rc::clone(&name));
+        self.name_indexes.insert(name, id);
+        self.emitted_indexes.push(None);
+        id
+    }
+
+    fn push(&mut self, name: usize, position: Position) {
+        // Assign output indexes at first emission, preserving name ordering and
+        // omitting zero-width frames. Returning to a frame only touches IDs.
+        let name_index = *self.emitted_indexes[name].get_or_insert_with(|| {
+            let index = self.emitted_names.len() as i64;
+            self.emitted_names.push(name);
             index
-        };
+        });
         let line = i64::from(position.line);
         let column = i64::from(position.column);
         let line_delta = line - self.previous_line.max(1);
@@ -567,6 +615,34 @@ fn position_greater(left: Position, right: Position) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn interning_preserves_first_emission_order_and_skips_unused_names() {
+        let mut encoder = MappingEncoder::default();
+        let unused = encoder.intern("unused".into());
+        let outer = encoder.intern("outer".into());
+        let inner = encoder.intern("inner".into());
+        assert_eq!(encoder.intern("outer".into()), outer);
+        encoder.push(inner, Position { line: 1, column: 0 });
+        encoder.push(outer, Position { line: 1, column: 1 });
+        encoder.push(inner, Position { line: 1, column: 2 });
+        assert_eq!(encoder.emitted_names, vec![inner, outer]);
+        assert_eq!(encoder.emitted_indexes[unused], None);
+        assert_eq!(encoder.mappings, "AAA,CC,CD");
+    }
+
+    #[test]
+    fn anonymous_iife_names_stay_bounded_as_sibling_count_grows() {
+        for count in [250, 500, 1000] {
+            let body = (0..count)
+                .map(|index| format!("function sibling{index}(){{}}"))
+                .collect::<String>();
+            let map = generate(&format!("(function(){{{body}}})();"), "input.js").unwrap();
+            assert_eq!(map.names.len(), count + 2);
+            assert_eq!(&map.names[..2], &["<global>", "<anonymous>"]);
+            assert!(map.names.iter().all(|name| name.len() < 32));
+        }
+    }
 
     #[test]
     fn positions_use_utf16_columns() {

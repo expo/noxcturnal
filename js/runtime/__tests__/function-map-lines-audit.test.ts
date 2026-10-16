@@ -104,6 +104,25 @@ test.each([
   expect(standalone.names).toContain(expected);
 });
 
+test.each([
+  { source: '(function(){ function inner(){} })();', expected: '<anonymous>' },
+  { source: '(function(){ })(() => 1);', expected: '<anonymous>$argument_0' },
+  { source: 'factory()(() => 1);', expected: '<anonymous>$argument_0' },
+  { source: 'new (factory())(() => 1);', expected: '<anonymous>$argument_0' },
+  { source: 'api["subscribe"](() => 1);', expected: 'api.subscribe$argument_0' },
+  { source: 'api[key](() => 1);', expected: '<anonymous>$argument_0' },
+])('callee inference stays structural for $source', ({ source, expected }) => {
+  const standalone = native.generateFunctionMap(source, 'input.js');
+  const result = transform(source, 'input.js', defineNativePipeline({ phases: [] }), {
+    functionMap: true,
+  });
+  expect(result.status).toBe('complete');
+  if (result.status !== 'complete') throw new Error('Unexpected bailout');
+  expect(result.functionMap).toEqual(standalone);
+  expect(standalone.names).toContain(expected);
+  expect(standalone.names.every(name => !/[{}();]/.test(name))).toBe(true);
+});
+
 test('repeated function names reuse one name entry while retaining both frame starts', () => {
   const map = native.generateFunctionMap(
     '{ function named(){} }\n{ function named(){} }',
