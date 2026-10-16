@@ -4,9 +4,15 @@ import { test } from 'vitest';
 import { defineNativePipeline, defineNativePlugin, defineVisitor, transform } from '../../index';
 import { native } from '../../native/binding';
 import { packFieldRequests } from '../../protocol/edits';
-import { decodeRoutedEnvelope, dispatchRoutedEvents } from '../../protocol/events';
+import {
+  decodeEventBatch,
+  decodePackedEnvelope,
+  decodeRoutedEnvelope,
+  dispatchRoutedEvents,
+} from '../../protocol/events';
 import { packRouteManifest } from '../../protocol/manifest';
 import { NativeTransformSession } from '../../runtime/session';
+import { toNodeView } from '../../runtime/node-utils';
 
 const ALL_RETAINED_CAPABILITIES = (1 << 6) - 1;
 const openRetained = (
@@ -870,4 +876,62 @@ test('retains materially less native memory for narrow plans', () => {
   assert.ok(narrow.nativeMemoryBytes < broad.nativeMemoryBytes * 0.6);
   narrow.close();
   broad.close();
+});
+
+test('retained child, inspection and node responses use independent local string tables', () => {
+  const values = ['雪😀', '', '\ud800', '\0value'];
+  const manifest = packRouteManifest(
+    [],
+    true,
+    true,
+    1 << 3,
+    { VariableDeclarator: ['init'] },
+    { VariableDeclarator: ['bindingName'], StringLiteral: ['value'] },
+  );
+  let expectedBytes: number | undefined;
+  for (const size of [32, 64, 128]) {
+    const source =
+      Array.from({ length: size }, (_, i) => `const noise${i} = "unrelated${i}";`).join('') +
+      values.map((value, i) => `const selected${i} = ${JSON.stringify(value)};`).join('');
+    const session = new native.NativeIndexedSession(source, 'fixture.js', manifest);
+    const decode = (buffer: Buffer) =>
+      decodeEventBatch(decodePackedEnvelope(buffer)).events.map(toNodeView);
+    try {
+      const parents = decode(session.queryNodesPackedBuffer(['VariableDeclarator'])).filter(event =>
+        String(event.bindingName).startsWith('selected'),
+      );
+      const children = session.childrenPackedBuffer(
+        parents.map(event => event.id),
+        [],
+        [],
+      );
+      assert.equal(children.events.readUInt32LE(8), values.length);
+      assert.deepEqual(
+        decode(children.events).map(event => event.value),
+        values,
+      );
+      if (expectedBytes != null) assert.equal(children.events.length, expectedBytes);
+      expectedBytes = children.events.length;
+      const events = decode(children.events);
+      for (const expected of [...events].reverse()) {
+        const id = expected.id;
+        const response = session.inspectPackedBuffer([id]);
+        assert.equal(response.readUInt32LE(8), 1);
+        const event = decode(response)[0];
+        assert.deepEqual(event, expected);
+        assert.deepEqual(decode(session.inspectPackedBuffer([id])), [event]);
+      }
+      for (const empty of [
+        session.inspectPackedBuffer([]),
+        session.queryNodesPackedBuffer(['RegExpLiteral']),
+        session.childrenPackedBuffer([], [], []).events,
+      ]) {
+        assert.equal(empty.length, 16);
+        assert.equal(empty.readUInt32LE(8), 0);
+      }
+    } finally {
+      session.close();
+    }
+    assert.throws(() => session.inspectPackedBuffer([]), /session-closed/);
+  }
 });
