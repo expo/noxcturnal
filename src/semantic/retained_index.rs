@@ -32,7 +32,7 @@ pub struct RetainedIndex {
     parent_ids: Vec<u32>,
     scope_ids: Vec<u32>,
     traversal_records: Vec<u32>,
-    traversal_by_start: OnceCell<Vec<(u32, usize)>>,
+    traversal_ranges: OnceCell<TraversalRanges>,
     traversal_sequences: OnceCell<TraversalSequences>,
     pending_child_edges: Option<Vec<ChildEdge>>,
     child_offsets: Option<Vec<u32>>,
@@ -57,8 +57,85 @@ pub struct RetainedIndex {
 
 #[derive(Default)]
 struct TraversalSequences {
-    enters: Vec<u32>,
-    exits_by_type: FxHashMap<u32, Vec<usize>>,
+    blocks: Vec<TraversalSequenceBlock>,
+    exits_by_type: FxHashMap<u32, Vec<u32>>,
+}
+
+struct TraversalSequenceBlock {
+    before: u32,
+    enters: u32,
+}
+
+const TRAVERSAL_BLOCK_SIZE: usize = u32::BITS as usize;
+
+/// A tape block cannot contain a matching span if every start is too early or
+/// every end is too late. Aggregate those bounds in a tree so source order and
+/// unique spans are not required. Leaves summarize small, contiguous blocks;
+/// their exact records are inspected only when the aggregate cannot rule them out.
+struct TraversalRanges {
+    bounds: Vec<(u32, u32)>,
+    leaves: usize,
+}
+
+impl TraversalRanges {
+    fn new(index: &RetainedIndex) -> Self {
+        let leaves = index
+            .traversal_records
+            .len()
+            .div_ceil(TRAVERSAL_BLOCK_SIZE)
+            .next_power_of_two();
+        let mut bounds = vec![(0, u32::MAX); leaves * 2];
+        for (block, records) in index
+            .traversal_records
+            .chunks(TRAVERSAL_BLOCK_SIZE)
+            .enumerate()
+        {
+            let bound = &mut bounds[leaves + block];
+            for &record in records {
+                let id = record & 0x7fff_ffff;
+                bound.0 = bound.0.max(index.start(id));
+                bound.1 = bound.1.min(index.end(id));
+            }
+        }
+        for node in (1..leaves).rev() {
+            bounds[node] = (
+                bounds[node * 2].0.max(bounds[node * 2 + 1].0),
+                bounds[node * 2].1.min(bounds[node * 2 + 1].1),
+            );
+        }
+        Self { bounds, leaves }
+    }
+
+    fn find<const REVERSE: bool>(
+        &self,
+        index: &RetainedIndex,
+        node: usize,
+        start: u32,
+        end: u32,
+    ) -> Option<usize> {
+        let (max_start, min_end) = self.bounds[node];
+        if max_start < start || min_end > end {
+            return None;
+        }
+        if node < self.leaves {
+            let first = node * 2 + usize::from(REVERSE);
+            let second = node * 2 + usize::from(!REVERSE);
+            return self
+                .find::<REVERSE>(index, first, start, end)
+                .or_else(|| self.find::<REVERSE>(index, second, start, end));
+        }
+        let first = (node - self.leaves) * TRAVERSAL_BLOCK_SIZE;
+        let last = (first + TRAVERSAL_BLOCK_SIZE).min(index.traversal_records.len());
+        let matches = |&offset: &usize| {
+            let id = index.traversal_records[offset] & 0x7fff_ffff;
+            index.start(id) >= start && index.end(id) <= end
+        };
+        if REVERSE {
+            (first..last).rev().find(matches)
+        } else {
+            (first..last).find(matches)
+        }
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -270,7 +347,7 @@ impl RetainedIndex {
             parent_ids: vec![ABSENT_ID; node_count],
             scope_ids: vec![0; node_count],
             traversal_records: Vec::new(),
-            traversal_by_start: OnceCell::new(),
+            traversal_ranges: OnceCell::new(),
             traversal_sequences: OnceCell::new(),
             pending_child_edges: child_role_mask_by_parent_type.map(|_| Vec::new()),
             child_offsets: None,
@@ -970,7 +1047,7 @@ impl RetainedIndex {
         parent_id: Option<u32>,
         scope_id: u32,
     ) {
-        self.traversal_by_start.take();
+        self.traversal_ranges.take();
         self.traversal_sequences.take();
         let index = node_id as usize;
         if index >= self.type_ids.len() {
@@ -1079,13 +1156,13 @@ impl RetainedIndex {
     }
 
     pub fn record_enter(&mut self, node_id: u32) {
-        self.traversal_by_start.take();
+        self.traversal_ranges.take();
         self.traversal_sequences.take();
         self.traversal_records.push(node_id);
     }
 
     pub fn record_exit(&mut self, node_id: u32) {
-        self.traversal_by_start.take();
+        self.traversal_ranges.take();
         self.traversal_sequences.take();
         self.traversal_records.push(node_id | 0x8000_0000);
     }
@@ -1117,41 +1194,33 @@ impl RetainedIndex {
         &self.traversal_records
     }
 
-    /// Bound a source-range query without assuming AST traversal follows source
-    /// order (or that spans uniquely identify nodes). Build the source-order
-    /// lookup lazily in O(N log N), then inspect only records starting inside the
-    /// requested range after two O(log N) searches. Keep the tape slice in its
-    /// original order; the route writer still applies the exact span predicate.
+    /// Locate the smallest tape interval containing every matching span. The
+    /// lazy block hierarchy takes O(N) time to build and less than one byte per
+    /// tape record (apart from rounding small indexes). Searches skip blocks
+    /// whose bounds exclude the query, without sorting or scanning its interior.
+    /// Adversarially interleaved spans can still require O(N) search work when
+    /// block bounds are inconclusive. The route writer applies the exact span
+    /// predicate within the resulting interval.
     pub fn traversal_range(&self, start: u32, end: u32) -> std::ops::Range<usize> {
-        if start > end {
+        if start > end || self.traversal_records.is_empty() {
             return 0..0;
         }
-        let by_start = self.traversal_by_start.get_or_init(|| {
-            let mut records = self
-                .traversal_records
-                .iter()
-                .enumerate()
-                .map(|(offset, record)| (self.start(record & 0x7fff_ffff), offset))
-                .collect::<Vec<_>>();
-            records.sort_unstable_by_key(|&(start, _)| start);
-            records
-        });
-        let first = by_start.partition_point(|&(record_start, _)| record_start < start);
-        let last = by_start.partition_point(|&(record_start, _)| record_start <= end);
-        let mut lower = self.traversal_records.len();
-        let mut upper = 0;
-        for &(_, offset) in &by_start[first..last] {
-            let node_id = self.traversal_records[offset] & 0x7fff_ffff;
-            if self.end(node_id) <= end {
-                lower = lower.min(offset);
-                upper = upper.max(offset + 1);
-            }
-        }
-        if lower >= upper { 0..0 } else { lower..upper }
+        let ranges = self
+            .traversal_ranges
+            .get_or_init(|| TraversalRanges::new(self));
+        let Some(first) = ranges.find::<false>(self, 1, start, end) else {
+            return 0..0;
+        };
+        let last = ranges
+            .find::<true>(self, 1, start, end)
+            .expect("forward search found a matching record");
+        first..last + 1
     }
 
     /// Match the full-tape sequence numbering for the active manifest, whose
-    /// exit routes determine which exit carriers advance the sequence.
+    /// exit routes determine which exit carriers advance the sequence. A prefix
+    /// and enter bitset per block give O(1) enter counts without a per-record
+    /// prefix array; each enabled exit type adds one binary search.
     pub fn traversal_sequence_before(
         &self,
         offset: usize,
@@ -1159,29 +1228,52 @@ impl RetainedIndex {
     ) -> u32 {
         let sequences = self.traversal_sequences.get_or_init(|| {
             let mut sequences = TraversalSequences::default();
-            sequences.enters.push(0);
             let mut enters = 0;
-            for (offset, &record) in self.traversal_records.iter().enumerate() {
-                if let Some(type_id) = self.type_id(record & 0x7fff_ffff) {
-                    if record & 0x8000_0000 == 0 {
-                        enters += 1;
-                    } else {
-                        sequences
-                            .exits_by_type
-                            .entry(type_id)
-                            .or_default()
-                            .push(offset);
+            for (block_id, records) in self
+                .traversal_records
+                .chunks(TRAVERSAL_BLOCK_SIZE)
+                .enumerate()
+            {
+                let mut block = TraversalSequenceBlock {
+                    before: enters,
+                    enters: 0,
+                };
+                for (bit, &record) in records.iter().enumerate() {
+                    if let Some(type_id) = self.type_id(record & 0x7fff_ffff) {
+                        if record & 0x8000_0000 == 0 {
+                            block.enters |= 1 << bit;
+                        } else {
+                            sequences
+                                .exits_by_type
+                                .entry(type_id)
+                                .or_default()
+                                .push((block_id * TRAVERSAL_BLOCK_SIZE + bit) as u32);
+                        }
                     }
                 }
-                sequences.enters.push(enters);
+                enters += block.enters.count_ones();
+                sequences.blocks.push(block);
+            }
+            if self
+                .traversal_records
+                .len()
+                .is_multiple_of(TRAVERSAL_BLOCK_SIZE)
+            {
+                sequences.blocks.push(TraversalSequenceBlock {
+                    before: enters,
+                    enters: 0,
+                });
             }
             sequences
         });
-        sequences.enters[offset]
+        let block = &sequences.blocks[offset / TRAVERSAL_BLOCK_SIZE];
+        let preceding_bits = (1u32 << (offset % TRAVERSAL_BLOCK_SIZE)) - 1;
+        block.before
+            + (block.enters & preceding_bits).count_ones()
             + exit_types
                 .map(|type_id| {
                     sequences.exits_by_type.get(&type_id).map_or(0, |offsets| {
-                        offsets.partition_point(|&exit| exit < offset) as u32
+                        offsets.partition_point(|&exit| (exit as usize) < offset) as u32
                     })
                 })
                 .sum::<u32>()
@@ -1490,17 +1582,16 @@ impl RetainedIndex {
             + self.parent_ids.capacity() * size_of::<u32>()
             + self.scope_ids.capacity() * size_of::<u32>()
             + self.traversal_records.capacity() * size_of::<u32>()
-            + self
-                .traversal_by_start
-                .get()
-                .map_or(0, |records| records.capacity() * size_of::<(u32, usize)>())
+            + self.traversal_ranges.get().map_or(0, |ranges| {
+                ranges.bounds.capacity() * size_of::<(u32, u32)>()
+            })
             + self.traversal_sequences.get().map_or(0, |sequences| {
-                sequences.enters.capacity() * size_of::<u32>()
-                    + sequences.exits_by_type.capacity() * size_of::<(u32, Vec<usize>)>()
+                sequences.blocks.capacity() * size_of::<TraversalSequenceBlock>()
+                    + sequences.exits_by_type.capacity() * size_of::<(u32, Vec<u32>)>()
                     + sequences
                         .exits_by_type
                         .values()
-                        .map(|offsets| offsets.capacity() * size_of::<usize>())
+                        .map(|offsets| offsets.capacity() * size_of::<u32>())
                         .sum::<usize>()
             })
             + self
@@ -1716,30 +1807,101 @@ mod tests {
 
     #[test]
     fn bounded_sequences_match_full_tape_for_each_exit_manifest() {
-        let mut index = RetainedIndex {
-            type_ids: vec![0, 1, ABSENT_ID, 0],
-            ..RetainedIndex::default()
-        };
-        for id in 0..4 {
-            index.record_enter(id);
-            index.record_exit(id);
-        }
-        for exit_types in [vec![], vec![0], vec![1], vec![0, 1]] {
-            for offset in 0..=index.traversal_records.len() {
-                let expected = index.traversal_records[..offset]
-                    .iter()
-                    .filter(|&&record| {
-                        index.type_id(record & 0x7fff_ffff).is_some_and(|type_id| {
-                            record & 0x8000_0000 == 0 || exit_types.contains(&type_id)
+        for count in [0, 4, 16, 17, 64, 65] {
+            let mut index = RetainedIndex {
+                type_ids: (0..count).map(|id| [0, 1, ABSENT_ID, 0][id % 4]).collect(),
+                ..RetainedIndex::default()
+            };
+            for id in 0..count as u32 {
+                index.record_enter(id);
+                index.record_exit(id);
+            }
+            for exit_types in [vec![], vec![0], vec![1], vec![0, 1]] {
+                for offset in 0..=index.traversal_records.len() {
+                    let expected = index.traversal_records[..offset]
+                        .iter()
+                        .filter(|&&record| {
+                            index.type_id(record & 0x7fff_ffff).is_some_and(|type_id| {
+                                record & 0x8000_0000 == 0 || exit_types.contains(&type_id)
+                            })
                         })
+                        .count() as u32;
+                    assert_eq!(
+                        index.traversal_sequence_before(offset, exit_types.iter().copied()),
+                        expected
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn bounded_traversal_handles_reordered_blocks_and_extreme_ranges() {
+        let mut index = RetainedIndex::default();
+        for id in 0..129 {
+            // Deliberately scatter adjacent spans across multiple tape blocks.
+            let start = (id * 67) % 129;
+            index.record(id, 0, start, start + id % 7, None, 0);
+            index.record_enter(id);
+            if id % 3 != 0 {
+                index.record_exit(id);
+            }
+        }
+        for start in (0..140).chain([u32::MAX]) {
+            for end in (start..140).chain([u32::MAX]) {
+                let matching = index
+                    .traversal_records
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(offset, &record)| {
+                        let id = record & 0x7fff_ffff;
+                        (index.start(id) >= start && index.end(id) <= end).then_some(offset)
                     })
-                    .count() as u32;
+                    .collect::<Vec<_>>();
+                let expected = matching
+                    .first()
+                    .zip(matching.last())
+                    .map_or(0..0, |(&first, &last)| first..last + 1);
                 assert_eq!(
-                    index.traversal_sequence_before(offset, exit_types.iter().copied()),
-                    expected
+                    index.traversal_range(start, end),
+                    expected,
+                    "range {start}..{end}"
                 );
             }
         }
+    }
+
+    #[test]
+    fn bounded_traversal_caches_are_compact_and_follow_index_mutations() {
+        let mut index = RetainedIndex::default();
+        for id in 0..8192 {
+            index.record(id, 0, id * 2, id * 2 + 1, None, 0);
+            index.record_enter(id);
+            index.record_exit(id);
+        }
+        let before = index.memory_usage();
+        assert_eq!(index.traversal_range(20, 21), 20..22);
+        assert_eq!(index.traversal_sequence_before(20, [0].into_iter()), 20);
+        assert!(index.memory_usage() - before < index.traversal_records.len() * size_of::<u32>());
+
+        // Changing both a span and its protocol type must invalidate both caches.
+        index.record(0, ABSENT_ID, 20, 21, None, 0);
+        assert_eq!(index.traversal_range(20, 21), 0..22);
+        assert_eq!(index.traversal_sequence_before(20, [0].into_iter()), 18);
+        index.record_enter(10);
+        index.record_exit(10);
+        assert_eq!(index.traversal_range(20, 21), 0..16386);
+        assert_eq!(
+            index.traversal_sequence_before(16386, [0].into_iter()),
+            16384
+        );
+        index.clear();
+        assert!(index.traversal_range(0, u32::MAX).is_empty());
+        assert_eq!(index.traversal_sequence_before(0, [0].into_iter()), 0);
+        index.record(0, 0, 5, 6, None, 0);
+        index.record_enter(0);
+        assert_eq!(index.traversal_range(5, 6), 0..1);
+        assert_eq!(index.traversal_sequence_before(1, [0].into_iter()), 1);
     }
 
     #[test]
@@ -1763,7 +1925,7 @@ mod tests {
                 })
                 .sum::<usize>();
             assert_eq!(scanned, count as usize * 2);
-            // Appending records invalidates the lazy source-order lookup.
+            // Appending records invalidates the lazy range lookup.
             index.record_enter(0);
             assert_eq!(
                 index.traversal_records()[index.traversal_range(0, 5)].last(),
