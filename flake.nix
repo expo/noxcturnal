@@ -4,7 +4,7 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     hermes = {
-      url = "github:facebook/hermes/73855a1475e016cec814d67578f860112ef711e1";
+      url = "github:facebook/hermes/17b37301da5da4a2cd55d78f9697c46c0fd96123";
       flake = false;
     };
     fenix = {
