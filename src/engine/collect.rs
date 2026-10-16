@@ -558,7 +558,7 @@ fn retain_comments(
     );
 }
 
-pub(crate) fn parse_program_body_offsets(source: &str, filename: &str) -> Result<[u32; 3]> {
+pub(crate) fn parse_program_body_offsets(source: &str, filename: &str) -> Result<[u32; 5]> {
     let allocator = Allocator::default();
     let parsed = Parser::new(&allocator, source, source_type(filename, source)?).parse();
     if !parsed.diagnostics.is_empty() {
@@ -580,7 +580,7 @@ fn program_body_offsets(
     program: &oxc_ast::ast::Program<'_>,
     source: &str,
     utf16: Option<&[u32]>,
-) -> [u32; 3] {
+) -> [u32; 5] {
     let coordinate = |byte: u32| utf16.map_or(byte, |index| index[byte as usize]);
     let prepend = program
         .body
@@ -602,9 +602,20 @@ fn program_body_offsets(
             && comment.kind == oxc_ast::ast::CommentKind::Line
             && comment.span.end == source.len() as u32
     });
+    let unterminated =
+        |end: u32| source.as_bytes().get(end.saturating_sub(1) as usize) != Some(&b';');
+    let prepend_separator = program
+        .directives
+        .last()
+        .is_some_and(|directive| unterminated(directive.span.end));
+    let append_separator = program.body.last().map_or(prepend_separator, |statement| {
+        unterminated(statement.span().end)
+    });
     [
         coordinate(prepend),
         coordinate(append),
         u32::from(needs_eof_line_boundary),
+        u32::from(prepend_separator),
+        u32::from(append_separator),
     ]
 }

@@ -38,7 +38,9 @@ export class NativeTransformSession {
   #scopeParents: Uint32Array | null = null;
   #scopeMetadata: Uint32Array | null = null;
   #ownedScopes = new Map<number, number>();
-  #programBodyOffsets: readonly [number, number, boolean] | null = null;
+  #linePrefixPage = -1;
+  #linePrefixIntervals: Uint32Array | undefined;
+  #programBodyOffsets: readonly [number, number, boolean, boolean, boolean] | null = null;
   #bindingIndex: { nameIds: Map<string, number>; keys: Set<number> } | null = null;
   #bindingsByScope = new Map<number, Map<string, QueryResult['bindings'][number]>>();
   constructor(
@@ -577,10 +579,22 @@ export class NativeTransformSession {
       kind: words[offset + 3],
     };
   }
-  programBodyOffsets(): readonly [prepend: number, append: number, needsEofLineBoundary: boolean] {
+  programBodyOffsets(): readonly [
+    prepend: number,
+    append: number,
+    needsEofLineBoundary: boolean,
+    prependSeparator: boolean,
+    appendSeparator: boolean,
+  ] {
     if (this.#programBodyOffsets == null) {
       const offsets = this.#binding('program-body-offsets').programBodyOffsets();
-      this.#programBodyOffsets = [offsets[0], offsets[1], offsets[2] === 1];
+      this.#programBodyOffsets = [
+        offsets[0],
+        offsets[1],
+        offsets[2] === 1,
+        offsets[3] === 1,
+        offsets[4] === 1,
+      ];
     }
     return this.#programBodyOffsets;
   }
@@ -594,6 +608,38 @@ export class NativeTransformSession {
   get sourceTextOperations(): InstanceType<typeof native.NativeSourceText> {
     this.#assertOpen();
     return (this.#sourceText ??= new native.NativeSourceText(this.source));
+  }
+  startsLine(offset: number): boolean {
+    // Keep one 8 KiB source window. A single sparse query uses the adjacent
+    // whitespace check; only a second query on the page requests interval facts.
+    const page = Math.floor(offset / 4096);
+    if (page !== this.#linePrefixPage) {
+      const result = this.sourceTextOperations.startsLine(offset);
+      this.#linePrefixPage = page;
+      this.#linePrefixIntervals = undefined;
+      return result;
+    }
+    let intervals = this.#linePrefixIntervals;
+    if (!intervals) {
+      const start = page * 4096;
+      const data = this.sourceTextOperations.linePrefixIntervals(
+        start,
+        Math.min(start + 4096, this.source.length),
+      );
+      intervals = this.#linePrefixIntervals = new Uint32Array(
+        data.buffer,
+        data.byteOffset,
+        data.byteLength / 4,
+      );
+    }
+    let low = 0;
+    let high = intervals.length / 2;
+    while (low < high) {
+      const middle = (low + high) >>> 1;
+      if (intervals[middle * 2 + 1] < offset) low = middle + 1;
+      else high = middle;
+    }
+    return low * 2 < intervals.length && intervals[low * 2] <= offset;
   }
   generateUid(name = 'temp'): string {
     return this.sourceTextOperations.generateUid(name, this.#nativeFilename);

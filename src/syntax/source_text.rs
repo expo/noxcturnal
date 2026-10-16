@@ -1,7 +1,10 @@
 //! Source-dependent operations live beside native parsing, never in JS heuristics.
 use std::cell::OnceCell;
 
-use napi::{Error, Result, Status, bindgen_prelude::Utf16String};
+use napi::{
+    Error, Result, Status,
+    bindgen_prelude::{Buffer, Either, Utf16String},
+};
 use napi_derive::napi;
 use oxc_allocator::Allocator;
 use oxc_ast::{AstKind, ast::Program};
@@ -15,6 +18,12 @@ pub struct SourceMatch {
     pub end: u32,
     pub captures: Vec<Utf16String>,
     pub content: Option<Utf16String>,
+}
+
+#[napi(object)]
+pub struct SourceTextRange {
+    pub start: u32,
+    pub end: u32,
 }
 
 #[napi]
@@ -106,6 +115,85 @@ impl NativeSourceText {
         offset > 0 && self.source.get(offset as usize - 1) != Some(&10)
     }
 
+    /// Text and composite payloads use separate typed batches. Results are in
+    /// text-first order, followed by composite order, without an outer union.
+    #[napi]
+    pub fn insertion_suffixes(
+        &self,
+        texts: Vec<Utf16String>,
+        composites: Vec<Vec<Either<Utf16String, SourceTextRange>>>,
+    ) -> Result<Buffer> {
+        let mut separators = Vec::with_capacity(texts.len() + composites.len());
+        for text in texts {
+            separators.push(u8::from(!terminated_insertion(&text) || text.contains(&47)));
+        }
+        for parts in composites {
+            let terminated =
+                matches!(parts.last(), Some(Either::A(text)) if terminated_insertion(text));
+            let mut comment_free = true;
+            if terminated {
+                for part in &parts {
+                    let text: &[u16] = match part {
+                        Either::A(text) => text,
+                        Either::B(range) => self
+                            .source
+                            .get(range.start as usize..range.end as usize)
+                            .ok_or_else(|| {
+                                Error::new(Status::InvalidArg, "invalid source range")
+                            })?,
+                    };
+                    if text.contains(&47) {
+                        comment_free = false;
+                        break;
+                    }
+                }
+            }
+            separators.push(u8::from(!terminated || !comment_free));
+        }
+        Ok(separators.into())
+    }
+
+    #[napi]
+    pub fn starts_line(&self, offset: u32) -> bool {
+        self.source[..(offset as usize).min(self.source.len())]
+            .iter()
+            .rev()
+            .find(|&&unit| !is_whitespace(unit) || matches!(unit, 10 | 13 | 0x2028 | 0x2029))
+            .is_none_or(|&unit| matches!(unit, 10 | 13 | 0x2028 | 0x2029))
+    }
+
+    /// Inclusive intervals of boundary offsets with only whitespace before them
+    /// on their line. A bounded window amortizes nearby comment queries without
+    /// scanning an entire source for one sparse query.
+    #[napi]
+    pub fn line_prefix_intervals(&self, start: u32, end: u32) -> Result<Buffer> {
+        let text = self
+            .source
+            .get(start as usize..end as usize)
+            .ok_or_else(|| Error::new(Status::InvalidArg, "invalid source range"))?;
+        let mut intervals = Vec::new();
+        let mut leading = self.starts_line(start);
+        if leading {
+            intervals.extend_from_slice(&start.to_le_bytes());
+        }
+        for (index, &unit) in text.iter().enumerate() {
+            let offset = start + index as u32;
+            if matches!(unit, 10 | 13 | 0x2028 | 0x2029) {
+                if !leading {
+                    intervals.extend_from_slice(&(offset + 1).to_le_bytes());
+                }
+                leading = true;
+            } else if leading && !is_whitespace(unit) {
+                intervals.extend_from_slice(&offset.to_le_bytes());
+                leading = false;
+            }
+        }
+        if leading {
+            intervals.extend_from_slice(&end.to_le_bytes());
+        }
+        Ok(intervals.into())
+    }
+
     #[napi]
     pub fn locations(&mut self, start: u32, end: u32) -> Vec<u32> {
         let lines = self.line_starts();
@@ -133,6 +221,7 @@ impl NativeSourceText {
         flags: Option<String>,
         all: bool,
         replacement: Option<Utf16String>,
+        start: Option<f64>,
     ) -> Result<Vec<SourceMatch>> {
         let text: &[u16] = &self.source;
         let mut output = Vec::new();
@@ -168,7 +257,18 @@ impl NativeSourceText {
         let flags = flags.unwrap_or_default();
         let expression = regress::Regex::from_unicode(pattern.into_iter(), flags.as_str())
             .map_err(|error| Error::new(Status::InvalidArg, error.to_string()))?;
-        let mut offset = 0;
+        // ToLength: NaN and negative cursors become zero; positive cursors are
+        // truncated. Compare before narrowing so large values cannot wrap.
+        let cursor = start.unwrap_or(0.0);
+        let cursor = if cursor.is_nan() || cursor < 0.0 {
+            0.0
+        } else {
+            cursor.trunc()
+        };
+        if cursor > text.len() as f64 {
+            return Ok(output);
+        }
+        let mut offset = cursor as usize;
         while offset <= text.len() {
             let found = if unicode {
                 expression.find_from_utf16(text, offset).next()
@@ -228,6 +328,10 @@ impl NativeSourceText {
             lines
         })
     }
+}
+
+fn terminated_insertion(text: &[u16]) -> bool {
+    text.iter().rev().find(|&&unit| !is_whitespace(unit)) == Some(&59)
 }
 
 fn is_whitespace(unit: u16) -> bool {

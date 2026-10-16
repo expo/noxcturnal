@@ -35,6 +35,11 @@ export function createEditor(
   edits: EditCommand[],
   owner: string,
   nextOrder: () => number,
+  hooks?: {
+    affects(edit: EditCommand): boolean;
+    reconcile(): void;
+    beforeCommit?(): void;
+  },
 ): NativeEditor {
   const source = session.source;
   const push = (kind: EditKind, start: number, end: number, content?: string) =>
@@ -61,11 +66,17 @@ export function createEditor(
     replacement: string | ((match: string, ...groups: string[]) => string),
     all: boolean,
   ) => {
+    const flags = typeof search === 'string' ? undefined : search.flags;
+    // `String#replace` replaces every match of a global expression, and a sticky
+    // expression resumes at `lastIndex`. Global search still starts at zero.
+    const start =
+      typeof search !== 'string' && search.sticky && !search.global ? search.lastIndex : undefined;
     const matches = operations().matches(
       typeof search === 'string' ? search : search.source,
-      typeof search === 'string' ? undefined : search.flags,
-      all,
+      flags,
+      all || (typeof search !== 'string' && search.global),
       typeof replacement === 'string' ? replacement : undefined,
+      start,
     );
     for (const match of matches)
       replaceRange(
@@ -102,11 +113,16 @@ export function createEditor(
     },
     reset(start, end) {
       let write = 0;
+      let reconcile = false;
       for (const edit of edits) {
-        if (edit.owner === owner && edit.start >= start && edit.end <= end) continue;
+        if (edit.owner === owner && edit.start >= start && edit.end <= end) {
+          if (hooks?.affects(edit)) reconcile = true;
+          continue;
+        }
         edits[write++] = edit;
       }
       edits.length = write;
+      if (reconcile) hooks!.reconcile();
     },
     indent(prefix = '  ') {
       push('Replace', 0, source.length, operations().indent(prefix));
@@ -134,7 +150,10 @@ export function createEditor(
       replace(search, replacement, true);
     },
     slice: (start, end) => source.slice(start, end),
-    toString: () => session.commit(edits).code,
+    toString: () => {
+      hooks?.beforeCommit?.();
+      return session.commit(edits).code;
+    },
     isEmpty: () => margins()[0] === source.length,
   };
 }

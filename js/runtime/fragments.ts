@@ -66,6 +66,7 @@ export function realizeContent(
   prefix = '',
   suffix = '',
 ): RealizedContent {
+  if (typeof value === 'string' && !prefix && !suffix) return { content: value };
   const parts: (string | { start: number; end: number })[] = [];
   let hasCopy = false;
   const push = (part: Code): void => {
@@ -150,7 +151,17 @@ export const codeFactory: CodeFactory = {
             ? 'null'
             : typeof value === 'string'
               ? JSON.stringify(value)
-              : String(value),
+              : typeof value === 'number'
+                ? Object.is(value, -0)
+                  ? '(-0)'
+                  : Number.isNaN(value)
+                    ? '(0/0)'
+                    : value === Infinity
+                      ? '(1/0)'
+                      : value === -Infinity
+                        ? '(-1/0)'
+                        : String(value)
+                : String(value),
       mapping: 'sourceless',
     };
   },
@@ -170,12 +181,10 @@ export const codeFactory: CodeFactory = {
       return { kind: 'composite', parts: composite };
     }
     const chunks: string[] = [];
-    parts.forEach((part, index) => {
-      chunks.push(part);
-      if (index >= values.length) return;
-      const value = values[index]!;
-      chunks.push(typeof value === 'string' ? value : (value as CodeFragment).code);
-    });
+    for (let index = 0; index < parts.length; index++) {
+      chunks.push(parts[index]);
+      if (index < values.length) appendSourcelessFragment(chunks, values[index] as Code);
+    }
     return {
       code: chunks.join(''),
       mapping: 'sourceless',
@@ -190,6 +199,13 @@ export const codeFactory: CodeFactory = {
     return { code, mapping: 'anchor-boundaries' };
   },
 };
+
+function appendSourcelessFragment(chunks: string[], fragment: Code): void {
+  if (typeof fragment === 'string') chunks.push(fragment);
+  else if ('kind' in fragment && fragment.kind === 'composite') {
+    for (const part of fragment.parts) appendSourcelessFragment(chunks, part);
+  } else chunks.push((fragment as CodeFragment).code);
+}
 
 function identicalContentParts(
   a: readonly (string | { start: number; end: number })[],

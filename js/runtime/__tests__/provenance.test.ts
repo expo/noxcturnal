@@ -33,8 +33,13 @@ test('handles deterministic randomized non-overlapping edit batches', () => {
       end: index * 5 + 1,
       content: String.fromCharCode(65 + Math.floor(random() * 26)),
     }));
-    assert.equal(session.commit(edits).code.length, source.length);
-    session.close();
+    const expected = [...source];
+    for (const edit of edits) expected[edit.start] = edit.content;
+    try {
+      assert.equal(session.commit(edits).code, expected.join(''));
+    } finally {
+      session.close();
+    }
   }
 });
 

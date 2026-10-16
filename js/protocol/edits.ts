@@ -23,18 +23,20 @@ const EDIT_MAPPINGS: Record<NonNullable<EditCommand['mapping']>, number> = {
   Identity: 3,
 };
 
+function validateOffset(value: number): void {
+  if (value >>> 0 !== value)
+    throw new Error(`invalid edit offset ${value}: expected an unsigned 32-bit integer`);
+}
+
 export function packEdits(edits: readonly EditCommand[]): Buffer {
-  for (const edit of edits) {
-    if (edit.coordinateSpace != null && edit.coordinateSpace !== 'original')
-      throw new Error(
-        `edit coordinate space ${edit.coordinateSpace} requires explicit translation before commit`,
-      );
-  }
   const strings: string[] = [];
   const stringLengths: number[] = [];
+  let asciiStrings = true;
   const addString = (value: string): number => {
     strings.push(value);
-    stringLengths.push(Buffer.byteLength(value));
+    const bytes = Buffer.byteLength(value);
+    stringLengths.push(bytes);
+    asciiStrings &&= bytes === value.length;
     return strings.length - 1;
   };
   const contentWords = new Uint32Array(edits.length);
@@ -44,7 +46,20 @@ export function packEdits(edits: readonly EditCommand[]): Buffer {
   let partsEntryCount = 0;
   for (let index = 0; index < edits.length; index++) {
     const edit = edits[index];
+    validateOffset(edit.start);
+    validateOffset(edit.end);
+    if (edit.coordinateSpace != null && edit.coordinateSpace !== 'original')
+      throw new Error(
+        `edit coordinate space ${edit.coordinateSpace} requires explicit translation before commit`,
+      );
     if (edit.kind === 'Move') {
+      for (const part of edit.contentParts ?? []) {
+        if (typeof part !== 'string') {
+          validateOffset(part.start);
+          validateOffset(part.end);
+        }
+      }
+      if (edit.destination != null) validateOffset(edit.destination);
       contentWords[index] = edit.destination ?? MISSING_VALUE;
     } else if (edit.contentParts != null) {
       if (
@@ -60,7 +75,11 @@ export function packEdits(edits: readonly EditCommand[]): Buffer {
         partsData.push(edit.contentParts.length);
         for (const part of edit.contentParts) {
           if (typeof part === 'string') partsData.push(0, addString(part), 0);
-          else partsData.push(1, part.start, part.end);
+          else {
+            validateOffset(part.start);
+            validateOffset(part.end);
+            partsData.push(1, part.start, part.end);
+          }
         }
       }
     } else if (edit.content != null) {
@@ -81,7 +100,12 @@ export function packEdits(edits: readonly EditCommand[]): Buffer {
   for (let index = 0; index < strings.length; index++)
     data.writeUInt32LE(stringLengths[index], 8 + index * 4);
   const slabOffset = 8 + strings.length * 4;
-  data.write(strings.join(''), slabOffset, slabBytes, 'utf8');
+  let stringOffset = slabOffset;
+  // ASCII cannot form a surrogate pair across entries. Bound the temporary join
+  // to a small slab; large and non-ASCII entries retain independent encoding.
+  if (asciiStrings && slabBytes <= Buffer.poolSize)
+    data.write(strings.join(''), stringOffset, slabBytes, 'utf8');
+  else for (const value of strings) stringOffset += data.write(value, stringOffset, 'utf8');
   data.fill(0, slabOffset + slabBytes, wordsOffset);
   let wordIndex = 0;
   let nameCursor = 0;

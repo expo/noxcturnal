@@ -62,6 +62,7 @@ interface DispatcherEntry extends PathState {
 interface Dispatcher {
   contexts: Map<NativePlugin<any, any>, DispatcherEntry>;
   run(): void;
+  flushInsertions(): void;
 }
 
 export function createDispatcher(
@@ -87,11 +88,93 @@ export function createDispatcher(
   let visitorId = 0;
   let visitorIds: WeakMap<object, number> | undefined;
   let activeTraversals: Set<string> | undefined;
-  let programBodyOffsets:
-    | readonly [prepend: number, append: number, needsEofLineBoundary: boolean]
-    | undefined;
-  let programEndBoundaryAdded = false;
-  const programInsertionPoints = new Set<number>();
+  let programBodyOffsets: ReturnType<NativeTransformSession['programBodyOffsets']> | undefined;
+  let programEndBoundary: EditCommand | undefined;
+  const programInsertions = new WeakMap<
+    EditCommand,
+    { prefix: string; pending: RealizedContent | undefined }
+  >();
+  const programInsertionPoints = new Map<number, EditCommand>();
+  let hasPendingInsertions = false;
+  const flushInsertions = (): void => {
+    if (!hasPendingInsertions) return;
+    const texts: string[] = [];
+    const composites: (string | { start: number; end: number })[][] = [];
+    const targets: EditCommand[] = [];
+    // Text indices are nonnegative; composites use -1-based indices so their
+    // final position remains correct when later inserts add more text requests.
+    const indices: number[] = [];
+    let previous: RealizedContent | undefined;
+    let requestIndex = 0;
+    for (const edit of edits) {
+      const realized = programInsertions.get(edit)?.pending;
+      if (!realized) continue;
+      if (!previous || !identicalRealizedContent(previous, realized)) {
+        requestIndex = realized.contentParts
+          ? -composites.push(realized.contentParts)
+          : texts.push(realized.content!) - 1;
+        previous = realized;
+      }
+      targets.push(edit);
+      indices.push(requestIndex);
+    }
+    if (targets.length) {
+      const separators = session.sourceTextOperations.insertionSuffixes(texts, composites);
+      if (separators.length !== texts.length + composites.length)
+        throw new Error('invalid insertion suffix batch');
+      for (let index = 0; index < targets.length; index++) {
+        const edit = targets[index];
+        const request = indices[index];
+        const separator = separators[request >= 0 ? request : texts.length - request - 1];
+        const suffix = separator ? '\n;\n' : '\n';
+        if (edit.contentParts) edit.contentParts = [...edit.contentParts, suffix];
+        else edit.content += suffix;
+        programInsertions.get(edit)!.pending = undefined;
+      }
+    }
+    hasPendingInsertions = false;
+  };
+  const boundaryPrefixes: [string?, string?] = [];
+  const insertionPrefix = (kind: EditCommand['kind'], offset: number): string => {
+    if (programInsertionPoints.has(offset)) return '';
+    const index = kind === 'Prologue' ? 0 : 1;
+    // Source is immutable in this phase; reset changes edits, not these facts.
+    return (boundaryPrefixes[index] ??=
+      (session.sourceTextOperations.needsLineBoundary(offset) ? '\n' : '') +
+      (programBodyOffsets?.[index + 3] ? ';\n' : ''));
+  };
+  const resetProgramBoundaries = (): void => {
+    programInsertionPoints.clear();
+    let append: EditCommand | undefined;
+    for (const edit of edits) {
+      const record = programInsertions.get(edit);
+      if (!record) continue;
+      const prefix = insertionPrefix(edit.kind, edit.start);
+      if (prefix !== record.prefix && edit.contentParts) {
+        edit.contentParts = [
+          ...(prefix ? [prefix] : []),
+          ...edit.contentParts.slice(record.prefix ? 1 : 0),
+        ];
+      } else if (prefix !== record.prefix) {
+        edit.content = prefix + edit.content!.slice(record.prefix.length);
+      }
+      record.prefix = prefix;
+      if (!programInsertionPoints.has(edit.start)) programInsertionPoints.set(edit.start, edit);
+      if (edit.kind === 'AppendLeft') append = edit;
+    }
+    if (programEndBoundary && !edits.includes(programEndBoundary)) programEndBoundary = undefined;
+    if (append && programBodyOffsets?.[2] && !programEndBoundary) {
+      programEndBoundary = {
+        kind: 'AppendLeft',
+        start: session.source.length,
+        end: session.source.length,
+        content: '\n',
+        owner: append.owner,
+        order: order++,
+      };
+      edits.push(programEndBoundary);
+    }
+  };
   const contexts = new Map<NativePlugin<any, any>, DispatcherEntry>();
   const metadataOwners = new Map<string, string>();
   for (const plugin of activePlugins)
@@ -152,22 +235,21 @@ export function createDispatcher(
       offset: number,
       realized: RealizedContent,
     ): void => {
-      const prefix =
-        !programInsertionPoints.has(offset) &&
-        session.sourceTextOperations.needsLineBoundary(offset)
-          ? '\n'
-          : '';
-      programInsertionPoints.add(offset);
-      edits.push({
+      const prefix = insertionPrefix(kind, offset);
+      const edit: EditCommand = {
         kind,
         start: offset,
         end: offset,
         ...(realized.contentParts
-          ? { contentParts: [...(prefix ? [prefix] : []), ...realized.contentParts, '\n'] }
-          : { content: `${prefix}${realized.content}\n` }),
+          ? { contentParts: [...(prefix ? [prefix] : []), ...realized.contentParts] }
+          : { content: `${prefix}${realized.content}` }),
         owner: plugin.name,
         order: order++,
-      });
+      };
+      if (!programInsertionPoints.has(offset)) programInsertionPoints.set(offset, edit);
+      programInsertions.set(edit, { prefix, pending: realized });
+      hasPendingInsertions = true;
+      edits.push(edit);
     };
     const pushProgramInsertion = (
       kind: 'Prologue' | 'AppendLeft',
@@ -237,16 +319,16 @@ export function createDispatcher(
       appendToProgram: code => {
         programBodyOffsets ??= session.programBodyOffsets();
         pushProgramInsertion('AppendLeft', programBodyOffsets[1], code);
-        if (programBodyOffsets[2] && !programEndBoundaryAdded) {
-          edits.push({
+        if (programBodyOffsets[2] && !programEndBoundary) {
+          programEndBoundary = {
             kind: 'AppendLeft',
             start: session.source.length,
             end: session.source.length,
             content: '\n',
             owner: plugin.name,
             order: order++,
-          });
-          programEndBoundaryAdded = true;
+          };
+          edits.push(programEndBoundary);
         }
       },
       ensureHelper: (key, code) => {
@@ -292,7 +374,12 @@ export function createDispatcher(
         return makeSourceFragment(session, start, end);
       },
       code: codeFactory,
-      editor: createEditor(session, edits, plugin.name, () => order++),
+      editor: createEditor(session, edits, plugin.name, () => order++, {
+        affects: edit =>
+          edit === programEndBoundary || programInsertionPoints.get(edit.start) === edit,
+        reconcile: resetProgramBoundaries,
+        beforeCommit: flushInsertions,
+      }),
     };
     entry.context = context;
     contexts.set(plugin, entry);
@@ -616,6 +703,7 @@ export function createDispatcher(
   );
   return {
     contexts,
+    flushInsertions,
     run() {
       for (const entry of contexts.values()) resetSkippedTraversal(entry.skipped);
       dispatchRoutedEvents(

@@ -17,7 +17,7 @@ mod session;
 pub(crate) use routed::materialize_routed_buffer;
 
 struct MaterializedSessionParts {
-    pub(crate) program_body_offsets: [u32; 3],
+    pub(crate) program_body_offsets: [u32; 5],
     pub(crate) scope_parents: Vec<u32>,
     pub(crate) retained_index: RetainedIndex,
     pub(crate) initial_routed_buffer: Option<Vec<u8>>,

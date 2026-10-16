@@ -84,6 +84,12 @@ interface NativeBinding {
     whitespace(): number[];
     indent(prefix: string): string;
     needsLineBoundary(offset: number): boolean;
+    startsLine(offset: number): boolean;
+    linePrefixIntervals(start: number, end: number): Buffer;
+    insertionSuffixes(
+      texts: readonly string[],
+      composites: readonly (readonly (string | { start: number; end: number })[])[],
+    ): Buffer;
     locations(start: number, end: number): number[];
     locationOffset(line: number, column: number): number;
     matches(
@@ -91,6 +97,7 @@ interface NativeBinding {
       flags: string | undefined,
       all: boolean,
       replacement?: string,
+      start?: number,
     ): {
       start: number;
       end: number;
@@ -147,7 +154,13 @@ interface NativeBinding {
     bindingIndexBuffer(): Buffer;
     scopeParentsBuffer(): Buffer;
     scopeMetadataBuffer(): Buffer;
-    programBodyOffsets(): [prepend: number, append: number, needsEofLineBoundary: number];
+    programBodyOffsets(): [
+      prepend: number,
+      append: number,
+      needsEofLineBoundary: number,
+      prependSeparator: number,
+      appendSeparator: number,
+    ];
     queryCapturesBatch(
       functionIds: number[],
       programBindings?: number[],
