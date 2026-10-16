@@ -2,7 +2,11 @@ import type { RouteCapabilities } from '../pipeline/types';
 import { decodeConstant, decodeString } from '../protocol/value-transport';
 import { parserFilename } from '../adapters/classification';
 import { CHILD_ROLES, FIELD_KEY_IDS, NODE_TYPE_IDS, NODE_TYPES } from '../generated/event-schema';
-import { native, type NativeIndexedSessionBinding } from '../native/binding';
+import {
+  native,
+  type NativeIndexedSessionBinding,
+  type NativeParsedSourceBinding,
+} from '../native/binding';
 import {
   dispatchRoutedEvents,
   decodeEventBatch,
@@ -53,18 +57,22 @@ export class NativeTransformSession {
     retentionManifest?: Buffer,
     initialManifest?: Buffer,
     buildInitialRoute = true,
+    parsedSource?: NativeParsedSourceBinding,
   ) {
     this.#nativeFilename = parserFilename(filename, options.parser);
     // Without a retention plan the native session holds no state, so its
     // construction (and the source copy it takes) is deferred until something needs it.
     if (retentionManifest != null || initialManifest != null) {
-      this.#native = new native.NativeIndexedSession(
-        source,
-        this.#nativeFilename,
-        retentionManifest,
-        initialManifest,
-        buildInitialRoute,
-      );
+      this.#native =
+        parsedSource != null && retentionManifest != null && initialManifest != null
+          ? parsedSource.materialize(retentionManifest, initialManifest)
+          : new native.NativeIndexedSession(
+              source,
+              this.#nativeFilename,
+              retentionManifest,
+              initialManifest,
+              buildInitialRoute,
+            );
     }
   }
   get nativeMemoryBytes(): number {

@@ -1,4 +1,9 @@
-import { CHILD_ROLES, NODE_TYPES, PREDICATE_FIELDS } from '../generated/event-schema';
+import {
+  CHILD_ROLES,
+  NODE_TYPE_IDS,
+  NODE_TYPES,
+  PREDICATE_FIELDS,
+} from '../generated/event-schema';
 import { maxEditEffect } from './compile';
 import { stableJson } from './cache-key';
 import {
@@ -460,6 +465,19 @@ function mergeChildRoleRequests(
 function pluginPlan(plugin: NativePlugin<any, any>): PreparedPluginPlan {
   let plan = pluginPlans.get(plugin);
   if (plan != null) return plan;
+  const syntax = plugin.contract?.syntax;
+  if (
+    syntax != null &&
+    (!Array.isArray(syntax.anyOf) ||
+      syntax.anyOf.length === 0 ||
+      syntax.anyOf.some(
+        feature =>
+          feature !== 'AsyncFunction' &&
+          feature !== 'GeneratorFunction' &&
+          !NODE_TYPE_IDS.has(feature),
+      ))
+  )
+    throw new Error(`${plugin.name}: syntax.anyOf requires a nonempty list of syntax features`);
   plan = synthesizeVisitorPlan(plugin, plugin.visitors == null ? [] : resolveTypedVisitors(plugin));
   // Plugin-contract requirements union with the visitor-derived plan.
   if (plugin.contract != null) {
@@ -470,6 +488,37 @@ function pluginPlan(plugin: NativePlugin<any, any>): PreparedPluginPlan {
   }
   pluginPlans.set(plugin, plan);
   return plan;
+}
+
+// Applicability changes only the plugin subset, not the plugins' contracts.
+// Cap cached subsets so highly variable files cannot grow a phase cache forever.
+const applicablePhases = new WeakMap<PipelinePhase, Map<string, PreparedPhase>>();
+
+export function prepareApplicablePhase(
+  phase: PipelinePhase,
+  facts: ReadonlySet<string> | null,
+): PreparedPhase {
+  // Public callers may pass a pipeline directly to transform. Validate its
+  // complete definition before applicability can hide an invalid contract.
+  const complete = preparePhase(phase);
+  if (facts == null) return complete;
+  const plugins = complete.activePlugins;
+  let key = '';
+  const active = plugins.filter(plugin => {
+    const applicable =
+      plugin.contract?.syntax == null ||
+      plugin.contract.syntax.anyOf.some(feature => facts.has(feature));
+    key += applicable ? '1' : '0';
+    return applicable;
+  });
+  if (active.length === plugins.length) return complete;
+  let cache = applicablePhases.get(phase);
+  const cached = cache?.get(key);
+  if (cached != null) return cached;
+  const prepared = preparePhase({ ...phase, plugins: active });
+  if (cache == null) applicablePhases.set(phase, (cache = new Map()));
+  if (cache.size < 32) cache.set(key, prepared);
+  return prepared;
 }
 
 export function preparePhase(phase: PipelinePhase): PreparedPhase {

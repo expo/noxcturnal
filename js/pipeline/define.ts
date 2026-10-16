@@ -43,7 +43,19 @@ export function defineNativePlugin<
   const definition = {
     ...plugin,
     visitors: plugin.visitors == null ? undefined : Object.freeze([...plugin.visitors]),
-    contract: plugin.contract == null ? undefined : Object.freeze({ ...plugin.contract }),
+    contract:
+      plugin.contract == null
+        ? undefined
+        : Object.freeze({
+            ...plugin.contract,
+            ...(plugin.contract.syntax == null
+              ? {}
+              : {
+                  syntax: Object.freeze({
+                    anyOf: Object.freeze([...plugin.contract.syntax.anyOf]),
+                  }),
+                }),
+          }),
   } as DefinedNativePlugin<State, Options, Analysis, Contract>;
   Object.defineProperty(definition, 'withOptions', {
     enumerable: false,

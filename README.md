@@ -63,6 +63,25 @@ Every plugin in a phase observes the same immutable input. Its edits become visi
 phase boundary, after validation and an optional reparse. Split dependent transforms into separate
 phases when a later transform must observe an earlier transform's output.
 
+Plugins that only apply to particular syntax can declare a necessary condition:
+
+```ts
+contract: {
+  syntax: {
+    anyOf: ['AsyncFunction', 'Super'];
+  }
+}
+```
+
+The plugin runs only when at least one listed feature occurs in the current phase's input.
+Features are concrete AST node kinds, plus `AsyncFunction` (including async arrows and methods)
+and `GeneratorFunction` (including generator methods). Comments, strings, and property names do
+not count as the syntax they mention. Choose a conservative condition: use `analyze` for further
+semantic checks. A rejected plugin skips all lifecycle hooks, including state creation and cleanup,
+and adds no retention or child hydration requirements. Native syntax selection shares the input
+parse with active visitors and is reevaluated when earlier phases change the source. Pipelines
+without syntax requirements keep their existing execution path.
+
 `path.matchesPattern()` uses native AST facts. Declare `fields: ['memberPath']` for static or
 computed member expressions or `fields: ['name']` for identifiers, including in child contracts.
 Missing declarations throw. An identifier reached through a `memberPath` declaration returns false,

@@ -80,6 +80,19 @@ export interface NativePreflightResultOutput {
 }
 
 interface NativeBinding {
+  NativeParsedSource: new (
+    source: string,
+    filename: string,
+  ) => {
+    syntaxFacts(): string[];
+    materializeRouted(manifest: Buffer): Buffer;
+    materialize(
+      retentionManifest: Buffer,
+      initialRouteManifest: Buffer,
+    ): NativeIndexedSessionBinding;
+    validate(): void;
+    close(): void;
+  };
   NativeSourceText: new (source: string) => {
     generateUid(name: string, filename: string): string;
     whitespace(): number[];
@@ -342,6 +355,7 @@ function platformSuffix(): string {
   return `${process.platform}-${process.arch}`;
 }
 export const native = loadBinding();
+export type NativeParsedSourceBinding = InstanceType<NativeBinding['NativeParsedSource']>;
 export type NativeIndexedSessionBinding = InstanceType<NativeBinding['NativeIndexedSession']>;
 
 let flowErasureBuilt: boolean | undefined;

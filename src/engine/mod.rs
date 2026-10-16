@@ -10,6 +10,7 @@ use crate::sourcemap;
 mod collect;
 mod fields;
 mod member;
+mod parsed;
 mod pipeline;
 mod retained;
 mod routed;

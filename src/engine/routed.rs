@@ -54,11 +54,27 @@ pub fn materialize_routed_buffer(
             "routed-materialization",
         ));
     }
+    materialize_routed_program(
+        source,
+        &allocator,
+        &parsed.program,
+        &manifest,
+        root_start.zip(root_end),
+    )
+}
+
+pub(super) fn materialize_routed_program<'a>(
+    source: &'a str,
+    allocator: &'a Allocator,
+    program: &oxc_ast::ast::Program<'a>,
+    manifest: &CompiledManifest,
+    root: Option<(u32, u32)>,
+) -> Result<Buffer> {
     let semantic_return = manifest.needs_semantics.then(|| {
         SemanticBuilder::new()
             .with_build_nodes(true)
             .with_check_syntax_error(true)
-            .build(&parsed.program)
+            .build(program)
     });
     if let Some(semantic_return) = &semantic_return
         && !semantic_return.diagnostics.is_empty()
@@ -69,10 +85,10 @@ pub fn materialize_routed_buffer(
             "routed-materialization",
         ));
     }
-    let utf16 = (!source.is_ascii()).then(|| utf16_index(source, &allocator));
+    let utf16 = (!source.is_ascii()).then(|| utf16_index(source, allocator));
     let mut collector = RoutedEventCollector {
         source,
-        manifest: &manifest,
+        manifest,
         nodes: semantic_return
             .as_ref()
             .map(|semantic_return| semantic_return.semantic.nodes()),
@@ -80,7 +96,7 @@ pub fn materialize_routed_buffer(
             .as_ref()
             .map(|semantic_return| semantic_return.semantic.scoping()),
         utf16: utf16.as_deref().map(|offsets| &**offsets),
-        root: root_start.zip(root_end),
+        root,
         node_count: 0,
         validation_stats: Stats::default(),
         sequence: 0,
@@ -90,47 +106,34 @@ pub fn materialize_routed_buffer(
         route_scratch: Vec::new(),
         parent_ids: FxHashSet::default(),
         target_stack: Vec::new(),
-        tracks_member_writes: tracks_member_writes(
-            Some(&manifest),
-            manifest.retention_capabilities,
-        ),
+        tracks_member_writes: tracks_member_writes(Some(manifest), manifest.retention_capabilities),
         member_paths: MemberPathInterner::default(),
         comments: manifest
             .needs_comments
-            .then_some(parsed.program.comments.as_slice()),
+            .then_some(program.comments.as_slice()),
     };
     // Program-only routes need no descendant payloads or traversal. Validation
     // still visits the entire AST and supplies its exact node count; reuse that
     // count instead of walking the same tree again just to emit its root.
     if manifest.program_only && !manifest.needs_semantics {
         let validated = crate::syntax::validation::validate_program(
-            &parsed.program,
+            program,
             "routed-materialization",
-            &allocator,
+            allocator,
         )?;
         collector.node_count = validated.stats.nodes;
-        collector.emit(
-            AstKind::Program(&parsed.program),
-            VisitSide::Enter,
-            false,
-            false,
-        );
+        collector.emit(AstKind::Program(program), VisitSide::Enter, false, false);
         if manifest.include_exit {
             collector.sequence = collector.node_count;
-            collector.emit(
-                AstKind::Program(&parsed.program),
-                VisitSide::Exit,
-                false,
-                false,
-            );
+            collector.emit(AstKind::Program(program), VisitSide::Exit, false, false);
         }
     } else {
-        collector.visit_program(&parsed.program);
+        collector.visit_program(program);
     }
     if !manifest.needs_semantics && !manifest.program_only {
         collector.validation_stats.nodes = collector.node_count;
         crate::syntax::validation::validate_program_with_stats(
-            &parsed.program,
+            program,
             "routed-materialization",
             collector.validation_stats,
         )?;
@@ -150,7 +153,7 @@ pub fn materialize_routed_buffer(
         strings[id as usize] = value;
     }
     encode_routed_envelope(
-        &manifest,
+        manifest,
         node_count,
         strings,
         data,
