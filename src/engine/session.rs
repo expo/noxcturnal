@@ -1,7 +1,4 @@
-use napi::{
-    Error, Result, Status,
-    bindgen_prelude::{Buffer, Utf16String},
-};
+use napi::{Error, Result, Status, bindgen_prelude::Buffer};
 use napi_derive::napi;
 use rustc_hash::FxHashSet;
 
@@ -14,6 +11,7 @@ use crate::semantic::retained_index::{
     NativeBindingFact, NativeCallFact, NativeCaptureGroup, NativeConstantFact, NativeRenamePlan,
     RetainedIndex,
 };
+use crate::syntax::source_text::UidAllocator;
 
 use super::collect::{materialize_with_scope_parents, parse_program_body_offsets};
 use super::retained::routed_buffer_from_index;
@@ -45,6 +43,7 @@ pub struct NativeIndexedSession {
     source: String,
     filename: String,
     retained_index: RetainedIndex,
+    uids: UidAllocator,
     scope_parents: Vec<u32>,
     initial_route_manifest: Option<Vec<u8>>,
     initial_routed_buffer: Option<Vec<u8>>,
@@ -88,21 +87,16 @@ impl NativeIndexedSession {
         Ok(session)
     }
 
-    /// Move the requested identifier inventory without serializing names through JS.
-    /// Keep the caller's original UTF-16 text: the parser's UTF-8 copy cannot
-    /// preserve lone surrogates used by source operations such as replacement.
+    /// Probe retained names directly, without copying the source or assembling
+    /// another identifier inventory. Absent retention uses the standalone path.
     #[napi]
-    pub fn create_source_text(
-        &mut self,
-        source: Utf16String,
-    ) -> Result<crate::syntax::source_text::NativeSourceText> {
+    pub fn generate_uid(&mut self, name: String) -> Result<Option<String>> {
         self.ensure_open()?;
-        Ok(
-            crate::syntax::source_text::NativeSourceText::with_identifiers(
-                source,
-                self.retained_index.take_uid_identifiers(),
-            ),
-        )
+        Ok(self.retained_index.has_uid_identifiers().then(|| {
+            self.uids.generate(&name, |uid| {
+                self.retained_index.contains_uid_identifier(uid)
+            })
+        }))
     }
 
     #[napi]
@@ -431,6 +425,7 @@ impl NativeIndexedSession {
     pub fn close(&mut self) {
         self.closed = true;
         self.retained_index.clear();
+        self.uids = UidAllocator::default();
         self.scope_parents.clear();
         self.initial_route_manifest = None;
         self.initial_routed_buffer = None;
@@ -442,6 +437,7 @@ impl NativeIndexedSession {
         (self.source.len()
             + self.filename.len()
             + self.retained_index.memory_usage()
+            + self.uids.memory_usage()
             + self
                 .initial_route_manifest
                 .as_ref()
@@ -476,6 +472,7 @@ impl NativeIndexedSession {
             source,
             filename,
             retained_index,
+            uids: UidAllocator::default(),
             scope_parents,
             initial_route_manifest: initial_route_manifest.map(|manifest| manifest.to_vec()),
             initial_routed_buffer,

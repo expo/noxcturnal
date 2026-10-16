@@ -690,7 +690,7 @@ mod uid_tests {
                 Parser::new(&allocator, source, source_type(filename, source).unwrap()).parse();
             assert!(parsed.diagnostics.is_empty(), "{filename}");
             let expected = identifier_names(&parsed.program);
-            let mut parts = materialize_program(
+            let parts = materialize_program(
                 source,
                 &allocator,
                 &parsed.program,
@@ -699,10 +699,10 @@ mod uid_tests {
                 false,
             )
             .unwrap();
-            let inventory = parts.retained_index.take_uid_identifiers().unwrap();
+            assert!(parts.retained_index.has_uid_identifiers());
+            let inventory = parts.retained_index.uid_identifier_names();
             assert_eq!(inventory, expected, "{filename}");
             assert!(!inventory.contains("_notAnIdentifier"));
-            assert!(parts.retained_index.take_uid_identifiers().is_none());
         }
     }
 }

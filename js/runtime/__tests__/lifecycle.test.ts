@@ -744,3 +744,41 @@ test('retained source operations preserve original UTF-16 units alongside UID re
   assert.equal(session.generateUid('temp'), '_temp3');
   session.close();
 });
+
+test('retained UID allocation bypasses source-text initialization', () => {
+  for (const source of ['', 'const _temp = 1; const obj = { _temp2: 2 };']) {
+    const session = openRetained(source, 'fixture.js');
+    const sourceText = vi.spyOn(session, 'sourceTextOperations', 'get');
+    try {
+      assert.equal(session.generateUid('temp'), source ? '_temp3' : '_temp');
+      assert.equal(session.generateUid('t-e-m-p'), source ? '_temp4' : '_temp2');
+      assert.equal(sourceText.mock.calls.length, 0);
+    } finally {
+      sourceText.mockRestore();
+      session.close();
+    }
+    assert.throws(() => session.generateUid('temp'), /closed/);
+  }
+});
+
+test('UID allocation without identifier retention preserves lazy parsing and errors', () => {
+  const session = new NativeTransformSession(
+    'const _temp = 1;',
+    'fixture.js',
+    {},
+    packRouteManifest([], false, false, 0),
+  );
+  const sourceText = vi.spyOn(session, 'sourceTextOperations', 'get');
+  try {
+    assert.equal(session.generateUid('temp'), '_temp2');
+    assert.equal(session.generateUid('temp'), '_temp3');
+    assert.equal(sourceText.mock.calls.length, 2);
+  } finally {
+    sourceText.mockRestore();
+    session.close();
+  }
+  const invalid = new NativeTransformSession('invalid !!!', 'fixture.js');
+  assert.throws(() => invalid.generateUid('temp'));
+  assert.throws(() => invalid.generateUid('temp'));
+  invalid.close();
+});

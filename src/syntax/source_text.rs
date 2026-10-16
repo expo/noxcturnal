@@ -31,9 +31,52 @@ pub struct NativeSourceText {
     source: Utf16String,
     lines: Option<Vec<u32>>,
     identifiers: Option<FxHashSet<String>>,
+    uids: UidAllocator,
+    utf8: OnceCell<String>,
+}
+
+/// Reservations and normalized-hint cursors are independent of how the immutable
+/// source answers membership queries. Retained sessions use their existing index;
+/// standalone source operations lazily parse and cache identifier names.
+#[derive(Default)]
+pub(crate) struct UidAllocator {
     reserved: FxHashSet<String>,
     next_suffix: FxHashMap<String, u64>,
-    utf8: OnceCell<String>,
+}
+
+impl UidAllocator {
+    pub(crate) fn generate(
+        &mut self,
+        name: &str,
+        mut contains_identifier: impl FnMut(&str) -> bool,
+    ) -> String {
+        let hint: String = name
+            .chars()
+            .filter(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '$'))
+            .collect();
+        let base = format!("_{}", if hint.is_empty() { "temp" } else { &hint });
+        let mut index = self.next_suffix.get(&base).copied().unwrap_or(1);
+        let mut uid = if index == 1 {
+            base.clone()
+        } else {
+            format!("{base}{index}")
+        };
+        index = if index == 1 { 2 } else { index + 1 };
+        while contains_identifier(&uid) || self.reserved.contains(&uid) {
+            uid = format!("{base}{index}");
+            index += 1;
+        }
+        self.next_suffix.insert(base, index);
+        self.reserved.insert(uid.clone());
+        uid
+    }
+
+    pub(crate) fn memory_usage(&self) -> usize {
+        self.reserved.capacity() * size_of::<String>()
+            + self.reserved.iter().map(String::capacity).sum::<usize>()
+            + self.next_suffix.capacity() * size_of::<(String, u64)>()
+            + self.next_suffix.keys().map(String::capacity).sum::<usize>()
+    }
 }
 
 #[napi]
@@ -44,8 +87,7 @@ impl NativeSourceText {
             source,
             lines: None,
             identifiers: None,
-            reserved: FxHashSet::default(),
-            next_suffix: FxHashMap::default(),
+            uids: UidAllocator::default(),
             utf8: OnceCell::new(),
         }
     }
@@ -70,25 +112,9 @@ impl NativeSourceText {
             }
             self.identifiers = Some(identifier_names(&parsed.program));
         }
-        let hint: String = name
-            .chars()
-            .filter(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '$'))
-            .collect();
-        let base = format!("_{}", if hint.is_empty() { "temp" } else { &hint });
-        let mut index = self.next_suffix.get(&base).copied().unwrap_or(1);
-        let mut uid = if index == 1 {
-            base.clone()
-        } else {
-            format!("{base}{index}")
-        };
-        index = if index == 1 { 2 } else { index + 1 };
-        while self.identifiers.as_ref().unwrap().contains(&uid) || self.reserved.contains(&uid) {
-            uid = format!("{base}{index}");
-            index += 1;
-        }
-        self.next_suffix.insert(base, index);
-        self.reserved.insert(uid.clone());
-        Ok(uid)
+        Ok(self.uids.generate(&name, |uid| {
+            self.identifiers.as_ref().unwrap().contains(uid)
+        }))
     }
 
     #[napi]
@@ -325,6 +351,7 @@ impl NativeSourceText {
 }
 
 impl NativeSourceText {
+    #[cfg(test)]
     pub(crate) fn with_identifiers(
         source: Utf16String,
         identifiers: Option<FxHashSet<String>>,
@@ -506,7 +533,7 @@ mod uid_tests {
                     .unwrap(),
                 expected
             );
-            assert_eq!(source.next_suffix["_temp"], index.max(1) + 1);
+            assert_eq!(source.uids.next_suffix["_temp"], index.max(1) + 1);
         }
     }
 }

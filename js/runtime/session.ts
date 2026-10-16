@@ -672,8 +672,7 @@ export class NativeTransformSession {
   }
   get sourceTextOperations(): InstanceType<typeof native.NativeSourceText> {
     this.#assertOpen();
-    return (this.#sourceText ??=
-      this.#native?.createSourceText(this.source) ?? new native.NativeSourceText(this.source));
+    return (this.#sourceText ??= new native.NativeSourceText(this.source));
   }
   startsLine(offset: number): boolean {
     // Keep one 8 KiB source window. A single sparse query uses the adjacent
@@ -708,7 +707,11 @@ export class NativeTransformSession {
     return low * 2 < intervals.length && intervals[low * 2] <= offset;
   }
   generateUid(name = 'temp'): string {
-    return this.sourceTextOperations.generateUid(name, this.#nativeFilename);
+    this.#assertOpen();
+    return (
+      this.#native?.generateUid(name) ??
+      this.sourceTextOperations.generateUid(name, this.#nativeFilename)
+    );
   }
   sourceLocation(start: number, end: number): SourceLocation {
     const [startLine, startColumn, endLine, endColumn] = this.sourceTextOperations.locations(
