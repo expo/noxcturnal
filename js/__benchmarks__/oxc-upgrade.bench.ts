@@ -14,6 +14,13 @@ const implementations = [
   ['candidate', candidate] as const,
 ];
 if (process.env.NOXCTURNAL_BENCH_REVERSE === '1') implementations.reverse();
+const only = process.env.NOXCTURNAL_BENCH_ONLY;
+if (only)
+  implementations.splice(
+    0,
+    implementations.length,
+    ...implementations.filter(([label]) => label === only),
+  );
 
 const compiler = {
   compilationMode: 'infer',
@@ -36,6 +43,15 @@ const react = Array.from(
   { length: 40 },
   (_, i) => `export function Component${i}({value}) {return <div>{value + ${i}}</div>}`,
 ).join('\n');
+const largeSource = `import {useState} from 'react'; export function Large({data,flag,onSelect}) {
+  const [count,setCount] = useState(0);
+  return <div onClick={() => setCount(count + 1)}>${sections}</div>;
+}`;
+const branchSource = `export function Branches({data, flag}) {
+  let result = data.base;
+  ${Array.from({ length: 80 }, (_, i) => `if (flag && data.items[${i}]) {result = result + data.items[${i}].value} else {result = result + data.fallback}`).join('\n')}
+  return <div>{result}</div>;
+}`;
 const cases: { name: string; filename: string; source: string; plan: PreflightPlan }[] = [
   {
     name: 'mapped TypeScript and JSX (100 components)',
@@ -80,11 +96,20 @@ const cases: { name: string; filename: string; source: string; plan: PreflightPl
   {
     name: 'React Compiler (large single component)',
     filename: 'input.jsx',
-    source: `import {useState} from 'react'; export function Large({data,flag,onSelect}) {
-      const [count,setCount] = useState(0);
-      return <div onClick={() => setCount(count + 1)}>${sections}</div>;
-    }`,
+    source: largeSource,
     plan: { reactCompiler: compiler, jsx: 'classic' },
+  },
+  {
+    name: 'React Compiler (branch-heavy component)',
+    filename: 'input.jsx',
+    source: branchSource,
+    plan: { reactCompiler: compiler, jsx: 'classic' },
+  },
+  {
+    name: 'large JSX without compiler (control)',
+    filename: 'input.jsx',
+    source: largeSource,
+    plan: { jsx: 'classic' },
   },
 ];
 for (const entry of cases)
@@ -102,7 +127,7 @@ for (const entry of cases)
       assert.notEqual(result.code, entry.source);
       if (entry.plan.reactCompiler) assert.match(result.code, /_c\(/);
       console.info(
-        `${label}: ${entry.source.length} input chars, ${result.code.length} output chars`,
+        `${label}: ${entry.source.length} input chars, ${result.code.length} output chars, ${result.code.match(/\b_c\(/g)?.length ?? 0} memo-cache calls`,
       );
       bench(label, run);
     }
