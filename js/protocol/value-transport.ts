@@ -1,10 +1,10 @@
 /** Native strings normally stay UTF-8; exceptional UTF-16 strings use a NUL-prefixed JSON string. */
-export function decodeString(value: string, cache?: Map<string, string>): string {
+export function decodeString(value: string, cache?: string[], stringId?: number): string {
   if (value.charCodeAt(0) !== 0) return value;
-  const cached = cache?.get(value);
+  const cached = stringId === undefined ? undefined : cache?.[stringId];
   if (cached !== undefined) return cached;
   const decoded: string = JSON.parse(value.slice(1));
-  cache?.set(value, decoded);
+  if (cache && stringId !== undefined) cache[stringId] = decoded;
   return decoded;
 }
 
@@ -20,11 +20,12 @@ export function encodeString(value: string): string {
 
 export function decodeConstant(
   value: string,
-  cache?: Map<string, string>,
+  cache?: string[],
+  stringId?: number,
 ): string | number | boolean | null {
   switch (value[0]) {
     case 's':
-      return decodeString(value.slice(1), cache);
+      return decodeString(value.slice(1), cache, stringId);
     case 'n':
       return Number(value.slice(1));
     case 'b':

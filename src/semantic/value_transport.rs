@@ -1,7 +1,6 @@
 //! Host value encoding, separate from JavaScript coercion and optimizer evaluation.
 //! The optimizer keeps its own string-coercion and lone-surrogate refusal.
 use std::borrow::Cow;
-use std::fmt::Write;
 
 use oxc_ast::{
     AstKind,
@@ -37,42 +36,34 @@ fn encode_host_string(value: &str, lone_surrogates: bool) -> Cow<'_, str> {
     if !lone_surrogates && !value.starts_with('\0') {
         return Cow::Borrowed(value);
     }
-    let mut json = String::with_capacity(value.len() + 8);
-    json.push_str("\0\"");
-    if lone_surrogates {
-        push_marked_json(&mut json, value);
-    } else {
-        for ch in value.chars() {
-            push_json_escaped(&mut json, ch);
-        }
+    // serde_json supplies the same string escaping as JSON.stringify. Only
+    // Oxc's isolated-surrogate markers need a transport-specific conversion.
+    let mut json = serde_json::to_string(value).expect("strings serialize to JSON");
+    if !lone_surrogates {
+        json.insert(0, '\0');
+        return Cow::Owned(json);
     }
-    json.push('"');
-    Cow::Owned(json)
-}
-
-fn push_marked_json(json: &mut String, value: &str) {
-    let mut rest = value;
+    let mut encoded = String::with_capacity(json.len() + 1);
+    encoded.push('\0');
+    let mut rest = json.as_str();
     while let Some(start) = rest.find('\u{fffd}') {
-        for ch in rest[..start].chars() {
-            push_json_escaped(json, ch);
-        }
+        encoded.push_str(&rest[..start]);
         let after = &rest[start + '\u{fffd}'.len_utf8()..];
         if let Some(unit) = marked_unit(after) {
             if (0xd800..=0xdfff).contains(&unit) {
-                json.push_str("\\u");
-                json.push_str(&after[..4]);
+                encoded.push_str("\\u");
+                encoded.push_str(&after[..4]);
             } else {
-                json.push_str("\\ufffd");
+                encoded.push('\u{fffd}');
             }
             rest = &after[4..];
-            continue;
+        } else {
+            encoded.push('\u{fffd}');
+            rest = after;
         }
-        json.push_str("\\ufffd");
-        rest = after;
     }
-    for ch in rest.chars() {
-        push_json_escaped(json, ch);
-    }
+    encoded.push_str(rest);
+    Cow::Owned(encoded)
 }
 
 fn marked_unit(after: &str) -> Option<u16> {
@@ -82,24 +73,6 @@ fn marked_unit(after: &str) -> Option<u16> {
     }
     let unit = u16::from_str_radix(hex, 16).ok()?;
     ((0xd800..=0xdfff).contains(&unit) || unit == 0xfffd).then_some(unit)
-}
-
-// Match JSON.stringify, including literal U+2028/U+2029, so native payloads
-// and predicate manifests have identical spelling.
-fn push_json_escaped(output: &mut String, ch: char) {
-    match ch {
-        '"' => output.push_str("\\\""),
-        '\\' => output.push_str("\\\\"),
-        '\u{0008}' => output.push_str("\\b"),
-        '\u{000c}' => output.push_str("\\f"),
-        '\n' => output.push_str("\\n"),
-        '\r' => output.push_str("\\r"),
-        '\t' => output.push_str("\\t"),
-        ch if (ch as u32) < 0x20 => {
-            write!(output, "\\u{:04x}", ch as u32).unwrap();
-        }
-        ch => output.push(ch),
-    }
 }
 
 /// JavaScript numeric spelling, except negative zero keeps the sign that
@@ -143,7 +116,11 @@ pub(crate) fn constant(kind: AstKind<'_>) -> Option<TransportConstant> {
     let encoded = match &value {
         EvaluatedConstant::Null => "z".into(),
         EvaluatedConstant::Boolean(value) => format!("b{value}"),
-        EvaluatedConstant::Number(value) => format!("n{}", number_literal(*value)),
+        EvaluatedConstant::Number(value) => {
+            let mut encoded = number_literal(*value);
+            encoded.insert(0, 'n');
+            encoded
+        }
         EvaluatedConstant::String(value) => format!("s{}", plain_string(value)),
     };
     Some(TransportConstant {
@@ -193,7 +170,7 @@ mod tests {
         );
         assert_eq!(
             encode_host_string("\u{FFFD}fffd\u{FFFD}dc00x", true).as_ref(),
-            "\0\"\\ufffd\\udc00x\""
+            "\0\"\u{fffd}\\udc00x\""
         );
         assert_eq!(encode_host_string("\0a", false).as_ref(), "\0\"\\u0000a\"");
         assert_eq!(encode_host_string("a\"b", true).as_ref(), "\0\"a\\\"b\"");

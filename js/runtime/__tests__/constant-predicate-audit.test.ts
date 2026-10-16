@@ -73,7 +73,7 @@ const cases: {
     value: '',
     expected: 1,
   },
-  ...['\uD800', '\0'].flatMap(prefix =>
+  ...['\uD800', '\0', '\uFFFD\uD800'].flatMap(prefix =>
     ['\u2028', '\u2029'].map(separator => ({
       name: `exceptional string ${JSON.stringify(prefix + separator)}`,
       route: 'StringLiteral' as const,

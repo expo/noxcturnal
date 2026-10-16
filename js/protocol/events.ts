@@ -116,7 +116,7 @@ export function dispatchRoutedEvents(
   const words = new Int32Array(batch.data.buffer, batch.data.byteOffset, batch.data.byteLength / 4);
   const enterEvents: (NativeEvent | undefined)[] | null = batch.includeExit ? [] : null;
   // Interned exceptional strings need JSON decoding only once per tape.
-  const decodedStrings = new Map<string, string>();
+  const decodedStrings: string[] = [];
   let offset = 0;
   for (let record = 0; record < batch.nodeRecordCount; record++) {
     const sequenceWord = words[offset++];
@@ -165,9 +165,12 @@ export function dispatchRoutedEvents(
     for (let field = 0; field < fieldCount; field++) {
       const key = FIELD_KEYS[words[offset++]];
       if (!key) throw new Error('invalid routed field key');
-      const value = decodeValue(words[offset++], batch.stringAt);
+      const word = words[offset++];
+      const value = decodeValue(word, batch.stringAt);
       node[key] =
-        typeof value === 'string' ? coerceFieldValue(key, type, value, decodedStrings) : value;
+        typeof value === 'string'
+          ? coerceFieldValue(key, type, value, decodedStrings, word)
+          : value;
     }
     if (batch.includeComments) {
       const commentCount = words[offset++];
@@ -303,9 +306,10 @@ export function coerceFieldValue(
   key: string,
   nodeType: string,
   value: string,
-  decodedStrings?: Map<string, string>,
+  decodedStrings?: string[],
+  stringId?: number,
 ): string | number | boolean | null {
-  if (key === 'constantValue') return decodeConstant(value, decodedStrings);
+  if (key === 'constantValue') return decodeConstant(value, decodedStrings, stringId);
   if (key === 'value' && nodeType === 'NumericLiteral') return Number(value);
   if (key === 'value' && nodeType === 'BooleanLiteral') return parseScalar(value);
   if (
@@ -317,7 +321,7 @@ export function coerceFieldValue(
     key === 'exported' ||
     key === 'local'
   )
-    return decodeString(value, decodedStrings);
+    return decodeString(value, decodedStrings, stringId);
   return value;
 }
 
