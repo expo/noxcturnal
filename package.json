@@ -10,7 +10,8 @@
   "source": "./js/index.ts",
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
   "main": "./dist/noxcturnal.js",
   "module": "./dist/noxcturnal.mjs",
