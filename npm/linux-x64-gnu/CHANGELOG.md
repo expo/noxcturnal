@@ -1,5 +1,11 @@
 # @noxcturnal/noxcturnal-linux-x64-gnu
 
+## 0.1.5
+
+### Patch Changes
+
+- Add licence file, by [@kitten](https://github.com/kitten) (See [`6744c9e`](https://github.com/expo/noxcturnal/commit/6744c9efaec6a675714f411a23f1c9721da2fc84))
+
 ## 0.1.4
 
 ## 0.1.3
