@@ -44,6 +44,23 @@ pub fn validate_identifier(name: String) -> napi::Result<()> {
 }
 
 #[napi]
+pub fn original_source_position(
+    mappings: String,
+    line: u32,
+    column: u32,
+) -> Option<preflight::transform::NativeErrorLocation> {
+    if line == 0 {
+        return None;
+    }
+    sourcemap::trace_input_position(&mappings, line - 1, column).map(|(line, column)| {
+        preflight::transform::NativeErrorLocation {
+            line: line + 1,
+            column,
+        }
+    })
+}
+
+#[napi]
 pub fn native_preflight_transform(
     source: String,
     filename: String,

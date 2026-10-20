@@ -877,6 +877,41 @@ fn decode(mappings: &str) -> Vec<Vec<Segment>> {
     lines
 }
 
+pub(crate) fn trace_input_position(mappings: &str, line: u32, column: u32) -> Option<(u32, u32)> {
+    let mut previous = None;
+    let mut next = None;
+    let _: Result<_, std::convert::Infallible> =
+        visit_decoded(mappings, |generated_line, segment| {
+            if generated_line == line {
+                if segment.generated_column <= column {
+                    previous = Some(segment);
+                } else if next.is_none() {
+                    next = Some(segment);
+                }
+            }
+            Ok(())
+        });
+    let previous: Segment = previous?;
+    if previous.source != 0 || previous.original_line == u32::MAX {
+        return None;
+    }
+    let affine = next.is_some_and(|next| {
+        next.source == previous.source
+            && next.original_line == previous.original_line
+            && next.original_column.checked_sub(previous.original_column)
+                == next.generated_column.checked_sub(previous.generated_column)
+    });
+    Some((
+        previous.original_line,
+        previous.original_column
+            + if affine {
+                column - previous.generated_column
+            } else {
+                0
+            },
+    ))
+}
+
 fn visit_decoded<E>(
     mappings: &str,
     mut visit: impl FnMut(u32, Segment) -> Result<(), E>,
@@ -1063,7 +1098,7 @@ mod decoded;
 
 pub(crate) use decoded::{
     DecodedLayer, DecodedMapError, compose_decoded_layers, compose_layer_chain,
-    compose_layer_chain_with_input, pack_decoded_layer,
+    compose_layer_chain_with_input, pack_decoded_layer, trace_position,
 };
 
 #[cfg(test)]

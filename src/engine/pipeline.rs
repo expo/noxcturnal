@@ -79,6 +79,20 @@ impl NativePipelineSession {
                 self.normalized_javascript,
                 self.resident_jsx,
             )?;
+            if let Some(location) = result.error_location.take() {
+                result.error_location = crate::sourcemap::trace_position(
+                    &self.layers,
+                    location.line - 1,
+                    location.column,
+                )
+                .map_err(super::compose_error)?
+                .map(|(line, column)| {
+                    crate::preflight::transform::NativeErrorLocation {
+                        line: line + 1,
+                        column,
+                    }
+                });
+            }
             let complete = result.status == "complete";
             if complete {
                 let code = result
@@ -139,6 +153,27 @@ impl NativePipelineSession {
             code_changed,
             map_changed,
         })
+    }
+
+    #[napi]
+    pub fn original_position(
+        &self,
+        line: u32,
+        column: u32,
+    ) -> Result<Option<crate::preflight::transform::NativeErrorLocation>> {
+        if line == 0 {
+            return Ok(None);
+        }
+        Ok(
+            crate::sourcemap::trace_position(&self.layers, line - 1, column)
+                .map_err(super::compose_error)?
+                .map(
+                    |(line, column)| crate::preflight::transform::NativeErrorLocation {
+                        line: line + 1,
+                        column,
+                    },
+                ),
+        )
     }
 
     /// The current source text. A visitor phase needs it to open its routing
