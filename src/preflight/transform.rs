@@ -444,9 +444,9 @@ fn transform_with_function_map(
     if options.typescript.as_deref() == Some("strip") {
         active_source_type = active_source_type.with_typescript(true);
     }
-    if options.jsx.is_some() {
-        active_source_type = active_source_type.with_jsx(true);
-    }
+    // JSX handling controls output, not the input grammar. Keep the filename's
+    // dialect (or the normalized resident dialect) even when JSX is preserved
+    // or lowered, so a TypeScript file does not become TSX between phases.
     let possible_decorators =
         options.legacy_decorators == Some(true) && source.contains('@') && source.contains("class");
     let language_prepass = (active_source_type.is_typescript()
@@ -1679,7 +1679,8 @@ fn transform_with_function_map(
             changed: true,
             normalized_javascript: output_normalized_javascript
                 || active_source_type.is_typescript(),
-            jsx: active_source_type.is_jsx() && options.jsx.is_none(),
+            jsx: active_source_type.is_jsx()
+                && matches!(options.jsx.as_deref(), None | Some("preserve")),
             reason: None,
             code: Some(generated_code),
             map: Some(layer.into()),
