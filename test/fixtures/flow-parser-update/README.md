@@ -1,10 +1,12 @@
 # Hermes parser update coverage matrix
 
-This is the step-2 inventory for baseline
-`73855a1475e016cec814d67578f860112ef711e1` and candidate
-`17b37301da5da4a2cd55d78f9697c46c0fd96123`. The embedded checkout remains pinned
-throughout validation. The baseline is extracted with `git archive` into `target/`;
-the other Hermes worktree is never touched.
+This is the coverage record for the Hermes parser update. The submodule at
+`crates/hermes-parser-sys/hermes` is the candidate
+`17b37301da5da4a2cd55d78f9697c46c0fd96123`. Baseline
+`73855a1475e016cec814d67578f860112ef711e1` is the previous pin the inventory
+diffed against. The tables below are that audit. The embedded checkout stays
+pinned. Reproduction commands extract the baseline with `git archive` into
+`target/` and leave every other Hermes worktree alone.
 
 ## Scope and evidence
 
@@ -111,15 +113,14 @@ case-folding are additionally exercised by upstream regex runtime tests.
 [Regex modifier parsing][regex-commit], [flag propagation][regex-flags],
 [flag state refactor][regex-state], [word boundaries][regex-word], and
 [negative properties][regex-negative] change the linked regex engine. The native
-JSParser/WASM parser treats a regexp literal as a raw pattern and does **not**
-validate its modifier flags. Consequently `regex-modifiers-invalid` is retained
-verbatim by baseline, candidate, both JS references, and the no-op public pipeline;
-this is recorded as invalid syntax with deferred regexp validation, not claimed as
-supported syntax or a newly accepted JavaScript grammar change. The actual
-`RegexParser` rejection is asserted by upstream
-[test/hermes/regexp-modifiers-group.js][regex-test] (`new RegExp('(?ii:)')`) through
-the upstream runtime test workflow. The valid `regex-modifiers` row proves raw
-literal preservation and downstream Oxc parseability. Support-library Regex/RegExp
+JSParser/WASM parser stores a regexp literal as a raw pattern and leaves modifier
+flags to a later engine. `regex-modifiers-invalid` is the same text at baseline,
+at the candidate, in both JS references, and in the no-op public pipeline: invalid
+syntax with deferred validation. Upstream
+[test/hermes/regexp-modifiers-group.js][regex-test] (`new RegExp('(?ii:)')`) is
+the `RegexParser` rejection, run through the upstream runtime test workflow. The
+valid `regex-modifiers` row checks that the raw literal survives and that Oxc can
+parse it. Support-library Regex/RegExp
 unit tests (8 tests) also passed. The upstream regexp runtime selection passed
 20 tests; its one unsupported test is `test/jit/regexp.js`, which requires the
 JIT disabled in this build. Native Flow erasure does not execute regexes.
@@ -363,8 +364,7 @@ erasure gaps**. The compiler JSON entry point is specifically inapplicable to
 Flow source, with a passing upstream depth regression instead. The no-op lexer,
 Rust FFI consumer, and shared cleanup changes are classified in the ledger.
 The initially missing async-component, record, decorator, and ref-relocation
-paths now have native support. Invalid syntax and reference-rejected match forms
-are not claimed as supported Flow programs.
+paths now have native support.
 
 Original step-2 Darwin ARM64 validation passed: 49 parser-enabled native crate tests,
 82/82 baseline/candidate probe comparisons, 502 public/compliance/alignment tests

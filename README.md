@@ -16,8 +16,11 @@ dependencies, rewrite modules, or wrap output for a particular framework.
 pnpm add noxcturnal
 ```
 
-Noxcturnal requires Node.js 18 or later. The package selects a prebuilt native binary for supported
-macOS, Linux, and Windows targets.
+Noxcturnal requires Node.js 18 or later. The published package ships JavaScript only. Native code
+is eight optional dependencies named `@noxcturnal/noxcturnal-<platform>`. The loader tries a
+colocated `noxcturnal.<platform>.node`, then that package. Linux chooses `gnu` or `musl` from the
+process report's glibc version. An unsupported platform fails to load; there is no JavaScript
+fallback. The platform set is `scripts/native-targets.json`.
 
 ## Usage
 
@@ -139,19 +142,25 @@ Refresh integration, common ES syntax lowering, constant folding, and dead-code 
 
 `transform` has three outcomes:
 
-- A successful transform returns a `NativeTransformResult`.
-- An intentional compatibility boundary returns a `NativeBailoutResult` with the pristine input in
-  `source`.
+- A successful transform returns the output.
+- An intentional compatibility boundary returns a bailout. The source on that result is the string
+  passed to `transform`, including when Flow erasure or a parser adapter had already produced a
+  working buffer.
 - Invalid input or configuration and internal failures throw.
 
 Run a compatibility transformer only for a returned bailout. Thrown failures should propagate.
-Syntax failures use `TransformSyntaxError`; fatal native failures use `NativeTransformError` with
-the stable code `NOXCTURNAL_TRANSFORM_ERROR`.
+A syntax failure is a syntax error. Any other fatal failure is a transform error. A `cleanup`
+hook that throws promotes a bailout into that fatal error. When the transform was already fatal,
+the original error stays primary.
+
+`functionMap: true` collects ranges from the input parse, before lowering rewrites the file.
 
 ## Development
 
-The reproducible development environment includes Node.js, pnpm, Rust, CMake, Ninja, Python, and
-the C++ tools needed to build the optional Hermes-backed Flow parser.
+The Nix development shell supplies Node.js 22, pnpm 10, Rust 1.97, CMake, Ninja, and Python.
+`flow_parser` and `react_compiler` are default Cargo features, so a normal build includes Hermes
+Flow erasure and the React Compiler. A binary built without `flow_parser` reports Flow erasure as
+`unsupported` and leaves the file to a parser adapter.
 
 ```sh
 nix develop
@@ -165,8 +174,29 @@ Use `pnpm format` to format the TypeScript and Rust sources. User-visible change
 changeset because the main package and its native platform packages are released as one fixed
 version group.
 
-The test suite is organized by ownership and purpose; see [test/README.md](test/README.md) before
-adding, moving, or deleting coverage.
+The test suite is organized by ownership and purpose. Read [test/README.md](test/README.md) before
+adding, moving, or deleting coverage. Each feature folder under [js/](js/README.md) and
+[src/](src/README.md) has its own README.
+
+## Repository
+
+Noxcturnal is one npm package and one N-API crate.
+
+[`js/`](js/README.md) is the public package: the API, the pipeline, visitors, and the protocol on
+this side of the addon. [`src/`](src/README.md) is the addon: parsing, native transforms, commits,
+and source maps. `protocol/event-schema.json` is the shared AST schema. `pnpm codegen` emits both
+sides from it.
+
+`crates/hermes-flow` erases Flow from Hermes' serialized AST. `crates/hermes-parser-sys` links the
+Hermes parser. `vendor/oxc_transformer` and `vendor/oxc_react_compiler` are the patched Oxc
+trees, selected with `[patch.crates-io]`. The first drop of the transformer was vendored with no
+local changes. Repairs landed after that, and each crate's `NOXCTURNAL.md` lists them. Confirm a
+bullet against the current source. Later upgrades did not rewrite that list.
+
+[`test/`](test/README.md) holds the alignment, compliance, transform, and integration suites.
+`npm/` holds the optional per-platform binaries.
+
+Oxc crates and `@oxc-project/types` stay on the same exact version.
 
 ## License
 

@@ -1,5 +1,9 @@
 # Oxc transformer
 
+Noxcturnal vendors this crate at 0.154.0 (`UPSTREAM_REVISION`: `crates_v0.154.0`,
+`d47efe5`) and selects it with `[patch.crates-io]`. Local repairs are listed in
+[NOXCTURNAL.md](./NOXCTURNAL.md). The guide below is upstream Oxc's.
+
 We mostly model Oxc's transforms on [Babel](https://babeljs.io/)'s implementations.
 
 First iteration of a transform will usually be as straight a port from Babel as possible. We may then
