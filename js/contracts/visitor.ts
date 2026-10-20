@@ -38,7 +38,10 @@ export class NativeTransformError extends Error {
     readonly owners?: readonly string[],
     options?: { cause?: unknown; phase?: string; reason?: string },
   ) {
-    super(message);
+    const details = [...new Set(diagnostics.map(diagnostic => diagnostic.message.trim()))].filter(
+      detail => detail.length > 0 && detail !== message.trim(),
+    );
+    super(details.length === 0 ? message : `${message}\n\n${details.join('\n')}`);
     this.name = 'NativeTransformError';
     if (options && 'cause' in options) this.cause = options.cause;
     this.phase = options?.phase;
