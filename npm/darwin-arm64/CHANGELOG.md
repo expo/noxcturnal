@@ -1,5 +1,7 @@
 # @noxcturnal/noxcturnal-darwin-arm64
 
+## 0.1.6
+
 ## 0.1.5
 
 ### Patch Changes
