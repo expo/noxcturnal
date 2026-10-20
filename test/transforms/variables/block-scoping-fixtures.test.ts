@@ -1718,7 +1718,7 @@ export const fixtureCases = [
     title: 'general — jsx identifier (input)',
     source:
       '// #1683\n\nvar arr = [];\nfor(let i = 0; i < 4; ++i) {\n  arr.push(\n    <i></i>\n  );\n}\n',
-    filename: 'input.js',
+    filename: 'input.jsx',
     modes: [
       {
         title: 'default',

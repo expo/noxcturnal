@@ -107,7 +107,7 @@ test.each(['classic', 'automatic'] as const)(
       sourceType: 'script',
       plugins: [[jsx, { runtime: selected }]],
     })!.code!;
-    const code = compile(source, { jsx: selected }, 'input.cjs');
+    const code = compile(source, { jsx: selected }, 'input.cjs', { parser: 'jsx' });
     expect(observe(code)).toEqual(observe(reference));
     if (runtime === 'classic') expect(code).not.toContain('...props');
     else expect(code).toContain('...props');

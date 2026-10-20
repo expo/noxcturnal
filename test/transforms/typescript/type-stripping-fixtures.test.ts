@@ -1327,7 +1327,7 @@ export const fixtureCases = [
     title: 'imports — elide jsx pragma namespace no (input)',
     source:
       '/* @jsx jsx.htm */\n// Don\'t elide htm if a JSX element appears somewhere.\nimport * as jsx from "fake-jsx-package";\n<div></div>;\n',
-    filename: 'input.ts',
+    filename: 'input.tsx',
     modes: [
       {
         title: 'default',
@@ -1346,7 +1346,7 @@ export const fixtureCases = [
     title: 'imports — elide jsx pragma no (input)',
     source:
       '/* @jsx htm */\n// Don\'t elide htm if a JSX element appears somewhere.\nimport { htm } from "fake-jsx-package";\n<div></div>;\n',
-    filename: 'input.ts',
+    filename: 'input.tsx',
     modes: [
       {
         title: 'default',
@@ -1365,7 +1365,7 @@ export const fixtureCases = [
     title: 'imports — elide jsx pragmaFrag namespace no (input)',
     source:
       '/* @jsxFrag jsx.htm */\n// Don\'t elide htm if a JSX fragment appears somewhere.\nimport * as jsx from "fake-jsx-package";\n<></>;\n',
-    filename: 'input.ts',
+    filename: 'input.tsx',
     modes: [
       {
         title: 'default',
@@ -1384,7 +1384,7 @@ export const fixtureCases = [
     title: 'imports — elide jsx pragmaFrag no (input)',
     source:
       '/* @jsxFrag htm */\n// Don\'t elide htm if a JSX fragment appears somewhere.\nimport { htm } from "fake-jsx-package";\n<></>;\n',
-    filename: 'input.ts',
+    filename: 'input.tsx',
     modes: [
       {
         title: 'default',
@@ -1417,7 +1417,7 @@ export const fixtureCases = [
     title: 'imports — elide preact no 1 (input)',
     source:
       '// Don\'t elide Preact if a JSX element appears somewhere.\nimport { h, Fragment, render } from "preact";\n<div></div>;\n<></>;\n',
-    filename: 'input.ts',
+    filename: 'input.tsx',
     modes: [
       {
         title: 'default',
@@ -1433,7 +1433,7 @@ export const fixtureCases = [
     title: 'imports — elide preact no 2 (input)',
     source:
       '// Don\'t elide Preact if a JSX fragment appears somewhere.\nimport { Fragment, render } from "preact";\n<></>;\n',
-    filename: 'input.ts',
+    filename: 'input.tsx',
     modes: [
       {
         title: 'default',
@@ -1463,7 +1463,7 @@ export const fixtureCases = [
     title: 'imports — elide react no 1 (input)',
     source:
       '// Don\'t elide React if a JSX element appears somewhere.\nimport * as React from "react";\n<div></div>;\n',
-    filename: 'input.ts',
+    filename: 'input.tsx',
     modes: [
       {
         title: 'default',
@@ -1479,7 +1479,7 @@ export const fixtureCases = [
     title: 'imports — elide react no 2 (input)',
     source:
       '// Don\'t elide React if a JSX element appears somewhere.\nimport * as React from "react";\n<div/>;\n',
-    filename: 'input.ts',
+    filename: 'input.tsx',
     modes: [
       {
         title: 'default',
@@ -1495,7 +1495,7 @@ export const fixtureCases = [
     title: 'imports — elide react no 3 (input)',
     source:
       '// Don\'t elide React if a JSX fragment appears somewhere.\nimport * as React from "react";\n<></>;\n',
-    filename: 'input.ts',
+    filename: 'input.tsx',
     modes: [
       {
         title: 'default',
@@ -2585,7 +2585,7 @@ export const fixtureCases = [
   {
     title: 'type arguments — tsx (input)',
     source: '<C<number>></C>;\n<C<number>/>;\n',
-    filename: 'input.ts',
+    filename: 'input.tsx',
     modes: [
       {
         title: 'default',

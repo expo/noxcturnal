@@ -89,7 +89,9 @@ for (const automatic of [false, true]) {
     })!.code!;
     const expected = automatic ? 'final/jsx-runtime' : 'classic';
     expect(observeRuntime(reference)).toBe(expected);
-    const code = compile(source, { jsx: automatic ? 'classic' : 'automatic' }, 'input.cjs');
+    const code = compile(source, { jsx: automatic ? 'classic' : 'automatic' }, 'input.cjs', {
+      parser: 'jsx',
+    });
     expect(code).not.toContain('<div');
     expect(observeRuntime(code)).toBe(expected);
   });

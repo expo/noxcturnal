@@ -39,6 +39,41 @@ const pipeline = (
     ],
   });
 
+test('compiler JSX preservation keeps generic arrows in the TypeScript grammar across phases', () => {
+  const result = transform(
+    'export const identity = <T>(value: T) => value;',
+    'fixture.ts',
+    defineNativePipeline({
+      phases: [
+        { name: 'react-compiler', native: { reactCompiler: compiler(), jsx: 'preserve' } },
+        { name: 'jsx', native: { jsx: 'automatic' } },
+      ],
+    }),
+  );
+  assert.equal(result.status, 'complete');
+  assert.match(result.code, /identity = \(value\) => value/);
+});
+
+test.each([false, true])('preserves TSX across phases with React Compiler enabled=%s', enabled => {
+  const result = transform(
+    'export function Component(props: { text: string }) { return <View>{props.text}</View>; }',
+    'fixture.tsx',
+    defineNativePipeline({
+      phases: [
+        {
+          name: 'preserve',
+          native: { jsx: 'preserve', ...(enabled ? { reactCompiler: compiler() } : {}) },
+        },
+        { name: 'lower', native: { jsx: 'automatic' } },
+      ],
+    }),
+  );
+  assert.equal(result.status, 'complete');
+  assert.match(result.code, /react\/jsx-runtime/);
+  assert.doesNotMatch(result.code, /<View|props:\s*\{/);
+  if (enabled) assert.match(result.code, /react\/compiler-runtime/);
+});
+
 test.each([
   ['17', 'react-compiler-runtime'],
   ['18', 'react-compiler-runtime'],
