@@ -1,3 +1,4 @@
+import { resolve } from 'node:path';
 import { expect, test } from 'vitest';
 import { stripVTControlCharacters } from 'node:util';
 import { transformSync } from '@babel/core';
@@ -315,6 +316,82 @@ test('plugin locations trace through Flow erasure to the original annotations', 
     loc: { line: 2, column: source.split('\n')[1].indexOf('value') },
   });
   expect((failure as NativeTransformError).message).toContain('value: number');
+});
+
+test.each([
+  { filename: 'src/input.js', projectRoot: '/workspace/app' },
+  { filename: '../shared/input.js', projectRoot: '/workspace/app' },
+  { filename: '/shared/input.js', projectRoot: '/workspace/app' },
+  { filename: 'src/input.js', projectRoot: undefined },
+  { filename: 'src/input.js', projectRoot: 'apps/mobile' },
+])('resolves diagnostic filenames like Babel: %j', ({ filename, projectRoot }) => {
+  const source = 'const value = 1;';
+  let observedFilename: string | undefined;
+  const plugin = defineNativePlugin({
+    name: 'reject-relative',
+    pre(context) {
+      observedFilename = context.filename;
+    },
+    visitors: [
+      defineVisitor('Identifier', {}, path => {
+        throw path.buildCodeFrameError('Invalid value');
+      }),
+    ],
+  });
+  let failure: unknown;
+  let babelFailure: unknown;
+  try {
+    transform(
+      source,
+      filename,
+      defineNativePipeline({
+        phases: [{ name: 'reject-relative', plugins: [plugin] }],
+      }),
+      { projectRoot },
+    );
+  } catch (error) {
+    failure = error;
+  }
+  try {
+    transformSync(source, {
+      cwd: projectRoot,
+      filename,
+      configFile: false,
+      babelrc: false,
+      plugins: [
+        () => ({
+          visitor: {
+            Identifier(path: any) {
+              throw path.buildCodeFrameError('Invalid value');
+            },
+          },
+        }),
+      ],
+    });
+  } catch (error) {
+    babelFailure = error;
+  }
+  const absoluteFilename = resolve(projectRoot ?? process.cwd(), filename);
+  expect(failure).toBeInstanceOf(NativeTransformError);
+  expect(failure).toMatchObject({ filename: absoluteFilename });
+  expect((failure as Error).message).toContain(`${absoluteFilename}: Invalid value`);
+  expect((failure as Error).stack).toContain(`${absoluteFilename}: Invalid value`);
+  expect((babelFailure as Error).message).toContain(`${absoluteFilename}: Invalid value`);
+  expect(observedFilename).toBe(filename);
+});
+
+test('projectRoot resolves parser-error filenames too', () => {
+  let failure: unknown;
+  try {
+    transform('const = ;', 'src/input.js', defineNativePipeline({ phases: [] }), {
+      projectRoot: '/workspace/app',
+    });
+  } catch (error) {
+    failure = error;
+  }
+  expect(failure).toBeInstanceOf(SyntaxError);
+  expect(failure).toMatchObject({ filename: '/workspace/app/src/input.js' });
+  expect((failure as Error).message).toContain('/workspace/app/src/input.js:');
 });
 
 test.each([

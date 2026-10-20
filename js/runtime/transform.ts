@@ -1,3 +1,4 @@
+import { resolve } from 'node:path';
 import { classifyForTransform, parserFilename, sourceHints } from '../adapters/classification';
 import { selectParserAdapter } from '../adapters/registry';
 import { compilePhasePlan } from '../pipeline/compile';
@@ -424,7 +425,10 @@ export function transform(
         cleanupStates(prepared, 'error');
       } catch {}
       throw preparationComplete
-        ? transformFailure(error, []).setSourceContext(filename, originalSource)
+        ? transformFailure(error, []).setSourceContext(
+            resolve(options.projectRoot ?? process.cwd(), filename),
+            originalSource,
+          )
         : error;
     }
   }
@@ -952,7 +956,11 @@ export function transform(
       } satisfies NativeBailoutResult;
     }
     if (parseFailure != null)
-      throw syntaxError(parseFailure, filename, parseFailure.source ?? currentSource());
+      throw syntaxError(
+        parseFailure,
+        resolve(options.projectRoot ?? process.cwd(), filename),
+        parseFailure.source ?? currentSource(),
+      );
     const failure = transformFailure(error, diagnostics);
     if (failure.filename != null) throw failure;
     if (failure.reason === 'plugin-error' && failure.loc != null && pipelineSession != null)
@@ -962,6 +970,9 @@ export function transform(
       failure.loc =
         native.originalSourcePosition(adapterMap.mappings, failure.loc.line, failure.loc.column) ??
         undefined;
-    throw failure.setSourceContext(filename, originalSource);
+    throw failure.setSourceContext(
+      resolve(options.projectRoot ?? process.cwd(), filename),
+      originalSource,
+    );
   }
 }

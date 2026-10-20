@@ -242,6 +242,8 @@ export interface InspectRequest {
  */
 
 export interface TransformOptions {
+  /** Base directory for absolute diagnostic filenames. Defaults to process.cwd(). */
+  projectRoot?: string;
   /** Reserved declarative configuration for native preflight phases. */
   preflight?: PreflightPlan;
   sourceMapMode?: SourceMapMode;
