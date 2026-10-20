@@ -1,5 +1,13 @@
 # noxcturnal
 
+## 0.1.7
+
+### Patch Changes
+
+- Include filenames, source locations, and Babel-style code frames in native transform errors. Trace error locations through earlier transform phases so Metro can identify the input file and line.
+  Resolve diagnostic filenames against the new `projectRoot` transform option, defaulting to the current working directory, by [@kitten](https://github.com/kitten) (See [#60](https://github.com/expo/noxcturnal/pull/60))
+- Expose the original caller filename consistently to plugin hooks and visitors, preserving its extension and relative form when parser overrides or adapters select a different input dialect, by [@kitten](https://github.com/kitten) (See [#61](https://github.com/expo/noxcturnal/pull/61))
+
 ## 0.1.6
 
 ### Patch Changes
