@@ -218,7 +218,7 @@ describe('nested edit ownership', () => {
       }
       expect(caught).toBeInstanceOf(NativeTransformError);
       const error = caught as NativeTransformError;
-      expect(error.message).toMatch(/^overlapping edits at 0\.\.1 and 0\.\.1/);
+      expect(error.message).toContain('input.js: overlapping edits at 0..1 and 0..1');
       return error.owners;
     };
     expect(conflict(false)).toEqual(['first', 'second']);

@@ -712,7 +712,12 @@ export class NodePathImpl implements NativeNodePath {
         },
       ],
       undefined,
-      { cause, phase: this.runtime.context.phase },
+      {
+        cause,
+        phase: this.runtime.context.phase,
+        reason: 'plugin-error',
+        loc: this.getLocation().start,
+      },
     );
   }
   skip(): void {

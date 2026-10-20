@@ -30,22 +30,64 @@ import type {
 export class NativeTransformError extends Error {
   readonly code = 'NOXCTURNAL_TRANSFORM_ERROR' as const;
   readonly cause?: unknown;
+  readonly #summary: string;
+  readonly #details: string[];
+  filename?: string;
+  loc?: { line: number; column: number };
 
   constructor(
     message: string,
     readonly diagnostics: Diagnostic[],
     /** Owning plugin names of a conflict, structured for fallback telemetry. */
     readonly owners?: readonly string[],
-    options?: { cause?: unknown; phase?: string; reason?: string },
+    options?: {
+      cause?: unknown;
+      phase?: string;
+      reason?: string;
+      loc?: { line: number; column: number };
+    },
   ) {
     const details = [...new Set(diagnostics.map(diagnostic => diagnostic.message.trim()))].filter(
       detail => detail.length > 0 && detail !== message.trim(),
     );
     super(details.length === 0 ? message : `${message}\n\n${details.join('\n')}`);
     this.name = 'NativeTransformError';
+    this.#summary = message;
+    this.#details = details;
     if (options && 'cause' in options) this.cause = options.cause;
     this.phase = options?.phase;
     this.reason = options?.reason;
+    this.loc = options?.loc;
+  }
+
+  /** @internal Attach caller source information once, without replacing the thrown error. */
+  setSourceContext(filename: string, source: string): this {
+    if (this.filename != null) return this;
+    const previousMessage = this.message;
+    const previousStack = this.stack;
+    this.filename = filename;
+    const location = this.loc;
+    let frame: string | undefined;
+    if (location != null) {
+      const { codeFrameColumns } =
+        require('@babel/code-frame') as typeof import('@babel/code-frame');
+      frame = codeFrameColumns(
+        source,
+        {
+          start: { line: location.line, column: location.column + 1 },
+        },
+        { highlightCode: true },
+      );
+    }
+    const detail = this.#details.length === 0 ? this.#summary : this.#details.join('\n');
+    this.message = `${filename}: ${detail}${location == null ? '' : ` (${location.line}:${location.column})\n\n${frame}`}${this.#details.length === 0 ? '' : `\n\n${this.#summary}`}`;
+    if (previousStack != null) {
+      this.stack = previousStack.replace(
+        `${this.name}: ${previousMessage}`,
+        () => `${this.name}: ${this.message}`,
+      );
+    }
+    return this;
   }
 
   readonly phase?: string;
