@@ -1,3 +1,4 @@
+import { resolve } from 'node:path';
 import { classifyForTransform, parserFilename, sourceHints } from '../adapters/classification';
 import { selectParserAdapter } from '../adapters/registry';
 import { compilePhasePlan } from '../pipeline/compile';
@@ -126,7 +127,7 @@ export function assertNativePhaseCompleted(
         `Native phase ${phase} failed: ${reason}`,
         diagnostics,
         [phase],
-        { phase, reason },
+        { phase, reason, loc: result.errorLocation },
       );
     }
   }
@@ -423,7 +424,12 @@ export function transform(
       try {
         cleanupStates(prepared, 'error');
       } catch {}
-      throw preparationComplete ? transformFailure(error, []) : error;
+      throw preparationComplete
+        ? transformFailure(error, []).setSourceContext(
+            resolve(options.projectRoot ?? process.cwd(), filename),
+            originalSource,
+          )
+        : error;
     }
   }
   if (adapterMap != null && pipeline.phases.some(phase => phase.native?.reactCompiler != null)) {
@@ -950,7 +956,23 @@ export function transform(
       } satisfies NativeBailoutResult;
     }
     if (parseFailure != null)
-      throw syntaxError(parseFailure, filename, parseFailure.source ?? currentSource());
-    throw transformFailure(error, diagnostics);
+      throw syntaxError(
+        parseFailure,
+        resolve(options.projectRoot ?? process.cwd(), filename),
+        parseFailure.source ?? currentSource(),
+      );
+    const failure = transformFailure(error, diagnostics);
+    if (failure.filename != null) throw failure;
+    if (failure.reason === 'plugin-error' && failure.loc != null && pipelineSession != null)
+      failure.loc =
+        pipelineSession.originalPosition(failure.loc.line, failure.loc.column) ?? undefined;
+    if (failure.loc != null && adapterMap != null)
+      failure.loc =
+        native.originalSourcePosition(adapterMap.mappings, failure.loc.line, failure.loc.column) ??
+        undefined;
+    throw failure.setSourceContext(
+      resolve(options.projectRoot ?? process.cwd(), filename),
+      originalSource,
+    );
   }
 }

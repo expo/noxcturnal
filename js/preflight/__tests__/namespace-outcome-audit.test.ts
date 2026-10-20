@@ -27,7 +27,7 @@ beforeAll(() => {
     // Retain precise failure attribution if this regression returns.
     expect(failure).toBeInstanceOf(NativeTransformError);
     expect((failure as NativeTransformError).code).toBe('NOXCTURNAL_TRANSFORM_ERROR');
-    expect((failure as Error).message).toBe('Native phase typescript failed: transform-error');
+    expect((failure as Error).message).toContain('Native phase typescript failed: transform-error');
     expect(
       (failure as NativeTransformError).diagnostics.some(diagnostic =>
         diagnostic.message.includes('Namespaces exporting non-const are not supported by Oxc'),

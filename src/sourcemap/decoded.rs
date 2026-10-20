@@ -506,6 +506,32 @@ fn unpack_decoded_layer(
     ))
 }
 
+pub(crate) fn trace_position(
+    layers: &[Vec<u8>],
+    line: u32,
+    column: u32,
+) -> Result<Option<(u32, u32)>, DecodedMapError> {
+    let mut position = MappingPoint {
+        source: 0,
+        generated_column: column,
+        original_line: line,
+        original_column: column,
+        name: 0,
+        behavior: MappingBehavior::Boundary,
+    };
+    for layer in layers.iter().rev() {
+        let (map, _) = unpack_decoded_layer(layer, &mut MappingBudget::new())?;
+        let Some(traced) = trace_segment(&position, &map, &mut LineLookup::default(), false) else {
+            return Ok(None);
+        };
+        if traced.is_unmapped() {
+            return Ok(None);
+        }
+        position = traced;
+    }
+    Ok(Some((position.original_line, position.original_column)))
+}
+
 fn trace_segment(
     segment: &MappingPoint,
     inner: &DecodedMap,

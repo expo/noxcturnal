@@ -229,6 +229,12 @@ fn validate_generated_async_iterator_results<'a>(
 }
 
 #[napi(object)]
+pub struct NativeErrorLocation {
+    pub line: u32,
+    pub column: u32,
+}
+
+#[napi(object)]
 pub struct NativePreflightResult {
     pub status: String,
     pub changed: bool,
@@ -238,6 +244,7 @@ pub struct NativePreflightResult {
     pub code: Option<String>,
     pub map: Option<Buffer>,
     pub diagnostics: Vec<String>,
+    pub error_location: Option<NativeErrorLocation>,
     pub helpers_used: Vec<String>,
     pub function_map: Option<crate::sourcemap::function_map::FunctionMap>,
 }
@@ -683,6 +690,7 @@ fn transform_with_function_map(
                 code: Some(code),
                 map: Some(layer.pack().into()),
                 diagnostics: Vec::new(),
+                error_location: None,
                 helpers_used: Vec::new(),
             })
         });
@@ -1275,7 +1283,23 @@ fn transform_with_function_map(
             if transformed.diagnostics.iter().all(|diagnostic| diagnostic.message == "Namespaces exporting non-const are not supported by Oxc. Change to const or see: https://oxc.rs/docs/guide/usage/transformer/typescript.html#partial-namespace-support") {
                 return Ok(unsupported("mutable-namespace-export", transformed.diagnostics));
             }
-            return Ok(fatal("transform-error", transformed.diagnostics));
+            let mut failure = located_fatal("transform-error", transformed.diagnostics.into_vec(), source);
+            if let Some(location) = failure.error_location.take() {
+                let layers: Vec<_> = rewrite_layers.iter().map(DecodedLayer::pack).collect();
+                failure.error_location = crate::sourcemap::trace_position(
+                    &layers,
+                    location.line - 1,
+                    location.column,
+                )
+                .map_err(|error| {
+                    Error::new(
+                        Status::GenericFailure,
+                        format!("native error location tracing failed: {error:?}"),
+                    )
+                })?
+                .map(|(line, column)| NativeErrorLocation { line: line + 1, column });
+            }
+            return Ok(failure);
         }
         if transform_options.jsx.jsx_plugin && transformed.jsx_runtime == JsxRuntime::Classic {
             let (changed, jsx_helper_requests) = object_spread::run_jsx_props(
@@ -1685,6 +1709,7 @@ fn transform_with_function_map(
             code: Some(generated_code),
             map: Some(layer.into()),
             diagnostics: Vec::new(),
+            error_location: None,
             helpers_used,
         })
     })
@@ -2734,6 +2759,7 @@ fn unsupported(
         reason: Some(reason.into()),
         code: None,
         map: None,
+        error_location: None,
         diagnostics: diagnostics
             .into_iter()
             .map(|diagnostic| diagnostic.to_string())
@@ -2757,12 +2783,53 @@ fn fatal(
         reason: Some(reason.into()),
         code: None,
         map: None,
+        error_location: None,
         diagnostics: diagnostics
             .into_iter()
             .map(|diagnostic| diagnostic.to_string())
             .collect(),
         helpers_used: Vec::new(),
     }
+}
+
+fn located_fatal(
+    reason: &str,
+    diagnostics: Vec<oxc_diagnostics::OxcDiagnostic>,
+    source: &str,
+) -> NativePreflightResult {
+    let error_location = diagnostics.first().and_then(|diagnostic| {
+        let label = diagnostic
+            .labels
+            .iter()
+            .find(|label| label.primary())
+            .or_else(|| diagnostic.labels.first())?;
+        let offset = label.offset() as usize;
+        if offset > source.len() || !source.is_char_boundary(offset) {
+            return None;
+        }
+        let prefix = &source[..offset];
+        let mut line = 1;
+        let mut column = 0;
+        let mut chars = prefix.chars().peekable();
+        while let Some(character) = chars.next() {
+            if character == '\r' {
+                if chars.peek() == Some(&'\n') {
+                    chars.next();
+                }
+                line += 1;
+                column = 0;
+            } else if matches!(character, '\n' | '\u{2028}' | '\u{2029}') {
+                line += 1;
+                column = 0;
+            } else {
+                column += character.len_utf16() as u32;
+            }
+        }
+        Some(NativeErrorLocation { line, column })
+    });
+    let mut result = fatal(reason, diagnostics);
+    result.error_location = error_location;
+    result
 }
 
 fn identity_result(
@@ -2789,6 +2856,7 @@ fn identity_result(
         code: Some(source),
         map,
         diagnostics: Vec::new(),
+        error_location: None,
         helpers_used: Vec::new(),
     }
 }
@@ -2800,6 +2868,28 @@ mod tests {
         edit::{EditCommand, EditKind, MappingPolicy, build},
         sourcemap::{compose, compose_layer_chain, render},
     };
+
+    #[test]
+    fn fatal_locations_use_utf16_columns_and_javascript_line_breaks() {
+        let source = "first\r\n😀 value";
+        let start = source.find("value").unwrap() as u32;
+        let diagnostic = oxc_diagnostics::OxcDiagnostic::error("Invalid value")
+            .with_label(oxc_span::Span::new(start, start + 5));
+        let result = located_fatal("transform-error", vec![diagnostic], source);
+        let location = result.error_location.unwrap();
+        assert_eq!((location.line, location.column), (2, 3));
+        assert_eq!(result.diagnostics, ["Invalid value"]);
+    }
+
+    #[test]
+    fn unlabelled_fatal_diagnostics_have_no_location() {
+        let result = located_fatal(
+            "transform-error",
+            vec![oxc_diagnostics::OxcDiagnostic::error("Invalid value")],
+            "source",
+        );
+        assert!(result.error_location.is_none());
+    }
 
     #[test]
     fn failure_result_constructors_encode_disposition_without_artifacts() {

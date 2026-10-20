@@ -78,10 +78,16 @@ export interface NativePreflightResultOutput {
   /** Present only on the free-function path; the pipeline session keeps it resident. */
   map?: Buffer;
   diagnostics: string[];
+  errorLocation?: { line: number; column: number };
   helpersUsed: string[];
 }
 
 interface NativeBinding {
+  originalSourcePosition(
+    mappings: string,
+    line: number,
+    column: number,
+  ): { line: number; column: number } | null;
   NativeParsedSource: new (
     source: string,
     filename: string,
@@ -264,6 +270,7 @@ interface NativeBinding {
       codeChanged: boolean;
       mapChanged: boolean;
     };
+    originalPosition(line: number, column: number): { line: number; column: number } | null;
     sourceText(): string;
     finish(
       inputMappings?: string,

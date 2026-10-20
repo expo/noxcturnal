@@ -1,3 +1,4 @@
+import { resolve } from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { runInNewContext } from 'node:vm';
@@ -409,7 +410,7 @@ test.each(['ordinary Node', 'separate realm'] as const)(
     expect(caught).toBeInstanceOf(api.TransformSyntaxError);
     expect(caught).toMatchObject({
       code: 'TRANSFORM_SYNTAX_ERROR',
-      filename: 'input.ts',
+      filename: resolve('input.ts'),
       loc: { line: 1, column: 23 },
       codeFrame: expect.stringContaining(source),
       message: expect.stringContaining('input.ts'),
