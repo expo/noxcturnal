@@ -95,6 +95,7 @@ export class NativeTransformError extends Error {
 }
 
 export interface PrepareContext {
+  /** Original caller filename, preserving its extension and relative form. */
   readonly filename: string;
   readonly options: TransformOptions;
   readonly parser: ReturnType<typeof native.classify>;
@@ -128,6 +129,7 @@ export interface NativeBinding {
 }
 
 export interface PluginContext {
+  /** Original caller filename, preserving its extension and relative form. */
   readonly filename: string;
   readonly phase: string;
   readonly pluginData: unknown;

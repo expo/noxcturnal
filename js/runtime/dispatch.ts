@@ -69,6 +69,7 @@ interface Dispatcher {
 
 export function createDispatcher(
   session: NativeTransformSession,
+  filename: string,
   phase: PipelinePhase,
   activePlugins: readonly NativePlugin<any, any>[],
   plans: ReadonlyMap<NativePlugin<any, any>, PreparedPluginPlan>,
@@ -273,7 +274,7 @@ export function createDispatcher(
       code: Code,
     ): void => pushRealizedProgramInsertion(kind, offset, realizeIntentContent(code));
     const context: PluginContext = {
-      filename: session.filename,
+      filename,
       phase: phase.name,
       pluginData,
       source: session.source,

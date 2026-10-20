@@ -774,6 +774,7 @@ export function transform(
       if (batch.includeParent) session.seedSummaries(batch.parentSummaries);
       const dispatch = createDispatcher(
         session,
+        filename,
         phase,
         activePlugins,
         plans,
