@@ -19,6 +19,9 @@ snapshot workflow when an intentional output change requires snapshot updates.
 - `integration/` tests the packaged public surface and fitment claims. Put export, package-loading,
   pipeline-composition, and advertised-capability coverage here.
 
+`fixtures/flow-parser-update/` is the shared Hermes parser-update matrix. Alignment and public Flow
+tests both read it. Its README is the coverage record for that pin.
+
 A structural alignment test, an executed semantic test, a focused regression, and a packaging test
 can reasonably start from similar source. That overlap is intentional when each copy observes a
 different contract. Similar subject matter or source text alone is not evidence that one is
@@ -38,9 +41,10 @@ runtime semantic contract, bailout boundary, source-map contract, helper ABI/out
 or public-surface assertion merely to reduce test count. Record the surviving test in the review or
 change description when deleting coverage.
 
-`pnpm test:duplicates` runs the exact-duplicate inventory as part of `pnpm check`; it is a
-classification aid, not permission to collapse suite layers. `duplicate-allowlist.json` is reviewed
-code: every allowed duplicate must state why the copies are intentional and name the distinct
-observable contract protected by each one. New exact duplicates must either be removed or added to
-that allowlist with the same evidence; renaming or formatting a case does not make duplicate
-execution distinct.
+Implementation constraints for a transform live in the feature README beside the code
+([`js/README.md`](../js/README.md), [`src/README.md`](../src/README.md)). A test records an
+observable contract. It does not replace that note.
+
+`pnpm check` does not read `duplicate-allowlist.json` or `fallback-reason-allowlist.json`. The
+duplicate file is an empty list. The fallback file records Expo Metro reasons whose tests live in
+the Expo repository. Updating either file has no effect on this suite.

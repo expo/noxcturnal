@@ -244,7 +244,10 @@ export interface InspectRequest {
 export interface TransformOptions {
   /** Base directory for absolute diagnostic filenames. Defaults to process.cwd(). */
   projectRoot?: string;
-  /** Reserved declarative configuration for native preflight phases. */
+  /**
+   * Declared, and not applied by `transform`. The pipeline cache key still
+   * serializes it. Native configuration belongs on `PipelinePhase.native`.
+   */
   preflight?: PreflightPlan;
   sourceMapMode?: SourceMapMode;
   parser?: 'auto' | 'js' | 'jsx' | 'ts' | 'tsx' | 'dts';

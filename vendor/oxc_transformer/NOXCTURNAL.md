@@ -1,11 +1,18 @@
-Vendored from crates.io oxc_transformer 0.141.0. Original MIT license retained.
-Noxcturnal patches the pinned transformer to repair constructor initialization, exponentiation assignment, logical assignment, optional chaining, legacy decorator lowering, async lowering, TypeScript import and enum preservation, resource-management scope and module ordering, and Compiler/Refresh integration.
+Read this when a transform in this tree behaves differently from upstream Oxc.
+The bullets name the file that holds each repair. Open that file and confirm the
+repair is still there before you edit it or treat the bullet as a diff.
 
-Original crates.io archive SHA-256: `3481b17ea50d4866901de759f736aa2c63bfca1fb6a20a67faa423f5361429e9`.
+Vendored Oxc transformer, pinned at 0.154.0 and selected by `[patch.crates-io]`.
+`UPSTREAM_REVISION` records `oxc-project/oxc` tag `crates_v0.154.0` (`d47efe5`).
+Original MIT license retained.
 
-Provenance: upstream commit `14533a3dc118bea73e755426aaf35f71dbe81eb8`,
-`crates/oxc_transformer`. LICENSE was retrieved from that commit's repository root
-because the published crate archive omits the license file.
+Noxcturnal patches this tree to repair constructor initialization, exponentiation assignment, logical assignment, optional chaining, legacy decorator lowering, async lowering, TypeScript import and enum preservation, resource-management scope and module ordering, and Compiler/Refresh integration.
+
+The repair list below was first written against crates.io 0.141.0
+(archive SHA-256 `3481b17ea50d4866901de759f736aa2c63bfca1fb6a20a67faa423f5361429e9`,
+upstream commit `14533a3dc118bea73e755426aaf35f71dbe81eb8`). `aab6d77` moved the
+tree to 0.154.0. LICENSE for that original drop was taken from the
+0.141 commit's repository root because the published crate archive omits it.
 
 Local patches:
 
