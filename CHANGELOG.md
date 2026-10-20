@@ -1,5 +1,11 @@
 # noxcturnal
 
+## 0.1.6
+
+### Patch Changes
+
+- Differentiate output and input `jsx` settings, forcing `.ts` to not enable input JSX grammar, which would otherwise interpret it as `.tsx`, by [@kitten](https://github.com/kitten) (See [#58](https://github.com/expo/noxcturnal/pull/58))
+
 ## 0.1.5
 
 ### Patch Changes
