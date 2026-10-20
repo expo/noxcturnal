@@ -451,42 +451,45 @@ mod tests {
 
     #[test]
     fn tsx_resident_dialect_tracks_typescript_and_jsx_independently() {
-        let mut session = NativePipelineSession::new(
+        for jsx in [None, Some("preserve".into())] {
+            let mut session = NativePipelineSession::new(
             "fixture.tsx".into(),
             "type Props = { value?: number }; const View = ({ value = 1 }: Props) => <div>{value}</div>;"
                 .into(),
         );
-        let results = session
-            .run_native_phases(vec![
-                NativePreflightOptions {
-                    typescript: Some("strip".into()),
-                    ..NativePreflightOptions::default()
-                },
-                NativePreflightOptions {
-                    parameters: Some(true),
-                    ..NativePreflightOptions::default()
-                },
-                NativePreflightOptions {
-                    jsx: Some("automatic".into()),
-                    ..NativePreflightOptions::default()
-                },
-                NativePreflightOptions {
-                    regexp_look_behind: Some(true),
-                    ..NativePreflightOptions::default()
-                },
-            ])
-            .unwrap();
-        assert!(results.iter().all(|result| result.status == "complete"));
-        assert!(results[0].normalized_javascript && results[0].jsx);
-        assert!(results[1].normalized_javascript && results[1].jsx);
-        assert!(results[2].normalized_javascript && !results[2].jsx);
-        assert!(results[3].normalized_javascript && !results[3].jsx);
-        assert!(session.normalized_javascript);
-        assert_eq!(session.resident_jsx, Some(false));
-        let code = session.current.as_deref().unwrap();
-        assert!(!code.contains("type Props"));
-        assert!(!code.contains("<div>"));
-        assert!(code.contains("react/jsx-runtime"));
+            let results = session
+                .run_native_phases(vec![
+                    NativePreflightOptions {
+                        typescript: Some("strip".into()),
+                        jsx,
+                        ..NativePreflightOptions::default()
+                    },
+                    NativePreflightOptions {
+                        parameters: Some(true),
+                        ..NativePreflightOptions::default()
+                    },
+                    NativePreflightOptions {
+                        jsx: Some("automatic".into()),
+                        ..NativePreflightOptions::default()
+                    },
+                    NativePreflightOptions {
+                        regexp_look_behind: Some(true),
+                        ..NativePreflightOptions::default()
+                    },
+                ])
+                .unwrap();
+            assert!(results.iter().all(|result| result.status == "complete"));
+            assert!(results[0].normalized_javascript && results[0].jsx);
+            assert!(results[1].normalized_javascript && results[1].jsx);
+            assert!(results[2].normalized_javascript && !results[2].jsx);
+            assert!(results[3].normalized_javascript && !results[3].jsx);
+            assert!(session.normalized_javascript);
+            assert_eq!(session.resident_jsx, Some(false));
+            let code = session.current.as_deref().unwrap();
+            assert!(!code.contains("type Props"));
+            assert!(!code.contains("<div>"));
+            assert!(code.contains("react/jsx-runtime"));
+        }
     }
 
     #[test]

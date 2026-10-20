@@ -2591,7 +2591,7 @@ export const fixtureCases = [
     title: 'regression — 2775 (input)',
     source:
       "import React, {Component} from 'react';\n\nexport default class RandomComponent extends Component {\n  constructor(){\n    super();\n  }\n\n  render() {\n    return (\n      <div className='sui-RandomComponent'>\n        <h2>Hi there!</h2>\n      </div>\n    );\n  }\n}\n",
-    filename: 'input.mjs',
+    filename: 'input.jsx',
     modes: [
       {
         title: 'default',

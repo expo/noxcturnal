@@ -18,6 +18,39 @@ const nativePipeline = (filename: string, options: PreflightPlan) => ({
   }),
 });
 
+test.each(['preserve', 'classic', 'automatic', 'automatic-if-present'] as const)(
+  'JSX %s keeps the TypeScript input grammar',
+  jsx => {
+    const source = 'export const identity = <T>(value: T) => value;';
+    const result = transform(source, 'fixture.ts', nativePipeline('fixture.ts', { jsx }).pipeline);
+    assert.equal(result.status, 'complete');
+    if (jsx === 'automatic-if-present') assert.equal(result.code, source);
+    else assert.match(result.code, /identity = \(value\) => value/);
+  },
+);
+
+test.each(['js', 'ts'] as const)('JSX preservation respects explicit %s grammar', parser => {
+  assert.throws(() =>
+    transform(
+      'const view = <Widget />;',
+      'fixture.tsx',
+      nativePipeline('fixture.tsx', { jsx: 'preserve' }).pipeline,
+      { parser },
+    ),
+  );
+});
+
+test('JSX lowering respects explicit JSX grammar for JavaScript files', () => {
+  const result = transform(
+    'const view = <Widget />;',
+    'fixture.js',
+    nativePipeline('fixture.js', { jsx: 'automatic' }).pipeline,
+    { parser: 'jsx' },
+  );
+  assert.equal(result.status, 'complete');
+  assert.match(result.code, /react\/jsx-runtime/);
+});
+
 test('erases TypeScript syntax and preserves runtime constructs', () => {
   const source = [
     'enum Direction { Up, Down = 4 }',

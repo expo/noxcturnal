@@ -1,11 +1,16 @@
 import { expect } from 'vitest';
 
-import type { PreflightPlan } from '../../js';
+import type { PreflightPlan, TransformOptions } from '../../js';
 import { defineNativePipeline, transform } from '../../js';
 
 type RuntimeBindings = Record<string, unknown>;
 
-export function compile(source: string, plan: PreflightPlan, filename = 'input.js'): string {
+export function compile(
+  source: string,
+  plan: PreflightPlan,
+  filename = 'input.js',
+  options?: TransformOptions,
+): string {
   const result = transform(
     source,
     filename,
@@ -17,6 +22,7 @@ export function compile(source: string, plan: PreflightPlan, filename = 'input.j
         },
       ],
     }),
+    options,
   );
   expect(result.status, JSON.stringify(result)).toBe('complete');
   if (result.status !== 'complete') throw new Error(result.reason);

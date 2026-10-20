@@ -841,7 +841,7 @@ export const fixtureCases = [
     title: 'regression — 7178 (input)',
     source:
       'const title = "Neem contact op";\n\nasync function action() {\n  return <Contact title={title} />;\n}\n',
-    filename: 'input.js',
+    filename: 'input.jsx',
     modes: [
       {
         title: 'default',
