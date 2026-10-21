@@ -8,7 +8,7 @@ The native passes those comparisons exercise are described in
 [`crates/hermes-flow`](../../crates/hermes-flow) plus [`src/flow.rs`](../../src/flow.rs).
 
 The canonical versions are pinned in the root `package.json`. The inventory test
-records the `babel-preset-expo` version and Expo commit used for the review, and
+records the `babel-preset-expo` version used for the review, and
 resolves the shipped Hermes, web, WebView, and React configs so plugin-list drift
 must be classified explicitly.
 
